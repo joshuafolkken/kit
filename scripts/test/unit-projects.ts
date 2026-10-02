@@ -1,14 +1,14 @@
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
-import { PILOT_FILES } from './pilot-files'
+import { PURE_FILES } from './pure-files'
 import { VITEST_INCLUDE_GLOBS } from './vitest-include-globs'
 
 // The unit suite runs as two Vitest projects so the isolation-safe files can skip per-file worker
 // isolation, which re-evaluates every shared module once per file (joshuafolkken/kit#2170). Measured
-// back to back on the pilot set, isolate:false ran it in 27.5s against 64.7s isolated — a 57% cut,
+// back to back on the pure set, isolate:false ran it in 27.5s against 64.7s isolated — a 57% cut,
 // because module evaluation is about half of a run's wall clock.
 //
 // **The two projects partition the suite exactly.** `pure` runs the classifier's isolation-free set;
-// `isolated` runs everything else the main globs match, excluding the pilot files so no file lands in
+// `isolated` runs everything else the main globs match, excluding the pure files so no file lands in
 // both. Their union is every included file bar the packed-consumer smoke test, and nothing runs
 // twice — which is what keeps the gate's green condition identical to the single-project suite it
 // replaces. `classify-isolation.ts` lists a file as pure only when it mutates no state a sibling in
@@ -112,7 +112,7 @@ function unit_project(spec: UnitProjectSpec): UnitProject {
 const UNIT_PROJECTS: ReadonlyArray<UnitProject> = [
 	unit_project({
 		name: PURE_PROJECT,
-		include: PILOT_FILES,
+		include: PURE_FILES,
 		isolate: false,
 		globalSetup: STATE_GUARD,
 	}),
@@ -120,7 +120,7 @@ const UNIT_PROJECTS: ReadonlyArray<UnitProject> = [
 		name: ISOLATED_PROJECT,
 		include: VITEST_INCLUDE_GLOBS,
 		isolate: true,
-		exclude: [...MAIN_EXCLUDE, ...PILOT_FILES],
+		exclude: [...MAIN_EXCLUDE, ...PURE_FILES],
 	}),
 ]
 

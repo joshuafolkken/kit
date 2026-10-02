@@ -10,7 +10,7 @@ const GIT_COMMAND_UNIX = '/usr/bin/git'
 // modules (joshuafolkken/kit#1640) and a copy in each is a second answer to one question.
 const PORCELAIN_FLAG = '--porcelain'
 // The untracked-files mode every porcelain status reading passes (`git-command.ts` carries why it is
-// passed and why it is `all`), shared so `run-carry-flush.ts`'s own reading cannot drift from it.
+// passed and why it is `all`), shared so another module's own reading cannot drift from it.
 const UNTRACKED_FILES_FLAG = '--untracked-files=all'
 
 function get_git_command(): string {

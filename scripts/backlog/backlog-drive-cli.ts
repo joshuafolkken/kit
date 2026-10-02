@@ -1,13 +1,14 @@
 #!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
 import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
 import { lane_registry } from '#scripts/lane/lane-registry'
+import { cli_flags } from '#scripts/lib/cli-flags'
+import { error_text } from '#scripts/lib/error-message'
 import { run_carry, type RunCarry } from '#scripts/run/run-carry'
 import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
 import { run_merge_cli } from '#scripts/run/run-merge-cli'
@@ -49,7 +50,7 @@ const LIST_SEPARATOR = ','
 const COUNT_PATTERN = /^\d+$/u
 const ISSUE_PATTERN = /^[1-9]\d*$/u
 const USAGE =
-	'Usage: josh backlog:drive --owner <pid> [--active <ISO-8601>] [--max <n>] [--idle <minutes>] [--only] [--exclude <n>[,<n>...]] [--await <n>[,<n>...]] [--window <minutes>]'
+	'Usage: josh backlog:drive --owner <pid> [--active <ISO-8601>] [--max <n>] [--idle <minutes>] [--only] [--exclude <n>[,<n>...]] [--await <n>[,<n>...]] [--window <minutes>] [--stopped <n>]'
 
 const OPTIONS = {
 	active: { type: 'string' },
@@ -59,6 +60,7 @@ const OPTIONS = {
 	max: { type: 'string' },
 	only: { type: 'boolean' },
 	owner: { type: 'string' },
+	stopped: { type: 'string' },
 	window: { type: 'string' },
 } as const
 
@@ -72,16 +74,14 @@ interface DriveContext {
 	window_ms: number | undefined
 	window: string | undefined
 	is_only: boolean
+	// The child whose merge answered `stop` before the hand-back: the resumed run starts already stopping.
+	stopped: string | undefined
 }
 
 type Values = Partial<Record<Exclude<keyof typeof OPTIONS, 'only'>, string>> & { only?: boolean }
 
 function read_values(argv: ReadonlyArray<string>): Values | undefined {
-	try {
-		return parseArgs({ args: [...argv], options: OPTIONS, strict: true }).values
-	} catch {
-		return undefined
-	}
+	return cli_flags.parse_or_undefined({ args: [...argv], options: OPTIONS, strict: true })?.values
 }
 
 // A comma list of issue numbers; one entry that is not an issue number refuses the whole list.
@@ -110,6 +110,12 @@ function is_valid_window(raw: string | undefined): boolean {
 	return raw === undefined || COUNT_PATTERN.test(raw)
 }
 
+function is_valid_single(values: Values): boolean {
+	const is_valid_stopped = values.stopped === undefined || ISSUE_PATTERN.test(values.stopped)
+
+	return is_valid_stopped && is_valid_window(values.window)
+}
+
 function owner_of(values: Values | undefined): string | undefined {
 	const owner = values?.owner
 
@@ -117,7 +123,7 @@ function owner_of(values: Values | undefined): string | undefined {
 }
 
 function to_context(values: Values, owner: string): DriveContext | undefined {
-	if (!is_valid_window(values.window)) return undefined
+	if (!is_valid_single(values)) return undefined
 
 	const forwarded = forwarded_of(values)
 	const exclude = to_issues(values.exclude)
@@ -136,6 +142,7 @@ function to_context(values: Values, owner: string): DriveContext | undefined {
 		window_ms,
 		window: values.window,
 		is_only: values.only === true,
+		stopped: values.stopped,
 	}
 }
 
@@ -274,6 +281,7 @@ function resume_line(state: DriveState, context: DriveContext): string {
 
 	if (exclude.length > 0) flags.push('--exclude', exclude.join(LIST_SEPARATOR))
 	if (context.window !== undefined) flags.push('--window', context.window)
+	if (state.stopped_by !== undefined) flags.push('--stopped', state.stopped_by)
 
 	return `resume: ${flags.join(' ')}`
 }
@@ -325,7 +333,9 @@ async function drive(context: DriveContext): Promise<number> {
 	const seeded = await seeded_lanes(context)
 
 	if (seeded === undefined) return FAILURE_EXIT_CODE
-	const initial = backlog_drive.initial_state(seeded, context.active ?? new Date().toISOString())
+	const fresh = backlog_drive.initial_state(seeded, context.active ?? new Date().toISOString())
+	const initial =
+		context.stopped === undefined ? fresh : backlog_drive.merge_stopped(context.stopped, fresh)
 	const last = { state: { ...initial, exclude: [...context.exclude] } }
 	const config = { poll_ms: POLL_MS, offer_ms: OFFER_MS, window_ms: context.window_ms }
 	const end = await backlog_drive.run_loop(last.state, config, ports_of(context, seeded, last))
@@ -340,7 +350,7 @@ async function run_safe(context: DriveContext): Promise<number> {
 	try {
 		return await drive(context)
 	} catch (error) {
-		console.info(`error ${error instanceof Error ? error.message : String(error)}`)
+		console.info(`error ${error_text.message_of(error)}`)
 
 		return FAILURE_EXIT_CODE
 	}

@@ -1,5 +1,6 @@
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import type { UsageRecord } from '#scripts/cost-runtime/cost-usage'
+import { git_branch } from '#scripts/git/git-branch'
 
 // Classifying a run's transcripts into role-tagged tree nodes (joshuafolkken/kit#1937).
 //
@@ -51,19 +52,9 @@ interface RunNode {
 	is_readable: boolean
 }
 
-const LEADING_ISSUE = /^(\d+)-/u
-
-// The issue a branch names, or `undefined` when it does not lead with one — `1937-lane` and
-// `1937-add-a-scope` both read 1937, while `main` reads nothing.
-function issue_from_branch(branch: string): number | undefined {
-	const match = LEADING_ISSUE.exec(branch)
-
-	return match?.[1] === undefined ? undefined : Number(match[1])
-}
-
 function branch_issue(records: ReadonlyArray<UsageRecord>): number | undefined {
 	for (const record of records) {
-		const issue = issue_from_branch(record.branch)
+		const issue = git_branch.issue_from_branch(record.branch)
 
 		if (issue !== undefined) return issue
 	}
@@ -197,7 +188,7 @@ function build_nodes(files: ReadonlyArray<SessionFile>, context: NodeContext): A
 }
 
 const cost_run_nodes = {
-	issue_from_branch,
+	issue_from_branch: git_branch.issue_from_branch,
 	branch_issue,
 	started_ms,
 	split_files,

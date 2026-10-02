@@ -14,7 +14,7 @@ import { sonarjs_rules } from './rules/sonarjs.js'
 // 453 physical lines. Three files were split on this limit in one session, each time by an author
 // who could not predict where the tool would object.
 //
-// The second drift is the numbers themselves. Three distributed documents restate the limits, and
+// The second drift is the numbers themselves. Three distributed documents restated the limits, and
 // two of them had the same three wrong — complexity ≤4, nesting ≤1, params ≤3 — so a reader
 // following either flagged code the gate accepts, while `max-statements` and
 // `sonarjs/cognitive-complexity` were enforced without appearing in any of them.
@@ -29,7 +29,6 @@ import { sonarjs_rules } from './rules/sonarjs.js'
 
 const REVIEW_RUBRIC = 'prompts/review-rubric.md'
 const REFACTORING_PROMPT = 'prompts/refactoring.md'
-const CODING_STANDARDS = 'prompts/coding-standards.md'
 
 const COGNITIVE_COMPLEXITY = 'sonarjs/cognitive-complexity'
 const MAX_LINES = 'max-lines'
@@ -66,8 +65,9 @@ type RuleSet = Readonly<Record<string, unknown>>
 
 // One document's restatement of the limits: where the block starts, how it words each rule, and how
 // it words the tests-block exception. The phrasings are written out rather than generated — a suite
-// that generated them would pass against a document nobody can read — and they differ per document
-// because two of the three are in Japanese.
+// that generated them would pass against a document nobody can read. `prompts/coding-standards.md`
+// was the third, Japanese restatement until joshuafolkken/kit#2890 replaced it with a pointer to
+// `CLAUDE.md`, so no document is left for a second phrasing to pin.
 interface DocumentSpec {
 	path: string
 	marker: string
@@ -85,16 +85,6 @@ const ENGLISH_PHRASES: Readonly<Record<string, string>> = {
 	[COGNITIVE_COMPLEXITY]: `cognitive complexity ≤${PLACEHOLDER}`,
 }
 
-const JAPANESE_PHRASES: Readonly<Record<string, string>> = {
-	complexity: `関数の複雑度**: 最大${PLACEHOLDER}`,
-	'max-depth': `ネストレベル**: 最大${PLACEHOLDER}`,
-	[MAX_LINES_PER_FUNCTION]: `関数の行数**: 最大${PLACEHOLDER}行`,
-	[MAX_LINES]: `ファイルの行数**: 最大${PLACEHOLDER}行`,
-	'max-params': `パラメータ数**: 最大${PLACEHOLDER}個`,
-	'max-statements': `関数内の文の数**: 最大${PLACEHOLDER}`,
-	[COGNITIVE_COMPLEXITY]: `認知的複雑度**: 最大${PLACEHOLDER}`,
-}
-
 const ENGLISH_OVERRIDE = `${String(TEST_LINES_PER_FUNCTION)} code lines`
 
 const DOCUMENT_SPECS: ReadonlyArray<DocumentSpec> = [
@@ -109,12 +99,6 @@ const DOCUMENT_SPECS: ReadonlyArray<DocumentSpec> = [
 		marker: '**Quality limits**:',
 		phrases: ENGLISH_PHRASES,
 		test_override: ENGLISH_OVERRIDE,
-	},
-	{
-		path: CODING_STANDARDS,
-		marker: '### 複雑度制限',
-		phrases: JAPANESE_PHRASES,
-		test_override: `テストファイルは${String(TEST_LINES_PER_FUNCTION)}行`,
 	},
 ]
 

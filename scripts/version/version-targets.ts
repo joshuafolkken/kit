@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { file_reader } from '#scripts/lib/read-file'
 import { package_version_schema, pnpm_ls_global_schema } from '#scripts/lib/schemas'
 import { execaSync } from 'execa'
 import { safe_json_parse } from './parse-json'
@@ -42,7 +42,7 @@ function project_package_path(cwd: string, package_name: string): string {
 
 function read_project_version(cwd: string, package_name: string): string | undefined {
 	const package_path = project_package_path(cwd, package_name)
-	const raw = existsSync(package_path) ? readFileSync(package_path, 'utf8') : undefined
+	const raw = file_reader.read_optional(package_path)
 
 	return parse_project_version(raw)
 }
@@ -52,7 +52,7 @@ function read_project_version(cwd: string, package_name: string): string | undef
 // package version under node_modules.
 function read_workspace_version(cwd: string): string | undefined {
 	const package_path = path.join(cwd, PACKAGE_JSON)
-	const raw = existsSync(package_path) ? readFileSync(package_path, 'utf8') : undefined
+	const raw = file_reader.read_optional(package_path)
 
 	return parse_project_version(raw)
 }

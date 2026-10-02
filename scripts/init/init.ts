@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_local_bin } from '#scripts/build/local-bin'
 import { doctor_io } from '#scripts/doctor/doctor-io'
+import { error_text } from '#scripts/lib/error-message'
 import { package_version_schema, with_package_manager_schema } from '#scripts/lib/schemas'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
 import { project_config } from '#scripts/safe-chain/project-config'
@@ -45,8 +46,11 @@ function show_sample(action: FileAction): void {
 	console.info(action.create().replaceAll(/^/gmu, () => SAMPLE_INDENT))
 }
 
-function report_unchanged(action: FileAction): void {
-	if (action.should_show_sample_when_unchanged === true) show_sample(action)
+// A file that already holds the sample needs nothing added, so only one that differs gets it shown.
+function report_unchanged(action: FileAction, existing: string): void {
+	const is_sample_missing = existing !== action.create()
+
+	if (is_sample_missing && action.should_show_sample_when_unchanged === true) show_sample(action)
 	else console.info(`  ✔ unchanged ${action.dest}`)
 }
 
@@ -59,7 +63,7 @@ function merge_existing_file(
 	const merged = merge_function(existing)
 
 	if (merged === existing) {
-		report_unchanged(action)
+		report_unchanged(action, existing)
 
 		return
 	}
@@ -375,7 +379,7 @@ function run_cli(args: ReadonlyArray<string>): void {
 	try {
 		if (main(args)) print_start_hint()
 	} catch (error) {
-		console.error(`\n✖ ${error instanceof Error ? error.message : String(error)}\n`)
+		console.error(`\n✖ ${error_text.message_of(error)}\n`)
 		process.exitCode = 1
 	}
 }

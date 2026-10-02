@@ -17,9 +17,9 @@ import { run_tail, type TailSection } from './run-tail'
 //
 // **A dispatched lane child skips the ledger step** (joshuafolkken/kit#2492). A flush opens a
 // ledger-only pull request and waits out its whole CI before it merges — minutes per issue, spent on a
-// file only the retrospective and the measurements read. The line stays appended in the primary
-// checkout, and the `backlogrun` parent flushes once at its end (`run:carry --end`, `run-carry-flush.ts`).
-// A single run outside a lane keeps the step: its one end is already the run's end.
+// file only the retrospective and the measurements read — and a lane has nothing for it: its lines
+// merged with its own pull request (joshuafolkken/kit#2919). A single run outside a lane keeps the
+// step for a line written on the default branch outside any issue's run.
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0

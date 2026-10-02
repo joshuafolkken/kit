@@ -1,9 +1,9 @@
 // The review-finding line's grammar, its category vocabulary and the aggregation over it — the single
 // place all three are defined (joshuafolkken/kit#2325). A `/code-review` round's findings evaporated
 // the moment they were fixed, so no one could say which category recurred. They now land in the same
-// append-only ledger the observation lines use (`docs/maintainers/observations.md`), under a distinct `- rf:`
-// prefix so `observation-ledger-line.ts`'s `- k:` grammar never treats them as its own — one ledger
-// file, one flush path, a second line *type* rather than a second ledger.
+// append-only ledger the observation lines use (`docs/maintainers/observations/`), under a distinct `- rf:`
+// prefix so `observation-ledger-line.ts`'s `- k:` grammar never treats them as its own — one ledger,
+// one commit path, a second line *type* rather than a second ledger.
 
 const FINDING_PREFIX = '- rf:'
 const FIELD_SEPARATOR = ' | '

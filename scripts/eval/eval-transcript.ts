@@ -1,4 +1,5 @@
 import { claude_result_event } from '#scripts/agent/claude-result-event'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
 // `claude -p --output-format stream-json --verbose` writes one JSON object per line. Only the
@@ -36,21 +37,11 @@ function tool_calls_in_content(content: ReadonlyArray<unknown>): ReadonlyArray<T
 
 // A malformed line is skipped rather than thrown on: the stream carries progress lines that are not
 // events, and a run that produced a hundred good calls should not be unreadable because of one.
-// One line of the stream as a value, or `undefined` when it is blank or not JSON. Three readers ask
-// different questions of the same lines, and a `try` around each is three chances for them to
-// disagree about what an unreadable line means (joshuafolkken/kit#1001).
-function parse_line(line: string): unknown {
-	if (line.trim() === '') return undefined
-
-	try {
-		return JSON.parse(line)
-	} catch {
-		return undefined
-	}
-}
-
+// Three readers ask different questions of the same lines, and a `try` around each is three chances
+// for them to disagree about what an unreadable line means (joshuafolkken/kit#1001), so all three
+// read a line through `json_value.parse_or_undefined` — blank or not JSON is `undefined`.
 function tool_calls_in_line(line: string): ReadonlyArray<ToolCall> {
-	const parsed = STREAM_EVENT_SCHEMA.safeParse(parse_line(line))
+	const parsed = STREAM_EVENT_SCHEMA.safeParse(json_value.parse_or_undefined(line))
 
 	if (!parsed.success) return []
 
@@ -67,7 +58,7 @@ const INIT_EVENT_SCHEMA = z.looseObject({ type: z.literal('system'), subtype: z.
 function has_started(transcript: string): boolean {
 	return transcript
 		.split('\n')
-		.some((line) => INIT_EVENT_SCHEMA.safeParse(parse_line(line)).success)
+		.some((line) => INIT_EVENT_SCHEMA.safeParse(json_value.parse_or_undefined(line)).success)
 }
 
 // The stream's own account of why it stopped, for the case stderr is silent — which is every one
@@ -81,7 +72,7 @@ function has_started(transcript: string): boolean {
 // value in *one* of them fails the whole parse and discards the others — which is how a perfectly
 // good reason was lost beside a `result` that was not a string (joshuafolkken/kit#1001).
 function error_in_line(line: string): string | undefined {
-	const result = claude_result_event.decode(parse_line(line))
+	const result = claude_result_event.decode(json_value.parse_or_undefined(line))
 
 	return result?.is_error === true ? result.reason : undefined
 }

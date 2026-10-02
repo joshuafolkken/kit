@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
 import { git_worktree } from '#scripts/git/git-worktree'
+import { file_reader } from '#scripts/lib/read-file'
 import { lane_cache } from './lane-cache'
 import { lane_environment } from './lane-environment'
 import { lane_install, type InstallResult } from './lane-install'
@@ -52,7 +53,7 @@ const SEAT_LOCK_PREFIX = 'seat-'
 function read_root_environment(repository_root: string): string {
 	const file = path.join(repository_root, ENV_FILE_NAME)
 
-	return existsSync(file) ? readFileSync(file, 'utf8') : ''
+	return file_reader.read_file_or_empty(file)
 }
 
 function build_lane(

@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { epic_busy } from '#scripts/epic/epic-busy'
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import { error_text } from '#scripts/lib/error-message'
 import { run_carry } from '#scripts/run/run-carry'
 import { lane_await } from './lane-await'
 import { lane_close, type CloseOutcome, type SweepOutcome } from './lane-close'
@@ -384,7 +385,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	try {
 		return await dispatch(argv)
 	} catch (error) {
-		console.error(error instanceof Error ? error.message : String(error))
+		console.error(error_text.message_of(error))
 
 		return FAILURE_EXIT_CODE
 	}

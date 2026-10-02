@@ -47,7 +47,7 @@ const HUMAN_REVIEW = 'human-review'
 // test. `LIVE` is the silent norm; `STOPPED` and `UNKNOWN` lead the difference lines.
 const LIVE = 'live'
 const STOPPED = 'stopped'
-// The verdicts `epic --reconcile` prints; kept in step with the `git_epic_reconcile` constants in its
+// The verdicts `epic --reconcile` prints; kept in step with the `epic_reconcile` constants in its
 // test.
 const RECONCILED = 'reconciled'
 const NOTHING_TO_RECONCILE = 'nothing to reconcile'
@@ -302,7 +302,7 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		decision: 'Whether cross-file or cross-repository code duplication exists',
 		args: '',
 		vocabulary: ['clean', 'clones:'],
-		single_source: 'prompts/collaboration-workflow/no-clones.md',
+		single_source: 'prompts/collaboration-workflow/principles.md → クローン禁止',
 	},
 	{
 		name: 'epic:reconcile',

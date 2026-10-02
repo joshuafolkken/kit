@@ -1,6 +1,6 @@
 # Claude Code Instructions
 
-> **This file is the single source for every agent rule.** `AGENTS.md` and `GEMINI.md` are pointers to it and carry no rules of their own.
+> **This file is the single source for every agent rule.** `AGENTS.md` and `GEMINI.md` are pointers to it and carry no rules of their own — a rule addition, spec change or wording fix is written **once**, here. History: `docs/maintainers/claude-md-history.md`.
 >
 > Each rule is written as a **trigger plus a pointer** — enough to act safely with nothing else loaded, with the steps and rationale at the pointer.
 
@@ -10,20 +10,18 @@ Stack: TypeScript · pnpm · SvelteKit · Vitest · Playwright · TailwindCSS ·
 
 ## Communication
 
-Each rule is a trigger and a pointer; the procedure and rationale are at the cited file.
-
 - **Answer opinion-seeking questions from a neutral standpoint.** A leading question ("how about X?" / "〜〜ではどうか？") is not a cue to agree — weigh the merits and recommend the option you genuinely judge best, even when it differs from the one hinted at.
 - **Fix root causes, not symptoms.** Diagnose the underlying cause and apply the correct fix rather than an ad-hoc workaround; where the proper fix is out of scope, surface the root cause instead of papering over the symptom.
 - **Cross-package problems → file the upstream Issue, then stop.** A defect originating in another package (a dependency, or `josh` / kit tooling) is never worked around locally — **weakening a verification gate is a workaround too**, and the trigger is discovery. File it (first-party Tier A, third-party Tier C) and stop. `prompts/collaboration-workflow/upstream-interrupt.md`.
 - **Third-party repositories are Tier C.** Decide first-party vs third-party mechanically with `pnpm josh repo:party` (owner equality, computed). Every write to a tracker we do not own needs explicit current-turn instruction — a correct diagnosis is not authorization to publish. `prompts/collaboration-workflow/upstream-interrupt.md`.
-- **No clones — single-source, even across package boundaries.** About to replicate non-trivial logic that already lives somewhere? Stop and single-source it; duplicate only after presenting the alternative and its cost and getting explicit approval. `prompts/collaboration-workflow/no-clones.md`.
-- **Design for elegance and simplicity first.** Before adding a mechanism (a hook, guard, rule, or abstraction), ask whether fixing the cause would make that mechanism unnecessary — if it would, fix the cause instead of adding the mechanism. `prompts/collaboration-workflow/simplicity-first.md`.
-- **Distinguish consultation from execution.** A question about approach or a goal statement ("どうすべき？", "〜したい") is a request for analysis only — act only on an explicit imperative or a workflow keyword. `prompts/collaboration-workflow/consultation-vs-execution.md`.
-- **Route distributed-doc / config changes upstream to kit.** In a consumer repo never edit kit-distributed docs/config locally (`josh sync` overwrites them); propose the change for kit. In kit itself you are the source. `prompts/collaboration-workflow/distributed-docs.md`.
-- **Latest-first, fix forward — pin back only as a last resort.** Adopt newest versions by default and resolve a breaking bump forward, recording why on the rare pin-back. This never authorizes a silent edit to a protected pin. `prompts/collaboration-workflow/latest-first.md`.
+- **No clones — single-source, even across package boundaries.** About to replicate non-trivial logic that already lives somewhere? Stop and single-source it; duplicate only after presenting the alternative and its cost and getting explicit approval. `prompts/collaboration-workflow/principles.md` → "クローン禁止".
+- **Design for elegance and simplicity first.** Before adding a mechanism (a hook, guard, rule, or abstraction), ask whether fixing the cause would make that mechanism unnecessary — if it would, fix the cause instead of adding the mechanism. `prompts/collaboration-workflow/principles.md` → "設計はエレガント".
+- **Distinguish consultation from execution.** A question about approach or a goal statement ("どうすべき？", "〜したい") is a request for analysis only — act only on an explicit imperative or a workflow keyword. `prompts/collaboration-workflow/principles.md` → "相談と実行".
+- **Route distributed-doc / config changes upstream to kit.** In a consumer repo never edit kit-distributed docs/config locally (`josh sync` overwrites them); propose the change for kit. In kit itself you are the source. `prompts/collaboration-workflow/principles.md` → "配布ドキュメント".
+- **Latest-first, fix forward — pin back only as a last resort.** Adopt newest versions by default and resolve a breaking bump forward, recording why on the rare pin-back. `prompts/collaboration-workflow/principles.md` → "最新優先".
 - **Output language follows `JOSH_SESSION_LANG`** (default `ja`; a hook injects it). It governs session-facing output and artifact prose (Issue bodies, comments, Telegram). English stays for Issue/PR titles, code comments/test titles/commit messages, and script-emitted strings. `prompts/collaboration-workflow/overview.md`.
 - **Cite an Issue with a number-link and a short Japanese title in session-facing output** — `[#<N>](https://github.com/<owner>/<repo>/issues/<N>) — <短い要約>`. `prompts/collaboration-workflow/issue-citation.md`.
-- **Durable rules belong in prompts/docs, not local MEMORY.** Encode a rule that should hold in future sessions as a change to kit's distributed prompts/docs; keep local auto-memory minimal, and propose the edit when the turn does not authorize a doc change. `prompts/collaboration-workflow/durable-rules.md`.
+- **Durable rules belong in prompts/docs, not local MEMORY.** Encode a lasting rule as a change to kit's distributed prompts/docs, not auto-memory; propose the edit when the turn does not authorize one. `prompts/collaboration-workflow/principles.md` → "恒久ルール".
 - **Never carry a file's new text inside a shell command.** Edit a region with the Edit tool, never a heredoc — unless the change is so scattered the partial edit would carry more text than the file. The criterion is whether the command carries the replacement wholesale, not the tool's name. `prompts/collaboration-workflow/file-edits.md`.
 - **Never put a body in shell double quotes** — a backtick or `$` there is _executed_; pass the body by path. `prompts/collaboration-workflow/shell-body.md`.
 - **Put every call that does not depend on another's result in the same turn.** **The criterion is whether this call's input needs another call's result, not what kind of call it is** — edits are covered exactly as reads are. `pnpm josh batch:guard` states it at the call that breaks it; enumeration in `prompts/collaboration-workflow/rule-delivery.md`, cost in `prompts/collaboration-workflow/turn-batching.md`.
@@ -34,7 +32,7 @@ Classify each decision point into one tier and act; stop **only** when the choic
 
 - **Tier A — reversible implementation / design choices** (library pick, naming, file layout, test approach, refactor shape). Select the clearly-better option and proceed; log it when you would normally surface it. **Placing a filed Issue into an epic is Tier A**, as is **self-correction** (fixing a factual error you published, or closing a gap in your own work this session).
 - **Tier B — genuine toss-up.** Both top options sound, margin narrow. **The only tier that stops** — ask the user (`AskUserQuestion` where available) with the candidates and trade-offs.
-- **Tier C — irreversible / shared-state / out-of-scope actions** (merge, branch delete, force push, destructive ops, repo-settings changes, anything outside the task scope, `devEngines` / overrides edits). Always require explicit user instruction — never auto-decide, even when one looks clearly better or when you caused the problem. Full boundaries: `prompts/collaboration-workflow/operating-rules.md` → 「意思決定の自律ポリシー（確認停止を減らす）」.
+- **Tier C — irreversible / shared-state / out-of-scope actions** (merge, branch delete, force push, destructive ops, repo-settings changes, anything outside the task scope, `devEngines` / overrides edits). Deleting a git-tracked file is reversible, so it is not a destructive op — never ask on reversibility grounds, but inspect the target first and surface anything that contradicts the task. Always require explicit user instruction — never auto-decide, even when one looks clearly better or when you caused the problem. Full boundaries: `prompts/collaboration-workflow/operating-rules.md` → 「意思決定の自律ポリシー（確認停止を減らす）」.
 
 **Logging auto-decisions:** inside an Issue workflow, post an Issue comment with the chosen option, the rejected alternatives and why; outside one, add a one-line "Auto-decided: `<choice>` over `<alt>` because `<reason>`" to your reply.
 
@@ -104,47 +102,38 @@ Read from a `.env` file at the project root by the AI scripts, `josh port` and `
 
 For every code modification, in order:
 
-0. **Work summary + test declaration** _(before any implementation code)_: a two-layer summary — a plain-language overview (three lines, **Now / Change / Check**, one sentence each, in the session language, naming the concrete subject, no file paths / function names / CLI flags), **Details**, then **every change with its test** (`<what changes> — Test: <Unit|E2E> — <file path> — <what it verifies>`). Ordinary markdown, **never in a code fence**, once per Issue before implementation (`kickoff` is exempt); completion reports lead with **Cause / Fix / Result**. `prompts/collaboration-workflow/report-format.md` (summarized in the `UserPromptSubmit` hook). Presentation, not a confirmation stop.
+0. **Work summary + test declaration** _(before writing any implementation code)_: a two-layer summary — a plain-language overview a non-programmer can follow (three lines, **Now / Change / Check**, one sentence each, in the session language; name the concrete subject in each line — subject-less prose is not acceptable; no file paths, function or type names, or CLI option flags — only internal identifiers are banned, not names the reader sees on screen), **Details**, then **every change with its test** (`<what changes> — Test: <Unit|E2E> — <file path> — <what it verifies>`). Ordinary markdown, **never wrapped in a code fence**, once per Issue before implementation — required in fullrun/halfrun/backlogrun even when the Issue body was filled (`kickoff` is exempt); completion reports lead with **Cause / Fix / Result**. `prompts/collaboration-workflow/report-format.md`; `pnpm josh report:lint` checks the form, and the `UserPromptSubmit` hook points here. Presentation only, never a confirmation stop.
 
-   - **Tests are required for ALL code changes** (bug fixes, timing/animation fixes and refactors included): bug fix → regression test; UI/animation/timing → E2E for the observable change; logic/utility → unit; refactor → tests pinning existing behavior BEFORE the change (`prompts/refactoring.md`).
+   - **Tests are required for ALL changes** — zero tests without explicit approval is a violation (bug fixes, timing/animation fixes and refactors included): bug fix → regression test; UI/animation/timing → E2E for the observable change; logic/utility → unit; refactor → tests pinning existing behavior BEFORE the change (`prompts/refactoring.md`).
    - **Non-runtime updates (pre-approved manual-only exception)**: a change touching no executable runtime code path may proceed with manual verification — declare it in Step 0 and state why. It covers docs, non-executable config, editor/IDE files, and cosmetic asset swaps with no selector/path change; the mechanically exempt (`*.md`, `.editorconfig`, `.idea/**`, `.vscode/**`, `prompts/**`) are recognized by the command below, and the rest stay the exemption a person declares. A test infeasible for a runtime change needs its reason stated and user approval.
-   - **basic の手動確認例外:** `package.json` に `josh.profile: basic`（改名前の `static` も同じ）が記録され、変更が kit がテストを実行できない言語のファイル（HTML/CSS や Lua などのソース）だけなら、自動テストの代わりに手で確認する。HTML/CSS はブラウザーで対象ページを開き、想定する画面幅でレイアウト・リンク・HTML 内の操作を確認する。そのほかのソースは変更した処理を実際に動かす。どちらも観察結果を報告する。JavaScript と TypeScript のファイルには同時に変更した場合も自動テストが必要。`pnpm josh test:declared` はこの場合だけ理由を添えて `exempt` と表示する。
+   - **basic の手動確認例外:** `package.json` に `josh.profile: basic`（改名前の `static` も同じ）が記録され、変更が kit がテストできない言語のファイル（HTML/CSS や Lua などのソース）だけなら、自動テストの代わりに手で確認する。HTML/CSS はブラウザーで対象ページを開き、想定する画面幅でレイアウト・リンク・HTML 内の操作を確認する。そのほかのソースは変更した処理を実際に動かす。どちらも観察結果を報告する。JavaScript と TypeScript のファイルには同時に変更した場合も自動テストが必要。`pnpm josh test:declared` はこの場合だけ理由を添えて `exempt` と表示する。
    - **The commit stage answers this mechanically**: `pnpm josh test:declared` prints `required` / `exempt` / `satisfied` from the changed paths, and a runtime change with no test is refused at `pnpm josh git -y` on `required` — add the declared test or declare the non-runtime exception, then reissue (`prompts/collaboration-workflow/rule-delivery.md`).
    - **Read a target's line headroom before editing: `pnpm josh lines <path>`** — near the limit, `Target` carries the splitting plan.
 
-1. **Refactor first** — apply high/medium refactoring to all new/modified code (`prompts/refactoring.md`); do not proceed until none remain.
+1. **Refactor first** — before any refactoring, read and follow `prompts/refactoring.md`; apply high/medium refactoring to all new/modified code and do not proceed until none remain.
 2. **Tests** — implement those declared in Step 0 (`prompts/testing-guide.md`); prefer stable `data-testid` selectors over locale strings.
-3. **Verification gate** — `pnpm josh gate` (lint, type check, spell check, unit tests **concurrently**); fix all before reporting done. Add legitimate flagged terms to `cspell.config.yaml`. Each `Edit` / `Write` triggers a `pnpm josh format:edited` hook, so a file may differ from what you wrote.
-4. **IDE feedback** — check IDE lint output; never say "it should pass" without running commands, never finish while errors exist. Do not modify `eslint.config.js` unless explicitly asked.
+3. **Verification gate** — `pnpm josh gate` (lint, type check, spell check, unit tests **concurrently**); fix all before reporting done. One gate per run; while implementing re-run a single check by name (`pnpm josh lint:related` / `pnpm josh cspell:dot` / `pnpm josh test:related`). Add legitimate flagged terms to `cspell.config.yaml`. Each `Edit` / `Write` triggers a `pnpm josh format:edited` hook, so a file may differ from what you wrote. Docs- or config-only changes still run it.
+4. **IDE feedback** — zero errors on every changed file; never say "it should pass" without running commands. Do not modify `eslint.config.js` unless explicitly asked.
 
 ## Completion gate (before you tell the user work is done)
 
 Run the full verification set **in order**; do not skip, reorder, or report completion on a failed or skipped step without the user agreeing. Inside a `fullrun` / `backlogrun` the gate runs beside the review and the merge chain (`workflow-commands` skill → §2, `prompts/review.md`).
 
-0. **Test gate** — no tests added? Continue only under the non-runtime exception (Step 0) or explicit approval; otherwise stop and add tests.
-   basic プロファイルで kit がテストできない言語のファイルだけの変更には、Step 0 の手動確認を適用できる。
-1. **Refactor** — `prompts/refactoring.md`, until no high/medium items remain.
-2. **`pnpm josh gate`** — lint, type check, spell check and unit tests concurrently. One gate per run; while implementing re-run a single check by name (`pnpm josh lint:related` / `pnpm josh cspell:dot` / `pnpm josh test:related`).
-3. **Self-review** — a subagent runs `/code-review` per `prompts/review.md` (never a main-line `Skill` load); level from the changed paths, at most two rounds, high/medium findings resolved. `prompts/review.md` → "Review round cap".
-4. **IDE feedback**: zero errors on every changed file.
+0. **Test gate** — no tests added? Stop and add them, unless a Step 0 exception (non-runtime or basic) or explicit approval covers the change.
+1. **Refactor** — Code Change Rules Step 1.
+2. **`pnpm josh gate`** — Step 3.
+3. **Self-review** — Pre-commit Self-Review below.
+4. **IDE feedback** — Step 4.
 5. **E2E** — the CI E2E job when a PR is open (`pnpm josh followup` blocks the merge on it), `pnpm josh test:e2e` run by you when there is none; a printed skip is the answer for a project with no suite. `prompts/testing-guide.md` → "Closing the E2E gate without a human run".
 6. **Live-execution evidence** — a runtime change's PR body carries a `## 実機証跡` section (command + actual fenced output), or `pnpm josh followup` refuses the merge. `prompts/collaboration-workflow/report-format.md`.
 
 **UI verification (screenshot):** any change to the rendered UI is **not** done until you have looked at the result — capture the affected screen with the `/verify-ui` skill and confirm it matches the intent. If none can be produced, ask the user to verify visually.
 
-Docs- or config-only changes still run `pnpm josh gate`.
-
-## Refactoring Rules
-
-- When performing any refactoring, ALWAYS read and follow `prompts/refactoring.md` before starting.
-
 ## Pre-commit Self-Review (mandatory)
 
-Before every `git commit` (follow-up commits included), self-review against `prompts/review.md`: the staged diff, and `git diff main...HEAD` before opening or updating a PR. Level from `pnpm josh review:brief --level-only`; resolve all high/medium findings; iterate — **at most two reviews in total**, the second a verification pass over the fix delta. Then route each remaining non-High finding through the three-way disposition: fix in place, file it as a follow-up Issue only when it is a confirmed defect that reaches a runtime path — `pnpm josh disposition <path>` answers `runtime` / `non-runtime`, so the only judgement left is whether the defect is confirmed — or drop it with a one-line PR note (the default). **A filed finding is run through `pnpm josh epic:bundle <new>` before the current Issue closes.** A confirmed High blocks rather than buying a third round; CI runs no Claude review, so this pass is authoritative. `prompts/review.md` → "Review round cap".
+Before every `git commit` (follow-up commits included), self-review against `prompts/review.md` — a subagent runs `/code-review`, never a main-line `Skill` load: the staged diff, and `git diff main...HEAD` before opening or updating a PR. Level from `pnpm josh review:brief --level-only`; resolve all high/medium findings; iterate — **at most two reviews in total**, the second a verification pass over the fix delta. Then route each remaining non-High finding through the three-way disposition: fix in place, file it as a follow-up Issue only when it is a confirmed defect that reaches a runtime path — `pnpm josh disposition <path>` answers `runtime` / `non-runtime`, so the only judgement left is whether the defect is confirmed — or drop it with a one-line PR note (the default). **A filed finding is run through `pnpm josh epic:bundle <new>` before the current Issue closes.** A confirmed High blocks rather than buying a third round; CI runs no Claude review, so this pass is authoritative. `prompts/review.md` → "Review round cap".
 
 ## Doc Sync Rules
-
-**`CLAUDE.md` is the single source for every agent rule.** `AGENTS.md` and `GEMINI.md` carry no rules — a rule addition, spec change or wording fix is written **once**, here (joshuafolkken/kit#963).
 
 **docs/ must stay in sync with the package.** When `josh bump` changes the version, review `docs/` and update any section describing changed behavior (new/renamed commands, `josh init` / `josh sync` behavior, new config files) before committing.
 
@@ -158,13 +147,12 @@ Before every `git commit` (follow-up commits included), self-review against `pro
 ## Collaboration Workflow
 
 - For the issue-driven proposal/plan/execution/notification flow, follow `prompts/collaboration-workflow/` (indexed by `prompts/collaboration-workflow.md`; each topic is its own file).
-- **Before writing a rule as prose, ask whether its answer can be computed from mechanically readable inputs alone.** If yes, the rule is a decision oracle — add it to `pnpm josh oracle:list` (`scripts/rules/decision-oracle.ts`) rather than writing it in `CLAUDE.md` or a prompt file. `prompts/collaboration-workflow/residency.md` → question 0 is the criterion.
-- **Before writing a rule that decides when or in what order to act, put it in the run driver, not prose.** A rule that decides ordering rather than _what_ belongs in `pnpm josh run:step`'s state transitions (`scripts/run/run-step.ts`), never `CLAUDE.md` or a prompt file. `prompts/collaboration-workflow/residency.md` → ordering question is the criterion.
+- **Before writing a rule as prose, place it by `prompts/collaboration-workflow/residency.md`** — its single source. A computable answer goes to `pnpm josh oracle:list` and an ordering rule to `pnpm josh run:step`, never into `CLAUDE.md` or a prompt file.
 - **Count the target repository's open Issues before filing; with more than 30 open, close one first.** Nothing honestly closable means do not file. A filing the run is blocked by is exempt, and so is an **interrupt** — three tests decide that, never judgement: a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository; both exemptions proceed, stating the overage. Meeting none of the three, a finding stays discretionary. `pnpm josh rule:guard` states it again at the call that files. The count command and both procedures: `prompts/collaboration-workflow/wip-cap.md`.
 
 ### Shorthand Commands
 
-`kickoff`, `fullrun`, `halfrun` and `backlogrun` are the Issue-driven shorthand commands. **Their procedures are not resident** — they live in the `workflow-commands` skill. **What stays here is decided by one question: must the rule fire on a turn where no skill was loaded?** Explicit invocation, the mid-workflow stop notification, the `overrides` / `devEngines` prohibitions, the UI-verification gate and the three `epic:*` rules below all do; everything a run reaches only after reading the skill is routed to, never restated (`SKILL.md` → "What stays resident, and what is read from here").
+`kickoff`, `fullrun`, `halfrun` and `backlogrun` are the Issue-driven shorthand commands. **Their procedures are not resident** — they live in the `workflow-commands` skill. **What stays here is decided by one question: must the rule fire on a turn where no skill was loaded?** Explicit invocation, the mid-workflow stop notification, the `overrides` / `devEngines` prohibitions, the UI-verification gate and the three `epic:*` rules below all do; everything a run reaches only after reading the skill is routed to, never restated (`prompts/collaboration-workflow/residency.md` → "第 2 問").
 
 **Read the skill before running any part of a command — including the first `gh` call.**
 
@@ -175,13 +163,11 @@ Before every `git commit` (follow-up commits included), self-review against `pro
 | `halfrun [#N \| new]`    | Implement + gate, then **stop before commit** for manual verification                                                                                                 | + `halfrun.md` + `split-assessment.md`                           |
 | `backlogrun [#N1 #N2 …]` | Run named Issues and epics in order (an epic runs its children first), then drain the opted-in backlog — dependency order, lanes. `--only` stops after the named list | + `backlogrun.md` + `split-assessment.md` + the `fullrun` set    |
 
-**`queue` was removed (joshuafolkken/kit#1984); its job folded into `backlogrun`.** A user who types `queue` should run `backlogrun #N1 #N2 …` instead — named Issues run in order, then the opted-in backlog drains.
-
-**`epicrun` was removed (joshuafolkken/kit#1985); its job folded into `backlogrun` too.** A named item may now be an epic, whose children all run before the next item; **`backlogrun #E --only` runs one epic's children and stops**. If a user types `epicrun`, tell them to run `backlogrun #E --only` (drop `--only` to also drain the backlog).
+**`queue` and `epicrun` were removed** — tell a user who types `queue` to run `backlogrun #N1 #N2 …`, and one who types `epicrun` to run `backlogrun #E --only` (drop `--only` to also drain the backlog).
 
 **Three rules decide what a run does when the work turns out not to be one Issue** — the split assessment every entry point applies identically (**its default is not to split**: separability **and** a scope clearly exceeding one verification gate — about 10 changed files, about 400 changed lines (test files excluded) — must both hold), a prerequisite discovered mid-run (a dependency, not parked), and a named `backlogrun` item that is not an epic. All bind only after a command has started, so all are read from the `workflow-commands` skill: `split-assessment.md`, `SKILL.md` → §2d, `backlogrun-child.md` → "When `#N` is not an epic", and `fullrun.md` / `halfrun.md` / `backlogrun.md` for the branch each entry takes.
 
-**The `josh epic:*` commands have their own skill** — `epic:audit`, `epic:next`, `epic:bundle`, and how an epic spans repositories. **Read the `epic-commands` skill before running any of them, before writing an epic that tracks a child in another repository, and right after filing an issue.** Three rules stay here because they bind outside those commands: **recording a decision removes that child's `needs-decision` label** (Tier A); **fixing what the audit finds is Tier A**, park only when the contradiction is a design choice nobody has made; and **an epic in another repository is referenced as `owner/repo#N`** (a bare `#N` resolves to this repository's issue). Canonical reference: `prompts/collaboration-workflow/epic-bundle.md`.
+**The `josh epic:*` commands have their own skill** — `epic:audit`, `epic:next`, `epic:bundle`, and how an epic spans repositories. **Read the `epic-commands` skill before running any of them, before writing an epic that tracks a child in another repository, and right after filing an issue.** Three rules stay here because they bind outside those commands: **recording a decision removes that child's `needs-decision` label** (Tier A); **fixing what the audit finds is Tier A**, park only when the contradiction is a design choice nobody has made; and **an epic in another repository is referenced as `owner/repo#N`** (a bare `#N` resolves to this repository's issue). Canonical reference: `.claude/skills/epic-commands/SKILL.md`.
 
 #### Explicit invocation required (MANDATORY)
 

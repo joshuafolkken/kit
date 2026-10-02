@@ -208,7 +208,9 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "[options]",
       "automation",
       [
+        "files",
         "network",
+        "processes",
       ],
     ],
     "backlog:plan": [
@@ -911,10 +913,10 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "rule:value": [
-      "",
+      "[--refresh]",
       "developer",
       [
-        "none",
+        "files",
       ],
     ],
     "run:carry": [

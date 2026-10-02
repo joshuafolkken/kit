@@ -1,12 +1,12 @@
 # Set up the full profile
 
-The detailed version of the [Quick start](../../README.md#quick-start) for the `full` [profile](../init.md#project-profiles): a JavaScript / TypeScript project with npm dependencies. For an `index.html` site, or a Python, Rust or other non-Node project, see [Set up the basic profile](./basic.md) — it also installs Node.js and pnpm.
+The detailed version of the [Quick start](../../README.md#quick-start) for the `full` [profile](../init.md#project-profiles): a JavaScript / TypeScript project with npm dependencies. For an `index.html` site, or a Python, Rust or other non-Node project, see [Set up the basic profile](./basic.md).
 
-kit needs **Node.js 22.19.0 or later** and **pnpm 12 or later** ([checking and installing them](./basic.md#1-check-the-prerequisites) — follow steps 1–2 there, then return here). The package is independent of the [global `josh` CLI](../cli.md) — most projects want both, but the package alone is enough to consume configs.
+kit needs **Node.js 22.19.0 or later** and **pnpm 12 or later**, and `josh start` needs the gh CLI ([install the prerequisites](./prerequisites.md), then return here). The package is independent of the [global `josh` CLI](../cli.md) — most projects want both, but the package alone is enough to consume configs.
 
 ## 1. Choose `josh init` or `josh start`
 
-One question decides it: **will this project use the GitHub Issue workflow** (`kickoff`, `fullrun`, `backlogrun`)? Then use `josh start` (§3), whether or not the project already has Git or a GitHub repository. Otherwise use `josh init` (§2). Both set up the `full` profile the same way. The full table is in [init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start).
+Which one to run is decided in [init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start). Both set up the `full` profile the same way: `josh init` is §2, `josh start` is §3.
 
 ## 2. Install and initialize with `josh init`
 

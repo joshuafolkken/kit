@@ -130,8 +130,10 @@ function spawning_sources(): Array<string> {
 }
 
 describe('every `gh api` spawn under scripts/ bypasses the loopback proxy', () => {
+	// One file since joshuafolkken/kit#2901 routed every reader through this layer — and
+	// `gh-subcommand-guard.test.ts` refuses a `gh api` spawn anywhere else.
 	it('finds the spawning readers, so the scan cannot pass by matching nothing', () => {
-		expect(spawning_sources().length).toBeGreaterThan(1)
+		expect(spawning_sources()).toContain('git/git-gh-exec.ts')
 	})
 
 	it('spreads the shared direct environment wherever `gh api` is spawned', () => {

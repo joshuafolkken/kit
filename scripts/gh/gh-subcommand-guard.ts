@@ -14,7 +14,7 @@ import ts from 'typescript'
 // `josh issue <N>` still 403'd.
 //
 // This scanner is the mechanical check that survey did not have. It reads **every** `.ts` file
-// under `scripts/` and `scripts-ai/`, and anything it finds whose first argument is not `api` fails
+// under `scripts/`, and anything it finds whose first argument is not `api` fails
 // unless it is named in `ALLOWED_SPAWNS` below.
 //
 // **It parses rather than greps.** A regex over the text has to decide for itself what is code and
@@ -43,8 +43,8 @@ import ts from 'typescript'
 // from './constants'` then `execa(GH_BIN, […])` is the same evasion one file further out, and the
 // import is followed by reading that module's source and taking its own string `const` — the pass
 // above, applied to the imported file. The alternative was `ts.createProgram` with a `TypeChecker`,
-// which follows any indirection but builds a program over every file under `scripts/` and
-// `scripts-ai/` on a scan that runs in the unit suite; nothing else in this repository does that,
+// which follows any indirection but builds a program over every file under `scripts/` on a scan
+// that runs in the unit suite; nothing else in this repository does that,
 // and the shape it would buy beyond this one is not a shape kit writes.
 //
 // **The import hop is a single one, and it is deliberate.** A constant that is itself imported from
@@ -69,7 +69,7 @@ const SCRIPTS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..'
 const REPO_ROOT = path.resolve(SCRIPTS_DIR, '..')
 
 const SCRIPTS_DIRECTORY = 'scripts'
-const SCANNED_DIRECTORIES: ReadonlyArray<string> = [SCRIPTS_DIRECTORY, 'scripts-ai']
+const SCANNED_DIRECTORIES: ReadonlyArray<string> = [SCRIPTS_DIRECTORY]
 const TS_EXTENSION = '.ts'
 
 // How an import specifier names a file. `#scripts/…` is the subpath `package.json` → `imports`

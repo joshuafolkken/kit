@@ -58,8 +58,8 @@ vi.mock('./telegram-notify', () => ({
 	telegram_notify: { send: vi.fn(), send_or_report: vi.fn() },
 }))
 
-vi.mock('./git-epic-close', () => ({
-	git_epic_close: { close_completed_epics: vi.fn() },
+vi.mock('#scripts/epic/epic-close', () => ({
+	epic_close: { close_completed_epics: vi.fn() },
 }))
 
 // This suite drives the whole `run()`, which now reaches the observation-ledger flush in the
@@ -83,7 +83,7 @@ const { git_gh_command } = await import('./git-gh-command')
 const { git_pr_checks } = await import('./git-pr-checks')
 const { git_pr_ai_review } = await import('./git-pr-ai-review')
 const { telegram_notify } = await import('./telegram-notify')
-const { git_epic_close } = await import('./git-epic-close')
+const { epic_close } = await import('#scripts/epic/epic-close')
 
 const PR_URL = 'https://github.com/owner/repo/pull/1'
 const UNDISTRIBUTED_FILE = 'scripts/git/git-pr-followup.ts'
@@ -135,7 +135,7 @@ function setup_run_mocks(): void {
 	})
 	vi.mocked(git_pr_ai_review.handle_ai_review_findings).mockResolvedValue([])
 	vi.mocked(telegram_notify.send_or_report).mockResolvedValue(true)
-	vi.mocked(git_epic_close.close_completed_epics).mockResolvedValue()
+	vi.mocked(epic_close.close_completed_epics).mockResolvedValue()
 }
 
 beforeEach(() => {

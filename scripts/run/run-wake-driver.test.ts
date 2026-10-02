@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { josh_command } from '#scripts/josh/josh-run'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { run_carry } from './run-carry'
@@ -8,6 +9,8 @@ import { run_wake_driver } from './run-wake-driver'
 
 const INVOCATION = 'backlogrun #2509 --max 5 --only'
 const OUTPUT = 'merge over #2509\nresume: --owner 1 --exclude 2509'
+const LONG_STDERR_REPEAT = 1000
+const EPIC_OUTPUT = 'epic #1\nresume: --owner 1'
 const scratch = { directory: '', target: '' }
 
 beforeEach(() => {
@@ -62,12 +65,28 @@ test('finishes without a judgment when the driver ends the carry record', async 
 	expect(await run_wake_driver.drive(scratch.target)).toStrictEqual({ kind: 'finished' })
 })
 
+test('hands on only the tail of a long stderr, after the verdict, resume line and epic note', () => {
+	const result = run_wake_driver.driver_result(
+		EPIC_OUTPUT,
+		{ kind: 'none' },
+		`${'early output\n'.repeat(LONG_STDERR_REPEAT)}why it stopped`,
+	)
+
+	expect(result.kind).toBe('judgment')
+	if (result.kind !== 'judgment') return
+	expect(result.material.length).toBeLessThan(agent_role_profile.MAX_VALUE_LENGTH)
+	expect(result.material).toMatch(
+		/^Driver result: epic #1\nresume: --owner 1\nThe named item is an epic/u,
+	)
+	expect(result.material.endsWith('why it stopped')).toBe(true)
+})
+
 test('refuses an incomplete driver result without waking an agent', () => {
 	expect(run_wake_driver.driver_result('', { kind: 'none' })).toMatchObject({ kind: 'failed' })
 })
 
 test('tells an epic judgment session how to advance the named carry', () => {
-	const result = run_wake_driver.driver_result('epic #1\nresume: --owner 1', { kind: 'none' })
+	const result = run_wake_driver.driver_result(EPIC_OUTPUT, { kind: 'none' })
 
 	expect(result).toMatchObject({ kind: 'judgment' })
 	if (result.kind !== 'judgment') return

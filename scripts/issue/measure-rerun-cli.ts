@@ -2,6 +2,7 @@
 import { execSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
+import { error_text } from '#scripts/lib/error-message'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { baseline_measure, type Baseline } from './baseline-measure'
 
@@ -21,7 +22,7 @@ function measure(command: string): string {
 	try {
 		return execSync(command, { encoding: 'utf8' }).trim()
 	} catch (error) {
-		return `(command failed: ${error instanceof Error ? error.message : String(error)})`
+		return `(command failed: ${error_text.message_of(error)})`
 	}
 }
 
@@ -40,12 +41,12 @@ function rerun_one(baseline: Baseline, date: string): Outcome {
 	}
 }
 
-async function append_ledger(lines: ReadonlyArray<string>): Promise<void> {
+async function append_ledger(lines: ReadonlyArray<string>, now: Date): Promise<void> {
 	if (lines.length === 0) return
 
-	// The primary checkout's ledger even inside a lane, whose own copy never reaches the default branch
-	// (joshuafolkken/kit#2419).
-	const ledger_path = observation_ledger_home.ledger_path()
+	// The running work tree's file for the checked-out issue, a lane's inside a lane — the run's own
+	// commit carries it (joshuafolkken/kit#2919).
+	const ledger_path = await observation_ledger_home.writer_path(now)
 
 	await observation_ledger_home.append(ledger_path, lines)
 	console.info(`Recorded ${String(lines.length)} refuted premise(s) in ${ledger_path}.`)
@@ -70,7 +71,7 @@ async function rerun(body_path: string, now: Date): Promise<number> {
 		.filter((line): line is string => line !== undefined)
 
 	console.info(outcomes.map((outcome) => outcome.pair).join('\n\n'))
-	await append_ledger(ledger_lines)
+	await append_ledger(ledger_lines, now)
 
 	return 0
 }

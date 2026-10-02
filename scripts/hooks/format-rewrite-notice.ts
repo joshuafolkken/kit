@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { file_reader } from '#scripts/lib/read-file'
 
 // The rewrite half of the edit hook (joshuafolkken/kit#2314). The format hook runs prettier and
 // `eslint --fix` in place after every edit, so a file the model just wrote can be rewritten out from
@@ -85,13 +85,7 @@ function build(before: string, after: string): string | undefined {
 // handed nothing for, or one gone by the time it reads, compares as an empty string rather than
 // throwing — the hook runs after the write already succeeded and must never turn it into a failure.
 function read_text(file_path: string | undefined): string {
-	if (file_path === undefined) return ''
-
-	try {
-		return readFileSync(file_path, 'utf8')
-	} catch {
-		return ''
-	}
+	return file_path === undefined ? '' : (file_reader.read_if_readable(file_path) ?? '')
 }
 
 const rewrite_notice = { build, read_text }

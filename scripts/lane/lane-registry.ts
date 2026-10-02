@@ -1,10 +1,11 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
 import type { AgentProfile } from '#scripts/agent/agent-role-profile'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { git_command } from '#scripts/git/git-command'
 import { git_worktree } from '#scripts/git/git-worktree'
+import { file_reader } from '#scripts/lib/read-file'
 import { lane_environment } from './lane-environment'
 import { lane_paths } from './lane-paths'
 
@@ -105,11 +106,7 @@ function held_seat(content: string | undefined): SeatPorts {
  * a state the report shows rather than a state anything falls back from.
  */
 function read_environment(directory: string): string | undefined {
-	try {
-		return readFileSync(path.join(directory, ENV_FILE_NAME), 'utf8')
-	} catch {
-		return undefined
-	}
+	return file_reader.read_if_readable(path.join(directory, ENV_FILE_NAME))
 }
 
 // A lane is identified by its branch rather than by where it sits, so nothing here compares two

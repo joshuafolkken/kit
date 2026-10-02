@@ -175,10 +175,15 @@ joshuafolkken/kit#1726 is the worked case: its own body says the depth test woul
 and it was filed anyway, because **discarding it was the only alternative on offer**
 (joshuafolkken/kit#1728).
 
-- **The destination is `docs/maintainers/observations.md` in the repository the observation is about** — the same
-  repository the Issue would have been filed into. **The count and the append are both run in that
-  repository's checkout**, resolved the way §2c (`target-repository.md`) resolves any cross-repository target, and the file is
-  created on the first append where that repository has none. **The subject decides, never the
+- **The destination is the `docs/maintainers/observations/` directory in the repository the
+  observation is about** — the same repository the Issue would have been filed into — **one file per
+  issue** (joshuafolkken/kit#2919): append to `<N>.md` for the issue the run is executing (the number
+  its branch leads with, a lane's included), or to `<YYYY-MM-DD>.md` for a line written on the
+  default branch outside any issue's run. Parallel lanes therefore write different files, and their
+  pull requests never conflict on the ledger. **The count and the append are both run in that
+  repository's checkout** — in this repository, the work tree the run is in, a lane's inside a lane —
+  resolved the way §2c (`target-repository.md`) resolves any cross-repository target, and the
+  directory is created on the first append where that repository has none. **The subject decides, never the
   working directory**: an observation about this package's own orchestration, seen while a run is
   inside a repository that consumes it, is recorded here rather than there — the append follows the
   subject, never the working directory. **A third-party target gets no line either** — Tier C covers
@@ -186,8 +191,8 @@ and it was filed anyway, because **discarding it was the only alternative on off
 - **It is append-only.** A line is never edited and never deleted, because the count of lines
   carrying one key is what says whether an observation has recurred; a second sighting is a second
   line, not a rewrite of the first. **A merge conflict in it is resolved by keeping both sides** —
-  two lanes appending at once is the ordinary case, and a repeated key is the whole signal, so
-  dropping either side destroys exactly what the file is for.
+  one file per issue should keep it from arising, but a repeated key is the whole signal, so
+  dropping either side destroys exactly what the ledger is for.
 - **The completion report keeps its line too.** The ledger is what the next run can read; the report
   is what this run's reader sees. Neither replaces the other.
 - **The append is not the end of it** — a line only becomes readable to anyone else once it has
@@ -215,21 +220,22 @@ A sample, in the shape a real entry takes:
 ```
 
 **`k:example` is reserved for this sample and is never used by a real observation**, so the count
-below can be run over the whole file without the sample answering for one. **The grammar is defined
+below can be run over the whole ledger without the sample answering for one. **The grammar is defined
 here rather than in the ledger** because this skill is distributed to every repository that consumes
 the package and `docs/` is not — a rule that named a definition the reader never received would
 leave every consumer's ledger shaped by hand.
 
 **The identity key is the whole of the repeat test — never a similarity judgement about the prose.**
 Choose the key from the phenomenon rather than from the run, then count what the ledger already holds
-for it, in that repository's checkout rather than the working directory. **The `|| true` is not
-decoration**: `grep -c` exits non-zero on a count of zero, which is the first-sighting branch and the
-common one, so without it the step reads as a failed command wherever an exit status is being
-watched. **A missing file is not a count of zero, though** — there `grep` exits 2 and prints no
-number at all, so an empty answer means create the ledger, never that this is a first sighting.
+for it, in that repository's checkout rather than the working directory. **Every file of the
+directory is counted**, because a recurrence is a recurrence whichever issue's file each sighting
+sits in. **The `|| true` is not decoration**: `grep -c` exits non-zero on a count of zero, which is
+the first-sighting branch and the common one, so without it the step reads as a failed command
+wherever an exit status is being watched. **A missing directory is still a first sighting** — `cat`
+complains on standard error and the count is zero; the append below creates the directory.
 
 ```bash
-grep -c '^- k:<slug> |' <that repository's checkout>/docs/maintainers/observations.md || true
+cat <that repository's checkout>/docs/maintainers/observations/*.md | grep -c '^- k:<slug> |' || true
 ```
 
 Free-text comparison is what the key exists to replace, so two lines that read alike under different
@@ -254,7 +260,7 @@ that is empty on every other machine**, and every sighting was a first one, whic
 joshuafolkken/kit#1728 created the ledger to end.
 
 - **A run's appended lines ride its own commit** (joshuafolkken/kit#2763). `pnpm josh git` stages
-  `docs/maintainers/observations.md` with the run's other changes, in the one staging step every entry
+  `docs/maintainers/observations/` with the run's other changes, in the one staging step every entry
   point goes through (`scripts/git/git-staging.ts`), so the lines are reviewed and merged with the
   pull request of the run that recorded them, and the run's CI is the only wait they cost. Until
   #2763 the ledger was excluded there (joshuafolkken/kit#1756) and every run that appended a line
@@ -263,35 +269,28 @@ joshuafolkken/kit#1728 created the ledger to end.
   before `pnpm josh git -y` is carried; the time while CI runs is for the records that need no CI
   result — filing an observation Issue, drafting the completion report.
 - **A line that breaks the grammar is not carried** (joshuafolkken/kit#2123). The staging step parses
-  the ledger first — after moving lines still on the old path (joshuafolkken/kit#2724) — and on a
-  broken line leaves the ledger out of the commit and says so; the commit itself goes ahead.
-- **What no run's commit carried is flushed as a pull request of its own** — `pnpm josh
-  observations:flush`: a lane's lines (next bullets) and a line appended after the commit, such as a
-  second review round's record. It stages that one path and nothing else, commits it on a branch of
-  its own, opens a docs-only pull request, waits on the same required checks every other pull request
-  waits on, merges it and returns the checkout to the default branch. **Nothing is committed to the
-  default branch directly.**
-- **`pnpm josh followup` runs that flush itself, so no run has to remember to** (joshuafolkken/kit#1810).
-  After the merge and before it releases the working-tree hold, `followup` reads the tree, and **only
-  when the ledger still holds a pending append** returns the checkout to the default branch
-  (`pnpm josh ms`) and flushes. A run whose lines rode its commit pays nothing, and a lane skips it
-  (next bullet). A flush that fails is reported and does not take the merge, the epic close or the
-  hold release down with it. **A side effect: on a run that did flush, `followup` ends on the default
-  branch.**
-- **A lane's writers use the primary checkout's ledger** (joshuafolkken/kit#2419): a lane refuses
-  `pnpm josh ms`, so its own copy had no way out. `pnpm josh observations:flush` acts on the primary
-  checkout from a lane. **A dispatched lane child does not flush at all** (joshuafolkken/kit#2492): its
-  `run:tail` skips the step, and the `backlogrun` flushes every lane's lines once, in one pull request,
-  at `pnpm josh run:carry --end`.
-- **A lane child's pull request does not carry the lines, and that is deliberate.** Lanes run side by
-  side, and two pull requests that each append at the ledger's tail conflict with each other the
-  moment the first merges — a conflict ends the other's CI wait. The batch's single flush at
-  `run:carry --end` is already one pull request per batch, not one per child.
-- **Run by hand it goes in the primary checkout, once per cycle rather than once per observation** —
-  but with the lines riding the run's commit and `pnpm josh followup` flushing the rest (above), a hand
-  run is the exception rather than the rule. It refuses off the default branch and refuses a working tree holding anything besides
-  the ledger, so a run in progress cannot be flushed out from under, and a lane's checkout is never
-  the one it acts on.
+  every file of the ledger first — after moving lines still on an old single-file path
+  (joshuafolkken/kit#2724, joshuafolkken/kit#2919) — and on a broken line leaves the ledger out of the
+  commit and says so; the commit itself goes ahead.
+- **`pnpm josh followup` commits a line appended after the run's commit onto the pull request, before
+  the merge** (joshuafolkken/kit#2919) — a second review round's record is the usual case. After the
+  merge gates and before the CI wait, `followup` reads the tree and, **only when the ledger holds a
+  pending append**, stages the ledger paths alone, commits them and pushes the branch; the CI wait
+  that follows covers the pushed commit. A broken line refuses the merge, because the line would
+  otherwise be lost with the branch. A run whose lines rode its commit pays nothing.
+- **A lane carries its own lines, in its own pull request** (joshuafolkken/kit#2919). Its writers
+  append to its own tree's `<N>.md`, so the two steps above take them to the default branch exactly as
+  they do for a run in the primary checkout. Lanes once wrote to the primary checkout's single file
+  instead (joshuafolkken/kit#2419) and a `backlogrun` flushed them all at `run:carry --end`
+  (joshuafolkken/kit#2492); another run's stash of that checkout took the lines before the flush saw
+  them, so neither route remains. **Nothing is held in the primary checkout for later.**
+- **`pnpm josh observations:flush` is left for a line written outside any issue's run** — the
+  date-named file a retrospective or a hand append on the default branch writes. It stages the ledger
+  and nothing else, commits it on a branch of its own, opens a docs-only pull request, waits on the
+  same required checks every other pull request waits on, merges it and returns the checkout to the
+  default branch; a single run's `run:tail` runs it after the merge. It refuses off the default branch
+  and refuses a working tree holding anything besides the ledger, so a run in progress cannot be
+  flushed out from under. **Nothing is committed to the default branch directly.**
 - **Nothing to flush is an answer, not a failure.** With the ledger matching the commit it sits on
   the command prints `clean` and exits 0 — most cycles append nothing, and a command that errored
   there would be one nobody runs.

@@ -1,9 +1,9 @@
-import { git_epic_parse, type ExternalChild } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import type { IssueReadFailure } from '#scripts/git/git-gh-issue-read'
 import { epic_cross_repo } from './epic-cross-repo'
 import type { EpicChild, IssueReference } from './epic-graph'
 import { epic_issue, type EpicIssue } from './epic-issue'
+import { epic_parse, type ExternalChild } from './epic-parse'
 import { epic_relation_recheck } from './epic-relation-recheck'
 
 // Reading an epic and its children from GitHub.
@@ -73,8 +73,8 @@ async function fetch_epic_body(epic_number: number, scope?: string): Promise<Epi
 	return {
 		body,
 		body_failure: read.kind === 'read' ? undefined : read,
-		child_numbers: git_epic_parse.parse_task_list_issue_numbers(body),
-		external: git_epic_parse.parse_external_task_list_children(body),
+		child_numbers: epic_parse.parse_task_list_issue_numbers(body),
+		external: epic_parse.parse_external_task_list_children(body),
 	}
 }
 

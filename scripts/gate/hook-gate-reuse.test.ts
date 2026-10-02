@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
-import { OBSERVATION_LEDGER_PATH } from '#scripts/observations/observation-ledger'
+import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_test_fixture } from './gate-test-fixture'
@@ -41,7 +41,7 @@ const RENAMED = `R  old.ts -> ${PATH}`
 const UNSTAGED = ` M ${PATH}`
 const PARTIALLY_STAGED = `MM ${PATH}`
 const UNTRACKED = `?? ${PATH}`
-const UNSTAGED_LEDGER = ` M ${OBSERVATION_LEDGER_PATH}`
+const UNSTAGED_LEDGER = ` M ${observation_ledger.ledger_file(1)}`
 const FORCE_ENV = 'JOSH_TEST_HOOK_FORCE'
 const BASE = 'a1b2c3d4'
 const TREE: GateTree = { files: { [PATH]: 'digest-one' }, base: BASE }

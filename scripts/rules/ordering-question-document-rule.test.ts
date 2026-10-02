@@ -5,13 +5,12 @@ import { describe, expect, it } from 'vitest'
 // joshuafolkken/kit#2251: the ordering question of the rule-placement criterion lives in residency.md
 // as the single source, applied right after question 0. A rule that decides *when or in what order* to
 // act belongs in the run driver's state transitions (`run:step`), not prose — so CLAUDE.md and
-// SKILL.md §3 carry a pointer rather than repeating it, rule-residency.md routes to it, and the
-// manifests name the driver instead of re-narrating the sequence it computes. This is the same shape
-// as decision-oracle-document-rule.test.ts built for question 0, and adds no second mechanism.
+// SKILL.md §3 carry a pointer rather than repeating it, and the manifests name the driver instead of
+// re-narrating the sequence it computes. This is the same shape as
+// decision-oracle-document-rule.test.ts built for question 0, and adds no second mechanism.
 
 const RESIDENCY = 'prompts/collaboration-workflow/residency.md'
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
-const RULE_RESIDENCY = '.claude/skills/workflow-commands/rule-residency.md'
 const CLAUDE = 'CLAUDE.md'
 const FULLRUN = '.claude/skills/workflow-commands/fullrun.md'
 const BACKLOGRUN = '.claude/skills/workflow-commands/backlogrun.md'
@@ -50,12 +49,6 @@ describe('SKILL.md §3 points to residency.md for the ordering question', () => 
 
 		expect(skill).toContain(ORDERING_EN_MARKER)
 		expect(skill).toContain(DRIVER_COMMAND)
-	})
-})
-
-describe('rule-residency.md routes to the ordering question', () => {
-	it('names run:step alongside question 0', () => {
-		expect(read_repo_file(RULE_RESIDENCY)).toContain(DRIVER_COMMAND)
 	})
 })
 

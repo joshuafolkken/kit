@@ -199,13 +199,30 @@ describe('the split lost nothing', () => {
 	// moved into `.claude/skills/workflow-commands/backlogrun.md` and the topic file became a pointer,
 	// which this suite deliberately does not read — so sampling it would have asserted the opposite
 	// of what the suite is for. A sentence from a topic that still holds a body took its place.
+	// joshuafolkken/kit#2893 did the same for the overrides sample: its body moved into
+	// `.claude/skills/dependency-update/SKILL.md`, so a sentence from the body `operating-rules.md`
+	// still holds — the CI-failure report — replaced it.
 	it.each([
 		'9. 検証ゲート（`CLAUDE.md` の Completion gate）を実行する',
 		'**(1) ラベルはセッション言語に訳す。**',
-		'overrides に設定された制約は、**セキュリティ・互換性・動作保証のために意図的に追加されたもの**である。',
+		'**完了コメントに失敗を隠してはならない**',
 	])('keeps %j in a topic file, not only in the index', (marker) => {
 		expect(topics).toContain(marker)
 		expect(read_index()).not.toContain(marker)
+	})
+
+	// joshuafolkken/kit#2894 merged seven principle files into one; each kept its own heading so
+	// `CLAUDE.md` can still cite it by section. Losing one would orphan that citation's rule.
+	it.each([
+		'## クローン禁止・単一ソース化',
+		'## 設計はエレガント・シンプルを第一目標にする',
+		'## 相談と実行を区別する',
+		'## 最新優先・fix-forward',
+		'## 恒久ルールは MEMORY ではなくプロンプト／ドキュメントに書く',
+		'## 配布ドキュメント・設定の変更は kit に上流化する',
+		'## エージェント規則の単一ソースは `CLAUDE.md`',
+	])('keeps the principle %j as its own section', (heading) => {
+		expect(read_repo_file(`${WORKFLOW_PROMPT_DIRECTORY}/principles.md`)).toContain(heading)
 	})
 
 	it.each(topic_files())('%s is more than a heading', (file_name) => {

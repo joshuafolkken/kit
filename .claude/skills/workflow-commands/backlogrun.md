@@ -27,18 +27,9 @@ therefore runs exactly one epic's children and stops.
 
 ## Explicit invocation required (MANDATORY)
 
-**Never start a `backlogrun` unless the user has typed the keyword in the current turn's prompt.**
-This is the same rule the other entry points carry, at the same strength — `SKILL.md` → §0 is its
-single source, and `CLAUDE.md` → "Explicit invocation required (MANDATORY)" is where it stays resident
-so it binds on a turn where nothing here has been read. It matters more here than anywhere else,
-because this is the entry point with the widest authorization: a conversational "clear the backlog" is
-**not** an invocation, a confirmation question is no substitute for the keyword, and an earlier turn's
-authorization does not carry.
-
-**The keystroke starts the invocation; it does not have to land in every session that invocation
-spans.** A `backlogrun` cut mid-run and resumed is still that one invocation
-(`backlogrun-steps.md` → "The session cut is inside the invocation"). This reading covers `backlogrun`
-and it alone — a `fullrun` cut still waits for the keyword.
+**Never start a `backlogrun` unless the user has typed the keyword in the current turn's prompt** —
+`SKILL.md` → "0. The rule that fires before any of them — explicit invocation"; a cut and resumed run
+is still that one invocation (`backlogrun-steps.md` → "The session cut is inside the invocation").
 
 ## The manifest — the ordered flow
 

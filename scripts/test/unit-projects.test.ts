@@ -2,7 +2,7 @@ import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { run_ship_detach } from '#scripts/run/run-ship-detach'
 import { describe, expect, it } from 'vitest'
-import { PILOT_FILES } from './pilot-files'
+import { PURE_FILES } from './pure-files'
 import { unit_projects, type UnitProject } from './unit-projects'
 import { VITEST_INCLUDE_GLOBS } from './vitest-include-globs'
 
@@ -47,7 +47,7 @@ describe('the unit suite splits into a pure and an isolated project', () => {
 // packed-consumer smoke test and nothing runs twice.
 describe('the two projects partition the suite without gaps or overlap', () => {
 	it('runs the classifier list as the pure project', () => {
-		expect(project(PURE_PROJECT).include).toEqual([...PILOT_FILES])
+		expect(project(PURE_PROJECT).include).toEqual([...PURE_FILES])
 	})
 
 	it('runs the main globs as the isolated project', () => {
@@ -55,7 +55,7 @@ describe('the two projects partition the suite without gaps or overlap', () => {
 	})
 
 	it('excludes every pure file from the isolated project so nothing runs twice', () => {
-		for (const file of PILOT_FILES) {
+		for (const file of PURE_FILES) {
 			expect(project(ISOLATED_PROJECT).exclude, `${file} runs in both projects`).toContain(file)
 		}
 	})

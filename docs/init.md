@@ -55,7 +55,7 @@ To add Git later, run `git init`, then run `josh init` again to add Git files wi
 
 ## `josh init` or `josh start`
 
-One question decides which to run: **will this project use the GitHub Issue workflow** (`kickoff`, `fullrun`, `backlogrun`)? If it will, run `josh start` — whether or not the project already has Git or a GitHub repository. If it will not, run `josh init`. The [profile](#project-profiles) is a separate question: both commands choose it the same way.
+This section is the single source for choosing between `josh init` and `josh start`; the setup guides, the tutorial and the command reference link here. One question decides which to run: **will this project use the GitHub Issue workflow** (`kickoff`, `fullrun`, `backlogrun`)? If it will, run `josh start` — whether or not the project already has Git or a GitHub repository. If it will not, run `josh init`. The [profile](#project-profiles) is a separate question: both commands choose it the same way.
 
 | Situation                                                                                       | Run                                                                  |
 | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
@@ -99,21 +99,8 @@ pnpm --allow-build=esbuild dlx @joshuafolkken/kit init
 ## Refused inside the package's own repository
 
 `josh init` writes nothing and exits non-zero when the project it is aimed at **is**
-`@joshuafolkken/kit` itself — the case a globally installed kit reaches when it is run from inside
-the kit checkout:
-
-```text
-Refusing to sync: this is @joshuafolkken/kit's own repository.
-Syncing here would overwrite the distribution source with its own derived templates.
-Run this command from a consumer project instead.
-```
-
-`init` writes everything `josh sync` does plus the project's `package.json` scripts and
-devDependencies, so the damage there is strictly larger than the 14 files reproduced in
-[#868](https://github.com/joshuafolkken/kit/issues/868). It shares the sync guard's detection rather
-than repeating it ([#879](https://github.com/joshuafolkken/kit/issues/879)); the rule, its fallbacks
-and why a downstream distributor is unaffected are described in
-[sync.md](./sync.md#refused-inside-the-distribution-packages-own-repository).
+`@joshuafolkken/kit` itself. The message, the detection and why a downstream distributor is
+unaffected are in [sync.md → Refused inside the distribution package's own repository](./sync.md#refused-inside-the-distribution-packages-own-repository).
 
 A project with no `package.json` yet — the scaffolding case `init` exists for — never matches on the
 name, because an unreadable manifest says nothing about who the project is. What still applies there
@@ -238,19 +225,7 @@ The ESLint preset likewise resolves ESLint and its plugins from the consumer pro
 
 ### Available `pnpm josh` subcommands
 
-| Command      | Runs                                                                                                                                                                    |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lint`       | `prettier --check .` then `eslint . --cache --cache-strategy content`                                                                                                   |
-| `format`     | `prettier --write .` then `eslint . --fix --cache --cache-strategy content`; a `basic` project without Prettier or ESLint skips that tool with a reason, as `lint` does |
-| `cspell:dot` | `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`                                                                                         |
-| `test:unit`  | `vitest run` (skips when vitest is absent; fails when it is present with no test file)                                                                                  |
-| `main:sync`  | `git checkout <default> && git pull --ff-only`, then prunes merged branches with a `[gone]` remote-tracking upstream (refuses inside a linked work tree)                |
-| `main:merge` | `git fetch origin <default>` then `git merge origin/<default>`                                                                                                          |
-| `check`      | `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo` (a `basic` project with nothing to type-check skips it with the reason)                                     |
-
-SvelteKit type-checking is no longer part of kit's framework-agnostic `josh` CLI. SvelteKit projects get `josh-app check` / `josh-app check:ci` from [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) instead.
-
-Retired scripts (previously managed, now removed): `git`, `git:followup`, `telegram:test`, `audit:security`, `prep`, `issue:prep`, `prevent-main-commit`, `check-commit-message`, `version:*`, `overrides:check`, `check:ci`, `check:svelte`, `check:svelte:ci`.
+The `josh` script runs every subcommand in [josh-commands.md](./josh-commands.md), the single source for what each one runs — for example [`josh lint`](./josh-commands.md#josh-lint), [`josh check`](./josh-commands.md#josh-check) and [`josh main:sync`](./josh-commands.md#josh-mainsync). The package scripts kit retired are listed in [init-rationale.md](./maintainers/init-rationale.md#retired-package-scripts) — `docs/maintainers/init-rationale.md` → "Retired package scripts".
 
 ## AI files
 

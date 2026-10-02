@@ -28,16 +28,8 @@ resident in the AI documents, because it has to hold when this skill has *not* b
 - The rule applies even when the user authorized a related workflow in an earlier turn. Each
   invocation must be re-typed by the user in the current turn.
 
-**A session cut inside a declared budget is not a new invocation.** A `backlogrun` that is cut and
-resumed is still the one invocation a person typed — the keyword authorized the declared budget, and
-the cut is an execution detail of spending it. What this rule forbids is _inferring_ a workflow from a
-request's shape. **The reading covers `backlogrun` and it alone** — a `fullrun` cut still waits for
-the keyword, because a `fullrun` ends at one issue and has nothing to carry.
-
-**`backlogrun-steps.md` → "The session cut is inside the invocation" is the single source of the
-mechanism** — the record, the two commands, and what each answer means, and how a named-issue
-`backlogrun #N1 #N2 …` pins its list to what was typed while the issues it has finished live in the
-record's `done` field rather than shrinking the string.
+**A session cut inside a declared budget is not a new invocation — for `backlogrun` alone**; its
+single source is `backlogrun-steps.md` → "The session cut is inside the invocation".
 
 ## 1. Which file to read
 
@@ -62,7 +54,7 @@ lists `backlogrun.md` alone: its parent orchestrates and never implements, so `f
 Every procedure for *running* a `backlogrun` item — lanes (`backlogrun-lanes.md`), park-and-continue,
 the guards — stays `backlogrun.md`'s. The on-demand sections `into-target.md` (an `into` suffix) and `target-repository.md`
 (an `owner/repo#` prefix) are read only when their trigger is typed, and §3's residency procedure lives
-in `rule-residency.md`, reached only when a rule is placed, moved or retired.
+in `prompts/collaboration-workflow/residency.md`, reached only when a rule is placed, moved or retired.
 
 ### The fetch is one `Read` call per file
 
@@ -251,15 +243,8 @@ there. A dispatched lane child never runs the retrospective.
 
 ## 3. What stays resident, and what is read from here
 
-**The residency criterion and its procedure are `rule-residency.md`, read only when a rule is being
-placed, moved or retired — never at any entry, and never during a run.** It carries question 0 (is the
-answer computable from mechanically readable inputs, so it is a decision oracle — `pnpm josh
-oracle:list`), the ordering question (does it decide *when or in what order* rather than *what*, so it
-goes in the run driver `pnpm josh run:step` — `prompts/collaboration-workflow/residency.md` → ordering
-question), the first question (can the trigger be named as one tool call, so the body moves out of
-`CLAUDE.md` to a hook via `prompts/collaboration-workflow/rule-delivery.md`), the second question
-(does it have to fire on a turn where no skill was loaded, so it stays in `CLAUDE.md`), and the
-procedure that decides how much of a resident rule is resident — the trigger-plus-pointer shape, the
-enumeration of every resident rule with an on-demand counterpart, and the retirement route and its
-three tests. `rule-residency.md` is the single source; the moment it binds is a turn spent editing
-these documents, never a turn spent executing an Issue.
+**The residency criterion is `prompts/collaboration-workflow/residency.md`, its single source — read
+only when a rule is being placed, moved or retired, never at any entry and never during a run.** Its
+questions are asked there in order — question 0 (`pnpm josh oracle:list`), the ordering question
+(`pnpm josh run:step`), the first and the second — beside how much of a resident rule stays and the
+retirement route; none is restated here.

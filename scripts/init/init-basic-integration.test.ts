@@ -317,6 +317,25 @@ describe('basic initialization of a project set up before the rename', () => {
 		)
 		expect(readFileSync(prettier_config, 'utf8')).toContain("'@joshuafolkken/kit/prettier/basic'")
 	})
+})
+
+// joshuafolkken/kit#2909: the sample is shown only for a Prettier config that does not already hold it.
+describe('basic initialization of an existing Prettier config', () => {
+	it('reports a Prettier config that already matches the sample as unchanged', async () => {
+		write_index_html()
+		const prettier_config = path.join(paths_mock.root, BASIC_PRETTIER)
+		const sample =
+			"import { config } from '@joshuafolkken/kit/prettier/basic'\n\nexport default config\n"
+
+		writeFileSync(prettier_config, sample)
+		await run_init()
+
+		expect(readFileSync(prettier_config, 'utf8')).toBe(sample)
+		expect(vi.mocked(console.info)).toHaveBeenCalledWith(`  ✔ unchanged ${BASIC_PRETTIER}`)
+		expect(vi.mocked(console.info)).not.toHaveBeenCalledWith(
+			`  ⚠ exists    ${BASIC_PRETTIER} — add manually:`,
+		)
+	})
 
 	it('still asks for the kit preset in a Prettier config of the project own', async () => {
 		write_index_html()

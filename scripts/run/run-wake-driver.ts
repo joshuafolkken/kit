@@ -6,6 +6,8 @@ import type { DriveResult } from './run-wake-loop'
 const SUCCESS = 0
 const FIRST_LINE = 0
 const RESUME_PREFIX = 'resume: '
+const DETAILS_TAIL_LENGTH = 2048
+const TRUNCATION_MARK = '... '
 
 function driver_args(invocation: string): ReadonlyArray<string> | undefined {
 	const rebuilt = run_invocation.rebuild(invocation)
@@ -24,13 +26,24 @@ function is_final_stop(verdict: string | undefined, read: CarryRead): boolean {
 	return verdict?.startsWith('stop') === true && read.kind === 'none'
 }
 
+// **The details are the driver's whole stderr, so only their tail is handed on, and it goes last**
+// (joshuafolkken/kit#2931). The stderr carries every command the driver ran since it started, which
+// after a long run is tens of kilobytes — far past what `is_safe_value` lets into an argv element. Its
+// tail is where the reason for stopping is; placing it last means the cap `wake_argv` applies to the
+// whole prompt can only ever cut into the details, never the verdict, the resume line or the epic note.
+function details_tail(details: string): string {
+	return details.length > DETAILS_TAIL_LENGTH
+		? `${TRUNCATION_MARK}${details.slice(-DETAILS_TAIL_LENGTH)}`
+		: details
+}
+
 function handoff_material(verdict: string, resume: string, details: string): string {
-	const context = details === '' ? '' : `\nDetails: ${details}`
+	const context = details === '' ? '' : `\nDetails: ${details_tail(details)}`
 	const epic = verdict.startsWith('epic #')
 		? '\nThe named item is an epic. Follow backlogrun-steps.md named epic procedure; do not launch the epic root as a fullrun child. After all children merge or park, record the root with pnpm josh run:carry --done <epic-number> --owner "$PPID" before continuing to the next named item.'
 		: ''
 
-	return `Driver result: ${verdict}\n${resume}${context}${epic}`
+	return `Driver result: ${verdict}\n${resume}${epic}${context}`
 }
 
 function driver_result(out: string, read: CarryRead, details = ''): DriveResult {

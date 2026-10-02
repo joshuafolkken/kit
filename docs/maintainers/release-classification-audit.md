@@ -13,7 +13,7 @@
 | 除外 (`ignore-for-release`)    |         11 |              0 |
 | 合計                           |      1,104 |          1,093 |
 
-四区間の監査表は [#2646](release-classification-audit-2646.tsv)、[#2647](release-classification-audit-2647.tsv)、[#2648](release-classification-audit-2648.tsv)、[#2649](release-classification-audit-2649.tsv)。各 275 件、計 1,100 件を記録した。区間の後にマージされた監査 PR #2650、#2651、#2652、#2657 はすべて `other-change` で、元 Issue は順に #2646、#2647、#2648、#2649。固定スナップショットで判断保留は 0 件。第一親履歴との照合で重複、欠落、範囲外の行、マージ SHA の不一致も 0 件だった。
+四区間の監査表は役目を終えたためリポジトリから削除した。生データとそれを検証したテストは、削除直前のコミット [`0e15c3dd`](https://github.com/joshuafolkken/kit/tree/0e15c3dd44a2dc5d94a8db1a6f637ef0f521f2b1/docs/maintainers) の `release-classification-audit-{2646,2647,2648,2649}.tsv` と `scripts/release/release-classification-audit.test.ts` に残る。各 275 件、計 1,100 件を記録した。区間の後にマージされた監査 PR #2650、#2651、#2652、#2657 はすべて `other-change` で、元 Issue は順に #2646、#2647、#2648、#2649。固定スナップショットで判断保留は 0 件。第一親履歴との照合で重複、欠落、範囲外の行、マージ SHA の不一致も 0 件だった。
 
 ## 分類と根拠の残し方
 
@@ -29,8 +29,9 @@
 
 ```sh
 git log --first-parent --merges --format='%H %s' v0.113.0..01eb8610556d27a5a0f60726d133561916dba9b3
-pnpm exec vitest run scripts/release/release-classification-audit.test.ts
 ```
+
+監査表との照合テストは、上記コミット `0e15c3dd` を取り出して `pnpm exec vitest run scripts/release/release-classification-audit.test.ts` で再実行できる。
 
 GitHub のリリースノート生成 API に比較開始点を明示してプレビューした。`v1.888.0` はプレビュー用の仮タグ名であり、Release は公開していない。返された本文の PR リンクは 1,093 件で重複なし。第一親履歴との差は、監査表で除外した #349、#352、#364、#379、#385、#531、#675、#756、#758、#763、#2520 の 11 件だけだった。四つの掲載区分の件数も上表と一致した。
 

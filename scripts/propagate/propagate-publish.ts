@@ -1,7 +1,6 @@
 import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { poll } from '#scripts/lib/poll'
 import { with_page_size } from '#scripts/version/version-remote'
-import { execaSync } from 'execa'
 
 // Waiting for a specific version of this package to actually exist in the registry.
 //
@@ -58,15 +57,15 @@ function finish(state: PublishWaitState, version: string, attempts: number): Pub
 // reported apart, because one means wait longer and the other means something is broken.
 function fetch_published_versions(versions_endpoint: string): Array<string> | undefined {
 	const endpoint = with_page_size(versions_endpoint, VERSIONS_PAGE_SIZE)
-	const result = execaSync('gh', ['api', endpoint, '--jq', NAMES_JQ], {
-		...git_gh_exec.direct_environment(),
-		reject: false,
-		timeout: GH_TIMEOUT_MS,
+	const stdout = git_gh_exec.read_gh_api_sync({
+		path: endpoint,
+		jq_filter: NAMES_JQ,
+		timeout_ms: GH_TIMEOUT_MS,
 	})
-	if (result.exitCode !== 0) return undefined
+	if (stdout === undefined) return undefined
 
 	try {
-		const parsed: unknown = JSON.parse(result.stdout)
+		const parsed: unknown = JSON.parse(stdout)
 
 		return Array.isArray(parsed) ? parsed.filter((name) => typeof name === 'string') : undefined
 	} catch {

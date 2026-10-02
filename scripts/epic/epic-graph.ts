@@ -1,10 +1,10 @@
-import type { DependencyLink } from '#scripts/git/git-epic-parse'
+import type { DependencyLink } from './epic-parse'
 import {
 	format_dependency_link,
 	join_references,
 	to_issue_reference,
 	type IssueReference,
-} from '#scripts/git/git-epic-reference'
+} from './epic-reference'
 
 // The dependency graph an epic's children form, and the two ways it can be wrong.
 //
@@ -275,5 +275,5 @@ const epic_graph = {
 }
 
 export type { EpicChild, GraphAnomaly, GraphAnomalyKind }
-export type { IssueReference } from '#scripts/git/git-epic-reference'
+export type { IssueReference } from './epic-reference'
 export { epic_graph }

@@ -103,7 +103,7 @@ entry fullrun  227672/229376 bytes · 1704 left
 
 ### `josh format`
 
-Format code with prettier and eslint. A `basic` project skips ESLint for the reason `josh lint` prints.
+Format code with prettier and eslint. A `basic` project without Prettier or ESLint skips that tool for the reason `josh lint` prints.
 
 ```bash
 pnpm josh format
@@ -272,7 +272,7 @@ pnpm josh test:unit
 
 - `vitest` installed with **no** `*.{test,spec}.{ts,js}` file anywhere is a failure, not a skip.
 - Guards (kit's own checkout): a unit test that reaches the network or writes into the suite's repository fails; the fix is in the test (mock the read, clear git location env, carry identity on `-c`).
-- **The suite runs as two Vitest projects** (`vitest.config.ts`): the classifier's isolation-free files (`scripts/test/pilot-files.ts`) run `pure` with `isolate:false` — each shared module evaluated once per worker, not once per file, a measured 57% cut on that set (joshuafolkken/kit#2170) — and the rest run `isolated` with the default. They partition the suite exactly, so **the same files run and the green condition is unchanged**; only the pure ones run faster. The state guard is scoped to `pure`.
+- **The suite runs as two Vitest projects** (`vitest.config.ts`): the classifier's isolation-free files (`scripts/test/pure-files.ts`) run `pure` with `isolate:false` — each shared module evaluated once per worker, not once per file, a measured 57% cut on that set (joshuafolkken/kit#2170) — and the rest run `isolated` with the default. They partition the suite exactly, so **the same files run and the green condition is unchanged**; only the pure ones run faster. The state guard is scoped to `pure`.
 - **A setup file silences the real streams for each test body** (`scripts/test/test-stdout-guard.ts`), so a fixture that drives a CLI `main` cannot leak its `process.stdout` lines into the suite's output; `console.*` is untouched and the streams are restored after each test (joshuafolkken/kit#2296).
 
 ### `josh test:related`
@@ -343,7 +343,7 @@ See [Composite commands and extra arguments](#composite-commands-and-extra-argum
 
 ### `josh check`
 
-Type-check with `tsc --noEmit`. A `basic` project with nothing to check is skipped as `josh gate` does; a listed, uninstalled tool fails.
+Type-check with `tsc --noEmit`. A `basic` project with nothing to check is skipped as `josh gate` does; a listed, uninstalled tool fails. SvelteKit type-checking is not part of kit's framework-agnostic `josh` CLI: SvelteKit projects get `josh-app check` / `josh-app check:ci` from [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit).
 
 ```bash
 pnpm josh check
@@ -627,13 +627,13 @@ pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file 
 
 ### `josh observations:flush`
 
-Commit the observation ledger lines no run's own commit carried (`docs/maintainers/observations.md`) as a docs-only pull request of its own (no `closes #N`), wait for the required checks, merge it, and return to the default branch. A run in the primary checkout needs none: `josh git` stages the ledger with the run's own commit when its grammar holds (joshuafolkken/kit#2763), so what is left here is a lane's lines and whatever was appended after a commit.
+Commit the observation ledger lines no run's own commit carried (`docs/maintainers/observations/`) as a docs-only pull request of its own (no `closes #N`), wait for the required checks, merge it, and return to the default branch. A run needs none — a lane's included: `josh git` stages the run's own `<N>.md` with its commit when its grammar holds (joshuafolkken/kit#2763), and `pnpm josh followup` commits a line appended after that onto the pull request before it merges (joshuafolkken/kit#2919). What is left here is a line written on the default branch outside any issue's run, in a date-named `<YYYY-MM-DD>.md`.
 
 ```bash
 pnpm josh observations:flush
 ```
 
-**Behavior:** refuses off the default branch (naming `pnpm josh main:sync`) and refuses when the working tree holds any change besides the ledger (listing those paths). When the ledger matches the commit it sits on it prints `clean` and exits 0. A commit the pre-commit hook rejects is rolled back and its branch removed; a leftover flush branch that holds a commit is landed first, one holding none is discarded. `pnpm josh followup` runs this automatically after a merged run, so it is rarely typed by hand. **Run from a lane it acts on the primary checkout**, where the ledger lives (joshuafolkken/kit#2419): it moves there first, and each refusal names that checkout. A lane never flushes (`followup` and `run:tail` skip it); `pnpm josh run:carry --end` commits every lane's lines (joshuafolkken/kit#2492).
+**Behavior:** refuses off the default branch (naming `pnpm josh main:sync`) and refuses when the working tree holds any change besides the ledger (listing those paths). When the ledger matches the commit it sits on it prints `clean` and exits 0. A commit the pre-commit hook rejects is rolled back and its branch removed; a leftover flush branch that holds a commit is landed first, one holding none is discarded. A single run's `pnpm josh run:tail` runs it after the merge, so it is rarely typed by hand. **It acts on the checkout it runs in**: a lane's lines merge with the lane's own pull request, so a lane is refused like any feature branch, and nothing flushes at `pnpm josh run:carry --end` any more (joshuafolkken/kit#2919).
 
 Related: [`josh followup`](#josh-followup).
 
@@ -645,13 +645,13 @@ Re-run a behavior-change Issue's declared baseline after it merges and print the
 pnpm josh measure:rerun /tmp/issue-body.md
 ```
 
-**Behavior:** when a value has not moved, the premise the rule rested on is recorded as refuted — one line appended to the observation ledger (`docs/maintainers/observations.md`), keyed to the command so a second refutation of the same measurement is a same-key repeat the promotion rule counts. It reuses that append-only ledger rather than a second one. A section written in prose (no `` `command` → value `` line) is refused, since a natural-language measurement cannot be re-run. `pnpm josh observations:flush` is the ledger's commit path.
+**Behavior:** when a value has not moved, the premise the rule rested on is recorded as refuted — one line appended to the observation ledger (`docs/maintainers/observations/`, in the file for the issue the checked-out branch leads with, or a date-named file outside any issue's branch), keyed to the command so a second refutation of the same measurement is a same-key repeat the promotion rule counts. It reuses that append-only ledger rather than a second one. A section written in prose (no `` `command` → value `` line) is refused, since a natural-language measurement cannot be re-run. `pnpm josh observations:flush` is the ledger's commit path.
 
 Related: [`josh observations:flush`](#josh-observationsflush), [`josh issue:lint`](#josh-issuelint).
 
 ### `josh review:record`
 
-Record a `/code-review` round's findings so they survive the run (joshuafolkken/kit#2325). It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the observation ledger (`docs/maintainers/observations.md`) — the same append-only file the observation lines use, under a distinct `- rf:` prefix so the `- k:` grammar never treats a finding as its own. It is the one write path for findings.
+Record a `/code-review` round's findings so they survive the run (joshuafolkken/kit#2325). It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the issue's own file of the observation ledger (`docs/maintainers/observations/<N>.md`, in the work tree the command runs in — a lane's inside a lane; joshuafolkken/kit#2919) — the same append-only ledger the observation lines use, under a distinct `- rf:` prefix so the `- k:` grammar never treats a finding as its own. It is the one write path for findings.
 
 ```bash
 pnpm josh review:record --issue 2325 bug-risks:medium:src/foo.ts:42 tests:low:a.test.ts
@@ -1403,7 +1403,7 @@ Run the `backlogrun` parent loop as one wait: offer, launch, await, merge, then 
 pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--only]
 ```
 
-An open carry record supplies the start time, merged count and remaining named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `triage`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. A drained backlog yields for the retrospective only when `JOSH_RETROSPECTIVE` is on (the same switch `run:step` reads, loaded from `.env`); with the switch off, or once the retrospective has run, the idle watch continues and a drained `stop` ends the run itself. Named issues are dispatched in their recorded order; `--only` reports and ends after the list. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event.
+An open carry record supplies the start time, merged count and remaining named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `triage`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. A `stop` from `run:merge` is read like the offer's: that child is collected, nothing new starts, and every child still in flight is collected before the run ends as `stop` (joshuafolkken/kit#2881). A drained backlog yields for the retrospective only when `JOSH_RETROSPECTIVE` is on (the same switch `run:step` reads, loaded from `.env`); with the switch off, or once the retrospective has run, the idle watch continues and a drained `stop` ends the run itself. Named issues are dispatched in their recorded order; `--only` reports and ends after the list. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event.
 
 ### `needs-human-review` — the opposite label
 
@@ -1525,7 +1525,7 @@ pnpm josh delegate --list     # the enumeration, and what was rejected and why
 | `split-assessment` | a missed split widens one Issue into a batch nobody authorized                          |
 | `review`           | the review is the last thing between a defect and a merge; a cheaper one finds less     |
 
-**`investigation` is the only row that carries a threshold, and the threshold is 3 files, and it is a count, not a forecast.** What comes back is the conclusion plus the `file:line` citations that support it, never the file text; a throwaway probe script is written, run and deleted inside the unit. **It is not `survey`, and it is not `diagnosis`**: `survey` reports where something appears and is checked by one `grep`, while a root cause stays with the main line. `pnpm josh delegate --list` prints the count. **A delegation resets the counter rather than spending it** — the counting moved into `josh investigation:guard`.
+**`investigation` is the only row that carries a threshold, and the threshold is 3 files, and it is a count, not a forecast.** What comes back is the conclusion plus the `file:line` citations that support it, never the file text; a throwaway probe script is written, run and deleted inside the unit. **It is not `survey`, and it is not `diagnosis`**: `survey` reports where something appears and is checked by one `grep`, while a root cause stays with the main line. `pnpm josh delegate --list` prints the count. **A delegation resets the counter rather than spending it**; `josh investigation:guard` does the counting (`docs/maintainers/josh-commands-rationale.md` → "`josh delegate` no longer counts investigation reads").
 
 **The mechanism is not the unit.** **One row covers both batch entry points**: an epic's child and one named issue of a `backlogrun` are the same unit, so both were wired to `epic-child`. **`followup-filing` is a third such unit**: the parent composed the finding text either way, so the unit's work is mechanical. **`implementation-unit` is a fourth**: the writing of one Step 0 unit goes to a subagent while the design that decided _what_ to write stays in the main line, and only file-disjoint units split — `josh fanout` confirms that mechanically, so two subagents never race on one file. Rule: `.claude/skills/workflow-commands/SKILL.md` → "2b. Delegating a step to a cheaper tier".
 
@@ -1561,7 +1561,7 @@ pnpm josh split:assess --json   # the verdict and the reason, machine-readable
 
 ### `josh oracle:list`
 
-Print the decision oracles — commands that answer a rule question from mechanically readable inputs alone (question 0 of the rule-placement criterion, `prompts/collaboration-workflow/residency.md` → question 0). Each row carries the command, its answer vocabulary, its **firing point** (or the reason none can be named) and its single-source document. Adding a new oracle means adding a row here and a firing-point declaration in `scripts/rules/oracle-firing.ts`, and nowhere else.
+Print the decision oracles — commands that answer a rule question from mechanically readable inputs alone (question 0 of the rule-placement criterion, `prompts/collaboration-workflow/residency.md` → "第 0 問"). Each row carries the command, its answer vocabulary, its **firing point** (or the reason none can be named) and its single-source document. Adding a new oracle means adding a row here and a firing-point declaration in `scripts/rules/oracle-firing.ts`, and nowhere else.
 
 ```bash
 pnpm josh oracle:list
@@ -1576,11 +1576,12 @@ Print each delivered rule's **unaided compliance** — how far the carried text 
 
 ```bash
 pnpm josh rule:value
+pnpm josh rule:value --refresh   # write the reading to the loop-head cache instead of stdout
 ```
 
 - Transcripts are grouped by the run they belong to, so a lane's transcript counts with the parent that dispatched it rather than as a run of its own.
 - It reports and never fails: an environment with no measurable transcript prints `no measurement targets` and exits zero.
-- Called once per iteration from the `backlogrun` loop head (`josh backlog:offer`), so a rule that never fires appears as a printed row rather than as something a person has to think to measure (joshuafolkken/kit#2271). Single source: `scripts/rules/rule-value-cli.ts`.
+- Read once per iteration at the `backlogrun` loop head (`josh backlog:offer`), so a rule that never fires appears as a printed row rather than as something a person has to think to measure (joshuafolkken/kit#2271). The loop head never measures: it prints the last reading from `node_modules/.cache/josh/rule-value.txt` to stderr and, at most once every 15 minutes, starts a detached `josh rule:value --refresh` that rewrites it, so the offer never waits on the measurement and a failed one never changes its answer (joshuafolkken/kit#2881). Single sources: `scripts/rules/rule-value-cli.ts` and `scripts/rules/rule-value-cache.ts`.
 
 ### `josh clone:scan`
 
@@ -1614,7 +1615,7 @@ pnpm josh run:tidy
 ```
 
 - **Lanes:** closes a lane whose issue was closed by a merge, whose work tree has no uncommitted change, whose branch has no commit that no remote reaches, and that no live run holds — then releases its run record.
-- **Stashes:** drops an entry when every issue its message names (`#N`, a leading `N: `, or an `On N-lane:` branch) was closed by a merge. An entry that touches `docs/maintainers/observations.md` has its ledger lines appended to the primary checkout's ledger first, less those already there.
+- **Stashes:** drops an entry when every issue its message names (`#N`, a leading `N: `, or an `On N-lane:` branch) was closed by a merge. An entry that touches the observation ledger has its ledger lines appended first to the running work tree's own ledger file, less those any file of `docs/maintainers/observations/` already holds.
 - **Left alone:** an issue closed as not planned or without a merged pull request, an open issue, a stash naming no issue, a lane with changes or unpushed commits.
 
 "Closed by a merge" is read from the issue's REST timeline: its latest closed/reopened event is `closed` as completed (not `not_planned` or `duplicate`) and a merged pull request cross-references it.
@@ -1858,8 +1859,8 @@ Closes a run in one call, folding the three-round-trip post-merge sequence (josh
 under one header per step, non-zero if any failed. It folds only bookkeeping; the review verdict, the
 merge and the push above it stay their own calls. The flush is residual: a run's appended lines ride
 its own commit (joshuafolkken/kit#2763), so it commits only a line appended after that commit and
-otherwise prints `clean`. **A lane child skips `observations:flush`**; its line waits for
-`pnpm josh run:carry --end` (joshuafolkken/kit#2492).
+otherwise prints `clean`. **A lane child skips `observations:flush`**; its lines merged with its own
+pull request (joshuafolkken/kit#2919).
 
 ### `josh ship`
 
@@ -2022,7 +2023,7 @@ non-AI supervisor for Codex generations, while Claude Code sessions run unchange
 SQLite stays lane-local; worker rollout files persist for active-usage cuts. Native auth/config stay
 put. The printed PID is the supervisor's.
 
-**Before it launches, it applies the `in-progress` label to `#<N>`** (creating the label if missing), so the lane counts as busy from the dispatch rather than only once the child's own `fullrun` reaches its apply — that window used to be tens of minutes. If the label cannot be applied it launches nothing and refuses; if the launch then fails it removes the label again, leaving no `in-progress` on an idle issue.
+**Before it launches, it applies the `in-progress` label to `#<N>`** (creating the label if missing), so the lane counts as busy from the dispatch rather than only once the child's own `fullrun` reaches its apply (`docs/maintainers/josh-commands-rationale.md` → "`josh lane:dispatch` applies `in-progress` before it launches"). If the label cannot be applied it launches nothing and refuses; if the launch then fails it removes the label again, leaving no `in-progress` on an idle issue.
 
 **Options:**
 
@@ -2074,7 +2075,7 @@ The child's pid is the one thing on stdout; a refusal is an empty capture beside
 
 ### `josh cost`
 
-Answer whether the next turn exceeds a threshold from active-provider usage. `--cut` selects the shared 135,000 limit — the break-even context a cut pays back at, derived by `context-cut-payback.ts` (joshuafolkken/kit#2406); `--over <tokens>` sets an explicit one. The old report scopes and `--cap` are retired; `josh time` retains hand-off aggregates.
+Answer whether the next turn exceeds a threshold from active-provider usage. `--cut` selects the shared 135,000 limit — the break-even context a cut pays back at, derived by `context-cut-payback.ts` (joshuafolkken/kit#2406); `--over <tokens>` sets an explicit one; any other flag is a usage error (exit 1). `josh time` carries the hand-off aggregates. History: [josh-commands-rationale.md](./maintainers/josh-commands-rationale.md) — `docs/maintainers/josh-commands-rationale.md` → "`josh cost` and `josh time` lost their report scopes".
 
 ```bash
 pnpm josh cost --cut             # compare billed input per request with the shared 135,000 context-cut threshold
@@ -2208,7 +2209,7 @@ pnpm josh time --path <dir>     # read another project's transcripts from this c
 
 **Options:**
 
-- `--run` (default) — the whole run tree, wall clock led beside dollars. The additional report scopes (`--issue`/`--session`/`--epic`/`--last`/`--period`) and the `--instructions`/`--top` modifiers they carried were retired with no rule or decision reading them (#2017).
+- `--run` (default) — the whole run tree, wall clock led beside dollars. It is the only scope; any other flag is a usage error (exit 1). History: `docs/maintainers/josh-commands-rationale.md` → "`josh cost` and `josh time` lost their report scopes".
 - `--path <dir>` — aim the read at another project (absolute path); keeps the `cwd` behavior when absent.
 - `--json` — the run tree, machine-readable.
 

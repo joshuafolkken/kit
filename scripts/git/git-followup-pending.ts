@@ -21,7 +21,7 @@ import { git_command } from './git-command'
 // there cannot include this run's own merge, and a bare number would be understated by exactly one.
 // Saying so is the honest form of the same measurement. The console line printed after the merge
 // passes `false` and carries no note, because by then the merge is on the remote and the fetch below
-// brings it in; `scripts-ai/git-followup-finish.ts` is that caller, so **both branches of this flag
+// brings it in; `git-followup-finish.ts` is that caller, so **both branches of this flag
 // are live**. What a run *does* about the count is `pnpm josh release:scope`, asked after the merge,
 // which reads `read_pending` below rather than this line (joshuafolkken/kit#1582).
 const MERGE_PENDING_NOTE = "— this run's merge is not counted; it lands next"

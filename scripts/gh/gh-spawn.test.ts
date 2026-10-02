@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const execa_sync_mock = vi.hoisted(() => vi.fn())
+const FAKE_ROOT = vi.hoisted(() => '/fake/root')
 
-vi.mock('execa', () => ({ execaSync: execa_sync_mock }))
+vi.mock('execa', async () => {
+	const { gh_execa_fixture } = await import('#scripts/git/git-gh-execa-fixture')
 
-vi.mock('#scripts/init/init-paths', () => ({ PROJECT_ROOT: '/fake/root' }))
+	return { execaSync: gh_execa_fixture.honoring_reject(execa_sync_mock) }
+})
+
+vi.mock('#scripts/init/init-paths', () => ({ PROJECT_ROOT: FAKE_ROOT }))
 
 const REPO_NAME = 'owner/repo'
 const TIMEOUT_MS = 3000
@@ -67,5 +72,31 @@ describe('gh_spawn — what it asks gh for', () => {
 			REST_ARGS,
 			expect.objectContaining({ timeout: TIMEOUT_MS }),
 		)
+	})
+})
+
+// joshuafolkken/kit#2901: pinned before the spawn moved behind `git_gh_exec`. `{owner}/{repo}` is
+// resolved from the checkout gh runs in, and the unbounded lookup must stay unbounded.
+function spawn_options(): object {
+	const options: unknown = execa_sync_mock.mock.calls[0]?.at(-1)
+
+	return typeof options === 'object' && options !== null ? options : {}
+}
+
+describe('gh_spawn — where and how long it asks', () => {
+	it('runs gh in the project root', () => {
+		execa_sync_mock.mockReturnValue({ exitCode: 0, stdout: REPO_NAME })
+
+		gh_spawn.get_repo_name_with_owner()
+
+		expect(spawn_options()).toEqual(expect.objectContaining({ cwd: FAKE_ROOT }))
+	})
+
+	it('sets no budget on the unbounded lookup', () => {
+		execa_sync_mock.mockReturnValue({ exitCode: 0, stdout: REPO_NAME })
+
+		gh_spawn.get_repo_name_with_owner()
+
+		expect(Reflect.get(spawn_options(), 'timeout') ?? 0).toBe(0)
 	})
 })

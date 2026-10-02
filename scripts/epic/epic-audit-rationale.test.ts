@@ -1,9 +1,9 @@
-import { git_epic_body } from '#scripts/git/git-epic-body'
-import { git_epic_decision } from '#scripts/git/git-epic-decision'
-import { git_epic_parse, type DependencyLink } from '#scripts/git/git-epic-parse'
 import { describe, expect, it } from 'vitest'
 import type { AuditChild } from './epic-audit-checks'
 import { epic_audit_rationale, type OrderPair } from './epic-audit-rationale'
+import { epic_body } from './epic-body'
+import { epic_decision } from './epic-decision'
+import { epic_parse, type DependencyLink } from './epic-parse'
 
 const REPO = 'joshuafolkken/kit'
 const OTHER_REPO = 'joshuafolkken/app-kit'
@@ -150,16 +150,16 @@ describe('find_unjustified_orders — what it will not judge', () => {
 // builder produced and the real section reader, not a hand-written fixture.
 describe('find_unjustified_orders — an epic created with `--ordered`', () => {
 	it('reports nothing, because the creation records the order it declared', () => {
-		const body = git_epic_body.build_epic_body({
+		const body = epic_body.build_epic_body({
 			children: [101, 102],
 			rationale: '',
 			is_ordered: true,
 		})
-		const links = git_epic_parse.parse_dependency_links(body)
+		const links = epic_parse.parse_dependency_links(body)
 		const pairs = pairs_of(links, [child(101), child(102)])
 
 		expect(
-			findings_of({ pairs, decisions: git_epic_decision.read_recorded_reasons(body) }),
+			findings_of({ pairs, decisions: epic_decision.read_recorded_reasons(body) }),
 		).toStrictEqual([])
 	})
 })

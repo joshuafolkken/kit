@@ -1,7 +1,6 @@
+import { epic_close } from '#scripts/epic/epic-close'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deferred_answer, type DeferredAnswer } from './deferred-answer-fixture'
-import { git_epic_close } from './git-epic-close'
-import { git_followup_flush } from './git-followup-flush'
 import { git_followup_issue_close } from './git-followup-issue-close'
 import { git_followup_label } from './git-followup-label'
 import { git_followup_stages } from './git-followup-stages'
@@ -31,12 +30,8 @@ vi.mock('./git-followup-issue-close', () => ({
 	git_followup_issue_close: { ensure_issue_closed: vi.fn(), CLOSE_RECOVERY: 'close by hand' },
 }))
 
-vi.mock('./git-epic-close', () => ({
-	git_epic_close: { close_completed_epics: vi.fn() },
-}))
-
-vi.mock('./git-followup-flush', () => ({
-	git_followup_flush: { flush_ledger_step: vi.fn() },
+vi.mock('#scripts/epic/epic-close', () => ({
+	epic_close: { close_completed_epics: vi.fn() },
 }))
 
 vi.mock('./git-notify', () => ({
@@ -59,7 +54,7 @@ const BASE_INPUT: WrapupInput = {
 const mocked_get_body = vi.mocked(git_gh_command.issue_get_body)
 const mocked_edit_body = vi.mocked(git_gh_command.issue_edit_body)
 const mocked_comment = vi.mocked(git_gh_command.issue_comment)
-const mocked_close_epics = vi.mocked(git_epic_close.close_completed_epics)
+const mocked_close_epics = vi.mocked(epic_close.close_completed_epics)
 const mocked_strip_label = vi.mocked(git_followup_label.strip_in_progress)
 const mocked_ensure_closed = vi.mocked(git_followup_issue_close.ensure_issue_closed)
 
@@ -322,24 +317,6 @@ const REPORT_LINE = '.claude/skills/workflow-commands/backlogrun.md (AI_COPY_DIR
 function notes_passed(): ReadonlyArray<string> | undefined {
 	return vi.mocked(git_notify.build_completion_comment_body).mock.calls[0]?.[0]?.notes
 }
-
-// joshuafolkken/kit#1810: the observation ledger's flush is wired into the post-merge tail, after
-// the tail steps and before the hold release, so an appended line reaches the default branch without
-// a person remembering. This module hands `should_merge` through; the flush's own behavior — the
-// short-circuit, the guard, the default-branch return — is `git-followup-flush.test.ts`.
-describe('run_wrapup — the observation ledger flush', () => {
-	it('flushes on a merged run, passing should_merge through', async () => {
-		await run_wrapup({})
-
-		expect(vi.mocked(git_followup_flush.flush_ledger_step)).toHaveBeenCalledWith(true)
-	})
-
-	it('hands should_merge through on a run that merged nothing', async () => {
-		await run_wrapup({ should_merge: false })
-
-		expect(vi.mocked(git_followup_flush.flush_ledger_step)).toHaveBeenCalledWith(false)
-	})
-})
 
 describe('run_wrapup — the managed config-file report', () => {
 	it('hands the report to the completion comment body', async () => {

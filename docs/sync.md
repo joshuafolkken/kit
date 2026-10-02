@@ -38,532 +38,40 @@ SECURITY.md         tsconfig.sonar.json
 
 The Codex project files are managed by kit. Sync overwrites both files, and rewrites `.codex/hooks.json` commands to run the consumer's installed kit bundles. If sync is run from a newer kit than the consumer has installed, it skips both hook files (`.claude/settings.json` and `.codex/hooks.json`) and tells the consumer to update the installed package first; `.codex/config.toml` can still be synced.
 
-> **The four distributed skills ship as the `kit` Claude Code plugin, not as copies
-> (joshuafolkken/kit#1879).** `.claude/settings.json` still overwrites the consumer's file — it
-> carries the `permissions.deny` rules a plugin cannot provide — and now also declares the `kit`
-> marketplace and enables the `kit` plugin. The skill bodies load from the package
-> (`node_modules/@joshuafolkken/kit/.claude/skills/`). The CLI does not auto-install a plugin from
-> settings alone, so a consumer runs a one-time `claude plugin marketplace add
-./node_modules/@joshuafolkken/kit && claude plugin install kit@kit` (or `/plugin`). `josh sync`
-> removes a stale copied skill directory only when its content still matches the shipment, and keeps —
-> with a warning — one the consumer edited or authored.
->
-> **A retired skill is removed the same way, but from a frozen manifest (joshuafolkken/kit#1990).** A
-> skill dropped from distribution has no package source left to compare against, so `josh sync` matches a
-> consumer's leftover copy against the recorded hash of its last distributed content: an untouched
-> copy is removed, an edited one is kept with a warning.
->
-> **GitHub Actions workflows are single-sourced by the kit.** Every consumer-facing workflow
-> (`ci.yml`, `auto-tag.yml`, `dependabot-auto-merge.yml`, `pr-classification.yml`, `production.yml`, `sonar-qube.yml`) is overwritten on
-> each `josh sync`, so action SHA pins are bumped once in the kit and propagated to all consumers —
-> no per-consumer maintenance. The kit's own `github-actions` Dependabot is what bumps those pins at
-> the source; `josh sync` then distributes them. The `github-actions` entry in the distributed
-> `dependabot.yml` is intentionally kept as a backstop (it covers any non-kit workflow a consumer
-> adds, and finds nothing to bump for synced workflows since their pins are already current).
->
-> **The `npm` entry, by contrast, no longer opens routine version-update PRs in any consumer.**
-> It sets `open-pull-requests-limit: 0`, which disables version updates only. `josh latest` runs
-> at the start of every `fullrun` / `halfrun` / `backlogrun` and already bumps npm dependencies to
-> latest, so the weekly Dependabot PRs were duplicating it — in kit they were closed unmerged
-> after each had consumed a full CI run, and the same noise was replicated in every consumer that
-> synced the file. Security advisories are unaffected — GitHub's Dependabot options reference
-> states that security update pull requests "are not subject to this limit and do not count toward
-> it" — so an advisory still opens an npm PR, provided the consumer has Dependabot security updates
-> enabled. This reaches a consumer on its next `josh sync`. See joshuafolkken/kit#803.
->
-> **`josh init`, `josh sync` and `josh doctor` all report that prerequisite.** Because the advisory path is now
-> the only npm Dependabot path, a consumer whose `Dependabot security updates` setting is off
-> receives no npm PRs at all — and the absence of a PR is indistinguishable from the absence of an
-> advisory. All three query `GET /repos/{owner}/{repo}/automated-security-fixes` and print one
-> of four results: `enabled`, `paused` (on, but opening no PRs), `disabled`, or `could not be read`.
-> `sync` reports unconditionally, because it overwrites the file on every run. `init` and `doctor`
-> report only where kit's config is actually present: `init` skips the file when the consumer
-> already has its own, and `doctor` is routinely run from a home directory or an unrelated clone to
-> diagnose the global install. Past that gate both always report, so a broken `gh` surfaces as
-> `could not be read` instead of as silence.
-> The last is reported as unchecked rather than as off — a 404 or a token without the scope is not
-> evidence that the setting is disabled — and never fails the command. When the setting is **off**
-> the report prints the enabling command, addressed at the resolved repository; kit does not run it,
-> because changing a repository setting is the maintainer's call. A **paused** repository gets
-> different advice: it is already `enabled: true`, so the enable endpoint is a no-op there — it must
-> be resumed from the repository's Security → Dependabot page instead. See joshuafolkken/kit#805.
->
-> **The workflow that merges the github-actions PRs is distributed too.**
-> `.github/workflows/dependabot-auto-merge.yml` is the other half of `dependabot.yml`: without it a
-> consumer receives the machinery that _opens_ Dependabot pull requests and none of the machinery
-> that _closes_ them. That is the state joshuafolkken/app-kit#184 was found in — all checks green,
-> `mergeable: MERGEABLE`, and no `autoMergeRequest` on the pull request, because nothing in the
-> repository ever enabled auto-merge. It merges `github-actions` **patch and minor** bumps only, and
-> never an npm bump at any semver level: the npm entry above leaves security advisories as the only
-> npm pull request that can reach it, and an advisory is exactly the kind a human should read.
->
-> **It merges a bump only in a workflow the consumer owns.** A bump to a workflow kit distributes
-> (`ci.yml`, `auto-tag.yml`, `dependabot-auto-merge.yml`, `production.yml`, `sonar-qube.yml`) is left
-> open instead, because the next `josh sync` rewrites those pins from the installed kit package
-> regardless of what was merged. Merging one produces a loop — Dependabot bumps the pin, the workflow
-> merges it, `josh sync` writes it back, Dependabot proposes the same bump again — with a full CI run
-> on every round. kit 1.93.0 shipped the workflow without this exclusion; joshuafolkken/kit#836 added
-> it. The pins in those files are maintained at the source: kit's own Dependabot bumps them and
-> `josh sync` distributes the result. See joshuafolkken/kit#802 for the ecosystem gate,
-> joshuafolkken/kit#834 for the distribution, and joshuafolkken/kit#836 for the exclusion.
->
-> **Each distributed workflow says so itself, rather than appearing on a list.** Every workflow this
-> package writes into a consumer gets a two-line header naming the package that wrote it:
->
-> ```yaml
-> # josh-managed-workflow: @joshuafolkken/kit
-> # Overwritten on every sync of that package. Edit it there, not here.
-> ```
->
-> The stamp is applied by the same write-time transform that resolves the action pins, so a workflow
-> distributed as a file or a renamed mapping cannot arrive without it. Two write paths bypass the
-> transform: the directory copy, which a kit unit test holds to an empty list, and `deploy-vps.yml`,
-> which is deliberately left unstamped for the reason below.
-> `josh init` still leaves an existing file alone — it does not stamp one, because the destination may
-> hold a workflow the consumer wrote themselves and a header claiming this package owns it would hold
-> every bump to it back on a false premise. It warns instead: until `sync` writes a header, the
-> auto-merge workflow reads that file as consumer-owned, and the warning names that rather than
-> leaving it to be discovered from a revert. The auto-merge workflow then reads each changed workflow at the
-> pull request's head and looks for that header on the first line — the answer to "will an upstream
-> package overwrite this?" comes off the file being asked about.
->
-> Until joshuafolkken/kit#844 the answer came from a list of five paths hardcoded in the auto-merge
-> workflow, and a list can only speak for the package that holds it. **Some kit consumers are
-> distribution packages themselves**: app-kit byte-copies `dast.yml` and `load.yml` into _its_
-> consumers on every sync. Those paths were not on kit's list, so in an app-kit consumer a bump to one
-> of them merged and the next `josh-app sync` wrote it straight back — the loop #836 closed, reopened
-> one tier down. A shared list could not fix it either: kit's write time is the only moment kit
-> controls, and at that moment it knows nothing of what app-kit distributes, so whichever `sync` ran
-> last would decide the list. A stamp written by the package that overwrites the file has no such
-> ordering problem, and any number of distribution tiers can each stamp their own output.
->
-> **A package built on kit stamps its own files through the same helper.** kit exports it as
-> `@joshuafolkken/kit/managed-marker`, taking the distributor's own package name:
->
-> ```ts
-> import { managed_marker_logic } from '@joshuafolkken/kit/managed-marker'
->
-> const written = managed_marker_logic.apply_marker_for_destination(
-> 	destination,
-> 	content,
-> 	'@joshuafolkken/app-kit',
-> )
-> ```
->
-> It is exported rather than left internal because the alternative is each distributor writing the
-> header itself, and a second implementation that spells the token differently or stacks a duplicate
-> silently breaks the check that reads it. The check matches the token, not any particular package
-> name, so every tier's stamp is recognized the same way.
->
-> The stamp also draws a line the list could only describe in prose. `deploy-vps.yml` is patched by
-> sync but written directly rather than through that transform, so it is never stamped and a bump to
-> its own pins still merges — a property of how the file is written, not of anyone remembering to
-> leave it out of a list.
->
-> Two failure modes are decided on the safe side. A changed workflow that cannot be read at the pull
-> request's head — deleted, rate-limited, or unreachable — fails the step rather than being answered:
-> publishing no output lands on the same side as answering "managed" (the reconciling step below reads
-> a missing input as "do not arm") but it lands there visibly, instead of withdrawing an auto-merge on
-> a green job with nothing to look at. And the narrowing to workflow paths happens inside the `--jq`
-> query rather than through `grep`, which answers `1` for "no match" and `2` for "I could not look":
-> the old check read both as "not managed", and one of those readings means "merge it".
->
-> **The decision is made once, and one step makes the pull request match it.** `gh pr merge --auto` is
-> state that outlives the run that set it, so deciding not to arm is not the same as undoing an arm an
-> earlier run performed. For four rounds this workflow carried two steps for that — one that armed and
-> one that withdrew — whose conditions had to be exact complements of each other, with nothing
-> enforcing the complement: joshuafolkken/kit#840 made it hold by writing one as the literal negation
-> of the other, which is a convention rather than a structure. Every fix since joshuafolkken/kit#836
-> had the same shape, a new axis added to several conditions at once.
->
-> joshuafolkken/kit#845 replaced that with one step that changes the state, taking both directions
-> from two declarations that answer two genuinely different questions — which is what the old design
-> conflated:
->
-> ```yaml
-> MAY_ARM: >-
->   ${{ github.actor == 'dependabot[bot]'
->   && steps.managed.outputs.has-upstream-managed == 'false' }}
-> SHOULD_BE_ARMED: >-
->   ${{ github.actor == 'dependabot[bot]'
->   && steps.managed.outputs.has-upstream-managed == 'false'
->   && steps.metadata.outputs.package-ecosystem == 'github_actions'
->   && (steps.metadata.outputs.update-type == 'version-update:semver-patch'
->   || steps.metadata.outputs.update-type == 'version-update:semver-minor') }}
-> ```
->
-> `MAY_ARM` asks whether this **run** is entitled to decide — who pushed, and whether the diff holds a
-> workflow an upstream package overwrites. `SHOULD_BE_ARMED` asks whether this **bump** qualifies, and
-> is `MAY_ARM` plus the ecosystem and the semver level, which are facts about the bump that do not
-> change over a pull request's life. The second contains the first verbatim and a kit unit test holds
-> that containment, so they cannot drift into disagreeing the way two complements could.
->
-> **The distinction is what the withdrawal keys on, and it is load-bearing.** On a run that is still
-> entitled, a bump that simply does not qualify — an npm security advisory, a github-actions major — is
-> left exactly as it is: if a maintainer read it and enabled auto-merge by hand, that is their
-> decision. Withdrawing there would strand the pull request green, mergeable and unmerged, which is the
-> state joshuafolkken/kit#834 exists to prevent.
->
-> What is withdrawn is an arm the **run** is not entitled to. That takes back a hand-armed auto-merge
-> as well, and deliberately: a push nobody reviewed as part of the bump is exactly the case
-> joshuafolkken/kit#840 closed, and who armed it earlier does not make the new commits reviewed. A
-> human is overridden when merging would be harmful, and only then — falling outside this workflow's
-> policy is not.
->
-> The step reads what the pull request currently says before either direction, because
-> `--disable-auto` is an error rather than a no-op on a pull request that has none. Arming and
-> withdrawing stop being two policies that must not disagree and become two directions of one.
->
-> It stays an **expression** rather than shell on purpose. Written that way, GitHub's own engine
-> evaluates it and kit's unit tests evaluate the very same string with that engine — a matrix over
-> actor, upstream-managed, ecosystem and semver level proves which updates can reach the arming call.
-> Moved into the script it would still work, and every guard on it would decay from an evaluation into
-> a substring match.
->
-> **A step that could not answer publishes no outputs, and the chain that names it goes false.** The
-> two chains name different inputs, which is deliberate. An upstream-managed check that refused to
-> decide costs the run its entitlement, so an arm it finds is taken back. A metadata action that could
-> not read the branch costs only qualification: nothing is armed now, and an arm an earlier run made is
-> left alone — that run did verify the ecosystem and the semver level, and neither changes over a pull
-> request's life, so withdrawing would strip a good arm every time the action has a bad day. The safe
-> side is per question rather than per input: _do not arm on what I cannot verify_, and _take back what
-> this run is not entitled to_.
->
-> The two failures also announce themselves differently, which is why only one of them fails a step. An
-> upstream-managed check that guessed would let an unreviewed bump merge and nothing would say so, so
-> it fails loudly. A metadata action that cannot answer makes bumps stop merging, which announces
-> itself by the pile of open pull requests; the reconciling step names it in the log as well, so a
-> broken action is not mistaken for a queue of bumps that merely do not qualify. The step carries
-> `if: '!cancelled()'` so it is reached after either failure; a cancelled run is left alone, because it
-> changed nothing about the pull request and the run that superseded it will decide from the current
-> state anyway (joshuafolkken/kit#840).
->
-> **`dependabot/fetch-metadata` no longer constrains the order.** The ecosystem and the semver level
-> come from an action rather than a context, and that action fails outright when the branch's first
-> commit is not Dependabot's — a maintainer who amended or rebased the bump. A failed step used to take
-> every step after it with it, which is why the withdrawal had to be placed ahead of it and why it had
-> to repeat the arming gate to avoid running at all (joshuafolkken/kit#838). `continue-on-error: true`
-> contains that failure, and both workarounds go with it. What order remains is data dependency alone.
->
-> **The two directions are not equally dangerous.** Failing to arm leaves the bump open for a human —
-> an inconvenience. Failing to withdraw leaves an auto-merge armed on a diff nobody re-approved, and
-> this workflow is not a required check, so a red run does not hold the merge back.
->
-> That asymmetry is why, of the two calls that change the state, **the arming one does not retry**. A `gh` call that
-> failed once — a rate limit, a 5xx, a network blip — used to end the step where it stood, and the arm
-> survived; the state read and the `--disable-auto` now each get a few attempts with a widening delay.
-> The read is shared, so an arming run gets those attempts too — what it does not get is a second try
-> at arming. The notice below retries on the same terms, and so does the lookup that checks whether one
-> already stands.
->
-> Those attempts widen the window in which a superseded run could undo an arm a newer one just made,
-> from one failed call to the length of the backoff. The concurrency group above cancels such a run,
-> and where it does not the outcome lands on the same safe side as every other failure here: the bump
-> is left open for a human. When the read never succeeds, the
-> withdrawal is attempted anyway rather than skipped, because "I could not tell" is not evidence that
-> there is nothing to take back; the arming direction does the opposite and refuses, because arming on
-> a state nobody could read is the one move that cannot be undone later. Arming is not retried at all:
-> its failure leaves the bump open, which is where a human wanted it anyway.
->
-> When the withdrawal still fails after its retries, the run **comments on the pull request**. That
-> does not stop the merge — nothing in a non-required check can — but it puts the reason where the
-> person looking at the merged pull request will find it, instead of leaving a red job nobody had a
-> reason to open. The comment carries a marker naming the head it was written for and what the run
-> established, so re-running the job after a blip does not repeat a notice that already says the same
-> thing — while a failure after the branch moved, or a re-run that learned more ("confirmed armed and not
-> disarmed" where only "state unknown" stood), is reported as the new information it is. The reverse is
-> not: a later run that could not read the state adds nothing to a standing notice that did. The lookup
-> that checks for a standing notice is the same call against the same API as the state read, so it
-> cannot help when that read is what never succeeded — a lasting read outage duplicates the notice on
-> each re-run, which is the better mistake when the alternative is silence.
->
-> A withdrawal whose response was lost looks the same as one that failed, and the retry after it then
-> fails for the honest reason that there is nothing left to disable — so before anyone is asked to
-> act, the run reads the state once more and exits quietly if the pull request is not armed after all.
-> That same read resolves the case where the state was never legible: a pull request that turns out
-> not to be armed needs no notice. The notice is not retracted when a later run succeeds where an
-> earlier one did not; it asks the reader to check, and finding it already withdrawn is the cheap end
-> of that.
->
-> The notice is not free: most pull requests reaching the unreadable-state path were never armed, so
-> during a partial outage some of those comments ask someone to check something that turns out to be
-> fine. That is the deliberate side of the trade — the silence it buys would let a genuinely armed
-> auto-merge merge an unreviewed diff with nothing to read anywhere — and the notice for that case says
-> the state is unknown rather than claiming it is armed. See joshuafolkken/kit#846.
->
-> The same asymmetry is why only the arming call carries `--match-head-commit`, naming the head the run
-> was triggered for:
-> the flag reaches GitHub as the auto-merge mutation's `expectedHeadOid`, so the arm is refused if the
-> branch moved since this run decided. That closes the window the concurrency group only narrows
-> (joshuafolkken/kit#842). Withdrawing from a stale view costs at most an auto-merge the next run
-> re-arms, so it needs no such guard.
->
-> **One run at a time per pull request.** Nothing above orders the runs against each other, and GitHub
-> leaves them running in parallel unless a workflow declares a `concurrency` group. Without one, a run
-> that found nothing upstream-managed in the diff, was overtaken by a force-push that added one, and
-> reached its arming step after the newer run had already reconciled, would arm auto-merge on a diff
-> kit overwrites — with nothing left to run afterwards to undo it. Both copies therefore declare
-> `group: ${{ github.workflow }}-${{ github.ref }}` with `cancel-in-progress: true`; `github.ref` is
-> the pull request's own merge ref, so a superseded run is cancelled without one bump waiting on
-> another's.
->
-> **`ci.yml`'s group is no longer the same expression, and it is not one to reconcile with.** Since
-> joshuafolkken/kit#1481 it appends the commit sha on a `push` event, so that every commit landing on
-> the default branch runs to completion instead of being cancelled by the next one. This workflow is
-> triggered by `pull_request` alone, so that clause can never fire here: copied verbatim it renders
-> to the empty string and buys nothing. Copied **without** its `github.event_name == 'push'` guard it
-> would be actively wrong — the merge ref's sha moves with every push to the branch, so each push
-> would get a group of its own and no superseded run would ever be cancelled, which is the whole of
-> what this block buys.
->
-> In kit's **own** repository the same workflow deliberately has no upstream-managed exclusion — and so
-> has nothing to withdraw, which is why it keeps a plain arming step and the narrower `github.actor`
-> guard on its job. Reconciling there would newly withdraw an auto-merge a human enabled by hand, for a
-> decision kit's own copy does not even make. There `.github/workflows/*` is the source of truth, so a
-> bump merged in kit is precisely the update every consumer then receives.
->
-> **`josh init`, `josh sync` and `josh doctor` report that workflow's prerequisite too.**
-> `gh pr merge --auto` fails outright with `Auto-merge is not allowed for this repository` unless the
-> repository's own **Allow auto-merge** setting is on, and that setting is off by default — so
-> distributing the workflow without reporting the setting would hand every consumer a workflow that
-> never merges anything. All three read the `allow_auto_merge` field of
-> `GET /repos/{owner}/{repo}` and print one of three results: `enabled`, `disabled`, or
-> `could not be read`. The whole repository object is requested rather than a `--jq` projection,
-> because a projection cannot tell a field that is `false` from a field the response never carried —
-> a token without admin access simply does not receive it. `sync` reports unconditionally; `init` and
-> `doctor` report only where a workflow that calls `gh pr merge --auto` is actually present, which
-> also covers a consumer's own auto-merge workflow, since it needs the same setting. When the setting
-> is **off** the report prints the enabling command, addressed at the resolved repository. kit never
-> runs it: changing a repository setting is outward-facing, needs admin scope, and is the
-> maintainer's call — the same line joshuafolkken/kit#805 drew, which is why `josh doctor --fix` does
-> not enable this either. See joshuafolkken/kit#834.
->
-> **Pins are resolved when the file is written, not read from the template.** Every workflow the
-> kit writes into a consumer (`josh init` and `josh sync` alike) passes through
-> `workflow_pin_logic.apply_pins_for_destination`, which substitutes each `uses:` ref from the
-> kit's own `.github/workflows/*` — the single source of truth. Dependabot's `github-actions`
-> ecosystem can only scan `.github/workflows/**` and a root `action.yml`, so it can never update
-> `templates/workflows/*`; resolving at write time is what keeps that blind spot from reaching
-> consumers. A template ref that lags behind a bump is therefore harmless, and no longer fails the
-> kit's own CI. See joshuafolkken/kit#747.
->
-> **`.claude/settings.json` denies the commands the prompts forbid most often.** `CLAUDE.md` bans
-> autonomous staging and pull request merges nobody asked for in several places, but prose is only
-> honored while it is being read — so the distributed
-> settings deny them mechanically, alongside the destructive commands that were already there:
->
-> ```json
-> "Bash(git add*)", "Bash(git stage*)", "Bash(git rm*)", "Bash(git mv*)",
-> "Bash(git reset*)", "Bash(git restore --staged*)", "Bash(git restore -S*)",
-> "Bash(git commit*)", "Bash(gh pr merge*)"
-> ```
->
-> **The REST era gave every write a second spelling, and joshuafolkken/kit#1022 left the deny list
-> matching only the first.** `gh <noun> <verb>` was the shape the entries above were written
-> against; once the merge became `PUT repos/{owner}/{repo}/pulls/<N>/merge`, `Bash(gh pr merge*)`
-> stopped covering the command the tooling actually runs, and `CLAUDE.md` was left claiming a
-> guarantee the file no longer provided. joshuafolkken/kit#1054 corrected the prose;
-> joshuafolkken/kit#1062 audited the whole list and closed what a pattern can close:
->
-> ```json
-> "Bash(gh api *pulls/*/merge*)", "Bash(gh api graphql*mergePullRequest*)",
-> "Bash(git push *--force*)", "Bash(git push * -f)", "Bash(git push * -f *)",
-> "Bash(git push * +*)", "Bash(git push *--delete*)", "Bash(git push -d*)",
-> "Bash(git push * -d)", "Bash(git push * -d *)", "Bash(git branch -d*)",
-> "Bash(git branch -D*)", "Bash(git branch --delete*)",
-> "Bash(gh api *DELETE*git/refs/heads/*)", "Bash(gh api *git/refs/heads/*DELETE*)"
-> ```
->
-> The merge entries match the **path**, not the method: `-X PUT` may be written before or after it,
-> and an entry pinned to one ordering leaves the other open. That also refuses a `GET` of the same
-> path, which is the accepted cost — merge state is read from `pulls/{N}` instead. The force-push and
-> branch-deletion entries exist because `CLAUDE.md` forbids all three shared-state mutations in one
-> sentence while only one spelling of one of them was denied: `git push origin main --force` put the
-> flag after the arguments and walked straight past `Bash(git push --force*)`, and branch deletion
-> had no entry at all. **Each flag git spells two ways is denied both ways, in both positions** —
-> `--force` and `-f`, `--delete` and `-d` — plus `+<ref>`, which force-updates a branch with no flag
-> at all. The short-flag entries carry a leading space (`git push * -f`) so a branch whose name ends
-> in `-f` can still be pushed; written as `*-f` they would match that branch name and block the
-> manual push the recovery path depends on. **A grouped short flag is the spelling that still gets
-> through** — `git push -uf origin main` matches none of them, because the glob has only `*` and
-> cannot say "inside the first token", and every approximation that catches `-uf` also catches an
-> ordinary push. It is left to the prose rule rather than closed with a pattern that would strand a
-> run. No josh step deletes a branch or force-pushes, so none of this constrains the workflow.
->
-> **A rule cannot match a literal `:`.** Measured against the running harness, not inferred: an entry
-> containing `=` or `+` matched exactly what it named, and every entry containing `:` matched nothing
-> at all — the character is grammar in the rule syntax (the `:*` trailing-wildcard form).
-> `Bash(git push origin :*)` refuses neither `git push origin :branch` nor `git push origin main`; it
-> is simply dead. So `git push origin :branch`, the colon-refspec spelling of a branch deletion,
-> cannot be denied and is left to the prose rule. An entry carrying a colon would ship as a guard
-> that was never in force, which is why `claude-settings.test.ts` fails one.
->
-> **No josh step is affected.** `pnpm josh git` and `pnpm josh followup` run git and gh from
-> inside node scripts, so the only command string the Bash matcher ever sees is the `pnpm josh …`
-> wrapper — denying the direct forms leaves the entire commit-and-merge workflow intact. `git rm` is
-> denied whole rather than as `git rm --cached`, which would leave `git rm -r --cached` through; a
-> tracked file is deleted with plain `rm` and staged by `pnpm josh git`, so nothing legitimate needs
-> it. `git restore <path>` is left unblocked so the documented way to undo a deletion stays
-> available to whoever runs it; the two spellings that carry the index, `--staged` and `-S`, are
-> denied. Unblocked is not the same as endorsed — the prose rule still has the agent ask before
-> running that or any other destructive rewrite.
->
-> **`git commit` is denied as a whole subcommand, and was not always.** `git commit -a` stages every
-> tracked file and commits it, which is the fallback a refused `git add` pushes an agent toward, so
-> the two spellings of that flag were denied first and alone. Plain `git commit -m "…"` was left
-> reachable deliberately: `prompts/git-automation.md` — shipped to consumers in the same package —
-> instructed the agent to run exactly that command, and denying it here would have broken a
-> documented flow from the other half of the distribution. **That reason is gone.**
-> joshuafolkken/kit#1064 retired the prompt, and no distributed document instructs the agent to run a
-> bare `git commit` any more, because `pnpm josh git` drives the whole commit through a node script —
-> so the Bash matcher sees `pnpm josh …` and the approved commit flow is untouched by any pattern
-> written here. joshuafolkken/kit#1075 therefore folded both flag entries into the single
-> `Bash(git commit*)` that contains them. What that closes is the second fallback: an agent refused
-> at `git add` reached for `git commit -a`, and an agent refused at both reached for `git commit -m`,
-> which is now denied by the same prefix as the staging command it was standing in for. The one bare
-> `git commit` still printed anywhere is the pre-commit type check's `JOSH_PRE_COMMIT_FORCE=1 …`
-> hint, and that is addressed to whoever is at the terminal: an environment assignment ahead of the
-> command does not escape the matcher, so an agent that copies it is refused like any other spelling.
->
-> **It is a guardrail, not a sandbox.** Each entry is a prefix pattern, so plenty still runs: a
-> global option ahead of the subcommand (`git -C . add .`), a flag pair the prefix does not cover
-> (`git restore --worktree --staged <path>`), the plumbing spellings (`git update-index`,
-> `git apply --cached`), and everything that stages or commits by another route (`git merge`,
-> `git cherry-pick`, `git revert`). `git stash` is the notable one: the documented `fullrun new` /
-> `backlogrun` steps run it and `pnpm josh stash:pop "<message>"` themselves (message-targeted, because
-> the stash is a repository-wide stack every lane shares — joshuafolkken/kit#2050), and a `pop` without
-> `--index` reapplies everything unstaged, so that flow flattens a staged baseline the deny entries
-> otherwise protect.
-> Closing all of them would mean denying
-> `git` itself, which takes the read-only inspection commands the prompts require with it. The deny
-> stops the habitual form, which is the form an agent reaches for; the prose rule in `CLAUDE.md`
-> stays the authority on intent, and a command being refused is not the boundary of what is
-> forbidden.
->
-> **The same file caps what one command's output contributes to the context.** Its `env` block
-> declares `BASH_MAX_OUTPUT_LENGTH`, which Claude Code applies by middle-truncating a longer Bash
-> result — so the limit sits in the harness rather than in the judgement of whichever agent typed the
-> command. The harness default of 30,000 characters fired on none of 1,848 Bash results measured
-> across 25 sessions, which is why the distributed value is lower. The number, the measurement behind
-> it and the two designs it was chosen over are in
-> `prompts/collaboration-workflow/output-bounds.md`; `scripts/lib/bash-output-cap.test.ts` fails a value
-> that would not fire.
->
-> **`.claude/skills/verify-ui/` is the UI gate's implementation.** The completion gate in the rule
-> AI documents says a change to the rendered screen is not done until someone has looked at it, and
-> until joshuafolkken/kit#853 it named a skill this package did not ship — so the step pointed at
-> nothing. The skill picks the routes, calls the application layer's own screenshot command, and
-> opens the images. Where no such command exists it says so and leaves the gate open, which is the
-> point: a skill that returned success there would read as closed while verifying nothing. Of the two
-> commands it looks for, `josh-app shot` shipped in app-kit 0.86.0 (joshuafolkken/app-kit#200) and
-> `josh-game shot` does not exist yet, so a SvelteKit project captures for real while a game project
-> still takes the fallback. Which branch a project takes is decided by the command list its toolkit
-> prints, never by a sentence here: this one is true of a version, and the skill is written to check
-> rather than to trust it (joshuafolkken/kit#883).
->
-> It is distributed as `verify-ui` rather than `verify` deliberately. Claude Code bundles a `/verify`
-> of its own, and a project skill at `.claude/skills/verify/` replaces it — that path is also where
-> the bundled skill records its own recipe, so `josh sync` and the recording would overwrite each
-> other on every run, the same distribution loop the workflow pins had to be pulled out of. A unit
-> test asserts that no `.github/workflows` path is in the directory-copy list: the copy skips the
-> pin-and-stamp transform, and a workflow shipped through it would arrive unpinned and unstamped.
->
-> **`.claude/skills/workflow-commands/` and `.claude/skills/dependency-update/` hold what the AI
-> documents used to inline.** The rule document is read in full on every turn, and roughly
-> half of it was procedure for a workflow most turns never enter — the `kickoff` / `fullrun` /
-> `halfrun` / `backlogrun` steps, the `/code-review` → `followup` chain rule, and the checks that run
-> after a dependency update. joshuafolkken/kit#854 moved those into these two skills and left the
-> documents with the trigger, cutting each from roughly 83 KB to roughly 49 KB.
->
-> **What stays resident is decided by one question — must the rule fire on a turn where no skill was
-> loaded?** joshuafolkken/kit#951 wrote that criterion down after the documents grew back to within
-> three bytes of their ceiling and each new rule started paying for itself by deleting a neighboring
-> sentence. `.claude/skills/workflow-commands/SKILL.md` → "What stays resident, and what is read from
-> here" carries the criterion and the exhaustive list of the rules that pass it; a unit test asserts
-> each of them present in `CLAUDE.md`, and asserts headroom under the ceiling so the next rule is
-> written while moving a procedure is still a choice. Since
-> [#963](https://github.com/joshuafolkken/kit/issues/963) that is the only document those markers
-> are asserted against — `AGENTS.md` and `GEMINI.md` are pointers to it, guarded instead by
-> `scripts/document/ai-document-pointers.test.ts`, which fails if a rule body reappears in either.
->
-> Their markdown does cite `prompts/…` paths, which a byte copy would have shipped unresolved — so
-> the directory copy is followed by the same rewrite the file copies run, over the copied markdown
-> only. A binary file under a skill is left untouched, and a `.github/workflows` path still may not
-> live there: the rewrite covers markdown, not the pin-and-stamp transform.
->
-> **The directory copy merges and never prunes.** `cpSync` writes the package's files over the
-> consumer's and leaves everything else in place, so a file dropped from the skill upstream stays in
-> the consumer until someone deletes it, and a file a consumer adds beside `SKILL.md` survives every
-> sync. Deleting the destination first would be the alternative, and it would take a consumer's own
-> files with it — so the merge is the deliberate half of the trade, and a removed file is something
-> to announce in the release notes rather than something sync cleans up.
->
-> **The same file wires the post-edit formatter.** Its `PostToolUse` hook runs
-> `pnpm josh format:edited` after every `Edit`, `Write` and `Bash`, formatting the one file that
-> changed instead of leaving an agent to run a whole-project lint to see what a single edit looked
-> like. `Bash` is in that list for the live round-trip density line the same hook carries, not for
-> formatting — a shell payload names a command rather than a file, and seven of the ten most recent
-> sessions in this checkout never called `Edit` or `Write` once, so on the narrower matcher the line
-> reached none of them (joshuafolkken/kit#1337). It reaches a consumer the same way the deny list
-> does, and `docs/josh-commands.md` documents what the command does, why the matcher names exactly
-> those three tools, and why it never fails.
->
-> **And it wires the batching guard, on the earlier side of the same event pair.** A `PreToolUse` hook
-> runs `pnpm josh batch:guard` before every `Bash`, `Edit`, `Read` and `Write` call, refusing the one that would make a third
-> consecutive single-call turn — or, for a `Write`, which it cannot refuse, notifying instead (joshuafolkken/kit#1390, joshuafolkken/kit#1848). It is on the earlier event for the reason the
-> formatter is on the later one: by `PostToolUse` the round trip has already been spent, and describing
-> it there is what the density line above already does — measured at 1.10–1.12 calls per round trip
-> across the three runs after that line shipped, against a 1.50 floor. **It names `Edit` beside `Bash` since joshuafolkken/kit#1762,
-> `Read` since joshuafolkken/kit#1798 and `Write` (for the notice) since joshuafolkken/kit#1848**, where it named `Bash` alone before the first of those: `Edit` carries 164 of the 251
-> recoverable round trips measured over 20 runs, so excluding it put the largest contributor beyond
-> reach. Refusing one is safe because the guard **withholds the refusal whenever the call in hand names
-> a file the sequence behind it already touched** — the visible case where a reissued edit would meet
-> text that has moved, since Claude Code denies one call of a turn and runs the rest. It cannot see the
-> turn it interrupts, so a batched turn's first edit can still be refused while its siblings apply; the
-> bound is that a refusable write is content-addressed, so the reissue either applies where it was meant
-> to or fails to match and is reported, never lands wrongly. **`Write` is excluded for exactly that
-> reason** — a reissued whole-file write carries no match check, so it could overwrite a sibling's
-> applied edit in silence. Within `Bash` the
-> mutation words still exclude every `pnpm josh` command, commit and Issue write — a matcher is settings
-> a consumer can widen, and what a call is stays the script's answer whatever the wiring says.
-> `JOSH_BATCH_GUARD=off` in the environment or in `.env` switches it off without editing the settings
-> file. `docs/josh-commands.md` carries the conditions, what the guard
-> cannot know about the turn it interrupts, and the bound on how often a refusal can repeat.
->
-> **A second `PreToolUse` hook runs `pnpm josh investigation:guard`, on `Read` and `Bash`**
-> (joshuafolkken/kit#1460). It refuses a file read once the run has read the delegation threshold's
-> worth of files it has not edited **since its last delegated unit** — the count taken off the
-> transcript rather than kept in an agent's head, which is what makes the threshold fire a second and
-> third time instead of once per run. It names `Read` as well as `Bash` because in these transcripts the
-> reading is split between the two, and on the `Bash` side it refuses only a line that **writes
-> nothing** — the test the batching guard itself asked until joshuafolkken/kit#1762 widened that one,
-> kept under a name of its own so the two guards cannot be moved together by accident. A
-> `sed -n` read is therefore counted and never refused. `JOSH_INVESTIGATION_GUARD=off` switches it off,
-> and `docs/josh-commands.md` carries which commands count as reading, the one-refusal-per-accumulation
-> bound and how to verify it.
->
-> **A third `PreToolUse` hook runs `pnpm josh rule:guard`, on `Bash`** (joshuafolkken/kit#1524). It is
-> a dispatcher rather than a third rule: `scripts/rules/delivered-rules.ts` enumerates the rules whose
-> trigger can be named as one tool call, and each row is a spec of the same shell the two guards above
-> share. **This is what makes a rule cheaper to ship than to carry** — `CLAUDE.md` is read on every
-> turn and had run out of room, while a refusal costs nothing until the call that binds the rule and
-> cannot be skimmed past. Today it delivers the backlog WIP cap at the call that files an Issue; a
-> comment endpoint is not a filing and is left alone, and so — the trigger reads the command string —
-> is a filing whose title never appears in it. **That limit is why the rule keeps a one-line trigger
-> resident**: the line binds on every route, and the delivery reinforces it where it can see one. It
-> also delivers the rule that an Issue's comments are read with its body (joshuafolkken/kit#1319), and
-> the one that a verification command is not read through a pipe (joshuafolkken/kit#1556) — a pipeline
-> exits with its last command's status, so a red gate read through `| tail` came back as a success.
-> **Read-only listings are untouched** — that trigger names only the checks whose result means pass or
-> fail, and narrowing a listing with `| head` is how one is properly read.
-> `JOSH_RULE_GUARD=off` switches it off, and
-> `prompts/collaboration-workflow/rule-delivery.md` is the enumeration and the criterion behind it.
->
-> **The trade-off is deliberate.** A deny entry has no exception for "the user asked for it in this
-> turn", so the one case the prompts allow — an explicit staging instruction — is blocked too. It is
-> blocked only for the agent: the user runs `git add` in their own terminal unchanged. A permanent
-> mechanical guarantee is worth more than an exception that costs one command to work around. See
-> joshuafolkken/kit#850.
+What else a consumer should know about the files above. Each item is the behavior; why it is that way, and the history behind it, is maintainer rationale in `docs/maintainers/sync-rationale.md`.
+
+- **The distributed skills ship as the `kit` Claude Code plugin, not as copies.** `.claude/settings.json` declares the `kit` marketplace and enables the `kit` plugin; the skill bodies load from `node_modules/@joshuafolkken/kit/.claude/skills/`. The CLI does not install a plugin from settings alone, so run once: `claude plugin marketplace add ./node_modules/@joshuafolkken/kit && claude plugin install kit@kit` (or `/plugin`). Sync removes a leftover copied skill directory — including one for a skill no longer distributed — only while it still matches what kit shipped; a copy you edited or authored is kept with a warning. Rationale: `docs/maintainers/sync-rationale.md` → "The skills ship as a plugin".
+- **Every distributed workflow is overwritten on each sync**, so its action SHA pins come from kit. The distributed `dependabot.yml` keeps a `github-actions` entry as a backstop for workflows you add yourself, and its `npm` entry sets `open-pull-requests-limit: 0`: npm version-update PRs are off, and only security advisories open npm PRs — which requires the repository's **Dependabot security updates** setting. `josh init`, `josh sync` and `josh doctor` report that setting as `enabled`, `paused`, `disabled` or `could not be read` (`sync` always; `init` and `doctor` only where kit's `dependabot.yml` is present) and never fail on it. When it is off they print the enabling command; a paused repository is resumed from its Security → Dependabot page. kit never changes the setting itself. Rationale: `docs/maintainers/sync-rationale.md` → "Dependabot: the github-actions backstop and npm version updates".
+- **`.github/workflows/dependabot-auto-merge.yml` auto-merges Dependabot `github-actions` patch and minor bumps only** — never an npm bump, never a major — and never a bump to a workflow an upstream package overwrites (one carrying the header below), because the next sync would write that pin back. Rationale: `docs/maintainers/sync-rationale.md` → "The auto-merge workflow and what it never merges".
+- **It also withdraws an auto-merge the run is not entitled to**, including one armed by hand, while leaving a hand-armed bump that merely does not qualify alone. Arming is refused if the branch moved since the run decided (`--match-head-commit`); a withdrawal that still fails after its retries leaves a comment on the pull request; and runs are serialized per pull request by a `concurrency` group. Rationale: `docs/maintainers/sync-rationale.md` → "Arming and withdrawing auto-merge".
+- **That workflow needs the repository's Allow auto-merge setting**, which is off by default. `josh init`, `josh sync` and `josh doctor` report it as `enabled`, `disabled` or `could not be read` (`sync` always; `init` and `doctor` only where a workflow calling `gh pr merge --auto` is present) and print the enabling command when it is off; kit never runs it, `josh doctor --fix` included. Rationale: `docs/maintainers/sync-rationale.md` → "The Allow auto-merge prerequisite".
+- **Every workflow kit writes starts with a managed header**:
+
+  ```yaml
+  # josh-managed-workflow: @joshuafolkken/kit
+  # Overwritten on every sync of that package. Edit it there, not here.
+  ```
+
+  `josh init` does not stamp a workflow file that already exists; it warns that the auto-merge workflow treats that file as yours until `sync` writes the header. `deploy-vps.yml` is patched but never stamped, so bumps to its own pins still auto-merge. A package built on kit stamps the files it distributes through the same helper, passing its own package name:
+
+  ```ts
+  import { managed_marker_logic } from '@joshuafolkken/kit/managed-marker'
+
+  const written = managed_marker_logic.apply_marker_for_destination(
+  	destination,
+  	content,
+  	'@joshuafolkken/app-kit',
+  )
+  ```
+
+  Rationale: `docs/maintainers/sync-rationale.md` → "The managed-workflow stamp".
+
+- **Action pins are resolved when a workflow is written, not read from the template** — each `uses:` ref is taken from kit's own `.github/workflows/*`, by `josh init` and `josh sync` alike. Rationale: `docs/maintainers/sync-rationale.md` → "Action pins are resolved at write time".
+- **`.claude/settings.json` denies the commands the prompts forbid most often** — staging and committing (`git add`, `git commit`, `git restore --staged` and the like), pull request merges (`gh pr merge` and its REST and GraphQL spellings), force pushes and branch deletions. `pnpm josh git` and `pnpm josh followup` are unaffected, and so is your own terminal. It is a guardrail, not a sandbox: some spellings still get through, and `CLAUDE.md` stays the authority on what is forbidden. Rationale: `docs/maintainers/sync-rationale.md` → "The deny list in .claude/settings.json".
+- **The same file caps a Bash result** with `BASH_MAX_OUTPUT_LENGTH` in its `env` block; `prompts/collaboration-workflow/output-bounds.md` has the value. Rationale: `docs/maintainers/sync-rationale.md` → "The Bash output cap".
+- **`verify-ui` is the skill behind the UI verification gate.** It captures the affected routes through your toolkit's screenshot command (`josh-app shot`), and where none exists it says so and leaves the gate open. Rationale: `docs/maintainers/sync-rationale.md` → "The verify-ui skill".
+- **The `workflow-commands` and `dependency-update` skills hold the workflow procedures** the AI documents point to. A skill directory copy merges and never prunes: a file removed upstream stays until you delete it, and a file you add beside `SKILL.md` survives every sync. Rationale: `docs/maintainers/sync-rationale.md` → "Skills that hold what the AI documents used to inline".
+- **The same file wires the session hooks**: `pnpm josh audit:provision` on `SessionStart`; the work-summary reminder and `pnpm josh session:lang` on `UserPromptSubmit`; one `PreToolUse` process, `pnpm josh pretool:guard`, on `Bash`, `Edit`, `Read`, `Write` and `AskUserQuestion`, which runs the batching, investigation and rule guards together; `pnpm josh format:edited` after every `Edit` and `Write`; and `pnpm josh stop:guard` on `Stop`. Each guard is switched off by `JOSH_BATCH_GUARD=off`, `JOSH_INVESTIGATION_GUARD=off` or `JOSH_RULE_GUARD=off` in the environment or `.env`; [josh-commands.md](./josh-commands.md) documents each command. The rationale section records how the hooks were first introduced, as separate entries. Rationale: `docs/maintainers/sync-rationale.md` → "The hooks in .claude/settings.json".
 
 ### `pnpm-workspace.yaml` (merged)
 
@@ -670,8 +178,9 @@ Bundled directories (`prompts/`, `eslint/`) point into `node_modules`; paths the
 
 ## Refused inside the distribution package's own repository
 
-`josh sync` and `josh init` both write nothing and exit non-zero when the project they are aimed at
-**is** the package that distributes the files:
+This section is the single source for the self-sync refusal; [init.md](./init.md#refused-inside-the-packages-own-repository)
+links here and adds only the empty-directory case. `josh sync` and `josh init` both write nothing
+and exit non-zero when the project they are aimed at **is** the package that distributes the files:
 
 ```text
 Refusing to sync: this is @joshuafolkken/kit's own repository.
@@ -701,7 +210,8 @@ distributor syncing its own upstream — app-kit running kit's base sync inside 
 ([#879](https://github.com/joshuafolkken/kit/issues/879)). It calls the sync writers directly rather
 than through `josh sync`, so the guard on the sync entry point never covered it — and its blast
 radius is the larger of the two: on top of the files above it rewrites the project's `package.json`
-scripts and devDependencies. See [init.md](./init.md#refused-inside-the-packages-own-repository).
+scripts and devDependencies. A project with no `package.json` yet is covered in
+[init.md](./init.md#refused-inside-the-packages-own-repository).
 
 The detection ships as the `@joshuafolkken/kit/self-sync-guard` export so app-kit and game-kit apply
 the same rule rather than each re-implementing it.

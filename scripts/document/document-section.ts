@@ -12,7 +12,7 @@
 // is the distinction joshuafolkken/kit#1344 and joshuafolkken/kit#1460 were written after: a rule
 // moved to "read it later" is a rule that measurably never fires, and this moves nothing to later.
 
-import { readFileSync } from 'node:fs'
+import { file_reader } from '#scripts/lib/read-file'
 
 // `#` to `######`, one space, then the title. Written with a literal space rather than `\s+` and a
 // lazy title so it cannot backtrack: `sonarjs/super-linear-regex` rejects the `\s+…+?\s*$` shape,
@@ -134,11 +134,7 @@ function candidates(markdown: string, wanted: string): Array<string> {
 }
 
 function read_optional(file_path: string): string | undefined {
-	try {
-		return readFileSync(file_path, 'utf8')
-	} catch {
-		return undefined
-	}
+	return file_reader.read_if_readable(file_path)
 }
 
 const document_section = {

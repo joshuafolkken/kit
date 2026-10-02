@@ -59,8 +59,8 @@ vi.mock('./telegram-notify', () => ({
 
 // Mocked rather than left real: the auto-close reads GitHub, and a timing suite that reached the
 // network would measure the network.
-vi.mock('./git-epic-close', () => ({
-	git_epic_close: { close_completed_epics: vi.fn() },
+vi.mock('#scripts/epic/epic-close', () => ({
+	epic_close: { close_completed_epics: vi.fn() },
 }))
 
 // The same rule as the auto-close above, applied to the path that suite missed. `notify_completion`
@@ -89,7 +89,7 @@ const { git_gh_command } = await import('./git-gh-command')
 const { git_pr_checks } = await import('./git-pr-checks')
 const { git_pr_ai_review } = await import('./git-pr-ai-review')
 const { telegram_notify } = await import('./telegram-notify')
-const { git_epic_close } = await import('./git-epic-close')
+const { epic_close } = await import('#scripts/epic/epic-close')
 
 const { STAGE, STAGE_LINE_PREFIX, STAGE_TOTAL_PREFIX } = git_followup_stages
 
@@ -126,7 +126,7 @@ function answer_every_call(): void {
 	})
 	vi.mocked(git_pr_ai_review.handle_ai_review_findings).mockResolvedValue([])
 	vi.mocked(telegram_notify.send_or_report).mockResolvedValue(true)
-	vi.mocked(git_epic_close.close_completed_epics).mockResolvedValue()
+	vi.mocked(epic_close.close_completed_epics).mockResolvedValue()
 }
 
 function printed_lines(): Array<string> {
@@ -188,13 +188,13 @@ describe('git_pr_followup.run — a merged run whose cleanup failed', () => {
 	})
 
 	it('resolves, so a merged run is not reported as a failed one', async () => {
-		vi.mocked(git_epic_close.close_completed_epics).mockRejectedValue(FAILURE)
+		vi.mocked(epic_close.close_completed_epics).mockRejectedValue(FAILURE)
 
 		await expect(git_pr_followup.run({ ...BASE_INPUT, should_merge: true })).resolves.toBeDefined()
 	})
 
 	it('reports every stage, so the block still names where the run went', async () => {
-		vi.mocked(git_epic_close.close_completed_epics).mockRejectedValue(FAILURE)
+		vi.mocked(epic_close.close_completed_epics).mockRejectedValue(FAILURE)
 
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
 
@@ -202,7 +202,7 @@ describe('git_pr_followup.run — a merged run whose cleanup failed', () => {
 	})
 
 	it('names the step that failed rather than passing silently', async () => {
-		vi.mocked(git_epic_close.close_completed_epics).mockRejectedValue(FAILURE)
+		vi.mocked(epic_close.close_completed_epics).mockRejectedValue(FAILURE)
 
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
 
@@ -212,7 +212,7 @@ describe('git_pr_followup.run — a merged run whose cleanup failed', () => {
 	})
 
 	it('keeps merging the pull request', async () => {
-		vi.mocked(git_epic_close.close_completed_epics).mockRejectedValue(FAILURE)
+		vi.mocked(epic_close.close_completed_epics).mockRejectedValue(FAILURE)
 
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
 

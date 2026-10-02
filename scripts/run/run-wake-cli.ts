@@ -2,9 +2,9 @@
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import type { AgentProfile } from '#scripts/agent/agent-role-profile'
 import { telegram_notify } from '#scripts/git/telegram-notify'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryRead } from './run-carry'
 import { run_event_stream } from './run-event-stream'
 import { run_headless } from './run-headless'
@@ -120,11 +120,7 @@ function note_to_stderr(note: string): void {
 }
 
 function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
-	try {
-		return parseArgs({ args: [...argv], options: OPTIONS, strict: true }).values
-	} catch {
-		return undefined
-	}
+	return cli_flags.parse_or_undefined({ args: [...argv], options: OPTIONS, strict: true })?.values
 }
 
 function text_of(value: string | boolean | undefined): string | undefined {

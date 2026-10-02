@@ -27,7 +27,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['<message>', 'automation', ['git']],
 	},
 	epic: {
-		script: 'scripts-ai/epic.ts',
+		script: 'scripts/epic/epic.ts',
 		description: 'Create an epic issue from its child issue numbers',
 		category: 'AI tools',
 		reference: ['<title> <issue...> [--ordered]', 'automation', ['network']],
@@ -51,7 +51,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['<epic>', 'automation', ['network']],
 	},
 	'epic:check': {
-		script: 'scripts-ai/epic-check.ts',
+		script: 'scripts/epic/epic-check.ts',
 		description: 'Check an epic issue against the tracking requirements',
 		category: 'AI tools',
 		reference: ['<epic>', 'automation', ['network']],

@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { error_text } from '#scripts/lib/error-message'
 import { z } from 'zod'
 
 // A scenario is a rule from the distributed documents, restated as something an agent either does or
@@ -73,7 +74,7 @@ function parsed_json(source_path: string, raw: string): unknown {
 	try {
 		return JSON.parse(raw)
 	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error)
+		const reason = error_text.message_of(error)
 
 		throw new Error(`${path.basename(source_path)}: ${reason}`, { cause: error })
 	}

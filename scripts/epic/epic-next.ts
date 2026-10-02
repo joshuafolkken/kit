@@ -1,7 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
-import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
@@ -16,6 +15,7 @@ import { epic_lane_offer, type LaneOffer, type LaneRequest } from './epic-lane-o
 import { epic_next_read, type EpicRead, type SnapshotReads } from './epic-next-read'
 import { epic_next_views, type EpicView } from './epic-next-views'
 import { epic_outside_blocker } from './epic-outside-blocker'
+import { epic_parse } from './epic-parse'
 import { epic_report, type EpicNextResult } from './epic-report'
 
 // `josh epic:next <E…>` — which of the named epics' children can be started right now, bundled per
@@ -170,7 +170,7 @@ function unreadable_anomaly(snapshot: EpicSnapshot): GraphAnomaly | undefined {
 // body whose declared chain and recorded relations agree — a worse outcome than following the chain
 // the run's own `epic:check` already flagged.
 function is_order_declared(body: string | undefined, links: ReadonlyArray<unknown>): boolean {
-	return links.length > 0 || git_epic_parse.has_unordered_declaration(body)
+	return links.length > 0 || epic_parse.has_unordered_declaration(body)
 }
 
 function decide(
@@ -178,7 +178,7 @@ function decide(
 	paths: ReadonlyMap<string, string> = new Map(),
 	running?: ReadonlySet<string>,
 ): EpicNextResult {
-	const links = git_epic_parse.parse_dependency_links(snapshot.body)
+	const links = epic_parse.parse_dependency_links(snapshot.body)
 	const unreadable = body_anomaly(snapshot) ?? unreadable_anomaly(snapshot)
 	const anomalies =
 		unreadable === undefined

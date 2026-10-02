@@ -1,5 +1,4 @@
 #!/usr/bin/env tsx
-import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_finding_ledger, type CategoryCount } from './review-finding-ledger'
@@ -29,16 +28,10 @@ function format_report(counts: ReadonlyArray<CategoryCount>, zero_rounds: number
 	return `findings by category:\n${body}\n${zero_line(zero_rounds)}`
 }
 
-async function read_ledger(ledger_path: string): Promise<string> {
-	try {
-		return await readFile(ledger_path, 'utf8')
-	} catch {
-		return ''
-	}
-}
-
-async function run(ledger_path: string = observation_ledger_home.ledger_path()): Promise<number> {
-	const content = await read_ledger(ledger_path)
+// Every issue's file of the ledger directory is counted (joshuafolkken/kit#2919): a recurring category
+// is one whichever issue recorded each sighting.
+async function run(root: string = observation_ledger_home.ledger_root()): Promise<number> {
+	const content = (await observation_ledger_home.read(root)) ?? ''
 	const counts = review_finding_ledger.category_counts(content)
 
 	console.info(format_report(counts, review_finding_ledger.zero_round_count(content)))

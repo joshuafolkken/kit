@@ -73,6 +73,13 @@ describe('josh stash:pop refusals', () => {
 		expect(vi.mocked(git_stash.pop)).not.toHaveBeenCalled()
 		expect(code).toBe(FAILURE_EXIT_CODE)
 	})
+
+	it('refuses an unknown flag rather than popping around it', async () => {
+		const code = await stash_pop_cli.run([MESSAGE, '--nope'])
+
+		expect(vi.mocked(git_stash.pop)).not.toHaveBeenCalled()
+		expect(code).toBe(FAILURE_EXIT_CODE)
+	})
 })
 
 describe('josh stash:pop conflicts', () => {

@@ -1,62 +1,88 @@
 import { observation_ledger } from '#scripts/observations/observation-ledger'
-import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
+import { observation_ledger_prepare } from '#scripts/observations/observation-ledger-prepare'
 import { observations_flush } from '#scripts/observations/observations-flush'
 import { git_command } from './git-command'
-import { git_followup_cleanup } from './git-followup-cleanup'
-import { main_sync } from './main-sync'
+import { git_spawn } from './git-spawn'
 
 // The residual commit path for the observation ledger (joshuafolkken/kit#1810). A run's appended lines
-// ride its own commit (joshuafolkken/kit#2763), so after the merge the ledger is usually clean and this
-// short-circuits; what it still catches is a line appended after the commit — a second review round's
-// record — which would otherwise stay in the working tree until a person remembered to flush it. This
-// wires the flush into `pnpm josh followup`, the one step that knows the merge has landed.
+// ride its own commit (joshuafolkken/kit#2763), so the ledger is usually clean by now and this
+// short-circuits; what it still catches is a line appended after that commit — a second review round's
+// record — which would otherwise stay in the working tree after the merge.
 //
-// **It runs before the working-tree hold is released** (`scripts-ai/git-followup-finish.ts`, whose
-// `finish()` runs after `git_pr_followup.run()` returns), because a flush switches branches, and a
-// hold released first would let another run grab the tree mid-switch.
+// **It commits onto the pull request's own branch, before the merge** (joshuafolkken/kit#2919). It used
+// to flush after the merge from the default branch, which a lane cannot reach, so a lane's lines
+// waited in the primary checkout for a batch-end flush and were lost there to another run's stash.
+// Committed to the branch instead, the lines merge with the pull request — in a lane as anywhere — and
+// the CI wait `pnpm josh followup` runs next covers the pushed commit like any other push.
 
-const MAIN_SYNC_SUCCESS = 0
-const FLUSH_RECOVERY = 'pnpm josh observations:flush'
-const SYNC_FAILURE_MESSAGE =
-	'Could not return to the default branch to flush the observation ledger; `pnpm josh ms` printed the reason above.'
+const COMMIT_MESSAGE_PREFIX = 'Record observation ledger entries'
 
-// `observations_flush.flush` requires the default branch, so the checkout is returned to it first.
-// `main_sync.run` catches its own errors and answers with an exit code rather than throwing, so a
-// checkout it could not move is turned into the throw the guarded step below reports.
-async function sync_and_flush(): Promise<void> {
-	if ((await main_sync.run([])) !== MAIN_SYNC_SUCCESS) throw new Error(SYNC_FAILURE_MESSAGE)
-
-	console.info(await observations_flush.flush(new Date()))
+function commit_message(issue_number: string | undefined): string {
+	return issue_number === undefined
+		? COMMIT_MESSAGE_PREFIX
+		: `${COMMIT_MESSAGE_PREFIX} #${issue_number}`
 }
 
-// **Short-circuits when the ledger holds no pending append.** That is every run that recorded no
-// observation, so the ordinary run pays nothing. Guarded like its sibling tail steps (joshuafolkken/kit#1539): past the merge a flush
-// failure is reported, never allowed to take the merge, the epic close and the hold release with it.
-//
-// **A lane skips it outright** (joshuafolkken/kit#2419). Its ledger is the primary checkout's
-// (`observation-ledger-home.ts`), which this step cannot flush — `main_sync` refuses in a linked work
-// tree — so the line waits in the primary checkout and the `backlogrun` commits every lane's lines at
-// once through `pnpm josh run:carry --end` (joshuafolkken/kit#2492).
-async function flush_ledger_step(should_merge: boolean): Promise<void> {
-	if (
-		!should_merge ||
-		observation_ledger_home.is_lane() ||
-		!observation_ledger.has_pending_append(await git_command.status())
-	) {
-		return
+// **A broken line refuses the merge rather than riding it** (joshuafolkken/kit#2123): the branch's
+// ledger file goes away with the lane, so a line left behind here is a line lost.
+async function assert_grammar(): Promise<void> {
+	const broken = await observation_ledger_prepare.prepare(await git_command.repository_root())
+
+	if (broken.length > 0) throw new Error(observations_flush.broken_lines_message(broken))
+}
+
+// **A push that fails takes its commit back**, leaving the lines staged: the next `pnpm josh followup`
+// then finds them pending and retries. Left committed, they would read as clean and the merge would
+// go ahead without them, the lines stranded in a local commit no reader sees.
+async function push_or_undo_commit(): Promise<void> {
+	try {
+		await git_command.push()
+	} catch (error) {
+		await git_spawn.read(['reset', '--soft', 'HEAD~1'])
+		throw error
 	}
-
-	// `should_merge` is always true past the early return; it is passed on as `run_guarded_step`'s
-	// guard flag rather than a literal `true` so this step stays identical to its sibling tail steps —
-	// hardcoding `true` would turn the guard on for a `--no-merge` run if the early return were ever
-	// dropped (the trap `in_progress_step` warns of).
-	await git_followup_cleanup.run_guarded_step(should_merge, {
-		label: 'The observation ledger flush',
-		recovery: FLUSH_RECOVERY,
-		run: sync_and_flush,
-	})
 }
 
-const git_followup_flush = { flush_ledger_step }
+// Only the ledger paths are staged — whatever else the tree holds is the run's to commit, not this
+// step's — and `-A` takes a migration's deletion of an old path with it.
+async function commit_and_push(
+	paths: ReadonlyArray<string>,
+	issue_number: string | undefined,
+): Promise<void> {
+	await git_spawn.read(['add', '-A', '--', ...paths])
+	await git_command.commit(commit_message(issue_number))
+	await push_or_undo_commit()
+}
+
+// **Short-circuits when the ledger holds no pending append**, which is every run that recorded nothing
+// after its commit, and on a `--no-merge` run, which has no merge for the lines to ride.
+async function commit_ledger_step(
+	should_merge: boolean,
+	issue_number: string | undefined,
+): Promise<void> {
+	if (!should_merge) return
+
+	const status_output = await git_command.status()
+
+	if (!observation_ledger.has_pending_append(status_output)) return
+
+	await assert_grammar()
+
+	// Read again: the grammar check migrated any old-path ledger, which changes what is to be staged.
+	const paths = observation_ledger
+		.ledger_paths(await git_command.status())
+		.filter((file_path) => !observation_ledger.is_migration_claim(file_path))
+
+	// A live run's migration claim alone is pending, not a line: with no path, `git add -A --` would
+	// stage the whole tree.
+	if (paths.length === 0) return
+
+	await commit_and_push(paths, issue_number)
+	console.info(
+		`💡 Committed ${String(paths.length)} observation ledger path(s) to the pull request.`,
+	)
+}
+
+const git_followup_flush = { COMMIT_MESSAGE_PREFIX, commit_ledger_step }
 
 export { git_followup_flush }

@@ -279,7 +279,7 @@ describe('josh_logic.spawn_script — default_script_arguments injection', () =>
 	it('injects default_script_arguments between script path and user args', () => {
 		const spy = vi.spyOn(josh_logic, 'spawn_script').mockReturnValue(0)
 		const tsx_executable = 'tsx'
-		const script_path = path.join(PACKAGE_DIR, 'scripts-ai/git-workflow.ts')
+		const script_path = path.join(PACKAGE_DIR, 'scripts/git/git-workflow.ts')
 		const user_arguments = ['feat: my feature #42']
 		const expected_arguments = [
 			script_path,

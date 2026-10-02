@@ -12,44 +12,63 @@ import { prompt_hooks } from './prompt-hooks'
 //
 // Shortening a rule is only safe if the rule survives, so this suite pins the directives rather
 // than the prose. A rewrite that drops one of them fails here, however elegant it reads.
+//
+// joshuafolkken/kit#2889 cut the hooks again, to a trigger and a pointer: the directives they
+// restated now live once, in `CLAUDE.md` → Code Change Rules Step 0 (and the deletion policy in its
+// Tier C line, pinned by `claude-settings-hooks.test.ts`), which every session already loads. So the
+// directives are pinned where they live, and the hook is pinned to the trigger and the pointer.
 
 // Headroom on purpose. joshuafolkken/kit#951 showed what a ceiling with none does: the next edit
 // pays for itself by deleting a neighboring sentence, and the sentence it deletes is whichever one
-// no test pinned rather than whichever matters least. 1,010 bytes today against a 1,100 ceiling
-// still locks in a quarter of the reduction and leaves room for one legitimate clarification.
-const PER_TURN_CEILING_BYTES = 1100
+// no test pinned rather than whichever matters least. About 190 bytes today against a 256 ceiling
+// locks in the reduction and leaves room for one legitimate clarification.
+const PER_TURN_CEILING_BYTES = 256
 
-// One phrase per instruction the long form carried. Chosen as the words that change behavior — the
-// trigger, the shape, the prohibitions — not the sentences that explained why.
-//
-// Some of these are also asserted by `report-format.test.ts` and `claude-settings.test.ts`, and the
-// overlap is deliberate rather than an oversight. Those suites pin a phrase because the *rule* needs
-// it; this one pins the same phrase because a *shortening* must not drop it. They would be edited
-// for different reasons and by different changes, and a rewrite that satisfied one while quietly
-// failing the other is exactly what this list exists to catch.
-const REQUIRED_DIRECTIVES: ReadonlyArray<string> = [
+// The trigger and the shape the reader is asked for — stated by the hook and by Step 0 alike.
+const SHARED_DIRECTIVES: ReadonlyArray<string> = [
 	'before writing any implementation code',
+	'Now / Change / Check',
+	'every change with its test',
+]
+
+// What the hook itself must keep: the shared directives and the pointer.
+const HOOK_DIRECTIVES: ReadonlyArray<string> = [
+	...SHARED_DIRECTIVES,
+	'Code Change Rules Step 0 in CLAUDE.md',
+]
+
+// One phrase per instruction the long hook carried, now asserted in the Step 0 it points at. Chosen
+// as the words that change behavior — the trigger, the shape, the prohibitions — not the sentences
+// that explained why. Some of these are also asserted by `report-format.test.ts`; the overlap is
+// deliberate — that suite pins a phrase because the *rule* needs it, this one because a
+// *shortening* must not drop it.
+const STEP_ZERO_DIRECTIVES: ReadonlyArray<string> = [
+	...SHARED_DIRECTIVES,
 	'in the session language',
 	'a non-programmer can follow',
 	'only internal identifiers are banned',
-	'Now / Change / Check',
-	'Name the concrete subject in each line',
+	'name the concrete subject in each line',
 	'subject-less prose is not acceptable',
 	'no file paths, function or type names, or CLI option flags',
 	'Details',
-	'every change with its test',
 	'never wrapped in a code fence',
 	'fullrun/halfrun/backlogrun',
 	'never a confirmation stop',
 	'Cause / Fix / Result',
 	'Tests are required for ALL changes',
-	'Code Change Rules Step 0 in CLAUDE.md',
-	'reversible',
-	'NOT Tier C',
-	'inspect the target first',
+	'zero tests without explicit approval is a violation',
 ]
 
 const SETTINGS_PATH = fileURLToPath(new URL('../../.claude/settings.json', import.meta.url))
+const CLAUDE_MD_PATH = fileURLToPath(new URL('../../CLAUDE.md', import.meta.url))
+const STEP_ZERO_START = '0. **Work summary + test declaration**'
+const STEP_ONE_START = '1. **Refactor first**'
+
+function step_zero(): string {
+	const text = readFileSync(CLAUDE_MD_PATH, 'utf8')
+
+	return text.slice(text.indexOf(STEP_ZERO_START), text.indexOf(STEP_ONE_START))
+}
 
 // Read through the same parser `josh cost` prices these with (joshuafolkken/kit#1151). A ceiling
 // and a report that disagreed about what "the injected text" is would guard one quantity and print
@@ -82,8 +101,8 @@ describe('the per-turn hooks stay small', () => {
 	})
 })
 
-describe('the per-turn hooks kept every directive', () => {
-	it.each(REQUIRED_DIRECTIVES)('still states %j', (directive) => {
+describe('the per-turn hooks kept the trigger and the pointer', () => {
+	it.each(HOOK_DIRECTIVES)('the hook still states %j', (directive) => {
 		expect(injected_text()).toContain(directive)
 	})
 
@@ -91,5 +110,15 @@ describe('the per-turn hooks kept every directive', () => {
 	// the whole rule.
 	it('points at the document that holds the full rule', () => {
 		expect(injected_text()).toContain('CLAUDE.md')
+	})
+})
+
+describe('the Step 0 the hook points at kept every directive', () => {
+	it('finds Step 0 in CLAUDE.md', () => {
+		expect(step_zero()).toContain(STEP_ZERO_START)
+	})
+
+	it.each(STEP_ZERO_DIRECTIVES)('Step 0 still states %j', (directive) => {
+		expect(step_zero()).toContain(directive)
 	})
 })

@@ -5,8 +5,8 @@ const rule_value_emit_mock = vi.hoisted(() => vi.fn())
 const emit_once_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
-vi.mock('#scripts/rules/rule-value-cli', () => ({
-	rule_value_cli: { emit: rule_value_emit_mock },
+vi.mock('#scripts/rules/rule-value-cache', () => ({
+	rule_value_cache: { emit: rule_value_emit_mock },
 }))
 vi.mock('#scripts/run/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit_once: emit_once_mock },
@@ -110,9 +110,10 @@ describe('backlog_offer_cli.run — the output the loop reads', () => {
 		expect(info_lines).toStrictEqual(['watch'])
 	})
 
-	// The loop head is `rule:value`'s one call site — every valid iteration measures the delivered
-	// rules so a rule that never fires appears as a printed row (joshuafolkken/kit#2271).
-	it('measures the delivered rules once per iteration', async () => {
+	// The loop head is `rule:value`'s one call site — every valid iteration prints the cached reading so
+	// a rule that never fires appears as a printed row (joshuafolkken/kit#2271), and never runs the
+	// measurement itself (joshuafolkken/kit#2881).
+	it('prints the cached rule reading once per iteration', async () => {
 		await answer_for({ code: OK, out: '12' }, 'run')
 
 		expect(rule_value_emit_mock).toHaveBeenCalledTimes(1)

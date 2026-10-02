@@ -1,4 +1,5 @@
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { error_text } from '#scripts/lib/error-message'
 import { execa, execaSync } from 'execa'
 import { has_timed_out } from './git-execa-error'
 import { check_gh_installed } from './git-gh-check'
@@ -21,7 +22,7 @@ const BODY_FROM_STDIN = '-'
 //   *sleeps* rather than the wall clock, so each poll's requests sit on top of it. A request allowed
 //   to outlast that whole window would make the budget meaningless; half of it keeps one request
 //   from dominating the look-ahead.
-// - kit's other `gh` spawns already sit at 5 seconds (`repo-setting.ts`) and 20
+// - the readers that override it ask for 5 seconds (`repo-setting.ts`) and 20
 //   (`propagate-publish.ts`, `epic-cross-repo.ts`). Sixty is deliberately the most generous of them,
 //   because this entry also serves `--paginate` requests — several HTTP round trips inside one
 //   spawn — which a 5-second budget would break.
@@ -70,10 +71,10 @@ function to_timeout_option(timeout_ms?: number): { timeout: number } {
 // Nothing is spread when there is nothing to remove, so a spawn outside such a wrapper keeps its
 // options exactly as they were.
 //
-// **It is exported because this file is not the only place `gh` is spawned.** The synchronous
-// readers that spell their own `gh api` (`gh-spawn.ts`, `repo-setting.ts`, `epic-cross-repo.ts`,
-// `version-remote.ts`, `propagate-publish.ts`) spread it too, and `git-gh-exec-proxy.test.ts` refuses
-// a new `gh api` spawn anywhere under `scripts/` that does not.
+// **It is exported for the one spawn that is not a REST request** — `josh start`'s `gh repo create`
+// step (`start-exec.ts`). Every `gh api` request goes through the entries below since
+// joshuafolkken/kit#2901, which `gh-subcommand-guard.test.ts` enforces, and
+// `git-gh-exec-proxy.test.ts` still refuses a `gh api` spawn that does not spread it.
 interface DirectEnvironment {
 	env?: Record<string, undefined>
 }
@@ -84,8 +85,20 @@ function direct_environment(): DirectEnvironment {
 	return Object.keys(removed).length > 0 ? { env: removed } : {}
 }
 
-function to_spawn_options(timeout_ms?: number): { timeout: number } & DirectEnvironment {
-	return { ...to_timeout_option(timeout_ms), ...direct_environment() }
+interface SpawnOptions extends DirectEnvironment {
+	timeout: number
+	cwd?: string
+}
+
+// `cwd` is spread in only when given: `{owner}/{repo}` in a path is resolved from the checkout gh
+// runs in, so a caller pinned to the project root says so, and every other caller keeps inheriting
+// the process's own directory exactly as before.
+function to_spawn_options(timeout_ms?: number, cwd?: string): SpawnOptions {
+	return {
+		...to_timeout_option(timeout_ms),
+		...direct_environment(),
+		...(cwd !== undefined && { cwd }),
+	}
 }
 
 // What a request that ran out of time is labelled with, ahead of whatever gh managed to write.
@@ -113,10 +126,6 @@ function to_timeout_prefix(error: unknown): string {
 	return has_timed_out(error) ? `${GH_REQUEST_TIMEOUT_MESSAGE}: ` : ''
 }
 
-function to_error_message(error: unknown): string {
-	return error instanceof Error ? error.message : String(error)
-}
-
 // Surface the gh CLI's stderr as the thrown message when present (matching the previous spawn
 // behavior), otherwise fall back to execa's own message — **and append what gh wrote to stdout**.
 //
@@ -134,7 +143,7 @@ function to_error_message(error: unknown): string {
 function to_gh_error(error: unknown): Error {
 	const stderr = has_stderr_field(error) ? error.stderr.trim() : ''
 	const stdout = has_stdout_field(error) ? error.stdout.trim() : ''
-	const summary = stderr.length > 0 ? stderr : to_error_message(error)
+	const summary = stderr.length > 0 ? stderr : error_text.message_of(error)
 	const detail = stdout.length > 0 ? `${summary}\n${stdout}` : summary
 
 	return gh_failure.attach(
@@ -143,11 +152,16 @@ function to_gh_error(error: unknown): Error {
 	)
 }
 
-async function exec_gh_command(arguments_: Array<string>, timeout_ms?: number): Promise<string> {
+async function exec_gh_command(
+	arguments_: Array<string>,
+	timeout_ms?: number,
+	cwd?: string,
+): Promise<string> {
 	await check_gh_installed()
+	const options = to_spawn_options(timeout_ms, cwd)
 
 	try {
-		const { stdout } = await execa('gh', arguments_, to_spawn_options(timeout_ms)) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
+		const { stdout } = await execa('gh', arguments_, options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
 
 		return stdout.trimEnd()
 	} catch (error) {
@@ -161,12 +175,13 @@ async function exec_gh_command_with_stdin(input: {
 	// `number | undefined` rather than plain optional: `exec_gh_api` forwards its own optional field,
 	// which `exactOptionalPropertyTypes` will not narrow for it.
 	timeout_ms?: number | undefined
+	cwd?: string | undefined
 }): Promise<string> {
 	await check_gh_installed()
 
 	// Built ahead of the call so the spawn itself stays on one line: `// NOSONAR` suppresses the rule
 	// only on the line it sits on, and a wrapped call moves that line away from the reported one.
-	const options = { input: input.stdin_body, ...to_spawn_options(input.timeout_ms) }
+	const options = { input: input.stdin_body, ...to_spawn_options(input.timeout_ms, input.cwd) }
 
 	try {
 		const { stdout } = await execa('gh', input.args, options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
@@ -184,6 +199,12 @@ function parse_status_line(output: string): number | undefined {
 	const { status } = STATUS_LINE_PATTERN.exec(output)?.groups ?? {}
 
 	return status === undefined ? undefined : Number(status)
+}
+
+// What a status probe that exited non-zero reached: `--include` keeps the status line even then,
+// and execa carries it on the error it throws.
+function status_of_failure(error: unknown): number | undefined {
+	return has_stdout_field(error) ? parse_status_line(error.stdout) : undefined
 }
 
 // The HTTP status of one `gh api` request, read from the status line rather than from `gh`'s error
@@ -215,7 +236,24 @@ async function exec_gh_api_status(path: string, timeout_ms?: number): Promise<nu
 
 		return parse_status_line(stdout)
 	} catch (error) {
-		return has_stdout_field(error) ? parse_status_line(error.stdout) : undefined
+		return status_of_failure(error)
+	}
+}
+
+// The synchronous twin of `exec_gh_api_status`, for `epic-cross-repo.ts`, whose resolver is
+// synchronous all the way up to `epic_classify` (joshuafolkken/kit#2901). Same request, same
+// answer: the status line, or `undefined` when no status was reached. It cannot run
+// `check_gh_installed`, which awaits — a missing gh is a spawn that throws without stdout, so it
+// answers `undefined`, which is what that check would have led to anyway.
+function exec_gh_api_status_sync(path: string, timeout_ms?: number): number | undefined {
+	const options = to_spawn_options(timeout_ms)
+
+	try {
+		const { stdout } = execaSync('gh', ['api', '--include', '--silent', path], options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
+
+		return parse_status_line(stdout)
+	} catch (error) {
+		return status_of_failure(error)
 	}
 }
 
@@ -251,8 +289,13 @@ interface GhApiRequest {
 	should_slurp?: boolean
 	jq_filter?: string
 	// The budget for this one request, overriding `GH_REQUEST_TIMEOUT_MS`. A field rather than a
-	// second argument for the reason recorded beside that constant (joshuafolkken/kit#1065).
+	// second argument for the reason recorded beside that constant (joshuafolkken/kit#1065). `0` is
+	// execa's own "no budget", kept for the one reader whose caller's writes depend on the answer
+	// (`gh-spawn.ts`, joshuafolkken/kit#805).
 	timeout_ms?: number
+	// The checkout gh runs in, which is what `{owner}/{repo}` in `path` resolves against. Absent means
+	// the process's own directory.
+	cwd?: string
 }
 
 function optional_flag(flag: string, value?: string): Array<string> {
@@ -277,20 +320,23 @@ function to_gh_api_args(request: GhApiRequest): Array<string> {
 
 // The response body of one `gh api` request, as text. Every REST caller that can await one goes
 // through it, so the verb, the body and the paging stop being spelled out per call site
-// (joshuafolkken/kit#1023). The synchronous readers that cannot — `gh-spawn.ts`, `epic-cross-repo.ts`
-// — still share its path builder.
+// (joshuafolkken/kit#1023). A caller that cannot await uses `exec_gh_api_sync` or
+// `read_gh_api_sync` below.
 //
 // Failure handling funnels through `to_gh_error` on both paths below, so a failed request throws
 // with gh's stderr summary *and* the JSON error body it wrote to stdout.
 async function exec_gh_api(request: GhApiRequest): Promise<string> {
 	const args = to_gh_api_args(request)
 
-	if (request.body === undefined) return await exec_gh_command(args, request.timeout_ms)
+	if (request.body === undefined) {
+		return await exec_gh_command(args, request.timeout_ms, request.cwd)
+	}
 
 	return await exec_gh_command_with_stdin({
 		args,
 		stdin_body: request.body,
 		timeout_ms: request.timeout_ms,
+		cwd: request.cwd,
 	})
 }
 
@@ -300,11 +346,10 @@ async function exec_gh_api(request: GhApiRequest): Promise<string> {
 // opens in the consumer is created here rather than by turning the whole runner asynchronous for
 // one request (joshuafolkken/kit#1042).
 //
-// It is the **write** side's synchronous entry, and the only one so far. The synchronous *readers*
-// named above `exec_gh_api` — `gh-spawn.ts`, `epic-cross-repo.ts`, `repo-setting.ts`,
-// `propagate-publish.ts`, `version-remote.ts` — each spell their own `['api', path, '--jq', …]` out
-// and share only the path builder; a read has no body and no verb to get wrong, which is why they
-// were left as they are rather than migrated here in passing.
+// It began as the write side's synchronous entry; since joshuafolkken/kit#2901 the synchronous
+// readers — `gh-spawn.ts`, `epic-cross-repo.ts`, `repo-setting.ts`, `propagate-publish.ts`,
+// `version-remote.ts` — go through it too, rather than each spelling its own `execaSync('gh', …)`
+// with its own error handling, timeout and proxy handling.
 //
 // **It is the same layer, not a second one.** The argument builder and the error translation are
 // shared with the asynchronous path above, so `--input -` for the body, `--jq` for the unwrap, and
@@ -318,7 +363,7 @@ async function exec_gh_api(request: GhApiRequest): Promise<string> {
 // replaced already did.
 function exec_gh_api_sync(request: GhApiRequest): string {
 	const body_option = request.body === undefined ? {} : { input: request.body }
-	const options = { ...body_option, ...to_spawn_options(request.timeout_ms) }
+	const options = { ...body_option, ...to_spawn_options(request.timeout_ms, request.cwd) }
 
 	try {
 		const { stdout } = execaSync('gh', to_gh_api_args(request), options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
@@ -329,13 +374,27 @@ function exec_gh_api_sync(request: GhApiRequest): string {
 	}
 }
 
+// `exec_gh_api_sync` for a reader to which a failed request is an answer rather than an error:
+// `undefined` for every failure — a non-zero exit, a timeout, gh missing — and the response text
+// otherwise. The readers that degrade instead of throwing (a report that says `unreadable`, a
+// registry read that retries) share this one catch rather than each writing their own.
+function read_gh_api_sync(request: GhApiRequest): string | undefined {
+	try {
+		return exec_gh_api_sync(request)
+	} catch {
+		return undefined
+	}
+}
+
 const git_gh_exec = {
 	direct_environment,
 	exec_gh_command,
 	exec_gh_command_with_stdin,
 	exec_gh_api,
 	exec_gh_api_sync,
+	read_gh_api_sync,
 	exec_gh_api_status,
+	exec_gh_api_status_sync,
 	parse_status_line,
 }
 

@@ -167,3 +167,76 @@ describe('exec_gh_api_sync — the request budget', () => {
 		)
 	})
 })
+
+// joshuafolkken/kit#2901: the synchronous readers that each spelled their own `execaSync('gh', …)`
+// now go through this layer, so what they relied on — the checkout gh runs in, a failure answered as
+// a value, the status a probe reached — is the layer's contract and pinned here.
+const PROJECT_DIRECTORY = '/fake/root'
+const NOT_FOUND_STATUS = 404
+const NOT_FOUND_HEADERS = 'HTTP/2.0 404 Not Found\nContent-Type: application/json'
+
+function fail_spawn(fields: { stdout?: string; stderr?: string }): void {
+	mocked_execa_sync.mockImplementationOnce(() => {
+		throw Object.assign(new Error(GH_FAILED), fields)
+	})
+}
+
+describe('exec_gh_api_sync — the checkout gh runs in', () => {
+	it('runs gh in the directory the request names', () => {
+		mocked_execa_sync.mockReturnValueOnce(fake_sync_result(ISSUE_URL))
+
+		git_gh_exec.exec_gh_api_sync({ path: API_PATH, cwd: PROJECT_DIRECTORY })
+
+		expect(mocked_execa_sync.mock.calls[0]?.at(-1)).toMatchObject({ cwd: PROJECT_DIRECTORY })
+	})
+
+	it('leaves the directory to the process when the request names none', () => {
+		mocked_execa_sync.mockReturnValueOnce(fake_sync_result(ISSUE_URL))
+
+		git_gh_exec.exec_gh_api_sync({ path: API_PATH })
+
+		expect(mocked_execa_sync.mock.calls[0]?.at(-1)).not.toHaveProperty('cwd')
+	})
+})
+
+describe('read_gh_api_sync — a failed read is an answer', () => {
+	it('answers the response text on success', () => {
+		mocked_execa_sync.mockReturnValueOnce(fake_sync_result(`${ISSUE_URL}\n`))
+
+		expect(git_gh_exec.read_gh_api_sync({ path: API_PATH, jq_filter: HTML_URL_FILTER })).toBe(
+			ISSUE_URL,
+		)
+	})
+
+	it('answers undefined instead of throwing when gh fails', () => {
+		fail_spawn({ stderr: VALIDATION_SUMMARY, stdout: VALIDATION_BODY })
+
+		expect(git_gh_exec.read_gh_api_sync({ path: API_PATH })).toBeUndefined()
+	})
+})
+
+describe('exec_gh_api_status_sync — the status a probe reached', () => {
+	it('asks for the headers alone, bounded by the given budget', () => {
+		mocked_execa_sync.mockReturnValueOnce(fake_sync_result('HTTP/2.0 200 OK'))
+
+		git_gh_exec.exec_gh_api_status_sync(API_PATH, OVERRIDE_TIMEOUT_MS)
+
+		expect(mocked_execa_sync).toHaveBeenCalledWith(
+			'gh',
+			['api', '--include', '--silent', API_PATH],
+			expect.objectContaining({ timeout: OVERRIDE_TIMEOUT_MS }),
+		)
+	})
+
+	it('reads the status off a probe that exited non-zero', () => {
+		fail_spawn({ stdout: NOT_FOUND_HEADERS })
+
+		expect(git_gh_exec.exec_gh_api_status_sync(API_PATH)).toBe(NOT_FOUND_STATUS)
+	})
+
+	it('answers undefined when no status was reached', () => {
+		fail_spawn({ stderr: 'spawn gh ENOENT' })
+
+		expect(git_gh_exec.exec_gh_api_status_sync(API_PATH)).toBeUndefined()
+	})
+})

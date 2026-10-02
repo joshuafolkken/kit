@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
-import { refuse_unknown_flags } from '#scripts/lib/cli-flags'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { propagate_run, type TargetResult } from '#scripts/propagate/propagate-run'
 import { propagate_steps, type Release, type ReleasePlan } from '#scripts/propagate/propagate-steps'
 import type { PropagateTarget } from '#scripts/propagate/propagate-targets'
@@ -40,7 +40,7 @@ interface RunOptions {
 
 function parse_options(argv: ReadonlyArray<string>): RunOptions {
 	const options: RunOptions = { is_dry_run: argv.includes(DRY_RUN_FLAG) }
-	const usage = refuse_unknown_flags(argv, KNOWN_FLAGS, 'adopt')
+	const usage = cli_flags.refuse_unknown_flags(argv, KNOWN_FLAGS, 'adopt')
 
 	return usage === undefined ? options : { ...options, usage }
 }

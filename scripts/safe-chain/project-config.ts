@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { file_reader } from '#scripts/lib/read-file'
 import { release_age } from '#scripts/version/release-age'
 import { yaml_document } from '#scripts/yaml/yaml-document'
 import { dump } from 'js-yaml'
@@ -126,17 +127,13 @@ function merge_project_config(existing: string, workspace: string, npmrc = ''): 
 	return replace_safe_chain_block(existing, merged)
 }
 
-function read_optional(file_path: string): string {
-	return existsSync(file_path) ? readFileSync(file_path, 'utf8') : ''
-}
-
 function sync_project_config(root: string): boolean {
 	const workspace_path = path.join(root, WORKSPACE_FILE)
 	if (!existsSync(workspace_path)) return false
 	const config_path = path.join(root, PROJECT_CONFIG_FILE)
-	const existing = read_optional(config_path)
+	const existing = file_reader.read_file_or_empty(config_path)
 	const workspace = readFileSync(workspace_path, 'utf8')
-	const npmrc = read_optional(path.join(root, NPMRC_FILE))
+	const npmrc = file_reader.read_file_or_empty(path.join(root, NPMRC_FILE))
 	const merged = merge_project_config(existing, workspace, npmrc)
 	if (merged === existing) return false
 	writeFileSync(config_path, merged)

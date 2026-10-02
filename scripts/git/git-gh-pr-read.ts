@@ -43,9 +43,6 @@ const COMMENTS_QUERY = FULL_PAGE_QUERY
 // Written as a constant rather than inline: `{owner}` inside a template literal reads as a broken
 // interpolation.
 const OWNER_PLACEHOLDER = '{owner}'
-const NO_HEAD_REF_MESSAGE = 'gh api answered a pull request with no head branch'
-const FORK_HEAD_MESSAGE =
-	'gh api answered a pull request whose head branch is in another repository'
 // What a branch-keyed caller that cannot fold an absence into its own answer throws. Lives here
 // rather than beside either caller: the merge-gate snapshot and the two branch-keyed writes all need
 // it, and three copies of one message is the clone `CLAUDE.md` prohibits (joshuafolkken/kit#1029).
@@ -236,21 +233,6 @@ async function pr_view(branch_name: string): Promise<string> {
 	return JSON.stringify(git_gh_pr_rest.to_pr_info(pull))
 }
 
-// Already keyed by number, so no resolution is needed. It throws where the others fold to an empty
-// answer, which is the contract `sync-dependabot-pins.ts` relies on: it checks out the branch it is
-// handed, and a guessed one would push template pins onto the wrong PR.
-async function pr_head_reference(pr_number: number): Promise<string> {
-	const pull = await read_pull(pr_number)
-	const reference = pull.head?.ref
-	if (reference === undefined) throw new Error(NO_HEAD_REF_MESSAGE)
-	// A fork's head is not on `origin` under this name, and `origin` may well carry a different branch
-	// that answers to it. Refusing is the same contract the missing ref has: the caller checks out what
-	// it is handed, so a guessed branch pushes template pins onto the wrong pull request.
-	if (!git_gh_pr_rest.is_same_repository_head(pull)) throw new Error(FORK_HEAD_MESSAGE)
-
-	return reference
-}
-
 // `undefined` when the listing could not be read — a failed request, or a PR whose number could not
 // be resolved. Not `'[]'`, which every failure used to become.
 //
@@ -300,7 +282,6 @@ const git_gh_pr_read = {
 	pr_get_url,
 	pr_get_body,
 	pr_view,
-	pr_head_reference,
 	pr_get_comments,
 	pr_get_review_comments,
 }
@@ -315,8 +296,6 @@ export {
 	read_pull,
 	require_pr_number,
 	resolve_pr_number,
-	FORK_HEAD_MESSAGE,
-	NO_HEAD_REF_MESSAGE,
 	NO_PULL_REQUEST_MESSAGE,
 	UNREADABLE_PULL_REQUEST_MESSAGE,
 }

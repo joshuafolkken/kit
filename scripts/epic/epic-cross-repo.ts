@@ -4,7 +4,6 @@ import { git_gh_api_path } from '#scripts/git/git-gh-api-path'
 import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { propagate_publish } from '#scripts/propagate/propagate-publish'
 import { derive_versions_endpoint } from '#scripts/version/version-command-config'
-import { execaSync } from 'execa'
 import { load } from 'js-yaml'
 import type { DependencyVerdict } from './epic-classify'
 import type { EpicChild } from './epic-graph'
@@ -71,7 +70,6 @@ function is_published(repo: string, version: string): boolean {
 }
 
 const GH_TIMEOUT_MS = 20_000
-const SUCCESS_EXIT_CODE = 0
 // The manifest arrives base64-encoded in the API's `content` field; `jq` decodes and reads it.
 const VERSION_JQ = '.content | @base64d | fromjson | {version, private, workspaces} | tojson'
 const PNPM_WORKSPACE_FILE = 'pnpm-workspace.yaml'
@@ -147,24 +145,20 @@ function pnpm_workspace_path(repo: string): string {
 
 // A read that failed for any reason other than a missing file leaves the layout unknown.
 function classify_workspace_failure(repo: string): WorkspaceCheck {
-	const probe = execaSync('gh', ['api', '--include', '--silent', pnpm_workspace_path(repo)], {
-		...git_gh_exec.direct_environment(),
-		reject: false,
-		timeout: GH_TIMEOUT_MS,
-	})
+	const status = git_gh_exec.exec_gh_api_status_sync(pnpm_workspace_path(repo), GH_TIMEOUT_MS)
 
-	return git_gh_exec.parse_status_line(probe.stdout) === NOT_FOUND_STATUS ? 'single' : 'unreadable'
+	return status === NOT_FOUND_STATUS ? 'single' : 'unreadable'
 }
 
 function read_pnpm_workspace(repo: string): WorkspaceCheck {
-	const result = execaSync('gh', ['api', pnpm_workspace_path(repo), '--jq', WORKSPACE_JQ], {
-		...git_gh_exec.direct_environment(),
-		reject: false,
-		timeout: GH_TIMEOUT_MS,
+	const stdout = git_gh_exec.read_gh_api_sync({
+		path: pnpm_workspace_path(repo),
+		jq_filter: WORKSPACE_JQ,
+		timeout_ms: GH_TIMEOUT_MS,
 	})
-	if (result.exitCode !== SUCCESS_EXIT_CODE) return classify_workspace_failure(repo)
+	if (stdout === undefined) return classify_workspace_failure(repo)
 
-	return declares_packages(result.stdout) ? 'workspace' : 'single'
+	return declares_packages(stdout) ? 'workspace' : 'single'
 }
 
 // Whether the repository declares a workspace. `workspaces` covers npm and yarn; pnpm keeps its
@@ -227,38 +221,27 @@ function to_manifest(repo: string, stdout: string): ManifestAnswer {
 }
 
 // Why the read failed, asked only when it did. The status line is the protocol rather than prose, so
-// a missing manifest is told from a rate limit by matching a contract instead of a message — through
-// `git_gh_exec.parse_status_line` rather than a second copy of it.
+// a missing manifest is told from a rate limit by matching a contract instead of a message.
 //
-// `git_gh_exec.exec_gh_api_status` asks the same question and is **not** reused: it is async, and
-// every caller down to `resolve_cross_repo` is synchronous. What is worth sharing is the parser,
-// which is shared; the spawn is four lines and duplicating it costs less than turning the
-// classifier, the resolver and `epic_classify` async for one probe. A 404 here is trustworthy in a way
-// a registry 404 is not: the repository's issues are already being read, so access is established and
-// what is missing is the file.
+// The probe is `exec_gh_api_status_sync`, the synchronous twin of `exec_gh_api_status`: every caller
+// down to `resolve_cross_repo` is synchronous, and turning the classifier, the resolver and
+// `epic_classify` async for one probe would cost more than the twin (joshuafolkken/kit#2901). A 404
+// here is trustworthy in a way a registry 404 is not: the repository's issues are already being read,
+// so access is established and what is missing is the file.
 function classify_manifest_failure(repo: string): ManifestAnswer {
-	const probe = execaSync('gh', ['api', '--include', '--silent', manifest_path(repo)], {
-		...git_gh_exec.direct_environment(),
-		reject: false,
-		timeout: GH_TIMEOUT_MS,
-	})
+	const status = git_gh_exec.exec_gh_api_status_sync(manifest_path(repo), GH_TIMEOUT_MS)
 
-	return {
-		kind:
-			git_gh_exec.parse_status_line(probe.stdout) === NOT_FOUND_STATUS ? 'absent' : 'unreadable',
-	}
+	return { kind: status === NOT_FOUND_STATUS ? 'absent' : 'unreadable' }
 }
 
 function fetch_manifest(repo: string): ManifestAnswer {
-	const result = execaSync('gh', ['api', manifest_path(repo), '--jq', VERSION_JQ], {
-		...git_gh_exec.direct_environment(),
-		reject: false,
-		timeout: GH_TIMEOUT_MS,
+	const stdout = git_gh_exec.read_gh_api_sync({
+		path: manifest_path(repo),
+		jq_filter: VERSION_JQ,
+		timeout_ms: GH_TIMEOUT_MS,
 	})
 
-	return result.exitCode === SUCCESS_EXIT_CODE
-		? to_manifest(repo, result.stdout)
-		: classify_manifest_failure(repo)
+	return stdout === undefined ? classify_manifest_failure(repo) : to_manifest(repo, stdout)
 }
 
 // Read once per pass, for the reason `published_cache` holds the other half: every edge to one
