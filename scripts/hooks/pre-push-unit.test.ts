@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_test_fixture } from '#scripts/gate/gate-test-fixture'
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -85,7 +85,6 @@ const SUITE_RAN = 1
 const FORCE_ENV = 'JOSH_PRE_PUSH_FORCE'
 const SPEC_FILTER = '--project=unit'
 const COMMAND_NAME = 'pre-push-unit'
-const ALIAS = 'ppu'
 
 // This suite runs *inside* `pnpm josh gate`, which is itself reading and writing the shared record —
 // so it plants its own rather than overwriting the one the live run relies on.
@@ -265,9 +264,5 @@ describe('a record that cannot speak for this tree', () => {
 describe(`josh ${COMMAND_NAME} is registered`, () => {
 	it('routes through the pre-push unit script', () => {
 		expect(COMMAND_MAP[COMMAND_NAME]?.script).toBe(SCRIPT_PATH)
-	})
-
-	it('is reachable by its alias', () => {
-		expect(ALIASES[ALIAS]).toBe(COMMAND_NAME)
 	})
 })

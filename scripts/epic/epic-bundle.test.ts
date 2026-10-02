@@ -1,4 +1,4 @@
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import { epic_bundle, type BacklogIssue } from './epic-bundle'
 import { epic_bundle_cli } from './epic-bundle-cli'
@@ -341,12 +341,6 @@ describe('josh epic:bundle registration', () => {
 		const entry = COMMAND_MAP['epic:bundle']
 
 		expect(entry?.script).toBe('scripts/epic/epic-bundle-cli.ts')
-	})
-
-	it('is reachable through the eb alias', () => {
-		const { eb } = ALIASES
-
-		expect(eb).toBe('epic:bundle')
 	})
 })
 

@@ -1,4 +1,4 @@
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import type { AuditFinding } from './epic-audit'
 import { epic_audit_report } from './epic-audit-report'
@@ -79,11 +79,5 @@ describe('josh epic:audit registration', () => {
 		const entry = COMMAND_MAP['epic:audit']
 
 		expect(entry?.script).toBe('scripts/epic/epic-audit-cli.ts')
-	})
-
-	it('is reachable through the ea alias', () => {
-		const { ea } = ALIASES
-
-		expect(ea).toBe('epic:audit')
 	})
 })

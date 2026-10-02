@@ -12,7 +12,7 @@ import {
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
 import { AUTO_OK_LABEL, EPIC_LABEL } from '#scripts/git/issue-labels'
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_next } from './backlog-next'
@@ -168,11 +168,5 @@ describe(`josh ${COMMAND_NAME} registration`, () => {
 		const entry = COMMAND_MAP[COMMAND_NAME]
 
 		expect(entry?.script).toBe('scripts/backlog/backlog-next.ts')
-	})
-
-	it('is reachable through the bl alias', () => {
-		const { bl } = ALIASES
-
-		expect(bl).toBe(COMMAND_NAME)
 	})
 })

@@ -228,10 +228,4 @@ describe('josh run:status registration', () => {
 		expect(source).toContain("'run:status'")
 		expect(source).toContain(CLI_PATH)
 	})
-
-	it('has the rst alias', () => {
-		const source = readFileSync('scripts/josh/josh-command-map.ts', 'utf8')
-
-		expect(source).toContain("rst: 'run:status'")
-	})
 })

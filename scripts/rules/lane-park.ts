@@ -30,8 +30,7 @@ import { shell_segments } from './shell-segments'
 // the stop, the reason is a checklist rather than an accusation, and a child that already parked simply
 // reissues. One wasted round trip on the compliant path is the safe direction; a missed park is not.
 
-// `josh notify`, in either spelling — the alias `nf` is expanded to `notify` before this sees it, the
-// same way `pre-gate-cut.ts` matches `gate` through `ga`.
+// `josh notify`, named canonically — `shell_segments.is_josh_command` expands an alias before the match.
 const NOTIFY_COMMANDS: ReadonlySet<string> = new Set(['notify'])
 // The task type that marks a stop waiting on a person, taken quoted or bare so `--task-type
 // confirmation` and `--task-type=confirmation` read alike. A `progress` or `pr` notification is not a

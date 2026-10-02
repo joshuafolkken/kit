@@ -42,7 +42,7 @@ per the table below, and do not let it silently block an unrelated change).
 ## Step A / Step B: fetch the hotspots and read each one's disposition
 
 ```bash
-pnpm josh sonar:hotspots <PR>   # alias: josh shs
+pnpm josh sonar:hotspots <PR>
 ```
 
 The command fetches the hotspots on the pull request from SonarCloud's public API (no auth), reading

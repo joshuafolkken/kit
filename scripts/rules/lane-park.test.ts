@@ -17,8 +17,8 @@ const BASH = 'Bash'
 const RULE_ID = 'lane-park'
 const ISSUE = '2034'
 const CONFIRMATION_NOTIFY = `pnpm josh notify --task-type confirmation --issue-url https://x/${ISSUE} --body-file /tmp/b.md`
-// The alias `nf` and the `--task-type=confirmation` spelling are the same call.
-const CONFIRMATION_ALIAS = 'pnpm josh nf --task-type=confirmation --body-file /tmp/b.md'
+// The `--task-type=confirmation` spelling is the same call.
+const CONFIRMATION_EQUALS = 'pnpm josh notify --task-type=confirmation --body-file /tmp/b.md'
 // A notification that is not a stop: progress reports and PR notices never park anything.
 const PROGRESS_NOTIFY = 'pnpm josh notify --task-type progress --body-file /tmp/b.md'
 const APPLY_PARK = `gh api repos/o/r/issues/${ISSUE}/labels -f 'labels[]=needs-decision'`
@@ -85,7 +85,7 @@ describe('cwd isolation', () => {
 describe('is_confirmation_notify', () => {
 	it.each([
 		[CONFIRMATION_NOTIFY],
-		[CONFIRMATION_ALIAS],
+		[CONFIRMATION_EQUALS],
 		// A chain: the notify is one segment of it, and each segment is judged on its own.
 		[`git status && ${CONFIRMATION_NOTIFY}`],
 	])('reads %j as a confirmation stop', (command) => {

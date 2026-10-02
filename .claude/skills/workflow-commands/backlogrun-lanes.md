@@ -137,7 +137,7 @@ runs `lane:open`, then — only when `--stash` is given, which is the first lane
 into the lane and re-installs against the lock it brought in, then `lane:dispatch`:
 
 ```bash
-pid=$(pnpm josh lane:launch "$n") || exit 1   # the child's pid on stdout, nothing else; alias: josh lnla
+pid=$(pnpm josh lane:launch "$n") || exit 1   # the child's pid on stdout, nothing else
 pid=$(pnpm josh lane:launch "$n" --stash "backlogrun: josh latest before lanes") || exit 1   # the first lane only, and only if `josh latest` stashed
 ```
 

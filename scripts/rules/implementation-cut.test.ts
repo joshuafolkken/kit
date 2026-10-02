@@ -88,13 +88,12 @@ function unread_verdict(): CostVerdict {
 }
 
 describe('takes_the_impl_cut', () => {
-	it.each([
-		[TAKE_THE_IMPL_CUT],
-		[`pnpm josh rct --impl ${ISSUE}`],
-		[`pnpm josh run:cut --impl=${ISSUE}`],
-	])('reads %j as taking the implementation cut', (command) => {
-		expect(implementation_cut.takes_the_impl_cut(command)).toBe(true)
-	})
+	it.each([[TAKE_THE_IMPL_CUT], [`pnpm josh run:cut --impl=${ISSUE}`]])(
+		'reads %j as taking the implementation cut',
+		(command) => {
+			expect(implementation_cut.takes_the_impl_cut(command)).toBe(true)
+		},
+	)
 
 	// **The bare cut is the pre-gate boundary, and the asking spellings are not a cut.** A predicate that
 	// counted a bare `run:cut` would credit the pre-gate cut as the implementation one.

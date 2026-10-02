@@ -1,4 +1,4 @@
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import {
 	DISTRIBUTED_ROOT_FILE,
 	DISTRIBUTED_SKILL_FILE,
@@ -8,7 +8,6 @@ import { CLEAN_ANSWER, MANAGED_ANSWER, managed_config_scope_cli } from './manage
 
 const COMMAND = 'sync:scope'
 const SCRIPT_PATH = 'scripts/sync/managed-config-scope-cli.ts'
-const ALIAS = 'sys'
 
 // The file under test is itself a path no distribution list holds, so it doubles as the negative
 // case rather than introducing a second literal for the same string.
@@ -70,10 +69,6 @@ describe('managed_config_scope_cli.run', () => {
 describe('sync:scope registration', () => {
 	it('is on the command map', () => {
 		expect(COMMAND_MAP[COMMAND]?.script).toBe(SCRIPT_PATH)
-	})
-
-	it('is reachable by its alias', () => {
-		expect(ALIASES[ALIAS]).toBe(COMMAND)
 	})
 
 	it('states the two flags it accepts in its usage line', () => {

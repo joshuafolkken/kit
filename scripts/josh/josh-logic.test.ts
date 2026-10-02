@@ -211,11 +211,15 @@ describe('ALIASES', () => {
 		expect(new Set(keys).size).toBe(keys.length)
 	})
 
-	it('every command in COMMAND_MAP has an alias', () => {
+	// An alias is a typing shortcut, so only a command a person types carries one: an `automation`
+	// command is called by an AI or a hook under its canonical name (joshuafolkken/kit#2906).
+	it('gives an alias to every command a person types and to no automation command', () => {
 		const aliased_commands = new Set(Object.values(ALIASES))
 
-		for (const cmd of Object.keys(COMMAND_MAP)) {
-			expect(aliased_commands.has(cmd)).toBe(true)
+		for (const [cmd, entry] of Object.entries(COMMAND_MAP)) {
+			const is_typed_by_a_person = entry.reference[1] !== 'automation'
+
+			expect(aliased_commands.has(cmd), cmd).toBe(is_typed_by_a_person)
 		}
 	})
 })
@@ -229,7 +233,7 @@ describe('resolve_alias', () => {
 
 	it('resolves 2-char alias to full command name', () => {
 		expect(resolve_alias('tu')).toBe('test:unit')
-		expect(resolve_alias('cm')).toBe(CHECK_COMMIT_MESSAGE_CMD)
+		expect(resolve_alias('tr')).toBe('test:related')
 	})
 
 	it('returns input unchanged for full command names', () => {

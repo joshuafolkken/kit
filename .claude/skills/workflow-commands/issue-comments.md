@@ -12,7 +12,7 @@ delegated unit executing `fullrun`'s procedure, and the hook keys its once-per-r
 same turn as whatever else the run already needs:
 
 ```bash
-pnpm josh issue:read <N> [<N> ...]     # body and comments, one call per batch; alias: josh ird
+pnpm josh issue:read <N> [<N> ...]     # body and comments, one call per batch
 gh api repos/{owner}/{repo}/issues/<N>/comments --jq '.[] | {user: .user.login, created_at, body}'
 ```
 

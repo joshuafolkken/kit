@@ -15,7 +15,7 @@ green while spacing, layout and styling are visibly broken. This skill is the lo
 In order:
 
 1. The routes given as arguments (`/verify-ui / /blog`).
-2. Otherwise, derive the candidates with `pnpm josh ui:routes` (alias `josh uir`): it reads the
+2. Otherwise, derive the candidates with `pnpm josh ui:routes`: it reads the
    change (the branch diff, or the staged diff with `--staged`) and lists the routes it touches,
    tracing a changed shared component to the routes that render it. From that list **pick the ones a
    reader would notice** — that narrowing is the judgement the command leaves to you.

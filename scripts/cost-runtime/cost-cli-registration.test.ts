@@ -1,4 +1,4 @@
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 
 // `josh cost`'s command-map registration, split from cost-cli.test.ts to keep that file under its
@@ -10,11 +10,5 @@ describe('josh cost registration', () => {
 		const { cost } = COMMAND_MAP
 
 		expect(cost?.script).toBe('scripts/cost-runtime/cost-cli.ts')
-	})
-
-	it('has a short alias', () => {
-		const { co } = ALIASES
-
-		expect(co).toBe('cost')
 	})
 })

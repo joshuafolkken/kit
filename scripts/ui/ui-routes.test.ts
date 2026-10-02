@@ -1,11 +1,10 @@
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import { ui_routes } from './ui-routes'
 import { ui_routes_cli } from './ui-routes-cli'
 
 const COMMAND = 'ui:routes'
 const SCRIPT_PATH = 'scripts/ui/ui-routes-cli.ts'
-const ALIAS = 'uir'
 const SHARED_COMPONENT = 'src/lib/Button.svelte'
 const ABOUT_PAGE = 'src/routes/about/+page.svelte'
 
@@ -66,10 +65,6 @@ describe('ui:routes flag parsing', () => {
 describe('ui:routes registration', () => {
 	it('is on the command map', () => {
 		expect(COMMAND_MAP[COMMAND]?.script).toBe(SCRIPT_PATH)
-	})
-
-	it('is reachable by its alias', () => {
-		expect(ALIASES[ALIAS]).toBe(COMMAND)
 	})
 
 	it('states the flag it accepts in its usage line', () => {

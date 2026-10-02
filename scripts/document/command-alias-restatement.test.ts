@@ -44,15 +44,15 @@ describe('the hand-written command reference never restates an alias', () => {
 
 	// The guard is only worth keeping if it fails on the thing it exists to catch — one case per form.
 	it('flags a restatement in each of its forms', () => {
-		expect(restated_aliases('run `josh rh` to claim', ALIAS_KEYS)).toStrictEqual(['rh'])
-		expect(restated_aliases('the branch diff; alias: josh sys', ALIAS_KEYS)).toStrictEqual(['sys'])
-		expect(restated_aliases('into one call; alias `rp`.', ALIAS_KEYS)).toStrictEqual(['rp'])
-		expect(restated_aliases('pnpm josh obf   # alias', ALIAS_KEYS)).toStrictEqual(['obf'])
+		expect(restated_aliases('run `josh mm` to merge', ALIAS_KEYS)).toStrictEqual(['mm'])
+		expect(restated_aliases('the spell check; alias: josh sd', ALIAS_KEYS)).toStrictEqual(['sd'])
+		expect(restated_aliases('the related tests; alias `tr`.', ALIAS_KEYS)).toStrictEqual(['tr'])
+		expect(restated_aliases('pnpm josh trd   # alias', ALIAS_KEYS)).toStrictEqual(['trd'])
 	})
 
 	// The canonical name and English prose that merely follows the word `josh` are not restatements.
 	it('accepts the canonical form and leaves ordinary prose alone', () => {
-		expect(restated_aliases('run `pnpm josh run:hold` to claim', ALIAS_KEYS)).toStrictEqual([])
+		expect(restated_aliases('run `pnpm josh main:merge` to merge', ALIAS_KEYS)).toStrictEqual([])
 		expect(
 			restated_aliases('reclaim the global josh by removing a shim', ALIAS_KEYS),
 		).toStrictEqual([])

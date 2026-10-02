@@ -336,8 +336,8 @@ function josh_subcommand(command: string): string | undefined {
 }
 
 // Whether a shell line is one of the read-only `josh` bookkeeping commands, and nothing else. A chained
-// line falls through. An alias is resolved to its canonical name first — a run may type `josh ist` for
-// `issue:state` — so the allow-list holds canonical names alone. Everything not on the list falls
+// line falls through. An alias is resolved to its canonical name first, so the allow-list holds
+// canonical names alone. Everything not on the list falls
 // through to the read/mutation test, which is what keeps `josh gate` / `followup` / `git`
 // non-bundleable (joshuafolkken/kit#1875).
 function is_read_josh(command: string): boolean {

@@ -99,7 +99,7 @@ afterAll(() => {
 // watcher for its numerator — without the first, a run that always let the watcher wait would drop out
 // of the reading and the rate would be taken over runs that armed a timer at least once.
 describe('is_progress_watch and waits_for_progress', () => {
-	it.each([WAITING_REPORT, EXPLICIT_ASK, 'pnpm josh rg --wait'])(
+	it.each([WAITING_REPORT, EXPLICIT_ASK])(
 		'reads %j as letting the watcher hold the clock',
 		(command) => {
 			expect(early_heartbeat.is_progress_watch(command)).toBe(true)

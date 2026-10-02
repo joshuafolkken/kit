@@ -1,4 +1,4 @@
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it, vi } from 'vitest'
 import { delegation_cli } from './delegation-cli'
 import { delegation_policy } from './delegation-policy'
@@ -351,12 +351,6 @@ describe('josh delegate registration', () => {
 		const { delegate } = COMMAND_MAP
 
 		expect(delegate?.script).toBe('scripts/delegation/delegation-cli.ts')
-	})
-
-	it('has a short alias', () => {
-		const { dg } = ALIASES
-
-		expect(dg).toBe('delegate')
 	})
 })
 

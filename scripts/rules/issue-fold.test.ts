@@ -22,10 +22,6 @@ describe('runs_the_fold', () => {
 		expect(issue_fold.runs_the_fold(FOLD_COMMAND)).toBe(true)
 	})
 
-	it('reads the fold call in its alias spelling', () => {
-		expect(issue_fold.runs_the_fold('pnpm josh isf "a" "b"')).toBe(true)
-	})
-
 	it('does not read a fold spelling quoted inside a filing body', () => {
 		expect(issue_fold.runs_the_fold('gh issue create --title "run pnpm josh issue:fold"')).toBe(
 			false,
