@@ -309,7 +309,7 @@ Fetch SonarCloud hotspots on a pull request and print each one's Step B disposit
 
 > **Audience:** developer · **Side effects:** files, git, network, processes
 
-`[--profile basic|full] [--yes] [--github] [--public]`
+`[--profile basic|full] [--yes] [--github] [--public] [--init-command <command>]`
 
 Set a project up for the GitHub Issue workflow, from git init to the setup PR
 

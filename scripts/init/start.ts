@@ -14,7 +14,9 @@ import { start_steps } from './start-steps'
 
 const ARGUMENT_START_INDEX = 2
 const READY_MESSAGE = 'GitHub workflow ready. Use kickoff new in your assistant to plan an Issue.'
-const START_USAGE = 'josh start [--profile basic|full] [--yes] [--github] [--public]'
+const START_USAGE =
+	'josh start [--profile basic|full] [--yes] [--github] [--public] [--init-command <command>]'
+const INIT_COMMAND_FLAG = '--init-command'
 const YES_FLAG = '--yes'
 const GITHUB_FLAG = '--github'
 const PUBLIC_FLAG = '--public'
@@ -26,16 +28,42 @@ interface Prepared {
 	choices: Choices
 }
 
-// The switches are peeled off first, so what remains is exactly the `--profile` pair `josh init`
-// accepts — one parser for the profile in both commands.
+interface InitCommandSplit {
+	init_command: string | undefined
+	rest: ReadonlyArray<string>
+}
+
+// A value that is blank or another flag means the command itself was left out, which would otherwise
+// swallow the next switch or hand the initialize step nothing to run.
+function is_command_value(value: string | undefined): value is string {
+	return value !== undefined && value.trim() !== '' && !value.startsWith('-')
+}
+
+// The command arrives as the one argument after its flag and is removed together with it.
+function split_init_command(args: ReadonlyArray<string>): InitCommandSplit {
+	const index = args.indexOf(INIT_COMMAND_FLAG)
+
+	if (index === -1) return { init_command: undefined, rest: args }
+
+	const value = args[index + 1]
+
+	if (!is_command_value(value)) throw new Error(`Usage: ${START_USAGE}`)
+
+	return { init_command: value, rest: args.filter((_, at) => at !== index && at !== index + 1) }
+}
+
+// The switches and the initialize command are peeled off first, so what remains is exactly the
+// `--profile` pair `josh init` accepts — one parser for the profile in both commands.
 function parse_start_options(args: ReadonlyArray<string>): StartOptions {
-	const profile_args = args.filter((argument) => !SWITCHES.has(argument))
+	const { init_command, rest } = split_init_command(args)
+	const profile_args = rest.filter((argument) => !SWITCHES.has(argument))
 
 	return {
 		profile: project_profile.requested_profile(profile_args, START_USAGE),
-		is_yes: args.includes(YES_FLAG),
-		is_github: args.includes(GITHUB_FLAG),
-		visibility: args.includes(PUBLIC_FLAG) ? 'public' : 'private',
+		is_yes: rest.includes(YES_FLAG),
+		is_github: rest.includes(GITHUB_FLAG),
+		visibility: rest.includes(PUBLIC_FLAG) ? 'public' : 'private',
+		init_command,
 	}
 }
 
@@ -83,11 +111,13 @@ function prepare(args: ReadonlyArray<string>, is_tty: boolean, root: string): Pr
 async function main(args: ReadonlyArray<string>, is_tty: boolean): Promise<void> {
 	const { steps, interaction, choices } = prepare(args, is_tty, process.cwd())
 
-	console.info(start_plan.plan_summary(steps))
-	const profile = await resolve_profile(choices, interaction)
 	const { root, options } = choices
+	const { visibility, init_command } = options
 
-	await start_steps.run_steps(steps, { root, profile, visibility: options.visibility })
+	console.info(start_plan.plan_summary(steps, start_plan.step_labels(init_command)))
+	const profile = await resolve_profile(choices, interaction)
+
+	await start_steps.run_steps(steps, { root, profile, visibility, init_command })
 	console.info(`\n${READY_MESSAGE}`)
 }
 

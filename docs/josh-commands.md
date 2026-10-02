@@ -425,7 +425,7 @@ pnpm exec josh start --yes --github --profile basic    # unattended, including t
 5. The missing workflow and release-classification labels; existing ones are left unchanged
 6. The setup pull request — only while `main` has commits but no kit: an Issue, a commit of only kit's files on its branch, and the pull request. It never merges
 
-**Options:** `--profile basic|full` sets the profile instead of asking (the detected one is the default). `--yes` accepts the defaults, but is **not** consent to write to GitHub: when step 4 or 6 is planned, an unattended run without `--github` stops before changing anything. `--public` creates a public repository. Without a terminal, `--yes` is required.
+**Options:** `--profile basic|full` sets the profile instead of asking (the detected one is the default). `--yes` accepts the defaults, but is **not** consent to write to GitHub: when step 4 or 6 is planned, an unattended run without `--github` stops before changing anything. `--public` creates a public repository. Without a terminal, `--yes` is required. `--init-command "<command>"` runs that command as step 2 instead of kit's setup — for a toolkit layered over kit, e.g. `"josh-app init"`. It runs without a shell, with `--profile <confirmed profile>` appended; its non-zero exit stops before the commit, and step 6 also commits every file changed since it ran.
 
 **Existing state:** with a GitHub origin, nothing replaces it and `main` is never pushed to. After a failed commit hook, a re-run on the setup branch resumes step 6. A non-GitHub origin, or commits on a branch other than `main`, is refused before any change.
 

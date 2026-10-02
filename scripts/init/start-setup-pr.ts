@@ -12,15 +12,22 @@ import { start_exec } from './start-exec'
 const SETUP_TITLE = `Set up ${KIT_PACKAGE_NAME}`
 const SETUP_BODY = [
 	`Adds the files \`josh start\` wrote while setting up ${KIT_PACKAGE_NAME}, so main carries the`,
-	'rules, settings and workflows every later Issue is run with. Only the files kit wrote are in the',
-	'pull request; anything else in the working tree is left as it was.',
+	'rules, settings and workflows every later Issue is run with. Only the files the setup wrote are in',
+	'the pull request; anything else in the working tree is left as it was.',
 ].join('\n')
+const NAME_ONLY = '--name-only'
 const NOTHING_TO_COMMIT = 'The kit setup has no changes to commit, so no pull request was opened.'
 const OPEN_SETUP_ISSUES_QUERY = `?state=open&labels=${IGNORE_FOR_RELEASE_LABEL}&per_page=100`
 const FIRST_SETUP_ISSUE_FILTER = `[.[] | select(.title == "${SETUP_TITLE}") | .number][0] // empty`
 
-function lines_of(output: string | undefined): Array<string> {
-	return (output ?? '').split('\n').filter((line) => line.length > 0)
+// Listings are read NUL-separated (`-z`), so a path is never quoted — a name a caller's initialize
+// command wrote need not be ASCII the way kit's own are (#2872).
+function paths_of(output: string | undefined): Array<string> {
+	return (output ?? '').split('\0').filter((listed) => listed.length > 0)
+}
+
+function listing(args: ReadonlyArray<string>, root: string): Array<string> {
+	return paths_of(start_exec.read_output('git', [...args, '-z'], root))
 }
 
 function setup_issue(issue_number: string): IssueInfo {
@@ -42,17 +49,18 @@ function is_setup_branch(branch: string | undefined): boolean {
 }
 
 // Untracked files the ignore rules let through, plus tracked files the setup changed — two plain
-// listings, so nothing has to be parsed out of `git status`. Every kit path is ASCII, so git's
-// quoting of other names never hides one.
+// listings, so nothing has to be parsed out of `git status`.
 function changed_paths(root: string): Array<string> {
-	const untracked = start_exec.read_output(
-		'git',
-		['ls-files', '--others', '--exclude-standard'],
-		root,
-	)
-	const modified = start_exec.read_output('git', ['diff', '--name-only', 'HEAD'], root)
+	const untracked = listing(['ls-files', '--others', '--exclude-standard'], root)
+	const modified = listing(['diff', NAME_ONLY, 'HEAD'], root)
 
-	return [...lines_of(untracked), ...lines_of(modified)]
+	return [...untracked, ...modified]
+}
+
+// On the setup branch a failed commit left, that run's `git add` already staged its files, so they
+// read as changed before this run's command ran — the staged ones count as setup output (#2872).
+function carried_paths(root: string, current: string | undefined): Array<string> {
+	return is_setup_branch(current) ? listing(['diff', NAME_ONLY, '--cached'], root) : []
 }
 
 // The Issue carries the release classification the pull request is opened with, so the PR step finds
@@ -113,10 +121,30 @@ function commit_kit_paths(paths: ReadonlyArray<string>, issue: IssueInfo, root: 
 	start_exec.run('git', ['commit', '--message', issue.commit_message, '--', ...paths], root)
 }
 
-// Issue → branch → only kit's files committed → push → pull request. The merge is left to a person:
-// it is the one step that changes main.
-async function open(root: string): Promise<void> {
-	const paths = kit_written_paths.select(changed_paths(root))
+// A caller's initialize command writes files kit cannot name, so with a `baseline` — what was already
+// changed before that command ran — everything changed since joins kit's own files, while a change
+// the user had made before the run still stays out (#2872).
+function setup_paths(
+	root: string,
+	baseline: ReadonlyArray<string> | undefined,
+	current: string | undefined,
+): Array<string> {
+	const changed = changed_paths(root)
+	const kit_paths = kit_written_paths.select(changed)
+
+	if (baseline === undefined) return kit_paths
+
+	const carried = carried_paths(root, current)
+	const written = changed.filter((path) => !baseline.includes(path) || carried.includes(path))
+
+	return [...new Set([...kit_paths, ...written])]
+}
+
+// Issue → branch → only the setup's files committed → push → pull request. The merge is left to a
+// person: it is the one step that changes main.
+async function open(root: string, baseline?: ReadonlyArray<string>): Promise<void> {
+	const current = start_exec.read_output('git', ['symbolic-ref', '--short', 'HEAD'], root)
+	const paths = setup_paths(root, baseline, current)
 
 	if (paths.length === 0) {
 		console.info(NOTHING_TO_COMMIT)
@@ -124,7 +152,6 @@ async function open(root: string): Promise<void> {
 		return
 	}
 
-	const current = start_exec.read_output('git', ['symbolic-ref', '--short', 'HEAD'], root)
 	const issue = resolve_issue(current)
 
 	switch_to(issue.branch_name, current, root)

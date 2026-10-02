@@ -16,7 +16,9 @@ const PUSH = `git push --set-upstream origin ${BRANCH}`
 const READ_ONLY = ['git ls-files', 'git diff', 'git symbolic-ref', 'git rev-parse']
 const PERSONAL_NOTE = 'employment-test.md'
 const MANIFEST = 'package.json'
-const UNTRACKED = ['CLAUDE.md', PERSONAL_NOTE, '.serena/project.yml', '.github/workflows/ci.yml']
+const EDITOR_DIRECTORY_FILE = '.serena/project.yml'
+const UNTRACKED = ['CLAUDE.md', PERSONAL_NOTE, EDITOR_DIRECTORY_FILE, '.github/workflows/ci.yml']
+const TOOLKIT_FILE = 'src/app.html'
 const mocked_execa = vi.mocked(execaSync)
 
 interface Tree {
@@ -25,6 +27,7 @@ interface Tree {
 	modified: ReadonlyArray<string>
 	open_issue: string
 	has_branch: boolean
+	staged: ReadonlyArray<string>
 }
 
 function result(stdout = '', exit_code = 0): ReturnType<typeof execaSync> {
@@ -48,14 +51,19 @@ function git_writes(): Array<string> {
 // What each read-only git subcommand answers for `tree`; `rev-parse` answers whether the branch exists.
 function git_answer(subcommand: string, tree: Tree): ReturnType<typeof execaSync> {
 	const listings: Readonly<Record<string, string>> = {
-		'ls-files': tree.untracked.join('\n'),
-		diff: tree.modified.join('\n'),
+		'ls-files': tree.untracked.join('\0'),
+		diff: tree.modified.join('\0'),
+		staged: tree.staged.join('\0'),
 		'symbolic-ref': tree.branch,
 	}
 
 	if (subcommand === 'rev-parse') return result('', tree.has_branch ? 0 : 1)
 
 	return result(listings[subcommand] ?? '')
+}
+
+function subcommand_of(args: ReadonlyArray<string>): string {
+	return args.includes('--cached') ? 'staged' : String(args[0])
 }
 
 // The working tree the reported onboarding left: kit's files beside a personal note and an editor's
@@ -67,11 +75,12 @@ function given(tree: Partial<Tree> = {}): void {
 		modified: [MANIFEST, '.gitignore'],
 		open_issue: '',
 		has_branch: false,
+		staged: [],
 		...tree,
 	}
 
 	mocked_execa.mockImplementation((_command, args) =>
-		git_answer(Array.isArray(args) ? String(args[0]) : '', full),
+		git_answer(Array.isArray(args) ? subcommand_of(args) : '', full),
 	)
 	vi.mocked(git_gh_exec.exec_gh_api_sync).mockImplementation((request: GhApiRequest) =>
 		request.body === undefined ? full.open_issue : ISSUE_URL,
@@ -128,6 +137,48 @@ describe('the setup pull request josh start opens (#2816)', () => {
 
 		expect(git_gh_exec.exec_gh_api_sync).not.toHaveBeenCalled()
 		expect(git_pr.create_with_issue_info).not.toHaveBeenCalled()
+	})
+})
+
+describe('the setup pull request after a caller initialize command (#2872)', () => {
+	it('also commits what changed since the baseline, leaving earlier changes out', async () => {
+		given({ untracked: [...UNTRACKED, TOOLKIT_FILE] })
+		await start_setup_pr.open(ROOT, [PERSONAL_NOTE, EDITOR_DIRECTORY_FILE])
+
+		expect(git_writes()[1]).toBe(`git add -- ${KIT_PATHS} ${TOOLKIT_FILE}`)
+	})
+
+	it('commits only kit files without a baseline', async () => {
+		given({ untracked: [...UNTRACKED, TOOLKIT_FILE] })
+		await start_setup_pr.open(ROOT)
+
+		expect(git_writes()[1]).toBe(`git add -- ${KIT_PATHS}`)
+	})
+
+	it('keeps the files a failed run staged on the setup branch when it resumes', async () => {
+		given({
+			branch: BRANCH,
+			untracked: [PERSONAL_NOTE],
+			modified: [TOOLKIT_FILE],
+			staged: [TOOLKIT_FILE],
+		})
+		await start_setup_pr.open(ROOT, [PERSONAL_NOTE, TOOLKIT_FILE])
+
+		expect(git_writes()[0]).toBe(`git add -- ${TOOLKIT_FILE}`)
+	})
+
+	it('reads listings NUL-separated so a non-ASCII name is committed unquoted', async () => {
+		const non_ascii_file = 'src/日記.md'
+
+		given({ untracked: [...UNTRACKED, non_ascii_file] })
+		await start_setup_pr.open(ROOT, [])
+
+		const listing_call = mocked_execa.mock.calls.find((call) =>
+			command_of(call).includes('ls-files'),
+		)
+
+		expect(git_writes()[1]).toContain(non_ascii_file)
+		expect(listing_call?.[1]).toContain('-z')
 	})
 })
 

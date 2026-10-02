@@ -8,17 +8,26 @@ import type { ProjectShape } from './project-profile'
 import { start_setup_pr } from './start-setup-pr'
 import { start_steps, type StepContext } from './start-steps'
 
-vi.mock('execa', () => ({ execaSync: vi.fn() }))
+vi.mock(import('execa'), async (import_original) => ({
+	...(await import_original()),
+	execaSync: vi.fn(),
+}))
 vi.mock('./init', () => ({ main: vi.fn() }))
 vi.mock('#scripts/repo/repository-labels', () => ({
 	repository_labels: { ensure_labels: vi.fn() },
 }))
-vi.mock('./start-setup-pr', () => ({ start_setup_pr: { open: vi.fn() } }))
+vi.mock('./start-setup-pr', () => ({ start_setup_pr: { open: vi.fn(), changed_paths: vi.fn() } }))
 
 const mocked_execa = vi.mocked(execaSync)
 const GIT_ADD_ALL = 'git add --all'
 const ROOT = path.join(path.sep, 'work', 'my-site')
-const CONTEXT: StepContext = { root: ROOT, profile: 'basic', visibility: 'private' }
+const CONTEXT: StepContext = {
+	root: ROOT,
+	profile: 'basic',
+	visibility: 'private',
+	init_command: undefined,
+}
+const INIT_COMMAND = 'josh-app init --verbose'
 const SHAPE: ProjectShape = {
 	profile: 'basic',
 	reason: 'test',
@@ -137,6 +146,38 @@ describe('the steps josh start runs', () => {
 	})
 })
 
+describe('an initialize step handed to a caller command (#2872)', () => {
+	it('runs the command in the root with the confirmed profile instead of josh init', async () => {
+		await start_steps.run_steps(['initialize'], { ...CONTEXT, init_command: INIT_COMMAND })
+
+		expect(commands()).toStrictEqual(['josh-app init --verbose --profile basic'])
+		const call: ReadonlyArray<unknown> = mocked_execa.mock.calls[0] ?? []
+
+		expect(call[2]).toMatchObject({ cwd: ROOT, stdio: 'inherit' })
+		expect(init_main).not.toHaveBeenCalled()
+	})
+
+	it('names the command in the progress line', async () => {
+		await start_steps.run_steps(['initialize'], { ...CONTEXT, init_command: INIT_COMMAND })
+
+		expect(console.info).toHaveBeenCalledWith(`\n[1/1] Initialize with ${INIT_COMMAND}`)
+	})
+
+	it('stops before the commit when the command fails', async () => {
+		mocked_execa.mockImplementation((command) => {
+			if (command === 'josh-app') throw new Error('Command failed with exit code 1')
+
+			return result(0)
+		})
+		const context = { ...CONTEXT, init_command: INIT_COMMAND }
+
+		await expect(start_steps.run_steps(['initialize', 'commit'], context)).rejects.toThrow(
+			/stopped at: Initialize with josh-app init[\s\S]*Completed: nothing[\s\S]*exit code 1/u,
+		)
+		expect(commands()).not.toContain(GIT_ADD_ALL)
+	})
+})
+
 describe('the labels and failures of josh start', () => {
 	// Which labels are missing and how a failure is reported is `repository-labels.test.ts`'s.
 	it('provisions the labels through the shared step, on the repository gh resolves here', async () => {
@@ -149,7 +190,16 @@ describe('the labels and failures of josh start', () => {
 	it('opens the setup pull request through its own step, in the project root (#2816)', async () => {
 		await start_steps.run_steps(['setup_pr'], CONTEXT)
 
-		expect(start_setup_pr.open).toHaveBeenCalledWith(ROOT)
+		expect(start_setup_pr.open).toHaveBeenCalledWith(ROOT, undefined)
+	})
+
+	it('hands the setup pull request what was changed before a caller command ran (#2872)', async () => {
+		vi.mocked(start_setup_pr.changed_paths).mockReturnValue(['notes.md'])
+		const context = { ...CONTEXT, init_command: INIT_COMMAND }
+
+		await start_steps.run_steps(['initialize', 'setup_pr'], context)
+
+		expect(start_setup_pr.open).toHaveBeenCalledWith(ROOT, ['notes.md'])
 	})
 
 	it('reports how far it got when a step fails', async () => {
