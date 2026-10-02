@@ -219,6 +219,7 @@ function plan(project_npmrc: string, user_npmrc: string, lockfile: string): Migr
 const migrate_logic = {
 	plan,
 	github_tarballs,
+	is_github_tarball,
 	rewrite_kit_lockfile,
 	registry_of,
 	scoped_packages,
