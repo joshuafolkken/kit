@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 import type { ShipState } from './run-ship-stage'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
@@ -12,6 +13,18 @@ const emit_mock = vi.hoisted(() => vi.fn())
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('./run-ship-probe', () => ({ run_ship_probe: probe }))
 vi.mock('./run-event-stream-emit', () => ({ run_event_stream_emit: { emit: emit_mock } }))
+// The preflight's own branches are pinned in `run-ship-preflight.test.ts`; here it passes.
+vi.mock('./run-ship-preflight', () => ({
+	run_ship_preflight: { stage: vi.fn().mockResolvedValue({ code: 0, out: 'ready' }) },
+}))
+vi.mock('./run-ship-scoped', async (import_original) => {
+	const actual = await import_original<{ run_ship_scoped: typeof real_scoped }>()
+	const scoped_pair = vi
+		.fn<typeof real_scoped.scoped_pair>()
+		.mockResolvedValue({ code: 0, out: '' })
+
+	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_pair } }
+})
 // Outside a lane, so a gate run inside a lane child never hands these ships to a real supervisor.
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: vi.fn().mockReturnValue(false) },
@@ -93,7 +106,7 @@ describe('josh ship — a restart with a record', () => {
 		})
 
 		expect(await run_ship_cli.run([TITLE])).toBe(FAILED)
-		expect([...run_ship_stage.read_done(current.target)]).toStrictEqual(['gate'])
+		expect([...run_ship_stage.read_done(current.target)]).toStrictEqual(['preflight', 'gate'])
 	})
 })
 
@@ -136,6 +149,7 @@ describe('josh ship — the stage trace on the event stream', () => {
 		await run_ship_cli.run([TITLE])
 
 		expect(events()).toStrictEqual([
+			'ship-stage #2426 preflight skipped',
 			'ship-stage #2426 gate skipped',
 			'ship-stage #2426 commit skipped',
 			'ship-stage #2426 followup skipped',
@@ -149,7 +163,12 @@ describe('josh ship — the stage trace on the event stream', () => {
 
 		await run_ship_cli.run([TITLE])
 
-		expect(events()).toStrictEqual(['ship-stage #2426 gate start', 'ship-stage #2426 gate failed'])
+		expect(events()).toStrictEqual([
+			'ship-stage #2426 preflight start',
+			'ship-stage #2426 preflight done',
+			'ship-stage #2426 gate start',
+			'ship-stage #2426 gate failed',
+		])
 	})
 
 	it('shows a skipped stage under its header in the report', async () => {

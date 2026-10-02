@@ -105,6 +105,30 @@ describe('git_preflight.check — when every precondition holds', () => {
 	})
 })
 
+// joshuafolkken/kit#2946: `josh ship` asks the same preconditions before its review and gate.
+describe('git_preflight.problems_of — the refusal as a list', () => {
+	it('lists every unmet precondition the check refuses on, without throwing', async () => {
+		arrange(UNNUMBERED_BRANCH, UNCLASSIFIED_ISSUE)
+
+		const problems = await git_preflight.problems_of({
+			cli_input: NUMBERED_TITLE,
+			will_open_pr: true,
+		})
+
+		expect(problems).toHaveLength(2)
+		expect(problems[0]).toMatch(/Branch mismatch/u)
+		expect(problems[1]).toMatch(/Choose one release classification/u)
+	})
+
+	it('is empty when every precondition holds', async () => {
+		arrange(NUMBERED_BRANCH, CLASSIFIED_ISSUE)
+
+		expect(
+			await git_preflight.problems_of({ cli_input: undefined, will_open_pr: true }),
+		).toStrictEqual([])
+	})
+})
+
 describe('git_preflight.check — live-evidence notice', () => {
 	it('announces the evidence section for a runtime change', async () => {
 		arrange(NUMBERED_BRANCH, CLASSIFIED_ISSUE, 'scripts/git/git-pr.ts')

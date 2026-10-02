@@ -1,7 +1,5 @@
 import { agent_argv, type AgentArgv } from '#scripts/agent/agent-argv'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
-import { gate_tree } from '#scripts/gate/gate-tree'
-import { scoped_green } from '#scripts/gate/scoped-green'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -9,6 +7,7 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { openai_review_broker } from '#scripts/lane/openai-review-broker'
 import { detached_launch } from './detached-launch'
 import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
+import { run_ship_scoped, type Phase } from './run-ship-scoped'
 
 // The side effects of `josh ship --review` (joshuafolkken/kit#2427): the round-1 review the chain used
 // to open, launch, join, attest and record across five agent turns, run by the supervisor beside the
@@ -47,7 +46,10 @@ const FIXED_JOIN_NOTE =
 	'the round-1 gate read the tree before the review fixes — drained, not judged; the gate stage re-runs it.'
 const ROUND_TWO_SKIPPED_NOTE = 'round 2 not due — nothing left to verify; shipping on.'
 
-type Phase = () => Promise<JoshResult>
+// The scoped pair's precondition, met by the supervisor itself rather than stopped on
+// (joshuafolkken/kit#2500), single-sourced with the preflight and gate stages (joshuafolkken/kit#2946).
+const { run_phases, scoped_pair } = run_ship_scoped
+
 type PromptOf = (brief_path: string, findings_path: string) => string
 
 function failure(out: string): JoshResult {
@@ -153,17 +155,6 @@ async function record_and_route(
 	return outcome.is_passing ? { code: SUCCESS_EXIT_CODE, out } : failure(out)
 }
 
-async function run_phases(phases: ReadonlyArray<Phase>): Promise<JoshResult> {
-	let last: JoshResult = { code: SUCCESS_EXIT_CODE, out: '' }
-
-	for (const phase of phases) {
-		last = await phase()
-		if (last.code !== SUCCESS_EXIT_CODE) return last
-	}
-
-	return last
-}
-
 // A brief-minting command, then a reviewer handed what it printed.
 function reviewed(
 	open: ReadonlyArray<string>,
@@ -183,18 +174,6 @@ function reviewed(
 		},
 		async () => await launch_reviewer(opened.brief, prompt_of, issue, round),
 	]
-}
-
-// The scoped pair's precondition, met by the supervisor itself rather than stopped on
-// (joshuafolkken/kit#2500): only the checks with no green record for this tree run — the same
-// question `review:brief` and the local gate refuse on — so a fresh record costs nothing and a stale
-// or absent one costs a scoped run instead of a stop and a relaunched session. A check that genuinely
-// fails still stops the ship, its output forwarded to the ship log.
-async function scoped_pair(): Promise<JoshResult> {
-	const tree = await gate_tree.read_gate_tree()
-	const scripts = scoped_green.missing_scripts(tree.files, tree.base)
-
-	return await run_phases(scripts.map((script) => async () => await josh([script])))
 }
 
 // Fixes made in place are counted only once the scoped pair is green on the fixed tree. The reviewer is
