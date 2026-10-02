@@ -15,17 +15,16 @@ import { gh_subcommand_guard, type GhSpawn } from './gh-subcommand-guard'
 // forbidden spawn out in full here is not itself one.
 
 const FIXTURE_FILE = 'scripts/fixture.ts'
-const AI_FIXTURE_FILE = 'scripts-ai/fixture.ts'
+const NESTED_FIXTURE_FILE = 'scripts/git/fixture.ts'
 // The real module on disk that the import-resolution cases name, in the three spellings a
-// `scripts/` or `scripts-ai/` file can reach it by.
+// `scripts/` file can reach it by.
 const RELATIVE_MODULE = './gh/gh-subcommand-guard-fixture'
 const SUBPATH_MODULE = '#scripts/gh/gh-subcommand-guard-fixture'
-const PARENT_MODULE = '../scripts/gh/gh-subcommand-guard-fixture'
+const PARENT_MODULE = '../gh/gh-subcommand-guard-fixture'
 const GH_CONSTANT = 'FIXTURE_GH_BINARY'
 const GIT_CONSTANT = 'FIXTURE_GIT_BINARY'
 const SCRIPTS_DIRECTORY = 'scripts'
-const SCRIPTS_AI_DIRECTORY = 'scripts-ai'
-const SCRIPTS_AI_FILE = 'scripts-ai/epic.ts'
+const EPIC_ENTRY_FILE = 'scripts/epic/epic.ts'
 const GH_EXEC_FILE = 'scripts/git/git-gh-exec.ts'
 const GUARD_MODULE_EXCLUSION = '!scripts/gh/gh-subcommand-guard.ts'
 const PACKAGE_JSON = path.join(
@@ -34,7 +33,7 @@ const PACKAGE_JSON = path.join(
 	'..',
 	'package.json',
 )
-// A repository scan parses every file under scripts/ and scripts-ai/: about six seconds alone, past
+// A repository scan parses every file under scripts/: about six seconds alone, past
 // the ten-second suite default once the gate runs its checks side by side. The allowance is
 // wall-clock only; the assertions are unchanged.
 const SCAN_TIMEOUT_MS = 60_000
@@ -72,13 +71,11 @@ describe('gh subcommand guard — the repository as it stands', () => {
 	)
 
 	// The blind spot itself. `scripts-ai/` was outside joshuafolkken/kit#1042's grep, so a scan that
-	// covered only `scripts/` would pass while `josh issue <N>` still spawned `gh issue view`.
-	it('reads both scripts/ and scripts-ai/', () => {
-		expect(gh_subcommand_guard.SCANNED_DIRECTORIES).toStrictEqual([
-			SCRIPTS_DIRECTORY,
-			SCRIPTS_AI_DIRECTORY,
-		])
-		expect(gh_subcommand_guard.source_files(SCRIPTS_AI_DIRECTORY)).toContain(SCRIPTS_AI_FILE)
+	// covered only `scripts/` would pass while `josh issue <N>` still spawned `gh issue view`. Those
+	// entry points now live under `scripts/` (joshuafolkken/kit#2903), so the one tree reaches them.
+	it('reads every file under scripts/, the former scripts-ai/ entry points included', () => {
+		expect(gh_subcommand_guard.SCANNED_DIRECTORIES).toStrictEqual([SCRIPTS_DIRECTORY])
+		expect(gh_subcommand_guard.source_files(SCRIPTS_DIRECTORY)).toContain(EPIC_ENTRY_FILE)
 		expect(gh_subcommand_guard.source_files(SCRIPTS_DIRECTORY)).toContain(GH_EXEC_FILE)
 	})
 
@@ -243,10 +240,10 @@ describe('gh subcommand guard — a binary named through an import', () => {
 	})
 
 	// The two spellings a cross-directory import takes: the `#scripts/*` subpath `package.json`
-	// declares, and the `../scripts/…` form `scripts-ai/` files are allowed to write.
+	// declares, and the parent-relative `../…` form read from the importing file's own directory.
 	it('resolves the subpath and parent-relative spellings of the same module', () => {
 		expect(subcommands(importing(SUBPATH_MODULE, GH_CONSTANT))).toStrictEqual(['issue'])
-		expect(subcommands(importing(PARENT_MODULE, GH_CONSTANT), AI_FIXTURE_FILE)).toStrictEqual([
+		expect(subcommands(importing(PARENT_MODULE, GH_CONSTANT), NESTED_FIXTURE_FILE)).toStrictEqual([
 			'issue',
 		])
 	})
@@ -330,12 +327,12 @@ describe('gh subcommand guard — line numbers and URLs', () => {
 describe('gh subcommand guard — the failure message', () => {
 	it('names the file, the line and the command', () => {
 		const message = gh_subcommand_guard.describe_violation({
-			file: SCRIPTS_AI_FILE,
+			file: EPIC_ENTRY_FILE,
 			line: 21,
 			subcommand: 'issue',
 		})
 
-		expect(message).toContain(`${SCRIPTS_AI_FILE}:21`)
+		expect(message).toContain(`${EPIC_ENTRY_FILE}:21`)
 		expect(message).toContain('gh issue')
 	})
 

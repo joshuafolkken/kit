@@ -1,16 +1,16 @@
 #!/usr/bin/env tsx
 import { parseArgs } from 'node:util'
-import { git_branch } from '../scripts/git/git-branch'
-import { git_commit } from '../scripts/git/git-commit'
-import { git_error } from '../scripts/git/git-error'
-import { git_issue, type IssueInfo } from '../scripts/git/git-issue'
-import { git_pr } from '../scripts/git/git-pr'
-import { git_preflight } from '../scripts/git/git-preflight'
-import { git_prompt, type WorkflowConfirmations } from '../scripts/git/git-prompt'
-import { git_push } from '../scripts/git/git-push'
-import { git_staging } from '../scripts/git/git-staging'
-import { cli_body } from '../scripts/josh/cli-body'
-import { test_red_commit } from '../scripts/test/test-red-commit'
+import { cli_body } from '#scripts/josh/cli-body'
+import { test_red_commit } from '#scripts/test/test-red-commit'
+import { git_branch } from './git-branch'
+import { git_commit } from './git-commit'
+import { git_error } from './git-error'
+import { git_issue, type IssueInfo } from './git-issue'
+import { git_pr } from './git-pr'
+import { git_preflight } from './git-preflight'
+import { git_prompt, type WorkflowConfirmations } from './git-prompt'
+import { git_push } from './git-push'
+import { git_staging } from './git-staging'
 
 const SKIP_MESSAGES = {
 	commit: '💡 Commit skipped.',

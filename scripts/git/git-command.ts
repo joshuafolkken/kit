@@ -411,7 +411,7 @@ async function push(): Promise<void> {
 // the same thing: it is on the default branch, bringing it up to date before doing something else —
 // `main-sync.ts` for `josh ms`, `release-cli.ts` / `release-publish.ts` around the release pull
 // request, `scripts-ai/prep.ts` before it snapshots the overrides, and `git-branch.ts` →
-// `pull_latest` — reached from `scripts-ai/git-workflow.ts`, so it runs on every `josh git` /
+// `pull_latest` — reached from `git-workflow.ts`, so it runs on every `josh git` /
 // `josh pr` started from the default branch, which makes it the hottest of the five rather than a
 // dormant one. **None of them is
 // asking to absorb divergence**, so `merge_branch`'s reasoning inverts here: a default branch that

@@ -1,19 +1,19 @@
 #!/usr/bin/env tsx
 import { parseArgs } from 'node:util'
-import { git_branch } from '../scripts/git/git-branch'
-import { git_error } from '../scripts/git/git-error'
-import { git_followup_flush } from '../scripts/git/git-followup-flush'
-import { git_notify, type GitNotifyConfig } from '../scripts/git/git-notify'
-import { git_pr_followup } from '../scripts/git/git-pr-followup'
-import { cli_body } from '../scripts/josh/cli-body'
-import { live_evidence } from '../scripts/review/live-evidence'
-import { review_attest } from '../scripts/review/review-attest'
-import { review_record } from '../scripts/review/review-record'
-import { load_optional_environment } from './environment-loader'
+import { cli_body } from '#scripts/josh/cli-body'
+import { josh_environment_file } from '#scripts/josh/josh-environment-file'
+import { live_evidence } from '#scripts/review/live-evidence'
+import { review_attest } from '#scripts/review/review-attest'
+import { review_record } from '#scripts/review/review-record'
 import { parse_issue_number_from_text } from './followup-issue-number'
+import { git_branch } from './git-branch'
+import { git_error } from './git-error'
 import { git_followup_finish } from './git-followup-finish'
+import { git_followup_flush } from './git-followup-flush'
+import { git_notify, type GitNotifyConfig } from './git-notify'
+import { git_pr_followup } from './git-pr-followup'
 
-load_optional_environment()
+josh_environment_file.load_environment_file()
 
 // cspell:words coderabbit
 

@@ -1,5 +1,5 @@
-import type { TelegramSendInput, TelegramTaskType } from '../scripts/git/telegram-notify'
-import { cli_body } from '../scripts/josh/cli-body'
+import { cli_body } from '#scripts/josh/cli-body'
+import type { TelegramSendInput, TelegramTaskType } from './telegram-notify'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 interface CliValues {

@@ -1,6 +1,6 @@
-import type { InsertKind, InsertPosition } from '../scripts/git/git-epic-chains'
-import { git_epic_parse, type ExternalChild } from '../scripts/git/git-epic-parse'
-import { cli_body } from '../scripts/josh/cli-body'
+import type { InsertKind, InsertPosition } from '#scripts/git/git-epic-chains'
+import { git_epic_parse, type ExternalChild } from '#scripts/git/git-epic-parse'
+import { cli_body } from '#scripts/josh/cli-body'
 import { epic_cli_argv, ISSUE_NUMBER_PATTERN } from './epic-cli-argv'
 import { epic_cli_remove } from './epic-cli-remove'
 

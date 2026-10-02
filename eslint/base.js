@@ -29,13 +29,10 @@ import {
 import { typescript_rules } from './rules/typescript.js'
 import { unicorn_rules } from './rules/unicorn.js'
 
-const SCRIPTS_AI_PATTERNS = ['scripts-ai/**/*.ts', 'scripts-ai/**/*.js']
-
 const FILE_PATTERNS = {
 	d_ts: ['**/*.d.ts'],
 	typescript: ['**/*.ts', '**/*.tsx'],
-	scripts_ai: SCRIPTS_AI_PATTERNS,
-	scripts: ['scripts/**/*.ts', 'scripts/**/*.js', ...SCRIPTS_AI_PATTERNS],
+	scripts: ['scripts/**/*.ts', 'scripts/**/*.js'],
 	// joshuafolkken/kit#1414: `**/*.spec.ts` is deliberately absent. The same config bans that name
 	// outright, so handing it the test relaxation (`max-lines-per-function` 35 and the rest) is the
 	// config contradicting itself, and it is what makes `*.spec.ts` read as supported. A banned file
@@ -160,7 +157,7 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			files: FILE_PATTERNS.scripts,
 			rules: {
 				'unicorn/no-process-exit': 'off',
-				// scripts under scripts/ and scripts-ai/ are dual-purpose: shebang-executable
+				// scripts under scripts/ are dual-purpose: shebang-executable
 				// (run via tsx) AND importable namespace modules (consumed via #scripts/* and
 				// in tests). unicorn/no-exports-in-scripts flags exports in any shebang file,
 				// which conflicts with the kit export { module } convention, so disable it here.
@@ -171,12 +168,6 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 				// kit's export { module } namespace pattern means functions never use this,
 				// so referencing them unbound (e.g. test spies) is safe
 				'@typescript-eslint/unbound-method': 'off',
-			},
-		},
-		{
-			files: FILE_PATTERNS.scripts_ai,
-			rules: {
-				'@typescript-eslint/no-restricted-imports': 'off',
 			},
 		},
 		{

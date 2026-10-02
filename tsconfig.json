@@ -14,7 +14,6 @@
 		"ports/**/*.ts",
 		"prettier/**/*.d.ts",
 		"scripts/**/*.ts",
-		"scripts-ai/**/*.ts",
 		"templates/**/*.ts"
 	]
 }

@@ -1,12 +1,12 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { git_error } from '../scripts/git/git-error'
-import { git_gh_issue_read } from '../scripts/git/git-gh-issue-read'
-import { git_gh_repo } from '../scripts/git/git-gh-repo'
-import { github_issue_url, type IssueUrlTarget } from '../scripts/git/github-issue-url'
-import { telegram_notify } from '../scripts/git/telegram-notify'
-import { load_optional_environment } from './environment-loader'
+import { josh_environment_file } from '#scripts/josh/josh-environment-file'
+import { git_error } from './git-error'
+import { git_gh_issue_read } from './git-gh-issue-read'
+import { git_gh_repo } from './git-gh-repo'
+import { github_issue_url, type IssueUrlTarget } from './github-issue-url'
+import { telegram_notify } from './telegram-notify'
 import { telegram_test_logic, type CliValues, type ResolvedContext } from './telegram-test-logic'
 
 const REPO_NAME_SEPARATOR = '/'
@@ -97,7 +97,7 @@ async function resolve_context(values: CliValues): Promise<ResolvedContext> {
 }
 
 async function main(): Promise<void> {
-	load_optional_environment()
+	josh_environment_file.load_environment_file()
 	const values = parse_cli_arguments()
 	const context = await resolve_context(values)
 	const input = telegram_test_logic.build_input({ values, context })

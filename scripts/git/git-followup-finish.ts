@@ -1,11 +1,11 @@
-import { git_followup_cleanup, type CleanupStep } from '../scripts/git/git-followup-cleanup'
-import { git_followup_pending } from '../scripts/git/git-followup-pending'
-import { git_next_issues } from '../scripts/git/git-next-issues'
-import { review_attest } from '../scripts/review/review-attest'
-import { review_stamps } from '../scripts/review/review-stamps'
-import { run_hold } from '../scripts/run/run-hold'
-import { run_progress_clock } from '../scripts/run/run-progress-clock'
+import { review_attest } from '#scripts/review/review-attest'
+import { review_stamps } from '#scripts/review/review-stamps'
+import { run_hold } from '#scripts/run/run-hold'
+import { run_progress_clock } from '#scripts/run/run-progress-clock'
 import { parse_completed_issue_number } from './followup-issue-number'
+import { git_followup_cleanup, type CleanupStep } from './git-followup-cleanup'
+import { git_followup_pending } from './git-followup-pending'
+import { git_next_issues } from './git-next-issues'
 
 // **The count of unreleased merges, not the project version** (joshuafolkken/kit#1486). This line
 // used to read the local `package.json` and was read as "the version this run just shipped"; children

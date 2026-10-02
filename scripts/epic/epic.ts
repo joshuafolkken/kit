@@ -2,18 +2,18 @@
 /**
  * Create an epic Issue that satisfies every requirement the auto-close and the order warning read.
  *
- * Usage: tsx scripts-ai/epic.ts "<title>" <N1> <N2> ... [--ordered] [--rationale-file <path|->]
+ * Usage: tsx scripts/epic/epic.ts "<title>" <N1> <N2> ... [--ordered] [--rationale-file <path|->]
  *                                                       [--origin <owner/repo#N>]
- *        tsx scripts-ai/epic.ts --promote <N> <N1> <N2> ... [same flags]
- *        tsx scripts-ai/epic.ts --add <E> <N1> <N2> ... [--before <M> | --after <M>]
+ *        tsx scripts/epic/epic.ts --promote <N> <N1> <N2> ... [same flags]
+ *        tsx scripts/epic/epic.ts --add <E> <N1> <N2> ... [--before <M> | --after <M>]
  *                                                      [--decision-file <path|->]
- *        tsx scripts-ai/epic.ts --remove <E> <M> <N> ... [--decision-file <path|->]
+ *        tsx scripts/epic/epic.ts --remove <E> <M> <N> ... [--decision-file <path|->]
  */
-import { git_epic_add, type AddChildrenInput } from '../scripts/git/git-epic-add'
-import { git_epic_reconcile } from '../scripts/git/git-epic-reconcile'
-import { git_epic_remove } from '../scripts/git/git-epic-remove'
-import { git_epic_run } from '../scripts/git/git-epic-run'
-import { git_gh_command } from '../scripts/git/git-gh-command'
+import { git_epic_add, type AddChildrenInput } from '#scripts/git/git-epic-add'
+import { git_epic_reconcile } from '#scripts/git/git-epic-reconcile'
+import { git_epic_remove } from '#scripts/git/git-epic-remove'
+import { git_epic_run } from '#scripts/git/git-epic-run'
+import { git_gh_command } from '#scripts/git/git-gh-command'
 import { epic_cli, type AddArguments, type CrossRepoAddTarget } from './epic-cli'
 
 const ARGV_OFFSET = 2

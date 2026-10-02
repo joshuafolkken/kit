@@ -34,8 +34,7 @@ function find_tests_block(config: Array<ConfigBlock>): ConfigBlock | undefined {
 	return config.find((block) => has_file_pattern(block, '*.test.ts'))
 }
 
-// The scripts block is identified by `unicorn/no-process-exit`: the scripts-ai block shares the
-// `scripts-ai/` glob but carries a different rule set.
+// The scripts block is identified by its `scripts/` glob together with `unicorn/no-process-exit`.
 function find_scripts_block(config: Array<ConfigBlock>): ConfigBlock | undefined {
 	return config.find(
 		(block) =>
@@ -56,22 +55,21 @@ function find_global_block(config: Array<ConfigBlock>): ConfigBlock | undefined 
 	)
 }
 
+// joshuafolkken/kit#2903 moved the `scripts-ai/` entry points under `scripts/`, so they follow the
+// `scripts/` import rules and no block relaxes them any more.
 describe('create_base_config — scripts block', () => {
-	it('includes scripts-ai in the scripts file pattern', () => {
-		const scripts_block = build_config().find((block) => has_file_pattern(block, 'scripts-ai'))
-
-		expect(scripts_block).toBeDefined()
-	})
-
-	it('turns off no-restricted-imports for scripts-ai to allow ../scripts/ imports', () => {
-		const scripts_ai_block = build_config().find(
-			(block) =>
-				Array.isArray(block.files) &&
-				block.files.every((pattern) => String(pattern).startsWith('scripts-ai/')),
+	it('names no scripts-ai pattern in any block', () => {
+		const scripts_ai_blocks = build_config().filter((block) =>
+			has_file_pattern(block, 'scripts-ai'),
 		)
 
-		expect(scripts_ai_block).toBeDefined()
-		expect(rules_of(scripts_ai_block)['@typescript-eslint/no-restricted-imports']).toBe('off')
+		expect(scripts_ai_blocks).toStrictEqual([])
+	})
+
+	it('leaves no-restricted-imports on for scripts', () => {
+		const scripts_block = find_scripts_block(build_config())
+
+		expect(rules_of(scripts_block)['@typescript-eslint/no-restricted-imports']).toBeUndefined()
 	})
 })
 
