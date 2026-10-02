@@ -704,3 +704,8 @@ dropping either side destroys exactly what it exists to record.
 - rf:none | none | - | 2026-10-02 | #2873
 - rf:comments | low | README.md | 2026-10-02 | #2874
 - rf:comments | low | README.md | 2026-10-02 | #2874
+- rf:bug-risks | medium | README.md:19 | 2026-10-02 | #2917
+- rf:bug-risks | low | README.md:20 | 2026-10-02 | #2917
+- rf:bug-risks | low | README.md:26 | 2026-10-02 | #2917
+- rf:tests | low | scripts/document/overview-documents.test.ts:25 | 2026-10-02 | #2917
+- rf:bug-risks | low | README.md:19 | 2026-10-02 | #2917
