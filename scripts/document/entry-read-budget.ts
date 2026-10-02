@@ -77,11 +77,12 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// planning entries): kickoff has no headroom, so the addition was offset by tightening that file's
 	// heartbeat prose, keeping every entry within its existing block.
 	// joshuafolkken/kit#2762 moved the rationale of five point-of-use documents to
-	// `docs/maintainers/*-rationale.md`, and the ratchet holds the reduction.
+	// `docs/maintainers/*-rationale.md`, and the ratchet holds the reduction. joshuafolkken/kit#2895 did
+	// the same for eight more, lowering fullrun, halfrun and backlogrun one block each.
 	{ entry: 'kickoff', bytes: 229_376 },
-	{ entry: 'fullrun', bytes: 229_376 },
-	{ entry: 'halfrun', bytes: 229_376 },
-	{ entry: 'backlogrun', bytes: 233_472 },
+	{ entry: 'fullrun', bytes: 225_280 },
+	{ entry: 'halfrun', bytes: 225_280 },
+	{ entry: 'backlogrun', bytes: 229_376 },
 	{ entry: LANE_CHILD, bytes: 77_824 },
 ]
 
