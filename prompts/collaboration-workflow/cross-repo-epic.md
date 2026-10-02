@@ -1,54 +1,5 @@
 ## リポジトリをまたぐ EPIC
 
-1 つの要望が kit / app-kit / game-kit / joshuafolkken-com のうち複数にまたがることは珍しくない。EPIC は**他リポジトリの子 Issue を持てる**。
+**この規則の単一ソースは `.claude/skills/epic-commands/SKILL.md` → "Epics that span repositories" である。** 子の書き方、owner の制限、自動クローズ、公開の完了を待つ依存、配布物を持たない repo、実行のディスパッチ、`owner/repo#N` での参照はすべてそこにある。
 
-### 書き方
-
-EPIC 本文のタスクリストに、次のどちらかの形で書く。
-
-```md
-## Progress
-
-- [ ] #101
-- [ ] joshuafolkken/app-kit#7
-- [ ] https://github.com/joshuafolkken/game-kit/issues/12
-```
-
-**状態の読み取りにローカルチェックアウトは要らない。** そのリポジトリを指定した REST パス（`gh api repos/<owner>/<repo>/issues/<n>`）で読むため、クローンが必要になるのは実装の段になってからである。
-
-**owner の制限は joshuafolkken/kit#869 のものをそのまま継承する。** 現在のリポジトリと owner が異なるリポジトリの子は、いかなる経路でも対象にならない。
-
-### 自動クローズ
-
-**他リポジトリの子の状態が全て読めた場合に限り**、EPIC は自動でクローズされる。1 件でも読めない子があれば従来どおり据え置かれる。「状態を読めないまま閉じない」という安全側の判断は変わっておらず、読む手段ができただけである。
-
-### 別 repo への依存は「公開の完了」までを条件とする
-
-**`blocked-by` は相手 Issue が closed になれば解決するが、repo をまたぐ依存ではそれでは早すぎる。** kit の Issue が closed になった時点では npm への公開がまだ終わっていない（マージ → auto-tag → publish が非同期）。その瞬間に app-kit の子を着手可能と判定すると、まだ公開されていないバージョンを取りに行って失敗するか、古いバージョンのまま実装して壊れる。**放置すると「たまに壊れる」という最も診断しにくい形で出る。**
-
-- 同一 repo 内の依存 → 相手が closed で解決
-- **別 repo の子への依存 → 相手が closed ＋ その repo が配布するパッケージの新バージョンが npm に出現、で解決**
-
-**評価は AND であり、順序が意味を持つ。** 相手が open のあいだは未解決と判定するだけで npm を見に行かない。EPIC 開始時から公開待ちで固まることはなく、「前の子が終わってから、公開されたら着手する」という待ち方になる。
-
-**待つ標的は具体的な版であり、「新しいバージョン」ではない。** 消費者が数バージョン遅れている場合、「今より新しい版が出た」を条件にすると目的の機能を含まない古い公開で満たされてしまう。相手 repo の default branch の `package.json` が持つバージョンを標的にする（`gh api` でローカルチェックアウト無しに読める）。**ただし子はもうバージョンを上げない**（joshuafolkken/kit#1486）。版が動くのは `pnpm josh release` が走ったときだけなので、標的は「子がマージされた直後の版」ではなく「その子を含むリリースが打たれた後の版」である。マージ直後の default branch の版は前回リリースのものなので、それを標的にすると待ちが即座に満たされてしまう。
-
-**ただし相手 repo が配布物を持たない場合は待たない**（joshuafolkken/kit#1129）。default branch に `package.json` が無い、あるいは `private` を宣言している repo は公開する版そのものが存在しないため、closed な blocker はそこで解決とする。待ち続けると実行上限の 8 時間まで抜けられず、しかも人が編集して解消できるものが無い。
-
-**この判定は相手 repo の manifest から読み、レジストリからは読まない。** レジストリの 404 は「公開されたことがない」だけでなく「このトークンからは見えない」（repo 名の変更、private パッケージ、`read:packages` 権限の欠如）も意味するため、それで解決としてしまうと、blocker の版がまだ公開されていないのに消費者側の子が着手してしまう。manifest の 404 にはその曖昧さが無い — その repo の Issue は既に読めているので権限は確認済みであり、無いのはファイルのほうである。読み取り自体の失敗は HTTP ステータスで区別し、従来どおり待つ。
-
-公開待ちの判定は `josh propagate` の実装を共有する。二重定義を作らない。
-
-### 実行のディスパッチ
-
-`josh epic:next` の出力は各候補の**対象リポジトリとローカルチェックアウトのパス**を含む。パスは joshuafolkken/kit#869 の地図から引く。**チェックアウトが無いリポジトリは、勝手に clone せず「ローカルチェックアウト無し」と表示する。**
-
-### EPIC を別リポジトリから参照する
-
-**クロス repo の EPIC は 1 つの repo にしか存在しない。** app-kit のセッションから kit の EPIC を参照するときは `owner/repo#N` の形で修飾する。
-
-```bash
-pnpm josh epic:next joshuafolkken/kit#858 --repo joshuafolkken/app-kit
-```
-
-**裸の `#N` は自リポジトリの別 Issue に解決される** — 番号が同じだけの、まったく別の Issue である。したがってクロス repo の EPIC には必ず修飾を付ける。`backlogrun joshuafolkken/kit#858 --only` も同じ形。
+経緯（公開待ちが要る理由、joshuafolkken/kit#1129）は [`docs/maintainers/epic-commands-rationale.md`](../../docs/maintainers/epic-commands-rationale.md) にある。

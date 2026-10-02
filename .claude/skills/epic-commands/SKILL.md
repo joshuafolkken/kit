@@ -6,8 +6,9 @@ description: The procedures for the `josh epic:*` commands that make an epic run
 # The `josh epic:*` commands
 
 These three commands are what turn an epic from a list of issue numbers into something a run can
-execute unattended. The canonical extended reference is `prompts/collaboration-workflow/` — `epic-bundle.md`, `epic-audit.md` and `cross-repo-epic.md` between them; this
-skill is the operational procedure, and the two must agree.
+execute unattended. **This skill is their single source**: `prompts/collaboration-workflow/` keeps
+`epic-bundle.md`, `epic-audit.md` and `cross-repo-epic.md` only as pointers here, and the history
+behind the rules is `docs/maintainers/epic-commands-rationale.md` (joshuafolkken/kit#2892).
 
 The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `backlogrun` — live in the
 `workflow-commands` skill.
@@ -80,9 +81,12 @@ adds is reading *inside* the children:
 | The search for those issues could not read the open backlog | **error** |
 | That search stopped before the end of the backlog | warning |
 
-**Only errors fail it.** The first check fires on a legitimate forward reference as readily as on a
-real missing dependency; failing on both would make design notes unwritable. A forward reference the
-other child *already depends on* is not reported at all.
+**Only errors fail it** (exit 1); a warning leaves the exit code alone. The first check fires on a
+legitimate forward reference as readily as on a real missing dependency; failing on both would make
+design notes unwritable, so the reader judges and the machine only keeps it from being missed. A
+forward reference the other child *already depends on* is not reported at all. Acceptance criteria
+that require what a child free to run later produces cannot be met however anyone decides, which is
+why that check is an error.
 
 **A pair with either child closed is a warning, not an error.** What makes an undeclared order a
 contradiction is that the criteria's child *can run first*, and one end closing is enough to make
@@ -92,11 +96,13 @@ audit forever, which stops every future run of that epic at the first step. It i
 dropped because dropping it hands the same pair to the first check, which reports it as an implicit
 dependency instead: the same one line, minus the detail that the name is in the acceptance criteria
 (joshuafolkken/kit#1010, widened from both-closed to either-closed by joshuafolkken/kit#1597 after a
-closed child citing an open sibling **as evidence** held an epic red at step one).
+closed child citing an open sibling **as evidence** held an epic red at step one). **The demotion
+needs the closed state confirmed**: `epic_issue.normalize_state` maps every state but `CLOSED`
+(`MERGED` included) to `OPEN`, so a state that could not be confirmed stays an error.
 
 **Fixing what it finds is Tier A** — re-pointing a dependency or correcting prose is reversible and
-will otherwise stall the work. Park with `needs-decision` only when the contradiction is a design
-choice nobody has made.
+will otherwise stall the work, so fix it without asking and record why on the issue. Park with
+`needs-decision` only when the contradiction is a design choice nobody has made.
 
 **The two `orphan search` findings are the exception, because neither is a contradiction.** They are
 about the search itself rather than about anything the children say (joshuafolkken/kit#1033):
@@ -113,6 +119,8 @@ about the search itself rather than about anything the children say (joshuafolkk
 **One thing it cannot check** belongs to planning: when a child introduces a new label, command,
 state or artifact, list the existing code referencing that concept and confirm some child owns
 updating it. Label names are single-sourced in `scripts/git/issue-labels.ts`.
+
+History: `docs/maintainers/epic-commands-rationale.md` → "`epic:audit` — why the children are read across".
 
 ## `josh epic:next <E…>` — what is runnable
 
@@ -328,7 +336,11 @@ to implement.
 - **The epic auto-closes only when every cross-repository child's state could actually be read.** One
   unreadable child leaves it open, exactly as before.
 - **An epic in another repository must be referenced as `owner/repo#N`** — `backlogrun
-  joshuafolkken/kit#858 --only`. A bare `#N` resolves to *this* repository's issue of that number.
+  joshuafolkken/kit#858 --only`, `epic:next joshuafolkken/kit#858 --repo joshuafolkken/app-kit`. A
+  bare `#N` resolves to *this* repository's issue of that number. A cross-repository epic exists in
+  one repository only.
+- **`epic:next` prints each candidate's repository and local checkout** from joshuafolkken/kit#869's
+  map; a repository with no checkout prints `(no local checkout)` and is **never cloned on its own**.
 
 **A dependency that crosses a repository is not satisfied by the blocking issue closing.** Merging
 does not publish: the merge, the auto-tag and the publish run one after another, so a consumer told
@@ -341,12 +353,17 @@ default branch declares has appeared in the registry.
 wait on — so a closed blocker there resolves rather than waiting until the run's own eight-hour
 timeout with nothing an operator can edit to clear it. The answer is read from the blocker
 repository's own manifest and never from the registry: a registry 404 also means "this token may not
-see it", so resolving on one would start a consumer child before its blocker's release existed.
+see it", so resolving on one would start a consumer child before its blocker's release existed. A
+manifest read that fails (rather than answering 404) is told apart by HTTP status and still waits.
 
 **The evaluation is an AND in that order.** While the blocker is open the registry is never
 consulted, so a run never stalls on a publish from the moment it starts. The target is that exact
 version, never "something newer" — a consumer several releases behind would otherwise be satisfied by
-a publish that predates the change.
+a publish that predates the change. **A child no longer bumps the version** (joshuafolkken/kit#1486):
+the version moves only when `pnpm josh release` runs, so the target is the release that includes the
+blocker, and the default branch's version just after its merge is the previous release, which would
+satisfy the wait at once. The publish check shares `josh propagate`'s implementation; it is not
+defined twice. History: `docs/maintainers/epic-commands-rationale.md` → "Cross-repository epics".
 
 ## `josh epic:bundle <N>` — does this new issue belong with one already filed?
 
@@ -373,14 +390,18 @@ all: `repos/{owner}/{repo}/issues/<N>` serves one too, and a merged PR does not 
 
 **A number that does not exist is not a gap.** A typo, or another repository's number quoted in
 prose, is dropped in silence — neither a candidate nor something the command reports it could not
-read. Reported as a gap it puts `⚠ Could not read #N.` above the verdict, and the rule below stops an
-unattended run on exactly that, for a reference that never existed (joshuafolkken/kit#957). **The two
+read. Reported as a gap it puts `⚠ Could not read #N.` above the verdict, and the could-not-answer rule
+(`prompts/review.md` → "Three-way disposition after the cap") stops an unattended run on exactly that, for a reference that never existed (joshuafolkken/kit#957). **The two
 are told apart by HTTP status, never by `gh`'s wording**: 404 is nothing at that number, 403 and 429
 are a rate limit. GitHub answers 404 for an issue the token may not see as well, so as not to leak
 its existence — which does not reach this command, because it probes the repository whose open issues
 it has just listed. The probe costs one REST request and runs **only** when a read has already
 failed, and only on the path that needs the distinction: the backlog's own relation reads, up to two
-hundred of them, never pay it.
+hundred of them, never pay it, and the referenced-number reads are capped at twenty. **Only the
+subject's own body is followed** — the reverse direction would scan every closed issue, and a
+follow-up already names its parent. The reference parsing is the same implementation as
+`epic:audit`'s implicit-dependency check, applied to the backlog instead of one epic. The open backlog
+is small enough to scan whole, so there is no index or cache.
 
 | Candidates | Do | Tier |
 | --- | --- | --- |
@@ -392,6 +413,11 @@ hundred of them, never pay it.
 | No strong signal | Nothing | — |
 | **The epic listing was cut short** | **Nothing** — every placing row above is withheld | — |
 
+**`none` is a legitimate answer** — a self-review outside any workflow has no current issue to point
+at, so the issue stays in the backlog: what the procedure requires is running the command and
+following its answer, not landing every issue in an epic. The review-cap follow-up's filing and the
+answer table it acts on are `prompts/review.md` → "Three-way disposition after the cap".
+
 **Every row that *places* the issue asserts a negative, so a cut epic listing withholds all of them**
 (joshuafolkken/kit#1697). "No epic already tracks this issue" — which `create_epic` asserts about the
 candidates too — is only as good as the listing it was read from, and an epic past the cut tracks its
@@ -399,7 +425,8 @@ children invisibly. **`add_to_epic` rests on it as much as `create_epic` does**:
 the epic a *candidate* sits in, while an unseen epic already tracks the issue itself, is the same
 duplicate by another route. The cut was already on standard error
 (`⚠ The epic listing …`) while standard output went on printing an executable
-instruction such as `Create an epic for these (Tier A — do it).` — and the rule below that reads a warning as "could not answer" is written for one above
+instruction such as `Create an epic for these (Tier A — do it).` — and the rule that reads a warning as "could not answer" (`prompts/review.md` → "Three-way
+disposition after the cap") is written for one above
 `Nothing to bundle.`, so it never reached this verdict. Acted on as Tier A, that is a **second epic
 over an already-tracked issue**, which the auto-close and `epic:next` cannot both be right about
 (joshuafolkken/kit#943). The verdict now says so itself:
@@ -462,3 +489,5 @@ Full behavior: `docs/josh-commands.md` → "`josh issue:file`".
 **When the relation carries an order, record it** in `blocked-by` and in the epic's `Dependencies` —
 on an addition as much as on a new epic. Without it the batch survives and the reason for it does
 not. An order **nobody declared is not invented**.
+
+History: `docs/maintainers/epic-commands-rationale.md` → "`epic:bundle` — why issues filed apart are bundled afterwards".

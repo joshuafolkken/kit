@@ -39,7 +39,7 @@ new epic" when what gets created is often a single Issue.
   applies depends on what the target is, and promoting rewrites someone else's Issue into a container.
 - **A cross-repository target is written `owner/repo#N`** and inserted from that repository's
   checkout; run there, since `epic --add` reads and writes only the repository it runs from
-  (`prompts/collaboration-workflow/cross-repo-epic.md`). A bare `#N` resolves to this repository's
+  (`.claude/skills/epic-commands/SKILL.md` → "Epics that span repositories"). A bare `#N` resolves to this repository's
   issue of that number.
 - **No suffix leaves the behavior exactly as it was.**
 

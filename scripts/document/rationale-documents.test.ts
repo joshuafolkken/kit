@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { document_scan } from './document-scan'
@@ -15,6 +15,8 @@ const ROOT = process.cwd()
 const RATIONALE_DIRECTORY = path.join('docs', 'maintainers')
 const RATIONALE_SUFFIX = '-rationale.md'
 const SECTION_LEVEL = 2
+const SKILL_ROOT = path.join('.claude', 'skills')
+const SKILL_FILE = 'SKILL.md'
 
 function rationale_files(): Array<string> {
 	return readdirSync(path.join(ROOT, RATIONALE_DIRECTORY))
@@ -26,10 +28,15 @@ function read(relative_path: string): string {
 	return readFileSync(path.join(ROOT, relative_path), 'utf8')
 }
 
+// A workflow procedure file first; a whole skill's `SKILL.md` when the rationale is named after a skill
+// rather than a workflow file (`epic-commands-rationale.md`, joshuafolkken/kit#2892).
 function procedure_of(rationale: string): string {
-	const name = path.basename(rationale).replace(RATIONALE_SUFFIX, '.md')
+	const name = path.basename(rationale).replace(RATIONALE_SUFFIX, '')
+	const workflow_procedure = path.join(entry_read_set.SKILL_DIRECTORY, `${name}.md`)
 
-	return path.join(entry_read_set.SKILL_DIRECTORY, name)
+	if (existsSync(path.join(ROOT, workflow_procedure))) return workflow_procedure
+
+	return path.join(SKILL_ROOT, name, SKILL_FILE)
 }
 
 function section_titles(markdown: string): Array<string> {
@@ -84,6 +91,12 @@ describe('workflow rationale documents sit off the read path', () => {
 		const rationale_names = new Set(RATIONALE_FILES.map((file) => path.basename(file)))
 
 		expect(read_files.filter((file) => rationale_names.has(file))).toStrictEqual([])
+	})
+
+	it('maps a rationale named after a skill to that skill', () => {
+		expect(procedure_of('docs/maintainers/epic-commands-rationale.md')).toBe(
+			path.join(SKILL_ROOT, 'epic-commands', SKILL_FILE),
+		)
 	})
 
 	it('flags a rationale section its procedure never cites', () => {
