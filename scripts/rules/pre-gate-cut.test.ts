@@ -170,7 +170,7 @@ describe('runs_the_gate', () => {
 })
 
 describe('takes_the_cut', () => {
-	it.each([[TAKE_THE_CUT], [`pnpm josh rct ${ISSUE}`]])('reads %j as taking the cut', (command) => {
+	it.each([[TAKE_THE_CUT]])('reads %j as taking the cut', (command) => {
 		expect(pre_gate_cut.takes_the_cut(command)).toBe(true)
 	})
 
@@ -204,12 +204,9 @@ describe('asks_about_the_cut', () => {
 })
 
 describe('claims_the_hold', () => {
-	it.each([[CLAIM_THE_HOLD], [`pnpm josh rh ${ISSUE}`]])(
-		'reads %j as claiming the working tree',
-		(command) => {
-			expect(pre_gate_cut.claims_the_hold(command)).toBe(true)
-		},
-	)
+	it.each([[CLAIM_THE_HOLD]])('reads %j as claiming the working tree', (command) => {
+		expect(pre_gate_cut.claims_the_hold(command)).toBe(true)
+	})
 
 	// **`run:release` is the other end of the same record and is not the claim.** A run that only ever
 	// released one made no claim of its own, and reading it as one would put the resumed session — which

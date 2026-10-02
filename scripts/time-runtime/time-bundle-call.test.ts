@@ -316,14 +316,6 @@ describe('time_bundle_call.bash_facts — read-only josh bookkeeping', () => {
 		expect(facts.may_write).toBe(false)
 	})
 
-	// An alias resolves to its canonical name before the allow-list test.
-	it.each(['josh ist 1875', 'pnpm josh co', 'pnpm josh ird 1 2'])(
-		'resolves the alias %s to its canonical read command',
-		(command) => {
-			expect(time_bundle_call.bash_facts(command).is_bundleable).toBe(true)
-		},
-	)
-
 	// The writing josh commands keep the leading word `pnpm` turning them away.
 	it.each([
 		'pnpm josh gate',

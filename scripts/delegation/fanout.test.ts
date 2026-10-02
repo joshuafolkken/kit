@@ -1,4 +1,4 @@
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it, vi } from 'vitest'
 import { fanout } from './fanout'
 import { fanout_cli } from './fanout-cli'
@@ -118,11 +118,5 @@ describe('josh fanout registration', () => {
 		const { fanout: entry } = COMMAND_MAP
 
 		expect(entry?.script).toBe('scripts/delegation/fanout-cli.ts')
-	})
-
-	it('has a short alias', () => {
-		const { fo } = ALIASES
-
-		expect(fo).toBe('fanout')
 	})
 })

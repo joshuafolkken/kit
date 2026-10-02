@@ -1,6 +1,6 @@
 import { read_repo_file } from '#scripts/document/ai-document-fixture'
 import { entry_read_set } from '#scripts/document/entry-read-set'
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#1776. The rule that a `` `X.md` → "Heading" `` pointer is read as that section
@@ -14,10 +14,8 @@ import { describe, expect, it } from 'vitest'
 const DOCS = 'docs/josh-commands.md'
 
 const SECTION_COMMAND = 'doc:section'
-const SECTION_ALIAS = 'ds'
 const SECTION_SCRIPT = 'scripts/document/document-section-cli.ts'
 const SET_COMMAND = 'read:set'
-const SET_ALIAS = 'rs'
 const SET_SCRIPT = 'scripts/document/read-set-cli.ts'
 
 const DOC_MARKERS: ReadonlyArray<string> = [
@@ -32,15 +30,11 @@ const DOC_MARKERS: ReadonlyArray<string> = [
 ]
 
 describe.each([
-	[SECTION_COMMAND, SECTION_ALIAS, SECTION_SCRIPT],
-	[SET_COMMAND, SET_ALIAS, SET_SCRIPT],
-])('%s is registered', (command, alias, script) => {
+	[SECTION_COMMAND, SECTION_SCRIPT],
+	[SET_COMMAND, SET_SCRIPT],
+])('%s is registered', (command, script) => {
 	it('runs the script it is documented as running', () => {
 		expect(COMMAND_MAP[command]?.script).toBe(script)
-	})
-
-	it('has the short alias the documents print', () => {
-		expect(ALIASES[alias]).toBe(command)
 	})
 })
 

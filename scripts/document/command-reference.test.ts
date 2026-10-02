@@ -43,7 +43,12 @@ describe('every josh command a document names exists', () => {
 	})
 
 	it('accepts a real command and its alias', () => {
-		expect(unknown_commands('`pnpm josh gate` then `josh rh`')).toStrictEqual([])
+		expect(unknown_commands('`pnpm josh gate` then `josh ga`')).toStrictEqual([])
+	})
+
+	// An alias retired with joshuafolkken/kit#2906 is no longer a command a document may name.
+	it('flags a retired automation alias', () => {
+		expect(unknown_commands('then `josh rh`')).toStrictEqual(['rh'])
 	})
 })
 

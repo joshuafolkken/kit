@@ -52,7 +52,7 @@ to the gate rather than relaunching.
 At the pre-gate boundary, issue:
 
 ```bash
-pnpm josh run:cut <N>          # alias: josh rct
+pnpm josh run:cut <N>
 ```
 
 - `cut` (0) — record written and handed to the lane's launch owner (OpenAI supervisor starts the

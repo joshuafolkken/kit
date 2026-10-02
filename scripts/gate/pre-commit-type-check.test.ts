@@ -1,4 +1,4 @@
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_skip } from './gate-skip'
@@ -122,7 +122,6 @@ const REFUSED_EXIT_CODE = 1
 const FORCE_ENV = 'JOSH_PRE_COMMIT_FORCE'
 const A_PATH = 'scripts/gate/gate-skip.ts'
 const COMMAND_NAME = 'pre-commit-type-check'
-const ALIAS = 'ptc'
 
 // This suite runs *inside* `pnpm josh gate`, which is itself reading and writing the shared record — so
 // it plants its own rather than overwriting the one the live run relies on. Nothing here ever writes a
@@ -353,9 +352,5 @@ describe('the recorded default step is this hook’s own check', () => {
 describe(`josh ${COMMAND_NAME} is registered`, () => {
 	it('routes through the pre-commit type check script', () => {
 		expect(COMMAND_MAP[COMMAND_NAME]?.script).toBe(SCRIPT_PATH)
-	})
-
-	it('is reachable by its alias', () => {
-		expect(ALIASES[ALIAS]).toBe(COMMAND_NAME)
 	})
 })

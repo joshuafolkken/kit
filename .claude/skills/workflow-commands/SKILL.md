@@ -92,8 +92,8 @@ procedure alone, and the rest of `backlogrun-park.md` is read only when it is re
 **A pointer written `` `X.md` → "Heading" `` is read as that section, never by opening `X.md` whole:**
 
 ```bash
-pnpm josh doc:section <file.md> "<heading>"   # the section, verbatim ; alias: josh ds
-pnpm josh read:set [<keyword>]                # what an entry reads, and what it costs ; alias: josh rs
+pnpm josh doc:section <file.md> "<heading>"   # the section, verbatim
+pnpm josh read:set [<keyword>]                # what an entry reads, and what it costs
 ```
 
 The section is fetched in the same turn, printed verbatim with its subsections; **a heading that does

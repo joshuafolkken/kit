@@ -54,12 +54,9 @@ describe('is_direct_filing', () => {
 // The run-level filing rows' trigger: the `josh issue:file` call, in either spelling, and never a
 // spelling quoted inside another command's body.
 describe('is_issue_filing', () => {
-	it.each([FILING_COMMAND, 'pnpm josh ifl "x" --body-file b.md --depth 0'])(
-		READS_A_FILING,
-		(command) => {
-			expect(delivered_rules.is_issue_filing(command)).toBe(true)
-		},
-	)
+	it.each([FILING_COMMAND])(READS_A_FILING, (command) => {
+		expect(delivered_rules.is_issue_filing(command)).toBe(true)
+	})
 
 	it.each([
 		DIRECT_FILING_API_COMMAND,

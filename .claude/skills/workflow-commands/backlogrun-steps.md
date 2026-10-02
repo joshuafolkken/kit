@@ -131,7 +131,7 @@ single source.
 carried in a record rather than in the conversation:
 
 ```bash
-pnpm josh run:carry --begin "backlogrun --max 5 --idle 30" --owner "$PPID"   # alias: josh rc
+pnpm josh run:carry --begin "backlogrun --max 5 --idle 30" --owner "$PPID"
 pnpm josh run:carry --json                                                   # read it back in a resumed session
 ```
 
@@ -204,7 +204,7 @@ judgment starts an AI session, with the branch result and resume flags in its pr
 **Start it in the same turn as `--begin`, and stop it in the same turn as `--end`:**
 
 ```bash
-pnpm josh run:wake --start   # alias: josh rw ; right after `run:carry --begin`
+pnpm josh run:wake --start   # right after `run:carry --begin`
 pnpm josh run:wake --stop    # in the same turn as `run:carry --end`
 ```
 
@@ -267,7 +267,7 @@ run.
 **The plan is one command's output, not an assembly of several:**
 
 ```bash
-pnpm josh backlog:plan          # alias: josh blp
+pnpm josh backlog:plan
 ```
 
 **It renders the same classified pool `backlog:next` answers from**, so **the plan cannot promise an
@@ -331,7 +331,7 @@ returns the verdict with the issues to start. It stays both halves' contract sou
 *means* changes here.
 
 ```bash
-offer=$(pnpm josh backlog:offer --started "$started" --active "$active")   # alias: josh blo
+offer=$(pnpm josh backlog:offer --started "$started" --active "$active")
 offer=$(pnpm josh backlog:offer --started "$started" --active "$active" --exclude 1630,1631)   # after #1630, #1631 merged
 ```
 

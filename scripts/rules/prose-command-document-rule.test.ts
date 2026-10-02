@@ -1,6 +1,6 @@
 import { read_repo_file, routing_documents } from '#scripts/document/ai-document-fixture'
 import { single_source, type SingleSourceRule } from '#scripts/document/single-source'
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#2188. The two commands that lay the foundation epic #2166 trims the entry read on
@@ -13,10 +13,8 @@ import { describe, expect, it } from 'vitest'
 const DOCS = 'docs/josh-commands.md'
 
 const NEXT_COMMAND = 'run:next'
-const NEXT_ALIAS = 'rn'
 const NEXT_SCRIPT = 'scripts/run/run-next-cli.ts'
 const READ_COMMAND = 'doc:read'
-const READ_ALIAS = 'dcr'
 const READ_SCRIPT = 'scripts/document/document-read-cli.ts'
 
 const DOC_MARKERS: ReadonlyArray<string> = ['### `josh run:next`', '### `josh doc:read`']
@@ -30,15 +28,11 @@ const DOC_READ_RULE: SingleSourceRule = {
 }
 
 describe.each([
-	[NEXT_COMMAND, NEXT_ALIAS, NEXT_SCRIPT],
-	[READ_COMMAND, READ_ALIAS, READ_SCRIPT],
-])('%s is registered', (command, alias, script) => {
+	[NEXT_COMMAND, NEXT_SCRIPT],
+	[READ_COMMAND, READ_SCRIPT],
+])('%s is registered', (command, script) => {
 	it('runs the script it is documented as running', () => {
 		expect(COMMAND_MAP[command]?.script).toBe(script)
-	})
-
-	it('has the short alias the documents print', () => {
-		expect(ALIASES[alias]).toBe(command)
 	})
 })
 

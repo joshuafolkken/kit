@@ -228,8 +228,8 @@ describe('ALIASES — all resolve to valid COMMAND_MAP keys', () => {
 		expect(get_alias('g')).toBe('git')
 	})
 
-	it('resolves fu alias to followup', () => {
-		expect(get_alias('fu')).toBe('followup')
+	it('no longer resolves the retired fu alias', () => {
+		expect(get_alias('fu')).toBeUndefined()
 	})
 
 	it('resolves tu alias to test:unit', () => {
