@@ -6,7 +6,7 @@ kit needs **Node.js 22.19.0 or later** and **pnpm 12 or later**, and `josh start
 
 ## 1. Choose `josh init` or `josh start`
 
-One question decides it: **will this project use the GitHub Issue workflow** (`kickoff`, `fullrun`, `backlogrun`)? Then use `josh start` (§3), whether or not the project already has Git or a GitHub repository. Otherwise use `josh init` (§2). Both set up the `full` profile the same way. The full table is in [init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start).
+Which one to run is decided in [init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start). Both set up the `full` profile the same way: `josh init` is §2, `josh start` is §3.
 
 ## 2. Install and initialize with `josh init`
 
