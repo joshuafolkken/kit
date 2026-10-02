@@ -13,6 +13,7 @@ import {
 	type VersionSnapshot,
 } from './version-check-logic'
 import type {
+	PackageVersionConfig,
 	UpstreamHookContext,
 	UpstreamVersionConfig,
 	VersionCommandConfig,
@@ -29,11 +30,11 @@ const NO_QUARANTINE_MINUTES = 0
 // whose `installable` is undefined when the timestamps cannot be read — the report then renders
 // exactly as it did before (joshuafolkken/kit#808).
 //
-// Skipped entirely unless some target is behind `latest`: the timestamps cost a second `gh api`
+// Skipped entirely unless some target is behind `latest`: the timestamps cost a second registry
 // round trip per package, and a package with nothing stale has no gap for a hold to explain. On the
 // common all-current run the report costs exactly what it did before this feature.
 function read_release_hold(
-	versions_endpoint: string | undefined,
+	package_config: PackageVersionConfig,
 	latest: string,
 	versions: ReadonlyArray<string | undefined>,
 ): ReleaseHold | undefined {
@@ -45,7 +46,7 @@ function read_release_hold(
 	// a registry round trip discovering that.
 	if (minimum_age_minutes <= NO_QUARANTINE_MINUTES) return undefined
 	const installable = release_hold.resolve_installable(
-		fetch_release_times(versions_endpoint),
+		fetch_release_times(package_config.versions_endpoint, package_config.package_name),
 		latest,
 		minimum_age_minutes,
 		Date.now(),
@@ -157,7 +158,7 @@ function read_upstream_report(
 	// After the effective install is attached, so its version counts toward the staleness gate.
 	// Only the effective install is peer-resolved, so it is the only target the window can hold back.
 	const hold = is_hold_wanted
-		? read_release_hold(upstream.versions_endpoint, latest, [report.effective?.version])
+		? read_release_hold(upstream, latest, [report.effective?.version])
 		: undefined
 	if (hold !== undefined) report.hold = hold
 

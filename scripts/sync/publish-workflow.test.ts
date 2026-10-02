@@ -235,7 +235,7 @@ describe('installation guidance', () => {
 	it('identifies the registry used by kit version checks', () => {
 		const content = readFileSync(PACKAGE_API_REFERENCE, 'utf8')
 
-		expect(content).toContain('GitHub Packages versions API')
+		expect(content).toMatch(/public npm, without credentials[^\n]*GitHub Packages versions/u)
 	})
 
 	it('keeps the migration steps in troubleshooting, linked from the CLI guide', () => {
