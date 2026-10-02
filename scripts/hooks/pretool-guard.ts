@@ -2,6 +2,7 @@ import { duplicate_read_outcome } from '#scripts/delegation/duplicate-read-guard
 import { investigation_refusal } from '#scripts/delegation/investigation-guard'
 import type { GuardOutcome } from '#scripts/josh/hook-decision'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
+import { run_parent_cut_hook } from '#scripts/run/run-parent-cut-hook'
 import { run_watcher_hook } from '#scripts/run/run-watcher-hook'
 import { batch_outcome } from './batch-guard'
 
@@ -68,12 +69,23 @@ function pretool_outcome(raw_payload: string): GuardOutcome {
 // as `combine_outcomes` orders them, and the watcher's refusal fills a clear verdict rather than
 // overriding one. It fires once per run itself (`run-watcher-hook.ts`), so a stale watcher refuses the
 // first call but not the `pnpm josh run:progress --wait` that fixes it.
+//
+// **The parent hand-off guard is the second asynchronous rule, asked after the watcher's**
+// (joshuafolkken/kit#2947). It reads the carry record to tell the `backlogrun` parent apart, so it sits
+// beside the watcher rather than among the synchronous rows; a stale watcher is the cheaper fix and is
+// surfaced first.
+async function async_reason(raw_payload: string): Promise<string | undefined> {
+	const watcher = await run_watcher_hook.watcher_hook_reason(raw_payload)
+
+	return watcher ?? (await run_parent_cut_hook.parent_cut_reason(raw_payload))
+}
+
 async function pretool_outcome_async(raw_payload: string): Promise<GuardOutcome> {
 	const base = pretool_outcome(raw_payload)
 
 	if (!is_clear(base)) return base
 
-	const reason = await run_watcher_hook.watcher_hook_reason(raw_payload)
+	const reason = await async_reason(raw_payload)
 
 	return reason === undefined ? base : { reason, notice: undefined, fault: undefined }
 }

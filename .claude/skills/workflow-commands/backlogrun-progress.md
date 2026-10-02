@@ -312,8 +312,8 @@ the next turn of this session costs more than the threshold in billed input.
 
 **135,000 is shared by the scheduler entry, scheduler hand-off and lane worker implementation cut.**
 The value is `CONTEXT_CUT_THRESHOLD` in `scripts/cost-runtime/context-cut-threshold.ts`; `cost --cut`,
-`run:merge` and `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` all read it rather than carrying separate
-numbers. The output ceiling and the entry-read figure are a separate 150,000, not this threshold.
+`run:merge`, `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` and the parent hand-off guard all read it. The
+output ceiling and the entry-read figure are a separate 150,000, not this threshold.
 
 ### The check is asked at every merge, and delegation does not excuse it
 
@@ -328,7 +328,7 @@ answer, and take `over`'s branch at that child.
 
 ### When to ask, and what to do
 
-**Ask once per child, immediately after its merge and `pnpm josh ms`** — never mid-child.
+**Ask once per child, immediately after its merge and `pnpm josh ms`**; mid-child, a hook asks (#2947).
 
 ### A parent without a completion callback hands off at its first dispatch
 

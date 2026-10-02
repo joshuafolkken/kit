@@ -133,6 +133,26 @@ describe('run_headless.is_backlog_parent', () => {
 	})
 })
 
+// joshuafolkken/kit#2947: the parent cut reads the record's counters, so the parent test returns it.
+describe('run_headless.driving_carry', () => {
+	it('returns the record an attached session owns and drives', async () => {
+		read_carry.mockReturnValue(OWNED)
+
+		expect(await run_headless.driving_carry(ATTACHED, own_ancestry)).toStrictEqual(OWNED.carry)
+	})
+
+	it('returns nothing for a lane child, a handed-off record or another owner', async () => {
+		read_carry.mockReturnValue(OWNED)
+		expect(await run_headless.driving_carry(HEADLESS_CHILD, own_ancestry)).toBeUndefined()
+
+		read_carry.mockReturnValue(HANDED_OFF)
+		expect(await run_headless.driving_carry(ATTACHED, own_ancestry)).toBeUndefined()
+
+		read_carry.mockReturnValue({ kind: 'carried', carry: carry({ owner_pid: SUCCESSOR_PID }) })
+		expect(await run_headless.driving_carry(ATTACHED, own_ancestry)).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#2472: after a cut the successor owns the record, and the session that cut —
 // reading the same file — kept being blocked as though it still drove the run.
 describe('run_headless.is_backlog_parent — ownership', () => {

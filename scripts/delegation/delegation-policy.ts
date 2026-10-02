@@ -92,6 +92,17 @@ const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
 		verifier:
 			'the parent opens the cited lines; a conclusion those lines do not support fails there, and reading a handful of cited regions costs far less than redoing the reading. The unit reports what the code does and never what to change — deciding that is `diagnosis`, which stays kept, so a unit returning a root cause would be delegating the rejected row under this name',
 	},
+	{
+		name: 'lane-failure-investigation',
+		// The `backlogrun` parent's counterpart of `investigation` (joshuafolkken/kit#2947). The parent
+		// orchestrates and never implements, yet it read a failed lane's logs, records and sources in its
+		// own context — about 150 grep / cat / sed calls on 2026-10-02 — and every later request of the
+		// batch re-read them. The verifier is `investigation`'s, and so is the boundary: the unit reports
+		// what happened, and what the parent does about it (park, re-dispatch, file) stays its own call.
+		does: "find out why a lane's child stopped, failed or conflicted — its output log, run records, PR checks and the files they name — and return the conclusion plus the `file:line` or log-line citations that support it, never the text read, so the batch parent's context stays the size its orchestration needs",
+		verifier:
+			'the parent opens the cited lines and re-reads the child with `pnpm josh issue:state`; a conclusion those do not support fails there. The unit reports what happened and never what to do — parking, re-dispatching or filing stays with the parent, so a wrong account is caught before it is acted on',
+	},
 ]
 
 // Steps that were considered and are **not** delegatable, kept as a list rather than dropped: the

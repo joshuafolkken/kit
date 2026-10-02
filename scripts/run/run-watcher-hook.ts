@@ -81,6 +81,6 @@ async function watcher_hook_reason(
 	return await stale_reason(transcript, now_ms)
 }
 
-const run_watcher_hook = { SWITCH_ENV_KEY, STAMP_PREFIX, watcher_hook_reason }
+const run_watcher_hook = { SWITCH_ENV_KEY, STAMP_PREFIX, transcript_of, watcher_hook_reason }
 
 export { run_watcher_hook }
