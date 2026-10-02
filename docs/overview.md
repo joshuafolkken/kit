@@ -29,4 +29,39 @@ In a `basic` project, `josh gate`, `josh lint` and the other checks skip each to
 3. **Sync** — run `josh sync` after upgrading the package to pull in updated AI files, workflow templates, and other managed files. It follows the recorded profile, so a `basic` project gets only its own file set ([#2827](https://github.com/joshuafolkken/kit/issues/2827)).
 4. **josh CLI** — a single `josh` binary (available as `pnpm josh` after init) gives you git workflow helpers, version management, security auditing, and more.
 
-To walk the Issue-driven loop once — file an Issue, have an agent plan and implement it, verify, merge — follow [tutorial.md](./tutorial.md). To find the steps for a task — updating kit or dependencies, releasing, running Issues — start at [how-to.md](./how-to.md). The full list of guides is in the [README](../README.md#documentation).
+To walk the Issue-driven loop once — file an Issue, have an agent plan and implement it, verify, merge — follow [tutorial.md](./tutorial.md). To find the steps for a task — updating kit or dependencies, releasing, running Issues — start at [how-to.md](./how-to.md). The full list of guides is below.
+
+## Documentation
+
+**Set up**
+
+- [setup/prerequisites.md](./setup/prerequisites.md) — Node.js, pnpm and the gh CLI
+- [setup/basic.md](./setup/basic.md) — a `basic` project, from an empty machine
+- [setup/full.md](./setup/full.md) — a Node project, with `josh init` or `josh start`
+- [cli.md](./cli.md) — the global `josh` command
+- [troubleshooting.md](./troubleshooting.md) — install and auth errors
+
+**Use**
+
+- [why.md](./why.md) — why kit exists (Japanese)
+- [tutorial.md](./tutorial.md) — your first change with an agent, from Issue to merge
+- [how-to.md](./how-to.md) — guides by task
+
+**Commands and configuration**
+
+- [josh-commands.md](./josh-commands.md) — every `josh` command ([catalog](./josh-command-catalog.md))
+- [init.md](./init.md) — what `josh init` creates
+- [sync.md](./sync.md) — what `josh sync` updates
+- [manual-config.md](./manual-config.md) — the presets without `josh init`
+- [package-api.md](./package-api.md) — the package's exports
+
+**AI workflow and operations**
+
+- [scripts-ai.md](./scripts-ai.md) — Issue workflow commands and Telegram notifications
+- [cloud-session.md](./cloud-session.md) — running in an agent container
+- [eval.md](./eval.md) — measuring rule adherence
+- [authentication.md](./authentication.md) — existing GitHub Packages installs only
+
+**Maintaining kit**
+
+- [publishing.md](./publishing.md) — releasing a new version

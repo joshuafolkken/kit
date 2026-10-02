@@ -6,10 +6,14 @@ import { document_scan } from './document-scan'
 // detailed version of the README Quick start. They only stay reachable while the Quick start links
 // to them as its details and the overview routes readers to them. Their link on to the tutorial is
 // pinned by the tutorial's own suite.
-const SETUP_PAGES: ReadonlyArray<string> = ['docs/setup/basic.md', 'docs/setup/full.md']
+const SETUP_PAGES: ReadonlyArray<string> = [
+	'docs/setup/basic.md',
+	'docs/setup/full.md',
+	'docs/setup/prerequisites.md',
+]
 const README = 'README.md'
 const QUICK_START_HEADING = '## Quick start'
-const NEXT_README_HEADING = '## Documentation'
+const NEXT_README_HEADING = '## Docs'
 const ENTRY_DOCUMENTS: ReadonlyArray<string> = [README, 'docs/overview.md']
 
 function quick_start_links(): Array<string> {

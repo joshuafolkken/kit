@@ -1,49 +1,12 @@
 # Set up the basic profile
 
-The detailed version of the [Quick start](../../README.md#quick-start) for the `basic` [profile](../init.md#project-profiles). It takes a directory that holds only an `index.html` file — or a Python, Rust or other project without Web files — from an empty machine to a formatted, verified project. It needs no Git repository, no GitHub account and no npm token; only the optional GitHub Issue workflow at the end of step 4 needs Git and GitHub. For a JavaScript / TypeScript project, see [Set up the full profile](./full.md).
+The detailed version of the [Quick start](../../README.md#quick-start) for the `basic` [profile](../init.md#project-profiles). It takes a directory that holds only an `index.html` file — or a Python, Rust or other project without Web files — from an empty machine to a formatted, verified project. It needs no Git repository, no GitHub account and no npm token; only the optional GitHub Issue workflow at the end of step 3 needs Git and GitHub. For a JavaScript / TypeScript project, see [Set up the full profile](./full.md).
 
-## 1. Check the prerequisites
+## 1. Install the prerequisites
 
-kit needs **Node.js 22.19.0 or later** and **pnpm 12 or later**. This guide was verified with pnpm 12.6.0; older pnpm releases may lack the commands and options it uses.
+kit needs **Node.js 22.19.0 or later** and **pnpm 12 or later**. [Install the prerequisites](./prerequisites.md) checks what you have and installs what is missing; its gh CLI step is only for the optional GitHub Issue workflow.
 
-```bash
-node --version   # v22.19.0 or later
-pnpm --version   # 12 or later
-```
-
-If both commands print a version that meets the requirement, keep what you have and go to [step 3](#3-install-kit-and-initialize). kit never installs or replaces a machine-wide Node.js or pnpm. If `node` or `pnpm` is missing, follow step 2 for your operating system. If `pnpm` is older than 12, update it yourself with `pnpm self-update`; if `node` is older, install a newer release with the same route you used before, or with `pnpm runtime set node 22 -g` from step 2.
-
-## 2. Install pnpm and Node.js
-
-Each route below is the tool's own official installer. Use one route per machine.
-
-### Linux and macOS
-
-Install pnpm with its standalone script, which does not need Node.js, then let pnpm install Node.js:
-
-```bash
-curl -fsSL https://get.pnpm.io/install.sh | sh -
-# open a new terminal, or load the lines the script appended to your shell profile
-pnpm runtime set node 22 -g
-node --version
-```
-
-On macOS, `brew install pnpm` followed by the same `pnpm runtime set node 22 -g` also works if you use Homebrew. See the [pnpm installation page](https://pnpm.io/installation) for other routes.
-
-### Windows
-
-pnpm's standalone Windows executable can be flagged by antivirus software ([pnpm installation page](https://pnpm.io/installation)). Install Node.js first instead, then pnpm:
-
-1. Install the Node.js 22 LTS release from [nodejs.org](https://nodejs.org/en/download), or run `winget install OpenJS.NodeJS.LTS` in PowerShell.
-2. Open a new PowerShell window and run:
-
-```powershell
-npm install -g pnpm
-node --version
-pnpm --version
-```
-
-## 3. Install kit and initialize
+## 2. Install kit and initialize
 
 In the project directory:
 
@@ -72,7 +35,7 @@ It adds no ESLint, cspell, Playwright, Git hooks, GitHub workflows or external-s
 
 **The `preinstall` script does not scan the `pnpm install` on your machine.** It runs [safe-chain](https://github.com/AikidoSec/safe-chain)'s `setup-ci`, which only acts on a CI runner. To have local installs scanned for malware, install safe-chain as its [README](https://github.com/AikidoSec/safe-chain#installation) describes (or run `safe-chain setup` if it is already installed), then restart your terminal; until then `preinstall` prints a warning with these steps and never blocks the install. Details: [init.md → Package scripts](../init.md#package-scripts).
 
-## 4. Verify
+## 3. Verify
 
 ```bash
 pnpm josh gate
@@ -82,7 +45,7 @@ pnpm josh gate
 
 Re-running `pnpm exec josh init` later leaves the files unchanged. **If the project will use the GitHub Issue workflow** (`kickoff`, `fullrun`, `backlogrun`), run `pnpm exec josh start` now — it needs the [gh CLI](https://cli.github.com/), signed in. It leaves this setup as it is and carries it to GitHub: it creates what is missing — Git, the first commit, the repository — and, when `main` already has commits, opens a pull request with only kit's files for you to merge. Which steps run for each starting state: [init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start).
 
-## 5. Check the page in a browser
+## 4. Check the page in a browser
 
 Open `index.html` in a browser and check the layout, links and any interaction at the screen widths you care about. kit does not require an automated browser test for each HTML change.
 
@@ -94,7 +57,7 @@ Open `index.html` in a browser and check the layout, links and any interaction a
 
 ## Verifying this guide
 
-The guide is checked by running steps 2–4 in a fresh container with no Git, no `~/.npmrc` and no Node.js. `buildpack-deps:bookworm-curl` is a Debian image with curl and without Git. The pnpm installer reads `SHELL` to pick the profile it edits, and a container does not set it:
+The guide is checked by running [the prerequisites' step 2](./prerequisites.md#2-install-pnpm-and-nodejs) and steps 2–3 here in a fresh container with no Git, no `~/.npmrc` and no Node.js. `buildpack-deps:bookworm-curl` is a Debian image with curl and without Git. The pnpm installer reads `SHELL` to pick the profile it edits, and a container does not set it:
 
 ```bash
 docker run --rm -it -e SHELL=/bin/bash buildpack-deps:bookworm-curl bash

@@ -20,5 +20,5 @@ You have a repository and want kit's AI rules, formatting and checks in it. This
 ## Common failures
 
 - `josh` is not found after a global install: see [cli.md](../cli.md#2-if-josh-isnt-found) and [troubleshooting.md](../troubleshooting.md#josh-command-not-found-after-pnpm-add--g).
-- The install gets the previous kit version right after a release: pnpm holds back releases younger than a day ([Set up the basic profile](../setup/basic.md#3-install-kit-and-initialize)).
+- The install gets the previous kit version right after a release: pnpm holds back releases younger than a day ([Set up the basic profile](../setup/basic.md#2-install-kit-and-initialize)).
 - Any other install or authentication error: [troubleshooting.md](../troubleshooting.md).
