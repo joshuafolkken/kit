@@ -1,6 +1,6 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
-const GIT_WORKFLOW_SCRIPT = 'scripts-ai/git-workflow.ts'
+const GIT_WORKFLOW_SCRIPT = 'scripts/git/git-workflow.ts'
 const GIT_MESSAGE_ARGUMENTS = '[-y] <message>'
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -27,7 +27,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 	// session, and `followup` with them the merge step of every `fullrun` there. `doctor` was moved to
 	// this form for the same reason in joshuafolkken/kit#869.
 	//
-	// Nothing is lost by relaxing it: both scripts already call `load_optional_environment()`
+	// Nothing is lost by relaxing it: both scripts already load `.env` through `josh_environment_file`
 	// themselves, so the file is read either way and node's precedence — an existing environment
 	// variable wins over the file — is node's own in both spellings.
 	//
@@ -35,7 +35,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 	// than dropped: `telegram_notify.send` now throws on missing credentials and on a failed send, so
 	// `josh notify` exits non-zero instead of warning and answering 0.
 	followup: {
-		script: 'scripts-ai/git-followup-workflow.ts',
+		script: 'scripts/git/git-followup-workflow.ts',
 		description: 'Follow-up git workflow',
 		category: 'Workflow',
 		reference: [
@@ -46,7 +46,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
 	notify: {
-		script: 'scripts-ai/telegram-test.ts',
+		script: 'scripts/git/telegram-test.ts',
 		description: 'Send Telegram notification',
 		category: 'Workflow',
 		reference: ['--task-type <type> --body <text>', 'automation', ['notifications']],

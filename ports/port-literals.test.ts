@@ -15,7 +15,7 @@ const PORT_LITERALS: ReadonlyArray<string> = ['5173', '4173']
 
 // Source trees that ship or run code. Tests state the expected numbers on purpose and prose
 // documents them for the reader, so neither is a second definition.
-const SCANNED_DIRECTORIES: ReadonlyArray<string> = ['ports', 'scripts', 'scripts-ai', 'eslint']
+const SCANNED_DIRECTORIES: ReadonlyArray<string> = ['ports', 'scripts', 'eslint']
 const SCANNED_ROOT_FILES: ReadonlyArray<string> = [
 	'playwright.config.ts',
 	'playwright-config-fixture.ts',

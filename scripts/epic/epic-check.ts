@@ -2,9 +2,9 @@
 /**
  * Check an existing epic Issue against the four requirements, reporting each as pass or fail.
  *
- * Usage: tsx scripts-ai/epic-check.ts <issue-number>
+ * Usage: tsx scripts/epic/epic-check.ts <issue-number>
  */
-import { git_epic_run } from '../scripts/git/git-epic-run'
+import { git_epic_run } from '#scripts/git/git-epic-run'
 import { epic_cli } from './epic-cli'
 
 const ARGV_OFFSET = 2

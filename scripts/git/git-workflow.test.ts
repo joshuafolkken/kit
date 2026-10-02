@@ -21,7 +21,7 @@ vi.mock('node:util', () => ({
 // The order the import-time run reached the pre-fix check and the commit (joshuafolkken/kit#2448).
 const CALL_ORDER = vi.hoisted((): Array<string> => [])
 
-vi.mock('../scripts/git/git-preflight', () => ({
+vi.mock('./git-preflight', () => ({
 	git_preflight: {
 		check: vi.fn(async () => {
 			CALL_ORDER.push('preflight')
@@ -29,7 +29,7 @@ vi.mock('../scripts/git/git-preflight', () => ({
 	},
 }))
 
-vi.mock('../scripts/git/git-staging', () => ({
+vi.mock('./git-staging', () => ({
 	git_staging: {
 		check_and_confirm_staging: vi.fn(async () => {
 			CALL_ORDER.push('stage')
@@ -37,21 +37,21 @@ vi.mock('../scripts/git/git-staging', () => ({
 	},
 }))
 
-vi.mock('../scripts/git/git-branch', () => ({
+vi.mock('./git-branch', () => ({
 	git_branch: {
 		current: vi.fn().mockResolvedValue('feature-branch'),
 		check_and_create_branch: vi.fn<() => Promise<string>>().mockResolvedValue(FAKE_BRANCH_NAME),
 	},
 }))
 
-vi.mock('../scripts/git/git-issue', () => ({
+vi.mock('./git-issue', () => ({
 	git_issue: {
 		get_and_display: vi.fn().mockResolvedValue(FAKE_ISSUE_INFO),
 		resolve_and_display: vi.fn().mockResolvedValue(FAKE_ISSUE_INFO),
 	},
 }))
 
-vi.mock('../scripts/git/git-prompt', () => ({
+vi.mock('./git-prompt', () => ({
 	git_prompt: {
 		confirm_workflow_steps: vi.fn().mockResolvedValue({ commit: false, push: false, pr: false }),
 		get_issue_info: vi.fn().mockResolvedValue('fake #42'),
@@ -64,7 +64,7 @@ vi.hoisted(() => {
 	process.stdin.isTTY = false
 })
 
-vi.mock('../scripts/test/test-red-commit', () => ({
+vi.mock('#scripts/test/test-red-commit', () => ({
 	test_red_commit: {
 		assert_reproduces: vi.fn(async (issue_number: string) => {
 			CALL_ORDER.push(`test:red #${issue_number}`)
@@ -72,24 +72,24 @@ vi.mock('../scripts/test/test-red-commit', () => ({
 	},
 }))
 
-vi.mock('../scripts/git/git-commit', () => ({
+vi.mock('./git-commit', () => ({
 	git_commit: {
 		commit: vi.fn(async () => {
 			CALL_ORDER.push('commit')
 		}),
 	},
 }))
-vi.mock('../scripts/git/git-push', () => ({ git_push: { push: vi.fn() } }))
-vi.mock('../scripts/git/git-pr', () => ({ git_pr: { create_with_issue_info: vi.fn() } }))
-vi.mock('../scripts/git/git-error', () => ({ git_error: { handle: vi.fn() } }))
+vi.mock('./git-push', () => ({ git_push: { push: vi.fn() } }))
+vi.mock('./git-pr', () => ({ git_pr: { create_with_issue_info: vi.fn() } }))
+vi.mock('./git-error', () => ({ git_error: { handle: vi.fn() } }))
 
 const { git_workflow } = await import('./git-workflow')
 const IMPORT_TIME_ORDER = [...CALL_ORDER]
-const { git_preflight } = await import('../scripts/git/git-preflight')
-const { git_staging } = await import('../scripts/git/git-staging')
-const { git_branch } = await import('../scripts/git/git-branch')
-const { git_commit } = await import('../scripts/git/git-commit')
-const { git_push } = await import('../scripts/git/git-push')
+const { git_preflight } = await import('./git-preflight')
+const { git_staging } = await import('./git-staging')
+const { git_branch } = await import('./git-branch')
+const { git_commit } = await import('./git-commit')
+const { git_push } = await import('./git-push')
 
 describe('pre-fix check before the commit', () => {
 	it('asks test:red for the resolved Issue before committing', () => {
@@ -193,7 +193,7 @@ describe('get_workflow_confirmations — auto mode skip flags', () => {
 
 describe('get_workflow_confirmations — interactive mode', () => {
 	it('calls confirm_workflow_steps when is_auto_mode=false', async () => {
-		const { git_prompt } = await import('../scripts/git/git-prompt')
+		const { git_prompt } = await import('./git-prompt')
 
 		await git_workflow.get_workflow_confirmations(false, {})
 
@@ -251,7 +251,7 @@ describe('prepare_issue_info — branch name override', () => {
 	})
 
 	it('routes resolution through resolve_and_display with the non-interactive flag', async () => {
-		const { git_issue } = await import('../scripts/git/git-issue')
+		const { git_issue } = await import('./git-issue')
 
 		await git_workflow.prepare_issue_info(undefined, true)
 

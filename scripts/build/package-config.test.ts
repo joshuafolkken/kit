@@ -61,7 +61,6 @@ function collect_export_directories(exports_map: Record<string, unknown>): Array
 
 const RUNTIME_DIRS = [
 	'scripts',
-	'scripts-ai',
 	'prompts',
 	// `josh eval` reads its scenarios from the installed package, so a release without them turns a
 	// registered command into an ENOENT for every consumer.

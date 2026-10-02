@@ -11,32 +11,32 @@ vi.mock('node:util', () => ({
 	parseArgs: vi.fn().mockReturnValue({ values: {}, positionals: [] }),
 }))
 
-vi.mock('../scripts/git/git-pr-followup', () => ({
+vi.mock('./git-pr-followup', () => ({
 	git_pr_followup: { run: vi.fn<() => Promise<void>>().mockResolvedValue() },
 }))
 
-vi.mock('../scripts/git/git-branch', () => ({
+vi.mock('./git-branch', () => ({
 	git_branch: { current: vi.fn().mockResolvedValue('main') },
 }))
 
-vi.mock('../scripts/git/git-notify', () => ({
+vi.mock('./git-notify', () => ({
 	git_notify: { build_notify_config: vi.fn<() => void>().mockReturnValue() },
 }))
 
-vi.mock('../scripts/git/git-next-issues', () => ({
+vi.mock('./git-next-issues', () => ({
 	git_next_issues: {
 		fetch_next_issue_lines: vi.fn<() => Promise<Array<string>>>().mockResolvedValue([]),
 	},
 }))
 
-vi.mock('../scripts/git/git-error', () => ({
+vi.mock('./git-error', () => ({
 	git_error: { handle: vi.fn() },
 }))
 
 // **Mocked because the real one fetches the default branch** (joshuafolkken/kit#1486): the count has
 // to come from main rather than from whatever branch is checked out, so resolving it touches the
 // network. `main` runs at import time in this module, which would make every run of this suite do it.
-vi.mock('../scripts/git/git-followup-pending', () => ({
+vi.mock('./git-followup-pending', () => ({
 	git_followup_pending: {
 		pending_release_line: vi
 			.fn<() => Promise<string | undefined>>()
@@ -49,7 +49,7 @@ vi.mock('../scripts/git/git-followup-pending', () => ({
 // fixed for the gate's own records, one directory over (joshuafolkken/kit#1441). With the record gone,
 // that run's next `josh review:brief` records a fresh one against its already-fixed tree and
 // `josh review:round2` skips the round it owes.
-vi.mock('../scripts/review/review-stamps', () => ({
+vi.mock('#scripts/review/review-stamps', () => ({
 	review_stamps: { clear_round_one: vi.fn() },
 }))
 
@@ -63,7 +63,7 @@ const attest_check_mock = vi.hoisted(() => vi.fn(async () => ({ status: NOT_REQU
 const attest_clear_mock = vi.hoisted(() => vi.fn(async () => undefined))
 const REFUSAL_SENTINEL = vi.hoisted(() => 'attestation-refusal-sentinel')
 
-vi.mock('../scripts/review/review-attest', () => ({
+vi.mock('#scripts/review/review-attest', () => ({
 	review_attest: {
 		check_here: attest_check_mock,
 		clear_here: attest_clear_mock,
@@ -80,7 +80,7 @@ const NO_MERGE_TITLE = 'leaves a --no-merge run alone'
 const RECORD_REFUSAL_SENTINEL = vi.hoisted(() => 'record-refusal-sentinel')
 const record_check_mock = vi.hoisted(() => vi.fn(async () => ({ status: NOT_REQUIRED })))
 
-vi.mock('../scripts/review/review-record', () => ({
+vi.mock('#scripts/review/review-record', () => ({
 	review_record: {
 		check: record_check_mock,
 		refusal_message: () => RECORD_REFUSAL_SENTINEL,
@@ -92,7 +92,7 @@ vi.mock('../scripts/review/review-record', () => ({
 const EVIDENCE_REFUSAL_SENTINEL = vi.hoisted(() => 'evidence-refusal-sentinel')
 const evidence_check_mock = vi.hoisted(() => vi.fn(async () => 'exempt'))
 
-vi.mock('../scripts/review/live-evidence', () => ({
+vi.mock('#scripts/review/live-evidence', () => ({
 	live_evidence: {
 		check: evidence_check_mock,
 		refusal_message: () => EVIDENCE_REFUSAL_SENTINEL,
@@ -101,7 +101,7 @@ vi.mock('../scripts/review/live-evidence', () => ({
 
 // **Mocked because `git_pr_followup` reaches `telegram-notify` and `main` runs at import time** — so
 // an unmocked sender would put this suite one send away from a live HTTP request.
-vi.mock('../scripts/git/telegram-notify', () => ({
+vi.mock('./telegram-notify', () => ({
 	telegram_notify: { send_or_report: vi.fn(async () => true) },
 }))
 
@@ -115,7 +115,7 @@ const worktree_directory_mock = vi.hoisted(() =>
 	vi.fn<() => Promise<string | undefined>>().mockResolvedValue(WORKTREE_DIRECTORY),
 )
 
-vi.mock('../scripts/run/run-hold', () => ({
+vi.mock('#scripts/run/run-hold', () => ({
 	run_hold: {
 		hold_path: (directory: string) => `${directory}/hold.json`,
 		release_hold: release_hold_mock,
@@ -125,7 +125,7 @@ vi.mock('../scripts/run/run-hold', () => ({
 
 // **Mocked for the same reason** (joshuafolkken/kit#2919): `main` runs at import time, so the real step
 // would commit and push the observation ledger of whatever checkout is executing this suite.
-vi.mock('../scripts/git/git-followup-flush', () => ({
+vi.mock('./git-followup-flush', () => ({
 	git_followup_flush: { commit_ledger_step: vi.fn() },
 }))
 
@@ -293,7 +293,7 @@ describe('resolve_branch_name', () => {
 	})
 
 	it('falls back to git_branch.current() when branch is undefined', async () => {
-		const { git_branch } = await import('../scripts/git/git-branch')
+		const { git_branch } = await import('./git-branch')
 
 		vi.mocked(git_branch.current).mockResolvedValue(RESOLVED_BRANCH)
 
@@ -303,7 +303,7 @@ describe('resolve_branch_name', () => {
 	})
 
 	it('falls back to git_branch.current() when branch is empty string', async () => {
-		const { git_branch } = await import('../scripts/git/git-branch')
+		const { git_branch } = await import('./git-branch')
 
 		vi.mocked(git_branch.current).mockResolvedValue(RESOLVED_BRANCH)
 

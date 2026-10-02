@@ -1,8 +1,12 @@
+import { existsSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { ALIASES, CATEGORY_ORDER, COMMAND_MAP, type CommandEntry } from './josh-command-map'
 import { COMMAND_AUDIENCES, COMMAND_SIDE_EFFECTS } from './josh-command-types'
 import { composite_arguments } from './josh-composite-arguments'
 
+const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const ALL_COMMAND_NAMES = Object.keys(COMMAND_MAP)
 const TEST_E2E_COMMAND = 'test:e2e'
 const TEST_UNIT_COMMAND = 'test:unit'
@@ -54,6 +58,18 @@ describe('COMMAND_MAP — required fields', () => {
 			const has_both = entry.script !== undefined && entry.shell !== undefined
 
 			expect(has_both, `command ${name} has both script and shell`).toBe(false)
+		}
+	})
+})
+
+describe('COMMAND_MAP — script paths', () => {
+	// A moved entry point leaves the map pointing at nothing, and no other test runs every command
+	// (joshuafolkken/kit#2903).
+	it('every command script exists in the package', () => {
+		for (const [name, entry] of Object.entries(COMMAND_MAP)) {
+			if (entry.script === undefined) continue
+
+			expect(existsSync(path.join(PACKAGE_DIR, entry.script)), `command ${name}`).toBe(true)
 		}
 	})
 })

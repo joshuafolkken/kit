@@ -22,25 +22,25 @@ const pending_release_mock = vi.hoisted(() =>
 	vi.fn<() => Promise<string | undefined>>().mockResolvedValue(undefined),
 )
 
-vi.mock('../scripts/git/git-followup-pending', () => ({
+vi.mock('./git-followup-pending', () => ({
 	git_followup_pending: { pending_release_line: pending_release_mock },
 }))
 
-vi.mock('../scripts/git/git-next-issues', () => ({
+vi.mock('./git-next-issues', () => ({
 	git_next_issues: {
 		fetch_next_issue_lines: vi.fn<() => Promise<Array<string>>>().mockResolvedValue([]),
 	},
 }))
 
-vi.mock('../scripts/review/review-stamps', () => ({
+vi.mock('#scripts/review/review-stamps', () => ({
 	review_stamps: { clear_round_one: clear_round_one_mock },
 }))
 
-vi.mock('../scripts/review/review-attest', () => ({
+vi.mock('#scripts/review/review-attest', () => ({
 	review_attest: { clear_here: attest_clear_mock },
 }))
 
-vi.mock('../scripts/run/run-hold', () => ({
+vi.mock('#scripts/run/run-hold', () => ({
 	run_hold: {
 		hold_path: (directory: string) => `${directory}/hold.json`,
 		release_hold: release_hold_mock,
@@ -48,14 +48,14 @@ vi.mock('../scripts/run/run-hold', () => ({
 	},
 }))
 
-vi.mock('../scripts/run/run-progress-clock', () => ({
+vi.mock('#scripts/run/run-progress-clock', () => ({
 	run_progress_clock: {
 		life_target_of: (directory: string) => `${directory}/life.json`,
 		end_life: end_life_mock,
 	},
 }))
 
-const { git_next_issues } = await import('../scripts/git/git-next-issues')
+const { git_next_issues } = await import('./git-next-issues')
 const { git_followup_finish } = await import('./git-followup-finish')
 
 const fetch_next_issue_lines_mock = vi.mocked(git_next_issues.fetch_next_issue_lines)

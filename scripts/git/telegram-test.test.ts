@@ -6,18 +6,20 @@ const telegram_send_mock = vi.hoisted(() => vi.fn())
 const error_handle_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('node:util', () => ({ parseArgs: vi.fn().mockReturnValue({ values: {} }) }))
-vi.mock('../scripts/git/git-gh-repo', () => ({
+vi.mock('./git-gh-repo', () => ({
 	git_gh_repo: { repo_get_name_with_owner: repo_get_name_with_owner_mock },
 }))
-vi.mock('../scripts/git/git-gh-issue-read', () => ({
+vi.mock('./git-gh-issue-read', () => ({
 	git_gh_issue_read: { issue_get_title: issue_get_title_mock },
 }))
-vi.mock('../scripts/git/telegram-notify', () => ({
+vi.mock('./telegram-notify', () => ({
 	telegram_notify: { send: telegram_send_mock },
 }))
 // Mocked because the real one ends in `process.exit(1)`, which would take the test runner with it.
-vi.mock('../scripts/git/git-error', () => ({ git_error: { handle: error_handle_mock } }))
-vi.mock('./environment-loader', () => ({ load_optional_environment: vi.fn() }))
+vi.mock('./git-error', () => ({ git_error: { handle: error_handle_mock } }))
+vi.mock('#scripts/josh/josh-environment-file', () => ({
+	josh_environment_file: { load_environment_file: vi.fn() },
+}))
 
 const REPO_NAME_WITH_OWNER = 'owner/my-repo'
 const ISSUE_TITLE = 'Fix login bug'

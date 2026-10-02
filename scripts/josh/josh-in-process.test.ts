@@ -105,9 +105,9 @@ const ENTRY_DETECTION_MARKERS: ReadonlyArray<string> = [
 	'import.meta.filename',
 ]
 const UNCONDITIONAL_SCRIPTS: ReadonlyArray<string> = [
-	'scripts-ai/epic-check.ts',
-	'scripts-ai/epic.ts',
-	'scripts-ai/git-workflow.ts',
+	'scripts/epic/epic-check.ts',
+	'scripts/epic/epic.ts',
+	'scripts/git/git-workflow.ts',
 	'scripts/eval/eval-run.ts',
 	'scripts/version/version-check.ts',
 ]
