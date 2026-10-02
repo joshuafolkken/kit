@@ -1877,6 +1877,8 @@ follow-up citations filed this run — branch-2 filing runs before `ship` — fo
 the closed issue so `issue:cite` reports them too. The one decision the region carried — disposing of a
 review finding — stays in front of this command.
 
+A `preflight` stage runs first (joshuafolkken/kit#2946): it asks every pull-request precondition at once — `git -y`'s preflight (release classification, branch and title checks) and, for a runtime change, the `## 実機証跡` section `followup` gates on, read from `--body-file` or else the open PR's body — and reports them together, then meets the scoped lint/test pair. A stop those checks would cause therefore lands before the review and the gate rather than after them. The gate stage meets the scoped pair again before `josh gate`, as a round-1 reviewer may have edited the tree since. The checks themselves are unchanged; only where they run moved.
+
 A re-run resumes (joshuafolkken/kit#2426): a per-issue stage record, honored only where the actual
 state (committed, pushed, merged) corroborates it, passes over finished stages; each stage is logged
 as a `ship-stage` trace event.
