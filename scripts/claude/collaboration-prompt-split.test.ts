@@ -211,6 +211,20 @@ describe('the split lost nothing', () => {
 		expect(read_index()).not.toContain(marker)
 	})
 
+	// joshuafolkken/kit#2894 merged seven principle files into one; each kept its own heading so
+	// `CLAUDE.md` can still cite it by section. Losing one would orphan that citation's rule.
+	it.each([
+		'## クローン禁止・単一ソース化',
+		'## 設計はエレガント・シンプルを第一目標にする',
+		'## 相談と実行を区別する',
+		'## 最新優先・fix-forward',
+		'## 恒久ルールは MEMORY ではなくプロンプト／ドキュメントに書く',
+		'## 配布ドキュメント・設定の変更は kit に上流化する',
+		'## エージェント規則の単一ソースは `CLAUDE.md`',
+	])('keeps the principle %j as its own section', (heading) => {
+		expect(read_repo_file(`${WORKFLOW_PROMPT_DIRECTORY}/principles.md`)).toContain(heading)
+	})
+
 	it.each(topic_files())('%s is more than a heading', (file_name) => {
 		const body = read_repo_file(`${WORKFLOW_PROMPT_DIRECTORY}/${file_name}`)
 		const filled = body.split('\n').filter((line) => line.trim() !== '')

@@ -302,7 +302,7 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		decision: 'Whether cross-file or cross-repository code duplication exists',
 		args: '',
 		vocabulary: ['clean', 'clones:'],
-		single_source: 'prompts/collaboration-workflow/no-clones.md',
+		single_source: 'prompts/collaboration-workflow/principles.md → クローン禁止',
 	},
 	{
 		name: 'epic:reconcile',
