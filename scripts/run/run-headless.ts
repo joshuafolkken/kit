@@ -73,10 +73,27 @@ function is_owned_here(carry: RunCarry, ancestry: () => ReadonlySet<number>): bo
 	return carry.owner_pid !== undefined && ancestry().has(carry.owner_pid)
 }
 
-function is_driven_here(read: CarryRead | undefined, ancestry: () => ReadonlySet<number>): boolean {
-	if (read?.kind !== 'carried' || !is_driving(read)) return false
+function driven_here(
+	read: CarryRead | undefined,
+	ancestry: () => ReadonlySet<number>,
+): RunCarry | undefined {
+	if (read?.kind !== 'carried' || !is_driving(read)) return undefined
 
-	return is_owned_here(read.carry, ancestry)
+	return is_owned_here(read.carry, ancestry) ? read.carry : undefined
+}
+
+/**
+ * The live, un-handed-off carry record this session drives as the `backlogrun` parent, or `undefined`
+ * for a lane child or any session that does not own one. Returned rather than tested so a caller that
+ * also needs the record's counters (the parent cut's cap, joshuafolkken/kit#2947) reads it once.
+ */
+async function driving_carry(
+	source: EnvironmentSource = process.env,
+	ancestry: () => ReadonlySet<number> = lane_reap.own_ancestry,
+): Promise<RunCarry | undefined> {
+	if (lane_child_marker.marked_issue(source) !== undefined) return undefined
+
+	return driven_here(await read_carry_here(), ancestry)
 }
 
 /**
@@ -88,14 +105,13 @@ async function is_backlog_parent(
 	source: EnvironmentSource = process.env,
 	ancestry: () => ReadonlySet<number> = lane_reap.own_ancestry,
 ): Promise<boolean> {
-	if (lane_child_marker.marked_issue(source) !== undefined) return false
-
-	return is_driven_here(await read_carry_here(), ancestry)
+	return (await driving_carry(source, ancestry)) !== undefined
 }
 
 const run_headless = {
 	HEADLESS_ENV_KEY,
 	current_carry,
+	driving_carry,
 	environment,
 	is_backlog_parent,
 	is_headless,

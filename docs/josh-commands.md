@@ -1506,14 +1506,15 @@ pnpm josh delegate --list     # the enumeration, and what was rejected and why
 
 **The list is the whole of the rule: anything not on the list is `keep`.** A step earns its place by naming how a wrong result is caught — by something in the parent tier that costs less than redoing the step.
 
-| Step                  | Delegatable because                                                                                                                                                          |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `gate-fix`            | `pnpm josh gate` re-runs; a wrong fix fails it again, naming the file                                                                                                        |
-| `epic-child`          | the parent reads the child's state from GitHub, so a child reported done but not merged shows as still open                                                                  |
-| `followup-filing`     | the parent reads the filed Issue with `pnpm josh issue:state <new>`, so one reported filed but not created shows as absent                                                   |
-| `survey`              | the reported locations are checked directly; a fabricated or missed one fails one `grep`                                                                                     |
-| `investigation`       | the parent opens the cited lines; an unsupported conclusion fails there, far cheaper than redoing the reading                                                                |
-| `implementation-unit` | the parent runs the whole change through `pnpm josh gate` and a `/code-review` it would run anyway, so a unit's mistake fails the same backstop a serial edit passes through |
+| Step                         | Delegatable because                                                                                                                                                          |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gate-fix`                   | `pnpm josh gate` re-runs; a wrong fix fails it again, naming the file                                                                                                        |
+| `epic-child`                 | the parent reads the child's state from GitHub, so a child reported done but not merged shows as still open                                                                  |
+| `followup-filing`            | the parent reads the filed Issue with `pnpm josh issue:state <new>`, so one reported filed but not created shows as absent                                                   |
+| `survey`                     | the reported locations are checked directly; a fabricated or missed one fails one `grep`                                                                                     |
+| `investigation`              | the parent opens the cited lines; an unsupported conclusion fails there, far cheaper than redoing the reading                                                                |
+| `implementation-unit`        | the parent runs the whole change through `pnpm josh gate` and a `/code-review` it would run anyway, so a unit's mistake fails the same backstop a serial edit passes through |
+| `lane-failure-investigation` | the `backlogrun` parent opens the cited lines and re-reads the child with `pnpm josh issue:state`; parking, re-dispatching and filing stay with the parent                   |
 
 **These were considered and kept**; `pnpm josh delegate <step>` answers `kept deliberately` for them, distinguishing them from a step that is merely unlisted:
 

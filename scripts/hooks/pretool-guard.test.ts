@@ -12,8 +12,14 @@ vi.mock('#scripts/run/run-watcher-hook', () => ({
 	run_watcher_hook: { watcher_hook_reason: vi.fn().mockResolvedValue(undefined) },
 }))
 
+vi.mock('#scripts/run/run-parent-cut-hook', () => ({
+	run_parent_cut_hook: { parent_cut_reason: vi.fn().mockResolvedValue(undefined) },
+}))
+
 const { run_watcher_hook } = await import('#scripts/run/run-watcher-hook')
 const watcher_hook_reason = vi.mocked(run_watcher_hook.watcher_hook_reason)
+const { run_parent_cut_hook } = await import('#scripts/run/run-parent-cut-hook')
+const parent_cut_reason = vi.mocked(run_parent_cut_hook.parent_cut_reason)
 
 const { combine_outcomes } = pretool_guard
 
@@ -21,6 +27,7 @@ const BENIGN_COMMAND = 'ls'
 const SHELL_BODY_COMMAND = 'pnpm josh notify --body="hi `date`"'
 const SHELL_BODY_REASON = 'shell-evaluated body'
 const WATCHER_STALE_REASON = 'watcher stale'
+const PARENT_CUT_REASON = 'parent hand-off'
 
 function outcome(
 	reason: string | undefined,
@@ -108,5 +115,40 @@ describe('pretool_outcome_async — the composed watcher guard', () => {
 
 		expect(refusal.reason).toContain(SHELL_BODY_REASON)
 		expect(watcher_hook_reason).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#2947: the parent hand-off guard is the second asynchronous rule, after the watcher.
+describe('pretool_outcome_async — the composed parent hand-off guard', () => {
+	afterEach(() => {
+		watcher_hook_reason.mockReset()
+		watcher_hook_reason.mockResolvedValue(undefined)
+		parent_cut_reason.mockReset()
+		parent_cut_reason.mockResolvedValue(undefined)
+	})
+
+	it('surfaces the parent hand-off refusal on a call everything else cleared', async () => {
+		parent_cut_reason.mockResolvedValue(PARENT_CUT_REASON)
+
+		const refusal = await pretool_outcome_async(payload_with_transcript(BENIGN_COMMAND))
+
+		expect(refusal.reason).toBe(PARENT_CUT_REASON)
+	})
+
+	it('shows a stale watcher first, without consulting the parent guard', async () => {
+		watcher_hook_reason.mockResolvedValue(WATCHER_STALE_REASON)
+		parent_cut_reason.mockResolvedValue(PARENT_CUT_REASON)
+
+		const refusal = await pretool_outcome_async(payload_with_transcript(BENIGN_COMMAND))
+
+		expect(refusal.reason).toBe(WATCHER_STALE_REASON)
+		expect(parent_cut_reason).not.toHaveBeenCalled()
+	})
+
+	it('keeps a synchronous refusal, without consulting the parent guard', async () => {
+		const refusal = await pretool_outcome_async(payload_with_transcript(SHELL_BODY_COMMAND))
+
+		expect(refusal.reason).toContain(SHELL_BODY_REASON)
+		expect(parent_cut_reason).not.toHaveBeenCalled()
 	})
 })
