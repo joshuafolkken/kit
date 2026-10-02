@@ -2,6 +2,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	symlinkSync,
@@ -30,6 +31,7 @@ vi.mock('execa', () => ({ execaSync: vi.fn() }))
 vi.mock('node:readline/promises', () => ({ createInterface: vi.fn() }))
 const mocked_execa = vi.mocked(execaSync)
 const PACKAGE_JSON = 'package.json'
+const INDEX_HTML = 'index.html'
 const GITIGNORE = '.gitignore'
 const GITHUB_DIR = '.github'
 const BASIC_PROFILE_ENTRY = '"profile": "basic"'
@@ -40,7 +42,7 @@ const INSTALL_HINT = 'run `pnpm install`'
 const PNPM_INSTALL = 'pnpm install'
 
 function write_index_html(): void {
-	writeFileSync(path.join(paths_mock.root, 'index.html'), '<h1>Hello</h1>')
+	writeFileSync(path.join(paths_mock.root, INDEX_HTML), '<h1>Hello</h1>')
 }
 
 // `init` does the setup only as the kit the project itself installed; any other kit hands off to that
@@ -251,7 +253,9 @@ describe('the install and format init finishes with', () => {
 // A `pnpm dlx` kit may be a stale cache entry; the version the project gets is pnpm's choice, and the
 // setup is that version's (joshuafolkken/kit#2794).
 describe('a kit run from outside the project', () => {
-	it('installs the project kit and hands the run to it without writing anything itself', async () => {
+	// The bare package.json anchors pnpm to this directory rather than an ancestor project
+	// (joshuafolkken/kit#2866); it carries no kit version or template, so #2794's guarantee holds.
+	it('installs the project kit and hands the run to it, writing only a bare package.json itself', async () => {
 		write_index_html()
 		mocked_execa.mockReturnValue(fake_git_result(0, ''))
 		await run_init(['--profile', 'basic'])
@@ -260,7 +264,10 @@ describe('a kit run from outside the project', () => {
 			'pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit',
 			'pnpm exec josh init --profile static',
 		])
-		expect(existsSync(path.join(paths_mock.root, PACKAGE_JSON))).toBe(false)
+		const manifest = readFileSync(path.join(paths_mock.root, PACKAGE_JSON), 'utf8')
+
+		expect(new Set(readdirSync(paths_mock.root))).toStrictEqual(new Set([INDEX_HTML, PACKAGE_JSON]))
+		expect(JSON.parse(manifest)).toStrictEqual({ private: true })
 	})
 
 	it('fails without handing off when the kit install fails', async () => {

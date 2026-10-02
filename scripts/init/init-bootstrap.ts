@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
+import { init_basic } from './init-basic'
 import { init_install, type InstallStep } from './init-install'
 import { init_logic_workspace } from './init-logic-workspace'
 import { project_profile } from './project-profile'
@@ -73,6 +74,14 @@ function handoff_step(args: ReadonlyArray<string>): InstallStep {
 	}
 }
 
+// pnpm walks up to the nearest `package.json`, so without one here it installs kit into whatever
+// project an ancestor directory holds and rewrites that project's files (joshuafolkken/kit#2866).
+function ensure_project_manifest(project_root: string): void {
+	const manifest_path = path.join(project_root, PACKAGE_JSON)
+
+	if (!existsSync(manifest_path)) writeFileSync(manifest_path, init_basic.initial_manifest())
+}
+
 // Returns the failure to report, or undefined once the project-installed kit finished the setup.
 function hand_off(
 	package_directory: string,
@@ -83,6 +92,8 @@ function hand_off(
 	console.info('\n🚀 Installing @joshuafolkken/kit into the project, then running its josh init')
 	const template = readFileSync(path.join(package_directory, KIT_BUILDS_TEMPLATE), 'utf8')
 	const install = kit_install_step(has_kit_dependency(project_root), template)
+
+	ensure_project_manifest(project_root)
 	if (!init_install.did_step_succeed(install, project_root)) return `${install.label} failed`
 	if (!init_install.did_step_succeed(handoff_step(args), project_root)) return HANDOFF_FAILURE
 

@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -32,11 +40,35 @@ function commands(): Array<string> {
 	})
 }
 
+function call_options(index: number): unknown {
+	// The mock is typed from execa's two-argument overload, so the options argument is read untyped.
+	const { calls }: { calls: ReadonlyArray<ReadonlyArray<unknown>> } = mocked_execa.mock
+
+	return calls[index]?.[2]
+}
+
 function link_project_kit(target: string): void {
 	const scope = path.join(fixture.root, 'node_modules', '@joshuafolkken')
 
 	mkdirSync(scope, { recursive: true })
 	symlinkSync(target, path.join(scope, 'kit'))
+}
+
+function read_manifest(directory: string): string {
+	return readFileSync(path.join(directory, PACKAGE_JSON), 'utf8')
+}
+
+// Records, at each command the hand-off runs, whether the project already had its own package.json.
+function record_manifest_presence(project: string): Array<boolean> {
+	const presence: Array<boolean> = []
+
+	mocked_execa.mockImplementation(() => {
+		presence.push(existsSync(path.join(project, PACKAGE_JSON)))
+
+		return result(0)
+	})
+
+	return presence
 }
 
 beforeEach(() => {
@@ -120,14 +152,38 @@ describe('hand_off', () => {
 	})
 })
 
+describe('hand_off — a directory without package.json', () => {
+	it('creates package.json in the project before adding kit, leaving an ancestor project untouched', () => {
+		const ancestor_manifest = '{ "devDependencies": { "@joshuafolkken/kit": "0.281.0" } }'
+		const project = path.join(fixture.root, 'project')
+
+		mkdirSync(project)
+		writeFileSync(path.join(fixture.root, PACKAGE_JSON), ancestor_manifest)
+		const manifest_presence = record_manifest_presence(project)
+
+		init_bootstrap.hand_off(KIT_DIR, project, PROFILE_ARGS)
+
+		expect(manifest_presence).toStrictEqual([true, true])
+		expect(call_options(0)).toMatchObject({ cwd: project })
+		expect(JSON.parse(read_manifest(project))).toStrictEqual({ private: true })
+		expect(read_manifest(fixture.root)).toBe(ancestor_manifest)
+	})
+
+	it('leaves an existing package.json as it is', () => {
+		const manifest = '{ "name": "existing" }'
+
+		writeFileSync(path.join(fixture.root, PACKAGE_JSON), manifest)
+		init_bootstrap.hand_off(KIT_DIR, fixture.root, PROFILE_ARGS)
+
+		expect(read_manifest(fixture.root)).toBe(manifest)
+	})
+})
+
 describe('hand_off — a repeated hand-off', () => {
 	it('marks the handed-off run so it can tell it was handed off', () => {
 		init_bootstrap.hand_off(KIT_DIR, fixture.root, PROFILE_ARGS)
 
-		// The mock is typed from execa's two-argument overload, so the options argument is read untyped.
-		const { calls }: { calls: ReadonlyArray<ReadonlyArray<unknown>> } = mocked_execa.mock
-
-		expect(calls[1]?.[2]).toMatchObject({ env: { JOSH_INIT_HANDED_OFF: '1' } })
+		expect(call_options(1)).toMatchObject({ env: { JOSH_INIT_HANDED_OFF: '1' } })
 	})
 
 	it('refuses to hand off again from a run that was itself handed off', () => {
