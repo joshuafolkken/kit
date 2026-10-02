@@ -17,6 +17,7 @@ const RATIONALE_SUFFIX = '-rationale.md'
 const SECTION_LEVEL = 2
 const SKILL_ROOT = path.join('.claude', 'skills')
 const SKILL_FILE = 'SKILL.md'
+const DOCS_DIRECTORY = 'docs'
 
 function rationale_files(): Array<string> {
 	return readdirSync(path.join(ROOT, RATIONALE_DIRECTORY))
@@ -29,14 +30,18 @@ function read(relative_path: string): string {
 }
 
 // A workflow procedure file first; a whole skill's `SKILL.md` when the rationale is named after a skill
-// rather than a workflow file (`epic-commands-rationale.md`, joshuafolkken/kit#2892).
+// rather than a workflow file (`epic-commands-rationale.md`, joshuafolkken/kit#2892); a consumer-facing
+// page under `docs/` when it is named after neither (`sync-rationale.md`, joshuafolkken/kit#2896).
 function procedure_of(rationale: string): string {
 	const name = path.basename(rationale).replace(RATIONALE_SUFFIX, '')
 	const workflow_procedure = path.join(entry_read_set.SKILL_DIRECTORY, `${name}.md`)
+	const skill_procedure = path.join(SKILL_ROOT, name, SKILL_FILE)
 
 	if (existsSync(path.join(ROOT, workflow_procedure))) return workflow_procedure
 
-	return path.join(SKILL_ROOT, name, SKILL_FILE)
+	if (existsSync(path.join(ROOT, skill_procedure))) return skill_procedure
+
+	return path.join(DOCS_DIRECTORY, `${name}.md`)
 }
 
 function section_titles(markdown: string): Array<string> {
@@ -96,6 +101,12 @@ describe('workflow rationale documents sit off the read path', () => {
 	it('maps a rationale named after a skill to that skill', () => {
 		expect(procedure_of('docs/maintainers/epic-commands-rationale.md')).toBe(
 			path.join(SKILL_ROOT, 'epic-commands', SKILL_FILE),
+		)
+	})
+
+	it('maps a rationale named after neither to the consumer-facing page under docs/', () => {
+		expect(procedure_of('docs/maintainers/sync-rationale.md')).toBe(
+			path.join(DOCS_DIRECTORY, 'sync.md'),
 		)
 	})
 

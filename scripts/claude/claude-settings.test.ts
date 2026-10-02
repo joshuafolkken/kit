@@ -4,7 +4,9 @@ import { AI_DOCS, read_repo_file, WORKFLOW_PROMPT } from '#scripts/document/ai-d
 import { describe, expect, it } from 'vitest'
 import { claude_settings_fixture } from './claude-settings-fixture'
 
-const SYNC_DOC_PATH = fileURLToPath(new URL('../../docs/sync.md', import.meta.url))
+const SYNC_DOC_PATH = fileURLToPath(
+	new URL('../../docs/maintainers/sync-rationale.md', import.meta.url),
+)
 
 const { load_settings } = claude_settings_fixture
 
@@ -296,7 +298,7 @@ describe('.claude/settings.json — deny patterns', () => {
 	})
 })
 
-describe('docs/sync.md — deny rationale', () => {
+describe('docs/maintainers/sync-rationale.md — deny rationale', () => {
 	it('records why the git index and PR merge commands are denied', () => {
 		const sync_document = readFileSync(SYNC_DOC_PATH, 'utf8')
 
@@ -325,7 +327,8 @@ describe('docs/sync.md — deny rationale', () => {
 // The deny list only holds while every copy of the prose says the same thing: a doc that still
 // reads "ask first" without naming the deny sends an agent looking for an exception that the tool
 // no longer grants. joshuafolkken/kit#1924 slimmed `CLAUDE.md`'s Git Rules to the resident trigger and
-// moved the pattern enumeration and the loophole explanation to `docs/sync.md` and the Japanese
+// moved the pattern enumeration and the loophole explanation to `docs/sync.md` (since
+// joshuafolkken/kit#2896, `docs/maintainers/sync-rationale.md`) and the Japanese
 // workflow prompt (both pinned by the suites below); what stays resident in `CLAUDE.md` is the
 // criterion a no-hook agent cannot infer from the deny list — the deny is narrower than the rule, and
 // the tool letting a command through is not permission.
