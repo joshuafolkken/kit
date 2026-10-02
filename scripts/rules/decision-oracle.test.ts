@@ -1,7 +1,7 @@
 import { cases } from '#scripts/cases/cases-logic'
 import { clone_scan } from '#scripts/clone/clone-scan'
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
-import { git_epic_reconcile } from '#scripts/git/git-epic-reconcile'
+import { epic_reconcile } from '#scripts/epic/epic-reconcile'
 import { COMMAND_MAP } from '#scripts/josh/josh-logic'
 import { lane_occupancy } from '#scripts/lane/lane-occupancy'
 import { disposition } from '#scripts/review/disposition-logic'
@@ -143,8 +143,8 @@ describe('the #2235 oracles are on the enumeration', () => {
 	it('epic:reconcile vocabulary stays in step with the emitted tokens', () => {
 		const oracle = decision_oracle.find_oracle(RECONCILE_ORACLE)
 
-		expect(oracle?.vocabulary).toContain(git_epic_reconcile.RECONCILED)
-		expect(oracle?.vocabulary).toContain(git_epic_reconcile.NOTHING_TO_RECONCILE)
+		expect(oracle?.vocabulary).toContain(epic_reconcile.RECONCILED)
+		expect(oracle?.vocabulary).toContain(epic_reconcile.NOTHING_TO_RECONCILE)
 	})
 
 	it('lane:list vocabulary stays in step with the liveness verdicts', () => {

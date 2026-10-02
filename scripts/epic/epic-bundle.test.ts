@@ -1,8 +1,8 @@
-import type { IssueReference } from '#scripts/git/git-epic-reference'
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import { epic_bundle, type BacklogIssue } from './epic-bundle'
 import { epic_bundle_cli } from './epic-bundle-cli'
+import type { IssueReference } from './epic-reference'
 
 const REPO = 'joshuafolkken/kit'
 const OTHER_REPO = 'joshuafolkken/app-kit'

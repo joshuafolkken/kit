@@ -111,7 +111,7 @@ const rest_comment_schema = z.looseObject({
 // Labels come back as objects, so the name is picked out here rather than at every call site.
 const issue_label_schema = z.object({ name: z.string() })
 
-// `state` is optional because most readers ignore it — only `git-epic-add.ts` consults it, to refuse
+// `state` is optional because most readers ignore it — only `epic-add.ts` consults it, to refuse
 // adding a child to a closed epic (joshuafolkken/kit#2337). A reader that never asks the state field
 // still parses cleanly.
 const epic_subject_schema = z.object({

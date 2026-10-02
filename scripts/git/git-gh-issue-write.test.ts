@@ -221,7 +221,7 @@ describe('label_ensure', () => {
 })
 
 describe('issue_create_with_label', () => {
-	// `git-epic-run.ts` parses the epic's number back out of this answer, so the shape has to stay
+	// `epic-run.ts` parses the epic's number back out of this answer, so the shape has to stay
 	// the browser URL `gh issue create` printed.
 	it('creates the issue with its label and answers the browser URL', async () => {
 		const url = await git_gh_issue_write.issue_create_with_label({

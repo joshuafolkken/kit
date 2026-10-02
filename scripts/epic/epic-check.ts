@@ -4,8 +4,8 @@
  *
  * Usage: tsx scripts/epic/epic-check.ts <issue-number>
  */
-import { git_epic_run } from '#scripts/git/git-epic-run'
 import { epic_cli } from './epic-cli'
+import { epic_run } from './epic-run'
 
 const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh epic:check <issue-number>'
@@ -19,7 +19,7 @@ async function main(): Promise<void> {
 		process.exit(FAILURE_EXIT_CODE)
 	}
 
-	const exit_code = await git_epic_run.check_epic(epic_number)
+	const exit_code = await epic_run.check_epic(epic_number)
 
 	if (exit_code !== 0) process.exit(exit_code)
 }

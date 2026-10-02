@@ -6,7 +6,7 @@
 // notification carrying only a pull-request URL until joshuafolkken/kit#994 added the second form
 // here rather than beside it.
 //
-// Two other modules read a URL for something narrower and keep their own patterns. `git-epic-parse`
+// Two other modules read a URL for something narrower and keep their own patterns. `epic-parse`
 // scans an epic body for task-list rows, so its regex is anchored to the row marker and runs
 // globally over a document; `propagate-steps` takes the trailing number of whatever URL
 // `gh issue create` just printed, where the repository is already known. This one is for a caller

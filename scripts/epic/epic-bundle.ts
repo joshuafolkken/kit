@@ -1,7 +1,7 @@
-import type { DependencyLink } from '#scripts/git/git-epic-parse'
-import type { IssueReference } from '#scripts/git/git-epic-reference'
 import { epic_audit_logic } from './epic-audit'
 import { epic_graph } from './epic-graph'
+import type { DependencyLink } from './epic-parse'
+import type { IssueReference } from './epic-reference'
 
 // Bundling a newly filed issue with the ones it turns out to be related to.
 //

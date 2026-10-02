@@ -1,6 +1,5 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import type { IssueReference } from '#scripts/git/git-epic-reference'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
@@ -18,6 +17,7 @@ import { epic_bundle_gaps } from './epic-bundle-gaps'
 import { epic_bundle_referenced, type ReferencedContext } from './epic-bundle-referenced'
 import { epic_index, epic_schema, type FetchedEpics } from './epic-index'
 import { epic_issue } from './epic-issue'
+import type { IssueReference } from './epic-reference'
 
 // `josh epic:bundle <N>` — after an issue is filed, look at the open backlog and say whether it
 // belongs with something already there (joshuafolkken/kit#873).

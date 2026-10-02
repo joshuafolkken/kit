@@ -1,8 +1,8 @@
-import type { IssueReference } from '#scripts/git/git-epic-reference'
 import { git_gh_issue_rest } from '#scripts/git/git-gh-issue-rest'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
 import { blocked_by_schema } from '#scripts/git/schemas'
 import { z } from 'zod'
+import type { IssueReference } from './epic-reference'
 
 // The shapes one issue is read as, and the argument every epic command takes.
 //
