@@ -1,6 +1,12 @@
 import { execa } from 'execa'
 import { git_utilities } from './constants'
-import { create_spawn_error, get_exit_code, has_timed_out } from './git-execa-error'
+import {
+	create_spawn_error,
+	get_exit_code,
+	has_timed_out,
+	TIMEOUT_EXIT_CODE,
+} from './git-execa-error'
+import { git_ssh_keepalive } from './git-ssh-keepalive'
 
 const MS_PER_SECOND = 1000
 
@@ -33,64 +39,9 @@ const PUSH_TIMEOUT_LABEL = `${String(PUSH_TIMEOUT_SECONDS)}s`
 // said no" are different diagnoses, and only the first one is worth retrying.
 const PUSH_TIMEOUT_MESSAGE = 'git push timed out'
 
-// A timeout has no exit code — the process was killed rather than allowed to exit — so `cause` says
-// so in the slot every other git failure puts a number in. `is_upstream_not_set_error` compares
-// against '128', which this can never equal, so a timed-out bare push is never mistaken for a
-// missing upstream and retried as `--set-upstream`.
-const PUSH_TIMEOUT_EXIT_CODE = 'timeout'
-
-// SSH's own liveness probe: three unanswered checks 15 seconds apart, so a connection that dies
-// mid-transfer is noticed in about 45 seconds instead of waiting on the TCP default. The budget
-// above bounds the damage either way; this is what makes the common case fail in seconds rather
-// than sit out the whole budget.
-const SSH_KEEPALIVE_OPTIONS = '-o ServerAliveInterval=15 -o ServerAliveCountMax=3'
-const SSH_COMMAND_VARIABLE = 'GIT_SSH_COMMAND'
-const SSH_LEGACY_VARIABLE = 'GIT_SSH'
-const KEEPALIVE_SSH_COMMAND = `ssh ${SSH_KEEPALIVE_OPTIONS}`
-const SSH_COMMAND_CONFIG_KEY = 'core.sshCommand'
+// `TIMEOUT_EXIT_CODE` is never '128', which `is_upstream_not_set_error` compares against, so a
+// timed-out bare push is never mistaken for a missing upstream and retried as `--set-upstream`.
 const PUSH_SUBCOMMAND = 'push'
-
-// Whatever already decides how ssh is invoked, or an empty string when nothing does. git reads three
-// sources in this order — `GIT_SSH_COMMAND`, `core.sshCommand`, then the legacy `GIT_SSH` — and the
-// last one has to be asked as well precisely because it loses: setting `GIT_SSH_COMMAND` on top of a
-// `GIT_SSH=plink.exe` outranks it, so the push would run an ssh binary the user did not choose.
-function to_environment_value(name: string): string {
-	return process.env[name]?.trim() ?? ''
-}
-
-function to_configured_ssh_command(): string {
-	const from_command = to_environment_value(SSH_COMMAND_VARIABLE)
-
-	return from_command === '' ? to_environment_value(SSH_LEGACY_VARIABLE) : from_command
-}
-
-// Whether any of those three sources answered. **A hit means hands off entirely.**
-//
-// Appending the options to a command someone else chose is not safe, because they are OpenSSH's:
-// `plink` and `TortoiseGitPlink` are supported ssh commands on the platform `get_git_command_for_spawn`
-// goes out of its way to handle, and a wrapper script with a fixed argument list is common on any
-// platform — each of them exits on a usage error rather than pushing. Setting the variable while
-// `core.sshCommand` is configured is the same mistake from the other side: the environment wins, so
-// a per-repository key would be silently replaced by a plain `ssh`.
-//
-// What those users lose is the keepalive, not the fix: the budget above still bounds their push, and
-// `ServerAliveInterval` belongs in their own ssh config where it applies to every tool they run.
-async function has_configured_ssh_command(): Promise<boolean> {
-	if (to_configured_ssh_command() !== '') return true
-
-	try {
-		const git_command_bin = git_utilities.get_git_command_for_spawn()
-		// execa runs the binary directly with an argument array and no `shell` option, so CLI
-		// args cannot break out of a shell sandbox; the git command and args are internally
-		// controlled, never untrusted input. tssecurity:S8705 is a false positive here.
-		const { stdout } = await execa(git_command_bin, ['config', '--get', SSH_COMMAND_CONFIG_KEY]) // NOSONAR
-
-		return stdout.trim() !== ''
-	} catch {
-		// `git config --get` exits 1 when the key is unset, which is the answer rather than a failure.
-		return false
-	}
-}
 
 interface PushOptions {
 	stdio: 'inherit'
@@ -99,12 +50,10 @@ interface PushOptions {
 }
 
 async function to_push_options(): Promise<PushOptions> {
-	const should_keep_alive = !(await has_configured_ssh_command())
-
 	return {
 		stdio: 'inherit',
 		timeout: PUSH_TIMEOUT_MS,
-		env: should_keep_alive ? { [SSH_COMMAND_VARIABLE]: KEEPALIVE_SSH_COMMAND } : {},
+		env: await git_ssh_keepalive.to_environment(),
 	}
 }
 
@@ -142,7 +91,7 @@ function to_retry_notice(arguments_list: Array<string>): string {
 function create_timeout_error(arguments_list: Array<string>): Error {
 	const message = `${PUSH_TIMEOUT_MESSAGE} twice (${PUSH_TIMEOUT_LABEL} each). Re-run it by hand: ${to_manual_command(arguments_list)}`
 
-	return new Error(message, { cause: { exit_code: PUSH_TIMEOUT_EXIT_CODE } })
+	return new Error(message, { cause: { exit_code: TIMEOUT_EXIT_CODE } })
 }
 
 // One push, bounded and retried once — and **only** on a timeout. A push the remote rejected (a
@@ -164,10 +113,4 @@ const git_push_transport = {
 }
 
 export { git_push_transport }
-export {
-	KEEPALIVE_SSH_COMMAND,
-	PUSH_TIMEOUT_MESSAGE,
-	PUSH_TIMEOUT_MS,
-	SSH_COMMAND_VARIABLE,
-	SSH_LEGACY_VARIABLE,
-}
+export { PUSH_TIMEOUT_MESSAGE, PUSH_TIMEOUT_MS }

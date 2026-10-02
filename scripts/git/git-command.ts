@@ -418,7 +418,7 @@ async function push(): Promise<void> {
 // has diverged is a state to fail loudly on rather than to grow a merge commit over. The name says
 // which of the two this is, as `merge_fast_forward` does beside `merge_branch`.
 async function pull_fast_forward(): Promise<void> {
-	await git_spawn.with_output('pull', ['--ff-only'])
+	await git_spawn.with_output_remote('pull', ['--ff-only'])
 }
 
 // Every local branch matching a `git branch --list` pattern, one name per line. The boolean below is
