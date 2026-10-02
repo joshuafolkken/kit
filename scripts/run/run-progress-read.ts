@@ -78,7 +78,7 @@ async function to_child(issue: OpenIssueData): Promise<ChildObservation> {
 	const number = String(issue.number)
 	const child = await run_preflight.read_child_state(number)
 
-	return { issue: number, labels: to_labels(issue), pr_state: child.pr_state }
+	return { issue: number, title: issue.title, labels: to_labels(issue), pr_state: child.pr_state }
 }
 
 async function read_children(repo: string): Promise<ReadonlyArray<ChildObservation> | undefined> {
@@ -171,6 +171,7 @@ async function read_observations(request: ObservationRequest): Promise<Observati
 	if (children.length === 0 && !(await has_run_started(lanes))) return IDLE_READ
 
 	const observations: Observations = {
+		repo: request.repo,
 		children,
 		lanes,
 		load_average: loadavg()[FIRST_LOAD_AVERAGE] ?? 0,

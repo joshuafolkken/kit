@@ -1,4 +1,6 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { gh_spawn } from '#scripts/gh/gh-spawn'
+import { issue_citation } from '#scripts/rules/issue-citation'
 import { run_carry, type CarryRead } from './run-carry'
 import { run_event_stream } from './run-event-stream'
 import { run_liveness } from './run-liveness'
@@ -9,6 +11,7 @@ import { run_wake, type RunWake } from './run-wake'
 // record reads back to a person lives here, one cohesive block.
 
 const UNKNOWN_CUTS = 'an unreadable number of'
+const REPO_LOOKUP_TIMEOUT_MS = 10_000
 const STOP_COMMAND = 'pnpm josh run:wake --stop'
 
 // The three paths every verb needs: the carry record it reads, its own record, and the work tree a
@@ -91,7 +94,22 @@ function describe_wake(wake: RunWake, context: WakeContext): string {
 		.join('\n')
 }
 
-const run_wake_describe = { STOP_COMMAND, describe_wake }
+// The description as a person reads it, every issue on it a number-link (joshuafolkken/kit#2943). The
+// invocation and the newest event both name issues (`backlogrun #1 #2`, `#1904 merged`), and a report
+// that copies them bare is what the Stop guard sends back. The repository is asked here, bounded, rather
+// than in the context every verb resolves: only the two describing verbs print it, and a lookup that
+// does not answer leaves the description as it was rather than withholding it.
+function cite_description(description: string, repo: string | undefined): string {
+	return repo === undefined ? description : issue_citation.linkify(description, repo)
+}
+
+function describe_wake_cited(wake: RunWake, context: WakeContext): string {
+	const repo = gh_spawn.get_repo_name_with_owner_within(REPO_LOOKUP_TIMEOUT_MS)
+
+	return cite_description(describe_wake(wake, context), repo)
+}
+
+const run_wake_describe = { STOP_COMMAND, cite_description, describe_wake, describe_wake_cited }
 
 export type { WakeContext }
 export { run_wake_describe }

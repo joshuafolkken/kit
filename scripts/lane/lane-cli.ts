@@ -2,6 +2,8 @@
 import { fileURLToPath } from 'node:url'
 import { epic_busy } from '#scripts/epic/epic-busy'
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import type { OpenIssueData } from '#scripts/git/schemas'
+import { issue_cite, type IssueCiter } from '#scripts/issue/issue-cite'
 import { error_text } from '#scripts/lib/error-message'
 import { run_carry } from '#scripts/run/run-carry'
 import { lane_await } from './lane-await'
@@ -150,10 +152,10 @@ function report_sweep(outcome: SweepOutcome): number {
 
 // `none` on standard output for the empty case as well, so `lane:list` keeps the contract the rest
 // of the commands follow — the prose belongs on standard error with every other explanation.
-function report_lanes(lanes: ReadonlyArray<LaneInfo>): number {
+function report_lanes(lanes: ReadonlyArray<LaneInfo>, cite: IssueCiter): number {
 	if (lanes.length === 0) console.error(lane_report.NO_LANES)
 
-	console.info(lanes.length === 0 ? NONE_TOKEN : lane_report.describe_lanes(lanes))
+	console.info(lanes.length === 0 ? NONE_TOKEN : lane_report.describe_lanes(lanes, cite))
 
 	return SUCCESS_EXIT_CODE
 }
@@ -192,21 +194,37 @@ const OCCUPANCY_UNREADABLE =
 // The `in-progress` issues this repository shows running, read the way `epic:next` reads lane
 // occupancy — never rebuilt (joshuafolkken/kit#2235). A read that could not see the whole listing is
 // `undefined`, so the difference is skipped rather than computed against a set known to be partial.
-async function to_holder_numbers(repo: string): Promise<ReadonlyArray<number> | undefined> {
+async function to_holders(repo: string): Promise<ReadonlyArray<OpenIssueData> | undefined> {
 	const read = await epic_busy.read_repository(repo)
 	if (read.kind === 'idle') return []
 
-	return read.kind === 'busy' ? read.issues.map((issue) => issue.number) : undefined
+	return read.kind === 'busy' ? read.issues : undefined
 }
 
-async function read_in_progress(): Promise<ReadonlyArray<number> | undefined> {
+// The repository and its running issues, read once: the listing cites each lane from the titles here
+// (joshuafolkken/kit#2943) and the occupancy check compares against the same set.
+interface InProgress {
+	repo: string | undefined
+	holders: ReadonlyArray<OpenIssueData> | undefined
+}
+
+async function read_in_progress(): Promise<InProgress> {
 	try {
 		const repo = await git_gh_command.repo_get_name_with_owner()
 
-		return repo === undefined ? undefined : await to_holder_numbers(repo)
+		return { repo, holders: repo === undefined ? undefined : await to_holders(repo) }
 	} catch {
-		return undefined
+		return { repo: undefined, holders: undefined }
 	}
+}
+
+function citer_of(in_progress: InProgress): IssueCiter {
+	const holders = in_progress.holders ?? []
+
+	return issue_cite.citer(
+		in_progress.repo,
+		new Map(holders.map((issue) => [String(issue.number), issue.title])),
+	)
 }
 
 // A stranded lane's work tree is gone, so it holds no issue: it counts as no lane rather than a live
@@ -217,16 +235,15 @@ function live_lane_issues(lanes: ReadonlyArray<LaneInfo>): Array<number> {
 
 // The lane/label difference, printed to standard error beside the listing. Wrapped so a GitHub read
 // that fails skips only this section — `lane:list`'s job is to list the lanes it already read.
-async function report_occupancy(lanes: ReadonlyArray<LaneInfo>): Promise<void> {
-	const in_progress = await read_in_progress()
-
-	if (in_progress === undefined) {
+function report_occupancy(lanes: ReadonlyArray<LaneInfo>, in_progress: InProgress): void {
+	if (in_progress.holders === undefined) {
 		console.error(OCCUPANCY_UNREADABLE)
 
 		return
 	}
 
-	const report = lane_occupancy.classify(in_progress, {
+	const holders = in_progress.holders.map((issue) => issue.number)
+	const report = lane_occupancy.classify(holders, {
 		kind: 'lanes',
 		issues: live_lane_issues(lanes),
 	})
@@ -239,9 +256,10 @@ async function list_command(rest: ReadonlyArray<string>): Promise<number> {
 	if (rest.length > 0) return report_usage()
 
 	const lanes = await lane_registry.list_lanes()
-	const code = report_lanes(lanes)
+	const in_progress = await read_in_progress()
+	const code = report_lanes(lanes, citer_of(in_progress))
 
-	await report_occupancy(lanes)
+	report_occupancy(lanes, in_progress)
 
 	return code
 }

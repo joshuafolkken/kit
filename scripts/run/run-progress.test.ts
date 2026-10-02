@@ -1,3 +1,5 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
+import { issue_citation } from '#scripts/rules/issue-citation'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_progress, type Observations } from './run-progress'
 
@@ -8,10 +10,17 @@ const MINUTE = run_progress.MS_PER_MINUTE
 const NOW = 10 * 60 * MINUTE
 const DAY = 24 * 60 * MINUTE
 const IN_PROGRESS = 'in-progress'
+const REPO = 'joshuafolkken/kit'
+const CHILD_TITLE = 'Child title'
+
+function link(number: string): string {
+	return `[#${number}](${issue_cite.issue_url(REPO, number)})`
+}
 
 function observations(overrides: Partial<Observations> = {}): Observations {
 	return {
-		children: [{ issue: '1520', labels: [IN_PROGRESS], pr_state: 'open' }],
+		repo: REPO,
+		children: [{ issue: '1520', title: CHILD_TITLE, labels: [IN_PROGRESS], pr_state: 'open' }],
 		lanes: [{ issue: '1520', state: 'open' }],
 		load_average: 3.25,
 		record_age_ms: 2 * MINUTE,
@@ -86,7 +95,11 @@ describe('observation_key — what "unchanged" is measured over', () => {
 	it('moves when a child moves, which is the run itself moving', () => {
 		const before = run_progress.observation_key(observations())
 		const after = run_progress.observation_key(
-			observations({ children: [{ issue: '1520', labels: [IN_PROGRESS], pr_state: 'merged' }] }),
+			observations({
+				children: [
+					{ issue: '1520', title: CHILD_TITLE, labels: [IN_PROGRESS], pr_state: 'merged' },
+				],
+			}),
 		)
 
 		expect(before).not.toBe(after)
@@ -143,7 +156,7 @@ describe('format_line — observations, never "still running"', () => {
 	})
 
 	it('carries the lanes, the load average and how long the record has been silent', () => {
-		expect(LINE).toContain('lanes 1520:open')
+		expect(LINE).toContain(`lanes ${link('1520')}:open`)
 		expect(LINE).toContain('load 3.3')
 		expect(LINE).toContain('record +2m')
 	})
@@ -276,13 +289,37 @@ describe('format_line — what it says when it has nothing to say', () => {
 	})
 
 	it('says so when no lane is open', () => {
-		expect(run_progress.format_lanes([])).toBe('none')
+		expect(run_progress.format_lanes([], REPO)).toBe('none')
 	})
 
 	it('says so when a child carries no label at all', () => {
-		expect(run_progress.format_child({ issue: '9', labels: [], pr_state: 'none' })).toBe(
-			'#9 (no labels) PR:none',
-		)
+		const child = { issue: '9', title: CHILD_TITLE, labels: [], pr_state: 'none' }
+		const cite = issue_cite.citer(REPO, new Map())
+
+		expect(run_progress.format_child(child, cite)).toBe(`${link('9')} (no labels) PR:none`)
+	})
+})
+
+// joshuafolkken/kit#2943: the parent relays these lines verbatim, so every issue on them is already the
+// citation a report needs — the Stop guard finds no bare `#N` to send back.
+describe('format_line — issues printed as citations', () => {
+	const line = run_progress.format_line(observations(), {
+		interval_ms: INTERVAL,
+		now_ms: NOW,
+		quiet_since_ms: NOW - MINUTE,
+		unchanged_since_ms: NOW,
+	})
+
+	it('cites each child with its link and its title', () => {
+		expect(line).toContain(`children ${issue_cite.citation_line(REPO, '1520', CHILD_TITLE)}`)
+	})
+
+	it('links each lane by number', () => {
+		expect(line).toContain(`lanes ${link('1520')}:open`)
+	})
+
+	it('leaves no bare issue reference for the Stop guard to flag', () => {
+		expect(issue_citation.has_bare_reference(line)).toBe(false)
 	})
 })
 
@@ -290,7 +327,7 @@ describe('format_line — what it says when it has nothing to say', () => {
 // set, and the slot says the pre-label stage as an observed fact rather than sitting blank.
 describe('format_children — the pre-label stage', () => {
 	it('names the pre-label stage when the run has started but no child is in flight', () => {
-		expect(run_progress.format_children([])).toBe(run_progress.NO_CHILD_YET)
+		expect(run_progress.format_children([], REPO)).toBe(run_progress.NO_CHILD_YET)
 	})
 
 	it('puts that pre-label marker on the line in place of a blank children slot', () => {
@@ -306,8 +343,11 @@ describe('format_children — the pre-label stage', () => {
 
 	it('joins the children with a separator once any are in flight', () => {
 		expect(
-			run_progress.format_children([{ issue: '9', labels: [IN_PROGRESS], pr_state: 'open' }]),
-		).toBe('#9 in-progress PR:open')
+			run_progress.format_children(
+				[{ issue: '9', title: CHILD_TITLE, labels: [IN_PROGRESS], pr_state: 'open' }],
+				REPO,
+			),
+		).toBe(`${issue_cite.citation_line(REPO, '9', CHILD_TITLE)} in-progress PR:open`)
 	})
 })
 

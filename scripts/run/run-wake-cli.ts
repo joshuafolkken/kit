@@ -290,7 +290,7 @@ function start(context: WakeContext, interval: string | undefined): number {
 	const existing = run_wake.read_wake(context.wake_target)
 
 	if (existing !== undefined && run_wake.is_supervisor_live(existing)) {
-		console.error(run_wake_describe.describe_wake(existing, context))
+		console.error(run_wake_describe.describe_wake_cited(existing, context))
 
 		return report(RUNNING_VERDICT)
 	}
@@ -342,7 +342,7 @@ function list(context: WakeContext): number {
 
 	if (wake === undefined) return report(NONE_VERDICT)
 
-	console.error(run_wake_describe.describe_wake(wake, context))
+	console.error(run_wake_describe.describe_wake_cited(wake, context))
 
 	return report(run_wake.is_supervisor_live(wake) ? SUPERVISING_VERDICT : STALE_VERDICT)
 }

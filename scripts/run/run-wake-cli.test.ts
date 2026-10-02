@@ -2,7 +2,9 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { issue_citation } from '#scripts/rules/issue-citation'
 import { afterAll, beforeEach, describe, expect, it, test, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_event_stream } from './run-event-stream'
@@ -16,6 +18,14 @@ import { run_wake_session } from './run-wake-session'
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: { git_directories: vi.fn(), status: vi.fn() },
+}))
+
+// `--list` cites the issue the newest event names (joshuafolkken/kit#2943), so the repository lookup
+// is pinned rather than reaching the network.
+const { REPO_SLUG } = vi.hoisted(() => ({ REPO_SLUG: 'joshuafolkken/kit' }))
+
+vi.mock('#scripts/gh/gh-spawn', () => ({
+	gh_spawn: { get_repo_name_with_owner_within: vi.fn().mockReturnValue(REPO_SLUG) },
 }))
 
 const { git_command } = await import('#scripts/git/git-command')
@@ -263,7 +273,20 @@ describe('josh run:wake --list — the woken session’s progress', () => {
 
 		expect(await run_wake_cli.run(['--list'])).toBe(SUCCESS)
 		expect(out).toStrictEqual([run_wake_cli.SUPERVISING_VERDICT])
-		expect(errors.join('\n')).toContain(`progress: ${line}`)
+		expect(errors.join('\n')).toContain(`progress: ${issue_citation.linkify(line, REPO_SLUG)}`)
+	})
+
+	// joshuafolkken/kit#2943: a report copies this description, so the event's issue arrives linked and
+	// the Stop guard finds no bare `#N` in it.
+	it('links the issue the newest event names', async () => {
+		write_carry(false)
+		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, NOW))
+		run_event_stream.append(event_target(), KIND, TEXT, AT)
+
+		await run_wake_cli.run(['--list'])
+
+		expect(errors.join('\n')).toContain(`[#1904](${issue_cite.issue_url(REPO_SLUG, '1904')})`)
+		expect(issue_citation.has_bare_reference(errors.join('\n'))).toBe(false)
 	})
 
 	// Before the first event there is no line, and "progress: (none)" on every pre-event listing is one

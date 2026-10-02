@@ -1,4 +1,6 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { issue_cite } from '#scripts/issue/issue-cite'
+import { issue_citation } from '#scripts/rules/issue-citation'
 import { describe, expect, it } from 'vitest'
 import type { LaneInfo } from './lane-registry'
 import { lane_report } from './lane-report'
@@ -104,6 +106,32 @@ describe('the recorded agent profile in the listing', () => {
 
 	it('marks a lane that has not been dispatched as unrecorded', () => {
 		expect(lane_report.describe_lane(lane())).toContain('profile -')
+	})
+})
+
+// joshuafolkken/kit#2943: a lane status report copies these rows, so the issue on each is the citation
+// the report needs rather than the bare `#N` the Stop guard sends back.
+describe('the issue each row names', () => {
+	const REPO = 'joshuafolkken/kit'
+	const TITLE = 'Open a lane per child'
+
+	it('cites the issue with its link and its title when the listing holds both', () => {
+		const cite = issue_cite.citer(REPO, new Map([['1490', TITLE]]))
+		const line = lane_report.describe_lane(lane(), cite)
+
+		expect(line.startsWith(issue_cite.citation_line(REPO, '1490', TITLE))).toBe(true)
+		expect(issue_citation.has_bare_reference(line)).toBe(false)
+	})
+
+	it('cites every row of the listing the same way', () => {
+		const cite = issue_cite.citer(REPO, new Map())
+		const listing = lane_report.describe_lanes([lane(), lane({ issue: '1491' })], cite)
+
+		expect(issue_citation.has_bare_reference(listing)).toBe(false)
+	})
+
+	it('keeps the plain number when no repository was read', () => {
+		expect(lane_report.describe_lane(lane()).startsWith('#1490 ')).toBe(true)
 	})
 })
 
