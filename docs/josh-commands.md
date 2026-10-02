@@ -272,7 +272,7 @@ pnpm josh test:unit
 
 - `vitest` installed with **no** `*.{test,spec}.{ts,js}` file anywhere is a failure, not a skip.
 - Guards (kit's own checkout): a unit test that reaches the network or writes into the suite's repository fails; the fix is in the test (mock the read, clear git location env, carry identity on `-c`).
-- **The suite runs as two Vitest projects** (`vitest.config.ts`): the classifier's isolation-free files (`scripts/test/pilot-files.ts`) run `pure` with `isolate:false` — each shared module evaluated once per worker, not once per file, a measured 57% cut on that set (joshuafolkken/kit#2170) — and the rest run `isolated` with the default. They partition the suite exactly, so **the same files run and the green condition is unchanged**; only the pure ones run faster. The state guard is scoped to `pure`.
+- **The suite runs as two Vitest projects** (`vitest.config.ts`): the classifier's isolation-free files (`scripts/test/pure-files.ts`) run `pure` with `isolate:false` — each shared module evaluated once per worker, not once per file, a measured 57% cut on that set (joshuafolkken/kit#2170) — and the rest run `isolated` with the default. They partition the suite exactly, so **the same files run and the green condition is unchanged**; only the pure ones run faster. The state guard is scoped to `pure`.
 - **A setup file silences the real streams for each test body** (`scripts/test/test-stdout-guard.ts`), so a fixture that drives a CLI `main` cannot leak its `process.stdout` lines into the suite's output; `console.*` is untouched and the streams are restored after each test (joshuafolkken/kit#2296).
 
 ### `josh test:related`

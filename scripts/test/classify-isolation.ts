@@ -6,8 +6,8 @@ import { VITEST_INCLUDE_GLOBS } from './vitest-include-globs'
 
 // Isolation requirements — a test matching ANY condition below mutates state a sibling test running
 // in the same worker could observe, so it must run with the default isolate:true and must NOT appear
-// in the generated pilot list. The classifier is deliberately conservative: a file it cannot decide
-// is left isolated, because a false "pure" costs a flaky pilot while a false "isolate" costs only a
+// in the generated pure list. The classifier is deliberately conservative: a file it cannot decide
+// is left isolated, because a false "pure" costs a flaky pure run while a false "isolate" costs only a
 // little speed.
 //   1. Module mocks: vi.mock / vi.spyOn / vi.stubEnv / vi.stubGlobal / vi.resetModules /
 //      vi.unstubAllEnvs / vi.unstubAllGlobals
@@ -66,10 +66,10 @@ const FS_WRITES = word_pattern(FS_WRITE_TOKENS)
 const ISOLATION_PATTERNS: ReadonlyArray<RegExp> = [MODULE_MOCKS, ENV_WRITES, SUBPROCESS, FS_WRITES]
 
 // Excluded from the main suite in vitest.config.ts (packs and installs the real tarball), so it must
-// never reach the pilot either.
+// never reach the pure project either.
 const MAIN_EXCLUDE = new Set(['scripts/build/packed-consumer.test.ts'])
 const NODE_MODULES = 'node_modules'
-const PILOT_FILES_PATH = 'scripts/test/pilot-files.ts'
+const PURE_FILES_PATH = 'scripts/test/pure-files.ts'
 const WRITE_FLAG = '--write'
 const INDENT = '\t'
 const UTF8 = 'utf8'
@@ -78,7 +78,7 @@ const GENERATED_HEADER = `/* eslint-disable max-lines */
 // GENERATED FILE — do not edit by hand.
 // Regenerate with: pnpm exec tsx scripts/test/classify-isolation.ts --write
 // Every entry is a test file the classifier judges free of the isolation requirements documented in
-// classify-isolation.ts; these files run with isolate:false in vitest.pilot.config.ts.`
+// classify-isolation.ts; these files run with isolate:false as the pure project in unit-projects.ts.`
 
 function normalize_path(file: string): string {
 	return file.split(path.sep).join('/')
@@ -111,39 +111,39 @@ function requires_isolation(source: string): boolean {
 	return ISOLATION_PATTERNS.some((pattern) => pattern.test(source))
 }
 
-function is_pilot_candidate(file: string): boolean {
+function is_pure_candidate(file: string): boolean {
 	return !requires_isolation(readFileSync(file, UTF8))
 }
 
-function classify_pilot_files(): Array<string> {
-	return all_test_files().filter((file) => is_pilot_candidate(file))
+function classify_pure_files(): Array<string> {
+	return all_test_files().filter((file) => is_pure_candidate(file))
 }
 
-function render_pilot_files(files: ReadonlyArray<string>): string {
+function render_pure_files(files: ReadonlyArray<string>): string {
 	const entries = files.map((file) => `${INDENT}'${file}',`).join('\n')
-	const body = `const PILOT_FILES: ReadonlyArray<string> = [\n${entries}\n]`
+	const body = `const PURE_FILES: ReadonlyArray<string> = [\n${entries}\n]`
 
-	return `${GENERATED_HEADER}\n\n${body}\n\nexport { PILOT_FILES }\n`
+	return `${GENERATED_HEADER}\n\n${body}\n\nexport { PURE_FILES }\n`
 }
 
-function write_pilot_files(): void {
-	writeFileSync(PILOT_FILES_PATH, render_pilot_files(classify_pilot_files()))
+function write_pure_files(): void {
+	writeFileSync(PURE_FILES_PATH, render_pure_files(classify_pure_files()))
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	if (process.argv.includes(WRITE_FLAG)) write_pilot_files()
-	else process.stdout.write(`${classify_pilot_files().join('\n')}\n`)
+	if (process.argv.includes(WRITE_FLAG)) write_pure_files()
+	else process.stdout.write(`${classify_pure_files().join('\n')}\n`)
 }
 
 const classify_isolation = {
 	ISOLATION_PATTERNS,
 	all_test_files,
 	by_code_point,
-	classify_pilot_files,
-	is_pilot_candidate,
-	render_pilot_files,
+	classify_pure_files,
+	is_pure_candidate,
+	render_pure_files,
 	requires_isolation,
-	write_pilot_files,
+	write_pure_files,
 }
 
 export { classify_isolation }
