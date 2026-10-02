@@ -20,7 +20,7 @@ const REFERENCE_PATTERN = /#(\d+)\b/gu
 // What may appear in the `owner/repo` written in front of a `#`: exactly the set the previous
 // lookbehind refused a bare reference after, plus the `.` a repository name may legitimately contain.
 //
-// The dot is where this parse and the task-list parse used to disagree. `git_epic_parse`'s
+// The dot is where this parse and the task-list parse used to disagree. `epic_parse`'s
 // `EXTERNAL_REFERENCE_SOURCE` allows one, so `- [ ] owner/site.com#40` is tracked as a genuine
 // cross-repository child; this one excluded it, so a sibling quoting `owner/site.com#40` was read
 // back as `com` — no repository — and every check skipped it in silence. A child that can be tracked

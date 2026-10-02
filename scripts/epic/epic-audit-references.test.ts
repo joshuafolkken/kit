@@ -1,9 +1,9 @@
-import { git_epic_parse } from '#scripts/git/git-epic-parse'
-import type { IssueReference } from '#scripts/git/git-epic-reference'
 import { describe, expect, it } from 'vitest'
 import { epic_audit_logic, type AuditFinding, type ReferenceState } from './epic-audit'
 import { epic_audit_checks, type AuditChild } from './epic-audit-checks'
 import { epic_graph } from './epic-graph'
+import { epic_parse } from './epic-parse'
+import type { IssueReference } from './epic-reference'
 
 // Reading a child's references against the repository that child lives in (joshuafolkken/kit#1014).
 //
@@ -155,7 +155,7 @@ describe('epic_audit_logic.parse_issue_references — a repository name with a d
 describe('the tracked children and the citable ones are the same set', () => {
 	it('cites every repository a task-list row can name', () => {
 		const rows = `- [ ] ${DOTTED_40}\n- [ ] ${OTHER_40}`
-		const tracked = git_epic_parse.parse_external_task_list_children(rows)
+		const tracked = epic_parse.parse_external_task_list_children(rows)
 		const known = new Set([REPO, ...tracked.map((entry) => entry.repo)])
 
 		for (const entry of tracked) {

@@ -126,7 +126,7 @@ describe('parse_rest_issue — a response that is not an issue', () => {
 	})
 
 	// A 200 carrying an API message object rather than an issue would otherwise be read as an issue
-	// whose every field is missing, and `git-epic-close` reports that as `is_closed: false` fact.
+	// whose every field is missing, and `epic-close` reports that as `is_closed: false` fact.
 	it('throws on an object that is not an issue', () => {
 		expect(() => git_gh_issue_rest.parse_rest_issue('{"message":"Not Found"}')).toThrow()
 	})

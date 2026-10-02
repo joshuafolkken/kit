@@ -1,6 +1,6 @@
+import { epic_close } from '#scripts/epic/epic-close'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deferred_answer, type DeferredAnswer } from './deferred-answer-fixture'
-import { git_epic_close } from './git-epic-close'
 import { git_followup_issue_close } from './git-followup-issue-close'
 import { git_followup_label } from './git-followup-label'
 import { git_followup_stages } from './git-followup-stages'
@@ -30,8 +30,8 @@ vi.mock('./git-followup-issue-close', () => ({
 	git_followup_issue_close: { ensure_issue_closed: vi.fn(), CLOSE_RECOVERY: 'close by hand' },
 }))
 
-vi.mock('./git-epic-close', () => ({
-	git_epic_close: { close_completed_epics: vi.fn() },
+vi.mock('#scripts/epic/epic-close', () => ({
+	epic_close: { close_completed_epics: vi.fn() },
 }))
 
 vi.mock('./git-notify', () => ({
@@ -54,7 +54,7 @@ const BASE_INPUT: WrapupInput = {
 const mocked_get_body = vi.mocked(git_gh_command.issue_get_body)
 const mocked_edit_body = vi.mocked(git_gh_command.issue_edit_body)
 const mocked_comment = vi.mocked(git_gh_command.issue_comment)
-const mocked_close_epics = vi.mocked(git_epic_close.close_completed_epics)
+const mocked_close_epics = vi.mocked(epic_close.close_completed_epics)
 const mocked_strip_label = vi.mocked(git_followup_label.strip_in_progress)
 const mocked_ensure_closed = vi.mocked(git_followup_issue_close.ensure_issue_closed)
 

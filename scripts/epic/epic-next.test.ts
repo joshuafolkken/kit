@@ -1,4 +1,3 @@
-import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it, vi } from 'vitest'
@@ -6,6 +5,7 @@ import { epic_fetch, type EpicSnapshot } from './epic-fetch'
 import type { EpicChild, IssueReference } from './epic-graph'
 import { epic_issue } from './epic-issue'
 import { epic_next } from './epic-next'
+import { epic_parse } from './epic-parse'
 
 const REPO = 'joshuafolkken/kit'
 const CROSS_REPO_REFERENCE = `${REPO}#858`
@@ -273,7 +273,7 @@ describe('epic_next.decide — the graph anomalies', () => {
 	it('reads the declaration through the shared epic parser', () => {
 		const body = 'Dependencies\n\n#1 -> #2 -> #3'
 
-		expect(git_epic_parse.parse_dependency_links(body)).toEqual([
+		expect(epic_parse.parse_dependency_links(body)).toEqual([
 			{ blocker: 1, blocked: 2 },
 			{ blocker: 2, blocked: 3 },
 		])

@@ -1,6 +1,6 @@
+import { epic_parse } from '#scripts/epic/epic-parse'
 import { poll, type PollOptions } from '#scripts/lib/poll'
 import { z } from 'zod'
-import { git_epic_parse } from './git-epic-parse'
 import { git_gh_command } from './git-gh-command'
 import { parse_json_object_safe } from './parse-json-array'
 
@@ -28,7 +28,7 @@ async function is_issue_closed(issue_number: string): Promise<boolean> {
 	const raw = await git_gh_command.issue_get_state_and_relations(issue_number)
 	const parsed = raw === undefined ? undefined : parse_json_object_safe(raw, state_read_schema)
 
-	return git_epic_parse.is_state_closed(parsed?.state)
+	return epic_parse.is_state_closed(parsed?.state)
 }
 
 const FOLLOWUP_CLOSER = 'pnpm josh followup'

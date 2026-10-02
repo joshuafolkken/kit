@@ -1,4 +1,4 @@
-import { git_epic_close } from './git-epic-close'
+import { epic_close } from '#scripts/epic/epic-close'
 import { git_followup_cleanup } from './git-followup-cleanup'
 import { git_followup_issue_close } from './git-followup-issue-close'
 import { git_followup_label } from './git-followup-label'
@@ -136,7 +136,7 @@ async function epic_close_step(input: WrapupInput): Promise<void> {
 		label: 'The epic auto-close',
 		recovery: undefined,
 		run: async () => {
-			await git_epic_close.close_completed_epics({
+			await epic_close.close_completed_epics({
 				issue_number: input.issue_number,
 				is_merged: input.should_merge,
 			})

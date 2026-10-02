@@ -46,7 +46,7 @@ async function read_label_names(issue_number: string): Promise<ReadonlyArray<str
 // **An issue that does not carry it is never written to**, which is what keeps the step silent on a
 // run whose issue was never labelled — a `404` swallowed into a warning would report a failure where
 // there was nothing to do. The read itself is always paid: one `number,labels,body` call per merged
-// run, which is the read `git-epic-read.ts` already makes rather than a field list of its own.
+// run, which is the read `epic-read.ts` already makes rather than a field list of its own.
 //
 // A run whose pull request named no issue has nothing to strip, so it returns rather than throwing:
 // the number is recovered from the `closes #N` keyword, and its absence is already reported where
