@@ -17,6 +17,7 @@ const EXPORT_KEY = './managed-marker'
 const EXPORT_TYPES = './dist/managed-marker/index.d.ts'
 const EXPORT_DEFAULT = './dist/managed-marker/index.js'
 const BUILD_STEP = 'tsx scripts/build/build-managed-marker.ts'
+const PREPACK_BUILD_CALL = 'pnpm build'
 
 function read_manifest(): z.infer<typeof exports_schema> {
 	const raw = readFileSync(path.join(PACKAGE_ROOT, 'package.json'), 'utf8')
@@ -44,7 +45,10 @@ describe('package.json managed-marker export', () => {
 	// carries this library if `prepack` builds it. Without that the export resolves to a file that
 	// was never written, and the downstream import this whole mechanism exists for throws
 	// ERR_MODULE_NOT_FOUND (joshuafolkken/kit#844).
-	it.each(['build', 'prepack'])('builds the library in the %s script', (script) => {
-		expect(read_manifest().scripts[script]).toContain(BUILD_STEP)
+	it('builds the library in the build script that prepack calls', () => {
+		const { scripts } = read_manifest()
+
+		expect(scripts['build']).toContain(BUILD_STEP)
+		expect(scripts['prepack']).toContain(PREPACK_BUILD_CALL)
 	})
 })

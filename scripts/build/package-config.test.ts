@@ -220,22 +220,31 @@ describe('package.json scripts', () => {
 
 const RANGE_GUARD_SCRIPT = 'publishable-range-check'
 const BIN_BUILD_SCRIPT = 'build-bin'
+const BUILD_CALL = 'pnpm build'
 
 describe('package.json prepack', () => {
-	const prepack = load_manifest().scripts?.['prepack'] ?? ''
+	const scripts = load_manifest().scripts ?? {}
+	const prepack = scripts['prepack'] ?? ''
 
-	it('builds the compiled bin before packing', () => {
-		expect(prepack).toContain(BIN_BUILD_SCRIPT)
+	it('builds the compiled bin through the build script', () => {
+		expect(scripts['build']).toContain(BIN_BUILD_SCRIPT)
+		expect(prepack).toContain(BUILD_CALL)
+	})
+
+	// joshuafolkken/kit#2885: the build steps are defined once, in `build`; a copied list in
+	// `prepack` drifts the moment only one of the two is edited.
+	it('calls the build script rather than copying its steps', () => {
+		expect(prepack).not.toContain(BIN_BUILD_SCRIPT)
 	})
 
 	it('gates packing on every published dependency range still resolving', () => {
 		expect(prepack).toContain(RANGE_GUARD_SCRIPT)
 	})
 
-	// The guard has to run before the build steps: a range no consumer can resolve makes the
-	// published package uninstallable (#742), so there is nothing worth building past that point.
-	it('runs the range guard before the build steps', () => {
-		expect(prepack.indexOf(RANGE_GUARD_SCRIPT)).toBeLessThan(prepack.indexOf(BIN_BUILD_SCRIPT))
+	// The guard has to run before the build: a range no consumer can resolve makes the published
+	// package uninstallable (#742), so there is nothing worth building past that point.
+	it('runs the range guard before the build', () => {
+		expect(prepack.indexOf(RANGE_GUARD_SCRIPT)).toBeLessThan(prepack.indexOf(BUILD_CALL))
 	})
 })
 

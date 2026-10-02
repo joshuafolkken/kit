@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { execa } from 'execa'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest'
 import { build_hooks, HOOK_BUNDLES, outfile_for } from './build-hooks'
 
 const BUILD_TIMEOUT_MS = 60_000
@@ -109,6 +109,32 @@ describe('build_hooks', () => {
 
 		await expect_parity('scripts/hooks/format-edited-file.ts', 'dist/hooks/format-edited.js', input)
 	})
+})
+
+// joshuafolkken/kit#2885: split builds emit freshly hashed chunks each time, so a chunk left from an
+// earlier build has to be gone after the next one rather than shipping beside the live chunks.
+describe('build_hooks output directory', () => {
+	it(
+		'removes a stale chunk left from an earlier build',
+		async () => {
+			const out_directory = mkdtempSync(path.join(tmpdir(), 'build-hooks-out-'))
+			const stale_chunk = path.join(out_directory, 'chunk-STALE.js')
+
+			onTestFinished(() => {
+				rmSync(out_directory, { recursive: true, force: true })
+			})
+			writeFileSync(stale_chunk, 'export {}\n')
+			await build_hooks(out_directory)
+
+			expect(existsSync(stale_chunk)).toBe(false)
+			const built = HOOK_BUNDLES.map((bundle) =>
+				existsSync(path.join(out_directory, `${bundle.out}.js`)),
+			)
+
+			expect(built.every(Boolean)).toBe(true)
+		},
+		BUILD_TIMEOUT_MS,
+	)
 })
 
 describe('Codex adapter bundle', () => {
