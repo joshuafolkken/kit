@@ -307,13 +307,19 @@ stop at a time.**
   path) becomes a native `blocked-by`; an issue the `wip-cap.md` → 「実行のしかた」 enumeration hits
   gets `run:solo`, **every other one `run:lane`**. Comment the reason; the offer commands enforce all
   three, answering `triage` while an issue has neither.
+- **Mark what has to go first — `priority:high`, only on cited grounds** (joshuafolkken/kit#2928). The
+  offer ranks `priority:high` first, then a verification-path defect (`bug` with `run:solo`, or
+  `route:interrupt`), then how many open issues wait on it, then its usual order. Apply
+  `priority:high` only where you can cite one of two grounds: a deadline or a stated reason for urgency
+  in the issue's body or comments, or a policy a person wrote that the issue falls under. Comment the
+  reason and where the ground is written. **Never remove `priority:high`** — only a person does.
 - **Report the order those labels produce — `pnpm josh backlog:plan --waves`** (joshuafolkken/kit#2778),
   `backlog:next` played forward wave by wave. Report it with the plan, never an order derived by hand.
 - **Then start the loop.** Whatever is still labelled is reported as parked and left standing; the
   run does not wait on it.
 
-**`needs-decision`, `run:solo` and `run:lane` are the workflow labels a run may apply, and none is
-`auto-ok` or `needs-human-review`.** Those two stay a person's alone (this file, `SKILL.md` → §2z); a
+**`needs-decision`, `run:solo`, `run:lane` and `priority:high` are the workflow labels a run may
+apply, and none is `auto-ok` or `needs-human-review`.** Those two stay a person's alone (this file, `SKILL.md` → §2z); a
 run parks with `needs-decision` and a person clears it.
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the plan and the decision pass come first"

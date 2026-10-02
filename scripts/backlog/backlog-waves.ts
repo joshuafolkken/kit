@@ -4,9 +4,9 @@ import { epic_cross_repo } from '#scripts/epic/epic-cross-repo'
 import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
 import { epic_outside_blocker } from '#scripts/epic/epic-outside-blocker'
 import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
-import { epic_solo } from '#scripts/epic/epic-solo'
 import { has_label_name, IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
 import { backlog_plan, type PlanContext } from './backlog-plan'
+import { backlog_rank } from './backlog-rank'
 
 // The order a `backlogrun` takes, wave by wave, before it starts (joshuafolkken/kit#2778).
 //
@@ -14,13 +14,13 @@ import { backlog_plan, type PlanContext } from './backlog-plan'
 // made from, so the order past the first answer was left for a person to work out by hand. This plays
 // the asks forward under one assumption: **every issue of a wave merges before the next wave starts**.
 //
-// **No rule is written twice.** The first wave is `epic_solo.select` over the very candidates
-// `backlog:next` resolves, asked of an idle repository — so it is what `backlog:next` prints when
-// nothing is running. Each later wave marks the earlier waves closed and re-classifies the same pool
+// **No rule is written twice.** The first wave is `backlog_rank.select` — rank, `run:solo` gate, cap —
+// over the very candidates `backlog:next` resolves, asked of an idle repository — so it is what
+// `backlog:next` prints when nothing is running (joshuafolkken/kit#2928). Each later wave marks the earlier waves closed and re-classifies the same pool
 // through `epic_classify.classify_children` with the resolver `epic:next` sorted it with the first
 // time — `epic_cross_repo.resolve_cross_repo`, so a blocker in another repository still waits for its
 // release rather than counting as done on close — then puts the runnable set through
-// `epic_solo.select` again.
+// `backlog_rank.select` again.
 
 const IDLE: BusyRead = { kind: 'idle' }
 const CLOSED = 'CLOSED'
@@ -45,14 +45,6 @@ function is_running(child: EpicChild): boolean {
 	return has_label_name(child.labels, IN_PROGRESS_LABEL)
 }
 
-// Every child the classification placed, in the order it placed them: the ranked candidates first,
-// then the waiting ones, then the ones waiting on a person.
-function everything_in(result: EpicNextResult): ReadonlyArray<EpicChild> {
-	const candidates = result.candidates.flatMap((bundle) => bundle.children)
-
-	return [...candidates, ...result.waiting, ...result.blocked_on_people]
-}
-
 function as_closed(child: EpicChild, done: ReadonlySet<string>): EpicChild {
 	return done.has(epic_graph.key_of(child)) ? { ...child, state: CLOSED } : child
 }
@@ -63,24 +55,35 @@ interface WavePool {
 	children: ReadonlyArray<EpicChild>
 	running: ReadonlySet<string>
 	repo: string
+	standalone: ReadonlySet<string>
 }
 
-function pool_of(result: EpicNextResult, repo: string): WavePool {
-	const all = everything_in(result)
+function pool_of(result: EpicNextResult, repo: string, standalone: ReadonlySet<string>): WavePool {
+	const all = backlog_rank.everything_in(result)
 
 	return {
 		children: all.filter((child) => !is_running(child)),
 		running: epic_outside_blocker.running_keys(all),
 		repo,
+		standalone,
 	}
 }
 
-function offer(runnable: ReadonlyArray<EpicChild>, repo: string): ReadonlyArray<EpicChild> {
-	return epic_solo.select(runnable, IDLE, repo).offered
+function offer(
+	candidates: ReadonlyArray<EpicChild>,
+	children: ReadonlyArray<EpicChild>,
+	pool: WavePool,
+): ReadonlyArray<EpicChild> {
+	const { repo, standalone } = pool
+
+	return backlog_rank.select({ candidates, pool: children, read: IDLE, repo, standalone }).offered
 }
 
-function first_wave(result: EpicNextResult, repo: string): ReadonlyArray<EpicChild> {
-	return offer(epic_report.candidates_for_repo(result, repo), repo)
+// Ranked against the whole result, exactly as `backlog:next` ranks it, so the two agree.
+function first_wave(result: EpicNextResult, pool: WavePool): ReadonlyArray<EpicChild> {
+	const candidates = epic_report.candidates_for_repo(result, pool.repo)
+
+	return offer(candidates, backlog_rank.everything_in(result), pool)
 }
 
 function next_wave(pool: WavePool, done: ReadonlySet<string>): ReadonlyArray<EpicChild> {
@@ -93,25 +96,31 @@ function next_wave(pool: WavePool, done: ReadonlySet<string>): ReadonlyArray<Epi
 
 	return offer(
 		runnable.filter((child) => child.repo === pool.repo),
-		pool.repo,
+		children,
+		pool,
 	)
 }
 
 // Each wave is closed before the next is asked for; a wave that offers nothing ends the plan, which
-// the pool's size bounds because every wave closes at least one child.
-function build(result: EpicNextResult, repo: string): WavePlan {
-	const pool = pool_of(result, repo)
+// the pool's size bounds because every wave closes at least one child. `standalone` names the rows the
+// offer's cap bounds; left empty, no wave is capped.
+function build(
+	result: EpicNextResult,
+	repo: string,
+	standalone: ReadonlySet<string> = new Set(),
+): WavePlan {
+	const pool = pool_of(result, repo, standalone)
 	const done = new Set<string>()
 	const waves: Array<ReadonlyArray<EpicChild>> = []
 
-	for (let wave = first_wave(result, repo); wave.length > 0; wave = next_wave(pool, done)) {
+	for (let wave = first_wave(result, pool); wave.length > 0; wave = next_wave(pool, done)) {
 		waves.push(wave)
 		for (const child of wave) done.add(epic_graph.key_of(child))
 	}
 
-	const unreached = everything_in(result).filter(
-		(child) => child.repo === repo && !done.has(epic_graph.key_of(child)),
-	)
+	const unreached = backlog_rank
+		.everything_in(result)
+		.filter((child) => child.repo === repo && !done.has(epic_graph.key_of(child)))
 
 	return { waves, unreached }
 }
@@ -139,10 +148,14 @@ function unreached_lines(plan: WavePlan, context: PlanContext): Array<string> {
 	)
 }
 
-function format_waves(result: EpicNextResult, context: PlanContext): string {
+function format_waves(
+	result: EpicNextResult,
+	context: PlanContext,
+	standalone: ReadonlySet<string> = new Set(),
+): string {
 	if (result.verdict === 'error') return backlog_plan.format_unusable(result)
 
-	const plan = build(result, context.repo)
+	const plan = build(result, context.repo, standalone)
 	const waves = plan.waves.map((wave, index) => wave_line(wave, index, context.repo))
 
 	return [

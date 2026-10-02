@@ -6,6 +6,7 @@ import {
 	type RepoAnswer,
 } from './epic-candidate-confirm'
 import { epic_graph, type EpicChild } from './epic-graph'
+import { epic_rank } from './epic-rank'
 import type { EpicVerdict } from './epic-report'
 import { epic_solo } from './epic-solo'
 import { epic_triage, type TriageVerdict } from './epic-triage'
@@ -107,6 +108,15 @@ function candidates_in(pool: RepoPool, repo: string): RepoPool {
 	return { ...pool, candidates: pool.candidates.filter((child) => child.repo === repo) }
 }
 
+// A pool's candidates for the repository in `epic_rank.rank` order — the ranking `backlog:next` offers
+// in (joshuafolkken/kit#2928), counted against the pool's own graph. **Within a pool, not across
+// pools**: the pool order is the order a person named the epics in, and that stays the outer key.
+function ranked_in(pool: RepoPool, repo: string): RepoPool {
+	const scoped = candidates_in(pool, repo)
+
+	return { ...scoped, candidates: epic_rank.rank(scoped.candidates, pool.context.children) }
+}
+
 // One pool's candidates, minus every one an earlier pool already carries. `seen` is mutated rather
 // than rebuilt because the earlier pools' claim is what the later one is filtered against.
 function unseen_candidates(pool: RepoPool, seen: Set<string>): RepoPool {
@@ -184,24 +194,6 @@ function solo_offer(
 	return { ...answer, children: offered, notice: offered_notice(offered, read, request) }
 }
 
-// The confirmation walk stops at the free-lane count, so a `run:solo` candidate ranked past it — or
-// in a pool past it — would never reach `solo_offer` to be preferred. Into an idle repository the
-// first pool holding one is asked first, with it at its head through the same `epic_solo.prefer` the
-// offer applies (joshuafolkken/kit#2778). The candidate stays in its own pool, because a pool carries
-// the graph it is confirmed against.
-function solo_first(pools: ReadonlyArray<RepoPool>, read: BusyRead): ReadonlyArray<RepoPool> {
-	if (read.kind !== 'idle') return pools
-
-	const index = pools.findIndex((pool) => pool.candidates.some((child) => epic_solo.is_solo(child)))
-	const pool = pools[index]
-
-	if (pool === undefined) return pools
-
-	const lifted = { ...pool, candidates: epic_solo.prefer(pool.candidates, read) }
-
-	return [lifted, ...pools.filter((other) => other !== pool)]
-}
-
 // The repository is asked how full it is **before** any candidate is confirmed, for the reason
 // joshuafolkken/kit#1121 records: a repository with no free lane is handed nothing, so the relations
 // request that would confirm a candidate there buys an answer nobody reads — and a polling `epicrun`
@@ -247,10 +239,7 @@ async function offer_for_repo(
 		}
 	}
 
-	const for_repo = solo_first(
-		dedupe_pools(pools.map((pool) => candidates_in(pool, request.repo))),
-		read,
-	)
+	const for_repo = dedupe_pools(pools.map((pool) => ranked_in(pool, request.repo)))
 
 	return solo_offer(await collect(for_repo, wanted_of(request, free)), read, request)
 }

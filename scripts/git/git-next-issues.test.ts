@@ -70,6 +70,30 @@ describe('git_next_issues.prioritize - ordering', () => {
 	})
 })
 
+// joshuafolkken/kit#2928: the ranking keys sit above recency, and `order` is the same ranking uncapped.
+describe('git_next_issues.prioritize - ranking keys', () => {
+	it('puts priority:high, then a verification-path defect, then a waited-on issue ahead of recency', () => {
+		const waiting = { ...issue(5, CREATED_LATEST), blockedBy: { nodes: [{ number: 2 }] } }
+		const issues = [
+			waiting,
+			issue(4, CREATED_LATEST),
+			issue(3, CREATED_EARLIER, ['bug', 'run:solo']),
+			issue(2, CREATED_EARLIER),
+			issue(1, CREATED_EARLIER, ['priority:high']),
+		]
+
+		expect(prioritized_numbers(issues)).toEqual([1, 3, 2, 5, 4])
+	})
+
+	it('orders every candidate without the display cap', () => {
+		const issues = Array.from({ length: OVER_LIMIT_COUNT }, (_, index) =>
+			issue(index + 1, CREATED_EARLIER),
+		)
+
+		expect(git_next_issues.order(issues)).toHaveLength(OVER_LIMIT_COUNT)
+	})
+})
+
 describe('git_next_issues.prioritize - exclusions', () => {
 	// An epic tracks a batch and is never run directly (`queue` receives child issues only), and an
 	// in-progress issue is already claimed. The mixed casing covers repos whose label predates the

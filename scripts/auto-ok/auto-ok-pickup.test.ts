@@ -369,3 +369,22 @@ describe('josh auto-ok:next — excluding more than one issue', () => {
 		)
 	})
 })
+
+// joshuafolkken/kit#2928: the dependents key counts the issues waiting on a row, and a waiting issue
+// is blocked — so it is counted before the blocked rows are dropped, or it never decides anything.
+const WAITING_NUMBER = 950
+
+describe('auto_ok_cli.pick_next — issues waiting on a candidate', () => {
+	it('picks the older issue another open issue waits on over a newer one', () => {
+		const waiting = blocked_issue(WAITING_NUMBER, CREATED_LATER, [
+			{ number: OLD_ISSUE_NUMBER, state: OPEN_SPELLING },
+		])
+		const issues = [
+			issue(NEW_ISSUE_NUMBER, CREATED_LATER),
+			issue(OLD_ISSUE_NUMBER, CREATED_EARLIER),
+			waiting,
+		]
+
+		expect(auto_ok_cli.pick_next(issues)?.number).toBe(OLD_ISSUE_NUMBER)
+	})
+})
