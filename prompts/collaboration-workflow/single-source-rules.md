@@ -10,4 +10,4 @@
 
 **他ツールでの検証は行っていない。** Codex / Cursor / Gemini CLI が導線を辿るかは未確認で、現在 Claude しか使っていないという判断による（joshuafolkken/kit#970 の `## Decisions`）。導線を辿らないツールを使い始める時点で、そのツールについて別途扱う。
 
-- このルールは横断ドキュメント（CLAUDE.md「Doc Sync Rules」）のカノニカル参照
+- このルールは横断ドキュメント（CLAUDE.md 冒頭の引用ブロック）のカノニカル参照

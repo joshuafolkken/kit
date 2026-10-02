@@ -44,7 +44,6 @@ const RESIDENT_ANCHORS: ReadonlyArray<Anchor> = [
 	{ file: CLAUDE_MD, heading: 'Package-First Development' },
 	{ file: CLAUDE_MD, heading: 'Code Change Rules' },
 	{ file: CLAUDE_MD, heading: 'Completion gate' },
-	{ file: CLAUDE_MD, heading: 'Refactoring Rules' },
 	{ file: CLAUDE_MD, heading: 'Pre-commit Self-Review' },
 	{ file: CLAUDE_MD, heading: 'Doc Sync Rules' },
 	{ file: CLAUDE_MD, heading: 'Git Rules' },
