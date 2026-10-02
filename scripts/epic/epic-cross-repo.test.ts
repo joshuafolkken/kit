@@ -3,10 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_cross_repo } from './epic-cross-repo'
 import type { EpicChild } from './epic-graph'
 
-vi.mock('execa', () => ({ execaSync: vi.fn() }))
+const gh_outcomes = vi.hoisted(() => vi.fn())
 
-const execa = await import('execa')
-const gh = vi.mocked(execa.execaSync)
+vi.mock('execa', async () => {
+	const { gh_execa_fixture } = await import('#scripts/git/git-gh-execa-fixture')
+
+	return { execaSync: gh_execa_fixture.honoring_reject(gh_outcomes) }
+})
+
+const gh = gh_outcomes
 
 const KIT = 'joshuafolkken/kit'
 const APP_KIT = 'joshuafolkken/app-kit'
@@ -39,7 +44,7 @@ const PRIVATE_MANIFEST = {
 // when the answer can still change.
 function queue(...results: ReadonlyArray<{ exitCode: number; stdout: string }>): void {
 	for (const result of results) {
-		gh.mockReturnValueOnce(result as unknown as ReturnType<typeof execa.execaSync>)
+		gh.mockReturnValueOnce(result)
 	}
 }
 
@@ -49,7 +54,7 @@ beforeEach(() => {
 	// entry would make the next case read the previous one's answer.
 	epic_cross_repo.reset_publish_cache()
 	gh.mockReset()
-	gh.mockReturnValue(MANIFEST_READ_SUCCESS as unknown as ReturnType<typeof execa.execaSync>)
+	gh.mockReturnValue(MANIFEST_READ_SUCCESS)
 })
 
 describe('epic_cross_repo.package_name_for', () => {
@@ -220,7 +225,7 @@ describe('epic_cross_repo.read_default_branch_version', () => {
 	// A failed read costs two calls — the read, then the status probe that says whether the manifest
 	// is missing or the request failed — and then nothing for the rest of the pass.
 	it('caches a read that failed rather than retrying it all pass', () => {
-		gh.mockReturnValue(MANIFEST_UNREADABLE as unknown as ReturnType<typeof execa.execaSync>)
+		gh.mockReturnValue(MANIFEST_UNREADABLE)
 
 		expect(epic_cross_repo.read_default_branch_version(KIT)).toBeUndefined()
 		expect(epic_cross_repo.read_default_branch_version(KIT)).toBeUndefined()
@@ -233,7 +238,7 @@ describe('epic_cross_repo.read_default_branch_version', () => {
 // the publish check to ever find, and nothing an operator could edit to clear it.
 describe('epic_cross_repo.publishes_nothing', () => {
 	it('reads a repository with no manifest as shipping nothing', () => {
-		gh.mockReturnValue(MANIFEST_MISSING as unknown as ReturnType<typeof execa.execaSync>)
+		gh.mockReturnValue(MANIFEST_MISSING)
 
 		expect(epic_cross_repo.publishes_nothing(KIT)).toBe(true)
 	})
@@ -291,7 +296,7 @@ describe('epic_cross_repo.publishes_nothing — what it costs', () => {
 	})
 
 	it('reads a published manifest as shipping something', () => {
-		gh.mockReturnValue(MANIFEST_READ_SUCCESS as unknown as ReturnType<typeof execa.execaSync>)
+		gh.mockReturnValue(MANIFEST_READ_SUCCESS)
 
 		expect(epic_cross_repo.publishes_nothing(KIT)).toBe(false)
 	})
@@ -299,7 +304,7 @@ describe('epic_cross_repo.publishes_nothing — what it costs', () => {
 	// The one direction this may not fail in: read as "nothing to wait for", a rate limit would start
 	// work on a prerequisite that has not finished.
 	it('does not read a failed request as shipping nothing', () => {
-		gh.mockReturnValue(MANIFEST_UNREADABLE as unknown as ReturnType<typeof execa.execaSync>)
+		gh.mockReturnValue(MANIFEST_UNREADABLE)
 
 		expect(epic_cross_repo.publishes_nothing(KIT)).toBe(false)
 	})
@@ -307,7 +312,7 @@ describe('epic_cross_repo.publishes_nothing — what it costs', () => {
 
 describe('epic_cross_repo.resolve_cross_repo — a repository that publishes nothing', () => {
 	it('resolves a closed blocker rather than waiting for a release that cannot come', () => {
-		gh.mockReturnValue(MANIFEST_MISSING as unknown as ReturnType<typeof execa.execaSync>)
+		gh.mockReturnValue(MANIFEST_MISSING)
 
 		const verdict = epic_cross_repo.resolve_cross_repo(
 			child(1, KIT, 'CLOSED'),
@@ -318,7 +323,7 @@ describe('epic_cross_repo.resolve_cross_repo — a repository that publishes not
 	})
 
 	it('keeps waiting when the manifest read failed rather than answering 404', () => {
-		gh.mockReturnValue(MANIFEST_UNREADABLE as unknown as ReturnType<typeof execa.execaSync>)
+		gh.mockReturnValue(MANIFEST_UNREADABLE)
 
 		const verdict = epic_cross_repo.resolve_cross_repo(
 			child(1, KIT, 'CLOSED'),

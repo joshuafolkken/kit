@@ -1,9 +1,7 @@
 import { git_gh_exec } from '#scripts/git/git-gh-exec'
-import { execaSync } from 'execa'
 import { safe_json_parse } from './parse-json'
 import { release_age } from './release-age'
 
-const GH_FAILURE_FALLBACK = 'gh api failed'
 // Enough history to reach past a quarantine window into the newest release that has aged out of it.
 // The endpoint's default page is a single entry, so it is widened to the API's maximum rather than
 // paged through: a page that cannot span the window resolves no aged release at all, which silently
@@ -23,32 +21,27 @@ function require_endpoint(versions_endpoint: string | undefined, package_name: s
 	)
 }
 
-// Turn a failed `gh api` result into a concise detail line: prefer gh's own stderr
-// (e.g. "gh: Not Found (HTTP 404)"), falling back to execa's short message.
-function describe_failure(result: { stderr: string; shortMessage?: string | undefined }): string {
-	const stderr = result.stderr.trim()
-
-	if (stderr !== '') return stderr
-
-	return result.shortMessage ?? GH_FAILURE_FALLBACK
-}
-
 // Fetch the latest published version from a GitHub Packages versions endpoint. The endpoint is
 // supplied per package (e.g. `/users/joshuafolkken/packages/npm/kit/versions?per_page=1`) so the
 // same fetcher serves kit, jgame, and app-kit. Guards an undefined/empty endpoint and wraps
-// `gh api` failures with an actionable message instead of a raw ExecaSyncError stack.
+// `gh api` failures with an actionable message instead of a raw ExecaSyncError stack. The detail is
+// the shared layer's failure text: gh's own stderr (e.g. "gh: Not Found (HTTP 404)") when it wrote
+// one, execa's message otherwise, followed by any JSON error body gh wrote to stdout.
 function fetch_latest_version(versions_endpoint: string | undefined, package_name: string): string {
 	const endpoint = require_endpoint(versions_endpoint, package_name)
-	const result = execaSync('gh', ['api', endpoint, '--jq', '.[0].name'], {
-		...git_gh_exec.direct_environment(),
-		reject: false,
-	})
 
-	if (result.exitCode === 0) return result.stdout.trim()
+	try {
+		return git_gh_exec.exec_gh_api_sync({ path: endpoint, jq_filter: '.[0].name' }).trim()
+	} catch (error) {
+		const detail = error instanceof Error ? error.message : String(error)
 
-	throw new Error(
-		`Failed to fetch latest version for ${package_name} via ${endpoint}: ${describe_failure(result)}`,
-	)
+		throw new Error(
+			`Failed to fetch latest version for ${package_name} via ${endpoint}: ${detail}`,
+			{
+				cause: error,
+			},
+		)
+	}
 }
 
 // Rewrite the endpoint's page size. The endpoint is consumer-overridable, so `per_page` is set
@@ -73,12 +66,9 @@ function fetch_release_times(
 ): Record<string, string> | undefined {
 	if (versions_endpoint === undefined || versions_endpoint.trim() === '') return undefined
 	const endpoint = with_page_size(versions_endpoint, TIMES_PAGE_SIZE)
-	const result = execaSync('gh', ['api', endpoint, '--jq', TIMES_JQ], {
-		...git_gh_exec.direct_environment(),
-		reject: false,
-	})
-	if (result.exitCode !== 0) return undefined
-	const parsed = release_age.release_times_schema.safeParse(safe_json_parse(result.stdout))
+	const stdout = git_gh_exec.read_gh_api_sync({ path: endpoint, jq_filter: TIMES_JQ })
+	if (stdout === undefined) return undefined
+	const parsed = release_age.release_times_schema.safeParse(safe_json_parse(stdout))
 
 	return parsed.success ? parsed.data : undefined
 }

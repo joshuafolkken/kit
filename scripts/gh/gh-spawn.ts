@@ -1,27 +1,29 @@
 import { git_gh_api_path } from '#scripts/git/git-gh-api-path'
 import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
-import { execaSync } from 'execa'
 
 // The synchronous twin of `git_gh_repo.repo_get_name_with_owner`: same fact, read the same way, but
-// through `execaSync` because `josh init` / `josh sync` / `josh doctor` decide before they can await.
+// synchronously because `josh init` / `josh sync` / `josh doctor` decide before they can await.
 // It asks REST for the same reason — `gh repo view` goes through GraphQL, which a cloud session is
 // refused (403), and a repository that reads as unresolved makes `init` / `sync` skip
 // `sonar-project.properties` outright (joshuafolkken/kit#1023). The path comes from the shared
 // builder rather than being spelled out again here.
 //
-// `timeout` is spread in rather than passed as `undefined`: execa's options type does not admit an
-// undefined value for it, and an explicit `undefined` would not mean "no timeout" anyway.
-function fetch_repo_name(timeout_ms: number | undefined): string | undefined {
-	const result = execaSync('gh', ['api', git_gh_api_path.repo_api_path(), '--jq', '.full_name'], {
-		...git_gh_exec.direct_environment(),
-		cwd: PROJECT_ROOT,
-		reject: false,
-		...(timeout_ms !== undefined && { timeout: timeout_ms }),
-	})
-	if (result.exitCode !== 0 || !result.stdout) return undefined
+// An unbounded lookup asks for `NO_BUDGET`, execa's own "no timeout": the shared layer otherwise
+// applies its default budget, which would change what `init` / `sync` wait for.
+const NO_BUDGET = 0
 
-	return result.stdout.trim() || undefined
+function fetch_repo_name(timeout_ms: number | undefined): string | undefined {
+	const stdout = git_gh_exec.read_gh_api_sync({
+		path: git_gh_api_path.repo_api_path(),
+		jq_filter: '.full_name',
+		cwd: PROJECT_ROOT,
+		timeout_ms: timeout_ms ?? NO_BUDGET,
+	})
+
+	const name = stdout?.trim()
+
+	return name === '' ? undefined : name
 }
 
 // The unbounded lookup, for callers whose *writes* depend on the answer. A timeout would surface as
