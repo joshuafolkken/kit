@@ -4,12 +4,15 @@ import type { BranchRecord } from './gone-branch'
 // joshuafolkken/kit#2504: `josh ms` deletes local branches, so what this pins is which ones are
 // never touched — unmerged, local-only, still tracking, or checked out in a lane.
 
-vi.mock('./git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
+vi.mock('./git-spawn', () => ({ git_spawn: { read: vi.fn(), read_remote: vi.fn() } }))
 
 const { git_spawn } = await import('./git-spawn')
 const { gone_branch } = await import('./gone-branch')
 
 const read = vi.mocked(git_spawn.read)
+// joshuafolkken/kit#2942: the fetch is the one call that reaches the remote, so it goes through the
+// bounded spawn — an unbounded one waited 37 minutes on a dead connection.
+const read_remote = vi.mocked(git_spawn.read_remote)
 const DEFAULT_BRANCH = 'main'
 const FOR_EACH_REF = 'for-each-ref'
 const MERGED = new Set(['main', '10-lane', '11-lane', '12-lane'])
@@ -65,8 +68,8 @@ describe('selecting the branches to prune', () => {
 
 // `11-lane` is the branch `git branch -d` refuses, standing in for a disagreement between the reads.
 function answer_reads(records: string, merged: string): void {
+	read_remote.mockResolvedValue('')
 	read.mockImplementation(async (arguments_) => {
-		if (arguments_[0] === 'fetch') return ''
 		if (arguments_.some((argument) => argument.startsWith('--merged='))) return merged
 		if (arguments_[0] === FOR_EACH_REF) return records
 		if (arguments_.includes('11-lane')) throw new Error('not fully merged')
@@ -78,6 +81,7 @@ function answer_reads(records: string, merged: string): void {
 describe('pruning', () => {
 	beforeEach(() => {
 		read.mockReset()
+		read_remote.mockReset()
 	})
 
 	it('fetches with --prune, then deletes each candidate with -d', async () => {
@@ -88,7 +92,8 @@ describe('pruning', () => {
 
 		const result = await gone_branch.prune(DEFAULT_BRANCH)
 
-		expect(read).toHaveBeenNthCalledWith(1, ['fetch', '--prune'])
+		expect(read_remote).toHaveBeenCalledWith(['fetch', '--prune'])
+		expect(read).not.toHaveBeenCalledWith(['fetch', '--prune'])
 		expect(read).toHaveBeenCalledWith([
 			FOR_EACH_REF,
 			`--merged=refs/heads/${DEFAULT_BRANCH}`,

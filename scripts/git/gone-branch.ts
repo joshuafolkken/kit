@@ -100,9 +100,10 @@ async function delete_each(names: ReadonlyArray<string>): Promise<PruneResult> {
 }
 
 // `fetch --prune` first, because `[gone]` is read from the remote-tracking refs and those outlive the
-// remote branch until something prunes them.
+// remote branch until something prunes them. The fetch is the one call here that reaches the remote,
+// so it is the one bounded (joshuafolkken/kit#2942).
 async function prune(default_branch: string): Promise<PruneResult> {
-	await git_spawn.read(['fetch', '--prune'])
+	await git_spawn.read_remote(['fetch', '--prune'])
 
 	return await delete_each(await read_candidates(default_branch))
 }

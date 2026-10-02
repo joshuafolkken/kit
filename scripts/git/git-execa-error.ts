@@ -22,6 +22,11 @@ function has_timed_out(error: unknown): boolean {
 	return error.timedOut === true
 }
 
+// A timeout has no exit code — the process was killed rather than allowed to exit — so `cause` says
+// so in the slot every other git failure puts a number in. Shared by every git spawn that carries a
+// budget: the push (`git-push-transport.ts`) and the fetch and pull (`git-spawn.ts`).
+const TIMEOUT_EXIT_CODE = 'timeout'
+
 // The error a spawned git command fails with. The exit code is carried on `cause` as well as in the
 // message, because callers branch on it rather than parse it: `git_command.push` reads 128 there to
 // decide whether to retry with `--set-upstream`.
@@ -32,4 +37,4 @@ function create_spawn_error(command: string, exit_code: number | undefined): Err
 	return new Error(error_message, { cause: { exit_code: exit_code_string } })
 }
 
-export { create_spawn_error, get_exit_code, has_timed_out }
+export { create_spawn_error, get_exit_code, has_timed_out, TIMEOUT_EXIT_CODE }
