@@ -354,6 +354,20 @@ describe('propagate_steps — one issue names every release the plan carries', (
 	})
 })
 
+describe('propagate_steps.plan_title — releases at different versions', () => {
+	// A toolkit's propagation pins each base at its own version (joshuafolkken/kit#2879).
+	it('names each version when the releases disagree on one', () => {
+		const releases = [
+			{ package_name: KIT, version: VERSION, bin_name: 'josh' },
+			{ package_name: APP_KIT, version: LATEST, bin_name: 'josh-app' },
+		]
+
+		expect(propagate_steps.plan_title(releases)).toBe(
+			`Upgrade ${KIT} to ${VERSION} and ${APP_KIT} to ${LATEST}`,
+		)
+	})
+})
+
 describe('propagate_run.STEP_ORDER', () => {
 	// Everything after the pre-check writes: the upgrade rewrites the lockfile, the sync overwrites
 	// managed files. Refusing a dirty consumer afterwards would be refusing it too late.

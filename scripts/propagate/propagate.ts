@@ -4,15 +4,14 @@ import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { status_icons } from '#scripts/lib/status-icons'
-import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
-import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { derive_versions_endpoint } from '#scripts/version/version-command-config'
 import { version_targets } from '#scripts/version/version-targets'
 import { propagate_git } from './propagate-git'
+import { propagate_plan } from './propagate-plan'
 import { propagate_publish } from './propagate-publish'
 import { propagate_run } from './propagate-run'
 import { propagate_select, type TargetSelection } from './propagate-select'
-import { propagate_steps } from './propagate-steps'
+import { propagate_steps, type ReleasePlan } from './propagate-steps'
 import { propagate_targets, type PropagateTarget } from './propagate-targets'
 
 // `josh propagate` — carry the release this repository just published into every consumer checked
@@ -78,7 +77,8 @@ function parse_options(argv: ReadonlyArray<string>): RunOptions {
 	return usage === undefined ? options : { ...options, usage }
 }
 
-// Propagation runs from the supplier's own repository, and only there.
+// Propagation runs from the supplier's own repository, and only there — kit's, or a toolkit's built
+// on it (joshuafolkken/kit#2879).
 //
 // This is also what decides who propagates when several sessions are running: in the
 // per-repository concurrency model there is one session per checkout, so the session standing in
@@ -86,13 +86,7 @@ function parse_options(argv: ReadonlyArray<string>): RunOptions {
 // convention enforced at the boundary, not a lock — two checkouts of the supplier would both pass,
 // which is why each consumer is additionally refused unless its working tree is clean.
 function refuse_outside_source_repository(project_root: string): string | undefined {
-	if (self_sync_guard.read_package_name(project_root) === KIT_PACKAGE_NAME) return undefined
-
-	return [
-		`Refusing to propagate: this is not ${KIT_PACKAGE_NAME}'s own repository.`,
-		'Propagation carries a published release outward, so it runs from the package that published it.',
-		`Run it from the ${KIT_PACKAGE_NAME} checkout instead.`,
-	].join('\n')
+	return propagate_plan.resolve_supplier(project_root).refusal
 }
 
 // The version to carry: this repository's own declared version, which is what the merge published.
@@ -144,10 +138,14 @@ function resolve_run_version(project_root: string, is_dry_run = false): RunVersi
 	return resolve_supplier_version(project_root, is_dry_run)
 }
 
-async function await_publish(target_version: string, is_skipped: boolean): Promise<boolean> {
+async function await_publish(
+	package_name: string,
+	target_version: string,
+	is_skipped: boolean,
+): Promise<boolean> {
 	if (is_skipped) return true
-	console.info(`Waiting for ${KIT_PACKAGE_NAME}@${target_version} to appear in the registry…`)
-	const endpoint = derive_versions_endpoint(KIT_PACKAGE_NAME)
+	console.info(`Waiting for ${package_name}@${target_version} to appear in the registry…`)
+	const endpoint = derive_versions_endpoint(package_name)
 	const result = await propagate_publish.wait_for_publish(endpoint, target_version)
 
 	if (result.state === 'published') {
@@ -179,49 +177,65 @@ function announce_run_version(resolved: RunVersion): string | undefined {
 
 interface RunPlan {
 	version: string
+	releases: ReleasePlan
 	targets: ReadonlyArray<PropagateTarget>
 }
 
 // The consumers this run will consider, narrowed by `--target`. Resolved before the publish wait so
-// a mistyped name fails at once instead of after minutes of polling the registry.
-function resolve_run_targets(version: string, target: string | undefined): TargetSelection {
+// a mistyped name fails at once instead of after minutes of polling the registry. A consumer that
+// installs a toolkit above the supplier is left to that toolkit's propagation (joshuafolkken/kit#2879).
+function resolve_run_targets(
+	releases: ReleasePlan,
+	version: string,
+	target: string | undefined,
+): TargetSelection {
 	const map = repo_discovery.discover_repositories(PROJECT_ROOT)
-	const targets = propagate_targets.resolve_targets(map, KIT_PACKAGE_NAME, version)
+	const supplier = propagate_plan.supplier_name(releases)
+	const targets = propagate_targets
+		.resolve_targets(map, supplier, version)
+		.map((candidate) => propagate_plan.mark_carried(candidate, releases))
 
 	return propagate_select.select_target(targets, target)
 }
 
-// The version and the consumers, or nothing once whatever stopped the run has been printed.
+// Print why the run stopped before any consumer was touched.
+function refuse_run(refusal: string): void {
+	console.error(refusal)
+	console.error(UNTOUCHED_NOTE)
+}
+
+interface PlanOutcome {
+	plan?: RunPlan
+	refusal?: string
+}
+
+// The releases and the consumers for a version already accepted, or the reason there are none.
+function plan_consumers(version: string, options: RunOptions): PlanOutcome {
+	const { plan: releases, refusal } = propagate_plan.build_plan(PROJECT_ROOT, version)
+	if (releases === undefined) return { refusal: refusal ?? UNTOUCHED_NOTE }
+	const selection = resolve_run_targets(releases, version, options.target)
+	if (selection.refusal !== undefined) return { refusal: selection.refusal }
+
+	return { plan: { version, releases, targets: selection.targets } }
+}
+
+// The version, the releases and the consumers, or nothing once whatever stopped the run has been
+// printed.
 function plan_run(options: RunOptions): RunPlan | undefined {
 	const version = announce_run_version(resolve_run_version(PROJECT_ROOT, options.is_dry_run))
 	if (version === undefined) return undefined
-	const selection = resolve_run_targets(version, options.target)
+	const { plan, refusal } = plan_consumers(version, options)
+	if (refusal !== undefined) refuse_run(refusal)
 
-	if (selection.refusal !== undefined) {
-		console.error(selection.refusal)
-		console.error(UNTOUCHED_NOTE)
-
-		return undefined
-	}
-
-	return { version, targets: selection.targets }
+	return plan
 }
 
 // Everything after the publish wait: run each consumer, print one report.
 function propagate_to_consumers(plan: RunPlan, is_dry_run: boolean): number {
-	const { version, targets } = plan
+	const { releases, targets } = plan
 	const step = is_dry_run
-		? propagate_steps.describe_step
-		: propagate_steps.create_step_runner({
-				releases: [
-					{
-						package_name: KIT_PACKAGE_NAME,
-						version,
-						bin_name: propagate_steps.JOSH_BIN,
-					},
-				],
-				origin: propagate_steps.PROPAGATE_ORIGIN,
-			})
+		? propagate_plan.create_step_describer(releases)
+		: propagate_steps.create_step_runner(releases)
 	const results = propagate_run.run_targets(
 		targets,
 		step,
@@ -236,8 +250,12 @@ function propagate_to_consumers(plan: RunPlan, is_dry_run: boolean): number {
 
 // A dry run never waits: the whole reason to ask for one is to see the target list, and a wait that
 // times out would end the run before the list was ever printed.
-async function resolve_publish(version: string, options: RunOptions): Promise<boolean> {
-	return await await_publish(version, options.is_dry_run || options.is_publish_wait_skipped)
+async function resolve_publish(plan: RunPlan, options: RunOptions): Promise<boolean> {
+	return await await_publish(
+		propagate_plan.supplier_name(plan.releases),
+		plan.version,
+		options.is_dry_run || options.is_publish_wait_skipped,
+	)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -251,7 +269,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	const plan = plan_run(options)
 	if (plan === undefined) return FAILURE_EXIT_CODE
-	if (!(await resolve_publish(plan.version, options))) return FAILURE_EXIT_CODE
+	if (!(await resolve_publish(plan, options))) return FAILURE_EXIT_CODE
 
 	return propagate_to_consumers(plan, options.is_dry_run)
 }

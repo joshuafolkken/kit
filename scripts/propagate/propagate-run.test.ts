@@ -155,6 +155,23 @@ describe('propagate_run.run_targets — one failure does not stop the rest', () 
 	})
 })
 
+describe('propagate_run.run_targets — a consumer a toolkit above delivers', () => {
+	// The topmost toolkit a consumer installs is the one that delivers to it (joshuafolkken/kit#2879).
+	it('skips it without running a step, naming that toolkit', () => {
+		const target: PropagateTarget = {
+			repo: APP_KIT,
+			path: '/x',
+			state: 'carried_above',
+			carriers: ['@joshuafolkken/game-kit'],
+		}
+		const [result] = propagate_run.run_targets([target], all_pass)
+
+		expect(result?.outcome).toBe('skipped')
+		expect(result?.steps).toEqual([])
+		expect(result?.reason).toContain('above this one: @joshuafolkken/game-kit')
+	})
+})
+
 describe('propagate_run.run_targets — candidates that are not processed', () => {
 	it('skips a consumer that already carries the release, and says so', () => {
 		const target: PropagateTarget = { repo: APP_KIT, path: '/x', state: 'up_to_date' }

@@ -20,9 +20,17 @@ const MANIFEST_NAME = 'package.json'
 const NODE_MODULES = 'node_modules'
 
 // Why a candidate is not going to be processed, or that it is. `not_selected` is the one state set
-// after classification: a candidate `--target` left out (joshuafolkken/kit#2755).
+// after classification: a candidate `--target` left out (joshuafolkken/kit#2755). `carried_above` is
+// the other: a consumer that installs a toolkit above the supplier, which that toolkit's own
+// propagation delivers instead (joshuafolkken/kit#2879).
 type TargetState =
-	'ready' | 'up_to_date' | 'not_downstream' | 'missing_checkout' | 'unreadable' | 'not_selected'
+	| 'ready'
+	| 'up_to_date'
+	| 'not_downstream'
+	| 'missing_checkout'
+	| 'unreadable'
+	| 'not_selected'
+	| 'carried_above'
 
 interface PropagateTarget {
 	repo: string
@@ -31,6 +39,9 @@ interface PropagateTarget {
 	// The range the consumer currently declares, when it declares one at all. Reported so a skip can
 	// say what it skipped rather than only that it did.
 	declared_range?: string
+	// The toolkits above the supplier this consumer installs, when it is `carried_above` — named in
+	// the skip so the report says which propagation will deliver it.
+	carriers?: ReadonlyArray<string>
 }
 
 // Only the fields propagation reads. `passthrough` is deliberate — a consumer manifest carries far
