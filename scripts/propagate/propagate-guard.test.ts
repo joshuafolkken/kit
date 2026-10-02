@@ -12,15 +12,29 @@ const REFUSAL = 'Refusing to propagate'
 const MISSPELLED_FLAG = '--dryrun'
 const VERSION = '1.111.0'
 const MISSING_NAME = 'needs a repository'
+const KIT_BIN = { josh: 'dist/josh.js' }
 
 const state = { workspace: '' }
 
-function make_repository(name: string, version?: string): string {
+function write_repository(manifest: Record<string, unknown>): string {
 	const repository_path = mkdtempSync(path.join(state.workspace, 'repo-'))
 
-	writeFileSync(path.join(repository_path, MANIFEST), JSON.stringify({ name, version }))
+	writeFileSync(path.join(repository_path, MANIFEST), JSON.stringify(manifest))
 
 	return repository_path
+}
+
+// A supplier has to ship a CLI, so every fixture does unless it is built as a library.
+function make_repository(
+	name: string,
+	version?: string,
+	bin: Record<string, string> = KIT_BIN,
+): string {
+	return write_repository({ name, version, bin })
+}
+
+function make_library(name: string): string {
+	return write_repository({ name, version: VERSION })
 }
 
 beforeEach(() => {
@@ -39,9 +53,20 @@ describe('propagate.refuse_outside_source_repository', () => {
 	})
 
 	it('refuses the run from a consumer repository', () => {
-		const refusal = propagate.refuse_outside_source_repository(make_repository(APP_KIT))
+		const refusal = propagate.refuse_outside_source_repository(make_repository('consumer'))
 
 		expect(refusal).toContain(REFUSAL)
+	})
+
+	// A toolkit built on kit propagates its own releases (joshuafolkken/kit#2879).
+	it('allows the run inside a toolkit own repository', () => {
+		const repository_path = make_repository(APP_KIT, VERSION, { 'josh-app': 'dist/josh-app.js' })
+
+		expect(propagate.refuse_outside_source_repository(repository_path)).toBeUndefined()
+	})
+
+	it('refuses the run from a scoped package that ships no CLI', () => {
+		expect(propagate.refuse_outside_source_repository(make_library(APP_KIT))).toContain(REFUSAL)
 	})
 
 	it('refuses the run from a directory with no manifest at all', () => {

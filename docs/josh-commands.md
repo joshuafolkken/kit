@@ -501,7 +501,9 @@ pnpm josh ui:routes --staged   # the staged diff instead
 
 ### `josh propagate`
 
-Carry the release this repository just published into every consumer repository checked out next to it. Runs only from the supplier's own clean, up-to-date default branch; waits for the exact published version to appear in the registry before touching any consumer.
+Carry the release this repository just published into every consumer repository checked out next to it. Runs only from the clean, up-to-date default branch of kit or a CLI-shipping toolkit (app-kit, game-kit); waits for the exact published version to appear in the registry before touching any consumer.
+
+Staged delivery: kit → app-kit → joshuafolkken-com / game-kit → waneccha. A toolkit also carries its base packages, pinned to its installed versions. Each consumer is delivered by the topmost toolkit it installs; lower runs report it `skipped`, naming that toolkit.
 
 ```bash
 pnpm josh propagate
@@ -516,7 +518,7 @@ pnpm josh propagate --target app-kit    # carry the release into one consumer on
 - `--skip-publish-wait` — skip the registry poll for an already-published release.
 - `--target <repo>` — process only that consumer (`app-kit` or `joshuafolkken/app-kit`); the rest are reported `skipped` and left untouched. An unknown, ambiguous or non-dependent name fails before the publish wait, writing nothing.
 
-Per consumer, in order: working-tree check, `pnpm add -D @joshuafolkken/kit@<version>`, `pnpm josh sync`, verification gate, open upgrade issue, `pnpm josh git`, return to default branch. One consumer's failure never stops another; each is reported as `propagated`, `failed` (with the step, reason, and what it left behind), or `skipped`.
+Per consumer, in order: working-tree check, `pnpm add -D <package>@<version>` per carried package, `pnpm <bin> sync` per carried package (base first), verification gate, open upgrade issue, `pnpm josh git`, return to default branch. One consumer's failure never stops another; each is reported as `propagated`, `failed` (with the step, reason, and what it left behind), or `skipped`.
 
 The opposite direction — one consumer catching itself up from its own checkout — is [`josh adopt`](#josh-adopt).
 

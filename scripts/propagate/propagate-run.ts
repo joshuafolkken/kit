@@ -65,13 +65,17 @@ const SKIP_REASONS: Readonly<Record<string, string>> = {
 	missing_checkout: 'no local checkout at the mapped path — reported, not cloned',
 	unreadable: 'package.json could not be read',
 	not_selected: 'not the repository --target named',
+	carried_above: 'delivered by the propagation of a toolkit above this one',
 }
 
 // The reason text for a candidate that is not going to be processed. A missing local checkout is
 // reported rather than cloned: propagation writes to a working tree, and creating one nobody asked
 // for is not a step this command may take on its own.
 function skip_reason(target: PropagateTarget): string {
-	return SKIP_REASONS[target.state] ?? 'not eligible'
+	const reason = SKIP_REASONS[target.state] ?? 'not eligible'
+	if (target.carriers === undefined) return reason
+
+	return `${reason}: ${target.carriers.join(', ')}`
 }
 
 const LEFTOVER_NOTE = 'upgrade/sync changes left uncommitted'
