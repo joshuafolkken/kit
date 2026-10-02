@@ -21,7 +21,8 @@ import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
 // **Every path here was measured against the live API before it was written**, on a throwaway pull
 // request opened between two throwaway branches so that neither `main` nor any real pull request was
 // touched. Two of the four did not behave as reading the documentation would suggest: see
-// `pr_create` for the duplicate-head response and `pr_checkout` for what `gh` actually does.
+// `pr_create` for the duplicate-head response. The other, `pr_checkout`, is gone with its one caller,
+// `sync-dependabot-pins` (joshuafolkken/kit#2887).
 //
 // `pr_checks` — a `gh pr checks <branch>` wrapper — is gone rather than converted. Nothing called it:
 // the merge gate reads the rollup out of the snapshot and `git-pr-checks-watch.ts` runs the watching
@@ -139,27 +140,6 @@ async function pr_create(
 	return url
 }
 
-// **`gh pr checkout` does use GraphQL** — one `POST /graphql` to resolve the pull request, measured
-// with `GH_DEBUG=api` on the throwaway pull request (joshuafolkken/kit#1029). Everything after that
-// is git, so only the resolution had to move: `pr_head_reference` is the REST read that already
-// replaced it for this file's one caller, `sync-dependabot-pins.ts`.
-//
-// `fetch_branch` updates `refs/remotes/origin/<branch>`, which is what lets the plain `checkout`
-// resolve a branch that exists only on the remote — the tracking branch `gh` left behind, by the
-// operations `git-command.ts` already owns rather than a new wrapper. The fast-forward is the third
-// thing the CLI did and the one a fetch-and-checkout pair silently drops: a branch that is already
-// local is checked out at whatever commit the last run left it on.
-//
-// A fork's head is refused by `pr_head_reference` rather than fetched from `origin` under a name
-// that repository may use for something else.
-async function pr_checkout(pr_number: number): Promise<void> {
-	const branch_name = await git_gh_pr_read.pr_head_reference(pr_number)
-
-	await git_command.fetch_branch(branch_name)
-	await git_command.checkout(branch_name)
-	await git_command.merge_fast_forward(branch_name)
-}
-
 // A pull request's conversation comment is an **issue** comment: `POST issues/{N}/comments` is the
 // endpoint, and it answers the same `html_url` for a pull request as for an issue (measured on the
 // throwaway pull request). `git-gh-issue-write.ts` already posts to it, so this resolves the number
@@ -270,7 +250,6 @@ const git_gh_pr = {
 	pr_create,
 	pr_get_classification,
 	pr_ensure_classification,
-	pr_checkout,
 	pr_comment,
 	pr_merge,
 	pr_update_body,

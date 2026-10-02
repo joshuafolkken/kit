@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { git_branch } from '#scripts/git/git-branch'
-import { issue_logic } from '#scripts/issue/issue-logic'
+import { git_issue } from '#scripts/git/git-issue'
 import { describe, expect, it } from 'vitest'
 import { lane_paths } from './lane-paths'
 
@@ -62,9 +62,7 @@ describe('what a lane is called', () => {
 	// the next reader knows the collision is real and is answered by `lane_registry.parse_block`
 	// requiring the work tree to sit at `<lane root>/<N>`, not by the branch name being unique.
 	it('is a name pnpm josh git could also generate, which is why the directory is checked too', () => {
-		expect(issue_logic.suggest_branch_name(Number(ISSUE), 'Lane')).toBe(
-			lane_paths.lane_branch(ISSUE),
-		)
+		expect(git_issue.parse(`Lane #${ISSUE}`).branch_name).toBe(lane_paths.lane_branch(ISSUE))
 	})
 })
 

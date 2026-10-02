@@ -5,10 +5,9 @@ import { z } from 'zod'
 // (joshuafolkken/kit#1151).
 //
 // What these commands echo is injected into **every** user turn and then re-read as accumulated
-// context on every turn after it, which is why joshuafolkken/kit#967 put a ceiling on their size and
-// why `josh cost` names them in the resident breakdown. Two readers, one parser: the suite that
-// enforces the ceiling and the report that prices it must agree on what is being measured, or the
-// ceiling guards a quantity the report does not show.
+// context on every turn after it, which is why joshuafolkken/kit#967 put a ceiling on their size.
+// Two readers, one parser: the suite that enforces the ceiling and the Codex project-config suite
+// must agree on which commands are declared, or each guards a different list.
 
 const HOOK_SCHEMA = z.object({ command: z.string().nullish() })
 const MATCHER_SCHEMA = z.object({ hooks: z.array(HOOK_SCHEMA).nullish() })
