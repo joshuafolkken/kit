@@ -118,6 +118,13 @@ describe('adopt_logic.refuse_incomplete_plan', () => {
 		expect(refusal).toContain(APP_KIT)
 	})
 
+	// The overlay explanation moved out of `docs/sync.md` (joshuafolkken/kit#2896); the pointer follows it.
+	it('points at the document that explains the overlay tier', () => {
+		const refusal = adopt_logic.refuse_incomplete_plan([APP_KIT], [])
+
+		expect(refusal).toContain('docs/maintainers/sync-rationale.md')
+	})
+
 	// The path that used to say nothing at all: a declared toolkit with no runnable CLI here.
 	it('refuses and names a toolkit whose CLI could not be resolved', () => {
 		const refusal = adopt_logic.refuse_incomplete_plan([], [APP_KIT])
