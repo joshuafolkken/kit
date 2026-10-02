@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { file_reader } from '#scripts/lib/read-file'
 import { execa } from 'execa'
 import { z } from 'zod'
 import { migrate_logic, type MigrationPlan } from './migrate-logic'
@@ -70,7 +71,7 @@ interface MigrationContext {
 }
 
 function read_file(file_path: string): string {
-	return existsSync(file_path) ? readFileSync(file_path, 'utf8') : ''
+	return file_reader.read_file_or_empty(file_path)
 }
 
 function has_registry_override(environment: NodeJS.ProcessEnv): boolean {

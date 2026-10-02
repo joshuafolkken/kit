@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url'
+import { error_text } from '#scripts/lib/error-message'
 import { git_stash } from './git-stash'
 import { stash_pop_args, type Request } from './stash-pop-args'
 
@@ -66,7 +67,7 @@ async function answer(request: Request): Promise<number> {
 }
 
 function report_unknown(error: unknown): number {
-	console.error(error instanceof Error ? error.message : String(error))
+	console.error(error_text.message_of(error))
 
 	return FAILURE_EXIT_CODE
 }

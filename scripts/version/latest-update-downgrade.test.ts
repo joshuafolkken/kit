@@ -221,7 +221,7 @@ describe('latest_update.take_snapshot', () => {
 	// A project without a lockfile still has to snapshot cleanly; there is simply nothing to restore.
 	it('tolerates a missing lockfile', () => {
 		read_mock.mockImplementation((path: string) => {
-			if (path === LOCKFILE_PATH) throw new Error('ENOENT')
+			if (path === LOCKFILE_PATH) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
 
 			return tree.package_json
 		})

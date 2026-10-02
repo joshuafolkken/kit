@@ -5,6 +5,7 @@ import { backlog_arrival, type ArrivalProbe } from '#scripts/backlog/backlog-arr
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { error_text } from '#scripts/lib/error-message'
 import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_progress, type ProgressState } from './run-progress'
 import { run_progress_args, type ParsedValues } from './run-progress-args'
@@ -229,7 +230,7 @@ function decline(loop: WatchLoop, now_ms: number, notice: string): WatchLoop {
 // under load — the very load this command exists to report — would otherwise take the reporting down
 // silently for the rest of an unattended run, with the parent not waiting on it and nothing saying why.
 function to_notice(error: unknown): string {
-	return `${FAILED_TICK_PREFIX} ${error instanceof Error ? error.message : String(error)}`
+	return `${FAILED_TICK_PREFIX} ${error_text.message_of(error)}`
 }
 
 async function attempt(

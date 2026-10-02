@@ -1,6 +1,7 @@
 import { cpSync, lstatSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { transform_copied_content } from '#scripts/init/init-copy-content'
+import { error_text } from '#scripts/lib/error-message'
 import { file_content } from './file-content'
 
 // `josh init` and `josh sync` both copy a distributed directory with `cpSync`, and both have to
@@ -143,7 +144,7 @@ function copy_directory(source_path: string, destination_path: string): boolean 
 // throw here would end `josh init` or `josh sync` in the middle of their work. The message is
 // returned for the caller to report, the same way a blocker is.
 function failure_message(prefix: string, error: unknown): string {
-	return `${prefix} (${error instanceof Error ? error.message : String(error)})`
+	return `${prefix} (${error_text.message_of(error)})`
 }
 
 // The two failures are reported apart because they leave the destination in opposite states, and

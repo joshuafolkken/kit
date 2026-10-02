@@ -1,7 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME, PORT_SEED_KEY, ports } from '#ports'
 import { lane_environment } from '#scripts/lane/lane-environment'
+import { file_reader } from '#scripts/lib/read-file'
 
 // Each discovered repository's port seed and the dev / preview ports it resolves to, plus which
 // repositories share a seed (joshuafolkken/kit#1494).
@@ -40,7 +40,7 @@ interface SharedSeed {
 // the one key that is actually wrong.
 function read_repository_ports(name: string, repository_path: string): RepoPorts {
 	const file = path.join(repository_path, ENV_FILE_NAME)
-	const content = existsSync(file) ? readFileSync(file, 'utf8') : ''
+	const content = file_reader.read_file_or_empty(file)
 
 	try {
 		const seed = lane_environment.read_root_seed(content)

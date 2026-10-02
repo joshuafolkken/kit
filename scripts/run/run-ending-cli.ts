@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { error_text } from '#scripts/lib/error-message'
 import {
 	run_ending,
 	UNREADABLE_VERDICT,
@@ -96,7 +97,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	try {
 		return report(await run_ending.check(request))
 	} catch (error) {
-		return report_unreadable(error instanceof Error ? error.message : String(error))
+		return report_unreadable(error_text.message_of(error))
 	}
 }
 

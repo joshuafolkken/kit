@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { error_text } from '#scripts/lib/error-message'
 import { project_profile, type ProjectProfile } from './project-profile'
 import {
 	start_plan,
@@ -96,7 +97,7 @@ async function run(args: ReadonlyArray<string>, is_tty: boolean): Promise<number
 
 		return 0
 	} catch (error) {
-		console.error(error instanceof Error ? error.message : String(error))
+		console.error(error_text.message_of(error))
 
 		return 1
 	}

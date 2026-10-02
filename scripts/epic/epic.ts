@@ -14,6 +14,7 @@ import { git_epic_reconcile } from '#scripts/git/git-epic-reconcile'
 import { git_epic_remove } from '#scripts/git/git-epic-remove'
 import { git_epic_run } from '#scripts/git/git-epic-run'
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import { error_text } from '#scripts/lib/error-message'
 import { epic_cli, type AddArguments, type CrossRepoAddTarget } from './epic-cli'
 
 const ARGV_OFFSET = 2
@@ -187,6 +188,6 @@ async function main(): Promise<void> {
 try {
 	await main()
 } catch (error) {
-	console.error(`✖ ${error instanceof Error ? error.message : String(error)}`)
+	console.error(`✖ ${error_text.message_of(error)}`)
 	process.exit(FAILURE_EXIT_CODE)
 }

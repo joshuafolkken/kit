@@ -2,6 +2,7 @@ import { git_command } from '#scripts/git/git-command'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { git_pr_checks } from '#scripts/git/git-pr-checks'
 import { main_sync } from '#scripts/git/main-sync'
+import { error_text } from '#scripts/lib/error-message'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LEGACY_OBSERVATION_LEDGER_PATHS } from './observation-ledger'
 import { observation_ledger_migrate } from './observation-ledger-migrate'
@@ -127,7 +128,7 @@ async function flush_message(): Promise<string> {
 	try {
 		return await observations_flush.flush(new Date(MORNING_INSTANT))
 	} catch (error) {
-		return error instanceof Error ? error.message : String(error)
+		return error_text.message_of(error)
 	}
 }
 

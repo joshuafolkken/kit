@@ -1,4 +1,5 @@
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { error_text } from '#scripts/lib/error-message'
 import { execa, execaSync } from 'execa'
 import { has_timed_out } from './git-execa-error'
 import { check_gh_installed } from './git-gh-check'
@@ -113,10 +114,6 @@ function to_timeout_prefix(error: unknown): string {
 	return has_timed_out(error) ? `${GH_REQUEST_TIMEOUT_MESSAGE}: ` : ''
 }
 
-function to_error_message(error: unknown): string {
-	return error instanceof Error ? error.message : String(error)
-}
-
 // Surface the gh CLI's stderr as the thrown message when present (matching the previous spawn
 // behavior), otherwise fall back to execa's own message — **and append what gh wrote to stdout**.
 //
@@ -134,7 +131,7 @@ function to_error_message(error: unknown): string {
 function to_gh_error(error: unknown): Error {
 	const stderr = has_stderr_field(error) ? error.stderr.trim() : ''
 	const stdout = has_stdout_field(error) ? error.stdout.trim() : ''
-	const summary = stderr.length > 0 ? stderr : to_error_message(error)
+	const summary = stderr.length > 0 ? stderr : error_text.message_of(error)
 	const detail = stdout.length > 0 ? `${summary}\n${stdout}` : summary
 
 	return gh_failure.attach(

@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { is_workflow_destination } from '#scripts/claude/workflow-destination'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
+import { file_reader } from '#scripts/lib/read-file'
 import { managed_marker_logic } from '#scripts/managed-marker/managed-marker-logic'
 import {
 	classify_path,
@@ -238,11 +239,7 @@ function did_skip_ai_directory_copy(directory_name: string): boolean {
 // moved onto the basic path — only that kit-written line, never the consumer's additions.
 // An unreadable file is left as it is and reported as skipped, as it was before the migration.
 function read_if_readable(destination_path: string): string | undefined {
-	try {
-		return readFileSync(destination_path, 'utf8')
-	} catch {
-		return undefined
-	}
+	return file_reader.read_if_readable(destination_path)
 }
 
 function report_existing_claude_md(destination_path: string): void {

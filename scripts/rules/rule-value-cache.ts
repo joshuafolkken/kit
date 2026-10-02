@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
-import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { file_reader } from '#scripts/lib/read-file'
 
 // The `rule:value` reading at the `backlogrun` loop head, without the loop waiting on it
 // (joshuafolkken/kit#2881). Measuring re-reads every transcript and takes minutes, and `backlog:offer`
@@ -32,11 +33,7 @@ function cache_path(cwd: string, file: string): string {
 }
 
 function read_cached(cwd: string): string | undefined {
-	try {
-		return readFileSync(cache_path(cwd, CACHE_FILE), 'utf8')
-	} catch {
-		return undefined
-	}
+	return file_reader.read_if_readable(cache_path(cwd, CACHE_FILE))
 }
 
 function is_refresh_due(cwd: string, now_ms: number): boolean {

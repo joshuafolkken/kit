@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { error_text } from '#scripts/lib/error-message'
 import { build_library, library_paths } from './build-library'
 
 const CONFIG_MERGE_LIBRARY = 'config-merge'
@@ -16,7 +17,7 @@ async function main(): Promise<void> {
 		console.info(`  ✔ ${CONFIG_MERGE_OUTFILE} built`)
 		console.info(`  ✔ ${CONFIG_MERGE_DTS_FILE} built`)
 	} catch (error) {
-		console.error(error instanceof Error ? error.message : String(error))
+		console.error(error_text.message_of(error))
 		process.exit(1)
 	}
 }

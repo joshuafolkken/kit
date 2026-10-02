@@ -7,6 +7,7 @@ import { git_gh_command } from '#scripts/git/git-gh-command'
 import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
 import { github_issue_url } from '#scripts/git/github-issue-url'
+import { error_text } from '#scripts/lib/error-message'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_scout_cli } from './issue-scout-cli'
@@ -105,7 +106,7 @@ async function create(filing: Filing): Promise<string | undefined> {
 	try {
 		return await git_gh_exec.exec_gh_api(request)
 	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error)
+		const reason = error_text.message_of(error)
 
 		console.error(`✖ the create call failed: ${reason}`)
 

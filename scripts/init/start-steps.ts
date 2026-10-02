@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { error_text } from '#scripts/lib/error-message'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
 import { main as init_main } from './init'
@@ -119,7 +120,7 @@ async function run_step(
 	try {
 		await STEP_ACTIONS[step](context)
 	} catch (error) {
-		const cause = error instanceof Error ? error.message : String(error)
+		const cause = error_text.message_of(error)
 
 		throw new Error(start_plan.progress_report(step, completed, cause), { cause: error })
 	}

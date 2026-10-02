@@ -1,3 +1,4 @@
+import { error_text } from '#scripts/lib/error-message'
 import { git_epic_close_comment } from './git-epic-close-comment'
 import { git_epic_parse, type ExternalChild } from './git-epic-parse'
 import { git_gh_command } from './git-gh-command'
@@ -256,7 +257,7 @@ async function close_epic_isolated(epic: EpicIssue, merged_number: number): Prom
 	try {
 		return await close_epic_when_complete(epic, merged_number)
 	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error)
+		const message = error_text.message_of(error)
 
 		console.info(`⚠️  Skipped epic #${String(epic.number)}: ${message}`)
 
@@ -351,7 +352,7 @@ async function resolve_and_close_safely(merged_number: number): Promise<void> {
 	try {
 		await resolve_and_close(merged_number)
 	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error)
+		const message = error_text.message_of(error)
 
 		console.info(`⚠️  Skipped the epic auto-close check: ${message}`)
 	}

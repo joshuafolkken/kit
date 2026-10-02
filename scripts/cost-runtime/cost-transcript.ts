@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { lane_paths } from '#scripts/lane/lane-paths'
+import { file_reader } from '#scripts/lib/read-file'
 import { cost_usage, type UsageRecord } from './cost-usage'
 
 // Finding and reading Claude Code's session transcripts (joshuafolkken/kit#962).
@@ -404,16 +405,8 @@ function tally(content: string): Omit<SessionUsage, 'session_id'> {
 	}
 }
 
-function read_text(file_path: string): string | undefined {
-	try {
-		return readFileSync(file_path, 'utf8')
-	} catch {
-		return undefined
-	}
-}
-
 function read_session(file: SessionFile): SessionUsage {
-	const content = read_text(file.path)
+	const content = file_reader.read_if_readable(file.path)
 
 	if (content === undefined) return { session_id: file.session_id, ...empty_session() }
 
@@ -426,7 +419,7 @@ function read_session(file: SessionFile): SessionUsage {
 // "could not be read" is already reported through `is_readable`, and throwing here would turn one
 // missing session into a failed command.
 function read_raw(file: SessionFile): string {
-	return read_text(file.path) ?? ''
+	return file_reader.read_if_readable(file.path) ?? ''
 }
 
 // The same read, with the failure left visible (joshuafolkken/kit#1439). **An unreadable transcript
@@ -435,7 +428,7 @@ function read_raw(file: SessionFile): string {
 // measured* rather than as measured at zero. `is_readable` on `SessionUsage` is the same distinction
 // on the cost side; this is it for a caller that wants the text.
 function read_optional(file: SessionFile): string | undefined {
-	return read_text(file.path)
+	return file_reader.read_if_readable(file.path)
 }
 
 // One directory the search looked in, and whether it was there to look in. `exists` tells a directory

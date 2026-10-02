@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { file_reader } from '#scripts/lib/read-file'
 
 // The scope expansion `prompts/refactoring.md` §4.3 used to describe in prose (joshuafolkken/kit#2180):
 // from the seed files, follow imports both ways — the files a seed imports and the files that import a
@@ -67,11 +67,7 @@ function resolve_spec(
 }
 
 function read_source(file: string): string {
-	try {
-		return readFileSync(file, 'utf8')
-	} catch {
-		return ''
-	}
+	return file_reader.read_if_readable(file) ?? ''
 }
 
 function file_imports(file: string, root: string, known: ReadonlySet<string>): ReadonlySet<string> {

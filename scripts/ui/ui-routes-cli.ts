@@ -1,9 +1,10 @@
 #!/usr/bin/env tsx
-import { readdirSync, readFileSync } from 'node:fs'
+import { readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
+import { file_reader } from '#scripts/lib/read-file'
 import { ui_routes } from './ui-routes'
 
 // `josh ui:routes [--staged]` — list the screenshot-target routes the current change touches
@@ -59,11 +60,7 @@ function route_files(root: string): Array<RouteFile> {
 }
 
 function read_text(file: string): string {
-	try {
-		return readFileSync(file, 'utf8')
-	} catch {
-		return ''
-	}
+	return file_reader.read_if_readable(file) ?? ''
 }
 
 // A route file imports the component when its source names the component's file — the import

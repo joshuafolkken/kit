@@ -5,6 +5,7 @@ import { transform_copied_content } from '#scripts/init/init-copy-content'
 import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
 import type { ProjectShape } from '#scripts/init/project-profile'
+import { file_reader } from '#scripts/lib/read-file'
 import { copy_directory_failure, directory_copy_blocker } from './directory-copy-guard'
 import { file_content } from './file-content'
 import { REMOVED_SKILL_MANIFEST } from './removed-skill-manifest'
@@ -70,8 +71,7 @@ function sync_workspace_yaml(
 	is_force = false,
 ): boolean {
 	const template = readFileSync(template_path, 'utf8')
-	const existing =
-		!is_force && existsSync(destination_path) ? readFileSync(destination_path, 'utf8') : ''
+	const existing = is_force ? '' : file_reader.read_file_or_empty(destination_path)
 	const merged = init_logic.merge_workspace_yaml(existing, template)
 
 	return file_content.write_text_if_changed(destination_path, merged)
@@ -155,7 +155,7 @@ function ensured_claude_md(existing: string | undefined, shape?: ProjectShape): 
 // without ever disturbing those additions — so this ignores --force, which would otherwise mean
 // discarding a consumer's content.
 function sync_claude_md(destination_path: string, shape?: ProjectShape): void {
-	const existing = existsSync(destination_path) ? readFileSync(destination_path, 'utf8') : undefined
+	const existing = file_reader.read_optional(destination_path)
 	const ensured = ensured_claude_md(existing, shape)
 
 	if (ensured === existing) {
