@@ -20,6 +20,11 @@ const OUT_DIR = path.join(PACKAGE_DIR, 'dist', 'hooks')
 // splitting keeps every entry in its own file with its own `import.meta.url`, so an imported guard's
 // `import.meta.url` never equals `argv[1]` and only the file actually launched runs its main.
 //
+// **The flip side: an entry another entry imports loses its main** (joshuafolkken/kit#2922). Splitting
+// moves a module two entries share into a chunk, so a launched hook whose own module is imported
+// elsewhere becomes a re-export stub that runs nothing. Each launched hook is therefore a `*-cli.ts`
+// file holding only the self-invoke, which no other module imports.
+//
 // `packages: 'external'` keeps bare dependencies as runtime imports the consumer resolves from kit's
 // node_modules, exactly as the library bundles do, while kit's internal `#scripts/*` graph is inlined.
 // No shebang banner is added: unlike `dist/josh.js` (the `bin.josh` entry, executed directly), a hook
@@ -35,9 +40,9 @@ interface HookBundle {
 // `delivered-rules` (the fourth guard) has no self-invoke, so it stays inlined.
 const HOOK_BUNDLES: ReadonlyArray<HookBundle> = [
 	{ source: 'scripts/hooks/codex-hook-adapter.ts', out: 'codex-hook-adapter' },
-	{ source: 'scripts/hooks/pretool-guard.ts', out: 'pretool-guard' },
+	{ source: 'scripts/hooks/pretool-guard-cli.ts', out: 'pretool-guard' },
 	{ source: 'scripts/hooks/stop-guard.ts', out: 'stop-guard' },
-	{ source: 'scripts/hooks/format-edited-file.ts', out: 'format-edited' },
+	{ source: 'scripts/hooks/format-edited-cli.ts', out: 'format-edited' },
 	{ source: 'scripts/josh/session-language-cli.ts', out: 'session-lang' },
 	{ source: 'scripts/hooks/batch-guard.ts', out: 'batch-guard' },
 	{ source: 'scripts/delegation/investigation-guard.ts', out: 'investigation-guard' },

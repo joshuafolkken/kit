@@ -1,7 +1,6 @@
 #!/usr/bin/env tsx
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { resolve_local_bin, resolve_package_bin } from '#scripts/build/local-bin'
 import { ESLINT_EDIT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
@@ -482,14 +481,6 @@ async function run_hook(payload: string): Promise<void> {
 	if (context !== undefined) process.stdout.write(`${build_envelope(context)}\n`)
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	if (process.stdin.isTTY) {
-		report_no_payload()
-	} else {
-		await run_hook(await text(process.stdin))
-	}
-}
-
 export {
 	build_envelope,
 	compose_context,
@@ -501,7 +492,9 @@ export {
 	plan_commands,
 	plan_daemon_restart,
 	relative_to_root,
+	report_no_payload,
 	resolve_invocations,
+	run_hook,
 	select_invocation,
 	ESLINT_DAEMON,
 	MAX_DIAGNOSTIC_CHARS,

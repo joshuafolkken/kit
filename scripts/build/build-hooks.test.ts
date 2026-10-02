@@ -4,12 +4,15 @@ import path from 'node:path'
 import { execa } from 'execa'
 import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest'
 import { build_hooks, HOOK_BUNDLES, outfile_for } from './build-hooks'
+import { lane_cut_fixture } from './lane-cut-fixture'
 
 const BUILD_TIMEOUT_MS = 60_000
 const TSX_BIN = path.join('node_modules', '.bin', 'tsx')
 const UNFORMATTED_JSON = '{"value":1}'
 const CODEX_ADAPTER_SOURCE = 'scripts/hooks/codex-hook-adapter.ts'
 const CODEX_ADAPTER_BUNDLE = 'dist/hooks/codex-hook-adapter.js'
+const PRETOOL_BUNDLE = 'dist/hooks/pretool-guard.js'
+const FORMAT_BUNDLE = 'dist/hooks/format-edited.js'
 
 interface RunResult {
 	stdout: string
@@ -101,13 +104,48 @@ describe('build_hooks', () => {
 	it('reaches the same guard decision as the source', async () => {
 		const input = payload('Bash', { command: 'git commit -m x' })
 
-		await expect_parity('scripts/hooks/pretool-guard.ts', 'dist/hooks/pretool-guard.js', input)
+		await expect_parity('scripts/hooks/pretool-guard-cli.ts', PRETOOL_BUNDLE, input)
 	})
 
 	it('runs the format-edited hook identically to the source', async () => {
 		const input = payload('Edit', { file_path: path.join(directory, 'absent.ts') })
 
-		await expect_parity('scripts/hooks/format-edited-file.ts', 'dist/hooks/format-edited.js', input)
+		await expect_parity('scripts/hooks/format-edited-cli.ts', FORMAT_BUNDLE, input)
+	})
+})
+
+// joshuafolkken/kit#2922: `codex-hook-adapter.ts` imports `pretool-guard.ts` and `format-edited-file.ts`,
+// so code splitting moved their self-invoke into a shared chunk and the launched bundles ran nothing.
+// Source and bundle both printing nothing passed the parity checks above, so these assert an effect.
+describe('launched hook bundles run their main', () => {
+	it('emits the pretool guard verdict rather than exiting silently', async () => {
+		const result = await run('node', [PRETOOL_BUNDLE], 'not-json')
+
+		expect(result.stdout).toContain('JOSH_BATCH_GUARD')
+	})
+
+	it(
+		'formats the edited file',
+		async () => {
+			const file_path = path.join(format_directory, 'claude.json')
+
+			writeFileSync(file_path, UNFORMATTED_JSON)
+			await run('node', [FORMAT_BUNDLE], payload('Edit', { file_path }))
+
+			expect(readFileSync(file_path, 'utf8')).not.toBe(UNFORMATTED_JSON)
+		},
+		BUILD_TIMEOUT_MS,
+	)
+
+	it('refuses an over-threshold edit in an uncut lane child', async () => {
+		const lane = lane_cut_fixture.create_over_threshold_lane()
+
+		onTestFinished(() => {
+			lane_cut_fixture.remove(lane)
+		})
+		const result = await lane_cut_fixture.run_edit(lane)
+
+		expect(result).toContain('⛔ implementation-phase cut:')
 	})
 })
 
