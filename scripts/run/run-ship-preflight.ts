@@ -43,15 +43,6 @@ async function evidence_problems(body_path: string | undefined): Promise<Array<s
 	return live_evidence.verdict_for(paths, body) === 'required' ? [EVIDENCE_PROBLEM] : []
 }
 
-async function pr_problems(request: PreflightRequest): Promise<Array<string>> {
-	const [preflight, evidence] = await Promise.all([
-		git_preflight.problems_of({ cli_input: request.title, will_open_pr: true }),
-		evidence_problems(request.body_path),
-	])
-
-	return [...preflight, ...evidence]
-}
-
 function refusal(problems: ReadonlyArray<string>): JoshResult {
 	const lines = problems.map((problem) => `  - ${problem}`)
 	const head = `${String(problems.length)} pull-request precondition(s) unmet before the review and the gate:`
@@ -62,12 +53,22 @@ function refusal(problems: ReadonlyArray<string>): JoshResult {
 // The reads here run in the ship's own process, where the commit stage's ran in a `git -y` child: a
 // throw — a `--body-file` path that does not exist, a git read that failed — would escape `ship()`
 // past the stop a supervised ship hands back on, so it is reported as one more unmet precondition.
-async function asked_problems(request: PreflightRequest): Promise<Array<string>> {
+// Each side is caught on its own, so one side's failed read never hides what the other side found.
+async function caught(problems: Promise<Array<string>>): Promise<Array<string>> {
 	try {
-		return await pr_problems(request)
+		return await problems
 	} catch (error) {
 		return [error_text.message_of(error)]
 	}
+}
+
+async function asked_problems(request: PreflightRequest): Promise<Array<string>> {
+	const [preflight, evidence] = await Promise.all([
+		caught(git_preflight.problems_of({ cli_input: request.title, will_open_pr: true })),
+		caught(evidence_problems(request.body_path)),
+	])
+
+	return [...preflight, ...evidence]
 }
 
 async function stage(request: PreflightRequest): Promise<JoshResult> {

@@ -39,6 +39,9 @@ const CLASSIFICATION = 'Choose one release classification before opening the PR'
 const EVIDENCE_BODY =
 	'## 実機証跡\n\n`pnpm josh ship --log 2946`\n\n```\nstopped at: === preflight ===\n```\n'
 const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-ship-preflight-'))
+const MISSING_BODY = path.join(TEMPORARY, 'missing.md')
+const TWO_PROBLEMS = '2 pull-request precondition(s)'
+const GIT_FAILURE = 'git status failed'
 
 function body_file(text: string): string {
 	const target = path.join(TEMPORARY, `${randomUUID()}.md`)
@@ -67,7 +70,7 @@ describe('run_ship_preflight.stage — every pull-request precondition at once',
 		const result = await run_ship_preflight.stage(NO_BODY)
 
 		expect(result.code).toBe(FAILED)
-		expect(result.out).toContain('2 pull-request precondition(s)')
+		expect(result.out).toContain(TWO_PROBLEMS)
 		expect(result.out).toContain(CLASSIFICATION)
 		expect(result.out).toContain(run_ship_preflight.EVIDENCE_PROBLEM)
 		expect(scoped_mock).not.toHaveBeenCalled()
@@ -106,13 +109,32 @@ describe('run_ship_preflight.stage — every pull-request precondition at once',
 
 describe('run_ship_preflight.stage — a precondition that cannot be read', () => {
 	it('fails as a stage rather than throwing when the --body-file cannot be read', async () => {
-		const missing = path.join(TEMPORARY, 'missing.md')
-		const result = await run_ship_preflight.stage({ title: TITLE, body_path: missing })
+		const result = await run_ship_preflight.stage({ title: TITLE, body_path: MISSING_BODY })
 
 		expect(result.code).toBe(FAILED)
 		expect(result.out).toContain('1 pull-request precondition(s)')
-		expect(result.out).toContain(missing)
+		expect(result.out).toContain(MISSING_BODY)
 		expect(scoped_mock).not.toHaveBeenCalled()
+	})
+
+	it('still reports the git preflight problems when the --body-file cannot be read', async () => {
+		problems_mock.mockResolvedValue([CLASSIFICATION])
+		const result = await run_ship_preflight.stage({ title: TITLE, body_path: MISSING_BODY })
+
+		expect(result.code).toBe(FAILED)
+		expect(result.out).toContain(TWO_PROBLEMS)
+		expect(result.out).toContain(CLASSIFICATION)
+		expect(result.out).toContain(MISSING_BODY)
+	})
+
+	it('still reports the evidence problem when the git preflight read throws', async () => {
+		problems_mock.mockRejectedValue(new Error(GIT_FAILURE))
+		paths_mock.mockResolvedValue(RUNTIME_PATHS)
+
+		const result = await run_ship_preflight.stage(NO_BODY)
+
+		expect(result.out).toContain(GIT_FAILURE)
+		expect(result.out).toContain(run_ship_preflight.EVIDENCE_PROBLEM)
 	})
 })
 

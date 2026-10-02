@@ -79,7 +79,7 @@ function mark_done(target: string, stage: Stage): void {
 	stamp_file.replace_stamp(target, { done: [...done] })
 }
 
-// Removed once the report stage completes, so a later ship of the same issue starts from the gate.
+// Removed once the report stage completes, so a later ship of the same issue starts from the preflight.
 function clear(target: string): void {
 	stamp_file.remove_stamp(target)
 }

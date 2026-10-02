@@ -260,9 +260,9 @@ async function stopped(
 	return sections
 }
 
-// Run the four in order, stopping at the first that failed: a red gate never reaches the commit, so
+// Run the stages in order, stopping at the first that failed: a red gate never reaches the commit, so
 // the returned sections end at the failure the report names. A ship that reached the end clears its
-// record, so the next ship of the same issue starts from the gate.
+// record, so the next ship of the same issue starts from the preflight.
 async function ship(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 	const context = await open_context(args)
 	const sections: Array<ShipSection> = []
