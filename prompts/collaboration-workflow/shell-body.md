@@ -10,9 +10,7 @@
 gh api repos/{owner}/{repo}/issues/1535/comments -f body="… `pnpm josh ms` は …"
 ```
 
-zsh は `pnpm josh ms` を実行し、その標準出力を本文に埋め込む。2026-09-07 深夜の joshuafolkken/kit#1535 の実行では、これで**レーンの work tree が `main` に切り替わり、実行が止まった**。復旧は手動である。
-
-同じ根がもう 1 つの口にもある。`pnpm josh followup --notify-message "…"` に渡した本文のバッククォート語（`` `owner/repo#` ``）が空文字に置換され、Telegram 通知の 1 行目から語が丸ごと消えた（joshuafolkken/kit#1176 の子 #1182）。**被害の重さが違うだけで、原因は同一である。**
+zsh は `pnpm josh ms` を実行し、その標準出力を本文に埋め込む。`pnpm josh followup --notify-message "…"` の本文も同じ根で壊れる。事故の経緯は `docs/maintainers/shell-body-rationale.md` →「事故の経緯 — 二つの被害、一つの原因」。
 
 - **通知経路**: 置換結果が本文に混ざる。壊れ方が静かで、`followup` は正常終了する
 - **`gh` 経路**: 置換された結果が捨てられるのではなく、**コマンドとして実行される**
@@ -28,7 +26,7 @@ zsh は `pnpm josh ms` を実行し、その標準出力を本文に埋め込む
 | `!`             | 発火しない（履歴展開は非対話では無効）               |
 | `\$` / `` \` `` | 発火しない（直前のバックスラッシュがリテラル化する） |
 
-joshuafolkken/kit#1198 のコメントは `!` も発火すると書いていたが、**この環境では発火しない**。引き金にも入れていない — 「!」を含む本文は日常的であり、そこで拒否するフックは[「誤ったターンで発火するフック」](./rule-delivery.md)そのものになる。
+`!` は引き金に入れていない。理由は `docs/maintainers/shell-body-rationale.md` →「`!` を引き金に入れない理由」。
 
 ### 安全な書き方
 
@@ -41,7 +39,7 @@ pnpm josh followup "<title> #<N>" --notify-message-file <path>
 pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file <path>
 ```
 
-**PR コメントも同じ経路である** — REST では pull request のコメントは issue のコメントであり、`pnpm josh issue:comment <N> --body-file <path>` がそのまま使える。`gh issue comment` / `gh pr comment` にも `--body-file` はあるが、本リポジトリの配布ドキュメントは GraphQL 経由の `gh` サブコマンドを実行可能ブロックに書かない（クラウドセッションでは 403 になる。`scripts/gh/gh-document-guard.test.ts`）。
+**PR コメントも同じ経路である** — REST では pull request のコメントは issue のコメントであり、`pnpm josh issue:comment <N> --body-file <path>` がそのまま使える。`gh issue comment` / `gh pr comment` は使わない（GraphQL 経由。理由は `docs/maintainers/shell-body-rationale.md` →「`gh` サブコマンドを実行可能ブロックに書かない理由」）。
 
 ### コメント投稿は `pnpm josh issue:comment` の 1 綴りだけ（joshuafolkken/kit#2304）
 
@@ -50,19 +48,19 @@ pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file <path>
 - `gh api ... -F body=@<path>` ／ `--field body=@<path>` — `@` で始まる値を**ファイルとして読む**。正しい
 - `gh api ... -f body=@<path>` ／ `--raw-field body=@<path>` — 値を**そのまま送る**。`@<path>` というリテラル文字列がコメントとして投稿される
 
-`-f` と `-F` は 1 文字違いで、どちらでも `gh` は終了コード 0 でコメント URL を返す。**壊れたことが分かるのは後で人が Issue を見たときだけ**である（joshuafolkken/kit#2304 は park コメント 2 件がこれで失われた）。
+`-f` と `-F` は 1 文字違いで、どちらでも `gh` は終了コード 0 でコメント URL を返す。**壊れたことが分かるのは後で人が Issue を見たときだけ**である（`docs/maintainers/shell-body-rationale.md` →「`-f body=@` で失われたコメント」）。
 
 だから **Issue／PR コメントの投稿は `pnpm josh issue:comment <N> --body-file <path>` ただ 1 綴りに寄せる** — 間違ったフラグを選ぶ余地が無く、本文は `cli-body.ts` を通ってパスで渡るためシェルも評価しない。`-f body=@…` の綴りは実行前に `pnpm josh rule:guard` が拒否する（列挙表の `raw-field-body` 行、`scripts/rules/raw-field-body.ts`）。上の Issue body 書き換え（`-X PATCH ... --field body=@<path>`）は `-F` 側で安全なので綴りを変えない。
 
-`--body-file` / `--notify-message-file` はいずれも `-` で標準入力を読む（`gh issue create --body-file -` と同じ約束）。読み取りは `scripts/josh/cli-body.ts` の 1 本だけで、`josh notify` / `josh followup` / `epic --rationale-file` / `epic --decision-file` の 4 つがそれを共有する。**`--body` と `--body-file` の同時指定は拒否する** — 優先順位を決めると、ファイルを渡したつもりの呼び出しが、避けようとしていたインライン文字列をそのまま送ってしまう。
+`--body-file` / `--notify-message-file` はいずれも `-` で標準入力を読む（`gh issue create --body-file -` と同じ約束）。読み取りは `scripts/josh/cli-body.ts` の 1 本だけで、`josh notify` / `josh followup` / `epic --rationale-file` / `epic --decision-file` の 4 つがそれを共有する。**`--body` と `--body-file` の同時指定は拒否する**（`docs/maintainers/shell-body-rationale.md` →「`--body` と `--body-file` の同時指定を拒否する理由」）。
 
 **`$'…'` も安全である。** ANSI-C クォートの中ではコマンド置換も変数展開も起きない。`CLAUDE.md` が Telegram の本文に `--body=$'…'` を指定しているのはそのためであり、この規則はそれを置き換えるものではない。ただし本文が長くなるほどファイルの方が扱いやすい。
 
 ### 引き金つき配送 — 書いただけでは守られないため
 
-**規則を書くだけでは守られないことは、本リポジトリで繰り返し計測されている**（[`rule-delivery.md`](./rule-delivery.md)）。したがってこの規則は joshuafolkken/kit#1524 の機構に 1 行として載っており、`pnpm josh rule:guard` が該当する `Bash` 呼び出しを拒否して本文を突きつける。列挙表の行は `scripts/rules/delivered-rules.ts` の `shell-body` であり、その行が読む引き金 — どの綴りが本文をインラインで運ぶか、シェルがその値に何をするか — は `scripts/rules/shell-body-trigger.ts` にある。
+`pnpm josh rule:guard` が該当する `Bash` 呼び出しを拒否して本文を突きつける（`docs/maintainers/shell-body-rationale.md` →「引き金つき配送にした理由」）。列挙表の行は `scripts/rules/delivered-rules.ts` の `shell-body` であり、その行が読む引き金 — どの綴りが本文をインラインで運ぶか、シェルがその値に何をするか — は `scripts/rules/shell-body-trigger.ts` にある。
 
-**引き金はフラグではなく本文の中身である。** 本リポジトリのプロンプトにある作例はいずれもプレースホルダ（`-f body="<plan>"`）を渡しており、これは無害である。フラグで引くと、規則が既に守られているそれらのターンでも拒否することになる。実際にバッククォートか `$` を含む本文が二重引用符に載った瞬間だけが、テキストが実行される呼び出しである。
+**引き金はフラグではなく本文の中身である** — 二重引用符の本文値にバッククォートか `$` が実際に含まれるときだけ発火し、プレースホルダの作例（`-f body="<plan>"`）では無言である（`docs/maintainers/shell-body-rationale.md` →「引き金をフラグでなく本文で引く理由」）。
 
 ### 引き金が見えないもの
 
