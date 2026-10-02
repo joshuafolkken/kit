@@ -116,21 +116,23 @@ describe('epic_solo.gate on a run:solo candidate', () => {
 	})
 })
 
-// joshuafolkken/kit#2778: an idle repository takes its first run:solo candidate ahead of the ranking.
+// joshuafolkken/kit#2928 (reversing joshuafolkken/kit#2778): run:solo means "runs alone", not "runs
+// first" — an idle repository takes the candidates in rank order, and the ones ahead of a run:solo
+// candidate start without it.
 describe('epic_solo.gate on a later run:solo candidate', () => {
-	it('offers a later run:solo candidate alone, ahead of the ranking, into an idle repository', () => {
+	it('keeps a later run:solo candidate in its ranked place in an idle repository', () => {
 		const gated = epic_solo.gate(result([child(FIRST), solo(SECOND), child(THIRD)]), IDLE, REPO)
 
-		expect(offered(gated.result)).toStrictEqual([SECOND])
-		expect(waiting(gated.result)).toStrictEqual([FIRST, THIRD])
+		expect(offered(gated.result)).toStrictEqual([FIRST])
+		expect(waiting(gated.result)).toStrictEqual([SECOND, THIRD])
 		expect(gated.notice).toBeUndefined()
 	})
 
-	it('offers only the first of two run:solo candidates into an idle repository', () => {
+	it('offers nothing past the first of two run:solo candidates in an idle repository', () => {
 		const gated = epic_solo.gate(result([child(FIRST), solo(SECOND), solo(THIRD)]), IDLE, REPO)
 
-		expect(offered(gated.result)).toStrictEqual([SECOND])
-		expect(waiting(gated.result)).toStrictEqual([FIRST, THIRD])
+		expect(offered(gated.result)).toStrictEqual([FIRST])
+		expect(waiting(gated.result)).toStrictEqual([SECOND, THIRD])
 	})
 
 	it.each<BusyRead>([{ kind: 'unreadable' }, { kind: 'truncated' }])(

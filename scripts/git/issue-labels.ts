@@ -19,6 +19,11 @@ const RUN_SOLO_LABEL = 'run:solo'
 // (joshuafolkken/kit#2779). Without it an issue lacking `run:solo` could mean "judged parallel" or
 // "never judged", and `backlog:next` withholds the second (`epic-triage.ts`).
 const RUN_LANE_LABEL = 'run:lane'
+// Puts an issue at the head of the backlog's ranking (joshuafolkken/kit#2928). A person or a run may
+// apply it — a run only where it can cite a deadline or a stated urgency, or a policy a person wrote
+// (`backlogrun-steps.md`) — and **only a person removes it**: a run that could clear it could undo
+// the person's ordering. Read by `issue-rank.ts`, the one place the ranking keys are decided.
+const PRIORITY_HIGH_LABEL = 'priority:high'
 // Opts one issue outside any epic into unattended execution (joshuafolkken/kit#906). **Only a
 // person applies it.** `epicrun #<E>` approves the merges inside `#<E>`; this label is the only way
 // a person extends that approval past the epic's edge, so a label an AI could apply to itself would
@@ -212,6 +217,11 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 		color: '0e8a16',
 		description: 'Judged safe to run beside others in a backlogrun',
 	},
+	{
+		name: PRIORITY_HIGH_LABEL,
+		color: 'e99695',
+		description: 'Offered first in a backlogrun; only a person removes it',
+	},
 	...FILING_ROUTE_LABELS,
 	...DEPTH_LABELS,
 ]
@@ -322,6 +332,7 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	AUTO_OK_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	ALREADY_DONE_LABEL,
+	PRIORITY_HIGH_LABEL,
 	INTERRUPT_ROUTE_LABEL,
 	REVIEW_CAP_ROUTE_LABEL,
 	REVIEW_ROUND2_SKIPPED_LABEL,
@@ -364,6 +375,7 @@ export {
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
 	OTHER_CHANGE_LABEL,
+	PRIORITY_HIGH_LABEL,
 	RELEASE_CLASSIFICATION_LABELS,
 	RELEASE_CLASSIFICATION_NAMES,
 	REPOSITORY_LABELS,

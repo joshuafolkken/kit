@@ -6,7 +6,7 @@ import {
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
 import { git_gh_command } from '#scripts/git/git-gh-command'
-import { AUTO_OK_LABEL, EPIC_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
+import { AUTO_OK_LABEL, BUG_LABEL, EPIC_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
 import type { OpenIssueData } from '#scripts/git/schemas'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
@@ -31,15 +31,15 @@ function open_row(number: number, labels: ReadonlyArray<string> = []): OpenIssue
 	return issue(number, CREATED_LATER, labels)
 }
 
-// One opted-in epic: an ordinary child ranked first, a run:solo child ranked second, and a child
-// waiting on the first.
+// One opted-in epic: an ordinary child listed first, a run:solo defect listed second — which the
+// ranking lifts to the head (joshuafolkken/kit#2928) — and a child waiting on the first.
 function stub_backlog(): void {
 	backlog_fixture.stub_backlog({
 		opted_in: [open_row(EPIC_NUMBER, [AUTO_OK_LABEL, EPIC_LABEL])],
 		epics: [{ number: EPIC_NUMBER, children: [FIRST, SOLO, BLOCKED] }],
 		children: [
 			{ number: FIRST },
-			{ number: SOLO, labels: [RUN_SOLO_LABEL] },
+			{ number: SOLO, labels: [BUG_LABEL, RUN_SOLO_LABEL] },
 			{ number: BLOCKED, blocked_by: [FIRST] },
 		],
 	})
@@ -58,7 +58,7 @@ beforeEach(() => {
 })
 
 describe('josh backlog:plan --waves', () => {
-	it('prints the run order wave by wave, the run:solo child first', async () => {
+	it('prints the run order wave by wave, the run:solo defect first', async () => {
 		stub_backlog()
 
 		expect(await backlog_plan_cli.run(['--waves'])).toBe(SUCCESS_EXIT_CODE)

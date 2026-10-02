@@ -4,7 +4,13 @@ import {
 	listing_of,
 	listing_outcome,
 } from '#scripts/git/git-gh-issue-list-fixture'
-import { IN_PROGRESS_LABEL, RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
+import {
+	BUG_LABEL,
+	IN_PROGRESS_LABEL,
+	PRIORITY_HIGH_LABEL,
+	RUN_LANE_LABEL,
+	RUN_SOLO_LABEL,
+} from '#scripts/git/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ConfirmContext } from './epic-candidate-confirm'
 import { epic_classify } from './epic-classify'
@@ -319,32 +325,40 @@ describe('epic_lane_offer.offer_for_repo — run:solo', () => {
 	})
 })
 
-// joshuafolkken/kit#2778: an idle repository takes its first run:solo child ahead of the ranking.
+// joshuafolkken/kit#2928 (reversing joshuafolkken/kit#2778): an idle repository takes the children in
+// rank order; a run:solo child does not jump the ranking or the free-lane walk.
 describe('epic_lane_offer.offer_for_repo — a later run:solo child', () => {
-	it('offers a later run:solo child alone into an idle repository', async () => {
+	it('offers the children ahead of a later run:solo child in an idle repository', async () => {
 		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
 
 		const children = [child(FIRST), solo(SECOND), child(THIRD)]
 		const offer = await epic_lane_offer.offer_for_repo([pool(children)], request(THREE_LANES))
 
-		expect(numbers_of(offer.children)).toEqual([SECOND])
+		expect(numbers_of(offer.children)).toEqual([FIRST])
 	})
 
-	it('reaches a run:solo child in a pool past the free lanes of an idle repository', async () => {
+	it('fills the free lanes in rank order before a run:solo child in a later pool', async () => {
 		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
 
 		const pools = [pool([child(FIRST), child(SECOND)]), pool([solo(THIRD)])]
 		const offer = await epic_lane_offer.offer_for_repo(pools, request(TWO_LANES))
 
-		expect(numbers_of(offer.children)).toEqual([THIRD])
+		expect(numbers_of(offer.children)).toEqual([FIRST, SECOND])
 	})
+})
 
-	it('reaches a run:solo child ranked past the free lanes of an idle repository', async () => {
+// joshuafolkken/kit#2928: a named epic's lanes take the ranking `backlog:next` offers in, so an
+// urgent verification-path defect listed later is offered ahead of the child listed first.
+describe('epic_lane_offer.offer_for_repo — rank order', () => {
+	it('offers a priority:high verification-path defect ahead of an earlier child', async () => {
 		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
 
-		const children = [child(FIRST), child(SECOND), solo(THIRD)]
-		const offer = await epic_lane_offer.offer_for_repo([pool(children)], request(ONE_LANE))
+		const urgent = { ...child(SECOND), labels: [BUG_LABEL, RUN_SOLO_LABEL, PRIORITY_HIGH_LABEL] }
+		const offer = await epic_lane_offer.offer_for_repo(
+			[pool([child(FIRST), urgent])],
+			request(TWO_LANES),
+		)
 
-		expect(numbers_of(offer.children)).toEqual([THIRD])
+		expect(numbers_of(offer.children)).toEqual([SECOND])
 	})
 })

@@ -1,8 +1,9 @@
 import { epic_cross_repo } from '#scripts/epic/epic-cross-repo'
-import type { EpicChild, IssueReference } from '#scripts/epic/epic-graph'
+import { epic_graph, type EpicChild, type IssueReference } from '#scripts/epic/epic-graph'
 import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
-import { epic_solo } from '#scripts/epic/epic-solo'
+import { git_next_issues } from '#scripts/git/git-next-issues'
 import {
+	BUG_LABEL,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
 	RUN_LANE_LABEL,
@@ -11,6 +12,7 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_plan, type PlanContext } from './backlog-plan'
+import { backlog_rank } from './backlog-rank'
 import { backlog_waves } from './backlog-waves'
 
 // joshuafolkken/kit#2778: the order a `backlogrun` takes, wave by wave, assuming every wave merges
@@ -52,6 +54,11 @@ function child(number: number, spec: ChildSpec = {}): EpicChild {
 
 function solo(number: number, blocked_by: ReadonlyArray<number> = []): EpicChild {
 	return child(number, { labels: [RUN_SOLO_LABEL], blocked_by })
+}
+
+// A run:solo issue whose defect reaches the verification path — the one the ranking puts first.
+function solo_defect(number: number): EpicChild {
+	return child(number, { labels: [BUG_LABEL, RUN_SOLO_LABEL] })
 }
 
 function result(
@@ -102,7 +109,7 @@ describe('backlog_waves.build', () => {
 			[child(SECOND, { blocked_by: [FIRST] }), solo(SOLO_FIRST, [FIRST])],
 		)
 
-		expect(waves_of(input)).toStrictEqual([[FIRST], [SOLO_FIRST], [SECOND]])
+		expect(waves_of(input)).toStrictEqual([[FIRST], [SECOND], [SOLO_FIRST]])
 	})
 
 	it('gives each of two run:solo issues its own wave', () => {
@@ -113,8 +120,14 @@ describe('backlog_waves.build', () => {
 })
 
 describe('backlog_waves.build — run:solo issues across the backlog', () => {
-	it('plans the current backlog in three waves, run:solo issues first', () => {
-		const ranked = [child(FIRST), solo(SOLO_FIRST), solo(SOLO_SECOND), child(SECOND), child(THIRD)]
+	it('plans verification-path defects first, each in its own wave', () => {
+		const ranked = [
+			child(FIRST),
+			solo_defect(SOLO_FIRST),
+			solo_defect(SOLO_SECOND),
+			child(SECOND),
+			child(THIRD),
+		]
 
 		expect(waves_of(result(ranked))).toStrictEqual([
 			[SOLO_FIRST],
@@ -123,14 +136,37 @@ describe('backlog_waves.build — run:solo issues across the backlog', () => {
 		])
 	})
 
+	// joshuafolkken/kit#2928: run:solo alone means "runs alone", not "runs first".
+	it('keeps a run:solo issue that is not a defect in its ranked place', () => {
+		const ranked = [child(FIRST), solo(SOLO_FIRST), child(SECOND)]
+
+		expect(waves_of(result(ranked))).toStrictEqual([[FIRST], [SOLO_FIRST], [SECOND]])
+	})
+})
+
+// joshuafolkken/kit#2928: the plan and the run cut each wave with one selection — rank, run:solo
+// gate, cap — so wave 1 is what backlog:next offers an idle repository, past the cap included.
+describe('backlog_waves.build — the same offer backlog:next makes', () => {
+	const STANDALONE_NUMBERS = [2801, 2802, 2803, 2804, 2805, 2806, 2807]
+	const standalone_children = STANDALONE_NUMBERS.map((number) => child(number))
+	const keys = new Set(standalone_children.map((entry) => epic_graph.key_of(entry)))
+
 	it('matches what backlog:next offers an idle repository in its first wave', () => {
-		const input = result([child(FIRST), solo(SOLO_FIRST), child(SECOND)])
+		const input = result([child(FIRST), solo(SOLO_FIRST), ...standalone_children])
 		const offered = epic_report.candidates_for_repo(
-			epic_solo.gate(input, { kind: 'idle' }, REPO).result,
+			backlog_rank.gate(input, { kind: 'idle' }, REPO, keys).result,
 			REPO,
 		)
 
-		expect(backlog_waves.build(input, REPO).waves[0]).toStrictEqual(offered)
+		expect(backlog_waves.build(input, REPO, keys).waves[0]).toStrictEqual(offered)
+	})
+
+	it('caps a wave of standalone rows at five, as backlog:next does', () => {
+		const wave = backlog_waves.build(result(standalone_children), REPO, keys).waves[0] ?? []
+
+		expect(wave.map((entry) => entry.number)).toStrictEqual(
+			STANDALONE_NUMBERS.slice(0, git_next_issues.DISPLAY_LIMIT),
+		)
 	})
 })
 

@@ -37,6 +37,9 @@ const DECISION_LABELS: ReadonlySet<string> = new Set([NEEDS_DECISION_LABEL, ALRE
 // `tracked` is the narrowed set `epic_index.withheld_children` builds, not every child an epic
 // tracks (joshuafolkken/kit#1668) — the narrowing itself is defined there, once, for this half and
 // `auto-ok:next` alike.
+// The part of the context that decides which rows the standalone half considers at all.
+type ConsideredContext = Pick<StandaloneContext, 'tracked' | 'exclude' | 'repo'>
+
 interface StandaloneContext {
 	tracked: ReadonlyMap<number, number>
 	exclude: ReadonlyArray<number>
@@ -135,26 +138,28 @@ function standalone_rows(issues: ReadonlyArray<OpenIssueData>): ReadonlyArray<Op
 // are actually going to offer their children and applied here for the same reason. Which rows those
 // are is `epic_index.withheld_children`'s answer, not a second test made here. A row the caller
 // excluded is out of the pool entirely rather than merely unoffered: it has just merged.
-function is_considered(issue: OpenIssueData, context: StandaloneContext): boolean {
+function is_considered(issue: OpenIssueData, context: ConsideredContext): boolean {
 	return !context.tracked.has(issue.number) && !context.exclude.includes(issue.number)
 }
 
 // The standalone half, in the buckets the verdict is read from.
 //
-// The order is `git_next_issues.prioritize`'s and not a second one — the same ranking the
-// `🗒 Next issues` display and `auto-ok:next` already answer with, cap included, so the three cannot
-// disagree about what comes next. Anything it withholds is still open work: `needs-decision` is
-// waiting on a person, and everything else — a standing blocker, a run already in progress, a row
-// past the cap — resolves on its own and is waiting on time. **The cap is one of those**: a sixth
-// runnable standalone issue is reported as waiting rather than offered, and the next ask offers it
-// once one of the five above it merges, so the backlog drains without it ever being lost. That is
-// the cost of having one ranking rather than two, and `docs/josh-commands.md` states it.
+// The order is `git_next_issues.order`'s and not a second one — the same ranking the
+// `🗒 Next issues` display and `auto-ok:next` already answer with, so the three cannot disagree about
+// what comes next. Anything it withholds is still open work: `needs-decision` is waiting on a person,
+// and everything else — a standing blocker, a run already in progress — resolves on its own and is
+// waiting on time.
+//
+// **The display's cap is not applied here** (joshuafolkken/kit#2928). Cut at this point, a sixth
+// runnable `run:solo` issue never reached the gate that holds back what is ranked below it, so the
+// cap is applied after that gate instead (`backlog-rank.ts`). A row past it is still reported as
+// waiting and offered by a later ask, so the backlog drains without it ever being lost.
 function classify_standalone(
 	issues: ReadonlyArray<OpenIssueData>,
 	context: StandaloneContext,
 ): Classification {
 	const considered = issues.filter((issue) => is_considered(issue, context))
-	const runnable = git_next_issues.prioritize(
+	const runnable = git_next_issues.order(
 		considered.filter((issue) => auto_ok_cli.is_runnable(issue, context.tracked, context.exclude)),
 	)
 	const offered = new Set(runnable.map((issue) => issue.number))
@@ -301,11 +306,26 @@ function merge_classifications(left: Classification, right: Classification): Cla
 	}
 }
 
+// The keys of the rows the standalone half considers — the rows the offer's cap bounds. An issue an
+// opted-in epic tracks is that epic's child here, and never capped, exactly as before.
+function standalone_keys(
+	issues: ReadonlyArray<OpenIssueData>,
+	context: ConsideredContext,
+): ReadonlySet<string> {
+	return keys_of(
+		to_children(
+			standalone_rows(issues).filter((issue) => is_considered(issue, context)),
+			context.repo,
+		),
+	)
+}
+
 const backlog_pool = {
 	classify_standalone,
 	cross_epic_cycles,
 	running_set,
 	settle_standalone,
+	standalone_keys,
 	drop_excluded,
 	epic_classification,
 	is_epic_row,
@@ -319,4 +339,4 @@ const backlog_pool = {
 }
 
 export { backlog_pool }
-export type { StandaloneContext }
+export type { ConsideredContext, StandaloneContext }

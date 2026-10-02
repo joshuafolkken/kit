@@ -310,9 +310,8 @@ async function fetch_tracking(count: number): Promise<TrackingRead> {
 	}
 }
 
-// The pickup *order* is `git_next_issues.prioritize` itself, not a copy of it: newest first, with the
-// `epic` / `in-progress` / `needs-decision` exclusions. Its display cap does not reach this caller,
-// which reads only the first row.
+// The pickup *order* is `git_next_issues.order` itself, not a copy of it: the ranking `prioritize`
+// shows, with the `epic` / `in-progress` / `needs-decision` exclusions, before its display cap.
 //
 // The two are no longer the same *set*, and deliberately so: since joshuafolkken/kit#996 the pickup
 // also drops a candidate whose prerequisite is still open, while `🗒 Next issues` shows every open
@@ -323,9 +322,12 @@ async function fetch_tracking(count: number): Promise<TrackingRead> {
 // Membership of the label is the *query's* job, not this function's: `--label` is what makes the
 // listing the opted-in set, so re-testing it here would be a second definition of opting in.
 //
-// The exclusions are applied **before** `prioritize`, not after: it keeps only its first few rows,
-// so filtering its output would answer `none` whenever those rows happen to be blocked while a
-// runnable issue sits below them.
+// The exclusions are applied to `git_next_issues.order`'s **uncapped** ranking, never to
+// `prioritize`'s capped one, which would answer `none` whenever its first rows happen to be blocked
+// while a runnable issue sits below them. They are applied **after** the ranking, not before it: the
+// dependents key counts the issues waiting on a row, and a waiting issue is by definition blocked —
+// filtered first, every row would count zero and the key would never decide anything
+// (joshuafolkken/kit#2928).
 //
 // The `🗒 Next issues` display is deliberately *not* filtered this way; `git-next-issues.ts` records
 // why, and the short version is that a person can see a blocked issue and choose to start it anyway
@@ -354,9 +356,7 @@ function pick_next(
 	tracked: ReadonlyMap<number, number> = new Map(),
 	exclude: ReadonlyArray<number> = [],
 ): OpenIssueData | undefined {
-	const runnable = issues.filter((issue) => is_runnable(issue, tracked, exclude))
-
-	return git_next_issues.prioritize(runnable)[0]
+	return git_next_issues.order(issues).find((issue) => is_runnable(issue, tracked, exclude))
 }
 
 // Why there is nothing to run. "No open issue carries the label" and "every opted-in issue is
