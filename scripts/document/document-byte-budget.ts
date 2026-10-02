@@ -65,7 +65,7 @@ function block_ceiling(size: number): number {
 // unreached file, so the definition cannot rot as documents move on or off the execution path.
 const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/dependency-update/SKILL.md', bytes: 8192 },
-	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 32_768 },
+	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 36_864 },
 	{ path: '.claude/skills/verify-ui/SKILL.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/followup-reference.md', bytes: 16_384 },
 	{ path: '.claude/skills/workflow-commands/fullrun-steps.md', bytes: 8192 },
@@ -87,11 +87,11 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/coding-standards.md', bytes: 16_384 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/consultation-vs-execution.md', bytes: 4096 },
-	{ path: 'prompts/collaboration-workflow/cross-repo-epic.md', bytes: 8192 },
+	{ path: 'prompts/collaboration-workflow/cross-repo-epic.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/distributed-docs.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/durable-rules.md', bytes: 4096 },
-	{ path: 'prompts/collaboration-workflow/epic-audit.md', bytes: 12_288 },
-	{ path: 'prompts/collaboration-workflow/epic-bundle.md', bytes: 24_576 },
+	{ path: 'prompts/collaboration-workflow/epic-audit.md', bytes: 4096 },
+	{ path: 'prompts/collaboration-workflow/epic-bundle.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/gh-rest.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 8192 },

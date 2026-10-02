@@ -119,7 +119,7 @@ const CHILD_FLOW_DOCUMENTS: ReadonlyArray<string> = [
 	'CLAUDE.md',
 	REVIEW_PROMPT,
 	'prompts/collaboration-workflow/plan-comment.md',
-	'prompts/collaboration-workflow/cross-repo-epic.md',
+	'.claude/skills/epic-commands/SKILL.md',
 	'.claude/skills/workflow-commands/SKILL.md',
 	CHAIN_RULE,
 	'.claude/skills/workflow-commands/fullrun.md',

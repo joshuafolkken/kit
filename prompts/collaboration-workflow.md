@@ -10,34 +10,34 @@
 
 **話題ごとにファイルが分かれている。** 以前はこの内容が 1 本の 169KB のファイルにあり、1 つの節を確かめるだけでも全体を読む必要があった。読んだものはそのセッションの残り全ターンで積み上がった前置きとして課金され続けるため、確認 1 回の費用が会話の長さに比例して効いていた（joshuafolkken/kit#965）。**必要な 1 本だけを開くこと。この索引を入口に、下の表から選ぶ。**
 
-| 話題                                                                           | ファイル                                                                                |
-| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| Overview                                                                       | [`overview.md`](./collaboration-workflow/overview.md)                                   |
-| Step 1: Issue 作成テンプレ                                                     | [`issue-template.md`](./collaboration-workflow/issue-template.md)                       |
-| Step 2: 提案依頼（AI 共通）                                                    | [`proposal-request.md`](./collaboration-workflow/proposal-request.md)                   |
-| Step 3: 計画コメントを記録して通知する                                         | [`plan-comment.md`](./collaboration-workflow/plan-comment.md)                           |
-| 報告フォーマット（平易な概要 ＋ 技術詳細）                                     | [`report-format.md`](./collaboration-workflow/report-format.md)                         |
-| セッション向け出力で Issue はリンク＋短い日本語要約で参照する                  | [`issue-citation.md`](./collaboration-workflow/issue-citation.md)                       |
-| 後から関連が判明した Issue を epic に束ねる                                    | [`epic-bundle.md`](./collaboration-workflow/epic-bundle.md)                             |
-| オープン Issue の WIP 上限（30 件）                                            | [`wip-cap.md`](./collaboration-workflow/wip-cap.md)                                     |
-| リポジトリをまたぐ EPIC                                                        | [`cross-repo-epic.md`](./collaboration-workflow/cross-repo-epic.md)                     |
-| `josh epic:audit` — 子 Issue 群を横断して矛盾を検出する                        | [`epic-audit.md`](./collaboration-workflow/epic-audit.md)                               |
-| 別パッケージ起因の問題は割り込み Issue で対応する                              | [`upstream-interrupt.md`](./collaboration-workflow/upstream-interrupt.md)               |
-| クローン禁止・単一ソース化（パッケージ境界を越えても）                         | [`no-clones.md`](./collaboration-workflow/no-clones.md)                                 |
-| 設計はエレガント・シンプルを第一目標にする（仕組みを足す前に原因を問う）       | [`simplicity-first.md`](./collaboration-workflow/simplicity-first.md)                   |
-| 相談と実行を区別する（議論中にファイルを編集しない）                           | [`consultation-vs-execution.md`](./collaboration-workflow/consultation-vs-execution.md) |
-| 配布ドキュメント・設定の変更は kit に上流化する                                | [`distributed-docs.md`](./collaboration-workflow/distributed-docs.md)                   |
-| エージェント規則の単一ソースは `CLAUDE.md`（`AGENTS.md` / `GEMINI.md` は導線） | [`single-source-rules.md`](./collaboration-workflow/single-source-rules.md)             |
-| 最新優先・fix-forward（pin-back は最終手段）                                   | [`latest-first.md`](./collaboration-workflow/latest-first.md)                           |
-| 恒久ルールは MEMORY ではなくプロンプト／ドキュメントに書く                     | [`durable-rules.md`](./collaboration-workflow/durable-rules.md)                         |
-| ファイル編集はコマンド本文に本文を載せない                                     | [`file-edits.md`](./collaboration-workflow/file-edits.md)                               |
-| 本文をシェルの二重引用符に載せない                                             | [`shell-body.md`](./collaboration-workflow/shell-body.md)                               |
-| 独立した呼び出しは同じターンに載せる                                           | [`turn-batching.md`](./collaboration-workflow/turn-batching.md)                         |
-| `gh` は REST（`gh api`）で書く — 散文の指示も含む                              | [`gh-rest.md`](./collaboration-workflow/gh-rest.md)                                     |
-| 常駐ドキュメントと skill の分担（何を常駐に残すか）                            | [`residency.md`](./collaboration-workflow/residency.md)                                 |
-| 引き金つき配送 — 規則を効く瞬間に届ける                                        | [`rule-delivery.md`](./collaboration-workflow/rule-delivery.md)                         |
-| コマンド出力が文脈へ持ち込む量の上限                                           | [`output-bounds.md`](./collaboration-workflow/output-bounds.md)                         |
-| 運用ルール                                                                     | [`operating-rules.md`](./collaboration-workflow/operating-rules.md)                     |
+| 話題                                                                                    | ファイル                                                                                |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Overview                                                                                | [`overview.md`](./collaboration-workflow/overview.md)                                   |
+| Step 1: Issue 作成テンプレ                                                              | [`issue-template.md`](./collaboration-workflow/issue-template.md)                       |
+| Step 2: 提案依頼（AI 共通）                                                             | [`proposal-request.md`](./collaboration-workflow/proposal-request.md)                   |
+| Step 3: 計画コメントを記録して通知する                                                  | [`plan-comment.md`](./collaboration-workflow/plan-comment.md)                           |
+| 報告フォーマット（平易な概要 ＋ 技術詳細）                                              | [`report-format.md`](./collaboration-workflow/report-format.md)                         |
+| セッション向け出力で Issue はリンク＋短い日本語要約で参照する                           | [`issue-citation.md`](./collaboration-workflow/issue-citation.md)                       |
+| 後から関連が判明した Issue を epic に束ねる（本文は `epic-commands` skill）             | [`epic-bundle.md`](./collaboration-workflow/epic-bundle.md)                             |
+| オープン Issue の WIP 上限（30 件）                                                     | [`wip-cap.md`](./collaboration-workflow/wip-cap.md)                                     |
+| リポジトリをまたぐ EPIC（本文は `epic-commands` skill）                                 | [`cross-repo-epic.md`](./collaboration-workflow/cross-repo-epic.md)                     |
+| `josh epic:audit` — 子 Issue 群を横断して矛盾を検出する（本文は `epic-commands` skill） | [`epic-audit.md`](./collaboration-workflow/epic-audit.md)                               |
+| 別パッケージ起因の問題は割り込み Issue で対応する                                       | [`upstream-interrupt.md`](./collaboration-workflow/upstream-interrupt.md)               |
+| クローン禁止・単一ソース化（パッケージ境界を越えても）                                  | [`no-clones.md`](./collaboration-workflow/no-clones.md)                                 |
+| 設計はエレガント・シンプルを第一目標にする（仕組みを足す前に原因を問う）                | [`simplicity-first.md`](./collaboration-workflow/simplicity-first.md)                   |
+| 相談と実行を区別する（議論中にファイルを編集しない）                                    | [`consultation-vs-execution.md`](./collaboration-workflow/consultation-vs-execution.md) |
+| 配布ドキュメント・設定の変更は kit に上流化する                                         | [`distributed-docs.md`](./collaboration-workflow/distributed-docs.md)                   |
+| エージェント規則の単一ソースは `CLAUDE.md`（`AGENTS.md` / `GEMINI.md` は導線）          | [`single-source-rules.md`](./collaboration-workflow/single-source-rules.md)             |
+| 最新優先・fix-forward（pin-back は最終手段）                                            | [`latest-first.md`](./collaboration-workflow/latest-first.md)                           |
+| 恒久ルールは MEMORY ではなくプロンプト／ドキュメントに書く                              | [`durable-rules.md`](./collaboration-workflow/durable-rules.md)                         |
+| ファイル編集はコマンド本文に本文を載せない                                              | [`file-edits.md`](./collaboration-workflow/file-edits.md)                               |
+| 本文をシェルの二重引用符に載せない                                                      | [`shell-body.md`](./collaboration-workflow/shell-body.md)                               |
+| 独立した呼び出しは同じターンに載せる                                                    | [`turn-batching.md`](./collaboration-workflow/turn-batching.md)                         |
+| `gh` は REST（`gh api`）で書く — 散文の指示も含む                                       | [`gh-rest.md`](./collaboration-workflow/gh-rest.md)                                     |
+| 常駐ドキュメントと skill の分担（何を常駐に残すか）                                     | [`residency.md`](./collaboration-workflow/residency.md)                                 |
+| 引き金つき配送 — 規則を効く瞬間に届ける                                                 | [`rule-delivery.md`](./collaboration-workflow/rule-delivery.md)                         |
+| コマンド出力が文脈へ持ち込む量の上限                                                    | [`output-bounds.md`](./collaboration-workflow/output-bounds.md)                         |
+| 運用ルール                                                                              | [`operating-rules.md`](./collaboration-workflow/operating-rules.md)                     |
 
 **どの 1 本を開けばよいかを決めるのに必要なのは、この索引だけである。** バイト数はここに書かない — 手で保守した数字は本文より先に古くなり、古い数字は無いより悪い。実サイズは `ls -l prompts/collaboration-workflow/` が答える。
 
