@@ -1,3 +1,4 @@
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import type { AgentProvider } from './agent-role-profile'
 import { claude_result_event } from './claude-result-event'
@@ -52,14 +53,6 @@ const EMPTY_STATE: AgentEventState = {
 }
 const LAUNCH_HEADER_PREFIX = '=== '
 const LAUNCH_HEADER_MARKER = ' · started by process '
-
-function parse_line(line: string): unknown {
-	try {
-		return JSON.parse(line)
-	} catch {
-		return undefined
-	}
-}
 
 function usable_text(value: unknown): string | undefined {
 	return typeof value === 'string' && value.trim() !== '' ? value : undefined
@@ -149,7 +142,7 @@ function next_state(line: string, state: AgentEventState): AgentEventState {
 	const is_header = line.startsWith(LAUNCH_HEADER_PREFIX) && line.includes(LAUNCH_HEADER_MARKER)
 	if (is_header) return EMPTY_STATE
 
-	return normalized(parse_line(line), state)
+	return normalized(json_value.parse_or_undefined(line), state)
 }
 
 function read(transcript: string): AgentEventState {

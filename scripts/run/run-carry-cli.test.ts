@@ -93,6 +93,12 @@ describe('beginning a run', () => {
 		expect(await run_carry_cli.run(['--begin', INVOCATION])).toBe(0)
 		expect(out).toStrictEqual([run_carry_cli.BEGAN_VERDICT])
 	})
+
+	it('refuses an unknown flag rather than beginning around it', async () => {
+		expect(await run_carry_cli.run(['--begin', INVOCATION, '--nope'])).toBe(1)
+		expect(errors).toStrictEqual([run_carry_cli.USAGE])
+		expect(run_carry.read_carry(target()).kind).toBe('none')
+	})
 })
 
 describe('who a standing record belongs to', () => {

@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { path_decision } from '#scripts/josh/path-decision'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { backlog_budget, type BacklogAnswer, type BudgetInput } from './backlog-budget'
 
 // The thin half of `josh backlog:budget` (joshuafolkken/kit#1632): read the loop's state off the
@@ -32,11 +32,7 @@ type ParsedValues = Partial<Record<OptionName, string | boolean>>
 // A misspelled flag is refused rather than defaulted, the contract `path_decision.has_unknown_flag`
 // states for the path-decided commands: an invocation nobody can read is never answered.
 function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
-	try {
-		return parseArgs({ args: [...argv], options: OPTIONS, strict: true }).values
-	} catch {
-		return undefined
-	}
+	return cli_flags.parse_or_undefined({ args: [...argv], options: OPTIONS, strict: true })?.values
 }
 
 function text_of(value: string | boolean | undefined): string | undefined {

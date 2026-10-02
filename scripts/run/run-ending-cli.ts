@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import {
 	run_ending,
 	UNREADABLE_VERDICT,
@@ -56,11 +56,7 @@ interface ParsedArguments {
 }
 
 function read_arguments(argv: ReadonlyArray<string>): ParsedArguments | undefined {
-	try {
-		return parseArgs({ args: [...argv], options: OPTIONS, allowPositionals: true })
-	} catch {
-		return undefined
-	}
+	return cli_flags.parse_or_undefined({ args: [...argv], options: OPTIONS, allowPositionals: true })
 }
 
 function is_valid(parsed: ParsedArguments): boolean {

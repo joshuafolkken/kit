@@ -1,4 +1,4 @@
-import { parseArgs } from 'node:util'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_issue_number } from './run-issue-number'
 
 // `josh run:cut` turns its `argv` into one of four requests. The contract mirrors `run-carry-args.ts`:
@@ -47,18 +47,12 @@ type Request =
 	| { kind: 'end' }
 
 function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
-	try {
-		const parsed = parseArgs({
-			args: [...argv],
-			options: OPTIONS,
-			strict: true,
-			allowPositionals: true,
-		})
-
-		return { values: parsed.values, positionals: parsed.positionals }
-	} catch {
-		return undefined
-	}
+	return cli_flags.parse_or_undefined({
+		args: [...argv],
+		options: OPTIONS,
+		strict: true,
+		allowPositionals: true,
+	})
 }
 
 // The issue is the sole positional, and it must be a real issue number: a cut relaunches

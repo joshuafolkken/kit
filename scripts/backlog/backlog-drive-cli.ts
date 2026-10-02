@@ -1,13 +1,13 @@
 #!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
 import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
 import { lane_registry } from '#scripts/lane/lane-registry'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type RunCarry } from '#scripts/run/run-carry'
 import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
 import { run_merge_cli } from '#scripts/run/run-merge-cli'
@@ -80,11 +80,7 @@ interface DriveContext {
 type Values = Partial<Record<Exclude<keyof typeof OPTIONS, 'only'>, string>> & { only?: boolean }
 
 function read_values(argv: ReadonlyArray<string>): Values | undefined {
-	try {
-		return parseArgs({ args: [...argv], options: OPTIONS, strict: true }).values
-	} catch {
-		return undefined
-	}
+	return cli_flags.parse_or_undefined({ args: [...argv], options: OPTIONS, strict: true })?.values
 }
 
 // A comma list of issue numbers; one entry that is not an issue number refuses the whole list.
