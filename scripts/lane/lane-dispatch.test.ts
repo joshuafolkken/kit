@@ -228,7 +228,7 @@ describe('lane_dispatch.dispatch_child — the request the lane gets', () => {
 			cwd: LANE_DIRECTORY,
 			log_path: DERIVED_LOG,
 			profile: WORKER_PROFILE,
-			env: { [lane_child_marker.KEY]: ISSUE },
+			env: lane_child_marker.env_for(ISSUE),
 		})
 		expect(launched_request().profile).toMatchObject({ model: 'claude-opus-5-5', effort: 'medium' })
 	})
@@ -238,7 +238,7 @@ describe('lane_dispatch.dispatch_child — the request the lane gets', () => {
 	it('marks the child as dispatched for this issue', async () => {
 		await lane_dispatch.dispatch_child(ISSUE)
 
-		expect(launch.mock.calls[0]?.[0].env).toStrictEqual({ [lane_child_marker.KEY]: ISSUE })
+		expect(launch.mock.calls[0]?.[0].env).toStrictEqual(lane_child_marker.env_for(ISSUE))
 	})
 
 	it('records the path it writes to, so an unrecorded lane is not a reachable state', async () => {

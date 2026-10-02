@@ -19,6 +19,15 @@ import { lane_paths } from './lane-paths'
 // `.claude/skills/workflow-commands/pre-gate-cut.md`.
 const KEY = 'JOSH_LANE_CHILD'
 
+// **A dispatched child also asks for the five-minute prompt-cache TTL** (joshuafolkken/kit#2944). A
+// headless `claude -p` session on a subscription defaults to the one-hour TTL, whose writes bill at 2x
+// the input rate against 1.25x for five minutes. A replay of 1,953 lane transcripts (about 57,000
+// requests) found 0.3% of request gaps over five minutes, so the shorter TTL — re-writing the prefix on
+// those few gaps — still costs 12-13% less. Every launcher of a child composes its environment here,
+// so this is the one place the choice is made.
+const CACHE_TTL_KEY = 'CLAUDE_CODE_PROMPT_CACHE_TTL'
+const CACHE_TTL = '5m'
+
 type MarkerSource = Readonly<Record<string, string | undefined>>
 
 // The environment fragment that marks a child dispatched for `#<issue>`. Composed from a digits-only
@@ -27,7 +36,7 @@ type MarkerSource = Readonly<Record<string, string | undefined>>
 function environment_for(issue: string): Record<string, string> {
 	run_issue_number.require_issue_number(issue)
 
-	return { [KEY]: issue }
+	return { [KEY]: issue, [CACHE_TTL_KEY]: CACHE_TTL }
 }
 
 // The issue a child was dispatched for, or `undefined` when the mark is absent or malformed. A blank
@@ -52,7 +61,12 @@ function is_child_of(directory: string, source: MarkerSource = process.env): boo
 	return marked !== undefined && marked === lane_paths.lane_issue_of(directory, { ...source })
 }
 
-const lane_child_marker = { KEY, env_for: environment_for, is_child_of, marked_issue }
+const lane_child_marker = {
+	KEY,
+	env_for: environment_for,
+	is_child_of,
+	marked_issue,
+}
 
 export type { MarkerSource }
 export { lane_child_marker }
