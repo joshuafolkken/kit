@@ -103,7 +103,7 @@ entry fullrun  227672/229376 bytes · 1704 left
 
 ### `josh format`
 
-Format code with prettier and eslint. A `basic` project skips ESLint for the reason `josh lint` prints.
+Format code with prettier and eslint. A `basic` project without Prettier or ESLint skips that tool for the reason `josh lint` prints.
 
 ```bash
 pnpm josh format
@@ -343,7 +343,7 @@ See [Composite commands and extra arguments](#composite-commands-and-extra-argum
 
 ### `josh check`
 
-Type-check with `tsc --noEmit`. A `basic` project with nothing to check is skipped as `josh gate` does; a listed, uninstalled tool fails.
+Type-check with `tsc --noEmit`. A `basic` project with nothing to check is skipped as `josh gate` does; a listed, uninstalled tool fails. SvelteKit type-checking is not part of kit's framework-agnostic `josh` CLI: SvelteKit projects get `josh-app check` / `josh-app check:ci` from [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit).
 
 ```bash
 pnpm josh check
