@@ -9,7 +9,16 @@ const ISSUE = '1904'
 
 describe('env_for', () => {
 	it('carries the issue number under the marker key', () => {
-		expect(lane_child_marker.env_for(ISSUE)).toStrictEqual({ [lane_child_marker.KEY]: ISSUE })
+		expect(lane_child_marker.env_for(ISSUE)).toMatchObject({ [lane_child_marker.KEY]: ISSUE })
+	})
+
+	// joshuafolkken/kit#2944: a lane child runs on the five-minute prompt-cache TTL, measured cheaper
+	// than the one-hour default for the request gaps a lane produces.
+	it('asks for the five-minute prompt-cache TTL', () => {
+		expect(lane_child_marker.env_for(ISSUE)).toStrictEqual({
+			[lane_child_marker.KEY]: ISSUE,
+			CLAUDE_CODE_PROMPT_CACHE_TTL: '5m',
+		})
 	})
 
 	// The mark is composed from a digits-only issue number, so a malformed one fails here rather than
