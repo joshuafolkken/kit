@@ -1525,7 +1525,7 @@ pnpm josh delegate --list     # the enumeration, and what was rejected and why
 | `split-assessment` | a missed split widens one Issue into a batch nobody authorized                          |
 | `review`           | the review is the last thing between a defect and a merge; a cheaper one finds less     |
 
-**`investigation` is the only row that carries a threshold, and the threshold is 3 files, and it is a count, not a forecast.** What comes back is the conclusion plus the `file:line` citations that support it, never the file text; a throwaway probe script is written, run and deleted inside the unit. **It is not `survey`, and it is not `diagnosis`**: `survey` reports where something appears and is checked by one `grep`, while a root cause stays with the main line. `pnpm josh delegate --list` prints the count. **A delegation resets the counter rather than spending it** — the counting moved into `josh investigation:guard`.
+**`investigation` is the only row that carries a threshold, and the threshold is 3 files, and it is a count, not a forecast.** What comes back is the conclusion plus the `file:line` citations that support it, never the file text; a throwaway probe script is written, run and deleted inside the unit. **It is not `survey`, and it is not `diagnosis`**: `survey` reports where something appears and is checked by one `grep`, while a root cause stays with the main line. `pnpm josh delegate --list` prints the count. **A delegation resets the counter rather than spending it**; `josh investigation:guard` does the counting (`docs/maintainers/josh-commands-rationale.md` → "`josh delegate` no longer counts investigation reads").
 
 **The mechanism is not the unit.** **One row covers both batch entry points**: an epic's child and one named issue of a `backlogrun` are the same unit, so both were wired to `epic-child`. **`followup-filing` is a third such unit**: the parent composed the finding text either way, so the unit's work is mechanical. **`implementation-unit` is a fourth**: the writing of one Step 0 unit goes to a subagent while the design that decided _what_ to write stays in the main line, and only file-disjoint units split — `josh fanout` confirms that mechanically, so two subagents never race on one file. Rule: `.claude/skills/workflow-commands/SKILL.md` → "2b. Delegating a step to a cheaper tier".
 
@@ -2023,7 +2023,7 @@ non-AI supervisor for Codex generations, while Claude Code sessions run unchange
 SQLite stays lane-local; worker rollout files persist for active-usage cuts. Native auth/config stay
 put. The printed PID is the supervisor's.
 
-**Before it launches, it applies the `in-progress` label to `#<N>`** (creating the label if missing), so the lane counts as busy from the dispatch rather than only once the child's own `fullrun` reaches its apply — that window used to be tens of minutes. If the label cannot be applied it launches nothing and refuses; if the launch then fails it removes the label again, leaving no `in-progress` on an idle issue.
+**Before it launches, it applies the `in-progress` label to `#<N>`** (creating the label if missing), so the lane counts as busy from the dispatch rather than only once the child's own `fullrun` reaches its apply (`docs/maintainers/josh-commands-rationale.md` → "`josh lane:dispatch` applies `in-progress` before it launches"). If the label cannot be applied it launches nothing and refuses; if the launch then fails it removes the label again, leaving no `in-progress` on an idle issue.
 
 **Options:**
 
@@ -2075,7 +2075,7 @@ The child's pid is the one thing on stdout; a refusal is an empty capture beside
 
 ### `josh cost`
 
-Answer whether the next turn exceeds a threshold from active-provider usage. `--cut` selects the shared 135,000 limit — the break-even context a cut pays back at, derived by `context-cut-payback.ts` (joshuafolkken/kit#2406); `--over <tokens>` sets an explicit one. The old report scopes and `--cap` are retired; `josh time` retains hand-off aggregates.
+Answer whether the next turn exceeds a threshold from active-provider usage. `--cut` selects the shared 135,000 limit — the break-even context a cut pays back at, derived by `context-cut-payback.ts` (joshuafolkken/kit#2406); `--over <tokens>` sets an explicit one; any other flag is a usage error (exit 1). `josh time` carries the hand-off aggregates. History: [josh-commands-rationale.md](./maintainers/josh-commands-rationale.md) — `docs/maintainers/josh-commands-rationale.md` → "`josh cost` and `josh time` lost their report scopes".
 
 ```bash
 pnpm josh cost --cut             # compare billed input per request with the shared 135,000 context-cut threshold
@@ -2209,7 +2209,7 @@ pnpm josh time --path <dir>     # read another project's transcripts from this c
 
 **Options:**
 
-- `--run` (default) — the whole run tree, wall clock led beside dollars. The additional report scopes (`--issue`/`--session`/`--epic`/`--last`/`--period`) and the `--instructions`/`--top` modifiers they carried were retired with no rule or decision reading them (#2017).
+- `--run` (default) — the whole run tree, wall clock led beside dollars. It is the only scope; any other flag is a usage error (exit 1). History: `docs/maintainers/josh-commands-rationale.md` → "`josh cost` and `josh time` lost their report scopes".
 - `--path <dir>` — aim the read at another project (absolute path); keeps the `cwd` behavior when absent.
 - `--json` — the run tree, machine-readable.
 
