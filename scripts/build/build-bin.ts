@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { error_text } from '#scripts/lib/error-message'
 import { build } from 'esbuild'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -26,7 +27,7 @@ async function main(): Promise<void> {
 		await build_bin()
 		console.info(`  ✔ ${OUTFILE} built`)
 	} catch (error) {
-		console.error(error instanceof Error ? error.message : String(error))
+		console.error(error_text.message_of(error))
 		process.exit(1)
 	}
 }

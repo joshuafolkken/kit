@@ -8,6 +8,7 @@ import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
 import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { error_text } from '#scripts/lib/error-message'
 import { run_carry, type RunCarry } from '#scripts/run/run-carry'
 import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
 import { run_merge_cli } from '#scripts/run/run-merge-cli'
@@ -349,7 +350,7 @@ async function run_safe(context: DriveContext): Promise<number> {
 	try {
 		return await drive(context)
 	} catch (error) {
-		console.info(`error ${error instanceof Error ? error.message : String(error)}`)
+		console.info(`error ${error_text.message_of(error)}`)
 
 		return FAILURE_EXIT_CODE
 	}

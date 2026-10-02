@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { git_command } from '#scripts/git/git-command'
+import { error_text } from '#scripts/lib/error-message'
 import { release_history } from './release-history'
 import { release_plan, type ReleasePlan } from './release-plan'
 import { release_publish } from './release-publish'
@@ -76,7 +77,7 @@ async function main(): Promise<void> {
 	try {
 		process.exit(await run(is_dry_run_requested(process.argv)))
 	} catch (error) {
-		console.error(error instanceof Error ? error.message : String(error))
+		console.error(error_text.message_of(error))
 		process.exit(FAILURE_EXIT_CODE)
 	}
 }

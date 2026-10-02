@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { extract_issue_number } from '#scripts/hooks/check-commit-message'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
+import { error_text } from '#scripts/lib/error-message'
 import { git_command } from './git-command'
 import { main_merge_guard } from './main-merge-guard'
 
@@ -103,7 +104,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	try {
 		return await dispatch(argv)
 	} catch (error) {
-		console.error(error instanceof Error ? error.message : String(error))
+		console.error(error_text.message_of(error))
 
 		return FAILURE_EXIT_CODE
 	}

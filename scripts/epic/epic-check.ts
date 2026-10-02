@@ -4,6 +4,7 @@
  *
  * Usage: tsx scripts/epic/epic-check.ts <issue-number>
  */
+import { error_text } from '#scripts/lib/error-message'
 import { epic_cli } from './epic-cli'
 import { epic_run } from './epic-run'
 
@@ -29,6 +30,6 @@ async function main(): Promise<void> {
 try {
 	await main()
 } catch (error) {
-	console.error(`✖ ${error instanceof Error ? error.message : String(error)}`)
+	console.error(`✖ ${error_text.message_of(error)}`)
 	process.exit(FAILURE_EXIT_CODE)
 }

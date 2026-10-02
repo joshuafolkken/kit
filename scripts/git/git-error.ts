@@ -1,8 +1,5 @@
+import { error_text } from '#scripts/lib/error-message'
 import { has_stderr_field } from './git-gh-exec'
-
-function get_error_message(error: unknown): string {
-	return error instanceof Error ? error.message : String(error)
-}
 
 function get_stderr_from_error(cause: Error): string | undefined {
 	if (!has_stderr_field(cause)) return undefined
@@ -46,7 +43,7 @@ function display_error_details(cause: unknown): void {
 }
 
 function handle(error: unknown): void {
-	const error_message = get_error_message(error)
+	const error_message = error_text.message_of(error)
 
 	console.error('')
 	console.error('❌ Error:', error_message)

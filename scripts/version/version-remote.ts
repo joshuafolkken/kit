@@ -1,4 +1,5 @@
 import { git_gh_exec } from '#scripts/git/git-gh-exec'
+import { error_text } from '#scripts/lib/error-message'
 import { safe_json_parse } from './parse-json'
 import { release_age } from './release-age'
 
@@ -33,7 +34,7 @@ function fetch_latest_version(versions_endpoint: string | undefined, package_nam
 	try {
 		return git_gh_exec.exec_gh_api_sync({ path: endpoint, jq_filter: '.[0].name' }).trim()
 	} catch (error) {
-		const detail = error instanceof Error ? error.message : String(error)
+		const detail = error_text.message_of(error)
 
 		throw new Error(
 			`Failed to fetch latest version for ${package_name} via ${endpoint}: ${detail}`,

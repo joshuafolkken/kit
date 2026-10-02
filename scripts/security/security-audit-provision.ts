@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { error_text } from '#scripts/lib/error-message'
 import { security_audit } from './security-audit'
 import { security_audit_logic } from './security-audit-logic'
 import { security_audit_provision_logic, type ScannerAsset } from './security-audit-provision-logic'
@@ -13,10 +14,6 @@ const FAILURE_STAMP_PREFIX = 'josh-audit-provision-'
 const FORCE_FLAG = '--force'
 const PATH_LOCATION = 'on PATH'
 const { RETRY_INTERVAL_MS } = security_audit_provision_logic
-
-function describe_error(error: unknown): string {
-	return error instanceof Error ? error.message : String(error)
-}
 
 // `content` absent is the failure, and `reason` says which one. A 404 — what a bumped version whose
 // asset was renamed looks like, and the one failure that never fixes itself — would otherwise read
@@ -41,7 +38,7 @@ async function download(url: string, timeout_ms: number): Promise<DownloadOutcom
 
 		return { content: Buffer.from(await response.arrayBuffer()), reason: '' }
 	} catch (error) {
-		return { reason: describe_error(error) }
+		return { reason: error_text.message_of(error) }
 	}
 }
 
@@ -128,7 +125,7 @@ async function attempt(
 	} catch (error) {
 		return record_failure(
 			target_path,
-			security_audit_provision_logic.format_provision_error(describe_error(error)),
+			security_audit_provision_logic.format_provision_error(error_text.message_of(error)),
 		)
 	}
 }
@@ -175,7 +172,9 @@ async function main(): Promise<void> {
 	try {
 		console.info(await report(PROJECT_ROOT, process.platform, process.arch, is_forced))
 	} catch (error) {
-		console.warn(security_audit_provision_logic.format_provision_error(describe_error(error)))
+		console.warn(
+			security_audit_provision_logic.format_provision_error(error_text.message_of(error)),
+		)
 	}
 }
 

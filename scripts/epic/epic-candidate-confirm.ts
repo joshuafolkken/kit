@@ -1,3 +1,4 @@
+import { error_text } from '#scripts/lib/error-message'
 import { epic_classify, type ResolveDependency } from './epic-classify'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 import type { BlockersReader } from './epic-relation-recheck'
@@ -118,7 +119,7 @@ async function read_or_withhold(
 	try {
 		return await read_blockers(candidate)
 	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error)
+		const reason = error_text.message_of(error)
 
 		console.warn(
 			`⚠ could not confirm the blockers of #${String(candidate.number)}: ${reason}\n` +

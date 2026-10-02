@@ -10,6 +10,7 @@
  *        tsx scripts/epic/epic.ts --remove <E> <M> <N> ... [--decision-file <path|->]
  */
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import { error_text } from '#scripts/lib/error-message'
 import { epic_add, type AddChildrenInput } from './epic-add'
 import { epic_cli, type AddArguments, type CrossRepoAddTarget } from './epic-cli'
 import { epic_reconcile } from './epic-reconcile'
@@ -187,6 +188,6 @@ async function main(): Promise<void> {
 try {
 	await main()
 } catch (error) {
-	console.error(`✖ ${error instanceof Error ? error.message : String(error)}`)
+	console.error(`✖ ${error_text.message_of(error)}`)
 	process.exit(FAILURE_EXIT_CODE)
 }

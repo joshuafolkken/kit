@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { file_reader } from '#scripts/lib/read-file'
 
 // `josh cases <path...>` (joshuafolkken/kit#2246): read the changed paths and answer which I/O
 // boundaries the code crosses — network, process start, filesystem — then name the abnormal cases
@@ -63,11 +63,7 @@ const BOUNDARIES: ReadonlyArray<BoundaryDefinition> = [
 // A path that cannot be read counts as no boundary rather than an error: a deleted or renamed path in
 // a diff is still passed in, and the answer for it is simply "nothing crossed here".
 function read_file(path: string): string {
-	try {
-		return readFileSync(path, 'utf8')
-	} catch {
-		return ''
-	}
+	return file_reader.read_if_readable(path) ?? ''
 }
 
 // The distinct boundaries any of the paths cross. The content is joined and each boundary is tested

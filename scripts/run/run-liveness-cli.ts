@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { error_text } from '#scripts/lib/error-message'
 import { run_issue_number } from './run-issue-number'
 import {
 	MS_PER_MINUTE,
@@ -150,7 +151,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	try {
 		return report(await run_liveness.check(request))
 	} catch (error) {
-		return report_undetermined(error instanceof Error ? error.message : String(error))
+		return report_undetermined(error_text.message_of(error))
 	}
 }
 

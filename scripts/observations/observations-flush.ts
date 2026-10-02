@@ -1,6 +1,7 @@
 import { git_command } from '#scripts/git/git-command'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { main_sync } from '#scripts/git/main-sync'
+import { error_text } from '#scripts/lib/error-message'
 import { observation_ledger, OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger'
 import type { BrokenLine } from './observation-ledger-line'
 import { observation_ledger_prepare } from './observation-ledger-prepare'
@@ -81,10 +82,6 @@ function other_changed_paths(status_output: string): ReadonlyArray<string> {
 	return status_paths(status_output).filter(
 		(file_path) => !observation_ledger.is_ledger_path(file_path),
 	)
-}
-
-function message_of(error: unknown): string {
-	return error instanceof Error ? error.message : String(error)
 }
 
 // **The branch a failed flush leaves behind holds the only copy of those lines**, because the working
@@ -206,7 +203,9 @@ async function catch_up_default(default_branch: string): Promise<void> {
 	try {
 		await git_command.merge_fast_forward(default_branch)
 	} catch (error) {
-		throw new Error(behind_default_message(default_branch, message_of(error)), { cause: error })
+		throw new Error(behind_default_message(default_branch, error_text.message_of(error)), {
+			cause: error,
+		})
 	}
 }
 
@@ -243,7 +242,9 @@ async function return_to_default_branch(default_branch: string): Promise<void> {
 	try {
 		await git_command.fast_forward_local(default_branch)
 	} catch (error) {
-		throw new Error(`${FAST_FORWARD_FAILURE_MESSAGE} ${message_of(error)}`, { cause: error })
+		throw new Error(`${FAST_FORWARD_FAILURE_MESSAGE} ${error_text.message_of(error)}`, {
+			cause: error,
+		})
 	}
 
 	const exit_code = await main_sync.run([])
@@ -259,7 +260,9 @@ async function push_and_open(branch_name: string): Promise<string> {
 
 		return await git_gh_command.pr_create(COMMIT_MESSAGE, pull_request_body(), 'ignore-for-release')
 	} catch (error) {
-		throw new Error(stranded_branch_message(branch_name, message_of(error)), { cause: error })
+		throw new Error(stranded_branch_message(branch_name, error_text.message_of(error)), {
+			cause: error,
+		})
 	}
 }
 
@@ -280,7 +283,7 @@ async function roll_back(branch_name: string, default_branch: string): Promise<s
 
 		return undefined
 	} catch (error) {
-		return message_of(error)
+		return error_text.message_of(error)
 	}
 }
 
@@ -316,9 +319,12 @@ async function commit_ledger(branch_name: string, default_branch: string): Promi
 	} catch (error) {
 		const roll_back_reason = await roll_back(branch_name, default_branch)
 
-		throw new Error(rejection_message(branch_name, message_of(error), roll_back_reason), {
-			cause: error,
-		})
+		throw new Error(
+			rejection_message(branch_name, error_text.message_of(error), roll_back_reason),
+			{
+				cause: error,
+			},
+		)
 	}
 }
 
@@ -346,7 +352,9 @@ async function land(
 	try {
 		await observations_flush_landing.wait_for_landing(branch_name, is_auto_merge)
 	} catch (error) {
-		throw new Error(stranded_branch_message(branch_name, message_of(error)), { cause: error })
+		throw new Error(stranded_branch_message(branch_name, error_text.message_of(error)), {
+			cause: error,
+		})
 	}
 
 	await return_to_default_branch(default_branch)

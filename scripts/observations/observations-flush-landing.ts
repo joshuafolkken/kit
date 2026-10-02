@@ -1,6 +1,7 @@
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import type { OpenPull } from '#scripts/git/git-gh-pr-auto-merge'
 import { git_pr_checks } from '#scripts/git/git-pr-checks'
+import { error_text } from '#scripts/lib/error-message'
 
 // **A flush pull request lands whether or not the flush that opened it is still alive**
 // (joshuafolkken/kit#2497). The merge used to happen only inside the flush's own wait, so a session
@@ -25,7 +26,7 @@ async function request_auto_merge(branch_name: string): Promise<boolean> {
 
 		return true
 	} catch (error) {
-		console.warn(AUTO_MERGE_WARNING, error instanceof Error ? error.message : String(error))
+		console.warn(AUTO_MERGE_WARNING, error_text.message_of(error))
 
 		return false
 	}

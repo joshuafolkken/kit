@@ -1,3 +1,4 @@
+import { error_text } from '#scripts/lib/error-message'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 import { epic_parse } from './epic-parse'
 
@@ -57,7 +58,7 @@ async function reread_child(child: EpicChild, read_blockers: BlockersReader): Pr
 	try {
 		return { ...child, blocked_by: await read_blockers(child) }
 	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error)
+		const reason = error_text.message_of(error)
 
 		console.warn(
 			`⚠ could not re-read the blockers of #${String(child.number)}: ${reason}\n` +

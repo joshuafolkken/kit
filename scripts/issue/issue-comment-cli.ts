@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { cli_body } from '#scripts/josh/cli-body'
+import { error_text } from '#scripts/lib/error-message'
 
 // `josh issue:comment <N> --body <text> | --body-file <path>` — post one comment to an issue (a PR
 // comment is an issue comment over REST) and print the comment URL (joshuafolkken/kit#2304).
@@ -66,7 +67,7 @@ function resolve_request(argv: ReadonlyArray<string>): CommentRequest | undefine
 
 		return request
 	} catch (error) {
-		console.error(error instanceof Error ? error.message : String(error))
+		console.error(error_text.message_of(error))
 
 		return undefined
 	}

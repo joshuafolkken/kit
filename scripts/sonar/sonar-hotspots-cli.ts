@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { git_command } from '#scripts/git/git-command'
+import { error_text } from '#scripts/lib/error-message'
 import { managed_config_scope } from '#scripts/sync/managed-config-scope'
 import { z } from 'zod'
 import {
@@ -69,7 +70,7 @@ async function fetch_hotspots(url: string): Promise<HotspotFetch> {
 
 		return { hotspots: parsed.hotspots ?? [] }
 	} catch (error) {
-		return { error: error instanceof Error ? error.message : String(error) }
+		return { error: error_text.message_of(error) }
 	}
 }
 

@@ -8,6 +8,7 @@ import {
 	ENHANCEMENT_LABEL,
 	type ReleaseClassification,
 } from '#scripts/git/issue-labels'
+import { error_text } from '#scripts/lib/error-message'
 import { z } from 'zod'
 
 const CLASSIFICATION_SET: ReadonlySet<string> = new Set(CLASSIFICATION_LABELS)
@@ -102,7 +103,7 @@ function fetch_current_labels(repository: string, pull_number: number): Readonly
 
 		return names.split('\n').filter((name) => name !== '')
 	} catch (error) {
-		const detail = error instanceof Error ? error.message : String(error)
+		const detail = error_text.message_of(error)
 
 		throw new Error(`Could not read the pull request labels: ${detail}`, { cause: error })
 	}

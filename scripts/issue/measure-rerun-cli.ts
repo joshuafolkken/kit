@@ -2,6 +2,7 @@
 import { execSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
+import { error_text } from '#scripts/lib/error-message'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { baseline_measure, type Baseline } from './baseline-measure'
 
@@ -21,7 +22,7 @@ function measure(command: string): string {
 	try {
 		return execSync(command, { encoding: 'utf8' }).trim()
 	} catch (error) {
-		return `(command failed: ${error instanceof Error ? error.message : String(error)})`
+		return `(command failed: ${error_text.message_of(error)})`
 	}
 }
 
