@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 const API_URL = 'https://api.github.com/repos/joshuafolkken/kit/releases'
 const WORKFLOW_RUNS_URL =
-	'https://api.github.com/repos/joshuafolkken/kit/actions/workflows/publish.yml/runs?event=repository_dispatch&per_page=100'
+	'https://api.github.com/repos/joshuafolkken/kit/actions/workflows/publish.yml/runs?per_page=100'
 const WORKFLOW_JOBS_URL = 'https://api.github.com/repos/joshuafolkken/kit/actions/runs'
 const TAG_PATTERN = /^v\d+\.\d+\.\d+(?:[.-][0-9A-Za-z.-]+)?$/u
 const REQUEST_TIMEOUT_MS = 30_000
