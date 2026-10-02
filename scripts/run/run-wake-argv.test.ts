@@ -1,4 +1,5 @@
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { describe, expect, it, vi } from 'vitest'
 import { detached_launch } from './detached-launch'
@@ -17,6 +18,8 @@ const NAMED_INVOCATION = 'backlogrun #1762 #1749'
 const NAMED_EPIC = 'backlogrun #2663 --only'
 const REMAINING_CHILD = '#2668 remains'
 const SKIP_PERMISSIONS = 'dangerously-skip-permissions'
+const LONG_STDERR_LINES = 2000
+const EPIC_RESUME = 'resume: --owner 83431 --only'
 
 // The CLI version probe is the diagnostics' own test; here it would depend on the machine's CLI.
 vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
@@ -67,6 +70,18 @@ function prompt_of(invocation: string): string | undefined {
 	const built = run_wake_session.wake_argv(invocation)
 
 	return built?.kind === 'argv' ? built.argv.args.at(-1) : undefined
+}
+
+// The prompt a judgment handoff launches with, defined only once the whole argv passes the launch check.
+function handoff_prompt_of(material: string): string | undefined {
+	const built = run_wake_session.wake_argv(NAMED_EPIC, undefined, undefined, {
+		id: 'session',
+		material,
+	})
+	if (built?.kind !== 'argv') return undefined
+	expect(detached_launch.is_safe_argv(built.argv)).toBe(true)
+
+	return built.argv.args.at(-1)
 }
 
 // The recorded invocation is taken apart and composed again out of this file's own constants and the
@@ -147,7 +162,7 @@ describe('run_wake_session.wake_argv — a named-issue backlogrun', () => {
 describe('run_wake_session.wake_argv — a judgment handoff', () => {
 	it('launches a named epic continuation with its driver result and resume instruction', () => {
 		const result = run_wake_driver.driver_result(
-			'epic #2663\nresume: --owner 83431 --only',
+			`epic #2663\n${EPIC_RESUME}`,
 			{ kind: 'none' },
 			REMAINING_CHILD,
 		)
@@ -166,17 +181,50 @@ describe('run_wake_session.wake_argv — a judgment handoff', () => {
 		expect(detached_launch.is_safe_argv(built.argv)).toBe(true)
 		expect(built.argv.args.at(-1)).toContain(NAMED_EPIC)
 		expect(built.argv.args.at(-1)).toContain(REMAINING_CHILD)
-		expect(built.argv.args.at(-1)).toContain('resume: --owner 83431 --only')
+		expect(built.argv.args.at(-1)).toContain(EPIC_RESUME)
+	})
+})
+
+describe('run_wake_session.wake_argv — handoff material the launch check would refuse', () => {
+	// joshuafolkken/kit#2931: the material is the driver's own output, so a control character in it is
+	// flattened to a space rather than failing the launch and stopping the supervisor.
+	it.each(['\t', '\r', '\u{0}', '\u{1B}'])(
+		'flattens a %j in handoff material into a launch',
+		(unsafe) => {
+			const prompt = handoff_prompt_of(`resume: --owner 83431${unsafe}--only`)
+
+			expect(prompt).toContain(EPIC_RESUME)
+		},
+	)
+
+	// joshuafolkken/kit#2931: a driver that ran for a while hands on tens of kilobytes of stderr.
+	it('launches a handoff whose driver stderr is far past the argv cap, keeping its verdict and resume line', () => {
+		const stderr = Array.from(
+			{ length: LONG_STDERR_LINES },
+			(_, index) => `candidate\t#${String(index)}`,
+		)
+		const result = run_wake_driver.driver_result(
+			'blocked over #2931\nresume: --owner 2608 --max 5',
+			{ kind: 'none' },
+			stderr.join('\n'),
+		)
+
+		expect(result.kind).toBe('judgment')
+		if (result.kind !== 'judgment') return
+
+		const prompt = handoff_prompt_of(result.material)
+
+		expect(prompt).toContain('Driver result: blocked over #2931')
+		expect(prompt).toContain('resume: --owner 2608 --max 5')
+		expect(prompt).toContain(`candidate #${String(LONG_STDERR_LINES - 1)}`)
 	})
 
-	it.each(['\t', '\r', '\u{0}'])('keeps a %s in handoff material out of a launch', (unsafe) => {
-		const built = run_wake_session.wake_argv(NAMED_EPIC, undefined, undefined, {
-			id: 'session',
-			material: `resume: --owner 83431${unsafe}--only`,
-		})
+	it('caps the prompt even when the material alone is past the argv cap', () => {
+		const prompt = handoff_prompt_of(
+			`resume: --owner 1 | ${'x'.repeat(agent_role_profile.MAX_VALUE_LENGTH)}`,
+		)
 
-		expect(built?.kind).toBe('argv')
-		if (built?.kind !== 'argv') return
-		expect(detached_launch.is_safe_argv(built.argv)).toBe(false)
+		expect(prompt?.length).toBe(agent_role_profile.MAX_VALUE_LENGTH)
+		expect(prompt).toContain('resume: --owner 1')
 	})
 })
