@@ -697,7 +697,7 @@ Order the whole opted-in backlog: auto-ok issues and the descendants of auto-ok 
 
 ### `josh backlog:offer` · `josh blo`
 
-> **Audience:** automation · **Side effects:** network
+> **Audience:** automation · **Side effects:** files, network, processes
 
 `[options]`
 
@@ -1197,9 +1197,9 @@ Claude Code hook: deliver a trigger-delivered rule at the call that binds it (re
 
 ### `josh rule:value` · `josh ruv`
 
-> **Audience:** developer · **Side effects:** none
+> **Audience:** developer · **Side effects:** files
 
-_No arguments._
+`[--refresh]`
 
 Print each delivered rule's unaided compliance — runs reached, kept rate, refusals
 

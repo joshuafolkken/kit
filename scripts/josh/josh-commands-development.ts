@@ -57,7 +57,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			"Print each delivered rule's unaided compliance — runs reached, kept rate, refusals",
 		category: 'AI tools',
-		reference: ['', 'developer', ['none']],
+		reference: ['[--refresh]', 'developer', ['files']],
 	},
 	format: {
 		script: 'scripts/lint/format.ts',

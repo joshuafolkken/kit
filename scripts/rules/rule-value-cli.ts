@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import { delivered_rules } from './delivered-rules'
 import { rule_value, type RuleReading } from './rule-value'
+import { rule_value_cache } from './rule-value-cache'
 
 // `josh rule:value` — what each delivered rule earns on the channel that carries it, one row per rule
 // (joshuafolkken/kit#2271). `rule_value.measure` was public but had no caller outside its own test, so
@@ -14,6 +15,8 @@ import { rule_value, type RuleReading } from './rule-value'
 // no measurable transcript prints `NO_TARGETS` and exits zero rather than erroring, so a fresh
 // checkout reads differently from a broken command.
 
+const ARGV_OFFSET = 2
+const REFRESH_FLAG = '--refresh'
 const PERCENT_SIGN = '%'
 const COLUMN_GAP = '  '
 const NO_TARGETS = 'no measurement targets'
@@ -98,24 +101,22 @@ function render(runs: ReadonlyArray<ReadonlyArray<string>>): string {
 		.join('\n')
 }
 
-// The loop-head call: `backlog:offer` writes this to stderr once per iteration, so a rule that never
-// fires appears as a printed row rather than as something a person has to go looking for.
-function emit(cwd: string = process.cwd()): void {
-	process.stderr.write(`${render(gather_runs(cwd))}\n`)
-}
+// `--refresh` is the detached measurement the `backlogrun` loop head starts: the reading goes to the
+// cache `backlog:offer` prints from, never to stdout (`rule-value-cache.ts`, joshuafolkken/kit#2881).
+function run_rule_value(argv: ReadonlyArray<string> = [], cwd: string = process.cwd()): number {
+	const reading = render(gather_runs(cwd))
 
-function run_rule_value(cwd: string = process.cwd()): number {
-	process.stdout.write(`${render(gather_runs(cwd))}\n`)
+	if (argv.includes(REFRESH_FLAG)) rule_value_cache.store(reading, cwd)
+	else process.stdout.write(`${reading}\n`)
 
 	return 0
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	process.exitCode = run_rule_value()
+	process.exitCode = run_rule_value(process.argv.slice(ARGV_OFFSET))
 }
 
 const rule_value_cli = {
-	emit,
 	gather_runs,
 	group_by_run,
 	render,

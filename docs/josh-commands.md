@@ -1403,7 +1403,7 @@ Run the `backlogrun` parent loop as one wait: offer, launch, await, merge, then 
 pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--only]
 ```
 
-An open carry record supplies the start time, merged count and remaining named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `triage`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. A drained backlog yields for the retrospective only when `JOSH_RETROSPECTIVE` is on (the same switch `run:step` reads, loaded from `.env`); with the switch off, or once the retrospective has run, the idle watch continues and a drained `stop` ends the run itself. Named issues are dispatched in their recorded order; `--only` reports and ends after the list. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event.
+An open carry record supplies the start time, merged count and remaining named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `triage`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. A `stop` from `run:merge` is read like the offer's: that child is collected, nothing new starts, and every child still in flight is collected before the run ends as `stop` (joshuafolkken/kit#2881). A drained backlog yields for the retrospective only when `JOSH_RETROSPECTIVE` is on (the same switch `run:step` reads, loaded from `.env`); with the switch off, or once the retrospective has run, the idle watch continues and a drained `stop` ends the run itself. Named issues are dispatched in their recorded order; `--only` reports and ends after the list. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event.
 
 ### `needs-human-review` — the opposite label
 
@@ -1576,11 +1576,12 @@ Print each delivered rule's **unaided compliance** — how far the carried text 
 
 ```bash
 pnpm josh rule:value
+pnpm josh rule:value --refresh   # write the reading to the loop-head cache instead of stdout
 ```
 
 - Transcripts are grouped by the run they belong to, so a lane's transcript counts with the parent that dispatched it rather than as a run of its own.
 - It reports and never fails: an environment with no measurable transcript prints `no measurement targets` and exits zero.
-- Called once per iteration from the `backlogrun` loop head (`josh backlog:offer`), so a rule that never fires appears as a printed row rather than as something a person has to think to measure (joshuafolkken/kit#2271). Single source: `scripts/rules/rule-value-cli.ts`.
+- Read once per iteration at the `backlogrun` loop head (`josh backlog:offer`), so a rule that never fires appears as a printed row rather than as something a person has to think to measure (joshuafolkken/kit#2271). The loop head never measures: it prints the last reading from `node_modules/.cache/josh/rule-value.txt` to stderr and, at most once every 15 minutes, starts a detached `josh rule:value --refresh` that rewrites it, so the offer never waits on the measurement and a failed one never changes its answer (joshuafolkken/kit#2881). Single sources: `scripts/rules/rule-value-cli.ts` and `scripts/rules/rule-value-cache.ts`.
 
 ### `josh clone:scan`
 
