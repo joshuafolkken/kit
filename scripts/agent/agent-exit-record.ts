@@ -1,3 +1,4 @@
+import { json_value } from '#scripts/lib/json-value'
 import { claude_result_event, type ClaudeResultEvent } from './claude-result-event'
 
 // The exit record of a dispatched lane child — the terminal `result` event a `claude -p` session
@@ -12,18 +13,10 @@ import { claude_result_event, type ClaudeResultEvent } from './claude-result-eve
 // over; a transcript with no result event at all reads as `undefined`, which the classifier treats as
 // an unreadable ending rather than guessing one.
 
-function parse_line(line: string): unknown {
-	try {
-		return JSON.parse(line)
-	} catch {
-		return undefined
-	}
-}
-
 function read_exit_record(transcript: string): ClaudeResultEvent | undefined {
 	return transcript
 		.split('\n')
-		.map((line) => claude_result_event.decode(parse_line(line)))
+		.map((line) => claude_result_event.decode(json_value.parse_or_undefined(line)))
 		.findLast((record) => record !== undefined)
 }
 

@@ -1,4 +1,4 @@
-import { parseArgs } from 'node:util'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryChange, type CarryClaimRequest, type CarryOwner } from './run-carry'
 import { run_issue_number } from './run-issue-number'
 
@@ -76,11 +76,7 @@ type Request =
 const READ_REQUEST: Request = { kind: 'read' }
 
 function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
-	try {
-		return parseArgs({ args: [...argv], options: OPTIONS, strict: true }).values
-	} catch {
-		return undefined
-	}
+	return cli_flags.parse_or_undefined({ args: [...argv], options: OPTIONS, strict: true })?.values
 }
 
 function text_of(value: OptionValue): string | undefined {

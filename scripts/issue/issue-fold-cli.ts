@@ -1,8 +1,8 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { git_command } from '#scripts/git/git-command'
 import { path_decision } from '#scripts/josh/path-decision'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { split_assess, type SplitVerdict } from '#scripts/split/split-assess'
 import { issue_fold, type FoldVerdict } from './issue-fold'
 
@@ -33,27 +33,20 @@ interface FoldArguments {
 	is_json: boolean
 }
 
-function parse_arguments(argv: ReadonlyArray<string>): FoldArguments {
-	const { values, positionals } = parseArgs({
+// An unknown flag is `undefined` rather than a throw, so the answer is the usage line rather than a
+// stack trace, on a command whose output a workflow reads.
+function read_arguments(argv: ReadonlyArray<string>): FoldArguments | undefined {
+	const parsed = cli_flags.parse_or_undefined({
 		args: [...argv],
 		options: { json: { type: 'boolean' }, 'not-separable': { type: 'boolean' } },
 		allowPositionals: true,
 	})
+	if (parsed === undefined) return undefined
 
 	return {
-		titles: positionals,
-		is_separable: values['not-separable'] !== true,
-		is_json: values.json === true,
-	}
-}
-
-// An unknown flag makes `parseArgs` throw. Caught so the answer is the usage line rather than a stack
-// trace, on a command whose output a workflow reads.
-function read_arguments(argv: ReadonlyArray<string>): FoldArguments | undefined {
-	try {
-		return parse_arguments(argv)
-	} catch {
-		return undefined
+		titles: parsed.positionals,
+		is_separable: parsed.values['not-separable'] !== true,
+		is_json: parsed.values.json === true,
 	}
 }
 

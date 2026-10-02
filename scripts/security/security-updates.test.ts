@@ -1,12 +1,18 @@
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
-import { execaSync } from 'execa'
+import type { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { security_updates } from './security-updates'
 
-vi.mock('execa', () => ({ execaSync: vi.fn() }))
+const gh_outcomes = vi.hoisted(() => vi.fn())
 
-const mocked_execa_sync = vi.mocked(execaSync)
+vi.mock('execa', async () => {
+	const { gh_execa_fixture } = await import('#scripts/git/git-gh-execa-fixture')
+
+	return { execaSync: gh_execa_fixture.honoring_reject(gh_outcomes) }
+})
+
+const mocked_execa_sync = vi.mocked(gh_outcomes)
 
 type ExecaSyncResult = ReturnType<typeof execaSync>
 
@@ -41,7 +47,7 @@ describe('read_security_updates', () => {
 		expect(mocked_execa_sync).toHaveBeenCalledWith(
 			'gh',
 			['api', `repos/${REPO}/automated-security-fixes`],
-			expect.objectContaining({ reject: false }),
+			expect.objectContaining({ cwd: PROJECT_ROOT }),
 		)
 	})
 
@@ -62,7 +68,7 @@ describe('read_security_updates robustness', () => {
 	// execa reports a spawn failure (no `gh` on PATH) as `exitCode: undefined` with `stdout`
 	// undefined too, so neither may be dereferenced.
 	it('does not crash when gh is missing entirely', () => {
-		mocked_execa_sync.mockReturnValue({} as unknown as ExecaSyncResult)
+		mocked_execa_sync.mockReturnValue({})
 
 		expect(security_updates.read_security_updates(REPO)).toBe('unreadable')
 	})
@@ -74,12 +80,12 @@ describe('read_security_updates robustness', () => {
 		expect(mocked_execa_sync).toHaveBeenCalledWith(
 			'gh',
 			['api', `repos/${REPO}/automated-security-fixes`],
-			{ cwd: PROJECT_ROOT, reject: false, timeout: security_updates.GH_TIMEOUT_MS },
+			expect.objectContaining({ cwd: PROJECT_ROOT, timeout: security_updates.GH_TIMEOUT_MS }),
 		)
 	})
 
 	it('treats an undefined exit code as unreadable rather than as success', () => {
-		mocked_execa_sync.mockReturnValue({ stdout: ENABLED_BODY } as unknown as ExecaSyncResult)
+		mocked_execa_sync.mockReturnValue({ stdout: ENABLED_BODY })
 
 		expect(security_updates.read_security_updates(REPO)).toBe('unreadable')
 	})

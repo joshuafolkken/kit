@@ -1,4 +1,4 @@
-import { parseArgs } from 'node:util'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_progress_config } from './run-progress-config'
 
 // The argument half of `josh run:progress`, kept apart from the watcher so the CLI stays inside the file
@@ -37,11 +37,7 @@ interface ParsedValues {
 }
 
 function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
-	try {
-		return parseArgs({ args: [...argv], options: OPTIONS }).values
-	} catch {
-		return undefined
-	}
+	return cli_flags.parse_or_undefined({ args: [...argv], options: OPTIONS })?.values
 }
 
 // A hand-typed `--interval` outranks the environment, the environment outranks the interval the

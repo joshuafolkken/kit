@@ -1,10 +1,16 @@
-import { execaSync } from 'execa'
+import type { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetch_latest_version, fetch_release_times, with_page_size } from './version-remote'
 
-vi.mock('execa', () => ({ execaSync: vi.fn() }))
+const gh_outcomes = vi.hoisted(() => vi.fn())
 
-const mocked_execa_sync = vi.mocked(execaSync)
+vi.mock('execa', async () => {
+	const { gh_execa_fixture } = await import('#scripts/git/git-gh-execa-fixture')
+
+	return { execaSync: gh_execa_fixture.honoring_reject(gh_outcomes) }
+})
+
+const mocked_execa_sync = vi.mocked(gh_outcomes)
 
 type ExecaSyncResult = ReturnType<typeof execaSync>
 
@@ -26,9 +32,11 @@ function fake_stdout(stdout: string): ExecaSyncResult {
 }
 
 function expect_gh_call(endpoint: string): void {
-	expect(mocked_execa_sync).toHaveBeenCalledWith('gh', ['api', endpoint, '--jq', '.[0].name'], {
-		reject: false,
-	})
+	expect(mocked_execa_sync).toHaveBeenCalledWith(
+		'gh',
+		['api', endpoint, '--jq', '.[0].name'],
+		expect.anything(),
+	)
 }
 
 beforeEach(() => {
@@ -154,7 +162,7 @@ describe('fetch_release_times', () => {
 				'--jq',
 				TIMES_JQ,
 			],
-			{ reject: false },
+			expect.anything(),
 		)
 	})
 })
