@@ -2,14 +2,11 @@
 
 `@joshuafolkken/kit` distributes the documents and skills that decide how an AI agent behaves in a
 project: `CLAUDE.md` (the rules), `AGENTS.md` / `GEMINI.md` (pointers to it), `prompts/` and
-`.claude/skills/`. Until
-[joshuafolkken/kit#855](https://github.com/joshuafolkken/kit/issues/855) there was no way to tell
-whether editing them changed anything. Every observed violation was answered with more prose, and
-prose was the only evidence in either direction — so a rule that never worked looked exactly like one
-that did, and nothing was ever deleted.
-
-`pnpm josh eval` is the measurement. It replays a handful of representative situations against a real
-agent and judges each one on **what the agent did**, never on what it said.
+`.claude/skills/`. `pnpm josh eval` measures whether editing them changed what an agent does. It
+replays a handful of representative situations against a real agent and judges each one on **what the
+agent did**, never on what it said. Why it exists, and how each rule below was reached, is in
+[eval-rationale.md](./maintainers/eval-rationale.md) — `docs/maintainers/eval-rationale.md` → "Why the
+suite exists".
 
 ## Running it
 
@@ -23,15 +20,12 @@ JOSH_EVAL_CONCURRENCY=2 pnpm josh eval  # fewer sessions at a time (default: 5)
 Each scenario is a real Claude session, so a full run costs tokens and takes minutes. It is
 **deliberately not part of CI**: it runs when a distributed document, a skill or a hook changes — the
 moment its answer is worth paying for. **Which change that is, is decided by a command rather than by
-eye** (see "When it runs" below).
+eye** (see "When to run it" below).
 
 **The scenarios run side by side, up to five at a time.** Each builds its own sandbox and spawns its
 own session, so nothing about them has to be serialized, and the suite's wall-clock is close to its
-slowest scenario rather than the sum of all of them. They used to run one at a time with a 20-second
-pause between them, on the stated grounds that "the scenarios share one API rate budget" — a cause
-[#1001](https://github.com/joshuafolkken/kit/issues/1001) went looking for and did not find: what it
-measured instead was `API Error: Unable to connect to API (ConnectionRefused)`, which is a connection
-failure rather than throttling ([#1144](https://github.com/joshuafolkken/kit/issues/1144)).
+slowest scenario rather than the sum of all of them (`docs/maintainers/eval-rationale.md` → "Why the
+scenarios run side by side").
 
 The width is a cap rather than a fan-out: five is the number the suite's five scenarios were measured
 at, so a suite that grows does not silently start testing a wider one. Lower it with
@@ -46,12 +40,8 @@ scenario held.
 
 `pnpm josh eval` is a **manual** command. Run it by hand when you change a distributed document, a
 skill or a hook and want to know whether the change moved what an agent does. It is **deliberately not
-part of CI**, and since [joshuafolkken/kit#1922](https://github.com/joshuafolkken/kit/issues/1922) it
-is wired into no verification or completion gate at all: one run is five real Claude sessions, and on
-the tree this shipped from the suite almost never reached `held`, so the wait it added to every
-distributed-document change was not worth paying automatically. The scenarios' unreliability is its own
-Issue; the command stays exactly so a `blocked` verdict's baseline and confirmation readings — and any
-diagnosis of the scenarios themselves — remain possible.
+part of CI**, and it is wired into no verification or completion gate at all
+(`docs/maintainers/eval-rationale.md` → "Why it is wired into no gate").
 
 **What is worth measuring** is a change under the paths a scenario can see: `CLAUDE.md`, `AGENTS.md`,
 `GEMINI.md`, `.claude/skills/**`, `prompts/**`, `.claude/settings.json`. That set is what the sandbox
@@ -78,10 +68,8 @@ when every scenario passed, so a failed run and one that measured nothing exit a
 | `unreachable` | the suite could not reach the API (`⚠`)  | nothing was measured — say so, naming the connection                       |
 
 **`unreachable` is the narrow half of `unmeasured`.** Both leave the rules unmeasured and neither
-blocks a merge, so the fourth word buys nothing at the merge and everything at the report: a reader
-sent to the `?` lines to fix the harness or the prompt found nothing wrong with either, because the
-fault was a refused connection (joshuafolkken/kit#1197). Under its own word the suite says which one
-to look at, and a run of them three days running is visible as three of the same word.
+blocks a merge; `unreachable` says the fault was a refused connection rather than the harness or the
+prompt (`docs/maintainers/eval-rationale.md` → "Why `unreachable` is its own verdict").
 
 **One refused session earns the word; two stop the suite.** The verdict is `unreachable` as soon as a
 single `⚠` line appears, which says only that this run did not measure every scenario — the other
@@ -91,37 +79,15 @@ each one is a whole Claude session that meets the same refusal. **Which scenario
 depends on the width**, so read the `⚠` lines rather than the count: only the ones whose note says
 `session not started` were skipped, and on a run where every scenario was dequeued there are none.
 
-**At the shipped default it saves less than it looks like.** Five scenarios and a width of five means
-every scenario is dequeued before the first verdict returns, so no scenario is ever queued and the
-only sessions left to skip are retries — and a refused session is not retried in the first place. So
-on the run this was written for, where every session meets the same refusal, the tally skips nothing
-at all: the five sessions were already in flight, and none of them would have made a second attempt.
-What it does save is the mixed run — refusals accumulating while other scenarios come back merely
-inconclusive — where it stops up to three of those retries, and any suite wider than its pool, where
-everything still queued is skipped. Lower `JOSH_EVAL_CONCURRENCY` and the queue, and the saving,
-appear at five scenarios too.
-
 **A `blocked` verdict is confirmed, then attributed, before it blocks.** One scenario is one real
-Claude session, so its verdict is a sample rather than a fact: measured on
-[joshuafolkken/kit#1071](https://github.com/joshuafolkken/kit/issues/1071), `no-implicit-workflow`
-failed 2 of 10 readings of an **unchanged** tree. Reading each side once therefore manufactures
-`held → failed` about one time in six on its own, which is what stopped the merge on
-joshuafolkken/kit#1062. So re-run the failing scenario alone against **the same tree** first
-(`pnpm josh eval <name>`): a second reading that holds means the scenario disagreed with itself, and
-there is no pair to form — record both readings, file the instability as its own Issue against that
-scenario unless one is already open, and continue. A second reading that fails again belongs to the
-tree, and the attribution follows. A confirmation that measures nothing (`?`) is re-read once more,
-and if it still will not measure the whole run is reported `unmeasured`.
-
-**That is a trade, and not a uniformly favorable one.** A rule that stopped working outright fails
-both readings and is a real regression; one that only _sometimes_ fires can pass the second reading
-and slip through — at 7 failures in 10 readings it gets through about 3 times in 10, which is larger
-than the one-in-six false alarm being removed. What it buys is a check that is reliable rather than
-one that is strictly stronger, and the reason is about behavior rather than probability: a check that
-fails at random is one people learn to argue with, and the next real failure is then
-attributed away with the reasoning the false ones taught. Filing the disagreement against the
-scenario is what keeps it honest — a rule failing half its readings surfaces as a ruler nobody can
-read rather than as silence.
+Claude session, so its verdict is a sample rather than a fact. So re-run the failing scenario alone
+against **the same tree** first (`pnpm josh eval <name>`): a second reading that holds means the
+scenario disagreed with itself, and there is no pair to form — record both readings, file the
+instability as its own Issue against that scenario unless one is already open, and continue. A second
+reading that fails again belongs to the tree, and the attribution follows. A confirmation that measures
+nothing (`?`) is re-read once more, and if it still will not measure the whole run is reported
+`unmeasured`. Why a second reading rather than one: `docs/maintainers/eval-rationale.md` → "Why a
+`blocked` verdict is confirmed before it blocks".
 
 The suite measures the whole distribution rather than the diff, so a red scenario may also predate
 the change — which is why the unit is a pair of readings. Re-run that one scenario against the
@@ -138,12 +104,10 @@ CLI included, is `unmeasured` too. **A run nobody saw hold is never reported as 
 **`unmeasured` is never evidence that the rules held.** It is a statement about who could not measure,
 not that the rules held — the run reports what it did not learn, and saying so is required rather than
 optional. A report that lists the verdict without saying the measurement was not obtained has reported
-a pass it does not have. In particular, "measured and held" and "could not measure" must not both read
-as "nothing was wrong": the measurement kit#907 added exists to catch a distributed document degrading
-while every other check stays green, and an unmeasured run is exactly that not happening
-(joshuafolkken/kit#1001).
+a pass it does not have. "Measured and held" and "could not measure" must not both read as "nothing
+was wrong" (`docs/maintainers/eval-rationale.md` → "Why an unmeasured run is never green").
 
-**What an unmeasured scenario tells you now.** The report names what happened, because the cases need
+**What an unmeasured scenario tells you.** The report names what happened, because the cases need
 different fixes:
 
 | The report says                                            | What it means                                                                                                                                                             |
@@ -152,45 +116,20 @@ different fixes:
 | `session exited N after starting, before calling any tool` | It ran and then stopped without acting. The reason follows the colon; `API Error: Unable to connect to API (ConnectionRefused)` is the one observed so far.               |
 | `session timed out …`                                      | The 10-minute per-session limit ended it. Named from its own flag, because a signal-terminated process reports **no** exit code at all — so the number would say nothing. |
 | `session was killed by <signal> …`                         | Something else ended it — an OOM killer, a harness watchdog. Distinct from both a timeout and a failed start, which otherwise arrive looking identical.                   |
-| `… : <reason>`                                             | The reason, from stderr, or from the stream's own failing `result` event when stderr said nothing — which was every case observed across joshuafolkken/kit#908.           |
+| `… : <reason>`                                             | The reason, from stderr, or from the stream's own failing `result` event when stderr said nothing.                                                                        |
 
-**The suite no longer paces itself.** Running sessions back to back was the first suspected cause of
-an empty transcript — across joshuafolkken/kit#908 the suite degraded run over run at a 20-second
-spacing (4/5 scenarios held, then 2/5, then no verdict at all, then 1/5) while every one of those
-same scenarios held when run on its own moments later — so a 20-second pause went between scenarios
-and a 60-second one before the single retry.
+**The suite does not pace itself.** No pause goes between scenarios, and an inconclusive verdict is
+retried once, after a 5-second wait — except a refused session (`⚠`), which is not retried at all.
 
-**That explanation did not hold up.** The first run to print a reason named something else entirely —
-`API Error: Unable to connect to API (ConnectionRefused)`, on every inconclusive scenario, after the
-session had started (joshuafolkken/kit#1001). Raising the spacing to 45 seconds and adding a second
-retry at 180 recovered nothing while nearly doubling the worst-case suite time. The inter-scenario
-pause is therefore gone and the retry waits 5 seconds rather than 60: a wait that was never shown to
-prevent anything, and under a pool it holds a slot for the whole time
-(joshuafolkken/kit#1144). **The retry itself is unchanged** — one attempt, only for an inconclusive
-verdict.
+**A session never inherits its parent's connection.** The harness removes the parent Claude session's
+`CLAUDE_CODE_MESSAGING_SOCKET` and the three variables beside it from each session's environment, in
+`session_environment`, so nothing has to be set by hand. **A proxy on this machine's own interface is
+removed with them** — an `HTTPS_PROXY` naming a loopback port; **a proxy naming a real host is left
+exactly as it was**, so a machine that reaches the API through its network's proxy is untouched.
 
-**The cause was found, and it was neither pacing nor width.** A session spawned from inside a Claude
-session inherited the parent's own `CLAUDE_CODE_MESSAGING_SOCKET` — a UNIX socket only the parent
-listens on — dialled it, and was refused; lowering `JOSH_EVAL_CONCURRENCY`, the suspected cause,
-made it worse. Removing that variable and the three beside it from the child's environment restored
-5/5 held in 54 seconds (joshuafolkken/kit#1158, carried into joshuafolkken/kit#1197). The harness now
-does that itself, in `session_environment`, so nothing has to be set by hand.
-
-**A proxy on this machine's own interface is removed with them** (joshuafolkken/kit#1760). Whatever
-wraps this machine's package manager may stand a scanning proxy up on a loopback port and write
-`HTTPS_PROXY` into everything the invocation spawns — and a session that inherits it dials that port
-instead of the API. `josh run:wake` is where it was found, because a detached supervisor outlives the
-invocation and the port is gone by the time it wakes anything; the eval suite spawns its sessions
-while that proxy is still listening, so it was never the one failing. It is removed here all the
-same: neither launcher starts a package install, and a proxy that exists to inspect package downloads
-has no business carrying a session's API traffic. **A proxy naming a real host is left exactly as it
-was**, so a machine that reaches the API through its network's proxy is untouched.
-
-**That fix does not retire the defense built beside it.** A connection can fail again for reasons
-that have nothing to do with an inherited socket, and the failure mode being closed here is the one
-where the suite pays for five sessions and returns `unmeasured` — so a refused connection is now
-reported under its own verdict and stops the suite starting further sessions, whatever caused it. To
-check where it stands after changing anything here:
+**A refused connection is reported under its own verdict and stops the suite starting further
+sessions, whatever caused it.** How the cause was found: `docs/maintainers/eval-rationale.md` → "How
+the connection failures were found". To check where it stands after changing anything here:
 
 ```bash
 pnpm josh eval <one-scenario>   # must hold on its own
@@ -230,7 +169,7 @@ Verdict: blocked — a scenario failed; fix the rule its → line names before m
 ```
 
 The last line is what a run means for a merge, in one token — `held`, `blocked`, `unmeasured` or
-`unreachable` ("When it runs" above). A failure names three things: the expectation that broke, the sentence explaining **why that call was
+`unreachable` ("When to run it" above). A failure names three things: the expectation that broke, the sentence explaining **why that call was
 the evidence**, and the calls the run actually made. The `→` line is the one to act on — it points at
 the rule, so a red scenario tells you which prose to change rather than only that something went
 wrong.
@@ -275,25 +214,12 @@ until it passes would turn the suite into a slot machine.
 
 **The gate's same-tree confirmation is not that retry, and it is not in the harness.** It is a second
 reading a person or an agent takes after a `blocked` verdict, and a disagreement between the two is
-recorded and filed against the scenario rather than read as a pass ("When it runs" above). The
+recorded and filed against the scenario rather than read as a pass ("When to run it" above). The
 harness still reports the first reading exactly as it found it.
 
-**A batch of sessions can stop starting, and nobody has established why.** What was observed while
-building this suite: each scenario passes when run on its own, while a full run returned complete
-transcripts for the first two and empty ones for the rest — and after several full runs in one
-sitting, even the first scenario stopped starting. That was read as a shared upstream budget being
-exhausted, which nobody had measured; what the first reason to be printed actually named was
-`ConnectionRefused` (joshuafolkken/kit#1001). Pacing was the mitigation, and it was never shown to
-prevent anything, so it is gone (joshuafolkken/kit#1144).
-
-One thing that _was_ measured, on joshuafolkken/kit#1144: the symptom tracks how many Claude sessions
-that machine is running at once, not how closely one run's scenarios follow each other. Two eval
-runners left running as orphans were enough to make the next scenario fail with `ConnectionRefused`
-twice in a row; the same scenario held once they were stopped, and a five-wide run of the whole suite
-held 5/5. **So look at what else is running before concluding anything.**
-
-The practical rule is unchanged: a run of consecutive inconclusive verdicts is a statement about the
-harness or its surroundings, not about the rules. Run the scenarios one at a time
+**A run of consecutive inconclusive verdicts is a statement about the harness or its surroundings, not
+about the rules.** The symptom tracks how many Claude sessions the machine is running at once, so
+**look at what else is running before concluding anything**. Run the scenarios one at a time
 (`pnpm josh eval <name>`), lower `JOSH_EVAL_CONCURRENCY`, or come back later, before concluding
 anything from them.
 
@@ -307,10 +233,8 @@ is reported as the violation it is; a _missing_ required call is thrown out as i
       → fix the harness or the prompt; this says nothing about the rule
 ```
 
-This is not hypothetical. While the suite was being built, an unclosed stdin pipe made the CLI stall
-for three seconds and every transcript came back empty — and three prohibition scenarios reported
-green while measuring nothing. An inconclusive verdict is neither a pass nor a silent one, and it
-points at the harness rather than at the rule.
+An inconclusive verdict is neither a pass nor a silent one, and it points at the harness rather than
+at the rule (`docs/maintainers/eval-rationale.md` → "Why a partly-run session is not thrown out").
 
 Beyond that guard, a prohibition scenario is only as good as a prompt that would genuinely tempt the
 violation. That is the part to review when adding one.
