@@ -11,8 +11,10 @@ half: what you actually run to find out whether a command already touched them, 
 one change that is expected. It applies after `pnpm update`, `josh latest`, `pnpm josh overrides`,
 a Dependabot merge, or any other command that can rewrite dependency versions.
 
-The canonical extended reference is `prompts/collaboration-workflow/operating-rules.md` → the overrides protection
-section; this skill is the operational procedure, and the two must agree.
+This skill is the single source of the overrides protection's procedure;
+`prompts/collaboration-workflow/operating-rules.md` only points here. Overrides were added on
+purpose — for security, compatibility or a working guarantee (for example
+`"esbuild@<=0.24.2": ">=0.25.0"` for Workers build compatibility).
 
 ## 1. Effective overrides live in the workspace — inspect both files
 
@@ -35,7 +37,8 @@ git diff -- pnpm-workspace.yaml package.json
 and confirm the effective `overrides:` block in `pnpm-workspace.yaml` and any historical
 `pnpm.overrides` declarations in `package.json` are untouched, **and** that `devDependencies`
 versions still respect the effective overrides. If any entry was removed, modified, or bumped past
-an override, restore it immediately.
+an override, restore it immediately, investigate why it changed, and report that to the user — never
+keep the change without explicit approval.
 
 `josh latest` prints its own verdict as its last overrides line (`✔ overrides unchanged (<n> from
 <file>)`, or a `⚠ overrides changed` warning), and `pnpm josh overrides` compares effective workspace

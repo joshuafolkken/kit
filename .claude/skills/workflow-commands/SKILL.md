@@ -28,16 +28,8 @@ resident in the AI documents, because it has to hold when this skill has *not* b
 - The rule applies even when the user authorized a related workflow in an earlier turn. Each
   invocation must be re-typed by the user in the current turn.
 
-**A session cut inside a declared budget is not a new invocation.** A `backlogrun` that is cut and
-resumed is still the one invocation a person typed — the keyword authorized the declared budget, and
-the cut is an execution detail of spending it. What this rule forbids is _inferring_ a workflow from a
-request's shape. **The reading covers `backlogrun` and it alone** — a `fullrun` cut still waits for
-the keyword, because a `fullrun` ends at one issue and has nothing to carry.
-
-**`backlogrun-steps.md` → "The session cut is inside the invocation" is the single source of the
-mechanism** — the record, the two commands, and what each answer means, and how a named-issue
-`backlogrun #N1 #N2 …` pins its list to what was typed while the issues it has finished live in the
-record's `done` field rather than shrinking the string.
+**A session cut inside a declared budget is not a new invocation — for `backlogrun` alone**; its
+single source is `backlogrun-steps.md` → "The session cut is inside the invocation".
 
 ## 1. Which file to read
 
