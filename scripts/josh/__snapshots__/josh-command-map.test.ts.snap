@@ -1012,7 +1012,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "start": [
-      "[--profile basic|full] [--yes] [--github] [--public]",
+      "[--profile basic|full] [--yes] [--github] [--public] [--init-command <command>]",
       "developer",
       [
         "files",
