@@ -700,3 +700,4 @@ dropping either side destroys exactly what it exists to record.
 - rf:tests | low | scripts/init/init-bootstrap.test.ts:169 | 2026-10-01 | #2866
 - rf:confidence | low | scripts/init/init-bootstrap.ts:79 | 2026-10-01 | #2866
 - rf:none | none | - | 2026-10-01 | #2866
+- rf:bug-risks | low | pnpm-lock.yaml | 2026-10-02 | #2869
