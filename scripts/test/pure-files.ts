@@ -2,9 +2,9 @@
 // GENERATED FILE — do not edit by hand.
 // Regenerate with: pnpm exec tsx scripts/test/classify-isolation.ts --write
 // Every entry is a test file the classifier judges free of the isolation requirements documented in
-// classify-isolation.ts; these files run with isolate:false in vitest.pilot.config.ts.
+// classify-isolation.ts; these files run with isolate:false as the pure project in unit-projects.ts.
 
-const PILOT_FILES: ReadonlyArray<string> = [
+const PURE_FILES: ReadonlyArray<string> = [
 	'env/index.test.ts',
 	'eslint/base-resolution.test.ts',
 	'eslint/base.test.ts',
@@ -389,8 +389,8 @@ const PILOT_FILES: ReadonlyArray<string> = [
 	'scripts/sync/workflow-pin-logic.test.ts',
 	'scripts/sync/workflow-pin-packaging.test.ts',
 	'scripts/test/http-fault-injection.test.ts',
-	'scripts/test/pilot-config.test.ts',
-	'scripts/test/pilot-files.test.ts',
+	'scripts/test/vitest-config.test.ts',
+	'scripts/test/pure-files.test.ts',
 	'scripts/test/test-declared-document-rule.test.ts',
 	'scripts/test/test-declared-logic.test.ts',
 	'scripts/test/test-declared-match.test.ts',
@@ -445,4 +445,4 @@ const PILOT_FILES: ReadonlyArray<string> = [
 	'scripts/yaml/yaml-document.test.ts',
 ]
 
-export { PILOT_FILES }
+export { PURE_FILES }

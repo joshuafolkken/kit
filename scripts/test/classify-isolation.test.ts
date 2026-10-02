@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { classify_isolation } from './classify-isolation'
 
-const { classify_pilot_files, is_pilot_candidate, render_pilot_files, requires_isolation } =
+const { classify_pure_files, is_pure_candidate, render_pure_files, requires_isolation } =
 	classify_isolation
 
 // Each string carries exactly one isolation condition from the classifier's documented five.
@@ -48,8 +48,8 @@ describe('requires_isolation — the five documented conditions', () => {
 	})
 })
 
-describe('classify_pilot_files — the generated candidate list', () => {
-	const candidates = classify_pilot_files()
+describe('classify_pure_files — the generated candidate list', () => {
+	const candidates = classify_pure_files()
 
 	it('returns a sorted, duplicate-free list of files that exist on disk', () => {
 		expect(candidates.length).toBeGreaterThan(0)
@@ -58,18 +58,18 @@ describe('classify_pilot_files — the generated candidate list', () => {
 		for (const file of candidates) expect(existsSync(file), file).toBe(true)
 	})
 
-	it('classifies every returned file as a pilot candidate', () => {
-		for (const file of candidates) expect(is_pilot_candidate(file), file).toBe(true)
+	it('classifies every returned file as a pure candidate', () => {
+		for (const file of candidates) expect(is_pure_candidate(file), file).toBe(true)
 	})
 })
 
-describe('render_pilot_files — the regenerated artifact', () => {
+describe('render_pure_files — the regenerated artifact', () => {
 	it('emits the generated banner and one quoted entry per file', () => {
-		const rendered = render_pilot_files(['a/one.test.ts', 'b/two.test.ts'])
+		const rendered = render_pure_files(['a/one.test.ts', 'b/two.test.ts'])
 
 		expect(rendered).toContain('// GENERATED FILE — do not edit by hand.')
 		expect(rendered).toContain("\t'a/one.test.ts',")
 		expect(rendered).toContain("\t'b/two.test.ts',")
-		expect(rendered).toContain('export { PILOT_FILES }')
+		expect(rendered).toContain('export { PURE_FILES }')
 	})
 })

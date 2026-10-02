@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { classify_isolation } from './classify-isolation'
-import { PILOT_FILES } from './pilot-files'
+import { PURE_FILES } from './pure-files'
 import { VITEST_INCLUDE_GLOBS } from './vitest-include-globs'
 
 function glob_to_matcher(glob: string): (file: string) => boolean {
@@ -34,29 +34,29 @@ describe('matches_main_include — root-glob branch', () => {
 	})
 })
 
-describe('PILOT_FILES — partitioning does not lose test targets', () => {
+describe('PURE_FILES — partitioning does not lose test targets', () => {
 	it('is non-empty', () => {
-		expect(PILOT_FILES.length).toBeGreaterThan(0)
+		expect(PURE_FILES.length).toBeGreaterThan(0)
 	})
 
 	it('contains no duplicate entries', () => {
-		expect(new Set(PILOT_FILES).size).toBe(PILOT_FILES.length)
+		expect(new Set(PURE_FILES).size).toBe(PURE_FILES.length)
 	})
 
 	it('all files exist on disk', () => {
-		for (const file of PILOT_FILES) {
+		for (const file of PURE_FILES) {
 			expect(existsSync(file), `${file} does not exist on disk`).toBe(true)
 		}
 	})
 
 	it('all files are covered by a main-suite include pattern', () => {
-		for (const file of PILOT_FILES) {
+		for (const file of PURE_FILES) {
 			expect(matches_main_include(file), `${file} is not covered by vitest.config.ts`).toBe(true)
 		}
 	})
 })
 
-describe('PILOT_FILES — a generated list the classifier keeps valid', () => {
+describe('PURE_FILES — a generated list the classifier keeps valid', () => {
 	// The list is produced by `pnpm exec tsx scripts/test/classify-isolation.ts --write`; widen it by
 	// rerunning that. A full-equality check against a live scan is deliberately NOT enforced here: CI
 	// runs on the branch merged with main, so a concurrent PR adding any test file would fail an exact
@@ -65,8 +65,8 @@ describe('PILOT_FILES — a generated list the classifier keeps valid', () => {
 	// listed file directly and never scans the tree, so it catches a misclassified or stale entry
 	// regardless of what else exists.
 	it('holds no file that requires isolation (misclassification guard)', () => {
-		for (const file of PILOT_FILES) {
-			expect(classify_isolation.is_pilot_candidate(file), `${file} requires isolation`).toBe(true)
+		for (const file of PURE_FILES) {
+			expect(classify_isolation.is_pure_candidate(file), `${file} requires isolation`).toBe(true)
 		}
 	})
 })
