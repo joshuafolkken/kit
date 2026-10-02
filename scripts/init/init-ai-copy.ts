@@ -101,20 +101,32 @@ function did_skip_copy_if_absent(
 	return false
 }
 
-function did_skip_workspace_yaml_copy(source_path: string, destination_path: string): boolean {
-	if (!existsSync(destination_path)) {
-		copy_ai_file(source_path, destination_path)
-		console.info(`  ✔ created   ${WORKSPACE_YAML}`)
-
-		return false
-	}
-
+// The merged file is written back, and reported as `updated`, only when the merge changed it — a
+// second `josh init` over an already-merged file reports `unchanged` (joshuafolkken/kit#2873).
+function merge_existing_workspace_yaml(source_path: string, destination_path: string): void {
 	const template = readFileSync(source_path, 'utf8')
 	const existing = readFileSync(destination_path, 'utf8')
 	const merged = init_logic.merge_workspace_yaml(existing, template)
 
-	if (merged !== existing) writeFileSync(destination_path, merged)
+	if (merged === existing) {
+		console.info(`  ✔ unchanged ${WORKSPACE_YAML}`)
+
+		return
+	}
+
+	writeFileSync(destination_path, merged)
 	console.info(`  ✔ updated   ${WORKSPACE_YAML}`)
+}
+
+function did_skip_workspace_yaml_copy(source_path: string, destination_path: string): boolean {
+	if (existsSync(destination_path)) {
+		merge_existing_workspace_yaml(source_path, destination_path)
+
+		return false
+	}
+
+	copy_ai_file(source_path, destination_path)
+	console.info(`  ✔ created   ${WORKSPACE_YAML}`)
 
 	return false
 }

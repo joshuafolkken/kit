@@ -144,13 +144,9 @@ describe('init_ai_copy.copy_ai_file — write behavior', () => {
 // writes a header, the consumer's auto-merge workflow reads that workflow as consumer-owned
 // (joshuafolkken/kit#844).
 function run_over_existing_files(existing_content: string = RAW_CONTENT): Array<string> {
-	const warn = vi.spyOn(console, 'warn').mockImplementation(() => {
-		/* suppress */
-	})
+	const warn = vi.spyOn(console, 'warn').mockImplementation(vi.fn())
 
-	vi.spyOn(console, 'info').mockImplementation(() => {
-		/* suppress */
-	})
+	vi.spyOn(console, 'info').mockImplementation(vi.fn())
 	exists_sync_mock.mockReturnValue(true)
 	// Everything already exists in this fixture, the distributed directory included: `init` declines
 	// to overwrite it, which is an ordinary skip and not a warning.
@@ -205,12 +201,8 @@ describe('init_ai_copy.run_ai_copies — unstamped workflow warning', () => {
 
 	// A permissions problem on the one file kind `init` now opens must not take the command down.
 	it('does not abort when a workflow cannot be read', () => {
-		vi.spyOn(console, 'warn').mockImplementation(() => {
-			/* suppress */
-		})
-		vi.spyOn(console, 'info').mockImplementation(() => {
-			/* suppress */
-		})
+		vi.spyOn(console, 'warn').mockImplementation(vi.fn())
+		vi.spyOn(console, 'info').mockImplementation(vi.fn())
 		exists_sync_mock.mockReturnValue(true)
 		read_file_mock.mockImplementation(() => {
 			throw new Error(READ_FAILURE)
@@ -223,9 +215,7 @@ describe('init_ai_copy.run_ai_copies — unstamped workflow warning', () => {
 describe('init_ai_copy.run_ai_copies — file mapping behavior', () => {
 	it('writes mapping destination when it does not exist', () => {
 		exists_sync_mock.mockReturnValue(false)
-		vi.spyOn(console, 'info').mockImplementation(() => {
-			/* suppress */
-		})
+		vi.spyOn(console, 'info').mockImplementation(vi.fn())
 		write_file_mock.mockClear()
 
 		init_ai_copy.run_ai_copies()
@@ -243,9 +233,7 @@ describe('init_ai_copy.run_ai_copies — file mapping behavior', () => {
 describe('init_ai_copy.run_ai_copies — copy behavior', () => {
 	it('writes file when destination does not exist', () => {
 		exists_sync_mock.mockReturnValue(false)
-		vi.spyOn(console, 'info').mockImplementation(() => {
-			/* suppress */
-		})
+		vi.spyOn(console, 'info').mockImplementation(vi.fn())
 		write_file_mock.mockClear()
 
 		init_ai_copy.run_ai_copies()
@@ -255,9 +243,7 @@ describe('init_ai_copy.run_ai_copies — copy behavior', () => {
 
 	it('calls init_sonar.copy_sonar_with_template during run', () => {
 		exists_sync_mock.mockReturnValue(false)
-		vi.spyOn(console, 'info').mockImplementation(() => {
-			/* suppress */
-		})
+		vi.spyOn(console, 'info').mockImplementation(vi.fn())
 		copy_sonar_mock.mockClear()
 
 		init_ai_copy.run_ai_copies()
@@ -271,12 +257,8 @@ describe('init_ai_copy.run_ai_copies — copy behavior', () => {
 // packed files coming from one install makes a packing regression rather than a version mismatch —
 // and the throw would end `josh init` before the sonar config and the repository-settings report.
 function silence_console(): void {
-	vi.spyOn(console, 'info').mockImplementation(() => {
-		/* suppress */
-	})
-	vi.spyOn(console, 'warn').mockImplementation(() => {
-		/* suppress */
-	})
+	vi.spyOn(console, 'info').mockImplementation(vi.fn())
+	vi.spyOn(console, 'warn').mockImplementation(vi.fn())
 }
 
 describe('init_ai_copy.run_ai_copies — directory copy', () => {
@@ -363,27 +345,42 @@ describe('init_ai_copy.run_ai_copies — CLAUDE.md import', () => {
 	})
 })
 
+// The merge is written back and reported as `updated` only when it changed the file — a second
+// `josh init` over an already-merged file reports `unchanged` (joshuafolkken/kit#2873).
 describe('init_ai_copy.run_ai_copies — pnpm-workspace.yaml merge when exists', () => {
-	it('calls merge_workspace_yaml when pnpm-workspace.yaml exists', () => {
+	const WORKSPACE_DEST = `/project/${WORKSPACE_YAML}`
+
+	beforeEach(() => {
 		get_ai_copy_files_mock.mockReturnValueOnce([WORKSPACE_YAML])
-		exists_sync_mock.mockReturnValue(true)
-		vi.spyOn(console, 'info').mockImplementation(() => {
-			/* suppress */
-		})
+		write_file_mock.mockClear()
 		merge_workspace_mock.mockClear()
+	})
+
+	it('reports unchanged without writing when the merge leaves the file as it is', () => {
+		exists_sync_mock.mockReturnValue(true)
+		const info_spy = vi.spyOn(console, 'info').mockImplementation(vi.fn())
 
 		init_ai_copy.run_ai_copies()
 
 		expect(merge_workspace_mock).toHaveBeenCalled()
+		expect(write_file_mock).not.toHaveBeenCalledWith(WORKSPACE_DEST, expect.anything())
+		expect(info_spy).toHaveBeenCalledWith(`  ✔ unchanged ${WORKSPACE_YAML}`)
+	})
+
+	it('writes the merged content and reports updated when the merge changes the file', () => {
+		exists_sync_mock.mockReturnValue(true)
+		merge_workspace_mock.mockReturnValueOnce('merged')
+		const info_spy = vi.spyOn(console, 'info').mockImplementation(vi.fn())
+
+		init_ai_copy.run_ai_copies()
+
+		expect(write_file_mock).toHaveBeenCalledWith(WORKSPACE_DEST, 'merged')
+		expect(info_spy).toHaveBeenCalledWith(`  ✔ updated   ${WORKSPACE_YAML}`)
 	})
 
 	it('creates pnpm-workspace.yaml when file does not exist', () => {
-		get_ai_copy_files_mock.mockReturnValueOnce([WORKSPACE_YAML])
 		exists_sync_mock.mockReturnValue(false)
-		vi.spyOn(console, 'info').mockImplementation(() => {
-			/* suppress */
-		})
-		write_file_mock.mockClear()
+		vi.spyOn(console, 'info').mockImplementation(vi.fn())
 
 		init_ai_copy.run_ai_copies()
 
