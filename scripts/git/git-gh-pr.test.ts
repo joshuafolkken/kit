@@ -5,7 +5,6 @@ import { git_gh_pr } from './git-gh-pr'
 import {
 	EMPTY_LISTING,
 	find_request,
-	FORK_REPO,
 	gh_api_routes,
 	gh_failure,
 	PR_BRANCH,
@@ -17,7 +16,6 @@ import {
 } from './git-gh-pr-fixture'
 import {
 	forget_pr_numbers,
-	FORK_HEAD_MESSAGE,
 	NO_PULL_REQUEST_MESSAGE,
 	UNREADABLE_PULL_REQUEST_MESSAGE,
 } from './git-gh-pr-read'
@@ -36,9 +34,6 @@ vi.mock('./git-command', () => ({
 	git_command: {
 		get_default_branch: vi.fn(),
 		branch: vi.fn(),
-		fetch_branch: vi.fn(),
-		checkout: vi.fn(),
-		merge_fast_forward: vi.fn(),
 	},
 }))
 
@@ -315,54 +310,6 @@ describe.each([
 		mocked_api.mockRejectedValue(failure)
 
 		await expect(write()).rejects.toHaveProperty('cause', failure)
-	})
-})
-
-// `gh pr checkout` was measured with `GH_DEBUG=api` and does issue one `POST /graphql` to resolve the
-// pull request; everything after it is git. Only the resolution moved (joshuafolkken/kit#1029).
-describe('pr_checkout', () => {
-	it('fetches and checks out the head branch the REST read answered', async () => {
-		await git_gh_pr.pr_checkout(PR_NUMBER)
-
-		expect(mocked_git.fetch_branch).toHaveBeenCalledWith(PR_BRANCH)
-		expect(mocked_git.checkout).toHaveBeenCalledWith(PR_BRANCH)
-	})
-
-	it('runs no gh subcommand, so nothing reaches GraphQL', async () => {
-		await git_gh_pr.pr_checkout(PR_NUMBER)
-
-		expect(mocked_command).not.toHaveBeenCalled()
-	})
-
-	// The third thing the CLI did, and the one a fetch-and-checkout pair silently drops: a branch that
-	// is already local is otherwise checked out at whatever commit the previous run left it on.
-	it('fast-forwards the branch after checking it out', async () => {
-		await git_gh_pr.pr_checkout(PR_NUMBER)
-
-		expect(mocked_git.merge_fast_forward).toHaveBeenCalledWith(PR_BRANCH)
-	})
-
-	// A fork's head is not on `origin` under this name, and `origin` may carry a different branch that
-	// answers to it — which would be checked out silently.
-	it('refuses a head branch that lives in another repository', async () => {
-		const fork_routes = pr_routes(
-			{ head: { ref: PR_BRANCH, repo: { full_name: FORK_REPO } } },
-			write_extra(),
-		)
-
-		mocked_api.mockImplementation(gh_api_routes(fork_routes))
-
-		await expect(git_gh_pr.pr_checkout(PR_NUMBER)).rejects.toThrow(FORK_HEAD_MESSAGE)
-		expect(mocked_git.fetch_branch).not.toHaveBeenCalled()
-	})
-
-	// `pr_head_reference` throws rather than guessing, and `sync-dependabot-pins.ts` depends on that:
-	// a guessed branch would push template pins onto the wrong pull request.
-	it('does not check anything out when the head branch cannot be read', async () => {
-		mocked_api.mockImplementation(gh_api_routes({}))
-
-		await expect(git_gh_pr.pr_checkout(PR_NUMBER)).rejects.toThrow()
-		expect(mocked_git.checkout).not.toHaveBeenCalled()
 	})
 })
 

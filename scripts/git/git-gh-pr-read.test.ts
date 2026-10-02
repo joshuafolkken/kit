@@ -6,14 +6,12 @@ import {
 	gh_failure,
 	PR_BRANCH,
 	pr_conversation_comments_path,
-	pr_detail_path,
 	PR_HTML_URL,
 	pr_lookup_path,
 	PR_NUMBER,
 	pr_review_comments_path,
 	pr_routes,
 	RATE_LIMITED,
-	rest_pull,
 	rest_pull_page,
 	type GhApiAnswer,
 } from './git-gh-pr-fixture'
@@ -258,24 +256,6 @@ describe('the reads keyed by the resolved number', () => {
 		stub({ [pr_lookup_path()]: rest_pull_page([{}]) })
 
 		await expect(git_gh_pr_read.pr_view(PR_BRANCH)).resolves.toBe('')
-	})
-})
-
-describe('pr_head_reference', () => {
-	// Already keyed by a number, so it needs no lookup at all.
-	it('reads the head branch without resolving anything', async () => {
-		stub({ [pr_detail_path()]: rest_pull() })
-
-		await expect(git_gh_pr_read.pr_head_reference(PR_NUMBER)).resolves.toBe(PR_BRANCH)
-		expect(mocked_api).toHaveBeenCalledTimes(1)
-	})
-
-	// It throws where the branch-keyed reads fold to an empty answer: `sync-dependabot-pins.ts`
-	// checks out what it is handed, and a guessed branch pushes onto the wrong pull request.
-	it('throws rather than answering a guessed branch', async () => {
-		stub({ [pr_detail_path()]: JSON.stringify({ number: PR_NUMBER }) })
-
-		await expect(git_gh_pr_read.pr_head_reference(PR_NUMBER)).rejects.toThrow()
 	})
 })
 

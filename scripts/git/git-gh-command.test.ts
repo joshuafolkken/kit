@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_command, parse_pr_state_string } from './git-gh-command'
-import { find_request, PR_REPO, request_body } from './git-gh-pr-fixture'
+import { find_request, request_body } from './git-gh-pr-fixture'
 import { PR_CHECKS_WATCH_TIMEOUT_MS } from './git-pr-checks-watch'
 
 vi.mock('./git-gh-exec', () => ({
@@ -24,9 +24,6 @@ vi.mock('./git-command', () => ({
 	git_command: {
 		get_default_branch: vi.fn(),
 		branch: vi.fn(),
-		fetch_branch: vi.fn(),
-		checkout: vi.fn(),
-		merge_fast_forward: vi.fn(),
 	},
 }))
 
@@ -42,7 +39,6 @@ const NETWORK_ERROR = 'network error'
 const PR_TITLE = 'title'
 const PR_BODY = 'body'
 const GITHUB_PR_URL = 'https://github.com/owner/repo/pull/1'
-const PR_NUMBER = 578
 const PULLS_PATH = 'repos/{owner}/{repo}/pulls'
 const HEAD_BRANCH = 'feature-branch'
 const REPO_NAME = 'joshuafolkken/kit'
@@ -121,25 +117,6 @@ describe('parse_pr_state_string', () => {
 	// empty and no longer collapses to undefined.
 	it('returns a bare quote pair rather than undefined', () => {
 		expect(parse_pr_state_string('""')).toBe('""')
-	})
-})
-
-// `gh pr checkout` was measured to issue one `POST /graphql` before doing its git work, so the
-// resolution moved to the REST head read and the git half stayed git (joshuafolkken/kit#1029).
-describe('git_gh_command.pr_checkout', () => {
-	it('checks out the head branch the REST read answered, running no gh subcommand', async () => {
-		mocked_api.mockResolvedValue(
-			JSON.stringify({
-				number: PR_NUMBER,
-				head: { ref: HEAD_BRANCH, repo: { full_name: PR_REPO } },
-				base: { repo: { full_name: PR_REPO } },
-			}),
-		)
-
-		await git_gh_command.pr_checkout(PR_NUMBER)
-
-		expect(mocked_git.checkout).toHaveBeenCalledWith(HEAD_BRANCH)
-		expect(mocked_exec).not.toHaveBeenCalled()
 	})
 })
 
