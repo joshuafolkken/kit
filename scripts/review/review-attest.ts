@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import { lstatSync } from 'node:fs'
 import { git_command } from '#scripts/git/git-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -240,6 +241,47 @@ function check(now: number = Date.now(), root?: string): AttestVerdict {
 	return verdict
 }
 
+function is_written_since(source: string, taken_at: string): boolean {
+	try {
+		const stats = lstatSync(source)
+
+		return stats.isFile() && stats.mtimeMs >= Date.parse(taken_at)
+	} catch {
+		return false
+	}
+}
+
+// **Whether the last briefed review of this branch finished** (joshuafolkken/kit#2945). A ship resumed
+// after a stop re-issues round 1, and without this answer it briefed the whole change again — the
+// files the finished review had just read, re-read at full cost. It is asked before `record_target`
+// mints the next nonce, since that call drops the record it reads. The branch must match: the pointer
+// is keyed on the root, and a lane root outlives the branch a previous run reviewed there.
+//
+// **An attestation alone is not a finished review.** The reviewer may attest and then die before it
+// reports — a timeout, a usage limit — and narrowing on that would call files nobody read "already
+// read". So the findings file, written only once the review has its verdict, must postdate the brief
+// this pointer names; one left from an earlier review is older than that brief and does not count.
+function is_reviewed_on(checkout: ReviewCheckout, findings_path: string, root?: string): boolean {
+	const pointer = read_pointer(root)
+
+	if (pointer === undefined) return false
+
+	const verdict = verdict_for(pointer.nonce)
+
+	if (verdict.status !== 'ok' || verdict.expected?.branch !== checkout.branch) return false
+
+	return is_written_since(findings_path, pointer.taken_at)
+}
+
+// Whether a record written at `written_at` belongs to the brief the pointer names rather than an earlier
+// one (joshuafolkken/kit#2945): that brief writes it right after minting the pointer. ISO timestamps
+// order as strings.
+function is_briefed_since(written_at: string, root?: string): boolean {
+	const pointer = read_pointer(root)
+
+	return pointer !== undefined && written_at >= pointer.taken_at
+}
+
 // The pointer is keyed on the repository root rather than on `process.cwd()`, which is what
 // `PROJECT_ROOT` is. `josh review:brief` records against the root it just asked git for, so the check
 // has to ask the same question: run the two from different directories — one from `scripts/`, one
@@ -303,6 +345,8 @@ const review_attest = {
 	clear_here,
 	EXPECT_PREFIX,
 	expect_path,
+	is_briefed_since,
+	is_reviewed_on,
 	MISMATCH_VERDICT,
 	MISSING_REASON,
 	POINTER_PREFIX,

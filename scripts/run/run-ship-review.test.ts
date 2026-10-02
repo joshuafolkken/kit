@@ -105,6 +105,23 @@ describe('run_ship_review — the two rounds route differently', () => {
 	})
 })
 
+describe('run_ship_review.is_clean_round_one — a resume narrows only past a clean review', () => {
+	it.each([
+		['', true],
+		['tests:low:a.ts', true],
+		['fixed bug-risks:medium:a.ts:3', false],
+		['bug-risks:high:a.ts:42', false],
+		['bug-risks:medium:a.ts:3', false],
+		['not a finding', false],
+	])('reads %j as clean: %s', (text, is_clean) => {
+		expect(run_ship_review.is_clean_round_one(text)).toBe(is_clean)
+	})
+
+	it('reads an absent findings file as not clean', () => {
+		expect(run_ship_review.is_clean_round_one(undefined)).toBe(false)
+	})
+})
+
 describe('run_ship_review — the two prompts', () => {
 	it('lets round 1 fix a local Medium and asks it to mark what it fixed', () => {
 		const prompt = run_ship_review.reviewer_prompt(BRIEF, FINDINGS)
