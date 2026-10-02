@@ -46,8 +46,11 @@ function show_sample(action: FileAction): void {
 	console.info(action.create().replaceAll(/^/gmu, () => SAMPLE_INDENT))
 }
 
-function report_unchanged(action: FileAction): void {
-	if (action.should_show_sample_when_unchanged === true) show_sample(action)
+// A file that already holds the sample needs nothing added, so only one that differs gets it shown.
+function report_unchanged(action: FileAction, existing: string): void {
+	const is_sample_missing = existing !== action.create()
+
+	if (is_sample_missing && action.should_show_sample_when_unchanged === true) show_sample(action)
 	else console.info(`  ✔ unchanged ${action.dest}`)
 }
 
@@ -60,7 +63,7 @@ function merge_existing_file(
 	const merged = merge_function(existing)
 
 	if (merged === existing) {
-		report_unchanged(action)
+		report_unchanged(action, existing)
 
 		return
 	}

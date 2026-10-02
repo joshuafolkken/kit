@@ -32,7 +32,7 @@ function is_toolkit_package(package_name: string): boolean {
 
 // kit is the base tier and every other toolkit distributes files *derived* from kit's, so the two
 // can manage the same path and whichever `sync` ran last decides its contents
-// (`docs/sync.md` → "two distribution tiers"). Ordering is therefore base-first: kit syncs, then the
+// (`docs/maintainers/sync-rationale.md` → "The managed-workflow stamp"). Ordering is therefore base-first: kit syncs, then the
 // toolkits that overlay it. Sorting by name would put kit last and have it overwrite the overlay
 // with the original every single run.
 function toolkit_rank(package_name: string): number {

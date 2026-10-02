@@ -12,7 +12,7 @@ const ADOPT_ORIGIN = 'Opened by `josh adopt` in this repository.'
 const INCOMPLETE_HEADLINE =
 	'Refusing to adopt: these declared toolkits would fall out of the plan, and the run would sync the rest without them.'
 const INCOMPLETE_EFFECT =
-	"The toolkits overlay files derived from kit's own (see docs/sync.md), so syncing kit without one rewrites that overlay back to kit's original — a wrong diff wearing kit's face."
+	"The toolkits overlay files derived from kit's own (see docs/maintainers/sync-rationale.md), so syncing kit without one rewrites that overlay back to kit's original — a wrong diff wearing kit's face."
 const MISPLACED_CAUSE =
 	'declared under `dependencies`; the upgrade installs with `pnpm add -D` and would relocate it. Move it to `devDependencies`.'
 const ABSENT_CAUSE =
@@ -60,7 +60,7 @@ function name_causes(package_names: ReadonlyArray<string>, cause: string): Array
 
 // A declared toolkit that falls out of the plan is a refusal rather than a warning
 // (joshuafolkken/kit#1540). kit distributes the base files and every other toolkit overlays files
-// *derived* from them (`docs/sync.md` → two distribution tiers), so a run that syncs kit without the
+// *derived* from them (`docs/maintainers/sync-rationale.md` → "The managed-workflow stamp"), so a run that syncs kit without the
 // overlay does not merely do less — it writes the overlay's paths back to kit's originals. That diff
 // then wears kit's own face in the pull request, which is exactly what a reviewer cannot spot.
 //

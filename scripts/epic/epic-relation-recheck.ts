@@ -1,6 +1,6 @@
-import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { error_text } from '#scripts/lib/error-message'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
+import { epic_parse } from './epic-parse'
 
 // joshuafolkken/kit#1113: a second look at the relations, taken only where the first one is about to
 // become a verdict.
@@ -43,7 +43,7 @@ function suspect_children(
 	body: string | undefined,
 	declared_repo: string,
 ): Set<number> {
-	const links = git_epic_parse.parse_dependency_links(body)
+	const links = epic_parse.parse_dependency_links(body)
 	const local = children.filter((child) => child.repo === declared_repo)
 
 	return new Set(

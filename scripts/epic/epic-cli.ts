@@ -1,8 +1,8 @@
-import type { InsertKind, InsertPosition } from '#scripts/git/git-epic-chains'
-import { git_epic_parse, type ExternalChild } from '#scripts/git/git-epic-parse'
 import { cli_body } from '#scripts/josh/cli-body'
+import type { InsertKind, InsertPosition } from './epic-chains'
 import { epic_cli_argv, ISSUE_NUMBER_PATTERN } from './epic-cli-argv'
 import { epic_cli_remove } from './epic-cli-remove'
+import { epic_parse, type ExternalChild } from './epic-parse'
 
 // Parsing lives apart from the entry point so the argument rules can be asserted without spawning a
 // process or reaching GitHub. The entry point is then a thin shell around these two functions.
@@ -290,7 +290,7 @@ interface CrossRepoAddTarget {
 function find_cross_repo_add_target(argv: ReadonlyArray<string>): CrossRepoAddTarget | undefined {
 	const [raw_epic] = to_positional_arguments(argv, ADD_VALUE_FLAGS)
 	if (raw_epic === undefined) return undefined
-	const epic = git_epic_parse.parse_external_reference(raw_epic)
+	const epic = epic_parse.parse_external_reference(raw_epic)
 	if (epic === undefined) return undefined
 
 	const local = parse_add_arguments(

@@ -1,7 +1,5 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { git_epic_decision } from '#scripts/git/git-epic-decision'
-import { git_epic_parse, type DependencyLink } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { issue_read } from '#scripts/issue/issue-read'
 import { epic_audit_logic, type AuditFinding, type ReferenceState } from './epic-audit'
@@ -10,10 +8,12 @@ import { epic_audit_orphans, type ClaimingSearch } from './epic-audit-orphans'
 import { epic_audit_rationale, type OrderPair } from './epic-audit-rationale'
 import { epic_audit_report, type AuditResult } from './epic-audit-report'
 import { epic_cross_repo } from './epic-cross-repo'
+import { epic_decision } from './epic-decision'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
 import { epic_graph, type IssueReference } from './epic-graph'
 import { epic_issue } from './epic-issue'
 import { epic_next } from './epic-next'
+import { epic_parse, type DependencyLink } from './epic-parse'
 
 // `josh epic:audit <E>` — read an epic's children against each other and report what contradicts
 // what (joshuafolkken/kit#870).
@@ -278,7 +278,7 @@ async function to_audit_input(
 	epic_number: number,
 	repo: string,
 ): Promise<AuditInput> {
-	const links = git_epic_parse.parse_dependency_links(snapshot.body)
+	const links = epic_parse.parse_dependency_links(snapshot.body)
 	const order_pairs = epic_audit_rationale.order_pairs(links, children, snapshot.repo, repo)
 
 	return {
@@ -291,7 +291,7 @@ async function to_audit_input(
 		anomalies: fetch_anomalies(snapshot, children, links),
 		contradictions: epic_audit_checks.find_order_contradictions(children, repo),
 		order_pairs,
-		decisions: git_epic_decision.read_recorded_reasons(snapshot.body),
+		decisions: epic_decision.read_recorded_reasons(snapshot.body),
 		order_comments: await read_order_comments(order_pairs),
 		is_epic_closed: await read_epic_closed(epic_number, epic_fetch.scope_for(snapshot.repo, repo)),
 	}

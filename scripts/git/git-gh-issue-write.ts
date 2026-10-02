@@ -24,7 +24,7 @@ const PATCH_METHOD = 'PATCH'
 const DELETE_METHOD = 'DELETE'
 
 // `gh issue edit`, `gh issue comment` and `gh issue create` each printed one URL, and the callers
-// read it — `git-epic-run.ts` parses the epic's number back out of it. REST answers the whole
+// read it — `epic-run.ts` parses the epic's number back out of it. REST answers the whole
 // object, so the same value is unwrapped out of it rather than the shape being changed.
 const HTML_URL_FILTER = '.html_url'
 const ID_FILTER = '.id'
@@ -34,9 +34,9 @@ const COMMENTS_SEGMENT = '/comments'
 const CLOSED_STATE = 'closed'
 const COLOR_HASH = '#'
 
-// The four writers below answered `boolean` under `gh`, and their callers read it: `git-epic-run.ts`
-// only reports the epic label when it was applied, `git-epic-relations.ts` counts the relations it
-// could not apply, and `git-epic-close.ts` prints "close it manually" on a false. One try/catch
+// The four writers below answered `boolean` under `gh`, and their callers read it: `epic-run.ts`
+// only reports the epic label when it was applied, `epic-relations.ts` counts the relations it
+// could not apply, and `epic-close.ts` prints "close it manually" on a false. One try/catch
 // rather than four copies of it (`CLAUDE.md` → "No clones").
 async function did_write_succeed(write: () => Promise<unknown>): Promise<boolean> {
 	try {
@@ -77,7 +77,7 @@ async function issue_try_comment(issue_number: string, body: string): Promise<bo
 // **The comment goes first**, which is what keeps the return value meaning what it meant: a `false`
 // then says "the issue is still open" in *both* failure branches, because the state change is the
 // last thing attempted. Closing first would answer `false` for an issue that is in fact closed, and
-// `git-epic-close.ts` prints "close it manually" on that answer.
+// `epic-close.ts` prints "close it manually" on that answer.
 //
 // **`comment: undefined` closes without commenting**, and it is what the ordering above costs: a run
 // whose comment landed and whose close was refused leaves the issue open carrying the comment, so
@@ -168,7 +168,7 @@ function issue_create_request(input: {
 }
 
 // The browser URL of the created issue, which is what `gh issue create` printed and what
-// `git-epic-run.ts` parses the epic's number out of.
+// `epic-run.ts` parses the epic's number out of.
 async function issue_create_with_label(input: {
 	title: string
 	label: string

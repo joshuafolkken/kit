@@ -1,7 +1,7 @@
-import type { DependencyLink } from '#scripts/git/git-epic-parse'
 import { epic_audit_logic, type AuditFinding } from './epic-audit'
 import type { AuditChild } from './epic-audit-checks'
 import { epic_graph, type IssueReference } from './epic-graph'
+import type { DependencyLink } from './epic-parse'
 
 // Check 6 — a declared order between two open children that nobody wrote a reason for
 // (joshuafolkken/kit#1712).

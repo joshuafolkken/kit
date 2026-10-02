@@ -47,7 +47,7 @@ const HUMAN_REVIEW = 'human-review'
 // test. `LIVE` is the silent norm; `STOPPED` and `UNKNOWN` lead the difference lines.
 const LIVE = 'live'
 const STOPPED = 'stopped'
-// The verdicts `epic --reconcile` prints; kept in step with the `git_epic_reconcile` constants in its
+// The verdicts `epic --reconcile` prints; kept in step with the `epic_reconcile` constants in its
 // test.
 const RECONCILED = 'reconciled'
 const NOTHING_TO_RECONCILE = 'nothing to reconcile'
