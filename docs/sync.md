@@ -178,8 +178,9 @@ Bundled directories (`prompts/`, `eslint/`) point into `node_modules`; paths the
 
 ## Refused inside the distribution package's own repository
 
-`josh sync` and `josh init` both write nothing and exit non-zero when the project they are aimed at
-**is** the package that distributes the files:
+This section is the single source for the self-sync refusal; [init.md](./init.md#refused-inside-the-packages-own-repository)
+links here and adds only the empty-directory case. `josh sync` and `josh init` both write nothing
+and exit non-zero when the project they are aimed at **is** the package that distributes the files:
 
 ```text
 Refusing to sync: this is @joshuafolkken/kit's own repository.
@@ -209,7 +210,8 @@ distributor syncing its own upstream — app-kit running kit's base sync inside 
 ([#879](https://github.com/joshuafolkken/kit/issues/879)). It calls the sync writers directly rather
 than through `josh sync`, so the guard on the sync entry point never covered it — and its blast
 radius is the larger of the two: on top of the files above it rewrites the project's `package.json`
-scripts and devDependencies. See [init.md](./init.md#refused-inside-the-packages-own-repository).
+scripts and devDependencies. A project with no `package.json` yet is covered in
+[init.md](./init.md#refused-inside-the-packages-own-repository).
 
 The detection ships as the `@joshuafolkken/kit/self-sync-guard` export so app-kit and game-kit apply
 the same rule rather than each re-implementing it.
