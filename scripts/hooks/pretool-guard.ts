@@ -1,9 +1,6 @@
-#!/usr/bin/env tsx
-import { text } from 'node:stream/consumers'
-import { fileURLToPath } from 'node:url'
 import { duplicate_read_outcome } from '#scripts/delegation/duplicate-read-guard'
 import { investigation_refusal } from '#scripts/delegation/investigation-guard'
-import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
+import type { GuardOutcome } from '#scripts/josh/hook-decision'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { run_watcher_hook } from '#scripts/run/run-watcher-hook'
 import { batch_outcome } from './batch-guard'
@@ -82,15 +79,5 @@ async function pretool_outcome_async(raw_payload: string): Promise<GuardOutcome>
 }
 
 const pretool_guard = { combine_outcomes, pretool_outcome, pretool_outcome_async }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	if (process.stdin.isTTY) hook_decision.report_no_payload('pretool:guard')
-	else {
-		const raw_payload = await text(process.stdin)
-
-		hook_decision.load_environment_file()
-		hook_decision.emit_outcome(await pretool_outcome_async(raw_payload))
-	}
-}
 
 export { pretool_guard, pretool_outcome, pretool_outcome_async }
