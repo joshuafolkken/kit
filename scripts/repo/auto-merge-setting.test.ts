@@ -1,12 +1,18 @@
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
-import { execaSync } from 'execa'
+import type { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { auto_merge_setting } from './auto-merge-setting'
 
-vi.mock('execa', () => ({ execaSync: vi.fn() }))
+const gh_outcomes = vi.hoisted(() => vi.fn())
 
-const mocked_execa_sync = vi.mocked(execaSync)
+vi.mock('execa', async () => {
+	const { gh_execa_fixture } = await import('#scripts/git/git-gh-execa-fixture')
+
+	return { execaSync: gh_execa_fixture.honoring_reject(gh_outcomes) }
+})
+
+const mocked_execa_sync = vi.mocked(gh_outcomes)
 
 type ExecaSyncResult = ReturnType<typeof execaSync>
 
@@ -44,7 +50,7 @@ describe('read_auto_merge', () => {
 		expect(mocked_execa_sync).toHaveBeenCalledWith(
 			'gh',
 			['api', `repos/${REPO}`],
-			expect.objectContaining({ reject: false }),
+			expect.objectContaining({ cwd: PROJECT_ROOT }),
 		)
 	})
 
@@ -63,7 +69,7 @@ describe('read_auto_merge', () => {
 	// execa reports a spawn failure (no `gh` on PATH) as `exitCode: undefined` with `stdout`
 	// undefined too, so neither may be dereferenced.
 	it('does not crash when gh is missing entirely', () => {
-		mocked_execa_sync.mockReturnValue({} as unknown as ExecaSyncResult)
+		mocked_execa_sync.mockReturnValue({})
 
 		expect(auto_merge_setting.read_auto_merge(REPO)).toBe('unreadable')
 	})
@@ -72,11 +78,11 @@ describe('read_auto_merge', () => {
 		stub_gh(OK, ENABLED_BODY)
 		auto_merge_setting.read_auto_merge(REPO)
 
-		expect(mocked_execa_sync).toHaveBeenCalledWith('gh', ['api', `repos/${REPO}`], {
-			cwd: PROJECT_ROOT,
-			reject: false,
-			timeout: auto_merge_setting.GH_TIMEOUT_MS,
-		})
+		expect(mocked_execa_sync).toHaveBeenCalledWith(
+			'gh',
+			['api', `repos/${REPO}`],
+			expect.objectContaining({ cwd: PROJECT_ROOT, timeout: auto_merge_setting.GH_TIMEOUT_MS }),
+		)
 	})
 })
 
