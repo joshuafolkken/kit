@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import {
 	BREAKING_CHANGE_LABEL as BREAKING,
 	BUGFIX_LABEL as BUGFIX,
@@ -7,7 +8,7 @@ import {
 	ENHANCEMENT_LABEL,
 	type ReleaseClassification,
 } from '#scripts/git/issue-labels'
-import { execaSync } from 'execa'
+import { error_text } from '#scripts/lib/error-message'
 import { z } from 'zod'
 
 const CLASSIFICATION_SET: ReadonlySet<string> = new Set(CLASSIFICATION_LABELS)
@@ -95,17 +96,17 @@ function select_issue_classification(issue_json: string): ReleaseClassification 
 // payload, that run fails, and when it lands in the newer check suite GitHub keeps its red result —
 // a rerun replays the same payload and fails again (joshuafolkken/kit#2712).
 function fetch_current_labels(repository: string, pull_number: number): ReadonlyArray<string> {
-	const result = execaSync(
-		'gh',
-		['api', `repos/${repository}/issues/${String(pull_number)}/labels`, '--jq', '.[].name'],
-		{ reject: false },
-	)
+	const path = `repos/${repository}/issues/${String(pull_number)}/labels`
 
-	if (result.exitCode !== 0) {
-		throw new Error(`Could not read the pull request labels: ${result.stderr}`)
+	try {
+		const names = git_gh_exec.exec_gh_api_sync({ path, jq_filter: '.[].name' })
+
+		return names.split('\n').filter((name) => name !== '')
+	} catch (error) {
+		const detail = error_text.message_of(error)
+
+		throw new Error(`Could not read the pull request labels: ${detail}`, { cause: error })
 	}
-
-	return result.stdout.split('\n').filter((name) => name !== '')
 }
 
 function check_event(
@@ -133,6 +134,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 const pr_classification = {
 	classification_error,
 	check_event,
+	fetch_current_labels,
 	declaration,
 	is_classification,
 	select_issue_classification,

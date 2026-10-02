@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { copyFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { package_path } from '#scripts/init/init-paths'
+import { file_reader } from '#scripts/lib/read-file'
 import { z } from 'zod'
 
 interface TemplateSourcePair {
@@ -39,9 +40,7 @@ function read_file(relative_path: string): string {
 }
 
 function read_optional_file(relative_path: string): string {
-	const full_path = package_path(relative_path)
-
-	return existsSync(full_path) ? readFileSync(full_path, 'utf8') : ''
+	return file_reader.read_file_or_empty(package_path(relative_path))
 }
 
 function hash_text(text: string): string {

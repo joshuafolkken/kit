@@ -9,12 +9,13 @@
  *                                                      [--decision-file <path|->]
  *        tsx scripts/epic/epic.ts --remove <E> <M> <N> ... [--decision-file <path|->]
  */
-import { git_epic_add, type AddChildrenInput } from '#scripts/git/git-epic-add'
-import { git_epic_reconcile } from '#scripts/git/git-epic-reconcile'
-import { git_epic_remove } from '#scripts/git/git-epic-remove'
-import { git_epic_run } from '#scripts/git/git-epic-run'
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import { error_text } from '#scripts/lib/error-message'
+import { epic_add, type AddChildrenInput } from './epic-add'
 import { epic_cli, type AddArguments, type CrossRepoAddTarget } from './epic-cli'
+import { epic_reconcile } from './epic-reconcile'
+import { epic_remove } from './epic-remove'
+import { epic_run } from './epic-run'
 
 const ARGV_OFFSET = 2
 const FLAGS = '[--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>]'
@@ -37,7 +38,7 @@ async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return await git_epic_run.promote_epic({
+	return await epic_run.promote_epic({
 		epic_number: parsed.epic_number,
 		children: parsed.children,
 		rationale: epic_cli.read_rationale(parsed.rationale_path),
@@ -67,7 +68,7 @@ function to_add_input(parsed: AddArguments): AddChildrenInput {
 async function run_qualified_addition(found: CrossRepoAddTarget): Promise<number> {
 	const local = epic_cli.resolve_local_add(found, await git_gh_command.repo_get_name_with_owner())
 
-	if (local !== undefined) return await git_epic_add.add_children(to_add_input(local))
+	if (local !== undefined) return await epic_add.add_children(to_add_input(local))
 
 	console.error(epic_cli.format_cross_repo_refusal(found))
 
@@ -109,7 +110,7 @@ async function run_addition(argv: ReadonlyArray<string>): Promise<number> {
 
 	if (parsed === undefined) return await refuse_addition(argv)
 
-	return await git_epic_add.add_children(to_add_input(parsed))
+	return await epic_add.add_children(to_add_input(parsed))
 }
 
 // Deleting a declared order. No position and no `--ordered`: the path itself says which orders go,
@@ -126,7 +127,7 @@ async function run_removal(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return await git_epic_remove.remove_order({
+	return await epic_remove.remove_order({
 		epic_number: parsed.epic_number,
 		path: parsed.path,
 		decision: epic_cli.read_decision(parsed.decision_path),
@@ -144,7 +145,7 @@ async function run_reconciliation(argv: ReadonlyArray<string>): Promise<number> 
 		return FAILURE_EXIT_CODE
 	}
 
-	return await git_epic_reconcile.reconcile_epic(parsed.epic_number)
+	return await epic_reconcile.reconcile_epic(parsed.epic_number)
 }
 
 async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
@@ -156,7 +157,7 @@ async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return await git_epic_run.create_epic({
+	return await epic_run.create_epic({
 		title: parsed.title,
 		children: parsed.children,
 		rationale: epic_cli.read_rationale(parsed.rationale_path),
@@ -187,6 +188,6 @@ async function main(): Promise<void> {
 try {
 	await main()
 } catch (error) {
-	console.error(`✖ ${error instanceof Error ? error.message : String(error)}`)
+	console.error(`✖ ${error_text.message_of(error)}`)
 	process.exit(FAILURE_EXIT_CODE)
 }

@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs'
 import { json_value } from '#scripts/lib/json-value'
+import { file_reader } from '#scripts/lib/read-file'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { bash_triggers } from './bash-triggers'
 import { shell_segments } from './shell-segments'
@@ -81,7 +81,7 @@ function string_field(input: Record<string, unknown>, key: string): string {
 // measure against. Injected so the suite controls it without touching the real filesystem, the way
 // `file-body.ts` injects its existence check. A new file reads as empty, so its whole body is added.
 function read_existing(file_path: string): string {
-	return existsSync(file_path) ? readFileSync(file_path, 'utf8') : ''
+	return file_reader.read_file_or_empty(file_path)
 }
 
 function texts_of(

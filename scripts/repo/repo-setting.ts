@@ -1,7 +1,5 @@
 import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
-import { read_spawn_stdout } from '#scripts/lib/spawn-exit'
-import { execaSync } from 'execa'
 
 // The shared half of every "report a GitHub repository setting kit cannot write" check.
 //
@@ -27,17 +25,21 @@ interface RepoApiResult {
 	stdout: string
 }
 
+const FAILED_EXIT_CODE = 1
+
 // One `gh api` call. Never throws and never propagates a non-zero exit: an unreadable answer is a
-// reported status, not a command failure.
+// reported status, not a command failure. Every failure reads as `FAILED_EXIT_CODE` with no output,
+// which `parse_payload` treats as unreadable whatever gh's own exit code was.
 function query_repo_api(api_path: string): RepoApiResult {
-	const result = execaSync('gh', ['api', api_path], {
-		...git_gh_exec.direct_environment(),
+	const stdout = git_gh_exec.read_gh_api_sync({
+		path: api_path,
 		cwd: PROJECT_ROOT,
-		reject: false,
-		timeout: GH_TIMEOUT_MS,
+		timeout_ms: GH_TIMEOUT_MS,
 	})
 
-	return { exit_code: result.exitCode ?? 1, stdout: read_spawn_stdout(result) }
+	return stdout === undefined
+		? { exit_code: FAILED_EXIT_CODE, stdout: '' }
+		: { exit_code: 0, stdout }
 }
 
 // The response body as an object, or nothing. A non-zero exit covers every case where the answer

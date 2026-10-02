@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import type { IssueReference } from './git-epic-reference'
 import { MERGED_STATE, to_gh_state } from './git-gh-rest-state'
+import type { IssueReference } from './issue-reference'
 import { parse_json_array_or_undefined, parse_json_object_safe } from './parse-json-array'
 import { blocking_issue_schema } from './schemas'
 
@@ -19,7 +19,7 @@ import { blocking_issue_schema } from './schemas'
 //
 // `number` is required so that a 200 carrying something other than an issue — a proxy's HTML error
 // page, an API message object — fails the parse rather than passing as an issue whose every field is
-// missing. `git-epic-close` would turn that into `is_closed: false` for every child and report it as
+// missing. `epic-close` would turn that into `is_closed: false` for every child and report it as
 // fact. The dependency summary is absent on a pull request, which the issue endpoint serves as
 // readily as an issue, so it stays optional and tolerates an explicit null.
 const rest_issue_schema = z.looseObject({

@@ -1,4 +1,3 @@
-import type { IssueReference } from './git-epic-reference'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
 import { gh_failure, type GhFailure } from './git-gh-failure'
@@ -10,6 +9,7 @@ import {
 	type RestIssue,
 } from './git-gh-issue-rest'
 import { gh_reachability } from './git-gh-reachability'
+import type { IssueReference } from './issue-reference'
 
 // Reading one issue. Split out of `git-gh-issue.ts`, which had grown past the file-length limit
 // while holding both the reads and the writes; the reads are what every epic command goes through,
@@ -341,7 +341,7 @@ async function issue_get_plan_fields_classified(issue_number: string): Promise<I
 	return await issue_view_json_classified(issue_number, PLAN_FIELDS)
 }
 
-// `state` rides along for `git-epic-add.ts`'s closed-epic refusal (joshuafolkken/kit#2337); every
+// `state` rides along for `epic-add.ts`'s closed-epic refusal (joshuafolkken/kit#2337); every
 // other caller reads only the labels and body and ignores it, so it costs no extra request.
 async function issue_get_labels_and_body(issue_number: string): Promise<string | undefined> {
 	return await issue_view_json(issue_number, 'number,state,labels,body')

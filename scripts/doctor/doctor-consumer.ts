@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { file_reader } from '#scripts/lib/read-file'
 import { read_spawn_stdout } from '#scripts/lib/spawn-exit'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { safe_json_parse } from '#scripts/version/parse-json'
@@ -36,16 +37,8 @@ const STATE_TARGET_MISSING = 'target-missing'
 const STATE_MISSING = 'missing'
 type ClaudeMdState = typeof STATE_OK | typeof STATE_TARGET_MISSING | typeof STATE_MISSING
 
-function read_optional(file_path: string): string | undefined {
-	try {
-		return existsSync(file_path) ? readFileSync(file_path, 'utf8') : undefined
-	} catch {
-		return undefined
-	}
-}
-
 function parse_manifest(root: string): ManifestShape | undefined {
-	const content = read_optional(path.join(root, 'package.json'))
+	const content = file_reader.read_if_readable(path.join(root, 'package.json'))
 	if (content === undefined) return undefined
 	const parsed = manifest_schema.safeParse(safe_json_parse(content))
 
@@ -74,7 +67,7 @@ function is_kit_consumer(root: string): boolean {
 }
 
 function is_plugin_declared(root: string): boolean {
-	const content = read_optional(path.join(root, SETTINGS_PATH))
+	const content = file_reader.read_if_readable(path.join(root, SETTINGS_PATH))
 	if (content === undefined) return false
 	const parsed = settings_schema.safeParse(safe_json_parse(content))
 
@@ -94,7 +87,7 @@ function configured_hooks_path(root: string): string | undefined {
 }
 
 function claude_md_state(root: string): ClaudeMdState {
-	const content = read_optional(path.join(root, CLAUDE_MD))
+	const content = file_reader.read_if_readable(path.join(root, CLAUDE_MD))
 	if (content === undefined) return STATE_MISSING
 	if (!content.includes(CLAUDE_MD_POINTER)) return STATE_OK
 

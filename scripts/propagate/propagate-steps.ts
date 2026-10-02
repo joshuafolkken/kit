@@ -3,6 +3,7 @@ import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
 import { OTHER_CHANGE_LABEL } from '#scripts/git/issue-labels'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
+import { error_text } from '#scripts/lib/error-message'
 import { build_upgrade_shell_command } from '#scripts/version/upgrade-shell-command'
 import { create_version_command_config } from '#scripts/version/version-command-config'
 import { execaSync } from 'execa'
@@ -235,7 +236,7 @@ function precheck_step(target: PropagateTarget, step: string): StepResult {
 // multi-line detail would print raw JSON as an unindented second line and glue that warning to the
 // end of it, where nobody reading the report would see it.
 function to_issue_detail(error: unknown): string {
-	const message = error instanceof Error ? error.message : String(error)
+	const message = error_text.message_of(error)
 
 	return message.replaceAll('\n', ' ').trim()
 }

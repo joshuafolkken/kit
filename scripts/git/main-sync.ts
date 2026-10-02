@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
+import { error_text } from '#scripts/lib/error-message'
 import { git_command } from './git-command'
 import { gone_branch, type PruneResult } from './gone-branch'
 
@@ -65,7 +66,7 @@ async function prune_quietly(default_branch: string): Promise<void> {
 	try {
 		report_prune(await gone_branch.prune(default_branch))
 	} catch (error) {
-		console.error(`branch prune skipped: ${error instanceof Error ? error.message : String(error)}`)
+		console.error(`branch prune skipped: ${error_text.message_of(error)}`)
 	}
 }
 
@@ -104,7 +105,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	try {
 		return await dispatch(argv)
 	} catch (error) {
-		console.error(error instanceof Error ? error.message : String(error))
+		console.error(error_text.message_of(error))
 
 		return FAILURE_EXIT_CODE
 	}

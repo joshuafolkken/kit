@@ -1,3 +1,4 @@
+import { error_text } from '#scripts/lib/error-message'
 import { live_evidence } from '#scripts/review/live-evidence'
 import { changed_paths } from './changed-paths'
 import { git_branch } from './git-branch'
@@ -26,10 +27,6 @@ interface Target {
 interface Resolution {
 	target: Target | undefined
 	problems: Array<string>
-}
-
-function error_message(error: unknown): string {
-	return error instanceof Error ? error.message : String(error)
 }
 
 function resolve_from_branch(current_branch: string): Resolution {
@@ -71,7 +68,7 @@ function resolve_from_title(
 	try {
 		return resolve_parsed(git_issue.parse(cli_input), current_branch, default_branch)
 	} catch (error) {
-		return { target: undefined, problems: [error_message(error)] }
+		return { target: undefined, problems: [error_text.message_of(error)] }
 	}
 }
 
@@ -89,7 +86,7 @@ async function classification_problems(target: Target): Promise<Array<string>> {
 
 		return []
 	} catch (error) {
-		return [error_message(error)]
+		return [error_text.message_of(error)]
 	}
 }
 

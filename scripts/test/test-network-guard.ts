@@ -1,16 +1,9 @@
-import {
-	accessSync,
-	chmodSync,
-	constants,
-	mkdirSync,
-	readFileSync,
-	rmSync,
-	writeFileSync,
-} from 'node:fs'
+import { accessSync, chmodSync, constants, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { shim_shell } from '#scripts/build/shim-shell'
 import { platform_temporary } from '#scripts/josh/platform-temporary'
+import { file_reader } from '#scripts/lib/read-file'
 import { test_repository_guard, type WriteGuard } from './test-repository-guard'
 import { GUARD_LOG_KEY } from './unit-guard-environment'
 
@@ -375,11 +368,7 @@ function install_shim(directory: string = GUARD_DIRECTORY): string {
 // the shim runs in its own process and the test workers are processes again, so the only evidence
 // this side has is the file — and "the file is not there" says nothing about what the run did.
 function read_log(log_file: string): string | undefined {
-	try {
-		return readFileSync(log_file, 'utf8')
-	} catch {
-		return undefined
-	}
+	return file_reader.read_if_readable(log_file)
 }
 
 // `globalSetup` runs before any worker is forked, so the workers inherit this `PATH` and every `gh`

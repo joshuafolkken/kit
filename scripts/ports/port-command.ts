@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { ports, type PortEnvironment } from '#ports'
+import { error_text } from '#scripts/lib/error-message'
 
 const SUCCESS_EXIT_CODE = 0
 const USAGE_EXIT_CODE = 1
@@ -49,7 +50,7 @@ function run(argv: ReadonlyArray<string>, environment?: PortEnvironment): PortRe
 		return { text: String(RESOLVERS[name](environment)), exit_code: SUCCESS_EXIT_CODE }
 	} catch (error) {
 		return {
-			text: error instanceof Error ? error.message : String(error),
+			text: error_text.message_of(error),
 			exit_code: FAILURE_EXIT_CODE,
 		}
 	}

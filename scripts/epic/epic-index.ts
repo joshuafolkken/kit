@@ -1,10 +1,10 @@
-import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { EPIC_LABEL, has_any_label } from '#scripts/git/issue-labels'
 import { cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import type { OpenIssueData } from '#scripts/git/schemas'
 import { z } from 'zod'
+import { epic_parse } from './epic-parse'
 
 // Which epic tracks which issue — the one answer, in one place (joshuafolkken/kit#1633).
 //
@@ -40,7 +40,7 @@ function build_tracking_index(
 	const index = new Map<number, ReadonlyArray<number>>()
 
 	for (const epic of epics) {
-		for (const child of git_epic_parse.parse_task_list_issue_numbers(epic.body)) {
+		for (const child of epic_parse.parse_task_list_issue_numbers(epic.body)) {
 			index.set(child, [...(index.get(child) ?? []), epic.number])
 		}
 	}

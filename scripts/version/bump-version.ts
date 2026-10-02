@@ -2,6 +2,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { error_text } from '#scripts/lib/error-message'
 import { json_object_schema, package_with_version_schema } from '#scripts/lib/schemas'
 import semver from 'semver'
 
@@ -61,7 +62,7 @@ function main(): void {
 	try {
 		bump_version(bump_type as BumpType)
 	} catch (error) {
-		console.error(error instanceof Error ? error.message : String(error))
+		console.error(error_text.message_of(error))
 		process.exit(1)
 	}
 }

@@ -1,4 +1,4 @@
-import { parseArgs } from 'node:util'
+import { cli_flags } from '#scripts/lib/cli-flags'
 
 // `josh stash:pop` turns its `argv` into a single request: the message of the stash to pop. Parsing
 // lives here, acting on the stack lives in `stash-pop-cli.ts`, and a malformed command line is
@@ -21,18 +21,12 @@ interface Request {
 }
 
 function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
-	try {
-		const parsed = parseArgs({
-			args: [...argv],
-			options: OPTIONS,
-			strict: true,
-			allowPositionals: true,
-		})
-
-		return { values: parsed.values, positionals: parsed.positionals }
-	} catch {
-		return undefined
-	}
+	return cli_flags.parse_or_undefined({
+		args: [...argv],
+		options: OPTIONS,
+		strict: true,
+		allowPositionals: true,
+	})
 }
 
 // The message is the sole positional and must be a non-empty string: an empty message matches every

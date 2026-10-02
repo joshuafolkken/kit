@@ -1,12 +1,9 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { error_text } from '#scripts/lib/error-message'
 import { observations_flush } from './observations-flush'
 
 const FAILURE_EXIT_CODE = 1
-
-function message_of(error: unknown): string {
-	return error instanceof Error ? error.message : String(error)
-}
 
 // The refusals are the command's whole safety story, so they are printed as the message rather than
 // as a stack: "this checkout is on a feature branch" and "the tree holds somebody else's work" are
@@ -18,7 +15,7 @@ async function main(): Promise<void> {
 	try {
 		console.info(await observations_flush.flush(new Date()))
 	} catch (error) {
-		console.error(message_of(error))
+		console.error(error_text.message_of(error))
 		process.exit(FAILURE_EXIT_CODE)
 	}
 }

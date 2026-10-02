@@ -1,7 +1,8 @@
 #!/usr/bin/env tsx
-import { appendFileSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { appendFileSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { file_reader } from '#scripts/lib/read-file'
 
 // Whether the preview server process died during a failed E2E attempt.
 //
@@ -59,11 +60,7 @@ function has_crash_signature(log_text: string): boolean {
 }
 
 function read_file_safe(file_path: string): string {
-	try {
-		return readFileSync(file_path, 'utf8')
-	} catch {
-		return ''
-	}
+	return file_reader.read_if_readable(file_path) ?? ''
 }
 
 // Every file under the directory, because wrangler names the debug log after the run and a job that

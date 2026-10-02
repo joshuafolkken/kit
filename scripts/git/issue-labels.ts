@@ -282,7 +282,7 @@ function label_name_of(labels: ReadonlyArray<string>, wanted: string): string | 
 
 // The same comparison for a caller holding label *names* rather than listing rows. `EpicChild.labels`
 // is an array of strings (`scripts/epic/epic-graph.ts`), which is the one shape `has_any_label` cannot
-// take — so `epic-classify.ts` and `git-epic-validate.ts` each grew a raw case-sensitive
+// take — so `epic-classify.ts` and `epic-validate.ts` each grew a raw case-sensitive
 // `Array.includes` instead, and an `Epic`-cased label walked past both. Kept here beside the rule it
 // implements rather than at either call site, for the reason the comment above gives.
 //

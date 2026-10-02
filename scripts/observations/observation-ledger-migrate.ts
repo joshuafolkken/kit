@@ -1,5 +1,6 @@
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import path from 'node:path'
+import { file_reader } from '#scripts/lib/read-file'
 import {
 	LEGACY_LEDGER_FILE,
 	LEGACY_OBSERVATION_LEDGER_PATHS,
@@ -84,14 +85,6 @@ function terminated(content: string): string {
 	return content.length === 0 || content.endsWith(NEWLINE) ? content : `${content}${NEWLINE}`
 }
 
-function read_or_undefined(file_path: string): string | undefined {
-	try {
-		return readFileSync(file_path, 'utf8')
-	} catch {
-		return undefined
-	}
-}
-
 // What of the claimed file goes to the ledger's tail: all of it, verbatim, when there is no ledger yet,
 // and otherwise only the lines the ledger does not already hold. **The old file can come back after
 // its lines were moved** — `git restore`, `git reset --hard` or a stash without `-u` restores a
@@ -109,7 +102,11 @@ function carried(content: string, ledger: string | undefined): string {
 // Moves one claimed file's lines to the tail of the ledger, then removes the claim.
 function absorb(claimed: string, target: string): void {
 	mkdirSync(path.dirname(target), { recursive: true })
-	appendFileSync(target, carried(readFileSync(claimed, 'utf8'), read_or_undefined(target)), 'utf8')
+	appendFileSync(
+		target,
+		carried(readFileSync(claimed, 'utf8'), file_reader.read_if_readable(target)),
+		'utf8',
+	)
 	rmSync(claimed)
 }
 

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { file_reader } from '#scripts/lib/read-file'
 import { z } from 'zod'
 import { fix_gh_packages_logic, type LockfilePackage } from './fix-gh-packages-logic'
 import { gh_cli_token } from './gh-cli-token'
@@ -19,7 +20,7 @@ const npm_packument_schema = z.looseObject({
 type ParsedPackages = Record<string, LockfilePackage>
 
 function read_file(file_path: string): string {
-	return existsSync(file_path) ? readFileSync(file_path, 'utf8') : ''
+	return file_reader.read_file_or_empty(file_path)
 }
 
 // Resolution order: NODE_AUTH_TOKEN → a literal token in the project .npmrc → `gh auth token`.

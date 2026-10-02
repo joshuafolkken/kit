@@ -1,10 +1,10 @@
-import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { cutoff_of, PAGE_CEILING_CAUSE, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_safe } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 import { epic_audit_logic, type AuditFinding, type FindingLevel } from './epic-audit'
 import type { EpicSnapshot } from './epic-fetch'
+import { epic_parse } from './epic-parse'
 
 // Check 4's half of `epic:audit`: an issue that names this epic as its parent but that the epic's
 // task list does not track. It would never be run, and the epic would close without it.
@@ -125,7 +125,7 @@ function claimed_numbers(search: ClaimingSearch): Array<number> {
 // reported (joshuafolkken/kit#1014). Read with the same parser `epic_fetch` reads the local rows
 // with, which never matches a `- [ ] owner/repo#N` row.
 function locally_tracked(snapshot: EpicSnapshot): Array<number> {
-	return git_epic_parse.parse_task_list_issue_numbers(snapshot.body)
+	return epic_parse.parse_task_list_issue_numbers(snapshot.body)
 }
 
 const epic_audit_orphans = {

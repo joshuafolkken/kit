@@ -1,12 +1,12 @@
 #!/usr/bin/env tsx
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { epic_audit_logic } from '#scripts/epic/epic-audit'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from '#scripts/epic/epic-bundle'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import {
 	issue_scout,
@@ -59,12 +59,17 @@ function has_invalid_arguments(
 	)
 }
 
-function parse_arguments(argv: ReadonlyArray<string>): ScoutArguments | undefined {
-	const { values, positionals } = parseArgs({
+// An unknown flag is `undefined` rather than a throw, so the answer is the usage line rather than a
+// stack trace, on a command whose output a workflow reads.
+function read_arguments(argv: ReadonlyArray<string>): ScoutArguments | undefined {
+	const parsed = cli_flags.parse_or_undefined({
 		args: [...argv],
 		options: { body: { type: 'string' }, 'body-file': { type: 'string' } },
 		allowPositionals: true,
 	})
+	if (parsed === undefined) return undefined
+
+	const { values, positionals } = parsed
 	const [title] = positionals
 
 	if (has_invalid_arguments(title, values.body, values['body-file'])) return undefined
@@ -78,16 +83,6 @@ async function with_draft_body(args: ScoutArguments): Promise<ScoutArguments | u
 
 	try {
 		return { ...args, body: await readFile(args.body_file, 'utf8') }
-	} catch {
-		return undefined
-	}
-}
-
-// An unknown flag makes `parseArgs` throw. Caught so the answer is the usage line rather than a stack
-// trace, on a command whose output a workflow reads.
-function read_arguments(argv: ReadonlyArray<string>): ScoutArguments | undefined {
-	try {
-		return parse_arguments(argv)
 	} catch {
 		return undefined
 	}
