@@ -46,7 +46,7 @@ call reports `hold`.
    `pnpm josh latest:scope` — update dependencies only on `required` (`latest-gate.md`), never on every
    run. `run:step` names every later action in order — the verification gate, `pnpm josh followup`,
    `pnpm josh ms`, the release ask — each read at the point-of-use doc the header lists, never
-   re-narrated here (`residency.md` → ordering question).
+   re-narrated here (`residency.md` → "順序の問い").
 
 ## The progress step and the lane-child seam
 

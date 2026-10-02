@@ -1,4 +1,3 @@
-import { SKILL_ROOT } from '#scripts/claude/skill-fixture'
 import {
 	AI_DOCS,
 	read_unwrapped,
@@ -21,16 +20,13 @@ const TOPIC_FILE = 'shell-body.md'
 const CANONICAL = `${WORKFLOW_PROMPT_DIRECTORY}/${TOPIC_FILE}`
 const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
 const RESIDENCY = `${WORKFLOW_PROMPT_DIRECTORY}/residency.md`
-// The delivered-rules list left `SKILL.md` §3 for `rule-residency.md` (joshuafolkken/kit#1797):
-// it binds when a rule is being placed or moved, never on a turn spent executing an Issue.
-const WORKFLOW_SKILL_ENTRY = `${SKILL_ROOT}/workflow-commands/rule-residency.md`
 const SUITE_PATH = 'scripts/rules/shell-body-rule.test.ts'
 // The trigger's own suite, split out of the enumeration's so the reading of a call is read beside the
 // cases it has to keep. The marker list has to name it, or the split loses its coverage claim.
 const TRIGGER_SUITE = 'scripts/rules/shell-body-trigger.test.ts'
 // The one line in that list that had drifted from the suite it credits.
 const STDIN_CLAIM = '`-` が標準入力を読むこと'
-// Named once: the enumeration, both residency lists and this suite have to agree on the command.
+// Named once: the enumeration, the residency list and this suite have to agree on the command.
 const GUARD_COMMAND = 'pnpm josh rule:guard'
 // The single safe spelling the rule steers every caller toward — asserted in the delivered text and
 // again at the topic file, so it is named once here rather than duplicated across the two.
@@ -138,18 +134,15 @@ describe(`${CANONICAL} — carries the damage, the measurement and the safe spel
 	)
 })
 
-// The residency lists are the second half of the rule: a rule the criterion moved and that is not
+// The residency list is the second half of the rule: a rule the criterion moved and that is not
 // listed as moved has not been checked against it (`residency.md`).
-describe.each([RESIDENCY, WORKFLOW_SKILL_ENTRY])(
-	'%s — lists the rule as delivered',
-	(list_path) => {
-		const content = read_unwrapped(list_path)
+describe.each([RESIDENCY])('%s — lists the rule as delivered', (list_path) => {
+	const content = read_unwrapped(list_path)
 
-		it.each([TOPIC_FILE, GUARD_COMMAND])('names %j', (marker) => {
-			expect(content).toContain(marker)
-		})
-	},
-)
+	it.each([TOPIC_FILE, GUARD_COMMAND])('names %j', (marker) => {
+		expect(content).toContain(marker)
+	})
+})
 
 describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, () => {
 	const content = read_unwrapped(DELIVERY)
