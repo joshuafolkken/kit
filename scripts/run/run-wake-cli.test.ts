@@ -101,6 +101,11 @@ describe('josh run:wake — the stdout contract', () => {
 		expect(errors).toContain(run_wake_cli.USAGE)
 	})
 
+	it('refuses an unknown flag rather than acting around it', async () => {
+		expect(await run_wake_cli.run([LOOP_FLAG, '--nope'])).toBe(FAILURE)
+		expect(errors).toContain(run_wake_cli.USAGE)
+	})
+
 	it('refuses two verbs at once rather than guessing an order', async () => {
 		expect(await run_wake_cli.run(['--start', '--stop'])).toBe(FAILURE)
 		expect(errors).toContain(run_wake_cli.USAGE)

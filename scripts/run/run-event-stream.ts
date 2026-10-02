@@ -1,4 +1,5 @@
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
 // The run's append-only, ordered event stream — the surface a reader who was away rebuilds the run's
@@ -143,11 +144,7 @@ function is_present(event: RunEvent | undefined): event is RunEvent {
 // A malformed line reads as no event rather than throwing, so one truncated append — a write that lost a
 // race — never makes the whole stream unreadable.
 function parse_line(line: string): RunEvent | undefined {
-	try {
-		return event_schema.safeParse(JSON.parse(line)).data
-	} catch {
-		return undefined
-	}
+	return event_schema.safeParse(json_value.parse_or_undefined(line)).data
 }
 
 // Every event on the stream, oldest first. An absent or unreadable file is an empty stream, the same

@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { z } from 'zod'
 import {
 	package_scout,
@@ -120,27 +120,19 @@ function parse_size(raw: string | undefined): number {
 	return raw === undefined || !Number.isSafeInteger(parsed) || parsed <= 0 ? DEFAULT_SIZE : parsed
 }
 
-function parse_arguments(argv: ReadonlyArray<string>): ScoutArguments | undefined {
-	const { values, positionals } = parseArgs({
+// An unknown flag is `undefined` rather than a throw, so the answer is the usage line rather than a
+// stack trace, on a command whose output a workflow reads.
+function read_arguments(argv: ReadonlyArray<string>): ScoutArguments | undefined {
+	const parsed = cli_flags.parse_or_undefined({
 		args: [...argv],
 		options: { size: { type: 'string' } },
 		allowPositionals: true,
 	})
-	const keywords = positionals.join(' ').trim()
+	const keywords = parsed?.positionals.join(' ').trim() ?? ''
 
-	if (keywords === '') return undefined
+	if (parsed === undefined || keywords === '') return undefined
 
-	return { keywords, size: parse_size(values.size) }
-}
-
-// An unknown flag makes `parseArgs` throw. Caught so the answer is the usage line rather than a stack
-// trace, on a command whose output a workflow reads.
-function read_arguments(argv: ReadonlyArray<string>): ScoutArguments | undefined {
-	try {
-		return parse_arguments(argv)
-	} catch {
-		return undefined
-	}
+	return { keywords, size: parse_size(parsed.values.size) }
 }
 
 async function report(args: ScoutArguments): Promise<number> {

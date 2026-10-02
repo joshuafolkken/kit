@@ -2,7 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
-import { refuse_unknown_flags } from '#scripts/lib/cli-flags'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { status_icons } from '#scripts/lib/status-icons'
 import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
@@ -72,7 +72,8 @@ function parse_options(argv: ReadonlyArray<string>): RunOptions {
 		...(target !== undefined && { target }),
 	}
 	const usage =
-		target_usage ?? refuse_unknown_flags(rest, [...KNOWN_FLAGS, TARGET_USAGE], 'propagate')
+		target_usage ??
+		cli_flags.refuse_unknown_flags(rest, [...KNOWN_FLAGS, TARGET_USAGE], 'propagate')
 
 	return usage === undefined ? options : { ...options, usage }
 }
