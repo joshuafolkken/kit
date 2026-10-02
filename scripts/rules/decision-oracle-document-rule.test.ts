@@ -4,12 +4,12 @@ import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#2117: question 0 of the rule-placement criterion lives in residency.md as the
 // single source, and both CLAUDE.md and SKILL.md §3 carry a pointer rather than repeating it.
-// Three things can rot independently: residency.md can drop the question, CLAUDE.md can lose the
-// pointer, and rule-residency.md can go back to saying only two questions exist.
+// Two things can rot independently: residency.md can drop the question, and CLAUDE.md can lose the
+// pointer. joshuafolkken/kit#2891 merged rule-residency.md into residency.md, so the third guard —
+// that file going back to saying only two questions exist — has no file left to watch.
 
 const RESIDENCY = 'prompts/collaboration-workflow/residency.md'
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
-const RULE_RESIDENCY = '.claude/skills/workflow-commands/rule-residency.md'
 const CLAUDE = 'CLAUDE.md'
 
 // The unique marker for question 0 in residency.md. The phrase appears only in the question 0
@@ -44,18 +44,10 @@ describe('SKILL.md §3 points to residency.md for question 0', () => {
 	})
 })
 
-describe('rule-residency.md is updated to reflect three questions', () => {
-	it('no longer says only "two questions"', () => {
-		const content = read_repo_file(RULE_RESIDENCY)
-
-		// The old wording "keeps the two questions" should no longer appear unchanged;
-		// after #2117 it should reference question 0 in addition.
-		expect(content).not.toContain('§3 keeps the two questions that decide')
-	})
-
-	it('names oracle:list or question 0', () => {
-		const content = read_repo_file(RULE_RESIDENCY)
-
-		expect(content.includes(ORACLE_COMMAND) || content.includes(QUESTION_0_JP_MARKER)).toBe(true)
+describe('SKILL.md §3 names the single source', () => {
+	it('routes to residency.md rather than a second copy', () => {
+		expect(read_repo_file(SKILL)).toContain(
+			'**The residency criterion is `prompts/collaboration-workflow/residency.md`, its single source',
+		)
 	})
 })

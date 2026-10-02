@@ -30,11 +30,7 @@ const DEPENDENCY_SKILL = '.claude/skills/dependency-update'
 // `WORKFLOW_PROMPT`, which answers with the whole concatenated corpus: an assertion about where the
 // ceiling policy is argued has to fail when it is argued somewhere else.
 const RESIDENCY_TOPIC = 'prompts/collaboration-workflow/residency.md'
-// §3's body left the entry file in joshuafolkken/kit#1797: how much of a resident rule is resident
-// binds on a turn spent moving a sentence, never on one spent executing an Issue, so a workflow
-// entry no longer pays for it. joshuafolkken/kit#2161 finished the move — the two residency questions
-// went here too, leaving only the pointer heading in `SKILL.md` §3.
-const RESIDENCY_SKILL = `${WORKFLOW_SKILL}/rule-residency.md`
+const NOT_ASPIRATIONAL_MARKER = '**この基準は努力目標ではない。**'
 
 // Long enough that it says when to read the skill rather than merely naming it — the description is
 // what an agent matches the situation against, so a one-liner ships a skill nothing ever opens.
@@ -229,13 +225,12 @@ describe(`${DEPENDENCY_SKILL} — carries the post-update verification`, () => {
 // re-derived differently every time it is applied.
 describe('the residency criterion — which rules may stay in the always-loaded documents', () => {
 	// §3's heading stays in the entry file as a pointer (pinned in `document-markers.test.ts`), but its
-	// whole body — the residency questions included — moved to `rule-residency.md`
-	// (joshuafolkken/kit#2161), read only when a rule is placed, moved or retired and never at an entry.
-	// Earlier (joshuafolkken/kit#1797) the two questions stayed resident; #2161 finished the move, since
-	// no run reaches them. Moved, not dropped: the criterion is asserted at its new home here.
-	it('states the residency criterion at its new home in rule-residency.md', () => {
-		expect(read_unwrapped(RESIDENCY_SKILL)).toContain(
-			'**A rule stays in `CLAUDE.md` if and only if it has to fire on a turn where no skill was loaded.**',
+	// whole body — the residency questions included — left it (joshuafolkken/kit#1797,
+	// joshuafolkken/kit#2161), and joshuafolkken/kit#2891 merged the skill-side copy into the canonical
+	// topic file, so the criterion is asserted at its one home.
+	it('states the residency criterion at its single source', () => {
+		expect(read_unwrapped(RESIDENCY_TOPIC)).toContain(
+			'**`CLAUDE.md` に残るのは、skill がロードされていないターンでも効く必要がある規則だけである。**',
 		)
 	})
 })
@@ -246,33 +241,27 @@ describe('the residency criterion — which rules may stay in the always-loaded 
 // line in two wrong places at once: `verify-ui` is routed to just as this skill is, and one entry
 // routes to a prompt rather than to a skill at all. The axis is whether the rule has a counterpart.
 describe('the residency list says what it covers', () => {
+	// joshuafolkken/kit#2891 merged the English skill-side copy of this list into the canonical topic
+	// file; each marker below is the Japanese counterpart of the English one it used to assert there.
 	it.each([
-		'**The scope of this list is every resident rule that has an on-demand counterpart**',
-		'Within that scope the list is exhaustive',
-		'Counting by skill would draw the line in the wrong place',
+		'この範囲の中では網羅的であり',
 		// The pointer has to name where each entry is actually guarded; two of them are asserted by their
 		// own suites, and a maintainer who looks only in this one concludes they are unguarded.
-		'`scripts/claude/verify-ui-skill.test.ts` for the UI gate',
-		'**None of that belongs on this list**',
-		'their absence here is correct rather than an omission',
-		// The six worked examples §3 used to carry, re-pointed here with the body they moved with
-		// (joshuafolkken/kit#1797). Every one is the marker that was asserted before.
-		'**Explicit invocation required**',
-		'**The mid-workflow stop notification**',
-		'**The `overrides` prohibition**',
-		'**The UI-verification gate**',
-		'**The three `josh epic:*` rules that bind outside those commands**',
-		'**The criterion is not advisory.**',
-	])('scopes the claim in the workflow skill: %j', (marker) => {
-		expect(read_unwrapped(RESIDENCY_SKILL)).toContain(marker)
+		'UI 検証ゲートは `scripts/claude/verify-ui-skill.test.ts`',
+		'一覧に無いことは欠落ではない',
+		// The six worked examples §3 used to carry (joshuafolkken/kit#1797).
+		'**明示起動の必須**',
+		'**停止時の `confirmation` 通知**',
+		'**`overrides` の保護**',
+		'**`josh epic:*` のうちコマンドの外側で効く 3 件**',
+		NOT_ASPIRATIONAL_MARKER,
+	])('scopes the claim at the single source: %j', (marker) => {
+		expect(read_unwrapped(RESIDENCY_TOPIC)).toContain(marker)
 	})
 
 	// Asserted absent, not merely replaced: the unscoped sentence beside the scoped one leaves two
 	// claims about the same list, and a reader applying the first one still grows it without end.
 	it('no longer claims the list covers every resident rule', () => {
-		expect(read_unwrapped(RESIDENCY_SKILL)).not.toContain(
-			'The list is exhaustive — a rule added to the documents',
-		)
 		expect(read_unwrapped(WORKFLOW_PROMPT)).not.toContain('**この一覧は網羅的である**')
 	})
 
@@ -282,7 +271,7 @@ describe('the residency list says what it covers', () => {
 	it.each([
 		'## 常駐ドキュメントと skill の分担（何を常駐に残すか）',
 		'**その規則は、skill がロードされていないターンでも効く必要があるか。**',
-		'**この基準は努力目標ではない。**',
+		NOT_ASPIRATIONAL_MARKER,
 		'**この一覧の対象範囲は、オンデマンド側に対応する手順を持つ常駐規則である**',
 		'**skill の数で線を引くのは誤りである**',
 		'**UI 検証ゲート**',
@@ -525,16 +514,16 @@ describe('the resident budget reads the same in both units', () => {
 	})
 })
 
-describe('the workflow skill defines how much of a resident rule is resident', () => {
-	const skill = read_unwrapped(RESIDENCY_SKILL)
+describe('the residency criterion defines how much of a resident rule is resident', () => {
+	const criterion = read_unwrapped(RESIDENCY_TOPIC)
 
 	it.each([
-		'**A resident rule is written as its trigger plus a pointer.**',
-		'The test is whether the resident text still produces correct behavior on a turn where the pointer is never opened.',
+		'**常駐規則は、トリガと導線の 2 つで書く。**',
+		'**判定は、導線を一度も開かないターンでも常駐の記述だけで正しく振る舞えるかである。**',
 		// Re-pointed by joshuafolkken/kit#1525: trimming is still moving, but a narrow retirement
 		// route now exists beside it, so the sentence that used to close the door names the exception.
-		'**Trimming is moving, and deleting is the exception that has to be earned.**',
+		'**削ることは移すことであり、削除は理由を示して初めて許される例外である。**',
 	])('states %j', (marker) => {
-		expect(skill).toContain(marker)
+		expect(criterion).toContain(marker)
 	})
 })

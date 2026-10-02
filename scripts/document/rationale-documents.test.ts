@@ -17,6 +17,7 @@ const RATIONALE_SUFFIX = '-rationale.md'
 const SECTION_LEVEL = 2
 const SKILL_ROOT = path.join('.claude', 'skills')
 const SKILL_FILE = 'SKILL.md'
+const TOPIC_DIRECTORY = path.join('prompts', 'collaboration-workflow')
 const DOCS_DIRECTORY = 'docs'
 
 function rationale_files(): Array<string> {
@@ -29,19 +30,23 @@ function read(relative_path: string): string {
 	return readFileSync(path.join(ROOT, relative_path), 'utf8')
 }
 
-// A workflow procedure file first; a whole skill's `SKILL.md` when the rationale is named after a skill
-// rather than a workflow file (`epic-commands-rationale.md`, joshuafolkken/kit#2892); a consumer-facing
-// page under `docs/` when it is named after neither (`sync-rationale.md`, joshuafolkken/kit#2896).
+// A workflow procedure file first; a canonical topic file when the rationale explains one that holds
+// its own body (`residency-rationale.md`, joshuafolkken/kit#2891); a whole skill's `SKILL.md` when the
+// rationale is named after a skill (`epic-commands-rationale.md`, joshuafolkken/kit#2892); a
+// consumer-facing page under `docs/` when it is named after none of them (`sync-rationale.md`,
+// joshuafolkken/kit#2896).
 function procedure_of(rationale: string): string {
 	const name = path.basename(rationale).replace(RATIONALE_SUFFIX, '')
-	const workflow_procedure = path.join(entry_read_set.SKILL_DIRECTORY, `${name}.md`)
-	const skill_procedure = path.join(SKILL_ROOT, name, SKILL_FILE)
+	const candidates = [
+		path.join(entry_read_set.SKILL_DIRECTORY, `${name}.md`),
+		path.join(TOPIC_DIRECTORY, `${name}.md`),
+		path.join(SKILL_ROOT, name, SKILL_FILE),
+	]
 
-	if (existsSync(path.join(ROOT, workflow_procedure))) return workflow_procedure
-
-	if (existsSync(path.join(ROOT, skill_procedure))) return skill_procedure
-
-	return path.join(DOCS_DIRECTORY, `${name}.md`)
+	return (
+		candidates.find((candidate) => existsSync(path.join(ROOT, candidate))) ??
+		path.join(DOCS_DIRECTORY, `${name}.md`)
+	)
 }
 
 function section_titles(markdown: string): Array<string> {
@@ -98,23 +103,31 @@ describe('workflow rationale documents sit off the read path', () => {
 		expect(read_files.filter((file) => rationale_names.has(file))).toStrictEqual([])
 	})
 
-	it('maps a rationale named after a skill to that skill', () => {
-		expect(procedure_of('docs/maintainers/epic-commands-rationale.md')).toBe(
-			path.join(SKILL_ROOT, 'epic-commands', SKILL_FILE),
-		)
-	})
-
-	it('maps a rationale named after neither to the consumer-facing page under docs/', () => {
-		expect(procedure_of('docs/maintainers/sync-rationale.md')).toBe(
-			path.join(DOCS_DIRECTORY, 'sync.md'),
-		)
-	})
-
 	it('flags a rationale section its procedure never cites', () => {
 		const rationale = 'docs/maintainers/example-rationale.md'
 		const markdown = '# Example\n\n## Cited\n\n## Orphaned\n'
 		const procedure_text = `Rationale: \`${rationale}\` → "Cited".`
 
 		expect(uncited_sections(rationale, procedure_text, markdown)).toStrictEqual(['Orphaned'])
+	})
+})
+
+describe('a rationale document maps to the procedure it explains', () => {
+	it('maps a rationale named after a skill to that skill', () => {
+		expect(procedure_of('docs/maintainers/epic-commands-rationale.md')).toBe(
+			path.join(SKILL_ROOT, 'epic-commands', SKILL_FILE),
+		)
+	})
+
+	it('maps a rationale named after a canonical topic file to that topic', () => {
+		expect(procedure_of('docs/maintainers/residency-rationale.md')).toBe(
+			path.join(TOPIC_DIRECTORY, 'residency.md'),
+		)
+	})
+
+	it('maps a rationale named after none of them to the consumer-facing page under docs/', () => {
+		expect(procedure_of('docs/maintainers/sync-rationale.md')).toBe(
+			path.join(DOCS_DIRECTORY, 'sync.md'),
+		)
 	})
 })

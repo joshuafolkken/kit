@@ -1,4 +1,3 @@
-import { SKILL_ROOT } from '#scripts/claude/skill-fixture'
 import {
 	AI_DOCS,
 	read_unwrapped,
@@ -25,12 +24,9 @@ const TOPIC_FILE = 'turn-batching.md'
 const CANONICAL = `${WORKFLOW_PROMPT_DIRECTORY}/${TOPIC_FILE}`
 const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
 const RESIDENCY = `${WORKFLOW_PROMPT_DIRECTORY}/residency.md`
-// The delivered-rules list left `SKILL.md` §3 for `rule-residency.md` (joshuafolkken/kit#1797):
-// it binds when a rule is being placed or moved, never on a turn spent executing an Issue.
-const WORKFLOW_SKILL_ENTRY = `${SKILL_ROOT}/workflow-commands/rule-residency.md`
 const SUITE_PATH = 'scripts/rules/turn-batching-rule.test.ts'
-// The trigger that now delivers the rule. Named once: the enumeration, both residency lists and this
-// suite have to agree on the command, and a string kept correct in one of four places is not kept.
+// The trigger that now delivers the rule. Named once: the enumeration, the residency list and this
+// suite have to agree on the command, and a string kept correct in one of three places is not kept.
 const GUARD_COMMAND = 'pnpm josh batch:guard'
 // The figures the issue was filed on. Quotable enough to be the first thing pasted back into an
 // always-loaded document, which is what makes them the marker for "the reasoning stayed put".
@@ -164,28 +160,25 @@ describe(`${CANONICAL} — reconciles the rejection with the shipped guard`, () 
 	})
 })
 
-// The residency lists are the second half of the rule: a rule the criterion moved and that is not
+// The residency list is the second half of the rule: a rule the criterion moved and that is not
 // listed as moved has not been checked against it (`residency.md`).
-describe.each([RESIDENCY, WORKFLOW_SKILL_ENTRY])(
-	'%s — lists the rule as delivered',
-	(list_path) => {
-		const content = read_unwrapped(list_path)
+describe.each([RESIDENCY])('%s — lists the rule as delivered', (list_path) => {
+	const content = read_unwrapped(list_path)
 
-		it('names the rule', () => {
-			expect(content).toContain(TOPIC_FILE)
-		})
+	it('names the rule', () => {
+		expect(content).toContain(TOPIC_FILE)
+	})
 
-		it('names the trigger that delivers it', () => {
-			expect(content).toContain(GUARD_COMMAND)
-		})
+	it('names the trigger that delivers it', () => {
+		expect(content).toContain(GUARD_COMMAND)
+	})
 
-		// Recorded so the relocation cannot later read as a cull: the prose was resident and not obeyed, and
-		// that measurement is the reason it moved.
-		it('gives the reason it moved off residency', () => {
-			expect(content).toContain('joshuafolkken/kit#1524')
-		})
-	},
-)
+	// Recorded so the relocation cannot later read as a cull: the prose was resident and not obeyed, and
+	// that measurement is the reason it moved.
+	it('gives the reason it moved off residency', () => {
+		expect(content).toContain('joshuafolkken/kit#1524')
+	})
+})
 
 describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, () => {
 	const content = read_unwrapped(DELIVERY)

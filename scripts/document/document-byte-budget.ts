@@ -79,7 +79,6 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// two budgets must not hold it twice — the reachability line moved it from `unreached` to
 	// `point-of-use`.
 	{ path: '.claude/skills/workflow-commands/prerequisite.md', bytes: 8192 },
-	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 24_576 },
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
 	{ path: 'docs/josh-commands.md', bytes: 180_224 },
@@ -104,7 +103,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/plan-comment.md', bytes: 20_480 },
 	{ path: 'prompts/collaboration-workflow/proposal-request.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 28_672 },
-	{ path: 'prompts/collaboration-workflow/residency.md', bytes: 20_480 },
+	{ path: 'prompts/collaboration-workflow/residency.md', bytes: 28_672 },
 	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 57_344 },
 	{ path: 'prompts/collaboration-workflow/shell-body.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/simplicity-first.md', bytes: 4096 },
