@@ -8,7 +8,7 @@
    - ルール上書きが要るなら **正しいレイヤー**（kit / app-kit の共有設定）でスコープする。消費者リポジトリでの場当たり的な一回限りの disable にしない
    - 破壊が first-party パッケージ（kit / app-kit）起因なら、**そこに Issue を立てて適切な altitude で直す**。消費者側の回避だけで済ませない（→「別パッケージ起因の問題は割り込み Issue で対応する」参照）
 3. **pin-back は最終手段**: fix-forward が本当に不可能／ブロックされている（例: 未リリースの上流修正待ち）ときだけ、古いバージョンへ固定する。固定するときは **理由を記録し、最新へ戻すためのトラッキング Issue を立てる**。pin-back を既定の推奨として提示してはならない
-4. **既存の保護を尊重する**: この方針は overrides / `devEngines` の承認ゲートを上書きしない。fix-forward は _「最新を優先し破壊を直す」_ であって _「保護された pin を黙って書き換える」_ ではない。overrides（`pnpm-workspace.yaml` / `package.json` のいずれも）と `devEngines` の変更は従来どおりユーザーの明示承認を要する（→「overrides の保護（`pnpm-workspace.yaml` / `package.json` の両方を見る）」、および CLAUDE.md の `devEngines` 保護ルール参照）
+4. **既存の保護を尊重する**: この方針は overrides / `devEngines` の承認ゲートを上書きしない。fix-forward は _「最新を優先し破壊を直す」_ であって _「保護された pin を黙って書き換える」_ ではない。overrides（`pnpm-workspace.yaml` / `package.json` のいずれも）と `devEngines` の変更は従来どおりユーザーの明示承認を要する（→ `.claude/skills/dependency-update/SKILL.md` → "1. Effective overrides live in the workspace — inspect both files"、および CLAUDE.md の `devEngines` 保護ルール参照）
 5. **タイムリーに**: バンプ起因の破壊は、可能な限り同じ作業セッション内で速やかに対処し、pin の裏に先送りしない
 
 - このルールは横断ドキュメント（CLAUDE.md「Latest-first, fix forward — pin back only as a last resort」）のカノニカル参照
