@@ -13,6 +13,7 @@ import {
 } from './claude-settings-fixture'
 
 const GITIGNORE_PATH = fileURLToPath(new URL('../../.gitignore', import.meta.url))
+const CLAUDE_MD_PATH = fileURLToPath(new URL('../../CLAUDE.md', import.meta.url))
 
 // #852: the innermost feedback loop is one edited file, and before this hook the only way to see
 // what prettier and eslint made of it was a whole-project run. The hook launches the pre-built
@@ -92,11 +93,11 @@ const MINIMUM_PROVISION_TIMEOUT_SECONDS =
 const SESSION_LANG_HOOK_COMMAND = hook_launch.hook_launch_command('session-lang.js', 'session:lang')
 const MINIMUM_SESSION_LANG_TIMEOUT_SECONDS = STARTUP_ALLOWANCE_SECONDS
 // The per-turn echoes are injected on every prompt, so each stays bounded (joshuafolkken/kit#1930).
-// The work-summary reminder carries every behavioral directive `prompt-hook-brevity.test.ts` pins
-// (its REQUIRED_DIRECTIVES) and points at the full rule in `CLAUDE.md`, which lands it near 800
-// characters. The real per-turn budget is the joined-text ceiling that suite owns (1,100 bytes); this
-// per-echo bound only has to keep a single reminder from growing past that same ceiling on its own.
-const ECHO_MAX_LENGTH = 1100
+// The work-summary reminder is a trigger and a pointer at Code Change Rules Step 0 in `CLAUDE.md`
+// (joshuafolkken/kit#2889), near 200 characters. The real per-turn budget is the joined-text ceiling
+// `prompt-hook-brevity.test.ts` owns (256 bytes); this per-echo bound only has to keep a single
+// reminder from growing past that same ceiling on its own.
+const ECHO_MAX_LENGTH = 256
 
 // Compared as sets, so the two sides are ordered the same way first. `localeCompare` rather than the
 // default, which sorts by code unit and is what the lint rule here is about.
@@ -352,20 +353,30 @@ describe('.claude/settings.json — the per-turn echoes are short', () => {
 	})
 })
 
-describe('.claude/settings.json — deletion-policy hook reconciliation', () => {
-	it('frames git-tracked deletion as reversible and not a Tier C action', () => {
-		const raw = claude_settings_fixture.read_settings_text()
+// joshuafolkken/kit#2889 moved the deletion policy from a per-turn hook into the Tier C definition in
+// `CLAUDE.md`, which every session loads, so the rule is pinned where it now lives.
+function tier_c_line(): string {
+	return (
+		readFileSync(CLAUDE_MD_PATH, 'utf8')
+			.split('\n')
+			.find((line) => line.includes('**Tier C')) ?? ''
+	)
+}
 
-		expect(raw).toContain('git restore')
-		expect(raw).toMatch(/reversible/u)
-		expect(raw).toMatch(/Tier C/u)
+describe('CLAUDE.md — deletion-policy reconciliation with Tier C', () => {
+	it('keeps the index-mutation deny the policy sits beside', () => {
+		expect(claude_settings_fixture.read_settings_text()).toContain('git restore')
+	})
+
+	it('frames git-tracked deletion as reversible and not a destructive op', () => {
+		expect(tier_c_line()).toContain(
+			'Deleting a git-tracked file is reversible, so it is not a destructive op',
+		)
 	})
 
 	it('still requires inspecting the target before deleting', () => {
-		const raw = claude_settings_fixture.read_settings_text()
-
-		expect(raw).toMatch(/inspect the target first/u)
-		expect(raw).not.toContain('proceed directly')
+		expect(tier_c_line()).toContain('inspect the target first')
+		expect(tier_c_line()).not.toContain('proceed directly')
 	})
 })
 

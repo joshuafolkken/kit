@@ -389,10 +389,11 @@ describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (
 
 	// joshuafolkken/kit#1985: `epicrun` was removed and its job folded into `backlogrun`. A person who
 	// types the old keyword must be pointed at the command that runs the same scope, so the guidance is
-	// pinned resident — the mid-workflow turn that mistypes it loads no skill.
+	// pinned resident — the mid-workflow turn that mistypes it loads no skill. The history moved to
+	// docs/maintainers/claude-md-rationale.md (joshuafolkken/kit#2889); the redirect stays.
 	it.each([
-		'`epicrun` was removed (joshuafolkken/kit#1985)',
-		'tell them to run `backlogrun #E --only`',
+		'**`queue` and `epicrun` were removed**',
+		'one who types `epicrun` to run `backlogrun #E --only`',
 	])('guides a typed `epicrun` to `backlogrun #E --only` with %j', (marker) => {
 		expect(content).toContain(marker)
 	})
