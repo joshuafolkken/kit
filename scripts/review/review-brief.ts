@@ -357,6 +357,39 @@ function round_two_block(
 	return narrow_block(scope.recorded_at, scope, root, base)
 }
 
+// **A resumed round 1 reads what changed since the attested review, reusing round 2's reconciliation**
+// (joshuafolkken/kit#2945). A ship that stopped and was re-issued briefed the whole change again, so
+// the reviewer re-read every file the attested review had just read. The scope is the comparison round
+// 2 makes, measured from the tree that review was briefed on. Every reading that cannot narrow falls back to the whole
+// change: no record, a moved base, or an empty target. An empty target is included because a resumed
+// review that read nothing would report a clean verdict over the one already recorded.
+const RESUMED_HEADING =
+	'Resumed round 1 — a review of this branch was already attested, so this pass reads only what changed since the tree it read.'
+
+const RESUMED_QUESTION =
+	'Review these files in full against the rubric — they are the only code this pass has not already read.'
+
+function resumed_target(
+	snapshot: FileMapStamp | undefined,
+	tree: Record<string, string>,
+	root: string,
+	base: string,
+): string {
+	const scope = round_two_scope(snapshot, tree, base)
+
+	if (scope.recorded_at === undefined || scope.target.length === 0) {
+		return whole_change_target(root, base)
+	}
+
+	return [
+		RESUMED_HEADING,
+		`The attested review read the tree recorded at ${scope.recorded_at}.`,
+		`Target: only these files, which changed since that tree:\n${format_paths(root, scope.target)}`,
+		...reconciliation(root, base, scope),
+		RESUMED_QUESTION,
+	].join('\n')
+}
+
 interface BriefStamps {
 	gate: FileMapStamp | undefined
 	in_flight: FileMapStamp | undefined
@@ -377,12 +410,23 @@ interface BriefInput {
 	// The rubric's absolute path, resolved by the caller against the kit package rather than the review
 	// checkout, so it resolves in a consumer that ships no `prompts/` of its own (joshuafolkken/kit#2402).
 	rubric_path: string
+	// The tree a finished, clean review of this branch was briefed on, so round 1 is a resume
+	// (joshuafolkken/kit#2945). Absent, round 1 reads the whole change.
+	resumed_from?: FileMapStamp | undefined
 }
 
 const SECOND_ROUND = 2
 
+function round_one_target(input: BriefInput): string {
+	const { root } = input.checkout
+
+	if (input.resumed_from === undefined) return whole_change_target(root, input.base)
+
+	return resumed_target(input.resumed_from, input.tree, root, input.base)
+}
+
 function target_block(input: BriefInput): string {
-	if (input.round < SECOND_ROUND) return whole_change_target(input.checkout.root, input.base)
+	if (input.round < SECOND_ROUND) return round_one_target(input)
 
 	return round_two_block(input.stamps.round_one, input.tree, input.checkout.root, input.base)
 }
@@ -422,6 +466,7 @@ const review_brief = {
 	green_stamp,
 	in_flight_line,
 	live_marker,
+	RESUMED_HEADING,
 	matching_stamp,
 	no_snapshot_line,
 	NOTHING_LEFT_LINE,
