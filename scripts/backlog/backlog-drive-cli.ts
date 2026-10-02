@@ -49,7 +49,7 @@ const LIST_SEPARATOR = ','
 const COUNT_PATTERN = /^\d+$/u
 const ISSUE_PATTERN = /^[1-9]\d*$/u
 const USAGE =
-	'Usage: josh backlog:drive --owner <pid> [--active <ISO-8601>] [--max <n>] [--idle <minutes>] [--only] [--exclude <n>[,<n>...]] [--await <n>[,<n>...]] [--window <minutes>]'
+	'Usage: josh backlog:drive --owner <pid> [--active <ISO-8601>] [--max <n>] [--idle <minutes>] [--only] [--exclude <n>[,<n>...]] [--await <n>[,<n>...]] [--window <minutes>] [--stopped <n>]'
 
 const OPTIONS = {
 	active: { type: 'string' },
@@ -59,6 +59,7 @@ const OPTIONS = {
 	max: { type: 'string' },
 	only: { type: 'boolean' },
 	owner: { type: 'string' },
+	stopped: { type: 'string' },
 	window: { type: 'string' },
 } as const
 
@@ -72,6 +73,8 @@ interface DriveContext {
 	window_ms: number | undefined
 	window: string | undefined
 	is_only: boolean
+	// The child whose merge answered `stop` before the hand-back: the resumed run starts already stopping.
+	stopped: string | undefined
 }
 
 type Values = Partial<Record<Exclude<keyof typeof OPTIONS, 'only'>, string>> & { only?: boolean }
@@ -110,6 +113,12 @@ function is_valid_window(raw: string | undefined): boolean {
 	return raw === undefined || COUNT_PATTERN.test(raw)
 }
 
+function is_valid_single(values: Values): boolean {
+	const is_valid_stopped = values.stopped === undefined || ISSUE_PATTERN.test(values.stopped)
+
+	return is_valid_stopped && is_valid_window(values.window)
+}
+
 function owner_of(values: Values | undefined): string | undefined {
 	const owner = values?.owner
 
@@ -117,7 +126,7 @@ function owner_of(values: Values | undefined): string | undefined {
 }
 
 function to_context(values: Values, owner: string): DriveContext | undefined {
-	if (!is_valid_window(values.window)) return undefined
+	if (!is_valid_single(values)) return undefined
 
 	const forwarded = forwarded_of(values)
 	const exclude = to_issues(values.exclude)
@@ -136,6 +145,7 @@ function to_context(values: Values, owner: string): DriveContext | undefined {
 		window_ms,
 		window: values.window,
 		is_only: values.only === true,
+		stopped: values.stopped,
 	}
 }
 
@@ -274,6 +284,7 @@ function resume_line(state: DriveState, context: DriveContext): string {
 
 	if (exclude.length > 0) flags.push('--exclude', exclude.join(LIST_SEPARATOR))
 	if (context.window !== undefined) flags.push('--window', context.window)
+	if (state.stopped_by !== undefined) flags.push('--stopped', state.stopped_by)
 
 	return `resume: ${flags.join(' ')}`
 }
@@ -325,7 +336,9 @@ async function drive(context: DriveContext): Promise<number> {
 	const seeded = await seeded_lanes(context)
 
 	if (seeded === undefined) return FAILURE_EXIT_CODE
-	const initial = backlog_drive.initial_state(seeded, context.active ?? new Date().toISOString())
+	const fresh = backlog_drive.initial_state(seeded, context.active ?? new Date().toISOString())
+	const initial =
+		context.stopped === undefined ? fresh : backlog_drive.merge_stopped(context.stopped, fresh)
 	const last = { state: { ...initial, exclude: [...context.exclude] } }
 	const config = { poll_ms: POLL_MS, offer_ms: OFFER_MS, window_ms: context.window_ms }
 	const end = await backlog_drive.run_loop(last.state, config, ports_of(context, seeded, last))

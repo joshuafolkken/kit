@@ -16,19 +16,22 @@
 // **Everything it touches is a port**, the pattern `run-wake-loop.ts` set, so the sequencing is pinned
 // without a process, a network or a clock.
 
-// The `run:merge` tokens that need the parent: a hand-off, a person's stop, a tripped guard, a foreign
-// owner, an unreadable state. `resumed` is not among them — the same lane is awaited again.
-const HANDOFF_TOKENS: ReadonlySet<string> = new Set([
+const RUN_VERDICT = 'run'
+const STOP_VERDICT = 'stop'
+// The `run:merge` tokens that end the loop at once: a hand-off, a person's stop, the environment down,
+// a foreign owner, an unreadable state. `resumed` is not among them — the same lane is awaited again.
+const IMMEDIATE_TOKENS: ReadonlySet<string> = new Set([
 	'over',
 	'human-review',
-	'stop',
 	'environment',
 	'busy',
 	'retry',
 ])
+// Every token `run:merge` prints first even on a non-zero exit. `stop` — a parked backlog or the failure
+// guard — is the offer's `stop` reached through a merge: the child is collected, nothing more starts,
+// and the children still in flight are collected before the loop ends (joshuafolkken/kit#2881).
+const HANDOFF_TOKENS: ReadonlySet<string> = new Set([...IMMEDIATE_TOKENS, STOP_VERDICT])
 const RESUMED_TOKEN = 'resumed'
-const RUN_VERDICT = 'run'
-const STOP_VERDICT = 'stop'
 const WATCH_VERDICT = 'watch'
 // The verdicts the loop acts on without the parent. Any other is handed back as it was printed.
 const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
@@ -63,6 +66,8 @@ interface DriveState {
 	is_stopping: boolean
 	stop_reason?: string | undefined
 	stop_is_finish?: boolean | undefined
+	// The child whose merge answered `stop`, carried on the resume line: no offer re-derives that stop.
+	stopped_by?: string | undefined
 }
 
 interface DriveEnd {
@@ -133,22 +138,43 @@ function initial_state(in_flight: ReadonlyArray<string>, active: string): DriveS
 	}
 }
 
-// One finished child: collected, excluded, and — unless its cut was resumed in place — out of flight.
+// The stop a merge reached: kept as the first stop's reason when an offer already stopped the run.
+function merge_stopped(issue: string, state: DriveState): DriveState {
+	if (state.is_stopping) return state
+
+	return {
+		...state,
+		is_stopping: true,
+		stop_reason: `run:merge #${issue} answered stop`,
+		stopped_by: issue,
+	}
+}
+
+// The child collected and excluded, and — unless its cut was resumed in place — out of flight.
+function collected_state(
+	issue: string,
+	token: string,
+	state: DriveState,
+	active: string,
+): DriveState {
+	const in_flight =
+		token === RESUMED_TOKEN ? state.in_flight : state.in_flight.filter((item) => item !== issue)
+	const exclude = state.exclude.includes(issue) ? state.exclude : [...state.exclude, issue]
+
+	return { ...state, in_flight, exclude, active }
+}
+
+// One finished child: handed back on an immediate token, otherwise collected.
 async function collect(issue: string, state: DriveState, ports: DrivePorts): Promise<PassResult> {
 	const token = await ports.merge(issue)
 
 	// An empty first line is a `run:merge` that failed before printing one: never read as a collection.
 	if (token === '') return ended('merge', state, undefined, issue)
-	if (HANDOFF_TOKENS.has(token)) return ended('merge', state, token, issue)
+	if (IMMEDIATE_TOKENS.has(token)) return ended('merge', state, token, issue)
 
-	const in_flight =
-		token === RESUMED_TOKEN ? state.in_flight : state.in_flight.filter((item) => item !== issue)
-	const exclude = state.exclude.includes(issue) ? state.exclude : [...state.exclude, issue]
+	const next = collected_state(issue, token, state, ports.now().toISOString())
 
-	return {
-		kind: 'continue',
-		state: { ...state, in_flight, exclude, active: ports.now().toISOString() },
-	}
+	return { kind: 'continue', state: token === STOP_VERDICT ? merge_stopped(issue, next) : next }
 }
 
 async function collect_finished(state: DriveState, ports: DrivePorts): Promise<PassResult> {
@@ -320,7 +346,15 @@ async function run_loop(
 	return step.end
 }
 
-const backlog_drive = { HANDOFF_TOKENS, collect, initial_state, on_verdict, run_loop, run_pass }
+const backlog_drive = {
+	HANDOFF_TOKENS,
+	collect,
+	initial_state,
+	merge_stopped,
+	on_verdict,
+	run_loop,
+	run_pass,
+}
 
 export type { DriveEnd, DrivePorts, DriveState, LoopConfig, LoopPorts, OfferRead, PassResult }
 export { backlog_drive }

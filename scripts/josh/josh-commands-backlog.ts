@@ -19,7 +19,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Collapse a backlogrun loop-head event into one call: read backlog:next, ask backlog:budget, return the verdict and any issues to start',
 		category: 'AI tools',
-		reference: ['[options]', 'automation', ['network']],
+		reference: ['[options]', 'automation', ['files', 'network', 'processes']],
 	},
 	'backlog:drive': {
 		script: 'scripts/backlog/backlog-drive-cli.ts',

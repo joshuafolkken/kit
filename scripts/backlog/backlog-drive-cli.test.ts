@@ -42,6 +42,7 @@ describe('backlog_drive_cli.parse', () => {
 			window_ms: WINDOW_MINUTES * MS_PER_MINUTE,
 			window: String(WINDOW_MINUTES),
 			is_only: false,
+			stopped: undefined,
 		})
 	})
 })
@@ -122,6 +123,18 @@ describe('backlog_drive_cli output', () => {
 		expect(context && backlog_drive_cli.resume_line(state, context)).toBe(
 			`resume: --owner 4242 --active ${ACTIVE} --idle 0 --exclude 2400,2401`,
 		)
+	})
+})
+
+describe('backlog_drive_cli — a merge stop across a hand-back', () => {
+	it('carries a merge stop on the resume line and reads it back', () => {
+		const context = backlog_drive_cli.parse(['--owner', '4242'])
+		const state = backlog_drive.merge_stopped('2401', backlog_drive.initial_state([], ACTIVE))
+		const line = context && backlog_drive_cli.resume_line(state, context)
+
+		expect(line).toBe(`resume: --owner 4242 --active ${ACTIVE} --stopped 2401`)
+		expect(backlog_drive_cli.parse(['--owner', '4242', '--stopped', '2401'])?.stopped).toBe('2401')
+		expect(backlog_drive_cli.parse(['--owner', '4242', '--stopped', 'x'])).toBeUndefined()
 	})
 })
 

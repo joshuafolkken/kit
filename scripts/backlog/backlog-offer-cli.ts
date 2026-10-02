@@ -2,7 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { josh_command } from '#scripts/josh/josh-run'
-import { rule_value_cli } from '#scripts/rules/rule-value-cli'
+import { rule_value_cache } from '#scripts/rules/rule-value-cache'
 import { run_event_stream } from '#scripts/run/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
 import { z } from 'zod'
@@ -242,11 +242,12 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	if (values === undefined) return refuse()
 
-	// The loop head is the one place `rule:value` is called from: once per iteration, the parent's
+	// The loop head is the one place `rule:value` is read from: once per iteration, the parent's
 	// context still small, so a rule that never fires shows up as a printed row rather than as
-	// something a person has to remember to measure (joshuafolkken/kit#2271). It reports to stderr and
-	// never fails, so a broken reading never stops the backlog.
-	rule_value_cli.emit()
+	// something a person has to remember to measure (joshuafolkken/kit#2271). It prints the cached
+	// reading and refreshes it in a detached process, so the offer never waits on the measurement
+	// (joshuafolkken/kit#2881), and it never fails, so a broken reading never stops the backlog.
+	rule_value_cache.emit()
 
 	const counts = counts_of(values)
 
