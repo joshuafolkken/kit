@@ -13,7 +13,11 @@ watcher that never exits, so the long-running form is right only where output is
 
 **Why a sleep-only `Bash` call is refused.** A call that only sleeps adds a second clock nobody
 reconciles with the watcher's, which is why `scripts/rules/early-heartbeat.ts` → `decide` refuses it on
-its three tests.
+its three tests: `scripts/rules/early-heartbeat.ts` → `decide` refuses a sleep-only `Bash` call when a
+timer it already allowed is still live, when the report it would produce would land before the interval
+is up, or when the wait runs longer than the interval — so a single correctly-spaced arm is allowed. A
+live timer is counted from the record the guard writes when it allows one, never from the machine's
+`sleep` processes.
 
 **Why nothing in flight keeps the watcher waiting.** Otherwise the "start the next one in the same
 turn" step would make it a poll.
@@ -33,8 +37,8 @@ heartbeat.
 
 **Why every report carries an absolute instant.** A relative figure means something only while the
 reports keep coming, and unattended execution is made of the events that break that — a suspend, a rate
-limit, a restart. The local clock leads with UTC and the offset beside it because the line is relayed to
-other machines and read in cloud sessions.
+limit, a restart. The date is part of it, and the local clock leads with UTC beside it and the offset
+that ties them, because the line is relayed to other machines and read in cloud sessions.
 
 ## Why the signal tiers are split this way
 
@@ -47,6 +51,12 @@ interrupt a person, and a line every fifteen minutes is the fatigue that stops t
 **Why a stop is pushed to the interrupt tier.** The heartbeat says a run is still going; a run that has
 _stopped_ is the event the ambient tier was hiding, because after a cut "quiet" and "stopped" look
 identical until a person reads for it (joshuafolkken/kit#2136).
+
+**Why the event stream is keyed to the run.** It survives the cut because it is the run's and not any
+one session's.
+
+**Why a stop and a park need no new mechanism.** Nothing new carries either one — both ride the
+existing notification types and the record the watcher already keeps.
 
 ## Why the watcher runs where it does
 
@@ -70,6 +80,15 @@ would hide the silence the interval measures.
 **Why `--output` is omitted in a single-issue run.** There is no delegated unit to name (a batch's unit
 changes every issue), so a fixed path would age a finished unit's file; `unread` is the command's
 defined answer for "no path was given".
+
+**Why a run that merges needs no teardown.** The issue leaves the `in-progress` listing at the merge, so
+whatever is waiting prints nothing and `--hours` ends it. A stop keeps that label, which is why a stop
+has to end the reporting itself.
+
+## Why a named epic's children run in lanes
+
+**Why `--lanes` is the form to use.** A lane's branch is `<N>-lane`, which `pnpm josh git` commits from,
+so a child handed a lane runs the whole `fullrun` procedure inside it.
 
 ## Why a child's ending is classified at once
 
@@ -147,7 +166,8 @@ lane opens would idle every free lane for no gain.
 
 **Why the counters are the carry record's.** Held in one place rather than counted twice, the
 human-readable epic comment and the guard the run reads can never disagree. The consecutive-failure count
-matters most: lost, a run keeps feeding children into a broken environment and never reaches three. The
+matters most: the stopped-unit section leans on it to notice the environment is at fault, and lost, a
+run keeps feeding children into a broken environment and never reaches three. The
 record survives a session cut and a compaction alike, so the counters the run's guards rest on are never
 taken by the moment the context is dropped. This does not contradict "Nothing is carried in the
 conversation": that is about the state a _next session_ needs, all of it on GitHub, while the record is
@@ -160,11 +180,21 @@ because it is only taken when a child has just closed.
 
 **Why the completion summary comes from `run:report`.** Passing its output to `pnpm josh notify
 --body-file` makes the summary a session shows and the message off-screen one text from one generator.
+It renders by reusing `format_event`, the stream's own event formatter.
 
 ## Why the parent waits on classification, not a clock
 
 **Why the parent sets no timer.** One tick per turn, at the largest context, is the cost `run:progress`
 removed; the waiting numbers are floors between asks.
+
+**Why the driver's own waits cost nothing.** The driver checks lane completion every five seconds and
+makes a new backlog offer no sooner than one minute after the previous offer, except after collecting a
+child — waits that cost no AI turns.
+
+**Why the stale window is 90 minutes.** It is longer than any single child has taken.
+
+**Why the whole run is bounded at 8 hours.** An unattended run that has not finished overnight needs a
+person, not more waiting.
 
 **Why the idle-watch poll is five minutes.** What a watch waits on happens on human timescales, and every
 ask bills the parent session's whole history.
