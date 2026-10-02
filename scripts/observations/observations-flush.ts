@@ -1,15 +1,16 @@
 import { git_command } from '#scripts/git/git-command'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { main_sync } from '#scripts/git/main-sync'
-import { observation_ledger, OBSERVATION_LEDGER_PATH } from './observation-ledger'
+import { observation_ledger, OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger'
 import type { BrokenLine } from './observation-ledger-line'
 import { observation_ledger_prepare } from './observation-ledger-prepare'
 import { observations_flush_landing } from './observations-flush-landing'
 
-// The commit path for the ledger lines no run's own commit carried (joshuafolkken/kit#1756). A run in
-// the primary checkout commits its appended lines with its own pull request (`scripts/git/
-// git-staging.ts`, joshuafolkken/kit#2763), so what is left here is a lane's lines — they sit in the
-// primary checkout, which a lane's commit cannot see — and whatever was appended after a commit.
+// The commit path for the ledger lines no run's own commit carried (joshuafolkken/kit#1756). Every run —
+// a lane's included — commits its appended lines with its own pull request (`scripts/git/
+// git-staging.ts`, joshuafolkken/kit#2763, joshuafolkken/kit#2919), and `pnpm josh followup` commits a
+// line appended after that commit before it merges, so what is left here is a line written on the
+// default branch outside any issue's run — the date-named file `observation-ledger-home.ts` resolves.
 //
 // **The shape is `scripts/release/release-publish.ts`'s, deliberately.** Both open a pull request of
 // their own over one path, wait on the same required checks every other pull request waits on, and
@@ -19,7 +20,7 @@ import { observations_flush_landing } from './observations-flush-landing'
 // below does not survive — `observations-flush-landing.ts` carries why.
 
 const COMMIT_MESSAGE = 'Record observation ledger entries'
-const CLEAN_MESSAGE = `clean — ${OBSERVATION_LEDGER_PATH} matches the commit it sits on, so there is nothing to flush`
+const CLEAN_MESSAGE = `clean — ${OBSERVATION_LEDGER_DIRECTORY} matches the commit it sits on, so there is nothing to flush`
 const BRANCH_PREFIX = 'observations/'
 const SUCCESS_EXIT_CODE = 0
 const RETURN_FAILURE_MESSAGE =
@@ -55,7 +56,7 @@ function branch_name_for(stamp: string): string {
 // single issue, and the ledger's own lines say where each one was seen.
 function pull_request_body(): string {
 	return [
-		`Appended observations from \`${OBSERVATION_LEDGER_PATH}\` that no run's own commit carried.`,
+		`Appended observations from \`${OBSERVATION_LEDGER_DIRECTORY}\` that no run's own commit carried.`,
 		'',
 		'The ledger is append-only, and a second line under one key is what promotes an observation to an issue — so this pull request adds lines and changes none.',
 		'',
@@ -366,7 +367,7 @@ function merged_message(branch_name: string): string {
 function broken_lines_message(broken: ReadonlyArray<BrokenLine>): string {
 	const rows = broken.map((entry) => `  ${entry.line}\n    ↳ ${entry.reason}`).join('\n')
 
-	return `\`${OBSERVATION_LEDGER_PATH}\` has ${String(broken.length)} line(s) that break the ledger grammar, so \`pnpm josh observations:flush\` stops rather than committing them:\n${rows}`
+	return `\`${OBSERVATION_LEDGER_DIRECTORY}\` has ${String(broken.length)} line(s) that break the ledger grammar, so the ledger commit stops rather than carrying them:\n${rows}`
 }
 
 // **A malformed line is refused before a branch is cut, not after.** The ledger path was collected

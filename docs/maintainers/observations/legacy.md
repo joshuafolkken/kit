@@ -1,7 +1,10 @@
 # Observation ledger
 
-**This file is where a mid-run observation goes when it is real but has not yet blocked anything.**
-Before it existed such an observation had two destinations — an Issue or nothing — and
+**This directory is where a mid-run observation goes when it is real but has not yet blocked
+anything** — one file per issue, `<N>.md`, written by that issue's run in its own work tree and merged
+with its own pull request, so parallel lanes never append to the same file (joshuafolkken/kit#2919).
+This file, `legacy.md`, holds every line recorded while the ledger was one file; readers count it with
+the rest of the directory, and nothing appends to it any more. Before the ledger existed such an observation had two destinations — an Issue or nothing — and
 `SKILL.md` → §2i's depth test sends most of them to "not filed". Dropped, the fact that the same
 thing was seen twice was never recorded anywhere, so every sighting looked like the first one and the
 depth gate was walked past instead of held (joshuafolkken/kit#1728).
@@ -16,8 +19,8 @@ rule the consumer actually receives.
 carrying one key is exactly what says whether an observation has recurred. A second sighting is a
 **second line with the same key**, not a rewrite of the first.
 
-**A merge conflict here is resolved by keeping both sides.** Two branches appending at once is the
-ordinary case, and a repeated key is the whole signal this file carries — resolving the conflict by
+**A merge conflict in a ledger file is resolved by keeping both sides.** With one file per issue it
+should not arise, but a repeated key is the whole signal the ledger carries — resolving a conflict by
 dropping either side destroys exactly what it exists to record.
 
 ## Ledger

@@ -153,3 +153,16 @@ describe('git_branch.is_mismatch', () => {
 		expect(git_branch.is_mismatch(NO_PREFIX_BRANCH, ISSUE_42_BRANCH, 'main')).toBe(true)
 	})
 })
+
+// joshuafolkken/kit#2919: the ledger writer names its file from this, so it lives in a shipped module.
+describe('git_branch.issue_from_branch', () => {
+	it('reads the leading issue number of a lane or topic branch', () => {
+		expect(git_branch.issue_from_branch('2919-lane')).toBe(2919)
+		expect(git_branch.issue_from_branch(ISSUE_42_BRANCH)).toBe(42)
+	})
+
+	it('reads nothing from a branch without a leading number', () => {
+		expect(git_branch.issue_from_branch('main')).toBeUndefined()
+		expect(git_branch.issue_from_branch(NO_PREFIX_BRANCH)).toBeUndefined()
+	})
+})

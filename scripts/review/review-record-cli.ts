@@ -7,8 +7,8 @@ import { review_record, type RecordVerdict } from './review-record'
 
 // `josh review:record --issue <N> [<category>:<severity>:<file> ...]` — the one write path for a
 // `/code-review` round's findings (joshuafolkken/kit#2325). It appends a `- rf:` line per finding to
-// the observation ledger, which `pnpm josh observations:flush` then commits like any other ledger
-// change. **A call with no findings is a zero-finding round, and it still writes one line** — so the
+// the issue's own file of the observation ledger, which the run's commit carries like any other
+// ledger change. **A call with no findings is a zero-finding round, and it still writes one line** — so the
 // round that found nothing is recorded rather than mistaken for a round nobody reviewed.
 //
 // `josh review:record --check --issue <N>` is the read half `pnpm josh followup` runs before it
@@ -121,14 +121,14 @@ function check_line(verdict: RecordVerdict): string {
 	return verdict.status === 'ok' ? RECORDED_LINE : NOT_REQUIRED_LINE
 }
 
-async function run_check(issue: string | undefined, ledger_path: string): Promise<number> {
+async function run_check(issue: string | undefined, root: string): Promise<number> {
 	if (issue === undefined || !ISSUE_PATTERN.test(issue)) {
 		console.error(CHECK_USAGE)
 
 		return FAILURE_EXIT_CODE
 	}
 
-	const verdict = await review_record.check(Number(issue), ledger_path)
+	const verdict = await review_record.check(Number(issue), root)
 
 	if (verdict.status === 'ok' || verdict.status === 'not-required') {
 		console.info(check_line(verdict))
@@ -141,7 +141,9 @@ async function run_check(issue: string | undefined, ledger_path: string): Promis
 	return FAILURE_EXIT_CODE
 }
 
-async function run_record(parsed: Parsed, now: Date, ledger_path: string): Promise<number> {
+// The round lands in its own issue's file (joshuafolkken/kit#2919), so two lanes recording at once
+// write two files, and their pull requests never conflict on the ledger.
+async function run_record(parsed: Parsed, now: Date, root: string): Promise<number> {
 	const request = to_request(parsed)
 
 	if (request === undefined) {
@@ -151,6 +153,7 @@ async function run_record(parsed: Parsed, now: Date, ledger_path: string): Promi
 	}
 
 	const lines = build_lines(request, today(now))
+	const ledger_path = observation_ledger_home.issue_path(request.issue, root)
 
 	await observation_ledger_home.append(ledger_path, lines)
 	console.info(confirmation(lines.length, ledger_path))
@@ -158,13 +161,13 @@ async function run_record(parsed: Parsed, now: Date, ledger_path: string): Promi
 	return 0
 }
 
-// **The default is the primary checkout's ledger, even inside a lane** (joshuafolkken/kit#2419). A line
-// appended to a lane's own copy never reached the default branch — the lane's flush is refused and
-// `lane:close` does not carry the file — while `--check` read that same copy and let the merge through.
+// **The default is the work tree the command runs in, a lane's inside a lane** (joshuafolkken/kit#2919).
+// The line rides that tree's own commit or `pnpm josh followup`'s pre-merge ledger commit, and
+// `--check` reads the same tree, so the two halves can never disagree about where the round is.
 async function run(
 	argv: ReadonlyArray<string>,
 	now: Date,
-	ledger_path: string = observation_ledger_home.ledger_path(),
+	root: string = observation_ledger_home.ledger_root(),
 ): Promise<number> {
 	const parsed = parse_argv(argv)
 
@@ -174,9 +177,9 @@ async function run(
 		return FAILURE_EXIT_CODE
 	}
 
-	if (parsed.check) return await run_check(parsed.issue, ledger_path)
+	if (parsed.check) return await run_check(parsed.issue, root)
 
-	return await run_record(parsed, now, ledger_path)
+	return await run_record(parsed, now, root)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

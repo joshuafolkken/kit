@@ -1,40 +1,105 @@
-import { appendFile, mkdir } from 'node:fs/promises'
+import { appendFile, mkdir, readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { repo_discovery } from '#scripts/discovery/repo-discovery'
-import { OBSERVATION_LEDGER_PATH } from './observation-ledger'
+import { git_branch } from '#scripts/git/git-branch'
+import { git_spawn } from '#scripts/git/git-spawn'
+import { observation_ledger, OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger'
 import { observation_ledger_migrate } from './observation-ledger-migrate'
 
-// Where the observation ledger is read and written, whichever work tree a command runs in
-// (joshuafolkken/kit#2419).
+// Where the observation ledger is read and written, whichever work tree a command runs in.
 //
-// **The ledger lives in the primary checkout, never in a lane.** A lane is a linked work tree that is
-// closed once its branch merges, and the ledger is excluded from ordinary staging — so a line appended
-// in a lane had no route to the default branch: `pnpm josh followup`'s flush needs `pnpm josh ms`,
-// which a lane refuses, and `lane:close` does not carry the file. Resolving the ledger to the primary
-// checkout at every reader and writer puts the line where the flush already works, rather than adding
-// a second route that moves it there afterwards.
-//
-// The primary checkout is `repo_discovery.main_worktree`'s answer, reused rather than spelled again;
-// in an ordinary checkout it is the given directory itself, so nothing outside a lane changes.
+// **The ledger lives in the work tree the command runs in — a lane's in a lane** (joshuafolkken/kit#2919).
+// It used to resolve to the primary checkout from every lane (joshuafolkken/kit#2419), so a lane's
+// lines waited there for a batch-end flush; another run's stash of that checkout took them, the flush
+// read `git status` and found nothing, and the lines were lost. Each run now appends to its own
+// issue's file in its own tree, `git-staging.ts` commits it with the run, and `pnpm josh followup`
+// commits whatever was appended after that commit before it merges — so a lane's lines reach the
+// default branch with the lane's own pull request, and the primary checkout holds none of them.
+
+const DATE_END = 10
 
 function ledger_root(cwd: string = process.cwd()): string {
-	return repo_discovery.main_worktree(cwd)
+	return cwd
 }
 
-function is_lane(cwd: string = process.cwd()): boolean {
-	return path.resolve(ledger_root(cwd)) !== path.resolve(cwd)
-}
-
-// **Resolving the path migrates the ledger first** (joshuafolkken/kit#2724). Every reader and writer
-// asks here — `review:record --check`, `review:findings`, the retrospective, the stash carry's
-// duplicate check — so none of them can read an empty new ledger while the lines still sit at the old
-// path, which for the review-record check would answer `not-required` for a round never recorded.
-function ledger_path(cwd: string = process.cwd()): string {
+// **Resolving the directory migrates the single-file ledgers first** (joshuafolkken/kit#2724,
+// joshuafolkken/kit#2919). Every reader and writer asks here — `review:record --check`,
+// `review:findings`, the retrospective, the stash carry's duplicate check — so none of them can read a
+// directory without the lines that still sit at an old path, which for the review-record check would
+// answer `missing` for a round recorded before the move.
+function ledger_directory(cwd: string = process.cwd()): string {
 	const root = ledger_root(cwd)
 
 	observation_ledger_migrate.migrate(root)
 
-	return path.join(root, OBSERVATION_LEDGER_PATH)
+	return path.join(root, OBSERVATION_LEDGER_DIRECTORY)
+}
+
+function file_path(name: number | string, cwd: string): string {
+	ledger_directory(cwd)
+
+	return path.join(ledger_root(cwd), observation_ledger.ledger_file(name))
+}
+
+function issue_path(issue: number, cwd: string = process.cwd()): string {
+	return file_path(issue, cwd)
+}
+
+async function current_branch(cwd: string): Promise<string> {
+	try {
+		return await git_spawn.read(['-C', cwd, 'rev-parse', '--abbrev-ref', 'HEAD'])
+	} catch {
+		return ''
+	}
+}
+
+// **The file a writer that names no issue appends to** — the issue the checked-out branch leads with
+// (`2919-lane`, `2919-store-the-ledger`), so a lane's lines land in its own issue's file; or the date,
+// for a line written on the default branch outside any issue's run, which `pnpm josh
+// observations:flush` commits.
+async function writer_path(now: Date, cwd: string = process.cwd()): Promise<string> {
+	const issue = git_branch.issue_from_branch(await current_branch(cwd))
+
+	return file_path(issue ?? now.toISOString().slice(0, DATE_END), cwd)
+}
+
+// A file whose last line has no newline would otherwise run into the next file's first line.
+async function read_file(target: string): Promise<string> {
+	try {
+		const content = await readFile(target, 'utf8')
+
+		return content.length === 0 || content.endsWith('\n') ? content : `${content}\n`
+	} catch {
+		return ''
+	}
+}
+
+async function ledger_files(directory: string): Promise<ReadonlyArray<string> | undefined> {
+	try {
+		const names = await readdir(directory)
+
+		return names
+			.filter((name) => observation_ledger.is_ledger_file_name(name))
+			.toSorted((left, right) => left.localeCompare(right))
+	} catch {
+		return undefined
+	}
+}
+
+// **Every file in the directory, read as one ledger**, in name order so the answer is stable. Readers
+// count across all of them — a recurrence is a recurrence whichever issue's file each line sits in.
+// `undefined` when there is no directory: a checkout that keeps no ledger, which `review:record
+// --check` turns into `not-required`.
+async function read(cwd: string = process.cwd()): Promise<string | undefined> {
+	const directory = ledger_directory(cwd)
+	const files = await ledger_files(directory)
+
+	if (files === undefined) return undefined
+
+	const contents = await Promise.all(
+		files.map(async (name) => await read_file(path.join(directory, name))),
+	)
+
+	return contents.join('')
 }
 
 // The one append every ledger writer goes through. A consumer that does not keep the ledger has no
@@ -47,6 +112,13 @@ async function append(target: string, lines: ReadonlyArray<string>): Promise<voi
 	await appendFile(target, `${lines.join('\n')}\n`, 'utf8')
 }
 
-const observation_ledger_home = { append, is_lane, ledger_path, ledger_root }
+const observation_ledger_home = {
+	append,
+	issue_path,
+	ledger_directory,
+	ledger_root,
+	read,
+	writer_path,
+}
 
 export { observation_ledger_home }

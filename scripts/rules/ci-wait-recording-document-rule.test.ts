@@ -37,7 +37,9 @@ describe('observation-filing.md — the commit path', () => {
 		expect(FILING).toContain("A run's appended lines ride its own commit")
 	})
 
-	it('keeps the flush only for what no run commit carried', () => {
-		expect(FILING).toContain("What no run's commit carried is flushed as a pull request of its own")
+	// joshuafolkken/kit#2919: a later append rides the pull request, and a lane's lines ride its own.
+	it('commits a later append onto the pull request and holds nothing in the primary checkout', () => {
+		expect(FILING).toContain("commits a line appended after the run's commit onto the pull request")
+		expect(FILING).toContain('Nothing is held in the primary checkout for later.')
 	})
 })

@@ -1,6 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { review_findings_cli } from './review-findings-cli'
 
@@ -10,17 +11,23 @@ afterAll(() => {
 	rmSync(TEST_DIR, { recursive: true, force: true })
 })
 
-function ledger_with(content: string): string {
-	const file = path.join(TEST_DIR, `${String(content.length)}.md`)
+// A checkout whose ledger directory holds one file per given content.
+function root_with(...contents: ReadonlyArray<string>): string {
+	const root = mkdtempSync(path.join(TEST_DIR, 'root-'))
 
-	writeFileSync(file, content, 'utf8')
+	for (const [index, content] of contents.entries()) {
+		const file = path.join(root, observation_ledger.ledger_file(index + 1))
 
-	return file
+		mkdirSync(path.dirname(file), { recursive: true })
+		writeFileSync(file, content, 'utf8')
+	}
+
+	return root
 }
 
-async function report_of(file: string): Promise<string> {
+async function report_of(root: string): Promise<string> {
 	const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-	const code = await review_findings_cli.run(file)
+	const code = await review_findings_cli.run(root)
 	const printed = String(info.mock.calls[0]?.[0])
 
 	info.mockRestore()
@@ -46,21 +53,20 @@ describe('review_findings_cli.format_report', () => {
 })
 
 describe('review_findings_cli.run', () => {
-	it('aggregates finding lines and zero rounds from a ledger file', async () => {
-		const file = ledger_with(
-			[
-				'- rf:tests | medium | a.ts | 2026-09-22 | #1',
-				'- rf:tests | low | b.ts | 2026-09-22 | #2',
-				'- rf:none | none | - | 2026-09-22 | #3',
-			].join('\n'),
+	// joshuafolkken/kit#2919: each issue writes its own file, and the count spans all of them.
+	it('aggregates finding lines and zero rounds across every issue file', async () => {
+		const root = root_with(
+			'- rf:tests | medium | a.ts | 2026-09-22 | #1\n',
+			'- rf:tests | low | b.ts | 2026-09-22 | #2\n',
+			'- rf:none | none | - | 2026-09-22 | #3\n',
 		)
 
-		expect(await report_of(file)).toBe(
+		expect(await report_of(root)).toBe(
 			'findings by category:\n  tests: 2\nzero-finding rounds recorded: 1',
 		)
 	})
 
 	it('reports nothing recorded for a missing ledger', async () => {
-		expect(await report_of(path.join(TEST_DIR, 'absent.md'))).toBe(review_findings_cli.NO_FINDINGS)
+		expect(await report_of(path.join(TEST_DIR, 'absent'))).toBe(review_findings_cli.NO_FINDINGS)
 	})
 })

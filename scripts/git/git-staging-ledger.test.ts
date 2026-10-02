@@ -1,6 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { OBSERVATION_LEDGER_PATH } from '#scripts/observations/observation-ledger'
+import {
+	observation_ledger,
+	OBSERVATION_LEDGER_DIRECTORY,
+} from '#scripts/observations/observation-ledger'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { git_command } from './git-command'
 import { git_fixture_workspace, type FixtureWorkspace } from './git-fixture-workspace'
@@ -16,6 +19,7 @@ import { git_fixture_workspace, type FixtureWorkspace } from './git-fixture-work
 const { git } = git_fixture_workspace
 const OTHER_FILE = 'README.md'
 const LEDGER_FIRST_LINE = '- k:one | d1 | 2026-09-11 | scripts/x.ts | The first sighting\n'
+const OBSERVATION_LEDGER_PATH = observation_ledger.ledger_file(1)
 const LEDGER_SECOND_LINE = '- k:two | d1 | 2026-09-11 | scripts/y.ts | The second sighting\n'
 
 // Held on an object rather than in a `let`: the fixture is opened inside `beforeEach`, and assigning
@@ -68,6 +72,15 @@ describe('git_command.add_tracked — the pathspec git actually receives', () =>
 		modify_both_files()
 
 		await git_command.add_tracked([OBSERVATION_LEDGER_PATH])
+
+		expect(await staged_paths()).toEqual([OTHER_FILE])
+	})
+
+	// joshuafolkken/kit#2919: the ledger is a directory, and excluding it leaves every file inside it.
+	it('leaves every ledger file unstaged when the whole directory is excluded', async () => {
+		modify_both_files()
+
+		await git_command.add_tracked([OBSERVATION_LEDGER_DIRECTORY])
 
 		expect(await staged_paths()).toEqual([OTHER_FILE])
 	})

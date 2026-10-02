@@ -1,5 +1,4 @@
 #!/usr/bin/env tsx
-import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { cost_run_report, type RunCostReport } from '#scripts/cost/cost-run-report'
 import { cost_run_tree } from '#scripts/cost/cost-run-tree'
@@ -33,12 +32,9 @@ function read_cost(cwd: string): RunCostReport | undefined {
 	return cost_run_report.build(tree.run_count, tree.unattributed_count, tree.nodes)
 }
 
-async function read_ledger(): Promise<string> {
-	try {
-		return await readFile(observation_ledger_home.ledger_path(), 'utf8')
-	} catch {
-		return ''
-	}
+// Every issue's file of the ledger directory, read as one (joshuafolkken/kit#2919).
+async function read_ledger(cwd: string): Promise<string> {
+	return (await observation_ledger_home.read(cwd)) ?? ''
 }
 
 function ledger_entries(content: string): Array<string> {
@@ -67,7 +63,7 @@ async function read_run(): Promise<RunRead> {
 }
 
 async function gather(cwd: string): Promise<RetrospectiveInputs> {
-	const ledger = await read_ledger()
+	const ledger = await read_ledger(cwd)
 	const run_read = await read_run()
 
 	return {

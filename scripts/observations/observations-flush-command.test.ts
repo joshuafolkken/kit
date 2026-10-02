@@ -3,7 +3,7 @@ import { git_gh_command } from '#scripts/git/git-gh-command'
 import { git_pr_checks } from '#scripts/git/git-pr-checks'
 import { main_sync } from '#scripts/git/main-sync'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { LEGACY_OBSERVATION_LEDGER_PATH, OBSERVATION_LEDGER_PATH } from './observation-ledger'
+import { LEGACY_OBSERVATION_LEDGER_PATHS } from './observation-ledger'
 import { observation_ledger_migrate } from './observation-ledger-migrate'
 import { observations_flush } from './observations-flush'
 import {
@@ -12,8 +12,11 @@ import {
 	MODIFIED_LEDGER,
 	MORNING_INSTANT,
 	MS_COMMAND,
+	LEDGER_FILE as OBSERVATION_LEDGER_PATH,
 	ONLY_COPY,
 } from './observations-flush-fixture'
+
+const LEGACY_OBSERVATION_LEDGER_PATH = LEGACY_OBSERVATION_LEDGER_PATHS[0] ?? ''
 
 // This file drives `observations_flush.flush()` against a mocked git — the whole command, both the
 // success path (joshuafolkken/kit#1795) and the rollbacks (joshuafolkken/kit#1785). `git_command` and

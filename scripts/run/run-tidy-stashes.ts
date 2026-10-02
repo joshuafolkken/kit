@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises'
 import { git_stash, type StashEntry } from '#scripts/git/git-stash'
 import { stash_orphans } from '#scripts/git/stash-orphans'
 import { stash_sweep_lock } from '#scripts/git/stash-sweep-lock'
@@ -18,16 +17,8 @@ const READ_CONCURRENCY = 8
 const GONE_REASON = 'already dropped by another run'
 const BUSY_REASON = 'another run held the stash sweep lock'
 
-async function read_ledger(ledger_path: string): Promise<string> {
-	try {
-		return await readFile(ledger_path, 'utf8')
-	} catch {
-		return ''
-	}
-}
-
-// An entry cut before joshuafolkken/kit#2724 holds its lines at the ledger's old path, so the lines of
-// every ledger path it touches are carried to the current ledger.
+// An entry cut before joshuafolkken/kit#2919 holds its lines at an old single-file path, so the lines
+// of every ledger path it touches are carried to the current ledger.
 async function added_ledger_lines(
 	hash: string,
 	ledger_paths: ReadonlyArray<string>,
@@ -43,16 +34,18 @@ async function added_ledger_lines(
 	return added
 }
 
-// How many ledger lines went into the primary checkout's ledger before the drop.
+// How many ledger lines went into the running work tree's ledger before the drop. The duplicate check
+// reads every issue's file, and the lines land in the file this tree writes (joshuafolkken/kit#2919),
+// so the run's own commit takes them to the default branch.
 async function carry_ledger(hash: string): Promise<number> {
 	const changed = await git_stash.changed_paths(hash)
 	const ledger_paths = changed.filter((file_path) => observation_ledger.is_ledger_path(file_path))
 
 	if (ledger_paths.length === 0) return 0
 
-	const ledger_path = observation_ledger_home.ledger_path()
+	const ledger_path = await observation_ledger_home.writer_path(new Date())
 	const added = await added_ledger_lines(hash, ledger_paths)
-	const carried = run_tidy.ledger_carry(added, await read_ledger(ledger_path))
+	const carried = run_tidy.ledger_carry(added, (await observation_ledger_home.read()) ?? '')
 
 	await observation_ledger_home.append(ledger_path, carried)
 

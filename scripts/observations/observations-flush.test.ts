@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OBSERVATION_LEDGER_PATH } from './observation-ledger'
+import { OBSERVATION_LEDGER_DIRECTORY as OBSERVATION_LEDGER_PATH } from './observation-ledger'
 import { observations_flush } from './observations-flush'
 import {
 	DEFAULT_BRANCH,

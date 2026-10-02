@@ -2,6 +2,7 @@
 import { parseArgs } from 'node:util'
 import { git_branch } from '../scripts/git/git-branch'
 import { git_error } from '../scripts/git/git-error'
+import { git_followup_flush } from '../scripts/git/git-followup-flush'
 import { git_notify, type GitNotifyConfig } from '../scripts/git/git-notify'
 import { git_pr_followup } from '../scripts/git/git-pr-followup'
 import { cli_body } from '../scripts/josh/cli-body'
@@ -202,6 +203,17 @@ async function assert_merge_gates(
 	await assert_live_evidence(should_merge, branch_name)
 }
 
+// After the gates, before the CI wait: a line appended since the run's commit rides the pull request
+// itself, so it merges with it — a lane's included (joshuafolkken/kit#2919).
+async function prepare_merge(
+	should_merge: boolean,
+	issue_number: string | undefined,
+	branch_name: string,
+): Promise<void> {
+	await assert_merge_gates(should_merge, issue_number, branch_name)
+	await git_followup_flush.commit_ledger_step(should_merge, issue_number)
+}
+
 async function main(): Promise<void> {
 	const cli = parse_cli_arguments()
 
@@ -216,7 +228,7 @@ async function main(): Promise<void> {
 	const should_merge = is_merge_resolved(cli.values)
 	const branch_name = await resolve_branch_name(cli.values.branch)
 
-	await assert_merge_gates(should_merge, issue_number, branch_name)
+	await prepare_merge(should_merge, issue_number, branch_name)
 	// **The number the run reports on is the one it used**, which is the number the pull request
 	// closes where the invocation named none (joshuafolkken/kit#1539). Recovered inside `run`, so the
 	// tail records a run the command line could not identify rather than silently skipping it.
