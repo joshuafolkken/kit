@@ -1,12 +1,15 @@
 name: Publish
-run-name: Publish ${{ github.event.client_payload.tag }}
+run-name: Publish ${{ github.ref_name }}
 
+# auto-tag.yml starts this workflow with `gh workflow run publish.yml --ref <tag>`, so the run's
+# commit and ref are the release tag's. npm provenance records the run's commit from the OIDC token,
+# and a repository_dispatch run is pinned to the default branch head, which can be newer than the tag.
 on:
-  repository_dispatch:
-    types: [new-tag-created]
+  workflow_dispatch:
 
 jobs:
   publish-github:
+    if: startsWith(github.ref, 'refs/tags/v')
     concurrency:
       group: package-publish
       queue: max
@@ -17,8 +20,6 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.client_payload.tag }}
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -55,6 +56,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish-npm:
+    if: startsWith(github.ref, 'refs/tags/v')
     concurrency:
       group: package-publish
       queue: max
@@ -65,8 +67,6 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.client_payload.tag }}
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -106,7 +106,7 @@ jobs:
       contents: write
     uses: ./.github/workflows/production.yml
     with:
-      tag: ${{ github.event.client_payload.tag }}
+      tag: ${{ github.ref_name }}
 
   create-release:
     needs: [publish-github, publish-npm, update-production]
@@ -118,7 +118,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.client_payload.tag }}
           fetch-depth: 0
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -143,4 +142,4 @@ jobs:
         run: pnpm exec tsx scripts/release/github-release-cli.ts
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.client_payload.tag }}
+          RELEASE_TAG: ${{ github.ref_name }}

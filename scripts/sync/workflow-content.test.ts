@@ -29,6 +29,18 @@ describe('auto-tag.yml — remote tag awareness', () => {
 		expect(content).toContain('client-payload:')
 		expect(content).toContain('steps.create_tag.outputs.tag')
 	})
+
+	it('starts a workflow_dispatch-only publish.yml on the tag ref after the new-tag-created dispatch', () => {
+		const content = read_workflow(AUTO_TAG_PATH)
+		const dispatch_index = content.indexOf('event-type: new-tag-created')
+		const start_index = content.indexOf('gh workflow run publish.yml --ref "$TAG"')
+
+		expect(content).toContain('actions: write')
+		expect(content).toContain('grep -Eq \'^[[:space:]]*workflow_dispatch:\' "$WORKFLOW"')
+		expect(content).toContain('! grep -q \'new-tag-created\' "$WORKFLOW"')
+		expect(dispatch_index).toBeGreaterThan(0)
+		expect(start_index).toBeGreaterThan(dispatch_index)
+	})
 })
 
 describe('production.yml — release merge source', () => {

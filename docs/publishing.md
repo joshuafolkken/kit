@@ -1,6 +1,6 @@
 # Publishing to public npm
 
-For kit maintainers releasing the package; projects that use kit can skip this page. Kit publishes each release to GitHub Packages and public npm in separate jobs. Both jobs check out the tag carried by the release event, so they publish the same source revision. A failure in one job does not prevent the other job from running.
+For kit maintainers releasing the package; projects that use kit can skip this page. Kit publishes each release to GitHub Packages and public npm in separate jobs. `auto-tag.yml` starts the workflow on the release tag itself (`gh workflow run publish.yml --ref <tag>`), so both jobs publish the tag's source revision and npm provenance records the tag's commit, even when `main` has moved on since the tag was created. A failure in one job does not prevent the other job from running.
 
 ## One-time public npm setup
 
