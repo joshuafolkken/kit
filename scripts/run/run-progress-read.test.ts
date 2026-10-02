@@ -181,7 +181,9 @@ describe('read_observations — the three answers a tick can give', () => {
 
 		await expect(observe()).resolves.toMatchObject({
 			kind: 'observed',
-			observations: { children: [{ issue: '1520', labels: [IN_PROGRESS], pr_state: 'open' }] },
+			observations: {
+				children: [{ issue: '1520', title: 'issue 1520', labels: [IN_PROGRESS], pr_state: 'open' }],
+			},
 		})
 	})
 })
@@ -191,7 +193,7 @@ describe('read_children and read_lanes', () => {
 		read_repository.mockResolvedValue({ kind: 'busy', issues: [issue_row(7, [])] })
 
 		await expect(run_progress_read.read_children(REPO)).resolves.toEqual([
-			{ issue: '7', labels: [], pr_state: 'open' },
+			{ issue: '7', title: 'issue 7', labels: [], pr_state: 'open' },
 		])
 	})
 
