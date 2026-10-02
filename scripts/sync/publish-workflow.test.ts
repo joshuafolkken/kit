@@ -212,7 +212,7 @@ describe('installation guidance', () => {
 			'pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit',
 		)
 		expect(content).not.toContain('gh auth login --scopes read:packages')
-		expect(content).toContain('gh CLI](https://cli.github.com/) for `josh version`')
+		expect(content).toContain('`josh start` also requires the [gh CLI](https://cli.github.com/)')
 	})
 
 	it.each([CLI_GUIDE, PACKAGE_GUIDE])(
