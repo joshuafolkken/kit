@@ -25,12 +25,26 @@ describe('git_argv.parse', () => {
 		expect(git_argv.parse('sudo git stash')?.subcommand).toBe('stash')
 	})
 
+	it('skips an env wrapper', () => {
+		expect(git_argv.parse('env GIT_EDITOR=true git commit -m x')?.subcommand).toBe('commit')
+	})
+
 	it('is not a git command when josh stands between the wrapper and git', () => {
 		expect(git_argv.parse('pnpm josh git -y "title #1"')).toBeUndefined()
 	})
 
 	it('is undefined for a non-git command', () => {
 		expect(git_argv.parse('gh api repos/o/r/issues')).toBeUndefined()
+	})
+})
+
+describe('git_argv.arguments_of', () => {
+	it('returns the words after a wrapped command', () => {
+		expect(git_argv.arguments_of('env gh pr close 5', 'gh')).toStrictEqual(['pr', 'close', '5'])
+	})
+
+	it('is undefined when the segment invokes another command', () => {
+		expect(git_argv.arguments_of('echo rm -rf x', 'rm')).toBeUndefined()
 	})
 })
 

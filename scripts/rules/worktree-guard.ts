@@ -36,8 +36,8 @@ function is_worktree_checkout(args: ReadonlyArray<string>): boolean {
 }
 
 // `git restore <path>` discards working-tree changes. `--staged` / `-S` alone is an index restore —
-// that is the deny list's territory (`git restore --staged*` / `-S*`), so a pure index restore is not
-// refused twice. Anything touching the worktree (the default, or an explicit `--worktree` / `-W`) is.
+// that is the `index-mutation` row's (`index-guard.ts`), so a pure index restore is not claimed by two
+// rows. Anything touching the worktree (the default, or an explicit `--worktree` / `-W`) is this row's.
 const STAGED_LONG = '--staged'
 const STAGED_LETTER = 'S'
 const WORKTREE_LONG = '--worktree'
@@ -83,14 +83,33 @@ function is_unauthorized_stash(args: ReadonlyArray<string>): boolean {
 	return true
 }
 
+// `git clean` deletes untracked files, which no commit can bring back (joshuafolkken/kit#2983). It
+// refuses to act without a force (`clean.requireForce`), so a force — `--force`, or a cluster carrying
+// `f` — is what marks the destructive call; `git clean -n` is a dry run and passes.
+const CLEAN_SUBCOMMAND = 'clean'
+const FORCE_LONG = '--force'
+const FORCE_LETTER = 'f'
+
+function is_forced_clean(args: ReadonlyArray<string>): boolean {
+	return args.some(
+		(argument) => argument === FORCE_LONG || git_argv.short_cluster_has(argument, FORCE_LETTER),
+	)
+}
+
+// Each subcommand this row judges, with the predicate that reads its arguments.
+const JUDGED_SUBCOMMANDS: ReadonlyMap<string, (args: ReadonlyArray<string>) => boolean> = new Map([
+	[CHECKOUT_SUBCOMMAND, is_worktree_checkout],
+	[RESTORE_SUBCOMMAND, touches_worktree],
+	[CLEAN_SUBCOMMAND, is_forced_clean],
+	[STASH_SUBCOMMAND, is_unauthorized_stash],
+])
+
 function is_unauthorized_segment(segment: string): boolean {
 	const call = git_argv.parse(segment)
 
 	if (call === undefined) return false
-	if (call.subcommand === CHECKOUT_SUBCOMMAND) return is_worktree_checkout(call.args)
-	if (call.subcommand === RESTORE_SUBCOMMAND) return touches_worktree(call.args)
 
-	return call.subcommand === STASH_SUBCOMMAND && is_unauthorized_stash(call.args)
+	return JUDGED_SUBCOMMANDS.get(call.subcommand ?? '')?.(call.args) === true
 }
 
 function is_unauthorized_worktree_change(command: string): boolean {
@@ -101,8 +120,8 @@ function is_unauthorized_worktree_change(command: string): boolean {
 // and — for a stash — the message form that is allowed. `pnpm josh git` and `pnpm josh stash:pop` are
 // invisible to this trigger, so a run that uses them is never refused.
 const WORKTREE_MUTATION_REASON =
-	'⛔ unauthorized working-tree change: `git checkout -- <path>`, `git restore <path>` and an ' +
-	'unauthorized `git stash` mutate the working tree or the repository-wide stash every work tree ' +
+	'⛔ unauthorized working-tree change: `git checkout -- <path>`, `git restore <path>`, a forced ' +
+	'`git clean` and an unauthorized `git stash` discard work or mutate the repository-wide stash every work tree ' +
 	'shares, and none is on the `.claude/settings.json` deny list (`operating-rules.md`). Do not run ' +
 	'them on your own judgement. A commit goes through `pnpm josh git`; a stash pop goes through `pnpm ' +
 	'josh stash:pop "<message>"`, never a positional `git stash pop` a shared stack lets another lane ' +
@@ -121,6 +140,7 @@ const ROW = {
 const worktree_guard = {
 	ROW,
 	WORKTREE_MUTATION_REASON,
+	is_forced_clean,
 	is_unauthorized_stash,
 	is_unauthorized_worktree_change,
 	is_worktree_checkout,

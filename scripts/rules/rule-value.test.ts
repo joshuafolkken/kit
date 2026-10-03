@@ -218,6 +218,27 @@ describe('rule_value.measure — a refusal is read from the block, not from the 
 	})
 })
 
+// The rows that cannot declare a compliance call, in enumeration order — asserted below.
+const UNMEASURABLE_ROWS: ReadonlyArray<string> = [
+	'third-party-write',
+	FILING_CAP_ID,
+	'raw-field-body',
+	'test-declared',
+	'lane-background',
+	'lane-interactive-ask',
+	'lane-carry-conflict',
+	'lane-switch-main',
+	'josh-git-bare',
+	'git-force',
+	'worktree-mutation',
+	'file-body',
+	'index-mutation',
+	'destructive-command',
+	'protected-file',
+	'poll-loop',
+	INVESTIGATION,
+]
+
 describe('rule_value.measure — rules nothing can score', () => {
 	it('reports a rule that declares no compliance test as unmeasured, never as zero', () => {
 		// Scoring it 0 would read as "never kept", which is a claim the missing predicate cannot make.
@@ -259,22 +280,7 @@ describe('rule_value.measure — rules nothing can score', () => {
 			.filter((reading) => !reading.is_measurable)
 			.map((reading) => reading.id)
 
-		expect(unmeasured).toStrictEqual([
-			'third-party-write',
-			FILING_CAP_ID,
-			'raw-field-body',
-			'test-declared',
-			'lane-background',
-			'lane-interactive-ask',
-			'lane-carry-conflict',
-			'lane-switch-main',
-			'josh-git-bare',
-			'git-force',
-			'worktree-mutation',
-			'file-body',
-			'poll-loop',
-			INVESTIGATION,
-		])
+		expect(unmeasured).toStrictEqual(UNMEASURABLE_ROWS)
 	})
 })
 
