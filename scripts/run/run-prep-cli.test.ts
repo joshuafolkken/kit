@@ -253,10 +253,4 @@ describe('josh run:prep registration', () => {
 		expect(source).toContain("'run:prep'")
 		expect(source).toContain('scripts/run/run-prep-cli.ts')
 	})
-
-	it('has the rp alias', () => {
-		const source = readFileSync('scripts/josh/josh-command-map.ts', 'utf8')
-
-		expect(source).toContain("rp: 'run:prep'")
-	})
 })

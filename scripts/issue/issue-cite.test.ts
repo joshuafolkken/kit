@@ -18,6 +18,26 @@ describe('issue_cite.citation_line', () => {
 	})
 })
 
+// joshuafolkken/kit#2943: the progress listings name an issue through this, so the form a report copies
+// is decided by what the listing holds, never left as the bare `#N` the Stop guard sends back.
+describe('issue_cite.citer', () => {
+	it('cites with the title when the listing holds it', () => {
+		const cite = issue_cite.citer(LOCAL_REPO, new Map([[NUMBER, 'A title']]))
+
+		expect(cite(NUMBER)).toBe(issue_cite.citation_line(LOCAL_REPO, NUMBER, 'A title'))
+	})
+
+	it('falls back to the number-link when only the repository is known', () => {
+		expect(issue_cite.citer(LOCAL_REPO, new Map())(NUMBER)).toBe(
+			`[#${NUMBER}](${issue_cite.issue_url(LOCAL_REPO, NUMBER)})`,
+		)
+	})
+
+	it('keeps the plain number when the repository could not be read', () => {
+		expect(issue_cite.citer(undefined, new Map([[NUMBER, 'A title']]))(NUMBER)).toBe(`#${NUMBER}`)
+	})
+})
+
 // Exported so the printing-side `linkify` builds a link the same way rather than restating the URL
 // shape (joshuafolkken/kit#2329).
 describe('issue_cite.issue_url', () => {

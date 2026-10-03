@@ -1,3 +1,5 @@
+import { issue_cite, type IssueCiter } from '#scripts/issue/issue-cite'
+
 // `josh run:progress` — the one line an unattended run prints when it has gone quiet, and the clock
 // that decides when that is (joshuafolkken/kit#1520).
 //
@@ -56,6 +58,9 @@ const DEFAULT_INTERVAL_MS = DEFAULT_INTERVAL_MINUTES * MS_PER_MINUTE
 // a second spelling of it — `none` / `open` / `merged` / `closed`.
 interface ChildObservation {
 	issue: string
+	// Kept from the `in-progress` listing the child was read from, so the line cites it in full
+	// (joshuafolkken/kit#2943) without a read per child.
+	title: string
 	labels: ReadonlyArray<string>
 	pr_state: string
 }
@@ -66,6 +71,8 @@ interface LaneObservation {
 }
 
 interface Observations {
+	// `owner/repo`, the repository the listing was read from — what every printed issue links into.
+	repo: string
 	children: ReadonlyArray<ChildObservation>
 	lanes: ReadonlyArray<LaneObservation>
 	load_average: number
@@ -195,26 +202,32 @@ function next_state(
 	return { key, unchanged_since_ms: now_ms }
 }
 
-function format_child(child: ChildObservation): string {
+// The issue leads as a citation rather than a bare `#N` (joshuafolkken/kit#2943): the parent relays these
+// lines verbatim, and a bare number copied into a reply is what the Stop guard sends back.
+function format_child(child: ChildObservation, cite: IssueCiter): string {
 	const labels = child.labels.length > 0 ? child.labels.join(',') : '(no labels)'
 
-	return `#${child.issue} ${labels} PR:${child.pr_state}`
+	return `${cite(child.issue)} ${labels} PR:${child.pr_state}`
 }
 
 // An empty set is the pre-label stage, said as such rather than left as a blank slot between the
 // separators (joshuafolkken/kit#1900). After that change a `read_observations` result carries no
 // children exactly when a run has started and none has reached `in-progress` yet, so this is the one
 // place the two cases are told apart on the line.
-function format_children(children: ReadonlyArray<ChildObservation>): string {
+function format_children(children: ReadonlyArray<ChildObservation>, repo: string): string {
 	if (children.length === 0) return NO_CHILD_YET
+	const cite = issue_cite.citer(repo, new Map(children.map((child) => [child.issue, child.title])))
 
-	return children.map((child) => format_child(child)).join(' · ')
+	return children.map((child) => format_child(child, cite)).join(' · ')
 }
 
-function format_lanes(lanes: ReadonlyArray<LaneObservation>): string {
+// A lane is linked without its title: a lane in flight is a child the line above already cited in full,
+// so repeating the title here would only lengthen the line.
+function format_lanes(lanes: ReadonlyArray<LaneObservation>, repo: string): string {
 	if (lanes.length === 0) return NO_LANES
+	const cite = issue_cite.citer(repo, new Map())
 
-	return lanes.map((lane) => `${lane.issue}:${lane.state}`).join(' ')
+	return lanes.map((lane) => `${cite(lane.issue)}:${lane.state}`).join(' ')
 }
 
 // Absent is said, never filled in. A run started without a transcript path prints `unread` here, which
@@ -303,8 +316,8 @@ function format_line(observations: Observations, timing: LineTiming): string {
 		observed_at: format_observed_at(timing.now_ms),
 		quiet: format_minutes(timing.now_ms - timing.quiet_since_ms),
 		unchanged: format_minutes(timing.now_ms - timing.unchanged_since_ms),
-		children: format_children(observations.children),
-		lanes: format_lanes(observations.lanes),
+		children: format_children(observations.children, observations.repo),
+		lanes: format_lanes(observations.lanes, observations.repo),
 		load: observations.load_average.toFixed(1),
 		record: format_record(observations.record_age_ms),
 		next: format_next_report(timing.now_ms, timing.interval_ms),

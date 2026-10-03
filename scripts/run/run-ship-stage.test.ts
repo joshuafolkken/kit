@@ -41,6 +41,17 @@ describe('run_ship_stage.is_done — the gate', () => {
 	})
 })
 
+// joshuafolkken/kit#2946: the preflight asks what the commit stage would refuse on.
+describe('run_ship_stage.is_done — the preflight', () => {
+	it('runs on a fresh tree whatever the record says', () => {
+		expect(run_ship_stage.is_done(STAGE.PREFLIGHT, ALL, NOTHING)).toBe(false)
+	})
+
+	it('is passed over once a commit exists', () => {
+		expect(run_ship_stage.is_done(STAGE.PREFLIGHT, NONE, COMMITTED)).toBe(true)
+	})
+})
+
 describe('run_ship_stage.is_done — the commit/push/PR stage', () => {
 	it('runs with no record even when committed and pushed, so the pull request is still ensured', () => {
 		expect(run_ship_stage.is_done(STAGE.COMMIT, NONE, SHIPPED)).toBe(false)

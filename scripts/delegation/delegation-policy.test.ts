@@ -1,4 +1,4 @@
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it, vi } from 'vitest'
 import { delegation_cli } from './delegation-cli'
 import { delegation_policy } from './delegation-policy'
@@ -14,6 +14,8 @@ const BACKLOG_CHILD = 'backlogrun-child'
 const BACKLOGRUN_LABEL = '`backlogrun`'
 const INVESTIGATION = 'investigation'
 const DIAGNOSIS = 'diagnosis'
+// The citation-read verifier `investigation` and `lane-failure-investigation` share.
+const CITED_LINES_READ = 'opens the cited lines'
 // One title shared by the two rows that each assert their own membership.
 const DELEGATABLE_CASE = 'is delegatable'
 // Titles and a verifier string shared by the epic-child and followup-filing blocks — both are
@@ -215,6 +217,31 @@ function listed_row(step_name: string): string | undefined {
 	return written.find((line) => line.includes(step_name))
 }
 
+// joshuafolkken/kit#2947: the `backlogrun` parent's lane-failure reading goes to a unit, on the same
+// citation verifier as `investigation`, and never carries the parent's decision with it.
+describe('lane-failure-investigation keeps the parent context small', () => {
+	const LANE_FAILURE_INVESTIGATION = 'lane-failure-investigation'
+
+	it(DELEGATABLE_CASE, () => {
+		expect(delegation_policy.verdict_for(LANE_FAILURE_INVESTIGATION)).toBe(
+			delegation_policy.DELEGATE_VERDICT,
+		)
+	})
+
+	it('names the citation read and the issue state as its verifier', () => {
+		const reason = delegation_policy.reason_for(LANE_FAILURE_INVESTIGATION)
+
+		expect(reason).toContain(CITED_LINES_READ)
+		expect(reason).toContain(ISSUE_STATE_READ)
+	})
+
+	it('returns citations, never the text read', () => {
+		expect(delegation_policy.find_step(LANE_FAILURE_INVESTIGATION)?.does).toContain(
+			'never the text read',
+		)
+	})
+})
+
 // joshuafolkken/kit#1426 puts the pre-implementation reading on this same enumeration. It is admitted
 // on the citations it returns — the parent opens them — and it must not swallow `diagnosis`, which is
 // rejected precisely because a wrong root cause produces a fix that passes the gate.
@@ -226,7 +253,7 @@ describe('investigation is the pre-implementation reading', () => {
 	// The parent-tier check, and deliberately not the returned prose: a conclusion checking itself is
 	// no verifier at all, which is the same trap `epic-child`'s summary would have been.
 	it('names the citation read as its verifier', () => {
-		expect(delegation_policy.reason_for(INVESTIGATION)).toContain('opens the cited lines')
+		expect(delegation_policy.reason_for(INVESTIGATION)).toContain(CITED_LINES_READ)
 	})
 
 	// Returning the text puts the cost back where it was, which is the whole reason the row exists.
@@ -324,12 +351,6 @@ describe('josh delegate registration', () => {
 		const { delegate } = COMMAND_MAP
 
 		expect(delegate?.script).toBe('scripts/delegation/delegation-cli.ts')
-	})
-
-	it('has a short alias', () => {
-		const { dg } = ALIASES
-
-		expect(dg).toBe('delegate')
 	})
 })
 

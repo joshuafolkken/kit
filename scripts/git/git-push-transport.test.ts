@@ -1,12 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { git_push_transport, PUSH_TIMEOUT_MESSAGE, PUSH_TIMEOUT_MS } from './git-push-transport'
 import {
-	git_push_transport,
 	KEEPALIVE_SSH_COMMAND,
-	PUSH_TIMEOUT_MESSAGE,
-	PUSH_TIMEOUT_MS,
 	SSH_COMMAND_VARIABLE,
 	SSH_LEGACY_VARIABLE,
-} from './git-push-transport'
+} from './git-ssh-keepalive'
 
 const TIMED_OUT = 'timed-out'
 const REJECTED = 'rejected'

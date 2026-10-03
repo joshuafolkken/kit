@@ -8,6 +8,7 @@ interface StartOptions {
 	is_yes: boolean
 	is_github: boolean
 	visibility: Visibility
+	init_command: string | undefined
 }
 
 type StartStep = 'git_init' | 'initialize' | 'commit' | 'repository' | 'labels' | 'setup_pr'
@@ -137,20 +138,31 @@ function github_consent(
 	}
 }
 
+// A run whose initialize step was handed to a caller's command names that command wherever the step
+// is printed, so the plan, the progress and a failure all say what actually runs (#2872).
+function step_labels(init_command: string | undefined): Readonly<Record<StartStep, string>> {
+	if (init_command === undefined) return STEP_LABELS
+
+	return { ...STEP_LABELS, initialize: `Initialize with ${init_command}` }
+}
+
 // What a failed run prints, so the user can tell how far it got before deciding how to resume.
 function progress_report(
 	failed: StartStep,
 	completed: ReadonlyArray<StartStep>,
 	cause: string,
+	labels: Readonly<Record<StartStep, string>> = STEP_LABELS,
 ): string {
-	const done =
-		completed.length === 0 ? 'nothing' : completed.map((step) => STEP_LABELS[step]).join('; ')
+	const done = completed.length === 0 ? 'nothing' : completed.map((step) => labels[step]).join('; ')
 
-	return `josh start stopped at: ${STEP_LABELS[failed]}\nCompleted: ${done}\nCause: ${cause}`
+	return `josh start stopped at: ${labels[failed]}\nCompleted: ${done}\nCause: ${cause}`
 }
 
-function plan_summary(steps: ReadonlyArray<StartStep>): string {
-	const lines = steps.map((step, index) => `  ${String(index + 1)}. ${STEP_LABELS[step]}`)
+function plan_summary(
+	steps: ReadonlyArray<StartStep>,
+	labels: Readonly<Record<StartStep, string>> = STEP_LABELS,
+): string {
+	const lines = steps.map((step, index) => `  ${String(index + 1)}. ${labels[step]}`)
 
 	return ['josh start will:', ...lines].join('\n')
 }
@@ -161,6 +173,7 @@ const start_plan = {
 	github_consent,
 	progress_report,
 	plan_summary,
+	step_labels,
 	STEP_LABELS,
 }
 export { start_plan }

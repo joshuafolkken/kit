@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const detach_mock = vi.hoisted(() => vi.fn())
@@ -22,6 +23,18 @@ vi.mock('./run-ship-probe', () => ({
 	},
 }))
 vi.mock('./run-event-stream-emit', () => ({ run_event_stream_emit: { emit: vi.fn() } }))
+// The preflight's own branches are pinned in `run-ship-preflight.test.ts`; here it passes.
+vi.mock('./run-ship-preflight', () => ({
+	run_ship_preflight: { stage: vi.fn().mockResolvedValue({ code: 0, out: 'ready' }) },
+}))
+vi.mock('./run-ship-scoped', async (import_original) => {
+	const actual = await import_original<{ run_ship_scoped: typeof real_scoped }>()
+	const scoped_pair = vi
+		.fn<typeof real_scoped.scoped_pair>()
+		.mockResolvedValue({ code: 0, out: '' })
+
+	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_pair } }
+})
 vi.mock('./run-ship-detach', () => ({
 	run_ship_detach: {
 		LAUNCHED: 'launched',

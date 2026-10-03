@@ -6,8 +6,13 @@ import { scoped_green } from '#scripts/gate/scoped-green'
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
+import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { find_package_directory } from '#scripts/josh/josh-logic'
 import { path_decision } from '#scripts/josh/path-decision'
+import { stamp_file } from '#scripts/josh/stamp-file'
+import { openai_review_broker } from '#scripts/lane/openai-review-broker'
+import { run_ship_review } from '#scripts/run/run-ship-review'
 import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
@@ -134,13 +139,54 @@ function record_round_one(
 // failed to record would hand the review a command that cannot succeed and the run a check that
 // answers `not-required` — the guard gone, silently, which is the shape this whole record exists to
 // remove.
-async function open_contract(): Promise<{ checkout: ReviewCheckout; nonce: string }> {
+//
+// **Whether this is a resume is read first** (joshuafolkken/kit#2945): `record_target` drops the
+// previous nonce's records, so asked afterwards the finished review would always read as absent. The
+// findings file is the ship's, keyed on `PROJECT_ROOT` as the ship keys it; a review run outside the
+// ship writes none, so it never reads as a resume and keeps the whole change.
+//
+// **The narrowing is measured from the tree that review was briefed on**, and only when that record
+// was written by the brief the pointer names: one left by an earlier brief is not the tree the
+// finished review read, so the resume reads the whole change instead.
+function attested_tree(checkout: ReviewCheckout): FileMapStamp | undefined {
+	const { findings } = openai_review_broker.review_paths(PROJECT_ROOT)
+	const briefed = review_stamps.briefed_stamp.read()
+
+	if (briefed === undefined || !review_attest.is_briefed_since(briefed.taken_at, checkout.root)) {
+		return undefined
+	}
+
+	const is_clean =
+		review_attest.is_reviewed_on(checkout, findings, checkout.root) &&
+		run_ship_review.is_clean_round_one(stamp_file.read_stamp_text(findings))
+
+	return is_clean ? briefed : undefined
+}
+
+async function open_contract(): Promise<{
+	checkout: ReviewCheckout
+	nonce: string
+	resumed_from: FileMapStamp | undefined
+}> {
 	const checkout = await review_checkout.read_checkout()
+	const resumed_from = attested_tree(checkout)
 
 	// Keyed on the root git just answered with, never on `process.cwd()`: the check made before the
 	// merge asks git the same question, and the two hash different keys the moment one of them runs
 	// from a subdirectory — a mismatch that would drop the guard with nothing printed.
-	return { checkout, nonce: review_attest.record_target(checkout, checkout.root) }
+	return { checkout, nonce: review_attest.record_target(checkout, checkout.root), resumed_from }
+}
+
+// Retaken on every round-1 brief, after the pointer it pairs with (joshuafolkken/kit#2945). Swallowed:
+// a record that failed to write predates the next pointer, so the resume widens rather than narrows.
+function record_briefed(round: number, tree: Record<string, string>, base?: string): void {
+	if (round !== FIRST_ROUND) return
+
+	try {
+		review_stamps.briefed_stamp.write(tree, undefined, base)
+	} catch {
+		/* no record widens the resume rather than narrowing it */
+	}
 }
 
 interface ComposeRequest {
@@ -252,6 +298,7 @@ async function run_review(round: number, reading: ChangeReading): Promise<number
 	if (resolved.kind === 'rejected') return report_error(resolved.note)
 	console.info(await compose_brief({ round, paths, tree, base, profile: resolved.profile }))
 	record_round_one(round, tree, commit)
+	record_briefed(round, tree, commit)
 
 	return 0
 }

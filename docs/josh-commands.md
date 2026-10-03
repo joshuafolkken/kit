@@ -425,7 +425,7 @@ pnpm exec josh start --yes --github --profile basic    # unattended, including t
 5. The missing workflow and release-classification labels; existing ones are left unchanged
 6. The setup pull request — only while `main` has commits but no kit: an Issue, a commit of only kit's files on its branch, and the pull request. It never merges
 
-**Options:** `--profile basic|full` sets the profile instead of asking (the detected one is the default). `--yes` accepts the defaults, but is **not** consent to write to GitHub: when step 4 or 6 is planned, an unattended run without `--github` stops before changing anything. `--public` creates a public repository. Without a terminal, `--yes` is required.
+**Options:** `--profile basic|full` sets the profile instead of asking (the detected one is the default). `--yes` accepts the defaults, but is **not** consent to write to GitHub: when step 4 or 6 is planned, an unattended run without `--github` stops before changing anything. `--public` creates a public repository. Without a terminal, `--yes` is required. `--init-command "<command>"` runs that command as step 2 instead of kit's setup — for a toolkit layered over kit, e.g. `"josh-app init"`. It runs without a shell, with `--profile <confirmed profile>` appended; its non-zero exit stops before the commit, and step 6 also commits every file changed since it ran.
 
 **Existing state:** with a GitHub origin, nothing replaces it and `main` is never pushed to. After a failed commit hook, a re-run on the setup branch resumes step 6. A non-GitHub origin, or commits on a branch other than `main`, is refused before any change.
 
@@ -501,7 +501,9 @@ pnpm josh ui:routes --staged   # the staged diff instead
 
 ### `josh propagate`
 
-Carry the release this repository just published into every consumer repository checked out next to it. Runs only from the supplier's own clean, up-to-date default branch; waits for the exact published version to appear in the registry before touching any consumer.
+Carry the release this repository just published into every consumer repository checked out next to it. Runs only from the clean, up-to-date default branch of kit or a CLI-shipping toolkit (app-kit, game-kit); waits for the exact published version to appear in the registry before touching any consumer.
+
+Staged delivery: kit → app-kit → joshuafolkken-com / game-kit → waneccha. A toolkit also carries its base packages, pinned to its installed versions. Each consumer is delivered by the topmost toolkit it installs; lower runs report it `skipped`, naming that toolkit.
 
 ```bash
 pnpm josh propagate
@@ -516,7 +518,7 @@ pnpm josh propagate --target app-kit    # carry the release into one consumer on
 - `--skip-publish-wait` — skip the registry poll for an already-published release.
 - `--target <repo>` — process only that consumer (`app-kit` or `joshuafolkken/app-kit`); the rest are reported `skipped` and left untouched. An unknown, ambiguous or non-dependent name fails before the publish wait, writing nothing.
 
-Per consumer, in order: working-tree check, `pnpm add -D @joshuafolkken/kit@<version>`, `pnpm josh sync`, verification gate, open upgrade issue, `pnpm josh git`, return to default branch. One consumer's failure never stops another; each is reported as `propagated`, `failed` (with the step, reason, and what it left behind), or `skipped`.
+Per consumer, in order: working-tree check, `pnpm add -D <package>@<version>` per carried package, `pnpm <bin> sync` per carried package (base first), verification gate, open upgrade issue, `pnpm josh git`, return to default branch. One consumer's failure never stops another; each is reported as `propagated`, `failed` (with the step, reason, and what it left behind), or `skipped`.
 
 The opposite direction — one consumer catching itself up from its own checkout — is [`josh adopt`](#josh-adopt).
 
@@ -1302,7 +1304,7 @@ pnpm josh epic:check 700
 
 ### `josh auto-ok:next`
 
-Print the next opted-in standalone issue an unattended run may pick up outside an epic. Read-only; ranks newest-first, skipping `epic`, `in-progress`, `needs-decision` and any candidate whose `blockedBy` is still open.
+Print the next opted-in standalone issue an unattended run may pick up outside an epic. Read-only; ranks `priority:high` first, then a verification-path defect (`bug` with `run:solo`, or `route:interrupt`), then issues other open issues wait on, then newest-first (joshuafolkken/kit#2928), skipping `epic`, `in-progress`, `needs-decision` and any candidate whose `blockedBy` is still open.
 
 ```bash
 pnpm josh auto-ok:next
@@ -1332,7 +1334,9 @@ stdout is one token per line (all exit 0 unless noted): `<number>…` (each an i
 
 **Defect priority** (joshuafolkken/kit#2455): on a `run` answer the command measures `defect:rate` over its default 14 days. While the rate is strictly above the baseline recorded on joshuafolkken/kit#2449 (0.42), the runnable numbers are re-ordered — defects (`- 種別: 不具合` or `route:interrupt`) first, new mechanisms (`- 種別: 振る舞い変更` without either) last, everything else in between — each kind keeping the graph's order. At or below the baseline, or when the rate cannot be read (noted on stderr), the order is unchanged. Only the order within the runnable set changes, so no dependency is crossed.
 
-**`run:solo` gate** (joshuafolkken/kit#2776): on a `run` answer the command reads the repository's open `in-progress` issues (parked ones excluded) and applies three rules. While a `run:solo` issue is running, it prints `wait`. When nothing is running, the first `run:solo` candidate is printed alone, wherever it ranks (joshuafolkken/kit#2778). While other lanes run, a `run:solo` candidate at the head prints `wait`, and one further down cuts the list, so only the candidates ahead of it are printed. When the listing cannot be read, or was cut short, it prints `wait`. The reason goes to stderr. `epic:next --lanes` applies the same gate to a named epic's lanes. `backlog:plan` is not gated, but it marks such rows `[run:solo]` and rows with neither label `[untriaged]`.
+**Ranking** (joshuafolkken/kit#2928): after the defect priority, this repository's runnable numbers are sorted by three keys, the earlier order breaking ties — `priority:high` first, then a verification-path defect (`bug` with `run:solo`, or `route:interrupt`), then the number of open backlog issues blocked by it. The `run:solo` gate below sees the whole ranking; only then are the standalone (non-epic) numbers cut to five, and a number past the cut is listed as waiting.
+
+**`run:solo` gate** (joshuafolkken/kit#2776): on a `run` answer the command reads the repository's open `in-progress` issues (parked ones excluded) and applies three rules. While a `run:solo` issue is running, it prints `wait`. When nothing is running, a `run:solo` candidate at the head is printed alone. A `run:solo` candidate further down cuts the list, so only the candidates ahead of it are printed. While other lanes run, a `run:solo` candidate at the head prints `wait`. The label does not move a candidate up the ranking (joshuafolkken/kit#2928). When the listing cannot be read, or was cut short, it prints `wait`. The reason goes to stderr. `epic:next --lanes` applies the same gate to a named epic's lanes. `backlog:plan` is not gated, but it marks such rows `[run:solo]` and rows with neither label `[untriaged]`.
 
 ### `josh backlog:plan`
 
@@ -1504,14 +1508,15 @@ pnpm josh delegate --list     # the enumeration, and what was rejected and why
 
 **The list is the whole of the rule: anything not on the list is `keep`.** A step earns its place by naming how a wrong result is caught — by something in the parent tier that costs less than redoing the step.
 
-| Step                  | Delegatable because                                                                                                                                                          |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `gate-fix`            | `pnpm josh gate` re-runs; a wrong fix fails it again, naming the file                                                                                                        |
-| `epic-child`          | the parent reads the child's state from GitHub, so a child reported done but not merged shows as still open                                                                  |
-| `followup-filing`     | the parent reads the filed Issue with `pnpm josh issue:state <new>`, so one reported filed but not created shows as absent                                                   |
-| `survey`              | the reported locations are checked directly; a fabricated or missed one fails one `grep`                                                                                     |
-| `investigation`       | the parent opens the cited lines; an unsupported conclusion fails there, far cheaper than redoing the reading                                                                |
-| `implementation-unit` | the parent runs the whole change through `pnpm josh gate` and a `/code-review` it would run anyway, so a unit's mistake fails the same backstop a serial edit passes through |
+| Step                         | Delegatable because                                                                                                                                                          |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gate-fix`                   | `pnpm josh gate` re-runs; a wrong fix fails it again, naming the file                                                                                                        |
+| `epic-child`                 | the parent reads the child's state from GitHub, so a child reported done but not merged shows as still open                                                                  |
+| `followup-filing`            | the parent reads the filed Issue with `pnpm josh issue:state <new>`, so one reported filed but not created shows as absent                                                   |
+| `survey`                     | the reported locations are checked directly; a fabricated or missed one fails one `grep`                                                                                     |
+| `investigation`              | the parent opens the cited lines; an unsupported conclusion fails there, far cheaper than redoing the reading                                                                |
+| `implementation-unit`        | the parent runs the whole change through `pnpm josh gate` and a `/code-review` it would run anyway, so a unit's mistake fails the same backstop a serial edit passes through |
+| `lane-failure-investigation` | the `backlogrun` parent opens the cited lines and re-reads the child with `pnpm josh issue:state`; parking, re-dispatching and filing stay with the parent                   |
 
 **These were considered and kept**; `pnpm josh delegate <step>` answers `kept deliberately` for them, distinguishing them from a step that is merely unlisted:
 
@@ -1874,6 +1879,8 @@ for `run:tail`, `--notify-message` is forwarded to `followup` alone, and `--body
 follow-up citations filed this run — branch-2 filing runs before `ship` — forwarded to `run:tail` after
 the closed issue so `issue:cite` reports them too. The one decision the region carried — disposing of a
 review finding — stays in front of this command.
+
+A `preflight` stage runs first (joshuafolkken/kit#2946): it asks every pull-request precondition at once — `git -y`'s preflight (release classification, branch and title checks) and, for a runtime change, the `## 実機証跡` section `followup` gates on, read from `--body-file` or else the open PR's body — and reports them together, then meets the scoped lint/test pair. A stop those checks would cause therefore lands before the review and the gate rather than after them. The gate stage meets the scoped pair again before `josh gate`, as a round-1 reviewer may have edited the tree since. The checks themselves are unchanged; only where they run moved.
 
 A re-run resumes (joshuafolkken/kit#2426): a per-issue stage record, honored only where the actual
 state (committed, pushed, merged) corroborates it, passes over finished stages; each stage is logged

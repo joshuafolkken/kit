@@ -59,10 +59,15 @@ const TEST_RELATED_PREFIX = 'josh-test-related-stamp-'
 const GATE_PREFIX = 'josh-gate-stamp-'
 const IN_FLIGHT_PREFIX = 'josh-gate-running-'
 const ROUND_ONE_PREFIX = 'josh-review-round1-'
+const BRIEFED_PREFIX = 'josh-review-briefed-'
 
 const gate_stamp: FileMapStampAccess = file_map_stamp.create(GATE_PREFIX, PROJECT_ROOT)
 const in_flight_stamp: FileMapStampAccess = file_map_stamp.create(IN_FLIGHT_PREFIX, PROJECT_ROOT)
 const round_one_stamp: FileMapStampAccess = file_map_stamp.create(ROUND_ONE_PREFIX, PROJECT_ROOT)
+// **The tree the latest round-1 brief handed out, retaken on every brief** (joshuafolkken/kit#2945).
+// The round-1 snapshot is kept from the first brief of a run, so it is not the tree a later review
+// read — a resume narrowed against it would skip a file put back to that older content.
+const briefed_stamp: FileMapStampAccess = file_map_stamp.create(BRIEFED_PREFIX, PROJECT_ROOT)
 const lint_related_stamp: FileMapStampAccess = file_map_stamp.create(
 	LINT_RELATED_PREFIX,
 	PROJECT_ROOT,
@@ -97,6 +102,8 @@ function clear_round_one(target?: string): void {
 }
 
 const review_stamps = {
+	BRIEFED_PREFIX,
+	briefed_stamp,
 	clear_round_one,
 	GATE_PREFIX,
 	gate_stamp,

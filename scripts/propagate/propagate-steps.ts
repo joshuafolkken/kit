@@ -88,13 +88,28 @@ function release_names(releases: ReadonlyArray<Release>): string {
 	return `${names.slice(0, -1).join(NAME_SEPARATOR)}${LAST_SEPARATOR}${last}`
 }
 
+// Each release with its own version, for a plan whose releases disagree on one — a toolkit's
+// propagation carries the base packages at the versions that toolkit was verified with
+// (joshuafolkken/kit#2879), so one shared "to <version>" would name a version most of them are not.
+function versioned_names(releases: ReadonlyArray<Release>): string {
+	const named = releases.map((release) => ({
+		...release,
+		package_name: `${release.package_name} to ${release.version}`,
+	}))
+
+	return `Upgrade ${release_names(named)}`
+}
+
 // One release reproduces `issue_title` exactly, which is what keeps a `propagate` run's issue title
 // unchanged by the generalization.
 function plan_title(releases: ReadonlyArray<Release>): string {
 	const [first] = releases
 	if (first === undefined) return EMPTY_PLAN_TITLE
+	const is_one_version = releases.every((release) => release.version === first.version)
 
-	return issue_title(release_names(releases), first.version)
+	return is_one_version
+		? issue_title(release_names(releases), first.version)
+		: versioned_names(releases)
 }
 
 function plan_body(plan: ReleasePlan): string {

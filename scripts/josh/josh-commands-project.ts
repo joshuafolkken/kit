@@ -17,7 +17,7 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Set a project up for the GitHub Issue workflow, from git init to the setup PR',
 		category: 'Project',
 		reference: [
-			`${PROFILE_ARGUMENTS} [--yes] [--github] [--public]`,
+			`${PROFILE_ARGUMENTS} [--yes] [--github] [--public] [--init-command <command>]`,
 			'developer',
 			['files', 'git', 'network', 'processes'],
 		],

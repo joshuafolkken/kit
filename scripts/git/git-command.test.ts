@@ -12,10 +12,16 @@ const execa_mock = vi.hoisted(() => {
 		// What the last call actually passed, for the assertions that care about the arguments rather
 		// than the output.
 		last_arguments: [] as Array<string>,
+		last_options: undefined as unknown,
 	}
 
-	async function mock_execa(_cmd: string, arguments_: Array<string>): Promise<{ stdout: string }> {
+	async function mock_execa(
+		_cmd: string,
+		arguments_: Array<string>,
+		options?: unknown,
+	): Promise<{ stdout: string }> {
 		state.last_arguments = [...arguments_]
+		state.last_options = options
 
 		const is_bare_push = arguments_[0] === 'push' && !arguments_.includes('--set-upstream')
 
@@ -48,6 +54,7 @@ beforeEach(() => {
 	execa_mock.state.fail_plain_push = false
 	execa_mock.state.plain_push_exit_code = UPSTREAM_NOT_SET_EXIT_CODE
 	execa_mock.state.last_arguments = []
+	execa_mock.state.last_options = undefined
 })
 
 // joshuafolkken/kit#1381: every reader of this porcelain output depends on the `??` lines being there
@@ -334,6 +341,17 @@ describe('git_command.pull_fast_forward', () => {
 		await git_command.pull_fast_forward()
 
 		expect(execa_mock.state.last_arguments).toStrictEqual(['pull', '--ff-only'])
+	})
+
+	// joshuafolkken/kit#2942: `josh main:sync` pulls through this, and an unbounded network call there
+	// waited 37 minutes on a dead connection while the backlog driver stood behind it.
+	it('bounds the pull with the remote budget', async () => {
+		const { git_command } = await import('./git-command')
+		const { PUSH_TIMEOUT_MS } = await import('./git-push-transport')
+
+		await git_command.pull_fast_forward()
+
+		expect(execa_mock.state.last_options).toMatchObject({ timeout: PUSH_TIMEOUT_MS })
 	})
 })
 

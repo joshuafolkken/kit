@@ -43,6 +43,11 @@ describe('help audience', () => {
 
 	it('keeps aliases for both common and detailed commands', () => {
 		expect(josh_logic.format_help()).toContain('ga, gate')
-		expect(josh_logic.format_help(true)).toContain('fu, followup')
+		expect(josh_logic.format_help(true)).toContain('bp, bump')
+	})
+
+	// An automation command has no alias since joshuafolkken/kit#2906, so its line starts at its name.
+	it('lists an automation command under its canonical name alone', () => {
+		expect(josh_logic.format_help(true)).toContain('\n  followup ')
 	})
 })

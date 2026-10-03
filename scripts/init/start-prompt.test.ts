@@ -25,6 +25,7 @@ const OPTIONS: StartOptions = {
 	is_yes: false,
 	is_github: false,
 	visibility: 'private',
+	init_command: undefined,
 }
 const CHOICES: Choices = {
 	options: OPTIONS,

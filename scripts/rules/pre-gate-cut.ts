@@ -44,8 +44,8 @@ const HOLD_COMMANDS: ReadonlySet<string> = new Set(['run:hold'])
 // predicate exists to keep it out of.
 const HOLD_MODE_FLAG = /(?:^|\s)--release(?:[=\s]|$)/u
 
-// **Alias-expanded rather than matched as text**, so `pnpm josh ga` and `pnpm josh rct` are the same
-// calls as their canonical spellings. Segment-wise for the reason every other row here is: one shell
+// **Alias-expanded rather than matched as text**, so `pnpm josh ga` is the same call as `pnpm josh
+// gate`. Segment-wise for the reason every other row here is: one shell
 // line carries several commands, and a name quoted inside a body is not the command being invoked.
 //
 // **One reading of that question rather than one per name set.** Four predicates here differ only in

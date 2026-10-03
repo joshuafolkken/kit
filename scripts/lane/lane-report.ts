@@ -1,4 +1,5 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { issue_cite, type IssueCiter } from '#scripts/issue/issue-cite'
 import { run_liveness } from '#scripts/run/run-liveness'
 import type { LaneInfo } from './lane-registry'
 
@@ -48,9 +49,14 @@ function event_column(lane: LaneInfo): string {
 	return state ?? 'agent -'
 }
 
-function describe_lane(lane: LaneInfo): string {
+// The plain `#N`, for a caller that could not read the repository the issue would link into.
+const PLAIN_CITE: IssueCiter = issue_cite.citer(undefined, new Map())
+
+// The issue leads as a citation (joshuafolkken/kit#2943): a lane status report copies this row, and a
+// bare `#N` copied into it is what the Stop guard sends back.
+function describe_lane(lane: LaneInfo, cite: IssueCiter = PLAIN_CITE): string {
 	return [
-		`#${lane.issue}`,
+		cite(lane.issue),
 		`seat ${value_or_unknown(lane.seat)}`,
 		`dev ${value_or_unknown(lane.development_port)}`,
 		`preview ${value_or_unknown(lane.preview_port)}`,
@@ -63,10 +69,10 @@ function describe_lane(lane: LaneInfo): string {
 	].join(COLUMN_SEPARATOR)
 }
 
-function describe_lanes(lanes: ReadonlyArray<LaneInfo>): string {
+function describe_lanes(lanes: ReadonlyArray<LaneInfo>, cite: IssueCiter = PLAIN_CITE): string {
 	if (lanes.length === 0) return NO_LANES
 
-	return lanes.map((lane) => describe_lane(lane)).join('\n')
+	return lanes.map((lane) => describe_lane(lane, cite)).join('\n')
 }
 
 function describe_ports(lane: LaneInfo): string {

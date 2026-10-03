@@ -33,6 +33,12 @@ authorization, whether it came from a named epic or from the opted-in pool:
   is Tier A" carries the re-dispatch itself. A released child takes a lane exactly as any batch child
   does.
 
+## The parent does not investigate a lane failure itself
+
+**A lane failure whose reason is not on its Issue is read by a unit** — `pnpm josh delegate
+lane-failure-investigation` (joshuafolkken/kit#2947); the parent checks the cited lines and
+`pnpm josh issue:state` before it parks, re-dispatches or files.
+
 ## `needs-human-review` — the one stop that is not a park
 
 A child carrying **`needs-human-review`** is degraded to a `halfrun`-shaped stop and **the whole run ends

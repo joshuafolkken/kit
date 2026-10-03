@@ -13,7 +13,8 @@ const TROUBLESHOOTING_GUIDE = 'docs/troubleshooting.md'
 const TEMPLATE_CI_YML = 'templates/workflows/ci.yml'
 const PUBLISH_JOB_NAMES = ['publish-github', 'publish-npm'] as const
 const GITHUB_AUTH_LINE = '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}'
-const DISPATCH_TAG = '${{ github.event.client_payload.tag }}'
+const DISPATCH_TAG = '${{ github.ref_name }}'
+const TAG_REF_GUARD = "startsWith(github.ref, 'refs/tags/v')"
 const PRODUCTION_WORKFLOW = './.github/workflows/production.yml'
 const PACKAGE_PUBLISH_GROUP = 'package-publish'
 const CHECKOUT_ACTION = 'actions/checkout@'
@@ -26,8 +27,10 @@ const STEP_SCHEMA = z.looseObject({
 	run: z.string().optional(),
 	uses: z.string().optional(),
 	with: z.record(z.string(), z.unknown()).optional(),
+	env: z.record(z.string(), z.string()).optional(),
 })
 const JOB_SCHEMA = z.object({
+	if: z.string().optional(),
 	needs: z.unknown().optional(),
 	concurrency: z.object({ group: z.string(), queue: z.string() }),
 	permissions: PERMISSIONS_SCHEMA,
@@ -47,6 +50,10 @@ const RELEASE_JOB_SCHEMA = z.object({
 })
 const WORKFLOW_SCHEMA = z.object({
 	jobs: JOBS_SCHEMA,
+})
+const TRIGGER_SCHEMA = z.object({
+	'run-name': z.string(),
+	on: z.record(z.string(), z.unknown()),
 })
 const RELEASE_WORKFLOW_SCHEMA = z.object({
 	concurrency: z.unknown().optional(),
@@ -75,16 +82,32 @@ function command_index(steps: TemplateSteps, marker: string): number {
 }
 
 describe('release tag checkout', () => {
-	it.each(PUBLISH_JOB_NAMES)(
-		'publishes the dispatched release tag in %s',
-		(job_name: 'publish-github' | 'publish-npm') => {
-			const checkout = read_workflow().jobs[job_name].steps.find((step) =>
-				step.uses?.startsWith(CHECKOUT_ACTION),
-			)
+	it('runs on the tag ref so npm provenance records the tag commit, not the default branch head', () => {
+		const workflow = TRIGGER_SCHEMA.parse(load(readFileSync(WORKFLOW_PATH, 'utf8')))
 
-			expect(checkout?.with?.['ref']).toBe(DISPATCH_TAG)
+		expect(Object.keys(workflow.on)).toEqual(['workflow_dispatch'])
+		// auto-tag.yml leaves any publish.yml mentioning new-tag-created to the repository_dispatch.
+		expect(readFileSync(WORKFLOW_PATH, 'utf8')).not.toContain('new-tag-created')
+		expect(workflow['run-name']).toBe(`Publish ${DISPATCH_TAG}`)
+	})
+
+	it.each(PUBLISH_JOB_NAMES)(
+		'publishes the checked-out run commit only from a release tag ref in %s',
+		(job_name: 'publish-github' | 'publish-npm') => {
+			const job = read_workflow().jobs[job_name]
+			const checkout = job.steps.find((step) => step.uses?.startsWith(CHECKOUT_ACTION))
+
+			expect(job.if).toBe(TAG_REF_GUARD)
+			expect(checkout).toBeDefined()
+			expect(checkout?.with?.['ref']).toBeUndefined()
 		},
 	)
+
+	it('looks up publish runs of every trigger so pre-migration runs stay visible', () => {
+		expect(readFileSync('scripts/release/github-release.ts', 'utf8')).toContain(
+			'publish.yml/runs?per_page=',
+		)
+	})
 })
 
 describe('dual registry publishing', () => {
@@ -143,8 +166,8 @@ describe('GitHub Release job ordering', () => {
 
 		expect(production.uses).toBe(PRODUCTION_WORKFLOW)
 		expect(production.with.tag).toBe(DISPATCH_TAG)
-		expect(checkout?.with?.['ref']).toBe(production.with.tag)
-		expect(publish).toBeDefined()
+		expect(checkout?.with?.['ref']).toBeUndefined()
+		expect(publish?.env?.['RELEASE_TAG']).toBe(production.with.tag)
 		expect(release.permissions['contents']).toBe('write')
 	})
 })
@@ -235,7 +258,7 @@ describe('installation guidance', () => {
 	it('identifies the registry used by kit version checks', () => {
 		const content = readFileSync(PACKAGE_API_REFERENCE, 'utf8')
 
-		expect(content).toContain('GitHub Packages versions API')
+		expect(content).toMatch(/public npm, without credentials[^\n]*GitHub Packages versions/u)
 	})
 
 	it('keeps the migration steps in troubleshooting, linked from the CLI guide', () => {

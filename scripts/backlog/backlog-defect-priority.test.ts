@@ -38,6 +38,9 @@ const CHILDREN: ReadonlyArray<ChildInput> = [
 ]
 
 const GRAPH_ORDER = [MECHANISM, CODE_ONLY, DEFECT, INTERRUPTED_MECHANISM, UNDECLARED]
+// joshuafolkken/kit#2928: `route:interrupt` is a ranking key above the defect-rate order, so the
+// interrupted issue heads the offer whatever the rate; the rest keep the order this file pins.
+const RANKED_GRAPH_ORDER = [INTERRUPTED_MECHANISM, MECHANISM, CODE_ONLY, DEFECT, UNDECLARED]
 
 const ABOVE_BASELINE: DefectRate = { ...backlog_fixture.AT_BASELINE, defects: 22 }
 
@@ -77,7 +80,7 @@ describe('backlog:next while the defect rate is above its baseline', () => {
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(offered()).toBe(
-			joined([DEFECT, INTERRUPTED_MECHANISM, CODE_ONLY, UNDECLARED, MECHANISM]),
+			joined([INTERRUPTED_MECHANISM, DEFECT, CODE_ONLY, UNDECLARED, MECHANISM]),
 		)
 		expect(stderr()).toContain(ABOVE_NOTE)
 	})
@@ -105,7 +108,7 @@ describe('backlog:next at or below the baseline', () => {
 		stub({ defect_rate: backlog_fixture.AT_BASELINE })
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(offered()).toBe(joined(GRAPH_ORDER))
+		expect(offered()).toBe(joined(RANKED_GRAPH_ORDER))
 		expect(stderr()).not.toContain(ABOVE_NOTE)
 	})
 
@@ -113,7 +116,7 @@ describe('backlog:next at or below the baseline', () => {
 		stub({ is_rate_unreadable: true })
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(offered()).toBe(joined(GRAPH_ORDER))
+		expect(offered()).toBe(joined(RANKED_GRAPH_ORDER))
 		expect(stderr()).toContain(backlog_defect_priority.UNMEASURED_MESSAGE)
 	})
 })

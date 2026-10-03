@@ -131,7 +131,7 @@ single source.
 carried in a record rather than in the conversation:
 
 ```bash
-pnpm josh run:carry --begin "backlogrun --max 5 --idle 30" --owner "$PPID"   # alias: josh rc
+pnpm josh run:carry --begin "backlogrun --max 5 --idle 30" --owner "$PPID"
 pnpm josh run:carry --json                                                   # read it back in a resumed session
 ```
 
@@ -204,7 +204,7 @@ judgment starts an AI session, with the branch result and resume flags in its pr
 **Start it in the same turn as `--begin`, and stop it in the same turn as `--end`:**
 
 ```bash
-pnpm josh run:wake --start   # alias: josh rw ; right after `run:carry --begin`
+pnpm josh run:wake --start   # right after `run:carry --begin`
 pnpm josh run:wake --stop    # in the same turn as `run:carry --end`
 ```
 
@@ -267,7 +267,7 @@ run.
 **The plan is one command's output, not an assembly of several:**
 
 ```bash
-pnpm josh backlog:plan          # alias: josh blp
+pnpm josh backlog:plan
 ```
 
 **It renders the same classified pool `backlog:next` answers from**, so **the plan cannot promise an
@@ -282,9 +282,8 @@ order the run does not take**. Its four sections are:
   is distinguished from "not reached yet".
 
 **Report all four to the person, in the session language, before the first child starts.** Epic
-children are enumerated individually rather than summarized under their root. A `⚠` about a truncated
-listing is reported with them: the plan is then partial, and saying so is what keeps it from reading as
-complete.
+children are enumerated individually rather than summarized under their root. Report a truncated-listing
+`⚠` with them: the plan is then partial.
 
 ### Resolve what the plan can resolve, before starting
 
@@ -293,27 +292,28 @@ stop at a time.**
 
 - **Decide everything decidable from the issue itself.** Read the issue's body **and its comments**
   (`SKILL.md` → §2g), and where the answer is already there, record it as an Issue comment and
-  **remove the label** — `CLAUDE.md` → "Decision autonomy" already makes that Tier A. **Read every one
-  of them in one call** — `pnpm josh issue:read <N> <N> …`, the numbers the plan just listed under
-  "Waiting on a person" — rather than a `gh api` pair per issue.
+  **remove the label** — `CLAUDE.md` → "Decision autonomy" already makes that Tier A. **Read them all in
+  one `pnpm josh issue:read <N> <N> …` call**, not a `gh api` pair per issue.
 - **Never measure in order to decide.** A question needing a benchmark, a profile, or a run of the
   thing itself is not settled here: it stays labelled and the plan says so.
-- **Label what you find.** An issue that turns out to need a person's judgement has `needs-decision`
-  applied — the same label a parked child gets, applied the way `backlogrun-park.md` → "park and continue"
-  applies it. **The next plan then classifies it by reading the label alone**, never by reading the
-  body again.
+- **Label what you find.** An issue needing a person's judgement gets `needs-decision`, applied as
+  `backlogrun-park.md` → "park and continue" does. **The next plan classifies it by the label alone**,
+  never the body.
 - **Order and isolate the pool in the same pass** (joshuafolkken/kit#2776), from the same
   `issue:read`: an issue that must land first (it builds what another reuses, or both edit one code
   path) becomes a native `blocked-by`; an issue the `wip-cap.md` → 「実行のしかた」 enumeration hits
   gets `run:solo`, **every other one `run:lane`**. Comment the reason; the offer commands enforce all
   three, answering `triage` while an issue has neither.
+- **`priority:high` puts an issue first** (joshuafolkken/kit#2928; ranking: `docs/josh-commands.md` →
+  `josh backlog:next`). Apply it only on a cited ground — a stated deadline or urgency, or a person's
+  written policy — commenting the ground; **never remove it**.
 - **Report the order those labels produce — `pnpm josh backlog:plan --waves`** (joshuafolkken/kit#2778),
   `backlog:next` played forward wave by wave. Report it with the plan, never an order derived by hand.
 - **Then start the loop.** Whatever is still labelled is reported as parked and left standing; the
   run does not wait on it.
 
-**`needs-decision`, `run:solo` and `run:lane` are the workflow labels a run may apply, and none is
-`auto-ok` or `needs-human-review`.** Those two stay a person's alone (this file, `SKILL.md` → §2z); a
+**`needs-decision`, `run:solo`, `run:lane` and `priority:high` are the workflow labels a run may
+apply, and none is `auto-ok` or `needs-human-review`.** Those two stay a person's alone (this file, `SKILL.md` → §2z); a
 run parks with `needs-decision` and a person clears it.
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the plan and the decision pass come first"
@@ -331,7 +331,7 @@ returns the verdict with the issues to start. It stays both halves' contract sou
 *means* changes here.
 
 ```bash
-offer=$(pnpm josh backlog:offer --started "$started" --active "$active")   # alias: josh blo
+offer=$(pnpm josh backlog:offer --started "$started" --active "$active")
 offer=$(pnpm josh backlog:offer --started "$started" --active "$active" --exclude 1630,1631)   # after #1630, #1631 merged
 ```
 

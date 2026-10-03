@@ -24,8 +24,10 @@ vi.mock('./lane-registry', () => ({ lane_registry: { list_lanes: vi.fn() } }))
 // `lane:list` reads the `in-progress` listing to name the lane/label difference (joshuafolkken/kit#2235);
 // mocked so the unit suite makes no live `gh` call. An idle repository plus a known owner lets the
 // occupancy path run deterministically over the listed lanes.
+const { REPO_SLUG } = vi.hoisted(() => ({ REPO_SLUG: 'joshuafolkken/kit' }))
+
 vi.mock('#scripts/git/git-gh-command', () => ({
-	git_gh_command: { repo_get_name_with_owner: vi.fn().mockResolvedValue('joshuafolkken/kit') },
+	git_gh_command: { repo_get_name_with_owner: vi.fn().mockResolvedValue(REPO_SLUG) },
 }))
 vi.mock('#scripts/epic/epic-busy', () => ({
 	epic_busy: { read_repository: vi.fn().mockResolvedValue({ kind: 'idle' }) },
@@ -45,6 +47,8 @@ const { lane_dispatch } = await import('./lane-dispatch')
 const { lane_registry } = await import('./lane-registry')
 const { lane_output } = await import('./lane-output')
 const { lane_cli } = await import('./lane-cli')
+const { epic_busy } = await import('#scripts/epic/epic-busy')
+const { issue_cite } = await import('#scripts/issue/issue-cite')
 
 const ALREADY_OPEN = 'already-open'
 const ISSUE = '1490'
@@ -234,6 +238,23 @@ describe('what lane:output refuses', () => {
 		expect(await lane_cli.run(['output', ISSUE, UNIT_OUTPUT, 'extra'])).toBe(FAILURE)
 		expect(vi.mocked(lane_output.record_output)).not.toHaveBeenCalled()
 		expect(vi.mocked(lane_output.read_output)).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#2943: the title comes from the `in-progress` listing the occupancy check already
+// reads, so the row a report copies is a full citation without a read per lane.
+describe('the issue each listed lane names', () => {
+	const TITLE = 'Open a lane'
+
+	it('cites each lane with the title its in-progress issue carries', async () => {
+		vi.mocked(lane_registry.list_lanes).mockResolvedValue([LANE])
+		vi.mocked(epic_busy.read_repository).mockResolvedValueOnce({
+			kind: 'busy',
+			issues: [{ number: Number(ISSUE), title: TITLE, labels: [], createdAt: '' }],
+		})
+
+		expect(await lane_cli.run(['list'])).toBe(SUCCESS)
+		expect(printed[0]).toContain(issue_cite.citation_line(REPO_SLUG, ISSUE, TITLE))
 	})
 })
 

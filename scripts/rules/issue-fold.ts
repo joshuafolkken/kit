@@ -21,8 +21,7 @@ import { tail_commands } from './tail-commands'
 // "fold first". **No new predicate**: the filing trigger is `bash_triggers.is_issue_filing`, and the
 // prior-filing count is `filing_cap.prior_filing_count`, both reused verbatim.
 
-// `pnpm josh issue:fold`, the one act the rule asks for. The alias `isf` is expanded where the command
-// is read, so the canonical name matches both spellings.
+// `pnpm josh issue:fold`, the one act the rule asks for.
 const FOLD_NAMES: ReadonlySet<string> = new Set(['issue:fold'])
 
 // Keeping the rule: a call that runs the fold. Segment-wise, so a spelling quoted inside a filing's

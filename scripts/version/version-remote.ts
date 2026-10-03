@@ -1,5 +1,6 @@
 import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { error_text } from '#scripts/lib/error-message'
+import { npm_registry } from './npm-registry'
 import { safe_json_parse } from './parse-json'
 import { release_age } from './release-age'
 
@@ -22,14 +23,18 @@ function require_endpoint(versions_endpoint: string | undefined, package_name: s
 	)
 }
 
-// Fetch the latest published version from a GitHub Packages versions endpoint. The endpoint is
-// supplied per package (e.g. `/users/joshuafolkken/packages/npm/kit/versions?per_page=1`) so the
-// same fetcher serves kit, jgame, and app-kit. Guards an undefined/empty endpoint and wraps
-// `gh api` failures with an actionable message instead of a raw ExecaSyncError stack. The detail is
-// the shared layer's failure text: gh's own stderr (e.g. "gh: Not Found (HTTP 404)") when it wrote
-// one, execa's message otherwise, followed by any JSON error body gh wrote to stdout.
+// Fetch the latest published version: public npm's `latest` dist-tag first, which needs no
+// credentials (joshuafolkken/kit#2882), then the GitHub Packages versions endpoint for a package
+// public npm does not answer for. The endpoint is supplied per package (e.g.
+// `/users/joshuafolkken/packages/npm/kit/versions?per_page=1`) so the same fetcher serves kit, jgame,
+// and app-kit. Guards an undefined/empty endpoint and wraps `gh api` failures with an actionable
+// message instead of a raw ExecaSyncError stack. The detail is the shared layer's failure text: gh's
+// own stderr (e.g. "gh: Not Found (HTTP 404)") when it wrote one, execa's message otherwise, followed
+// by any JSON error body gh wrote to stdout.
 function fetch_latest_version(versions_endpoint: string | undefined, package_name: string): string {
 	const endpoint = require_endpoint(versions_endpoint, package_name)
+	const public_latest = npm_registry.read_latest(package_name)
+	if (public_latest !== undefined) return public_latest
 
 	try {
 		return git_gh_exec.exec_gh_api_sync({ path: endpoint, jq_filter: '.[0].name' }).trim()
@@ -59,19 +64,28 @@ function with_page_size(endpoint: string, page_size: number): string {
 	return `${path_part}?${query.toString()}`
 }
 
-// Publish timestamps for the package's recent releases, or nothing. Unlike `fetch_latest_version`
-// this never throws: the timestamps only enrich an explanation, so a package whose history cannot be
-// read keeps the report it had before (joshuafolkken/kit#808).
-function fetch_release_times(
-	versions_endpoint: string | undefined,
-): Record<string, string> | undefined {
-	if (versions_endpoint === undefined || versions_endpoint.trim() === '') return undefined
+function read_github_release_times(versions_endpoint: string): Record<string, string> | undefined {
 	const endpoint = with_page_size(versions_endpoint, TIMES_PAGE_SIZE)
 	const stdout = git_gh_exec.read_gh_api_sync({ path: endpoint, jq_filter: TIMES_JQ })
 	if (stdout === undefined) return undefined
 	const parsed = release_age.release_times_schema.safeParse(safe_json_parse(stdout))
 
 	return parsed.success ? parsed.data : undefined
+}
+
+// Publish timestamps for the package's recent releases, or nothing. Unlike `fetch_latest_version`
+// this never throws: the timestamps only enrich an explanation, so a package whose history cannot be
+// read keeps the report it had before (joshuafolkken/kit#808). Read in the same source order as
+// the latest, so the hold is explained against the registry `latest` came from.
+function fetch_release_times(
+	versions_endpoint: string | undefined,
+	package_name: string,
+): Record<string, string> | undefined {
+	if (versions_endpoint === undefined || versions_endpoint.trim() === '') return undefined
+
+	return (
+		npm_registry.read_release_times(package_name) ?? read_github_release_times(versions_endpoint)
+	)
 }
 
 export { fetch_latest_version, fetch_release_times, with_page_size }

@@ -66,7 +66,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'developer', ['files', 'processes']],
 	},
 	'format:edited': {
-		script: 'scripts/hooks/format-edited-file.ts',
+		script: 'scripts/hooks/format-edited-cli.ts',
 		description: 'Claude Code hook: format the file just edited (reads the tool call on stdin)',
 		category: 'Development',
 		reference: ['', 'automation', ['files', 'processes']],
@@ -85,7 +85,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		// node's own `--env-file` parser with node's own precedence.
 	},
 	'pretool:guard': {
-		script: 'scripts/hooks/pretool-guard.ts',
+		script: 'scripts/hooks/pretool-guard-cli.ts',
 		description:
 			'Claude Code hook: the batch, investigation and rule guards in one process (reads the tool call on stdin)',
 		category: 'Development',

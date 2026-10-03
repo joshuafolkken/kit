@@ -23,6 +23,12 @@ function run(command: string, args: ReadonlyArray<string>, root: string): void {
 	execaSync(command, args, { ...git_gh_exec.direct_environment(), cwd: root, stdio: 'inherit' })
 }
 
-const start_exec = { succeeds, read_output, run }
+// A caller's own initialize command stands in for the in-process `josh init`, so it keeps the
+// environment that setup would have had — its install goes through a scanner's proxy as usual.
+function run_local(command: string, args: ReadonlyArray<string>, root: string): void {
+	execaSync(command, args, { cwd: root, stdio: 'inherit' })
+}
+
+const start_exec = { succeeds, read_output, run, run_local }
 
 export { start_exec }

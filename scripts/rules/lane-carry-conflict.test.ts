@@ -19,7 +19,6 @@ const RULE_ID = 'lane-carry-conflict'
 const ISSUE = '2267'
 const MERGE_COMMAND = 'pnpm josh run:merge 2258'
 const CARRY_COMMAND = 'pnpm josh run:carry --begin "backlogrun #2252" --owner 21461'
-const ALIAS_MERGE_COMMAND = 'pnpm josh rmg 2258'
 const CUT_COMMAND = 'pnpm josh run:cut 2258'
 const NOW_MS = 1_700_000_000_000
 const A_LATER_CALL_MS = NOW_MS + 60_000
@@ -87,7 +86,6 @@ describe('invokes_budget_command', () => {
 	it.each([
 		['run:merge', MERGE_COMMAND],
 		['run:carry', CARRY_COMMAND],
-		['an alias spelling', ALIAS_MERGE_COMMAND],
 		['a later segment', `git switch main && ${MERGE_COMMAND}`],
 	])('matches %s', (_name, command) => {
 		expect(lane_carry_conflict.invokes_budget_command(command)).toBe(true)

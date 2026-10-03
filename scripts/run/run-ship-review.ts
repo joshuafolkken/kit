@@ -154,6 +154,14 @@ function round_one_outcome(verdict: ScoredVerdict): RoundOutcome {
 	return { is_passing: true, note: verdict.kind === VERDICT.FIXED ? FIXED_NOTE : CLEAN_NOTE }
 }
 
+// Whether a findings file records a clean round 1 (joshuafolkken/kit#2945). A resumed round 1 narrows to
+// the delta only past a review that found nothing to fix. A blocking one has a finding in a file the
+// delta may not touch. A fixed one approved its own edits, not the briefed tree the delta is measured
+// from, so a file reverted to that tree would drop out of the delta with its finding back in it.
+function is_clean_round_one(text: string | undefined): boolean {
+	return read_verdict(text).kind === VERDICT.CLEAN
+}
+
 // Round 2 is final and reads only, so it passes clean or Low-only alone — a fix it made would itself be
 // unreviewed.
 function round_two_outcome(verdict: ScoredVerdict): RoundOutcome {
@@ -166,6 +174,7 @@ const run_ship_review = {
 	FIXED_PREFIX,
 	UNVERIFIED_OUTCOME,
 	VERDICT,
+	is_clean_round_one,
 	read_verdict,
 	reviewer_prompt,
 	round_one_outcome,

@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const review_mock = vi.hoisted(() => vi.fn())
 const round_two_mock = vi.hoisted(() => vi.fn())
 const repository_mock = vi.hoisted(() => vi.fn())
+const preflight_mock = vi.hoisted(() => vi.fn())
+const scoped_mock = vi.hoisted(() => vi.fn<typeof real_scoped.scoped_pair>())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 // A fresh ship: nothing recorded and nothing committed, pushed or merged. The resume paths are pinned in
@@ -23,6 +26,12 @@ vi.mock('./run-event-stream-emit', () => ({ run_event_stream_emit: { emit: vi.fn
 vi.mock('./run-ship-review-steps', () => ({
 	run_ship_review_steps: { review_stage: review_mock, round_two_stage: round_two_mock },
 }))
+vi.mock('./run-ship-preflight', () => ({ run_ship_preflight: { stage: preflight_mock } }))
+vi.mock('./run-ship-scoped', async (import_original) => {
+	const actual = await import_original<{ run_ship_scoped: typeof real_scoped }>()
+
+	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_pair: scoped_mock } }
+})
 // Outside a lane, so a gate run inside a lane child never hands these ships to a real supervisor.
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: vi.fn().mockReturnValue(false) },
@@ -44,6 +53,8 @@ const GATE = ['gate']
 const COMMIT = ['git', '-y', TITLE]
 const FOLLOWUP = ['followup', TITLE]
 const REPORT = ['run:tail', NUMBER]
+const BODY_FILE_FLAG = '--body-file'
+const PREFLIGHT_SECTION = '=== preflight ===\nready\n\n'
 
 const info_lines: Array<string> = []
 
@@ -58,6 +69,8 @@ beforeEach(() => {
 	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	review_mock.mockReset().mockResolvedValue({ code: OK, out: 'review clean' })
 	round_two_mock.mockReset().mockResolvedValue({ code: OK, out: 'round 2 not due' })
+	preflight_mock.mockReset().mockResolvedValue({ code: OK, out: 'ready' })
+	scoped_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
@@ -141,8 +154,54 @@ describe('run_ship_cli.run — folds the four ship steps into one call', () => {
 		await run_ship_cli.run([TITLE])
 
 		expect(info_lines[0]).toBe(
-			'=== gate ===\ngreen\n\n=== commit/push/PR ===\npushed\n\n=== followup ===\nmerged\n\n=== report ===\nshipped',
+			`${PREFLIGHT_SECTION}=== gate ===\ngreen\n\n=== commit/push/PR ===\npushed\n\n=== followup ===\nmerged\n\n=== report ===\nshipped`,
 		)
+	})
+})
+
+// joshuafolkken/kit#2946: the stops a pull-request precondition or a scoped check not yet run caused landed
+// after the review and the gate; the preflight stage asks them first.
+describe('run_ship_cli.run — the preflight runs before the review and the gate', () => {
+	it('stops at an unmet pull-request precondition before the review or the gate starts', async () => {
+		preflight_mock.mockResolvedValue({ code: FAILED, out: 'release classification missing' })
+
+		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(FAILED)
+		expect(review_mock).not.toHaveBeenCalled()
+		expect(argv_calls()).toStrictEqual([])
+		expect(info_lines[0]).toBe(
+			'=== preflight ===\nrelease classification missing\n\nstopped at: === preflight ===',
+		)
+	})
+
+	it('hands the preflight the title and the --body-file path', async () => {
+		await run_ship_cli.run([TITLE, BODY_FILE_FLAG, BODY_PATH])
+
+		expect(preflight_mock).toHaveBeenCalledWith({ title: TITLE, body_path: BODY_PATH })
+	})
+
+	it('meets the scoped pair in front of the gate, then runs the gate', async () => {
+		const calls: Array<string> = []
+
+		scoped_mock.mockImplementation(async () => {
+			calls.push('scoped')
+
+			return { code: OK, out: '' }
+		})
+		josh_run_mock.mockImplementation(async (argv: ReadonlyArray<string>) => {
+			calls.push(argv.join(' '))
+
+			return { code: OK, out: '' }
+		})
+		await run_ship_cli.run([TITLE])
+
+		expect(calls.slice(0, 2)).toStrictEqual(['scoped', 'gate'])
+	})
+
+	it('never reaches the gate when the scoped pair is red', async () => {
+		scoped_mock.mockResolvedValue({ code: FAILED, out: 'lint:related red' })
+
+		expect(await run_ship_cli.run([TITLE])).toBe(FAILED)
+		expect(argv_calls()).toStrictEqual([])
 	})
 })
 
@@ -167,8 +226,6 @@ describe('run_ship_cli.run — forwards the notify body to followup alone', () =
 
 // joshuafolkken/kit#2446: the PR body carries the live-execution evidence `followup` gates on.
 describe('run_ship_cli.run — forwards the PR body file to the commit step alone', () => {
-	const BODY_FILE_FLAG = '--body-file'
-
 	it('passes --body-file to git -y and not to followup', async () => {
 		await run_ship_cli.run([TITLE, BODY_FILE_FLAG, BODY_PATH])
 
@@ -196,7 +253,9 @@ describe('run_ship_cli.run — a failed step stops the ship', () => {
 
 		await run_ship_cli.run([TITLE])
 
-		expect(info_lines[0]).toBe('=== gate ===\nlint red\n\nstopped at: === gate ===')
+		expect(info_lines[0]).toBe(
+			`${PREFLIGHT_SECTION}=== gate ===\nlint red\n\nstopped at: === gate ===`,
+		)
 	})
 
 	it('refuses a title with no issue number rather than shipping past run:tail', async () => {
@@ -220,7 +279,9 @@ describe('run_ship_cli.run — --review owns the round-1 review (joshuafolkken/k
 		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(OK)
 		expect(review_mock).toHaveBeenCalledWith(NUMBER)
 		expect(argv_calls()).toStrictEqual([GATE, COMMIT, FOLLOWUP, REPORT])
-		expect(info_lines[0]).toMatch(/^=== review ===\nreview clean\n\n=== gate ===/u)
+		expect(info_lines[0]).toMatch(
+			/^=== preflight ===\nready\n\n=== review ===\nreview clean\n\n=== gate ===/u,
+		)
 	})
 
 	it('stops at a blocking review, never reaching the gate or the commit', async () => {

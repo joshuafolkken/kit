@@ -56,6 +56,7 @@ const stamp_target = vi.mocked(run_progress_read.stamp_target)
 const live_target = vi.mocked(run_progress_read.live_target)
 const is_life_ended = vi.mocked(run_progress_clock.is_life_ended)
 
+const REPO = 'joshuafolkken/kit'
 const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-progress-wait-'))
 const STAMP = path.join(TEMPORARY, 'stamp.json')
 const LIFE_STAMP = path.join(TEMPORARY, 'life.json')
@@ -72,7 +73,8 @@ const SUCCESS = 0
 const OBSERVED: ObservationRead = {
 	kind: 'observed',
 	observations: {
-		children: [{ issue: '1576', labels: ['in-progress'], pr_state: 'open' }],
+		repo: REPO,
+		children: [{ issue: '1576', title: 'Child title', labels: ['in-progress'], pr_state: 'open' }],
 		lanes: [],
 		load_average: 1.5,
 		record_age_ms: undefined,
@@ -86,7 +88,7 @@ function options_of(overrides: Partial<WatchOptions> = {}): WatchOptions {
 		interval_ms: INTERVAL_MS,
 		max_ms: MAX_MS,
 		output_paths: [],
-		repo: 'joshuafolkken/kit',
+		repo: REPO,
 		tick_ms: TICK_MS,
 		...overrides,
 	}

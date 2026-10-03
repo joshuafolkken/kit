@@ -32,13 +32,7 @@ The detail below is read at the filing decision, and the marker suite pins the r
 
 ### The depth test — a discretionary filing cites the product work it blocked
 
-**A run that has just spent an hour inside the workflow tooling files findings about the workflow
-tooling** (joshuafolkken/kit#1698). Measured on the `backlogrun` of 2026-09-09: 5 Issues shipped and
-15 filed, of which 13 were discretionary — and all 20 were about this package's own run
-orchestration or the tools that measure it, with not one change a consumer of the package would see.
-**A listing that measures itself has no natural stopping condition**, because every measurement
-creates something new to measure. So the condition comes from outside, and **depth is what supplies
-it — read off the subject rather than judged**:
+**Depth is read off the subject rather than judged** (joshuafolkken/kit#1698):
 
 | Depth | The subject | Where it lives |
 | --- | --- | --- |
@@ -75,16 +69,14 @@ gh api repos/{owner}/{repo}/labels -f name=depth:2 -f color=c5def5 -f descriptio
 - **It is read off the subject, exactly as the table is** — so applying it is not a judgement and not
   a person's to make, which is what separates it from `auto-ok` and `needs-human-review`. Those two
   decide what a run may do; this one records what an Issue is about and withholds nothing.
-- **Applied at filing, not at completion.** A depth assigned when the work finishes is assigned by
-  whoever happens to close it, and the share below is a question about the *open* backlog — an Issue
-  that never carried the label was never in the numerator's reach.
+- **Applied at filing, not at completion.**
 - **An Issue carrying more than one counts as the lowest depth present**, the one closest to the
-  consumer. It is a fixed tie-break rather than a preference: without one the same backlog measured
-  twice can answer twice, which is the whole defect joshuafolkken/kit#1729 was filed for.
+  consumer.
 - **An `epic` takes no depth label**, because it has no subject of its own to read one off — its
   children carry the subjects, and the share below excludes it from the denominator for that same
-  reason. A depth label present on an Issue the count skips is exactly the ambiguity this section
-  exists to remove.
+  reason.
+
+Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why the depth label is applied at filing".
 
 - **A discretionary observation at depth 1 or deeper is filed only where it can cite the depth-0 work
   it stopped or delayed** — named as an Issue number or a run, never as "this would slow runs down".
@@ -96,12 +88,8 @@ gh api repos/{owner}/{repo}/labels -f name=depth:2 -f color=c5def5 -f descriptio
 - **`route:tier-a` and `route:interrupt` do not take it either**, at any depth: a filing the run
   cannot proceed without is already citing its own blockage.
 - **A depth-2 filing — one whose subject is what measures a run — carries a further requirement, on
-  top of the depth-0 citation above rather than in place of it** (joshuafolkken/kit#1975). The
-  citation the depth-0 gate asks for is one a slow run can always produce, so it barely bites on a
-  measurement Issue: "runs are slow" and "the diff is large" both name depth-0 work, while the number
-  the Issue proposes to produce changes nothing — and a listing that measures itself has no natural
-  stopping condition precisely there. So a discretionary depth-2 filing states two things the depth-0
-  citation does not force:
+  top of the depth-0 citation above rather than in place of it** (joshuafolkken/kit#1975). A
+  discretionary depth-2 filing states two things the depth-0 citation does not force:
   - **The decision the number would change, named** — the Issue number holding the choice it is
     waiting on, or a decision a person is about to make. "Slow", "large" and "worth knowing" are not a
     decision.
@@ -115,15 +103,15 @@ gh api repos/{owner}/{repo}/labels -f name=depth:2 -f color=c5def5 -f descriptio
   depth-0 observation does not take it because it is the product, and a review round cap's branch-2
   filing (below) clears its own bar and never reaches this one.
 
+Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why depth gates a discretionary filing".
+
 **It governs this route only — the fourth row of §2d's table.** A review finding routed to branch 2
 of `prompts/review.md` → "Review round cap" is filed under that section's own bar — a confirmed
 defect reaching a runtime path, with a written failure scenario — and **does not take the depth
 test**: it has already cleared a bar this route has not, so gating it on a citation as well would
 drop the one kind of finding both documents agree is never dropped. **That bar is the reason, and the
-subject's depth is not** — the sentence here used to say that a defect in a `josh` command's behavior
-is depth 0 by construction, and joshuafolkken/kit#1694 and joshuafolkken/kit#1703 are both branch-2
-filings whose subject is the epic tooling, which the table above puts at depth 1
-(joshuafolkken/kit#1675).
+subject's depth is not.** Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why a
+review branch-2 filing skips the depth test".
 
 **This is not the count cap that was rejected.** A cap is rationing — past the number the finding is
 lost, and nothing about it says which findings were worth having. This changes what counts as a
@@ -133,34 +121,26 @@ finding at all, so what it excludes is excluded for a reason a reader can check.
 a depth-2 Issue that *proposes* a measurement; a pull request that *adds* one — a new report column,
 section, scope or subcommand, a diagnostic step — states in its body the reader that consumes it: the
 Issue number that read the value to decide something, or the path of the rule that reads it. **A
-measurement with no reader is not added** — this is joshuafolkken/kit#2012's test, the one that
-retired every column no decision reads, moved to the moment a column is proposed so the retirement
-never has to be filed again. `route:tier-a` and `route:interrupt` carry over unchanged.
+measurement with no reader is not added** (joshuafolkken/kit#2012). `route:tier-a` and
+`route:interrupt` carry over unchanged.
 
 ### The depth-0 share — what is counted
 
-**joshuafolkken/kit#1698 set a measurable target: the share of open Issues at depth 0** — 3/23
-≈ 13% on 2026-09-09 (joshuafolkken/kit#1729). Counted by eye it is not reproducible: done again on
-2026-09-10 it produced 3/14 ≈ 21%, and the two figures **are not comparable**: they took different
-denominators, and neither said which. So the denominator is fixed here as a rule rather than left to
-the counter.
+**The depth-0 share is the share of open Issues at depth 0** (joshuafolkken/kit#1698,
+joshuafolkken/kit#1729).
 
 **The denominator is a rule, not a choice, and this is it:**
 
-- **Counted: every open Issue that does not carry `epic`.** An epic is a container for other Issues
-  rather than a deliverable of its own — counting one counts its children twice, and an epic has no
-  subject of its own to read a depth off.
+- **Counted: every open Issue that does not carry `epic`.**
 - **`route:tier-a` and `route:interrupt` are counted like anything else.** The depth test above
-  exempts them from its *citation* requirement; it never said they are not work. Excluded, a run
-  could improve the share by choosing a filing route.
-- **An Issue with no depth label is in the denominator**, counted separately as `unlabelled`. Left
-  out, the share would improve every time a filing skipped the label — the one direction a
-  measurement must never be able to move on its own.
+  exempts them from its *citation* requirement; it never said they are not work.
+- **An Issue with no depth label is in the denominator**, counted separately as `unlabelled`.
 - **The numerator is what is left**: open, non-epic Issues carrying `depth:0`.
 
-**Two readings of the same backlog give the same number**, which is what the hand counts could not
-do: the denominator is a rule rather than a choice, so nothing in the count is left to the counter's
-judgement.
+**Two readings of the same backlog give the same number**: nothing in the count is left to the
+counter's judgement.
+
+Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why the depth-0 denominator is fixed".
 
 **What the number is for is not decided here.** Changing what `backlog:next` offers on the strength
 of it, and setting a target value, are both deliberately out of scope until the current value has
@@ -168,12 +148,9 @@ been measured the same way more than once (joshuafolkken/kit#1729 → 範囲外)
 
 ### The ledger — where an observation that cannot cite a blockage goes
 
-**"Not filed" used to mean "gone", and that is what walked the depth test past itself.** The
-completion report was the only place such an observation could land, and a completion report is
-read once and then scrolls away — so the next run met the same thing as a first sighting, forever.
-joshuafolkken/kit#1726 is the worked case: its own body says the depth test would not have filed it,
-and it was filed anyway, because **discarding it was the only alternative on offer**
-(joshuafolkken/kit#1728).
+**An observation the depth test turns away is recorded in the ledger, not discarded**
+(joshuafolkken/kit#1728). Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why the
+ledger exists".
 
 - **The destination is the `docs/maintainers/observations/` directory in the repository the
   observation is about** — the same repository the Issue would have been filed into — **one file per
@@ -221,9 +198,8 @@ A sample, in the shape a real entry takes:
 
 **`k:example` is reserved for this sample and is never used by a real observation**, so the count
 below can be run over the whole ledger without the sample answering for one. **The grammar is defined
-here rather than in the ledger** because this skill is distributed to every repository that consumes
-the package and `docs/` is not — a rule that named a definition the reader never received would
-leave every consumer's ledger shaped by hand.
+here rather than in the ledger** (`docs/maintainers/observation-filing-rationale.md` → "Why the
+ledger exists").
 
 **The identity key is the whole of the repeat test — never a similarity judgement about the prose.**
 Choose the key from the phenomenon rather than from the run, then count what the ledger already holds
@@ -244,27 +220,17 @@ rather than by editing the one already written.
 
 **The depth gate is not withdrawn, and this is not a way around it.** An observation that *can* cite
 the depth-0 work it stopped is filed exactly as it was before — this route is only for the ones that
-could not, and whose sole previous destination was nothing (joshuafolkken/kit#1698's gate stands
-unchanged).
+could not.
 
 ### The commit path — how an appended line reaches the default branch
 
-**An append nobody commits is an append nobody can count** (joshuafolkken/kit#1756). The ledger was
-given a destination and no route out of the working tree the line was written in, and **structurally
-nobody was going to commit one**: the parent session that appends never runs `pnpm josh git`, a child
-runs it inside a lane work tree that cannot see the parent's checkout, and in the primary checkout
-`git add -u` swept the line into whatever unrelated pull request that run was opening. Measured on
-the day the ledger shipped, `docs/observations.md` had exactly one commit — the one that created
-it — and seven lines had never left a working tree. **So the repeat count below was reading a file
-that is empty on every other machine**, and every sighting was a first one, which is the state
-joshuafolkken/kit#1728 created the ledger to end.
+**An append nobody commits is an append nobody can count** (joshuafolkken/kit#1756). Rationale:
+`docs/maintainers/observation-filing-rationale.md` → "Why the ledger has a commit path".
 
 - **A run's appended lines ride its own commit** (joshuafolkken/kit#2763). `pnpm josh git` stages
   `docs/maintainers/observations/` with the run's other changes, in the one staging step every entry
   point goes through (`scripts/git/git-staging.ts`), so the lines are reviewed and merged with the
-  pull request of the run that recorded them, and the run's CI is the only wait they cost. Until
-  #2763 the ledger was excluded there (joshuafolkken/kit#1756) and every run that appended a line
-  paid a second branch, CI wait and merge after its own — 144 ledger-only pull requests in one month.
+  pull request of the run that recorded them, and the run's CI is the only wait they cost.
   **Record before the commit, not after the merge:** a finding recorded with `pnpm josh review:record`
   before `pnpm josh git -y` is carried; the time while CI runs is for the records that need no CI
   result — filing an observation Issue, drafting the completion report.
@@ -280,10 +246,7 @@ joshuafolkken/kit#1728 created the ledger to end.
   otherwise be lost with the branch. A run whose lines rode its commit pays nothing.
 - **A lane carries its own lines, in its own pull request** (joshuafolkken/kit#2919). Its writers
   append to its own tree's `<N>.md`, so the two steps above take them to the default branch exactly as
-  they do for a run in the primary checkout. Lanes once wrote to the primary checkout's single file
-  instead (joshuafolkken/kit#2419) and a `backlogrun` flushed them all at `run:carry --end`
-  (joshuafolkken/kit#2492); another run's stash of that checkout took the lines before the flush saw
-  them, so neither route remains. **Nothing is held in the primary checkout for later.**
+  they do for a run in the primary checkout. **Nothing is held in the primary checkout for later.**
 - **`pnpm josh observations:flush` is left for a line written outside any issue's run** — the
   date-named file a retrospective or a hand append on the default branch writes. It stages the ledger
   and nothing else, commits it on a branch of its own, opens a docs-only pull request, waits on the
@@ -300,10 +263,9 @@ joshuafolkken/kit#1728 created the ledger to end.
 
 ### The second sighting is what files it
 
-**A repeat is the citation.** joshuafolkken/kit#1698 asked a discretionary filing to be pulled by a
-blockage rather than pushed by a sighting; an observation recorded twice has been pulled — it came
-back on its own, which no single sighting can demonstrate. So the gate has a second way through, and
-it is counted rather than judged:
+**A repeat is the citation**, so the gate has a second way through, and it is counted rather than
+judged (rationale: `docs/maintainers/observation-filing-rationale.md` → "Why a second sighting
+files"):
 
 - **On the count answering exactly `1`, the observation is filed**, at depth 1 or deeper, with no
   depth-0 citation — `1` and not "1 or more", because a higher count means the Issue was already
@@ -336,19 +298,12 @@ could bite later" line (`backlogrun-child.md` → "What the summary carries, and
 parent files what survives — under the depth test above, and inside the run's ceiling.
 
 **A delegated child does not append to the ledger either — the parent collapses the duplicates and
-appends what is left.** The ledger's whole value is that one key means one phenomenon, and a child
-holding one Issue's worth of context cannot tell its observation from the sibling lane's: eight
-children appending in parallel would write the same thing under eight keys, and every one of them
-would then read as a first sighting. The child's route is unchanged and is the only one it has —
+appends what is left.** The child's route is unchanged and is the only one it has —
 the summary's "Observations that could bite later" line — and the parent chooses the key, checks the
-count and writes the line.
+count and writes the line. **The 10-per-run ceiling for this route is the parent's to count.**
 
-**Two reasons, and a child can solve neither for itself.** It holds one Issue's worth of context, so
-**it cannot tell its observation from the one a sibling filed twenty minutes earlier** — the 15
-filings of 2026-09-09 were collapsed to 12 within that same day, which means they were collapsible
-at the moment they were made. And **the 10-per-run ceiling for this route is the parent's to
-count**: six children counting two or three filings each never reach it, which is why it did not
-fire once on the run that filed fifteen.
+Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why a delegated child neither files
+nor appends".
 
 **This file is the single source of every procedure above**, and `SKILL.md` → §2i is the single
 source of the rule they carry out; nothing under `prompts/collaboration-workflow/` restates either

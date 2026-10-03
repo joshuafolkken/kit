@@ -1,7 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
@@ -9,8 +8,8 @@ import { run_ship, type ShipSection } from './run-ship'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_return } from './run-ship-return'
-import { run_ship_review_steps } from './run-ship-review-steps'
 import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-ship-stage'
+import { run_ship_steps, type ShipArguments, type Step } from './run-ship-steps'
 
 // `josh ship "<title> #<N>"` — one call for the fixed commit-to-report region a run ships a change on
 // (joshuafolkken/kit#2398). The loop used to spend a round trip each on `gate`, `git -y`, `followup`
@@ -67,7 +66,6 @@ const USAGE =
 const NO_LOG_NOTE = 'no detached ship supervisor log for this issue'
 const LANE_CHILD_DETACH_NOTE =
 	'lane child: shipping through the detached supervisor (--detach implied), so the end of this turn cannot kill it'
-const should_forward_stderr = true
 
 type NotifyValues = Partial<Record<(typeof NOTIFY_OPTIONS)[number], string>>
 
@@ -84,23 +82,7 @@ const OPTIONS = {
 	cite: { type: 'string', multiple: true },
 } as const
 
-interface ShipArguments {
-	title: string
-	number: string
-	notify: ReadonlyArray<string>
-	body: ReadonlyArray<string>
-	cites: ReadonlyArray<string>
-	is_review: boolean
-	is_detach: boolean
-}
-
 type ShipCommand = { kind: 'ship'; args: ShipArguments } | { kind: 'log'; number: string }
-
-interface Step {
-	stage: Stage
-	header: string
-	run: (args: ShipArguments, state: ShipState) => Promise<JoshResult>
-}
 
 // What a resumed ship knows before its first stage: the record's path (absent outside a repository),
 // the stages it says completed, and the repository's actual state (`run-ship-stage.ts` decides from it).
@@ -124,58 +106,7 @@ function body_arguments(path: string | undefined): ReadonlyArray<string> {
 	return path === undefined ? [] : [`--${BODY_FILE_OPTION}`, path]
 }
 
-const { STAGE, PHASE } = run_ship_stage
-
-// The four steps in the order a change ships: the gate before the commit, the commit/push/PR before
-// the merge, the merge before the report bookkeeping. The commit step carries the `--skip-*` flags a
-// resumed ship needs, so an existing commit or push is never made twice.
-async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {
-	return await josh_command.josh_run(argv, should_forward_stderr)
-}
-
-const COMMIT_STEPS: ReadonlyArray<Step> = [
-	{ stage: STAGE.GATE, header: run_ship.GATE_HEADER, run: async () => await josh(['gate']) },
-	{
-		stage: STAGE.COMMIT,
-		header: run_ship.COMMIT_HEADER,
-		run: async (args, state) =>
-			await josh(['git', '-y', ...run_ship_stage.commit_flags(state), ...args.body, args.title]),
-	},
-]
-
-const MERGE_STEPS: ReadonlyArray<Step> = [
-	{
-		stage: STAGE.FOLLOWUP,
-		header: run_ship.FOLLOWUP_HEADER,
-		run: async (args) => await josh(['followup', args.title, ...args.notify]),
-	},
-	{
-		stage: STAGE.REPORT,
-		header: run_ship.REPORT_HEADER,
-		run: async (args) => await josh(['run:tail', args.number, ...args.cites]),
-	},
-]
-
-// `--review` (joshuafolkken/kit#2427) puts the supervised round-1 review in front of the gate: it
-// launches the gate itself, so the gate stage that follows reuses that tree's green record. It also
-// puts the round-2 pass between the commit and the followup (joshuafolkken/kit#2489), so the PR opens
-// between the rounds and round 2 runs beside CI — a no-op when round 1 left no fix delta.
-const REVIEW_STEP: Step = {
-	stage: STAGE.REVIEW,
-	header: run_ship.REVIEW_HEADER,
-	run: async (args) => await run_ship_review_steps.review_stage(args.number),
-}
-const ROUND_TWO_STEP: Step = {
-	stage: STAGE.ROUND_TWO,
-	header: run_ship.ROUND_TWO_HEADER,
-	run: async (args) => await run_ship_review_steps.round_two_stage(args.number),
-}
-
-function steps(args: ShipArguments): ReadonlyArray<Step> {
-	if (!args.is_review) return [...COMMIT_STEPS, ...MERGE_STEPS]
-
-	return [REVIEW_STEP, ...COMMIT_STEPS, ROUND_TWO_STEP, ...MERGE_STEPS]
-}
+const { PHASE } = run_ship_stage
 
 function issue_number(title: string): string | undefined {
 	return TRAILING_ISSUE_PATTERN.exec(title)?.[NUMBER_GROUP]
@@ -211,6 +142,7 @@ function ship_args(
 		number,
 		notify: notify_arguments(values),
 		body: body_arguments(values[BODY_FILE_OPTION]),
+		body_path: values[BODY_FILE_OPTION],
 		cites,
 		is_review: values.review === true,
 		is_detach: values.detach === true,
@@ -328,14 +260,14 @@ async function stopped(
 	return sections
 }
 
-// Run the four in order, stopping at the first that failed: a red gate never reaches the commit, so
+// Run the stages in order, stopping at the first that failed: a red gate never reaches the commit, so
 // the returned sections end at the failure the report names. A ship that reached the end clears its
-// record, so the next ship of the same issue starts from the gate.
+// record, so the next ship of the same issue starts from the preflight.
 async function ship(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 	const context = await open_context(args)
 	const sections: Array<ShipSection> = []
 
-	for (const step of steps(args)) {
+	for (const step of run_ship_steps.steps(args)) {
 		const section = await run_stage(step, args, context)
 
 		sections.push(section)

@@ -29,8 +29,7 @@ import { shell_segments } from './shell-segments'
 
 // The parent backlogrun budget/ownership commands. A child never runs either: `run:carry` begins and
 // advances the run budget the parent owns, and `run:merge` counts a returned child into it. Named in
-// canonical form only — `shell_segments.is_josh_command` canonicalizes an alias (`rc`, `rmg`) before
-// the match, so `pnpm josh rmg` arrives as `run:merge`.
+// canonical form only — `shell_segments.is_josh_command` canonicalizes an alias before the match.
 const RUN_BUDGET_COMMANDS: ReadonlySet<string> = new Set(['run:merge', 'run:carry'])
 
 // A segment that invokes one of the parent's budget commands. Segment-wise and alias-expanded for the

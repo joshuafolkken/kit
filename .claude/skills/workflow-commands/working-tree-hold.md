@@ -11,9 +11,9 @@ a `new` entry files its Issue**, because a run stopped after the filing has alre
 artifact it should not have created.
 
 ```bash
-pnpm josh run:hold <N>        # a `#N` entry point ; alias: josh rh
+pnpm josh run:hold <N>        # a `#N` entry point
 pnpm josh run:hold            # a `new` entry point, before the issue exists
-pnpm josh run:release <N>     # that same run releasing its own record ; alias: josh rr
+pnpm josh run:release <N>     # that same run releasing its own record
 pnpm josh run:release         # the bare form releases the unnumbered run's own record
 pnpm josh run:release --force # a record left behind by a run that has ended
 ```

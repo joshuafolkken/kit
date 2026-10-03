@@ -2,13 +2,13 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { WatchLoop, WatchOptions } from './run-progress-cli'
 // joshuafolkken/kit#1520. The command's surface: the interval is configurable and disable-able, a
 // real report is recorded with `--mark`, and a repository with nothing in flight is told apart from
 // one whose listing could not be read. The watch loop is driven a tick at a time through `step`,
 // which is what makes the guard around a failed reading, the once-per-streak notice and the read
 // cooldown testable without waiting out a real interval.
 
+import type { WatchLoop, WatchOptions } from './run-progress-cli'
 import type { ObservationRead } from './run-progress-read'
 
 vi.mock('#scripts/gh/gh-spawn', () => ({
@@ -74,6 +74,16 @@ const IN_PROGRESS = 'in-progress'
 const SPAWN_FAILURE = 'spawn git EAGAIN'
 const INTERVAL_KEY = 'JOSH_PROGRESS_INTERVAL_MINUTES'
 const DISABLE_KEY = 'JOSH_PROGRESS'
+const OBSERVED: ObservationRead = {
+	kind: 'observed',
+	observations: {
+		repo: REPO,
+		children: [{ issue: '1520', title: 'Child title', labels: [IN_PROGRESS], pr_state: 'open' }],
+		lanes: [],
+		load_average: 1,
+		record_age_ms: undefined,
+	},
+}
 
 const output: { printed: Array<string>; warned: Array<string> } = { printed: [], warned: [] }
 
@@ -169,15 +179,7 @@ describe('--mark — what keeps a heartbeat off the heels of a real report', () 
 
 describe('--once — one line now', () => {
 	it('prints the observations it read and records the report', async () => {
-		read_observations.mockResolvedValue({
-			kind: 'observed',
-			observations: {
-				children: [{ issue: '1520', labels: [IN_PROGRESS], pr_state: 'open' }],
-				lanes: [],
-				load_average: 1.5,
-				record_age_ms: undefined,
-			},
-		})
+		read_observations.mockResolvedValue(OBSERVED)
 
 		await expect(run_progress_cli.run(['--once'])).resolves.toBe(0)
 		expect(output.printed).toHaveLength(1)
@@ -259,16 +261,6 @@ const OPTIONS: WatchOptions = {
 	output_paths: [],
 	repo: REPO,
 	tick_ms: 30_000,
-}
-
-const OBSERVED: ObservationRead = {
-	kind: 'observed',
-	observations: {
-		children: [{ issue: '1520', labels: [IN_PROGRESS], pr_state: 'open' }],
-		lanes: [],
-		load_average: 1,
-		record_age_ms: undefined,
-	},
 }
 
 function loop_at(last_ms: number, overrides: Partial<WatchLoop> = {}): WatchLoop {

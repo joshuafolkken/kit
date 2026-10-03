@@ -84,7 +84,7 @@ pnpm josh notify --task-type failure --issue-url "<issue-url>" --body "<the reas
 **The matching itself is unchanged, and so is the reason it is mechanical.** The instruction the mechanical read replaced was skipped in two runs out of three on the day it was measured, and one of those two could not have succeeded by eye at all: `AI_COPY_DIRECTORIES` holds directories, so a distributed path such as `.claude/skills/workflow-commands/backlogrun.md` appears in no list textually.
 
 ```bash
-pnpm josh sync:scope    # managed | clean, naming which list claimed each path; alias: josh sys
+pnpm josh sync:scope    # managed | clean, naming which list claimed each path
 ```
 
 - **There is no flag to pass and nothing to approve.** `--managed-config-ignore-reason` is gone with the stop it existed to get past.
@@ -99,7 +99,7 @@ pnpm josh sync:scope    # managed | clean, naming which list claimed each path; 
 **The answer: `pnpm josh release:scope`.**
 
 ```bash
-pnpm josh release:scope          # → required | skip | unknown ; alias: josh res
+pnpm josh release:scope          # → required | skip | unknown
 pnpm josh release:scope --json   # the same answer as one JSON object
 ```
 

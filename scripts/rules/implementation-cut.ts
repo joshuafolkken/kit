@@ -50,7 +50,7 @@ function is_impl_cut_segment(segment: string): boolean {
 }
 
 // Whether this command takes the implementation-phase cut, segment-wise so a spelling quoted inside a
-// body is not read as the call, and alias-expanded so `pnpm josh rct --impl` is the same call.
+// body is not read as the call.
 function takes_the_impl_cut(command: string): boolean {
 	return shell_segments.segments_of(command).some((segment) => is_impl_cut_segment(segment))
 }

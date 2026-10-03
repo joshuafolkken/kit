@@ -117,19 +117,37 @@ function refusal(problems: ReadonlyArray<string>): Error {
 	)
 }
 
-async function check(input: PreflightInput): Promise<void> {
+interface PreflightAnswer {
+	pr_target: Target | undefined
+	problems: Array<string>
+}
+
+async function answer(input: PreflightInput): Promise<PreflightAnswer> {
 	const { target, problems } = await resolve_target(input.cli_input)
 	// The classification and the evidence belong to the pull request, so a `--skip-pr` run asks neither.
 	const pr_target = input.will_open_pr ? target : undefined
 	const pr_problems = pr_target === undefined ? [] : await classification_problems(pr_target)
-	const all_problems = [...problems, ...pr_problems]
 
-	if (all_problems.length > 0) throw refusal(all_problems)
+	return { pr_target, problems: [...problems, ...pr_problems] }
+}
+
+// joshuafolkken/kit#2946: the unmet preconditions as a list, so `josh ship` can ask them before its
+// review and gate start instead of meeting the refusal at the commit stage.
+async function problems_of(input: PreflightInput): Promise<Array<string>> {
+	const { problems } = await answer(input)
+
+	return problems
+}
+
+async function check(input: PreflightInput): Promise<void> {
+	const { pr_target, problems } = await answer(input)
+
+	if (problems.length > 0) throw refusal(problems)
 
 	if (pr_target !== undefined) await announce_evidence(pr_target.branch_name)
 }
 
-const git_preflight = { check }
+const git_preflight = { check, problems_of }
 
 export type { PreflightInput }
 export { git_preflight }

@@ -40,6 +40,23 @@ function citation_line(slug: string, number: string, summary: string): string {
 	return `[#${number}](${issue_url(slug, number)})${SUMMARY_SEPARATOR}${summary}`
 }
 
+// How a listing names one issue, given what it already holds (joshuafolkken/kit#2943). A progress
+// command's output is copied into a report verbatim, so the line it prints is the citation the report
+// carries: the full form when the title is in hand, the bare number-link when only the repository is,
+// and the plain `#N` only when the repository could not be read at all.
+type IssueCiter = (number: string) => string
+
+function citer(slug: string | undefined, titles: ReadonlyMap<string, string>): IssueCiter {
+	return function cite(number: string): string {
+		if (slug === undefined) return `#${number}`
+		const title = titles.get(number)
+
+		return title === undefined
+			? `[#${number}](${issue_url(slug, number)})`
+			: citation_line(slug, number, title)
+	}
+}
+
 function qualified_target(token: string): CiteTarget | undefined {
 	const match = REPO_QUALIFIED.exec(token)
 	if (match === null) return undefined
@@ -90,6 +107,7 @@ function no_repo_line(target: CiteTarget): string {
 const issue_cite = {
 	SUMMARY_SEPARATOR,
 	citation_line,
+	citer,
 	issue_url,
 	label,
 	missing_line,
@@ -98,5 +116,5 @@ const issue_cite = {
 	unreadable_line,
 }
 
-export type { CiteTarget }
+export type { CiteTarget, IssueCiter }
 export { issue_cite }

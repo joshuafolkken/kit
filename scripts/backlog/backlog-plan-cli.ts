@@ -104,6 +104,9 @@ interface Plan {
 	// past the listing cap. Carrying the *whole* index here instead would move that misreport rather
 	// than remove it: the sentence would name an epic that is withholding nothing.
 	tracked: ReadonlyMap<number, number>
+	// The rows the offer's cap bounds, so `--waves` cuts each wave where `backlog:next` does
+	// (joshuafolkken/kit#2928).
+	standalone: ReadonlySet<string>
 }
 
 // The listing plus whether it was cut. Carried together because the rows alone cannot say whether
@@ -138,6 +141,7 @@ async function classify(
 		repo: context.repo,
 		exclude,
 		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
+		standalone: backlog_next.standalone_keys(context),
 	}
 }
 
@@ -168,7 +172,7 @@ function print_plan(plan: Plan, listing: OpenListing, view: PlanView): void {
 	const context = context_of(plan, listing)
 
 	if (view.is_waves) {
-		console.info(backlog_waves.format_waves(plan.result, context))
+		console.info(backlog_waves.format_waves(plan.result, context, plan.standalone))
 
 		return
 	}

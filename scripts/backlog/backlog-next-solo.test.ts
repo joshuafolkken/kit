@@ -4,7 +4,12 @@ import {
 	EPIC_NUMBER,
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
-import { AUTO_OK_LABEL, IN_PROGRESS_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
+import {
+	AUTO_OK_LABEL,
+	BUG_LABEL,
+	IN_PROGRESS_LABEL,
+	RUN_SOLO_LABEL,
+} from '#scripts/git/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_next } from './backlog-next'
@@ -62,13 +67,23 @@ describe('backlog:next with run:solo', () => {
 		expect(stdout()).toBe(String(CHILD))
 	})
 
-	it('prints a later run:solo child alone, ahead of the ranking, when the repository is idle', async () => {
+	// joshuafolkken/kit#2928: run:solo alone means "runs alone", not "runs first".
+	it('prints the children ahead of a later run:solo child that is not a defect when the repository is idle', async () => {
 		epic_with([], [], [RUN_SOLO_LABEL])
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(CHILD))
+	})
+
+	it('prints a later run:solo defect alone, ranked first, when the repository is idle', async () => {
+		epic_with([], [], [BUG_LABEL, RUN_SOLO_LABEL])
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(String(SECOND_CHILD))
 	})
+})
 
+describe('backlog:next with run:solo while a lane runs', () => {
 	it('prints only the children ahead of a later run:solo child while another issue holds a lane', async () => {
 		epic_with([], [AUTO_OK_LABEL], [RUN_SOLO_LABEL])
 

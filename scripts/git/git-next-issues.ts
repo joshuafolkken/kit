@@ -1,12 +1,14 @@
 import { git_gh_command } from './git-gh-command'
 import { has_any_label, NOT_DIRECTLY_RUNNABLE_LABELS } from './issue-labels'
+import { issue_rank, type DependencyRow } from './issue-rank'
 import { parse_json_array_safe } from './parse-json-array'
 import { open_issue_schema, type OpenIssueData } from './schemas'
 
 // The next-issues display printed when a workflow completes (#821): up to five open issues in
 // priority order, so the user picks the next run from the completion output instead of opening the
 // issue list. Priority is recency — a newer issue usually encodes the most current understanding
-// of the backlog — with the label-based exclusions below.
+// of the backlog — with the label-based exclusions below, under the ranking keys `issue-rank.ts`
+// defines (joshuafolkken/kit#2928).
 //
 // `prioritize` is also the order `epicrun` picks up `auto-ok` issues in (joshuafolkken/kit#906).
 // The two ask one question — which open issue outside an epic is run next — so they share one
@@ -37,6 +39,34 @@ function compare_newest_first(first: OpenIssueData, second: OpenIssueData): numb
 	return first.createdAt < second.createdAt ? 1 : -1
 }
 
+// A row's blockers by number. **Lossy across repositories**: a blocker elsewhere sharing a number
+// with a row here counts as one of its dependents. The listings this ranks are one repository's own,
+// and `backlog:next` re-ranks its offer from the qualified graph (`backlog-rank.ts`), so the cost is a
+// display row placed one slot off rather than a run started early.
+function dependency_row(issue: OpenIssueData): DependencyRow {
+	return {
+		key: String(issue.number),
+		blockers: (issue.blockedBy?.nodes ?? []).map((blocker) => String(blocker.number)),
+	}
+}
+
+// Every candidate in rank order, uncapped. `backlog:next` takes this rather than `prioritize`, so the
+// `run:solo` gate sees the whole ranking before anything is cut (joshuafolkken/kit#2928).
+function order(
+	issues: ReadonlyArray<OpenIssueData>,
+	completed_issue_number?: number,
+): Array<OpenIssueData> {
+	const candidates = issues
+		.filter((issue) => is_candidate(issue, completed_issue_number))
+		.toSorted(compare_newest_first)
+	const dependents = issue_rank.count_dependents(candidates.map((issue) => dependency_row(issue)))
+
+	return issue_rank.rank(candidates, (issue) => ({
+		labels: (issue.labels ?? []).map((label) => label.name),
+		dependents: dependents.get(String(issue.number)) ?? 0,
+	}))
+}
+
 // **This display deliberately does not drop a blocked issue, and the `auto-ok` pickup deliberately
 // does.** They share this ordering and differ on the set, which reads as an inconsistency and is not
 // one (joshuafolkken/kit#1005).
@@ -50,10 +80,7 @@ function prioritize(
 	issues: ReadonlyArray<OpenIssueData>,
 	completed_issue_number?: number,
 ): Array<OpenIssueData> {
-	return issues
-		.filter((issue) => is_candidate(issue, completed_issue_number))
-		.toSorted(compare_newest_first)
-		.slice(0, DISPLAY_LIMIT)
+	return order(issues, completed_issue_number).slice(0, DISPLAY_LIMIT)
 }
 
 // Empty input yields no lines at all — a bare header with nothing under it reads as an error.
@@ -90,6 +117,8 @@ async function fetch_next_issue_lines(completed_issue_number?: number): Promise<
 }
 
 const git_next_issues = {
+	DISPLAY_LIMIT,
+	order,
 	prioritize,
 	format_lines,
 	fetch_next_issue_lines,

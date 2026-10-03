@@ -1,5 +1,5 @@
 import { git_gh_command } from '#scripts/git/git-gh-command'
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it, vi } from 'vitest'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
 import type { EpicChild, IssueReference } from './epic-graph'
@@ -349,12 +349,6 @@ describe('josh epic:next registration', () => {
 		const entry = COMMAND_MAP['epic:next']
 
 		expect(entry?.script).toBe('scripts/epic/epic-next.ts')
-	})
-
-	it('is reachable through the en alias', () => {
-		const { en } = ALIASES
-
-		expect(en).toBe('epic:next')
 	})
 })
 

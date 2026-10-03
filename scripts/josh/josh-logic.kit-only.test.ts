@@ -7,7 +7,7 @@ import { josh_logic, USAGE_ERROR_EXIT_CODE } from './josh-logic'
 // The alias-plus-name prefix a help line carries, which is specific enough to assert a command's
 // presence without matching a substring inside a description.
 const EVAL_LINE = 'ev, eval'
-const COST_LINE = 'co, cost'
+const COST_LINE = '\n  cost '
 
 describe('format_help hides kit-only commands from a consumer', () => {
 	it("lists eval in kit's own --all listing", () => {

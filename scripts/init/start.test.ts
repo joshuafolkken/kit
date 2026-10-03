@@ -13,6 +13,9 @@ const SHAPE: ProjectShape = {
 	has_github: false,
 }
 const SELF_RUN_REFUSAL = 'Refusing to sync'
+const INIT_COMMAND_FLAG = '--init-command'
+const INIT_COMMAND = 'josh-app init'
+const START_USAGE = 'Usage: josh start'
 const NO_GIT = {
 	has_git: false,
 	has_github: false,
@@ -121,6 +124,7 @@ describe('josh start options', () => {
 			is_yes: false,
 			is_github: false,
 			visibility: 'private',
+			init_command: undefined,
 		})
 	})
 
@@ -132,16 +136,52 @@ describe('josh start options', () => {
 			is_yes: true,
 			is_github: true,
 			visibility: 'public',
+			init_command: undefined,
 		})
 	})
 
 	it('names josh start in the usage for an unknown argument', () => {
-		expect(() => start.parse_start_options(['--force'])).toThrow('Usage: josh start')
+		expect(() => start.parse_start_options(['--force'])).toThrow(START_USAGE)
 	})
 
 	it('rejects an unknown profile', () => {
 		expect(() => start.parse_start_options(['--profile', 'python'])).toThrow(
 			'Profile must be basic or full',
+		)
+	})
+})
+
+describe('the josh start initialize command option (#2872)', () => {
+	it('reads the command apart from the profile pair', () => {
+		const args = ['--profile', 'full', INIT_COMMAND_FLAG, INIT_COMMAND, '--yes']
+		const options = start.parse_start_options(args)
+
+		expect(options.init_command).toBe(INIT_COMMAND)
+		expect(options.profile).toBe('full')
+		expect(options.is_yes).toBe(true)
+	})
+
+	it.each([[[INIT_COMMAND_FLAG]], [[INIT_COMMAND_FLAG, ' ']], [[INIT_COMMAND_FLAG, '--yes']]])(
+		'refuses the flag without a command: %j',
+		(args) => {
+			expect(() => start.parse_start_options(args)).toThrow(START_USAGE)
+		},
+	)
+
+	it('hands the command to the steps and names it in the plan', async () => {
+		vi.mocked(start_steps.read_git_state).mockReturnValue({
+			...NO_GIT,
+			has_git: true,
+			has_github: true,
+		})
+
+		expect(await start.run(['--yes', INIT_COMMAND_FLAG, INIT_COMMAND], false)).toBe(0)
+		expect(start_steps.run_steps).toHaveBeenCalledWith(
+			['initialize', 'labels'],
+			expect.objectContaining({ init_command: INIT_COMMAND }),
+		)
+		expect(console.info).toHaveBeenCalledWith(
+			expect.stringContaining(`1. Initialize with ${INIT_COMMAND}`),
 		)
 	})
 })

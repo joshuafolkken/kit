@@ -1,5 +1,5 @@
 {
-	"version": "1.1035.0",
+	"version": "1.1050.0",
 	"name": "@joshuafolkken/kit",
 	"description": "Development toolkit for AI-assisted projects: formatting, AI assistant rules and a Git/GitHub Issue workflow for any repository, plus lint, type check, tests and hooks for Node projects",
 	"keywords": [
@@ -229,7 +229,7 @@
 		"@playwright/test": "^1.63.0",
 		"@secretlint/secretlint-rule-preset-recommend": "^13.0.6",
 		"@stylistic/eslint-plugin": "^5.10.0",
-		"@types/node": "^26.6.3",
+		"@types/node": "^26.6.4",
 		"@types/semver": "^7.8.0",
 		"cspell": "^10.3.6",
 		"esbuild": "^0.28.2",
@@ -241,17 +241,17 @@
 		"eslint-plugin-sonarjs": "^4.2.2",
 		"eslint-plugin-unicorn": "^76.0.0",
 		"eslint_d": "^15.0.3",
-		"globals": "^17.12.0",
-		"lefthook": "^2.1.15",
+		"globals": "^17.13.0",
+		"lefthook": "^2.1.16",
 		"prettier": "^3.9.9",
 		"prettier-plugin-svelte": "^4.1.1",
 		"prettier-plugin-tailwindcss": "^0.8.1",
-		"rollup": "^4.63.5",
+		"rollup": "^4.63.6",
 		"rollup-plugin-dts": "^6.5.1",
 		"secretlint": "^13.0.6",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.71.0",
-		"vitest": "^5.0.2"
+		"vitest": "^5.0.3"
 	},
 	"dependencies": {
 		"execa": "^10.0.1",

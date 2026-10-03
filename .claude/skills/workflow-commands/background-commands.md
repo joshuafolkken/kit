@@ -2,7 +2,7 @@
 
 ## Background the gate and push
 
-- **The clean path folds the region into one backgrounded `pnpm josh ship`** (gate → `git -y` →
+- **The clean path folds the region into one backgrounded `pnpm josh ship`** (preflight → gate → `git -y` →
   foreground `followup` → `run:tail`; joshuafolkken/kit#2398). The calls below serve a due second round.
 - Background `pnpm josh gate` beside the review; join it before commit.
 - Issue `pnpm josh git -y` in the background; its completion resumes the run, so the turn never ends

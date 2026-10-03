@@ -164,7 +164,7 @@ unit was given** — this session's own unless the unit was handed a separate wo
 the recovery below is taken there too.
 
 ```bash
-pnpm josh run:liveness <N> --output <path> --process none    # alias: josh rv
+pnpm josh run:liveness <N> --output <path> --process none
 pnpm josh run:liveness <N> --output <path> --process alive
 pnpm josh run:liveness <N> --output <path> --process none --window 45 --repo <owner/repo>
 ```
@@ -290,7 +290,7 @@ separate command to ask first. Rationale: `docs/maintainers/backlogrun-child-rat
 preflight is part of the claim".
 
 ```bash
-answer=$(pnpm josh run:hold 926)   # alias: josh rh ; one token on stdout, prose on stderr
+answer=$(pnpm josh run:hold 926)   # one token on stdout, prose on stderr
 ```
 
 | Answer | What it found | What to do |

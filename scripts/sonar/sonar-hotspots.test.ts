@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { decision_oracle } from '#scripts/rules/decision-oracle'
 import { describe, expect, it } from 'vitest'
 import {
@@ -20,7 +20,6 @@ import { sonar_hotspots_cli } from './sonar-hotspots-cli'
 
 const COMMAND = 'sonar:hotspots'
 const SCRIPT_PATH = 'scripts/sonar/sonar-hotspots-cli.ts'
-const ALIAS = 'shs'
 const MANAGED_PREFIX = 'managed:'
 const TO_REVIEW = 'TO_REVIEW'
 const REVIEWED = 'REVIEWED'
@@ -183,10 +182,6 @@ describe('sonar_hotspots_cli.read_project_key', () => {
 describe('sonar:hotspots registration', () => {
 	it('is on the command map', () => {
 		expect(COMMAND_MAP[COMMAND]?.script).toBe(SCRIPT_PATH)
-	})
-
-	it('is reachable by its alias', () => {
-		expect(ALIASES[ALIAS]).toBe(COMMAND)
 	})
 
 	it('states the pull-request positional in its usage line', () => {

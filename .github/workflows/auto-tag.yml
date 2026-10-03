@@ -9,6 +9,7 @@ jobs:
     name: Create Git Tag if Version Changed
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       contents: write
     steps:
       - name: Checkout code
@@ -109,3 +110,23 @@ jobs:
         with:
           event-type: new-tag-created
           client-payload: '{"tag": "${{ steps.create_tag.outputs.tag }}"}'
+
+      # A publish workflow run on the tag ref records the tag's commit in npm provenance; a
+      # repository_dispatch run records the default branch head, which may already be past the tag.
+      # A publish.yml that still listens for new-tag-created is left to the dispatch above, so one
+      # release never starts two publish runs. This step runs after that dispatch so its failure
+      # cannot keep the dispatch from reaching production.yml.
+      - name: Start publish workflow on the tag
+        if: steps.create_tag.outputs.completed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.create_tag.outputs.tag }}
+        run: |
+          WORKFLOW=.github/workflows/publish.yml
+          if [ -f "$WORKFLOW" ] && grep -Eq '^[[:space:]]*workflow_dispatch:' "$WORKFLOW" && ! grep -q 'new-tag-created' "$WORKFLOW"; then
+            gh workflow run publish.yml --ref "$TAG"
+            echo "✅ Started publish.yml on $TAG"
+          else
+            echo "ℹ️ publish.yml is not a workflow_dispatch-only publisher, skipping"
+          fi

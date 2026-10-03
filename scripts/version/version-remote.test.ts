@@ -1,8 +1,18 @@
 import type { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { npm_registry } from './npm-registry'
 import { fetch_latest_version, fetch_release_times, with_page_size } from './version-remote'
 
 const gh_outcomes = vi.hoisted(() => vi.fn())
+
+// Public npm answers nothing by default, so every case below exercises the GitHub Packages fallback
+// unless it stubs the public answer itself.
+vi.mock('./npm-registry', () => ({
+	npm_registry: { read_latest: vi.fn(), read_release_times: vi.fn() },
+}))
+
+const mocked_public_latest = vi.mocked(npm_registry.read_latest)
+const mocked_public_times = vi.mocked(npm_registry.read_release_times)
 
 vi.mock('execa', async () => {
 	const { gh_execa_fixture } = await import('#scripts/git/git-gh-execa-fixture')
@@ -145,14 +155,14 @@ describe('fetch_release_times', () => {
 	it('returns the version to publish-date map', () => {
 		mocked_execa_sync.mockReturnValue(fake_stdout(`{"${KIT_VERSION}":"${KIT_PUBLISHED_AT}"}`))
 
-		expect(fetch_release_times(KIT_ENDPOINT)).toStrictEqual(
+		expect(fetch_release_times(KIT_ENDPOINT, KIT_PACKAGE)).toStrictEqual(
 			Object.fromEntries([[KIT_VERSION, KIT_PUBLISHED_AT]]),
 		)
 	})
 
 	it('requests a widened page rather than the single-entry default', () => {
 		mocked_execa_sync.mockReturnValue(fake_stdout('{}'))
-		fetch_release_times(KIT_ENDPOINT)
+		fetch_release_times(KIT_ENDPOINT, KIT_PACKAGE)
 
 		expect(mocked_execa_sync).toHaveBeenCalledWith(
 			'gh',
@@ -171,28 +181,58 @@ describe('fetch_release_times — degrading instead of throwing', () => {
 	it('returns nothing when gh fails, without throwing', () => {
 		mocked_execa_sync.mockReturnValue(fake_result({ exitCode: 1, stderr: 'gh: Not Found' }))
 
-		expect(fetch_release_times(KIT_ENDPOINT)).toBeUndefined()
+		expect(fetch_release_times(KIT_ENDPOINT, KIT_PACKAGE)).toBeUndefined()
 	})
 
 	it('returns nothing when the payload is not valid JSON', () => {
 		mocked_execa_sync.mockReturnValue(fake_stdout('null'))
 
-		expect(fetch_release_times(KIT_ENDPOINT)).toBeUndefined()
+		expect(fetch_release_times(KIT_ENDPOINT, KIT_PACKAGE)).toBeUndefined()
 	})
 
 	it('returns nothing when the payload is not a version to date map', () => {
 		mocked_execa_sync.mockReturnValue(fake_stdout('{"1.80.0":123}'))
 
-		expect(fetch_release_times(KIT_ENDPOINT)).toBeUndefined()
+		expect(fetch_release_times(KIT_ENDPOINT, KIT_PACKAGE)).toBeUndefined()
 	})
 
 	it('returns nothing for an absent endpoint instead of running gh', () => {
-		expect(fetch_release_times(undefined)).toBeUndefined()
+		expect(fetch_release_times(undefined, KIT_PACKAGE)).toBeUndefined()
 		expect(mocked_execa_sync).not.toHaveBeenCalled()
 	})
 
 	it('returns nothing for a blank endpoint instead of running gh', () => {
-		expect(fetch_release_times(' '.repeat(3))).toBeUndefined()
+		expect(fetch_release_times(' '.repeat(3), KIT_PACKAGE)).toBeUndefined()
 		expect(mocked_execa_sync).not.toHaveBeenCalled()
+	})
+})
+
+// Public npm answers without credentials, so a consumer who installed from it needs no
+// `read:packages` token; GitHub Packages is consulted only when public npm has no answer (#2882).
+describe('public npm first', () => {
+	it('returns the public npm latest without running gh', () => {
+		mocked_public_latest.mockReturnValueOnce('1.1035.0')
+
+		expect(fetch_latest_version(KIT_ENDPOINT, KIT_PACKAGE)).toBe('1.1035.0')
+		expect(mocked_public_latest).toHaveBeenCalledWith(KIT_PACKAGE)
+		expect(mocked_execa_sync).not.toHaveBeenCalled()
+	})
+
+	it('returns the public npm publish times without running gh', () => {
+		const times = Object.fromEntries([[KIT_VERSION, KIT_PUBLISHED_AT]])
+
+		mocked_public_times.mockReturnValueOnce(times)
+
+		expect(fetch_release_times(KIT_ENDPOINT, KIT_PACKAGE)).toStrictEqual(times)
+		expect(mocked_public_times).toHaveBeenCalledWith(KIT_PACKAGE)
+		expect(mocked_execa_sync).not.toHaveBeenCalled()
+	})
+
+	it('falls back to GitHub Packages when public npm has no answer', () => {
+		mocked_execa_sync.mockReturnValue(fake_stdout('0.223.0'))
+
+		expect(fetch_latest_version(KIT_ENDPOINT, GAME_PACKAGE)).toBe('0.223.0')
+		expect(mocked_public_latest).toHaveBeenCalledWith(GAME_PACKAGE)
+		expect_gh_call(KIT_ENDPOINT)
 	})
 })

@@ -14,6 +14,7 @@ const OPTIONS: StartOptions = {
 	is_yes: false,
 	is_github: false,
 	visibility: 'private',
+	init_command: undefined,
 }
 const WITH_REPOSITORY = ['initialize', 'repository'] as const
 const ADD_GITHUB = 'Add --github'
@@ -200,6 +201,15 @@ describe('the progress report of a failed run', () => {
 
 	it('says nothing was completed when the first step fails', () => {
 		expect(start_plan.progress_report('git_init', [], 'boom')).toContain('Completed: nothing')
+	})
+
+	it('names a caller initialize command in the plan and leaves the other steps as they are', () => {
+		const labels = start_plan.step_labels('josh-app init')
+
+		expect(start_plan.plan_summary(['initialize', 'labels'], labels)).toBe(
+			`josh start will:\n  1. Initialize with josh-app init\n  2. ${start_plan.STEP_LABELS.labels}`,
+		)
+		expect(start_plan.step_labels(undefined)).toBe(start_plan.STEP_LABELS)
 	})
 
 	it('lists the plan in order before running it', () => {

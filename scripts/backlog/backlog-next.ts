@@ -9,13 +9,13 @@ import { epic_next } from '#scripts/epic/epic-next'
 import { epic_next_read, type EpicRead } from '#scripts/epic/epic-next-read'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_report, type EpicNextResult, type EpicVerdict } from '#scripts/epic/epic-report'
-import { epic_solo } from '#scripts/epic/epic-solo'
 import { epic_triage, type TriageVerdict } from '#scripts/epic/epic-triage'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { backlog_defect_priority } from './backlog-defect-priority'
 import { backlog_pool } from './backlog-pool'
+import { backlog_rank } from './backlog-rank'
 
 // `josh backlog:next` — what the whole opted-in backlog may run next (joshuafolkken/kit#1630).
 //
@@ -235,12 +235,15 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 		return undefined
 	}
 
-	// The defect priority is applied here rather than when printing, so `backlog:plan` shows the order
-	// the run takes (joshuafolkken/kit#2455).
-	return await backlog_defect_priority.prioritize(
+	// The defect priority and the ranking keys are applied here rather than when printing, so
+	// `backlog:plan` shows the order the run takes (joshuafolkken/kit#2455, joshuafolkken/kit#2928). The
+	// ranking goes last: its sort is stable, so the defect order survives as its final key.
+	const ordered = await backlog_defect_priority.prioritize(
 		combine(views_from(reads, context), context),
 		context.repo,
 	)
+
+	return backlog_rank.rank_result(ordered, context.repo)
 }
 
 // Whether the `error` verdict is really a transport failure wearing the graph's clothes.
@@ -274,13 +277,25 @@ function report_retry(context: PoolContext): number {
 	return SUCCESS_EXIT_CODE
 }
 
+// The rows the offer's cap bounds — the standalone half, which `backlog:plan --waves` reads too.
+function standalone_keys(context: PoolContext): ReadonlySet<string> {
+	return backlog_pool.standalone_keys(context.opted_in.issues, {
+		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
+		exclude: context.exclude,
+		repo: context.repo,
+	})
+}
+
 // The `run:solo` gate is applied here rather than in `resolve`, because `backlog:plan` shares
 // `resolve` and a plan made before the run lists everything (joshuafolkken/kit#2776). The holders are
-// read only on a `run` answer — the one answer the gate can change.
-async function gate_solo(result: EpicNextResult, repo: string): Promise<EpicNextResult> {
+// read only on a `run` answer — the one answer the gate can change. The cap follows the gate
+// (`backlog-rank.ts`, joshuafolkken/kit#2928).
+async function gate_solo(result: EpicNextResult, context: PoolContext): Promise<EpicNextResult> {
 	if (result.verdict !== 'run') return result
 
-	const gated = epic_solo.gate(result, await epic_busy.read_repository(repo), repo)
+	const { repo } = context
+	const read = await epic_busy.read_repository(repo)
+	const gated = backlog_rank.gate(result, read, repo, standalone_keys(context))
 
 	if (gated.notice !== undefined) console.error(gated.notice)
 
@@ -314,7 +329,7 @@ async function answer_pool(context: PoolContext): Promise<number> {
 
 	if (untriaged.length > 0) return report_triage(context, untriaged)
 
-	return report(await gate_solo(result, context.repo), context)
+	return report(await gate_solo(result, context), context)
 }
 
 // A backlog nobody has opted into answers `none` before either listing below is asked for.
@@ -402,6 +417,7 @@ const backlog_next = {
 	combine,
 	views_from,
 	resolve,
+	standalone_keys,
 	is_transport_failure,
 	report_retry,
 	report_triage,

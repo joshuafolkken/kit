@@ -17,6 +17,7 @@ import { z } from 'zod'
 // re-run on an unchanged tree a reuse rather than a second execution. No quality gate is folded away.
 
 const STAGE = {
+	PREFLIGHT: 'preflight',
 	REVIEW: 'review',
 	GATE: 'gate',
 	COMMIT: 'commit',
@@ -78,7 +79,7 @@ function mark_done(target: string, stage: Stage): void {
 	stamp_file.replace_stamp(target, { done: [...done] })
 }
 
-// Removed once the report stage completes, so a later ship of the same issue starts from the gate.
+// Removed once the report stage completes, so a later ship of the same issue starts from the preflight.
 function clear(target: string): void {
 	stamp_file.remove_stamp(target)
 }
@@ -90,6 +91,9 @@ function is_shipped(state: ShipState): boolean {
 }
 
 const DONE_BY: Record<Stage, (done: ReadonlySet<string>, state: ShipState) => boolean> = {
+	// The preflight (joshuafolkken/kit#2946) asks what the commit stage would refuse on, so a commit is
+	// its output as it is the gate's; a resumed commit stage still asks `git -y`'s own preflight.
+	[STAGE.PREFLIGHT]: (_done, state) => state.is_merged || state.is_committed,
 	// The `--review` round (joshuafolkken/kit#2427) precedes the commit, so a commit is its output as it
 	// is the gate's. A record alone is not honored: before a commit the tree may have been edited since
 	// the recorded round, and only a commit pins the tree that round read.

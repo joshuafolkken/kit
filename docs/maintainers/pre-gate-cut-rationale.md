@@ -70,6 +70,13 @@ inside `backlogrun #2163 --only`: #2178's child hit a Tier B branch, called `Ask
 refused, and left an OPEN Issue with `in-progress` and no question. A hook deny returns to the model
 rather than ending the turn, so refusing the ask one call earlier turns it into an instruction.
 
+## Which suites pin each guard
+
+`scripts/rules/pre-gate-cut.test.ts` pins the pre-gate cut's gate refusal,
+`scripts/rules/implementation-cut.test.ts` pins the implementation-phase cut's edit refusal,
+`scripts/rules/lane-park.test.ts` pins the lane-child park's notify refusal, and
+`scripts/rules/lane-interactive-ask.test.ts` pins the interactive-ask refusal.
+
 ## Why the threshold is a break-even
 
 **One statistic, redefined.** joshuafolkken/kit#2295 changed `cost_verdict.per_request_cost` to average

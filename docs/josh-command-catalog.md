@@ -5,7 +5,7 @@ Run `tsx scripts/document/generate-catalog.ts` to regenerate.
 
 ## Development
 
-### `josh batch:guard` · `josh bg`
+### `josh batch:guard`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -55,7 +55,7 @@ Run spell check including dotfiles
 
 ---
 
-### `josh e2e:retry-check` · `josh er`
+### `josh e2e:retry-check`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -75,7 +75,7 @@ Format code with prettier and eslint (skips a tool a basic project lacks)
 
 ---
 
-### `josh format:edited` · `josh fd`
+### `josh format:edited`
 
 > **Audience:** automation · **Side effects:** files, processes
 
@@ -135,7 +135,7 @@ Print the PORT_SEED-resolved dev or preview port
 
 ---
 
-### `josh pr:classification` · `josh prc`
+### `josh pr:classification`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -145,7 +145,7 @@ Require one release classification on a pull request
 
 ---
 
-### `josh pretool:guard` · `josh ptg`
+### `josh pretool:guard`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -155,7 +155,7 @@ Claude Code hook: the batch, investigation and rule guards in one process (reads
 
 ---
 
-### `josh refactor:scan` · `josh rfs`
+### `josh refactor:scan`
 
 > **Audience:** automation · **Side effects:** processes
 
@@ -165,7 +165,7 @@ List refactoring candidates in the changed scope by category and answer clear/ca
 
 ---
 
-### `josh session:lang` · `josh sl`
+### `josh session:lang`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -175,7 +175,7 @@ Claude Code hook: print the resolved JOSH_SESSION_LANG (defaults to ja) for the 
 
 ---
 
-### `josh stop:guard` · `josh sg`
+### `josh stop:guard`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -295,7 +295,7 @@ Migrate a kit-only project from GitHub Packages to public npm
 
 ---
 
-### `josh sonar:hotspots` · `josh shs`
+### `josh sonar:hotspots`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -309,7 +309,7 @@ Fetch SonarCloud hotspots on a pull request and print each one's Step B disposit
 
 > **Audience:** developer · **Side effects:** files, git, network, processes
 
-`[--profile basic|full] [--yes] [--github] [--public]`
+`[--profile basic|full] [--yes] [--github] [--public] [--init-command <command>]`
 
 Set a project up for the GitHub Issue workflow, from git init to the setup PR
 
@@ -325,7 +325,7 @@ Sync config files
 
 ---
 
-### `josh sync:scope` · `josh sys`
+### `josh sync:scope`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -335,7 +335,7 @@ Say whether this change touches a file josh sync distributes
 
 ---
 
-### `josh ui:routes` · `josh uir`
+### `josh ui:routes`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -345,7 +345,7 @@ List the screenshot-target routes the current change touches
 
 ## Workflow
 
-### `josh followup` · `josh fu`
+### `josh followup`
 
 > **Audience:** automation · **Side effects:** git, network, notifications
 
@@ -385,7 +385,7 @@ Checkout default branch, pull latest, and prune merged remote-gone branches (ref
 
 ---
 
-### `josh measure:rerun` · `josh mrr`
+### `josh measure:rerun`
 
 > **Audience:** automation · **Side effects:** processes, files
 
@@ -395,7 +395,7 @@ Re-run a merged issue’s baseline command and print the before/after pair
 
 ---
 
-### `josh notify` · `josh nf`
+### `josh notify`
 
 > **Audience:** automation · **Side effects:** notifications
 
@@ -405,7 +405,7 @@ Send Telegram notification
 
 ---
 
-### `josh observations:flush` · `josh obf`
+### `josh observations:flush`
 
 > **Audience:** automation · **Side effects:** git, network
 
@@ -435,7 +435,7 @@ Count review findings by category from the observation ledger
 
 ---
 
-### `josh review:record` · `josh rvr`
+### `josh review:record`
 
 > **Audience:** automation · **Side effects:** files
 
@@ -475,7 +475,7 @@ Release the merges main has taken since the version last changed
 
 ---
 
-### `josh release:scope` · `josh res`
+### `josh release:scope`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -505,7 +505,7 @@ Run security audit
 
 ---
 
-### `josh audit:provision` · `josh ap`
+### `josh audit:provision`
 
 > **Audience:** automation · **Side effects:** files, network
 
@@ -545,7 +545,7 @@ Update pnpm on the current major while preserving the integrity pin
 
 ---
 
-### `josh latest:guard` · `josh lg`
+### `josh latest:guard`
 
 > **Audience:** automation · **Side effects:** files
 
@@ -555,7 +555,7 @@ Refuse josh latest inside a lane (the update stamp is keyed to the project root)
 
 ---
 
-### `josh latest:scope` · `josh ls`
+### `josh latest:scope`
 
 > **Audience:** automation · **Side effects:** files
 
@@ -595,7 +595,7 @@ Record template source hashes (--check to verify drift)
 
 ## Git hooks
 
-### `josh check-commit-message` · `josh cm`
+### `josh check-commit-message`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -605,7 +605,7 @@ Git hook: validate commit message
 
 ---
 
-### `josh pre-commit-type-check` · `josh ptc`
+### `josh pre-commit-type-check`
 
 > **Audience:** automation · **Side effects:** processes
 
@@ -615,7 +615,7 @@ Git hook: type-check, reusing a green gate recorded on the committed tree
 
 ---
 
-### `josh pre-push-unit` · `josh ppu`
+### `josh pre-push-unit`
 
 > **Audience:** automation · **Side effects:** processes
 
@@ -625,7 +625,7 @@ Git hook: run unit tests, reusing a green gate recorded on the pushed tree
 
 ---
 
-### `josh prevent-main-commit` · `josh pm`
+### `josh prevent-main-commit`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -635,7 +635,7 @@ Git hook: block commits to main
 
 ---
 
-### `josh reserved-run` · `josh rer`
+### `josh reserved-run`
 
 > **Audience:** automation · **Side effects:** processes
 
@@ -645,7 +645,7 @@ Git hook: run a command while holding a place in the machine-wide core budget
 
 ---
 
-### `josh secretlint-scan` · `josh ss`
+### `josh secretlint-scan`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -655,7 +655,7 @@ Git hook: scan staged files for secrets
 
 ## AI tools
 
-### `josh auto-ok:next` · `josh ao`
+### `josh auto-ok:next`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -665,7 +665,7 @@ Print the next opted-in issue an unattended run may pick up outside an epic
 
 ---
 
-### `josh backlog:budget` · `josh bb`
+### `josh backlog:budget`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -675,7 +675,7 @@ Say whether a backlogrun may start more work, keep watching, or finish
 
 ---
 
-### `josh backlog:drive` · `josh bld`
+### `josh backlog:drive`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -685,7 +685,7 @@ Drive backlogrun through offer, launch and merge; restore this run’s lanes and
 
 ---
 
-### `josh backlog:next` · `josh bl`
+### `josh backlog:next`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -695,7 +695,7 @@ Order the whole opted-in backlog: auto-ok issues and the descendants of auto-ok 
 
 ---
 
-### `josh backlog:offer` · `josh blo`
+### `josh backlog:offer`
 
 > **Audience:** automation · **Side effects:** files, network, processes
 
@@ -705,7 +705,7 @@ Collapse a backlogrun loop-head event into one call: read backlog:next, ask back
 
 ---
 
-### `josh backlog:plan` · `josh blp`
+### `josh backlog:plan`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -715,7 +715,7 @@ Print the whole backlog as a plan: ready now, waiting on what, waiting on a pers
 
 ---
 
-### `josh backlog:stalled` · `josh bls`
+### `josh backlog:stalled`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -725,7 +725,7 @@ Report whether ready backlog work is sitting undispatched with a free lane and n
 
 ---
 
-### `josh cases` · `josh ca`
+### `josh cases`
 
 > **Audience:** automation · **Side effects:** files
 
@@ -735,7 +735,7 @@ Read changed paths and print the I/O boundaries crossed and their mandatory abno
 
 ---
 
-### `josh clone:scan` · `josh cs`
+### `josh clone:scan`
 
 > **Audience:** automation · **Side effects:** files
 
@@ -745,7 +745,7 @@ Count code duplication across files and first-party repositories, printing each 
 
 ---
 
-### `josh cost` · `josh co`
+### `josh cost`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -755,7 +755,7 @@ Report a run's token and credit cost from Claude Code's session transcripts
 
 ---
 
-### `josh defect:rate` · `josh dfr`
+### `josh defect:rate`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -765,7 +765,7 @@ Print the defect rate of merged work: defects filed per behavior change complete
 
 ---
 
-### `josh delegate` · `josh dg`
+### `josh delegate`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -775,7 +775,7 @@ Say whether a run step may go to a cheaper execution tier
 
 ---
 
-### `josh disposition` · `josh dp`
+### `josh disposition`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -785,7 +785,7 @@ Say whether a review finding reaches a runtime path (runtime) or is inert (non-r
 
 ---
 
-### `josh doc:read` · `josh dcr`
+### `josh doc:read`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -795,7 +795,7 @@ Read a whole document safely: print it, or point at the Read tool when over the 
 
 ---
 
-### `josh doc:section` · `josh ds`
+### `josh doc:section`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -805,7 +805,7 @@ Print one section of a markdown document, for a `file.md` → "Heading" referenc
 
 ---
 
-### `josh duplicate-read:guard` · `josh drg`
+### `josh duplicate-read:guard`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -815,7 +815,7 @@ Claude Code hook: refuse a second whole-file read of a path whose content has no
 
 ---
 
-### `josh edit:files` · `josh ef`
+### `josh edit:files`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -825,7 +825,7 @@ Apply several content-addressed edits from a plan in one call
 
 ---
 
-### `josh epic` · `josh ep`
+### `josh epic`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -835,7 +835,7 @@ Create an epic issue from its child issue numbers
 
 ---
 
-### `josh epic:audit` · `josh ea`
+### `josh epic:audit`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -845,7 +845,7 @@ Audit an epic's children against each other for contradictions
 
 ---
 
-### `josh epic:bundle` · `josh eb`
+### `josh epic:bundle`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -855,7 +855,7 @@ Say whether a newly filed issue belongs with ones already in the backlog
 
 ---
 
-### `josh epic:check` · `josh ec`
+### `josh epic:check`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -865,7 +865,7 @@ Check an epic issue against the tracking requirements
 
 ---
 
-### `josh epic:next` · `josh en`
+### `josh epic:next`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -885,7 +885,7 @@ Run the agent rule-compliance scenarios (real Claude sessions)
 
 ---
 
-### `josh fanout` · `josh fo`
+### `josh fanout`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -895,7 +895,7 @@ Say whether proposed implementation units are file-disjoint, so they may run in 
 
 ---
 
-### `josh investigation:guard` · `josh ig`
+### `josh investigation:guard`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -905,7 +905,7 @@ Claude Code hook: refuse a read once the unedited-read threshold is reached agai
 
 ---
 
-### `josh issue:backlinks` · `josh ibl`
+### `josh issue:backlinks`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -915,7 +915,7 @@ Classify an origin issue’s upstream backlinks: ok, missing, or wrong heading
 
 ---
 
-### `josh issue:cite` · `josh ici`
+### `josh issue:cite`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -925,7 +925,7 @@ Print the paste-ready number-link citation line for each issue, in one call
 
 ---
 
-### `josh issue:comment` · `josh icm`
+### `josh issue:comment`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -935,7 +935,7 @@ Post one comment to an issue from a file, so no shell expands the body
 
 ---
 
-### `josh issue:file` · `josh ifl`
+### `josh issue:file`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -945,7 +945,7 @@ File an Issue with every filing step: lint, Origin, duplicate scout, labels, the
 
 ---
 
-### `josh issue:fold` · `josh isf`
+### `josh issue:fold`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -955,7 +955,7 @@ Before a second filing: say whether findings from this session fold into one iss
 
 ---
 
-### `josh issue:fold-existing` · `josh isfe`
+### `josh issue:fold-existing`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -965,7 +965,7 @@ Assess whether a complete draft can join an unstarted issue
 
 ---
 
-### `josh issue:lint` · `josh iln`
+### `josh issue:lint`
 
 > **Audience:** automation · **Side effects:** files
 
@@ -975,7 +975,7 @@ Check an issue body file for the template's required headings
 
 ---
 
-### `josh issue:read` · `josh ird`
+### `josh issue:read`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -985,7 +985,7 @@ Print each issue's title, body and every comment on it, in one call
 
 ---
 
-### `josh issue:scout` · `josh isc`
+### `josh issue:scout`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -995,7 +995,7 @@ Before filing: say whether an issue like this exists and which epic it belongs t
 
 ---
 
-### `josh issue:state` · `josh ist`
+### `josh issue:state`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -1005,7 +1005,7 @@ Print each issue's state and labels, in the spelling the documents compare again
 
 ---
 
-### `josh lane:await` · `josh lna`
+### `josh lane:await`
 
 > **Audience:** automation · **Side effects:** processes
 
@@ -1015,7 +1015,7 @@ Block until any of the named in-flight lane children completes; prints which one
 
 ---
 
-### `josh lane:close` · `josh lnc`
+### `josh lane:close`
 
 > **Audience:** automation · **Side effects:** files, git
 
@@ -1025,7 +1025,7 @@ Close a lane, leaving no work tree, branch or directory behind
 
 ---
 
-### `josh lane:dispatch` · `josh lnd`
+### `josh lane:dispatch`
 
 > **Audience:** automation · **Side effects:** processes
 
@@ -1035,7 +1035,7 @@ Start a lane’s child as a detached process that outlives this session
 
 ---
 
-### `josh lane:launch` · `josh lnla`
+### `josh lane:launch`
 
 > **Audience:** automation · **Side effects:** files, git, processes
 
@@ -1045,7 +1045,7 @@ Collapse a backlogrun lane-start event into one call: open the lane, pop and re-
 
 ---
 
-### `josh lane:list` · `josh lnl`
+### `josh lane:list`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -1055,7 +1055,7 @@ List the open lanes: which issue, which ports, and where each one is
 
 ---
 
-### `josh lane:open` · `josh lno`
+### `josh lane:open`
 
 > **Audience:** automation · **Side effects:** files, git
 
@@ -1065,7 +1065,7 @@ Open a lane: a linked work tree with its own branch and its own port seed
 
 ---
 
-### `josh lane:output` · `josh lnv`
+### `josh lane:output`
 
 > **Audience:** automation · **Side effects:** files
 
@@ -1075,7 +1075,7 @@ Record, or read back, where the unit running a lane’s child writes
 
 ---
 
-### `josh lane:prune` · `josh lnp`
+### `josh lane:prune`
 
 > **Audience:** automation · **Side effects:** files, git
 
@@ -1085,7 +1085,7 @@ Close every lane an interruption left without its work tree
 
 ---
 
-### `josh oracle:list` · `josh ol`
+### `josh oracle:list`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -1095,7 +1095,7 @@ Print the decision oracles — commands that answer a rule question mechanically
 
 ---
 
-### `josh pkg:scout` · `josh pks`
+### `josh pkg:scout`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -1105,7 +1105,7 @@ Rank package candidates by measured metrics so the Package-First tier decision i
 
 ---
 
-### `josh read:files` · `josh rf`
+### `josh read:files`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -1115,7 +1115,7 @@ Read several files in one call so edit targets fold into one turn
 
 ---
 
-### `josh read:set` · `josh rs`
+### `josh read:set`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -1125,7 +1125,7 @@ Print what an entry point reads before it starts, and what that read costs
 
 ---
 
-### `josh repo:party` · `josh rpy`
+### `josh repo:party`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -1135,7 +1135,7 @@ Say whether a repository is first-party or third-party by owner equality (comput
 
 ---
 
-### `josh report:lint` · `josh rl`
+### `josh report:lint`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -1155,7 +1155,7 @@ Aggregate a finished run's cost, review findings, observation ledger and events 
 
 ---
 
-### `josh review:attest` · `josh ra`
+### `josh review:attest`
 
 > **Audience:** automation · **Side effects:** files
 
@@ -1165,7 +1165,7 @@ Record, or verify, which checkout a /code-review actually read
 
 ---
 
-### `josh review:brief` · `josh rb`
+### `josh review:brief`
 
 > **Audience:** automation · **Side effects:** files
 
@@ -1175,7 +1175,7 @@ Print the whole /code-review invocation: level, what the gate already proved, ta
 
 ---
 
-### `josh review:round2` · `josh r2`
+### `josh review:round2`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -1185,7 +1185,7 @@ Say whether the second /code-review round is due, or may be skipped entirely
 
 ---
 
-### `josh rule:guard` · `josh rug`
+### `josh rule:guard`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -1205,7 +1205,7 @@ Print each delivered rule's unaided compliance — runs reached, kept rate, refu
 
 ---
 
-### `josh run:carry` · `josh rc`
+### `josh run:carry`
 
 > **Audience:** automation · **Side effects:** files
 
@@ -1215,7 +1215,7 @@ Carry one invocation’s budget across its own session cuts
 
 ---
 
-### `josh run:cut` · `josh rct`
+### `josh run:cut`
 
 > **Audience:** automation · **Side effects:** files
 
@@ -1225,7 +1225,7 @@ Cut a lane child before the gate and resume a fresh process
 
 ---
 
-### `josh run:ending` · `josh red`
+### `josh run:ending`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -1235,7 +1235,7 @@ Classify how a dispatched lane child ended (merged, cut, abandoned, unreadable)
 
 ---
 
-### `josh run:entry` · `josh ren`
+### `josh run:entry`
 
 > **Audience:** automation · **Side effects:** git, network, files
 
@@ -1245,7 +1245,7 @@ Open a run in one call: claim the tree, read the budget, bundle the reads, decid
 
 ---
 
-### `josh run:event` · `josh rev`
+### `josh run:event`
 
 > **Audience:** automation · **Side effects:** files
 
@@ -1255,7 +1255,7 @@ Append to, read or watch the run’s append-only event stream (--append <kind> <
 
 ---
 
-### `josh run:hold` · `josh rh`
+### `josh run:hold`
 
 > **Audience:** automation · **Side effects:** files
 
@@ -1265,7 +1265,7 @@ Claim this working tree for a run, or say which run already holds it
 
 ---
 
-### `josh run:liveness` · `josh rv`
+### `josh run:liveness`
 
 > **Audience:** automation · **Side effects:** processes
 
@@ -1275,7 +1275,7 @@ Say whether a delegated unit is still working, or stopped without reporting
 
 ---
 
-### `josh run:merge` · `josh rmg`
+### `josh run:merge`
 
 > **Audience:** automation · **Side effects:** git, network
 
@@ -1285,7 +1285,7 @@ Collapse a backlogrun merge event into one call: confirm the child, do the post-
 
 ---
 
-### `josh run:next` · `josh rn`
+### `josh run:next`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -1295,7 +1295,7 @@ Print the next step a fullrun takes, computed from the run’s state
 
 ---
 
-### `josh run:prep` · `josh rp`
+### `josh run:prep`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -1305,7 +1305,7 @@ Bundle a run’s pre-edit reads: body, comments, state, dependency scope
 
 ---
 
-### `josh run:progress` · `josh rg`
+### `josh run:progress`
 
 > **Audience:** automation · **Side effects:** files
 
@@ -1315,7 +1315,7 @@ Report an unattended run’s progress once it has gone quiet for an interval
 
 ---
 
-### `josh run:release` · `josh rr`
+### `josh run:release`
 
 > **Audience:** automation · **Side effects:** files
 
@@ -1325,7 +1325,7 @@ Release this working tree's run record
 
 ---
 
-### `josh run:report` · `josh rrp`
+### `josh run:report`
 
 > **Audience:** automation · **Side effects:** files, network
 
@@ -1335,7 +1335,7 @@ Generate the session-facing report for this invocation from the run’s event st
 
 ---
 
-### `josh run:review` · `josh rrv`
+### `josh run:review`
 
 > **Audience:** automation · **Side effects:** processes, files
 
@@ -1345,7 +1345,7 @@ Start the gate in the background and print the /code-review brief in one call so
 
 ---
 
-### `josh run:status` · `josh rst`
+### `josh run:status`
 
 > **Audience:** automation · **Side effects:** network
 
@@ -1355,7 +1355,7 @@ Bundle a run’s read-only status: issue state, cost verdict, carry counters
 
 ---
 
-### `josh run:step` · `josh rsp`
+### `josh run:step`
 
 > **Audience:** automation · **Side effects:** network, files
 
@@ -1365,7 +1365,7 @@ Print the run’s next single action, computed from the event stream, carry reco
 
 ---
 
-### `josh run:stranded` · `josh rsd`
+### `josh run:stranded`
 
 > **Audience:** automation · **Side effects:** processes, notifications
 
@@ -1375,7 +1375,7 @@ Report whether the run is stranded — budget handed off, owner gone, and no sup
 
 ---
 
-### `josh run:tail` · `josh rtl`
+### `josh run:tail`
 
 > **Audience:** automation · **Side effects:** git, network
 
@@ -1385,7 +1385,7 @@ Close a run in one call: commit the observation ledger, read the citations, deci
 
 ---
 
-### `josh run:tidy` · `josh rtd`
+### `josh run:tidy`
 
 > **Audience:** automation · **Side effects:** git, network, files
 
@@ -1395,7 +1395,7 @@ Close merged lanes and drop stashes whose issues are all merged
 
 ---
 
-### `josh run:wake` · `josh rw`
+### `josh run:wake`
 
 > **Audience:** automation · **Side effects:** processes, notifications
 
@@ -1405,7 +1405,7 @@ Wake the next session of a cut backlogrun from outside the conversation
 
 ---
 
-### `josh run:watcher:guard` · `josh rwg`
+### `josh run:watcher:guard`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -1415,7 +1415,7 @@ Guard: exits non-zero when lane children are in-flight but the watcher has not p
 
 ---
 
-### `josh ship` · `josh shp`
+### `josh ship`
 
 > **Audience:** automation · **Side effects:** git, network
 
@@ -1425,7 +1425,7 @@ Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the repor
 
 ---
 
-### `josh split:assess` · `josh sa`
+### `josh split:assess`
 
 > **Audience:** automation · **Side effects:** none
 
@@ -1435,7 +1435,7 @@ Measure the branch change size (tests excluded) and answer the split assessment 
 
 ---
 
-### `josh stash:pop` · `josh sp`
+### `josh stash:pop`
 
 > **Audience:** automation · **Side effects:** git
 
