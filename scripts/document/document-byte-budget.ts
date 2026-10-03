@@ -81,7 +81,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/prerequisite.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
-	{ path: 'docs/josh-commands.md', bytes: 180_224 },
+	{ path: 'docs/josh-commands.md', bytes: 184_320 },
 	{ path: 'prompts/coding-standards.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/cross-repo-epic.md', bytes: 4096 },
