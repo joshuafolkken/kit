@@ -69,7 +69,7 @@ function render(event: RunEvent, lang: string): string {
 	return [clock_of(event.at), label_of(event.kind, lang), event.text].join(FIELD_SEPARATOR)
 }
 
-const run_event_render = { KIND_LABELS, clock_of, label_of, render }
+const run_event_render = { clock_of, label_of, render }
 
 export type { KindLabel }
 export { run_event_render }

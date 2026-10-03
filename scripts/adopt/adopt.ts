@@ -156,13 +156,11 @@ function main(argv: ReadonlyArray<string>): void {
 }
 
 const adopt = {
-	DRY_RUN_REASON,
 	KNOWN_FLAGS,
 	NOTHING_TO_ADOPT,
 	parse_options,
 	run_here,
 	run,
-	main,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))

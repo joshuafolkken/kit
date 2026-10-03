@@ -582,7 +582,6 @@ const run_wake = {
 	IDLE_CEILING_MS,
 	MAX_WAKE_ATTEMPTS,
 	WAKE_GRACE_MS,
-	WAKE_PREFIX,
 	claim,
 	count_claim,
 	count_wake,

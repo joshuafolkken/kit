@@ -120,9 +120,6 @@ async function handle_coderabbit_findings(input: {
 }
 
 const git_pr_coderabbit = {
-	parse_pull_comments,
-	read_unresolved_cr_urls,
-	build_ignore_reason_comment,
 	handle_coderabbit_findings,
 }
 

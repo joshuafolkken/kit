@@ -114,7 +114,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const main_merge = { COMMAND_NAME, main, run }
+const main_merge = { run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

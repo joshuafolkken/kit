@@ -375,14 +375,12 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const backlog_drive_cli = {
-	USAGE,
 	end_line,
 	finish: backlog_drive_finish.finish,
 	merge_token,
 	offer_argv: backlog_drive_offer_argv.offer_argv,
 	parse,
 	resume_line,
-	run,
 	to_offer,
 }
 

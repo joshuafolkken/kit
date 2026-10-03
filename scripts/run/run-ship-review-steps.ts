@@ -235,6 +235,6 @@ async function round_two_stage(issue: string): Promise<JoshResult> {
 	])
 }
 
-const run_ship_review_steps = { paths, review_stage, round_two_stage }
+const run_ship_review_steps = { review_stage, round_two_stage }
 
 export { run_ship_review_steps }

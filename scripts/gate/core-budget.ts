@@ -272,16 +272,10 @@ async function with_core_reservation<T>(
 }
 
 const core_budget = {
-	MIN_BUDGET,
-	POLL_INTERVAL_MS,
 	RESERVED_PREFIX,
-	WAIT_CAP_MS,
 	admitted_keys,
 	admitted_load,
-	is_admitted,
-	is_running,
 	live_reservations,
-	read_reservation,
 	release,
 	reserve,
 	with_core_reservation,

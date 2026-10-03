@@ -72,7 +72,7 @@ function costed(root: string, spec: TrimSpec): ReadSetCost {
 	}
 }
 
-const read_set_trim = { costed, unused_skill_cost }
+const read_set_trim = { costed }
 
 export type { TrimSpec }
 export { read_set_trim }

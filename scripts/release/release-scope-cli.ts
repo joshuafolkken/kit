@@ -87,7 +87,6 @@ const release_scope_cli = {
 	main,
 	run,
 	JSON_KEY,
-	KNOWN_FLAGS,
 	NOTHING_PENDING_REASON,
 	RELEASE_HINT,
 	REQUIRED_SCOPE,

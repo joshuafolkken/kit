@@ -83,7 +83,6 @@ async function resolve_type_check_args(start_directory: string): Promise<Readonl
 
 const type_check_step = {
 	parse_usage_commands,
-	resolve_toolkit_step,
 	resolve_type_check_args,
 }
 

@@ -130,8 +130,6 @@ function format_issue(
 
 const issue_read = {
 	ISSUE_LABEL,
-	TITLE_LABEL,
-	STATE_LABEL,
 	NO_BODY,
 	NO_COMMENTS,
 	COMMENTS_UNREADABLE,

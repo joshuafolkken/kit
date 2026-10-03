@@ -58,10 +58,6 @@ function is_key_line(line: string, key: string): boolean {
 	return body.slice(key.length).trimStart().startsWith(ASSIGNMENT_SEPARATOR)
 }
 
-function is_seed_line(line: string): boolean {
-	return is_key_line(line, PORT_SEED_KEY)
-}
-
 function is_seat_line(line: string): boolean {
 	return is_key_line(line, LANE_SEAT_KEY)
 }
@@ -235,12 +231,7 @@ function with_lane_output(content: string, output: string, profile?: AgentProfil
 }
 
 const lane_environment = {
-	LANE_OUTPUT_KEY,
-	LANE_PROVIDER_KEY,
-	LANE_ROLE_KEY,
-	is_output_line,
 	is_seat_line,
-	is_seed_line,
 	lane_file_content,
 	read_lane_output,
 	read_lane_profile,

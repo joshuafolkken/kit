@@ -182,7 +182,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const issue_file_cli = { USAGE, THIRD_PARTY_MESSAGE, UNKNOWN_REPO_MESSAGE, run, main }
+const issue_file_cli = { THIRD_PARTY_MESSAGE, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

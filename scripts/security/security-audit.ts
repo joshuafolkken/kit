@@ -137,7 +137,6 @@ const security_audit = {
 	meets_floor,
 	resolve_scanner,
 	run_scanner,
-	scanner_version,
 }
 
 export { security_audit }

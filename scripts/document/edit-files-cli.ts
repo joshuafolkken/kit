@@ -270,7 +270,6 @@ function main(argv: ReadonlyArray<string>): void {
 
 const edit_files_cli = {
 	USAGE,
-	main,
 	parse_plan,
 	run,
 }

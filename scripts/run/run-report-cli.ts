@@ -62,7 +62,6 @@ async function main(): Promise<void> {
 }
 
 const run_report_cli = {
-	main,
 	run,
 }
 

@@ -86,8 +86,6 @@ function fanout_result(units: ReadonlyArray<FanoutUnit>): FanoutResult {
 const fanout = {
 	PARALLEL_VERDICT,
 	SERIAL_VERDICT,
-	MIN_UNITS_TO_PARALLELIZE,
-	overlapping_files,
 	fanout_result,
 }
 

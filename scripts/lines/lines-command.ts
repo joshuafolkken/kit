@@ -161,7 +161,6 @@ const lines_command = {
 	header,
 	near_limit_budgets,
 	not_counted_reason,
-	render,
 	row,
 	rows_for,
 	run_lines,

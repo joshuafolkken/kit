@@ -224,7 +224,6 @@ const implementation_cut = {
 	REISSUE_WINDOW_MS,
 	ROW,
 	decide,
-	is_edit_tool,
 	is_over_threshold_edit,
 	is_reissued_refusal,
 	takes_the_impl_cut,

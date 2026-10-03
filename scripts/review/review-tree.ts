@@ -53,6 +53,6 @@ async function read_changed_tree(
 	)
 }
 
-const review_tree = { ABSENT_DIGEST, digest_of, read_changed_tree, tree_of }
+const review_tree = { ABSENT_DIGEST, read_changed_tree, tree_of }
 
 export { review_tree }

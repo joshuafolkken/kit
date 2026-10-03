@@ -65,6 +65,6 @@ function repo_target(segment: string): RepoTarget | undefined {
 	return { owner: match[OWNER_GROUP] ?? '', repo: match[REPO_GROUP] ?? '' }
 }
 
-const gh_api = { GH_API_COMMAND, GH_FLAGS, is_gh_api, is_read, is_write, method_of, repo_target }
+const gh_api = { GH_FLAGS, is_gh_api, is_read, is_write, method_of, repo_target }
 
 export { gh_api }

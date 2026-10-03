@@ -90,7 +90,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv[0], new Date())
 }
 
-const measure_rerun_cli = { run, rerun_one, USAGE, NO_BASELINE }
+const measure_rerun_cli = { run }
 
 const ARGV_OFFSET = 2
 

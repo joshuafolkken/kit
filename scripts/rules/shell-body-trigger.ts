@@ -196,7 +196,6 @@ const SHELL_BODY_REASON =
 const shell_body_trigger = {
 	SHELL_BODY_REASON,
 	carries_a_body,
-	is_safe_body_form,
 	is_shell_evaluated_body,
 	keeps_body_safe,
 }

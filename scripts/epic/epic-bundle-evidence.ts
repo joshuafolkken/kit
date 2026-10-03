@@ -139,7 +139,6 @@ function format_evidence(
 
 const epic_bundle_evidence = {
 	EVIDENCE_HEADING,
-	ordering_evidence,
 	format_evidence,
 }
 

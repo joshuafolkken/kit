@@ -153,6 +153,6 @@ function format_report(groups: ReadonlyArray<CloneGroup>): string {
 	return [header, ...groups.map((group) => format_group(group))].join('\n')
 }
 
-const clone_scan = { CLEAN_VERDICT, CLONES_PREFIX, scan, format_site, format_group, format_report }
+const clone_scan = { CLEAN_VERDICT, CLONES_PREFIX, scan, format_report }
 
 export { clone_scan }

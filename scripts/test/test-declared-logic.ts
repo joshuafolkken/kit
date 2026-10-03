@@ -122,7 +122,6 @@ const test_declared_logic = {
 	EXEMPT_PATHS,
 	EXEMPT_PREFIXES,
 	EXEMPT_SUFFIXES,
-	TEST_SUFFIXES,
 	exempt_files,
 	is_basic_visual,
 	is_exempt,

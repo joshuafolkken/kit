@@ -110,7 +110,6 @@ const template_source_logic = {
 	TRIPWIRE_PAIRS,
 	hash_text,
 	find_copy_drift,
-	build_tripwire_manifest,
 	find_tripwire_drift,
 	read_recorded_manifest,
 	format_drift_message,

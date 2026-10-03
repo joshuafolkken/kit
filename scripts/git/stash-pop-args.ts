@@ -47,7 +47,7 @@ function to_request(parsed: ParsedValues): Request | undefined {
 	return { message, dir: parsed.values.dir }
 }
 
-const stash_pop_args = { USAGE, message_of, read_arguments, to_request }
+const stash_pop_args = { USAGE, read_arguments, to_request }
 
 export type { Request }
 export { stash_pop_args }

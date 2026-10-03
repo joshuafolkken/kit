@@ -93,12 +93,9 @@ const path_decision = {
 	format_path_list,
 	has_unknown_flag,
 	JSON_FLAG,
-	KNOWN_FLAGS,
-	MAX_LISTED_PATHS,
 	parse_options,
 	print_decision,
 	run_path_decision,
-	STAGED_FLAG,
 }
 
 export { path_decision }

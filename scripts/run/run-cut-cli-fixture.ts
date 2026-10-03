@@ -10,7 +10,6 @@ import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { afterAll, beforeEach, vi } from 'vitest'
 import { detached_launch } from './detached-launch'
 import { run_cut } from './run-cut'
-import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
 
 // What the `josh run:cut` CLI suites share (joshuafolkken/kit#2484): the scratch repository, the spied git
@@ -33,7 +32,6 @@ const LAUNCHED_PID = 4242
 const CONTEXT_OVER: CostVerdict = 'over'
 const CONTEXT_UNDER: CostVerdict = 'under'
 const CONTEXT_UNMEASURABLE: CostVerdict = 'unmeasurable'
-const CUT_KIND = run_event_stream.EVENT_KIND.CUT
 
 function target(): string {
 	return run_cut.cut_path(REPOSITORY)
@@ -124,33 +122,23 @@ function install(): void {
 
 const run_cut_cli_fixture = {
 	install,
-	scratch,
-	REPOSITORY,
 	ISSUE,
 	BRANCH,
 	INVOCATION,
 	DEFAULT_BRANCH,
 	LANE_DIRECTORY,
 	DERIVED_LOG,
-	LAUNCHED_PID,
 	CONTEXT_OVER,
 	CONTEXT_UNDER,
 	CONTEXT_UNMEASURABLE,
-	CUT_KIND,
 	target,
 	lane,
 	state,
-	default_branch,
 	find_open_lane,
-	log_path,
 	launch,
 	session_verdict,
-	emit,
-	info,
 	verdict,
 	worker_argv,
-	HANDOFF,
-	HANDOFF_PATH,
 	WITH_HANDOFF,
 	existing_cut,
 }

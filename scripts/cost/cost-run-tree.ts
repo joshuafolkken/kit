@@ -229,12 +229,9 @@ function load(cwd: string, run_id: string | undefined): RunTree | undefined {
 }
 
 const cost_run_tree = {
-	RUN_GAP_MS,
 	build_tree,
 	lane_issue_of,
 	load,
-	select,
-	build_clusters,
 }
 
 export type { RunTree }

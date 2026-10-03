@@ -491,27 +491,21 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const run_progress_cli = {
-	DECLINE_RETRY_SECONDS,
 	DEFAULT_MAX_HOURS,
 	DISABLED_NOTICE,
 	FAILED_TICK_PREFIX,
 	FRESH_LOOP,
 	IDLE_NOTICE,
 	LANE_CHILD_NOTICE,
-	MARKED_NOTICE,
 	REPO_UNRESOLVED_NOTICE,
-	TICK_SECONDS,
 	UNREADABLE_NOTICE,
 	USAGE,
 	WAIT_EXPIRED_NOTICE,
-	main,
 	read_arguments: run_progress_args.read_arguments,
-	report_decline,
 	run,
 	step,
 	to_interval_ms: run_progress_args.to_interval_ms,
 	to_max_ms: run_progress_args.to_max_ms,
-	to_options,
 	wait_once,
 }
 

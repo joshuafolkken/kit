@@ -76,6 +76,6 @@ const ROWS: ReadonlyArray<DeliveredRule> = oracle_firing
 	.firing_oracles()
 	.map(({ oracle, firing_point }) => row_for(oracle, firing_point))
 
-const oracle_consulted = { ROWS, command_line, reason_for, row_for, runs_the_oracle }
+const oracle_consulted = { ROWS, reason_for }
 
 export { oracle_consulted }

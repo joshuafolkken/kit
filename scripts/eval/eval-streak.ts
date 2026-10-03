@@ -109,12 +109,10 @@ function report_streak(verdict: MergeVerdict, target: string = streak_path()): s
 }
 
 const eval_streak = {
-	next_streak,
 	read_streak,
 	record,
 	report_streak,
 	STREAK_ALARM,
-	streak_path,
 	streak_warning,
 }
 

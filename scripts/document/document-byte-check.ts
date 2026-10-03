@@ -123,7 +123,6 @@ const document_byte_check = {
 	ceiling_message,
 	check_all,
 	check_files,
-	entry_over_budget_messages,
 	over_budget_for,
 	over_budget_messages,
 }

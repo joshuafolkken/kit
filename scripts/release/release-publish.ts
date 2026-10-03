@@ -150,7 +150,6 @@ const release_publish = {
 	publish,
 	pull_request_body,
 	unreachable_remote_message,
-	FAILURE_EXIT_CODE,
 	SUCCESS_EXIT_CODE,
 }
 

@@ -192,12 +192,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
 const test_declared = {
 	USAGE,
-	detail_for,
 	format_match,
 	next_step,
 	parse,
 	report,
-	run,
 	run_match,
 }
 

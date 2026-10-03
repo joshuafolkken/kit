@@ -96,7 +96,6 @@ function reference_forms(title: string): Array<string> {
 
 const document_scan = {
 	command_references,
-	is_placeholder_file,
 	label_references,
 	link_targets,
 	normalize_reference,

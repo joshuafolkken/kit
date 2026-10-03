@@ -351,8 +351,6 @@ const run_hold_cli = {
 	RELEASED_VERDICT,
 	UNKNOWN_VERDICT,
 	USAGE,
-	blocking_message,
-	main,
 	parse_request,
 	run,
 }

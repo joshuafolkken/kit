@@ -158,7 +158,6 @@ function read_recorded_reasons(body: string | undefined): string {
 }
 
 const epic_decision = {
-	DECISIONS_HEADING,
 	append_decision,
 	append_replacements,
 	read_recorded_reasons,

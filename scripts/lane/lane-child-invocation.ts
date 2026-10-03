@@ -76,7 +76,6 @@ function ship_stop_invocation(issue: string, stop?: ShipStop): string {
 }
 
 const lane_child_invocation = {
-	CHILD_INVOCATION,
 	child_invocation,
 	outage_resume_invocation,
 	process_pattern,

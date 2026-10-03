@@ -85,7 +85,6 @@ function fingerprints_for(source: string, site: FileSite): Array<Fingerprint> {
 }
 
 const clone_fingerprint = {
-	WINDOW_SIZE,
 	normalize,
 	is_significant,
 	significant_lines,

@@ -25,6 +25,6 @@ function list(resolve: (relative_path: string) => string = as_is): Array<string>
 		.filter((relative_path) => existsSync(resolve(relative_path)))
 }
 
-const composite_actions = { ACTIONS_DIRECTORY, list }
+const composite_actions = { list }
 
 export { composite_actions }

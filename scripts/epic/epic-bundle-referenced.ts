@@ -181,11 +181,7 @@ async function referenced_candidates(
 
 const epic_bundle_referenced = {
 	REFERENCED_LOOKUP_LIMIT,
-	LOOKUP_CONCURRENCY,
 	referenced_lookups,
-	is_failed_read,
-	to_backlog_issue,
-	is_usable_candidate,
 	collect_referenced,
 	fetch_referenced,
 	referenced_candidates,

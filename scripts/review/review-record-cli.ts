@@ -186,7 +186,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv, new Date())
 }
 
-const review_record_cli = { USAGE, build_lines, parse_finding, run }
+const review_record_cli = { build_lines, parse_finding, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

@@ -189,7 +189,6 @@ function build_nodes(files: ReadonlyArray<SessionFile>, context: NodeContext): A
 
 const cost_run_nodes = {
 	issue_from_branch: git_branch.issue_from_branch,
-	branch_issue,
 	started_ms,
 	split_files,
 	order_mains,

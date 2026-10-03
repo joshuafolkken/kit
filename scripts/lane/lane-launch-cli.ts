@@ -127,7 +127,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const lane_launch_cli = { USAGE, install, launch, launch_lane, prepare, read_context, run }
+const lane_launch_cli = { launch_lane, read_context, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

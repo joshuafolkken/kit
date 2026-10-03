@@ -268,7 +268,6 @@ function decide(input: BudgetInput): BudgetDecision {
 
 const backlog_budget = {
 	ANSWERS,
-	ANSWER_STOP_REASONS,
 	BLOCKED_REASON,
 	DEFAULT_IDLE_MINUTES,
 	DEFAULT_IDLE_MS,
@@ -283,7 +282,6 @@ const backlog_budget = {
 	UNREADABLE_REASON,
 	WATCH_VERDICT,
 	WHOLE_RUN_BUDGET_HOURS,
-	WHOLE_RUN_BUDGET_MINUTES,
 	WHOLE_RUN_BUDGET_MS,
 	WHOLE_RUN_REASON,
 	decide,

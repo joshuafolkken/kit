@@ -43,8 +43,6 @@ async function announce(notice: StopNotice): Promise<boolean> {
 }
 
 const run_stop_notify = {
-	STOP_RECOVERY,
-	STOP_TITLE,
 	announce,
 	plan,
 }

@@ -392,7 +392,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const run_ship_cli = { SUCCESS_EXIT_CODE, USAGE, main, parse, run, ship }
+const run_ship_cli = { run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

@@ -159,8 +159,6 @@ function report_consumer_setup(root: string): void {
 const doctor_consumer = {
 	claude_md_line,
 	claude_md_state,
-	configured_hooks_path,
-	consumer_setup_lines,
 	hooks_path_line,
 	is_kit_consumer,
 	is_plugin_declared,

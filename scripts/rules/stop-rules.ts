@@ -351,7 +351,6 @@ const stop_rules = {
 	STOP_NOTIFY_REASON,
 	SWITCH_ENV_KEY,
 	block_envelope,
-	block_reason,
 	build_language_reason,
 	count_headless_refusals,
 	is_enabled,

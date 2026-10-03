@@ -86,7 +86,7 @@ async function main(): Promise<void> {
 	process.exitCode = await run()
 }
 
-const retrospective_cli = { gather, run, main }
+const retrospective_cli = { gather }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 

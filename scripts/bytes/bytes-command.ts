@@ -170,10 +170,8 @@ const bytes_command = {
 	entry_row,
 	entry_rows,
 	near_ceiling_statuses,
-	run_bytes,
 	scan_lines,
 	status_row,
-	NONE_NEAR,
 	NOT_A_FILE,
 	NOT_BUDGETED,
 }

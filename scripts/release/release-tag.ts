@@ -82,12 +82,10 @@ const release_tag = {
 	attempts_for,
 	configured_timeout_seconds,
 	format_result,
-	tag_exists,
 	tag_name,
 	wait_for_tag,
 	DEFAULT_TIMEOUT_SECONDS,
 	TAG_POLL_INTERVAL_MS,
-	TIMEOUT_ENV,
 }
 
 export { release_tag }

@@ -229,15 +229,7 @@ function main(): void {
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
 const doctor = {
-	gather_context,
-	print_report,
-	reclaim_shim,
-	handle_shadow,
 	parse_options,
-	consumer_root,
-	run_reports,
-	report_repository_map,
-	report_port_seeds,
 	main,
 }
 

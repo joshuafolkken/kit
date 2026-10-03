@@ -115,7 +115,6 @@ function describe_refusal(refusal: Refusal, issue: string): string {
 const lane_output = {
 	NO_OUTPUT,
 	describe_refusal,
-	invalid_reason,
 	read_output,
 	record_output,
 }

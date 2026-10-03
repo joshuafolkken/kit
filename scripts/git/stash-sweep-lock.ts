@@ -25,6 +25,6 @@ async function with_lock<T>(
 	return await repository_lock.with_lock(work, target, max_wait_ms)
 }
 
-const stash_sweep_lock = { clear_stale: repository_lock.clear_stale, lock_path, with_lock }
+const stash_sweep_lock = { clear_stale: repository_lock.clear_stale, with_lock }
 
 export { stash_sweep_lock }

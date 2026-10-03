@@ -112,8 +112,6 @@ const package_scout = {
 	NEAR_TIE_THRESHOLD,
 	to_metrics,
 	rank,
-	tie_gap,
-	verdict_of,
 	build_table,
 }
 

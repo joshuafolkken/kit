@@ -125,14 +125,7 @@ function parse_pr_state_snapshot(raw_json: string): PrStateSnapshot {
 	}
 }
 
-const git_pr_checks_parse = {
-	parse_rollup_checks,
-	read_string,
-	parse_pr_state_snapshot,
-}
-
 export {
-	git_pr_checks_parse,
 	parse_rollup_checks,
 	read_string,
 	parse_pr_state_snapshot,

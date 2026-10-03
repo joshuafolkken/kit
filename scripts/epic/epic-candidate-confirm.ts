@@ -268,11 +268,6 @@ async function answer_for_repo(
 
 const epic_candidate_confirm = {
 	is_same_blockers,
-	untracked_blockers,
-	with_blockers,
-	is_still_runnable,
-	confirm_candidates,
-	withheld_verdict,
 	answer_for_repo,
 }
 

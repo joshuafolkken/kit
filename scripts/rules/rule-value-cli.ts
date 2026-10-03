@@ -117,7 +117,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 const rule_value_cli = {
-	gather_runs,
 	group_by_run,
 	render,
 	row,

@@ -410,23 +410,10 @@ const backlog_next = {
 	RETRY_MESSAGE,
 	READ_FAILURES,
 	VERDICT_TOKENS,
-	tokens_of,
-	warn_epic_gap,
-	warn_gaps,
-	report,
-	combine,
-	views_from,
 	resolve,
 	standalone_keys,
-	is_transport_failure,
-	report_retry,
-	report_triage,
 	context_of,
-	answer_pool,
-	report_none,
-	answer,
 	run,
-	main,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))

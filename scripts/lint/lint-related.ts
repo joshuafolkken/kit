@@ -99,6 +99,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run_related_lint(process.argv.slice(changed_file_scope.ARGV_START))
 }
 
-const lint_related = { report_ignored_flags, run_related_lint }
+const lint_related = { run_related_lint }
 
 export { lint_related }

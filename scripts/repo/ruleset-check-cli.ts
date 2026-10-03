@@ -46,7 +46,7 @@ function main(argv: ReadonlyArray<string>): void {
 	process.exitCode = run(argv)
 }
 
-const ruleset_check_cli = { APPLY_FLAG, main, run }
+const ruleset_check_cli = { APPLY_FLAG, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 

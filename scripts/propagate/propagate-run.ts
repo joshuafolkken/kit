@@ -189,8 +189,6 @@ function format_report(results: ReadonlyArray<TargetResult>): string {
 const propagate_run = {
 	PROPAGATED_REASON,
 	LEFTOVER_NOTE,
-	has_leftover_changes,
-	leftover_of,
 	STEP_RETURN,
 	STEP_PRECHECK,
 	STEP_ISSUE,

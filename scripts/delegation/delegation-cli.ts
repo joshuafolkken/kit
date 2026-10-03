@@ -84,7 +84,7 @@ function main(argv: ReadonlyArray<string>): void {
 	process.exitCode = run(argv)
 }
 
-const delegation_cli = { USAGE, print_list, run, main }
+const delegation_cli = { print_list, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 

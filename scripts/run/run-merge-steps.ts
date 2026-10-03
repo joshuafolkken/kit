@@ -347,7 +347,6 @@ async function ask_next(ctx: MergeContext): Promise<string> {
 
 const run_merge_steps = {
 	CUT_RELAUNCH_CAUSE,
-	apply_carry,
 	ask_next,
 	do_failed,
 	do_merged,

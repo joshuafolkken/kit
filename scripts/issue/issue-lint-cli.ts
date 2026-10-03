@@ -58,7 +58,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv[0])
 }
 
-const issue_lint_cli = { problems, run, OK_MESSAGE, USAGE }
+const issue_lint_cli = { problems, run }
 
 const ARGV_OFFSET = 2
 

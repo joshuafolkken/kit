@@ -132,7 +132,6 @@ const defect_rate = {
 	filed_query,
 	format,
 	is_above_baseline,
-	is_behavior_change,
 	is_defect,
 	kind_of,
 	measure,

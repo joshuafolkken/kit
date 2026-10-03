@@ -417,9 +417,6 @@ const lane_cli = {
 	ALL_FLAG,
 	NONE_TOKEN,
 	USAGE,
-	main,
-	parse_issue,
-	parse_lane_issue,
 	refusal_message,
 	run,
 }

@@ -367,7 +367,6 @@ const run_progress = {
 	format_line,
 	format_next_line,
 	format_next_report,
-	format_record,
 	format_report,
 	is_due,
 	minutes_from,

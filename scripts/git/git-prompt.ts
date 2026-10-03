@@ -120,18 +120,6 @@ async function confirm_without_version_update(): Promise<void> {
 	await confirm_or_cancel(confirm_version_not_updated)
 }
 
-async function confirm_commit(): Promise<boolean> {
-	return await create_confirm_function(PROMPT_MESSAGES.commit)()
-}
-
-async function confirm_push(): Promise<boolean> {
-	return await create_confirm_function(PROMPT_MESSAGES.push)()
-}
-
-async function confirm_pr(): Promise<boolean> {
-	return await create_confirm_function(PROMPT_MESSAGES.pr)()
-}
-
 async function ask_issue_info(prompt: Interface, question: string): Promise<string> {
 	git_prompt_display.display_start_separator()
 	const raw_answer: unknown = await prompt.question(question)
@@ -183,15 +171,9 @@ async function confirm_workflow_steps(): Promise<WorkflowConfirmations> {
 }
 
 const git_prompt = {
-	confirm_continue,
 	confirm_unstaged_files,
-	confirm_without_package_json,
 	confirm_missing_package_json,
-	confirm_version_not_updated,
 	confirm_without_version_update,
-	confirm_commit,
-	confirm_push,
-	confirm_pr,
 	get_issue_info,
 	confirm_workflow_steps,
 }

@@ -22,7 +22,6 @@ import { run_tail, type TailSection } from './run-tail'
 // step for a line written on the default branch outside any issue's run.
 
 const ARGV_OFFSET = 2
-const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = 'Usage: josh run:tail [<issue-number> ...]'
@@ -100,7 +99,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const run_tail_cli = { SUCCESS_EXIT_CODE, USAGE, close_run, main, parse_issues, run }
+const run_tail_cli = { run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

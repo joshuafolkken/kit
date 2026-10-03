@@ -39,7 +39,10 @@ const REPO_NAME_DOT = '.'
 const NO_KNOWN_REPOS: ReadonlySet<string> = new Set()
 // Where a child states what it must deliver. Both spellings, because the bodies are written in
 // whichever language the session was in.
-const ACCEPTANCE_HEADINGS: ReadonlyArray<string> = ['## 受け入れ条件', '## Acceptance criteria']
+const ACCEPTANCE_HEADINGS: ReadonlySet<string> = new Set([
+	'## 受け入れ条件',
+	'## Acceptance criteria',
+])
 const HEADING_PREFIX = '## '
 
 type FindingLevel = 'error' | 'warning'
@@ -163,7 +166,7 @@ function parse_references(text: string, repo = ''): Array<number> {
 }
 
 function is_acceptance_heading(line: string): boolean {
-	return ACCEPTANCE_HEADINGS.includes(line.trim())
+	return ACCEPTANCE_HEADINGS.has(line.trim())
 }
 
 function is_heading(line: string): boolean {
@@ -226,13 +229,11 @@ function depends_on(
 // a `#` lives in `prefix_before`, so the pattern on its own matches the tail of `owner/repo#12` —
 // the very reading this module exists to prevent.
 const epic_audit_logic = {
-	ACCEPTANCE_HEADINGS,
 	unique_references,
 	known_repos,
 	parse_issue_references,
 	parse_references,
 	acceptance_section,
-	collect_blockers,
 	depends_on,
 }
 

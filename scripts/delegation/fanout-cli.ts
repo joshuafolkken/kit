@@ -54,7 +54,7 @@ function main(argv: ReadonlyArray<string>): void {
 	process.exitCode = run(argv)
 }
 
-const fanout_cli = { USAGE, parse_unit, is_refused, run, main }
+const fanout_cli = { parse_unit, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 

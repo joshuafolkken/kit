@@ -115,7 +115,7 @@ function check(profile: AgentProfile, ports: DiagnosticPorts = default_ports): D
 	return check_auth(cli, ports)
 }
 
-const agent_diagnostics = { AUTH_ARGS, MODEL_CLI_FLOORS, PROVIDER_CLI_TABLE, VERSION_ARGS, check }
+const agent_diagnostics = { check }
 
 export type { DiagnosticPorts, DiagnosticResult, ProcessOutcome }
 export { agent_diagnostics }

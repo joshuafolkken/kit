@@ -83,7 +83,6 @@ const ROW = {
 const third_party_write = {
 	ROW,
 	THIRD_PARTY_WRITE_REASON,
-	is_third_party_write_segment,
 	writes_third_party,
 }
 

@@ -173,7 +173,6 @@ const import_graph = {
 	expand,
 	expand_scope,
 	invert,
-	neighbors_of,
 	parse_imports,
 	resolve_spec,
 	MAX_STAGES,

@@ -129,8 +129,6 @@ function locally_tracked(snapshot: EpicSnapshot): Array<number> {
 }
 
 const epic_audit_orphans = {
-	PARENT_MARKERS,
-	ORPHAN_SEARCH,
 	claimed_numbers,
 	claims_parent,
 	find_claiming_issues,

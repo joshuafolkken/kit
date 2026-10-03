@@ -28,7 +28,6 @@ const lockfile_fixture = {
 	OVERRIDDEN_NAME,
 	OVERRIDE_RANGE,
 	RAW_MANIFEST_RANGE,
-	RESOLVED_VERSION,
 }
 
 export { lockfile_fixture }

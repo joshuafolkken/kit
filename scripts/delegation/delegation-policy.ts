@@ -181,7 +181,6 @@ const delegation_policy = {
 	REJECTED_STEPS,
 	find_step,
 	verdict_for,
-	rejection_for,
 	reason_for,
 }
 

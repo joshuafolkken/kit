@@ -279,10 +279,7 @@ async function open_lane(issue: string): Promise<OpenOutcome> {
 }
 
 const lane_open = {
-	build_plan,
-	guard_unreadable,
 	open_lane,
-	read_root_environment,
 }
 
 export type { OpenOutcome }

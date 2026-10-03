@@ -69,6 +69,6 @@ const ROW = {
 	decide: (): boolean => true,
 }
 
-const protected_files = { PROTECTED_FILE_REASON, ROW, is_protected_file_call }
+const protected_files = { ROW, is_protected_file_call }
 
 export { protected_files }

@@ -163,7 +163,6 @@ const cost_pricing = {
 	CACHE_WRITE_5M_MULTIPLIER,
 	CACHE_WRITE_1H_MULTIPLIER,
 	CACHE_READ_MULTIPLIER,
-	MODEL_PRICES,
 	resolve_price,
 	estimate_cost,
 	estimate_composition,

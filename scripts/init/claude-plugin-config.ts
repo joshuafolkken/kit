@@ -43,7 +43,6 @@ const claude_plugin_config = {
 	PLUGIN_ID,
 	MARKETPLACE_PATH,
 	CLAUDE_SETTINGS_DESTINATION,
-	PLUGIN_SETTINGS,
 	inject_plugin_config,
 	apply_plugin_config_for_destination,
 }

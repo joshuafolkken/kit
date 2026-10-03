@@ -192,14 +192,11 @@ function main(argv: ReadonlyArray<string>): void {
 }
 
 const time_density_cli = {
-	USAGE,
 	DEFAULT_LANES,
-	MIN_ROUND_TRIPS,
 	parse_options,
 	transcript_stats,
 	summarize,
 	format,
-	run,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))

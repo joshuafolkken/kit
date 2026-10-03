@@ -55,7 +55,6 @@ function refusal_message(issue: number): string {
 }
 
 const review_record = {
-	MISSING_REASON,
 	check,
 	refusal_message,
 }

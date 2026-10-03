@@ -181,6 +181,6 @@ async function main(): Promise<void> {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 
-const security_audit_provision = { attempt, download, install, main, provision, report }
+const security_audit_provision = { attempt, provision, report }
 
 export { security_audit_provision }

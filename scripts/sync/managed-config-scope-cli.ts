@@ -54,7 +54,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const managed_config_scope_cli = { decide, format_reason, JSON_KEY, main, run, USAGE }
+const managed_config_scope_cli = { decide, format_reason, run, USAGE }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

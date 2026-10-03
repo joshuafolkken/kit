@@ -24,8 +24,4 @@ async function main(): Promise<void> {
 	process.exitCode = SUCCESS_EXIT_CODE
 }
 
-const run_stranded_cli = { main }
-
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
-
-export { run_stranded_cli }

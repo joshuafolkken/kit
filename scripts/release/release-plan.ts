@@ -123,7 +123,6 @@ const release_plan = {
 	format_plan,
 	next_version,
 	short_sha,
-	PENDING_ICON,
 }
 
 export { release_plan }

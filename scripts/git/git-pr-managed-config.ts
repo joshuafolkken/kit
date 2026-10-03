@@ -63,7 +63,6 @@ async function handle_managed_config_changes(input: {
 
 const git_pr_managed_config = {
 	handle_managed_config_changes,
-	build_report,
 }
 
 export { git_pr_managed_config }

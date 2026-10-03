@@ -100,7 +100,7 @@ function gate(
 	)
 }
 
-const backlog_rank = { everything_in, gate, rank, rank_result, select }
+const backlog_rank = { everything_in, gate, rank_result, select }
 
 export { backlog_rank }
 export type { OfferInput }

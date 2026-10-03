@@ -388,18 +388,14 @@ const latest_corepack = {
 	is_target_not_newer_than_pin,
 	notify_skipped_bump,
 	extract_times_json,
-	query_release_times,
 	query_major_latest_version,
 	resolve_corepack_target,
-	warn_skip,
-	warn_unresolved,
 	run_pnpm_update,
 	query_integrity,
 	restore_integrity,
 	did_warn_skip,
 	sync_development_engines,
 	restore_package_json,
-	bump_package_manager,
 	main,
 }
 

@@ -194,7 +194,6 @@ const epic_busy = {
 	unreadable_message,
 	truncated_message,
 	busy_reason,
-	format_holders,
 	is_parked,
 	parse_listing,
 	read_repository,

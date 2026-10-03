@@ -121,7 +121,7 @@ function compose(inputs: RetrospectiveInputs): string {
 	].join('\n')
 }
 
-const retrospective = { CLOSING, FRICTION_KINDS, WAITING_GAP, compose }
+const retrospective = { CLOSING, compose }
 
 export type { RetrospectiveInputs }
 export { retrospective }

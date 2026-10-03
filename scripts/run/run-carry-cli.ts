@@ -447,11 +447,9 @@ const run_carry_cli = {
 	RESUMED_VERDICT,
 	STANDING_VERDICT,
 	UNKNOWN_VERDICT,
-	UNREADABLE_VERDICT,
 	// Re-exported rather than restated: the usage line belongs to the half that parses, and a second
 	// copy of it here would drift from the flags it describes.
 	USAGE: run_carry_args.USAGE,
-	main,
 	run,
 }
 

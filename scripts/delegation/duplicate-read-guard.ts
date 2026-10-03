@@ -216,14 +216,6 @@ const { deny_envelope, DISABLED_VALUES } = hook_decision
 const duplicate_reads = {
 	REASON,
 	NOTICE,
-	SWITCH_ENV_KEY,
-	is_candidate,
-	is_rearmed,
-	is_redundant_reread,
-	is_refusable_call,
-	is_unchanged_reread,
-	last_read_ms,
-	read_target,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

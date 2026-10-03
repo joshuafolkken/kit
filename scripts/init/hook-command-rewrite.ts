@@ -99,8 +99,6 @@ function apply_hook_command_rewrite_for_destination(
 
 const hook_command_rewrite = {
 	apply_hook_command_rewrite_for_destination,
-	BUNDLE_INVOCATION,
-	PNPM_JOSH_PREFIX,
 	rewrite_hook_commands,
 }
 

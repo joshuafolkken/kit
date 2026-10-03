@@ -327,20 +327,17 @@ function refusal_message(verdict: AttestVerdict): string {
 }
 
 const review_attest = {
-	ATTEST_PREFIX,
 	attest,
 	attest_path,
 	check,
 	check_here,
 	clear,
 	clear_here,
-	EXPECT_PREFIX,
 	expect_path,
 	is_briefed_since,
 	is_reviewed_on,
 	MISMATCH_VERDICT,
 	MISSING_REASON,
-	POINTER_PREFIX,
 	pointer_path,
 	read_attestation,
 	read_expectation,

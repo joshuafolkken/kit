@@ -14,18 +14,11 @@ import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 
 const CWD = '/Users/someone/Development/kit'
 const MINUTE_MS = 60_000
-const ISSUE = 1268
 const BRANCH = '1268-measure-a-run'
-// The branch a lane run's session stays on for the whole of it, since the lane is a checkout the
-// session only ever shells into.
-const DEFAULT_BRANCH = 'main'
 const CALL_ID = 'a'
 // The tool a fixture call names unless a case says otherwise. Reading is what most of these
 // transcripts are made of, and a case about writes names its own.
 const READ_TOOL = 'Read'
-const AGENT_CALL_ID = 'g'
-// The skill whose load `time-markers.ts` reads as the instant a run opens.
-const WORKFLOW_SKILL = 'workflow-commands'
 
 // The day every fixture minute is an offset into. Fixed rather than `Date.now()`, so a failure reads
 // the same on the day it is written and a year later.
@@ -49,12 +42,6 @@ const DENSITY_TURNS = 12
 // ones already there.
 const OPENING_BRACE = 1
 const CLOSING_BRACE = -1
-// The minute a concurrent session's call lands on — inside the same window, on an instant the
-// delegated unit's spans do not share, so the cross-session dedupe cannot collapse the two.
-const CONCURRENT_CALL_MINUTE = 2
-// What `issue_lines` spends, and so what the same three minutes must still total once the parent's
-// wait for the unit that spent them is folded in.
-const THREE_MINUTES_MS = RESULT_MINUTE * MINUTE_MS
 
 function at(minute: number): string {
 	return new Date(
@@ -122,15 +109,6 @@ function issue_lines(offset: number, branch: string = BRANCH): Array<string> {
 	]
 }
 
-// The parent's whole view of a delegated child: one `Agent` span covering minutes 0→3, which is the
-// same wall clock the unit's transcript records as the work it did.
-function delegating_lines(branch: string = BRANCH): Array<string> {
-	return [
-		call_line(0, branch, 'Agent', AGENT_CALL_ID),
-		result_line(RESULT_MINUTE, branch, AGENT_CALL_ID),
-	]
-}
-
 // One `tool_use` line carrying its input, named by the tool (joshuafolkken/kit#1472). `call_line`
 // above carries no input at all, and the three builders below each used to write this same object
 // with one field changed — a clone that would have needed a fourth copy the moment a suite wanted a
@@ -164,52 +142,6 @@ function josh_call_line(minute: number, branch: string, command: string, id = CA
 // merged diff cannot express its subject without one.
 function edit_call_line(minute: number, branch: string, file_path: string, id = CALL_ID): string {
 	return tool_call_line(minute, branch, { name: 'Edit', input: { file_path }, id })
-}
-
-// A `Skill` call, which is what the `workflow` boundary is read off (joshuafolkken/kit#1428). The
-// skill name rides in the tool input, exactly as `time-markers.ts` reads it — so a suite about which
-// session actually ran a run cannot express its subject without one.
-function skill_call_line(minute: number, branch: string, skill: string, id = CALL_ID): string {
-	return tool_call_line(minute, branch, { name: 'Skill', input: { skill }, id })
-}
-
-// The same three minutes as `issue_lines`, opened by the workflow marker every entry point writes —
-// which is what says this session is the one that ran the issue rather than one that merely had its
-// branch checked out.
-function run_lines(offset: number, branch: string = BRANCH): Array<string> {
-	return [
-		prompt_line(offset, branch),
-		skill_call_line(offset + CALL_MINUTE, branch, WORKFLOW_SKILL),
-		result_line(offset + RESULT_MINUTE, branch),
-	]
-}
-
-// The call in which a run states, in its own transcript, which issue it is running.
-function label_command(issue: number): string {
-	return `gh api repos/joshuafolkken/kit/issues/${String(issue)}/labels -f 'labels[]=in-progress'`
-}
-
-// The shape a lane run leaves behind (joshuafolkken/kit#1617): the same three minutes as
-// `issue_lines`, but every one of them on the **default** branch, because the session writing the
-// transcript never left it — the work ran in a linked work tree the session only shelled into. So the
-// `in-progress` label call is the one line naming the issue, and being the workflow marker as well it
-// makes this a session `time_sessions.separate` keeps rather than excludes.
-function lane_lines(offset: number, issue: number = ISSUE): Array<string> {
-	return [
-		prompt_line(offset, DEFAULT_BRANCH),
-		josh_call_line(offset + CALL_MINUTE, DEFAULT_BRANCH, label_command(issue)),
-		result_line(offset + RESULT_MINUTE, DEFAULT_BRANCH),
-	]
-}
-
-// A second session working the same issue over the same three minutes, with span instants the unit's
-// do not share — otherwise the cross-session dedupe collapses the two and the case says nothing.
-function concurrent_lines(branch: string = BRANCH): Array<string> {
-	return [
-		prompt_line(0, branch),
-		call_line(CONCURRENT_CALL_MINUTE, branch),
-		result_line(RESULT_MINUTE, branch),
-	]
 }
 
 // The same assistant line, tagged with the message it belongs to (joshuafolkken/kit#1329). Claude
@@ -362,25 +294,6 @@ function write_session(home: string, name: string, lines: ReadonlyArray<string>)
 	write_transcript(project_directory(home), name, lines)
 }
 
-// A delegated unit's transcript, which Claude Code writes to a subdirectory of the session that
-// delegated it rather than beside that session's own file.
-function write_unit(
-	home: string,
-	session_name: string,
-	agent_name: string,
-	lines: ReadonlyArray<string>,
-): void {
-	write_transcript(
-		cost_transcript.unit_directory(project_directory(home), session_name),
-		agent_name,
-		lines,
-	)
-}
-
-function total_span_ms(spans: ReadonlyArray<{ duration_ms: number }>): number {
-	return spans.reduce((sum, one) => sum + one.duration_ms, 0)
-}
-
 // One tool span, named and placed on the minute grid, for the suites that test the arithmetic rather
 // than the reading. Here rather than beside each of them because two suites now assert against spans
 // built exactly this way, and a builder that drifted would let them disagree about what a span is.
@@ -418,12 +331,8 @@ function span(label: string, ended_minute: number, duration_minutes: number): Sp
 }
 
 const time_transcript_fixture = {
-	CWD,
-	MINUTE_MS,
-	ISSUE,
 	BRANCH,
 	DENSITY_TURNS,
-	THREE_MINUTES_MS,
 	at,
 	ms,
 	prompt_line,
@@ -432,7 +341,6 @@ const time_transcript_fixture = {
 	josh_call_line,
 	error_result_line,
 	result_line,
-	skill_call_line,
 	tool_call_line,
 	turn_call_line,
 	turn_lines,
@@ -441,16 +349,9 @@ const time_transcript_fixture = {
 	refused_turn_lines,
 	density_text,
 	issue_lines,
-	lane_lines,
-	label_command,
-	run_lines,
-	delegating_lines,
-	concurrent_lines,
 	with_null_agent,
 	project_directory,
 	write_session,
-	write_unit,
-	total_span_ms,
 	span,
 }
 

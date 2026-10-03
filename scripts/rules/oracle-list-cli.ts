@@ -70,10 +70,7 @@ function main(argv: ReadonlyArray<string>): void {
 }
 
 const oracle_list_cli = {
-	format_oracle,
-	main,
 	print_list,
-	run,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))

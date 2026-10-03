@@ -269,11 +269,7 @@ const time_round_trips = {
 	// `time-model-gaps.ts` and needed the same predicates and the same opener test this walk uses. A
 	// private copy there would be the clone `CLAUDE.md` prohibits, in the one place a drift would have
 	// the distribution and the count disagreeing about what a round trip is.
-	is_call,
-	is_model,
-	opens_round_trip,
 	per_round_trip,
-	started_ms,
 }
 
 export { time_round_trips }

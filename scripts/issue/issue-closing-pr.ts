@@ -88,6 +88,6 @@ async function read_closing_pr(issue: string): Promise<string | undefined> {
 	}
 }
 
-const issue_closing_pr = { parse_references, pick_closing_pr, read_closing_pr }
+const issue_closing_pr = { read_closing_pr }
 
 export { issue_closing_pr }

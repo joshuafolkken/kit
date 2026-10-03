@@ -25,7 +25,7 @@ function test_type_for(path: string): TestType {
 	return E2E_PREFIXES.some((prefix) => normalized.startsWith(prefix)) ? E2E : UNIT
 }
 
-const test_type_logic = { E2E, E2E_PREFIXES, UNIT, test_type_for }
+const test_type_logic = { E2E, UNIT, test_type_for }
 
 export type { TestType }
 export { test_type_logic }

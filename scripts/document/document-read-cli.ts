@@ -71,8 +71,6 @@ function main(argv: ReadonlyArray<string>): void {
 const document_read_cli = {
 	OVER_CAP_PREFIX,
 	READ_TOOL_DIRECTIVE,
-	USAGE,
-	main,
 	over_cap_directive,
 	run,
 }

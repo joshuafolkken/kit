@@ -32,7 +32,7 @@ function main(argv: ReadonlyArray<string>): void {
 	process.exitCode = run(argv)
 }
 
-const clone_scan_cli = { USAGE, main, run }
+const clone_scan_cli = { USAGE, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 

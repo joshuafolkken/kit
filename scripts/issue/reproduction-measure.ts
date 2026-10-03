@@ -53,7 +53,7 @@ function has_command_output(body: string, heading: string = REPRODUCTION_HEADING
 	return reproduction.has_command && reproduction.has_output
 }
 
-const reproduction_measure = { REPRODUCTION_HEADING, has_command_output, parse_reproduction }
+const reproduction_measure = { has_command_output }
 
 export type { Reproduction }
 export { reproduction_measure }

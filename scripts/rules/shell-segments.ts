@@ -37,7 +37,6 @@ function is_josh_command(segment: string, names: ReadonlySet<string>): boolean {
 }
 
 const shell_segments = {
-	SEGMENT_SEPARATOR,
 	is_josh_command,
 	segments_of,
 }

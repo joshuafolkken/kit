@@ -200,7 +200,6 @@ const epic_index = {
 	build_epic_index,
 	build_tracking_index,
 	fetch_epics,
-	opted_in_epic_numbers,
 	reachable_epic_numbers,
 	withheld_children,
 }

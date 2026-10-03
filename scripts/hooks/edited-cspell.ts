@@ -122,7 +122,7 @@ async function spelling_diagnostics(
 	}
 }
 
-const edited_cspell = { format_unknown_words, is_checkable, spelling_diagnostics }
+const edited_cspell = { format_unknown_words, spelling_diagnostics }
 
 export type { CspellRunner }
 export { edited_cspell, MAX_DIAGNOSTIC_CHARS }

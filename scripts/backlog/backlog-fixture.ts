@@ -215,11 +215,7 @@ function stub_backlog(input: BacklogInput): void {
 
 const backlog_fixture = {
 	AT_BASELINE,
-	CHECKOUT_PATH,
-	REACHABLE_STATUS,
 	REPO,
-	gh_child,
-	stub_environment,
 	stub_backlog,
 }
 

@@ -10,6 +10,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "by": "bytes",
     "c": "check",
     "dr": "doctor",
+    "eu": "exports:unused",
     "ev": "eval",
     "f": "format",
     "g": "git",
@@ -300,6 +301,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "processes",
         "network",
+      ],
+    ],
+    "exports:unused": [
+      "",
+      "developer",
+      [
+        "none",
       ],
     ],
     "fanout": [

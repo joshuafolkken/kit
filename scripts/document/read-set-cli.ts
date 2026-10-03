@@ -282,10 +282,8 @@ const read_set_cli = {
 	POINT_OF_USE_LABEL,
 	SCOPED_LABEL,
 	TOTAL_READ_LABEL,
-	USAGE,
 	WHOLE_LABEL,
 	known_entries,
-	main,
 	run,
 	saved_percent,
 }

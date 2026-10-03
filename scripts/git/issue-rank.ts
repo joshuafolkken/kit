@@ -83,7 +83,7 @@ function rank<T>(items: ReadonlyArray<T>, row_of: (item: T) => RankRow): Array<T
 		.map((entry) => entry.item)
 }
 
-const issue_rank = { compare, count_dependents, is_priority, is_verification_defect, rank }
+const issue_rank = { count_dependents, rank }
 
 export { issue_rank }
 export type { DependencyRow, RankRow }

@@ -90,6 +90,6 @@ async function pretool_outcome_async(raw_payload: string): Promise<GuardOutcome>
 	return reason === undefined ? base : { reason, notice: undefined, fault: undefined }
 }
 
-const pretool_guard = { combine_outcomes, pretool_outcome, pretool_outcome_async }
+const pretool_guard = { combine_outcomes, pretool_outcome }
 
 export { pretool_guard, pretool_outcome, pretool_outcome_async }

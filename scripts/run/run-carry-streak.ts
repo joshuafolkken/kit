@@ -107,7 +107,7 @@ function next_state(carry: StreakCarry, change: StreakChange, now: Date): Streak
 	}
 }
 
-const run_carry_streak = { OUTAGE_FOLD_WINDOW_MS, next_state }
+const run_carry_streak = { next_state }
 
 export type { StreakCarry, StreakChange, StreakState }
 export { run_carry_streak }

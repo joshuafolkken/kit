@@ -202,7 +202,6 @@ function merge_condition(target: WorkflowJob | undefined): string {
 const dependabot_workflow_fixture = {
 	TEMPLATE,
 	RUNTIME,
-	JOB,
 	MERGE_COMMAND,
 	METADATA_STEP_ID,
 	MANAGED_STEP_ID,
@@ -220,7 +219,6 @@ const dependabot_workflow_fixture = {
 	HEAD_SHA_VARIABLE,
 	HEAD_SHA_EXPRESSION,
 	ECOSYSTEM_OUTPUT,
-	UPDATE_TYPE_OUTPUT,
 	ACTIONS_ECOSYSTEM,
 	NPM_ECOSYSTEM,
 	PATCH_UPDATE,

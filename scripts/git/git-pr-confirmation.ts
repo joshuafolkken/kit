@@ -53,8 +53,6 @@ function has_ignore_reason(reason: string | undefined): reason is string {
 // gates drift apart.
 const git_pr_confirmation = {
 	notify_confirmation,
-	build_confirmation_input,
-	has_ignore_reason,
 }
 
 // `has_ignore_reason` stays a named export beside the namespace: `git-pr-coderabbit.ts` imports it

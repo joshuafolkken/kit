@@ -138,13 +138,10 @@ function read_optional(file_path: string): string | undefined {
 }
 
 const document_section = {
-	FENCE,
-	HEADING_PATTERN,
 	candidates,
 	headings,
 	read_optional,
 	section,
-	select,
 	titles,
 }
 

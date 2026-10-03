@@ -22,16 +22,16 @@ These commands replace the corresponding `package.json` scripts; consumer projec
 
 ### `josh gate`
 
-Run the completion gate's four checks — lint, type check, spell check and unit tests — **concurrently**, running all to completion and reporting every failure in one pass.
+Run the completion gate's checks — lint, type check, spell check, [behavior](#josh-behavior), [unused namespace members](#josh-exportsunused) and unit tests — **concurrently**, running all to completion and reporting every failure in one pass.
 
 ```bash
 pnpm josh gate
 pnpm josh gate --verbose   # every check's output, passing ones included
 pnpm josh gate --force     # re-run even on a tree already recorded green
-pnpm josh gate --no-unit   # the three static checks only (CI only)
+pnpm josh gate --no-unit   # the static checks only (CI only)
 ```
 
-- Static checks: `pnpm josh lint`, `pnpm josh cspell:dot`, `pnpm josh test:unit`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
+- Static checks: `pnpm josh lint`, `pnpm josh cspell:dot`, `pnpm josh behavior`, `pnpm josh exports:unused`; the unit leg is `pnpm josh test:unit`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
 - A tree recorded green is reused unless `--force` or the changed-file map moved.
 - **Refuses to start when the scoped pair has not been green on this tree.** A unit-included local gate reads the same record `josh review:brief` does and refuses — naming `pnpm josh lint:related && pnpm josh test:related` — so the first gate is the only gate. It never fires for `--no-unit` (CI has no scoped check in front of it) or `--force`, and `JOSH_SCOPED_GREEN=0` turns it off.
 - **On failure, a line per failed check with the command to re-run is printed at the tail**, just above the verdict, so a `tail` of the output keeps every failure and its next action rather than one at a time.
@@ -267,6 +267,21 @@ pnpm josh behavior
 - **A run with no transcript passes** without the skip marker, so a CI runner — which has none — never withholds the gate's green record.
 - **The seed set is one assertion**, green across the recorded corpus today: `no-direct-git-index-mutation` — `git add` / `git commit` / `git rm --cached` / `git restore --staged` must go through `pnpm josh git` (dry runs excluded). New assertions are added one at a time, each verified green against past real runs first. A break prints which run and which point it broke at.
 - **The manual `josh eval` is untouched**: this restores behavior verification without reviving the live-session path it removed.
+
+### `josh exports:unused`
+
+Report every member of an exported namespace object that nothing in the program reads (joshuafolkken/kit#2987). It is one of `pnpm josh gate`'s checks, so a dead namespace member fails the gate rather than accumulating.
+
+```bash
+pnpm josh exports:unused
+```
+
+- **Why its own check**: the namespace convention (`const git_prompt = { confirm_push }` exported as `export { git_prompt }`) keeps the namespace itself imported everywhere, so an ordinary unused-export tool never sees a member nobody calls.
+- **Scanned**: `snake_case`, un-annotated object-literal constants exported through a bare `export { x }` in a `.ts` file of the `tsconfig.json` program. An `UPPER_CASE` constant, a type-annotated table, a public `index.ts` entry and a test file declare no namespace it checks.
+- **A use is any reference the checker resolves to the member** — a property access, a destructuring, a string-keyed access, or `vi.spyOn(namespace, 'member')` — from any file, tests included.
+- **A namespace that escapes whole counts as fully used**: spread, passed as a value, read through a computed key, or re-exported. An alias or a member of another namespace stays tracked.
+- Exit `1` with one `path:line  namespace.member` line per finding. Remove the member from its namespace object, and its declaration if nothing in its file uses it either.
+- **kit only**: a consumer project reads its namespaces from `.svelte` files and routes this program does not see, so it skips with a notice.
 
 ### `josh test:unit`
 

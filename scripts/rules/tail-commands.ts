@@ -30,6 +30,6 @@ function prior_bash_commands(tail: string): ReadonlyArray<string> {
 	return tail.split('\n').flatMap((line) => bash_commands_of(line))
 }
 
-const tail_commands = { bash_commands_of, is_bash_use, prior_bash_commands }
+const tail_commands = { is_bash_use, prior_bash_commands }
 
 export { tail_commands }

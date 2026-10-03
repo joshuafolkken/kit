@@ -57,13 +57,11 @@ function bash_block(command: string): Block {
 }
 
 const behavior_test_fixture = {
-	BASH,
 	DENIED_BASH,
 	GIT_ADD_DRY,
 	GIT_COMMIT,
 	GIT_STATUS,
 	JOSH_GIT,
-	TOOL_USE,
 	TOOL_ID,
 	bash_block,
 	bash_line,

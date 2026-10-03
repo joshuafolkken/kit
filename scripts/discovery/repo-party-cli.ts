@@ -62,7 +62,7 @@ function main(argv: ReadonlyArray<string>): void {
 	process.exitCode = run(argv)
 }
 
-const repo_party_cli = { USAGE, decide, main, run }
+const repo_party_cli = { USAGE, decide, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 

@@ -96,9 +96,7 @@ const ROW = {
 const git_force = {
 	GIT_FORCE_REASON,
 	ROW,
-	is_branch_delete,
 	is_force_or_delete,
-	is_force_or_delete_push,
 }
 
 export { git_force }

@@ -13,12 +13,7 @@ import { cost_transcript } from './cost-transcript'
 const CWD = '/Users/someone/Development/kit'
 const MAIN = 'main'
 const SESSION_A = 'session-a'
-const ISSUE_BRANCH = '962-report-the-token-and-credit-cost-of-a-run'
 const MODEL = 'claude-opus-5'
-const THINKING_TOKENS = 7
-// The output-token count the populated session bills — named because a fixture is not a test file
-// and the magic-number rule applies to it, the same reason `time-cli-fixture.ts` names its own.
-const POPULATED_OUTPUT_TOKENS = 10
 
 function usage_line(request_id: string, branch: string, output_tokens: number): string {
 	return JSON.stringify({
@@ -26,26 +21,6 @@ function usage_line(request_id: string, branch: string, output_tokens: number): 
 		requestId: request_id,
 		gitBranch: branch,
 		message: { model: MODEL, usage: { input_tokens: 1, output_tokens } },
-	})
-}
-
-// A line carrying both a usage block and content, which is what the two decompositions read
-// (joshuafolkken/kit#1151). `usage_line` deliberately carries no content, so the older suites keep
-// exercising the usage reader on its own.
-function content_line(command: string): string {
-	return JSON.stringify({
-		type: 'assistant',
-		requestId: 'r2',
-		gitBranch: ISSUE_BRANCH,
-		message: {
-			model: MODEL,
-			usage: {
-				input_tokens: 1,
-				output_tokens: 5,
-				output_tokens_details: { thinking_tokens: THINKING_TOKENS },
-			},
-			content: [{ type: 'tool_use', name: 'Bash', input: { command } }],
-		},
 	})
 }
 
@@ -95,13 +70,6 @@ function write_session(session_id: string, lines: ReadonlyArray<string>): void {
 	write_session_under(CWD, session_id, lines)
 }
 
-function write_populated(): void {
-	write_session(SESSION_A, [
-		usage_line('r1', MAIN, POPULATED_OUTPUT_TOKENS),
-		content_line('git status --short'),
-	])
-}
-
 function output(): string {
 	return state.printed.join('\n')
 }
@@ -114,14 +82,9 @@ const cost_cli_fixture = {
 	CWD,
 	MAIN,
 	SESSION_A,
-	ISSUE_BRANCH,
-	MODEL,
-	THINKING_TOKENS,
 	usage_line,
-	content_line,
 	write_session,
 	write_session_under,
-	write_populated,
 	output,
 	stdout,
 	capture_console,
