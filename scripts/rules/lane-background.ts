@@ -20,7 +20,13 @@ import { run_tail } from './run-tail'
 //
 // **So the refusal is put at the launch, and it names the detached route.** The region from the gate to
 // the merge belongs to `pnpm josh ship --detach` in a child (`chain-rule.md` step 0), whose supervisor
-// outlives the turn. `ship` itself is not in the set: #2457 already detaches it implicitly in a child.
+// outlives the turn.
+//
+// **`ship` is in the set too, `--detach` or not** (joshuafolkken/kit#3027). #2457 detaches it in a child,
+// but only after its preflight — the scoped checks — has passed in the calling process, so a
+// backgrounded `ship` is killed at the turn's end before any supervisor exists: the #3022 child did
+// exactly that and was parked as a failure. Issued in the foreground it returns at `launched` within the
+// tool timeout, and the supervisor carries the rest.
 //
 // **Its stop-time half reads the same fact from the other side.** A backgrounded task the transcript
 // launched but never saw finish is still running, and in a child the stop about to happen kills it —
@@ -30,7 +36,7 @@ import { run_tail } from './run-tail'
 // The josh subcommands that run long enough to be backgrounded, as `time_shell` names them — canonical,
 // so the `ga` / `g` / `fu` aliases are covered by the one spelling.
 const LONG_RUNNING_COMMANDS: ReadonlySet<string> = new Set(
-	['gate', 'git', 'followup'].map((name) => `${time_shell.JOSH_PREFIX}${name}`),
+	['gate', 'git', 'followup', 'ship'].map((name) => `${time_shell.JOSH_PREFIX}${name}`),
 )
 
 const BACKGROUND_KEY = 'run_in_background'
@@ -92,11 +98,13 @@ function pending_agent_ids(tail: string): ReadonlyArray<string> {
 const LANE_BACKGROUND_REASON =
 	'⛔ lane background: this session is a dispatched lane child (`JOSH_LANE_CHILD`), a headless ' +
 	'`claude -p` process whose background Bash tasks are killed when the turn ends — so a backgrounded ' +
-	'`josh gate` / `josh git` / `josh followup` never re-invokes you; it dies at `exit code 143` ' +
-	'(joshuafolkken/kit#2704, measured on the #2606 child: implementation, review and live verification ' +
-	'done, the run parked instead of merged). Hand the gate-to-merge region to the detached supervisor ' +
-	'instead: `pnpm josh ship --detach --review "<title> #<N>"` (add `--cite <N>`), then end the turn on ' +
-	'`launched` / `busy` — `.claude/skills/workflow-commands/chain-rule.md` step 0 is the single source. A ' +
+	'`josh gate` / `josh git` / `josh followup` / `josh ship` never re-invokes you; it dies at `exit code ' +
+	'143` (joshuafolkken/kit#2704, measured on the #2606 child: implementation, review and live ' +
+	'verification done, the run parked instead of merged). Hand the gate-to-merge region to the detached ' +
+	'supervisor instead: `pnpm josh ship --detach --review "<title> #<N>"` (add `--cite <N>`) issued in ' +
+	'the foreground — its preflight runs in this process before the supervisor exists, so a backgrounded ' +
+	'`ship` dies with the turn (joshuafolkken/kit#3027) — then end the turn on `launched` / `busy`. ' +
+	'`.claude/skills/workflow-commands/chain-rule.md` step 0 is the single source. A ' +
 	'single check you must read before continuing runs in the foreground within the tool timeout; the ' +
 	'commit-push step does not — in a child it too belongs to the detached ship, in either spelling. This ' +
 	'rule fires on every occurrence, not once per run.'

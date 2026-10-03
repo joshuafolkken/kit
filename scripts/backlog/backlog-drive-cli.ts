@@ -28,6 +28,7 @@ import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_offer_cli } from './backlog-offer-cli'
+import { backlog_ready } from './backlog-ready'
 
 // `josh backlog:drive` — the backlogrun parent's loop as one resident wait (joshuafolkken/kit#2499).
 // The parent issues it once, in the background, and is woken only when it exits — with a token the model
@@ -304,6 +305,7 @@ function ports_of(
 		merge: async (issue) => await merge(issue, context.owner),
 		offer: async (state) => await read_offer(state, context),
 		launch: async (issue) => await launch(issue, context.owner),
+		free_lanes: backlog_ready.drive_free_lane_count,
 		now: () => new Date(),
 		sleep: async (milliseconds) => {
 			await sleep(milliseconds)

@@ -14,6 +14,8 @@ const OFFERED = '2500'
 const OFFERED_TOO = '2501'
 // The next-issue token `run:merge` prints after an ordinary merge.
 const NEXT_TOKEN = '2600'
+// A free-lane answer above any offer a suite queues, so only a suite that sets one meets the limit.
+const ROOMY_POOL = 6
 
 interface Harness {
 	ports: LoopPorts
@@ -27,6 +29,8 @@ interface Script {
 	merges?: ReadonlyMap<string, string>
 	offers?: ReadonlyArray<OfferRead | undefined>
 	failed_launches?: ReadonlyArray<string>
+	// The free-lane answers in order, the last repeating; unset reads as a pool with room to spare.
+	free_lanes?: ReadonlyArray<number>
 }
 
 function offer(verdict: string, issues: ReadonlyArray<string> = []): OfferRead {
@@ -56,10 +60,12 @@ function dispatch_ports(
 	script: Script,
 	calls: Array<string>,
 	offers: Array<DriveState>,
-): Pick<LoopPorts, 'offer' | 'launch'> {
+): Pick<LoopPorts, 'offer' | 'launch' | 'free_lanes'> {
 	const queue = [...(script.offers ?? [])]
+	const free = [...(script.free_lanes ?? [ROOMY_POOL])]
 
 	return {
+		free_lanes: async () => (free.length > 1 ? free.shift() : free[0]) ?? ROOMY_POOL,
 		offer: async (asked) => {
 			calls.push('offer')
 			offers.push(asked)

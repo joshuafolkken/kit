@@ -56,6 +56,16 @@ describe('backlog_ready.read_ready', () => {
 	})
 })
 
+// joshuafolkken/kit#3027: a zero here would leave the drive launching nothing and reporting nothing.
+describe('backlog_ready.drive_free_lane_count', () => {
+	it('throws on an unreadable lane limit instead of reading it as no free lane', async () => {
+		vi.stubEnv('JOSH_LANE_LIMIT', 'abc')
+
+		await expect(backlog_ready.drive_free_lane_count()).rejects.toThrow('JOSH_LANE_LIMIT')
+		vi.unstubAllEnvs()
+	})
+})
+
 describe('backlog_ready.print_ready_line', () => {
 	it('prints the ready line to the driving parent on a wake', async () => {
 		const info = vi.spyOn(console, 'info').mockReturnValue(undefined)

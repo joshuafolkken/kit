@@ -4,6 +4,8 @@ import { backlog_drive_fixture } from './backlog-drive-fixture'
 
 const { CONFIG, FIRST_CHILD, OFFERED, OFFERED_TOO, POLL_MS, SECOND_CHILD } = backlog_drive_fixture
 const { harness, offer, state } = backlog_drive_fixture
+const ONE_FREE_LANE = 1
+const NO_FREE_LANES = 0
 
 describe('backlog_drive.run_pass — dispatch', () => {
 	it('launches every issue a run verdict offers and counts them in flight', async () => {
@@ -35,7 +37,48 @@ describe('backlog_drive.run_pass — dispatch', () => {
 			issue: OFFERED,
 		})
 	})
+})
 
+// joshuafolkken/kit#3027: the offer lists every ready issue, so the drive caps the launches itself.
+describe('backlog_drive.run_pass — the lane limit', () => {
+	it('launches no more issues than there are free lanes', async () => {
+		const offered = offer('run', [OFFERED, OFFERED_TOO])
+		const { ports, calls } = harness({ offers: [offered], free_lanes: [ONE_FREE_LANE] })
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(calls).toStrictEqual(['offer', `launch ${OFFERED}`])
+		expect(result.kind === 'continue' && result.state.in_flight).toStrictEqual([OFFERED])
+	})
+
+	it('launches nothing when no lane is free', async () => {
+		const offered = offer('run', [OFFERED])
+		const { ports, calls } = harness({ offers: [offered], free_lanes: [NO_FREE_LANES] })
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(calls).toStrictEqual(['offer'])
+		expect(result.kind).toBe('continue')
+	})
+
+	it('keeps the active stamp when no lane is free, so the idle budget still runs out', async () => {
+		const offered = offer('run', [OFFERED])
+		const { ports } = harness({ offers: [offered], free_lanes: [NO_FREE_LANES] })
+		const before = state()
+		const result = await backlog_drive.run_pass(before, true, ports)
+
+		expect(result.kind === 'continue' && result.state.active).toBe(before.active)
+	})
+
+	it('waits rather than handing back a launch refused because every lane is taken', async () => {
+		const offered = offer('run', [OFFERED])
+		const script = { offers: [offered], failed_launches: [OFFERED], free_lanes: [1, 0] }
+		const { ports } = harness(script)
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(result.kind === 'continue' && result.state.in_flight).toStrictEqual([])
+	})
+})
+
+describe('backlog_drive.run_pass — dispatch throttle', () => {
 	it('does not ask the offer when throttled and nothing was collected', async () => {
 		const { ports, calls } = harness({})
 
