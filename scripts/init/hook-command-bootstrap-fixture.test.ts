@@ -19,7 +19,11 @@ describe('hook_command_bootstrap.initialize_repository', () => {
 
 	it('initializes a repository when git init succeeds', () => {
 		expect(() => {
-			hook_command_bootstrap.initialize_repository(['init', '-q'], temporary_root, process.env)
+			hook_command_bootstrap.initialize_repository(
+				['init', '-q'],
+				temporary_root,
+				hook_command_bootstrap.fresh_git_environment(),
+			)
 		}).not.toThrow()
 	})
 
@@ -28,7 +32,7 @@ describe('hook_command_bootstrap.initialize_repository', () => {
 			hook_command_bootstrap.initialize_repository(
 				['init', UNKNOWN_GIT_OPTION],
 				temporary_root,
-				process.env,
+				hook_command_bootstrap.fresh_git_environment(),
 			)
 		}).toThrow(`git init ${UNKNOWN_GIT_OPTION} failed`)
 	})

@@ -57,12 +57,15 @@ function initialize_repository(
 	}
 }
 
+// A hook exports `GIT_DIR` and friends, so the fixture's own `git init` would otherwise act on the
+// checkout the gate is running in rather than on the temporary directory.
+function fresh_git_environment(): NodeJS.ProcessEnv {
+	return { ...process.env, ...git_location_environment.location_free_environment() }
+}
+
 function checkout_environment(temporary_root: string, options: CheckoutOptions): NodeJS.ProcessEnv {
 	const metadata_root = path.join(temporary_root, 'metadata')
-	const git_environment = {
-		...process.env,
-		...git_location_environment.location_free_environment(),
-	}
+	const git_environment = fresh_git_environment()
 	const git_arguments = options.is_external_git
 		? ['init', '--bare', '-q', metadata_root]
 		: ['init', '-q']
@@ -101,6 +104,10 @@ function run_in_temporary_checkout(
 	}
 }
 
-const hook_command_bootstrap = { initialize_repository, run_in_temporary_checkout }
+const hook_command_bootstrap = {
+	fresh_git_environment,
+	initialize_repository,
+	run_in_temporary_checkout,
+}
 
 export { hook_command_bootstrap }

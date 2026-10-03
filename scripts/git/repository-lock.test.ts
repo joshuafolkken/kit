@@ -1,8 +1,9 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { git_location_environment } from '#scripts/git/git-location-environment'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { repository_lock } from './repository-lock'
 
 // Pins the current behavior of the shared repository lock directly, beside the stash-sweep wrapper's
@@ -172,6 +173,10 @@ describe('repository_lock.clear_stale', () => {
 })
 
 describe('repository_lock.lock_path', () => {
+	// A pre-push hook exports `GIT_DIR`, which would resolve every directory to the gated checkout.
+	// The returned restore runs as the block's teardown.
+	beforeAll(() => git_location_environment.clear_git_location_variables())
+
 	it('keys a directory outside any repository on the directory itself', () => {
 		expect(repository_lock.lock_path(PREFIX, state.scratch)).toBe(
 			stamp_file.stamp_path(PREFIX, state.scratch),
