@@ -836,7 +836,7 @@ pnpm josh ruleset:check           # report only
 pnpm josh ruleset:check --apply   # add the missing checks to the existing rule
 ```
 
-A distributed workflow's check gates nothing until the repository requires it, and requiring it is a per-repository setting. `ruleset:check` reads the default branch's rules — its rulesets first, classic branch protection when no ruleset requires a check — and compares them with the checks of the distributed workflows the repository actually has:
+A distributed workflow's check gates nothing until the repository requires it — a per-repository setting. `ruleset:check` reads the default branch's rules — its rulesets first, classic branch protection when no ruleset requires a check — and compares them with the checks of the distributed workflows the repository actually has:
 
 | Workflow                                  | Checks                                          |
 | ----------------------------------------- | ----------------------------------------------- |
@@ -850,7 +850,7 @@ It exits `0` when every expected check is required and `1` otherwise — when on
 
 **Options:**
 
-- `--apply` — append the missing checks to the ruleset's required-checks rule (or to the branch protection's contexts). It never creates a ruleset: with none, create one under Settings → Rules → Rulesets, then run it again. Changing a repository setting needs admin access and is outward-facing, so only this flag writes — `josh sync` and `josh doctor` never do.
+- `--apply` — append the missing checks to the ruleset's required-checks rule (or to the branch protection's contexts). It never creates a ruleset: with none, create one under Settings → Rules → Rulesets, then rerun. Writing a repository setting needs admin access, so only this flag writes — `josh sync` and `josh doctor` never do.
 
 ### `josh overrides`
 
