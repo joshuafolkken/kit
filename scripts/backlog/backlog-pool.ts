@@ -328,14 +328,11 @@ const backlog_pool = {
 	standalone_keys,
 	drop_excluded,
 	epic_classification,
-	is_epic_row,
-	keys_of,
 	merge_classifications,
 	opted_in_epics,
 	standalone_rows,
 	to_child,
 	to_children,
-	unique_children,
 }
 
 export { backlog_pool }

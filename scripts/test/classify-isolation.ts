@@ -136,14 +136,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 const classify_isolation = {
-	ISOLATION_PATTERNS,
-	all_test_files,
 	by_code_point,
 	classify_pure_files,
 	is_pure_candidate,
 	render_pure_files,
 	requires_isolation,
-	write_pure_files,
 }
 
 export { classify_isolation }

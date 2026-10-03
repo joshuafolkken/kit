@@ -274,8 +274,6 @@ const run_progress_clock = {
 	LIFE_PREFIX,
 	LOG_KEEP,
 	LOG_STALE_MS,
-	PROGRESS_PREFIX,
-	append_line,
 	begin_life,
 	end_life,
 	is_life_ended,
@@ -289,7 +287,6 @@ const run_progress_clock = {
 	read_last_report,
 	read_last_report_sync,
 	stamp_target_of,
-	stamp_target_sync,
 }
 
 export { run_progress_clock }

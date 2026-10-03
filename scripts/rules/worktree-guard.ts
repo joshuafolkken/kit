@@ -140,10 +140,7 @@ const ROW = {
 const worktree_guard = {
 	ROW,
 	WORKTREE_MUTATION_REASON,
-	is_forced_clean,
-	is_unauthorized_stash,
 	is_unauthorized_worktree_change,
-	is_worktree_checkout,
 	touches_worktree,
 }
 

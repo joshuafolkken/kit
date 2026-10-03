@@ -86,6 +86,6 @@ function refused_ask_of(permission_denials: unknown): string | undefined {
 	return questions.map((question) => render_question(question)).join(QUESTION_SEPARATOR)
 }
 
-const interactive_ask = { INTERACTIVE_TOOLS, is_interactive_tool, refused_ask_of }
+const interactive_ask = { is_interactive_tool, refused_ask_of }
 
 export { interactive_ask }

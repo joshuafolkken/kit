@@ -54,20 +54,8 @@ function format_replaced_relations(links: ReadonlyArray<DependencyLink>): string
 	return `Replaced blocked-by: ${join_references(quoted)}.`
 }
 
-const epic_reference = {
-	DEPENDENCY_ARROW,
-	REFERENCE_SEPARATOR,
-	to_issue_reference,
-	join_references,
-	format_dependency_link,
-	format_dependency_links,
-	format_issue_references,
-	format_replaced_relations,
-}
-
 export type { IssueReference } from '#scripts/git/issue-reference'
 export {
-	epic_reference,
 	DEPENDENCY_ARROW,
 	REFERENCE_SEPARATOR,
 	to_issue_reference,

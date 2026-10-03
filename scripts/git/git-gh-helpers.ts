@@ -36,7 +36,6 @@ function handle_pr_create_error(error: unknown): never {
 
 const git_gh_helpers = {
 	parse_pr_state_string,
-	is_pr_already_exists_message,
 	get_error_message_with_stderr,
 	handle_pr_create_error,
 }

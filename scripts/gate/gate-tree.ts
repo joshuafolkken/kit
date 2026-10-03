@@ -43,7 +43,7 @@ async function read_gate_tree(): Promise<GateTree> {
 	return { files, base }
 }
 
-const gate_tree = { read_base, read_changed_files, read_gate_tree }
+const gate_tree = { read_gate_tree }
 
 export type { GateTree }
 export { gate_tree }

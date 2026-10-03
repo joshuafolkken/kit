@@ -156,8 +156,6 @@ function density_notice(raw_payload: string, now_ms: number = Date.now()): strin
 }
 
 const time_density_hook = {
-	NOTICE_PREFIX,
-	TAIL_BYTES,
 	density_notice,
 	notice_path,
 	read_tail,

@@ -163,9 +163,6 @@ async function handle_ai_review_findings(input: {
 
 const git_pr_ai_review = {
 	handle_ai_review_findings,
-	parse_ai_review_comments,
-	to_review_comment,
-	has_ignore_reason,
 }
 
 export {

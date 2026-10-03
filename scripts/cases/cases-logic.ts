@@ -90,7 +90,7 @@ const VOCABULARY: ReadonlyArray<string> = [
 	NONE,
 ]
 
-const cases = { BOUNDARIES, NONE, VOCABULARY, boundaries_in, cases_for }
+const cases = { NONE, VOCABULARY, boundaries_in, cases_for }
 
 export type { Boundary }
 export { cases }

@@ -356,16 +356,13 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const epic_audit_cli = {
-	USAGE,
 	UNREADABLE_REPO,
 	parse_epic_number: epic_issue.parse_epic_number,
 	attach_bodies,
 	resolve_reference_states,
 	outside_references,
-	read_order_comments,
 	audit,
 	run,
-	main,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))

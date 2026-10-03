@@ -21,9 +21,6 @@ function format_share(part: number, whole: number): string {
 }
 
 const cost_format = {
-	USD_DECIMALS,
-	PERCENT_SCALE,
-	PERCENT_DECIMALS,
 	format_usd,
 	format_tokens,
 	format_share,

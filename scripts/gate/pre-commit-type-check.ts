@@ -174,13 +174,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 const pre_commit_type_check = {
 	FORCE_ENV,
 	TYPE_CHECK_ARGUMENTS,
-	format_refusal,
-	format_skip,
-	is_recorded_check_this_check,
-	read_commit_tree,
-	reusable_green_commit,
 	run_pre_commit_type_check,
-	unexpected_arguments,
 }
 
 export type { CommitTree }

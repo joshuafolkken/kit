@@ -62,10 +62,7 @@ function problems(body: string): ReadonlyArray<string> {
 }
 
 const issue_classification = {
-	BREAKING_DECLARATION,
 	CLASSIFICATION_LABELS,
-	FEATURE_DECLARATIONS,
-	NON_BUG_DECLARATION,
 	labels_for,
 	problems,
 	required_labels,

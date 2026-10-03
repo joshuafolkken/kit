@@ -94,7 +94,6 @@ function build_repository_map(
 
 const repo_map_logic = {
 	is_same_owner,
-	parse_overrides,
 	build_repository_map,
 }
 

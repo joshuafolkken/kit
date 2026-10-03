@@ -396,8 +396,6 @@ const run_merge_cli = {
 	RESUMED_TOKEN,
 	RETRY_TOKEN,
 	STOP_TOKEN,
-	USAGE,
-	main,
 	merge_child,
 	parse,
 	run,

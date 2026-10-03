@@ -40,6 +40,7 @@ const ALIASES: Record<string, string> = {
 	f: 'format',
 	sd: 'cspell:dot',
 	bh: 'behavior',
+	eu: 'exports:unused',
 	t: 'test',
 	tu: 'test:unit',
 	tr: 'test:related',

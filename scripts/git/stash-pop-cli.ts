@@ -97,7 +97,6 @@ const stash_pop_cli = {
 	CONFLICTED_VERDICT,
 	NO_MATCH_VERDICT,
 	POPPED_VERDICT,
-	main,
 	run,
 }
 

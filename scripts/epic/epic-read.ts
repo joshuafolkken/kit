@@ -65,7 +65,6 @@ async function read_epic(epic_number: number): Promise<EpicReading | { error: st
 }
 
 const epic_read = {
-	UNKNOWN_REPO,
 	read_epic,
 }
 

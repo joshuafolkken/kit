@@ -27,8 +27,6 @@ import { run_progress } from './run-progress'
 // watcher it guards kept the default, which is the one state this module exists to prevent.
 
 const PACKAGE_FILE = 'package.json'
-const CONFIG_FIELD = 'josh'
-const INTERVAL_FIELD = 'progress_interval_minutes'
 
 // Deep enough to cross a workspace package and its root, and bounded so a path that never reaches a
 // root — a broken mount, a mocked `dirname` — cannot spin.
@@ -108,8 +106,6 @@ function configured_interval_ms(directory: string = process.cwd()): number {
 }
 
 const run_progress_config = {
-	CONFIG_FIELD,
-	INTERVAL_FIELD,
 	PACKAGE_FILE,
 	configured_interval_ms,
 	read_package_minutes,

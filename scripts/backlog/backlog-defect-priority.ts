@@ -72,6 +72,6 @@ async function prioritize(
 	return await reorder(result, repo)
 }
 
-const backlog_defect_priority = { UNMEASURED_MESSAGE, KIND_RANK, prioritize }
+const backlog_defect_priority = { UNMEASURED_MESSAGE, prioritize }
 
 export { backlog_defect_priority }

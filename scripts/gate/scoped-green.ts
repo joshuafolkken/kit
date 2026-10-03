@@ -252,7 +252,6 @@ const scoped_green = {
 	read_before,
 	record_green,
 	record_if_green,
-	refusal,
 	refusal_for,
 }
 

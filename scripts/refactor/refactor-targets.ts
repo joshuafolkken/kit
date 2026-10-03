@@ -95,7 +95,6 @@ const refactor_targets = {
 	collect_targets,
 	has_ignore_marker,
 	is_path_excluded,
-	keep_target,
 	scripts_files,
 	select_scope,
 }

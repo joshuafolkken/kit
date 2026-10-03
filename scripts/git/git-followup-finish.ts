@@ -208,8 +208,6 @@ const git_followup_finish = {
 	print_next_issues,
 	print_pending_release,
 	clear_review_records,
-	clear_round_one_snapshot,
-	clear_review_target,
 	release_worktree_hold,
 	end_progress_watcher,
 }

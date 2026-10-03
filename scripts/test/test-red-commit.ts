@@ -45,7 +45,7 @@ async function assert_reproduces(
 	if (test_red_logic.is_refused(body, verdict)) throw new Error(reason_for(issue_number, files))
 }
 
-const test_red_commit = { assert_reproduces, reason_for }
+const test_red_commit = { assert_reproduces }
 
 export type { RedCommitPorts }
 export { test_red_commit }

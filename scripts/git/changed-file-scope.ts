@@ -194,7 +194,6 @@ const changed_file_scope = {
 	LISTED_FILE_LIMIT,
 	UNREADABLE_REASON,
 	describe_scope,
-	explicit_files_of,
 	flags_of,
 	is_flag,
 	read_changed_files,

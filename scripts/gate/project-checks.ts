@@ -159,8 +159,6 @@ function eslint_skip_reason(directory: string): string | undefined {
 const project_checks = {
 	CSPELL_CONFIGS,
 	ESLINT_CONFIGS,
-	SCRIPT_FILES,
-	TYPE_CONFIGS,
 	TYPE_FILES,
 	WEB_FILES,
 	eslint_skip_reason,

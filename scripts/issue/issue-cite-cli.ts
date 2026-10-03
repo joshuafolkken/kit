@@ -145,12 +145,8 @@ async function main(args: ReadonlyArray<string>): Promise<void> {
 
 const issue_cite_cli = {
 	USAGE,
-	main,
 	parse_targets,
-	parse_title,
-	report,
 	run,
-	to_line,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))

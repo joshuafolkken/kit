@@ -85,6 +85,6 @@ function install(): void {
 // eslint-disable-next-line unicorn/no-top-level-side-effects
 install()
 
-const test_telegram_guard = { BLOCKED_MESSAGE, RECORD_NAME, guarded_fetch, is_telegram }
+const test_telegram_guard = { BLOCKED_MESSAGE, guarded_fetch, is_telegram }
 
 export { test_telegram_guard }

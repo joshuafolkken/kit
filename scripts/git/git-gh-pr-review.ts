@@ -90,7 +90,7 @@ function to_review_decision(reviews_json: string): string {
 	return latest.has(REVIEW_APPROVED) ? REVIEW_APPROVED : REVIEW_NONE
 }
 
-const git_gh_pr_review = { to_review_decision, parse_rest_reviews }
+const git_gh_pr_review = { to_review_decision }
 
 export {
 	git_gh_pr_review,

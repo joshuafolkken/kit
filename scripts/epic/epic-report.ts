@@ -193,7 +193,6 @@ const epic_report = {
 	build_result,
 	candidates_for_repo,
 	format_result,
-	VERDICT_LINES,
 }
 
 export type { EpicNextResult, EpicVerdict, RepoCandidates }

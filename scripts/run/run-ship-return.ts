@@ -74,7 +74,7 @@ async function return_control(
 	return 'recorded'
 }
 
-const run_ship_return = { return_control, stop_text }
+const run_ship_return = { return_control }
 
 export type { ReturnOutcome }
 export { run_ship_return }

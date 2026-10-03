@@ -491,23 +491,13 @@ const auto_ok_cli = {
 	TRUNCATED_WITHOUT_ANSWER,
 	NONE_OPTED_IN_MESSAGE,
 	truncated_cause,
-	parse_issue_number,
-	parse_exclude,
-	parse_pair,
 	parse_options,
 	fetch_opted_in,
-	parse_listing,
-	is_page_complete,
-	is_closed,
-	is_unblocked,
 	fetch_tracking,
 	is_runnable,
 	pick_next,
 	truncation_note,
-	none_reason,
-	report,
 	run,
-	main,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))

@@ -148,7 +148,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await main(process.argv.slice(ARGV_OFFSET))
 }
 
-const test_red = { USAGE, run }
+const test_red = { run }
 
 export type { RedRun }
 export { test_red }

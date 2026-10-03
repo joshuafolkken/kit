@@ -213,10 +213,8 @@ async function run_loop(target: string, ports: LoopPorts, interval_ms: number): 
 const run_wake_loop = {
 	FAILED_REASON,
 	MAX_BACKOFF_FACTOR,
-	STOPPED_REASON,
 	next_interval,
 	run_loop,
-	step,
 }
 
 export type { DriveResult, LoopPorts, LoopStop }

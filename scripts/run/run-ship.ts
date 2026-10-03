@@ -70,7 +70,6 @@ const run_ship = {
 	ROUND_TWO_HEADER,
 	SKIPPED_BODY,
 	STOPPED_PREFIX,
-	SUCCESS_EXIT_CODE,
 	exit_code,
 	failed_section,
 	format_report,

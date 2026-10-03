@@ -32,6 +32,6 @@ function rank(
 	}))
 }
 
-const epic_rank = { dependents_of, rank }
+const epic_rank = { rank }
 
 export { epic_rank }

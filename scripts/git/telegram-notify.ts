@@ -413,7 +413,6 @@ async function stranded(input: StrandedInput): Promise<boolean> {
 }
 
 const telegram_notify = {
-	REPO_LOOKUP_TIMEOUT_MS,
 	confirm,
 	send,
 	send_or_report,

@@ -232,10 +232,8 @@ function find_duplicates(
 
 const issue_scout = {
 	SIMILARITY_THRESHOLD,
-	MIN_SHARED_TOKENS,
 	MAX_CANDIDATES,
 	tokenize,
-	shared_tokens,
 	dice_similarity,
 	find_duplicates,
 }

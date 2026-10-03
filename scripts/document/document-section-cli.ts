@@ -94,7 +94,7 @@ function main(argv: ReadonlyArray<string>): void {
 	process.exitCode = run(argv)
 }
 
-const document_section_cli = { FAILURE_EXIT_CODE, USAGE, main, resolve_document, run }
+const document_section_cli = { FAILURE_EXIT_CODE, USAGE, resolve_document, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 

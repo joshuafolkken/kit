@@ -168,8 +168,6 @@ async function wait_for_publish(
 }
 
 const propagate_publish = {
-	DEFAULT_TIMEOUT_MS,
-	DEFAULT_INTERVAL_MS,
 	UNREADABLE_THRESHOLD,
 	is_version_published,
 	should_keep_waiting,

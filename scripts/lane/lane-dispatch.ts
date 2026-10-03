@@ -444,7 +444,6 @@ async function warn_of_problem(outcome: DispatchOutcome, issue: string): Promise
 }
 
 const lane_dispatch = {
-	CHILD_INVOCATION: lane_child_invocation.CHILD_INVOCATION,
 	child_invocation,
 	default_log_path,
 	describe,

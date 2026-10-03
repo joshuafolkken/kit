@@ -207,7 +207,6 @@ function return_to_default_branch(repository_path: string): boolean {
 
 const propagate_git = {
 	default_branch,
-	fetch_branch,
 	return_to_default_branch,
 	current_branch,
 	commit_ahead,
@@ -215,7 +214,6 @@ const propagate_git = {
 	has_pre_push_hook,
 	can_push_without_hooks,
 	is_clean,
-	is_up_to_date,
 	decide_tree_state,
 	tree_state,
 }

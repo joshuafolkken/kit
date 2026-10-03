@@ -120,7 +120,6 @@ function format_security_updates_report(
 }
 
 const security_updates_logic = {
-	SETTING_LABEL,
 	enable_command,
 	classify_security_updates,
 	is_exposed,

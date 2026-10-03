@@ -222,9 +222,6 @@ async function check(request: EndingRequest): Promise<EndingDecision> {
 const run_ending = {
 	check,
 	decide,
-	describe_exit,
-	read_child_closed,
-	read_cut_taken,
 	read_exit,
 }
 

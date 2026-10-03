@@ -348,10 +348,8 @@ async function run_loop(
 
 const backlog_drive = {
 	HANDOFF_TOKENS,
-	collect,
 	initial_state,
 	merge_stopped,
-	on_verdict,
 	run_loop,
 	run_pass,
 }

@@ -71,7 +71,6 @@ function build_report(input: ReportInput): string {
 const run_report = {
 	UNKNOWN_SCOPE_NOTICE,
 	build_report,
-	release_tail,
 }
 
 export type { ReportInput }

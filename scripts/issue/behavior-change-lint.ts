@@ -112,7 +112,6 @@ function problems(body: string): ReadonlyArray<string> {
 
 const behavior_change_lint = {
 	is_target,
-	missing_headings,
 	firing_point_name,
 	problems,
 	REQUIRED_HEADINGS,

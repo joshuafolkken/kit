@@ -336,11 +336,9 @@ function is_same_owner_repo(repo: string, current_owner: string): boolean {
 
 const epic_cross_repo = {
 	publishes_nothing,
-	read_manifest,
 	read_default_branch_version,
 	reset_publish_cache,
 	package_name_for,
-	is_published,
 	resolve_cross_repo,
 	owner_of,
 	is_same_owner_repo,

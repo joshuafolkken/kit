@@ -68,6 +68,6 @@ function section_lines(body: string, heading: string): ReadonlyArray<string> {
 	return end === -1 ? rest : rest.slice(0, end)
 }
 
-const markdown_section = { section_lines, is_heading, has_line, has_unfenced_line }
+const markdown_section = { section_lines, has_line, has_unfenced_line }
 
 export { markdown_section }

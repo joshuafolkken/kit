@@ -77,7 +77,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const review_round2_cli = { CLOSED_FLAG, JSON_KEY, KNOWN_FLAGS, main, parse_options, run, USAGE }
+const review_round2_cli = { CLOSED_FLAG, parse_options, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

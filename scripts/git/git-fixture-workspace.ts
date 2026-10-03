@@ -79,7 +79,6 @@ const git_fixture_workspace = {
 	AUTHOR_NAME,
 	close_workspace,
 	git,
-	IDENTITY_OPTIONS,
 	MAIN_BRANCH,
 	open_workspace,
 }

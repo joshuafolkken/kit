@@ -132,9 +132,6 @@ async function check_and_create_branch(
 
 const git_branch = {
 	current,
-	create,
-	switch_to,
-	exists,
 	check_and_create_branch,
 	is_mismatch,
 	// Exported so a lane's branch name can be checked against the real matcher rather than against a

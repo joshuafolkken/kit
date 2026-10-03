@@ -181,7 +181,6 @@ function find_unjustified_orders(input: RationaleInput): Array<AuditFinding> {
 }
 
 const epic_audit_rationale = {
-	UNJUSTIFIED_ORDER,
 	order_pairs,
 	pair_ends,
 	find_unjustified_orders,

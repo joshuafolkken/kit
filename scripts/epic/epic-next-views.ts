@@ -132,7 +132,6 @@ function settle_views(
 const epic_next_views = {
 	settle_views,
 	format_reference,
-	confirm_context,
 	pools_of,
 	combined_verdict,
 	error_view,

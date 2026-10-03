@@ -240,17 +240,7 @@ function is_auto_merge_blocked(snapshot: PrStateSnapshot): boolean {
 	)
 }
 
-const git_pr_checks_eval = {
-	evaluate_pr_state,
-	is_review_decision_decisive,
-	read_required_statuses,
-	is_coderabbit_check,
-	collect_blocking_failures,
-	describe_pr_failure,
-}
-
 export {
-	git_pr_checks_eval,
 	evaluate_pr_state,
 	is_auto_merge_blocked,
 	is_review_decision_decisive,

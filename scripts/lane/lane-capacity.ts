@@ -59,9 +59,7 @@ function free_lanes(limit: number, occupied: number): number {
 }
 
 const lane_capacity = {
-	DEFAULT_LANE_LIMIT,
 	LANE_LIMIT_KEY,
-	read_limit,
 	lane_limit,
 	free_lanes,
 }

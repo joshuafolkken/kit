@@ -75,7 +75,6 @@ const sync_hook_safety = {
 	hook_write_warning,
 	installed_consumer_version,
 	is_safe_to_write_hooks,
-	outdated_install_warning,
 	read_version_at,
 }
 

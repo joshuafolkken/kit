@@ -65,6 +65,16 @@ Report whether the preview server crashed during a failed E2E attempt (CI)
 
 ---
 
+### `josh exports:unused` · `josh eu`
+
+> **Audience:** developer · **Side effects:** none
+
+_No arguments._
+
+Report exported namespace members nothing reads (kit only; a consumer project skips it)
+
+---
+
 ### `josh format` · `josh f`
 
 > **Audience:** developer · **Side effects:** files, processes

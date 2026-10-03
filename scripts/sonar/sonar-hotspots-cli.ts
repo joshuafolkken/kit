@@ -136,12 +136,8 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 const sonar_hotspots_cli = {
 	fetch_hotspots,
 	format_hotspot,
-	hotspots_url,
-	is_managed,
-	main,
 	print_disposition,
 	read_project_key,
-	run,
 	USAGE,
 }
 

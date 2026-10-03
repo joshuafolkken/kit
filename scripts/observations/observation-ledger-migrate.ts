@@ -146,6 +146,6 @@ function migrate(root: string): boolean {
 	).some(Boolean)
 }
 
-const observation_ledger_migrate = { claim_path, migrate }
+const observation_ledger_migrate = { migrate }
 
 export { observation_ledger_migrate }

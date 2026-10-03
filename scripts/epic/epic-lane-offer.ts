@@ -245,15 +245,8 @@ async function offer_for_repo(
 }
 
 const epic_lane_offer = {
-	is_held,
-	free_lanes,
-	wanted_of,
 	combine_verdicts,
-	candidates_in,
-	unseen_candidates,
 	dedupe_pools,
-	withheld_message,
-	collect,
 	offer_for_repo,
 }
 

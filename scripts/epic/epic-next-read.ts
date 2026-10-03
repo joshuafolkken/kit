@@ -129,11 +129,8 @@ async function read_snapshots(
 
 const epic_next_read = {
 	FOREIGN_EPIC,
-	epic_repo_of,
 	childless,
 	unique_references,
-	is_childless,
-	read_one,
 	read_snapshots,
 }
 

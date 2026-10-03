@@ -128,6 +128,13 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: ['', 'developer', ['files']],
 	},
+	'exports:unused': {
+		script: 'scripts/exports/unused-members-cli.ts',
+		description:
+			'Report exported namespace members nothing reads (kit only; a consumer project skips it)',
+		category: 'Development',
+		reference: ['', 'developer', ['none']],
+	},
 	'test:unit': {
 		script: 'scripts/test/test-unit-guard.ts',
 		description:

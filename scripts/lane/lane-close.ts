@@ -186,10 +186,7 @@ async function close_all_lanes(): Promise<SweepOutcome> {
 const lane_close = {
 	close_all_lanes,
 	close_lane,
-	lane_root_directory,
-	lane_targets,
 	prune_lanes,
-	remove_lane,
 	resolve_lane,
 }
 

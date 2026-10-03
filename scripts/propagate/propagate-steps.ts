@@ -428,14 +428,12 @@ function describe_step(target: PropagateTarget, step: string): StepResult {
 }
 
 const propagate_steps = {
-	STEP_COMMANDS,
 	JOSH_BIN,
 	PROPAGATE_ORIGIN,
 	sync_command,
 	upgrade_command,
 	upgrade_commands,
 	sync_commands,
-	return_step,
 	VERIFY_SCRIPT,
 	issue_title,
 	issue_body,

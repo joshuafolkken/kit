@@ -46,6 +46,6 @@ const REASON =
 // reason above.
 const ROW = { id: 'test-declared', is_trigger: is_untested_commit, reason: REASON }
 
-const test_declared_commit = { REASON, ROW, is_untested_commit }
+const test_declared_commit = { REASON, ROW }
 
 export { test_declared_commit }

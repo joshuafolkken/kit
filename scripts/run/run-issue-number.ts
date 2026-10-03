@@ -14,6 +14,6 @@ function require_issue_number(issue: string): void {
 	if (!ISSUE_NUMBER_PATTERN.test(issue)) throw new Error(`${BAD_ISSUE_MESSAGE}${issue}`)
 }
 
-const run_issue_number = { BAD_ISSUE_MESSAGE, ISSUE_NUMBER_PATTERN, require_issue_number }
+const run_issue_number = { ISSUE_NUMBER_PATTERN, require_issue_number }
 
 export { run_issue_number }

@@ -89,9 +89,6 @@ function format_auto_merge_report(
 
 const auto_merge_setting_logic = {
 	SETTING_LABEL,
-	ALLOW_AUTO_MERGE_FIELD,
-	WORKFLOW_PATH,
-	enable_command,
 	classify_auto_merge,
 	format_auto_merge_report,
 }

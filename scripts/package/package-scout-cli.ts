@@ -172,14 +172,9 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 const package_scout_cli = {
 	USAGE,
-	SEARCH_FAILED_MESSAGE,
 	DEFAULT_SIZE,
 	read_arguments,
-	facts_of,
-	license_of,
-	to_candidate,
 	run,
-	main,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))

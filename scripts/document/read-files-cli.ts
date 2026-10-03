@@ -122,11 +122,7 @@ function main(argv: ReadonlyArray<string>): void {
 
 const read_files_cli = {
 	OVER_CAP_PREFIX,
-	READ_TOOL_DIRECTIVE,
-	SUCCESS_EXIT_CODE,
 	USAGE,
-	main,
-	over_cap_directive,
 	run,
 }
 

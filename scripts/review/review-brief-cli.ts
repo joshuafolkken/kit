@@ -343,15 +343,10 @@ const review_brief_cli = {
 	FIRST_ROUND,
 	format_reason,
 	KEPT_NOTE_PREFIX,
-	kept_note,
-	LEVEL_ONLY_FLAG,
-	main,
 	parse_round,
 	record_round_one,
 	report_error,
 	run,
-	run_level,
-	USAGE,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))

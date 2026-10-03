@@ -96,10 +96,6 @@ function format_attributed_issue_state(issue_number: string, state: IssueState):
 
 const issue_state = {
 	NO_LABELS,
-	STATE_LABEL,
-	LABELS_LABEL,
-	HUMAN_REVIEW_LABEL_LINE,
-	ISSUE_LABEL,
 	parse_issue_state,
 	format_issue_state,
 	format_attributed_issue_state,

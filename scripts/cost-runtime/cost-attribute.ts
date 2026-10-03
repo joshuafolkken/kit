@@ -158,7 +158,6 @@ const cost_attribute = {
 	UNATTRIBUTED_KEY,
 	issue_from_branch,
 	declared_issue,
-	fill,
 	attribute,
 	group_by_issue,
 	records_for_issue,

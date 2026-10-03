@@ -135,6 +135,6 @@ function short_cluster_has(token: string, letters: string): boolean {
 	return false
 }
 
-const git_argv = { arguments_of, parse, short_cluster_has, words_of }
+const git_argv = { arguments_of, parse, short_cluster_has }
 
 export { git_argv }

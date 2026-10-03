@@ -105,12 +105,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const ui_routes_cli = {
-	build_find_importers,
-	main,
 	parse_staged,
-	print_routes,
-	route_files,
-	run,
 	USAGE,
 }
 

@@ -191,7 +191,6 @@ function format_below_floor(version: string): string {
 }
 
 const security_audit_provision_logic = {
-	FORCED_DOWNLOAD_TIMEOUT_MS,
 	RETRY_INTERVAL_MS,
 	SESSION_DOWNLOAD_TIMEOUT_MS,
 	SCANNER_VERSION,

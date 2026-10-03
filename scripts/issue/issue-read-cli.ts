@@ -175,10 +175,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const issue_read_cli = {
-	BLOCK_SEPARATOR,
-	ISSUE_FIELDS,
 	USAGE,
-	main,
 	parse_numbers,
 	read_block,
 	run,

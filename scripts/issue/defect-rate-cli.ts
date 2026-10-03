@@ -160,7 +160,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const defect_rate_cli = { USAGE, read_days, search_path, measure_window, run, main }
+const defect_rate_cli = { USAGE, read_days, search_path, measure_window, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

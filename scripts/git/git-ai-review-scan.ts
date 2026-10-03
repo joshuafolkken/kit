@@ -146,9 +146,5 @@ function classify_ai_review_comments(comments: ReadonlyArray<ReviewComment>): Cl
 	}
 }
 
-const git_ai_review_scan = {
-	classify_ai_review_comments,
-}
-
-export { git_ai_review_scan, classify_ai_review_comments }
+export { classify_ai_review_comments }
 export type { ReviewComment, ClassifiedFinding, ClassifiedFindings, FindingKind }

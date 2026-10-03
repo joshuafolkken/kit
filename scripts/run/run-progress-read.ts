@@ -28,7 +28,7 @@ import { run_progress_clock } from './run-progress-clock'
 // `run-progress-clock.ts`, because the trigger-delivered rule that refuses an early heartbeat reads
 // the same record from inside a `PreToolUse` hook and cannot await the git call this file makes
 // (joshuafolkken/kit#1570). What stays here is the asynchronous way of naming the work tree.
-const { PROGRESS_PREFIX, mark, parse_stamp, read_last_report } = run_progress_clock
+const { mark, parse_stamp, read_last_report } = run_progress_clock
 
 const FIRST_LOAD_AVERAGE = 0
 
@@ -182,7 +182,6 @@ async function read_observations(request: ObservationRequest): Promise<Observati
 }
 
 const run_progress_read = {
-	PROGRESS_PREFIX,
 	has_run_started,
 	live_target,
 	log_target,

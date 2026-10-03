@@ -263,13 +263,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 const backlog_plan_cli = {
 	OPEN_TRUNCATED_MESSAGE,
 	OPEN_UNREADABLE_MESSAGE,
-	USAGE,
 	WAVES_WITH_NAMED_MESSAGE,
-	classify,
-	fetch_open,
-	main,
-	print_plan,
-	report,
 	run,
 }
 

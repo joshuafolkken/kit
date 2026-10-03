@@ -278,7 +278,6 @@ const sync = {
 	sync_workspace_yaml: sync_ai_files.sync_workspace_yaml,
 	sync_claude_md: sync_ai_files.sync_claude_md,
 	sync_prettier_config,
-	sync_basic_prettier_config,
 	sync_playwright_config,
 	sync_deploy_vps,
 	sync_package_manager_version,

@@ -401,7 +401,6 @@ const run_liveness = {
 	decide,
 	describe_agent_state,
 	read_child_settled,
-	read_agent_state,
 	read_output_frozen,
 	sample_output,
 	to_safe_path,

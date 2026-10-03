@@ -145,8 +145,6 @@ function to_status_check_rollup(input: {
 }
 
 const git_gh_pr_rollup = {
-	to_check_run_items,
-	to_status_context_items,
 	to_status_check_rollup,
 }
 

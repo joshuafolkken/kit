@@ -79,13 +79,6 @@ function outcome_span(
 	}
 }
 
-// One file edit, which is what the diff reconciliation reads (joshuafolkken/kit#1387). The path rides
-// on `targets`, exactly as `time-bundle-call.ts` writes it at parse time — a case about an edit that
-// never landed cannot be expressed by the builders above, neither of which carries a target.
-function edit_span(label: string, target: string): Span {
-	return { ...span(time_spans.TOOL_CATEGORY, DEFAULT_MINUTES, label), targets: [target] }
-}
-
 // A subagent launch: a tool call that is never bundleable, carrying the turn that issued it and
 // whether its prompt builds on a prior finding (joshuafolkken/kit#1854). Single-sourced here so both
 // bundle suites build one the same way.
@@ -98,6 +91,6 @@ function launch_span(message_id: string, has_prior_reference = false): Span {
 	}
 }
 
-const time_span_fixture = { MINUTE_MS, span, outcome_span, edit_span, launch_span }
+const time_span_fixture = { MINUTE_MS, span, outcome_span, launch_span }
 
 export { time_span_fixture }

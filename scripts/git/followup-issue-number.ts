@@ -23,9 +23,4 @@ function parse_completed_issue_number(raw: string | undefined): number | undefin
 	return digits === undefined ? undefined : Number(digits)
 }
 
-const followup_issue_number = {
-	parse_issue_number_from_text,
-	parse_completed_issue_number,
-}
-
-export { followup_issue_number, parse_issue_number_from_text, parse_completed_issue_number }
+export { parse_issue_number_from_text, parse_completed_issue_number }

@@ -95,7 +95,6 @@ const run_halfrun_resume = {
 	UNREADABLE,
 	adopt,
 	adopt_at,
-	is_halfrun_stop,
 	is_pending,
 	mark_stop_at,
 }

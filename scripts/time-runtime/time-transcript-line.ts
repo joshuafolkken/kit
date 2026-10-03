@@ -247,7 +247,6 @@ function parse_line(line: string): TranscriptLine | undefined {
 
 const time_transcript_line = {
 	ERROR_TEXT_LIMIT,
-	REFUSAL_MARKER,
 	NO_MESSAGE_ID,
 	guard_from_refusal,
 	parse_line,

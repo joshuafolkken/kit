@@ -265,11 +265,9 @@ function mainline_records(pairs: ReadonlyArray<AttributedRecord>): Array<Array<U
 }
 
 const cost_corpus = {
-	accumulate_missing,
 	load_corpus,
 	attribute_corpus,
 	floor_for_issue,
-	dedupe_across_sessions,
 	attributed,
 	mainline_records,
 }

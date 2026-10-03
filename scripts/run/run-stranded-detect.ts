@@ -128,7 +128,7 @@ async function run_stranded_check(): Promise<void> {
 	}
 }
 
-const run_stranded_detect = { DEFAULT_PORTS, detect_and_report, gather, report, run_stranded_check }
+const run_stranded_detect = { detect_and_report, run_stranded_check }
 
 export { run_stranded_detect }
 export type { DetectPorts, RecordTargets }

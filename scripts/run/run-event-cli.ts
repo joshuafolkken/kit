@@ -193,8 +193,6 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const run_event_cli = {
-	USAGE,
-	main,
 	run,
 	watch_start,
 }

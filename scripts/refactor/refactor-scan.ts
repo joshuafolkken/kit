@@ -111,7 +111,6 @@ const refactor_scan = {
 	render,
 	render_result,
 	run_scan,
-	scan,
 	convergence_candidates,
 	verdict_line,
 	verdict_token,

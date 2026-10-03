@@ -171,7 +171,6 @@ function format_waves(
 const backlog_waves = {
 	HEADING_ASSUMPTION,
 	NEEDS_DECISION_NOTE,
-	NOT_REACHED_NOTE,
 	PARALLEL_NOTE,
 	UNREACHED_HEADING,
 	build,

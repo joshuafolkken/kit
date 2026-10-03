@@ -180,7 +180,6 @@ function kept_note(source: MigrationSource): string {
 }
 
 const skill_migration = {
-	is_unmodified_copy,
 	migrate_removed_skill_directories,
 	migrate_manifest_skills,
 	expected_manifest,

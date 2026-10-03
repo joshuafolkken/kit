@@ -146,7 +146,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
 const codex_hook_adapter = {
 	format_posttool_payloads,
-	patch_paths,
 	posttool_payloads,
 	pretool_outcome,
 	pretool_payload,

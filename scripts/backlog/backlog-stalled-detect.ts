@@ -137,7 +137,7 @@ async function run_stall_check(ready: ReadyPorts = backlog_ready.DEFAULT_PORTS):
 	}
 }
 
-const backlog_stalled_detect = { DEFAULT_PORTS, detect_and_report, gather, report, run_stall_check }
+const backlog_stalled_detect = { detect_and_report, run_stall_check }
 
 export { backlog_stalled_detect }
 export type { DetectPorts }

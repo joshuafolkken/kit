@@ -423,7 +423,6 @@ const observations_flush = {
 	broken_lines_message,
 	CLEAN_MESSAGE,
 	COMMIT_MESSAGE,
-	empty_flush_message,
 	flush,
 	flush_branch_message,
 	has_ledger_change,

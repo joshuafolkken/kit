@@ -135,8 +135,6 @@ const backlog_scope = {
 	OPTED_IN_UNPLACED_REASON,
 	open_numbers_of,
 	out_of_scope,
-	planned_numbers,
-	reason_for,
 	titles_of,
 }
 

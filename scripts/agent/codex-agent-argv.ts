@@ -88,7 +88,7 @@ function build(invocation: string, profile: AgentProfile, cwd?: string): CodexAr
 	}
 }
 
-const codex_agent_argv = { AGENT_COMMAND, AGENT_FLAGS, build }
+const codex_agent_argv = { build }
 
 export type { CodexArgv }
 export { codex_agent_argv }

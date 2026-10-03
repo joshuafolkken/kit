@@ -91,9 +91,7 @@ const epic_audit_report = {
 	PASS_LINE,
 	anomaly_findings,
 	unreadable_findings,
-	has_error,
 	build_result,
-	sort_findings,
 	format_report,
 }
 

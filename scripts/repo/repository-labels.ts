@@ -86,6 +86,6 @@ function ensure_labels(repo: string | undefined): ReadonlyArray<string> {
 	return create_missing(missing_labels(existing), repo)
 }
 
-const repository_labels = { missing_labels, ensure_labels }
+const repository_labels = { ensure_labels }
 
 export { repository_labels }

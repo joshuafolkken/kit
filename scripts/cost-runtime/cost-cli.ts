@@ -305,11 +305,8 @@ const cost_cli = {
 	USAGE,
 	parse_options,
 	to_threshold,
-	load_corpus: cost_corpus.load_corpus,
-	attributed: cost_corpus.attributed,
 	run,
 	session_verdict,
-	main,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))

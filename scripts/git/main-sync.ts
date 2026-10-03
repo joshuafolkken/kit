@@ -115,7 +115,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const main_sync = { COMMAND_NAME, LANE_REFUSAL, main, run }
+const main_sync = { run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

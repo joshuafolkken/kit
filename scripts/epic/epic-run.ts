@@ -213,7 +213,6 @@ async function check_epic(epic_number: number): Promise<number> {
 }
 
 const epic_run = {
-	parse_created_number,
 	create_epic,
 	promote_epic,
 	check_epic,

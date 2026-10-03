@@ -113,12 +113,8 @@ const split_assess = {
 	SPLIT_VERDICT,
 	SINGLE_VERDICT,
 	assess,
-	measure,
-	non_test_changes,
 	parse_numstat,
-	parse_row,
 	reason,
-	verdict_for,
 }
 
 export type { FileChange, SizeMeasurement, SplitVerdict }

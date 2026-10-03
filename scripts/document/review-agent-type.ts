@@ -37,8 +37,6 @@ function names_known_type(text: string = read_unwrapped(CHAIN_RULE)): boolean {
 }
 
 const review_agent_type = {
-	CHAIN_RULE,
-	KNOWN_AGENT_TYPES,
 	named_agent_type,
 	names_known_type,
 }

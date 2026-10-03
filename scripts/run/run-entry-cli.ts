@@ -188,11 +188,6 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 const run_entry_cli = {
 	HALFRUN_RESUME_TOKEN,
-	SUCCESS_EXIT_CODE,
-	USAGE,
-	check_cost,
-	claim_hold,
-	main,
 	parse_number,
 	run,
 }

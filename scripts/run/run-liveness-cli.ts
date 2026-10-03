@@ -159,7 +159,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const run_liveness_cli = { USAGE, main, parse_request, run }
+const run_liveness_cli = { USAGE, parse_request, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

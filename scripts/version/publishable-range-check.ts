@@ -69,6 +69,6 @@ function main(): void {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
-const publishable_range_check = { check, probe_range }
+const publishable_range_check = { check }
 
 export { publishable_range_check }

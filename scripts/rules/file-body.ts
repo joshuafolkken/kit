@@ -142,9 +142,6 @@ const file_body = {
 	FILE_BODY_REASON,
 	ROW,
 	carries_a_file_body,
-	is_in_place_perl,
-	is_interpreter_write,
-	writes_existing_file,
 }
 
 export { file_body }

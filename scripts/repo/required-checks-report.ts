@@ -65,7 +65,7 @@ function is_complete(report: RequiredChecksReport): boolean {
 	return is_read && report.missing.length === 0
 }
 
-const required_checks_report = { APPLY_COMMAND, format_report, is_complete }
+const required_checks_report = { format_report, is_complete }
 
 export type { RequiredChecksReport }
 export { required_checks_report }

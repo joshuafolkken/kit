@@ -262,16 +262,11 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 const backlog_offer_cli = {
 	JSON_KEY,
-	USAGE,
 	budget_argv,
 	counts_of,
-	emit,
-	main,
-	mark_drain,
 	next_argv,
 	read_values,
 	run,
-	to_tokens,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))

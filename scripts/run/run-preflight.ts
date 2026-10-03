@@ -89,7 +89,7 @@ const STASH_LABEL_PREFIX = 'run:hold reclaimed before #'
 // so the shape it may take is pinned beside the interpolation rather than only in the CLI that
 // happens to be today's single caller. `run:liveness` interpolates it the same way, so the pattern
 // and the refusal live in one module both read (joshuafolkken/kit#1485).
-const { ISSUE_NUMBER_PATTERN, require_issue_number } = run_issue_number
+const { require_issue_number } = run_issue_number
 const UNREADABLE_PR_MESSAGE = 'The pull request could not be read for branch '
 
 function needs_reclaim(tree: TreeState): boolean {
@@ -385,15 +385,8 @@ async function check(issue: string): Promise<PreflightDecision> {
 }
 
 const run_preflight = {
-	CLEAN_ADVICE,
-	CLEAN_REASON,
 	CLEAN_VERDICT,
-	ISSUE_NUMBER_PATTERN,
-	PARK_ADVICE,
-	PARK_VERDICT,
-	RECLAIM_VERDICT,
 	RESUME_ADVICE,
-	RESUME_VERDICT,
 	MERGED_PR,
 	STASH_LABEL_PREFIX,
 	check,

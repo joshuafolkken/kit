@@ -102,18 +102,15 @@ function clear_round_one(target?: string): void {
 }
 
 const review_stamps = {
-	BRIEFED_PREFIX,
 	briefed_stamp,
 	clear_round_one,
 	GATE_PREFIX,
 	gate_stamp,
 	IN_FLIGHT_PREFIX,
 	in_flight_stamp,
-	LINT_RELATED_PREFIX,
 	lint_related_stamp,
 	ROUND_ONE_PREFIX,
 	round_one_stamp,
-	TEST_RELATED_PREFIX,
 	test_related_stamp,
 }
 
