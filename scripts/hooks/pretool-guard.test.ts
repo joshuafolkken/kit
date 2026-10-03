@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { GuardOutcome } from '#scripts/josh/hook-decision'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { pretool_guard, pretool_outcome, pretool_outcome_async } from './pretool-guard'
+import { step_zero_notice } from './step-zero-notice'
 
 // The watcher guard is the one composed rule that reads off disk, so it is mocked here to pin the
 // composition — that a stale-watcher reason fills a clear verdict, and that a synchronous refusal wins
@@ -39,14 +40,28 @@ function outcome(
 
 // A real transcript file so the composed guards run their normal disk path rather than failing open,
 // and a fresh one per case so the once-per-run stamp never dedupes one case against another.
-function payload_with_transcript(command: string): string {
+function fresh_transcript(): string {
 	const directory = mkdtempSync(path.join(tmpdir(), 'pretool-guard-'))
 	const transcript_path = path.join(directory, 'transcript.jsonl')
 
 	writeFileSync(transcript_path, '{"type":"user"}\n')
 	closeSync(openSync(transcript_path, 'r'))
 
+	return transcript_path
+}
+
+function payload_with_transcript(command: string): string {
+	const transcript_path = fresh_transcript()
+
 	return JSON.stringify({ tool_name: 'Bash', tool_input: { command }, transcript_path })
+}
+
+// The same fresh transcript, carried by an `Edit` of a runtime file instead of a shell call.
+function edit_payload_with_transcript(): string {
+	const transcript_path = fresh_transcript()
+	const file_path = path.join(process.cwd(), 'scripts/hooks/example.ts')
+
+	return JSON.stringify({ tool_name: 'Edit', tool_input: { file_path }, transcript_path })
 }
 
 describe('combine_outcomes', () => {
@@ -115,6 +130,38 @@ describe('pretool_outcome_async — the composed watcher guard', () => {
 
 		expect(refusal.reason).toContain(SHELL_BODY_REASON)
 		expect(watcher_hook_reason).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#2994: the Step 0 reminder is the last layer, spoken only where nothing else did.
+describe('pretool_outcome — the Step 0 reminder at Edit time', () => {
+	afterEach(() => {
+		watcher_hook_reason.mockReset()
+		watcher_hook_reason.mockResolvedValue(undefined)
+	})
+
+	it('reminds on the first runtime edit of a session', async () => {
+		const result = await pretool_outcome_async(edit_payload_with_transcript())
+
+		expect(result).toEqual(outcome(undefined, step_zero_notice.NOTICE, undefined))
+	})
+
+	it('carries the reminder on the synchronous path the Codex adapter asks', () => {
+		expect(pretool_outcome(edit_payload_with_transcript()).notice).toBe(step_zero_notice.NOTICE)
+	})
+
+	it('says nothing on a shell call', async () => {
+		const result = await pretool_outcome_async(payload_with_transcript(BENIGN_COMMAND))
+
+		expect(result.notice).toBeUndefined()
+	})
+
+	it('lets an asynchronous refusal win over the reminder', async () => {
+		watcher_hook_reason.mockResolvedValue(WATCHER_STALE_REASON)
+
+		const result = await pretool_outcome_async(edit_payload_with_transcript())
+
+		expect(result).toEqual(outcome(WATCHER_STALE_REASON, undefined, undefined))
 	})
 })
 

@@ -124,12 +124,13 @@ describe('eval_sandbox.sandbox_settings', () => {
 		expect(eval_sandbox.sandbox_settings(raw)).toBe(raw)
 	})
 
-	// The rule-stating hooks are what a scenario reads, so the real file has to still carry them here.
-	it('keeps the shipped rule hooks', () => {
+	// The shipped file carries no echoed rule since joshuafolkken/kit#2994 moved the Step 0 reminder to
+	// the Edit-time guard, so what the real file pins here is the filter: no toolchain hook survives.
+	it('ships the real settings without a toolchain hook', () => {
 		const sandbox_path = sandbox_for()
 		const written = readFileSync(path.join(sandbox_path, eval_sandbox.SETTINGS_PATH), 'utf8')
 
-		expect(written).toContain('MANDATORY')
 		expect(written).not.toContain('josh format:edited')
+		expect(written).not.toContain('josh session:lang')
 	})
 })

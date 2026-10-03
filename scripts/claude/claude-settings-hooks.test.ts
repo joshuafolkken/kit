@@ -93,11 +93,6 @@ const MINIMUM_PROVISION_TIMEOUT_SECONDS =
 const SESSION_LANG_HOOK_COMMAND = hook_launch.hook_launch_command('session-lang.js', 'session:lang')
 const MINIMUM_SESSION_LANG_TIMEOUT_SECONDS = STARTUP_ALLOWANCE_SECONDS
 // The per-turn echoes are injected on every prompt, so each stays bounded (joshuafolkken/kit#1930).
-// The work-summary reminder is a trigger and a pointer at Code Change Rules Step 0 in `CLAUDE.md`
-// (joshuafolkken/kit#2889), near 200 characters. The real per-turn budget is the joined-text ceiling
-// `prompt-hook-brevity.test.ts` owns (256 bytes); this per-echo bound only has to keep a single
-// reminder from growing past that same ceiling on its own.
-const ECHO_MAX_LENGTH = 256
 
 // Compared as sets, so the two sides are ordered the same way first. `localeCompare` rather than the
 // default, which sorts by code unit and is what the lint rule here is about.
@@ -335,21 +330,22 @@ describe('.claude/settings.json — the language hook is not duplicated', () => 
 	})
 })
 
-// joshuafolkken/kit#1930: an echo hook is injected on every prompt, so each is kept short.
-function echo_commands(): ReadonlyArray<string> {
+function prompt_commands(): ReadonlyArray<string> {
 	return (claude_settings_fixture.load_settings().hooks.UserPromptSubmit ?? [])
 		.flatMap((entry) => entry.hooks)
 		.map((handler) => handler.command)
-		.filter((command) => command.startsWith('echo '))
 }
 
-describe('.claude/settings.json — the per-turn echoes are short', () => {
-	it('injects at least one reminder echo', () => {
-		expect(echo_commands().length).toBeGreaterThan(0)
+// joshuafolkken/kit#2994: an echo is injected on every prompt, a question that writes nothing included,
+// so the Step 0 reminder moved to the first runtime `Edit` / `Write` (`step-zero-notice.ts`) and the
+// prompt hook is the one session-language process.
+describe('.claude/settings.json — one per-turn process, no echoed reminder', () => {
+	it('runs exactly one UserPromptSubmit command, the session-language line', () => {
+		expect(prompt_commands()).toEqual([SESSION_LANG_HOOK_COMMAND])
 	})
 
-	it('keeps every echo under the per-turn length budget', () => {
-		for (const command of echo_commands()) expect(command.length).toBeLessThan(ECHO_MAX_LENGTH)
+	it('injects no echo on a prompt', () => {
+		expect(prompt_commands().filter((command) => command.startsWith('echo '))).toEqual([])
 	})
 })
 

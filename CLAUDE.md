@@ -1,8 +1,6 @@
 # Claude Code Instructions
 
-> **This file is the entry point for every agent rule.** `AGENTS.md` and `GEMINI.md` are pointers to it and carry no rules of their own — a rule's trigger is written **once**, here, and its procedure and any number it uses **once**, at its pointer. History: `docs/maintainers/claude-md-history.md`.
->
-> Each rule is written as a **trigger plus a pointer** — enough to act safely with nothing else loaded, with the steps and rationale at the pointer.
+> **This file is the entry point for every agent rule.** `AGENTS.md` and `GEMINI.md` are pointers to it and carry no rules of their own — a rule's trigger is written **once**, here, and its procedure and any number it uses **once**, at its pointer. History, and the explanations kept out of this file: `docs/maintainers/claude-md-history.md`.
 
 ## Project
 
@@ -38,7 +36,7 @@ Classify each decision point into one tier and act; stop **only** when the choic
 
 ## Environment Variables
 
-Read from a `.env` file at the project root by the AI scripts, `josh port` and `playwright.config.ts`. `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are required for notifications; `JOSH_SESSION_LANG`, `PORT_SEED` and `JOSH_REPO_PATHS` are optional and personal. Setup and full semantics: [docs/scripts-ai.md](https://github.com/joshuafolkken/kit/blob/main/docs/scripts-ai.md) and [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md).
+A `.env` at the project root: `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are required for notifications; `JOSH_SESSION_LANG`, `PORT_SEED` and `JOSH_REPO_PATHS` are optional and personal. Setup and semantics: [docs/scripts-ai.md](https://github.com/joshuafolkken/kit/blob/main/docs/scripts-ai.md) and [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md).
 
 **GitHub operations are `gh api` (REST) — instructing prose included — and need `gh` installed; some environments lack it.** Auth: `gh auth login`; `GH_TOKEN` in CI/cloud. `prompts/collaboration-workflow/gh-rest.md`.
 
@@ -66,7 +64,7 @@ Read from a `.env` file at the project root by the AI scripts, `josh port` and `
 ### Quality limits
 
 - Function complexity ≤5 · nesting ≤2 · function ≤25 lines · file ≤300 lines · params ≤4 · statements per function ≤10 · cognitive complexity ≤4
-- **Those line counts are code lines, not physical lines** (`max-lines` / `max-lines-per-function` run with `skipBlankLines` + `skipComments`) — judge by what `pnpm josh lint` reports, never `wc -l`. Test files (`*.test.ts` / `*.e2e.ts`) allow 35 code lines per function.
+- **Those line counts are code lines, not physical lines** — judge by what `pnpm josh lint` reports, never `wc -l`. Test files (`*.test.ts` / `*.e2e.ts`) allow 35 code lines per function.
 - Magic numbers: extract all literals except `0`, `1`, `-1` to named `UPPER_CASE` constants
 - No `any` · no unused vars · no floating promises · type assertions (`as`) are restricted
 - All function params and return types must be explicitly typed
@@ -96,13 +94,13 @@ Read from a `.env` file at the project root by the AI scripts, `josh port` and `
 
 - Before building a feature, check whether a well-maintained package already solves the problem rather than writing original code first, and propose replacing hand-rolled implementations with a suitable package when it improves maintainability.
 - Prefer modern, actively-maintained packages (maintenance, popularity, bundle size, TypeScript support, license, fit). **If one is clearly the best fit, select it** (Tier A — log it); **only when two or more are genuinely close**, present about three ranked options and let the user choose.
-- **Measure the choice before you judge it — `pnpm josh pkg:scout <keywords>`.** It ranks the candidate packages by downloads, last publish, bundled types, license and install size, and prints `clear` when the leader is ahead by at least the near-tie threshold (select it, Tier A) or `close` when the top two are within it (ask, Tier B) — so "clearly best" and "genuine toss-up" are read off the output rather than decided by impression.
+- **Measure the choice before you judge it — `pnpm josh pkg:scout <keywords>`:** `clear` → select it (Tier A), `close` → ask (Tier B). Metrics and threshold: `docs/josh-commands-automation.md`.
 
 ## Code Change Rules
 
 For every code modification, in order:
 
-0. **Work summary + test declaration** _(before writing any implementation code)_: a two-layer summary — a plain-language overview a non-programmer can follow (three lines, **Now / Change / Check**, one sentence each, in the session language; name the concrete subject in each line — subject-less prose is not acceptable; no file paths, function or type names, or CLI option flags — only internal identifiers are banned, not names the reader sees on screen), **Details**, then **every change with its test** (`<what changes> — Test: <Unit|E2E> — <file path> — <what it verifies>`). Ordinary markdown, **never wrapped in a code fence**, once per Issue before implementation — required in fullrun/halfrun/backlogrun even when the Issue body was filled (`kickoff` is exempt); completion reports lead with **Cause / Fix / Result**. `prompts/collaboration-workflow/report-format.md`; `pnpm josh report:lint` checks the form, and the `UserPromptSubmit` hook points here. Presentation only, never a confirmation stop.
+0. **Work summary + test declaration** _(before writing any implementation code)_: a two-layer summary — a plain-language overview a non-programmer can follow (three lines, **Now / Change / Check**, one sentence each, in the session language; name the concrete subject in each line — subject-less prose is not acceptable; no file paths, function or type names, or CLI option flags — only internal identifiers are banned, not names the reader sees on screen), **Details**, then **every change with its test** (`<what changes> — Test: <Unit|E2E> — <file path> — <what it verifies>`). Ordinary markdown, **never wrapped in a code fence**, once per Issue before implementation — required in fullrun/halfrun/backlogrun even when the Issue body was filled (`kickoff` is exempt); completion reports lead with **Cause / Fix / Result**. `prompts/collaboration-workflow/report-format.md`; `pnpm josh report:lint` checks the form, and a session's first runtime `Edit` / `Write` points here. Presentation only, never a confirmation stop.
 
    - **Tests are required for ALL changes** — zero tests without explicit approval is a violation (bug fixes, timing/animation fixes and refactors included): bug fix → regression test; UI/animation/timing → E2E for the observable change; logic/utility → unit; refactor → tests pinning existing behavior BEFORE the change (`prompts/refactoring.md`).
    - **Non-runtime updates (pre-approved manual-only exception)**: a change touching no executable runtime code path may proceed with manual verification — declare it in Step 0 and state why. It covers docs, non-executable config, editor/IDE files, and cosmetic asset swaps with no selector/path change; the mechanically exempt (`*.md`, `.editorconfig`, `.idea/**`, `.vscode/**`, `prompts/**`) are recognized by the command below, and the rest stay the exemption a person declares. A test infeasible for a runtime change needs its reason stated and user approval.
@@ -131,7 +129,7 @@ Run the full verification set **in order**; do not skip, reorder, or report comp
 
 ## Pre-commit Self-Review (mandatory)
 
-Before every `git commit` (follow-up commits included), self-review against `prompts/review.md` — a subagent runs `/code-review`, never a main-line `Skill` load: the staged diff, and `git diff main...HEAD` before opening or updating a PR. Level from `pnpm josh review:brief --level-only`; resolve all high/medium findings; iterate — **no further than the round cap**, the last round a verification pass over the fix delta. Then route each remaining non-High finding through the three-way disposition: fix in place, file it as a follow-up Issue only when it is a confirmed defect that reaches a runtime path — `pnpm josh disposition <path>` answers `runtime` / `non-runtime`, so the only judgement left is whether the defect is confirmed — or drop it with a one-line PR note (the default). **A filed finding is run through `pnpm josh epic:bundle <new>` before the current Issue closes.** A confirmed High blocks rather than buying a round past the cap; CI runs no Claude review, so this pass is authoritative. `prompts/review.md` → "Review round cap".
+Before every `git commit` (follow-up commits included), self-review against `prompts/review.md` — a subagent runs `/code-review`, never a main-line `Skill` load: the staged diff, and `git diff main...HEAD` before opening or updating a PR. Level from `pnpm josh review:brief --level-only`; resolve all high/medium findings; iterate — **no further than the round cap**, the last round a verification pass over the fix delta. Then route each remaining non-High finding through the three-way disposition: fix in place, file it as a follow-up Issue only when it is a confirmed defect that reaches a runtime path (`pnpm josh disposition <path>` answers `runtime` / `non-runtime`) — or drop it with a one-line PR note (the default). **A filed finding is run through `pnpm josh epic:bundle <new>` before the current Issue closes.** A confirmed High blocks rather than buying a round past the cap. `prompts/review.md` → "Review round cap".
 
 ## Doc Sync Rules
 
