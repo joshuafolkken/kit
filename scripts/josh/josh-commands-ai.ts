@@ -162,7 +162,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	'run:tail': {
 		script: 'scripts/run/run-tail-cli.ts',
 		description:
-			'Close a run in one call: commit the observation ledger, read the citations, decide the release scope',
+			'Close a run in one call: return to the default branch, commit the observation ledger, read the citations, decide the release scope',
 		category: 'AI tools',
 		reference: ['[<issue> ...]', 'automation', ['git', 'network']],
 	},
