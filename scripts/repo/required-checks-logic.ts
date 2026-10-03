@@ -26,8 +26,8 @@ const DISTRIBUTED_CHECKS: ReadonlyArray<WorkflowChecks> = [
 	{ workflow: CLASSIFICATION_WORKFLOW, checks: ['Release classification'] },
 ]
 
-// Where the repository's required checks live. A ruleset is read first; classic branch protection
-// is the fallback for a repository that never moved to rulesets.
+// Where the repository's required checks live. A ruleset is the source `--apply` writes to; classic
+// branch protection is read beside it, and is the source for a repository that never moved to rulesets.
 type RequiredSource =
 	| { kind: 'ruleset'; ruleset_id: number; contexts: ReadonlyArray<string> }
 	| { kind: 'protection'; contexts: ReadonlyArray<string> }
@@ -141,6 +141,17 @@ function parse_protection(read: ApiRead): RequiredSource {
 		: { kind: 'unreadable' }
 }
 
+// GitHub enforces rulesets and classic protection together, so a check either one requires is
+// required. The ruleset stays the source `--apply` writes to; a protection read that failed for any
+// reason but a 404 leaves the whole answer `unreadable`, as a lone protection read would.
+function combine_sources(rules: RequiredSource, protection: RequiredSource): RequiredSource {
+	if (rules.kind !== 'ruleset') return protection
+	if (protection.kind === 'none') return rules
+	if (protection.kind !== 'protection') return { kind: 'unreadable' }
+
+	return { ...rules, contexts: [...new Set([...rules.contexts, ...protection.contexts])] }
+}
+
 function missing_checks(
 	expected: ReadonlyArray<string>,
 	contexts: ReadonlyArray<string>,
@@ -185,6 +196,7 @@ const required_checks_logic = {
 	expected_checks,
 	parse_branch_rules,
 	parse_protection,
+	combine_sources,
 	missing_checks,
 	ruleset_update_body,
 	protection_update_body,

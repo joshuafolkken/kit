@@ -48,14 +48,16 @@ function read_protection(repo: string, branch: string): ApiRead {
 	}
 }
 
-// Rulesets first; classic branch protection only when no ruleset requires a check at all.
+// Rulesets and classic branch protection both, since GitHub enforces both; unreadable rules stop
+// there rather than letting protection alone pass for the whole answer.
 function read_source(repo: string, branch: string): RequiredSource {
 	const from_rules = required_checks_logic.parse_branch_rules(
 		read_api(`repos/${repo}/rules/branches/${branch}`),
 	)
-	if (from_rules.kind !== 'none') return from_rules
+	if (from_rules.kind === 'unreadable') return from_rules
+	const from_protection = required_checks_logic.parse_protection(read_protection(repo, branch))
 
-	return required_checks_logic.parse_protection(read_protection(repo, branch))
+	return required_checks_logic.combine_sources(from_rules, from_protection)
 }
 
 // The checks `root` should require, decided by the jobs its distributed workflows define on disk.

@@ -185,6 +185,35 @@ describe('parse_protection', () => {
 	})
 })
 
+describe('combine_sources', () => {
+	const ruleset = { kind: 'ruleset', ruleset_id: RULESET_ID, contexts: [CHECKS] } as const
+
+	it('adds the contexts classic protection requires to the ruleset, once each', () => {
+		const protection = { kind: 'protection', contexts: [CHECKS, SONAR_QUBE] } as const
+
+		expect(required_checks_logic.combine_sources(ruleset, protection)).toEqual({
+			...ruleset,
+			contexts: [CHECKS, SONAR_QUBE],
+		})
+	})
+
+	it('keeps the ruleset alone on a branch without protection', () => {
+		expect(required_checks_logic.combine_sources(ruleset, { kind: 'none' })).toEqual(ruleset)
+	})
+
+	it('reads an unreadable protection beside a ruleset as unreadable', () => {
+		const combined = required_checks_logic.combine_sources(ruleset, { kind: 'unreadable' })
+
+		expect(combined).toEqual({ kind: 'unreadable' })
+	})
+
+	it('answers with protection when no ruleset requires a check', () => {
+		const protection = { kind: 'protection', contexts: [E2E] } as const
+
+		expect(required_checks_logic.combine_sources({ kind: 'none' }, protection)).toEqual(protection)
+	})
+})
+
 describe('missing_checks', () => {
 	it('lists the expected checks the repository does not require, in expected order', () => {
 		const expected = [CHECKS, E2E, SONAR_QUBE, RELEASE_CLASSIFICATION]

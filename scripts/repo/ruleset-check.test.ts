@@ -20,6 +20,7 @@ const REPO = 'joshuafolkken/game-kit'
 const BRANCH = 'main'
 const RULESET_ID = 7
 const SONAR_QUBE = 'SonarQube'
+const CHECKS = 'Checks'
 const REQUIRED_STATUS_CHECKS = 'required_status_checks'
 const RULES_PATH = `repos/${REPO}/rules/branches/${BRANCH}`
 const PROTECTION_PATH = `repos/${REPO}/branches/${BRANCH}/protection/required_status_checks`
@@ -57,6 +58,12 @@ function stub_reads(responses: Record<string, string | undefined>): void {
 	)
 }
 
+function fail_protection_read(status: number): void {
+	mocks.exec.mockImplementationOnce(() => {
+		throw gh_failure.attach(new Error('gh api failed'), { status })
+	})
+}
+
 function report_for(source: RequiredChecksReport['source']): RequiredChecksReport {
 	return { repo: REPO, branch: BRANCH, source, expected: [SONAR_QUBE], missing: [SONAR_QUBE] }
 }
@@ -65,18 +72,32 @@ beforeEach(() => {
 	vi.resetAllMocks()
 })
 
-describe('ruleset_check.inspect', () => {
-	it('reads the ruleset and never falls back to protection when a ruleset requires checks', () => {
-		stub_reads({ [RULES_PATH]: branch_rules(['Checks']) })
+describe('ruleset_check.inspect beside a ruleset', () => {
+	it('reads the ruleset with no protection on the branch and reports what neither requires', () => {
+		stub_reads({ [RULES_PATH]: branch_rules([CHECKS]) })
+		fail_protection_read(NOT_FOUND)
 
 		expect(ruleset_check.inspect(REPO, scratch)).toMatchObject({
 			source: { kind: 'ruleset', ruleset_id: RULESET_ID },
 			expected: [SONAR_QUBE],
 			missing: [SONAR_QUBE],
 		})
-		expect(mocks.exec).not.toHaveBeenCalled()
 	})
 
+	// GitHub enforces both, so a check classic protection requires is not missing beside a ruleset.
+	it('counts a check classic protection requires beside a ruleset as required', () => {
+		stub_reads({ [RULES_PATH]: branch_rules([CHECKS]) })
+		mocks.exec.mockReturnValueOnce(`{"contexts":["${SONAR_QUBE}"]}`)
+
+		expect(ruleset_check.inspect(REPO, scratch)).toMatchObject({
+			source: { kind: 'ruleset', ruleset_id: RULESET_ID, contexts: [CHECKS, SONAR_QUBE] },
+			missing: [],
+		})
+		expect(mocks.exec).toHaveBeenCalledWith(expect.objectContaining({ path: PROTECTION_PATH }))
+	})
+})
+
+describe('ruleset_check.inspect', () => {
 	it('falls back to classic protection when no ruleset requires a check', () => {
 		stub_reads({ [RULES_PATH]: '[]' })
 		mocks.exec.mockReturnValueOnce(`{"contexts":["${SONAR_QUBE}"]}`)
@@ -112,9 +133,7 @@ describe('ruleset_check.inspect protection failures', () => {
 		[FORBIDDEN, 'unreadable'],
 	])('reads a protection failure with status %s as %s', (status, kind) => {
 		stub_reads({ [RULES_PATH]: '[]' })
-		mocks.exec.mockImplementationOnce(() => {
-			throw gh_failure.attach(new Error('gh api failed'), { status })
-		})
+		fail_protection_read(status)
 
 		expect(ruleset_check.inspect(REPO, scratch).source).toEqual({ kind })
 	})
