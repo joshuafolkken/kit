@@ -27,6 +27,33 @@ describe('stop_rules.stop_outcome — stop notification', () => {
 	})
 })
 
+// joshuafolkken/kit#2962: a lane child that handed its region to the detached ship waits on nobody.
+describe('stop_rules.stop_outcome — hand-off to the detached ship', () => {
+	it('demands no notify from a lane child handed to a running ship', () => {
+		const handed_off = context({ lane_child: true, hold_present: true, handed_off: true })
+
+		expect(stop_rules.stop_outcome(handed_off)).toEqual(stop_rules.NO_OUTCOME)
+	})
+
+	it('demands no hold release either, since the supervisor owns the hold', () => {
+		const handed_off = context({
+			lane_child: true,
+			hold_present: true,
+			tree_clean: true,
+			notified: true,
+			handed_off: true,
+		})
+
+		expect(stop_rules.stop_outcome(handed_off)).toEqual(stop_rules.NO_OUTCOME)
+	})
+
+	it('still demands the notify from a lane child that parks for a decision', () => {
+		const parked = context({ lane_child: true, hold_present: true, handed_off: false })
+
+		expect(stop_rules.stop_outcome(parked).reason).toBe(stop_rules.STOP_NOTIFY_REASON)
+	})
+})
+
 describe('stop_rules.stop_outcome — hold release', () => {
 	it('refuses a clean tree that still holds', () => {
 		const outcome = stop_rules.stop_outcome(

@@ -4,11 +4,12 @@ import { repo_party } from '#scripts/discovery/repo-party'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { session_language } from '#scripts/josh/session-language'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { lane_background } from '#scripts/rules/lane-background'
 import { stop_rules } from '#scripts/rules/stop-rules'
 import { run_cut } from '#scripts/run/run-cut'
 import { run_headless } from '#scripts/run/run-headless'
-import { run_hold } from '#scripts/run/run-hold'
+import { run_hold, type HoldRead } from '#scripts/run/run-hold'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -136,6 +137,39 @@ async function decide_in_lane(pending: ReadonlyArray<string>): Promise<string> {
 
 	return write.mock.calls.map((call) => String(call[0])).join('')
 }
+
+const HELD: HoldRead = {
+	kind: 'held',
+	hold: { issue: '2962', taken_at: '2026-10-03T00:00:00.000Z', pid: process.pid },
+}
+
+// The stdout writes of one stop decision on a held tree, with the ship hand-off reading `is_handed_off`.
+async function decide_held(is_handed_off: boolean): Promise<string> {
+	quiet_world()
+	vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(process.cwd())
+	vi.spyOn(run_hold, 'read_hold').mockReturnValue(HELD)
+	vi.spyOn(lane_handoff, 'is_handed_off').mockReturnValue(is_handed_off)
+	const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+
+	await write_stop_decision(JSON.stringify({ transcript_path: UNREAD_TRANSCRIPT }))
+
+	return write.mock.calls.map((call) => String(call[0])).join('')
+}
+
+// joshuafolkken/kit#2962: the hand-off reading reaches the stop rule, so a handed-off lane stops quietly.
+describe('write_stop_decision — the ship hand-off is wired', () => {
+	beforeEach(() => {
+		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
+	})
+
+	it('lets a held lane handed to the detached ship stop without a notify', async () => {
+		expect(await decide_held(true)).toBe('')
+	})
+
+	it('still demands the notify on a held tree that was not handed off', async () => {
+		expect(await decide_held(false)).toContain('mid-workflow stop notification')
+	})
+})
 
 // joshuafolkken/kit#2704: the lane mark and the transcript's pending tasks both reach the stop rule.
 describe('write_stop_decision — the lane background wait is wired', () => {

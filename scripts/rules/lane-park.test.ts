@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { lane_handoff } from '#scripts/lane/lane-handoff'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_park } from './lane-park'
 import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
@@ -105,17 +106,50 @@ describe('is_confirmation_notify', () => {
 describe('is_unparked_stop', () => {
 	// The dispatched-child case the refusal exists for.
 	it('fires on a confirmation stop from a dispatched lane child', () => {
-		expect(lane_park.is_unparked_stop(CONFIRMATION_NOTIFY, true)).toBe(true)
+		expect(lane_park.is_unparked_stop(CONFIRMATION_NOTIFY, () => true)).toBe(true)
 	})
 
 	// **A person working in the lane carries no dispatch mark, so the rule stays silent for them.**
 	it('says nothing about a confirmation stop that is not a lane child', () => {
-		expect(lane_park.is_unparked_stop(CONFIRMATION_NOTIFY, false)).toBe(false)
+		expect(lane_park.is_unparked_stop(CONFIRMATION_NOTIFY, () => false)).toBe(false)
 	})
 
-	// A lane child running any other command is not stopping.
+	// A lane child running any other command is not stopping, and the world is never consulted.
 	it('says nothing about a non-stop command even in a lane child', () => {
-		expect(lane_park.is_unparked_stop(PROGRESS_NOTIFY, true)).toBe(false)
+		const is_child = vi.fn(() => true)
+
+		expect(lane_park.is_unparked_stop(PROGRESS_NOTIFY, is_child)).toBe(false)
+		expect(is_child).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#2962: the park refusal reads the same hand-off the `Stop` hook stands down on.
+describe('is_parking_child', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('reads a lane child whose ship has not taken over as parking', () => {
+		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
+		vi.spyOn(lane_handoff, 'is_handed_off').mockReturnValue(false)
+
+		expect(lane_park.is_parking_child(WORK_DIRECTORY)).toBe(true)
+	})
+
+	it('reads a lane child handed to the detached ship as not parking', () => {
+		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
+		const handed_off = vi.spyOn(lane_handoff, 'is_handed_off').mockReturnValue(true)
+
+		expect(lane_park.is_parking_child(WORK_DIRECTORY)).toBe(false)
+		expect(handed_off).toHaveBeenCalledWith(WORK_DIRECTORY)
+	})
+
+	it('reads a session with no dispatch mark as not parking, without probing the ship', () => {
+		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(false)
+		const handed_off = vi.spyOn(lane_handoff, 'is_handed_off')
+
+		expect(lane_park.is_parking_child(WORK_DIRECTORY)).toBe(false)
+		expect(handed_off).not.toHaveBeenCalled()
 	})
 })
 
