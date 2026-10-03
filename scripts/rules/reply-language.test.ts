@@ -66,6 +66,27 @@ describe('reply_language.is_mismatch — a reply in the session language', () =>
 	})
 })
 
+// joshuafolkken/kit#2995: the policy for a one-line progress note. It is session-facing output, so the
+// session language binds it like any other reply — a short English note in a ja session is refused,
+// because drift starts with one line. Only text too short to carry a language is left alone.
+describe('reply_language.is_mismatch — a short progress note', () => {
+	it('flags a one-line English progress note in a ja session', () => {
+		expect(reply_language.is_mismatch('Reading the stall and stranded detectors now.', 'ja')).toBe(
+			true,
+		)
+	})
+
+	it('passes the same note written in Japanese', () => {
+		expect(reply_language.is_mismatch('stall と stranded の検出処理を読んでいます。', 'ja')).toBe(
+			false,
+		)
+	})
+
+	it('passes an English note too short to carry a language', () => {
+		expect(reply_language.is_mismatch('Gate running.', 'ja')).toBe(false)
+	})
+})
+
 describe('reply_language.is_mismatch — nothing to judge', () => {
 	it('passes a reply too short to carry a language', () => {
 		expect(reply_language.is_mismatch('Released the hold.', 'ja')).toBe(false)
