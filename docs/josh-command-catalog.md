@@ -1269,7 +1269,7 @@ Classify how a dispatched lane child ended (merged, cut, abandoned, unreadable)
 
 > **Audience:** automation · **Side effects:** git, network, files
 
-`<issue>`
+`<issue> [--to <command>]`
 
 Open a run in one call: claim the tree, read the budget, bundle the reads, decide the pre-implementation step
 

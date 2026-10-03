@@ -6,6 +6,7 @@
 // not by prose. Single source: `prompts/collaboration-workflow/residency.md` → question 0.
 //
 // Anything not on this list is answered by prose or by a hook-delivered rule, never by a command.
+import { RUN_ENTRY_ORACLE } from './decision-oracle-stage'
 
 // Paths that appear in more than one entry's `single_source` field.
 const CHAIN_RULE_MD = '.claude/skills/workflow-commands/chain-rule.md'
@@ -321,6 +322,7 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		vocabulary: [LIVE, STOPPED, UNKNOWN],
 		single_source: 'docs/josh-commands-automation.md → The `in-progress` / lane difference',
 	},
+	RUN_ENTRY_ORACLE,
 ]
 
 // Returns the command name for an oracle entry. When `command` is omitted from the entry,
@@ -339,4 +341,5 @@ const decision_oracle = {
 	get_command,
 }
 
+export type { DecisionOracle }
 export { decision_oracle }

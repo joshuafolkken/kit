@@ -1305,6 +1305,8 @@ child), `run:prep` and `run:step`. The `entry #<N> — hold: … · cost: … ·
 branches on; a `busy`/`unknown` hold or an `over` budget short-circuits with a non-zero exit — the
 shape `backlog:offer` folded the parent loop head on. It asks `run:cut --resume <N>` before the hold: any answer but `fresh` prints `entry #<N> — resume: <token>` with that command's exit code and claims nothing, since an implementation cut outside a lane keeps its hold (joshuafolkken/kit#2760). A stopped `halfrun`'s hold is adopted: `resume: halfrun` (#2796). A stopped `prrun`'s is adopted too, as `resume: prrun-merged` (merged by hand — the tail only), `prrun-merge` (unmoved here and on the pull request, and clean — merge without the gate) or `prrun-gate` (moved or dirty — the gate again) (#3023).
 
+`--to kickoff|halfrun|prrun|fullrun` names how far the run goes (default `fullrun`; joshuafolkken/kit#3042). Unless a cut resumes, the first line is `stage #<N> — at: <state> · to: <command> · start: <start>`: the state is read off the issue (`fresh`, `planned` from the `run:planned` label, `halfrun-stopped` / `prrun-stopped` from the hold's stop mark, `merged` from a closed issue) and the start is `plan`, `implement`, `gate`, `followup` or `reached`. `reached` prints that line alone and exits 0, except a merged issue, which falls through to the ordinary `already-done` / `keep-work` entry. `--to kickoff` never asks `run:cut` and claims nothing; `--to halfrun` claims without the `--fullrun` mark. The stage table is the `workflow-commands` skill → §2k.
+
 ### `josh run:status`
 
 Bundles a run's read-only status — issue state, `cost --cut` verdict, and carry counters — in one

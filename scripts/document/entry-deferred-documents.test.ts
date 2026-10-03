@@ -49,8 +49,8 @@ describe('decision procedures are delivered when needed', () => {
 	})
 
 	it('starts a numbered fullrun with the folded entry command', () => {
-		expect(document('SKILL.md')).toContain('`fullrun #N` first runs')
-		expect(document('SKILL.md')).toContain('`pnpm josh run:entry <N>`')
+		expect(document('SKILL.md')).toContain('a `#N` entry first runs')
+		expect(document('SKILL.md')).toContain('`pnpm josh run:entry <N> --to <command>`')
 		expect(document('fullrun.md')).toContain('For `fullrun #N`, first run the folded')
 	})
 })

@@ -21,7 +21,7 @@ single sources). Step 2 — the `in-progress` label — stays its own call, appl
 call reports `hold`.
 
 1. **Claim the working tree — first, before anything else.** For `fullrun #N`, first run the folded
-   `pnpm josh run:entry <N>` above; it calls `run:hold` as its first step. For `fullrun new`, call
+   `pnpm josh run:entry <N>` above (no `--to` is `fullrun`, §2k); it calls `run:hold` as its first step. For `fullrun new`, call
    bare `pnpm josh run:hold`, ahead of the title and filing. `hold` continues; `busy` / `unknown` stop
    with a `confirmation` Telegram carrying stderr.
    `working-tree-hold.md` is the single source; a cross-repository target resolves its checkout from

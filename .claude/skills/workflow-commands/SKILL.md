@@ -121,7 +121,7 @@ procedure.
 | `pnpm josh issue:state <N>` answers `human_review: yes` | Implement and gate, then stop before the commit | §2z → `needs-human-review.md` |
 | Under `backlogrun`, a stop that would end a batch, or a named non-epic item | Park one child and continue; run a named non-epic item as a `fullrun` | `backlogrun-park.md` → "park and continue"; `backlogrun-child.md` → "When `#N` is not an epic" |
 | `backlogrun`'s authorization | The whole `auto-ok` opted-in pool as well as its named items; `pnpm josh backlog:next` offers them | `backlogrun.md` |
-| First call of `fullrun` / `prrun` / `halfrun` (not `kickoff`) | Claim the tree: `fullrun #N` / `prrun #N` start with `pnpm josh run:entry <N>` (which runs the hold); `fullrun new` and `halfrun` use `pnpm josh run:hold` | §2f → `working-tree-hold.md` |
+| First call of any entry | `#N`: `pnpm josh run:entry <N> --to <command>` (claims the tree, except `kickoff`); `new` (not `kickoff`): `pnpm josh run:hold` | §2k; §2f → `working-tree-hold.md` |
 | Same turn as the hold (not a dispatched child, not `kickoff`) | `pnpm josh cost --cut`; `under` continues, `over` stops with a `confirmation` Telegram and the resume command, then `pnpm josh run:release` | `backlogrun-progress.md` → "The hand-off" (shared 135,000 threshold) |
 | Before any work starts (every entry) | The split assessment; the default is not to split — separability **and** a scope clearly over one gate must hold together; a `fullrun` / `halfrun` that finds a split files the epic and **stops** | `split-assessment.md` → "The question" |
 | Another Issue here must land first | A prerequisite is a dependency, not a park (the third of four mid-run discoveries) | §2d → `prerequisite.md` |
@@ -199,9 +199,9 @@ compatible duplicate. `docs/josh-commands-automation.md` → "`josh issue:file`"
 ## 2f. The working-tree hold — one run per tree
 
 **Trigger:** the first call of `fullrun` and `halfrun` alike — before the title is normalized, before
-`git switch main`, and before a `new` entry files its Issue. **Then:** `fullrun #N` first runs
-`pnpm josh run:entry <N>`, which includes the tree claim; `fullrun new` and `halfrun` first run
-`pnpm josh run:hold [<N>]`. `hold` continues; `busy` and `unknown` stop with a `confirmation` Telegram
+`git switch main`, and before a `new` entry files its Issue. **Then:** a `#N` entry first runs
+`pnpm josh run:entry <N> --to <command>` (§2k, the tree claim included); `new` runs bare
+`pnpm josh run:hold`. `hold` continues; `busy` and `unknown` stop with a `confirmation` Telegram
 carrying what stderr printed. **`kickoff` is exempt** (it edits nothing). A stop that leaves the tree
 clean releases explicitly with `pnpm josh run:release [<N>]`; a `halfrun` or `needs-human-review` stop
 keeps the hold; `pnpm josh followup` releases a merged run. The answer table, the per-child rule and
@@ -241,6 +241,13 @@ Tier C (`CLAUDE.md`).
 digest it names once.** File up to two worthwhile improvements through `issue:file` (scout and
 `epic:bundle` included), stack the rest in the observation ledger, and close the step with the command described
 there. A dispatched lane child never runs the retrospective.
+
+## 2k. The stage ladder
+
+`kickoff` → `halfrun` → `prrun` → `fullrun` (joshuafolkken/kit#3042): the command sets how far a run
+goes, the Issue where it starts. `run:entry <N> --to <command>` prints `stage #<N> — at: … · start:
+…`; **`start: reached` redoes nothing — stop** (at `merged`, the next line answers). A
+stop's `Next:` line names the commands further up. Table: `docs/how-to/run-issues.md`.
 
 ## 3. What stays resident, and what is read from here
 
