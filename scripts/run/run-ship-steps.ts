@@ -99,7 +99,7 @@ function steps(args: ShipArguments): ReadonlyArray<Step> {
 	return [PREFLIGHT_STEP, REVIEW_STEP, ...COMMIT_STEPS, ROUND_TWO_STEP, ...MERGE_STEPS]
 }
 
-const run_ship_steps = { steps }
+const run_ship_steps = { PREFLIGHT_STEP, steps }
 
 export type { ShipArguments, Step }
 export { run_ship_steps }
