@@ -243,6 +243,7 @@ SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
 .github/workflows/pr-classification.yml
 .github/workflows/production.yml
 .github/workflows/sonar-qube.yml
+.github/actions/setup-pnpm/action.yml
 .github/pull_request_template.md
 .github/release.yml
 .github/dependabot.yml

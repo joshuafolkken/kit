@@ -92,6 +92,10 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'.github/workflows/production.yml',
 	'.github/workflows/sonar-qube.yml',
 	'.github/workflows/pr-classification.yml',
+	// Called by `pr-classification.yml` as `uses: ./.github/actions/setup-pnpm`; without it the
+	// consumer's job cannot resolve the action and the Release classification check fails
+	// (joshuafolkken/kit#3013).
+	'.github/actions/setup-pnpm/action.yml',
 	'.github/pull_request_template.md',
 	'.github/release.yml',
 	'.github/dependabot.yml',

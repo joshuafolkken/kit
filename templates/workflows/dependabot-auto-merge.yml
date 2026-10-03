@@ -50,8 +50,10 @@ jobs:
       #
       # Everything comes from the API, so no checkout is needed. `--paginate` is what makes the file
       # list complete rather than the first page of a large diff, and the `select` narrows it to
-      # workflows inside `--jq` rather than through `grep`: the default shell is `bash -e` without
-      # `pipefail`, so a `gh` failure inside a pipeline would be masked by grep's status, and grep
+      # workflows — and the local composite actions under `.github/actions/`, which are stamped and
+      # overwritten the same way (joshuafolkken/kit#3013) — inside `--jq` rather than through `grep`:
+      # the default shell is `bash -e` without `pipefail`, so a `gh` failure inside a pipeline would
+      # be masked by grep's status, and grep
       # itself answers 1 for "no match" and 2 for "I could not look" — two readings this step must
       # not conflate, since one of them means "merge it" (joshuafolkken/kit#844). An assignment
       # carries the command's status, and `case` has no failure mode at all.
@@ -88,7 +90,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           changed="$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER/files" --paginate \
-            --jq '.[] | select(.filename | startswith(".github/workflows/"))
+            --jq '.[] | select(.filename | startswith(".github/workflows/") or startswith(".github/actions/"))
                       | [.filename, .contents_url] | @tsv')"
 
           has_managed=false

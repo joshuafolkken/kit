@@ -10,8 +10,8 @@ import { ci_yml_fixture } from './ci-yml-fixture'
 // match: an action the runtime workflow does not use has no canonical pin to resolve from.
 //
 // The runtime side counts the composite action ci.yml calls as part of ci.yml: the template carries
-// that action's steps inline, because it travels to consumers without `.github/actions/`
-// (joshuafolkken/kit#2982).
+// that action's steps inline (joshuafolkken/kit#2982). The action now travels to consumers too
+// (joshuafolkken/kit#3013), but the template has not been moved onto it yet.
 function extract_action_names(relative_paths: ReadonlyArray<string>): Array<string> {
 	const names = relative_paths
 		.flatMap((relative_path) => ci_yml_fixture.read_workflow(relative_path).split('\n'))

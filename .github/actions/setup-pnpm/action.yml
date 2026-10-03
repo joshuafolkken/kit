@@ -9,9 +9,11 @@ description: >
 # and GitHub Packages publish rights — had been left without safe-chain while `ci.yml` had it. A
 # job that calls this action cannot install without the scan.
 #
-# Not distributed: `templates/workflows/ci.yml` travels to a consumer without `.github/actions/`,
-# so the template keeps the same steps inline. `workflow_pin_logic` reads this file as a source of
-# canonical action pins, so the template's refs still resolve from here.
+# Distributed: `josh sync` writes this file into a consumer beside the workflows that call it
+# (`pr-classification.yml`), stamped as managed like they are (joshuafolkken/kit#3013).
+# `templates/workflows/ci.yml` still carries the same steps inline — it was written before this file
+# was distributed, and moving it onto the action is a change of its own. `workflow_pin_logic` reads
+# this file as a source of canonical action pins, so the template's refs still resolve from here.
 
 inputs:
   install:

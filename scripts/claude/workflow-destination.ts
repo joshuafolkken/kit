@@ -6,8 +6,17 @@
 // Matches a consumer workflow destination, absolute or repo-relative, on either separator.
 const WORKFLOW_DESTINATION_PATTERN = /(?:^|[/\\])\.github[/\\]workflows[/\\][^/\\]+\.ya?ml$/u
 
+// A local composite action is a workflow file too: it pins actions of its own, the distributed
+// `dependabot.yml` bumps it (`/.github/actions/*`), and the next sync writes it back — so it needs
+// the same pins and the same managed stamp as the workflow that calls it (joshuafolkken/kit#3013).
+const COMPOSITE_ACTION_DESTINATION_PATTERN =
+	/(?:^|[/\\])\.github[/\\]actions[/\\][^/\\]+[/\\]action\.ya?ml$/u
+
 function is_workflow_destination(destination: string): boolean {
-	return WORKFLOW_DESTINATION_PATTERN.test(destination)
+	return (
+		WORKFLOW_DESTINATION_PATTERN.test(destination) ||
+		COMPOSITE_ACTION_DESTINATION_PATTERN.test(destination)
+	)
 }
 
 export { is_workflow_destination }
