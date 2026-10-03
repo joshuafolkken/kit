@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { josh_command } from '#scripts/josh/josh-run'
+import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 
 // `josh lane:launch <issue> [--stash <message>]` — one composite command for a `backlogrun` lane-start
@@ -57,6 +58,7 @@ function read_context(argv: ReadonlyArray<string>): LaunchContext | undefined {
 async function install(directory: string): Promise<boolean> {
 	const result = await execa(PNPM, ['--dir', directory, 'install', '--frozen-lockfile'], {
 		reject: false,
+		timeout: INSTALL_TIMEOUT_MS,
 	})
 
 	if ((result.exitCode ?? FAILURE_EXIT_CODE) === SUCCESS_EXIT_CODE) return true

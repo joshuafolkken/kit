@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
+import { timed_fetch } from '#scripts/lib/timed-fetch'
 import { security_audit } from './security-audit'
 import { security_audit_logic } from './security-audit-logic'
 import { security_audit_provision_logic, type ScannerAsset } from './security-audit-provision-logic'
@@ -33,7 +34,7 @@ interface ProvisionOutcome {
 // catch-all would drop the release URL out of the message that names where the fetch went.
 async function download(url: string, timeout_ms: number): Promise<DownloadOutcome> {
 	try {
-		const response = await fetch(url, { signal: AbortSignal.timeout(timeout_ms) })
+		const response = await timed_fetch(url, {}, timeout_ms)
 		if (!response.ok) return { reason: `HTTP ${String(response.status)}` }
 
 		return { content: Buffer.from(await response.arrayBuffer()), reason: '' }

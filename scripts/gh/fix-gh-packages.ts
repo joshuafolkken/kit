@@ -2,6 +2,7 @@ import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { file_reader } from '#scripts/lib/read-file'
+import { timed_fetch } from '#scripts/lib/timed-fetch'
 import { z } from 'zod'
 import { fix_gh_packages_logic, type LockfilePackage } from './fix-gh-packages-logic'
 import { gh_cli_token } from './gh-cli-token'
@@ -9,7 +10,6 @@ import { gh_cli_token } from './gh-cli-token'
 const LOCKFILE = 'pnpm-lock.yaml'
 const NPMRC = '.npmrc'
 const GH_PACKAGES_HOST = 'npm.pkg.github.com'
-const FETCH_TIMEOUT_MS = 10_000
 
 const npm_distribution_schema = z.looseObject({ tarball: z.string().optional() })
 const npm_version_schema = z.looseObject({ dist: npm_distribution_schema.optional() })
@@ -42,10 +42,7 @@ async function fetch_tarball_url(
 	token: string,
 ): Promise<string | undefined> {
 	const url = `https://${GH_PACKAGES_HOST}/${package_path}`
-	const response = await fetch(url, {
-		headers: { Authorization: `Bearer ${token}` },
-		signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-	})
+	const response = await timed_fetch(url, { headers: { Authorization: `Bearer ${token}` } })
 
 	if (!response.ok) {
 		console.warn(`fix-gh-packages: fetch failed for ${package_path} (${String(response.status)})`)
