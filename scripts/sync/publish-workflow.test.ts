@@ -104,9 +104,10 @@ describe('release tag checkout', () => {
 	)
 
 	it('looks up publish runs of every trigger so pre-migration runs stay visible', () => {
-		expect(readFileSync('scripts/release/github-release.ts', 'utf8')).toContain(
-			'publish.yml/runs?per_page=',
-		)
+		const source = readFileSync('scripts/release/github-release.ts', 'utf8')
+
+		expect(source).toContain('/runs?per_page=')
+		expect(source).not.toContain('event=')
 	})
 })
 
@@ -162,7 +163,7 @@ describe('GitHub Release job ordering', () => {
 		const production = workflow.jobs['update-production']
 		const release = workflow.jobs['create-release']
 		const checkout = release.steps.find((step) => step.uses?.startsWith(CHECKOUT_ACTION))
-		const publish = release.steps.find((step) => step.run?.includes('github-release-cli.ts'))
+		const publish = release.steps.find((step) => step.run?.includes('josh release:github'))
 
 		expect(production.uses).toBe(PRODUCTION_WORKFLOW)
 		expect(production.with.tag).toBe(DISPATCH_TAG)
