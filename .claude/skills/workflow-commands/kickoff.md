@@ -37,7 +37,7 @@ than filing.
 **Read `split-assessment.md` → "The question" first.** It is the split decision every entry point
 applies, including this one — `kickoff #N` assesses scope exactly as `kickoff new` does. Its default is
 not to split: separability and a scope that clearly exceeds what one verification gate can confirm in
-one pass (the guide is about 10 changed files and about 400 changed lines) have to hold **together**.
+one pass (the size guide is stated there) have to hold **together**.
 The rest of `split-assessment.md` — what each entry does with the answer — is read on demand when a
 split is found.
 

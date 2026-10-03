@@ -27,8 +27,8 @@ points to them rather than restating them:
 The workflow review uses the `reviewer` role profile printed by `pnpm josh review:brief`. Pass its
 model and effort explicitly to the review subagent; do not substitute the review level for effort.
 
-Re-run after applying fixes until **no high or medium findings remain — or until two reviews have run
-in total, the first included — whichever comes first.** The cap below is not optional. The second round
+Re-run after applying fixes until **no high or medium findings remain — or until the round cap below is
+reached, the first review included — whichever comes first.** The cap below is not optional. The second round
 is a verification pass over the fixes, not the first review again
 (`prompts/review-rubric.md` → "The second round is a verification pass, not a second full review").
 

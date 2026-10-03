@@ -9,8 +9,8 @@ description: The procedures for the Issue-driven shorthand commands `kickoff`, `
 package's collaboration workflow is built on. Their procedures live here rather than in `CLAUDE.md`
 because each one applies only while its own command is running.
 
-The canonical extended reference is `prompts/collaboration-workflow/` (indexed by
-`prompts/collaboration-workflow.md`); this skill is the operational procedure, and the two must agree.
+Each topic file under `prompts/collaboration-workflow/` sources its own rule; this skill sources the
+procedures. Neither restates the other.
 
 ## 0. The rule that fires before any of them — explicit invocation
 

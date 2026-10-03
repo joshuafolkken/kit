@@ -39,7 +39,7 @@ pointers, the detail read on demand from the file each pointer names.
 josh latest:scope` and update dependencies only on `required` (`latest-gate.md`; load the
 `dependency-update` skill on `required`) → implement → run the **full verification gate** (refactor →
 start `pnpm josh gate` beside a subagent `/code-review` with the brief `pnpm josh review:brief` prints,
-join the gate before the stop, iterate to no high/medium findings, at most two reviews → `pnpm josh
+join the gate before the stop, iterate to no high/medium findings, within the round cap (`prompts/review.md`) → `pnpm josh
 test:e2e`, run by **you**, because `halfrun` opens no pull request and there is no CI E2E job; a printed
 skip is the answer where the project has no suite) → **mark the stop: `pnpm josh run:hold <N>
 --halfrun-stop`** (the record `fullrun #<N>` adopts; `new` passes the filed number) → send a

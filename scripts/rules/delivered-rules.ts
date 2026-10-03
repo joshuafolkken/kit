@@ -144,8 +144,10 @@ const { is_issue_filing, on_bash_command } = bash_triggers
 // exemptions and the three tests that decide the second one. The three tests are spelled out rather
 // than named, because a delivery that said only "an interrupt is exempt" would hand the deciding back
 // to judgement at exactly the moment nothing else is open to read (joshuafolkken/kit#1518).
+// `WIP_CAP` is the number's single source; `wip-cap.md` states it once and a test pins the two equal.
+const WIP_CAP = 30
 const WIP_CAP_REASON =
-	"⛔ backlog WIP cap: count the target repository's open Issues before filing. With more than 30 " +
+	`⛔ backlog WIP cap: count the target repository's open Issues before filing. With more than ${String(WIP_CAP)} ` +
 	'open, close one first; nothing honestly closable means do not file. Two filings are exempt and ' +
 	'proceed while stating the overage — one the run is blocked by, and an interrupt, decided by ' +
 	'three tests rather than judgement: a verification answers wrongly, a documented workflow cannot ' +
@@ -793,6 +795,7 @@ const delivered_rules = {
 	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,
 	THIRD_PARTY_WRITE_REASON: third_party_write.THIRD_PARTY_WRITE_REASON,
+	WIP_CAP,
 	WIP_CAP_REASON,
 	WORKTREE_MUTATION_REASON: worktree_guard.WORKTREE_MUTATION_REASON,
 	delivery,
