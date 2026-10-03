@@ -11,6 +11,8 @@ TELEGRAM_BOT_TOKEN=<your-bot-token>
 TELEGRAM_CHAT_ID=<your-chat-id>
 ```
 
+Every other variable kit reads — required or not, with its default — is listed in [environment-variables.md](./environment-variables.md).
+
 The `.env` file is loaded automatically by AI scripts on startup. Without both variables `josh notify` exits non-zero, while `josh followup` reports the missed notification and still completes (see [Notification Behavior](#notification-behavior)).
 
 ### `TELEGRAM_BOT_TOKEN`

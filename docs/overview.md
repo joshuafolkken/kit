@@ -50,6 +50,7 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 **Commands and configuration**
 
 - [josh-commands.md](./josh-commands.md) — every `josh` command ([catalog](./josh-command-catalog.md))
+- [environment-variables.md](./environment-variables.md) — every environment variable kit reads
 - [init.md](./init.md) — what `josh init` creates
 - [sync.md](./sync.md) — what `josh sync` updates
 - [manual-config.md](./manual-config.md) — the presets without `josh init`
