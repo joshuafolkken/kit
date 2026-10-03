@@ -96,6 +96,7 @@ async function tidy_lanes(is_merged: IsMerged): Promise<Array<Outcome>> {
 	const lanes = await lane_registry.list_lanes()
 
 	for (const lane of lanes) {
+		// eslint-disable-next-line no-await-in-loop -- a close prunes the worktree list the next one reads
 		const outcome = await tidy_lane(lane, is_merged)
 
 		if (outcome !== undefined) outcomes.push(outcome)

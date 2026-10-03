@@ -106,6 +106,7 @@ function launch_gate_from_hook(
 }
 
 beforeAll(async () => {
+	// eslint-disable-next-line no-await-in-loop -- a failed open leaves the earlier environments registered for afterAll
 	for (const kind of KINDS) environments.set(kind, await josh_harness.open_environment(kind))
 }, SETUP_TIMEOUT_MS)
 

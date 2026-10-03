@@ -161,6 +161,7 @@ async function wait_for_publish(
 		const { state } = probe_once(resolved, versions_endpoint, target_version, progress)
 
 		if (state !== undefined) return finish(state, target_version, progress.attempts)
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await resolved.sleep(resolved.interval_ms)
 	}
 

@@ -195,6 +195,7 @@ async function ready_record(repository: string, number: string): Promise<ShipRec
 	for (let attempt = 0; attempt < RECORD_WAIT_ATTEMPTS; attempt += 1) {
 		if (!is_pending(record)) return record
 
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await sleep(RECORD_POLL_MS)
 		record = current_record(repository, number)
 	}

@@ -227,6 +227,7 @@ async function await_admission(context: WaitContext): Promise<void> {
 	while (!is_admitted(context.key, live_reservations(context.directory), context.budget)) {
 		if (context.now() >= context.deadline) return
 
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await context.sleep(context.poll_interval_ms)
 	}
 }

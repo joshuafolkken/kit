@@ -178,6 +178,7 @@ async function fetch_selected(request: IssueListRequest): Promise<SelectedRows> 
 	let has_more = true
 
 	while (page <= MAX_PAGES && wants_more(has_more, selected.length, request.limit)) {
+		// eslint-disable-next-line no-await-in-loop -- paging stops as soon as enough rows are selected
 		const result = await fetch_page(request, page)
 
 		selected.push(...result.selected)
@@ -207,6 +208,7 @@ async function read_relations(
 	const relations: Array<BlockedBy> = []
 
 	for (const row of rows) {
+		// eslint-disable-next-line no-await-in-loop -- paced reads, so a rate limit does not fail rows
 		relations.push(await read_blocked_by(String(row.number), row, repo))
 	}
 

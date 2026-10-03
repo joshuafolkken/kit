@@ -83,6 +83,7 @@ async function wait_for_active(lane_directory: string): Promise<SupervisorOwner 
 	for (let attempt = 0; attempt < CLAIM_POLL_LIMIT; attempt += 1) {
 		const owner = active(lane_directory)
 		if (owner !== undefined) return owner
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await new Promise((resolve) => setTimeout(resolve, CLAIM_POLL_MS))
 	}
 
@@ -300,6 +301,7 @@ async function wait_for_inherited_child(
 	child_process_start: string | undefined,
 ): Promise<void> {
 	while (process_identity.is_same_process(child_pid, child_process_start) !== false) {
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await new Promise((resolve) => setTimeout(resolve, CHILD_POLL_MS))
 	}
 }

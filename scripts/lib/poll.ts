@@ -43,8 +43,10 @@ async function poll_until(is_done: () => Promise<boolean>, options: PollOptions)
 	const wait = options.sleeper ?? sleep
 
 	for (let attempt = 0; attempt < options.attempts; attempt += 1) {
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		if (await is_done()) return true
 
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await wait_between(wait, options.interval_ms, attempt, options.attempts)
 	}
 

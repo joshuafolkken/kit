@@ -94,6 +94,7 @@ async function reconcile(
 	for (const issue of completed) {
 		const outcome = parked.has(issue) ? 'parked' : 'merged'
 
+		// eslint-disable-next-line no-await-in-loop -- each mark rewrites the same carry file
 		await mark_done(String(issue), { outcome, code: 0, token: 'none' }, owner)
 	}
 }

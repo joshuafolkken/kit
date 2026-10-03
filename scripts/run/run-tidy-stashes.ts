@@ -18,20 +18,19 @@ const GONE_REASON = 'already dropped by another run'
 const BUSY_REASON = 'another run held the stash sweep lock'
 
 // An entry cut before joshuafolkken/kit#2919 holds its lines at an old single-file path, so the lines
-// of every ledger path it touches are carried to the current ledger.
+// of every ledger path it touches are carried to the current ledger. The reads are independent, and the
+// lines come back in path order however the reads finish.
 async function added_ledger_lines(
 	hash: string,
 	ledger_paths: ReadonlyArray<string>,
 ): Promise<Array<string>> {
-	const added: Array<string> = []
+	const added = await bounded_pool.bounded_map(
+		ledger_paths,
+		READ_CONCURRENCY,
+		async (ledger_path) => await git_stash.added_lines(hash, ledger_path),
+	)
 
-	for (const ledger_path of ledger_paths) {
-		const lines = await git_stash.added_lines(hash, ledger_path)
-
-		added.push(...lines)
-	}
-
-	return added
+	return added.flat()
 }
 
 // How many ledger lines went into the running work tree's ledger before the drop. The duplicate check
@@ -107,6 +106,7 @@ async function tidy_entries(
 	const outcomes: Array<Outcome> = []
 
 	for (const entry of entries) {
+		// eslint-disable-next-line no-await-in-loop -- drops shift the stash stack and append to the same ledger
 		const outcome = await tidy_entry(entry, merged)
 
 		if (outcome !== undefined) outcomes.push(outcome)

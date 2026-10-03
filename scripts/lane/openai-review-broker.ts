@@ -138,9 +138,11 @@ async function serve(
 
 		if (received?.session === session && received.nonce !== last_nonce) {
 			last_nonce = received.nonce
+			// eslint-disable-next-line no-await-in-loop -- requests are served one at a time, in arrival order
 			await process_request(lane, response, received, state)
 		}
 
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await sleep(POLL_MS)
 	}
 }
@@ -232,6 +234,7 @@ async function wait_response(target: string, session: string, nonce: string): Pr
 		const verdict = response_verdict(read_record(target, response_schema), session, nonce)
 		if (verdict !== 'wait') return verdict === 'success'
 
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await sleep(POLL_MS)
 	}
 

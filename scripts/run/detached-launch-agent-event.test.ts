@@ -33,6 +33,7 @@ async function log_text(marker = 'turn.'): Promise<string> {
 	for (let attempt = 0; attempt < POLL_LIMIT; attempt += 1) {
 		const text = readFileSync(scratch.log, 'utf8')
 		if (text.includes(marker)) return text
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
 	}
 

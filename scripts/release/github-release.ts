@@ -158,9 +158,11 @@ async function release_state(client: Client, tag: string): Promise<'ready' | 'fa
 
 async function wait_for_release(client: Client, tag: string, wait: Wait): Promise<boolean> {
 	for (let attempt = 0; attempt < MAX_WAIT_ATTEMPTS; attempt += 1) {
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		const state = await release_state(client, tag)
 		if (state !== 'pending') return state === 'ready'
 
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await wait()
 	}
 

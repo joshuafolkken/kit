@@ -169,6 +169,7 @@ async function collect(
 	for (const pool of pools) {
 		if (children.length >= wanted) break
 
+		// eslint-disable-next-line no-await-in-loop -- pools are asked in order until enough children are found
 		const answer = await ask_pool(pool, wanted - children.length)
 
 		children.push(...answer.children)

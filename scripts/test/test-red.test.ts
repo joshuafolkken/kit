@@ -1,4 +1,4 @@
-import { symlink, writeFile } from 'node:fs/promises'
+import { mkdir, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -20,6 +20,8 @@ const FIXED_REPORT =
 const TEST_IMPORTS = "import { expect, it } from 'vitest'\nimport { report } from './report.js'\n"
 const REPORT_FILE = 'report.js'
 const TEST_FILE = 'report.test.ts'
+const NESTED_DIRECTORY = 'nested'
+const NESTED_TEST_FILE = `${NESTED_DIRECTORY}/report.test.ts`
 const NODE_MODULES = 'node_modules'
 const PROJECT_NODE_MODULES = path.resolve(NODE_MODULES)
 
@@ -121,6 +123,24 @@ describe('test_red.run', () => {
 
 			expect(verdict).toBe('green')
 			expect(await snapshot()).toBe(before)
+		},
+		RUN_TIMEOUT,
+	)
+})
+
+// joshuafolkken/kit#3047: the changed tests are copied into the tree together, nested ones included.
+describe('test_red.run with several changed tests', () => {
+	it(
+		'copies every changed test, a nested one included, and runs them all',
+		async () => {
+			await build_fix_branch(WHOLE_OUTPUT_TEST)
+			await mkdir(path.join(process.cwd(), NESTED_DIRECTORY))
+			await write(NESTED_TEST_FILE, WHOLE_OUTPUT_TEST.replace('./report.js', '../report.js'))
+
+			const result = await test_red.run()
+
+			expect(result.verdict).toBe('red')
+			expect(result.files).toEqual(expect.arrayContaining([TEST_FILE, NESTED_TEST_FILE]))
 		},
 		RUN_TIMEOUT,
 	)

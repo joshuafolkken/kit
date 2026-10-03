@@ -199,10 +199,12 @@ async function run_loop(target: string, ports: LoopPorts, interval_ms: number): 
 	let wake = run_wake.read_own_wake(target)
 
 	while (wake !== undefined) {
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		const stop = await run_pass(target, wake, ports)
 
 		if (stop !== undefined) return stop
 
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await ports.sleep(next_interval(run_wake.read_own_wake(target), interval_ms, ports.now()))
 		wake = run_wake.read_own_wake(target)
 	}

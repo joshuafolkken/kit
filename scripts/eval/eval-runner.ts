@@ -170,7 +170,9 @@ async function run_with_retry(
 		deps.log(
 			`  … ${scenario.name} produced no measurement; waiting ${String(RETRY_PAUSE_MS / MS_PER_SECOND)}s, then retrying`,
 		)
+		// eslint-disable-next-line no-await-in-loop -- a retry runs only after the previous attempt has answered
 		await deps.pause(RETRY_PAUSE_MS)
+		// eslint-disable-next-line no-await-in-loop -- a retry runs only after the previous attempt has answered
 		verdict = await deps.run_once(scenario)
 	}
 

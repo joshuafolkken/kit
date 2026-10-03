@@ -73,6 +73,15 @@ describe('create_base_config — scripts block', () => {
 	})
 })
 
+// joshuafolkken/kit#3047: the local gate reports what Sonar's S9382 reports.
+describe('create_base_config — global block', () => {
+	it('reports an await inside a loop as an error', () => {
+		const global_block = find_global_block(build_config())
+
+		expect(rules_of(global_block)['no-await-in-loop']).toBe('error')
+	})
+})
+
 describe('create_base_config — scripts block (issue #442)', () => {
 	it('turns off no-os-command-from-path and unbound-method for scripts', () => {
 		const scripts_block = find_scripts_block(build_config())

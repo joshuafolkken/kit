@@ -191,6 +191,7 @@ async function collect_finished(state: DriveState, ports: DrivePorts): Promise<P
 	let current = state
 
 	for (const issue of finished) {
+		// eslint-disable-next-line no-await-in-loop -- each collect starts from the state the previous one returned
 		const result = await collect(issue, current, ports)
 
 		if (result.kind === 'end') return { ...result, state: current }
@@ -238,9 +239,11 @@ async function launch_all(
 	const free = await ports.free_lanes()
 
 	for (const issue of issues.slice(0, free)) {
+		// eslint-disable-next-line no-await-in-loop -- lanes launch in order and the first refusal ends the pass
 		const outcome = await ports.launch(issue)
 
 		if (outcome !== LAUNCHED) {
+			// eslint-disable-next-line no-await-in-loop -- lanes launch in order and the first refusal ends the pass
 			return await refused(issue, outcome, launched(state, in_flight, ports), ports)
 		}
 
@@ -377,7 +380,9 @@ async function run_loop(
 	let step = await loop_step(first, config, ports)
 
 	while (step.kind === 'next') {
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await ports.sleep(config.poll_ms)
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		step = await loop_step(step.run, config, ports)
 	}
 

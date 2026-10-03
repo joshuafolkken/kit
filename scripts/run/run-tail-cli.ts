@@ -80,6 +80,7 @@ async function close_run(issues: ReadonlyArray<string>): Promise<ReadonlyArray<T
 
 	const is_lane_child = lane_child_marker.is_child_of(process.cwd())
 
+	// eslint-disable-next-line no-await-in-loop -- the tail steps run in their declared order
 	for (const step of steps_for(is_lane_child)) sections.push(await run_step(step, issues))
 
 	return sections
