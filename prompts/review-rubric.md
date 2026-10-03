@@ -74,7 +74,7 @@ code changed, because returning none is what the instruction rules out. So a Med
 the second round even where the fixes were sufficient. The second round is narrowed to remove that.
 
 **What changes is the question, never the standard.** A confirmed High still blocks the merge
-whatever the round count, the cap is still two rounds, and every rule here applies to this pass
+whatever the round count, the cap in `prompts/review.md` → "Review round cap" still holds, and every rule here applies to this pass
 unchanged.
 
 |                | The first round      | The second round                                                                                                                                                               |

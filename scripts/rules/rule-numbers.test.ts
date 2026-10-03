@@ -25,8 +25,17 @@ const REVIEW_PROMPT = 'prompts/review.md'
 const OPERATING_RULES = 'prompts/collaboration-workflow/operating-rules.md'
 const OVERVIEW = 'prompts/collaboration-workflow/overview.md'
 const RESIDENCY = 'prompts/collaboration-workflow/residency.md'
-// The review round cap's number lives in the heading of `review.md` alone.
+// The review round cap's number is stated in `review.md`; every other document points at its heading.
+// Each phrasing below is one a document has used to restate the cap as a limit, not merely to name
+// "the two rounds" of a review that the cap allows.
 const TWO_REVIEWS = 'two reviews'
+const ROUND_CAP_RESTATEMENTS: ReadonlyArray<string> = [
+	TWO_REVIEWS,
+	'is still two rounds',
+	'at most two rounds',
+	'cap of two',
+	'cap of 2',
+]
 
 // Every document an agent reads except the three that state a number, so a restatement added to any
 // skill or topic file later is caught without someone remembering to list that file here.
@@ -42,7 +51,7 @@ const RESTATEMENTS: ReadonlyArray<string> = [
 	`${WIP_CAP} 件`,
 	`about ${FILE_GUIDE} changed files`,
 	`${LINE_GUIDE} changed lines`,
-	TWO_REVIEWS,
+	...ROUND_CAP_RESTATEMENTS,
 ]
 
 // The pointer-only topic files, deleted because each said nothing but "the rule lives elsewhere".
@@ -67,7 +76,7 @@ describe('each rule number agrees with its source in code', () => {
 		)
 	})
 
-	it('names the review round cap in the heading of review.md alone', () => {
+	it('names the review round cap in the heading of review.md', () => {
 		expect(read_repo_file(REVIEW_PROMPT)).toContain('## Review round cap (2 rounds)')
 		expect(read_unwrapped(REVIEW_PROMPT)).not.toContain(TWO_REVIEWS)
 	})
