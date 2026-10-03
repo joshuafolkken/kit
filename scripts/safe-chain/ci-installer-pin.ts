@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { composite_actions } from '#scripts/ci/composite-actions'
 import { execaSync } from 'execa'
 
 // Where the workflows that install safe-chain on the runner live. Each carries the release and the
@@ -25,13 +26,18 @@ function installer_url(version: string): string {
 	return `https://github.com/AikidoSec/safe-chain/releases/download/${version}/install-safe-chain.sh`
 }
 
+// The local composite actions follow the workflows: kit's own pin lives in
+// `.github/actions/setup-pnpm`, which every kit workflow installs through (joshuafolkken/kit#2982).
 function list_workflows(): Array<string> {
-	return WORKFLOW_DIRECTORIES.filter((directory) => existsSync(directory)).flatMap((directory) =>
-		readdirSync(directory)
-			.filter((file_name) => WORKFLOW_FILE_RE.test(file_name))
-			.toSorted((left, right) => left.localeCompare(right))
-			.map((file_name) => `${directory}/${file_name}`),
+	const workflows = WORKFLOW_DIRECTORIES.filter((directory) => existsSync(directory)).flatMap(
+		(directory) =>
+			readdirSync(directory)
+				.filter((file_name) => WORKFLOW_FILE_RE.test(file_name))
+				.toSorted((left, right) => left.localeCompare(right))
+				.map((file_name) => `${directory}/${file_name}`),
 	)
+
+	return [...workflows, ...composite_actions.list()]
 }
 
 function extract_pinned_version(content: string): string | undefined {

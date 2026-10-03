@@ -1,7 +1,11 @@
 version: 2
 updates:
+  # The local composite actions pin actions of their own, and Dependabot reads only the directories
+  # it is given — `/` covers `.github/workflows` and no `.github/actions/*/action.yml`.
   - package-ecosystem: 'github-actions'
-    directory: '/'
+    directories:
+      - '/'
+      - '/.github/actions/*'
     schedule:
       interval: 'weekly'
   # Version updates are disabled: `josh latest` runs at the start of every fullrun / halfrun /

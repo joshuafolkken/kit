@@ -27,13 +27,10 @@ concurrency:
 # set the JOSH_PLAYWRIGHT_BROWSERS repository variable to a space-separated list to widen it.
 env:
   JOSH_PLAYWRIGHT_BROWSERS: ${{ vars.JOSH_PLAYWRIGHT_BROWSERS || 'chromium' }}
-  # The safe-chain release every "Setup safe-chain" step installs, and the SHA-256 of that release's
-  # install-safe-chain.sh. The installer puts the safe-chain binary under ~/.safe-chain/bin and
-  # adds it to PATH beside the shims; `pnpm dlx … setup-ci` left only the shims, which then let
-  # every install through without a scan (joshuafolkken/kit#2711). `josh latest` moves both together.
-  SAFE_CHAIN_INSTALLER_VERSION: 1.5.20
-  SAFE_CHAIN_INSTALLER_SHA256: 0ad25efe15d1fa56105157a454d647223e78eb0c53d1f85e3d10afcd722e7bfd
 
+# Every job that needs pnpm prepares it through `.github/actions/setup-pnpm`, which carries the
+# pnpm version resolution, the store cache, the safe-chain installer pin and the install
+# (joshuafolkken/kit#2982).
 jobs:
   node-26-pnpm:
     name: Node 26 pnpm
@@ -43,17 +40,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Resolve pnpm version
-        id: pnpm-version
-        run: |
-          version=$(node -p "const m = require('./package.json'); m.packageManager?.match(/^pnpm@([^+]+)/)?.[1] ?? (m.devEngines?.packageManager?.name === 'pnpm' ? m.devEngines.packageManager.version?.split('+')[0] : 'latest') ?? 'latest'")
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+      - uses: ./.github/actions/setup-pnpm
         with:
-          version: ${{ steps.pnpm-version.outputs.version }}
           runtime: node@26
-          install: false
+          install: 'false'
       - run: node --version && pnpm --version
 
   playwright-image:
@@ -239,30 +229,6 @@ jobs:
           node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
 
-      - name: Resolve pnpm version
-        id: pnpm-version
-        run: |
-          version=$(node -p "const m = require('./package.json'); m.packageManager?.match(/^pnpm@([^+]+)/)?.[1] ?? (m.devEngines?.packageManager?.name === 'pnpm' ? m.devEngines.packageManager.version?.split('+')[0] : 'latest') ?? 'latest'")
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Setup pnpm
-        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
-        with:
-          version: ${{ steps.pnpm-version.outputs.version }}
-          install: false
-
-      - name: Resolve pnpm store path
-        run: echo "PNPM_STORE_PATH=$(pnpm store path)" >> "$GITHUB_ENV"
-
-      - name: Setup pnpm store cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ env.PNPM_STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
       - name: Setup ESLint cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: eslint-cache
@@ -317,17 +283,10 @@ jobs:
             ${{ runner.os }}-cspell-cache-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-cspell-cache-
 
-      - name: Setup safe-chain
-        run: |
-          installer="$RUNNER_TEMP/install-safe-chain.sh"
-          curl --proto '=https' -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$SAFE_CHAIN_INSTALLER_VERSION/install-safe-chain.sh" -o "$installer"
-          echo "$SAFE_CHAIN_INSTALLER_SHA256  $installer" | sha256sum -c -
-          sh "$installer" --ci
-
-      - name: Install dependencies
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Setup pnpm and install dependencies
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
 
       # One step rather than five, and concurrent rather than serial (joshuafolkken/kit#1216).
       # `josh gate` is the command a developer runs before committing; it fans out to the same
@@ -366,13 +325,10 @@ jobs:
       - name: Run verification gate
         run: pnpm josh gate --verbose --no-unit
 
-  # The other half of the gate, on a runner of its own. It carries the same setup steps as
-  # `static-checks` rather than sharing them: a GitHub job is its own machine, so every job that
-  # needs Node sets Node up, and this workflow already writes that preamble once per job. The
-  # single-source alternative — a local composite action under `.github/actions/` — is ruled out by
-  # `scripts/ci/ci-yml-action-parity.test.ts`, which pins the set of action names in this file to the
-  # set in `templates/workflows/ci.yml`; a local action cannot appear in a distributed template,
-  # because the template travels to consumers without it.
+  # The other half of the gate, on a runner of its own. A GitHub job is its own machine, so this job
+  # sets Node up again; the pnpm preamble is the shared `.github/actions/setup-pnpm` action
+  # (joshuafolkken/kit#2982), whose own action pins `scripts/ci/ci-yml-action-parity.test.ts` counts
+  # as this file's when it compares them with `templates/workflows/ci.yml`.
   #
   # No ESLint cache here — nothing in this job lints — and no `--maxWorkers`: `gate-plan.ts` leaves
   # any machine below its measured 11 cores uncapped, so vitest sizes its own pool from the runner
@@ -396,41 +352,10 @@ jobs:
           node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
 
-      - name: Resolve pnpm version
-        id: pnpm-version
-        run: |
-          version=$(node -p "const m = require('./package.json'); m.packageManager?.match(/^pnpm@([^+]+)/)?.[1] ?? (m.devEngines?.packageManager?.name === 'pnpm' ? m.devEngines.packageManager.version?.split('+')[0] : 'latest') ?? 'latest'")
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Setup pnpm
-        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+      - name: Setup pnpm and install dependencies
+        uses: ./.github/actions/setup-pnpm
         with:
-          version: ${{ steps.pnpm-version.outputs.version }}
-          install: false
-
-      - name: Resolve pnpm store path
-        run: echo "PNPM_STORE_PATH=$(pnpm store path)" >> "$GITHUB_ENV"
-
-      - name: Setup pnpm store cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ env.PNPM_STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Setup safe-chain
-        run: |
-          installer="$RUNNER_TEMP/install-safe-chain.sh"
-          curl --proto '=https' -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$SAFE_CHAIN_INSTALLER_VERSION/install-safe-chain.sh" -o "$installer"
-          echo "$SAFE_CHAIN_INSTALLER_SHA256  $installer" | sha256sum -c -
-          sh "$installer" --ci
-
-      - name: Install dependencies
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm install --frozen-lockfile --ignore-scripts
+          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
 
       # **Through `josh test:unit`, never `vitest run` directly, and that is what makes a job split
       # safe rather than a hole.** The guard decides between a skip and a failure, and
@@ -605,30 +530,6 @@ jobs:
           node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
 
-      - name: Resolve pnpm version
-        id: pnpm-version
-        run: |
-          version=$(node -p "const m = require('./package.json'); m.packageManager?.match(/^pnpm@([^+]+)/)?.[1] ?? (m.devEngines?.packageManager?.name === 'pnpm' ? m.devEngines.packageManager.version?.split('+')[0] : 'latest') ?? 'latest'")
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Setup pnpm
-        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
-        with:
-          version: ${{ steps.pnpm-version.outputs.version }}
-          install: false
-
-      - name: Resolve pnpm store path
-        run: echo "PNPM_STORE_PATH=$(pnpm store path)" >> "$GITHUB_ENV"
-
-      - name: Setup pnpm store cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ env.PNPM_STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
       - name: Setup build cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: build-cache
@@ -640,17 +541,10 @@ jobs:
             ${{ runner.os }}-build-cache-e2e-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-build-cache-e2e-
 
-      - name: Setup safe-chain
-        run: |
-          installer="$RUNNER_TEMP/install-safe-chain.sh"
-          curl --proto '=https' -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$SAFE_CHAIN_INSTALLER_VERSION/install-safe-chain.sh" -o "$installer"
-          echo "$SAFE_CHAIN_INSTALLER_SHA256  $installer" | sha256sum -c -
-          sh "$installer" --ci
-
-      - name: Install dependencies
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Setup pnpm and install dependencies
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
 
       # Only needed on the fallback path: the container image already ships browsers
       # matching its own Playwright version. Invoked through the local bin rather than
