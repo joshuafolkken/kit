@@ -105,4 +105,20 @@ describe('backlog:next with run:solo while a lane runs', () => {
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.wait)
 	})
+
+	// joshuafolkken/kit#3017: a stale `in-progress` on a run:solo issue drained the whole backlog.
+	it('offers the children and names a run:solo holder no process is running for', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [opted_in_epic()],
+			epics: [{ number: EPIC_NUMBER, children: [CHILD, SECOND_CHILD] }],
+			children: [{ number: CHILD }, { number: SECOND_CHILD }],
+			in_progress: [issue(HOLDER, CREATED_EARLIER, [IN_PROGRESS_LABEL, RUN_SOLO_LABEL])],
+			stale: [HOLDER],
+		})
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(`${String(CHILD)}\n${String(SECOND_CHILD)}`)
+		expect(stderr()).toContain(`#${String(HOLDER)}`)
+		expect(stderr()).toContain('stale')
+	})
 })
