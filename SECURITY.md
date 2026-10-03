@@ -29,7 +29,7 @@ The `files` field of `package.json` decides what the published `@joshuafolkken/k
 - `.codex/` — the same hooks for Codex (`hooks.json`) and its project settings (`config.toml`).
 - `.github/` — GitHub Actions workflows (CI, tagging, pull request classification, Dependabot auto-merge, SonarQube and production), composite actions, `dependabot.yml`, the pull request template and the release-notes config. `josh sync` overwrites the distributed workflows; their action references are pinned to commit SHAs. kit's own `publish.yml` ships in the package but is never copied into a project.
 - `lefthook/` — Git hook presets: lint before commit, checks before push.
-- The `preinstall` script `josh init` adds to `package.json` runs `pnpm dlx @aikidosec/safe-chain@<version> setup-ci` on every install, then a `node -e` check that only prints a warning. The `prepare` script it adds runs `lefthook install` when Lefthook is present, then, when tsx is present, kit's `fix-gh-packages` script: it reads a GitHub token (`NODE_AUTH_TOKEN`, a token in the project `.npmrc`, or `gh auth token`), queries GitHub Packages and rewrites tarball URLs in `pnpm-lock.yaml`.
+- The `preinstall` script `josh init` adds to `package.json` runs `pnpm dlx @aikidosec/safe-chain setup-ci` on every install, then a `node -e` check that only prints a warning, and only outside CI. The `prepare` script it adds runs `lefthook install` when Lefthook is present, then, when tsx is present, kit's `fix-gh-packages` script: only when the project `.npmrc` routes a scope to GitHub Packages, it reads a GitHub token (`NODE_AUTH_TOKEN`, a token in the project `.npmrc`, or `gh auth token`), queries GitHub Packages and rewrites tarball URLs in `pnpm-lock.yaml`.
 
 **Agent instructions and skills**
 

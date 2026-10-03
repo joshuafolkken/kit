@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { package_file } from '#scripts/claude/skill-fixture'
+import { safe_chain_preinstall } from '#scripts/safe-chain/preinstall-command'
 import { describe, expect, it } from 'vitest'
 import { linked_paths, read_document } from './ai-document-fixture'
 
@@ -30,7 +31,19 @@ const GITHUB_PACKAGES_ERROR = '401 Unauthorized'
 const FIRST_SECTION = /^## (.+)$/mu
 const SECURITY = 'SECURITY.md'
 const RELEASES_URL = 'https://github.com/joshuafolkken/kit/releases'
-const SECRETS: ReadonlyArray<string> = ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'SONAR_TOKEN']
+const SECRETS: ReadonlyArray<string> = [
+	'TELEGRAM_BOT_TOKEN',
+	'TELEGRAM_CHAT_ID',
+	'SONAR_TOKEN',
+	'GITHUB_TOKEN',
+	'GH_TOKEN',
+	'NODE_AUTH_TOKEN',
+]
+// The install command SECURITY.md names is the one `josh init` writes, minus the trailing warning check.
+const PREINSTALL_SETUP_COMMAND = safe_chain_preinstall.SAFE_CHAIN_CMD.replace(
+	` && ${safe_chain_preinstall.LOCAL_INTEGRATION_CHECK_CMD}`,
+	'',
+)
 
 interface Manifest {
 	files: Array<string>
@@ -99,6 +112,10 @@ describe('the security policy', () => {
 
 	it.each(SECRETS)('names the secret %s', (secret) => {
 		expect(read_document(SECURITY)).toContain(secret)
+	})
+
+	it('names the preinstall command josh init writes', () => {
+		expect(read_document(SECURITY)).toContain(`\`${PREINSTALL_SETUP_COMMAND}\``)
 	})
 
 	it('is reachable from the README beside the release notes', () => {
