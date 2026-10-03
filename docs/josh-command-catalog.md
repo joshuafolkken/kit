@@ -1401,7 +1401,7 @@ Report whether the run is stranded — budget handed off, owner gone, and no sup
 
 `[<issue> ...]`
 
-Close a run in one call: commit the observation ledger, read the citations, decide the release scope
+Close a run in one call: return to the default branch, commit the observation ledger, read the citations, decide the release scope
 
 ---
 

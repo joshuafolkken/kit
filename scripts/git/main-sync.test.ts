@@ -6,7 +6,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('./git-command', () => ({
 	git_command: {
+		branch: vi.fn(),
 		checkout: vi.fn(),
+		fast_forward_local: vi.fn(),
 		get_default_branch: vi.fn(),
 		git_directories: vi.fn(),
 		pull_fast_forward: vi.fn(),
@@ -26,10 +28,13 @@ const FAILURE_EXIT_CODE = 1
 const NO_ARGUMENTS: ReadonlyArray<string> = []
 const WORKERS_FLAG = '--workers=1'
 const CHECKOUT_FAILURE = 'local changes would be overwritten'
+const FEATURE_BRANCH = '2979-lane'
 
 const git_directories = vi.mocked(git_command.git_directories)
 const checkout = vi.mocked(git_command.checkout)
 const pull = vi.mocked(git_command.pull_fast_forward)
+const fast_forward = vi.mocked(git_command.fast_forward_local)
+const current_branch = vi.mocked(git_command.branch)
 const prune = vi.mocked(gone_branch.prune)
 
 function in_main_work_tree(): void {
@@ -46,6 +51,8 @@ beforeEach(() => {
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.mocked(git_command.get_default_branch).mockResolvedValue('main')
 	checkout.mockResolvedValue('')
+	current_branch.mockResolvedValue(FEATURE_BRANCH)
+	fast_forward.mockResolvedValue('')
 	pull.mockResolvedValue()
 	prune.mockResolvedValue({ deleted: [], failed: [] })
 	in_main_work_tree()
@@ -113,6 +120,36 @@ describe('syncing the main work tree', () => {
 
 		expect(await main_sync.run(NO_ARGUMENTS)).toBe(FAILURE_EXIT_CODE)
 		expect(console.error).toHaveBeenCalledWith(CHECKOUT_FAILURE)
+	})
+})
+
+// joshuafolkken/kit#2979: a ledger line appended after the merge made the checkout of a stale default
+// branch refuse, so `run:tail`'s sync failed whenever its flush had work.
+describe('fast-forwarding the default branch before the checkout', () => {
+	it('fast-forwards the local default branch before checking it out', async () => {
+		await main_sync.run(NO_ARGUMENTS)
+
+		expect(fast_forward).toHaveBeenCalledWith('main')
+		expect(fast_forward.mock.invocationCallOrder[0]).toBeLessThan(
+			checkout.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	it('skips the fast-forward when already on the default branch', async () => {
+		current_branch.mockResolvedValue('main')
+
+		await main_sync.run(NO_ARGUMENTS)
+
+		expect(fast_forward).not.toHaveBeenCalled()
+		expect(pull).toHaveBeenCalledOnce()
+	})
+
+	it('still checks out and pulls when the fast-forward is refused', async () => {
+		fast_forward.mockRejectedValue(new Error('non-fast-forward'))
+
+		expect(await main_sync.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)
+		expect(checkout).toHaveBeenCalledWith('main')
+		expect(pull).toHaveBeenCalledOnce()
 	})
 })
 

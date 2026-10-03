@@ -1904,14 +1904,17 @@ joshuafolkken/kit#2179 and `chain-rule.md`.
 
 ### `josh run:tail`
 
-Closes a run in one call, folding the three-round-trip post-merge sequence (joshuafolkken/kit#2372):
+Closes a run in one call, folding the post-merge sequence (joshuafolkken/kit#2372): `main:sync`,
 `observations:flush`, `issue:cite` (the closed issue and any follow-ups filed this run) and
 `release:scope`, run in order — the ledger commits before the release scope reads main — and joined
 under one header per step, non-zero if any failed. It folds only bookkeeping; the review verdict, the
 merge and the push above it stay their own calls. The flush is residual: a run's appended lines ride
 its own commit (joshuafolkken/kit#2763), so it commits only a line appended after that commit and
-otherwise prints `clean`. **A lane child skips `observations:flush`**; its lines merged with its own
-pull request (joshuafolkken/kit#2919).
+otherwise prints `clean`. The checkout returns to the default branch first because the flush refuses
+anywhere else, and a run closes still on the feature branch it merged — `josh ship` reaches this report
+with nothing in between (joshuafolkken/kit#2979). **A lane child skips `main:sync` and
+`observations:flush`**; `main:sync` refuses inside a lane, and its lines merged with its own pull
+request (joshuafolkken/kit#2919).
 
 ### `josh ship`
 
