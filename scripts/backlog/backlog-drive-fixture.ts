@@ -28,6 +28,8 @@ interface Harness {
 interface Script {
 	finished?: ReadonlyArray<string>
 	merges?: ReadonlyMap<string, string>
+	// Children `run:merge` handled as parked rather than merged; every other reads as merged.
+	parked?: ReadonlyArray<string>
 	offers?: ReadonlyArray<OfferRead | undefined>
 	// Launches that failed after `lane:open` took a lane, and ones `lane:open` itself refused.
 	failed_launches?: ReadonlyArray<string>
@@ -53,7 +55,9 @@ function child_ports(
 			calls.push(`merge ${issue}`)
 			finished.delete(issue)
 
-			return script.merges?.get(issue) ?? NEXT_TOKEN
+			const outcome = script.parked?.includes(issue) === true ? 'parked' : 'merged'
+
+			return { token: script.merges?.get(issue) ?? NEXT_TOKEN, outcome }
 		},
 	}
 }

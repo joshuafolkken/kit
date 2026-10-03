@@ -43,7 +43,7 @@ function drive_ports(world: World): DrivePorts {
 		merge: async () => {
 			world.merged = true
 
-			return 'none'
+			return { token: 'none', outcome: 'merged' }
 		},
 		offer: async (state: DriveState) => ({
 			verdict: world.merged ? 'stop' : 'run',

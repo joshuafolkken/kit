@@ -11,7 +11,7 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 import { run_carry, type RunCarry } from '#scripts/run/run-carry'
 import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
-import { run_merge_cli } from '#scripts/run/run-merge-cli'
+import { run_merge_cli, type MergeResult } from '#scripts/run/run-merge-cli'
 import { z } from 'zod'
 import {
 	backlog_drive,
@@ -218,7 +218,7 @@ function merge_token(out: string, code: number): string {
 
 // The child's transcript, where its lane recorded one, so `run:merge` can tell an API outage from a
 // failure exactly as it does for the parent that passes `--output` by hand.
-async function merge(issue: string, owner: string): Promise<string> {
+async function merge(issue: string, owner: string): Promise<MergeResult> {
 	await backlog_drive_owner.assert_current(owner)
 	const lane = await lane_registry.find_open_lane(issue)
 	const result = await run_merge_cli.merge_child({
@@ -232,7 +232,7 @@ async function merge(issue: string, owner: string): Promise<string> {
 
 	await backlog_drive_named.mark_done(issue, result, owner)
 
-	return result.token
+	return result
 }
 
 async function launch(issue: string, owner: string): Promise<LaunchOutcome['kind']> {
