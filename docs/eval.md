@@ -1,5 +1,7 @@
 # `josh eval` — measuring agent rule compliance
 
+For kit maintainers changing the documents kit distributes; projects that use kit can skip this page.
+
 `@joshuafolkken/kit` distributes the documents and skills that decide how an AI agent behaves in a
 project: `CLAUDE.md` (the rules), `AGENTS.md` / `GEMINI.md` (pointers to it), `prompts/` and
 `.claude/skills/`. `pnpm josh eval` measures whether editing them changed what an agent does. It
