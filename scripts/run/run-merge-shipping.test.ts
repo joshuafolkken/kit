@@ -4,8 +4,8 @@ const repository_mock = vi.hoisted(() => vi.fn())
 const ship_result_mock = vi.hoisted(() => vi.fn())
 const issue_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('./run-ship-probe', () => ({
-	run_ship_probe: { repository_directory: repository_mock },
+vi.mock('#scripts/git/git-common-directory', () => ({
+	git_common_directory: { repository: repository_mock },
 }))
 vi.mock('./run-ship-detach', () => ({
 	run_ship_detach: { read_result: ship_result_mock },
@@ -17,7 +17,7 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 const { run_merge_cli } = await import('./run-merge-cli')
 
 it('keeps a running detached ship in flight without classifying its issue', async () => {
-	repository_mock.mockResolvedValue(process.cwd())
+	repository_mock.mockReturnValue(process.cwd())
 	ship_result_mock.mockReturnValue({ launch_id: 'active', result: 'running' })
 
 	const result = await run_merge_cli.merge_child({

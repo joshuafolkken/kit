@@ -7,6 +7,7 @@ import { repo_party } from '#scripts/discovery/repo-party'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { session_language } from '#scripts/josh/session-language'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { filing_cap } from '#scripts/rules/filing-cap'
 import { lane_background } from '#scripts/rules/lane-background'
 import { lane_park } from '#scripts/rules/lane-park'
@@ -81,6 +82,7 @@ async function build_context(
 		lane_child: lane_child_marker.is_child_of(process.cwd()),
 		background_pending: lane_background.pending_background_ids(tail).length > 0,
 		agent_pending: lane_background.pending_agent_ids(tail).length > 0,
+		handed_off: lane_handoff.is_handed_off(process.cwd()),
 		session_lang: session_lang(),
 	}
 }
