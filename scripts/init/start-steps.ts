@@ -163,6 +163,7 @@ async function run_steps(steps: ReadonlyArray<StartStep>, context: StepContext):
 		const position = `${String(index + 1)}/${String(steps.length)}`
 
 		console.info(`\n[${position}] ${labels[step]}`)
+		// eslint-disable-next-line no-await-in-loop -- each step builds on what the earlier ones set up
 		await run_step(step, run_context, steps.slice(0, index))
 	}
 }

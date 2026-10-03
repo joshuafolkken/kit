@@ -94,7 +94,9 @@ async function wait_for_gate_finish(now: Clock = () => Date.now()): Promise<Gate
 	let state = await read_gate_state()
 
 	while (!run_review.is_gate_settled(state) && now() - started < MAX_JOIN_WAIT_MS) {
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await sleep(POLL_INTERVAL_MS)
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		state = await read_gate_state()
 	}
 

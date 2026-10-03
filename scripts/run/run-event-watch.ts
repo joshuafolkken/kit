@@ -22,6 +22,7 @@ async function watch(ports: WatchPorts, position: number): Promise<number> {
 	let next = position
 
 	while (ports.should_continue()) {
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		const read = await ports.pass(next)
 
 		for (const event of read.events) ports.write(ports.render(event))

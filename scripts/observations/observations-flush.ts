@@ -308,6 +308,7 @@ async function stage_ledger(): Promise<void> {
 	const ledger_paths = observation_ledger.ledger_paths(await git_command.status())
 
 	for (const file_path of ledger_paths) {
+		// eslint-disable-next-line no-await-in-loop -- git add holds the index lock, so two at once fail
 		await git_command.add_path(file_path)
 	}
 }

@@ -151,6 +151,7 @@ async function wait_for_any(
 
 		if (completed !== undefined) return completed
 
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await sleep(config.poll_ms)
 	}
 }

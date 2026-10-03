@@ -347,10 +347,13 @@ async function run_ticks(
 	let loop = seed_loop(target, started_ms)
 
 	while (Date.now() - started_ms < options.max_ms && !run_progress_clock.is_life_ended(life)) {
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await sleep(options.tick_ms)
 		run_progress_clock.ping_life(life)
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		loop = await step(options, target, loop)
 
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		const exit = await wait_exit(loop, wait)
 
 		if (exit !== undefined) return exit

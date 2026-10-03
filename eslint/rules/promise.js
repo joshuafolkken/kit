@@ -5,6 +5,11 @@ export const promise_rules = {
 	'promise/param-names': 'error',
 	'promise/no-nesting': 'error',
 
+	// ループ内で 1 つずつ await すると、独立した処理まで直列になる。Sonar の S9382 と同じ指摘を
+	// ローカルのゲートで先に出す。ポーリングや順序が意味を持つ処理など意図的な逐次は、
+	// `// eslint-disable-next-line no-await-in-loop -- <理由>` で理由を残して抑止する。
+	'no-await-in-loop': 'error',
+
 	// `promise-function-async` を有効にしている以上、`require-await` は同時に満たせない。
 	// Promise を返す契約の関数（execa モックなど）は async である必要がある一方、
 	// 実際に await する対象を持たないため `require-await` が必ず発火する。

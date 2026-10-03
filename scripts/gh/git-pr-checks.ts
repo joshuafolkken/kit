@@ -262,6 +262,7 @@ async function wait_for_pr_success(options: WaitForPrSuccessOptions): Promise<Pr
 
 	for (let attempt = 0; attempt < options.max_attempts; attempt += 1) {
 		console.info(`Checking PR status… (${String(attempt + 1)}/${String(options.max_attempts)})`)
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		carried = await attempt_pr_success_poll({
 			options,
 			stable_count: carried.next_stable_count,

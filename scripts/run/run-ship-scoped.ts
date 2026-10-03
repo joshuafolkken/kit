@@ -16,6 +16,7 @@ async function run_phases(phases: ReadonlyArray<Phase>): Promise<JoshResult> {
 	let last: JoshResult = { code: SUCCESS_EXIT_CODE, out: '' }
 
 	for (const phase of phases) {
+		// eslint-disable-next-line no-await-in-loop -- phases run in order and the first failure stops the rest
 		last = await phase()
 		if (last.code !== SUCCESS_EXIT_CODE) return last
 	}

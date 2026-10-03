@@ -207,9 +207,11 @@ async function sleep_between_read_backs(attempt: number): Promise<void> {
 // happen" from a read nobody got.
 async function has_merge_landed(pr_number: number, merge_error: unknown): Promise<boolean> {
 	for (let attempt = 0; attempt < MERGE_READ_BACK_ATTEMPTS; attempt += 1) {
+		// eslint-disable-next-line no-await-in-loop -- a retry runs only after the previous attempt has answered
 		const is_merged = await read_merge_state(pr_number)
 		if (is_merged !== undefined) return is_merged
 
+		// eslint-disable-next-line no-await-in-loop -- a retry runs only after the previous attempt has answered
 		await sleep_between_read_backs(attempt)
 	}
 

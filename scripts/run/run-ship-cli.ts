@@ -271,10 +271,12 @@ async function ship(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 	const sections: Array<ShipSection> = []
 
 	for (const step of run_ship_steps.steps(args)) {
+		// eslint-disable-next-line no-await-in-loop -- stages run in order and the first failure stops the ship
 		const section = await run_stage(step, args, context)
 
 		sections.push(section)
 
+		// eslint-disable-next-line no-await-in-loop -- stages run in order and the first failure stops the ship
 		if (section.code !== SUCCESS_EXIT_CODE) return await stopped(sections, args, step.stage)
 	}
 

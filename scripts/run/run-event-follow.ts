@@ -52,6 +52,7 @@ async function follow(
 	let read = ports.read(position)
 
 	while (read.events.length === 0 && ports.now() < deadline) {
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await ports.sleep(options.tick_ms)
 		read = ports.read(position)
 	}

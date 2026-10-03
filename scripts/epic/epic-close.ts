@@ -296,6 +296,7 @@ async function close_parents_of(
 	const closed: Array<number> = []
 
 	for (const epic of parents_of(open_epics, child_number)) {
+		// eslint-disable-next-line no-await-in-loop -- each close updates the evaluated set the next one reads
 		const number = await close_if_unseen(epic, child_number, evaluated)
 		if (number !== undefined) closed.push(number)
 	}
@@ -311,6 +312,7 @@ async function close_next_level(
 	const next: Array<number> = []
 
 	for (const child_number of frontier) {
+		// eslint-disable-next-line no-await-in-loop -- each close updates the evaluated set the next one reads
 		next.push(...(await close_parents_of(open_epics, child_number, evaluated)))
 	}
 
@@ -328,6 +330,7 @@ async function cascade_close(
 
 	for (let depth = 0; depth < MAX_CASCADE_DEPTH; depth++) {
 		if (frontier.length === 0) return
+		// eslint-disable-next-line no-await-in-loop -- the cascade closes one level before reading the next
 		frontier = await close_next_level(open_epics, frontier, evaluated)
 	}
 

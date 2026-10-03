@@ -105,11 +105,16 @@ async function verify_public_versions(
 	lockfile: string,
 	probe_version: MigrationDependencies['fetch_version'],
 ): Promise<VersionCheck> {
+	const versions = migrate_logic.scoped_versions(lockfile)
+	// Each probe reads its own package, so they run together; the report keeps the lockfile's order.
+	const probed = await Promise.all(
+		versions.map(async ([name, version]) => await probe_integrity(name, version, probe_version)),
+	)
 	const missing: Array<string> = []
 	const integrities = new Map<string, string>()
 
-	for (const [name, version] of migrate_logic.scoped_versions(lockfile)) {
-		const integrity = await probe_integrity(name, version, probe_version)
+	for (const [index, [name, version]] of versions.entries()) {
+		const integrity = probed[index]
 		if (integrity === undefined) missing.push(`${name}@${version}`)
 		else integrities.set(version, integrity)
 	}

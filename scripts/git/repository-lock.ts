@@ -110,6 +110,7 @@ async function acquire(target: string, max_wait_ms: number): Promise<boolean> {
 
 	while (!claim(target)) {
 		if (Date.now() >= deadline) return false
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await sleep(POLL_INTERVAL_MS)
 	}
 

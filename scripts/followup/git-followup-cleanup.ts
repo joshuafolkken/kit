@@ -70,6 +70,7 @@ async function run_guarded_steps(
 	let is_complete = true
 
 	for (const step of steps) {
+		// eslint-disable-next-line no-await-in-loop -- cleanup steps run in their declared order
 		const is_done = await run_guarded_step(is_guarded, step)
 
 		if (!is_done) is_complete = false

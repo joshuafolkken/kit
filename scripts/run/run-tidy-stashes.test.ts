@@ -46,6 +46,7 @@ const MIXED_ENTRY = {
 const OPEN_ENTRY = { selector: 'c'.repeat(40), subject: 'On main: backlogrun: parked #2701' }
 const NUMBERLESS_ENTRY = { selector: 'd'.repeat(40), subject: 'On main: scratch' }
 const MERGED_ISSUES = new Set(['2583', '2584'])
+const SLOW_READ_MS = 20
 const MIXED_KEPT = {
 	target: `stash "${MIXED_ENTRY.subject}"`,
 	verdict: { kind: 'keep', reason: '#2701 not merged' },
@@ -150,6 +151,24 @@ function primary_with_old_ledger(): string {
 
 // joshuafolkken/kit#2724: the duplicate check reads the ledger after the migration, not the empty new
 // path before it — otherwise a line both the old ledger and the stash hold is carried twice.
+// joshuafolkken/kit#3047: the path reads run together, and the carry keeps path order.
+describe('run_tidy_stashes.tidy_stashes — concurrent ledger path reads', () => {
+	it('keeps path order when the first path read finishes last', async () => {
+		vi.mocked(git_stash.changed_paths).mockResolvedValue([LEGACY_LEDGER_FILE, LEDGER_FILE])
+		vi.mocked(git_stash.added_lines).mockImplementation(async (_hash, file_path) => {
+			if (file_path !== LEGACY_LEDGER_FILE) return [OTHER_NEW_LINE]
+
+			await new Promise((resolve) => setTimeout(resolve, SLOW_READ_MS))
+
+			return [NEW_LINE]
+		})
+
+		await run_tidy_stashes.tidy_stashes(is_merged)
+
+		expect(readFileSync(LEDGER, 'utf8')).toBe(`${NEW_LINE}\n${OTHER_NEW_LINE}\n`)
+	})
+})
+
 describe('run_tidy_stashes.tidy_stashes — a primary checkout whose ledger is still at the old path', () => {
 	it('carries no line the not-yet-migrated old ledger already holds', async () => {
 		const root = primary_with_old_ledger()
