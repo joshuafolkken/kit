@@ -18,6 +18,7 @@ import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
 import { lane_switch_main } from './lane-switch-main'
 import { oracle_consulted } from './oracle-consulted'
+import { permission_guards } from './permission-guards'
 import { piped_verification } from './piped-verification'
 import { poll_loop } from './poll-loop'
 import { pre_gate_cut } from './pre-gate-cut'
@@ -482,6 +483,10 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	git_force.ROW,
 	worktree_guard.ROW,
 	file_body.ROW,
+	// **The deny-list bypasses closed by argv and path rather than glob** (joshuafolkken/kit#2983) — an
+	// index mutation, a recursive forced `rm` or destructive `gh` call, and a protected file. Each
+	// claims a command or file no row above does and refuses every occurrence (`permission-guards.ts`).
+	...permission_guards.ROWS,
 	// **The hand-written wait loop a lane child improvises over a backgrounded command's output**
 	// (joshuafolkken/kit#2371). `early-heartbeat` refuses a bare `sleep` and stands down on any loop
 	// keyword; this is the loop it left — a `while`/`until` that sleeps between probes of an output

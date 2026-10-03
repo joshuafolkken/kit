@@ -5,6 +5,11 @@
 		"deny": [
 			"Bash(rm -rf *)",
 			"Bash(rm -rf /*)",
+			"Bash(rm -fr *)",
+			"Bash(gh repo delete*)",
+			"Bash(gh repo archive*)",
+			"Bash(gh pr close*)",
+			"Read(./.env)",
 			"Bash(git push --force*)",
 			"Bash(git push -f*)",
 			"Bash(git push *--force*)",
