@@ -1,8 +1,8 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import type { IssueRead } from '#scripts/git/git-gh-issue-read'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import type { IssueRead } from '#scripts/gh/git-gh-issue-read'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { z } from 'zod'
 import { issue_cite, type CiteTarget } from './issue-cite'

@@ -13,6 +13,7 @@ import { lane_background } from '#scripts/rules/lane-background'
 import { lane_park } from '#scripts/rules/lane-park'
 import { last_prompt } from '#scripts/rules/last-prompt'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
+import { run_carry } from '#scripts/run/run-carry'
 import { run_cut } from '#scripts/run/run-cut'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_hold } from '#scripts/run/run-hold'
@@ -108,22 +109,43 @@ async function outcome_of(raw_payload: string): Promise<StopOutcome> {
 	}
 }
 
+// A live carry record is in place — `carried` alone reads as a run. Both report checks below are about
+// a carried run: the strand judge reads this very record and returns on anything but `carried`, and a
+// stall needs a backlog driver, which begins one before its plan. A spent (`expired`) or `unreadable`
+// record a crashed run left behind is no run either, so it does not re-arm the stall's backlog probe
+// on every stop (joshuafolkken/kit#2995).
+// A failed git read — outside a repository, `git rev-parse` exits non-zero — reads as no run, since this
+// gate sits ahead of the checks' own swallowing and must not throw into the stop decision either.
+async function has_run_record(): Promise<boolean> {
+	try {
+		const directory = await run_carry.repository_directory()
+
+		if (directory === undefined) return false
+
+		return run_carry.read_carry(run_carry.carry_path(directory)).kind === 'carried'
+	} catch {
+		return false
+	}
+}
+
+// The stall check rides the Stop hook because the stop *is* the loop boundary: a run alive but not
+// advancing ends turns without dispatching (joshuafolkken/kit#2359). The strand check rides the same
+// boundary and is the step before the stall (joshuafolkken/kit#2375): it fires when the driver is gone
+// — the budget handed off, the owner dead, no supervisor watching. Both only report and swallow their
+// own failures, so neither can change the stop decision. An ordinary stop with no run record skips
+// both, so it pays one directory read rather than their reads and a stale stream's backlog probe.
+async function run_report_checks(): Promise<void> {
+	if (!(await has_run_record())) return
+
+	await backlog_stalled_detect.run_stall_check(backlog_ready.DEFAULT_PORTS)
+	await run_stranded_detect.run_stranded_check()
+}
+
 // Nothing reaches stdout on an ordinary stop, so what the harness parses stays empty unless the stop
 // is being held — all three rules block, so a bare `#N` is reported the same way (joshuafolkken/kit#2247).
 async function write_stop_decision(raw_payload: string): Promise<void> {
 	hook_decision.load_environment_file()
-
-	// The stall check rides the Stop hook because the stop *is* the loop boundary: a run alive but not
-	// advancing ends turns without dispatching (joshuafolkken/kit#2359). It only reports — leaves a
-	// marker, sends a notification — and swallows its own failures, so it can never change the decision
-	// below or hold the stop.
-	await backlog_stalled_detect.run_stall_check(backlog_ready.DEFAULT_PORTS)
-
-	// The strand check rides the same boundary for the same reason, and is the step before the stall
-	// (joshuafolkken/kit#2375): the stall detector needs a live driver that could dispatch, and this one
-	// fires when that driver is gone — the budget handed off, the owner dead, no supervisor watching. It
-	// too only reports and swallows its own failures, so it never touches the stop decision below.
-	await run_stranded_detect.run_stranded_check()
+	await run_report_checks()
 
 	const { reason } = await outcome_of(raw_payload)
 

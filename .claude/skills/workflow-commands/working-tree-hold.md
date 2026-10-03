@@ -63,7 +63,7 @@ or release once the work is done; only an expired record over a clean tree is re
 **The batch entry points claim per child, not per batch.** `backlogrun` never
 call it themselves; each child runs the `fullrun` procedure, so it claims on entry and `pnpm josh
 followup` releases it at that child's merge. The command's behavior and the answer table are
-`docs/josh-commands.md` → "`josh run:hold` / `josh run:release`"; this file is the single source of
+`docs/josh-commands-automation.md` → "`josh run:hold` / `josh run:release`"; this file is the single source of
 the procedure.
 
 ## The halfrun resume

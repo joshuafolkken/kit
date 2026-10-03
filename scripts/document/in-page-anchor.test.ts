@@ -91,3 +91,43 @@ describe('same-page anchors resolve to a heading on that page', () => {
 		expect(broken_anchors(text)).toEqual(['not-a-heading'])
 	})
 })
+
+// A link into another page — `[x](josh-commands-automation.md#josh-run-step)` — has to name a
+// heading that page carries. Splitting the command reference into two pages moved most sections,
+// so a link written against the old page would otherwise land on its top (joshuafolkken/kit#2998).
+const CROSS_PAGE_LINK_PATTERN = /\]\(([\w./-]+\.md)#([^)\s]+)\)/gu
+
+function page_anchors(path: string): ReadonlySet<string> {
+	const text = readFileSync(package_file(path), 'utf8')
+
+	return anchors(outside_fences(text))
+}
+
+function broken_cross_page_anchors(path: string, text: string): ReadonlyArray<string> {
+	const links = [...outside_fences(text).matchAll(CROSS_PAGE_LINK_PATTERN)]
+
+	return links.flatMap(([, file = '', anchor = '']) => {
+		const target = node_path.join(node_path.dirname(path), file)
+
+		return page_anchors(target).has(anchor) ? [] : [`${path} → ${target}#${anchor}`]
+	})
+}
+
+describe('cross-page anchors resolve to a heading on the linked page', () => {
+	it('finds no broken cross-page anchor in the docs or the README', () => {
+		const broken = documents().flatMap((path) =>
+			broken_cross_page_anchors(path, readFileSync(package_file(path), 'utf8')),
+		)
+
+		expect(broken).toEqual([])
+	})
+
+	it('reports an anchor the linked page does not carry', () => {
+		const text =
+			'See [`josh gate`](josh-commands.md#josh-gate) and [x](josh-commands.md#josh-run-step).\n'
+
+		expect(broken_cross_page_anchors('docs/how-to.md', text)).toEqual([
+			'docs/how-to.md → docs/josh-commands.md#josh-run-step',
+		])
+	})
+})

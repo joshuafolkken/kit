@@ -3,13 +3,13 @@ import {
 	capped_listing_outcome,
 	listing_of,
 	listing_outcome,
-} from '#scripts/git/git-gh-issue-list-fixture'
+} from '#scripts/gh/git-gh-issue-list-fixture'
 import {
 	ALREADY_DONE_LABEL,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
-} from '#scripts/git/issue-labels'
+} from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_busy } from './epic-busy'
 
@@ -18,11 +18,11 @@ import { epic_busy } from './epic-busy'
 // turned the answer into a count: each such issue occupies one lane, and the caller compares that
 // count against the repository's limit.
 
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_list_by_label_in_repo: vi.fn() },
 }))
 
-const { git_gh_command } = await import('#scripts/git/git-gh-command')
+const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const issue_list = vi.mocked(git_gh_command.issue_list_by_label_in_repo)
 
 // The listing row builder is the `auto-ok` pickup's, not a second copy of it: both read the same

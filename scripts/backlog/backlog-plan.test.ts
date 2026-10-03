@@ -7,14 +7,14 @@ import {
 } from '#scripts/auto-ok/auto-ok-fixture'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_report } from '#scripts/epic/epic-report'
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import type { OpenIssueData } from '#scripts/git/schemas'
 import {
 	AUTO_OK_LABEL,
 	EPIC_LABEL,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
-} from '#scripts/git/issue-labels'
-import type { OpenIssueData } from '#scripts/git/schemas'
+} from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_named } from './backlog-named'

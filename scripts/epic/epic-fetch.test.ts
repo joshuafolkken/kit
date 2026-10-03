@@ -1,4 +1,4 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_fetch } from './epic-fetch'
 

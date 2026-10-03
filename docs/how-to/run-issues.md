@@ -23,10 +23,10 @@ This table is the single description of the keywords; the README and the [tutori
 
 ## Check it worked
 
-- A merged run ends with the Issue closed and a notification. [`josh followup`](../josh-commands.md#josh-followup) exits non-zero and names the failing check when it cannot merge.
+- A merged run ends with the Issue closed and a notification. [`josh followup`](../josh-commands-automation.md#josh-followup) exits non-zero and names the failing check when it cannot merge.
 
 ## Common failures
 
-- A run stops on an Issue labelled `needs-human-review`: that is intended — see [the label](../josh-commands.md#needs-human-review--the-opposite-label).
-- A run exits early because the work is already merged: see [`already-done`](../josh-commands.md#already-done--the-exit-for-work-that-is-already-merged).
+- A run stops on an Issue labelled `needs-human-review`: that is intended — see [the label](../josh-commands-automation.md#needs-human-review--the-opposite-label).
+- A run exits early because the work is already merged: see [`already-done`](../josh-commands-automation.md#already-done--the-exit-for-work-that-is-already-merged).
 - The gate or CI fails: [Fix a failing gate or CI](./fix-gate-and-ci.md).

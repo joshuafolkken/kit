@@ -26,7 +26,7 @@ vi.mock('./lane-registry', () => ({ lane_registry: { list_lanes: vi.fn() } }))
 // occupancy path run deterministically over the listed lanes.
 const { REPO_SLUG } = vi.hoisted(() => ({ REPO_SLUG: 'joshuafolkken/kit' }))
 
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { repo_get_name_with_owner: vi.fn().mockResolvedValue(REPO_SLUG) },
 }))
 vi.mock('#scripts/epic/epic-busy', () => ({

@@ -1,4 +1,4 @@
-import { EPIC_LABEL } from '#scripts/git/issue-labels'
+import { EPIC_LABEL } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import type { AuditFinding } from './epic-audit'
 import { epic_audit_checks, type AuditChild } from './epic-audit-checks'

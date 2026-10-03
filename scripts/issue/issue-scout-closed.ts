@@ -1,9 +1,9 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { EPIC_LABEL, has_any_label } from '#scripts/git/issue-labels'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { PAGE_CEILING_CAUSE } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_label_schema } from '#scripts/git/schemas'
 import { z } from 'zod'
+import { EPIC_LABEL, has_any_label } from './issue-labels'
 import type { ScoutIssue } from './issue-scout'
 
 // The closed half of `issue:scout`'s duplicate scan (joshuafolkken/kit#1679), held apart from the CLI

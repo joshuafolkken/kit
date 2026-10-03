@@ -1,4 +1,4 @@
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 
 // The shared half of every "report a GitHub repository setting kit cannot write" check.

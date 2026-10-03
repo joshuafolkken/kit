@@ -197,7 +197,7 @@ Only branch 2 files an Issue. What follows applies to that branch.
   1. File the follow-up Issue referencing the current one, tagged `route:review-cap` — **before the current Issue closes.**
      `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --route review-cap`.
      The command lints the body, applies the classification labels it declares, runs the duplicate scan
-     and then `epic:bundle` on the new Issue (`docs/josh-commands.md` → `josh issue:file`). The
+     and then `epic:bundle` on the new Issue (`docs/josh-commands-automation.md` → `josh issue:file`). The
      `epic:bundle` candidate search reads open issues only, so once the parent has closed it answers
      `none` permanently.
   2. Act on the `epic:bundle` answer it prints. **`epic:bundle` recommends and writes nothing**, so acting means running the

@@ -42,7 +42,7 @@ The detail below is read at the filing decision, and the marker suite pins the r
 
 **The depth is recorded on the Issue as a label, and the label is applied when the Issue is filed**
 (joshuafolkken/kit#1729). `depth:0`, `depth:1` and `depth:2` are the three, defined once in
-`scripts/git/issue-labels.ts` and carrying no definition of their own — **the table above is the
+`scripts/issue/issue-labels.ts` and carrying no definition of their own — **the table above is the
 single source**, and a label description that paraphrased it would be a second copy of the rule.
 **Every filing route applies one**, this route and the other three of §2d's table alike: a `new`
 entry point, a `route:tier-a` prerequisite, a `route:interrupt`, a split child and a review round
@@ -56,7 +56,7 @@ gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=depth:1'   # an Issue
 
 **Create the three once per repository**, before the first filing that applies one — REST auto-creates
 a missing label with a generated color and no description, and the three lines below are what give
-each a stable color a reader can scan a listing by. `DEPTH_LABELS` in `scripts/git/issue-labels.ts`
+each a stable color a reader can scan a listing by. `DEPTH_LABELS` in `scripts/issue/issue-labels.ts`
 is the single source of the colors and descriptions, and `scripts/rules/issue-depth-label.test.ts` keys
 these lines to it so the two cannot drift.
 

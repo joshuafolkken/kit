@@ -1,8 +1,8 @@
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_merged } from './issue-merged'
 
-vi.mock('#scripts/git/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: vi.fn() } }))
+vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: vi.fn() } }))
 
 const exec_gh_api = vi.mocked(git_gh_exec.exec_gh_api)
 const MERGED = 'merged-reference\t'

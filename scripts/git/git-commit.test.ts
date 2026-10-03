@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const COMMIT_MESSAGE = 'feat: add feature'
 const COMMIT_ERROR = 'commit failed'
 
-vi.mock('./animation-helpers', () => ({
+vi.mock('#scripts/lib/animation-helpers', () => ({
 	animation_helpers: {
 		execute_with_animation: vi
 			.fn()

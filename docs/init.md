@@ -1,6 +1,6 @@
 # josh init — Detailed Behavior
 
-`josh init` selects a project profile, then creates or merges the settings that apply to that project. It can initialize a directory without Git or an existing `package.json`.
+`josh init` selects a project profile, then creates or merges the settings that apply to that project. It can initialize a directory without Git or an existing `package.json`. The reasons behind its choices are in [init-rationale.md](./maintainers/init-rationale.md).
 
 ```bash
 pnpm josh init
@@ -240,6 +240,7 @@ SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
 .github/workflows/ci.yml
 .github/workflows/auto-tag.yml
 .github/workflows/dependabot-auto-merge.yml
+.github/workflows/github-release.yml
 .github/workflows/pr-classification.yml
 .github/workflows/production.yml
 .github/workflows/sonar-qube.yml
@@ -305,7 +306,7 @@ The kit pre-commit hook runs [secretlint](https://github.com/secretlint/secretli
 
 `josh init` provisions everything needed: `.secretlintrc.json` (recommend preset) plus the `secretlint` and `@secretlint/secretlint-rule-preset-recommend` devDependencies. The devDependencies live in the **consumer** project rather than in kit, because pnpm's isolated `node_modules` never exposes a kit dependency's bin to the consumer's `pnpm exec`.
 
-The hook runs through [`josh secretlint-scan`](./josh-commands.md#josh-secretlint-scan), which skips with a notice when the binary is absent instead of failing the commit.
+The hook runs through [`josh secretlint-scan`](./josh-commands-automation.md#josh-secretlint-scan), which skips with a notice when the binary is absent instead of failing the commit.
 
 > **Upgrading an existing project:** `josh sync` adds the same config and devDependencies, but the packages are not present until you run `pnpm install`. Until then every commit prints the skip notice and the secret scan does **not** run — run `pnpm install` immediately after syncing to restore it.
 

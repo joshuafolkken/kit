@@ -1,7 +1,11 @@
 import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixture'
 import type { EpicChild } from '#scripts/epic/epic-graph'
-import { ALREADY_DONE_LABEL, AUTO_OK_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
 import type { OpenIssueData } from '#scripts/git/schemas'
+import {
+	ALREADY_DONE_LABEL,
+	AUTO_OK_LABEL,
+	NEEDS_DECISION_LABEL,
+} from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import { backlog_pool } from './backlog-pool'
 

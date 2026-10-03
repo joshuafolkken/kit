@@ -1,12 +1,12 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import type { IssueListOutcome } from '#scripts/git/git-gh-issue-list'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import type { IssueListOutcome } from '#scripts/gh/git-gh-issue-list'
 import {
 	capped_listing_outcome,
 	listing_of,
 	listing_outcome,
-} from '#scripts/git/git-gh-issue-list-fixture'
-import { EPIC_LABEL } from '#scripts/git/issue-labels'
+} from '#scripts/gh/git-gh-issue-list-fixture'
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { EPIC_LABEL } from './issue-labels'
 import { issue_scout_closed } from './issue-scout-closed'
 
 // Pins the closed half of `issue:scout`'s duplicate scan (joshuafolkken/kit#1679) on its own.

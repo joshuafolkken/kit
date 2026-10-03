@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { git_followup_pending } from '#scripts/git/git-followup-pending'
+import { git_followup_pending } from '#scripts/followup/git-followup-pending'
 import { release_scope_cli } from '#scripts/release/release-scope-cli'
 import { run_carry } from './run-carry'
 import { run_event_scope, type EventScope } from './run-event-scope'

@@ -54,7 +54,7 @@ function format_replaced_relations(links: ReadonlyArray<DependencyLink>): string
 	return `Replaced blocked-by: ${join_references(quoted)}.`
 }
 
-export type { IssueReference } from '#scripts/git/issue-reference'
+export type { IssueReference } from '#scripts/issue/issue-reference'
 export {
 	DEPENDENCY_ARROW,
 	REFERENCE_SEPARATOR,

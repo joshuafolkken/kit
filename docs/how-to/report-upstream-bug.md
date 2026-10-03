@@ -6,8 +6,8 @@ A problem you hit comes from another package — a dependency, or kit itself see
 
 ## Steps
 
-1. Decide whose repository it is with [`josh repo:party`](../josh-commands.md#josh-repoparty): `first-party` when you own it, `third-party` otherwise. `unknown` is not third-party — resolve it first.
-2. For a first-party repository, file with [`josh issue:file`](../josh-commands.md#josh-issuefile) and `--repo <owner/repo>` in step 3 — it searches for an existing Issue, checks the draft and applies its labels in the same call. For a third-party repository (which `issue:file` refuses), search with [`josh issue:scout`](../josh-commands.md#josh-issuescout) and get the labels for your draft from [`josh issue:lint`](../josh-commands.md#josh-issuelint).
+1. Decide whose repository it is with [`josh repo:party`](../josh-commands-automation.md#josh-repoparty): `first-party` when you own it, `third-party` otherwise. `unknown` is not third-party — resolve it first.
+2. For a first-party repository, file with [`josh issue:file`](../josh-commands-automation.md#josh-issuefile) and `--repo <owner/repo>` in step 3 — it searches for an existing Issue, checks the draft and applies its labels in the same call. For a third-party repository (which `issue:file` refuses), search with [`josh issue:scout`](../josh-commands-automation.md#josh-issuescout) and get the labels for your draft from [`josh issue:lint`](../josh-commands-automation.md#josh-issuelint).
 3. File the Issue with a minimal reproduction outside your project (or a note that none exists), and link it from the Issue you were working on.
 4. Stop the dependent work until the upstream fix lands.
 

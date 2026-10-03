@@ -216,7 +216,7 @@ describe('Node 26 smoke job', () => {
 
 describe('pnpm update documentation', () => {
 	it('describes self-update without a Corepack installation instruction', () => {
-		const commands = readFileSync(package_path('docs/josh-commands.md'), 'utf8')
+		const commands = readFileSync(package_path('docs/josh-commands-automation.md'), 'utf8')
 		const troubleshooting = readFileSync(package_path('docs/troubleshooting.md'), 'utf8')
 
 		expect(commands).toContain('pnpm self-update')

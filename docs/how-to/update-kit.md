@@ -7,7 +7,7 @@ A new kit version is out and you want its updated AI rules, workflow templates a
 ## Steps
 
 1. Check what you have and what is available with [`josh version`](../josh-commands.md#josh-version); its upgrade option moves both the global install and the project dependency.
-2. Run [`josh sync`](../josh-commands.md#josh-sync) to pull in the managed files. It follows the recorded profile, so a `basic` project gets only its own file set and has its pre-rename paths moved ([#2827](https://github.com/joshuafolkken/kit/issues/2827)). [sync.md](../sync.md#what-gets-synced) lists what it overwrites and what it merges.
+2. Run [`josh sync`](../josh-commands.md#josh-sync) to pull in the managed files. It follows the recorded profile, so a `basic` project gets only its own file set and has its pre-rename paths moved. [sync.md](../sync.md#what-gets-synced) lists what it overwrites and what it merges.
 3. `package.json` is mostly left alone by sync. Re-running `josh init` adds scripts and development dependencies the new version introduced, but never overwrites ones that already exist ([what is not synced](../sync.md#what-does-not-get-synced), [init.md](../init.md)).
 4. Run `pnpm install` so a rewritten `prepare` script takes effect, then `josh gate`.
 

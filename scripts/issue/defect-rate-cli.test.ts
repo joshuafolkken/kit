@@ -1,5 +1,5 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { git_gh_exec, type GhApiRequest } from '#scripts/git/git-gh-exec'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_gh_exec, type GhApiRequest } from '#scripts/gh/git-gh-exec'
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { defect_rate_cli } from './defect-rate-cli'
 

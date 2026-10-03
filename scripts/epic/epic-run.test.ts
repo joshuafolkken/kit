@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_parse } from './epic-parse'
 
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
 		label_ensure: vi.fn(),
 		issue_create_with_label: vi.fn(),
@@ -12,7 +12,7 @@ vi.mock('#scripts/git/git-gh-command', () => ({
 	},
 }))
 
-const { git_gh_command } = await import('#scripts/git/git-gh-command')
+const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const { epic_run, FAILURE_EXIT_CODE } = await import('./epic-run')
 
 const mocked_label = vi.mocked(git_gh_command.label_ensure)

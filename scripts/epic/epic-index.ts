@@ -1,8 +1,8 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { EPIC_LABEL, has_any_label } from '#scripts/git/issue-labels'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import type { OpenIssueData } from '#scripts/git/schemas'
+import { EPIC_LABEL, has_any_label } from '#scripts/issue/issue-labels'
 import { z } from 'zod'
 import { epic_parse } from './epic-parse'
 

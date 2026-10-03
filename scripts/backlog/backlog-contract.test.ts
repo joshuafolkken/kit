@@ -9,9 +9,9 @@ import {
 	OLD_ISSUE_NUMBER,
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
-import { AUTO_OK_LABEL, EPIC_LABEL } from '#scripts/git/issue-labels'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
+import { AUTO_OK_LABEL, EPIC_LABEL } from '#scripts/issue/issue-labels'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'

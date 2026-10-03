@@ -4,14 +4,14 @@ import {
 	EPIC_NUMBER,
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
+import type { OpenIssueData } from '#scripts/git/schemas'
 import {
 	AUTO_OK_LABEL,
 	BUG_LABEL,
 	IN_PROGRESS_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RUN_SOLO_LABEL,
-} from '#scripts/git/issue-labels'
-import type { OpenIssueData } from '#scripts/git/schemas'
+} from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_next } from './backlog-next'

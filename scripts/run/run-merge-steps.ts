@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { git_followup_issue_close } from '#scripts/git/git-followup-issue-close'
-import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
-import { git_stash } from '#scripts/git/git-stash'
-import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import { git_followup_issue_close } from '#scripts/followup/git-followup-issue-close'
+import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
+import { git_stash } from '#scripts/git/stash/git-stash'
+import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_reap } from '#scripts/lane/lane-reap'
@@ -354,6 +354,7 @@ const run_merge_steps = {
 	has_resumable_cut,
 	is_over_budget,
 	refused_carry,
+	remove_in_progress,
 	resume_cut,
 }
 

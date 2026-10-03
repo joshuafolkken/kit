@@ -315,7 +315,10 @@ async function on_cut(ctx: MergeContext): Promise<MergeVerdict> {
 
 // A child that parked itself: nothing is counted, but the park is written to the stream as a failed
 // child's is, so a reader restoring the run from its events sees the child settled (joshuafolkken/kit#2508).
+// Its `in-progress` is dropped as a failed child's is: left on, it outlived the `needs-decision` a
+// person later lifted, and a `run:solo` child then held the whole backlog (joshuafolkken/kit#3017).
 async function on_parked(ctx: MergeContext): Promise<MergeVerdict> {
+	await run_merge_steps.remove_in_progress(ctx.child)
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.PARK, `#${ctx.child} parked`)
 
 	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)

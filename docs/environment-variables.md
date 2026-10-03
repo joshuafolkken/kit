@@ -1,0 +1,113 @@
+# Environment variables
+
+Every environment variable kit reads, in one place. Set the ones you need in a `.env` file at the project root — `.env` is gitignored, so each value stays on this machine — or as real environment variables, as a cloud session does ([cloud-session.md](./cloud-session.md#environment-variables)). A real environment variable wins over the same key in `.env`.
+
+Only these load `.env` themselves, and only when it exists: `josh notify`, `josh followup`, `josh doctor`, `josh latest:scope`, `josh port`, `josh session:lang`, `josh epic:next`, `josh backlog:drive`, `josh run:step`, `josh run:event`, `josh run:wake`, `josh run:stranded`, the `josh lane:*` commands except `lane:launch`, the Claude Code hooks (`josh pretool:guard` — which runs the rule, batch and investigation guards — and `josh stop:guard`) and `playwright.config.ts`. Every other command reads only the real environment — `josh gate`, `josh ship`, `josh review:brief`, `josh clone:scan`, `josh release`, `josh eval`, `josh run:progress` and the git hooks among them — so a variable one of those reads, such as `JOSH_SCOPED_GREEN`, `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`, `JOSH_EVAL_MODEL`, `JOSH_EVAL_CONCURRENCY`, `JOSH_PROGRESS` or the two `*_FORCE` switches, has to be set in the shell that runs it. `JOSH_PROGRESS_INTERVAL_MINUTES` in `.env` reaches only the `josh rule:guard` hook's heartbeat check, not `josh run:progress` itself — so set it in the shell too, or commit `josh.progress_interval_minutes` in `package.json`, or the two read different intervals.
+
+All of them are optional except the two Telegram credentials, which notifications need unless `JOSH_NOTIFY=off`. A blank value (`KEY=`) means the same as leaving the key out.
+
+`scripts/document/environment-variable-reference.test.ts` checks that the `JOSH_*` rows below match the variables the code reads, both ways, so a new variable cannot ship without a row here.
+
+## Variables you set
+
+### Notifications and language
+
+| Variable             | Required                      | Default                                        | Used when                                                                                                                                                            |
+| -------------------- | ----------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TELEGRAM_BOT_TOKEN` | Yes, unless `JOSH_NOTIFY=off` | —                                              | Every notification a workflow sends ([how to get it](./scripts-ai.md#telegram_bot_token)).                                                                           |
+| `TELEGRAM_CHAT_ID`   | Yes, unless `JOSH_NOTIFY=off` | —                                              | The chat that receives them ([how to get it](./scripts-ai.md#telegram_chat_id)).                                                                                     |
+| `JOSH_NOTIFY`        | No                            | on                                             | `off` skips every notification with exit code 0 and makes the two credentials unnecessary ([details](./scripts-ai.md#josh_notify)).                                  |
+| `JOSH_SESSION_LANG`  | No                            | `ja` (`josh init` seeds it from the OS locale) | The language of session dialogue, Issue bodies, comments and notification bodies, e.g. `en` ([`josh session:lang`](./josh-commands-automation.md#josh-sessionlang)). |
+
+### Ports and lanes
+
+| Variable                  | Required | Default                                           | Used when                                                                                                                                                                                                                  |
+| ------------------------- | -------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT_SEED`               | No       | `0` (dev 5173, preview 4173)                      | Several kit projects run on one machine: an integer `0`–`99` that moves this project's dev and preview ports by `seed × 10` ([`josh port`](./josh-commands.md#josh-port)).                                                 |
+| `JOSH_LANE_ROOT`          | No       | `.<repository-name>-lanes`, beside the repository | Where `josh lane:open` puts a lane's work tree.                                                                                                                                                                            |
+| `JOSH_LANE_LIMIT`         | No       | `6`                                               | How many lanes one repository runs at once ([`josh epic:next`](./josh-commands-automation.md#josh-epicnext)); set `2` on a small container.                                                                                |
+| `PLAYWRIGHT_REUSE_SERVER` | No       | off                                               | `1` / `true` / `yes` / `on` lets the E2E run reuse this project's own server already on the port instead of booting one ([troubleshooting](./troubleshooting.md#local-e2e-aborts-with-httplocalhost5173-is-already-used)). |
+
+### Unattended agents
+
+Each role's model and effort for a `backlogrun`. The invoking CLI picks the provider. Model overrides apply to Claude Code only — Codex always runs `gpt-6.1-sol`; effort accepts `low`, `medium`, `high`, `xhigh` or `max` for either provider.
+
+| Variable                | Required | Default                                            | Used when                                                   |
+| ----------------------- | -------- | -------------------------------------------------- | ----------------------------------------------------------- |
+| `JOSH_SCHEDULER_MODEL`  | No       | `claude-opus-5-5`                                  | The model of the run that schedules the batch.              |
+| `JOSH_SCHEDULER_EFFORT` | No       | `medium`                                           | The effort of the run that schedules the batch.             |
+| `JOSH_WORKER_MODEL`     | No       | `claude-opus-5-5`                                  | The model of each lane that implements an Issue.            |
+| `JOSH_WORKER_EFFORT`    | No       | `medium`, and `low` once the lane reaches the gate | The effort of each lane that implements an Issue.           |
+| `JOSH_REVIEWER_MODEL`   | No       | `claude-opus-5-5`                                  | The model of the review a lane's change gets.               |
+| `JOSH_REVIEWER_EFFORT`  | No       | `high`                                             | The effort of the review a lane's change gets.              |
+| `JOSH_LANE_MODEL`       | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_MODEL` instead.  |
+| `JOSH_LANE_EFFORT`      | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_EFFORT` instead. |
+
+### Runs
+
+| Variable                         | Required | Default                                                       | Used when                                                                                                                                                       |
+| -------------------------------- | -------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_PROGRESS_INTERVAL_MINUTES` | No       | `josh.progress_interval_minutes` in `package.json`, else `20` | How long a run goes quiet before `josh run:progress` prints a line ([`josh run:progress`](./josh-commands-automation.md#josh-runprogress)).                     |
+| `JOSH_PROGRESS`                  | No       | on                                                            | `0` turns the progress lines off.                                                                                                                               |
+| `JOSH_RETROSPECTIVE`             | No       | off                                                           | `on` / `1` / `true` / `yes` runs the end-of-run retrospective when a backlog drains ([`josh retrospective`](./josh-commands-automation.md#josh-retrospective)). |
+| `JOSH_REPO_PATHS`                | No       | sibling repositories are found automatically                  | A repository that is not a sibling, or is checked out twice: `owner/repo=/absolute/path`, comma-separated ([`josh doctor`](./josh-commands.md#josh-doctor)).    |
+
+### Merge, release and dependency updates
+
+| Variable                           | Required | Default     | Used when                                                                                                                                                        |
+| ---------------------------------- | -------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_CI_TIMEOUT_SECONDS`          | No       | 32 minutes  | How long `josh followup` waits for CI ([`josh followup`](./josh-commands-automation.md#josh-followup)).                                                          |
+| `JOSH_REQUIRED_CHECKS`             | No       | `SonarQube` | The checks a merge waits for, comma-separated.                                                                                                                   |
+| `JOSH_RELEASE_TAG_TIMEOUT_SECONDS` | No       | 30 minutes  | How long `josh release` watches for its tag ([`josh release`](./josh-commands-automation.md#josh-release)).                                                      |
+| `JOSH_LATEST_MAX_AGE_HOURS`        | No       | `12`        | How old the last dependency update may be before `josh latest:scope` answers `required` ([`josh latest:scope`](./josh-commands-automation.md#josh-latestscope)). |
+
+### Git hooks
+
+| Variable                | Required | Default | Used when                                                                                                                                                            |
+| ----------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_PRE_PUSH_FORCE`   | No       | off     | `1` runs the pre-push unit suite even on a tree already recorded green ([`josh pre-push-unit`](./josh-commands-automation.md#josh-pre-push-unit)).                   |
+| `JOSH_PRE_COMMIT_FORCE` | No       | off     | `1` runs the pre-commit type check even on a tree already recorded green ([`josh pre-commit-type-check`](./josh-commands-automation.md#josh-pre-commit-type-check)). |
+
+### Agent guards
+
+Each guard is on by default; `off`, `0`, `false` or `no` turns that one guard off.
+
+| Variable                    | Required | Default | Used when                                                                                                                 |
+| --------------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_BATCH_GUARD`          | No       | on      | [`josh batch:guard`](./josh-commands-automation.md#josh-batchguard) — calls that could have gone out together.            |
+| `JOSH_INVESTIGATION_GUARD`  | No       | on      | [`josh investigation:guard`](./josh-commands-automation.md#josh-investigationguard) — reading too much before delegating. |
+| `JOSH_DUPLICATE_READ_GUARD` | No       | on      | [`josh duplicate-read:guard`](./josh-commands-automation.md#josh-duplicate-readguard) — reading the same file twice.      |
+| `JOSH_RULE_GUARD`           | No       | on      | [`josh rule:guard`](./josh-commands-automation.md#josh-ruleguard) — a rule delivered at the call that breaks it.          |
+| `JOSH_STOP_GUARD`           | No       | on      | [`josh stop:guard`](./josh-commands-automation.md#josh-stopguard) — what a turn must do before it ends.                   |
+| `JOSH_WATCHER_GUARD`        | No       | on      | [`josh run:watcher:guard`](./josh-commands-automation.md#josh-runwatcherguard) — a run whose progress watcher stopped.    |
+| `JOSH_PARENT_CUT_GUARD`     | No       | on      | A `backlogrun` parent over its session budget.                                                                            |
+| `JOSH_SCOPED_GREEN`         | No       | on      | `josh gate` refusing a tree its scoped checks were never green on ([`josh gate`](./josh-commands.md#josh-gate)).          |
+
+### Rule evaluation
+
+| Variable                | Required | Default  | Used when                                                                                     |
+| ----------------------- | -------- | -------- | --------------------------------------------------------------------------------------------- |
+| `JOSH_EVAL_MODEL`       | No       | `sonnet` | The model `josh eval` runs against ([`josh eval`](./josh-commands-automation.md#josh-eval)).  |
+| `JOSH_EVAL_CONCURRENCY` | No       | `5`      | How many `josh eval` sessions run at once; a value that is not a positive integer is refused. |
+
+## Variables kit sets itself
+
+kit sets these for the processes it starts, or writes them into a lane's own `.env`. They are listed so every variable the code reads is named here; do not set them by hand.
+
+| Variable                   | Set by                         | Meaning                                                               |
+| -------------------------- | ------------------------------ | --------------------------------------------------------------------- |
+| `JOSH_LANE_CHILD`          | a `backlogrun` dispatch        | This session is a dispatched lane child.                              |
+| `JOSH_LANE_SEAT`           | `josh lane:open`               | The lane's seat (`1`–`9`), added to the port offset.                  |
+| `JOSH_LANE_OUTPUT`         | `josh lane:open`               | Where the lane's child writes its output.                             |
+| `JOSH_LANE_AGENT_PROVIDER` | a `backlogrun` dispatch        | The provider the lane's child was launched with.                      |
+| `JOSH_LANE_AGENT_ROLE`     | a `backlogrun` dispatch        | The role the lane's child was launched as.                            |
+| `JOSH_LANE_AGENT_MODEL`    | a `backlogrun` dispatch        | The model the lane's child was launched with.                         |
+| `JOSH_LANE_AGENT_EFFORT`   | a `backlogrun` dispatch        | The effort the lane's child was launched with.                        |
+| `JOSH_AGENT_PROVIDER`      | a detached launcher            | The provider handed to a process that is not itself an agent session. |
+| `JOSH_RUN_HEADLESS`        | the run supervisor             | This session was launched headless by the supervisor.                 |
+| `JOSH_SHIP_SUPERVISED`     | `josh ship --detach`           | This `josh ship` runs under the detached supervisor.                  |
+| `JOSH_SHIP_LAUNCH_ID`      | `josh ship --detach`           | The supervisor launch this `josh ship` belongs to.                    |
+| `JOSH_INIT_HANDED_OFF`     | `josh init`                    | `josh init` already handed off to the project's installed kit once.   |
+| `JOSH_UNIT_RUN_MARKED`     | `josh gate`                    | The gate already claimed its place for the unit suite it spawns.      |
+| `JOSH_UNIT_GUARD_LOG`      | the unit suite's network guard | Where the guard logs blocked calls.                                   |
+| `JOSH_TEMP_ROOT`           | the unit suite's network guard | The temporary directory host-wide records go to during a test run.    |

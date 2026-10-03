@@ -4,7 +4,7 @@ const execa_sync_mock = vi.hoisted(() => vi.fn())
 const FAKE_ROOT = vi.hoisted(() => '/fake/root')
 
 vi.mock('execa', async () => {
-	const { gh_execa_fixture } = await import('#scripts/git/git-gh-execa-fixture')
+	const { gh_execa_fixture } = await import('./git-gh-execa-fixture')
 
 	return { execaSync: gh_execa_fixture.honoring_reject(execa_sync_mock) }
 })

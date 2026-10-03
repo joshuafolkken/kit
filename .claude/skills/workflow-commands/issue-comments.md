@@ -66,7 +66,7 @@ procedure and not two. **Parking it is not the place**: `needs-decision` means "
 nobody has given", and here the answer exists.
 
 **The exit is the `already-done` label.** It is `needs-decision`'s counterpart: `epic:next`,
-`backlog:next` and `auto-ok:next` all stop offering the Issue (`scripts/git/issue-labels.ts` →
+`backlog:next` and `auto-ok:next` all stop offering the Issue (`scripts/issue/issue-labels.ts` →
 `NOT_DIRECTLY_RUNNABLE_LABELS`, `epic-classify.ts` → `human`), and `epic:busy` stops counting it as
 holding a lane. **Only a person removes it, by closing the Issue.**
 

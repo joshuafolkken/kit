@@ -3,7 +3,7 @@ import {
 	has_label_name,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
-} from '#scripts/git/issue-labels'
+} from '#scripts/issue/issue-labels'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 import { epic_nested } from './epic-nested'
 import {
@@ -44,7 +44,7 @@ function resolve_by_state(blocker: EpicChild): DependencyVerdict {
 // Case-insensitive, through the shared comparison rather than `Array.includes`. GitHub keeps the
 // casing a label was created with and treats `Epic` and `epic` as one label, so a repository that
 // predates these scripts can answer with either spelling — and a child read by eye against the
-// lowercase string is one this classification never sees (`scripts/git/issue-labels.ts`).
+// lowercase string is one this classification never sees (`scripts/issue/issue-labels.ts`).
 function has_label(child: EpicChild, label: string): boolean {
 	return has_label_name(child.labels, label)
 }

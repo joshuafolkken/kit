@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_branch } from './git-branch'
 import { BranchMismatchError } from './git-error'
 
-vi.mock('./animation-helpers', () => ({
+vi.mock('#scripts/lib/animation-helpers', () => ({
 	animation_helpers: {
 		execute_with_animation: vi
 			.fn()

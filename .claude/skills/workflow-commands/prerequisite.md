@@ -31,7 +31,7 @@ pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --route tier-
 
 The command lints the body against `prompts/collaboration-workflow/issue-template.md`, applies the
 classification labels it declares, and runs the duplicate scan and `epic:bundle` itself
-(`docs/josh-commands.md` → `josh issue:file`).
+(`docs/josh-commands-automation.md` → `josh issue:file`).
 
 Every "file the prerequisite" below means that labelled filing, and it always happens **first**: the
 steps after it name a number that does not exist until it is. **Its duplicate scan is read exactly as

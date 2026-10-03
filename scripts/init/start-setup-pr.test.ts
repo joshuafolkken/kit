@@ -1,11 +1,11 @@
-import { git_gh_exec, type GhApiRequest } from '#scripts/git/git-gh-exec'
-import { git_pr } from '#scripts/git/git-pr'
+import { git_gh_exec, type GhApiRequest } from '#scripts/gh/git-gh-exec'
+import { git_pr } from '#scripts/gh/git-pr'
 import { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { start_setup_pr } from './start-setup-pr'
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
-vi.mock('#scripts/git/git-pr', () => ({ git_pr: { create_with_issue_info: vi.fn() } }))
+vi.mock('#scripts/gh/git-pr', () => ({ git_pr: { create_with_issue_info: vi.fn() } }))
 
 const ROOT = '/work/game'
 const ISSUE_URL = 'https://github.com/owner/game/issues/7'

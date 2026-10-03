@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { issue_state, type IssueState } from './issue-state'
 

@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { AgentProfile } from '#scripts/agent/agent-role-profile'
-import { telegram_notify } from '#scripts/git/telegram-notify'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_carry, type CarryRead } from './run-carry'
 import { run_event_stream } from './run-event-stream'
 import { run_headless } from './run-headless'
@@ -226,7 +226,7 @@ async function warn_of_stop(stop: LoopStop, body: string, context: WakeContext):
 }
 
 // **Only a failed wake exits non-zero, and the two reasons that newly warn do not**
-// (joshuafolkken/kit#1746). The verdict-and-exit-code table in `docs/josh-commands.md` is a contract
+// (joshuafolkken/kit#1746). The verdict-and-exit-code table in `docs/josh-commands-automation.md` is a contract
 // callers branch on; what `expired` and `unreadable` were missing is the notification, not a different
 // exit code, and changing both at once would break a caller to fix a silence.
 function exit_code_of(reason: WakeStopReason): number {

@@ -1,5 +1,5 @@
-import { git_gh_api_path } from '#scripts/git/git-gh-api-path'
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
+import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { poll, type PollOptions } from '#scripts/lib/poll'
 
 // **The release is not finished when the pull request merges — it is finished when the tag exists.**

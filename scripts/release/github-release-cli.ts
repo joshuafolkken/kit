@@ -1,11 +1,13 @@
 import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { github_release } from './github-release'
+import { github_release_environment } from './github-release-environment'
 
-const token = process.env['GH_TOKEN']
-const tag = process.env['RELEASE_TAG']
+async function main(): Promise<void> {
+	const { token, tag, settings } = github_release_environment.read_release_input(process.env)
+	const tags = execFileSync('git', ['tag', '--list'], { encoding: 'utf8' }).trim().split('\n')
 
-if (!token || !tag) throw new Error('GH_TOKEN and RELEASE_TAG are required')
+	console.info(await github_release.publish(fetch, token, tag, { ...settings, tags }))
+}
 
-const tags = execFileSync('git', ['tag', '--list'], { encoding: 'utf8' }).trim().split('\n')
-
-console.info(await github_release.publish(fetch, token, tag, { tags }))
+if (process.argv[1] === fileURLToPath(import.meta.url)) await main()

@@ -1,4 +1,4 @@
-import { ALL_LABELS } from '#scripts/git/issue-labels'
+import { ALL_LABELS } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import { all_documents, read_document } from './ai-document-fixture'
 import { document_scan } from './document-scan'

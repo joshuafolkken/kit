@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { package_path } from '#scripts/init/init-paths'
-import { yaml_config_fixture } from '#scripts/yaml/yaml-config-fixture'
+import { yaml_config_fixture } from '#scripts/lib/yaml-config-fixture'
 import { describe, expect, it } from 'vitest'
 
 interface PackageJson {

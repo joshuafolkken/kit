@@ -1,9 +1,9 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import {
 	capped_listing_outcome,
 	listing_of,
 	listing_outcome,
-} from '#scripts/git/git-gh-issue-list-fixture'
+} from '#scripts/gh/git-gh-issue-list-fixture'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { describe, expect, it, vi, type MockInstance } from 'vitest'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from './epic-bundle'

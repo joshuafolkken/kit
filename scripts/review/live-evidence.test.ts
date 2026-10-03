@@ -13,7 +13,7 @@ const branch_mock = vi.hoisted(() => vi.fn<() => Promise<string>>())
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: { diff_main_names: diff_mock, branch: branch_mock },
 }))
-vi.mock('#scripts/git/git-gh-command', () => ({ git_gh_command: { pr_get_body: body_mock } }))
+vi.mock('#scripts/gh/git-gh-command', () => ({ git_gh_command: { pr_get_body: body_mock } }))
 
 const RUNTIME_PATHS = ['scripts/review/live-evidence.ts', 'scripts/review/live-evidence.test.ts']
 const DOCS_PATHS = ['docs/josh-commands.md', 'prompts/review.md']

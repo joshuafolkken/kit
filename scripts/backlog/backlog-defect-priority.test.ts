@@ -4,10 +4,10 @@ import {
 	EPIC_NUMBER,
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { INTERRUPT_ROUTE_LABEL } from '#scripts/git/issue-labels'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { behavior_change_lint } from '#scripts/issue/behavior-change-lint'
 import { defect_rate, type DefectRate } from '#scripts/issue/defect-rate'
+import { INTERRUPT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_defect_priority } from './backlog-defect-priority'
 import { backlog_fixture, type BacklogInput, type ChildInput } from './backlog-fixture'

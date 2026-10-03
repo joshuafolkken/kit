@@ -5,10 +5,10 @@ import { run_carry_stash } from './run-carry-stash'
 // the issue reads are mocked, so what is pinned is which entries reach the report and that a failed
 // read never throws out of `--end`.
 
-vi.mock('#scripts/git/git-stash', () => ({ git_stash: { list: vi.fn() } }))
+vi.mock('#scripts/git/stash/git-stash', () => ({ git_stash: { list: vi.fn() } }))
 vi.mock('#scripts/issue/issue-state-cli', () => ({ issue_state_cli: { read_issue: vi.fn() } }))
 
-const { git_stash } = await import('#scripts/git/git-stash')
+const { git_stash } = await import('#scripts/git/stash/git-stash')
 const { issue_state_cli } = await import('#scripts/issue/issue-state-cli')
 const list = vi.mocked(git_stash.list)
 const read_issue = vi.mocked(issue_state_cli.read_issue)

@@ -12,6 +12,8 @@ const BASH = 'Bash'
 const GATE_AND_PUSH = 'pnpm josh gate > gate.log 2>&1 && pnpm josh git -y "Fix it #2606"'
 const GATE = 'pnpm josh gate'
 const ROW_ID = 'lane-background'
+const SHIP = 'pnpm josh ship "Title #1" --body-file evidence.md'
+const DETACHED_SHIP = 'pnpm josh ship --detach --review "Title #1"'
 
 function in_lane(): boolean {
 	return true
@@ -97,15 +99,30 @@ describe('lane_background.is_background_long_run', () => {
 		expect(lane_background.is_background_long_run(call, outside_lane)).toBe(false)
 	})
 
-	it.each(['pnpm josh ship --detach --review "Title #1"', 'pnpm josh test:related', 'sleep 5'])(
-		'leaves a backgrounded %s alone',
-		(command) => {
-			expect(lane_background.is_background_long_run(background_call(command), in_lane)).toBe(false)
-		},
-	)
+	it.each(['pnpm josh test:related', 'sleep 5'])('leaves a backgrounded %s alone', (command) => {
+		expect(lane_background.is_background_long_run(background_call(command), in_lane)).toBe(false)
+	})
 
 	it('does not read the lane mark for a call that is not a candidate', () => {
 		expect(lane_background.is_background_long_run(background_call('ls'), never)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#3027: a child's `ship` detaches only after its preflight passed in the calling
+// process, so a backgrounded one dies with the turn before any supervisor exists.
+describe('lane_background.is_background_long_run — ship', () => {
+	it.each([SHIP, DETACHED_SHIP])('refuses a backgrounded ship in a lane child: %s', (command) => {
+		expect(lane_background.is_background_long_run(background_call(command), in_lane)).toBe(true)
+	})
+
+	it('leaves a foreground ship alone, which returns at the hand-off', () => {
+		const call = { name: BASH, input: { command: DETACHED_SHIP } }
+
+		expect(lane_background.is_background_long_run(call, in_lane)).toBe(false)
+	})
+
+	it('leaves a backgrounded ship alone outside a lane child', () => {
+		expect(lane_background.is_background_long_run(background_call(SHIP), outside_lane)).toBe(false)
 	})
 })
 
@@ -125,6 +142,10 @@ describe('lane_background.ROW — delivery', () => {
 
 	it('names the detached ship as the route', () => {
 		expect(lane_background.LANE_BACKGROUND_REASON).toContain('pnpm josh ship --detach')
+	})
+
+	it('says the ship is issued in the foreground', () => {
+		expect(lane_background.LANE_BACKGROUND_REASON).toContain('issued in the foreground')
 	})
 })
 

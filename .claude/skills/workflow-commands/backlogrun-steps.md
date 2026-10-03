@@ -140,7 +140,7 @@ be answered and every standing record is refused rather than resumed. A live PID
 the sandbox cannot read is held as `busy`.
 
 **Ask it before the plan, in the same turn as the first `git switch main && git pull`.** The contract
-is `docs/josh-commands.md` → "`josh run:carry`"; what this loop does with each answer is here:
+is `docs/josh-commands-automation.md` → "`josh run:carry`"; what this loop does with each answer is here:
 
 | It answers   | What the run does                                                                                                                                                                                                          |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -233,7 +233,7 @@ expired or cannot be read ends it the same way. `none` — the run having finish
 
 **A person keeps control of it.** `pnpm josh run:wake --list` names the running supervisor and
 `--stop` ends it; the full contract, what it launches and why that is a constant rather than a
-setting are `docs/josh-commands.md` → "`josh run:wake`".
+setting are `docs/josh-commands-automation.md` → "`josh run:wake`".
 
 **Every unattended role runs with the provider selected from the invoking CLI and its own profile.**
 Codex sessions use OpenAI; Claude Code sessions use Anthropic. Anthropic uses scheduler
@@ -244,7 +244,7 @@ and legacy `JOSH_LANE_*` values to the worker only. Invalid configuration, a mis
 session marker, or a missing, outdated or unauthenticated CLI refuses without fallback, promotion or
 worker retry. `run:wake --list`, `lane:list`, the review brief and each launch
 log expose the resolved provider, role, model and effort.
-`docs/josh-commands.md` → "`josh lane:dispatch`" and `backlogrun-child.md` → "Each child runs in a
+`docs/josh-commands-automation.md` → "`josh lane:dispatch`" and `backlogrun-child.md` → "Each child runs in a
 delegated unit" are the single sources.
 
 **It relays progress from the existing report record.** The driver keeps the same `run:merge` event
@@ -301,10 +301,10 @@ stop at a time.**
   never the body.
 - **Order and isolate the pool in the same pass** (joshuafolkken/kit#2776), from the same
   `issue:read`: an issue that must land first (it builds what another reuses, or both edit one code
-  path) becomes a native `blocked-by`; an issue the `wip-cap.md` → 「実行のしかた」 enumeration hits
-  gets `run:solo`, **every other one `run:lane`**. Comment the reason; the offer commands enforce all
+  path) becomes a native `blocked-by`; an issue meeting all three of the `wip-cap.md` → 「実行のしかた」
+  conditions gets `run:solo`, **every other one `run:lane`**. Comment the reason; the offer commands enforce all
   three, answering `triage` while an issue has neither.
-- **`priority:high` puts an issue first** (joshuafolkken/kit#2928; ranking: `docs/josh-commands.md` →
+- **`priority:high` puts an issue first** (joshuafolkken/kit#2928; ranking: `docs/josh-commands-automation.md` →
   `josh backlog:next`). Apply it only on a cited ground — a stated deadline or urgency, or a person's
   written policy — commenting the ground; **never remove it**.
 - **Report the order those labels produce — `pnpm josh backlog:plan --waves`** (joshuafolkken/kit#2778),
@@ -342,7 +342,7 @@ follow, one per line.** `backlog:offer` forwards `--exclude` and `--repo` to `ba
 in `--json`. **The verdict table is "The two budgets" below; the answer-to-word mapping it applies is
 this section's table.**
 
-**`backlog:next`'s output contract is `docs/josh-commands.md` → "`josh backlog:next`", and four parts
+**`backlog:next`'s output contract is `docs/josh-commands-automation.md` → "`josh backlog:next`", and four parts
 of it decide how the mapping is written:**
 
 1. **Standard output is one token per line, and everything else is standard error.**
@@ -398,7 +398,7 @@ records.
 blocker sits in another opted-in epic — or is an opted-in standalone issue — makes the child wait on
 time, so one `backlogrun` runs both epics in that order. A blocker outside the opted-in backlog, or one
 inside it that itself waits on a person, makes the child wait on a person instead, and a cycle across
-epics answers `error`. The table is `docs/josh-commands.md` → "`josh epic:next`".
+epics answers `error`. The table is `docs/josh-commands-automation.md` → "`josh epic:next`".
 
 **New work is picked up without restarting anything.** The command re-derives its pool from GitHub
 labels on every ask, so an issue filed and opted in while the run is going is offered on the next
@@ -466,7 +466,7 @@ again at its full budget. Both are ISO-8601 timestamps (`date -u +%FT%TZ`), and 
 `--active` is refused. `--merged` is what has merged and `--running` what is still in a lane; **both
 count against the maximum**. **No ending abandons a lane**: whatever would have ended the run answers
 `watch` while `--running` is above zero, so the lanes drain and their merges reach the report. The full
-contract is `docs/josh-commands.md` → "`josh backlog:budget`".
+contract is `docs/josh-commands-automation.md` → "`josh backlog:budget`".
 
 **The completion report names three things the budgets make meaningful**: how many issues this run
 took, how many of them were picked up during an idle watch, and the termination reason — quoted from

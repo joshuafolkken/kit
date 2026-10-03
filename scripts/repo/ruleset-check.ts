@@ -1,6 +1,6 @@
 import path from 'node:path'
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
-import { gh_failure } from '#scripts/git/git-gh-failure'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { gh_failure } from '#scripts/gh/git-gh-failure'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { file_reader } from '#scripts/lib/read-file'
 import { repo_setting } from './repo-setting'

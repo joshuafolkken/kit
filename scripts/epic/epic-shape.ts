@@ -1,4 +1,4 @@
-import { EPIC_LABEL } from '#scripts/git/issue-labels'
+import { EPIC_LABEL } from '#scripts/issue/issue-labels'
 import { epic_parse } from './epic-parse'
 import { to_issue_reference } from './epic-reference'
 

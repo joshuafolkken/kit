@@ -29,6 +29,7 @@ async function not_parent(): Promise<boolean> {
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 })
 
 describe('backlog_ready.ready_line', () => {
@@ -53,6 +54,15 @@ describe('backlog_ready.read_ready', () => {
 
 		expect(reading).toEqual({ issues: [], free_lanes: 0 })
 		expect(ready_issues).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#3027: a zero here would leave the drive launching nothing and reporting nothing.
+describe('backlog_ready.drive_free_lane_count', () => {
+	it('throws on an unreadable lane limit instead of reading it as no free lane', async () => {
+		vi.stubEnv('JOSH_LANE_LIMIT', 'abc')
+
+		await expect(backlog_ready.drive_free_lane_count()).rejects.toThrow('JOSH_LANE_LIMIT')
 	})
 })
 

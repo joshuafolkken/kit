@@ -9,7 +9,7 @@
  *                                                      [--decision-file <path|->]
  *        tsx scripts/epic/epic.ts --remove <E> <M> <N> ... [--decision-file <path|->]
  */
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { error_text } from '#scripts/lib/error-message'
 import { epic_add, type AddChildrenInput } from './epic-add'
 import { epic_cli, type AddArguments, type CrossRepoAddTarget } from './epic-cli'

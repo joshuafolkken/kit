@@ -1,4 +1,4 @@
-import { yaml_document } from '#scripts/yaml/yaml-document'
+import { yaml_document } from '#scripts/lib/yaml-document'
 import { z } from 'zod'
 
 // The status checks kit's distributed workflows report, keyed by the workflow that reports them —

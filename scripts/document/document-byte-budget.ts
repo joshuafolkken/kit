@@ -6,7 +6,7 @@
 // documents no entry reads — the reference documents a human browses, drawn by
 // `document-reachability.ts` from `read:set`'s output rather than by a hand-written table.
 //
-// Agent-read documents (`.claude/skills/**/*.md`, `prompts/**/*.md` and `docs/josh-commands.md`) have
+// Agent-read documents (`.claude/skills/**/*.md`, `prompts/**/*.md` and the two `docs/josh-commands*.md` references) have
 // been shrunk by reduction epics (joshuafolkken/kit#1929, joshuafolkken/kit#1924) only to swell
 // again, because nothing held the reduced size — a PR that adds a few lines at a time goes unseen
 // until the next reduction epic. This list is that hold for the unreached ones:
@@ -81,7 +81,9 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/prerequisite.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
-	{ path: 'docs/josh-commands.md', bytes: 188_416 },
+	// joshuafolkken/kit#2998 split the reference: the developer commands stay, the rest moved out.
+	{ path: 'docs/josh-commands-automation.md', bytes: 155_648 },
+	{ path: 'docs/josh-commands.md', bytes: 36_864 },
 	{ path: 'prompts/coding-standards.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 12_288 },

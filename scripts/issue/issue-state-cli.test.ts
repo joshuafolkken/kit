@@ -4,7 +4,7 @@ const classified_mock = vi.hoisted(() => vi.fn())
 const info_mock = vi.hoisted(() => vi.fn())
 const error_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_view_json_classified: classified_mock },
 }))
 

@@ -1,13 +1,13 @@
 import { ALIASES } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
-import { read_unwrapped } from './ai-document-fixture'
+import { COMMAND_REFERENCE_DOCS, read_unwrapped } from './ai-document-fixture'
 
 // The command catalog (`docs/josh-command-catalog.md`) is generated from the command map and owns the
 // computable columns — command name, synopsis, audience, side effects and the **aliases**. The
 // hand-written reference declares its own boundary in its opening line ("auto-generated from the
 // command map … aliases …") and must keep to it: it names commands by their canonical form and never
-// restates an alias, so the abbreviation lives in exactly one place (joshuafolkken/kit#2258).
-const COMMAND_DOC = 'docs/josh-commands.md'
+// restates an alias, so the abbreviation lives in exactly one place (joshuafolkken/kit#2258). Both
+// pages of the reference are held to it (joshuafolkken/kit#2998).
 
 // The forms an alias abbreviation is restated in — read off the ways the document named them before
 // this Issue removed them: a code-span invocation (`` `josh rh` ``, headings included), the `alias:`
@@ -36,10 +36,8 @@ function restated_aliases(text: string, aliases: ReadonlyArray<string>): Readonl
 const ALIAS_KEYS: ReadonlyArray<string> = Object.keys(ALIASES)
 
 describe('the hand-written command reference never restates an alias', () => {
-	it('names no alias the catalog already owns', () => {
-		const unwrapped = read_unwrapped(COMMAND_DOC)
-
-		expect(restated_aliases(unwrapped, ALIAS_KEYS)).toStrictEqual([])
+	it.each(COMMAND_REFERENCE_DOCS)('%s names no alias the catalog already owns', (path) => {
+		expect(restated_aliases(read_unwrapped(path), ALIAS_KEYS)).toStrictEqual([])
 	})
 
 	// The guard is only worth keeping if it fails on the thing it exists to catch — one case per form.

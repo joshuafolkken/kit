@@ -1,12 +1,8 @@
 import { pr_classification } from '#scripts/ci/pr-classification'
 import { GATE_TARGETS } from '#scripts/gate/verification-gate'
-import {
-	GH_REQUEST_TIMEOUT_MESSAGE,
-	git_gh_exec,
-	type GhApiRequest,
-} from '#scripts/git/git-gh-exec'
-import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
-import { OTHER_CHANGE_LABEL } from '#scripts/git/issue-labels'
+import { GH_REQUEST_TIMEOUT_MESSAGE, git_gh_exec, type GhApiRequest } from '#scripts/gh/git-gh-exec'
+import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
+import { OTHER_CHANGE_LABEL } from '#scripts/issue/issue-labels'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { propagate_run, type StepResult } from './propagate-run'
@@ -15,7 +11,7 @@ import type { PropagateTarget } from './propagate-targets'
 
 // The spawns are replaced, the module's own constants are not: `GH_REQUEST_TIMEOUT_MESSAGE` is
 // asserted below and a test-local copy of it would assert nothing (`CLAUDE.md` → "No clones").
-vi.mock('#scripts/git/git-gh-exec', async (import_original) => ({
+vi.mock('#scripts/gh/git-gh-exec', async (import_original) => ({
 	...(await import_original<Record<string, unknown>>()),
 	git_gh_exec: { exec_gh_api: vi.fn(), exec_gh_api_sync: vi.fn() },
 }))

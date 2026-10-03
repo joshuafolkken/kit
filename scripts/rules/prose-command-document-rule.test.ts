@@ -5,12 +5,12 @@ import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#2188. The two commands that lay the foundation epic #2166 trims the entry read on
 // — `run:next` (the next step, computed from run state) and `doc:read` (a Bash-cap-safe whole-document
-// read) — guarded off the command registration and `docs/josh-commands.md`, the command's own
+// read) — guarded off the command registration and `docs/josh-commands-automation.md`, the command's own
 // reference. It also exercises the single-source framework this issue ships (`single-source.ts`)
 // against the real corpus, so the framework a later child pins each prose move with is proven to run
 // on the documents rather than only on synthetic inputs.
 
-const DOCS = 'docs/josh-commands.md'
+const DOCS = 'docs/josh-commands-automation.md'
 
 const NEXT_COMMAND = 'run:next'
 const NEXT_SCRIPT = 'scripts/run/run-next-cli.ts'

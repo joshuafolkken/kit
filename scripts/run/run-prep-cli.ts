@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { git_stash } from '#scripts/git/git-stash'
+import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_read_cli, type BlockRead } from '#scripts/issue/issue-read-cli'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'

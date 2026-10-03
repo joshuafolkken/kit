@@ -1,4 +1,4 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it, vi } from 'vitest'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'

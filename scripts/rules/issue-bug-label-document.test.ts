@@ -1,5 +1,5 @@
 import { read_repo_file } from '#scripts/document/ai-document-fixture'
-import { BREAKING_CHANGE_LABEL, BUG_LABEL, ENHANCEMENT_LABEL } from '#scripts/git/issue-labels'
+import { BREAKING_CHANGE_LABEL, BUG_LABEL, ENHANCEMENT_LABEL } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 
 const ISSUE_TEMPLATE = 'prompts/collaboration-workflow/issue-template.md'

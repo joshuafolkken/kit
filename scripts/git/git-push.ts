@@ -1,4 +1,4 @@
-import { animation_helpers, create_git_operation_config } from './animation-helpers'
+import { animation_helpers, create_git_operation_config } from '#scripts/lib/animation-helpers'
 import { git_command } from './git-command'
 
 async function push(): Promise<void> {

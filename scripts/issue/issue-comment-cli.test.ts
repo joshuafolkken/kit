@@ -12,7 +12,7 @@ const { issue_comment } = vi.hoisted(() => ({
 	issue_comment: vi.fn<(issue_number: string, body: string) => Promise<string>>(),
 }))
 
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_comment },
 }))
 

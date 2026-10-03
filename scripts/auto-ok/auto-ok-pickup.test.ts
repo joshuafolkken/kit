@@ -1,6 +1,6 @@
-import { PICKUP_FIELDS } from '#scripts/git/git-gh-issue'
-import { listing_of, listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
-import { AUTO_OK_LABEL } from '#scripts/git/issue-labels'
+import { PICKUP_FIELDS } from '#scripts/gh/git-gh-issue'
+import { listing_of, listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
+import { AUTO_OK_LABEL } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { auto_ok_cli } from './auto-ok-cli'
 import {
@@ -21,11 +21,11 @@ import {
 // consulting no dependency, the cap notice contradicting the answer, both read failures naming the
 // authentication, and `--exclude` taking a single number.
 
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_list_by_label_summary: vi.fn(), issue_list_by_label: vi.fn() },
 }))
 
-const { git_gh_command } = await import('#scripts/git/git-gh-command')
+const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const issue_list = vi.mocked(git_gh_command.issue_list_by_label_summary)
 // The second listing, added in joshuafolkken/kit#1633: the open epics, whose task lists say which
 // issues are already tracked. Every case that is not about tracking gets a backlog with no epic.

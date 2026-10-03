@@ -57,7 +57,7 @@ run's *start*; this withholds its *end*. So a `needs-human-review` issue is stil
 the artifact a person is meant to look at would never be produced — and a child stopped by it **goes on
 holding its repository**, because the uncommitted work is still in the checkout; read as parked there,
 the next child would start `git switch main && git pull` on top of it. The code encodes both halves by
-leaving the label out of two sets: `scripts/git/issue-labels.ts` keeps it out of
+leaving the label out of two sets: `scripts/issue/issue-labels.ts` keeps it out of
 `NOT_DIRECTLY_RUNNABLE_LABELS` and `scripts/epic/epic-busy.ts` keeps it out of the parked set.
 
 Each entry point's own branch stays in its own file — `fullrun.md`, `halfrun.md`,

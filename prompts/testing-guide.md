@@ -264,9 +264,9 @@ a repository whose CI reports no `E2E` context at all resolves the required entr
 which is never `pass`, so the evaluation stays `pending` until the 32-minute wait times out with
 nothing actually wrong. What guarantees the job runs is the detection rule above, not the required
 list. A project that wants it required opts in through `JOSH_REQUIRED_CHECKS`, which
-`scripts/git/git-pr-checks-eval.test.ts` covers; the decision itself — `E2E` off the default list,
+`scripts/gh/git-pr-checks-eval.test.ts` covers; the decision itself — `E2E` off the default list,
 and a repository reporting no `E2E` check still mergeable — is pinned in
-`scripts/git/git-pr-checks-e2e-gate.test.ts`.
+`scripts/gh/git-pr-checks-e2e-gate.test.ts`.
 
 **A red E2E is reported as soon as it goes red, and by name.** `E2E` is not on the required list, so
 until joshuafolkken/kit#990 nothing ended the wait when it failed: the rollup read as pending,
@@ -275,4 +275,4 @@ to complete.` — a message naming neither the job nor the cause. Any failing ch
 on the poll that sees it, and the error names it (`PR checks failed (failed checks: E2E).`).
 The poll loop keeps CodeRabbit exempt under the temporary kit#753 policy. **This is a change to how fast the gate
 reports, never to what it lets through** — no failing check gained a path to `success`, which
-`scripts/git/git-pr-checks-e2e-gate.test.ts` continues to assert.
+`scripts/gh/git-pr-checks-e2e-gate.test.ts` continues to assert.

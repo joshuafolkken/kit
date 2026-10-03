@@ -485,6 +485,16 @@ Release the merges main has taken since the version last changed
 
 ---
 
+### `josh release:github`
+
+> **Audience:** automation · **Side effects:** network, release
+
+_No arguments._
+
+Create the GitHub Release for a published tag, with generated notes
+
+---
+
 ### `josh release:scope`
 
 > **Audience:** automation · **Side effects:** none

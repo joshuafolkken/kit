@@ -115,7 +115,7 @@ procedure.
 | While implementing | Re-run one check by name, not the whole gate — `pnpm josh lint:related`, `pnpm josh cspell:dot`, `pnpm josh test:related`; the last pair runs in front of the gate, and `pnpm josh review:brief` refuses a brief on a tree neither was green on | `chain-rule.md` |
 | A review has run | Its verdict counts only once `pnpm josh review:attest --check` answers `ok`; `missing` / `mismatch` are refusals `pnpm josh followup` blocks the merge on | `chain-rule.md` → "The brief names the checkout, and a review that read another one is refused" |
 | E2E gate | The CI E2E job where the command ends in a PR (`fullrun` / `backlogrun`, enforced by `pnpm josh followup`); you run `pnpm josh test:e2e` yourself where it does not (`halfrun`) | `prompts/testing-guide.md` → "Closing the E2E gate without a human run" |
-| A defect in the verification path turns up | The interrupt runs alone; a batch resumes only once it has merged — decided from an enumeration, not from how serious it looks | `prompts/collaboration-workflow/wip-cap.md` → 「実行のしかた」 |
+| A defect in kit's own verification turns up | It runs alone, and a batch resumes only once it has merged, when three conditions all hold (a defect, in kit's own verification, making unrelated PRs answer wrongly on `main` now) — never from how serious it looks | `prompts/collaboration-workflow/wip-cap.md` → 「実行のしかた」 |
 | A command can take minutes | Issue it in the background; the turn never ends at the push (`pnpm josh followup` stays foreground) | §2h → `background-commands.md` → "Background the gate and push" |
 | `pnpm josh issue:state <N>` answers `human_review: yes` | Implement and gate, then stop before the commit | §2z → `needs-human-review.md` |
 | Under `backlogrun`, a stop that would end a batch, or a named non-epic item | Park one child and continue; run a named non-epic item as a `fullrun` | `backlogrun-park.md` → "park and continue"; `backlogrun-child.md` → "When `#N` is not an epic" |
@@ -193,7 +193,7 @@ refuses the second `pnpm josh issue:file` call until it has.
 its duplicate and epic answers.** This applies inside every workflow, including observations and review
 follow-ups. The guard refuses any other filing call. Read `issue-scout.md` at that point for the
 duplicate, closed-Issue and epic decisions and for `--distinct`; `issue-fold-existing.md` handles a
-compatible duplicate. `docs/josh-commands.md` → "`josh issue:file`" defines the command.
+compatible duplicate. `docs/josh-commands-automation.md` → "`josh issue:file`" defines the command.
 
 ## 2f. The working-tree hold — one run per tree
 

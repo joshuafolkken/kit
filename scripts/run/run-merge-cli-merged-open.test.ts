@@ -30,6 +30,7 @@ vi.mock('./run-merge-steps', () => ({
 		has_resumable_cut: has_resumable_cut_mock,
 		is_over_budget: vi.fn().mockResolvedValue(false),
 		refused_carry: vi.fn().mockResolvedValue(undefined),
+		remove_in_progress: vi.fn(),
 		resume_cut: resume_cut_mock,
 	},
 }))

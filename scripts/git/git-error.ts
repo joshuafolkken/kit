@@ -1,5 +1,5 @@
+import { has_stderr_field } from '#scripts/gh/git-gh-exec'
 import { error_text } from '#scripts/lib/error-message'
-import { has_stderr_field } from './git-gh-exec'
 
 function get_stderr_from_error(cause: Error): string | undefined {
 	if (!has_stderr_field(cause)) return undefined

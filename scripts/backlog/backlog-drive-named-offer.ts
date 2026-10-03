@@ -1,4 +1,4 @@
-import { EPIC_LABEL, has_label_name, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import { EPIC_LABEL, has_label_name, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import type { RunCarry } from '#scripts/run/run-carry'

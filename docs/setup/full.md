@@ -25,7 +25,7 @@ To install kit without initializing — to import only its presets, for example 
 pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit
 ```
 
-kit's CLI runs on tsx, which depends on esbuild, and kit's optional ESLint import plugins bring in unrs-resolver; pnpm fails an install whose dependencies carry an unapproved build script. The two `--allow-build` flags record both approvals in `pnpm-workspace.yaml`. Added without them, the command exits non-zero with `ERR_PNPM_IGNORED_BUILDS` ([#2785](https://github.com/joshuafolkken/kit/issues/2785)), so keep both flags. A package-only installation does not include ESLint: a project importing `@joshuafolkken/kit/eslint/vanilla` installs ESLint and its plugins itself ([manual-config.md](../manual-config.md)).
+kit's CLI runs on tsx, which depends on esbuild, and kit's optional ESLint import plugins bring in unrs-resolver; pnpm fails an install whose dependencies carry an unapproved build script. The two `--allow-build` flags record both approvals in `pnpm-workspace.yaml`. Added without them, the command exits non-zero with `ERR_PNPM_IGNORED_BUILDS`, so keep both flags. A package-only installation does not include ESLint: a project importing `@joshuafolkken/kit/eslint/vanilla` installs ESLint and its plugins itself ([manual-config.md](../manual-config.md)).
 
 ## 3. Set up for the GitHub Issue workflow with `josh start`
 
@@ -42,7 +42,7 @@ Then make `main` require the checks the distributed workflows report — without
 pnpm josh ruleset:check --apply
 ```
 
-`pnpm josh ruleset:check` alone reports what is missing; [josh-commands.md → `josh ruleset:check`](../josh-commands.md#josh-rulesetcheck) lists the checks.
+`pnpm josh ruleset:check` alone reports what is missing; [josh-commands-automation.md → `josh ruleset:check`](../josh-commands-automation.md#josh-rulesetcheck) lists the checks.
 
 ## 4. Keep it up to date
 

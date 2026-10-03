@@ -1,7 +1,7 @@
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import type { OpenPull } from '#scripts/gh/git-gh-pr-auto-merge'
+import { git_pr_checks } from '#scripts/gh/git-pr-checks'
 import { git_command } from '#scripts/git/git-command'
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import type { OpenPull } from '#scripts/git/git-gh-pr-auto-merge'
-import { git_pr_checks } from '#scripts/git/git-pr-checks'
 import { main_sync } from '#scripts/git/main-sync'
 import { error_text } from '#scripts/lib/error-message'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -33,7 +33,7 @@ vi.mock('#scripts/git/git-command', () => ({
 		status: vi.fn(),
 	},
 }))
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
 		pr_create: vi.fn(),
 		pr_enable_auto_merge: vi.fn(),
@@ -41,7 +41,7 @@ vi.mock('#scripts/git/git-gh-command', () => ({
 		pr_merge: vi.fn(),
 	},
 }))
-vi.mock('#scripts/git/git-pr-checks', () => ({
+vi.mock('#scripts/gh/git-pr-checks', () => ({
 	git_pr_checks: {
 		read_merge_progress: vi.fn(),
 		wait_for_pr_merged: vi.fn(),

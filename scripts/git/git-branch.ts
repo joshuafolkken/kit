@@ -2,7 +2,7 @@ import {
 	animation_helpers,
 	create_git_operation_config,
 	type AnimationOptions,
-} from './animation-helpers'
+} from '#scripts/lib/animation-helpers'
 import { git_command } from './git-command'
 import { BranchMismatchError } from './git-error'
 

@@ -8,6 +8,14 @@ const NOT_FOUND_MESSAGE = 'HTTP 404'
 const CONNECTION_ERROR = 'connection lost'
 const NOTES = { name: TAG, body: '## Changes\n- One change' }
 const CONFIG_PATH = '.github/release.yml'
+const PUBLISH_NPM = 'publish-npm'
+// kit's own settings, as `.github/workflows/publish.yml` passes them to `josh release:github`.
+const KIT = {
+	repository: 'joshuafolkken/kit',
+	start_tag: 'v1.887.0',
+	workflow: 'publish.yml',
+	jobs: ['publish-github', PUBLISH_NPM, 'update-production'],
+}
 
 function note_request(tag: string, previous: string): string {
 	return JSON.stringify({
@@ -36,7 +44,7 @@ describe('GitHub Release notes', () => {
 				.mockResolvedValueOnce(response(200, NOTES))
 				.mockResolvedValueOnce(response(201, { tag_name: TAG }))
 
-			expect(await github_release.publish(request, TOKEN, TAG)).toContain(previous_tag)
+			expect(await github_release.publish(request, TOKEN, TAG, KIT)).toContain(previous_tag)
 			expect(request).toHaveBeenCalledTimes(4)
 			expect(request.mock.calls[0]?.[1]).not.toHaveProperty('body')
 			expect(request.mock.calls[1]?.[1]).not.toHaveProperty('body')
@@ -64,7 +72,7 @@ describe('GitHub Release notes', () => {
 it('does not duplicate an existing release', async () => {
 	const request = vi.fn().mockResolvedValue(response(200, { tag_name: TAG }))
 
-	expect(await github_release.publish(request, TOKEN, TAG)).toBe('already-published')
+	expect(await github_release.publish(request, TOKEN, TAG, KIT)).toBe('already-published')
 	expect(request).toHaveBeenCalledTimes(1)
 })
 
@@ -85,13 +93,14 @@ it('publishes reversed tags in version order using the prior release for notes',
 		.mockResolvedValueOnce(response(201, { tag_name: 'v1.889.0' }))
 
 	async function publish_earlier(): Promise<void> {
-		expect(await github_release.publish(earlier_request, TOKEN, TAG)).toBe(
+		expect(await github_release.publish(earlier_request, TOKEN, TAG, KIT)).toBe(
 			`published ${TAG} from ${PREVIOUS_TAG}`,
 		)
 	}
 
 	expect(
 		await github_release.publish(later_request, TOKEN, 'v1.889.0', {
+			...KIT,
 			tags: ['v1.883.0', TAG, 'v1.889.0'],
 			wait: publish_earlier,
 		}),
@@ -110,14 +119,14 @@ it('skips a lower tag whose package publication failed', async () => {
 		)
 		.mockResolvedValueOnce(
 			response(200, {
-				jobs: [{ name: 'publish-npm', status: 'completed', conclusion: 'failure' }],
+				jobs: [{ name: PUBLISH_NPM, status: 'completed', conclusion: 'failure' }],
 			}),
 		)
 		.mockResolvedValueOnce(response(200, { tag_name: PREVIOUS_TAG }))
 		.mockResolvedValueOnce(response(200, { name: 'v1.889.0', body: 'Changes' }))
 		.mockResolvedValueOnce(response(201, { tag_name: 'v1.889.0' }))
 
-	expect(await github_release.publish(request, TOKEN, 'v1.889.0', { tags: [TAG] })).toBe(
+	expect(await github_release.publish(request, TOKEN, 'v1.889.0', { ...KIT, tags: [TAG] })).toBe(
 		`published v1.889.0 from ${PREVIOUS_TAG}`,
 	)
 	expect(request.mock.calls[5]?.[1]).toHaveProperty('body', note_request('v1.889.0', PREVIOUS_TAG))
@@ -133,6 +142,7 @@ it('waits for the nearest lower tag when several newer tags exist', async () => 
 
 	expect(
 		await github_release.publish(request, TOKEN, 'v1.890.0', {
+			...KIT,
 			tags: [TAG, 'v1.889.0', 'v1.890.0'],
 		}),
 	).toBe('published v1.890.0 from v1.889.0')
@@ -148,10 +158,7 @@ it('does not publish the later tag when waiting for the earlier release fails', 
 	const wait = vi.fn().mockRejectedValue(new Error(CONNECTION_ERROR))
 
 	await expect(
-		github_release.publish(request, TOKEN, 'v1.889.0', {
-			tags: [TAG],
-			wait,
-		}),
+		github_release.publish(request, TOKEN, 'v1.889.0', { ...KIT, tags: [TAG], wait }),
 	).rejects.toThrow(CONNECTION_ERROR)
 	expect(request).toHaveBeenCalledTimes(3)
 })
@@ -160,7 +167,7 @@ describe('GitHub Release failures', () => {
 	it.each([500, 429, 403])('does not treat HTTP %i as a missing release', async (status) => {
 		const request = vi.fn().mockResolvedValue(response(status, { message: 'failed' }))
 
-		await expect(github_release.publish(request, TOKEN, TAG)).rejects.toThrow(
+		await expect(github_release.publish(request, TOKEN, TAG, KIT)).rejects.toThrow(
 			`HTTP ${String(status)}`,
 		)
 		expect(request).toHaveBeenCalledTimes(1)
@@ -172,7 +179,9 @@ describe('GitHub Release failures', () => {
 			.mockResolvedValueOnce(missing_response())
 			.mockResolvedValueOnce(missing_response())
 
-		await expect(github_release.publish(request, TOKEN, TAG)).rejects.toThrow(NOT_FOUND_MESSAGE)
+		await expect(github_release.publish(request, TOKEN, TAG, KIT)).rejects.toThrow(
+			NOT_FOUND_MESSAGE,
+		)
 		expect(request).toHaveBeenCalledTimes(2)
 	})
 
@@ -182,21 +191,21 @@ describe('GitHub Release failures', () => {
 			.mockResolvedValueOnce(missing_response())
 			.mockResolvedValueOnce(response(200, { tag_name: 'v1.889.0' }))
 
-		await expect(github_release.publish(request, TOKEN, TAG)).rejects.toThrow(
+		await expect(github_release.publish(request, TOKEN, TAG, KIT)).rejects.toThrow(
 			'Latest release v1.889.0 is not older than v1.888.0',
 		)
 		expect(request).toHaveBeenCalledTimes(2)
 	})
+})
 
-	it('stops on empty or malformed API data', async () => {
-		const request = vi
-			.fn()
-			.mockResolvedValueOnce(missing_response())
-			.mockResolvedValueOnce(new Response('', { status: 200 }))
+it('stops on empty or malformed API data', async () => {
+	const request = vi
+		.fn()
+		.mockResolvedValueOnce(missing_response())
+		.mockResolvedValueOnce(new Response('', { status: 200 }))
 
-		await expect(github_release.publish(request, TOKEN, TAG)).rejects.toThrow()
-		expect(request).toHaveBeenCalledTimes(2)
-	})
+	await expect(github_release.publish(request, TOKEN, TAG, KIT)).rejects.toThrow()
+	expect(request).toHaveBeenCalledTimes(2)
 })
 
 it.each([new Response('{', { status: 200 }), response(200, { name: TAG, body: '' })])(
@@ -208,7 +217,7 @@ it.each([new Response('{', { status: 200 }), response(200, { name: TAG, body: ''
 			.mockResolvedValueOnce(response(200, { tag_name: PREVIOUS_TAG }))
 			.mockResolvedValueOnce(notes_response)
 
-		await expect(github_release.publish(request, TOKEN, TAG)).rejects.toThrow()
+		await expect(github_release.publish(request, TOKEN, TAG, KIT)).rejects.toThrow()
 		expect(request).toHaveBeenCalledTimes(3)
 	},
 )
@@ -221,7 +230,7 @@ it.each([500, 429])('stops when publication returns HTTP %i', async (status) => 
 		.mockResolvedValueOnce(response(200, NOTES))
 		.mockResolvedValueOnce(response(status, { message: 'failed' }))
 
-	await expect(github_release.publish(request, TOKEN, TAG)).rejects.toThrow(
+	await expect(github_release.publish(request, TOKEN, TAG, KIT)).rejects.toThrow(
 		`HTTP ${String(status)}`,
 	)
 })
@@ -229,13 +238,13 @@ it.each([500, 429])('stops when publication returns HTTP %i', async (status) => 
 it('stops on a rejected or timed-out request', async () => {
 	const request = vi.fn().mockRejectedValue(new Error(CONNECTION_ERROR))
 
-	await expect(github_release.publish(request, TOKEN, TAG)).rejects.toThrow(CONNECTION_ERROR)
+	await expect(github_release.publish(request, TOKEN, TAG, KIT)).rejects.toThrow(CONNECTION_ERROR)
 })
 
 it('rejects an invalid tag before calling the API', async () => {
 	const request = vi.fn()
 
-	await expect(github_release.publish(request, TOKEN, 'main')).rejects.toThrow(
+	await expect(github_release.publish(request, TOKEN, 'main', KIT)).rejects.toThrow(
 		'Invalid release tag',
 	)
 	expect(request).not.toHaveBeenCalled()

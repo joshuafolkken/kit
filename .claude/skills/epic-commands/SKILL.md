@@ -116,7 +116,7 @@ about the search itself rather than about anything the children say (joshuafolkk
 
 **One thing it cannot check** belongs to planning: when a child introduces a new label, command,
 state or artifact, list the existing code referencing that concept and confirm some child owns
-updating it. Label names are single-sourced in `scripts/git/issue-labels.ts`.
+updating it. Label names are single-sourced in `scripts/issue/issue-labels.ts`.
 
 History: `docs/maintainers/epic-commands-rationale.md` → "`epic:audit` — why the children are read across".
 
@@ -151,7 +151,7 @@ command prints a ⚠️ line naming that child rather than reporting a reorderin
 `owner/repo#number` and kept by the epic named earlier; withheld there, it stays withheld, because a
 `blocked-by` relation belongs to the issue rather than to the epic listing it. **One unusable graph
 refuses the whole answer**, and **one reference that does not parse fails the read** rather than
-being dropped. `docs/josh-commands.md` → "`josh epic:next`" carries the worked form.
+being dropped. `docs/josh-commands-automation.md` → "`josh epic:next`" carries the worked form.
 
 **An `in-progress` issue occupies a lane rather than the whole repository.** The occupancy is counted
 from that repository's own `in-progress` listing — never from anything the session remembers, since
@@ -194,7 +194,7 @@ inherits; open and tracked by none, the child waits on a person and the
 blocker is named on standard error; a state the relation did not carry reads as waiting. **So an order
 between two epics is recorded with a native `blocked-by` relation and honoured by naming both epics**
 — `epic:next 1936 1931`, or `backlog:next`, whose set is the whole opted-in backlog. The table is
-`docs/josh-commands.md` → "`josh epic:next`".
+`docs/josh-commands-automation.md` → "`josh epic:next`".
 
 Two things stop the command rather than being worked around: a **circular dependency**, and a
 **disagreement between the epic body and the `blocked-by` relations** (an epic written before `josh`
@@ -482,7 +482,7 @@ than restated — and beside it the one thing this one deliberately refuses: whe
 already been filed, from a title comparison (joshuafolkken/kit#1252). **Both run**, and neither
 replaces the other: `pnpm josh issue:file` runs the scout before it creates the issue, and
 `epic:bundle` afterwards, from the real number and the relations recorded against it.
-Full behavior: `docs/josh-commands.md` → "`josh issue:file`".
+Full behavior: `docs/josh-commands-automation.md` → "`josh issue:file`".
 
 **When the relation carries an order, record it** in `blocked-by` and in the epic's `Dependencies` —
 on an addition as much as on a new epic. Without it the batch survives and the reason for it does

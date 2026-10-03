@@ -1,4 +1,4 @@
-import { has_any_label, has_label_name, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
+import { has_any_label, has_label_name, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { epic_busy, type BusyRead } from './epic-busy'
 import type { EpicChild } from './epic-graph'
@@ -15,7 +15,8 @@ import { epic_report, type EpicNextResult } from './epic-report'
 // `epic:next --lanes` (a named epic's children, `epic-lane-offer.ts`). One rule, so the two cannot
 // disagree about what may start beside what.
 //
-// Three rules, all against the repository's `in-progress` holders (`epic_busy.read_repository`):
+// Three rules, all against the repository's `in-progress` holders (`epic_busy.read_repository`, with
+// a stale `run:solo` holder taken out by `epic_solo_stale.release` — joshuafolkken/kit#3017):
 // a running `run:solo` issue lets nothing new start; a `run:solo` candidate starts only into an idle
 // repository and then alone; and nothing ranked below a waiting `run:solo` candidate is offered past
 // it, so it is not starved by the lanes it is waiting on. A listing that could not be read is not an

@@ -31,7 +31,7 @@ const CONTEXT_CUT_DOCS = [
 	'.claude/skills/workflow-commands/fullrun.md',
 	'.claude/skills/workflow-commands/halfrun.md',
 	'.claude/skills/workflow-commands/pre-gate-cut.md',
-	'docs/josh-commands.md',
+	'docs/josh-commands-automation.md',
 ]
 
 describe.each(CONTEXT_CUT_DOCS)('%s states the context-cut threshold', (path) => {

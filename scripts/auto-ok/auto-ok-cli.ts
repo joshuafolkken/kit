@@ -3,19 +3,19 @@ import { fileURLToPath } from 'node:url'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
 import { epic_index, type FetchedEpics } from '#scripts/epic/epic-index'
 import { epic_issue } from '#scripts/epic/epic-issue'
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { SUMMARY_FIELDS } from '#scripts/git/git-gh-issue'
-import { git_next_issues } from '#scripts/git/git-next-issues'
-import { AUTO_OK_LABEL } from '#scripts/git/issue-labels'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { SUMMARY_FIELDS } from '#scripts/gh/git-gh-issue'
 import { cutoff_cause, cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { read_json_listing } from '#scripts/git/parse-json-array'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/schemas'
+import { git_next_issues } from '#scripts/issue/git-next-issues'
+import { AUTO_OK_LABEL } from '#scripts/issue/issue-labels'
 
 // `josh auto-ok:next` — which issue outside the epic an unattended run picks up next
 // (joshuafolkken/kit#906).
 //
 // A command rather than a documented `gh` invocation, for the reason the label constant exists: the
-// name `auto-ok` is single-sourced in `scripts/git/issue-labels.ts`, and a procedure that told an
+// name `auto-ok` is single-sourced in `scripts/issue/issue-labels.ts`, and a procedure that told an
 // agent to type `gh issue list --label auto-ok` would put a second copy of it in prose, where
 // nothing checks it. The contract is `epic:next`'s: one token on standard output, every explanation
 // on standard error, so `answer=$(pnpm josh auto-ok:next)` reads it.
@@ -48,7 +48,7 @@ const LISTING_LIMIT = 200
 // CLI's version cannot be what changed the row shape — the same misdirection the message below
 // already refuses to repeat for the blocker relations, left standing one constant above it.
 const UNREADABLE_MESSAGE = `Could not read the \`${AUTO_OK_LABEL}\` listing. That is not "nothing is opted in" — check \`gh auth status\` and ask again.`
-const UNEXPECTED_SHAPE_MESSAGE = `Read the \`${AUTO_OK_LABEL}\` listing but could not parse it. That is not "nothing is opted in" — the rows came back in a shape this command does not recognize, so check the fields it asks for and the REST field mapping in \`scripts/git/git-gh-issue-rest.ts\` rather than your authentication.`
+const UNEXPECTED_SHAPE_MESSAGE = `Read the \`${AUTO_OK_LABEL}\` listing but could not parse it. That is not "nothing is opted in" — the rows came back in a shape this command does not recognize, so check the fields it asks for and the REST field mapping in \`scripts/gh/git-gh-issue-rest.ts\` rather than your authentication.`
 // The blocker relations failing takes the whole listing with them, and `issue_list` swallows
 // the error — so the read looks exactly like an access failure and sends the reader to
 // `gh auth status`, which is green. That is the misdirection joshuafolkken/kit#996 added the message

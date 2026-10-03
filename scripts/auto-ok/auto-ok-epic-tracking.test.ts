@@ -1,6 +1,6 @@
-import { listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
-import { AUTO_OK_LABEL } from '#scripts/git/issue-labels'
+import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import type { OpenIssueData } from '#scripts/git/schemas'
+import { AUTO_OK_LABEL } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { auto_ok_cli } from './auto-ok-cli'
 import {
@@ -25,11 +25,11 @@ import {
 // so every case here now says which side of that line its epic is on: an epic in the opted-in listing
 // keeps its children, and one absent from it keeps none.
 
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_list_by_label_summary: vi.fn(), issue_list_by_label: vi.fn() },
 }))
 
-const { git_gh_command } = await import('#scripts/git/git-gh-command')
+const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const issue_list = vi.mocked(git_gh_command.issue_list_by_label_summary)
 // The second listing: the open epics, whose task lists say which issues are already tracked.
 const epic_list = vi.mocked(git_gh_command.issue_list_by_label)

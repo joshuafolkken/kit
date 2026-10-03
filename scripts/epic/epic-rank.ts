@@ -1,4 +1,4 @@
-import { issue_rank } from '#scripts/git/issue-rank'
+import { issue_rank } from '#scripts/issue/issue-rank'
 import { epic_graph, type EpicChild } from './epic-graph'
 
 // `issue-rank.ts`'s keys over graph children (joshuafolkken/kit#2928), for both offer paths that hand
