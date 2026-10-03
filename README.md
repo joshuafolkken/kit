@@ -38,14 +38,14 @@ Each kit includes the one to its left: app-kit builds on kit, game-kit builds on
 
 ## The workflow
 
-| You type     | The agent                    |
-| ------------ | ---------------------------- |
-| `kickoff`    | Plans, then stops            |
-| `halfrun`    | Implements, stops for review |
-| `fullrun`    | Implements through to merge  |
-| `backlogrun` | Runs many Issues unattended  |
+| You type     | The agent                                        |
+| ------------ | ------------------------------------------------ |
+| `kickoff`    | Writes the plan on the Issue, then stops         |
+| `halfrun`    | Implements and self-reviews, stops before commit |
+| `fullrun`    | Plans if needed, implements through to merge     |
+| `backlogrun` | Runs many Issues unattended                      |
 
-When a run needs you, it [notifies you on Telegram](./docs/how-to/set-up-notifications.md).
+Each keyword in full: [Run Issues with the workflow keywords](./docs/how-to/run-issues.md). When a run needs you, it [notifies you on Telegram](./docs/how-to/set-up-notifications.md).
 
 ## Why you can trust "done"
 

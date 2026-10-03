@@ -6,18 +6,18 @@ You want an agent to take a GitHub Issue from plan to merge. You type a keyword 
 
 ## Which keyword
 
-| Keyword      | What the agent does                                                                       | Use it when                                               |
-| ------------ | ----------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `kickoff`    | Posts a plan on the Issue and stops                                                       | You want to review the approach before any code           |
-| `halfrun`    | Implements and runs the full gate, then stops before committing                           | A person has to look at the result first, such as UI work |
-| `fullrun`    | Plans, implements, opens the pull request and merges it                                   | The change can ship once the gate and review pass         |
-| `backlogrun` | Runs the Issues you name, in order (an epic runs its children), then the opted-in backlog | You want several Issues or an epic done without watching  |
+| Keyword      | What the agent does                                                                                                        | Use it when                                               |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `kickoff`    | Writes the plan on the Issue — with `new`, files the Issue from the conversation first — and stops                         | You want to review the approach before any code           |
+| `halfrun`    | Implements, runs the gate and a self-review, then stops before committing                                                  | A person has to look at the result first, such as UI work |
+| `fullrun`    | Writes the plan when the Issue has none, implements, runs the gate and a self-review, opens the pull request and merges it | The change can ship once the gate and review pass         |
+| `backlogrun` | Runs the Issues you name, in order (an epic runs its children), then the opted-in backlog                                  | You want several Issues or an epic done without watching  |
 
-The agent starts one only when you type the keyword yourself; asking it to "implement X" does not start a run. The procedures are in the [`workflow-commands` skill](../../.claude/skills/workflow-commands/SKILL.md).
+This table is the single description of the keywords; the README and the [tutorial](../tutorial.md) summarize it. The agent starts one only when you type the keyword yourself; asking it to "implement X" does not start a run. The procedures are in the [`workflow-commands` skill](../../.claude/skills/workflow-commands/SKILL.md).
 
 ## Steps
 
-1. Make sure `gh` is installed and signed in, and set up notifications as [scripts-ai.md](../scripts-ai.md) describes.
+1. Make sure `gh` is installed and signed in, and set up notifications as [Set up notifications](./set-up-notifications.md) describes.
 2. Type the keyword with the Issue number, for example `fullrun #123`.
 3. After a `kickoff` or `halfrun` stop, review the plan or the working tree, then type the next keyword or the commit command the notification gives you.
 

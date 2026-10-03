@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs'
 import type { IssueState } from '#scripts/issue/issue-state'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_prep } from './run-prep'
 
@@ -248,9 +248,6 @@ describe('run_prep.format_report', () => {
 
 describe('josh run:prep registration', () => {
 	it('is registered as a josh command', () => {
-		const source = readFileSync('scripts/josh/josh-commands-ai.ts', 'utf8')
-
-		expect(source).toContain("'run:prep'")
-		expect(source).toContain('scripts/run/run-prep-cli.ts')
+		expect(COMMAND_MAP['run:prep']?.script).toBe('scripts/run/run-prep-cli.ts')
 	})
 })
