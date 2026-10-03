@@ -14,10 +14,16 @@ const ROOT = process.cwd()
 const SCRIPTS = path.join(ROOT, 'scripts')
 const EPIC_DIR = `${path.join(SCRIPTS, 'epic')}${path.sep}`
 const GIT_DIR = `${path.join(SCRIPTS, 'git')}${path.sep}`
+// joshuafolkken/kit#2988 moved the GitHub I/O, notification, issue-label and spinner modules out of
+// `scripts/git/` — each destination is still the lower layer. `scripts/followup/` is left out on
+// purpose: it is the module that closes a finished epic, consuming the epic domain from above.
+const LOWER_DIRS = ['git', 'gh', 'notify', 'issue', 'lib'].map(
+	(name) => `${path.join(SCRIPTS, name)}${path.sep}`,
+)
 const TEST_SUFFIX = '.test.ts'
 const SOURCE_SUFFIX = '.ts'
 // A module the epic domain must reach, so an empty walk cannot pass the rule vacuously.
-const GH_COMMAND = path.join(SCRIPTS, 'git', 'git-gh-command.ts')
+const GH_COMMAND = path.join(SCRIPTS, 'gh', 'git-gh-command.ts')
 
 function runtime_sources(): ReadonlyArray<string> {
 	const entries = readdirSync(SCRIPTS, { recursive: true, encoding: 'utf8' })
@@ -49,7 +55,9 @@ function reachable_from(seeds: ReadonlyArray<string>, forward: FileGraph): Reado
 function back_edges(forward: FileGraph): ReadonlyArray<string> {
 	const epic_files = [...forward.keys()].filter((file) => is_epic(file))
 	const reached = reachable_from(epic_files, forward)
-	const git_files = [...reached].filter((file) => file.startsWith(GIT_DIR))
+	const git_files = [...reached].filter((file) =>
+		LOWER_DIRS.some((directory) => file.startsWith(directory)),
+	)
 
 	return git_files.filter((file) =>
 		[...(forward.get(file) ?? [])].some((target) => is_epic(target)),
@@ -78,5 +86,16 @@ describe('epic layering', () => {
 		])
 
 		expect(back_edges(cyclic)).toEqual([git_file])
+	})
+
+	it('reports a cycle closed from a module moved out of the git layer', () => {
+		const epic_file = path.join(EPIC_DIR, 'epic-x.ts')
+		const gh_file = path.join(SCRIPTS, 'gh', 'git-gh-x.ts')
+		const cyclic: FileGraph = new Map([
+			[epic_file, new Set([gh_file])],
+			[gh_file, new Set([epic_file])],
+		])
+
+		expect(back_edges(cyclic)).toEqual([gh_file])
 	})
 })

@@ -1,4 +1,4 @@
-import { git_stash } from '#scripts/git/git-stash'
+import { git_stash } from '#scripts/git/stash/git-stash'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
 import type { CarryRead } from './run-carry'
 import { run_event_stream } from './run-event-stream'

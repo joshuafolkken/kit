@@ -1,5 +1,5 @@
 import { git_spawn } from '#scripts/git/git-spawn'
-import { git_stash } from '#scripts/git/git-stash'
+import { git_stash } from '#scripts/git/stash/git-stash'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -7,7 +7,7 @@ import { run_hold } from './run-hold'
 import { run_tidy_lanes } from './run-tidy-lanes'
 
 vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
-vi.mock('#scripts/git/git-stash', () => ({ git_stash: { has_changes: vi.fn() } }))
+vi.mock('#scripts/git/stash/git-stash', () => ({ git_stash: { has_changes: vi.fn() } }))
 vi.mock('#scripts/lane/lane-close', () => ({ lane_close: { close_lane: vi.fn() } }))
 vi.mock('#scripts/lane/lane-registry', () => ({ lane_registry: { list_lanes: vi.fn() } }))
 vi.mock('./run-hold', () => ({

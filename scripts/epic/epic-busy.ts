@@ -1,12 +1,12 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { read_json_listing } from '#scripts/git/parse-json-array'
+import { open_issue_schema, type OpenIssueData } from '#scripts/git/schemas'
 import {
 	ALREADY_DONE_LABEL,
 	has_any_label,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
-} from '#scripts/git/issue-labels'
-import { read_json_listing } from '#scripts/git/parse-json-array'
-import { open_issue_schema, type OpenIssueData } from '#scripts/git/schemas'
+} from '#scripts/issue/issue-labels'
 
 // How much of a repository's parallelism is already spoken for — asked of the *repository*, never of
 // the epic (joshuafolkken/kit#925), and counted rather than treated as a yes/no since

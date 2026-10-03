@@ -1,5 +1,5 @@
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_command } from '#scripts/git/git-command'
-import { git_gh_command } from '#scripts/git/git-gh-command'
 import { reproduction_measure } from '#scripts/issue/reproduction-measure'
 import { test_declared_logic, type Verdict } from '#scripts/test/test-declared-logic'
 

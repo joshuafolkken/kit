@@ -1,9 +1,9 @@
 import { parseArgs } from 'node:util'
 import { epic_issue } from '#scripts/epic/epic-issue'
-import { github_issue_url } from '#scripts/git/github-issue-url'
-import { DEPTH_LABEL_ORDER, FILING_ROUTE_LABELS, has_label_name } from '#scripts/git/issue-labels'
+import { github_issue_url } from '#scripts/gh/github-issue-url'
 import { issue_backlinks } from './issue-backlinks'
 import { issue_classification } from './issue-classification'
+import { DEPTH_LABEL_ORDER, FILING_ROUTE_LABELS, has_label_name } from './issue-labels'
 import { markdown_section } from './markdown-section'
 
 // The decisions behind `josh issue:file` (joshuafolkken/kit#2808), kept apart from the command that

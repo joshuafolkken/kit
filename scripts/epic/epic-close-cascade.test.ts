@@ -1,5 +1,5 @@
-import type { IssueListOutcome } from '#scripts/git/git-gh-issue-list'
-import { listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
+import type { IssueListOutcome } from '#scripts/gh/git-gh-issue-list'
+import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CASCADE_DEPTH_NOTE, close_completed_epics, MAX_CASCADE_DEPTH } from './epic-close'
 
@@ -9,7 +9,7 @@ import { CASCADE_DEPTH_NOTE, close_completed_epics, MAX_CASCADE_DEPTH } from './
 //
 // Kept out of `epic-close.test.ts` because that suite is already at its file-length ceiling.
 
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
 		issue_list_by_label: vi.fn(),
 		issue_get_state_and_relations: vi.fn(),
@@ -18,7 +18,7 @@ vi.mock('#scripts/git/git-gh-command', () => ({
 	},
 }))
 
-const { git_gh_command } = await import('#scripts/git/git-gh-command')
+const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const mocked_list = vi.mocked(git_gh_command.issue_list_by_label)
 const mocked_get_child = vi.mocked(git_gh_command.issue_get_state_and_relations)
 const mocked_comments = vi.mocked(git_gh_command.issue_list_comments)

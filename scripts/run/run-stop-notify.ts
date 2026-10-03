@@ -1,4 +1,4 @@
-import { telegram_notify } from '#scripts/git/telegram-notify'
+import { telegram_notify } from '#scripts/notify/telegram-notify'
 import type { CarryRead } from './run-carry'
 
 // **A `backlogrun` that halts because a person is needed used to reach nobody once the session was

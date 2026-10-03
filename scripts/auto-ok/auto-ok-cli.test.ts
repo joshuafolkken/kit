@@ -1,5 +1,5 @@
-import { listing_of, listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
-import { AUTO_OK_LABEL } from '#scripts/git/issue-labels'
+import { listing_of, listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
+import { AUTO_OK_LABEL } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { auto_ok_cli } from './auto-ok-cli'
 import {
@@ -15,11 +15,11 @@ import {
 
 const { issue, epic_listing, console_streams } = auto_ok_fixture
 
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_list_by_label_summary: vi.fn(), issue_list_by_label: vi.fn() },
 }))
 
-const { git_gh_command } = await import('#scripts/git/git-gh-command')
+const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const issue_list = vi.mocked(git_gh_command.issue_list_by_label_summary)
 // The epic listing the pickup reads to drop a child of an epic (joshuafolkken/kit#1633). These cases
 // are about the token and the flags, so the default is a backlog with no epic in it.

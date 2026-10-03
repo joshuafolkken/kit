@@ -1,4 +1,4 @@
-import { EPIC_LABEL, IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
+import { EPIC_LABEL, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import type { EpicChild } from './epic-graph'
 import { epic_nested } from './epic-nested'

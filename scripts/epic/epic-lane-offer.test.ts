@@ -3,14 +3,14 @@ import {
 	capped_listing_outcome,
 	listing_of,
 	listing_outcome,
-} from '#scripts/git/git-gh-issue-list-fixture'
+} from '#scripts/gh/git-gh-issue-list-fixture'
 import {
 	BUG_LABEL,
 	IN_PROGRESS_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
-} from '#scripts/git/issue-labels'
+} from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ConfirmContext } from './epic-candidate-confirm'
 import { epic_classify } from './epic-classify'
@@ -21,11 +21,11 @@ import { epic_lane_offer, type LaneRequest, type RepoPool } from './epic-lane-of
 // from its `in-progress` listing on GitHub, never from anything a session remembers — two sessions
 // counting to six in their own memory would give twelve lanes.
 
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_list_by_label_in_repo: vi.fn() },
 }))
 
-const { git_gh_command } = await import('#scripts/git/git-gh-command')
+const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const issue_list = vi.mocked(git_gh_command.issue_list_by_label_in_repo)
 
 const { issue } = auto_ok_fixture

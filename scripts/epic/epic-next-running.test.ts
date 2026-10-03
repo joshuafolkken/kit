@@ -1,4 +1,4 @@
-import { NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { describe, expect, it, vi } from 'vitest'
 import type { EpicSnapshot } from './epic-fetch'
 import type { EpicChild, IssueReference } from './epic-graph'

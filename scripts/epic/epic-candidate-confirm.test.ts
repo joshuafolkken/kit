@@ -1,4 +1,4 @@
-import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { describe, expect, it, vi, type Mock } from 'vitest'
 import { epic_candidate_confirm, type ConfirmContext } from './epic-candidate-confirm'
 import { epic_classify } from './epic-classify'

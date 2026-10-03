@@ -15,13 +15,13 @@ vi.mock('#scripts/git/git-command', () => ({
 	git_command: { git_directories: vi.fn(), status: vi.fn() },
 }))
 vi.mock('./run-carry-stash', () => ({ run_carry_stash: { report_orphans: vi.fn() } }))
-vi.mock('#scripts/git/telegram-notify', () => ({
+vi.mock('#scripts/notify/telegram-notify', () => ({
 	telegram_notify: { confirm: vi.fn().mockResolvedValue(true) },
 }))
 
 const { git_command } = await import('#scripts/git/git-command')
 const git_directories = vi.mocked(git_command.git_directories)
-const { telegram_notify } = await import('#scripts/git/telegram-notify')
+const { telegram_notify } = await import('#scripts/notify/telegram-notify')
 const confirm = vi.mocked(telegram_notify.confirm)
 
 const TEST_PREFIX = 'run-carry-stop-test-'

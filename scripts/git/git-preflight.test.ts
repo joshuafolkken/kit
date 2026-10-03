@@ -17,7 +17,7 @@ vi.mock('./git-command', () => ({
 	},
 }))
 
-vi.mock('./git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
 		pr_exists: vi.fn(),
 		pr_get_body: vi.fn(),
@@ -27,7 +27,7 @@ vi.mock('./git-gh-command', () => ({
 
 const { git_preflight } = await import('./git-preflight')
 const { git_command } = await import('./git-command')
-const { git_gh_command } = await import('./git-gh-command')
+const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 
 const UNCLASSIFIED_ISSUE = JSON.stringify({ labels: [], body: 'no classification here' })
 const CLASSIFIED_ISSUE = JSON.stringify({ labels: [{ name: 'bug' }], body: '' })
@@ -131,7 +131,7 @@ describe('git_preflight.problems_of — the refusal as a list', () => {
 
 describe('git_preflight.check — live-evidence notice', () => {
 	it('announces the evidence section for a runtime change', async () => {
-		arrange(NUMBERED_BRANCH, CLASSIFIED_ISSUE, 'scripts/git/git-pr.ts')
+		arrange(NUMBERED_BRANCH, CLASSIFIED_ISSUE, 'scripts/gh/git-pr.ts')
 		const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
 
 		await git_preflight.check({ cli_input: undefined, will_open_pr: true })

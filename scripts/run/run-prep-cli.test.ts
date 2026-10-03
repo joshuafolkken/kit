@@ -33,7 +33,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 
 const has_changes_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('#scripts/git/git-stash', () => ({
+vi.mock('#scripts/git/stash/git-stash', () => ({
 	git_stash: { has_changes: has_changes_mock },
 }))
 

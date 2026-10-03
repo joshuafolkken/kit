@@ -1,6 +1,6 @@
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { SEPARATOR_LINE } from './constants'
-import { git_gh_issue_read } from './git-gh-issue-read'
 import { git_prompt } from './git-prompt'
 
 interface IssueInfo {

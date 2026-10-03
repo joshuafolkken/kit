@@ -1,0 +1,230 @@
+// cspell:words coderabbit coderabbitai
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+	handle_ai_review_findings,
+	UNREADABLE_COMMENTS_BODY,
+	UNREADABLE_COMMENTS_NOTE,
+	type TelegramContext,
+} from './git-pr-ai-review'
+
+vi.mock('./git-gh-command', () => ({
+	git_gh_command: {
+		pr_get_comments: vi.fn(),
+		pr_comment: vi.fn(),
+	},
+}))
+
+vi.mock('#scripts/notify/telegram-notify', () => ({
+	telegram_notify: {
+		send: vi.fn(),
+		send_or_report: vi.fn(),
+	},
+}))
+
+const { git_gh_command } = await import('./git-gh-command')
+const { telegram_notify } = await import('#scripts/notify/telegram-notify')
+const mocked_pr_get_comments = vi.mocked(git_gh_command.pr_get_comments)
+const mocked_pr_comment = vi.mocked(git_gh_command.pr_comment)
+// joshuafolkken/kit#1564: the tolerant form. What stops the run here is the blocker the
+// notification is about, raised by the caller — so a failed send must not replace that diagnosis.
+const mocked_telegram_send = vi.mocked(telegram_notify.send_or_report)
+
+const BRANCH = 'feature-branch'
+const IGNORE_REASON = 'Tracked in follow-up Issue #999'
+const CONTEXT: TelegramContext = {
+	repo_name: 'joshuafolkken-com',
+	issue_title: 'Fix bug',
+	issue_url: 'https://github.com/owner/repo/issues/1',
+	pr_url: 'https://github.com/owner/repo/pull/2',
+}
+
+const CLAUDE_BLOCKER_COMMENT = {
+	author: { login: 'claude' },
+	body: '## Code Review\n\n### Issues\n\n#### Logic bug — oops\n\n```ts\nconst x = 1\n```',
+	url: 'https://github.com/owner/repo/pull/2#issuecomment-1',
+}
+
+const CLAUDE_CLEAN_COMMENT = {
+	author: { login: 'claude' },
+	body: '## Code Review\n\nAll previous issues are resolved ✓',
+	url: 'https://github.com/owner/repo/pull/2#issuecomment-2',
+}
+
+const CODERABBIT_ACTIONABLE_COMMENT = {
+	author: { login: 'coderabbitai[bot]' },
+	body: '<!-- summary by coderabbit.ai -->\n\nActionable comments posted: 3\n\nReview details...',
+	url: 'https://github.com/owner/repo/pull/2#issuecomment-3',
+}
+
+const BLOCKER_MESSAGE_REGEX = /AI reviewer findings remain unresolved/u
+
+beforeEach(() => {
+	vi.clearAllMocks()
+})
+
+describe('handle_ai_review_findings — no blockers', () => {
+	it('returns no skip notes and no side effects when the classifier finds nothing', async () => {
+		mocked_pr_get_comments.mockResolvedValue(JSON.stringify([CLAUDE_CLEAN_COMMENT]))
+
+		const skip_notes = await handle_ai_review_findings({
+			branch_name: BRANCH,
+			ignore_reason: undefined,
+			context: CONTEXT,
+		})
+
+		expect(skip_notes).toStrictEqual([])
+		expect(mocked_pr_comment).not.toHaveBeenCalled()
+		expect(mocked_telegram_send).not.toHaveBeenCalled()
+	})
+})
+
+describe('handle_ai_review_findings — CodeRabbit findings (temporary kit#753)', () => {
+	it('does not throw and returns audit notes for CodeRabbit actionable comments', async () => {
+		mocked_pr_get_comments.mockResolvedValue(JSON.stringify([CODERABBIT_ACTIONABLE_COMMENT]))
+
+		const skip_notes = await handle_ai_review_findings({
+			branch_name: BRANCH,
+			ignore_reason: undefined,
+			context: CONTEXT,
+		})
+
+		expect(skip_notes).toHaveLength(1)
+		expect(skip_notes[0]).toContain('kit#753')
+		expect(skip_notes[0]).toContain('3')
+		expect(mocked_pr_comment).not.toHaveBeenCalled()
+		expect(mocked_telegram_send).not.toHaveBeenCalled()
+	})
+
+	it('still throws on Claude blockers while returning CodeRabbit notes separately', async () => {
+		mocked_pr_get_comments.mockResolvedValue(
+			JSON.stringify([CODERABBIT_ACTIONABLE_COMMENT, CLAUDE_BLOCKER_COMMENT]),
+		)
+
+		await expect(
+			handle_ai_review_findings({
+				branch_name: BRANCH,
+				ignore_reason: undefined,
+				context: CONTEXT,
+			}),
+		).rejects.toThrow(BLOCKER_MESSAGE_REGEX)
+		expect(mocked_telegram_send).toHaveBeenCalledTimes(1)
+	})
+})
+
+describe('handle_ai_review_findings — blocker without ignore reason', () => {
+	it('sends a confirmation Telegram and throws', async () => {
+		mocked_pr_get_comments.mockResolvedValue(JSON.stringify([CLAUDE_BLOCKER_COMMENT]))
+
+		await expect(
+			handle_ai_review_findings({
+				branch_name: BRANCH,
+				ignore_reason: undefined,
+				context: CONTEXT,
+			}),
+		).rejects.toThrow(BLOCKER_MESSAGE_REGEX)
+		expect(mocked_telegram_send).toHaveBeenCalledTimes(1)
+		const [send_input] = mocked_telegram_send.mock.calls[0] ?? []
+
+		expect(send_input?.task_type).toBe('confirmation')
+		expect(send_input?.body).toContain('claude')
+		expect(mocked_pr_comment).not.toHaveBeenCalled()
+	})
+
+	it('treats whitespace-only ignore_reason as missing and still throws', async () => {
+		mocked_pr_get_comments.mockResolvedValue(JSON.stringify([CLAUDE_BLOCKER_COMMENT]))
+
+		await expect(
+			handle_ai_review_findings({
+				branch_name: BRANCH,
+				ignore_reason: ' '.repeat(3),
+				context: CONTEXT,
+			}),
+		).rejects.toThrow(BLOCKER_MESSAGE_REGEX)
+		expect(mocked_telegram_send).toHaveBeenCalledTimes(1)
+		expect(mocked_pr_comment).not.toHaveBeenCalled()
+	})
+})
+
+describe('handle_ai_review_findings — blocker with ignore reason', () => {
+	it('posts an ignore-reason comment and proceeds without sending Telegram', async () => {
+		mocked_pr_get_comments.mockResolvedValue(JSON.stringify([CLAUDE_BLOCKER_COMMENT]))
+		mocked_pr_comment.mockResolvedValue('')
+
+		await handle_ai_review_findings({
+			branch_name: BRANCH,
+			ignore_reason: IGNORE_REASON,
+			context: CONTEXT,
+		})
+
+		expect(mocked_pr_comment).toHaveBeenCalledTimes(1)
+		const [branch, body] = mocked_pr_comment.mock.calls[0] ?? []
+
+		expect(branch).toBe(BRANCH)
+		expect(body).toContain('intentionally left unresolved')
+		expect(body).toContain(IGNORE_REASON)
+		expect(mocked_telegram_send).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#973: `pr_get_comments` turned every failure into the string `'[]'`, so a rate
+// limit reached this gate as "no reviewer left a finding" and the PR merged with the gate never
+// actually read. A gate that could not be read is not a gate that passed.
+describe('handle_ai_review_findings — comments that could not be read', () => {
+	const INPUT = { branch_name: BRANCH, ignore_reason: undefined, context: CONTEXT }
+
+	it('refuses to pass the gate when the read failed', async () => {
+		mocked_pr_get_comments.mockResolvedValue(undefined)
+
+		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow(UNREADABLE_COMMENTS_BODY)
+	})
+
+	// The rate-limit shape: valid JSON, but an object rather than a listing.
+	it('refuses to pass the gate when the answer is not a listing', async () => {
+		mocked_pr_get_comments.mockResolvedValue('{"message":"API rate limit exceeded"}')
+
+		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow(UNREADABLE_COMMENTS_BODY)
+	})
+
+	it('refuses to pass the gate when the answer is not json at all', async () => {
+		mocked_pr_get_comments.mockResolvedValue('not json at all')
+
+		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow(UNREADABLE_COMMENTS_BODY)
+	})
+
+	// The same alert an unresolved finding sends, so the stop reaches the person off-screen.
+	it('sends a confirmation notification before refusing', async () => {
+		mocked_pr_get_comments.mockResolvedValue(undefined)
+
+		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow()
+		// The second argument is the recovery line: a `confirmation` is exactly what `josh notify` is
+		// for, so this caller — unlike the completion one — has a command worth naming.
+		expect(mocked_telegram_send).toHaveBeenCalledWith(
+			expect.objectContaining({ task_type: 'confirmation' }),
+			expect.stringContaining('pnpm josh notify'),
+		)
+	})
+
+	// An ignore reason gets past this for the reason it gets past a real finding: a person has looked.
+	// The note is what keeps a bypassed run from reporting like one that read the gate and found
+	// nothing — the CodeRabbit sibling records the same thing for the same reason.
+	it('lets an ignore reason past, recording it on the pull request and in the notes', async () => {
+		mocked_pr_get_comments.mockResolvedValue(undefined)
+
+		await expect(
+			handle_ai_review_findings({ ...INPUT, ignore_reason: IGNORE_REASON }),
+		).resolves.toEqual([UNREADABLE_COMMENTS_NOTE])
+		expect(mocked_pr_comment).toHaveBeenCalledWith(BRANCH, expect.stringContaining(IGNORE_REASON))
+	})
+})
+
+describe('handle_ai_review_findings — a listing that is genuinely empty', () => {
+	const INPUT = { branch_name: BRANCH, ignore_reason: undefined, context: CONTEXT }
+
+	// `[]` is an answer: the PR has no comments, so there is nothing to block on.
+	it('passes the gate when the pull request has no comments at all', async () => {
+		mocked_pr_get_comments.mockResolvedValue('[]')
+
+		await expect(handle_ai_review_findings(INPUT)).resolves.toEqual([])
+		expect(mocked_telegram_send).not.toHaveBeenCalled()
+	})
+})

@@ -28,7 +28,7 @@ import { run_progress_read, type ObservationRead } from './run-progress-read'
 // `backlogrun` parent — `ready #N · free lanes N` — which is itself something the parent acts on.
 //
 // **It cannot send a Telegram.** That is structural rather than a promise — nothing here imports
-// `scripts/git/telegram-notify`, which is the only egress there is. A heartbeat every twenty minutes on
+// `scripts/notify/telegram-notify`, which is the only egress there is. A heartbeat every twenty minutes on
 // a phone is notification fatigue, and it would cheapen the `confirmation` and `completion` messages
 // that do need to interrupt someone.
 

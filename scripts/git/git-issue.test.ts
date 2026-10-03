@@ -15,7 +15,7 @@ const LANE_WORD = 'lane'
 
 const issue_get_title_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('./git-gh-issue-read', () => ({
+vi.mock('#scripts/gh/git-gh-issue-read', () => ({
 	git_gh_issue_read: {
 		issue_get_title: issue_get_title_mock,
 	},

@@ -1,5 +1,5 @@
-import { git_gh_api_path } from '#scripts/git/git-gh-api-path'
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
+import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 
 // Whether an issue was closed by a merge, read from its REST timeline (joshuafolkken/kit#2701). The
 // issue's own `state_reason` cannot tell: a pull request's `closes #N` and a person's "Close as

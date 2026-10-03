@@ -1,6 +1,6 @@
 # AI Workflow Automation
 
-For projects using the AI Issue workflow (`josh followup`, `josh notify`): the Telegram settings and what the scripts do. The scripts that power the `josh git`, `josh followup` and `josh notify` commands live under `scripts/git/` (they were a separate `scripts-ai/` directory until [#2903](https://github.com/joshuafolkken/kit/issues/2903)).
+For projects using the AI Issue workflow (`josh followup`, `josh notify`): the Telegram settings and what the scripts do. The scripts that power the `josh git`, `josh followup` and `josh notify` commands live under `scripts/git/`, `scripts/followup/` and `scripts/notify/` (they were a separate `scripts-ai/` directory until [#2903](https://github.com/joshuafolkken/kit/issues/2903), and were split out of `scripts/git/` by [#2988](https://github.com/joshuafolkken/kit/issues/2988)).
 
 ## Required Environment Variables
 
@@ -40,11 +40,11 @@ Optional. Set `JOSH_NOTIFY=off` when you do not use Telegram at all ([#2821](htt
 
 ## Commands
 
-| Command         | Script                                 | Description                                                   |
-| --------------- | -------------------------------------- | ------------------------------------------------------------- |
-| `josh followup` | `scripts/git/git-followup-workflow.ts` | Wait for CI, scan AI reviews, notify, and optionally merge PR |
-| `josh notify`   | `scripts/git/telegram-test.ts`         | Send a one-off Telegram notification with a task-type header  |
-| `josh git`      | `scripts/git/git-workflow.ts`          | AI-assisted commit, push, and PR creation workflow            |
+| Command         | Script                                      | Description                                                   |
+| --------------- | ------------------------------------------- | ------------------------------------------------------------- |
+| `josh followup` | `scripts/followup/git-followup-workflow.ts` | Wait for CI, scan AI reviews, notify, and optionally merge PR |
+| `josh notify`   | `scripts/notify/telegram-test.ts`           | Send a one-off Telegram notification with a task-type header  |
+| `josh git`      | `scripts/git/git-workflow.ts`               | AI-assisted commit, push, and PR creation workflow            |
 
 ## Notification Behavior
 

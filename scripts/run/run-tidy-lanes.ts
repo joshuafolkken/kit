@@ -1,5 +1,5 @@
 import { git_spawn } from '#scripts/git/git-spawn'
-import { git_stash } from '#scripts/git/git-stash'
+import { git_stash } from '#scripts/git/stash/git-stash'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { run_hold } from './run-hold'

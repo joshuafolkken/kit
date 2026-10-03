@@ -1,4 +1,4 @@
-import { EPIC_LABEL, has_label_name } from '#scripts/git/issue-labels'
+import { EPIC_LABEL, has_label_name } from '#scripts/issue/issue-labels'
 import type { EpicChild } from './epic-graph'
 
 // Whether a task-list row points at another epic (joshuafolkken/kit#1476).

@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import {
 	BREAKING_CHANGE_LABEL as BREAKING,
 	BUGFIX_LABEL as BUGFIX,
 	RELEASE_CLASSIFICATION_NAMES as CLASSIFICATION_LABELS,
 	ENHANCEMENT_LABEL,
 	type ReleaseClassification,
-} from '#scripts/git/issue-labels'
+} from '#scripts/issue/issue-labels'
 import { error_text } from '#scripts/lib/error-message'
 import { z } from 'zod'
 
@@ -144,4 +144,4 @@ export { pr_classification }
 export {
 	RELEASE_CLASSIFICATION_NAMES as CLASSIFICATION_LABELS,
 	type ReleaseClassification,
-} from '#scripts/git/issue-labels'
+} from '#scripts/issue/issue-labels'

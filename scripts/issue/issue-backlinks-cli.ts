@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 import { issue_backlinks, type UpstreamEntry } from './issue-backlinks'

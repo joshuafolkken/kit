@@ -1,4 +1,4 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { epic_add } from './epic-add'
 import { epic_add_fixture, EPIC_FIXTURE_REPO } from './epic-add-fixture'
@@ -9,7 +9,7 @@ vi.mock('./epic-fetch', () => ({
 	epic_fetch: { fetch_children: vi.fn() },
 }))
 
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
 		issue_get_labels_and_body: vi.fn(),
 		repo_get_name_with_owner: vi.fn(),

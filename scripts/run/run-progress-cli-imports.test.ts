@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const { PROJECT_ROOT: REPO_ROOT } = await import('#scripts/init/init-paths')
 
-// `scripts/git/telegram-notify.ts` is the only Telegram egress there is, so "this command cannot
+// `scripts/notify/telegram-notify.ts` is the only Telegram egress there is, so "this command cannot
 // notify" is a question about imports rather than a promise in prose.
 //
 // **What this asserts is the direct import of every module the command reaches**, its own three plus

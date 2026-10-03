@@ -1,11 +1,11 @@
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_pr } from '#scripts/gh/git-pr'
 import { error_text } from '#scripts/lib/error-message'
 import { live_evidence } from '#scripts/review/live-evidence'
 import { changed_paths } from './changed-paths'
 import { git_branch } from './git-branch'
 import { git_command } from './git-command'
-import { git_gh_command } from './git-gh-command'
 import { git_issue, type IssueInfo } from './git-issue'
-import { git_pr } from './git-pr'
 
 // joshuafolkken/kit#2817. A first `josh git -y` was refused once per unmet precondition — the title's
 // issue number, the branch name, the issue's release classification — each only after the stage

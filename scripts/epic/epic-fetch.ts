@@ -1,5 +1,5 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import type { IssueReadFailure } from '#scripts/git/git-gh-issue-read'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import type { IssueReadFailure } from '#scripts/gh/git-gh-issue-read'
 import { epic_cross_repo } from './epic-cross-repo'
 import type { EpicChild, IssueReference } from './epic-graph'
 import { epic_issue, type EpicIssue } from './epic-issue'

@@ -1,4 +1,4 @@
-import { EPIC_LABEL } from '#scripts/git/issue-labels'
+import { EPIC_LABEL } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import { epic_parse } from './epic-parse'
 import { epic_promote, type PromoteInput } from './epic-promote'

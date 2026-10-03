@@ -4,7 +4,7 @@ import {
 	REVIEW_CAP_ROUTE_LABEL,
 	SPLIT_ROUTE_LABEL,
 	TIER_A_ROUTE_LABEL,
-} from '#scripts/git/issue-labels'
+} from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#1083: an added Issue should say, by label, which filing route produced it — a
@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest'
 // `pnpm josh issue:file` call — the command cannot know which route produced the filing. What *is*
 // mechanical is that each filing procedure's documented command carries the route; this suite is
 // that guard. It keys every route's filing document to the single-source constant in
-// `git/issue-labels.ts`, so a command that drops its route label — or a label whose spelling drifts
+// `issue/issue-labels.ts`, so a command that drops its route label — or a label whose spelling drifts
 // from the constant the aggregation query uses — fails here rather than shipping an uncountable
 // filing.
 

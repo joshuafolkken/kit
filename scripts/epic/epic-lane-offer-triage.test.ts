@@ -1,5 +1,5 @@
-import { listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
-import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
+import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
+import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_classify } from './epic-classify'
 import type { EpicChild, IssueReference } from './epic-graph'
@@ -9,11 +9,11 @@ import { epic_triage } from './epic-triage'
 // joshuafolkken/kit#2779: a named epic's lanes go through `epic:next --lanes`, so the triage gate
 // `backlog:next` applies holds here as well.
 
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_list_by_label_in_repo: vi.fn() },
 }))
 
-const { git_gh_command } = await import('#scripts/git/git-gh-command')
+const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const issue_list = vi.mocked(git_gh_command.issue_list_by_label_in_repo)
 
 const REPO = 'joshuafolkken/kit'

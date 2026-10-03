@@ -1,6 +1,6 @@
-import { BREAKING_CHANGE_LABEL, ENHANCEMENT_LABEL } from '#scripts/git/issue-labels'
 import { describe, expect, it } from 'vitest'
 import { issue_classification } from './issue-classification'
+import { BREAKING_CHANGE_LABEL, ENHANCEMENT_LABEL } from './issue-labels'
 
 const BODY = '## 背景\n\n'
 const EXISTING = ['route:split', 'depth:1']

@@ -1,6 +1,6 @@
 import { auto_ok_fixture } from '#scripts/auto-ok/auto-ok-fixture'
-import { listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
-import { IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
+import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
+import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EpicSnapshot } from './epic-fetch'
 import type { EpicChild, IssueReference } from './epic-graph'
@@ -15,14 +15,14 @@ import { epic_view_fixture } from './epic-view-fixture'
 // prerequisite. `epic:next --repo` therefore confirms the one candidate it is about to offer against
 // the relations listing itself.
 
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
 		issue_list_by_label_in_repo: vi.fn(),
 		issue_blocked_by_references: vi.fn(),
 	},
 }))
 
-const { git_gh_command } = await import('#scripts/git/git-gh-command')
+const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const issue_list = vi.mocked(git_gh_command.issue_list_by_label_in_repo)
 const blocked_by = vi.mocked(git_gh_command.issue_blocked_by_references)
 

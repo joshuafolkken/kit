@@ -1,4 +1,4 @@
-import { git_followup_pending } from '#scripts/git/git-followup-pending'
+import { git_followup_pending } from '#scripts/followup/git-followup-pending'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { release_scope_cli } from './release-scope-cli'
 

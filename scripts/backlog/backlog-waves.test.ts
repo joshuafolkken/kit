@@ -1,14 +1,14 @@
 import { epic_cross_repo } from '#scripts/epic/epic-cross-repo'
 import { epic_graph, type EpicChild, type IssueReference } from '#scripts/epic/epic-graph'
 import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
-import { git_next_issues } from '#scripts/git/git-next-issues'
+import { git_next_issues } from '#scripts/issue/git-next-issues'
 import {
 	BUG_LABEL,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
-} from '#scripts/git/issue-labels'
+} from '#scripts/issue/issue-labels'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_plan, type PlanContext } from './backlog-plan'

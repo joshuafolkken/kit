@@ -15,7 +15,7 @@ const mocked_public_latest = vi.mocked(npm_registry.read_latest)
 const mocked_public_times = vi.mocked(npm_registry.read_release_times)
 
 vi.mock('execa', async () => {
-	const { gh_execa_fixture } = await import('#scripts/git/git-gh-execa-fixture')
+	const { gh_execa_fixture } = await import('#scripts/gh/git-gh-execa-fixture')
 
 	return { execaSync: gh_execa_fixture.honoring_reject(gh_outcomes) }
 })

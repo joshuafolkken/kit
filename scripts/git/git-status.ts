@@ -1,4 +1,4 @@
-import { animation_helpers, type AnimationOptions } from './animation-helpers'
+import { animation_helpers, type AnimationOptions } from '#scripts/lib/animation-helpers'
 import { REQUIRED_STATUS_LENGTH, STAGED_STATUS_INDEX, UNTRACKED_FILE_PREFIX } from './constants'
 import { git_command } from './git-command'
 

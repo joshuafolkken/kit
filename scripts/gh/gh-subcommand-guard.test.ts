@@ -25,7 +25,7 @@ const GH_CONSTANT = 'FIXTURE_GH_BINARY'
 const GIT_CONSTANT = 'FIXTURE_GIT_BINARY'
 const SCRIPTS_DIRECTORY = 'scripts'
 const EPIC_ENTRY_FILE = 'scripts/epic/epic.ts'
-const GH_EXEC_FILE = 'scripts/git/git-gh-exec.ts'
+const GH_EXEC_FILE = 'scripts/gh/git-gh-exec.ts'
 // What a REST request's spawn reports as: `api` written inline, or an argument list built elsewhere.
 const REST_SUBCOMMANDS: ReadonlySet<string> = new Set([
 	gh_subcommand_guard.API_SUBCOMMAND,

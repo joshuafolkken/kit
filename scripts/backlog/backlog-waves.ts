@@ -4,7 +4,11 @@ import { epic_cross_repo } from '#scripts/epic/epic-cross-repo'
 import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
 import { epic_outside_blocker } from '#scripts/epic/epic-outside-blocker'
 import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
-import { has_label_name, IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import {
+	has_label_name,
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+} from '#scripts/issue/issue-labels'
 import { backlog_plan, type PlanContext } from './backlog-plan'
 import { backlog_rank } from './backlog-rank'
 

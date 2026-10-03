@@ -9,10 +9,10 @@ import {
 	OLD_ISSUE_NUMBER,
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
-import type { IssueRead } from '#scripts/git/git-gh-issue-read'
-import { AUTO_OK_LABEL, TIER_A_ROUTE_LABEL } from '#scripts/git/issue-labels'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import type { IssueRead } from '#scripts/gh/git-gh-issue-read'
+import { AUTO_OK_LABEL, TIER_A_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_next } from './backlog-next'

@@ -61,7 +61,7 @@ function read_workspace_version(cwd: string): string | undefined {
 // `📦 project version: <v>` for the end of a workflow. Both are gone (joshuafolkken/kit#1486): a
 // child no longer bumps, so the local manifest names the *previous* release rather than what the run
 // ships, and every caller now prints the count of unreleased merges instead
-// (`scripts/git/git-followup-pending.ts`). Removed rather than left unused, so nothing reaches for
+// (`scripts/followup/git-followup-pending.ts`). Removed rather than left unused, so nothing reaches for
 // the misleading reading again.
 
 const version_targets = {

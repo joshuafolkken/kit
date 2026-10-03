@@ -1,4 +1,4 @@
-import { has_label_name, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import { has_label_name, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { run_carry, type RunCarry } from '#scripts/run/run-carry'
 import type { RunEvent } from '#scripts/run/run-event-stream'

@@ -1,5 +1,5 @@
-import { git_stash } from '#scripts/git/git-stash'
-import { stash_orphans } from '#scripts/git/stash-orphans'
+import { git_stash } from '#scripts/git/stash/git-stash'
+import { stash_orphans } from '#scripts/git/stash/stash-orphans'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 

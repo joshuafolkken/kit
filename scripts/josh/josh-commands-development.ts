@@ -46,7 +46,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'automation', ['processes']],
 	},
 	bytes: {
-		script: 'scripts/bytes/bytes-command.ts',
+		script: 'scripts/lines/bytes-command.ts',
 		description:
 			"Print an agent-read document's byte size against its ceiling and the headroom left",
 		category: 'Development',

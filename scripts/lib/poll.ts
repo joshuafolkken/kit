@@ -1,6 +1,6 @@
 // One bounded polling loop and one sleep, in one place.
 //
-// **Three modules had already written the same three-line `sleep`** — `git/git-pr-checks.ts`,
+// **Three modules had already written the same three-line `sleep`** — `gh/git-pr-checks.ts`,
 // `eval/eval-run.ts` and `propagate/propagate-publish.ts` — and the release command's tag watch
 // (joshuafolkken/kit#1169) would have been the fourth. `CLAUDE.md` → "No clones — single-source"
 // reads an existing duplication as the signal to single-source it rather than as a license to add to

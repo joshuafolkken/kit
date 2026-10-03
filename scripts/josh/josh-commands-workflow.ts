@@ -35,7 +35,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 	// than dropped: `telegram_notify.send` now throws on missing credentials and on a failed send, so
 	// `josh notify` exits non-zero instead of warning and answering 0.
 	followup: {
-		script: 'scripts/git/git-followup-workflow.ts',
+		script: 'scripts/followup/git-followup-workflow.ts',
 		description: 'Follow-up git workflow',
 		category: 'Workflow',
 		reference: [
@@ -46,7 +46,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
 	notify: {
-		script: 'scripts/git/telegram-test.ts',
+		script: 'scripts/notify/telegram-test.ts',
 		description: 'Send Telegram notification',
 		category: 'Workflow',
 		reference: ['--task-type <type> --body <text>', 'automation', ['notifications']],

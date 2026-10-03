@@ -116,7 +116,7 @@ about the search itself rather than about anything the children say (joshuafolkk
 
 **One thing it cannot check** belongs to planning: when a child introduces a new label, command,
 state or artifact, list the existing code referencing that concept and confirm some child owns
-updating it. Label names are single-sourced in `scripts/git/issue-labels.ts`.
+updating it. Label names are single-sourced in `scripts/issue/issue-labels.ts`.
 
 History: `docs/maintainers/epic-commands-rationale.md` → "`epic:audit` — why the children are read across".
 
