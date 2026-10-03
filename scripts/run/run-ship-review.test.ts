@@ -7,6 +7,9 @@ import { run_ship_review } from './run-ship-review'
 const { VERDICT } = run_ship_review
 const BRIEF = 'stamps/josh-ship-review-brief-x.md'
 const FINDINGS = 'stamps/josh-ship-review-findings-x.txt'
+const LOW_ONLY = 'tests:low:a.ts'
+const MEDIUM_OPEN = 'bug-risks:medium:a.ts:3'
+const MEDIUM_FIXED = `fixed ${MEDIUM_OPEN}`
 
 describe('run_ship_review.reviewer_prompt', () => {
 	it('is one launch-safe line naming the brief and the findings file', () => {
@@ -108,10 +111,10 @@ describe('run_ship_review — the two rounds route differently', () => {
 describe('run_ship_review.is_clean_round_one — a resume narrows only past a clean review', () => {
 	it.each([
 		['', true],
-		['tests:low:a.ts', true],
-		['fixed bug-risks:medium:a.ts:3', false],
+		[LOW_ONLY, true],
+		[MEDIUM_FIXED, false],
 		['bug-risks:high:a.ts:42', false],
-		['bug-risks:medium:a.ts:3', false],
+		[MEDIUM_OPEN, false],
 		['not a finding', false],
 	])('reads %j as clean: %s', (text, is_clean) => {
 		expect(run_ship_review.is_clean_round_one(text)).toBe(is_clean)
@@ -119,6 +122,23 @@ describe('run_ship_review.is_clean_round_one — a resume narrows only past a cl
 
 	it('reads an absent findings file as not clean', () => {
 		expect(run_ship_review.is_clean_round_one(undefined)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#2961: any finding marked fixed means the reviewer edited the tree, blocking or not.
+describe('run_ship_review.has_fixes — whether the reviewer edited the tree', () => {
+	it.each([
+		['', false],
+		[LOW_ONLY, false],
+		[MEDIUM_OPEN, false],
+		[MEDIUM_FIXED, true],
+		[`${MEDIUM_FIXED}\ntests:medium:b.ts`, true],
+	])('reads %j as edited: %s', (text, is_edited) => {
+		expect(run_ship_review.has_fixes(text)).toBe(is_edited)
+	})
+
+	it('reads an absent findings file as not edited', () => {
+		expect(run_ship_review.has_fixes(undefined)).toBe(false)
 	})
 })
 
