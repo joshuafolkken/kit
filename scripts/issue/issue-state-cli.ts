@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { issue_report_failures, type ReadFailureKind } from './issue-report-failures'
 import { issue_state, type IssueState } from './issue-state'
 
 // `josh issue:state <N> [<N> ...]` — print each issue's state and labels, in the spelling the
@@ -25,7 +26,6 @@ import { issue_state, type IssueState } from './issue-state'
 // answer as "not CLOSED" would report a child as failed because nobody could reach GitHub. The two
 // are told apart here and neither is a state.
 
-const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const REPO_FLAG = '--repo'
@@ -43,17 +43,12 @@ const READ_CONCURRENCY = 8
 // The two fields, under the names `gh issue view --json` gave them. `git-gh-issue-rest.ts` maps them
 // back from REST, which is what keeps `OPEN` / `CLOSED` / `MERGED` out of this file.
 const STATE_FIELDS = 'state,labels'
+const FAILURE_TERMS = { success_kind: 'state', misreading: 'the issue is open' } as const
 
 interface StateRequest {
 	issue_numbers: ReadonlyArray<string>
 	repo?: string
 }
-
-// The two failure kinds a read can end in, kept apart all the way to the report: `missing` is the
-// number resolving to nothing and `unreadable` is a read that failed, and the documents ask a
-// caller to report the two differently. Folding them together to simplify the batch would destroy
-// exactly that distinction.
-type ReadFailureKind = 'missing' | 'unreadable'
 
 // One issue's state, or the failure kind. Named for export because `run:prep` reads the state beside
 // the body and the dependency-update scope (joshuafolkken/kit#1978), reusing this read rather than a
@@ -146,19 +141,6 @@ function parse_request(argv: ReadonlyArray<string>): StateRequest | undefined {
 	return repo_flag.kind === 'named' ? { issue_numbers, repo: repo_flag.repo } : { issue_numbers }
 }
 
-// A number that resolves to nothing is an answer — a typo, or another repository's number quoted in
-// prose — and it is reported as one. Everything else is a gap, and the message says so, because the
-// caller's next move differs: a gap is retried, an answer is not.
-function report_failure(kind: ReadFailureKind, issue_number: string): void {
-	if (kind === 'missing') {
-		console.error(`✖ issue #${issue_number} does not resolve — check the number and the repository`)
-	} else {
-		console.error(
-			`✖ could not read issue #${issue_number} — a rate limit, expired auth, or a dropped connection. This is not "the issue is open"`,
-		)
-	}
-}
-
 // One number's read, reduced to what the report needs and nothing printed yet. Separating the two
 // is what lets the whole batch be in flight at once: the numbers are independent, so reading them
 // one after the other spends a round trip per number for no reason.
@@ -206,30 +188,7 @@ function print_states(reports: ReadonlyArray<IssueReport>): void {
 	const should_attribute = reports.length > 1
 	const blocks = reports.flatMap((report) => state_blocks(report, should_attribute))
 
-	if (blocks.length === 0) return
-
-	console.info(blocks.join(BLOCK_SEPARATOR))
-}
-
-function report_one_failure(report: IssueReport): boolean {
-	if (report.result.kind === 'state') return false
-
-	report_failure(report.result.kind, report.issue_number)
-
-	return true
-}
-
-// Every number that produced no state is named, so a caller is told which ones it has no answer for
-// rather than being left to subtract the printed blocks from what it asked. A single failure still
-// makes the exit code non-zero, exactly as it did when only one number could be passed.
-function report_failures(reports: ReadonlyArray<IssueReport>): number {
-	let has_failure = false
-
-	for (const report of reports) {
-		has_failure = report_one_failure(report) || has_failure
-	}
-
-	return has_failure ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
+	issue_report_failures.print_blocks(blocks, BLOCK_SEPARATOR)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -245,7 +204,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	print_states(reports)
 
-	return report_failures(reports)
+	return issue_report_failures.report_failures(reports, FAILURE_TERMS)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {
