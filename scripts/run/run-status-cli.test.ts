@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import type { IssueState } from '#scripts/issue/issue-state'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RunCarry } from './run-carry'
 import { run_status } from './run-status'
@@ -223,9 +224,6 @@ describe('run:status is read-only', () => {
 
 describe('josh run:status registration', () => {
 	it('is registered as a josh command', () => {
-		const source = readFileSync('scripts/josh/josh-commands-ai.ts', 'utf8')
-
-		expect(source).toContain("'run:status'")
-		expect(source).toContain(CLI_PATH)
+		expect(COMMAND_MAP['run:status']?.script).toBe(CLI_PATH)
 	})
 })

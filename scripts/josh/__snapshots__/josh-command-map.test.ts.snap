@@ -113,7 +113,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "backlog:plan": [
-      "[issue...] [--only]",
+      "[issue...] [--only] [--waves] [--exclude <n>[,<n>...]]",
       "automation",
       [
         "network",
@@ -183,7 +183,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "cost": [
-      "[--cut|--over]",
+      "(--cut | --over <tokens-per-request>) [--path <dir>]",
       "automation",
       [
         "none",
@@ -288,7 +288,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "epic:next": [
-      "<epic>",
+      "<epic>... [--repo <owner/repo>] [--lanes]",
       "automation",
       [
         "network",
@@ -402,7 +402,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "issue:fold-existing": [
-      "<assessment.json>",
+      "<assessment.json> [--json]",
       "automation",
       [
         "none",
@@ -423,7 +423,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "issue:scout": [
-      "<title> [--body <summary>]",
+      "<title> [--body <summary> | --body-file <path>]",
       "automation",
       [
         "network",
@@ -863,7 +863,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:hold": [
-      "[issue]",
+      "[<issue> [--fullrun | --halfrun-stop]]",
       "automation",
       [
         "files",
@@ -899,7 +899,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:progress": [
-      "[--wait|--mark]",
+      "[--once | --wait] [--interval <minutes>] [--hours <hours>] [--repo <owner/repo>] [--output <path>] | --mark | --path",
       "automation",
       [
         "files",
@@ -998,7 +998,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "ship": [
-      ""<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--notify-message <text> | --notify-message-file <path>] | --log <N>",
+      ""<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | --log <N>",
       "automation",
       [
         "git",

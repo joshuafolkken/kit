@@ -1,6 +1,6 @@
 # Set up the basic profile
 
-The detailed version of the [Quick start](../../README.md#quick-start) for the `basic` [profile](../init.md#project-profiles). It takes a directory that holds only an `index.html` file — or a Python, Rust or other project without Web files — from an empty machine to a formatted, verified project. It needs no Git repository, no GitHub account and no npm token; only the optional GitHub Issue workflow at the end of step 3 needs Git and GitHub. For a JavaScript / TypeScript project, see [Set up the full profile](./full.md).
+The `josh init` path for the `basic` [profile](../init.md#project-profiles) — the README's "Other projects" link. The [Quick start](../../README.md#quick-start) runs `josh start` instead, for a project that will use the GitHub Issue workflow; [init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start) decides which applies. This guide takes a directory that holds only an `index.html` file — or a Python, Rust or other project without Web files — from an empty machine to a formatted, verified project. It needs no Git repository, no GitHub account and no npm token; only the optional GitHub Issue workflow at the end of step 3 needs Git and GitHub. For a JavaScript / TypeScript project, see [Set up the full profile](./full.md).
 
 ## 1. Install the prerequisites
 

@@ -10,8 +10,10 @@ You have a repository and want kit's AI rules, formatting and checks in it. This
    - `basic` — an `index.html` site, or Python, Rust or another non-Node project: follow [Set up the basic profile](../setup/basic.md). It installs Node and pnpm too.
    - `full` — a JavaScript / TypeScript project with npm dependencies: follow [Set up the full profile](../setup/full.md).
 2. Optionally install the [global `josh` CLI](../cli.md) so `josh` works outside the project. The package alone is enough to use the configs.
-3. Run `josh init` as the guide says ([what it creates](../init.md)) — it installs the dependencies and formats the project itself — then `josh gate` to verify.
-4. If the project will use the GitHub Issue workflow, run `josh start` next and merge the setup pull request it opens, so `main` carries the setup ([init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start)).
+3. Run the one command [init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start) picks, as the guide says:
+   - The project will use the GitHub Issue workflow: run `josh start` alone — it runs the same setup as `josh init`, then opens the setup pull request for you to merge, so `main` carries the setup.
+   - It will not: run `josh init` ([what it creates](../init.md)) — it installs the dependencies and formats the project itself.
+4. Run `josh gate` to verify.
 
 ## Check it worked
 

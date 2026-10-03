@@ -4,10 +4,9 @@ import { DOCUMENT_COMMANDS } from './josh-commands-document'
 import { GUARD_COMMANDS } from './josh-commands-guard'
 import { ISSUE_COMMANDS } from './josh-commands-issue'
 import { LANE_COMMANDS } from './josh-commands-lane'
+import { RUN_COMMANDS } from './josh-commands-run'
 import { SPLIT_COMMANDS } from './josh-commands-split'
 
-// One script answers both `run:hold` and `run:release`; the flag below is what tells them apart.
-const RUN_HOLD_SCRIPT = 'scripts/run/run-hold-cli.ts'
 const ISSUE_WITH_OPTIONS = '<issue> [options]'
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -36,7 +35,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/epic/epic-next.ts',
 		description: "List an epic's runnable children, bundled per repository",
 		category: 'AI tools',
-		reference: ['<epic>', 'automation', ['network']],
+		reference: ['<epic>... [--repo <owner/repo>] [--lanes]', 'automation', ['network']],
 	},
 	'epic:bundle': {
 		script: 'scripts/epic/epic-bundle-cli.ts',
@@ -65,9 +64,10 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	...BACKLOG_COMMANDS,
 	cost: {
 		script: 'scripts/cost-runtime/cost-cli.ts',
-		description: "Report a run's token and credit cost from Claude Code's session transcripts",
+		description:
+			'Say whether the next turn of a run crosses the context-cut threshold (--cut) or a given tokens-per-request figure (--over)',
 		category: 'AI tools',
-		reference: ['[--cut|--over]', 'automation', ['none']],
+		reference: ['(--cut | --over <tokens-per-request>) [--path <dir>]', 'automation', ['none']],
 	},
 	...DOCUMENT_COMMANDS,
 	time: {
@@ -134,100 +134,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<unit-files> <unit-files> [<unit-files> …]', 'automation', ['none']],
 	},
-	'run:hold': {
-		script: RUN_HOLD_SCRIPT,
-		description: 'Claim this working tree for a run, or say which run already holds it',
-		category: 'AI tools',
-		reference: ['[issue]', 'automation', ['files']],
-	},
-	'run:release': {
-		script: RUN_HOLD_SCRIPT,
-		description: "Release this working tree's run record",
-		category: 'AI tools',
-		reference: ['[issue|--force]', 'automation', ['files']],
-		default_script_arguments: ['--release'],
-	},
-	'run:tidy': {
-		script: 'scripts/run/run-tidy-cli.ts',
-		description: 'Close merged lanes and drop stashes whose issues are all merged',
-		category: 'AI tools',
-		reference: ['', 'automation', ['git', 'network', 'files']],
-	},
-	'run:carry': {
-		script: 'scripts/run/run-carry-cli.ts',
-		description: 'Carry one invocation’s budget across its own session cuts',
-		category: 'AI tools',
-		reference: ['<operation> [arguments...]', 'automation', ['files']],
-	},
-	'run:wake': {
-		script: 'scripts/run/run-wake-cli.ts',
-		// `.env` rather than the ambient environment:
-		// the failure warning needs the Telegram credentials, the same
-		// reasons `notify` and `followup` carry these flags.
-		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
-		description: 'Wake the next session of a cut backlogrun from outside the conversation',
-		category: 'AI tools',
-		reference: ['[options]', 'automation', ['processes', 'notifications']],
-	},
-	'run:cut': {
-		script: 'scripts/run/run-cut-cli.ts',
-		description: 'Cut a lane child before the gate and resume a fresh process',
-		category: 'AI tools',
-		reference: ['[--resume] <issue> [--impl] [--handoff <path>]', 'automation', ['files']],
-	},
-	'run:liveness': {
-		script: 'scripts/run/run-liveness-cli.ts',
-		description: 'Say whether a delegated unit is still working, or stopped without reporting',
-		category: 'AI tools',
-		reference: ['<issue> --output <path> [options]', 'automation', ['processes']],
-	},
-	'run:ending': {
-		script: 'scripts/run/run-ending-cli.ts',
-		description: 'Classify how a dispatched lane child ended (merged, cut, abandoned, unreadable)',
-		category: 'AI tools',
-		reference: ['<issue> --output <path> [--repo <owner/repo>]', 'automation', ['network']],
-	},
-	'run:progress': {
-		script: 'scripts/run/run-progress-cli.ts',
-		description: 'Report an unattended run’s progress once it has gone quiet for an interval',
-		category: 'AI tools',
-		reference: ['[--wait|--mark]', 'automation', ['files']],
-	},
-	'run:prep': {
-		script: 'scripts/run/run-prep-cli.ts',
-		description: 'Bundle a run’s pre-edit reads: body, comments, state, dependency scope',
-		category: 'AI tools',
-		reference: ['<issue>', 'automation', ['network']],
-	},
-	// The entry sequence a lane opened on, folded into one call (joshuafolkken/kit#2372): claim the tree,
-	// read the budget, gather the issue reads and decide the pre-implementation step. `run:hold`,
-	// `cost --cut`, `run:prep` and `run:step` were four round trips re-billing a lane's full context each.
-	'run:entry': {
-		script: 'scripts/run/run-entry-cli.ts',
-		description:
-			'Open a run in one call: claim the tree, read the budget, bundle the reads, decide the pre-implementation step',
-		category: 'AI tools',
-		reference: ['<issue>', 'automation', ['git', 'network', 'files']],
-	},
-	'run:status': {
-		script: 'scripts/run/run-status-cli.ts',
-		description: 'Bundle a run’s read-only status: issue state, cost verdict, carry counters',
-		category: 'AI tools',
-		reference: ['<issue> [--repo <owner/repo>]', 'automation', ['network']],
-	},
-	'run:next': {
-		script: 'scripts/run/run-next-cli.ts',
-		description: 'Print the next step a fullrun takes, computed from the run’s state',
-		category: 'AI tools',
-		reference: ['<issue>', 'automation', ['network']],
-	},
-	'run:step': {
-		script: 'scripts/run/run-step-cli.ts',
-		description:
-			'Print the run’s next single action, computed from the event stream, carry record and issue state',
-		category: 'AI tools',
-		reference: ['<issue>', 'automation', ['network', 'files']],
-	},
+	...RUN_COMMANDS,
 	'repo:party': {
 		script: 'scripts/discovery/repo-party-cli.ts',
 		description:
@@ -269,7 +176,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			'Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step',
 		category: 'AI tools',
 		reference: [
-			'"<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--notify-message <text> | --notify-message-file <path>] | --log <N>',
+			'"<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | --log <N>',
 			'automation',
 			['git', 'network'],
 		],

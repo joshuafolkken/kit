@@ -41,7 +41,7 @@ Type:
 fullrun #N
 ```
 
-The agent implements the change, runs the gate and the self-review, opens the pull request with the `closes #N` line, waits for CI and merges it. The run ends with the Issue closed and a notification; it stops only when something needs you.
+The agent writes the plan on the Issue if it has none (the one `kickoff new` filed already does), implements the change, runs the gate and the self-review, opens the pull request with the `closes #N` line, waits for CI and merges it. The run ends with the Issue closed and a notification; it stops only when something needs you.
 
 If you ran `halfrun` in step 2, its changes are still uncommitted in the working tree, and `fullrun` will not start on a tree with uncommitted changes. Finish that run with the commit command its stop notification gives instead — it opens the pull request and merges it the same way ([Recover a stopped run](./how-to/recover-a-run.md)).
 

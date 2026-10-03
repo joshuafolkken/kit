@@ -33,7 +33,11 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Print the whole backlog as a plan: ready now, waiting on what, waiting on a person, out of scope',
 		category: 'AI tools',
-		reference: ['[issue...] [--only]', 'automation', ['network']],
+		reference: [
+			'[issue...] [--only] [--waves] [--exclude <n>[,<n>...]]',
+			'automation',
+			['network'],
+		],
 	},
 	'backlog:stalled': {
 		script: 'scripts/backlog/backlog-stalled-cli.ts',

@@ -719,7 +719,7 @@ Collapse a backlogrun loop-head event into one call: read backlog:next, ask back
 
 > **Audience:** automation · **Side effects:** network
 
-`[issue...] [--only]`
+`[issue...] [--only] [--waves] [--exclude <n>[,<n>...]]`
 
 Print the whole backlog as a plan: ready now, waiting on what, waiting on a person, out of scope
 
@@ -759,9 +759,9 @@ Count code duplication across files and first-party repositories, printing each 
 
 > **Audience:** automation · **Side effects:** none
 
-`[--cut|--over]`
+`(--cut | --over <tokens-per-request>) [--path <dir>]`
 
-Report a run's token and credit cost from Claude Code's session transcripts
+Say whether the next turn of a run crosses the context-cut threshold (--cut) or a given tokens-per-request figure (--over)
 
 ---
 
@@ -879,7 +879,7 @@ Check an epic issue against the tracking requirements
 
 > **Audience:** automation · **Side effects:** network
 
-`<epic>`
+`<epic>... [--repo <owner/repo>] [--lanes]`
 
 List an epic's runnable children, bundled per repository
 
@@ -969,7 +969,7 @@ Before a second filing: say whether findings from this session fold into one iss
 
 > **Audience:** automation · **Side effects:** none
 
-`<assessment.json>`
+`<assessment.json> [--json]`
 
 Assess whether a complete draft can join an unstarted issue
 
@@ -999,7 +999,7 @@ Print each issue's title, body and every comment on it, in one call
 
 > **Audience:** automation · **Side effects:** network
 
-`<title> [--body <summary>]`
+`<title> [--body <summary> | --body-file <path>]`
 
 Before filing: say whether an issue like this exists and which epic it belongs to
 
@@ -1269,7 +1269,7 @@ Append to, read or watch the run’s append-only event stream (--append <kind> <
 
 > **Audience:** automation · **Side effects:** files
 
-`[issue]`
+`[<issue> [--fullrun | --halfrun-stop]]`
 
 Claim this working tree for a run, or say which run already holds it
 
@@ -1319,7 +1319,7 @@ Bundle a run’s pre-edit reads: body, comments, state, dependency scope
 
 > **Audience:** automation · **Side effects:** files
 
-`[--wait|--mark]`
+`[--once | --wait] [--interval <minutes>] [--hours <hours>] [--repo <owner/repo>] [--output <path>] | --mark | --path`
 
 Report an unattended run’s progress once it has gone quiet for an interval
 
@@ -1429,7 +1429,7 @@ Guard: exits non-zero when lane children are in-flight but the watcher has not p
 
 > **Audience:** automation · **Side effects:** git, network
 
-`"<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--notify-message <text> | --notify-message-file <path>] | --log <N>`
+`"<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | --log <N>`
 
 Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step
 
