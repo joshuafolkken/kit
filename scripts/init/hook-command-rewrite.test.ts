@@ -6,6 +6,7 @@ import { claude_settings_fixture } from '#scripts/claude/claude-settings-fixture
 import { describe, expect, it, vi } from 'vitest'
 import { hook_command_bootstrap } from './hook-command-bootstrap-fixture'
 import { hook_command_rewrite } from './hook-command-rewrite'
+import { hook_launch } from './hook-launch'
 import { transform_copied_content } from './init-copy-content'
 
 const { apply_hook_command_rewrite_for_destination, rewrite_hook_commands } = hook_command_rewrite
@@ -254,5 +255,41 @@ describe('the distributed settings.json a consumer receives', () => {
 		for (const command of bundle_hooks) {
 			expect(command).toContain('node ./node_modules/@joshuafolkken/kit/dist/hooks/')
 		}
+	})
+})
+
+// kit's own hook commands already start from the root and pass the bundle-ready gate
+// (joshuafolkken/kit#2984); the copy a consumer receives must carry the root prefix once and swap the
+// gate — whose script ships only in kit's checkout — for a presence check.
+describe("kit's own launch command as a consumer receives it", () => {
+	it('carries the project-root prefix at most once', () => {
+		for (const command of consumer_hook_commands()) {
+			expect(command.split(hook_launch.PROJECT_ROOT_PREFIX).length).toBeLessThanOrEqual(2)
+		}
+	})
+
+	it.each([SETTINGS_DESTINATION, CODEX_HOOKS_DESTINATION])(
+		'drops the source-tree ready gate from %s',
+		(destination) => {
+			const source =
+				destination === CODEX_HOOKS_DESTINATION
+					? readFileSync(CODEX_HOOKS_SOURCE, 'utf8')
+					: claude_settings_fixture.read_settings_text()
+
+			expect(transform_copied_content(destination, source)).not.toContain(
+				hook_launch.BUNDLE_READY_GATE,
+			)
+		},
+	)
+
+	it('runs the installed bundle from a project subdirectory', () => {
+		const source = JSON.stringify({
+			command: hook_launch.hook_launch_command('pretool-guard.js', 'pretool:guard'),
+		})
+		const { command } = JSON.parse(rewrite_hook_commands(source)) as { command: string }
+		const result = hook_command_bootstrap.run_in_temporary_checkout(command, true, true)
+
+		expect(result.status).toBe(0)
+		expect(result.stdout).toBe(GUARD_OUTPUT)
 	})
 })

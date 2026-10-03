@@ -44,6 +44,7 @@ const SHIPPED_UNREACHABLE = new Set([
 	'scripts/build/build-config-merge.ts',
 	'scripts/build/build-hooks.ts',
 	'scripts/build/build-library.ts',
+	'scripts/build/hook-bundle-stamp.ts',
 	'scripts/build/build-managed-marker.ts',
 	'scripts/build/build-self-sync-guard.ts',
 	'scripts/build/build-version.ts',

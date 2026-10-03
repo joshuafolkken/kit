@@ -1,35 +1,36 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { claude_settings_fixture } from '#scripts/claude/claude-settings-fixture'
 import { execa } from 'execa'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
+import { hook_command_bootstrap } from './hook-command-bootstrap-fixture'
 import { hook_launch } from './hook-launch'
 
-const { hook_launch_command, launch_command } = hook_launch
+const { BUNDLE_READY_GATE, hook_launch_command, launch_command, PROJECT_ROOT_PREFIX } = hook_launch
 
 const PRETOOL_BUNDLE = 'pretool-guard.js'
 const PRETOOL_COMMAND = 'pretool:guard'
+const FALLBACK = 'echo FALLBACK'
+// The bundle the bootstrap fixture's partial install writes, relative to the checkout root.
+const INSTALLED_BUNDLE = 'node node_modules/@joshuafolkken/kit/dist/hooks/pretool-guard.js'
 
-// The three settings.json hooks: the bundle each launches and the josh subcommand it falls back to.
+// The four settings.json hooks: the bundle each launches and the josh subcommand it falls back to.
 const HOOKS = [
 	{ bundle: PRETOOL_BUNDLE, command: PRETOOL_COMMAND },
 	{ bundle: 'format-edited.js', command: 'format:edited' },
 	{ bundle: 'session-lang.js', command: 'session:lang' },
+	{ bundle: 'stop-guard.js', command: 'stop:guard' },
 ] as const
 
 // The branch selection is what the fallback is for, so it is exercised as a real shell decision: a
-// present primary runs, a missing one drops to the fallback.
-async function run_fallback_branch(primary_path: string): Promise<string> {
-	const command = launch_command(primary_path, 'echo FALLBACK')
-	const { stdout } = await execa('sh', ['-c', command])
+// passing gate runs the primary, a failing one drops to the fallback.
+async function run_branch(gate: string): Promise<string> {
+	const { stdout } = await execa('sh', ['-c', launch_command(gate, 'echo PRIMARY', FALLBACK)])
 
 	return stdout.trim()
 }
 
 function command_containing(fragment: string): string {
 	const { hooks } = claude_settings_fixture.load_settings()
-	const events = [hooks.UserPromptSubmit, hooks.PreToolUse, hooks.PostToolUse]
+	const events = [hooks.UserPromptSubmit, hooks.PreToolUse, hooks.PostToolUse, hooks.Stop]
 	const commands = events
 		.flatMap((matchers) => matchers ?? [])
 		.flatMap((entry) => entry.hooks.map((handler) => handler.command))
@@ -40,41 +41,40 @@ function command_containing(fragment: string): string {
 }
 
 describe('launch_command', () => {
-	it('prefers the primary path and falls back without an && / || chain', () => {
-		expect(launch_command('dist/hooks/x.js', 'pnpm josh x')).toBe(
-			'if [ -f dist/hooks/x.js ]; then node dist/hooks/x.js; else pnpm josh x; fi',
+	it('selects the primary on the gate and falls back without an && / || chain', () => {
+		expect(launch_command('gate', 'node x.js', 'pnpm josh x')).toBe(
+			'if gate; then node x.js; else pnpm josh x; fi',
 		)
 	})
 })
 
 describe('hook_launch_command', () => {
-	it('launches the bundle and falls back to the josh subcommand', () => {
+	it('starts from the project root, passes the ready gate, and falls back to the josh subcommand', () => {
 		expect(hook_launch_command(PRETOOL_BUNDLE, PRETOOL_COMMAND)).toBe(
-			'if [ -f dist/hooks/pretool-guard.js ]; then node dist/hooks/pretool-guard.js; else pnpm josh pretool:guard; fi',
+			`${PROJECT_ROOT_PREFIX}if ${BUNDLE_READY_GATE}; then node dist/hooks/pretool-guard.js; else pnpm josh pretool:guard; fi`,
 		)
 	})
 })
 
-describe('the fallback branch a hook command takes', () => {
-	let directory: string
-	let primary: string
-
-	beforeAll(() => {
-		directory = mkdtempSync(path.join(tmpdir(), 'hook-launch-'))
-		primary = path.join(directory, 'primary.js')
-		writeFileSync(primary, "console.log('PRIMARY')\n")
+describe('the branch a hook command takes', () => {
+	it('runs the primary bundle when the gate passes', async () => {
+		expect(await run_branch('true')).toBe('PRIMARY')
 	})
 
-	afterAll(() => {
-		rmSync(directory, { recursive: true, force: true })
+	it('runs the fallback when the gate fails', async () => {
+		expect(await run_branch('false')).toBe('FALLBACK')
 	})
+})
 
-	it('runs the primary bundle when it exists', async () => {
-		expect(await run_fallback_branch(primary)).toBe('PRIMARY')
-	})
+// joshuafolkken/kit#2984: every path after the prefix is relative, so a hook fired from a subdirectory
+// has to find its bundle from the root rather than from where the session stands.
+describe('a hook command fired from a project subdirectory', () => {
+	it('resolves the bundle from the project root', () => {
+		const command = `${PROJECT_ROOT_PREFIX}${launch_command('true', INSTALLED_BUNDLE, FALLBACK)}`
+		const result = hook_command_bootstrap.run_in_temporary_checkout(command, true, true)
 
-	it('runs the fallback when the bundle is missing', async () => {
-		expect(await run_fallback_branch(path.join(directory, 'absent.js'))).toBe('FALLBACK')
+		expect(result.status).toBe(0)
+		expect(result.stdout).toBe('guard ran')
 	})
 })
 

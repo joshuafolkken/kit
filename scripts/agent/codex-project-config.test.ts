@@ -2,6 +2,7 @@ import { lstatSync, readFileSync, readlinkSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { prompt_hooks } from '#scripts/hooks/prompt-hooks'
+import { hook_launch } from '#scripts/init/hook-launch'
 import { init_logic } from '#scripts/init/init-logic'
 import { describe, expect, it } from 'vitest'
 
@@ -11,10 +12,6 @@ const CLAUDE_SKILLS = path.join(ROOT, '.claude', 'skills')
 const CODEX_CONFIG = path.join(ROOT, '.codex', 'config.toml')
 const CODEX_HOOKS = path.join(ROOT, '.codex', 'hooks.json')
 const CLAUDE_SETTINGS = path.join(ROOT, '.claude', 'settings.json')
-const CODEX_PRETOOL_COMMAND =
-	'if [ -f dist/hooks/codex-hook-adapter.js ]; then node dist/hooks/codex-hook-adapter.js pretool; else pnpm exec tsx scripts/hooks/codex-hook-adapter.ts pretool; fi'
-const CODEX_POSTTOOL_COMMAND =
-	'if [ -f dist/hooks/codex-hook-adapter.js ]; then node dist/hooks/codex-hook-adapter.js posttool; else pnpm exec tsx scripts/hooks/codex-hook-adapter.ts posttool; fi'
 
 interface HookHandler {
 	type: string
@@ -29,6 +26,15 @@ interface MatcherGroup {
 
 interface HookConfig {
 	hooks: Record<string, Array<MatcherGroup>>
+}
+
+// The adapter launches like every other kit hook — root prefix, ready gate, bundle — with the adapter's
+// own source run through tsx as its fallback.
+function codex_adapter_command(mode: string): string {
+	return hook_launch.bundle_launch_command(
+		`codex-hook-adapter.js ${mode}`,
+		`pnpm exec tsx scripts/hooks/codex-hook-adapter.ts ${mode}`,
+	)
 }
 
 function read(file_path: string): string {
@@ -69,8 +75,18 @@ function normalize_codex_matchers(hooks: HookConfig['hooks']): void {
 function normalize_codex_hooks(codex: HookConfig, claude: HookConfig): HookConfig['hooks'] {
 	const normalized = structuredClone(codex.hooks)
 
-	normalize_adapter_command(normalized, claude.hooks, 'PreToolUse', CODEX_PRETOOL_COMMAND)
-	normalize_adapter_command(normalized, claude.hooks, 'PostToolUse', CODEX_POSTTOOL_COMMAND)
+	normalize_adapter_command(
+		normalized,
+		claude.hooks,
+		'PreToolUse',
+		codex_adapter_command('pretool'),
+	)
+	normalize_adapter_command(
+		normalized,
+		claude.hooks,
+		'PostToolUse',
+		codex_adapter_command('posttool'),
+	)
 	normalize_codex_matchers(normalized)
 	const prompt_group = normalized['UserPromptSubmit']?.[0]
 	if (prompt_group === undefined) throw new Error('Missing UserPromptSubmit hook group')

@@ -97,6 +97,7 @@
 		"!scripts/document/retired-phrases.ts",
 		"!scripts/document/review-agent-type.ts",
 		"!scripts/document/single-source.ts",
+		"!scripts/hooks/hook-bundle-ready.ts",
 		"!scripts/hooks/prompt-hooks.ts",
 		"!scripts/josh/josh-script-reader.ts",
 		"!scripts/package/production-dependency-graph.ts",
