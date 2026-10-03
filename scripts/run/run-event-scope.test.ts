@@ -112,15 +112,17 @@ describe('run_event_scope.last_issue_event', () => {
 	it('reads its own supervisor’s stop as the position', () => {
 		const own = ship(3, KIND.SHIP_STOP, ISSUE)
 
-		expect(run_event_scope.last_issue_event([...MIXED, own], since(START), ISSUE)).toEqual(own)
+		expect(run_event_scope.last_issue_event([...MIXED, own], since(START), ISSUE, false)).toEqual(
+			own,
+		)
 	})
 
 	it('leaves another lane’s supervisor out of this run’s position', () => {
 		const foreign = ship(3, KIND.SHIP_LAUNCH, '24280')
 
-		expect(run_event_scope.last_issue_event([...MIXED, foreign], since(START), ISSUE)).toEqual(
-			LATER,
-		)
+		expect(
+			run_event_scope.last_issue_event([...MIXED, foreign], since(START), ISSUE, false),
+		).toEqual(LATER)
 	})
 
 	it('reads its own supervisor without a carry scope, as an interactive fullrun has none', () => {
@@ -128,19 +130,99 @@ describe('run_event_scope.last_issue_event', () => {
 		const events = [...MIXED, own, ship(4, KIND.SHIP_STOP, '99')]
 
 		expect(
-			run_event_scope.last_issue_event(events, run_event_scope.UNKNOWN_EVENT_SCOPE, ISSUE),
+			run_event_scope.last_issue_event(events, run_event_scope.UNKNOWN_EVENT_SCOPE, ISSUE, false),
 		).toEqual(own)
 	})
 
 	it('does not read an earlier invocation’s stop when this invocation’s scope is still empty', () => {
 		const stale = { ...ship(3, KIND.SHIP_STOP, ISSUE), at: BEFORE }
 
-		expect(run_event_scope.last_issue_event([EARLIER, stale], since(START), ISSUE)).toBeUndefined()
+		expect(
+			run_event_scope.last_issue_event([EARLIER, stale], since(START), ISSUE, false),
+		).toBeUndefined()
 	})
 
 	it('reads nothing without a scope when no supervisor of its own is on the stream', () => {
 		expect(
-			run_event_scope.last_issue_event(MIXED, run_event_scope.UNKNOWN_EVENT_SCOPE, ISSUE),
+			run_event_scope.last_issue_event(MIXED, run_event_scope.UNKNOWN_EVENT_SCOPE, ISSUE, false),
 		).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#3039: another lane's merge was read as a lane child's position under a carry scope,
+// so `run:step` told a child that had not started implementing to stop — and the parent's stall, which
+// names no issue, pointed it at `backlog:next` the same way.
+function named(pos: number, kind: string, text: string): RunEvent {
+	return { pos, at: AFTER, kind, text }
+}
+
+// The parent's strand carries the whole invocation, so its first issue reference can be the child's own.
+const STRANDED = named(
+	9,
+	KIND.STRANDED,
+	`Run stranded — backlogrun #${ISSUE} #3027 started ${START}`,
+)
+const FOREIGN_CUT = named(8, KIND.CUT, '#2994 cut (pre-gate)')
+
+describe('run_event_scope.last_issue_event — the parent’s batch record', () => {
+	const PLAN = named(3, KIND.PLAN, `planned #${ISSUE}`)
+	const FOREIGN_MERGE = named(4, KIND.MERGE, '#3027 merged')
+	const FOREIGN_MERGE_LABEL = 'another issue’s merge'
+	const FOREIGN_OUTAGE = named(5, KIND.OUTAGE, '#3027 outage (re-dispatchable)')
+	const STALL = named(6, KIND.STALL, '1 ready, 6 free lane(s), 22m since the last dispatch')
+
+	it.each([
+		[FOREIGN_MERGE_LABEL, FOREIGN_MERGE],
+		['another issue’s outage', FOREIGN_OUTAGE],
+		['the parent’s stall', STALL],
+		['another lane’s cut', FOREIGN_CUT],
+		['the parent’s strand, whose invocation names it', STRANDED],
+	])('leaves %s out of a lane child’s position', (_label, foreign) => {
+		expect(run_event_scope.last_issue_event([PLAN, foreign], since(START), ISSUE, true)).toEqual(
+			PLAN,
+		)
+	})
+
+	it.each([
+		['plan', named(4, KIND.PLAN, `planned #${ISSUE}`)],
+		['cut', named(4, KIND.CUT, `#${ISSUE} cut (pre-gate)`)],
+		['merge', named(4, KIND.MERGE, `#${ISSUE} merged`)],
+	])('reads a lane child’s own %s as its position', (_label, own) => {
+		expect(run_event_scope.last_issue_event([STALL, own], since(START), ISSUE, true)).toEqual(own)
+	})
+
+	it.each([
+		[FOREIGN_MERGE_LABEL, FOREIGN_MERGE],
+		['the stall', STALL],
+	])('keeps %s as the parent’s position, which it acts on', (_label, batch) => {
+		expect(run_event_scope.last_issue_event([PLAN, batch], since(START), ISSUE, false)).toEqual(
+			batch,
+		)
+	})
+})
+
+describe('run_event_scope.last_issue_event — a lane child’s attempt', () => {
+	const OWN_OUTAGE = named(4, KIND.OUTAGE, `#${ISSUE} outage (re-dispatchable)`)
+	const OWN_DISPATCH = named(7, KIND.CHILD_LAUNCH, `#${ISSUE} dispatched`)
+	const ATTEMPT = [named(3, KIND.PLAN, `planned #${ISSUE}`), OWN_OUTAGE, OWN_DISPATCH]
+
+	it('does not read the previous attempt’s outage once it is re-dispatched', () => {
+		expect(run_event_scope.last_issue_event(ATTEMPT, since(START), ISSUE, true)).toBeUndefined()
+	})
+
+	it('reads the new attempt’s own events after its newest launch', () => {
+		const replanned = named(8, KIND.PLAN, `planned #${ISSUE}`)
+
+		expect(
+			run_event_scope.last_issue_event([...ATTEMPT, replanned], since(START), ISSUE, true),
+		).toEqual(replanned)
+	})
+
+	it('keeps its own outage when only another issue is launched after it', () => {
+		const foreign_dispatch = named(7, KIND.CHILD_LAUNCH, '#3027 dispatched')
+
+		expect(
+			run_event_scope.last_issue_event([OWN_OUTAGE, foreign_dispatch], since(START), ISSUE, true),
+		).toEqual(OWN_OUTAGE)
 	})
 })

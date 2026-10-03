@@ -91,6 +91,22 @@ const SHIP_POSITION_KINDS: ReadonlySet<string> = new Set([
 	run_event_stream.EVENT_KIND.SHIP_STOP,
 ])
 
+const KIND = run_event_stream.EVENT_KIND
+
+// The parent's record of the batch around a child — its dispatch, park and split, the retrospective
+// whose summary may name an issue it filed, and the strand whose text carries the whole invocation
+// (`backlogrun #<N1> #<N2> …`). Each can name the child, yet none is a position the child itself is at,
+// so a lane child never reads one as its own.
+const BATCH_RECORD_KINDS: ReadonlySet<string> = new Set([
+	KIND.CHILD_LAUNCH,
+	KIND.PARK,
+	KIND.SPLIT,
+	KIND.RETROSPECTIVE,
+	KIND.STRANDED,
+])
+
+const ISSUE_REFERENCE = /#(\d+)/u
+
 function is_foreign_ship_event(event: RunEvent, issue: string): boolean {
 	return SHIP_POSITION_KINDS.has(event.kind) && !event.text.startsWith(`#${issue} `)
 }
@@ -99,16 +115,49 @@ function is_own_ship_event(event: RunEvent, issue: string): boolean {
 	return SHIP_POSITION_KINDS.has(event.kind) && !is_foreign_ship_event(event, issue)
 }
 
+// **A lane child's position is read only from events that name its own issue** (joshuafolkken/kit#3039).
+// The parent and every lane append to one stream under one carry scope, so anything else on it is another
+// run's: another lane's merge told a planned child to stop, the parent's stall (which names no issue)
+// pointed it at `backlog:next`, and another lane's cut at `run:cut --resume`. The child's own merge and
+// outage stay, so the parent-only stop in `run-step.ts` still holds; the parent keeps reading everything.
+function names_issue(event: RunEvent, issue: string): boolean {
+	return ISSUE_REFERENCE.exec(event.text)?.[1] === issue
+}
+
+function is_lane_position(event: RunEvent, issue: string): boolean {
+	return !BATCH_RECORD_KINDS.has(event.kind) && names_issue(event, issue)
+}
+
+// A lane child's attempt begins at its own newest launch. A child re-dispatched after an outage — or
+// relaunched after a cut, whose resume `run:cut --resume` answers at the entry — shares the scope with
+// its previous attempt, and that attempt's outage would otherwise stop the new one at its entry `run:step`.
+function since_own_launch(events: ReadonlyArray<RunEvent>, issue: string): ReadonlyArray<RunEvent> {
+	const launch = events.findLastIndex(
+		(event) => event.kind === KIND.CHILD_LAUNCH && names_issue(event, issue),
+	)
+
+	return events.slice(launch + 1)
+}
+
+function is_foreign_event(event: RunEvent, issue: string, is_lane_child: boolean): boolean {
+	if (is_lane_child) return !is_lane_position(event, issue)
+
+	return is_foreign_ship_event(event, issue)
+}
+
 // The newest position for one issue's run: the scoped last event with other issues' ship positions left
-// out, and — where no scope applies, as in an interactive `fullrun` with no carry record — the issue's own
-// newest ship position, which its issue number already scopes. A determined scope with nothing in it yet
-// reads nothing: an earlier invocation's stop for the same issue is not this invocation's position.
+// out — and, for a lane child, every event not naming its issue — and, where no scope applies, as in
+// an interactive `fullrun` with no carry record, the issue's own newest ship position, which its issue
+// number already scopes. A determined scope with nothing in it yet reads nothing: an earlier invocation's
+// stop for the same issue is not this invocation's position.
 function last_issue_event(
 	events: ReadonlyArray<RunEvent>,
 	scope: EventScope,
 	issue: string,
+	is_lane_child: boolean,
 ): RunEvent | undefined {
-	const own = events.filter((event) => !is_foreign_ship_event(event, issue))
+	const attempt = is_lane_child ? since_own_launch(events, issue) : events
+	const own = attempt.filter((event) => !is_foreign_event(event, issue, is_lane_child))
 
 	if (scope.kind === SINCE_SCOPE) return last_scoped_event(own, scope)
 
