@@ -55,8 +55,8 @@ describe('issue_citation.bare_references', () => {
 		expect(issue_citation.bare_references(LINKED_BESIDE_BARE)).toEqual(['#34'])
 	})
 
-	it('drops a path-like prefix that is not a single owner/repo', () => {
-		expect(issue_citation.bare_references('touched src/lib/x#5')).toEqual(['#5'])
+	it('reads a #N glued to a path-like run, not a single owner/repo, as a fragment, not a citation', () => {
+		expect(issue_citation.bare_references('touched src/lib/x#5')).toEqual([])
 	})
 })
 
@@ -94,6 +94,46 @@ describe('issue_citation.bare_references — tightened detection', () => {
 
 	it('does not read a word merely ending in "pr" as a PR reference', () => {
 		expect(issue_citation.bare_references('the expr #5 broke')).toEqual(['#5'])
+	})
+})
+
+// joshuafolkken/kit#2995: a `#` and digits that are not an Issue number do not block the stop.
+describe('issue_citation.bare_references — non-Issue #digits', () => {
+	it.each([
+		['a hex color', 'the accent is #1e90ff now'],
+		['a heading anchor', 'jump to #12-setup for details'],
+		['a heading anchor as a link target', 'see [the setup step](#12) below'],
+		['a file fragment', 'read README.md#12 first'],
+		['an HTML numeric entity', 'the quote is encoded as &#39; there'],
+		['a URL fragment', 'open http://localhost:5173/#12 in the browser'],
+	])('ignores %s', (_label, message) => {
+		expect(issue_citation.bare_references(message)).toEqual([])
+	})
+
+	it('still flags a #N led by a plain word, such as a repository without its owner', () => {
+		expect(issue_citation.bare_references('fixed in kit#12 and fixes#34')).toEqual(['#12', '#34'])
+	})
+
+	it('still flags the numbers of a range rather than reading the hyphen as an anchor', () => {
+		expect(issue_citation.bare_references('see #12-#15 and #3-5')).toEqual(['#12', '#15', '#3'])
+	})
+
+	it('still flags a #N closing a sentence or inside parentheses', () => {
+		expect(issue_citation.bare_references('fixed in #12. Also (#34), #56')).toEqual([
+			'#12',
+			'#34',
+			'#56',
+		])
+	})
+
+	it('still flags a qualified owner/repo#N glued to its repository', () => {
+		expect(issue_citation.bare_references(CROSS_REPO_PROSE)).toEqual([CROSS_REPO_REF])
+	})
+
+	it('leaves the non-Issue #digits untouched through linkify', () => {
+		const message = 'color #1e90ff, anchor [setup](#12), entity &#39;'
+
+		expect(issue_citation.linkify(message, 'o/r')).toBe(message)
 	})
 })
 

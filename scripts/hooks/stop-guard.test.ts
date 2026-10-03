@@ -7,12 +7,13 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { lane_background } from '#scripts/rules/lane-background'
 import { stop_rules } from '#scripts/rules/stop-rules'
+import { run_carry, type CarryRead } from '#scripts/run/run-carry'
 import { run_cut } from '#scripts/run/run-cut'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_hold, type HoldRead } from '#scripts/run/run-hold'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { stop_guard, write_stop_decision } from './stop-guard'
 
 const SWITCH_KEY = stop_rules.SWITCH_ENV_KEY
@@ -41,21 +42,56 @@ describe('stop_guard — fail open', () => {
 	})
 })
 
-describe('write_stop_decision — the stall check is wired', () => {
-	it('runs the stall detector on every stop', async () => {
-		const check = vi.spyOn(backlog_stalled_detect, 'run_stall_check').mockResolvedValue(undefined)
+const CARRY = run_carry.fresh_carry('backlogrun', run_carry.NO_OWNER, new Date())
+
+// The two report checks of one stop on a repository whose carry record reads as `read`.
+async function report_checks_on(read: CarryRead): Promise<ReadonlyArray<MockInstance>> {
+	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(process.cwd())
+	vi.spyOn(run_carry, 'read_carry').mockReturnValue(read)
+	const stall = vi.spyOn(backlog_stalled_detect, 'run_stall_check').mockResolvedValue(undefined)
+	const strand = vi.spyOn(run_stranded_detect, 'run_stranded_check').mockResolvedValue(undefined)
+
+	await write_stop_decision('not json')
+
+	return [stall, strand]
+}
+
+// joshuafolkken/kit#2995: the stall and strand checks are about a carried run, so a stop without one
+// pays for neither.
+describe('write_stop_decision — the report checks are gated on a run record', () => {
+	it.each<CarryRead>([{ kind: 'none' }, { kind: 'unreadable' }, { kind: 'expired', carry: CARRY }])(
+		'runs neither check when the carry record reads as $kind',
+		async (read) => {
+			const [stall, strand] = await report_checks_on(read)
+
+			expect(stall).not.toHaveBeenCalled()
+			expect(strand).not.toHaveBeenCalled()
+		},
+	)
+
+	it('runs neither check outside a repository', async () => {
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
+		const stall = vi.spyOn(backlog_stalled_detect, 'run_stall_check').mockResolvedValue(undefined)
 
 		await write_stop_decision('not json')
 
-		expect(check).toHaveBeenCalledOnce()
+		expect(stall).not.toHaveBeenCalled()
 	})
 
-	it('hands the stall detector its ready ports', async () => {
-		const check = vi.spyOn(backlog_stalled_detect, 'run_stall_check').mockResolvedValue(undefined)
+	it('runs neither check, and still resolves, when the git read fails', async () => {
+		vi.spyOn(run_carry, 'repository_directory').mockRejectedValue(new Error('not a git repository'))
+		const stall = vi.spyOn(backlog_stalled_detect, 'run_stall_check').mockResolvedValue(undefined)
 
-		await write_stop_decision('not json')
+		await expect(write_stop_decision('not json')).resolves.toBeUndefined()
+		expect(stall).not.toHaveBeenCalled()
+	})
 
-		expect(check).toHaveBeenCalledWith(backlog_ready.DEFAULT_PORTS)
+	it('runs both checks while a run is carried, handing the stall its ready ports', async () => {
+		const [stall, strand] = await report_checks_on({ kind: 'carried', carry: CARRY })
+
+		expect(run_carry.read_carry).toHaveBeenCalledWith(run_carry.carry_path(process.cwd()))
+		expect(stall).toHaveBeenCalledWith(backlog_ready.DEFAULT_PORTS)
+		expect(strand).toHaveBeenCalledOnce()
 	})
 })
 
