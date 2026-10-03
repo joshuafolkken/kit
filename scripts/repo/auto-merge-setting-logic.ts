@@ -41,7 +41,7 @@ function format_disabled_detail(repo: string | undefined): ReadonlyArray<string>
 		`    off, so ${WORKFLOW_PATH} fails with`,
 		'    `Auto-merge is not allowed for this repository` and Dependabot pull requests stay open.',
 		`    Enable: ${enable_command(repo)}`,
-		`    ${ORIGIN_ISSUE} distributes the workflow; kit never changes a repository setting.`,
+		`    ${ORIGIN_ISSUE} distributes the workflow; kit never changes this setting.`,
 	]
 }
 

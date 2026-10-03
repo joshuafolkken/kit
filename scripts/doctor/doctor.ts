@@ -6,6 +6,7 @@ import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
+import { ruleset_check } from '#scripts/repo/ruleset-check'
 import { security_updates } from '#scripts/security/security-updates'
 import { running_binary } from '#scripts/version/running-binary'
 import { doctor_consumer } from './doctor-consumer'
@@ -32,8 +33,10 @@ interface GateScope {
 
 // Which repository-scoped reports this project has a prerequisite for.
 interface ApplicableSettings {
+	root: string
 	security_updates: boolean
 	auto_merge: boolean
+	required_checks: boolean
 }
 
 interface DoctorContext {
@@ -110,9 +113,15 @@ function resolve_gate_scope(git: GitTopLevel): GateScope | undefined {
 // workflow of its own has the second prerequisite and not the first.
 function resolve_applicable(scope: GateScope): ApplicableSettings {
 	return {
+		root: scope.root,
 		security_updates: doctor_io.has_distributed_dependabot_config(scope.root, scope.boundary),
 		auto_merge: doctor_io.has_auto_merge_workflow(scope.root, scope.boundary),
+		required_checks: ruleset_check.expected_in(scope.root).length > 0,
 	}
+}
+
+function has_any_applicable(applicable: ApplicableSettings): boolean {
+	return applicable.security_updates || applicable.auto_merge || applicable.required_checks
 }
 
 // Everything past the gate reports, including a failed lookup: `could not be read` is informative
@@ -123,6 +132,10 @@ function report_applicable_settings(
 ): void {
 	if (applicable.security_updates) security_updates.report_security_updates_section(repo)
 	if (applicable.auto_merge) auto_merge_setting.report_auto_merge_section(repo)
+
+	if (applicable.required_checks) {
+		ruleset_check.report_required_checks_section(repo, applicable.root)
+	}
 }
 
 // Last, and after the local diagnosis: this is the only part of `doctor` that touches the network,
@@ -143,7 +156,7 @@ function report_repository_settings(git: GitTopLevel): void {
 	const scope = resolve_gate_scope(git)
 	if (scope === undefined) return
 	const applicable = resolve_applicable(scope)
-	if (!applicable.security_updates && !applicable.auto_merge) return
+	if (!has_any_applicable(applicable)) return
 
 	report_applicable_settings(
 		applicable,

@@ -36,6 +36,14 @@ pnpm exec josh start
 
 `josh start` needs the [gh CLI](https://cli.github.com/), signed in. It asks first, runs the same setup as §2, then carries it to GitHub: it creates what is missing — Git, the first commit, the repository — and, when `main` already has commits, opens a pull request with only kit's files for you to merge. Which steps run for each starting state: [init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start). Once the setup is on `main`, `kickoff new` works — see [tutorial.md](../tutorial.md).
 
+Then make `main` require the checks the distributed workflows report — without a required check, a pull request with a failing one can still merge. Create a branch ruleset for `main` under Settings → Rules → Rulesets with **Require status checks to pass** turned on, then let kit fill in the list:
+
+```bash
+pnpm josh ruleset:check --apply
+```
+
+`pnpm josh ruleset:check` alone reports what is missing; [josh-commands.md → `josh ruleset:check`](../josh-commands.md#josh-rulesetcheck) lists the checks.
+
 ## 4. Keep it up to date
 
 After upgrading the package, pull in updated AI files, workflow templates and other managed files with `pnpm exec josh sync` ([sync.md](../sync.md)); the full procedure is [Update kit](../how-to/update-kit.md). A project-local `josh` is available via `pnpm josh …` after installation, so the CLI works even without the global install.
