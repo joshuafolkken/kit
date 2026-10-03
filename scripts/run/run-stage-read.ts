@@ -1,4 +1,4 @@
-import { PLANNED_LABEL } from '#scripts/issue/issue-labels'
+import { has_label_name, PLANNED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { run_halfrun_resume } from './run-halfrun-resume'
 import { run_prrun_resume, type PrrunToken } from './run-prrun-resume'
@@ -24,7 +24,7 @@ function is_closed(read: StateRead): boolean {
 }
 
 function is_planned(read: StateRead): boolean {
-	return read.kind === 'state' && read.state.labels.includes(PLANNED_LABEL)
+	return read.kind === 'state' && has_label_name(read.state.labels, PLANNED_LABEL)
 }
 
 // The two stops are one hold record, so at most one is present; the `prrun` one is asked only when the

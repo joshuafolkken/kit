@@ -35,6 +35,14 @@ describe('run_stage_read.read_stage — the planned mark (joshuafolkken/kit#3042
 		expect(read.state).toBe(run_stage.PLANNED)
 	})
 
+	it('reads the kickoff label as planned whatever its letter case on GitHub', async () => {
+		read_issue_mock.mockResolvedValue(open_with([PLANNED_LABEL.toUpperCase()]))
+
+		const read = await run_stage_read.read_stage(ISSUE)
+
+		expect(read.state).toBe(run_stage.PLANNED)
+	})
+
 	it('reads a bare planned roadmap label as fresh, not as a posted plan', async () => {
 		read_issue_mock.mockResolvedValue(open_with(['planned']))
 
