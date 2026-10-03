@@ -43,7 +43,7 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 
 **Use**
 
-- [why.md](./why.md) — why kit exists (Japanese)
+- [why.md](./why.md) — why kit exists: the pains it solves
 - [tutorial.md](./tutorial.md) — your first change with an agent, from Issue to merge
 - [how-to.md](./how-to.md) — guides by task
 
