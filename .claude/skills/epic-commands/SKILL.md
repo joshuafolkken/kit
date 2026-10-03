@@ -6,9 +6,7 @@ description: The procedures for the `josh epic:*` commands that make an epic run
 # The `josh epic:*` commands
 
 These three commands are what turn an epic from a list of issue numbers into something a run can
-execute unattended. **This skill is their single source**: `prompts/collaboration-workflow/` keeps
-`epic-bundle.md`, `epic-audit.md` and `cross-repo-epic.md` only as pointers here, and the history
-behind the rules is `docs/maintainers/epic-commands-rationale.md` (joshuafolkken/kit#2892).
+execute unattended. **This skill is their single source**, and the history behind the rules is `docs/maintainers/epic-commands-rationale.md` (joshuafolkken/kit#2892).
 
 The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `backlogrun` — live in the
 `workflow-commands` skill.

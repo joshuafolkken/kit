@@ -19,7 +19,7 @@ Tier C (`CLAUDE.md`). Name what was filed in the completion report. An observati
 on is dropped rather than filed.
 
 **The filing ceilings still apply.** Count this filing in the ten-Issue limit for the run. An
-observation is discretionary, so above 30 open Issues in the target repository, close one first or do
+observation is discretionary, so above the WIP cap in the target repository, close one first or do
 not file (`prompts/collaboration-workflow/wip-cap.md`). File it with `pnpm josh issue:file`
 (`issue-scout.md`), which lints the body against `prompts/collaboration-workflow/issue-template.md`,
 applies the classification labels it declares, runs the duplicate scan, and runs `epic:bundle` on the

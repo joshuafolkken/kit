@@ -226,7 +226,7 @@ describe('rule_delivery — the WIP cap at the call that files', () => {
 	// tests the interrupt exemption is decided by judgement — the failure joshuafolkken/kit#1518 named.
 	it.each([
 		"count the target repository's open Issues",
-		'With more than 30 open, close one first',
+		`With more than ${String(delivered_rules.WIP_CAP)} open, close one first`,
 		'nothing honestly closable means do not file',
 		'one the run is blocked by',
 		'a verification answers wrongly',

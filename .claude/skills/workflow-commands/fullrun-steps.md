@@ -26,7 +26,7 @@ in outline: refactor → `pnpm josh main:merge` → **a dispatched lane child ha
 joshuafolkken/kit#2428) → otherwise `pnpm josh run:cut <N>` (the pre-gate cut, before the gate; a no-op
 outside a lane) → start `pnpm josh gate` and a subagent `/code-review`
 with the brief `pnpm josh review:brief` prints on `git diff main`, join the gate before the commit,
-iterate to no high/medium findings, at most two reviews → **the clean path folds the ship region into
+iterate to no high/medium findings, within the round cap (`prompts/review.md`) → **the clean path folds the ship region into
 one call**, `pnpm josh ship "<title> #<N>"` (gate → commit/push/PR → the CI-wait `followup` → the
 `run:tail` report bookkeeping, stopping at the first failed step; joshuafolkken/kit#2398), with any
 branch-2 filing (`pnpm josh issue:file`, which runs `epic:bundle` itself) run before it → **when a second round is due `ship` does not

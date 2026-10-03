@@ -11,7 +11,7 @@ const SYNC_DOC_PATH = fileURLToPath(
 const { load_settings } = claude_settings_fixture
 
 // Every command that rewrites the index or ships work without going through `pnpm josh git`. The
-// same list is what each paired document has to enumerate, so drift shows up as a failing test
+// maintainer sync rationale has to enumerate the same list, so drift shows up as a failing test
 // rather than as a document that describes a weaker guard than the one being distributed.
 const INDEX_DENY_PATTERNS: ReadonlyArray<string> = [
 	'Bash(git add*)',
@@ -355,9 +355,11 @@ const AI_DOC_MARKERS: ReadonlyArray<string> = [
 	'never read "the tool let me" as permission',
 ]
 
+// joshuafolkken/kit#2996 made `.claude/settings.json` the single source of the pattern list: the
+// workflow prompt states that the deny exists and why, and points at the file instead of copying it.
 const WORKFLOW_MARKERS: ReadonlyArray<string> = [
-	...INDEX_DENY_PATTERNS,
-	'`Bash(gh pr merge*)`）で機械的に遮断されている',
+	'`permissions.deny` で機械的に遮断されている',
+	'パターンの一覧はそのファイルが一次情報であり、ここでは書き写さない',
 	'deny には「そのターンでユーザーが明示指示した」という例外がないため',
 	'ユーザー自身の端末で実行してもらう',
 	'「拒否される操作」と「禁止された操作」は同じ集合ではない',
@@ -380,4 +382,11 @@ describe(`${WORKFLOW_PROMPT} — canonical deny rationale`, () => {
 	it.each(WORKFLOW_MARKERS)('states %j', (marker) => {
 		expect(content).toContain(marker)
 	})
+
+	it.each([...INDEX_DENY_PATTERNS, PR_MERGE_DENY])(
+		'does not copy the deny pattern %j',
+		(pattern) => {
+			expect(content).not.toContain(pattern)
+		},
+	)
 })

@@ -114,8 +114,8 @@ describe('the canonical workflow document is split by topic', () => {
 	})
 
 	// The reason for the split, stated where the next editor will read it.
-	it('says the index is not what an agent reads during a run', () => {
-		expect(read_index()).toContain('実行中の参照先ではない')
+	it('says the index is not where a rule is defined', () => {
+		expect(read_index()).toContain('規則を定める場所ではない')
 	})
 
 	it.each(topic_files())('is listed in the index — %s', (file_name) => {

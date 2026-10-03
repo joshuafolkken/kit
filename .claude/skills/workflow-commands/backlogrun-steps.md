@@ -54,7 +54,7 @@ inside the invocation" below):
 | `--max` | how many issues one invocation may merge — a run's own filing competes for that number rather than extending it | `run:carry --merged` |
 | `--idle`, and the 8-hour whole-run bound | how long one invocation may go on looking for more | the record's `started_at` |
 | **Ten filings per invocation** | how much one invocation may add to the pool at all, on **every** filing route (`SKILL.md` → §2d) | `run:carry --filed` |
-| The WIP cap of 30 open issues | how large the pool may become, across invocations | `prompts/collaboration-workflow/wip-cap.md` |
+| The WIP cap on open issues | how large the pool may become, across invocations | `prompts/collaboration-workflow/wip-cap.md` |
 
 One invocation may add at most ten issues to the pool and merge at most `--max` of them, after which
 the run ends and the next one waits for a person to type the keyword.

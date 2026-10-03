@@ -72,7 +72,7 @@ const REVIEW_MARKERS: ReadonlyArray<string> = [
 const WIP_MARKERS: ReadonlyArray<string> = [
 	'repos/{owner}/{repo}/issues?state=open&per_page=100',
 	'select(.pull_request == null)',
-	'オープン Issue が 30 件を超えている状態で新しく起票するときは、先に 1 件閉じる',
+	'オープン Issue が上限を超えている状態で新しく起票するときは、先に 1 件閉じる',
 	'**判定するのは「起票 1 件」ではなく「起票のひとまとまり」である。**',
 	'正直に閉じられるものが無いなら、起票しない',
 	'場所を空けるために、まだ意味のある Issue を閉じてはならない',
@@ -174,7 +174,8 @@ describe(`${WIP_TOPIC} — the WIP cap and all three sides of its procedure`, ()
 // command included, so the one place it is written stays the one place it has to be kept correct.
 const RESIDENT_MARKERS: ReadonlyArray<string> = [
 	'**its default is not to split**',
-	'about 10 changed files, about 400 changed lines (test files excluded)',
+	// The guide's numbers stay at `split-assessment.md`; the resident line points there (joshuafolkken/kit#2996).
+	'the size guide in `split-assessment.md`, measured by `pnpm josh split:assess`',
 	'file it as a follow-up Issue only when it is a confirmed defect that reaches a runtime path',
 ]
 
@@ -184,7 +185,7 @@ const RESIDENT_MARKERS: ReadonlyArray<string> = [
 // survive, because dropping one changes what an agent does at the only moment it will read them.
 const DELIVERED_CAP_MARKERS: ReadonlyArray<string> = [
 	"count the target repository's open Issues",
-	'With more than 30 open, close one first',
+	`With more than ${String(delivered_rules.WIP_CAP)} open, close one first`,
 	'nothing honestly closable means do not file',
 	'one the run is blocked by',
 	// joshuafolkken/kit#1518. The three tests travel with the exemption rather than being left at the
@@ -220,7 +221,7 @@ describe.each(AI_DOCS)(
 		// reading `CLAUDE.md` through a pointer and running no hook — able to file past 30 with nothing
 		// telling it to count. What the relocation takes out is the heading and the procedure.
 		it.each([
-			"**Count the target repository's open Issues before filing; with more than 30 open, close one first.**",
+			"**Count the target repository's open Issues before filing; above the WIP cap, close one first.**",
 			'and so is an **interrupt** — three tests decide that, never judgement',
 			'a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository',
 			// Without these two the three tests are listed with nothing saying what happens when none is
@@ -246,7 +247,7 @@ describe.each(AI_DOCS)(
 // topic happened to quote the label, and the assertion would pass on a link that no longer exists.
 describe(`${WORKFLOW_PROMPT} — the WIP cap is reachable from the index`, () => {
 	it('links the topic file', () => {
-		expect(read_index()).toContain('| オープン Issue の WIP 上限（30 件）')
+		expect(read_index()).toContain('| オープン Issue の WIP 上限 ')
 	})
 })
 
