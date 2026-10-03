@@ -1,6 +1,7 @@
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { step_zero_notice } from '#scripts/hooks/step-zero-notice'
 import { execa } from 'execa'
 import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest'
 import { build_hooks, HOOK_BUNDLES, outfile_for } from './build-hooks'
@@ -15,6 +16,10 @@ const CODEX_ADAPTER_BUNDLE = 'dist/hooks/codex-hook-adapter.js'
 const PRETOOL_BUNDLE = 'dist/hooks/pretool-guard.js'
 const FORMAT_BUNDLE = 'dist/hooks/format-edited.js'
 
+const directory = mkdtempSync(path.join(tmpdir(), 'build-hooks-'))
+const format_directory = mkdtempSync(path.join(process.cwd(), '.codex-hook-fixture-'))
+const TRANSCRIPT_PATH = path.join(directory, 't.jsonl')
+
 interface RunResult {
 	stdout: string
 	exit_code: number | undefined
@@ -25,6 +30,9 @@ async function run(
 	args: ReadonlyArray<string>,
 	input: string,
 ): Promise<RunResult> {
+	// The Step 0 notice speaks once per transcript (joshuafolkken/kit#2994), so the first of a
+	// source-then-bundle pair would spend it and the second run silently. Each run starts unstamped.
+	rmSync(step_zero_notice.stamp_path(TRANSCRIPT_PATH), { force: true })
 	const { stdout, exitCode: exit_code } = await execa(command, [...args], {
 		input,
 		// `JOSH_WATCHER_GUARD` is off so the composed watcher guard (joshuafolkken/kit#2353) does not read
@@ -56,10 +64,7 @@ async function expect_adapter_parity(mode: string, input: string): Promise<void>
 	expect(bundle).toEqual(source)
 }
 
-const directory = mkdtempSync(path.join(tmpdir(), 'build-hooks-'))
-const format_directory = mkdtempSync(path.join(process.cwd(), '.codex-hook-fixture-'))
-
-writeFileSync(path.join(directory, 't.jsonl'), '{"type":"assistant","message":{"content":[]}}\n')
+writeFileSync(TRANSCRIPT_PATH, '{"type":"assistant","message":{"content":[]}}\n')
 
 beforeAll(async () => {
 	await build_hooks()
@@ -71,9 +76,7 @@ afterAll(() => {
 })
 
 function payload(tool_name: string, tool_input: Record<string, unknown>): string {
-	const transcript_path = path.join(directory, 't.jsonl')
-
-	return JSON.stringify({ transcript_path, tool_name, tool_input })
+	return JSON.stringify({ transcript_path: TRANSCRIPT_PATH, tool_name, tool_input })
 }
 
 function patch_payload(file_path: string): string {

@@ -81,10 +81,12 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// the same for eight more, lowering fullrun, halfrun and backlogrun one block each.
 	// joshuafolkken/kit#2998 split the command reference, so every reference to an automation command
 	// now names `josh-commands-automation.md`; the longer path tipped backlogrun one block over.
-	{ entry: 'kickoff', bytes: 229_376 },
+	// joshuafolkken/kit#2994 moved `CLAUDE.md`'s explanations to `docs/maintainers/claude-md-history.md`,
+	// lowering kickoff and backlogrun one block each.
+	{ entry: 'kickoff', bytes: 225_280 },
 	{ entry: 'fullrun', bytes: 225_280 },
 	{ entry: 'halfrun', bytes: 225_280 },
-	{ entry: 'backlogrun', bytes: 233_472 },
+	{ entry: 'backlogrun', bytes: 229_376 },
 	{ entry: LANE_CHILD, bytes: 77_824 },
 ]
 
