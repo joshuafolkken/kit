@@ -1,3 +1,4 @@
+import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -100,7 +101,7 @@ describe('lane_launch_cli.run — the first lane pops and re-installs', () => {
 		expect(mocked_execa).toHaveBeenCalledWith(
 			'pnpm',
 			['--dir', DIR, 'install', '--frozen-lockfile'],
-			{ reject: false },
+			{ reject: false, timeout: INSTALL_TIMEOUT_MS },
 		)
 		expect(info_lines).toStrictEqual([PID])
 	})

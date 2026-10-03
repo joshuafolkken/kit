@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { git_command } from '#scripts/git/git-command'
 import { error_text } from '#scripts/lib/error-message'
+import { timed_fetch } from '#scripts/lib/timed-fetch'
 import { managed_config_scope } from '#scripts/sync/managed-config-scope'
 import { z } from 'zod'
 import {
@@ -28,7 +29,6 @@ const SONAR_HOST = 'https://sonarcloud.io'
 const HOTSPOTS_PATH = '/api/hotspots/search'
 const PROPERTIES_FILE = 'sonar-project.properties'
 const PROJECT_KEY_PREFIX = 'sonar.projectKey='
-const FETCH_TIMEOUT_MS = 10_000
 const FAILURE_EXIT_CODE = 1
 const UNKNOWN_LINE = '?'
 
@@ -63,7 +63,7 @@ function hotspots_url(project_key: string, pull_request: string): string {
 
 async function fetch_hotspots(url: string): Promise<HotspotFetch> {
 	try {
-		const response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
+		const response = await timed_fetch(url)
 		if (!response.ok) return { error: `HTTP ${String(response.status)}` }
 
 		const parsed = response_schema.parse(await response.json())

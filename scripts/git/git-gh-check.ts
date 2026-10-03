@@ -1,3 +1,4 @@
+import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 
 const GH_NOT_INSTALLED_MSG = 'gh CLI is not installed. Install it from https://cli.github.com/'
@@ -6,7 +7,7 @@ const gh_check: { promise?: Promise<void> } = {}
 
 async function run_gh_check(): Promise<void> {
 	try {
-		await execa('gh', ['--version'])
+		await execa('gh', ['--version'], { timeout: COMMAND_TIMEOUT_MS })
 	} catch {
 		delete gh_check.promise
 		throw new Error(GH_NOT_INSTALLED_MSG)

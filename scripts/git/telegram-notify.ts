@@ -1,4 +1,5 @@
 import { gh_spawn } from '#scripts/gh/gh-spawn'
+import { timed_fetch } from '#scripts/lib/timed-fetch'
 import { z } from 'zod'
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org'
@@ -193,7 +194,7 @@ function build_text(input: TelegramSendInput): string {
 
 async function post_message(config: TelegramConfig, text: string): Promise<void> {
 	const url = `${TELEGRAM_API_BASE}/bot${config.bot_token}/sendMessage`
-	const response = await fetch(url, {
+	const response = await timed_fetch(url, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ chat_id: config.chat_id, text }),

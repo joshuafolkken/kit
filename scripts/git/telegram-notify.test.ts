@@ -243,6 +243,22 @@ describe('telegram_notify.send — a notification that reached nobody', () => {
 	})
 })
 
+// joshuafolkken/kit#2981: the send is awaited by unattended runs, so a stalled connection must time
+// out rather than hold the run forever.
+describe('telegram_notify.send — the request carries a time limit', () => {
+	it('sends with an abort signal attached', async () => {
+		set_credentials(BOT_TOKEN, CHAT_ID)
+		const fetch_spy = vi.fn<typeof fetch>().mockResolvedValue(new Response('{}'))
+
+		vi.stubGlobal('fetch', fetch_spy)
+		silence_console()
+		await telegram_notify.send(make_base({}))
+		const [call] = fetch_spy.mock.calls
+
+		expect(call?.[1]?.signal).toBeInstanceOf(AbortSignal)
+	})
+})
+
 // joshuafolkken/kit#2821. A consumer who chose not to use Telegram states it once, and only that
 // stated choice skips the send — a forgotten setup still fails as #1564 requires.
 describe('telegram_notify.send — JOSH_NOTIFY=off opts out explicitly', () => {
