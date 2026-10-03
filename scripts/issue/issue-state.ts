@@ -1,6 +1,6 @@
-import { has_any_label, NEEDS_HUMAN_REVIEW_LABEL } from '#scripts/git/issue-labels'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
+import { has_any_label, NEEDS_HUMAN_REVIEW_LABEL } from './issue-labels'
 
 // The answer `josh issue:state` prints, kept apart from the reading and the printing so the shape of
 // the report is decided by one pure function (joshuafolkken/kit#1054).

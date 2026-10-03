@@ -1,4 +1,4 @@
-import { git_followup_stages } from '#scripts/git/git-followup-stages'
+import { git_followup_stages } from '#scripts/followup/git-followup-stages'
 import { describe, expect, it } from 'vitest'
 import { time_followup_stage } from './time-followup-stage'
 

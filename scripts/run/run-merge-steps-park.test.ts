@@ -11,7 +11,7 @@ const add_label_mock = vi.hoisted(() => vi.fn())
 const comment_mock = vi.hoisted(() => vi.fn())
 const ensure_closed_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('#scripts/git/git-gh-issue-write', () => ({
+vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 	git_gh_issue_write: {
 		issue_add_label: add_label_mock,
 		issue_remove_label: vi.fn().mockResolvedValue(undefined),
@@ -19,7 +19,7 @@ vi.mock('#scripts/git/git-gh-issue-write', () => ({
 	},
 }))
 
-vi.mock('#scripts/git/git-followup-issue-close', () => ({
+vi.mock('#scripts/followup/git-followup-issue-close', () => ({
 	git_followup_issue_close: { ensure_issue_closed: ensure_closed_mock, CLOSE_RECOVERY: 'recover' },
 }))
 

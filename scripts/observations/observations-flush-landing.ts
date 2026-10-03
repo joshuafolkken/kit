@@ -1,6 +1,6 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import type { OpenPull } from '#scripts/git/git-gh-pr-auto-merge'
-import { git_pr_checks } from '#scripts/git/git-pr-checks'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import type { OpenPull } from '#scripts/gh/git-gh-pr-auto-merge'
+import { git_pr_checks } from '#scripts/gh/git-pr-checks'
 import { error_text } from '#scripts/lib/error-message'
 
 // **A flush pull request lands whether or not the flush that opened it is still alive**

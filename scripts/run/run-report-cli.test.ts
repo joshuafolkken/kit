@@ -20,7 +20,7 @@ vi.mock('./run-event-stream-emit', () => ({
 	run_event_stream_emit: { stream_target: stream_target_mock },
 }))
 
-vi.mock('#scripts/git/git-followup-pending', () => ({
+vi.mock('#scripts/followup/git-followup-pending', () => ({
 	git_followup_pending: { read_pending: read_pending_mock },
 }))
 

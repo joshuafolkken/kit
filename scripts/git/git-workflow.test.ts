@@ -80,7 +80,7 @@ vi.mock('./git-commit', () => ({
 	},
 }))
 vi.mock('./git-push', () => ({ git_push: { push: vi.fn() } }))
-vi.mock('./git-pr', () => ({ git_pr: { create_with_issue_info: vi.fn() } }))
+vi.mock('#scripts/gh/git-pr', () => ({ git_pr: { create_with_issue_info: vi.fn() } }))
 vi.mock('./git-error', () => ({ git_error: { handle: vi.fn() } }))
 
 const { git_workflow } = await import('./git-workflow')

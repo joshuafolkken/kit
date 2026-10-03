@@ -1,6 +1,6 @@
-import { git_gh_api_path } from '#scripts/git/git-gh-api-path'
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { git_gh_api_path } from './git-gh-api-path'
+import { git_gh_exec } from './git-gh-exec'
 
 // The synchronous twin of `git_gh_repo.repo_get_name_with_owner`: same fact, read the same way, but
 // synchronously because `josh init` / `josh sync` / `josh doctor` decide before they can await.

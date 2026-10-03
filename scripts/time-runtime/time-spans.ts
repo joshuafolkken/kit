@@ -1,5 +1,5 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
-import type { FollowupStage } from '#scripts/git/git-followup-stages'
+import type { FollowupStage } from '#scripts/followup/git-followup-stages'
 import { time_background } from './time-background'
 import { time_bundle_call } from './time-bundle-call'
 import { time_followup_stage } from './time-followup-stage'

@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { git_stash } from '#scripts/git/git-stash'
-import { stash_sweep_lock } from '#scripts/git/stash-sweep-lock'
+import { git_stash } from '#scripts/git/stash/git-stash'
+import { stash_sweep_lock } from '#scripts/git/stash/stash-sweep-lock'
 import {
 	LEGACY_OBSERVATION_LEDGER_PATHS,
 	LEGACY_LEDGER_FILE as MIGRATED_FILE_NAME,
@@ -13,7 +13,7 @@ import { observation_ledger_home } from '#scripts/observations/observation-ledge
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_tidy_stashes } from './run-tidy-stashes'
 
-vi.mock('#scripts/git/git-stash', () => ({
+vi.mock('#scripts/git/stash/git-stash', () => ({
 	git_stash: {
 		added_lines: vi.fn(),
 		changed_paths: vi.fn(),
@@ -22,7 +22,7 @@ vi.mock('#scripts/git/git-stash', () => ({
 	},
 }))
 
-vi.mock('#scripts/git/stash-sweep-lock', () => ({
+vi.mock('#scripts/git/stash/stash-sweep-lock', () => ({
 	stash_sweep_lock: {
 		with_lock: vi.fn(async (work: () => Promise<unknown>) => await work()),
 	},

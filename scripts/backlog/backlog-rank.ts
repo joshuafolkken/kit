@@ -3,7 +3,7 @@ import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
 import { epic_rank } from '#scripts/epic/epic-rank'
 import type { EpicNextResult } from '#scripts/epic/epic-report'
 import { epic_solo, type SoloGate, type SoloSelection } from '#scripts/epic/epic-solo'
-import { git_next_issues } from '#scripts/git/git-next-issues'
+import { git_next_issues } from '#scripts/issue/git-next-issues'
 
 // What the backlog offers, in the order it is decided (joshuafolkken/kit#2928): rank, then the
 // `run:solo` gate, then the cap. `backlog:next` and `backlog:plan --waves` both call `select`, so the

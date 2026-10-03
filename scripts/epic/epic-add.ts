@@ -1,5 +1,5 @@
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { epic_add_plan, type AddPlan } from './epic-add-plan'
 import type { InsertPosition } from './epic-chains'
 import { epic_decision } from './epic-decision'

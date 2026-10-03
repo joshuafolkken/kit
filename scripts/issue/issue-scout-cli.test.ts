@@ -1,12 +1,12 @@
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import {
 	capped_listing_outcome,
 	listing_of,
 	listing_outcome,
-} from '#scripts/git/git-gh-issue-list-fixture'
-import { EPIC_LABEL } from '#scripts/git/issue-labels'
+} from '#scripts/gh/git-gh-issue-list-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { EPIC_LABEL } from './issue-labels'
 import { issue_scout_cli } from './issue-scout-cli'
 
 // What the command answers before an issue is filed, as distinct from what it decides.

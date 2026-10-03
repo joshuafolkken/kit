@@ -3,8 +3,12 @@ import {
 	capped_listing_outcome,
 	listing_of,
 	listing_outcome,
-} from '#scripts/git/git-gh-issue-list-fixture'
-import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL, RUN_LANE_LABEL } from '#scripts/git/issue-labels'
+} from '#scripts/gh/git-gh-issue-list-fixture'
+import {
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+	RUN_LANE_LABEL,
+} from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EpicSnapshot } from './epic-fetch'
 import type { EpicChild } from './epic-graph'
@@ -26,14 +30,14 @@ import { epic_view_fixture } from './epic-view-fixture'
 // to offer against its own relations listing (joshuafolkken/kit#1121). Left out, every candidate is
 // withheld — which is the guard's safe direction working, and would make each test below assert the
 // confirmation's failure rather than the exclusion it is about.
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
 		issue_list_by_label_in_repo: vi.fn(),
 		issue_blocked_by_references: vi.fn(async () => []),
 	},
 }))
 
-const { git_gh_command } = await import('#scripts/git/git-gh-command')
+const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const issue_list = vi.mocked(git_gh_command.issue_list_by_label_in_repo)
 
 const { issue, record } = auto_ok_fixture

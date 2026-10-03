@@ -1,5 +1,5 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { MAX_SCANNED } from '#scripts/git/git-gh-issue-list'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_audit_orphans, type ClaimingSearch } from './epic-audit-orphans'
 import type { EpicSnapshot } from './epic-fetch'

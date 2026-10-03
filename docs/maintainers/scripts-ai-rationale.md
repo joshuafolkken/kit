@@ -17,7 +17,8 @@ notified ([#2821](https://github.com/joshuafolkken/kit/issues/2821)).
 
 ## Where the scripts live
 
-The scripts behind `josh git`, `josh followup` and `josh notify` live under `scripts/git/` —
-`git-workflow.ts`, `git-followup-workflow.ts` and `telegram-test.ts`. They were a separate
+The scripts behind `josh git`, `josh followup` and `josh notify` are `scripts/git/git-workflow.ts`,
+`scripts/followup/git-followup-workflow.ts` and `scripts/notify/telegram-test.ts`. They were a separate
 `scripts-ai/` directory until [#2903](https://github.com/joshuafolkken/kit/issues/2903), which is where
-this page's name comes from.
+this page's name comes from, and were split out of `scripts/git/` by
+[#2988](https://github.com/joshuafolkken/kit/issues/2988).

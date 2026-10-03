@@ -3,7 +3,7 @@ import {
 	EPIC_LABEL,
 	has_label_name,
 	NEEDS_DECISION_LABEL,
-} from '#scripts/git/issue-labels'
+} from '#scripts/issue/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
 import type { CarryChange, RunCarry } from './run-carry'
 

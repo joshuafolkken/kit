@@ -1,4 +1,4 @@
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { poll } from '#scripts/lib/poll'
 import { with_page_size } from '#scripts/version/version-remote'
 

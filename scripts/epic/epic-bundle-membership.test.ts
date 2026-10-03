@@ -1,5 +1,5 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { capped_listing_outcome, listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { capped_listing_outcome, listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import { describe, expect, it, vi } from 'vitest'
 import { epic_bundle, type BacklogIssue, type BundleAction } from './epic-bundle'
 import { epic_bundle_cli } from './epic-bundle-cli'

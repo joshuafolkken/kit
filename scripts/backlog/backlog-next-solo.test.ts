@@ -9,7 +9,7 @@ import {
 	BUG_LABEL,
 	IN_PROGRESS_LABEL,
 	RUN_SOLO_LABEL,
-} from '#scripts/git/issue-labels'
+} from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_next } from './backlog-next'

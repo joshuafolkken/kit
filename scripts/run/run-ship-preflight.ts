@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_branch } from '#scripts/git/git-branch'
-import { git_gh_command } from '#scripts/git/git-gh-command'
 import { git_preflight } from '#scripts/git/git-preflight'
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { error_text } from '#scripts/lib/error-message'

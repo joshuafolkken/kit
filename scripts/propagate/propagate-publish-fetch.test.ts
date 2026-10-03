@@ -4,7 +4,7 @@ import { propagate_publish } from './propagate-publish'
 const gh_outcomes = vi.hoisted(() => vi.fn())
 
 vi.mock('execa', async () => {
-	const { gh_execa_fixture } = await import('#scripts/git/git-gh-execa-fixture')
+	const { gh_execa_fixture } = await import('#scripts/gh/git-gh-execa-fixture')
 
 	return { execaSync: gh_execa_fixture.honoring_reject(gh_outcomes) }
 })

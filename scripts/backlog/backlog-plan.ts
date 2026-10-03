@@ -3,7 +3,7 @@ import type { IssueReference } from '#scripts/epic/epic-reference'
 import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
 import { epic_solo } from '#scripts/epic/epic-solo'
 import { epic_triage } from '#scripts/epic/epic-triage'
-import { has_label_name, IN_PROGRESS_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
+import { has_label_name, IN_PROGRESS_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import type { OutOfScopeRow } from './backlog-scope'
 
 // The plan a person reads before a `backlogrun` starts (joshuafolkken/kit#1652).

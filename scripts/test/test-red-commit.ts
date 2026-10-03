@@ -1,4 +1,4 @@
-import { git_gh_issue_read } from '#scripts/git/git-gh-issue-read'
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { test_red, type RedRun } from './test-red'
 import { test_red_logic } from './test-red-logic'
 

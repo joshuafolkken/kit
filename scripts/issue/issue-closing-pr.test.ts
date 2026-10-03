@@ -1,10 +1,10 @@
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
-import { git_gh_repo } from '#scripts/git/git-gh-repo'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_closing_pr } from './issue-closing-pr'
 
-vi.mock('#scripts/git/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: vi.fn() } }))
-vi.mock('#scripts/git/git-gh-repo', () => ({
+vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: vi.fn() } }))
+vi.mock('#scripts/gh/git-gh-repo', () => ({
 	git_gh_repo: { repo_get_name_with_owner: vi.fn() },
 }))
 

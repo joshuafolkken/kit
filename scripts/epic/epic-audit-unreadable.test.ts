@@ -1,4 +1,4 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuditFinding } from './epic-audit'
 import { epic_audit_cli } from './epic-audit-cli'

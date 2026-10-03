@@ -1,6 +1,6 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { EpicNextResult, RepoCandidates } from '#scripts/epic/epic-report'
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { defect_rate, type DefectRate, type IssueKind } from '#scripts/issue/defect-rate'
 import { defect_rate_cli } from '#scripts/issue/defect-rate-cli'
 

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { package_path } from '#scripts/init/init-paths'
-import { yaml_config_fixture } from '#scripts/yaml/yaml-config-fixture'
+import { yaml_config_fixture } from '#scripts/lib/yaml-config-fixture'
 
 // GitHub spells some workflow keys in kebab-case. They are declared verbatim — with the naming
 // rule disabled on the line, as elsewhere for external field names — rather than reached through

@@ -1,4 +1,4 @@
-import { NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { shell_segments } from './shell-segments'

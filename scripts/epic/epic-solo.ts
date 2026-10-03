@@ -1,4 +1,4 @@
-import { has_any_label, has_label_name, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
+import { has_any_label, has_label_name, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { epic_busy, type BusyRead } from './epic-busy'
 import type { EpicChild } from './epic-graph'

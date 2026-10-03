@@ -1,5 +1,5 @@
+import { MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
 import { describe, expect, it } from 'vitest'
-import { MAX_SCANNED } from './git-gh-issue-list'
 import { cutoff_of, PAGE_CEILING_CAUSE } from './listing-cutoff'
 
 // joshuafolkken/kit#1067: every caller of the open-issue listing asks "did I see everything", and

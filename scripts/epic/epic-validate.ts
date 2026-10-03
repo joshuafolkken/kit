@@ -1,6 +1,6 @@
-import { EPIC_LABEL, has_label_name } from '#scripts/git/issue-labels'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
 import { epic_subject_schema } from '#scripts/git/schemas'
+import { EPIC_LABEL, has_label_name } from '#scripts/issue/issue-labels'
 import { epic_parse, type DeclarationState } from './epic-parse'
 
 // The four requirements an epic has to satisfy are otherwise enforced only by an agent reading the

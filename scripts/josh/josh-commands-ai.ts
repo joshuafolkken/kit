@@ -20,7 +20,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['<keywords> [--size <n>]', 'automation', ['network']],
 	},
 	'stash:pop': {
-		script: 'scripts/git/stash-pop-cli.ts',
+		script: 'scripts/git/stash/stash-pop-cli.ts',
 		description: 'Pop the stash matching this message, not whichever a shared stack has on top',
 		category: 'AI tools',
 		reference: ['<message>', 'automation', ['git']],

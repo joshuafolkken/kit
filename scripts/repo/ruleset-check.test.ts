@@ -1,8 +1,8 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import type { GhApiRequest } from '#scripts/git/git-gh-exec'
-import { gh_failure } from '#scripts/git/git-gh-failure'
+import type { GhApiRequest } from '#scripts/gh/git-gh-exec'
+import { gh_failure } from '#scripts/gh/git-gh-failure'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RequiredChecksReport } from './required-checks-report'
 import { ruleset_check } from './ruleset-check'
@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 	exec: vi.fn<(request: GhApiRequest) => string>(),
 }))
 
-vi.mock('#scripts/git/git-gh-exec', () => ({
+vi.mock('#scripts/gh/git-gh-exec', () => ({
 	git_gh_exec: { read_gh_api_sync: mocks.read, exec_gh_api_sync: mocks.exec },
 }))
 

@@ -1,5 +1,5 @@
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_command } from '#scripts/git/git-command'
-import { git_gh_command } from '#scripts/git/git-gh-command'
 import { main_sync } from '#scripts/git/main-sync'
 import { error_text } from '#scripts/lib/error-message'
 import { observation_ledger, OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger'

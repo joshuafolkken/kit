@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { yaml_config_fixture } from '#scripts/yaml/yaml-config-fixture'
+import { yaml_config_fixture } from '#scripts/lib/yaml-config-fixture'
 import { describe, expect, it } from 'vitest'
 
 // `.github/dependabot.yml` is distributed verbatim to every consumer via AI_COPY_FILES, so these

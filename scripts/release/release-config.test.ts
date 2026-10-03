@@ -1,4 +1,4 @@
-import { yaml_config_fixture } from '#scripts/yaml/yaml-config-fixture'
+import { yaml_config_fixture } from '#scripts/lib/yaml-config-fixture'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 

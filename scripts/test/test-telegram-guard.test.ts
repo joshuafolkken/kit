@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { telegram_notify } from '#scripts/git/telegram-notify'
+import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { test_network_guard } from './test-network-guard'
 import { test_telegram_guard } from './test-telegram-guard'

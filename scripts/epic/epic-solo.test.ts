@@ -1,5 +1,9 @@
 import { auto_ok_fixture } from '#scripts/auto-ok/auto-ok-fixture'
-import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
+import {
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+	RUN_SOLO_LABEL,
+} from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import { epic_busy, type BusyRead } from './epic-busy'
 import type { EpicChild } from './epic-graph'

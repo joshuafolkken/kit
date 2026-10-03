@@ -1,4 +1,4 @@
-import { git_gh_api_path } from '#scripts/git/git-gh-api-path'
+import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { describe, expect, it } from 'vitest'
 import { release_tag } from './release-tag'
 

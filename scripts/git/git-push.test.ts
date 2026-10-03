@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const PUSH_ERROR = 'push failed'
 
-vi.mock('./animation-helpers', () => ({
+vi.mock('#scripts/lib/animation-helpers', () => ({
 	animation_helpers: {
 		execute_with_animation: vi
 			.fn()
@@ -22,7 +22,7 @@ vi.mock('./git-command', () => ({
 
 const { git_push } = await import('./git-push')
 const { git_command } = await import('./git-command')
-const { animation_helpers } = await import('./animation-helpers')
+const { animation_helpers } = await import('#scripts/lib/animation-helpers')
 const mocked_push = vi.mocked(git_command.push)
 const mocked_execute = vi.mocked(animation_helpers.execute_with_animation)
 

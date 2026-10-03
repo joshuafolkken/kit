@@ -1,4 +1,4 @@
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { execaSync } from 'execa'
 
 // The three spawn shapes every `josh start` step uses, shared by `start-steps.ts`, the setup pull

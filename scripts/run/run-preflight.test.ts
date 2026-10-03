@@ -21,7 +21,7 @@ vi.mock('#scripts/git/git-command', () => ({
 	},
 }))
 
-vi.mock('#scripts/git/git-gh-pr-read', () => ({
+vi.mock('#scripts/gh/git-gh-pr-read', () => ({
 	git_gh_pr_read: { pr_exists: vi.fn(), pr_view: vi.fn() },
 }))
 
@@ -30,7 +30,7 @@ vi.mock('#scripts/lane/lane-registry', () => ({
 }))
 
 const { git_command } = await import('#scripts/git/git-command')
-const { git_gh_pr_read } = await import('#scripts/git/git-gh-pr-read')
+const { git_gh_pr_read } = await import('#scripts/gh/git-gh-pr-read')
 const { lane_registry } = await import('#scripts/lane/lane-registry')
 
 const branch = vi.mocked(git_command.branch)

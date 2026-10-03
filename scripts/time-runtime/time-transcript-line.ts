@@ -1,4 +1,4 @@
-import type { FollowupStage } from '#scripts/git/git-followup-stages'
+import type { FollowupStage } from '#scripts/followup/git-followup-stages'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { time_background } from './time-background'

@@ -1,4 +1,4 @@
-import { git_followup_stages, type FollowupStage } from '#scripts/git/git-followup-stages'
+import { git_followup_stages, type FollowupStage } from '#scripts/followup/git-followup-stages'
 
 // Reading `followup`'s own stage rows back out of what it printed (joshuafolkken/kit#1445).
 //

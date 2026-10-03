@@ -1,4 +1,4 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { cutoff_of, PAGE_CEILING_CAUSE, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_safe } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
