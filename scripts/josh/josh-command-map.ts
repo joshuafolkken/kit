@@ -62,6 +62,7 @@ const ALIASES: Record<string, string> = {
 	v: 'version',
 	r: 'ranges',
 	dr: 'doctor',
+	rc: 'ruleset:check',
 	pg: 'propagate',
 	ad: 'adopt',
 	ov: 'overrides',

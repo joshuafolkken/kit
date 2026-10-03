@@ -793,7 +793,7 @@ pnpm josh doctor --fix    # reclaim the global josh by removing a stale kit shim
 pnpm josh doctor --ports  # also print the per-repository port-seed table
 ```
 
-`doctor` reports the running binary, the `josh` first on `PATH` (`which josh`), and the pnpm-global install (`pnpm bin -g`), warning when the two differ and printing the recovery command. In a kit consumer it also prints a **Consumer setup** section — one-line `✓` / `⚠` verdicts for the kit plugin, git `core.hooksPath`, `CLAUDE.md`, and secretlint — plus the repository's **Dependabot security updates** and **Allow auto-merge** settings (`enabled` / `disabled` / `could not be read`; auto-merge also `paused`). None of these ever fail the command, and `doctor` never changes a repository setting.
+`doctor` reports the running binary, the `josh` first on `PATH` (`which josh`), and the pnpm-global install (`pnpm bin -g`), warning when the two differ and printing the recovery command. In a kit consumer it also prints a **Consumer setup** section — one-line `✓` / `⚠` verdicts for the kit plugin, git `core.hooksPath`, `CLAUDE.md`, and secretlint — plus the repository's **Dependabot security updates** and **Allow auto-merge** settings (`enabled` / `disabled` / `could not be read`; auto-merge also `paused`) and, where a distributed workflow is present, the **Required status checks** report of [`josh ruleset:check`](#josh-rulesetcheck). None of these ever fail the command, and `doctor` never changes a repository setting.
 
 **Options:**
 
@@ -832,6 +832,31 @@ Port seeds (dev / preview, and repositories sharing one):
 ```
 
 It never rewrites a `.env` — the seed is a personal per-machine setting, so the report names the clash and a person resolves it. A malformed seed is reported as `PORT_SEED could not be read`.
+
+### `josh ruleset:check`
+
+Check that the default branch requires every status check kit's distributed workflows report.
+
+```bash
+pnpm josh ruleset:check           # report only
+pnpm josh ruleset:check --apply   # add the missing checks to the existing rule
+```
+
+A distributed workflow's check gates nothing until the repository requires it — a per-repository setting. `ruleset:check` reads the default branch's rules — its rulesets first, classic branch protection when no ruleset requires a check — and compares them with the checks of the distributed workflows the repository actually has:
+
+| Workflow                                  | Checks                                          |
+| ----------------------------------------- | ----------------------------------------------- |
+| `.github/workflows/ci.yml`                | `Checks`, `Detect E2E`, `E2E`, `Security Audit` |
+| `.github/workflows/sonar-qube.yml`        | `SonarQube`                                     |
+| `.github/workflows/pr-classification.yml` | `Release classification`                        |
+
+A workflow the repository does not have contributes nothing. `E2E` is safe to require without an E2E suite: the job is skipped then, and a skipped required check passes. Checks the repository requires beyond these are left alone.
+
+It exits `0` when every expected check is required and `1` otherwise — when one is missing, nothing requires checks at all, or the rules could not be read (a failed read is never reported as missing).
+
+**Options:**
+
+- `--apply` — append the missing checks to the ruleset's required-checks rule (or to the branch protection's contexts). It never creates a ruleset: with none, create one under Settings → Rules → Rulesets, then rerun. Writing a repository setting needs admin access, so only this flag writes — `josh sync` and `josh doctor` never do.
 
 ### `josh overrides`
 

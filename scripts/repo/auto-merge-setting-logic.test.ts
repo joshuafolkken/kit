@@ -84,7 +84,7 @@ describe('format_auto_merge_report — disabled', () => {
 	// kit reports the setting and never changes it — a repository setting is outward-facing and needs
 	// admin scope, which is why `josh doctor --fix` does not enable it either.
 	it('states that kit never changes the repository setting itself', () => {
-		expect(report_for_repo('disabled')).toContain('kit never changes a repository setting')
+		expect(report_for_repo('disabled')).toContain('kit never changes this setting')
 	})
 })
 

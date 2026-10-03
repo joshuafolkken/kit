@@ -28,6 +28,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "pg": "propagate",
     "pt": "port",
     "r": "ranges",
+    "rc": "ruleset:check",
     "re": "release",
     "rmi": "registry:migrate",
     "rt": "reconcile-templates",
@@ -815,6 +816,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "developer",
       [
         "files",
+      ],
+    ],
+    "ruleset:check": [
+      "[--apply]",
+      "maintainer",
+      [
+        "network",
       ],
     ],
     "run:carry": [

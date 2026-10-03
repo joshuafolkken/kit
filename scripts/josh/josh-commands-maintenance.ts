@@ -10,6 +10,13 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['[--fix]', 'developer', ['files']],
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
+	'ruleset:check': {
+		script: 'scripts/repo/ruleset-check-cli.ts',
+		description:
+			"Check that the default branch requires every status check kit's workflows report (--apply adds the missing ones)",
+		category: 'Maintenance',
+		reference: ['[--apply]', 'maintainer', ['network']],
+	},
 	overrides: {
 		script: 'scripts/overrides/overrides-check.ts',
 		description: 'Check pnpm overrides for drift',

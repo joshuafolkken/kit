@@ -593,6 +593,16 @@ _No arguments._
 
 Record template source hashes (--check to verify drift)
 
+---
+
+### `josh ruleset:check` · `josh rc`
+
+> **Audience:** maintainer · **Side effects:** network
+
+`[--apply]`
+
+Check that the default branch requires every status check kit's workflows report (--apply adds the missing ones)
+
 ## Git hooks
 
 ### `josh check-commit-message`
