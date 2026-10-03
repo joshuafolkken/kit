@@ -43,7 +43,7 @@ const ROUND_TWO_DECISION = ['review:round2', '--round-1-closed']
 const ROUND_TWO_BRIEF = ['review:brief', '--round', '2']
 const ROUND_TWO_REQUIRED = 'required'
 const FIXED_JOIN_NOTE =
-	'the round-1 gate read the tree before the review fixes — drained, not judged; the gate stage re-runs it.'
+	'the round-1 gate read the tree before the review fixes — drained, not judged; the gate re-runs once the tree is fixed.'
 const ROUND_TWO_SKIPPED_NOTE = 'round 2 not due — nothing left to verify; shipping on.'
 
 // The scoped pair's precondition, met by the supervisor itself rather than stopped on
@@ -125,12 +125,14 @@ function current_verdict(): ReturnType<typeof run_ship_review.read_verdict> {
 
 // A red join blocks unless the reviewer fixed findings in place: the background gate then read the
 // tree before the fixes, so its verdict describes a tree that no longer exists. The join still ran to
-// its end, so the gate stage that follows never races it.
+// its end, so the gate stage that follows never races it. Any fix drains it, not only a round whose
+// every finding was fixed — a partial fix moved the tree just the same, and the round then stops on its
+// unfixed finding at the record rather than on a `Gate RED` the gate never earned (joshuafolkken/kit#2961).
 async function join_gate(): Promise<JoshResult> {
 	const joined = await josh([RUN_REVIEW, '--join'])
 
 	if (joined.code === SUCCESS_EXIT_CODE) return joined
-	if (current_verdict().kind !== run_ship_review.VERDICT.FIXED) return joined
+	if (!run_ship_review.has_fixes(stamp_file.read_stamp_text(paths().findings))) return joined
 
 	note(FIXED_JOIN_NOTE)
 

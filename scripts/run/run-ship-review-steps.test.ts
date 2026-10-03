@@ -228,11 +228,14 @@ describe('run_ship_review_steps.review_stage — findings fixed in place', () =>
 		expect(commands().at(-1)).toBe(JOIN)
 	})
 
-	it('stops on a Medium left unfixed, after recording it', async () => {
+	// joshuafolkken/kit#2961: a partial fix still edited the tree the gate read, so the join is drained
+	// and the round stops on the Medium left unfixed rather than on a misleading `Gate RED`.
+	it('stops on a Medium left unfixed, after recording it, past a join the fix turned red', async () => {
 		stamps.read_stamp_text.mockReturnValue(`${FIXED_MEDIUM}\n${MEDIUM_UNFIXED}`)
+		answer_with(JOIN)
 
 		expect(await stage_code()).toBe(FAILED)
-		expect(commands()).toContain(`${RECORD} ${MEDIUM} ${MEDIUM_UNFIXED}`)
+		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, `${RECORD} ${MEDIUM} ${MEDIUM_UNFIXED}`])
 	})
 })
 
