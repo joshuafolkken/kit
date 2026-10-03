@@ -437,11 +437,13 @@ function target_block(input: BriefInput): string {
 
 // **Only beside a whole-change target** (joshuafolkken/kit#2963): each part is a path's diff against
 // the base, so beside a narrowed round 2 or a resumed round 1 the list would hand the reviewer the
-// code that narrowing exists to keep out of scope.
-function diff_block(input: BriefInput): ReadonlyArray<string> {
-	if (input.diff === undefined || input.round >= SECOND_ROUND || input.resumed_from !== undefined) {
-		return []
-	}
+// code that narrowing exists to keep out of scope. Decided by the target actually printed, not by
+// the round: every round that cannot narrow widens through `whole_change_target`, and that round
+// needs the parts as much as a first one does.
+function diff_block(input: BriefInput, target: string): ReadonlyArray<string> {
+	const is_whole_change = target.includes(whole_change_target(input.checkout.root, input.base))
+
+	if (!is_whole_change || input.diff === undefined) return []
 
 	return ['', review_diff_parts.reading_block(input.diff.parts, input.diff.cap)]
 }
@@ -450,6 +452,7 @@ function diff_block(input: BriefInput): ReadonlyArray<string> {
 // answer with `$(...)` — is the one thing a brief must not break.
 function compose(input: BriefInput): string {
 	const profile = input.profile ?? agent_role_profile.DEFAULT_PROFILES.reviewer
+	const target = target_block(input)
 
 	return [
 		input.level,
@@ -463,8 +466,8 @@ function compose(input: BriefInput): string {
 		gate_line(input.stamps, input.tree, input.base),
 		TEST_COMMAND_LINE,
 		'',
-		target_block(input),
-		...diff_block(input),
+		target,
+		...diff_block(input, target),
 	].join('\n')
 }
 
