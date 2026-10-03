@@ -69,6 +69,10 @@ describe('main push PR check reuse routing', () => {
 	it.each([STATIC_JOB, UNIT_JOB])('skips %s only when the proof output is true', (job_name) => {
 		expect(ci_yml_fixture.job_needs(job(job_name))).toContain(REUSE_JOB)
 		expect(job(job_name)?.if).toContain("needs.reuse-pr-checks.outputs.reuse != 'true'")
-		expect(job(job_name)?.if).toContain('always()')
+		expect(job(job_name)?.if).toContain('!cancelled()')
+	})
+
+	it.each([STATIC_JOB, UNIT_JOB])('lets a cancelled run stop %s', (job_name) => {
+		expect(job(job_name)?.if).not.toContain('always()')
 	})
 })

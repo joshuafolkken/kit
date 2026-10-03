@@ -223,7 +223,7 @@ jobs:
   static-checks:
     name: Static Checks
     needs: reuse-pr-checks
-    if: ${{ always() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
+    if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
@@ -380,7 +380,7 @@ jobs:
   unit:
     name: Unit Tests
     needs: reuse-pr-checks
-    if: ${{ always() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
+    if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
@@ -457,6 +457,10 @@ jobs:
   # through with an E2E suite that never ran (see the `Detect E2E` job below, and
   # https://github.com/joshuafolkken/kit/issues/991). A skipped aggregator would have reproduced that
   # defect on the unit suite. Running always and failing explicitly is the only shape that cannot.
+  # That is also why this job alone keeps `always()` while the two halves use `!cancelled()`
+  # (joshuafolkken/kit#2980): a cancelled run must stop the minutes-long halves, but a skipped
+  # `Checks` on a cancelled head-SHA run would read as passing, so this seconds-long job still runs
+  # and fails on the halves' `cancelled` results.
   #
   # The results are read from the environment rather than interpolated into the script. `needs.*.result`
   # is a GitHub-controlled enum and not attacker-controlled, but a `${{ }}` expression spliced into a
