@@ -45,12 +45,12 @@ const MARKDOWN_LINK = /\[[^[\]]*\]\([^()]*\)/gu
 const NUMBER_CONTINUATION = /^(?:\w|-[a-z])/iu
 // The width of the window `NUMBER_CONTINUATION` reads: a hyphen and the letter after it.
 const CONTINUATION_WIDTH = 2
-// The run of non-boundary characters before a `#N` that still leaves it a citation: none, or a plain
-// word — a repository name without its owner (`kit#12`) or a verb (`fixes#12`) is a citation slip all
-// the same. Anything else glues the `#N` into a longer token: an HTML entity (`&#39;`), a file
-// fragment (`README.md#12`), a path or URL fragment (`src/lib/x#5`, `example.com/#12`). A
-// well-formed `owner/repo#N` is read off `repo_prefix` first.
-const CITATION_LEAD = /^[\w-]*$/u
+// What, in the run of non-boundary characters before a `#N`, glues it into a longer token: the `&` of
+// an HTML entity (`&#39;`), the `.` of a file fragment (`README.md#12`), the `/` of a path or URL
+// fragment (`src/lib/x#5`, `example.com/#12`). Any other lead leaves it a citation — a repository
+// without its owner (`kit#12`), a verb (`fixes#12`), prose in a non-Latin script or emphasis
+// (`**#12**`) is a slip all the same. A well-formed `owner/repo#N` is read off `repo_prefix` first.
+const GLUED_LEAD = /[&./]/u
 // A fenced-code delimiter line: three or more backticks or tildes after optional indentation — both
 // delimiters CommonMark allows. Toggling on each one brackets the fenced block, so a `closes #N` shown
 // in a `gh api` example never reads as a slip whichever fence the reply drew it with.
@@ -133,13 +133,13 @@ interface LineReference {
 }
 
 // Whether the `#N` is part of a longer token rather than an Issue number of its own — continued past
-// its digits, or led by something other than an `owner/repo` or a plain word.
+// its digits, or led by an entity, file or path run (`GLUED_LEAD`) that is not an `owner/repo`.
 function is_glued(line: string, reference: LineReference): boolean {
 	const end = reference.index + reference.text.length
 
 	if (NUMBER_CONTINUATION.test(line.slice(end, end + CONTINUATION_WIDTH))) return true
 
-	return reference.prefix === '' && !CITATION_LEAD.test(lead_token(line, reference.index))
+	return reference.prefix === '' && GLUED_LEAD.test(lead_token(line, reference.index))
 }
 
 // The bare references on one line, in order — the glued tokens (`is_glued`) and the excluded mentions

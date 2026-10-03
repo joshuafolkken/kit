@@ -137,6 +137,16 @@ describe('issue_citation.bare_references — non-Issue #digits', () => {
 	})
 })
 
+describe('issue_citation.bare_references — leads that are not glued', () => {
+	it('still flags a #N led by non-ASCII prose or emphasis rather than reading it as glued', () => {
+		expect(issue_citation.bare_references('対応#12 と **#34** と 「#56」')).toEqual([
+			'#12',
+			'#34',
+			'#56',
+		])
+	})
+})
+
 describe('issue_citation.cite_arguments', () => {
 	it('strips the # from a bare reference so issue:cite reads a number', () => {
 		expect(issue_citation.cite_arguments(['#123', '#456'])).toEqual(['123', '456'])
