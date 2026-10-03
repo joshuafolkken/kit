@@ -1,3 +1,4 @@
+import { json_value } from '#scripts/lib/json-value'
 import { pr_raw_schema, type RollupItemData } from './schemas'
 
 const CHECK_STATUS_PASS = 'pass'
@@ -92,14 +93,6 @@ function read_rollup_array(parsed: unknown): Array<RollupItemData> {
 	return result.data.statusCheckRollup ?? []
 }
 
-function parse_json_safe(raw_json: string): unknown {
-	try {
-		return JSON.parse(raw_json)
-	} catch {
-		return undefined
-	}
-}
-
 function parse_rollup_item(item: RollupItemData): RollupCheck | undefined {
 	const name = read_string(item[KEY_NAME]) ?? read_string(item[KEY_CONTEXT])
 	if (name === undefined) return undefined
@@ -108,7 +101,7 @@ function parse_rollup_item(item: RollupItemData): RollupCheck | undefined {
 }
 
 function parse_rollup_checks(raw_json: string): Array<RollupCheck> {
-	const parsed = parse_json_safe(raw_json)
+	const parsed = json_value.parse_or_undefined(raw_json)
 	const rollup = read_rollup_array(parsed)
 	const checks: Array<RollupCheck> = []
 
@@ -121,7 +114,7 @@ function parse_rollup_checks(raw_json: string): Array<RollupCheck> {
 }
 
 function parse_pr_state_snapshot(raw_json: string): PrStateSnapshot {
-	const parsed = parse_json_safe(raw_json)
+	const parsed = json_value.parse_or_undefined(raw_json)
 	const result = pr_raw_schema.safeParse(parsed)
 	const data = result.success ? result.data : undefined
 
@@ -134,7 +127,6 @@ function parse_pr_state_snapshot(raw_json: string): PrStateSnapshot {
 
 const git_pr_checks_parse = {
 	parse_rollup_checks,
-	parse_json_safe,
 	read_string,
 	parse_pr_state_snapshot,
 }
@@ -142,7 +134,6 @@ const git_pr_checks_parse = {
 export {
 	git_pr_checks_parse,
 	parse_rollup_checks,
-	parse_json_safe,
 	read_string,
 	parse_pr_state_snapshot,
 	CHECK_STATUS_PASS,

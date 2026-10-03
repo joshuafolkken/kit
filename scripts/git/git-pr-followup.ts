@@ -1,3 +1,4 @@
+import { json_value } from '#scripts/lib/json-value'
 import { git_closes_keyword } from './git-closes-keyword'
 import { git_followup_pending } from './git-followup-pending'
 import { git_followup_stages, type StageLog } from './git-followup-stages'
@@ -7,7 +8,7 @@ import type { GitNotifyConfig } from './git-notify'
 import { git_pr_ai_review, type TelegramContext } from './git-pr-ai-review'
 import { DEFAULT_STABLE_READS, git_pr_checks, WATCH_CONFIRMED_STABLE_READS } from './git-pr-checks'
 import { is_coderabbit_check } from './git-pr-checks-eval'
-import { CHECK_STATUS_PASS, git_pr_checks_parse, type PrStateSnapshot } from './git-pr-checks-parse'
+import { CHECK_STATUS_PASS, type PrStateSnapshot } from './git-pr-checks-parse'
 import { git_pr_coderabbit } from './git-pr-coderabbit'
 import { git_pr_followup_wrapup } from './git-pr-followup-wrapup'
 import { git_pr_managed_config } from './git-pr-managed-config'
@@ -116,7 +117,7 @@ async function warn_if_missing_closes(branch_name: string): Promise<string | und
 // on the path this whole change exists to remove. So the question asked here is the narrow one —
 // *is this definitely an empty rollup* — and every other outcome falls through.
 function reads_as_empty_rollup(raw_json: string): boolean {
-	const parsed = git_pr_checks_parse.parse_json_safe(raw_json)
+	const parsed = json_value.parse_or_undefined(raw_json)
 
 	if (typeof parsed !== 'object' || parsed === null || !('statusCheckRollup' in parsed)) {
 		return false

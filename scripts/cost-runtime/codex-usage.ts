@@ -1,5 +1,6 @@
 import { globSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { cost_transcript } from './cost-transcript'
 import type { OverMeasurement } from './cost-verdict'
@@ -23,14 +24,6 @@ const TOKEN_COUNT_SCHEMA = z.looseObject({
 
 type Environment = Readonly<Record<string, string | undefined>>
 
-function decode(line: string): unknown {
-	try {
-		return JSON.parse(line)
-	} catch {
-		return undefined
-	}
-}
-
 function same_project(cwd: string, target: string): boolean {
 	return cost_transcript.session_cwd(cwd) === cost_transcript.session_cwd(target)
 }
@@ -51,7 +44,7 @@ function measurement_from(
 	target: string,
 	thread_id: string,
 ): OverMeasurement | undefined {
-	const values = content.split('\n').map((line) => decode(line))
+	const values = content.split('\n').map((line) => json_value.parse_or_undefined(line))
 	const metadata = values.flatMap((value) => {
 		const parsed = SESSION_META_SCHEMA.safeParse(value)
 

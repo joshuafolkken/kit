@@ -3,6 +3,7 @@ import { lstatSync } from 'node:fs'
 import { git_command } from '#scripts/git/git-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
 
 // The record that says which checkout a `/code-review` actually read (joshuafolkken/kit#1522).
@@ -81,17 +82,7 @@ function attest_path(nonce: string): string {
 function read_json(source: string): unknown {
 	const raw = stamp_file.read_stamp_text(source)
 
-	if (raw === undefined) return undefined
-
-	try {
-		return JSON.parse(raw)
-	} catch {
-		return undefined
-	}
-}
-
-function is_record(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null
+	return raw === undefined ? undefined : json_value.parse_or_undefined(raw)
 }
 
 function string_field(value: Record<string, unknown>, key: string): string | undefined {
@@ -101,7 +92,7 @@ function string_field(value: Record<string, unknown>, key: string): string | und
 }
 
 function to_checkout(value: unknown): ReviewCheckout | undefined {
-	if (!is_record(value)) return undefined
+	if (!json_value.is_record(value)) return undefined
 
 	const root = string_field(value, 'root')
 	const branch = string_field(value, 'branch')
@@ -113,7 +104,7 @@ function to_checkout(value: unknown): ReviewCheckout | undefined {
 }
 
 function to_pointer(value: unknown): PointerRecord | undefined {
-	if (!is_record(value)) return undefined
+	if (!json_value.is_record(value)) return undefined
 
 	const nonce = string_field(value, 'nonce')
 	const taken_at = string_field(value, 'taken_at')

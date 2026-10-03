@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { json_value } from '#scripts/lib/json-value'
 import { package_version_schema } from '#scripts/lib/schemas'
-import { safe_json_parse } from './parse-json'
 
 const PACKAGE_JSON = 'package.json'
 // Scripts live two levels under the package root (scripts/<group>/<file>.ts), so the running
@@ -27,7 +27,7 @@ function read_running_version(self_directory: string): string | undefined {
 	const package_path = resolve_self_package_path(self_directory)
 	if (!existsSync(package_path)) return undefined
 	const parsed = package_version_schema.safeParse(
-		safe_json_parse(readFileSync(package_path, 'utf8')),
+		json_value.parse_or_undefined(readFileSync(package_path, 'utf8')),
 	)
 
 	return parsed.success ? parsed.data.version : undefined

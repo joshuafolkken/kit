@@ -11,7 +11,7 @@ const LOCK_PREFIX = 'josh-stash-sweep-lock-'
 // wait; the cap only bounds a holder that hung, and a sweep that gives up keeps its entries.
 const MAX_WAIT_MS = 30_000
 
-function lock_path(cwd: string = process.cwd()): string {
+function lock_path(cwd?: string): string {
 	return repository_lock.lock_path(LOCK_PREFIX, cwd)
 }
 

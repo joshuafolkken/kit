@@ -1,3 +1,4 @@
+import { json_value } from '#scripts/lib/json-value'
 import { json_object_schema } from '#scripts/lib/schemas'
 import { load, loadAll, YAMLException } from 'js-yaml'
 
@@ -25,8 +26,9 @@ function parse_yaml(content: string): Record<string, unknown> {
 	return json_object_schema.parse(raw)
 }
 
+// A YAML mapping parses to the same plain object a JSON object does, so the test is `json_value`'s.
 function is_mapping_document(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value)
+	return json_value.is_record(value)
 }
 
 // pnpm 11 writes pnpm-lock.yaml as a multi-document stream (the package-manager document, then the

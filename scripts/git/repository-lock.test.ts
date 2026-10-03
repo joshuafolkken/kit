@@ -172,6 +172,33 @@ describe('repository_lock.clear_stale', () => {
 	})
 })
 
+// joshuafolkken/kit#2986: the record was cast to an owner unchecked, so JSON of another shape reached
+// the judge — and the default judge read `.pid` off `null` and threw out of the claim.
+describe('repository_lock.clear_stale on a record that is JSON but not an owner', () => {
+	it.each([
+		['null', 'null'],
+		['an array', '[1]'],
+		['an object with no pid', '{"process_start":"x"}'],
+		['a pid that is not a number', '{"pid":"1"}'],
+	])('keeps a record that parses to %s without consulting the judge', (_label, record) => {
+		writeFileSync(state.lock, record)
+		const judge = vi.fn(() => true)
+
+		repository_lock.clear_stale(state.lock, judge)
+
+		expect(judge).not.toHaveBeenCalled()
+		expect(readFileSync(state.lock, 'utf8')).toBe(record)
+	})
+
+	it('does not throw on a record that parses to null under the default judge', () => {
+		writeFileSync(state.lock, 'null')
+
+		expect(() => {
+			repository_lock.clear_stale(state.lock)
+		}).not.toThrow()
+	})
+})
+
 describe('repository_lock.lock_path', () => {
 	// A pre-push hook exports `GIT_DIR`, which would resolve every directory to the gated checkout.
 	// The returned restore runs as the block's teardown.

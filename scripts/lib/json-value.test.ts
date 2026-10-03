@@ -35,6 +35,9 @@ describe('json_value.is_record', () => {
 	it.each([
 		['a plain object', { a: 1 }, true],
 		['an array', [1], false],
+		// eslint-disable-next-line unicorn/no-null -- JSON `null` answers typeof 'object' and must be excluded
+		['null', null, false],
+		['undefined', undefined, false],
 		['a string', 'a', false],
 	])('answers %s', (_label, value, expected) => {
 		expect(json_value.is_record(value)).toBe(expected)
