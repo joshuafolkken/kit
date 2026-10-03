@@ -10,6 +10,8 @@ const CONFIGURED_LIMIT = 3
 const NO_LANES = 0
 const OCCUPIED_LANES = 2
 const REMAINING_LANES = DEFAULT_LIMIT - OCCUPIED_LANES
+const LANE_SEATS = 9
+const LIMIT_ABOVE_SEATS = 12
 
 function environment(value: string | undefined): Record<string, string | undefined> {
 	return { [LANE_LIMIT_KEY]: value }
@@ -82,5 +84,11 @@ describe('lane_capacity.free_lanes', () => {
 	// run — has no free lane. A negative count read as "how many to offer" is a slice nobody meant.
 	it('is never negative when more is occupied than the limit allows', () => {
 		expect(lane_capacity.free_lanes(CONFIGURED_LIMIT, DEFAULT_LIMIT)).toBe(NO_LANES)
+	})
+
+	// joshuafolkken/kit#3027: `lane:open` refuses past the nine seats whatever the limit says.
+	it('caps a limit above the seat count at the seats', () => {
+		expect(lane_capacity.free_lanes(LIMIT_ABOVE_SEATS, NO_LANES)).toBe(LANE_SEATS)
+		expect(lane_capacity.free_lanes(LIMIT_ABOVE_SEATS, LANE_SEATS)).toBe(NO_LANES)
 	})
 })

@@ -14,6 +14,7 @@ const THIRD = '3'
 const REPORT_END = 'report and end'
 const REPORT_STOP = 'report and stop'
 const NO_WINDOW = { poll_ms: POLL_MS, offer_ms: OFFER_MS, window_ms: undefined }
+const FREE_LANES = 6
 
 interface World {
 	backlog: Array<string>
@@ -79,8 +80,9 @@ function ports(world_state: World): LoopPorts {
 		launch: async (issue) => {
 			world_state.calls.push(`launch ${issue}`)
 
-			return true
+			return 'launched'
 		},
+		free_lanes: async () => FREE_LANES,
 		now: () => new Date(world_state.clock),
 		sleep: async (milliseconds) => {
 			world_state.clock += milliseconds

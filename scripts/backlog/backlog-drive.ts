@@ -16,6 +16,8 @@
 // **Everything it touches is a port**, the pattern `run-wake-loop.ts` set, so the sequencing is pinned
 // without a process, a network or a clock.
 
+import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
+
 const RUN_VERDICT = 'run'
 const STOP_VERDICT = 'stop'
 // The `run:merge` tokens that end the loop at once: a hand-off, a person's stop, the environment down,
@@ -41,6 +43,9 @@ const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
 	'wait',
 ])
 const NO_RETRIES = 0
+const NO_FREE_LANES = 0
+const LAUNCHED = 'launched'
+const UNOPENED = 'unopened'
 
 interface OfferRead {
 	verdict: string
@@ -87,7 +92,11 @@ interface DrivePorts {
 	merge: (issue: string) => Promise<string>
 	// `backlog:offer`'s answer for the state, or `undefined` when it exited non-zero.
 	offer: (state: DriveState) => Promise<OfferRead | undefined>
-	launch: (issue: string) => Promise<boolean>
+	// Where `lane:launch`'s chain ended — `launched`, `unopened` (no lane taken) or `failed` (one taken).
+	launch: (issue: string) => Promise<LaunchOutcome['kind']>
+	// The lanes free right now — `backlog_ready.drive_free_lane_count` in production, the limit less the
+	// open lanes.
+	free_lanes: () => Promise<number>
 	now: () => Date
 }
 
@@ -192,22 +201,53 @@ async function collect_finished(state: DriveState, ports: DrivePorts): Promise<P
 	return { kind: 'continue', state: current }
 }
 
+// A `lane:open` refused with every lane taken is a wait, not a judgement (joshuafolkken/kit#3027): the
+// next offer after a lane frees retries it. A step failing after the lane opened is always handed back —
+// that lane holds the last seat itself, so the free count would read the failure as a full pool.
+async function refused(
+	issue: string,
+	outcome: LaunchOutcome['kind'],
+	state: DriveState,
+	ports: DrivePorts,
+): Promise<PassResult> {
+	if (outcome !== UNOPENED) return ended('launch', state, undefined, issue)
+	if ((await ports.free_lanes()) <= NO_FREE_LANES) return { kind: 'continue', state }
+
+	return ended('launch', state, undefined, issue)
+}
+
+// **No more launches than free lanes** (joshuafolkken/kit#3027). `backlog:offer` lists every ready issue
+// without reading the lanes, so launching all of them overran `JOSH_LANE_LIMIT` until `lane:open` ran
+// out of seats. The free count is read once, before the first launch, because every launch here opens
+// a lane the count would otherwise have to be told about.
+//
+// **Only a launch is activity** (joshuafolkken/kit#3027): a pass that started nothing — every lane taken
+// — keeps `active` where it was, or the once-a-minute offer would restart the idle budget for good.
+function launched(state: DriveState, in_flight: Array<string>, ports: DrivePorts): DriveState {
+	if (in_flight.length === state.in_flight.length) return { ...state, in_flight }
+
+	return { ...state, in_flight, active: ports.now().toISOString() }
+}
+
 async function launch_all(
 	issues: ReadonlyArray<string>,
 	state: DriveState,
 	ports: DrivePorts,
 ): Promise<PassResult> {
 	const in_flight = [...state.in_flight]
+	const free = await ports.free_lanes()
 
-	for (const issue of issues) {
-		const is_launched = await ports.launch(issue)
+	for (const issue of issues.slice(0, free)) {
+		const outcome = await ports.launch(issue)
 
-		if (!is_launched) return ended('launch', { ...state, in_flight }, undefined, issue)
+		if (outcome !== LAUNCHED) {
+			return await refused(issue, outcome, launched(state, in_flight, ports), ports)
+		}
 
 		in_flight.push(issue)
 	}
 
-	return { kind: 'continue', state: { ...state, in_flight, active: ports.now().toISOString() } }
+	return { kind: 'continue', state: launched(state, in_flight, ports) }
 }
 
 // A watch with nothing in flight is the drain: `run:step` owes the retrospective there, so it is the
