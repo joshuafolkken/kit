@@ -1,5 +1,37 @@
 # @joshuafolkken/kit
 
+[![CI](https://github.com/joshuafolkken/kit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/joshuafolkken/kit/actions/workflows/ci.yml)
+[![Publish](https://github.com/joshuafolkken/kit/actions/workflows/publish.yml/badge.svg)](https://github.com/joshuafolkken/kit/actions/workflows/publish.yml)
+[![SonarQube](https://github.com/joshuafolkken/kit/actions/workflows/sonar-qube.yml/badge.svg?branch=main)](https://github.com/joshuafolkken/kit/actions/workflows/sonar-qube.yml)
+
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=joshuafolkken_kit&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=joshuafolkken_kit)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=joshuafolkken_kit&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=joshuafolkken_kit)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=joshuafolkken_kit&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=joshuafolkken_kit)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=joshuafolkken_kit&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=joshuafolkken_kit)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=joshuafolkken_kit&metric=bugs)](https://sonarcloud.io/summary/new_code?id=joshuafolkken_kit)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=joshuafolkken_kit&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=joshuafolkken_kit)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=joshuafolkken_kit&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=joshuafolkken_kit)
+[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=joshuafolkken_kit&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=joshuafolkken_kit)
+
+[![npm version](https://img.shields.io/npm/v/@joshuafolkken/kit)](https://www.npmjs.com/package/@joshuafolkken/kit)
+[![npm downloads](https://img.shields.io/npm/dm/@joshuafolkken/kit)](https://www.npmjs.com/package/@joshuafolkken/kit)
+[![License](https://img.shields.io/github/license/joshuafolkken/kit)](./LICENSE)
+[![Types](https://img.shields.io/npm/types/@joshuafolkken/kit)](https://www.npmjs.com/package/@joshuafolkken/kit)
+[![Node.js](https://img.shields.io/node/v/@joshuafolkken/kit?logo=nodedotjs)](https://nodejs.org/)
+[![pnpm](https://img.shields.io/github/package-json/packageManager/joshuafolkken/kit?logo=pnpm&label=pnpm)](https://pnpm.io/)
+[![TypeScript](https://img.shields.io/npm/dependency-version/@joshuafolkken/kit/peer/typescript?logo=typescript)](https://www.typescriptlang.org/)
+[![ESLint](https://img.shields.io/npm/dependency-version/@joshuafolkken/kit/peer/eslint?logo=eslint)](https://eslint.org/)
+[![typescript-eslint](https://img.shields.io/npm/dependency-version/@joshuafolkken/kit/peer/typescript-eslint?logo=typescript)](https://typescript-eslint.io/)
+[![Playwright](https://img.shields.io/npm/dependency-version/@joshuafolkken/kit/peer/@playwright/test?label=playwright)](https://playwright.dev/)
+
+[![Claude Code](https://img.shields.io/badge/Claude_Code-supported-D97757?logo=claude&logoColor=white)](https://claude.com/claude-code)
+[![Codex](https://img.shields.io/badge/Codex-supported-412991)](https://openai.com/codex/)
+[![Gemini](https://img.shields.io/badge/Gemini-supported-8E75B2?logo=googlegemini&logoColor=white)](https://github.com/google-gemini/gemini-cli)
+[![Cursor](https://img.shields.io/badge/Cursor-supported-000000?logo=cursor&logoColor=white)](https://cursor.com/)
+[![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot)](./.github/dependabot.yml)
+[![Last commit](https://img.shields.io/github/last-commit/joshuafolkken/kit)](https://github.com/joshuafolkken/kit/commits/main)
+[![Latest tag](https://img.shields.io/github/v/tag/joshuafolkken/kit)](https://github.com/joshuafolkken/kit/tags)
+
 **Write a GitHub Issue. Your AI agent takes it to a merged PR — the same way in every project.**
 
 kit gives Claude Code (or Codex, Gemini, Cursor) your project's rules, checks and an Issue-driven workflow.
