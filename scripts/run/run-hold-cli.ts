@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { run_halfrun_resume } from './run-halfrun-resume'
 import { run_hold, type HoldRead, type RunHold } from './run-hold'
 import { run_preflight, type PreflightDecision } from './run-preflight'
+import { run_prrun_resume } from './run-prrun-resume'
 import { run_tidy_cli } from './run-tidy-cli'
 
 // `josh run:hold [<N>]` and `josh run:release [<N> | --force]` — the working-tree guard the typed
@@ -48,11 +49,13 @@ const FORCE_FLAG = '--force'
 // implementation cut outside a lane resumes as `fullrun #N` (joshuafolkken/kit#2760).
 const FULLRUN_FLAG = '--fullrun'
 const HALFRUN_STOP_FLAG = '--halfrun-stop'
+// A `prrun`'s stop before merge (joshuafolkken/kit#3023): its record keeps the commit it stopped on.
+const PRRUN_STOP_FLAG = '--prrun-stop'
 // The most a claim reads: the issue number and the one flag after it.
 const MAX_CLAIM_ARGUMENTS = 2
 const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE =
-	'Usage: josh run:hold [<issue-number> [--fullrun | --halfrun-stop]] | josh run:release [<issue-number> | --force]'
+	'Usage: josh run:hold [<issue-number> [--fullrun | --halfrun-stop | --prrun-stop]] | josh run:release [<issue-number> | --force]'
 
 const HOLD_VERDICT = 'hold'
 const BUSY_VERDICT = 'busy'
@@ -65,6 +68,7 @@ const HELD_VERDICT = 'held'
 
 const FORCE_RELEASE_KIND = 'force-release'
 const HALFRUN_STOP_KIND = 'halfrun-stop'
+const PRRUN_STOP_KIND = 'prrun-stop'
 
 interface ClaimRequest {
 	kind: 'claim'
@@ -72,11 +76,20 @@ interface ClaimRequest {
 	is_fullrun?: boolean
 }
 
+interface StopRequest {
+	kind: typeof HALFRUN_STOP_KIND | typeof PRRUN_STOP_KIND
+	issue: string
+}
+
 type HoldRequest =
 	| ClaimRequest
+	| StopRequest
 	| { kind: 'release'; claimant: string }
 	| { kind: typeof FORCE_RELEASE_KIND }
-	| { kind: typeof HALFRUN_STOP_KIND; issue: string }
+
+function is_stop_request(request: HoldRequest): request is StopRequest {
+	return request.kind === HALFRUN_STOP_KIND || request.kind === PRRUN_STOP_KIND
+}
 
 const FORCE_RELEASE_REQUEST: HoldRequest = { kind: FORCE_RELEASE_KIND }
 
@@ -84,12 +97,20 @@ function release_request(claimant: string): HoldRequest {
 	return { kind: 'release', claimant }
 }
 
-// The flag after a numbered claim: absent, `--fullrun` or `--halfrun-stop`. Anything else is a usage
-// error.
+const STOP_KIND_BY_FLAG: ReadonlyMap<string, typeof HALFRUN_STOP_KIND | typeof PRRUN_STOP_KIND> =
+	new Map([
+		[HALFRUN_STOP_FLAG, HALFRUN_STOP_KIND],
+		[PRRUN_STOP_FLAG, PRRUN_STOP_KIND],
+	])
+
+// The flag after a numbered claim: absent, `--fullrun`, `--halfrun-stop` or `--prrun-stop`. Anything
+// else is a usage error.
 function numbered_claim(issue: string, flag: string | undefined): HoldRequest | undefined {
 	if (flag === undefined) return { kind: 'claim', issue }
 
-	if (flag === HALFRUN_STOP_FLAG) return { kind: HALFRUN_STOP_KIND, issue }
+	const stop_kind = STOP_KIND_BY_FLAG.get(flag)
+
+	if (stop_kind !== undefined) return { kind: stop_kind, issue }
 
 	return flag === FULLRUN_FLAG ? { kind: 'claim', issue, is_fullrun: true } : undefined
 }
@@ -293,8 +314,12 @@ async function read_worktree(): Promise<string | undefined> {
 
 // **A `halfrun` stop marks its own record** (joshuafolkken/kit#2796) — the positive "this run has ended
 // over its verified diff" that `run:entry` adopts on `fullrun #N`. Another run's record is left alone.
-function mark_halfrun_stop(target: string, issue: string): number {
-	const mark = run_halfrun_resume.mark_stop_at(target, issue)
+// A `prrun` stop marks its record the same way, with the commit it stopped on (joshuafolkken/kit#3023).
+async function mark_stop(target: string, request: StopRequest): Promise<number> {
+	const mark =
+		request.kind === PRRUN_STOP_KIND
+			? await run_prrun_resume.mark_stop_at(target, request.issue)
+			: run_halfrun_resume.mark_stop_at(target, request.issue)
 
 	if (mark === run_halfrun_resume.MARKED) return report_hold()
 
@@ -306,7 +331,7 @@ function mark_halfrun_stop(target: string, issue: string): number {
 async function dispatch(request: HoldRequest, target: string, is_linked: boolean): Promise<number> {
 	if (request.kind === 'claim') return await claim(target, request, is_linked)
 
-	if (request.kind === HALFRUN_STOP_KIND) return mark_halfrun_stop(target, request.issue)
+	if (is_stop_request(request)) return await mark_stop(target, request)
 
 	if (request.kind === FORCE_RELEASE_KIND) return force_release(target)
 

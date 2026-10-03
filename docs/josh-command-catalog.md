@@ -1289,7 +1289,7 @@ Append to, read or watch the run’s append-only event stream (--append <kind> <
 
 > **Audience:** automation · **Side effects:** files
 
-`[<issue> [--fullrun | --halfrun-stop]]`
+`[<issue> [--fullrun | --halfrun-stop | --prrun-stop]]`
 
 Claim this working tree for a run, or say which run already holds it
 

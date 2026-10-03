@@ -2,6 +2,8 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The workflow command that stops at a green, mergeable pull request (#3023).
+  - prrun
   # A rationale section no procedure document cites (#2762).
   - uncited
   # GitHub Release API field used to select the commit for generated notes.

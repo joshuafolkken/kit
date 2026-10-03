@@ -70,6 +70,22 @@ describe('stop_rules.stop_outcome — hold release', () => {
 
 		expect(outcome.reason).toBeUndefined()
 	})
+
+	it('is silent for a prrun stop that keeps its hold over a clean tree', () => {
+		const outcome = stop_rules.stop_outcome(
+			context({ hold_present: true, tree_clean: true, notified: true, prrun_stopped: true }),
+		)
+
+		expect(outcome.reason).toBeUndefined()
+	})
+
+	it('still demands the notify at a prrun stop', () => {
+		const outcome = stop_rules.stop_outcome(
+			context({ hold_present: true, tree_clean: true, prrun_stopped: true }),
+		)
+
+		expect(outcome.reason).toBe(stop_rules.STOP_NOTIFY_REASON)
+	})
 })
 
 describe('stop_rules.stop_outcome — loop breaker', () => {

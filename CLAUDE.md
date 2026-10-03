@@ -150,7 +150,7 @@ Before every `git commit` (follow-up commits included), self-review against `pro
 
 ### Shorthand Commands
 
-`kickoff`, `fullrun`, `halfrun` and `backlogrun` are the Issue-driven shorthand commands. **Their procedures are not resident** — they live in the `workflow-commands` skill. **What stays here is decided by one question: must the rule fire on a turn where no skill was loaded?** Explicit invocation, the mid-workflow stop notification, the `overrides` / `devEngines` prohibitions, the UI-verification gate and the three `epic:*` rules below all do; everything a run reaches only after reading the skill is routed to, never restated (`prompts/collaboration-workflow/residency.md` → "第 2 問").
+`kickoff`, `fullrun`, `prrun`, `halfrun` and `backlogrun` are the Issue-driven shorthand commands. **Their procedures are not resident** — they live in the `workflow-commands` skill. **What stays here is decided by one question: must the rule fire on a turn where no skill was loaded?** Explicit invocation, the mid-workflow stop notification, the `overrides` / `devEngines` prohibitions, the UI-verification gate and the three `epic:*` rules below all do; everything a run reaches only after reading the skill is routed to, never restated (`prompts/collaboration-workflow/residency.md` → "第 2 問").
 
 **Read the skill before running any part of a command — including the first `gh` call.**
 
@@ -158,6 +158,7 @@ Before every `git commit` (follow-up commits included), self-review against `pro
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | `kickoff [#N \| new]`    | Plan only — normalize title, post the plan, notify, **stop**                                                                                                          | `workflow-commands` skill + `kickoff.md` + `split-assessment.md` |
 | `fullrun [#N \| new]`    | Plan → implement → gate → PR → **merge** → notify                                                                                                                     | + `fullrun.md` + `split-assessment.md` + `chain-rule.md`         |
+| `prrun [#N \| new]`      | `fullrun` up to a green, mergeable PR, then **stop** for a person to merge by hand                                                                                    | + `prrun.md` + the `fullrun` set                                 |
 | `halfrun [#N \| new]`    | Implement + gate, then **stop before commit** for manual verification                                                                                                 | + `halfrun.md` + `split-assessment.md`                           |
 | `backlogrun [#N1 #N2 …]` | Run named Issues and epics in order (an epic runs its children first), then drain the opted-in backlog — dependency order, lanes. `--only` stops after the named list | + `backlogrun.md` + `split-assessment.md` + the `fullrun` set    |
 
@@ -169,7 +170,7 @@ Before every `git commit` (follow-up commits included), self-review against `pro
 
 #### Explicit invocation required (MANDATORY)
 
-Never start a `kickoff` / `halfrun` / `fullrun` / `backlogrun` workflow (including their `#N` and `new` variants) unless the user has typed the keyword in the **current turn's prompt**.
+Never start a `kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun` workflow (including their `#N` and `new` variants) unless the user has typed the keyword in the **current turn's prompt**.
 
 - Conversational requests like "implement X", "fix Y", "open a PR for Z" are **NOT** implicit invocations — do not infer authorization from the request shape.
 - Do **NOT** ask confirmation questions like "Shall I run `fullrun`?". A confirmation prompt is not a substitute for explicit invocation.
@@ -182,7 +183,7 @@ Never start a `kickoff` / `halfrun` / `fullrun` / `backlogrun` workflow (includi
 
 #### Mid-workflow stop notification (`confirmation`)
 
-Whenever you pause **any** run mid-execution to wait for the user — a `kickoff` / `halfrun` / `fullrun` stop, an upstream-Issue interrupt, a Tier C confirmation — you MUST send a Telegram notification **before** stopping, so the user is alerted off-screen. `halfrun`'s built-in stop before commit is a confirmation pause and follows this same rule.
+Whenever you pause **any** run mid-execution to wait for the user — a `kickoff` / `halfrun` / `prrun` / `fullrun` stop, an upstream-Issue interrupt, a Tier C confirmation — you MUST send a Telegram notification **before** stopping, so the user is alerted off-screen. `halfrun`'s built-in stop before commit is a confirmation pause and follows this same rule.
 
 ```bash
 pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'<one-line reason>\n<what is needed from the user>'

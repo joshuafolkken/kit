@@ -19,6 +19,7 @@ import {
 	type TelegramSendInput,
 	type TelegramTaskType,
 } from '#scripts/notify/telegram-notify'
+import { git_followup_merged } from './git-followup-merged'
 import { git_followup_pending } from './git-followup-pending'
 import { git_followup_stages, type StageLog } from './git-followup-stages'
 import { git_pr_followup_wrapup } from './git-pr-followup-wrapup'
@@ -73,6 +74,10 @@ interface FollowupInput {
 	ai_review_ignore_reason: string | undefined
 	is_skip_watch: boolean
 	should_merge: boolean
+	// The pull request merged before this run (joshuafolkken/kit#3023): only the tail is left to run.
+	is_merged?: boolean | undefined
+	// When it merged — a completion report posted before it is the `prrun` stop's, not this tail's.
+	merged_at?: string | undefined
 }
 
 const { parse_closes_issue_number } = git_closes_keyword
@@ -351,6 +356,8 @@ async function run_review_checks(
 	context: TelegramContext,
 	log: StageLog,
 ): Promise<{ notes: Array<string>; managed: Array<string> }> {
+	if (input.is_merged === true) return { notes: [], managed: [] }
+
 	const managed = await git_pr_managed_config.handle_managed_config_changes({
 		should_merge: input.should_merge,
 	})
@@ -368,6 +375,26 @@ async function run_review_checks(
 	return { notes: [...managed, ...check_notes, ...scan_notes], managed }
 }
 
+// **A tail re-run after a merge does not report twice** (joshuafolkken/kit#3023): where the issue
+// already carries this pull request's completion report, the Telegram is skipped here and the comment
+// in the wrapup. Answers whether it was recorded, so the wrapup skips on the same read.
+async function notify_unless_recorded(
+	input: FollowupInput,
+	issue_number: string | undefined,
+	context: TelegramContext,
+	checks: { notes: Array<string> },
+): Promise<boolean> {
+	const is_recorded = await git_followup_merged.is_completion_recorded({
+		merged_at: input.is_merged === true ? input.merged_at : undefined,
+		issue_number,
+		pr_url: context.pr_url,
+	})
+
+	if (!is_recorded) await notify_completion(context, checks.notes, input.should_merge)
+
+	return is_recorded
+}
+
 // **Answers with the issue number the run actually used** (joshuafolkken/kit#1539), which is the one
 // the invocation named or, failing that, the one the pull request body closes. Everything downstream
 // takes it from here rather than from the input, so the Telegram context, the completion comment and
@@ -378,8 +405,7 @@ async function run_stages(input: FollowupInput, log: StageLog): Promise<string |
 
 	lap(log, STAGE.closes_and_context)
 	const checks = await run_review_checks(input, context, log)
-
-	await notify_completion(context, checks.notes, input.should_merge)
+	const is_completion_recorded = await notify_unless_recorded(input, issue_number, context, checks)
 
 	lap(log, STAGE.telegram)
 	await git_pr_followup_wrapup.run_wrapup(
@@ -391,6 +417,8 @@ async function run_stages(input: FollowupInput, log: StageLog): Promise<string |
 			pr_url: context.pr_url,
 			should_merge: input.should_merge,
 			managed_notes: checks.managed,
+			is_merged: input.is_merged,
+			is_completion_recorded,
 		},
 		log,
 	)

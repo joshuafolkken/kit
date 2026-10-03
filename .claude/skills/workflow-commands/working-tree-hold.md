@@ -79,3 +79,22 @@ halfrun`. **Skip the title, the plan, the split assessment, `git switch main && 
 issue (`pnpm josh issue:read <N>`), then run the gate **in full** from the refactor (`chain-rule.md` →
 "Run the review-to-merge chain") — a fix made during the manual check has had no gate — and ship as
 any `fullrun` does.
+
+## The prrun resume
+
+**`fullrun #<N>` after a `prrun` stop resumes it the same way** (joshuafolkken/kit#3023). The `prrun`
+ends with `pnpm josh run:hold <N> --prrun-stop`, which writes the commit its pull request is on into its
+own record; only a record carrying that commit is adopted. `run:entry` asks the session budget, adopts
+the hold with the `fullrun` mark and prints one of three tokens — read, never inferred:
+
+- **`resume: prrun-merged`** — a person merged the pull request. Run `pnpm josh followup "<title>
+  #<N>"` alone: it detects the merge and runs only the post-merge tail.
+- **`resume: prrun-merge`** — the branch is still on the stop's commit, both here and on the pull
+  request, and the tree is clean, so what was verified is what would merge. Skip the gate and the
+  review; run `pnpm josh followup` to merge.
+- **`resume: prrun-gate`** — the branch moved (locally, or by a push made on GitHub), its pull request
+  could not be read, or the tree is dirty: a person changed something. Run the
+  gate **in full** and the review (`chain-rule.md` → "Run the review-to-merge chain"), then ship as any
+  `fullrun` does.
+
+All three skip the title, the plan, the split assessment and the implementation.

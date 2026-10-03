@@ -14,7 +14,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		script: RUN_HOLD_SCRIPT,
 		description: 'Claim this working tree for a run, or say which run already holds it',
 		category: 'AI tools',
-		reference: ['[<issue> [--fullrun | --halfrun-stop]]', 'automation', ['files']],
+		reference: ['[<issue> [--fullrun | --halfrun-stop | --prrun-stop]]', 'automation', ['files']],
 	},
 	'run:release': {
 		script: RUN_HOLD_SCRIPT,

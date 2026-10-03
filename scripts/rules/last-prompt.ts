@@ -20,6 +20,7 @@ const WORKFLOW_KEYWORDS: ReadonlySet<string> = new Set([
 	'kickoff',
 	'fullrun',
 	'halfrun',
+	'prrun',
 	'backlogrun',
 ])
 const NO_PROMPT = ''

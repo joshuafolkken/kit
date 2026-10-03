@@ -5,6 +5,7 @@ import type { StopContext } from './stop-rules'
 const BASE: StopContext = {
 	hold_present: false,
 	tree_clean: false,
+	prrun_stopped: false,
 	notified: false,
 	message: '',
 	prompt: '',

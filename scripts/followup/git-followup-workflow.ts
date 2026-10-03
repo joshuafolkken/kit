@@ -11,6 +11,7 @@ import { review_record } from '#scripts/review/review-record'
 import { parse_issue_number_from_text } from './followup-issue-number'
 import { git_followup_finish } from './git-followup-finish'
 import { git_followup_flush } from './git-followup-flush'
+import { git_followup_merged, type MergePlan } from './git-followup-merged'
 import { git_pr_followup } from './git-pr-followup'
 
 josh_environment_file.load_environment_file()
@@ -204,14 +205,18 @@ async function assert_merge_gates(
 }
 
 // After the gates, before the CI wait: a line appended since the run's commit rides the pull request
-// itself, so it merges with it — a lane's included (joshuafolkken/kit#2919).
+// itself, so it merges with it — a lane's included (joshuafolkken/kit#2919). **A pull request that has
+// already merged skips both** (joshuafolkken/kit#3023): the gates guard a merge this run no longer
+// makes, and a ledger commit would land on a branch that has already gone in.
 async function prepare_merge(
-	should_merge: boolean,
+	plan: MergePlan,
 	issue_number: string | undefined,
 	branch_name: string,
 ): Promise<void> {
-	await assert_merge_gates(should_merge, issue_number, branch_name)
-	await git_followup_flush.commit_ledger_step(should_merge, issue_number)
+	if (plan.is_merged) return
+
+	await assert_merge_gates(plan.should_merge, issue_number, branch_name)
+	await git_followup_flush.commit_ledger_step(plan.should_merge, issue_number)
 }
 
 async function main(): Promise<void> {
@@ -225,10 +230,10 @@ async function main(): Promise<void> {
 
 	const issue_number =
 		cli.values['issue-number'] ?? parse_issue_number_from_text(cli.positionals[0] ?? undefined)
-	const should_merge = is_merge_resolved(cli.values)
 	const branch_name = await resolve_branch_name(cli.values.branch)
+	const plan = await git_followup_merged.read_merge_plan(branch_name, is_merge_resolved(cli.values))
 
-	await prepare_merge(should_merge, issue_number, branch_name)
+	await prepare_merge(plan, issue_number, branch_name)
 	// **The number the run reports on is the one it used**, which is the number the pull request
 	// closes where the invocation named none (joshuafolkken/kit#1539). Recovered inside `run`, so the
 	// tail records a run the command line could not identify rather than silently skipping it.
@@ -239,10 +244,12 @@ async function main(): Promise<void> {
 		coderabbit_ignore_reason: cli.values['coderabbit-ignore-reason'],
 		ai_review_ignore_reason: cli.values['ai-review-ignore-reason'],
 		is_skip_watch: cli.values['skip-watch'] === true,
-		should_merge,
+		should_merge: plan.should_merge,
+		is_merged: plan.is_merged,
+		merged_at: plan.merged_at,
 	})
 
-	await git_followup_finish.finish(used_issue_number ?? issue_number, should_merge)
+	await git_followup_finish.finish(used_issue_number ?? issue_number, plan.should_merge)
 }
 
 try {
@@ -257,6 +264,7 @@ const git_followup_workflow = {
 	assert_review_attested,
 	assert_review_recorded,
 	parse_issue_number_from_text,
+	prepare_merge,
 	resolve_branch_name,
 	is_merge_resolved,
 }

@@ -19,7 +19,10 @@ bullets. Use the file option whenever it contains a command or path.
 
 It waits for required CI, checks CodeRabbit and top-level AI review comments, sends the completion
 Telegram, merges by default, posts the Issue report, closes completed epics, removes `in-progress`,
-and releases the hold. Only `--no-merge` stops the merge; `--merge` is a deprecated no-op. Keep the
+and releases the hold. Only `--no-merge` stops the merge; `--merge` is a deprecated no-op. **A pull
+request already merged by hand** (a `prrun` stop, joshuafolkken/kit#3023) skips the CI wait, the AI
+review scan and the merge and runs only the post-merge tail; a completion report already on the Issue
+is not posted or notified twice, so re-running is safe. Keep the
 default Issue target. Ignore a finding only after verifying it is inapplicable; rate-limit text is not
 a finding.
 

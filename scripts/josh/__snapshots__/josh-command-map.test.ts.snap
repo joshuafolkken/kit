@@ -879,7 +879,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:hold": [
-      "[<issue> [--fullrun | --halfrun-stop]]",
+      "[<issue> [--fullrun | --halfrun-stop | --prrun-stop]]",
       "automation",
       [
         "files",

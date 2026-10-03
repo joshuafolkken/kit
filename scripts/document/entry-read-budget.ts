@@ -84,10 +84,13 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// joshuafolkken/kit#2994 moved `CLAUDE.md`'s explanations to `docs/maintainers/claude-md-history.md`,
 	// lowering backlogrun one block; kickoff's reduction was offset by joshuafolkken/kit#3024's longer
 	// `wip-cap.md`, so its ceiling stays.
+	// joshuafolkken/kit#3023 added the `prrun` keyword to `SKILL.md` and `CLAUDE.md`, tipping backlogrun
+	// one block over; `prrun` reads `fullrun`'s set plus its own short manifest.
 	{ entry: 'kickoff', bytes: 229_376 },
 	{ entry: 'fullrun', bytes: 225_280 },
 	{ entry: 'halfrun', bytes: 225_280 },
-	{ entry: 'backlogrun', bytes: 229_376 },
+	{ entry: 'prrun', bytes: 229_376 },
+	{ entry: 'backlogrun', bytes: 233_472 },
 	{ entry: LANE_CHILD, bytes: 77_824 },
 ]
 
