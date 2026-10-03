@@ -137,13 +137,19 @@ Refuse a tool call that would make a third consecutive single-call turn, pushing
 		"hooks": [
 			{
 				"type": "command",
-				"command": "if [ -f dist/hooks/pretool-guard.js ]; then node dist/hooks/pretool-guard.js; else pnpm josh pretool:guard; fi",
+				"command": "<project-root prefix> if node --disable-warning=ExperimentalWarning scripts/hooks/hook-bundle-ready.ts; then node dist/hooks/pretool-guard.js; else pnpm josh pretool:guard; fi",
 				"timeout": 20
 			}
 		]
 	}
 ]
 ```
+
+Every kit hook command that launches a `dist/hooks/` bundle has this shape (`scripts/init/hook-launch.ts`, kit#2984):
+
+- **`<project-root prefix>`** — `cd`s to `git rev-parse --show-toplevel` (with the git location variables a git hook exports cleared first), so a hook fired from a subdirectory still finds its relative paths. It is the same prefix the consumer rewrite applies, written out in full in the real file.
+- **The ready gate** (`scripts/hooks/hook-bundle-ready.ts`, run by plain `node`) compares a content digest of the bundle inputs recorded at build time (`dist/hooks/inputs.json`) with the source on disk. Fresh → the bundle runs. Stale → it rebuilds `dist/hooks/` in-process (a fraction of a second) and says so on stderr, so an edited guard is never shadowed by its old bundle. A checkout that cannot build drops to the `pnpm josh` fallback with a stderr warning — that path is slow and a hook exceeding its timeout lets the call through unguarded.
+- A consumer receives the gate rewritten to a presence check on the installed `node_modules/@joshuafolkken/kit/dist/hooks/`, since the published bundles have no source beside them to go stale against.
 
 - The batch guard reaches `Bash`, `Edit`, `Read`, `Write`; the trailing `AskUserQuestion` in the matcher is the rule guard's, not this one's. `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
 - **Silent in a dispatched lane child since kit#2405** (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn (joshuafolkken/kit#2138), and every advisory notice tried instead (kit#2164, kit#2178, kit#2276) missed 1.40 — kit#2405 measured **1.13** calls per round trip (`josh time:density`, ten most recent lanes). The cause is structural — a `PreToolUse` hook cannot see the turn it is in — so the notice is **`off`**; the lever that moves the density is a composite command (`read:files` / `edit:files`). Decided in `scripts/lane/lane-guard-policy.ts` — `refuse` / `notice` / `off`.
@@ -1981,7 +1987,7 @@ pnpm josh run:stranded
 
 ### `josh lane:open` / `josh lane:close` / `josh lane:list` / `josh lane:prune`
 
-Open and close a lane: one linked git work tree with its own branch and its own port seat. `lane:open` cuts from `refs/remotes/origin/<default>` (falling back to the local branch), attaches to an existing `<N>-lane` branch, installs dependencies (`pnpm install --frozen-lockfile`), and warms the gate caches from the main checkout. It also copies the pre-built hook bundles (`dist/hooks/`) from the main checkout so the lane's Claude Code hooks launch off `node dist/hooks/<name>.js` rather than the slower `pnpm josh …` fallback — those bundles are git-ignored, so a lane's work tree never carries them otherwise. A consumer repository needs no such copy: its hook commands already point at `node_modules/@joshuafolkken/kit/dist/hooks/`, which the install materializes; only kit's own lanes use work-tree-relative paths. When the main checkout has no bundles (a clone that never ran `pnpm build`), the lane opens on the fallback path, and a copy that fails never fails the open — best-effort, exactly like the gate-cache warming.
+Open and close a lane: one linked git work tree with its own branch and its own port seat. `lane:open` cuts from `refs/remotes/origin/<default>` (falling back to the local branch), attaches to an existing `<N>-lane` branch, installs dependencies (`pnpm install --frozen-lockfile`), and warms the gate caches from the main checkout. It also copies the pre-built hook bundles (`dist/hooks/`) from the main checkout so the lane's Claude Code hooks launch off `node dist/hooks/<name>.js` rather than the slower `pnpm josh …` fallback — those bundles are git-ignored, so a lane's work tree never carries them otherwise. A consumer repository needs no such copy: its hook commands already point at `node_modules/@joshuafolkken/kit/dist/hooks/`, which the install materializes; only kit's own lanes use work-tree-relative paths. When the main checkout has no bundles (a clone that never ran `pnpm build`), the lane opens without them and the first hook's ready gate builds them; a copy that fails never fails the open — best-effort, exactly like the gate-cache warming. A copied bundle stays in use only while its recorded content digest matches the lane's source; once the lane edits a hook's inputs, the ready gate rebuilds it (see [`josh batch:guard`](#josh-batchguard)).
 
 ```bash
 pnpm josh lane:open 1490    # prints the lane directory on stdout

@@ -1,9 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { execa } from 'execa'
 import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest'
 import { build_hooks, HOOK_BUNDLES, outfile_for } from './build-hooks'
+import { hook_bundle_stamp } from './hook-bundle-stamp'
 import { lane_cut_fixture } from './lane-cut-fixture'
 
 const BUILD_TIMEOUT_MS = 60_000
@@ -149,18 +150,25 @@ describe('launched hook bundles run their main', () => {
 	})
 })
 
+function create_out_directory(): string {
+	const out_directory = mkdtempSync(path.join(tmpdir(), 'build-hooks-out-'))
+
+	onTestFinished(() => {
+		rmSync(out_directory, { recursive: true, force: true })
+	})
+
+	return out_directory
+}
+
 // joshuafolkken/kit#2885: split builds emit freshly hashed chunks each time, so a chunk left from an
 // earlier build has to be gone after the next one rather than shipping beside the live chunks.
 describe('build_hooks output directory', () => {
 	it(
 		'removes a stale chunk left from an earlier build',
 		async () => {
-			const out_directory = mkdtempSync(path.join(tmpdir(), 'build-hooks-out-'))
+			const out_directory = create_out_directory()
 			const stale_chunk = path.join(out_directory, 'chunk-STALE.js')
 
-			onTestFinished(() => {
-				rmSync(out_directory, { recursive: true, force: true })
-			})
 			writeFileSync(stale_chunk, 'export {}\n')
 			await build_hooks(out_directory)
 
@@ -170,6 +178,24 @@ describe('build_hooks output directory', () => {
 			)
 
 			expect(built.every(Boolean)).toBe(true)
+		},
+		BUILD_TIMEOUT_MS,
+	)
+
+	// joshuafolkken/kit#2984: every file is renamed in from a private staging directory, which must not
+	// be left beside the output, and the stamp it places last reads the fresh build as current.
+	it(
+		'places the build and its stamp without leaving the staging directory behind',
+		async () => {
+			const out_directory = create_out_directory()
+
+			await build_hooks(out_directory)
+
+			expect(existsSync(path.join(out_directory, hook_bundle_stamp.STAMP_NAME))).toBe(true)
+			expect(hook_bundle_stamp.is_fresh(out_directory, process.cwd())).toBe(true)
+			expect(readdirSync(path.dirname(out_directory))).not.toContainEqual(
+				expect.stringMatching(/^\.hooks-staging-/u),
+			)
 		},
 		BUILD_TIMEOUT_MS,
 	)

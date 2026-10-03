@@ -6,7 +6,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "if [ -f dist/hooks/codex-hook-adapter.js ]; then node dist/hooks/codex-hook-adapter.js pretool; else pnpm exec tsx scripts/hooks/codex-hook-adapter.ts pretool; fi",
+						"command": "if project_root=\"$(env -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_COMMON_DIR -u GIT_DIR -u GIT_INDEX_FILE -u GIT_NAMESPACE -u GIT_OBJECT_DIRECTORY -u GIT_WORK_TREE git rev-parse --show-toplevel 2>/dev/null)\"; then unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; else project_root=\"$(git rev-parse --show-toplevel)\" || exit 1; fi; cd \"$project_root\" && if node --disable-warning=ExperimentalWarning scripts/hooks/hook-bundle-ready.ts; then node dist/hooks/codex-hook-adapter.js pretool; else pnpm exec tsx scripts/hooks/codex-hook-adapter.ts pretool; fi",
 						"timeout": 20
 					}
 				]
@@ -18,7 +18,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "if [ -f dist/hooks/codex-hook-adapter.js ]; then node dist/hooks/codex-hook-adapter.js posttool; else pnpm exec tsx scripts/hooks/codex-hook-adapter.ts posttool; fi",
+						"command": "if project_root=\"$(env -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_COMMON_DIR -u GIT_DIR -u GIT_INDEX_FILE -u GIT_NAMESPACE -u GIT_OBJECT_DIRECTORY -u GIT_WORK_TREE git rev-parse --show-toplevel 2>/dev/null)\"; then unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; else project_root=\"$(git rev-parse --show-toplevel)\" || exit 1; fi; cd \"$project_root\" && if node --disable-warning=ExperimentalWarning scripts/hooks/hook-bundle-ready.ts; then node dist/hooks/codex-hook-adapter.js posttool; else pnpm exec tsx scripts/hooks/codex-hook-adapter.ts posttool; fi",
 						"timeout": 90
 					}
 				]
@@ -45,7 +45,7 @@
 					},
 					{
 						"type": "command",
-						"command": "if [ -f dist/hooks/session-lang.js ]; then node dist/hooks/session-lang.js; else pnpm josh session:lang; fi",
+						"command": "if project_root=\"$(env -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_COMMON_DIR -u GIT_DIR -u GIT_INDEX_FILE -u GIT_NAMESPACE -u GIT_OBJECT_DIRECTORY -u GIT_WORK_TREE git rev-parse --show-toplevel 2>/dev/null)\"; then unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; else project_root=\"$(git rev-parse --show-toplevel)\" || exit 1; fi; cd \"$project_root\" && if node --disable-warning=ExperimentalWarning scripts/hooks/hook-bundle-ready.ts; then node dist/hooks/session-lang.js; else pnpm josh session:lang; fi",
 						"timeout": 10
 					}
 				]
@@ -57,7 +57,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "if [ -f dist/hooks/stop-guard.js ]; then node dist/hooks/stop-guard.js; else pnpm josh stop:guard; fi",
+						"command": "if project_root=\"$(env -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_COMMON_DIR -u GIT_DIR -u GIT_INDEX_FILE -u GIT_NAMESPACE -u GIT_OBJECT_DIRECTORY -u GIT_WORK_TREE git rev-parse --show-toplevel 2>/dev/null)\"; then unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; else project_root=\"$(git rev-parse --show-toplevel)\" || exit 1; fi; cd \"$project_root\" && if node --disable-warning=ExperimentalWarning scripts/hooks/hook-bundle-ready.ts; then node dist/hooks/stop-guard.js; else pnpm josh stop:guard; fi",
 						"timeout": 20
 					}
 				]
