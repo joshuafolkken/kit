@@ -160,12 +160,14 @@ describe('merge_sonar_properties multicriteria edge cases', () => {
 		const existing = `${EXISTING}sonar.issue.ignore.multicriteria=e1,e2,e3,e4,e5\n`
 		const result = init_logic.merge_sonar_properties(existing, template)
 
-		for (const id of ['e6', 'e7', 'e8']) {
+		for (const id of ['e6', 'e7', 'e8', 'e9', 'e10', 'e11', 'e12']) {
 			expect(result).toContain(`sonar.issue.ignore.multicriteria.${id}.ruleKey=`)
 			expect(result).toContain(`sonar.issue.ignore.multicriteria.${id}.resourceKey=`)
 		}
 
-		expect(result).toContain('sonar.issue.ignore.multicriteria=e1,e2,e3,e4,e5,e6,e7,e8\n')
+		expect(result).toContain(
+			'sonar.issue.ignore.multicriteria=e1,e2,e3,e4,e5,e6,e7,e8,e9,e10,e11,e12\n',
+		)
 	})
 })
 

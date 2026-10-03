@@ -34,8 +34,9 @@ function is_local_export(_identifier: ts.Node, parent: ts.Node): boolean {
 
 function is_spied_holder(identifier: ts.Node, parent: ts.Node): boolean {
 	if (!ts.isCallExpression(parent)) return false
-	const index = parent.arguments.findIndex((argument) => argument === identifier)
-	const next = parent.arguments[index + 1]
+	const call_arguments: ReadonlyArray<ts.Node> = parent.arguments
+	const index = call_arguments.indexOf(identifier)
+	const next = call_arguments[index + 1]
 
 	return index !== -1 && next !== undefined && ts.isStringLiteralLike(next)
 }
