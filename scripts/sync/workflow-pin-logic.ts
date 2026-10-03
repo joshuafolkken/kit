@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { composite_actions } from '#scripts/ci/composite-actions'
 import { is_workflow_destination } from '#scripts/claude/workflow-destination'
 import { package_path } from '#scripts/init/init-paths'
 
@@ -9,7 +10,8 @@ import { package_path } from '#scripts/init/init-paths'
 //
 // The refs committed in templates/workflows/* are NOT authoritative: every consumer
 // workflow is written through apply_pins_for_destination, which resolves the pins from
-// .github/workflows at write time. Dependabot only ever updates .github/workflows (its
+// .github/workflows (and the composite actions under .github/actions) at write time. Dependabot
+// only ever updates .github (its
 // github-actions ecosystem cannot scan templates/), so a stale template ref must not be
 // able to reach a consumer — and must not fail CI either. `josh sync-workflow-pins`
 // stays available to refresh the committed refs, but nothing depends on it having run.
@@ -144,8 +146,19 @@ function list_workflow_sources(relative_directory: string): Array<WorkflowSource
 		.map((name) => read_source(relative_directory, name))
 }
 
+// The local composite actions are runtime sources too: `.github/actions/setup-pnpm` is the only
+// place kit's own workflows still pin pnpm/setup (joshuafolkken/kit#2982).
+function list_composite_action_sources(): Array<WorkflowSource> {
+	return composite_actions
+		.list(package_path)
+		.map((file) => ({ file, text: readFileSync(package_path(file), 'utf8') }))
+}
+
 function build_canonical_pins(): Map<string, string> {
-	return collect_canonical(list_workflow_sources(RUNTIME_WORKFLOWS_DIR))
+	return collect_canonical([
+		...list_workflow_sources(RUNTIME_WORKFLOWS_DIR),
+		...list_composite_action_sources(),
+	])
 }
 
 // An action the templates use but .github/workflows does not: write-time injection has no

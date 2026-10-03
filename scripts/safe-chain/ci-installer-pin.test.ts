@@ -29,6 +29,7 @@ const INSTALLER_BYTES = new TextEncoder().encode('#!/bin/sh\necho install\n')
 const INSTALLER_SHA = createHash('sha256').update(INSTALLER_BYTES).digest('hex')
 const PATHS = ['a/ci.yml', 'b/ci.yml']
 const GITHUB_WORKFLOWS = '.github/workflows'
+const GITHUB_ACTIONS = '.github/actions'
 const DAST_YML = `${GITHUB_WORKFLOWS}/dast.yml`
 const UNPINNED_YML = `${GITHUB_WORKFLOWS}/release.yml`
 const UNPINNED_WORKFLOW = 'env:\n  FOO: bar\n'
@@ -86,6 +87,22 @@ describe('ci_installer_pin.list_workflows', () => {
 
 		expect(ci_installer_pin.list_workflows()).toEqual([DAST_YML, `${GITHUB_WORKFLOWS}/load.yaml`])
 		expect(readdir_mock).toHaveBeenCalledOnce()
+	})
+
+	it('lists every local composite action file after the workflows', () => {
+		const present = new Set([
+			GITHUB_ACTIONS,
+			`${GITHUB_ACTIONS}/setup-pnpm/action.yml`,
+			`${GITHUB_ACTIONS}/other/action.yaml`,
+		])
+
+		exists_mock.mockImplementation((candidate: string) => present.has(candidate))
+		readdir_mock.mockReturnValue(['setup-pnpm', 'other'])
+
+		expect(ci_installer_pin.list_workflows()).toEqual([
+			`${GITHUB_ACTIONS}/other/action.yaml`,
+			`${GITHUB_ACTIONS}/setup-pnpm/action.yml`,
+		])
 	})
 })
 

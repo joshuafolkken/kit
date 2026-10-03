@@ -1,25 +1,41 @@
 import { ci_installer_pin } from '#scripts/safe-chain/ci-installer-pin'
 import { describe, expect, it } from 'vitest'
-import { ci_yml_fixture } from './ci-yml-fixture'
+import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
 
-const PR_CLASSIFICATION_YML = '.github/workflows/pr-classification.yml'
-const WORKFLOWS = [
-	ci_yml_fixture.RUNTIME_CI_YML,
-	ci_yml_fixture.TEMPLATE_CI_YML,
-	PR_CLASSIFICATION_YML,
-]
+// kit's own workflows install through the composite action, which carries the pin on its
+// safe-chain step; the distributed template, which travels without it, carries the pin at workflow
+// level (joshuafolkken/kit#2982).
+const ACTION_YML = ci_yml_fixture.SETUP_PNPM_ACTION
+const WORKFLOWS = [ACTION_YML, ci_yml_fixture.TEMPLATE_CI_YML]
 const LEGACY_SETUP = 'pnpm dlx @aikidosec/safe-chain'
+const SAFE_CHAIN_STEP = 'Setup safe-chain'
 const SHA256_RE = /^[0-9a-f]{64}$/u
 const VERSION_VARIABLE = 'SAFE_CHAIN_INSTALLER_VERSION'
 const SHA256_VARIABLE = 'SAFE_CHAIN_INSTALLER_SHA256'
 
-function safe_chain_steps(relative_path: string): Array<string> {
-	const workflow = ci_yml_fixture.load_workflow(relative_path)
+function is_action(relative_path: string): boolean {
+	return relative_path.endsWith('/action.yml')
+}
 
-	return Object.values(workflow.jobs)
-		.flatMap((job) => job.steps ?? [])
-		.filter((step) => step.name === 'Setup safe-chain')
+function all_steps(relative_path: string): ReadonlyArray<WorkflowStep> {
+	if (is_action(relative_path)) return ci_yml_fixture.load_action(relative_path).runs.steps
+
+	return Object.values(ci_yml_fixture.load_workflow(relative_path).jobs).flatMap(
+		(job) => job.steps ?? [],
+	)
+}
+
+function safe_chain_steps(relative_path: string): Array<string> {
+	return all_steps(relative_path)
+		.filter((step) => step.name === SAFE_CHAIN_STEP)
 		.map((step) => ci_yml_fixture.step_run(step))
+}
+
+// Where the pin is declared: the action's safe-chain step, or the workflow-level env.
+function pin_environment(relative_path: string): Record<string, string> {
+	if (!is_action(relative_path)) return ci_yml_fixture.load_workflow(relative_path).env ?? {}
+
+	return all_steps(relative_path).find((step) => step.name === SAFE_CHAIN_STEP)?.env ?? {}
 }
 
 // joshuafolkken/kit#2711: `pnpm dlx … setup-ci` left shims whose `safe-chain` binary was gone by
@@ -50,8 +66,8 @@ describe.each(WORKFLOWS)('safe-chain setup in %s', (relative_path) => {
 		)
 	})
 
-	it('pins a release and a full SHA-256 at workflow level', () => {
-		const environment = ci_yml_fixture.load_workflow(relative_path).env ?? {}
+	it('pins a release and a full SHA-256', () => {
+		const environment = pin_environment(relative_path)
 
 		expect(environment[VERSION_VARIABLE]).toMatch(/^\d+\.\d+\.\d+$/u)
 		expect(environment[SHA256_VARIABLE]).toMatch(SHA256_RE)
@@ -92,7 +108,7 @@ describe('safe-chain setup across every workflow', () => {
 describe('safe-chain installer pin parity', () => {
 	it('every pinned workflow installs the same release with the same SHA-256', () => {
 		const pins = WORKFLOWS.map((relative_path) => {
-			const environment = ci_yml_fixture.load_workflow(relative_path).env ?? {}
+			const environment = pin_environment(relative_path)
 
 			return JSON.stringify([environment[VERSION_VARIABLE], environment[SHA256_VARIABLE]])
 		})
