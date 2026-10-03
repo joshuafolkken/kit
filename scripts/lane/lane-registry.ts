@@ -217,6 +217,14 @@ async function list_lanes(): Promise<Array<LaneInfo>> {
 	return lanes.toSorted((left, right) => Number(left.issue) - Number(right.issue))
 }
 
+// The lanes a parent is still waiting on. A stranded lane has no child working in it, so it is not
+// in-flight — the one definition the watcher guard and the headless stop rule both read.
+async function has_lanes_in_flight(): Promise<boolean> {
+	const lanes = await list_lanes()
+
+	return lanes.some((lane) => !lane.is_stranded)
+}
+
 /** The seats live lanes hold — what a new lane's seat has to avoid. */
 function used_seats(lanes: ReadonlyArray<LaneInfo>): Array<number> {
 	return lanes.map((lane) => lane.seat).filter((seat): seat is number => seat !== undefined)
@@ -246,6 +254,7 @@ async function find_open_lane(issue: string): Promise<LaneInfo | undefined> {
 const lane_registry = {
 	find_lane,
 	find_open_lane,
+	has_lanes_in_flight,
 	list_lanes,
 	main_repository_root,
 	parse_block,

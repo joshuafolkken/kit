@@ -1,6 +1,8 @@
-import { EPIC_LABEL, has_label_name } from '#scripts/git/issue-labels'
+import { EPIC_LABEL, has_label_name, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import type { IssueState } from '#scripts/issue/issue-state'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import type { RunCarry } from '#scripts/run/run-carry'
+import type { MergeResult } from '#scripts/run/run-merge-cli'
 import { backlog_budget } from './backlog-budget'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_named } from './backlog-drive-named'
@@ -44,6 +46,15 @@ function budget_offer(
 	}
 }
 
+// The outcome a named issue has already reached without this run dispatching it: closed is merged, and
+// a `needs-decision` park waits on a person, so re-dispatching it only repeats the stop it parked on
+// (joshuafolkken/kit#2965). Either is booked done rather than offered.
+function settled_outcome(state: IssueState): MergeResult['outcome'] | undefined {
+	if (state.state.toUpperCase() === 'CLOSED') return 'merged'
+
+	return has_label_name(state.labels, NEEDS_DECISION_LABEL) ? 'parked' : undefined
+}
+
 async function classify(issue: string, named: OfferRead, owner: string): Promise<OfferRead> {
 	const result = await issue_state_cli.read_issue(issue)
 
@@ -51,8 +62,10 @@ async function classify(issue: string, named: OfferRead, owner: string): Promise
 		return { verdict: 'issue-state', issues: [], retries: NO_RETRIES }
 	}
 
-	if (result.state.state.toUpperCase() === 'CLOSED') {
-		await backlog_drive_named.mark_done(issue, { outcome: 'merged', code: 0, token: 'none' }, owner)
+	const outcome = settled_outcome(result.state)
+
+	if (outcome !== undefined) {
+		await backlog_drive_named.mark_done(issue, { outcome, code: 0, token: 'none' }, owner)
 
 		return { verdict: 'wait', issues: [], retries: NO_RETRIES }
 	}

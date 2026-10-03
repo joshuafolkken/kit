@@ -1,4 +1,5 @@
 import { lane_registry } from '#scripts/lane/lane-registry'
+import { run_headless } from './run-headless'
 import { run_progress_clock } from './run-progress-clock'
 
 // A watcher that stopped while children are still in-flight leaves the parent blind to completions
@@ -29,19 +30,21 @@ type GuardResult = { kind: 'ok' } | { kind: 'stale'; note: string }
 
 const OK_RESULT: GuardResult = { kind: 'ok' }
 
-// The lanes a parent is still waiting on. A stranded lane has no child working in it, so it is not
-// in-flight — the one definition both this guard and the headless stop rule read (`run-headless.ts`).
-async function has_lanes_in_flight(): Promise<boolean> {
-	const all_lanes = await lane_registry.list_lanes()
+// **Only the run that opened the lanes owes them a watcher** (joshuafolkken/kit#2965). The lane listing
+// is machine-wide, so a session with no run of its own — an investigation, a `fullrun` beside a batch —
+// used to be refused for another run's lanes. The session that drives the live `backlogrun` carry
+// record is the one that dispatched them; every other session passes.
+async function owes_watcher(): Promise<boolean> {
+	if (!(await run_headless.is_backlog_parent())) return false
 
-	return all_lanes.some((lane) => !lane.is_stranded)
+	return await lane_registry.has_lanes_in_flight()
 }
 
 // `life_target` is the path returned by `run_progress_read.stamp_target()` or
 // `run_progress_clock.life_target_of(git_directory)`. Passed in rather than resolved here so the
 // caller can use whichever resolution fits its sync/async context.
 async function check(life_target: string): Promise<GuardResult> {
-	if (!(await has_lanes_in_flight())) return OK_RESULT
+	if (!(await owes_watcher())) return OK_RESULT
 
 	if (run_progress_clock.is_life_fresh(life_target, STALE_THRESHOLD_MS)) return OK_RESULT
 
@@ -52,7 +55,6 @@ const run_watcher_guard = {
 	STALE_NOTE,
 	STALE_THRESHOLD_MS,
 	check,
-	has_lanes_in_flight,
 }
 
 export type { GuardResult }

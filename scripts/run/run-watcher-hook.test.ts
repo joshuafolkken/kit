@@ -1,7 +1,6 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import type { LaneInfo } from '#scripts/lane/lane-registry'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_progress_clock } from './run-progress-clock'
 import { run_watcher_guard } from './run-watcher-guard'
@@ -13,7 +12,11 @@ import { run_watcher_hook } from './run-watcher-hook'
 // switch, the lane-child exemption, and the once-per-run stamp.
 
 vi.mock('#scripts/lane/lane-registry', () => ({
-	lane_registry: { list_lanes: vi.fn() },
+	lane_registry: { has_lanes_in_flight: vi.fn() },
+}))
+
+vi.mock('./run-headless', () => ({
+	run_headless: { is_backlog_parent: vi.fn() },
 }))
 
 vi.mock('./run-progress-read', () => ({
@@ -21,23 +24,13 @@ vi.mock('./run-progress-read', () => ({
 }))
 
 const { lane_registry } = await import('#scripts/lane/lane-registry')
+const { run_headless } = await import('./run-headless')
 const { run_progress_read } = await import('./run-progress-read')
-const list_lanes = vi.mocked(lane_registry.list_lanes)
+const lanes_in_flight = vi.mocked(lane_registry.has_lanes_in_flight)
 const live_target = vi.mocked(run_progress_read.live_target)
 
 const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-watcher-hook-'))
 const LIFE_TARGET = path.join(TEMPORARY, 'life.json')
-
-const MOCK_LANE: LaneInfo = {
-	issue: '2113',
-	branch: '2113-lane',
-	directory: '',
-	seat: undefined,
-	development_port: undefined,
-	preview_port: undefined,
-	output: undefined,
-	is_stranded: false,
-}
 
 const sequence = { value: 0 }
 
@@ -56,7 +49,8 @@ afterAll(() => {
 })
 
 beforeEach(() => {
-	list_lanes.mockResolvedValue([MOCK_LANE])
+	vi.mocked(run_headless.is_backlog_parent).mockResolvedValue(true)
+	lanes_in_flight.mockResolvedValue(true)
 	live_target.mockResolvedValue(LIFE_TARGET)
 	delete process.env['JOSH_WATCHER_GUARD']
 	delete process.env['JOSH_LANE_CHILD']
@@ -99,7 +93,7 @@ describe('watcher_hook_reason — passes the call through', () => {
 	})
 
 	it('returns undefined when no lane is in-flight', async () => {
-		list_lanes.mockResolvedValue([])
+		lanes_in_flight.mockResolvedValue(false)
 
 		const reason = await run_watcher_hook.watcher_hook_reason(fresh_payload())
 
