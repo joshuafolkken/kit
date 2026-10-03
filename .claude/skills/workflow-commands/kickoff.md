@@ -1,13 +1,18 @@
 # `kickoff` — Planning phase only (plan → Issue → Telegram notify → stop)
 
-- `kickoff #<N>`: Read existing Issue #N **and every comment on it** — `pnpm josh issue:read <N>`; a
+- `kickoff #<N>`: **First `pnpm josh run:entry <N> --to kickoff`** (`SKILL.md` → §2k) — it claims
+  nothing and prints the stage line alone; `start: reached` means the Issue is already planned or further
+  up the ladder, so report the stage line and **stop**. Otherwise read existing Issue #N **and every comment on it** — `pnpm josh issue:read <N>`; a
   decision recorded after the body was written lives only in a comment, and the later text is the
   agreement in force (`SKILL.md` → §2g, which also carries the two answers that stop the run instead) →
   **normalize the title**: if the title is not in English or can be phrased more clearly, derive a
   better English title and run `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"` →
   analyze requirements → **scope assessment per `split-assessment.md`** → post the plan to the Issue (if
   body is blank, `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f body="<plan>"`; otherwise
-  `pnpm josh issue:comment <N> --body-file <path>`) → send Telegram notification → **stop**
+  `pnpm josh issue:comment <N> --body-file <path>`) → **apply the `run:planned` label** — the mark the next
+  command's `run:entry` reads to start at the implementation, provisioned by `josh sync` (`gh api
+  repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=run:planned' --silent`) → send Telegram
+  notification, its last line `Next: halfrun #<N> | prrun #<N> | fullrun #<N>` → **stop**
   (do not implement). **When the assessment finds two or more separately-mergeable deliverables**, take
   the split path instead of posting a plan: create the children as in `kickoff new`, then either
   **promote `#N`** with `pnpm josh epic --promote <N> <N1> <N2> ... [--ordered] [--rationale-file

@@ -6,6 +6,13 @@ up to a green, mergeable pull request and **stops before the merge**, so a perso
 the gate, the review and the stop branches are `fullrun`'s, unchanged. This file names only the
 difference, never a second copy of the procedure.
 
+## The difference — the entry
+
+`prrun #<N>` opens with `pnpm josh run:entry <N> --to prrun` where `fullrun` passes no `--to`
+(`SKILL.md` → §2k): a planned Issue starts at the implementation, a `halfrun` stop is adopted and
+resumes at the gate, and an Issue already stopped by a `prrun` is reached — report the stage line and
+stop. A merged Issue is reached too, but the `entry #<N>` line after the stage line answers it (§2k).
+
 ## The difference — the end of the run
 
 Where `fullrun` runs `pnpm josh followup` and merges, `prrun` does three things and stops:

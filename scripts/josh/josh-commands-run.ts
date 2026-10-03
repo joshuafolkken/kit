@@ -87,7 +87,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Open a run in one call: claim the tree, read the budget, bundle the reads, decide the pre-implementation step',
 		category: 'AI tools',
-		reference: ['<issue>', 'automation', ['git', 'network', 'files']],
+		reference: ['<issue> [--to <command>]', 'automation', ['git', 'network', 'files']],
 	},
 	'run:status': {
 		script: 'scripts/run/run-status-cli.ts',

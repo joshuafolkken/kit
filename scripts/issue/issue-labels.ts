@@ -6,6 +6,11 @@ const BUG_LABEL = 'bug'
 const ENHANCEMENT_LABEL = 'enhancement'
 const BREAKING_CHANGE_LABEL = 'breaking-change'
 const IN_PROGRESS_LABEL = 'in-progress'
+// Applied by `kickoff` once its plan is on the issue, so the next command's `run:entry` reads the issue
+// as planned and starts at the implementation rather than planning again (joshuafolkken/kit#3042).
+// Namespaced like `run:solo`: a bare `planned` is a common roadmap label a person may already apply,
+// and reading one as kickoff's mark would skip the planning that never happened.
+const PLANNED_LABEL = 'run:planned'
 // Parks a child that cannot advance without a person deciding something. `epic:next` is what reads
 // it: a parked child is why a run reports "nothing left that time will fix" rather than waiting
 // forever (joshuafolkken/kit#860).
@@ -207,6 +212,7 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 		description: 'Tracks a batch of child issues from one split',
 	},
 	{ name: IN_PROGRESS_LABEL, color: '0075ca', description: 'Work is actively in progress' },
+	{ name: PLANNED_LABEL, color: 'c2e0c6', description: 'kickoff posted the plan' },
 	{
 		name: RUN_SOLO_LABEL,
 		color: 'b60205',
@@ -328,6 +334,7 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	ENHANCEMENT_LABEL,
 	BREAKING_CHANGE_LABEL,
 	IN_PROGRESS_LABEL,
+	PLANNED_LABEL,
 	NEEDS_DECISION_LABEL,
 	AUTO_OK_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
@@ -375,6 +382,7 @@ export {
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
 	OTHER_CHANGE_LABEL,
+	PLANNED_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RELEASE_CLASSIFICATION_LABELS,
 	RELEASE_CLASSIFICATION_NAMES,

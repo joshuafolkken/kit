@@ -863,7 +863,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:entry": [
-      "<issue>",
+      "<issue> [--to <command>]",
       "automation",
       [
         "git",

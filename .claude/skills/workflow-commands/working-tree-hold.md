@@ -68,7 +68,8 @@ the procedure.
 
 ## The halfrun resume
 
-**`fullrun #<N>` after a `halfrun` stop resumes it instead of claiming** (joshuafolkken/kit#2796). The
+**`fullrun #<N>` or `prrun #<N>` after a `halfrun` stop resumes it instead of claiming**
+(joshuafolkken/kit#2796, #3042). The
 stop is **recorded, never inferred**: the `halfrun` ends with `pnpm josh run:hold <N> --halfrun-stop`,
 which marks its own record (re-keying a `halfrun new`'s unnumbered one to the filed issue) — a
 `halfrun` still implementing or a `backlogrun` child leaves the same hold over the same dirty tree, and
