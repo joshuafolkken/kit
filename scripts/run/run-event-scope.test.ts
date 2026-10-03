@@ -170,13 +170,11 @@ describe('run_event_scope.last_issue_event — the parent’s batch record', () 
 	const FOREIGN_MERGE_LABEL = 'another issue’s merge'
 	const FOREIGN_OUTAGE = named(5, KIND.OUTAGE, '#3027 outage (re-dispatchable)')
 	const STALL = named(6, KIND.STALL, '1 ready, 6 free lane(s), 22m since the last dispatch')
-	const OWN_DISPATCH = named(7, KIND.CHILD_LAUNCH, `#${ISSUE} dispatched`)
 
 	it.each([
 		[FOREIGN_MERGE_LABEL, FOREIGN_MERGE],
 		['another issue’s outage', FOREIGN_OUTAGE],
 		['the parent’s stall', STALL],
-		['its own dispatch', OWN_DISPATCH],
 		['another lane’s cut', FOREIGN_CUT],
 		['the parent’s strand, whose invocation names it', STRANDED],
 	])('leaves %s out of a lane child’s position', (_label, foreign) => {
@@ -200,5 +198,31 @@ describe('run_event_scope.last_issue_event — the parent’s batch record', () 
 		expect(run_event_scope.last_issue_event([PLAN, batch], since(START), ISSUE, false)).toEqual(
 			batch,
 		)
+	})
+})
+
+describe('run_event_scope.last_issue_event — a lane child’s attempt', () => {
+	const OWN_OUTAGE = named(4, KIND.OUTAGE, `#${ISSUE} outage (re-dispatchable)`)
+	const OWN_DISPATCH = named(7, KIND.CHILD_LAUNCH, `#${ISSUE} dispatched`)
+	const ATTEMPT = [named(3, KIND.PLAN, `planned #${ISSUE}`), OWN_OUTAGE, OWN_DISPATCH]
+
+	it('does not read the previous attempt’s outage once it is re-dispatched', () => {
+		expect(run_event_scope.last_issue_event(ATTEMPT, since(START), ISSUE, true)).toBeUndefined()
+	})
+
+	it('reads the new attempt’s own events after its newest launch', () => {
+		const replanned = named(8, KIND.PLAN, `planned #${ISSUE}`)
+
+		expect(
+			run_event_scope.last_issue_event([...ATTEMPT, replanned], since(START), ISSUE, true),
+		).toEqual(replanned)
+	})
+
+	it('keeps its own outage when only another issue is launched after it', () => {
+		const foreign_dispatch = named(7, KIND.CHILD_LAUNCH, '#3027 dispatched')
+
+		expect(
+			run_event_scope.last_issue_event([OWN_OUTAGE, foreign_dispatch], since(START), ISSUE, true),
+		).toEqual(OWN_OUTAGE)
 	})
 })

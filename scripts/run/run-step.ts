@@ -1,7 +1,6 @@
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
 import type { CarryRead } from './run-carry'
-import { run_event_scope } from './run-event-scope'
 import { run_event_stream } from './run-event-stream'
 import { run_retrospective } from './run-retrospective'
 
@@ -178,9 +177,8 @@ const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 // budget command — a child that ran it read the `busy` it got back as a competing session and parked
 // its Issue unimplemented (joshuafolkken/kit#2267). A merge or an outage is the parent's to classify,
 // so a child at one has nothing to run and stops rather than being handed `run:merge`
-// (joshuafolkken/kit#2297). The set is `run_event_scope.PARENT_ONLY_KINDS`, shared with the position read
-// that leaves another issue's merge out of a lane child's position (joshuafolkken/kit#3039).
-const PARENT_ONLY_EVENTS = run_event_scope.PARENT_ONLY_KINDS
+// (joshuafolkken/kit#2297).
+const PARENT_ONLY_EVENTS: ReadonlySet<string> = new Set([KIND.MERGE, KIND.OUTAGE])
 
 // A stopped run's last owed step is the end-of-run retrospective. When it is not owed the position stops
 // with no command to run, which is what the position meant before the retrospective existed.

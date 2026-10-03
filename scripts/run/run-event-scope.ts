@@ -93,10 +93,6 @@ const SHIP_POSITION_KINDS: ReadonlySet<string> = new Set([
 
 const KIND = run_event_stream.EVENT_KIND
 
-// The positions only a `backlogrun` parent acts on — `run:merge` classifies both (joshuafolkken/kit#2297).
-// A lane child at its *own* merge or outage stops rather than being handed `run:merge`.
-const PARENT_ONLY_KINDS: ReadonlySet<string> = new Set([KIND.MERGE, KIND.OUTAGE])
-
 // The parent's record of the batch around a child — its dispatch, park and split, the retrospective
 // whose summary may name an issue it filed, and the strand whose text carries the whole invocation
 // (`backlogrun #<N1> #<N2> …`). Each can name the child, yet none is a position the child itself is at,
@@ -124,10 +120,23 @@ function is_own_ship_event(event: RunEvent, issue: string): boolean {
 // run's: another lane's merge told a planned child to stop, the parent's stall (which names no issue)
 // pointed it at `backlog:next`, and another lane's cut at `run:cut --resume`. The child's own merge and
 // outage stay, so the parent-only stop in `run-step.ts` still holds; the parent keeps reading everything.
-function is_lane_position(event: RunEvent, issue: string): boolean {
-	if (BATCH_RECORD_KINDS.has(event.kind)) return false
-
+function names_issue(event: RunEvent, issue: string): boolean {
 	return ISSUE_REFERENCE.exec(event.text)?.[1] === issue
+}
+
+function is_lane_position(event: RunEvent, issue: string): boolean {
+	return !BATCH_RECORD_KINDS.has(event.kind) && names_issue(event, issue)
+}
+
+// A lane child's attempt begins at its own newest launch. A child re-dispatched after an outage — or
+// relaunched after a cut, whose resume `run:cut --resume` answers at the entry — shares the scope with
+// its previous attempt, and that attempt's outage would otherwise stop the new one at its entry `run:step`.
+function since_own_launch(events: ReadonlyArray<RunEvent>, issue: string): ReadonlyArray<RunEvent> {
+	const launch = events.findLastIndex(
+		(event) => event.kind === KIND.CHILD_LAUNCH && names_issue(event, issue),
+	)
+
+	return events.slice(launch + 1)
 }
 
 function is_foreign_event(event: RunEvent, issue: string, is_lane_child: boolean): boolean {
@@ -147,7 +156,8 @@ function last_issue_event(
 	issue: string,
 	is_lane_child: boolean,
 ): RunEvent | undefined {
-	const own = events.filter((event) => !is_foreign_event(event, issue, is_lane_child))
+	const attempt = is_lane_child ? since_own_launch(events, issue) : events
+	const own = attempt.filter((event) => !is_foreign_event(event, issue, is_lane_child))
 
 	if (scope.kind === SINCE_SCOPE) return last_scoped_event(own, scope)
 
@@ -155,7 +165,6 @@ function last_issue_event(
 }
 
 const run_event_scope = {
-	PARENT_ONLY_KINDS,
 	UNKNOWN_EVENT_SCOPE,
 	last_issue_event,
 	last_scoped_event,
