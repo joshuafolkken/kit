@@ -1,6 +1,7 @@
 import type { Interface } from 'node:readline/promises'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ask_yes_no, ask_yes_no_simple } from './git-prompt'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { OperationCancelledError } from './git-error'
+import { ask_yes_no, ask_yes_no_simple, git_prompt } from './git-prompt'
 import { git_prompt_display } from './git-prompt-display'
 
 vi.mock('./git-prompt-display', () => ({
@@ -95,4 +96,41 @@ describe('ask_yes_no_simple (without separators)', () => {
 		expect(git_prompt_display.display_start_separator).not.toHaveBeenCalled()
 		expect(git_prompt_display.display_end_separator).not.toHaveBeenCalled()
 	})
+})
+
+// joshuafolkken/kit#2985: a declined confirmation throws a typed error rather than calling
+// `process.exit`, so the caller's `finally` — a lock release, say — still runs. Without a TTY the
+// prompt falls back to "no", which is the cancellation path.
+describe('git_prompt cancel confirmations — a declined answer', () => {
+	const is_tty_original = process.stdin.isTTY
+
+	afterEach(() => {
+		process.stdin.isTTY = is_tty_original
+		vi.restoreAllMocks()
+	})
+
+	it.each([
+		['confirm_unstaged_files', git_prompt.confirm_unstaged_files],
+		['confirm_missing_package_json', git_prompt.confirm_missing_package_json],
+		['confirm_without_version_update', git_prompt.confirm_without_version_update],
+	])(
+		'%s rejects with OperationCancelledError and the caller finally runs',
+		async (_name, confirm) => {
+			process.stdin.isTTY = false
+			const exit_spy = vi.spyOn(process, 'exit')
+			const cleanup = vi.fn()
+
+			async function guarded(): Promise<void> {
+				try {
+					await confirm()
+				} finally {
+					cleanup()
+				}
+			}
+
+			await expect(guarded()).rejects.toThrow(OperationCancelledError)
+			expect(cleanup).toHaveBeenCalledOnce()
+			expect(exit_spy).not.toHaveBeenCalled()
+		},
+	)
 })

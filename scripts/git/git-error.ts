@@ -42,7 +42,41 @@ function display_error_details(cause: unknown): void {
 	console.error('💡 Details:', cause_message)
 }
 
-function handle(error: unknown): void {
+const FAILURE_EXIT_CODE = 1
+const OPERATION_CANCELLED_MESSAGE = '💡 Operation cancelled.'
+
+// **A library refuses by throwing; only the CLI entry decides the exit code** (joshuafolkken/kit#2985).
+// `process.exit()` from an imported module skips every `finally` above it (a lock release included)
+// and truncates a piped stdout, so these modules throw a typed error instead, and `handle` — the catch
+// at each entry — renders it and sets `process.exitCode`.
+interface BranchMismatch {
+	current_branch: string
+	target_branch_name: string
+}
+
+class BranchMismatchError extends Error {
+	readonly current_branch: string
+	readonly target_branch_name: string
+
+	constructor(mismatch: BranchMismatch, options?: ErrorOptions) {
+		super(
+			`Branch mismatch: on ${mismatch.current_branch}, expected ${mismatch.target_branch_name}`,
+			options,
+		)
+		this.name = 'BranchMismatchError'
+		this.current_branch = mismatch.current_branch
+		this.target_branch_name = mismatch.target_branch_name
+	}
+}
+
+class OperationCancelledError extends Error {
+	constructor() {
+		super('Operation cancelled')
+		this.name = 'OperationCancelledError'
+	}
+}
+
+function display_failure(error: unknown): void {
 	const error_message = error_text.message_of(error)
 
 	console.error('')
@@ -53,23 +87,46 @@ function handle(error: unknown): void {
 	}
 
 	console.error('')
-	process.exit(1)
 }
 
-function display_branch_mismatch_error(current_branch: string, target_branch_name: string): void {
+function display_branch_mismatch(error: BranchMismatchError): void {
 	console.error('')
 	console.error('❌ Branch mismatch detected')
 	console.error('')
-	console.error(`Current branch: ${current_branch}`)
-	console.error(`Expected branch: ${target_branch_name}`)
+	console.error(`Current branch: ${error.current_branch}`)
+	console.error(`Expected branch: ${error.target_branch_name}`)
 	console.error('')
 	console.error('💡 Please update main branch to the latest and try again.')
-	process.exit(1)
+}
+
+function display_cancelled(): void {
+	console.info(OPERATION_CANCELLED_MESSAGE)
+	console.info('')
+}
+
+function display(error: unknown): void {
+	if (error instanceof BranchMismatchError) {
+		display_branch_mismatch(error)
+
+		return
+	}
+
+	if (error instanceof OperationCancelledError) {
+		display_cancelled()
+
+		return
+	}
+
+	display_failure(error)
+}
+
+function handle(error: unknown): void {
+	display(error)
+	process.exitCode = FAILURE_EXIT_CODE
 }
 
 const git_error = {
 	handle,
-	display_branch_mismatch_error,
 }
 
-export { git_error }
+export { git_error, BranchMismatchError, OperationCancelledError }
