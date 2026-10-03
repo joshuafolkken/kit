@@ -7,6 +7,8 @@ const to_parts_mock = vi.hoisted(() => vi.fn())
 const format_report_mock = vi.hoisted(() => vi.fn())
 const adopt_mock = vi.hoisted(() => vi.fn())
 const is_pending_mock = vi.hoisted(() => vi.fn())
+const prrun_adopt_mock = vi.hoisted(() => vi.fn())
+const prrun_token_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/lane/lane-child-marker', () => ({
@@ -18,6 +20,9 @@ vi.mock('./run-prep-cli', () => ({
 vi.mock('./run-prep', () => ({ run_prep: { format_report: format_report_mock } }))
 vi.mock('./run-halfrun-resume', () => ({
 	run_halfrun_resume: { adopt: adopt_mock, is_pending: is_pending_mock },
+}))
+vi.mock('./run-prrun-resume', () => ({
+	run_prrun_resume: { adopt: prrun_adopt_mock, resume_token: prrun_token_mock },
 }))
 
 const { run_entry_cli } = await import('./run-entry-cli')
@@ -35,14 +40,20 @@ function state_parts(state: string, is_human_review = false, latest_scope = 'ski
 	return { issue_number: ISSUE, state: { state, is_human_review }, latest_scope }
 }
 
+function reset_resume_mocks(): void {
+	adopt_mock.mockReset().mockResolvedValue(false)
+	is_pending_mock.mockReset().mockResolvedValue(false)
+	prrun_adopt_mock.mockReset().mockResolvedValue(false)
+	prrun_token_mock.mockReset().mockResolvedValue(undefined)
+}
+
 beforeEach(() => {
 	josh_run_mock.mockReset()
 	is_child_mock.mockReset().mockReturnValue(false)
 	gather_mock.mockReset().mockResolvedValue({})
 	to_parts_mock.mockReset().mockReturnValue(state_parts('OPEN'))
 	format_report_mock.mockReset().mockReturnValue(PREP_BODY)
-	adopt_mock.mockReset().mockResolvedValue(false)
-	is_pending_mock.mockReset().mockResolvedValue(false)
+	reset_resume_mocks()
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
@@ -101,6 +112,44 @@ describe('run_entry_cli.run — a halfrun stop is resumed rather than claimed (j
 		expect(code).not.toBe(OK)
 		expect(adopt_mock).not.toHaveBeenCalled()
 		expect(info_lines[0]).toContain('cost: over')
+	})
+})
+
+describe('run_entry_cli.run — a prrun stop is resumed rather than claimed (joshuafolkken/kit#3023)', () => {
+	const PRRUN_TOKEN = 'prrun-merge'
+
+	it('adopts the prrun hold and reports its token without claiming', async () => {
+		josh_run_mock.mockResolvedValueOnce(FRESH).mockResolvedValueOnce(UNDER)
+		prrun_token_mock.mockResolvedValue(PRRUN_TOKEN)
+		prrun_adopt_mock.mockResolvedValue(true)
+
+		const code = await run_entry_cli.run([ISSUE])
+
+		expect(code).toBe(OK)
+		expect(prrun_adopt_mock).toHaveBeenCalledWith(ISSUE)
+		expect(josh_run_mock).toHaveBeenCalledTimes(2)
+		expect(gather_mock).not.toHaveBeenCalled()
+		expect(info_lines).toStrictEqual([`entry #${ISSUE} — resume: ${PRRUN_TOKEN}`])
+	})
+
+	it('stops busy when the hold could not be adopted', async () => {
+		josh_run_mock.mockResolvedValueOnce(FRESH).mockResolvedValueOnce(UNDER)
+		prrun_token_mock.mockResolvedValue(PRRUN_TOKEN)
+
+		const code = await run_entry_cli.run([ISSUE])
+
+		expect(code).not.toBe(OK)
+		expect(info_lines[0]).toContain('hold: busy')
+	})
+
+	it('asks nothing of the prrun stop when a halfrun stop is pending', async () => {
+		josh_run_mock.mockResolvedValueOnce(FRESH).mockResolvedValueOnce(UNDER)
+		is_pending_mock.mockResolvedValue(true)
+		adopt_mock.mockResolvedValue(true)
+
+		await run_entry_cli.run([ISSUE])
+
+		expect(prrun_token_mock).not.toHaveBeenCalled()
 	})
 })
 

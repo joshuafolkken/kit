@@ -242,7 +242,7 @@ pnpm josh followup "PR title #N" --no-merge                         # do the wor
 
 **Options:**
 
-- `--no-merge` — do the follow-up work but do not merge; leaves the PR open (the only flag that stops the merge). `--merge` is a deprecated no-op.
+- `--no-merge` — do the follow-up work but do not merge; leaves the PR open (the only flag that stops the merge). `--merge` is a deprecated no-op. A PR already merged by hand skips the CI wait, the AI-review scan and the merge and runs only the post-merge tail; a completion report already on the Issue is not posted again (#3023).
 - `--notify-message` — inline completion body; `\n` expands to newlines.
 - `--notify-message-file` — read the completion body from a file (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
 - `--ai-review-ignore-reason` — reason to dismiss an AI-review finding.
@@ -1169,7 +1169,7 @@ pnpm josh run:release 1091       # release this run's own record
 pnpm josh run:release --force    # clear a record left by a run that has ended
 ```
 
-**Options:** `--fullrun` (`run:hold <N>`) marks the record as `fullrun #N`'s (joshuafolkken/kit#2760); `--halfrun-stop` marks a `halfrun` stop for `run:entry` to adopt (#2796); `--force` (`run:release`) removes a record this run did not write, clearing another run's stale claim.
+**Options:** `--fullrun` (`run:hold <N>`) marks the record as `fullrun #N`'s (joshuafolkken/kit#2760); `--halfrun-stop` marks a `halfrun` stop for `run:entry` to adopt (#2796); `--prrun-stop` marks a `prrun` stop with the commit its pull request is on (#3023); `--force` (`run:release`) removes a record this run did not write, clearing another run's stale claim.
 
 **Output / exit codes:** stdout is one token; explanations go to stderr. `run:hold`: `hold`, `busy`, `reclaim` / `resume` / `park` (preflight found uncommitted work, an open PR or a branch with commits beyond the default branch or uncommitted changes in its lane, or a merged/closed PR; a branch with none of those is no leftover work), `unknown` (exit 1). `run:release`: `released`, `none`, or `held` (exit 1). A record over 8 hours old on a clean tree is replaced; on a dirty or unreadable one, `busy`. A `hold` answer is followed by the `josh run:tidy` sweep below, reported on stderr.
 
@@ -1303,7 +1303,7 @@ Bundles the reads a run makes before its first edit into one call.
 Opens a run in one call (joshuafolkken/kit#2372): `run:hold`, `cost --cut` (skipped in a lane
 child), `run:prep` and `run:step`. The `entry #<N> — hold: … · cost: … · verdict: …` line carries the three facts the run
 branches on; a `busy`/`unknown` hold or an `over` budget short-circuits with a non-zero exit — the
-shape `backlog:offer` folded the parent loop head on. It asks `run:cut --resume <N>` before the hold: any answer but `fresh` prints `entry #<N> — resume: <token>` with that command's exit code and claims nothing, since an implementation cut outside a lane keeps its hold (joshuafolkken/kit#2760). A stopped `halfrun`'s hold is adopted: `resume: halfrun` (#2796).
+shape `backlog:offer` folded the parent loop head on. It asks `run:cut --resume <N>` before the hold: any answer but `fresh` prints `entry #<N> — resume: <token>` with that command's exit code and claims nothing, since an implementation cut outside a lane keeps its hold (joshuafolkken/kit#2760). A stopped `halfrun`'s hold is adopted: `resume: halfrun` (#2796). A stopped `prrun`'s is adopted too, as `resume: prrun-merged` (merged by hand — the tail only), `prrun-merge` (unmoved here and on the pull request, and clean — merge without the gate) or `prrun-gate` (moved or dirty — the gate again) (#3023).
 
 ### `josh run:status`
 

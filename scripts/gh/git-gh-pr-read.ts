@@ -77,6 +77,12 @@ async function fetch_pr_number(branch_name: string): Promise<number | undefined>
 // distinction is the point. The *classification* is cheaper here and needs no status probe: a branch
 // with no pull request is a 200 with an empty listing rather than a 404, so the lookup's own outcome
 // already separates them (joshuafolkken/kit#1048).
+interface PullMergeState {
+	is_merged: boolean
+	merged_at: string | undefined
+	head_sha: string | undefined
+}
+
 type PullNumberRead =
 	{ kind: 'read'; pr_number: number } | { kind: 'missing' } | { kind: 'unreadable'; cause: unknown }
 
@@ -215,6 +221,22 @@ async function pr_get_url(branch_name: string): Promise<string | undefined> {
 	return git_gh_helpers.parse_pr_state_string(pull.html_url)
 }
 
+// **Where the branch's pull request stands** — a merge a person made by hand included
+// (joshuafolkken/kit#3023): whether it merged and when, and the commit its head is on, which a push
+// made on GitHub moves without touching the local branch. `undefined` covers both "no pull request"
+// and "nothing could be read": `followup` then takes its ordinary path, whose merge step settles a
+// pull request that did merge after all (`pr_merge`), so an unread answer costs a wait, not a wrong tail.
+async function pr_get_merge_state(branch_name: string): Promise<PullMergeState | undefined> {
+	const pull = await read_pull_of_branch(branch_name)
+	if (pull === undefined) return undefined
+
+	return {
+		is_merged: git_gh_pr_rest.is_merged(pull),
+		merged_at: pull.merged_at ?? undefined,
+		head_sha: pull.head?.sha,
+	}
+}
+
 // REST answers JSON null for a pull request with no body where `gh --json body` answered an empty
 // string, and both used to arrive here as the empty answer this folds to `undefined`.
 async function pr_get_body(branch_name: string): Promise<string | undefined> {
@@ -281,6 +303,7 @@ const git_gh_pr_read = {
 	pr_get_number,
 	pr_get_url,
 	pr_get_body,
+	pr_get_merge_state,
 	pr_view,
 	pr_get_comments,
 	pr_get_review_comments,
@@ -290,6 +313,7 @@ const git_gh_pr_read = {
 // needs them separately: the reviews endpoint is keyed by number while the rollup is keyed by the
 // head commit the detail carries. Exported rather than re-derived so the memo above stays one memo
 // (joshuafolkken/kit#1028).
+export type { PullMergeState }
 export {
 	git_gh_pr_read,
 	forget_pr_numbers,

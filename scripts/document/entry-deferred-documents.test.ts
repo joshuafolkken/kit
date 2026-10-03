@@ -6,7 +6,7 @@ import { entry_read_set } from './entry-read-set'
 
 const ROOT = process.cwd()
 const DIRECTORY = path.join(ROOT, entry_read_set.SKILL_DIRECTORY)
-const ORDINARY_ENTRIES = ['kickoff', 'fullrun', 'halfrun', 'backlogrun']
+const ORDINARY_ENTRIES = ['kickoff', 'fullrun', 'halfrun', 'prrun', 'backlogrun']
 const DELEGATION = 'delegation.md'
 const SCOUT = 'issue-scout.md'
 const DEFERRED = [DELEGATION, SCOUT]

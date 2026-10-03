@@ -15,6 +15,7 @@ import { last_prompt } from '#scripts/rules/last-prompt'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
 import { run_carry } from '#scripts/run/run-carry'
 import { run_cut } from '#scripts/run/run-cut'
+import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_hold } from '#scripts/run/run-hold'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
@@ -31,16 +32,17 @@ import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript
 // resolving (send the notify, release the hold) and `stop_hook_active` is the backstop, so failing
 // open here costs at most a missed nudge, never a stuck run.
 
-// The hold record for this working tree is still in place. `unreadable` reads as absent: the safe
-// direction for a stop guard is not to block, and an unreadable record is not proof a run is holding.
-async function is_hold_present(): Promise<boolean> {
+// The hold record for this working tree is still in place, and whether it is a `prrun` stop's
+// (joshuafolkken/kit#3023). `unreadable` reads as absent: the safe direction for a stop guard is not to
+// block, and an unreadable record is not proof a run is holding.
+async function hold_facts(): Promise<Pick<StopContext, 'hold_present' | 'prrun_stopped'>> {
 	const directory = await run_hold.worktree_directory()
+	const hold =
+		directory === undefined
+			? undefined
+			: run_halfrun_resume.hold_of(run_hold.read_hold(run_hold.hold_path(directory)))
 
-	if (directory === undefined) return false
-
-	const read = run_hold.read_hold(run_hold.hold_path(directory))
-
-	return read.kind === 'held' || read.kind === 'stale'
+	return { hold_present: hold !== undefined, prrun_stopped: hold?.prrun_stop_head !== undefined }
 }
 
 // A `confirmation` notify sits on this run's transcript tail. The tail is derived exactly as the
@@ -69,7 +71,7 @@ async function build_context(
 	const tail = transcript_tail(transcript_path)
 
 	return {
-		hold_present: await is_hold_present(),
+		...(await hold_facts()),
 		tree_clean: !(await run_hold.is_tree_dirty()),
 		notified: lane_park.mentions_confirmation_notify(tail),
 		message: payload_tail.message,

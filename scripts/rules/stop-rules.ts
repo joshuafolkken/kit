@@ -45,6 +45,9 @@ interface StopContext {
 	hold_present: boolean
 	// `git status --porcelain` came back empty.
 	tree_clean: boolean
+	// That record carries a `prrun` stop mark (joshuafolkken/kit#3023): the run stopped at a green pull
+	// request and keeps the hold over a clean tree on purpose, so a person can look before it merges.
+	prrun_stopped: boolean
 	// A `confirmation` notify is on this run's transcript tail.
 	notified: boolean
 	// The turn's session-facing reply text.
@@ -108,8 +111,8 @@ const HOLD_RELEASE_REASON =
 	'place, so the next run here runs `git switch main && git pull` believing the tree is free while ' +
 	'you hold it. `.claude/skills/workflow-commands/SKILL.md` → §2f: a stop that leaves the tree clean ' +
 	'releases the hold with `pnpm josh run:release <N>` (bare for a `new` entry). A `halfrun` ' +
-	'pre-commit stop and a `needs-human-review` stop keep the hold because their tree is dirty — this ' +
-	'row is silent there. Release it, then end with a one-line confirmation that it was released — do ' +
+	'pre-commit stop and a `needs-human-review` stop keep the hold because their tree is dirty, and a ' +
+	'`prrun` stop keeps it by its stop mark — this row is silent there. Release it, then end with a one-line confirmation that it was released — do ' +
 	'not repeat your previous reply.'
 
 // **A refusal that corrects rather than advises** (joshuafolkken/kit#2247). The bare `#N` is already
@@ -247,7 +250,7 @@ function needs_notify(context: StopContext): boolean {
 }
 
 function needs_release(context: StopContext): boolean {
-	return is_held_idle(context) && context.tree_clean
+	return is_held_idle(context) && context.tree_clean && !context.prrun_stopped
 }
 
 function citation_reason(context: StopContext): string | undefined {

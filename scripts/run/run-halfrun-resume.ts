@@ -1,4 +1,4 @@
-import { run_hold, type HoldRead, type RunHold } from './run-hold'
+import { run_hold, type HoldRead, type RunHold, type StopMarkFields } from './run-hold'
 
 // joshuafolkken/kit#2796: a `halfrun` stops before its commit and **keeps** its hold, because the
 // uncommitted, hand-verified work is exactly what a second run would trample. The person then types
@@ -38,7 +38,13 @@ function is_own_record(read: HoldRead, issue: string): boolean {
 	return hold === undefined || hold.issue === issue || hold.issue === run_hold.UNNUMBERED_ISSUE
 }
 
-function mark_stop_at(target: string, issue: string): StopMark {
+// `mark` is the `halfrun` stop's by default; a `prrun` stop passes its own (joshuafolkken/kit#3023), so
+// the own-record check is one check whichever run is stopping.
+function mark_stop_at(
+	target: string,
+	issue: string,
+	mark: StopMarkFields = run_hold.HALFRUN_STOP_FIELDS,
+): StopMark {
 	const read = run_hold.read_hold(target)
 
 	if (read.kind === 'unreadable') return UNREADABLE
@@ -47,7 +53,14 @@ function mark_stop_at(target: string, issue: string): StopMark {
 
 	run_hold.release_hold(target)
 
-	return run_hold.create_halfrun_stop_hold(target, issue) ? MARKED : FOREIGN
+	return run_hold.create_stop_hold(target, issue, mark) ? MARKED : FOREIGN
+}
+
+// The stopped run's record is replaced by this `fullrun`'s, shared with the `prrun` resume.
+function take_over(target: string, issue: string): boolean {
+	run_hold.release_hold(target)
+
+	return run_hold.create_hold(target, issue, new Date(), true)
 }
 
 // `false` leaves the record untouched, so the ordinary claim that follows decides the tree exactly as
@@ -55,9 +68,7 @@ function mark_stop_at(target: string, issue: string): StopMark {
 function adopt_at(target: string, issue: string, is_dirty: boolean): boolean {
 	if (!is_halfrun_stop(run_hold.read_hold(target), issue, is_dirty)) return false
 
-	run_hold.release_hold(target)
-
-	return run_hold.create_hold(target, issue, new Date(), true)
+	return take_over(target, issue)
 }
 
 // **An unreadable git directory is no resume**, never a crash: `run:entry` must still print its one
@@ -95,8 +106,11 @@ const run_halfrun_resume = {
 	UNREADABLE,
 	adopt,
 	adopt_at,
+	hold_of,
+	hold_target,
 	is_pending,
 	mark_stop_at,
+	take_over,
 }
 
 export type { StopMark }

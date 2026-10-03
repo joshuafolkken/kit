@@ -6,6 +6,7 @@ import {
 	gh_failure,
 	PR_BRANCH,
 	pr_conversation_comments_path,
+	PR_HEAD_SHA,
 	PR_HTML_URL,
 	pr_lookup_path,
 	PR_NUMBER,
@@ -34,6 +35,7 @@ vi.mock('./git-gh-exec', () => ({
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 
 const PR_BODY = 'closes #1027'
+const MERGED_AT = '2026-10-04T00:00:00Z'
 const NO_PULL_REQUEST = { [pr_lookup_path()]: EMPTY_LISTING }
 
 function stub(routes: Record<string, GhApiAnswer>): void {
@@ -331,5 +333,35 @@ describe('pr_get_comments maps the listing into the shape gh answered with', () 
 		stub(pr_routes({}, { [COMMENTS_PATH]: RATE_LIMITED }))
 
 		await expect(git_gh_pr_read.pr_get_comments(PR_BRANCH)).resolves.toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#3023: `followup` asks this first, so a pull request a person merged by hand after
+// a `prrun` stop takes only the post-merge tail.
+describe('pr_get_merge_state — where the branch pull request stands', () => {
+	it('answers merged with the merge time for a merged pull request', async () => {
+		stub(pr_routes({ state: 'closed', merged: true, merged_at: MERGED_AT }))
+
+		await expect(git_gh_pr_read.pr_get_merge_state(PR_BRANCH)).resolves.toStrictEqual({
+			is_merged: true,
+			merged_at: MERGED_AT,
+			head_sha: PR_HEAD_SHA,
+		})
+	})
+
+	it('answers not merged with the remote head for an open pull request', async () => {
+		stub(pr_routes({ merged: false }))
+
+		await expect(git_gh_pr_read.pr_get_merge_state(PR_BRANCH)).resolves.toStrictEqual({
+			is_merged: false,
+			merged_at: undefined,
+			head_sha: PR_HEAD_SHA,
+		})
+	})
+
+	it('answers undefined for a branch with no pull request', async () => {
+		stub(NO_PULL_REQUEST)
+
+		await expect(git_gh_pr_read.pr_get_merge_state(PR_BRANCH)).resolves.toBeUndefined()
 	})
 })

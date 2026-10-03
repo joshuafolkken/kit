@@ -129,7 +129,53 @@ vi.mock('./git-followup-flush', () => ({
 	git_followup_flush: { commit_ledger_step: vi.fn() },
 }))
 
+// **Mocked for the same reason** (joshuafolkken/kit#3023): `main` runs at import time, and the real
+// read asks GitHub whether the branch's pull request merged. Answers "open" with the merge requested.
+vi.mock('./git-followup-merged', () => ({
+	git_followup_merged: {
+		read_merge_plan: vi.fn(async (_branch: string, is_requested: boolean) => ({
+			is_merged: false,
+			should_merge: is_requested,
+			merged_at: undefined,
+		})),
+	},
+}))
+
 const { git_followup_workflow } = await import('./git-followup-workflow')
+const { git_followup_flush } = await import('./git-followup-flush')
+
+// joshuafolkken/kit#3023. A pull request a person merged by hand is finished by re-running `followup`;
+// the gates guard a merge this run no longer makes, and a ledger commit would land on a merged branch.
+describe('prepare_merge — a pull request that has already merged', () => {
+	const ISSUE = '3023'
+	const BRANCH = 'merged-branch'
+
+	it('asks no merge gate and commits no ledger line', async () => {
+		attest_check_mock.mockClear()
+		evidence_check_mock.mockClear()
+		vi.mocked(git_followup_flush.commit_ledger_step).mockClear()
+		await git_followup_workflow.prepare_merge(
+			{ is_merged: true, should_merge: true, merged_at: '2026-10-04T00:00:00Z' },
+			ISSUE,
+			BRANCH,
+		)
+
+		expect(attest_check_mock).not.toHaveBeenCalled()
+		expect(evidence_check_mock).not.toHaveBeenCalled()
+		expect(git_followup_flush.commit_ledger_step).not.toHaveBeenCalled()
+	})
+
+	it('still runs both on an open pull request', async () => {
+		vi.mocked(git_followup_flush.commit_ledger_step).mockClear()
+		await git_followup_workflow.prepare_merge(
+			{ is_merged: false, should_merge: true, merged_at: undefined },
+			ISSUE,
+			BRANCH,
+		)
+
+		expect(git_followup_flush.commit_ledger_step).toHaveBeenCalledWith(true, ISSUE)
+	})
+})
 
 describe('parse_issue_number_from_text', () => {
 	it('returns undefined for undefined input', () => {

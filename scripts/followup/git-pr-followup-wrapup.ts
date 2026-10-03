@@ -35,6 +35,10 @@ interface WrapupInput {
 	// completion notification (joshuafolkken/kit#1592). Empty on a run that changed nothing `josh sync`
 	// distributes, and an empty one adds no line.
 	managed_notes: ReadonlyArray<string>
+	// A pull request merged before this run is not merged again, and a tail whose completion report is
+	// already on the issue does not post it twice (joshuafolkken/kit#3023, `git-followup-merged.ts`).
+	is_merged?: boolean | undefined
+	is_completion_recorded?: boolean | undefined
 }
 
 function build_notify_body(input: {
@@ -113,6 +117,8 @@ async function post_completion_notification(input: {
 // merge, a step that throws is reported and the ones after it still run, rather than taking the epic
 // close and the working-tree hold release down with it.
 async function notify_step(input: WrapupInput): Promise<void> {
+	if (input.is_completion_recorded === true) return
+
 	await git_followup_cleanup.run_guarded_step(input.should_merge, {
 		label: 'The completion comment',
 		recovery: COMPLETION_COMMENT_RECOVERY,
@@ -227,7 +233,7 @@ async function run_tail_steps(input: WrapupInput): Promise<void> {
 }
 
 async function run_wrapup(input: WrapupInput, log: StageLog): Promise<void> {
-	if (input.should_merge) {
+	if (input.should_merge && input.is_merged !== true) {
 		await git_gh_command.pr_merge(input.branch_name)
 		lap(log, STAGE.merge)
 	}

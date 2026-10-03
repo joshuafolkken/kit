@@ -68,7 +68,7 @@ describe('last_prompt.prompt_text — what the harness wrote is not the prompt',
 })
 
 describe('last_prompt.prompt_text — a workflow invocation quotes nothing', () => {
-	it.each([INVOCATION, 'backlogrun #1 #2', ' kickoff #3', 'halfrun new'])(
+	it.each([INVOCATION, 'backlogrun #1 #2', ' kickoff #3', 'halfrun new', 'prrun #4'])(
 		'yields nothing for the workflow invocation %s',
 		(invocation) => {
 			expect(last_prompt.prompt_text(prompt_line(invocation))).toBe('')

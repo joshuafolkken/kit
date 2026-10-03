@@ -1,11 +1,11 @@
 ---
 name: workflow-commands
-description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun` and `backlogrun` — planning, implementation, the verification gate, unattended epic and backlog execution, the `/code-review` → `followup` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
+description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun`, `prrun` and `backlogrun` — planning, implementation, the verification gate, unattended epic and backlog execution, the `/code-review` → `followup` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
 ---
 
 # Issue-driven workflow commands
 
-`kickoff`, `fullrun`, `halfrun` and `backlogrun` are the shorthand commands this
+`kickoff`, `fullrun`, `halfrun`, `prrun` and `backlogrun` are the shorthand commands this
 package's collaboration workflow is built on. Their procedures live here rather than in `CLAUDE.md`
 because each one applies only while its own command is running.
 
@@ -14,7 +14,7 @@ procedures. Neither restates the other.
 
 ## 0. The rule that fires before any of them — explicit invocation
 
-**Never start a `kickoff` / `halfrun` / `fullrun` / `backlogrun` workflow (including their
+**Never start a `kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun` workflow (including their
 `#N` and `new` variants) unless the user has typed the keyword in the current turn's prompt.** This rule is also
 resident in the AI documents, because it has to hold when this skill has *not* been loaded.
 
@@ -44,6 +44,7 @@ the file its pointer names (for `fullrun`, the step lists are `fullrun-steps.md`
 | `kickoff` / `kickoff #N` / `kickoff new` | `kickoff.md`                                |
 | `fullrun` / `fullrun #N` / `fullrun new` | `fullrun.md`                                |
 | `halfrun` / `halfrun #N` / `halfrun new` | `halfrun.md`                                |
+| `prrun` / `prrun #N` / `prrun new`       | `prrun.md` — the difference over `fullrun.md`, read with it |
 | `backlogrun` / `backlogrun #N…` / `backlogrun #E…` | `backlogrun.md` — its dispatched child reads `fullrun.md` + `split-assessment.md` in its own unit, not the parent at entry |
 
 Each command manifest cites `split-assessment.md` → "The question" — the split decision, read at the
@@ -120,7 +121,7 @@ procedure.
 | `pnpm josh issue:state <N>` answers `human_review: yes` | Implement and gate, then stop before the commit | §2z → `needs-human-review.md` |
 | Under `backlogrun`, a stop that would end a batch, or a named non-epic item | Park one child and continue; run a named non-epic item as a `fullrun` | `backlogrun-park.md` → "park and continue"; `backlogrun-child.md` → "When `#N` is not an epic" |
 | `backlogrun`'s authorization | The whole `auto-ok` opted-in pool as well as its named items; `pnpm josh backlog:next` offers them | `backlogrun.md` |
-| First call of `fullrun` / `halfrun` (not `kickoff`) | Claim the tree: `fullrun #N` starts with `pnpm josh run:entry <N>` (which runs the hold); `fullrun new` and `halfrun` use `pnpm josh run:hold` | §2f → `working-tree-hold.md` |
+| First call of `fullrun` / `prrun` / `halfrun` (not `kickoff`) | Claim the tree: `fullrun #N` / `prrun #N` start with `pnpm josh run:entry <N>` (which runs the hold); `fullrun new` and `halfrun` use `pnpm josh run:hold` | §2f → `working-tree-hold.md` |
 | Same turn as the hold (not a dispatched child, not `kickoff`) | `pnpm josh cost --cut`; `under` continues, `over` stops with a `confirmation` Telegram and the resume command, then `pnpm josh run:release` | `backlogrun-progress.md` → "The hand-off" (shared 135,000 threshold) |
 | Before any work starts (every entry) | The split assessment; the default is not to split — separability **and** a scope clearly over one gate must hold together; a `fullrun` / `halfrun` that finds a split files the epic and **stops** | `split-assessment.md` → "The question" |
 | Another Issue here must land first | A prerequisite is a dependency, not a park (the third of four mid-run discoveries) | §2d → `prerequisite.md` |
