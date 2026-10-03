@@ -6,6 +6,7 @@ import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_ship, type ShipSection } from './run-ship'
 import { run_ship_detach } from './run-ship-detach'
+import { run_ship_next } from './run-ship-next'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_return } from './run-ship-return'
 import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-ship-stage'
@@ -255,7 +256,9 @@ async function stopped(
 	args: ShipArguments,
 	stage: Stage,
 ): Promise<ReadonlyArray<ShipSection>> {
-	if (run_ship_detach.is_supervised()) await run_ship_return.return_control(args.number, stage)
+	if (run_ship_detach.is_supervised()) {
+		await run_ship_return.return_control(args.number, stage, run_ship_next.resume_of(args))
+	}
 
 	return sections
 }

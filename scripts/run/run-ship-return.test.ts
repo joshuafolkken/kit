@@ -20,6 +20,9 @@ const { run_ship_return } = await import('./run-ship-return')
 // the stop as a position and — in a dispatched Anthropic lane — relaunches a child to fix it.
 
 const ISSUE = '2428'
+const TITLE = `Hand a stopped ship back #${ISSUE}`
+const BODY_PATH = 'scratchpad/evidence.md'
+const RESUME = { title: TITLE, flags: ['--body-file', BODY_PATH], is_review: true }
 const LANE = { issue: ISSUE, directory: '/lanes/2428', profile: undefined }
 
 beforeEach(() => {
@@ -32,7 +35,7 @@ beforeEach(() => {
 
 describe('run_ship_return.return_control', () => {
 	it('records the stopped stage as a ship-stop position naming the issue', async () => {
-		await run_ship_return.return_control(ISSUE, 'gate')
+		await run_ship_return.return_control(ISSUE, 'gate', RESUME)
 
 		expect(emit_mock).toHaveBeenCalledWith(
 			'ship-stop',
@@ -41,12 +44,13 @@ describe('run_ship_return.return_control', () => {
 	})
 
 	it('relaunches the lane child with the ship-stop prompt at the implementation phase', async () => {
-		expect(await run_ship_return.return_control(ISSUE, 'review')).toBe('relaunched')
+		expect(await run_ship_return.return_control(ISSUE, 'review', RESUME)).toBe('relaunched')
 
 		const [lane, invocation, phase] = (relaunch_mock.mock.calls[0] ?? []) as ReadonlyArray<unknown>
 
 		expect(lane).toBe(LANE)
 		expect(String(invocation)).toContain('ship supervisor stopped')
+		expect(String(invocation)).toContain(`--body-file ${BODY_PATH} '${TITLE}'`)
 		expect(String(invocation).endsWith(`fullrun #${ISSUE}`)).toBe(true)
 		expect(phase).toBe('implementation')
 	})
@@ -54,21 +58,21 @@ describe('run_ship_return.return_control', () => {
 	it('relaunches nothing outside a dispatched lane child', async () => {
 		is_child_mock.mockReturnValue(false)
 
-		expect(await run_ship_return.return_control(ISSUE, 'gate')).toBe('recorded')
+		expect(await run_ship_return.return_control(ISSUE, 'gate', RESUME)).toBe('recorded')
 		expect(relaunch_mock).not.toHaveBeenCalled()
 	})
 
 	it('leaves an OpenAI lane to its own supervisor', async () => {
 		find_lane_mock.mockResolvedValue({ ...LANE, profile: { provider: 'openai' } })
 
-		expect(await run_ship_return.return_control(ISSUE, 'followup')).toBe('recorded')
+		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME)).toBe('recorded')
 		expect(relaunch_mock).not.toHaveBeenCalled()
 	})
 
 	it('still records the stop when the relaunch could not start', async () => {
 		relaunch_mock.mockReturnValue({ kind: 'failed', note: 'no claude' })
 
-		expect(await run_ship_return.return_control(ISSUE, 'commit')).toBe('recorded')
+		expect(await run_ship_return.return_control(ISSUE, 'commit', RESUME)).toBe('recorded')
 		expect(emit_mock).toHaveBeenCalledTimes(1)
 	})
 })
