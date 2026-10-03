@@ -34,6 +34,7 @@ afterAll(() => {
 
 const HEAD_LINE = 'HEAD 0000000000000000000000000000000000000000'
 const LANE_BRANCH_LINE = 'branch refs/heads/1490-lane'
+const PRUNABLE_LINE = 'prunable gitdir file points to non-existent location'
 
 function lane_block(issue: string, extra: ReadonlyArray<string> = []): string {
 	const directory = path.join(LANE_ROOT, issue)
@@ -100,7 +101,7 @@ describe('reading the open lanes', () => {
 	// Stranded is the directory being gone, not git's `prunable` flag: git marks a registration
 	// prunable for a damaged `.git` pointer too, and that lane's ports are still bound.
 	it('reads a registration whose work tree is gone as stranded, holding no seat', async () => {
-		list_of(lane_block('1491', ['prunable gitdir file points to non-existent location']))
+		list_of(lane_block('1491', [PRUNABLE_LINE]))
 
 		const lanes = await lane_registry.list_lanes()
 
@@ -118,6 +119,21 @@ describe('reading the open lanes', () => {
 
 		expect(lanes[0]?.seat).toBeUndefined()
 		expect(lane_registry.unreadable_lanes(lanes).map((lane) => lane.issue)).toStrictEqual(['1490'])
+	})
+})
+
+// The one in-flight definition the watcher guard and the headless stop rule both read: a stranded
+// registration has no child working in it, so it alone keeps no parent waiting.
+describe('which lanes are in flight', () => {
+	it('counts only a live lane as in flight, never a stranded one', async () => {
+		list_of(lane_block('1491', [PRUNABLE_LINE]))
+
+		expect(await lane_registry.has_lanes_in_flight()).toBe(false)
+
+		open_on_disk('1490', '6')
+		list_of(lane_block('1491', [PRUNABLE_LINE]), lane_block('1490'))
+
+		expect(await lane_registry.has_lanes_in_flight()).toBe(true)
 	})
 })
 

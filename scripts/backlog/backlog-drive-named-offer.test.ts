@@ -1,6 +1,7 @@
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { expect, test, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
+import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 
 const ACTIVE = new Date().toISOString()
@@ -34,6 +35,26 @@ test('hands a named epic to the judgment session instead of launching the root',
 
 	expect(offer?.verdict).toBe('epic #1')
 	read.mockRestore()
+})
+
+test('never dispatches a named issue parked with needs-decision, and books it done', async () => {
+	const state = backlog_drive.initial_state([], ACTIVE)
+	const read = vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
+		kind: 'state',
+		state: { state: 'OPEN', labels: ['needs-decision'], is_human_review: false },
+	})
+	const mark_done = vi.spyOn(backlog_drive_named, 'mark_done').mockResolvedValue()
+
+	const offer = await backlog_drive_named_offer.read(CARRY, state, CONTEXT)
+
+	expect(offer).toMatchObject({ verdict: 'wait', issues: [] })
+	expect(mark_done).toHaveBeenCalledWith(
+		'1',
+		expect.objectContaining({ outcome: 'parked' }),
+		CONTEXT.owner,
+	)
+	read.mockRestore()
+	mark_done.mockRestore()
 })
 
 test('offers the next named issue after the epic root is recorded done', async () => {

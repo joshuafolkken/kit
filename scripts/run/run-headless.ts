@@ -1,7 +1,7 @@
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_reap } from '#scripts/lane/lane-reap'
+import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_carry, type CarryRead, type RunCarry } from './run-carry'
-import { run_watcher_guard } from './run-watcher-guard'
 
 // The headless `backlogrun` parent (joshuafolkken/kit#2437). `run:wake` starts a cut's successor as
 // `claude -p`, and there a turn that ends is the process that ends: its background `lane:await` and
@@ -51,7 +51,7 @@ async function read_carry_here(): Promise<CarryRead | undefined> {
 async function must_keep_waiting(source: EnvironmentSource = process.env): Promise<boolean> {
 	const is_candidate = is_headless(source) && lane_child_marker.marked_issue(source) === undefined
 
-	if (!is_candidate || !(await run_watcher_guard.has_lanes_in_flight())) return false
+	if (!is_candidate || !(await lane_registry.has_lanes_in_flight())) return false
 
 	return is_driving(await read_carry_here())
 }
