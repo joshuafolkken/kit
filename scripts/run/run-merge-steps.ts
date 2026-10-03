@@ -354,6 +354,7 @@ const run_merge_steps = {
 	has_resumable_cut,
 	is_over_budget,
 	refused_carry,
+	remove_in_progress,
 	resume_cut,
 }
 
