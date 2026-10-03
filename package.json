@@ -98,7 +98,6 @@
 		"!scripts/document/review-agent-type.ts",
 		"!scripts/document/single-source.ts",
 		"!scripts/hooks/prompt-hooks.ts",
-		"!scripts/init/hook-command-bootstrap.ts",
 		"!scripts/josh/josh-script-reader.ts",
 		"!scripts/package/production-dependency-graph.ts",
 		"!scripts/rules/delivered-rules-harness.ts",

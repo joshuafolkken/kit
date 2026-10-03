@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 
+const GIT_INIT_TIMEOUT_MS = 10_000
+
 interface HookResult {
 	status: number | null
 	stdout: string
@@ -34,6 +36,27 @@ function execution_directory(temporary_root: string, is_nested: boolean): string
 	return nested_root
 }
 
+// A failed or hung `git init` would leave the hook running outside a checkout, so every case after it
+// would assert against the wrong setup; it is bounded and refused rather than ignored.
+function initialize_repository(
+	git_arguments: ReadonlyArray<string>,
+	temporary_root: string,
+	git_environment: NodeJS.ProcessEnv,
+): void {
+	const result = spawnSync('git', git_arguments, {
+		cwd: temporary_root,
+		encoding: 'utf8',
+		env: git_environment,
+		timeout: GIT_INIT_TIMEOUT_MS,
+	})
+
+	if (result.status !== 0) {
+		throw new Error(
+			`git ${git_arguments.join(' ')} failed: ${result.error?.message ?? result.stderr}`,
+		)
+	}
+}
+
 function checkout_environment(temporary_root: string, options: CheckoutOptions): NodeJS.ProcessEnv {
 	const metadata_root = path.join(temporary_root, 'metadata')
 	const git_environment = {
@@ -44,7 +67,7 @@ function checkout_environment(temporary_root: string, options: CheckoutOptions):
 		? ['init', '--bare', '-q', metadata_root]
 		: ['init', '-q']
 
-	spawnSync('git', git_arguments, { cwd: temporary_root, env: git_environment })
+	initialize_repository(git_arguments, temporary_root, git_environment)
 
 	if (options.is_external_git) {
 		return { ...git_environment, GIT_DIR: metadata_root, GIT_WORK_TREE: temporary_root }
@@ -78,6 +101,6 @@ function run_in_temporary_checkout(
 	}
 }
 
-const hook_command_bootstrap = { run_in_temporary_checkout }
+const hook_command_bootstrap = { initialize_repository, run_in_temporary_checkout }
 
 export { hook_command_bootstrap }

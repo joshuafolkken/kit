@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { claude_settings_fixture } from '#scripts/claude/claude-settings-fixture'
 import { describe, expect, it, vi } from 'vitest'
-import { hook_command_bootstrap } from './hook-command-bootstrap'
+import { hook_command_bootstrap } from './hook-command-bootstrap-fixture'
 import { hook_command_rewrite } from './hook-command-rewrite'
 import { transform_copied_content } from './init-copy-content'
 
