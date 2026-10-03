@@ -17,7 +17,7 @@
 | Step 2: 提案依頼（AI 共通）                                                                       | [`proposal-request.md`](./collaboration-workflow/proposal-request.md)     |
 | Step 3: 計画コメントを記録して通知する                                                            | [`plan-comment.md`](./collaboration-workflow/plan-comment.md)             |
 | 報告フォーマット（平易な概要 ＋ 技術詳細）                                                        | [`report-format.md`](./collaboration-workflow/report-format.md)           |
-| セッション向け出力で Issue はリンク＋短い日本語要約で参照する                                     | [`issue-citation.md`](./collaboration-workflow/issue-citation.md)         |
+| セッション向け出力で Issue はリンク＋セッション言語の短い要約で参照する                           | [`issue-citation.md`](./collaboration-workflow/issue-citation.md)         |
 | 後から関連が判明した Issue を epic に束ねる（本文は `epic-commands` skill）                       | [`epic-bundle.md`](./collaboration-workflow/epic-bundle.md)               |
 | オープン Issue の WIP 上限（30 件）                                                               | [`wip-cap.md`](./collaboration-workflow/wip-cap.md)                       |
 | リポジトリをまたぐ EPIC（本文は `epic-commands` skill）                                           | [`cross-repo-epic.md`](./collaboration-workflow/cross-repo-epic.md)       |

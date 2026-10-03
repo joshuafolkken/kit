@@ -48,16 +48,31 @@ describe('the test-declared rule is routed to the command in CLAUDE.md', () => {
 
 // joshuafolkken/kit#2820: the exception covers any source kit cannot test, not HTML/CSS alone, so the
 // manual run for those sources is pinned beside the browser check.
+// joshuafolkken/kit#2997: CLAUDE.md states it in English and the Japanese topic file in Japanese, so each
+// file is held to the phrases of its own language.
+const BASIC_EXCEPTION_PHRASES: ReadonlyArray<[string, ReadonlyArray<string>]> = [
+	[
+		CLAUDE,
+		[
+			'browser',
+			'interactions in the HTML',
+			'languages kit cannot test',
+			'actually run the changed code',
+		],
+	],
+	[
+		'prompts/testing-guide.md',
+		['ブラウザー', 'HTML 内の操作', 'テストできない言語', '変更した処理を実際に動かす'],
+	],
+]
+
 describe('the basic manual-check exception is documented with its limit', () => {
-	it.each([CLAUDE, 'prompts/testing-guide.md'])('%s names both manual checks', (file) => {
+	it.each(BASIC_EXCEPTION_PHRASES)('%s names both manual checks', (file, phrases) => {
 		const content = read_repo_file(file)
 
 		expect(content).toContain('josh.profile: basic')
-		expect(content).toContain('ブラウザー')
-		expect(content).toContain('HTML 内の操作')
-		expect(content).toContain('テストできない言語')
+		for (const phrase of phrases) expect(content).toContain(phrase)
 		expect(content).toContain('Lua')
-		expect(content).toContain('変更した処理を実際に動かす')
 		expect(content).toContain('JavaScript')
 		expect(content).toContain('TypeScript')
 	})
