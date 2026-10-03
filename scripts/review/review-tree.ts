@@ -31,8 +31,18 @@ function digest_of(root: string, relative: string): string {
 
 // Sorted so two readings of one tree produce the same record byte for byte, which is what lets a
 // stored stamp be compared against a fresh reading without a normalization step in between.
+//
+// **The observation ledger is left out of the map**, for the reason `hook-gate-reuse.ts` drops it from
+// the status it reads: it is no code any check runs (joshuafolkken/kit#1756). Kept in, a review's line
+// appended after the gate moved the map, so the ledger commit `pnpm josh followup` pushes carried a
+// tree the record no longer matched — the pre-push hook re-ran the whole unit suite inside the push's
+// 120-second budget, the timed-out push was retried over the still-running suite, and the commit's
+// undo then moved the tree under both (joshuafolkken/kit#2998). Filtered here, every reader of the map
+// — the gate's record, both hooks, the brief and the round-2 fix delta — agrees on it.
 function tree_of(root: string, paths: ReadonlyArray<string>): Record<string, string> {
-	const sorted = [...paths].toSorted((left, right) => left.localeCompare(right))
+	const sorted = paths
+		.filter((relative) => !observation_ledger.is_ledger_path(relative))
+		.toSorted((left, right) => left.localeCompare(right))
 
 	return Object.fromEntries(sorted.map((relative) => [relative, digest_of(root, relative)]))
 }
@@ -44,21 +54,14 @@ function tree_of(root: string, paths: ReadonlyArray<string>): Record<string, str
 // say the gate had verified an arbitrarily edited tree, and `--round 2` would report an empty fix
 // delta. **A defect that answers "all clear" is the one shape this record cannot take**, which is why
 // the root is resolved rather than assumed (measured from `scripts/`: 18 of 25 entries `absent`).
-//
-// **The observation ledger is left out of the map** (joshuafolkken/kit#3017), for the reason
-// `hook-gate-reuse.ts` already drops it from the status reading: it is no code any check runs, and a
-// line appended after the gate — a second review round's record — must not read as an unverified tree.
-// Left in, that one line sent the ledger commit's pre-push back to the full unit suite, which outlived
-// the push budget and failed the run.
+// The observation ledger is dropped inside `tree_of`, above (joshuafolkken/kit#3017).
 async function read_changed_tree(
 	paths?: ReadonlyArray<string>,
 	root?: string,
 ): Promise<Record<string, string>> {
-	const listed = paths ?? (await changed_paths.read_changed_paths(false))
-
 	return tree_of(
 		root ?? (await git_command.repository_root()),
-		listed.filter((file_path) => !observation_ledger.is_ledger_path(file_path)),
+		paths ?? (await changed_paths.read_changed_paths(false)),
 	)
 }
 

@@ -40,9 +40,13 @@ const ENV_EXAMPLE = '.env.example'
 const MARKDOWN_EXTENSION = '.md'
 const PROMPT_ROOT = 'prompts'
 const DOCS_ROOT = 'docs'
-// The only file under `docs/` an agent is routed to read in full; the rest of `docs/` is reference a
-// human browses, so the byte budget (`document/document-byte-budget.ts`) covers this one alone.
-const AGENT_READ_DOC: ReadonlyArray<string> = ['docs/josh-commands.md']
+// The only files under `docs/` an agent is routed to read — the two command references; the rest of
+// `docs/` is reference a human browses, so the byte budget (`document/document-byte-budget.ts`)
+// covers these alone.
+const COMMAND_REFERENCE_DOCS: ReadonlyArray<string> = [
+	'docs/josh-commands.md',
+	'docs/josh-commands-automation.md',
+]
 
 // Every markdown file under one root, recursively, as repository-relative paths. Deliberately not
 // exported: the roots that matter are the ones `routing_documents` below composes, and handing out
@@ -76,7 +80,7 @@ function routing_documents(): ReadonlyArray<string> {
 }
 
 // Every document an agent reads in full during a session — the rule document, every distributed
-// skill, every workflow prompt, and the one routed `docs/` file. `document/document-byte-budget.ts`
+// skill, every workflow prompt, and the two routed `docs/` command references. `document/document-byte-budget.ts`
 // walks this set to assert none has grown past its recorded ceiling and that the budget names
 // exactly these files. Composed from the same roots as `routing_documents`, minus the rest of
 // `docs/`, so the two cannot drift on the directories they share.
@@ -85,7 +89,7 @@ function agent_read_documents(): ReadonlyArray<string> {
 		...AI_DOCS,
 		...distributed_skill_markdown(),
 		...markdown_under(PROMPT_ROOT),
-		...AGENT_READ_DOC,
+		...COMMAND_REFERENCE_DOCS,
 	].toSorted((left, right) => left.localeCompare(right))
 }
 
@@ -201,6 +205,7 @@ export {
 	all_documents,
 	CANONICAL_DOC,
 	CLAUDE_SETTINGS,
+	COMMAND_REFERENCE_DOCS,
 	ENV_EXAMPLE,
 	linked_paths,
 	PROMPT_ROOT,

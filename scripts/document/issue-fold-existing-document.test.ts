@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 const SKILL = readFileSync('.claude/skills/workflow-commands/SKILL.md', 'utf8')
 const SCOUT = readFileSync('.claude/skills/workflow-commands/issue-scout.md', 'utf8')
 const PROCEDURE = readFileSync('.claude/skills/workflow-commands/issue-fold-existing.md', 'utf8')
-const REFERENCE = readFileSync('docs/josh-commands.md', 'utf8')
+const REFERENCE = readFileSync('docs/josh-commands-automation.md', 'utf8')
 
 describe('existing issue fold procedure', () => {
 	it('requires reading the candidate and its comments before assessment', () => {

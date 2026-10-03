@@ -80,4 +80,4 @@ split is found.
   creation call. (3) Send Telegram notification listing all created issues. (4) Present the command
   `backlogrun #<E> --only`. (5) **Stop** — do not implement.
 
-`pnpm josh issue:file` lints the body and applies the classification labels it declares, following `prompts/collaboration-workflow/issue-template.md` for classification (`docs/josh-commands.md` → `josh issue:file`).
+`pnpm josh issue:file` lints the body and applies the classification labels it declares, following `prompts/collaboration-workflow/issue-template.md` for classification (`docs/josh-commands-automation.md` → `josh issue:file`).

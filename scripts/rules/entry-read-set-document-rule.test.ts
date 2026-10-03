@@ -8,10 +8,10 @@ import { describe, expect, it } from 'vitest'
 //
 // joshuafolkken/kit#1959 moved the §1 explanation and its measurement out of the always-read skill
 // (joshuafolkken/kit#1925 trims that meta prose), so the rule is guarded here off the command
-// registration and `docs/josh-commands.md` — the command's own reference, which is not trimmed — plus
+// registration and `docs/josh-commands-automation.md` — the command's own reference, which is not trimmed — plus
 // the check that every document the entry read set names is still the file it was.
 
-const DOCS = 'docs/josh-commands.md'
+const DOCS = 'docs/josh-commands-automation.md'
 
 const SECTION_COMMAND = 'doc:section'
 const SECTION_SCRIPT = 'scripts/document/document-section-cli.ts'

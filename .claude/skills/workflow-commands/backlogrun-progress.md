@@ -48,7 +48,7 @@ for a whole interval (that exit says so on standard error). **Nothing in flight 
 
 **`--mark` at every real report.** Whenever this loop reports something of its own — a child merged,
 parked, a stop — run `pnpm josh run:progress --mark` in the same turn to restart the silence clock. The clock is silence, never a timer
-(`docs/josh-commands.md` → "`josh run:progress`").
+(`docs/josh-commands-automation.md` → "`josh run:progress`").
 
 **Do not keep a progress clock of your own** — the hook refuses the arm rather than asking
 (`scripts/rules/early-heartbeat.ts` → `decide`), though **a single correctly-spaced arm is allowed**. It

@@ -221,7 +221,7 @@ words:
   - refusable
   - runnability
   # The outcome `josh lane:dispatch` answers with when a lane's log path could not be recorded
-  # (joshuafolkken/kit#1749), and the anchor of `docs/josh-commands.md` → "`josh run:wake`", which a
+  # (joshuafolkken/kit#1749), and the anchor of `docs/josh-commands-automation.md` → "`josh run:wake`", which a
   # document-rule test quotes verbatim.
   - unrecordable
   - runwake

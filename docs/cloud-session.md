@@ -52,7 +52,7 @@ against a pinned SHA256 and installs it into `node_modules/.cache/josh-tools/`.
 - **A failure backs off for 6 hours**, so a container without the release hosts does not re-download
   on every session. `--force` ignores the backoff.
 
-Details and the exact messages: [`josh audit:provision`](./josh-commands.md#josh-auditprovision).
+Details and the exact messages: [`josh audit:provision`](./josh-commands-automation.md#josh-auditprovision).
 
 ### The offline database is an alternative, not the default
 
@@ -160,5 +160,5 @@ Lanes work in a cloud container: `pnpm josh lane:open` creates the linked work t
 ## Related
 
 - [`josh audit` / `josh audit:provision`](./josh-commands.md#josh-audit)
-- [`josh run:liveness`](./josh-commands.md#josh-runliveness)
+- [`josh run:liveness`](./josh-commands-automation.md#josh-runliveness)
 - [AI workflow automation — notification behavior](./scripts-ai.md#notification-behavior)

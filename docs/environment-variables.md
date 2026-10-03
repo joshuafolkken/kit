@@ -12,12 +12,12 @@ All of them are optional except the two Telegram credentials, which notification
 
 ### Notifications and language
 
-| Variable             | Required                      | Default                                        | Used when                                                                                                                                                 |
-| -------------------- | ----------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TELEGRAM_BOT_TOKEN` | Yes, unless `JOSH_NOTIFY=off` | —                                              | Every notification a workflow sends ([how to get it](./scripts-ai.md#telegram_bot_token)).                                                                |
-| `TELEGRAM_CHAT_ID`   | Yes, unless `JOSH_NOTIFY=off` | —                                              | The chat that receives them ([how to get it](./scripts-ai.md#telegram_chat_id)).                                                                          |
-| `JOSH_NOTIFY`        | No                            | on                                             | `off` skips every notification with exit code 0 and makes the two credentials unnecessary ([details](./scripts-ai.md#josh_notify)).                       |
-| `JOSH_SESSION_LANG`  | No                            | `ja` (`josh init` seeds it from the OS locale) | The language of session dialogue, Issue bodies, comments and notification bodies, e.g. `en` ([`josh session:lang`](./josh-commands.md#josh-sessionlang)). |
+| Variable             | Required                      | Default                                        | Used when                                                                                                                                                            |
+| -------------------- | ----------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TELEGRAM_BOT_TOKEN` | Yes, unless `JOSH_NOTIFY=off` | —                                              | Every notification a workflow sends ([how to get it](./scripts-ai.md#telegram_bot_token)).                                                                           |
+| `TELEGRAM_CHAT_ID`   | Yes, unless `JOSH_NOTIFY=off` | —                                              | The chat that receives them ([how to get it](./scripts-ai.md#telegram_chat_id)).                                                                                     |
+| `JOSH_NOTIFY`        | No                            | on                                             | `off` skips every notification with exit code 0 and makes the two credentials unnecessary ([details](./scripts-ai.md#josh_notify)).                                  |
+| `JOSH_SESSION_LANG`  | No                            | `ja` (`josh init` seeds it from the OS locale) | The language of session dialogue, Issue bodies, comments and notification bodies, e.g. `en` ([`josh session:lang`](./josh-commands-automation.md#josh-sessionlang)). |
 
 ### Ports and lanes
 
@@ -25,7 +25,7 @@ All of them are optional except the two Telegram credentials, which notification
 | ------------------------- | -------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PORT_SEED`               | No       | `0` (dev 5173, preview 4173)                      | Several kit projects run on one machine: an integer `0`–`99` that moves this project's dev and preview ports by `seed × 10` ([`josh port`](./josh-commands.md#josh-port)).                                                 |
 | `JOSH_LANE_ROOT`          | No       | `.<repository-name>-lanes`, beside the repository | Where `josh lane:open` puts a lane's work tree.                                                                                                                                                                            |
-| `JOSH_LANE_LIMIT`         | No       | `6`                                               | How many lanes one repository runs at once ([`josh epic:next`](./josh-commands.md#josh-epicnext)); set `2` on a small container.                                                                                           |
+| `JOSH_LANE_LIMIT`         | No       | `6`                                               | How many lanes one repository runs at once ([`josh epic:next`](./josh-commands-automation.md#josh-epicnext)); set `2` on a small container.                                                                                |
 | `PLAYWRIGHT_REUSE_SERVER` | No       | off                                               | `1` / `true` / `yes` / `on` lets the E2E run reuse this project's own server already on the port instead of booting one ([troubleshooting](./troubleshooting.md#local-e2e-aborts-with-httplocalhost5173-is-already-used)). |
 
 ### Unattended agents
@@ -45,49 +45,49 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 
 ### Runs
 
-| Variable                         | Required | Default                                                       | Used when                                                                                                                                                    |
-| -------------------------------- | -------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `JOSH_PROGRESS_INTERVAL_MINUTES` | No       | `josh.progress_interval_minutes` in `package.json`, else `20` | How long a run goes quiet before `josh run:progress` prints a line ([`josh run:progress`](./josh-commands.md#josh-runprogress)).                             |
-| `JOSH_PROGRESS`                  | No       | on                                                            | `0` turns the progress lines off.                                                                                                                            |
-| `JOSH_RETROSPECTIVE`             | No       | off                                                           | `on` / `1` / `true` / `yes` runs the end-of-run retrospective when a backlog drains ([`josh retrospective`](./josh-commands.md#josh-retrospective)).         |
-| `JOSH_REPO_PATHS`                | No       | sibling repositories are found automatically                  | A repository that is not a sibling, or is checked out twice: `owner/repo=/absolute/path`, comma-separated ([`josh doctor`](./josh-commands.md#josh-doctor)). |
+| Variable                         | Required | Default                                                       | Used when                                                                                                                                                       |
+| -------------------------------- | -------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_PROGRESS_INTERVAL_MINUTES` | No       | `josh.progress_interval_minutes` in `package.json`, else `20` | How long a run goes quiet before `josh run:progress` prints a line ([`josh run:progress`](./josh-commands-automation.md#josh-runprogress)).                     |
+| `JOSH_PROGRESS`                  | No       | on                                                            | `0` turns the progress lines off.                                                                                                                               |
+| `JOSH_RETROSPECTIVE`             | No       | off                                                           | `on` / `1` / `true` / `yes` runs the end-of-run retrospective when a backlog drains ([`josh retrospective`](./josh-commands-automation.md#josh-retrospective)). |
+| `JOSH_REPO_PATHS`                | No       | sibling repositories are found automatically                  | A repository that is not a sibling, or is checked out twice: `owner/repo=/absolute/path`, comma-separated ([`josh doctor`](./josh-commands.md#josh-doctor)).    |
 
 ### Merge, release and dependency updates
 
-| Variable                           | Required | Default     | Used when                                                                                                                                             |
-| ---------------------------------- | -------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `JOSH_CI_TIMEOUT_SECONDS`          | No       | 32 minutes  | How long `josh followup` waits for CI ([`josh followup`](./josh-commands.md#josh-followup)).                                                          |
-| `JOSH_REQUIRED_CHECKS`             | No       | `SonarQube` | The checks a merge waits for, comma-separated.                                                                                                        |
-| `JOSH_RELEASE_TAG_TIMEOUT_SECONDS` | No       | 30 minutes  | How long `josh release` watches for its tag ([`josh release`](./josh-commands.md#josh-release)).                                                      |
-| `JOSH_LATEST_MAX_AGE_HOURS`        | No       | `12`        | How old the last dependency update may be before `josh latest:scope` answers `required` ([`josh latest:scope`](./josh-commands.md#josh-latestscope)). |
+| Variable                           | Required | Default     | Used when                                                                                                                                                        |
+| ---------------------------------- | -------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_CI_TIMEOUT_SECONDS`          | No       | 32 minutes  | How long `josh followup` waits for CI ([`josh followup`](./josh-commands-automation.md#josh-followup)).                                                          |
+| `JOSH_REQUIRED_CHECKS`             | No       | `SonarQube` | The checks a merge waits for, comma-separated.                                                                                                                   |
+| `JOSH_RELEASE_TAG_TIMEOUT_SECONDS` | No       | 30 minutes  | How long `josh release` watches for its tag ([`josh release`](./josh-commands-automation.md#josh-release)).                                                      |
+| `JOSH_LATEST_MAX_AGE_HOURS`        | No       | `12`        | How old the last dependency update may be before `josh latest:scope` answers `required` ([`josh latest:scope`](./josh-commands-automation.md#josh-latestscope)). |
 
 ### Git hooks
 
-| Variable                | Required | Default | Used when                                                                                                                                                 |
-| ----------------------- | -------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `JOSH_PRE_PUSH_FORCE`   | No       | off     | `1` runs the pre-push unit suite even on a tree already recorded green ([`josh pre-push-unit`](./josh-commands.md#josh-pre-push-unit)).                   |
-| `JOSH_PRE_COMMIT_FORCE` | No       | off     | `1` runs the pre-commit type check even on a tree already recorded green ([`josh pre-commit-type-check`](./josh-commands.md#josh-pre-commit-type-check)). |
+| Variable                | Required | Default | Used when                                                                                                                                                            |
+| ----------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_PRE_PUSH_FORCE`   | No       | off     | `1` runs the pre-push unit suite even on a tree already recorded green ([`josh pre-push-unit`](./josh-commands-automation.md#josh-pre-push-unit)).                   |
+| `JOSH_PRE_COMMIT_FORCE` | No       | off     | `1` runs the pre-commit type check even on a tree already recorded green ([`josh pre-commit-type-check`](./josh-commands-automation.md#josh-pre-commit-type-check)). |
 
 ### Agent guards
 
 Each guard is on by default; `off`, `0`, `false` or `no` turns that one guard off.
 
-| Variable                    | Required | Default | Used when                                                                                                        |
-| --------------------------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
-| `JOSH_BATCH_GUARD`          | No       | on      | [`josh batch:guard`](./josh-commands.md#josh-batchguard) — calls that could have gone out together.              |
-| `JOSH_INVESTIGATION_GUARD`  | No       | on      | [`josh investigation:guard`](./josh-commands.md#josh-investigationguard) — reading too much before delegating.   |
-| `JOSH_DUPLICATE_READ_GUARD` | No       | on      | [`josh duplicate-read:guard`](./josh-commands.md#josh-duplicate-readguard) — reading the same file twice.        |
-| `JOSH_RULE_GUARD`           | No       | on      | [`josh rule:guard`](./josh-commands.md#josh-ruleguard) — a rule delivered at the call that breaks it.            |
-| `JOSH_STOP_GUARD`           | No       | on      | [`josh stop:guard`](./josh-commands.md#josh-stopguard) — what a turn must do before it ends.                     |
-| `JOSH_WATCHER_GUARD`        | No       | on      | [`josh run:watcher:guard`](./josh-commands.md#josh-runwatcherguard) — a run whose progress watcher stopped.      |
-| `JOSH_PARENT_CUT_GUARD`     | No       | on      | A `backlogrun` parent over its session budget.                                                                   |
-| `JOSH_SCOPED_GREEN`         | No       | on      | `josh gate` refusing a tree its scoped checks were never green on ([`josh gate`](./josh-commands.md#josh-gate)). |
+| Variable                    | Required | Default | Used when                                                                                                                 |
+| --------------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_BATCH_GUARD`          | No       | on      | [`josh batch:guard`](./josh-commands-automation.md#josh-batchguard) — calls that could have gone out together.            |
+| `JOSH_INVESTIGATION_GUARD`  | No       | on      | [`josh investigation:guard`](./josh-commands-automation.md#josh-investigationguard) — reading too much before delegating. |
+| `JOSH_DUPLICATE_READ_GUARD` | No       | on      | [`josh duplicate-read:guard`](./josh-commands-automation.md#josh-duplicate-readguard) — reading the same file twice.      |
+| `JOSH_RULE_GUARD`           | No       | on      | [`josh rule:guard`](./josh-commands-automation.md#josh-ruleguard) — a rule delivered at the call that breaks it.          |
+| `JOSH_STOP_GUARD`           | No       | on      | [`josh stop:guard`](./josh-commands-automation.md#josh-stopguard) — what a turn must do before it ends.                   |
+| `JOSH_WATCHER_GUARD`        | No       | on      | [`josh run:watcher:guard`](./josh-commands-automation.md#josh-runwatcherguard) — a run whose progress watcher stopped.    |
+| `JOSH_PARENT_CUT_GUARD`     | No       | on      | A `backlogrun` parent over its session budget.                                                                            |
+| `JOSH_SCOPED_GREEN`         | No       | on      | `josh gate` refusing a tree its scoped checks were never green on ([`josh gate`](./josh-commands.md#josh-gate)).          |
 
 ### Rule evaluation
 
 | Variable                | Required | Default  | Used when                                                                                     |
 | ----------------------- | -------- | -------- | --------------------------------------------------------------------------------------------- |
-| `JOSH_EVAL_MODEL`       | No       | `sonnet` | The model `josh eval` runs against ([`josh eval`](./josh-commands.md#josh-eval)).             |
+| `JOSH_EVAL_MODEL`       | No       | `sonnet` | The model `josh eval` runs against ([`josh eval`](./josh-commands-automation.md#josh-eval)).  |
 | `JOSH_EVAL_CONCURRENCY` | No       | `5`      | How many `josh eval` sessions run at once; a value that is not a positive integer is refused. |
 
 ## Variables kit sets itself

@@ -115,4 +115,4 @@ pnpm josh release:scope --json   # the same answer as one JSON object
 
 **`pnpm josh release --dry-run` was checked first and does not answer this.** It refuses off the default branch and on a dirty working tree, and it counts against `HEAD` rather than `origin/<default>` — and every position above is a feature branch or a lane, which is exactly where it throws. So `release:scope` adds **no counting of its own**: it reads `git_followup_pending.read_pending`, the same fetch-then-count `pnpm josh followup` already uses for the Telegram line, and the two therefore cannot disagree.
 
-**This section is the single source.** `fullrun.md`, `backlogrun.md` and `backlogrun.md` point here rather than restating it, and `docs/josh-commands.md` → "`josh release:scope`" documents the command itself.
+**This section is the single source.** `fullrun.md`, `backlogrun.md` and `backlogrun.md` point here rather than restating it, and `docs/josh-commands-automation.md` → "`josh release:scope`" documents the command itself.

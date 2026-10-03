@@ -42,6 +42,8 @@ from the page it explains.
   [backlogrun-progress-rationale.md](./backlogrun-progress-rationale.md) — `backlogrun`
 - [pre-gate-cut-rationale.md](./pre-gate-cut-rationale.md) — the pre-gate session cut
 - [josh-commands-rationale.md](./josh-commands-rationale.md) — the `josh` commands
+- [josh-commands-automation-rationale.md](./josh-commands-automation-rationale.md) — the automation
+  `josh` commands
 - [init-rationale.md](./init-rationale.md) — `josh init`
 - [sync-rationale.md](./sync-rationale.md) — `josh sync`
 - [scripts-ai-rationale.md](./scripts-ai-rationale.md) — the notification commands

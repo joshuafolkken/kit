@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
-import { all_documents, read_document } from './ai-document-fixture'
+import { all_documents, COMMAND_REFERENCE_DOCS, read_document } from './ai-document-fixture'
 import { document_scan } from './document-scan'
 import { CATALOG_FILE, generate_catalog } from './generate-catalog'
 
@@ -56,10 +56,11 @@ describe('every josh command a document names exists', () => {
 // section, and no section documents a command that no longer exists (joshuafolkken/kit#1929). A
 // section is a heading whose code span names the command, so a grouped heading
 // (`` `josh run:hold` / `josh run:release` ``) covers each command it names.
-const COMMAND_DOC = 'docs/josh-commands.md'
-
+// The reference is two pages — the commands a person types, and the ones automation calls
+// (joshuafolkken/kit#2998) — and together they cover the map.
 function documented_commands(): Set<string> {
-	const headings = read_document(COMMAND_DOC)
+	const headings = COMMAND_REFERENCE_DOCS.map((path) => read_document(path))
+		.join('\n')
 		.split('\n')
 		.filter((line) => /^#{2,4} /u.test(line))
 	const names = new Set<string>()

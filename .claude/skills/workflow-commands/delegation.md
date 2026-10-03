@@ -17,13 +17,13 @@ pnpm josh delegate --list   # the enumeration, and what was rejected and why
 **how a wrong result is caught** cheaply in the parent tier, not merely by being unlikely to fail.
 `pnpm josh delegate --list` names both delegatable and rejected steps; a rejected step either has no
 verifier or lets a wrong result propagate too far. The command distinguishes `kept deliberately`
-from `kept by default`. `docs/josh-commands.md` → "`josh delegate`" carries the full enumeration.
+from `kept by default`. `docs/josh-commands-automation.md` → "`josh delegate`" carries the full enumeration.
 
 **The mechanism is not the unit.** `pnpm josh delegate` covers a run step, a file-disjoint Step 0
 implementation unit (`pnpm josh fanout`), and `epic-child` — an epic's child and a named issue of a
 `backlogrun` alike. Do not add a second batch-child mechanism. Read `backlogrun-child.md` → "Each child
 runs in a delegated unit" at child dispatch; `backlogrun-steps.md` → "Named issues run first, in order"
-applies to named issues. `docs/josh-commands.md` → "`josh fanout`" carries file-disjoint dispatch.
+applies to named issues. `docs/josh-commands-automation.md` → "`josh fanout`" carries file-disjoint dispatch.
 
 **`followup-filing` delegates the late review-finding filing chain** with the parent's finding text;
 the parent verifies the new Issue using `pnpm josh issue:state <new>`. For `epic-child`, the parent
@@ -41,7 +41,7 @@ a temporary probe script and return its output.
 delegate the unread investigation. Brief the unit on what was already read; do not re-read it there.
 **A delegation resets the counter rather than spending it**; `pnpm josh investigation:guard` counts
 unedited files and refuses the threshold read. `pnpm josh delegate --list` prints the threshold.
-`docs/josh-commands.md` → "`josh investigation:guard`" carries the command's counting details.
+`docs/josh-commands-automation.md` → "`josh investigation:guard`" carries the command's counting details.
 
 **The main line does not idle while the unit reads:** read files this run will edit, then verify the
 unit's cited lines. Independent investigations launch together; a brief that needs another unit's
