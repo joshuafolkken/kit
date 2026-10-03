@@ -1,6 +1,6 @@
 # josh init — Detailed Behavior
 
-`josh init` selects a project profile, then creates or merges the settings that apply to that project. It can initialize a directory without Git or an existing `package.json`.
+`josh init` selects a project profile, then creates or merges the settings that apply to that project. It can initialize a directory without Git or an existing `package.json`. The reasons behind its choices are in [init-rationale.md](./maintainers/init-rationale.md).
 
 ```bash
 pnpm josh init
@@ -240,6 +240,7 @@ SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
 .github/workflows/ci.yml
 .github/workflows/auto-tag.yml
 .github/workflows/dependabot-auto-merge.yml
+.github/workflows/github-release.yml
 .github/workflows/pr-classification.yml
 .github/workflows/production.yml
 .github/workflows/sonar-qube.yml

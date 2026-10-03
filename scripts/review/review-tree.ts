@@ -3,6 +3,7 @@ import path from 'node:path'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { observation_ledger } from '#scripts/observations/observation-ledger'
 
 // The tree `josh review:brief` records: every path the change touches, and the digest of its content
 // (joshuafolkken/kit#1241).
@@ -43,13 +44,21 @@ function tree_of(root: string, paths: ReadonlyArray<string>): Record<string, str
 // say the gate had verified an arbitrarily edited tree, and `--round 2` would report an empty fix
 // delta. **A defect that answers "all clear" is the one shape this record cannot take**, which is why
 // the root is resolved rather than assumed (measured from `scripts/`: 18 of 25 entries `absent`).
+//
+// **The observation ledger is left out of the map** (joshuafolkken/kit#3017), for the reason
+// `hook-gate-reuse.ts` already drops it from the status reading: it is no code any check runs, and a
+// line appended after the gate — a second review round's record — must not read as an unverified tree.
+// Left in, that one line sent the ledger commit's pre-push back to the full unit suite, which outlived
+// the push budget and failed the run.
 async function read_changed_tree(
 	paths?: ReadonlyArray<string>,
 	root?: string,
 ): Promise<Record<string, string>> {
+	const listed = paths ?? (await changed_paths.read_changed_paths(false))
+
 	return tree_of(
 		root ?? (await git_command.repository_root()),
-		paths ?? (await changed_paths.read_changed_paths(false)),
+		listed.filter((file_path) => !observation_ledger.is_ledger_path(file_path)),
 	)
 }
 

@@ -69,4 +69,4 @@ No Issue workflow? [Node projects](./docs/setup/full.md#2-install-and-initialize
 
 [Tutorial](./docs/tutorial.md) · [How-to](./docs/how-to.md) · [Commands](./docs/josh-commands.md) · [Troubleshooting](./docs/troubleshooting.md) · [All docs](./docs/overview.md)
 
-[Contributing](./CLAUDE.md) · [Publishing](./docs/publishing.md) · [MIT](./LICENSE)
+[Releases](https://github.com/joshuafolkken/kit/releases) · [Security](./SECURITY.md) · [Contributing](./CLAUDE.md) · [Maintaining kit](./docs/maintainers/README.md) · [MIT](./LICENSE)

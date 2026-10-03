@@ -36,8 +36,4 @@ For anyone who knows what they want to do but not which command does it. Each gu
 
 Looking up an error message instead? See [troubleshooting.md](./troubleshooting.md).
 
-## Release
-
-| I want to…            | Guide                          |
-| --------------------- | ------------------------------ |
-| Publish a new version | [Release](./how-to/release.md) |
+Maintaining kit itself — releasing it, or reading why a rule is the way it is? Start at [Maintaining kit](./maintainers/README.md).

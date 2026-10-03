@@ -235,7 +235,6 @@ words:
   - testuser
   - myorg
   - myrepo
-  - ncurc
   # The `tsc --noEmit` flag, folded to lower case: a lowercased command line is matched against
   # tool signatures, so the pattern cannot keep the camel case that would let the spell checker
   # split it (joshuafolkken/kit#1313).

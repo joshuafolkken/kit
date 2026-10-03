@@ -122,6 +122,9 @@ const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
 		src: 'templates/workflows/dependabot-auto-merge.yml',
 		dest: '.github/workflows/dependabot-auto-merge.yml',
 	},
+	// A template rather than a copy of kit's own file: kit releases from its publish.yml, so the file
+	// must not run in kit as well (joshuafolkken/kit#3007).
+	{ src: 'templates/workflows/github-release.yml', dest: '.github/workflows/github-release.yml' },
 ]
 
 // Empty since joshuafolkken/kit#1879: the five skill directories kit used to copy whole

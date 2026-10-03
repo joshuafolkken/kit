@@ -1,0 +1,81 @@
+name: GitHub Release
+
+# Creates the GitHub Release, with notes generated from `.github/release.yml`, for each tag
+# `josh release` cuts (joshuafolkken/kit#3007). A repository with a Publish workflow gets its release
+# once that workflow has succeeded for the tag; one without it gets the release when auto-tag.yml
+# announces the tag. kit's own release is the `create-release` job of its publish.yml, which runs the
+# same `josh release:github`, so this file is distributed but never runs in kit.
+on:
+  workflow_run:
+    workflows: [Publish]
+    types: [completed]
+  repository_dispatch:
+    types: [new-tag-created]
+
+# Deliberately no `concurrency` block: a later tag waits inside `josh release:github` for the lower
+# tag's release, so serializing the runs would leave the later run holding the slot the lower one needs.
+
+jobs:
+  release:
+    # The Publish run is titled `Publish <tag>`; its head branch is not the tag when it was started by
+    # repository_dispatch, so the title is where the tag is read from.
+    if: >-
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+      startsWith(github.event.workflow_run.display_title, 'Publish v')) ||
+      github.event_name == 'repository_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    permissions:
+      actions: read
+      contents: write
+      packages: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # A repository with a Publish workflow is released from the workflow_run above, after its
+      # publication, so the tag announcement is left alone there and one tag never starts two releases.
+      - name: Select release tag
+        id: release
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_TITLE: ${{ github.event.workflow_run.display_title }}
+          RUN_WORKFLOW: ${{ github.event.workflow_run.workflow_id }}
+          DISPATCH_TAG: ${{ github.event.client_payload.tag }}
+        run: |
+          if [ "$EVENT_NAME" = workflow_run ]; then
+            echo "tag=${RUN_TITLE#Publish }" >> "$GITHUB_OUTPUT"
+            echo "workflow=$RUN_WORKFLOW" >> "$GITHUB_OUTPUT"
+          elif [ -f .github/workflows/publish.yml ]; then
+            echo "ℹ️ publish.yml releases this tag once it has published, skipping"
+          else
+            echo "tag=$DISPATCH_TAG" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node.js
+        if: steps.release.outputs.tag != ''
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Configure GitHub Packages authentication for existing projects
+        if: steps.release.outputs.tag != ''
+        run: printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' >> "$HOME/.npmrc"
+
+      - name: Setup pnpm and install dependencies
+        if: steps.release.outputs.tag != ''
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: 'false'
+
+      - name: Publish GitHub Release
+        if: steps.release.outputs.tag != ''
+        run: pnpm josh release:github
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_WORKFLOW: ${{ steps.release.outputs.workflow }}

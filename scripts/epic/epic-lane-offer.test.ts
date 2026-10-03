@@ -11,6 +11,7 @@ import {
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
 } from '#scripts/issue/issue-labels'
+import { lane_await } from '#scripts/lane/lane-await'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ConfirmContext } from './epic-candidate-confirm'
 import { epic_classify } from './epic-classify'
@@ -73,6 +74,8 @@ function numbers_of(children: ReadonlyArray<EpicChild>): Array<number> {
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	// Every holder these cases list is running; a stale one is `epic-solo-stale.test.ts`'s case.
+	vi.spyOn(lane_await, 'is_process_running_default').mockReturnValue(true)
 })
 
 describe('epic_lane_offer.offer_for_repo — how many children fit', () => {
