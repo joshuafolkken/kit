@@ -5,7 +5,7 @@ import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-thresho
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
-import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
+import { lane_launch_cli, type LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
@@ -235,10 +235,12 @@ async function merge(issue: string, owner: string): Promise<string> {
 	return result.token
 }
 
-async function launch(issue: string, owner: string): Promise<boolean> {
+async function launch(issue: string, owner: string): Promise<LaunchOutcome['kind']> {
 	await backlog_drive_owner.assert_current(owner)
 
-	return (await lane_launch_cli.launch_lane({ issue, stash: undefined })) !== undefined
+	const outcome = await lane_launch_cli.launch_lane({ issue, stash: undefined })
+
+	return outcome.kind
 }
 
 // `lane:await`'s re-confirmed check, one state per child. A child already gone when the loop starts —

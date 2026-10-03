@@ -6,6 +6,7 @@ const { CONFIG, FIRST_CHILD, OFFERED, OFFERED_TOO, POLL_MS, SECOND_CHILD } = bac
 const { harness, offer, state } = backlog_drive_fixture
 const ONE_FREE_LANE = 1
 const NO_FREE_LANES = 0
+const EARLIER = '2026-09-23T00:00:00.000Z'
 
 describe('backlog_drive.run_pass — dispatch', () => {
 	it('launches every issue a run verdict offers and counts them in flight', async () => {
@@ -62,19 +63,32 @@ describe('backlog_drive.run_pass — the lane limit', () => {
 	it('keeps the active stamp when no lane is free, so the idle budget still runs out', async () => {
 		const offered = offer('run', [OFFERED])
 		const { ports } = harness({ offers: [offered], free_lanes: [NO_FREE_LANES] })
-		const before = state()
+		// Stamped before the fixture clock, so restamping on every pass would move it.
+		const before = { ...state(), active: EARLIER }
 		const result = await backlog_drive.run_pass(before, true, ports)
 
-		expect(result.kind === 'continue' && result.state.active).toBe(before.active)
+		expect(result.kind === 'continue' && result.state.active).toBe(EARLIER)
+	})
+})
+
+// joshuafolkken/kit#3027: only a lane:open refused at a full pool waits; a lane it opened holds a seat.
+describe('backlog_drive.run_pass — a refused launch at the lane limit', () => {
+	it('waits rather than handing back a lane:open refused because every lane is taken', async () => {
+		const offered = offer('run', [OFFERED])
+		const script = { offers: [offered], unopened_launches: [OFFERED], free_lanes: [1, 0] }
+		const { ports } = harness(script)
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(result.kind === 'continue' && result.state.in_flight).toStrictEqual([])
 	})
 
-	it('waits rather than handing back a launch refused because every lane is taken', async () => {
+	it('hands back a launch that failed after its lane took the last seat', async () => {
 		const offered = offer('run', [OFFERED])
 		const script = { offers: [offered], failed_launches: [OFFERED], free_lanes: [1, 0] }
 		const { ports } = harness(script)
 		const result = await backlog_drive.run_pass(state(), true, ports)
 
-		expect(result.kind === 'continue' && result.state.in_flight).toStrictEqual([])
+		expect(result.kind === 'end' && result.end.reason).toBe('launch')
 	})
 })
 

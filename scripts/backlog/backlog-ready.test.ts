@@ -29,6 +29,7 @@ async function not_parent(): Promise<boolean> {
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 })
 
 describe('backlog_ready.ready_line', () => {
@@ -62,7 +63,6 @@ describe('backlog_ready.drive_free_lane_count', () => {
 		vi.stubEnv('JOSH_LANE_LIMIT', 'abc')
 
 		await expect(backlog_ready.drive_free_lane_count()).rejects.toThrow('JOSH_LANE_LIMIT')
-		vi.unstubAllEnvs()
 	})
 })
 

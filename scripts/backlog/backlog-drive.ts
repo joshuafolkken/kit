@@ -16,6 +16,8 @@
 // **Everything it touches is a port**, the pattern `run-wake-loop.ts` set, so the sequencing is pinned
 // without a process, a network or a clock.
 
+import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
+
 const RUN_VERDICT = 'run'
 const STOP_VERDICT = 'stop'
 // The `run:merge` tokens that end the loop at once: a hand-off, a person's stop, the environment down,
@@ -42,6 +44,8 @@ const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
 ])
 const NO_RETRIES = 0
 const NO_FREE_LANES = 0
+const LAUNCHED = 'launched'
+const UNOPENED = 'unopened'
 
 interface OfferRead {
 	verdict: string
@@ -88,8 +92,10 @@ interface DrivePorts {
 	merge: (issue: string) => Promise<string>
 	// `backlog:offer`'s answer for the state, or `undefined` when it exited non-zero.
 	offer: (state: DriveState) => Promise<OfferRead | undefined>
-	launch: (issue: string) => Promise<boolean>
-	// The lanes free right now — `backlog_ready.free_lane_count` in production, the limit less the open lanes.
+	// Where `lane:launch`'s chain ended — `launched`, `unopened` (no lane taken) or `failed` (one taken).
+	launch: (issue: string) => Promise<LaunchOutcome['kind']>
+	// The lanes free right now — `backlog_ready.drive_free_lane_count` in production, the limit less the
+	// open lanes.
 	free_lanes: () => Promise<number>
 	now: () => Date
 }
@@ -195,9 +201,16 @@ async function collect_finished(state: DriveState, ports: DrivePorts): Promise<P
 	return { kind: 'continue', state: current }
 }
 
-// A refused launch with every lane taken is a wait, not a judgement (joshuafolkken/kit#3027): the next
-// offer after a lane frees retries it. Only a refusal with a lane still free is handed back.
-async function refused(issue: string, state: DriveState, ports: DrivePorts): Promise<PassResult> {
+// A `lane:open` refused with every lane taken is a wait, not a judgement (joshuafolkken/kit#3027): the
+// next offer after a lane frees retries it. A step failing after the lane opened is always handed back —
+// that lane holds the last seat itself, so the free count would read the failure as a full pool.
+async function refused(
+	issue: string,
+	outcome: LaunchOutcome['kind'],
+	state: DriveState,
+	ports: DrivePorts,
+): Promise<PassResult> {
+	if (outcome !== UNOPENED) return ended('launch', state, undefined, issue)
 	if ((await ports.free_lanes()) <= NO_FREE_LANES) return { kind: 'continue', state }
 
 	return ended('launch', state, undefined, issue)
@@ -225,9 +238,11 @@ async function launch_all(
 	const free = await ports.free_lanes()
 
 	for (const issue of issues.slice(0, free)) {
-		const is_launched = await ports.launch(issue)
+		const outcome = await ports.launch(issue)
 
-		if (!is_launched) return await refused(issue, launched(state, in_flight, ports), ports)
+		if (outcome !== LAUNCHED) {
+			return await refused(issue, outcome, launched(state, in_flight, ports), ports)
+		}
 
 		in_flight.push(issue)
 	}

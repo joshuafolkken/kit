@@ -80,7 +80,7 @@ function ports(world_state: World): LoopPorts {
 		launch: async (issue) => {
 			world_state.calls.push(`launch ${issue}`)
 
-			return true
+			return 'launched'
 		},
 		free_lanes: async () => FREE_LANES,
 		now: () => new Date(world_state.clock),

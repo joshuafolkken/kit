@@ -1,3 +1,4 @@
+import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import { backlog_drive, type DriveState, type LoopPorts, type OfferRead } from './backlog-drive'
 
 // The scripted ports every `backlog_drive` suite drives the loop through — one copy, so the suites
@@ -28,7 +29,9 @@ interface Script {
 	finished?: ReadonlyArray<string>
 	merges?: ReadonlyMap<string, string>
 	offers?: ReadonlyArray<OfferRead | undefined>
+	// Launches that failed after `lane:open` took a lane, and ones `lane:open` itself refused.
 	failed_launches?: ReadonlyArray<string>
+	unopened_launches?: ReadonlyArray<string>
 	// The free-lane answers in order, the last repeating; unset reads as a pool with room to spare.
 	free_lanes?: ReadonlyArray<number>
 }
@@ -55,6 +58,12 @@ function child_ports(
 	}
 }
 
+function launch_outcome(script: Script, issue: string): LaunchOutcome['kind'] {
+	if (script.failed_launches?.includes(issue) === true) return 'failed'
+
+	return script.unopened_launches?.includes(issue) === true ? 'unopened' : 'launched'
+}
+
 // The dispatch-facing ports: offers answer from the script's queue, then `wait`.
 function dispatch_ports(
 	script: Script,
@@ -75,7 +84,7 @@ function dispatch_ports(
 		launch: async (issue) => {
 			calls.push(`launch ${issue}`)
 
-			return !(script.failed_launches ?? []).includes(issue)
+			return launch_outcome(script, issue)
 		},
 	}
 }

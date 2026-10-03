@@ -54,7 +54,7 @@ function drive_ports(world: World): DrivePorts {
 		launch: async () => {
 			world.started = true
 
-			return true
+			return 'launched'
 		},
 		free_lanes: async () => FREE_LANES,
 		now: () => NOW,
