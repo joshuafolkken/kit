@@ -226,7 +226,7 @@ async function warn_of_stop(stop: LoopStop, body: string, context: WakeContext):
 }
 
 // **Only a failed wake exits non-zero, and the two reasons that newly warn do not**
-// (joshuafolkken/kit#1746). The verdict-and-exit-code table in `docs/josh-commands.md` is a contract
+// (joshuafolkken/kit#1746). The verdict-and-exit-code table in `docs/josh-commands-automation.md` is a contract
 // callers branch on; what `expired` and `unreadable` were missing is the notification, not a different
 // exit code, and changing both at once would break a caller to fix a silence.
 function exit_code_of(reason: WakeStopReason): number {

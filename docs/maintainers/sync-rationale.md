@@ -507,7 +507,7 @@ like. `Bash` is in that list for the live round-trip density line the same hook 
 formatting — a shell payload names a command rather than a file, and seven of the ten most recent
 sessions in this checkout never called `Edit` or `Write` once, so on the narrower matcher the line
 reached none of them (joshuafolkken/kit#1337). It reaches a consumer the same way the deny list
-does, and `docs/josh-commands.md` documents what the command does, why the matcher names exactly
+does, and `docs/josh-commands-automation.md` documents what the command does, why the matcher names exactly
 those three tools, and why it never fails.
 
 **And it wires the batching guard, on the earlier side of the same event pair.** A `PreToolUse` hook
@@ -529,7 +529,7 @@ applied edit in silence. Within `Bash` the
 mutation words still exclude every `pnpm josh` command, commit and Issue write — a matcher is settings
 a consumer can widen, and what a call is stays the script's answer whatever the wiring says.
 `JOSH_BATCH_GUARD=off` in the environment or in `.env` switches it off without editing the settings
-file. `docs/josh-commands.md` carries the conditions, what the guard
+file. `docs/josh-commands-automation.md` carries the conditions, what the guard
 cannot know about the turn it interrupts, and the bound on how often a refusal can repeat.
 
 **A second `PreToolUse` hook runs `pnpm josh investigation:guard`, on `Read` and `Bash`**
@@ -541,7 +541,7 @@ reading is split between the two, and on the `Bash` side it refuses only a line 
 nothing** — the test the batching guard itself asked until joshuafolkken/kit#1762 widened that one,
 kept under a name of its own so the two guards cannot be moved together by accident. A
 `sed -n` read is therefore counted and never refused. `JOSH_INVESTIGATION_GUARD=off` switches it off,
-and `docs/josh-commands.md` carries which commands count as reading, the one-refusal-per-accumulation
+and `docs/josh-commands-automation.md` carries which commands count as reading, the one-refusal-per-accumulation
 bound and how to verify it.
 
 **A third `PreToolUse` hook runs `pnpm josh rule:guard`, on `Bash`** (joshuafolkken/kit#1524). It is

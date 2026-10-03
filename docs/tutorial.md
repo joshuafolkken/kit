@@ -53,7 +53,7 @@ Repeat step 1 of Pattern A for each change: agree the plan with the agent, then 
 
 ### 2. Opt them in with the `auto-ok` label
 
-Add the `auto-ok` label to each Issue the agent may implement and merge without you — or to the epic, which opts in every Issue under it. Only a person applies this label; the agent never adds it. Create the label once per repository as [`josh auto-ok:next`](./josh-commands.md#josh-auto-oknext) shows.
+Add the `auto-ok` label to each Issue the agent may implement and merge without you — or to the epic, which opts in every Issue under it. Only a person applies this label; the agent never adds it. Create the label once per repository as [`josh auto-ok:next`](./josh-commands-automation.md#josh-auto-oknext) shows.
 
 ### 3. Run them all with `backlogrun`
 

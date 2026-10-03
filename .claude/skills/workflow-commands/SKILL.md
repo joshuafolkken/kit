@@ -193,7 +193,7 @@ refuses the second `pnpm josh issue:file` call until it has.
 its duplicate and epic answers.** This applies inside every workflow, including observations and review
 follow-ups. The guard refuses any other filing call. Read `issue-scout.md` at that point for the
 duplicate, closed-Issue and epic decisions and for `--distinct`; `issue-fold-existing.md` handles a
-compatible duplicate. `docs/josh-commands.md` → "`josh issue:file`" defines the command.
+compatible duplicate. `docs/josh-commands-automation.md` → "`josh issue:file`" defines the command.
 
 ## 2f. The working-tree hold — one run per tree
 

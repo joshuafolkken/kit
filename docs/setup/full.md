@@ -42,7 +42,7 @@ Then make `main` require the checks the distributed workflows report — without
 pnpm josh ruleset:check --apply
 ```
 
-`pnpm josh ruleset:check` alone reports what is missing; [josh-commands.md → `josh ruleset:check`](../josh-commands.md#josh-rulesetcheck) lists the checks.
+`pnpm josh ruleset:check` alone reports what is missing; [josh-commands-automation.md → `josh ruleset:check`](../josh-commands-automation.md#josh-rulesetcheck) lists the checks.
 
 ## 4. Keep it up to date
 

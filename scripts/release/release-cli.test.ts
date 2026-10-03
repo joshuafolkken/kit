@@ -25,7 +25,7 @@ function read_repository_file(relative_path: string): string {
 
 describe('the josh release command entry', () => {
 	it('is documented', () => {
-		expect(read_repository_file('docs/josh-commands.md')).toContain('`josh release`')
+		expect(read_repository_file('docs/josh-commands-automation.md')).toContain('`josh release`')
 	})
 })
 

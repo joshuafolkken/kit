@@ -147,7 +147,7 @@ interface GuardedCall {
 //
 // **The dispatch it adds is measured, and it is not the figure the deleted text quoted.** One hook run
 // is **0.53 s** in this checkout and about 0.4 s in a consumer, essentially all of it process startup —
-// measured under `docs/josh-commands.md` → "`josh format:edited`", which is where that reading was
+// measured under `docs/josh-commands-automation.md` → "`josh format:edited`", which is where that reading was
 // taken. The "about 2.4 s" above was a `pnpm josh` dispatch measured before joshuafolkken/kit#1342 made
 // this command eligible for the in-process path. Against that, one recovered round trip is a whole
 // model turn.

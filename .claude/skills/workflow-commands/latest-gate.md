@@ -82,4 +82,4 @@ found once — fix it forward before parking the issue for it.
 
 This file is the single source of the rule. `fullrun.md`, `halfrun.md`, `backlogrun.md` and `backlogrun.md`
 each name `pnpm josh latest:scope` at the point their procedure reaches it and route here for
-everything else; `docs/josh-commands.md` documents the command itself.
+everything else; `docs/josh-commands-automation.md` documents the command itself.
