@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_branch } from './git-branch'
+import { BranchMismatchError } from './git-error'
 
 vi.mock('./animation-helpers', () => ({
 	animation_helpers: {
@@ -24,20 +25,12 @@ vi.mock('./git-command', () => ({
 	},
 }))
 
-vi.mock('./git-error', () => ({
-	git_error: {
-		display_branch_mismatch_error: vi.fn(),
-	},
-}))
-
 const { git_command } = await import('./git-command')
-const { git_error } = await import('./git-error')
 const mocked_branch_exists = vi.mocked(git_command.branch_exists)
 const mocked_checkout = vi.mocked(git_command.checkout)
 const mocked_checkout_b = vi.mocked(git_command.checkout_b)
 const mocked_pull = vi.mocked(git_command.pull_fast_forward)
 const mocked_get_default_branch = vi.mocked(git_command.get_default_branch)
-const mocked_display_error = vi.mocked(git_error.display_branch_mismatch_error)
 
 const TARGET_BRANCH = 'feature-branch'
 const WRONG_BRANCH = 'wrong-branch'
@@ -85,18 +78,30 @@ describe('git_branch.check_and_create_branch — from correct branch', () => {
 	it('returns target branch name when already on it', async () => {
 		const result = await git_branch.check_and_create_branch(TARGET_BRANCH, TARGET_BRANCH)
 
-		expect(mocked_display_error).not.toHaveBeenCalled()
 		expect(mocked_checkout).not.toHaveBeenCalled()
 		expect(mocked_checkout_b).not.toHaveBeenCalled()
 		expect(result).toBe(TARGET_BRANCH)
 	})
 })
 
-describe('git_branch.check_and_create_branch — from wrong branch', () => {
-	it('calls display_branch_mismatch_error when on wrong branch', async () => {
-		await git_branch.check_and_create_branch(WRONG_BRANCH, TARGET_BRANCH)
+// joshuafolkken/kit#2985: a mismatch is thrown as a typed error for the CLI entry to render, never
+// ended with `process.exit`, so every `finally` above the call still runs.
+describe('git_branch.check_and_create_branch — a mismatched branch', () => {
+	it.each([
+		['on a wrong branch', WRONG_BRANCH, TARGET_BRANCH],
+		['issue numbers differ', ISSUE_42_BRANCH, ISSUE_99_BRANCH],
+		['current branch has no issue prefix', NO_PREFIX_BRANCH, ISSUE_42_BRANCH],
+	])('rejects with a BranchMismatchError when %s', async (_case, current, target) => {
+		const exit_spy = vi.spyOn(process, 'exit')
+		const rejection = git_branch.check_and_create_branch(current, target)
 
-		expect(mocked_display_error).toHaveBeenCalledWith(WRONG_BRANCH, TARGET_BRANCH)
+		await expect(rejection).rejects.toThrow(BranchMismatchError)
+		await expect(rejection).rejects.toMatchObject({
+			current_branch: current,
+			target_branch_name: target,
+		})
+		expect(exit_spy).not.toHaveBeenCalled()
+		exit_spy.mockRestore()
 	})
 })
 
@@ -107,20 +112,7 @@ describe('git_branch.check_and_create_branch — same issue prefix', () => {
 			'42-very-long-name-from-full-title',
 		)
 
-		expect(mocked_display_error).not.toHaveBeenCalled()
 		expect(result).toBe(SAME_PREFIX_CURRENT)
-	})
-
-	it('calls display_branch_mismatch_error when issue numbers differ', async () => {
-		await git_branch.check_and_create_branch(ISSUE_42_BRANCH, ISSUE_99_BRANCH)
-
-		expect(mocked_display_error).toHaveBeenCalledWith(ISSUE_42_BRANCH, ISSUE_99_BRANCH)
-	})
-
-	it('calls display_branch_mismatch_error when current branch has no issue prefix', async () => {
-		await git_branch.check_and_create_branch(NO_PREFIX_BRANCH, ISSUE_42_BRANCH)
-
-		expect(mocked_display_error).toHaveBeenCalledWith(NO_PREFIX_BRANCH, ISSUE_42_BRANCH)
 	})
 })
 

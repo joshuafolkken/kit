@@ -4,7 +4,7 @@ import {
 	type AnimationOptions,
 } from './animation-helpers'
 import { git_command } from './git-command'
-import { git_error } from './git-error'
+import { BranchMismatchError } from './git-error'
 
 async function current(): Promise<string> {
 	const config: AnimationOptions<string> = {
@@ -124,7 +124,7 @@ async function check_and_create_branch(
 	}
 
 	if (is_mismatch(current_branch, target_branch_name, default_branch)) {
-		git_error.display_branch_mismatch_error(current_branch, target_branch_name)
+		throw new BranchMismatchError({ current_branch, target_branch_name })
 	}
 
 	return current_branch

@@ -15,7 +15,7 @@ vi.mock('./git-gh-issue-read', () => ({
 vi.mock('./telegram-notify', () => ({
 	telegram_notify: { send: telegram_send_mock },
 }))
-// Mocked because the real one ends in `process.exit(1)`, which would take the test runner with it.
+// Mocked so the test observes the hand-off itself; the real one's exit code is pinned in `git-error.test.ts`.
 vi.mock('./git-error', () => ({ git_error: { handle: error_handle_mock } }))
 vi.mock('#scripts/josh/josh-environment-file', () => ({
 	josh_environment_file: { load_environment_file: vi.fn() },
