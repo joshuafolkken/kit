@@ -1,8 +1,8 @@
 import { lstatSync, readFileSync, readlinkSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { codex_hooks, type HookConfig } from '#scripts/agent/codex-hooks'
 import { prompt_hooks } from '#scripts/hooks/prompt-hooks'
-import { hook_launch } from '#scripts/init/hook-launch'
 import { init_logic } from '#scripts/init/init-logic'
 import { describe, expect, it } from 'vitest'
 
@@ -13,87 +13,12 @@ const CODEX_CONFIG = path.join(ROOT, '.codex', 'config.toml')
 const CODEX_HOOKS = path.join(ROOT, '.codex', 'hooks.json')
 const CLAUDE_SETTINGS = path.join(ROOT, '.claude', 'settings.json')
 
-interface HookHandler {
-	type: string
-	command: string
-	timeout?: number
-}
-
-interface MatcherGroup {
-	matcher?: string
-	hooks: Array<HookHandler>
-}
-
-interface HookConfig {
-	hooks: Record<string, Array<MatcherGroup>>
-}
-
-// The adapter launches like every other kit hook — root prefix, ready gate, bundle — with the adapter's
-// own source run through tsx as its fallback.
-function codex_adapter_command(mode: string): string {
-	return hook_launch.bundle_launch_command(
-		`codex-hook-adapter.js ${mode}`,
-		`pnpm exec tsx scripts/hooks/codex-hook-adapter.ts ${mode}`,
-	)
-}
-
 function read(file_path: string): string {
 	return readFileSync(file_path, 'utf8')
 }
 
 function load_hooks(file_path: string): HookConfig {
 	return JSON.parse(read(file_path)) as HookConfig
-}
-
-function first_handler(hooks: HookConfig['hooks'], event: string): HookHandler {
-	const handler = hooks[event]?.[0]?.hooks[0]
-	if (handler === undefined) throw new Error(`Missing ${event} hook handler`)
-
-	return handler
-}
-
-function normalize_adapter_command(
-	normalized: HookConfig['hooks'],
-	claude: HookConfig['hooks'],
-	event: string,
-	expected: string,
-): void {
-	const target = first_handler(normalized, event)
-	if (target.command !== expected) throw new Error(`Unexpected ${event} adapter command`)
-
-	target.command = first_handler(claude, event).command
-}
-
-function normalize_codex_matchers(hooks: HookConfig['hooks']): void {
-	for (const event of ['PreToolUse', 'PostToolUse']) {
-		const group = hooks[event]?.[0]
-		if (group?.matcher === undefined) throw new Error(`Missing ${event} hook matcher`)
-		group.matcher = group.matcher.replace('|apply_patch', '')
-	}
-}
-
-function normalize_codex_hooks(codex: HookConfig, claude: HookConfig): HookConfig['hooks'] {
-	const normalized = structuredClone(codex.hooks)
-
-	normalize_adapter_command(
-		normalized,
-		claude.hooks,
-		'PreToolUse',
-		codex_adapter_command('pretool'),
-	)
-	normalize_adapter_command(
-		normalized,
-		claude.hooks,
-		'PostToolUse',
-		codex_adapter_command('posttool'),
-	)
-	normalize_codex_matchers(normalized)
-	const prompt_group = normalized['UserPromptSubmit']?.[0]
-	if (prompt_group === undefined) throw new Error('Missing UserPromptSubmit hook group')
-	// Codex documents that UserPromptSubmit ignores matcher, so its omission is intentional.
-	prompt_group.matcher = ''
-
-	return normalized
 }
 
 describe('Codex skill discovery', () => {
@@ -158,12 +83,13 @@ describe('Codex hook wiring', () => {
 	})
 })
 
+// `.codex/hooks.json` is generated from `.claude/settings.json` (joshuafolkken/kit#2997), so the
+// committed copy has to be exactly what the generator prints for the current Claude settings.
 describe('Codex and Claude hook parity', () => {
-	it('matches the complete Claude hook structure apart from the Codex adapter', () => {
-		const codex = load_hooks(CODEX_HOOKS)
-		const claude = load_hooks(CLAUDE_SETTINGS)
-
-		expect(normalize_codex_hooks(codex, claude)).toStrictEqual(claude.hooks)
+	it('is the file the generator derives from the Claude settings', () => {
+		expect(read(CODEX_HOOKS), 'regenerate with `tsx scripts/build/build-codex-hooks.ts`').toBe(
+			codex_hooks.codex_hooks_text(read(CLAUDE_SETTINGS)),
+		)
 	})
 })
 

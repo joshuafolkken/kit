@@ -41,6 +41,8 @@ const PATH_LAUNCHED_ENTRIES = [
 const SHIPPED_UNREACHABLE = new Set([
 	'scripts/build/build-bin.ts',
 	'scripts/build/build-claude-md.ts',
+	'scripts/build/build-codex-hooks.ts',
+	'scripts/agent/codex-hooks.ts',
 	'scripts/build/build-config-merge.ts',
 	'scripts/build/build-hooks.ts',
 	'scripts/build/build-library.ts',
