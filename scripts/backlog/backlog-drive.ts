@@ -17,6 +17,7 @@
 // without a process, a network or a clock.
 
 import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
+import type { MergeResult } from '#scripts/run/run-merge-cli'
 
 const RUN_VERDICT = 'run'
 const STOP_VERDICT = 'stop'
@@ -34,6 +35,7 @@ const IMMEDIATE_TOKENS: ReadonlySet<string> = new Set([
 // and the children still in flight are collected before the loop ends (joshuafolkken/kit#2881).
 const HANDOFF_TOKENS: ReadonlySet<string> = new Set([...IMMEDIATE_TOKENS, STOP_VERDICT])
 const RESUMED_TOKEN = 'resumed'
+const MERGED_OUTCOME = 'merged'
 const WATCH_VERDICT = 'watch'
 // The verdicts the loop acts on without the parent. Any other is handed back as it was printed.
 const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
@@ -62,7 +64,9 @@ interface OfferRead {
 interface DriveState {
 	// The children this run has in flight — seeded from the open lanes, so a restarted loop resumes them.
 	in_flight: Array<string>
-	// Every child collected, fed back to `backlog:offer` because GitHub closes a merged issue late.
+	// Every child merged, fed back to `backlog:offer` because GitHub closes a merged issue late. A parked
+	// child is left out: its labels classify it, so one a person released is offered again
+	// (joshuafolkken/kit#3041).
 	exclude: Array<string>
 	// When the run last did something, handed to `backlog:budget` as `--active`.
 	active: string
@@ -85,11 +89,13 @@ interface DriveEnd {
 	is_finish?: boolean | undefined
 }
 
+type Collected = Pick<MergeResult, 'token' | 'outcome'>
+
 interface DrivePorts {
 	// Whether a child's process has confirmed-ended — `lane:await`'s re-confirmed check in production.
 	is_finished: (issue: string) => boolean
-	// `run:merge <N>`'s first stdout token.
-	merge: (issue: string) => Promise<string>
+	// `run:merge <N>`'s first stdout token and the outcome it handled the child as.
+	merge: (issue: string) => Promise<Collected>
 	// `backlog:offer`'s answer for the state, or `undefined` when it exited non-zero.
 	offer: (state: DriveState) => Promise<OfferRead | undefined>
 	// Where `lane:launch`'s chain ended — `launched`, `unopened` (no lane taken) or `failed` (one taken).
@@ -159,29 +165,40 @@ function merge_stopped(issue: string, state: DriveState): DriveState {
 	}
 }
 
-// The child collected and excluded, and — unless its cut was resumed in place — out of flight.
+// Only a merged child is excluded: `backlog:next` may still read it OPEN. Any other is classified by
+// its labels, so excluding it would hide a child a person released for the rest of the process.
+function excluded(issue: string, outcome: Collected['outcome'], state: DriveState): Array<string> {
+	if (outcome !== MERGED_OUTCOME || state.exclude.includes(issue)) return state.exclude
+
+	return [...state.exclude, issue]
+}
+
+// The child collected, and — unless its cut was resumed in place — out of flight.
 function collected_state(
 	issue: string,
-	token: string,
+	collected: Collected,
 	state: DriveState,
 	active: string,
 ): DriveState {
 	const in_flight =
-		token === RESUMED_TOKEN ? state.in_flight : state.in_flight.filter((item) => item !== issue)
-	const exclude = state.exclude.includes(issue) ? state.exclude : [...state.exclude, issue]
+		collected.token === RESUMED_TOKEN
+			? state.in_flight
+			: state.in_flight.filter((item) => item !== issue)
+	const exclude = excluded(issue, collected.outcome, state)
 
 	return { ...state, in_flight, exclude, active }
 }
 
 // One finished child: handed back on an immediate token, otherwise collected.
 async function collect(issue: string, state: DriveState, ports: DrivePorts): Promise<PassResult> {
-	const token = await ports.merge(issue)
+	const collected = await ports.merge(issue)
+	const { token } = collected
 
 	// An empty first line is a `run:merge` that failed before printing one: never read as a collection.
 	if (token === '') return ended('merge', state, undefined, issue)
 	if (IMMEDIATE_TOKENS.has(token)) return ended('merge', state, token, issue)
 
-	const next = collected_state(issue, token, state, ports.now().toISOString())
+	const next = collected_state(issue, collected, state, ports.now().toISOString())
 
 	return { kind: 'continue', state: token === STOP_VERDICT ? merge_stopped(issue, next) : next }
 }
