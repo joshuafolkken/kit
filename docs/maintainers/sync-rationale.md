@@ -95,6 +95,10 @@ The stamp is applied by the same write-time transform that resolves the action p
 distributed as a file or a renamed mapping cannot arrive without it. Two write paths bypass the
 transform: the directory copy, which a kit unit test holds to an empty list, and `deploy-vps.yml`,
 which is deliberately left unstamped for the reason below.
+A local composite action a distributed workflow calls (`.github/actions/setup-pnpm/action.yml`) is
+written through the same transform and stamped the same way: the distributed `dependabot.yml` bumps
+`/.github/actions/*`, so an unstamped action would merge its own bumps and have them written back by
+the next sync (joshuafolkken/kit#3013).
 `josh init` still leaves an existing file alone — it does not stamp one, because the destination may
 hold a workflow the consumer wrote themselves and a header claiming this package owns it would hold
 every bump to it back on a false premise. It warns instead: until `sync` writes a header, the

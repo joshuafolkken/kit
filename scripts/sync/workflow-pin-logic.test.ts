@@ -9,6 +9,7 @@ const NEW_REF = 'df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3'
 const TEMPLATE = 'templates/workflows/ci.yml'
 const SETUP_NODE = 'actions/setup-node'
 const WORKFLOW_DESTINATION = '.github/workflows/ci.yml'
+const SETUP_PNPM_ACTION = '.github/actions/setup-pnpm/action.yml'
 
 function uses_block(action: string, reference: string): string {
 	return `      - name: Checkout\n        uses: ${action}@${reference}`
@@ -129,6 +130,8 @@ describe('workflow_pin_logic.is_workflow_destination', () => {
 		['/srv/project/.github/workflows/ci.yml'],
 		['.github/workflows/deploy-vps.yaml'],
 		[String.raw`C:\project\.github\workflows\ci.yml`],
+		[SETUP_PNPM_ACTION],
+		['/srv/project/.github/actions/setup-pnpm/action.yaml'],
 	])('accepts a consumer workflow destination: %s', (destination) => {
 		expect(workflow_pin_logic.is_workflow_destination(destination)).toBe(true)
 	})
@@ -138,6 +141,9 @@ describe('workflow_pin_logic.is_workflow_destination', () => {
 		[TEMPLATE],
 		['CLAUDE.md'],
 		['.github/workflows/nested/ci.yml'],
+		['.github/actions/setup-pnpm/README.md'],
+		['.github/actions/action.yml'],
+		['.github/actions/setup-pnpm/nested/action.yml'],
 	])('rejects a destination that is not a consumer workflow: %s', (destination) => {
 		expect(workflow_pin_logic.is_workflow_destination(destination)).toBe(false)
 	})
@@ -174,7 +180,7 @@ describe('workflow_pin_logic repository guard', () => {
 	// joshuafolkken/kit#2982: pnpm/setup is pinned only in the setup-pnpm composite action, which
 	// every kit workflow calls, so the action has to count as a canonical source.
 	it('reads the local composite actions as canonical sources', () => {
-		const action = readFileSync('.github/actions/setup-pnpm/action.yml', 'utf8')
+		const action = readFileSync(SETUP_PNPM_ACTION, 'utf8')
 		const pin = action
 			.split('\n')
 			.map((line) => workflow_pin_logic.parse_uses_line(line))
