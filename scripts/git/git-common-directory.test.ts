@@ -19,6 +19,19 @@ describe('linked worktree Git common directory', () => {
 		expect(git_common_directory.repository(process.cwd())).toBe(common)
 	})
 
+	it('reads the same two directories synchronously as the asynchronous reader', async () => {
+		const [own, common] = await git_command.git_directories()
+
+		expect(git_common_directory.directories()).toStrictEqual([own, common])
+		expect(git_common_directory.own()).toBe(own)
+	})
+
+	it('answers a repeated read from the cache without asking git again', () => {
+		const first = git_common_directory.directories()
+
+		expect(git_common_directory.directories()).toBe(first)
+	})
+
 	it('selects only the common directory of a linked worktree', () => {
 		expect(git_common_directory.select_linked([WORKTREE_DIRECTORY, COMMON_DIRECTORY])).toBe(
 			COMMON_DIRECTORY,

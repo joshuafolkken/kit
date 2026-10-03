@@ -430,7 +430,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/version/latest-regression.test.ts',
 	'scripts/version/package-manager-version-consistency.test.ts',
 	'scripts/version/package-manager-version.test.ts',
-	'scripts/version/parse-json.test.ts',
 	'scripts/version/publishable-range.test.ts',
 	'scripts/version/release-age.test.ts',
 	'scripts/version/release-hold-output.test.ts',

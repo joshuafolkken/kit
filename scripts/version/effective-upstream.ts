@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
+import { json_value } from '#scripts/lib/json-value'
 import { package_named_version_schema } from '#scripts/lib/schemas'
-import { safe_json_parse } from './parse-json'
 
 const PACKAGE_JSON = 'package.json'
 // Node module paths never nest anywhere near this deep; the bound only guards against an unexpected
@@ -23,7 +23,7 @@ interface EffectiveUpstreamOptions {
 function read_matching_version(manifest_path: string, package_name: string): string | undefined {
 	if (!existsSync(manifest_path)) return undefined
 	const parsed = package_named_version_schema.safeParse(
-		safe_json_parse(readFileSync(manifest_path, 'utf8')),
+		json_value.parse_or_undefined(readFileSync(manifest_path, 'utf8')),
 	)
 	if (!parsed.success) return undefined
 	if (parsed.data.name !== package_name) return undefined

@@ -2,6 +2,7 @@ import { existsSync, globSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
 import { project_profile } from '#scripts/init/project-profile'
+import { json_value } from '#scripts/lib/json-value'
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
 import { z } from 'zod'
 
@@ -70,23 +71,23 @@ function has_bin(directory: string, bin_name: string): boolean {
 }
 
 function josh_settings(manifest: unknown): unknown {
-	if (typeof manifest !== 'object' || manifest === null || !('josh' in manifest)) return undefined
-
-	return manifest.josh
+	return json_value.is_record(manifest) ? manifest['josh'] : undefined
 }
 
 function is_basic_manifest(manifest: unknown): boolean {
 	const josh = josh_settings(manifest)
-	if (typeof josh !== 'object' || josh === null || !('profile' in josh)) return false
+	if (!json_value.is_record(josh)) return false
 
-	return project_profile.parse_profile(josh.profile) === 'basic'
+	return project_profile.parse_profile(josh['profile']) === 'basic'
 }
 
+// The try covers the read alone — a missing or unreadable manifest — since the parse already answers
+// `undefined` for text that is not JSON.
 function read_manifest(directory: string): unknown {
 	try {
 		const manifest_path = path.join(project_root(directory), PACKAGE_JSON)
 
-		return JSON.parse(readFileSync(manifest_path, 'utf8'))
+		return json_value.parse_or_undefined(readFileSync(manifest_path, 'utf8'))
 	} catch {
 		return undefined
 	}

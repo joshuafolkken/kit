@@ -4,7 +4,6 @@ import {
 	CHECK_STATUS_MISSING,
 	CHECK_STATUS_PASS,
 	CHECK_STATUS_PENDING,
-	parse_json_safe,
 	parse_rollup_checks,
 	read_string,
 } from './git-pr-checks-parse'
@@ -33,24 +32,6 @@ describe('read_string', () => {
 
 	it('returns undefined for undefined', () => {
 		expect(read_string(undefined)).toBeUndefined()
-	})
-})
-
-describe('parse_json_safe', () => {
-	it('parses valid JSON object', () => {
-		expect(parse_json_safe('{"key":"value"}')).toStrictEqual({ key: 'value' })
-	})
-
-	it('parses valid JSON array', () => {
-		expect(parse_json_safe('[1,2,3]')).toStrictEqual([1, 2, 3])
-	})
-
-	it('returns undefined for invalid JSON', () => {
-		expect(parse_json_safe(NON_STRING_VALUE)).toBeUndefined()
-	})
-
-	it('returns undefined for empty string', () => {
-		expect(parse_json_safe('')).toBeUndefined()
 	})
 })
 

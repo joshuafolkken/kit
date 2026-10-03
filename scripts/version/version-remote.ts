@@ -1,7 +1,7 @@
 import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { error_text } from '#scripts/lib/error-message'
+import { json_value } from '#scripts/lib/json-value'
 import { npm_registry } from './npm-registry'
-import { safe_json_parse } from './parse-json'
 import { release_age } from './release-age'
 
 // Enough history to reach past a quarantine window into the newest release that has aged out of it.
@@ -68,7 +68,7 @@ function read_github_release_times(versions_endpoint: string): Record<string, st
 	const endpoint = with_page_size(versions_endpoint, TIMES_PAGE_SIZE)
 	const stdout = git_gh_exec.read_gh_api_sync({ path: endpoint, jq_filter: TIMES_JQ })
 	if (stdout === undefined) return undefined
-	const parsed = release_age.release_times_schema.safeParse(safe_json_parse(stdout))
+	const parsed = release_age.release_times_schema.safeParse(json_value.parse_or_undefined(stdout))
 
 	return parsed.success ? parsed.data : undefined
 }

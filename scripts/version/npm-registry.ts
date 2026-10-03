@@ -1,7 +1,7 @@
+import { json_value } from '#scripts/lib/json-value'
 import { migrate_logic } from '#scripts/registry-migration/migrate-logic'
 import { execaSync } from 'execa'
 import { z } from 'zod'
-import { safe_json_parse } from './parse-json'
 import { release_age } from './release-age'
 
 // The public npm registry, read without credentials so a consumer who installed from public npm
@@ -46,7 +46,7 @@ function read_packument(package_name: string, accept: string): unknown {
 	)
 	if (result.exitCode !== 0) return undefined
 
-	return safe_json_parse(result.stdout)
+	return json_value.parse_or_undefined(result.stdout)
 }
 
 // Whether this checkout installs the package's scope from GitHub Packages, read with the same
