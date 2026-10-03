@@ -1,4 +1,10 @@
 import { run_issue_number } from '#scripts/run/run-issue-number'
+import { run_ship_next, type ShipResume } from '#scripts/run/run-ship-next'
+import type { Stage } from '#scripts/run/run-ship-stage'
+
+interface ShipStop extends ShipResume {
+	stage: Stage
+}
 
 const CHILD_INVOCATION = 'fullrun'
 const RESUME_GUIDE = '.claude/skills/workflow-commands/pre-gate-cut.md'
@@ -52,13 +58,21 @@ function outage_resume_invocation(issue: string): string {
 
 // The prompt a lane child is relaunched with when its detached ship supervisor stopped at a failed
 // stage (joshuafolkken/kit#2428) — a red gate, a High/Medium review, a failed push or red CI. The agent
-// ended at the hand-off, so this is how control comes back to one: it reads the stopped report through
-// the command `run:step` names, fixes it and hands the region back. It ends with `child_invocation` for
-// the reason `resume_invocation` does — the parent's poll keeps matching the relaunched process.
-function ship_stop_invocation(issue: string): string {
-	const preamble = `Resuming the lane child for issue #${issue} after its detached ship supervisor stopped at a failed stage — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Run \`pnpm josh run:step ${issue}\` and read the stopped report it names, fix what stopped the ship, then hand the region back per chain-rule.md. Do not re-plan or re-implement what is already on the branch.`
+// ended at the hand-off, so this is how control comes back to one: it reads the stopped report, fixes it
+// and hands the region back. It ends with `child_invocation` for the reason `resume_invocation` does —
+// the parent's poll keeps matching the relaunched process.
+//
+// **A known stage puts the next command in the prompt** (joshuafolkken/kit#2964), so the relaunched
+// session runs it rather than re-deriving it from `chain-rule.md`. An OpenAI lane's supervisor sees only
+// that the ship failed, not where, so without a stage the prompt points at `run:step` as before.
+function ship_stop_invocation(issue: string, stop?: ShipStop): string {
+	const opening = `Resuming the lane child for issue #${issue} after its detached ship supervisor stopped at a failed stage — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md).`
+	const next =
+		stop === undefined
+			? `Run \`pnpm josh run:step ${issue}\` and read the stopped report it names, fix what stopped the ship, then hand the region back per chain-rule.md.`
+			: run_ship_next.next_step(issue, stop.stage, stop)
 
-	return `${preamble} ${child_invocation(issue)}`
+	return `${opening} ${next} Do not re-plan or re-implement what is already on the branch. ${child_invocation(issue)}`
 }
 
 const lane_child_invocation = {

@@ -6,6 +6,7 @@ import { lane_child_invocation } from './lane-child-invocation'
 // bare `fullrun #<N>`, so `pgrep -laf "<invocation>$"` still matches a relaunched process.
 
 const ISSUE = '2317'
+const STOP = { stage: 'gate', flags: [], is_review: true } as const
 
 describe('the lane child invocation prompts', () => {
 	it('composes the bare fullrun invocation from a digits-only issue number', () => {
@@ -60,5 +61,16 @@ describe('the process pattern read as the extended regex pgrep applies', () => {
 
 		expect(prompt.endsWith(`fullrun #${ISSUE}`)).toBe(true)
 		expect(prompt).toContain(`run:step ${ISSUE}`)
+	})
+
+	// joshuafolkken/kit#2964: a known stage puts the resume command in the prompt itself.
+	it('puts the next command for a known stopped stage in the ship-stop prompt', () => {
+		const title = `Some work #${ISSUE}`
+		const prompt = lane_child_invocation.ship_stop_invocation(ISSUE, { ...STOP, title })
+
+		expect(prompt).toContain(`pnpm josh ship --log ${ISSUE}`)
+		expect(prompt).toContain(`pnpm josh ship --detach --review '${title}'`)
+		expect(prompt).not.toContain('chain-rule.md')
+		expect(prompt.endsWith(`fullrun #${ISSUE}`)).toBe(true)
 	})
 })

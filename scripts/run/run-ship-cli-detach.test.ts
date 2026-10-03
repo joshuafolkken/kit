@@ -200,8 +200,14 @@ describe('run_ship_cli.run — only a supervised ship hands a failed stage back'
 		is_supervised_mock.mockReturnValue(true)
 		josh_run_mock.mockResolvedValueOnce({ code: FAILED, out: 'lint red' })
 
-		expect(await run_ship_cli.run([TITLE])).toBe(FAILED)
-		expect(return_mock).toHaveBeenCalledWith(NUMBER, 'gate')
+		const flags = ['--body-file', 'evidence.md', '--cite', '2500']
+
+		expect(await run_ship_cli.run([TITLE, ...flags])).toBe(FAILED)
+		expect(return_mock).toHaveBeenCalledWith(NUMBER, 'gate', {
+			title: TITLE,
+			flags,
+			is_review: false,
+		})
 	})
 
 	it('hands nothing back from a ship run in the agent’s own turn', async () => {
