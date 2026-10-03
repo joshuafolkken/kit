@@ -76,6 +76,12 @@ describe('the brief points the reviewer at the rubric file', () => {
 		expect(line).toContain('apply')
 	})
 
+	// joshuafolkken/kit#2963: the rubric is larger than the Bash output cap, so a `cat` of it came back
+	// truncated and was read a second time.
+	it('tells the reviewer to read it with the Read tool rather than through Bash', () => {
+		expect(review_brief.rubric_line(RUBRIC_PATH)).toContain('Read tool rather than `cat`')
+	})
+
 	// The integration half: `compose` must actually place the rubric line in the brief. Testing
 	// `rubric_line` alone would still pass if someone dropped it from `compose`'s output.
 	it('composes the rubric line into the brief', () => {

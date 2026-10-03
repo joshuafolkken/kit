@@ -1,6 +1,7 @@
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
+import { review_diff_parts, type DiffParts } from './review-diff-parts'
 
 // The text `josh review:brief` prints — the `/code-review` invocation, composed from what the run
 // already knows (joshuafolkken/kit#1241).
@@ -56,7 +57,7 @@ function attest_line(nonce: string): string {
 const RUBRIC_RELATIVE_PATH = 'prompts/review-rubric.md'
 
 function rubric_line(rubric_path: string): string {
-	return `Rubric: read \`${rubric_path}\` first and apply it — it is the severity tests, the round output format, the nine categories and the stop conditions this review is scored against. You do not carry them otherwise, so a review that skips it is scored on the wrong rules.`
+	return `Rubric: read \`${rubric_path}\` first, with the Read tool rather than \`cat\` — it is larger than the Bash output cap, so a Bash print comes back truncated (joshuafolkken/kit#2963) — and apply it: it is the severity tests, the round output format, the nine categories and the stop conditions this review is scored against. You do not carry them otherwise, so a review that skips it is scored on the wrong rules.`
 }
 
 function checkout_block(checkout: ReviewCheckout, nonce: string): string {
@@ -413,6 +414,9 @@ interface BriefInput {
 	// The tree a finished, clean review of this branch was briefed on, so round 1 is a resume
 	// (joshuafolkken/kit#2945). Absent, round 1 reads the whole change.
 	resumed_from?: FileMapStamp | undefined
+	// The change written as parts under the Bash output cap (joshuafolkken/kit#2963). Absent when the
+	// write failed, and the target line alone then names the change.
+	diff?: { parts: DiffParts; cap: number } | undefined
 }
 
 const SECOND_ROUND = 2
@@ -431,10 +435,24 @@ function target_block(input: BriefInput): string {
 	return round_two_block(input.stamps.round_one, input.tree, input.checkout.root, input.base)
 }
 
+// **Only beside a whole-change target** (joshuafolkken/kit#2963): each part is a path's diff against
+// the base, so beside a narrowed round 2 or a resumed round 1 the list would hand the reviewer the
+// code that narrowing exists to keep out of scope. Decided by the target actually printed, not by
+// the round: every round that cannot narrow widens through `whole_change_target`, and that round
+// needs the parts as much as a first one does.
+function diff_block(input: BriefInput, target: string): ReadonlyArray<string> {
+	const is_whole_change = target.includes(whole_change_target(input.checkout.root, input.base))
+
+	if (!is_whole_change || input.diff === undefined) return []
+
+	return ['', review_diff_parts.reading_block(input.diff.parts, input.diff.cap)]
+}
+
 // The level alone on the first line, because the level-only mode's contract — a caller reading the
 // answer with `$(...)` — is the one thing a brief must not break.
 function compose(input: BriefInput): string {
 	const profile = input.profile ?? agent_role_profile.DEFAULT_PROFILES.reviewer
+	const target = target_block(input)
 
 	return [
 		input.level,
@@ -448,7 +466,8 @@ function compose(input: BriefInput): string {
 		gate_line(input.stamps, input.tree, input.base),
 		TEST_COMMAND_LINE,
 		'',
-		target_block(input),
+		target,
+		...diff_block(input, target),
 	].join('\n')
 }
 
