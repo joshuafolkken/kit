@@ -44,18 +44,22 @@ function is_handed_off_here(carry: CarryRead): boolean {
 	return run_headless.is_owned_here(carry.carry, lane_reap.own_ancestry)
 }
 
+const UNREADABLE_RUN: RunReads = {
+	carry_kind: 'unreadable',
+	is_retrospective_done: false,
+	is_at_cut_cap: false,
+	is_handed_off: false,
+	last_event: undefined,
+}
+
 // The run-level reads, keyed on the common git directory both the carry and the event stream share. A
 // directory that cannot be read leaves the position unknowable, which `next_action` answers `unknown`.
-function read_run(directory: string | undefined, issue_number: string): RunReads {
-	if (directory === undefined) {
-		return {
-			carry_kind: 'unreadable',
-			is_retrospective_done: false,
-			is_at_cut_cap: false,
-			is_handed_off: false,
-			last_event: undefined,
-		}
-	}
+function read_run(
+	directory: string | undefined,
+	issue_number: string,
+	is_lane_child: boolean,
+): RunReads {
+	if (directory === undefined) return UNREADABLE_RUN
 
 	const carry = run_carry.read_carry(run_carry.carry_path(directory))
 	const events = run_event_stream.read_events(run_event_stream.target_of(directory))
@@ -63,11 +67,13 @@ function read_run(directory: string | undefined, issue_number: string): RunReads
 	// invocation left on the stream must not be read as this run's position (joshuafolkken/kit#2395). The
 	// observed defect was a `run:step` that printed `wait` on a fresh run because an old `child-launch` was
 	// still the stream's tail. Another issue's detached ship supervisor is left out the same way
-	// (joshuafolkken/kit#2428).
+	// (joshuafolkken/kit#2428), and so — for a lane child — is every event that does not name its own issue
+	// (joshuafolkken/kit#3039).
 	const last = run_event_scope.last_issue_event(
 		events,
 		run_event_scope.scope_of(carry),
 		issue_number,
+		is_lane_child,
 	)
 
 	return {
@@ -82,7 +88,8 @@ function read_run(directory: string | undefined, issue_number: string): RunReads
 async function gather(issue_number: string): Promise<StepInput> {
 	const reads = await run_prep_cli.gather(issue_number)
 	const parts = run_prep_cli.to_parts(issue_number, reads)
-	const run_reads = read_run(await run_carry.repository_directory(), issue_number)
+	const is_lane_child = lane_child_marker.is_child_of(process.cwd())
+	const run_reads = read_run(await run_carry.repository_directory(), issue_number, is_lane_child)
 
 	return {
 		issue_number,
@@ -94,7 +101,7 @@ async function gather(issue_number: string): Promise<StepInput> {
 		is_retrospective_done: run_reads.is_retrospective_done,
 		is_at_cut_cap: run_reads.is_at_cut_cap,
 		is_handed_off: run_reads.is_handed_off,
-		is_lane_child: lane_child_marker.is_child_of(process.cwd()),
+		is_lane_child,
 		is_consumer: doctor_consumer.is_kit_consumer(find_package_directory(process.cwd())),
 		// Read here rather than in `run-step.ts` so the position logic stays a pure function of its input.
 		is_retrospective_enabled: run_retrospective.is_enabled(),
