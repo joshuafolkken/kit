@@ -31,6 +31,9 @@ const UNIVERSAL_FLAGS: ReadonlySet<string> = new Set(['--help'])
 // A usage line ends at the quote that opened its string — `ship`'s holds `"<title> #<N>"`, so any
 // other quote is part of the line — or at an escaped newline that starts the prose.
 const ESCAPED_NEWLINE = String.raw`\n`
+// The opening quote is the line's terminator, so a marker that does not open a string — one after
+// `\n` mid-literal — has none to read; guessing one would split on a letter and drop flags silently.
+const STRING_QUOTES: ReadonlySet<string> = new Set(["'", '"', '`'])
 // One usage line can name a sibling command (`run:hold`'s names `run:release`); only this one's count.
 const USAGE_ALTERNATIVE = ' | josh '
 
@@ -59,12 +62,19 @@ function flags_of(synopsis: string): ReadonlyArray<string> {
 	return synopsis.match(FLAG_PATTERN) ?? []
 }
 
+function opening_quote(source: string, start: number, name: string): string {
+	const quote = source.charAt(start - 1)
+	if (!STRING_QUOTES.has(quote)) throw new Error(`josh ${name}: usage line opens with ${quote}`)
+
+	return quote
+}
+
 function usage_flags(source: string, name: string): ReadonlyArray<string> {
 	const marker = `Usage: josh ${name} `
 	const start = source.indexOf(marker)
 	if (start === -1) return []
 
-	const quote = source.charAt(start - 1)
+	const quote = opening_quote(source, start, name)
 	const [literal = ''] = source.slice(start + marker.length).split(quote)
 	const [line = ''] = literal.split(ESCAPED_NEWLINE)
 	const [own = '', ...alternatives] = line.split(USAGE_ALTERNATIVE)
@@ -134,5 +144,11 @@ describe('command reference — reading a script usage line', () => {
 		const source = `'Usage: josh ship "<title> #<N>" [--detach] [--body-file <path>]'`
 
 		expect(usage_flags(source, 'ship')).toEqual(['--detach', '--body-file'])
+	})
+
+	it('refuses a usage line that does not open a string', () => {
+		const source = String.raw`'Unknown argument\nUsage: josh adopt [--dry-run] [--only <name>]'`
+
+		expect(() => usage_flags(source, 'adopt')).toThrow('josh adopt: usage line opens with n')
 	})
 })
