@@ -1,6 +1,6 @@
 # josh sync — Detailed Behavior
 
-For projects already set up with `josh init`, after upgrading kit: which files `josh sync` overwrites, merges or leaves alone. `josh sync` overwrites managed files in your project with the latest versions from the installed `@joshuafolkken/kit` package. Run it after upgrading the package.
+For projects already set up with `josh init`, after upgrading kit: which files `josh sync` overwrites, merges or leaves alone. `josh sync` overwrites managed files in your project with the latest versions from the installed `@joshuafolkken/kit` package. Run it after upgrading the package. The reasons behind each behavior below are in [sync-rationale.md](./maintainers/sync-rationale.md), cited section by section as "Rationale:".
 
 ```bash
 pnpm josh sync
@@ -25,6 +25,7 @@ SECURITY.md         tsconfig.sonar.json
 .github/workflows/ci.yml
 .github/workflows/auto-tag.yml
 .github/workflows/dependabot-auto-merge.yml
+.github/workflows/github-release.yml
 .github/workflows/pr-classification.yml
 .github/workflows/production.yml
 .github/workflows/sonar-qube.yml
@@ -92,6 +93,7 @@ These are fully-managed files whose package source has a different name than the
 | ----------------------------------------------- | --------------------------------------------- |
 | `templates/workflows/ci.yml`                    | `.github/workflows/ci.yml`                    |
 | `templates/workflows/dependabot-auto-merge.yml` | `.github/workflows/dependabot-auto-merge.yml` |
+| `templates/workflows/github-release.yml`        | `.github/workflows/github-release.yml`        |
 
 If the source file does not exist in the installed package, the destination is skipped with a warning.
 

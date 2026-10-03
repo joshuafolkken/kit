@@ -54,6 +54,7 @@ function tree_of(root: string, paths: ReadonlyArray<string>): Record<string, str
 // say the gate had verified an arbitrarily edited tree, and `--round 2` would report an empty fix
 // delta. **A defect that answers "all clear" is the one shape this record cannot take**, which is why
 // the root is resolved rather than assumed (measured from `scripts/`: 18 of 25 entries `absent`).
+// The observation ledger is dropped inside `tree_of`, above (joshuafolkken/kit#3017).
 async function read_changed_tree(
 	paths?: ReadonlyArray<string>,
 	root?: string,

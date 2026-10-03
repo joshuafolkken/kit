@@ -1,5 +1,7 @@
 # Release
 
+For kit maintainers publishing a new version of `@joshuafolkken/kit`; projects that use kit can skip this page.
+
 ## When to use it
 
 Merged work has landed since the last version change and you want it published. A person runs the release; no workflow keyword does.

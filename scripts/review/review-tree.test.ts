@@ -10,6 +10,8 @@ import { review_tree } from './review-tree'
 // hook re-ran the unit suite inside the push's timeout.
 const CODE_FILE = 'a.ts'
 const LEGACY_LEDGER = 'docs/maintainers/observations.md'
+const PACKAGE_FILE = 'package.json'
+const LEDGER_ISSUE = 3017
 
 describe('review_tree.tree_of — observation ledger', () => {
 	let root = ''
@@ -37,5 +39,16 @@ describe('review_tree.tree_of — observation ledger', () => {
 		const with_ledger = review_tree.tree_of(root, [CODE_FILE, observation_ledger.ledger_file(1)])
 
 		expect(with_ledger).toStrictEqual(review_tree.tree_of(root, [CODE_FILE]))
+	})
+})
+
+describe('review_tree.read_changed_tree', () => {
+	// joshuafolkken/kit#3017: a ledger line appended after the gate changed this map, so the ledger
+	// commit's pre-push no longer matched the green record and re-ran the whole unit suite.
+	it('leaves the observation ledger out of the digest map', async () => {
+		const ledger = observation_ledger.ledger_file(LEDGER_ISSUE)
+		const tree = await review_tree.read_changed_tree([PACKAGE_FILE, ledger])
+
+		expect(Object.keys(tree)).toStrictEqual([PACKAGE_FILE])
 	})
 })
