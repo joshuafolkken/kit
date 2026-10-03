@@ -112,8 +112,12 @@ jobs:
         with:
           cache: 'false'
 
+      # Tags through v1.887.0 predate automatic GitHub Releases and must not block the first new one.
       - name: Publish GitHub Release
-        run: pnpm exec tsx scripts/release/github-release-cli.ts
+        run: pnpm josh release:github
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_START_TAG: v1.887.0
+          RELEASE_WORKFLOW: publish.yml
+          RELEASE_JOBS: publish-github,publish-npm,update-production

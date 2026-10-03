@@ -771,6 +771,27 @@ pnpm josh release:scope --json   # {"scope":"…","reason":"…"} on one line
 
 **Output / exit codes:** the verdict goes to stdout, the reason to stderr. Exit code is 0 for every verdict and 1 only for an unknown flag; `unknown` is a verdict, never read as `skip`.
 
+### `josh release:github`
+
+Create the GitHub Release for a tag `josh release` cut, with notes generated from `.github/release.yml`. Run by CI, not by a person: kit's own `publish.yml` runs it in its `create-release` job, and every consumer receives `.github/workflows/github-release.yml` from `josh init` / `josh sync`, which runs it once the consumer's `Publish` workflow has succeeded for the tag — or, in a repository with no `publish.yml`, when `auto-tag.yml` announces the tag (`new-tag-created`).
+
+```bash
+GH_TOKEN=… RELEASE_TAG=v1.2.0 GITHUB_REPOSITORY=owner/repo pnpm josh release:github
+```
+
+| Environment         | Meaning                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------- |
+| `GH_TOKEN`          | Token with `contents: write` and `actions: read`. Required                                              |
+| `RELEASE_TAG`       | The tag to release. Required                                                                            |
+| `GITHUB_REPOSITORY` | `owner/repo` to release in — set by GitHub Actions. Required                                            |
+| `RELEASE_START_TAG` | Last tag before automatic releases. Unset: the latest release is the floor; none: the nearest lower tag |
+| `RELEASE_WORKFLOW`  | Publish workflow (file or id) whose failed run for a lower tag skips it. Unset: wait for its release    |
+| `RELEASE_JOBS`      | Comma-separated jobs in that workflow whose failure counts. Unset: any failed job                       |
+
+Releases are created in version order: a later tag waits for the nearest lower tag above the floor to get its release, and skips it when that tag's publication failed. A tag that already has a release is left alone. The consumer's release workflow needs the `.github/release.yml` categories and a `Publish` workflow titled `Publish <tag>` (`run-name`) when it has one.
+
+**Output / exit codes:** prints `published <tag> from <baseline>` or `already-published`; exits non-zero on an API error, an invalid tag or repository, a latest release that is not older than the tag, or a lower tag that never gets a release within the wait budget.
+
 ### `josh version`
 
 Show the global-install version, the current project version, and the latest published version — plus the **running binary** (the install that actually executed, resolved from `import.meta.url`), the single source of truth for which `josh` produced the report. A not-installed target reports `not installed`; a stale one gets a `Run:` hint with the upgrade command. A release inside the `.npmrc` `minimum-release-age` window prints a `Held:` line. When the `josh` first on `PATH` is not the pnpm-global install, a PATH-shadowing warning names both paths and points to [`josh doctor --fix`](#josh-doctor).
