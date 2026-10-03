@@ -1,38 +1,6 @@
 # Troubleshooting
 
-Common errors when installing or using `@joshuafolkken/kit`, and how to fix them. New installs use public npm; [GitHub Packages authentication](./authentication.md) applies to existing projects that still route this scope there.
-
-## `pnpm install` fails with `401 Unauthorized` / `403 Forbidden`
-
-`pnpm` reached GitHub Packages but the token was missing or expired.
-
-1. Confirm the credential lives in your **user-level** `~/.npmrc`, not the project `.npmrc` — pnpm ignores a project-level one unless `npmrcAuthFile` opts it in (see the warning below). `pnpm config get "//npm.pkg.github.com/:_authToken"` should print the token or the `${NODE_AUTH_TOKEN}` placeholder; if it is empty, run §2 of [authentication.md](./authentication.md).
-2. Using the placeholder form? Confirm the env var is set in the current shell:
-   ```bash
-   echo $NODE_AUTH_TOKEN
-   ```
-   If it is empty, your shell rc hasn't run §1 of [authentication.md](./authentication.md) yet — open a new shell or run `exec $SHELL`.
-3. The `gh` token may have expired or lost the `read:packages` scope. Refresh it:
-   ```bash
-   gh auth refresh --scopes read:packages
-   exec $SHELL   # re-evaluates export NODE_AUTH_TOKEN=$(gh auth token)
-   ```
-4. Verify the token is live: `gh auth token` should print a non-empty value.
-
-## `401` on a deploy build (Cloudflare, Vercel, Docker) while CI is green
-
-The builder is not a GitHub Actions runner: it has no `~/.npmrc` and no kit CI authentication step, so nothing supplies the credential once an existing project `.npmrc` carries only the registry mapping. CI cannot reproduce it — the kit CI template writes a GitHub Packages credential placeholder before dependency installation — so the failure surfaces first at deploy time.
-
-- Give the builder a credential from a source pnpm reads: see [§4 of authentication.md](./authentication.md#4-build-platforms-with-no-user-level-npmrc).
-- Restoring `//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}` to the project `.npmrc` fixes nothing **on its own** — pnpm ignores that line by default (next section). It becomes the credential only together with `npmrcAuthFile`, which is option (d) of that section.
-- Did this start right after a kit upgrade, on a project that was using `npmrcAuthFile`? Kit before `1.60.0` stripped the line on every `josh sync`. Upgrade to `1.60.0` or later, restore the line, and it stays.
-
-## `[WARN] Ignored project-level auth setting "//npm.pkg.github.com/:_authToken"`
-
-Since pnpm 11.6, environment variables are not expanded in registry credentials read from a project `.npmrc` **unless `npmrcAuthFile` declares that file trusted**, because the file is committed and could leak the token to an attacker-controlled registry. The warning means the opt-in is absent, so the line contributes no auth — whatever currently works is coming from somewhere else — and it repeats on every pnpm command.
-
-- Want the line to do nothing? Delete it from the project `.npmrc` and keep the credential in a source pnpm expands by default — see §2 of [authentication.md](./authentication.md). `josh sync` neither adds nor removes it, so the deletion sticks.
-- Want the line to be the credential (typically on a deploy builder with no user-level npmrc)? Set `npmrcAuthFile` to that file — see [§4(d) of authentication.md](./authentication.md#4-build-platforms-with-no-user-level-npmrc). The warning disappears and the token is expanded.
+Common errors when installing or using `@joshuafolkken/kit`, and how to fix them, the ones a new install meets first at the top. New installs use public npm; the GitHub Packages errors at the end apply only to existing projects that still route this scope there ([authentication.md](./authentication.md)).
 
 ## `ERR_PNPM_FETCH_404` — package not found
 
@@ -156,8 +124,40 @@ Playwright's own modules read `CI` with plain truthiness, though, and `'0'` is a
 
 One consequence is worth knowing: the `webServer` child process (`node --run dev`) inherits that environment, so it does not see `CI` either. That is deliberate — a dev server still reading `CI=0` as CI would reproduce the same bug one process down — but it means `CI=0` and `unset CI` are equivalent for anything in your dev pipeline that keys off the variable.
 
+## `pnpm install` fails with `401 Unauthorized` / `403 Forbidden`
+
+`pnpm` reached GitHub Packages but the token was missing or expired.
+
+1. Confirm the credential lives in your **user-level** `~/.npmrc`, not the project `.npmrc` — pnpm ignores a project-level one unless `npmrcAuthFile` opts it in (see the warning below). `pnpm config get "//npm.pkg.github.com/:_authToken"` should print the token or the `${NODE_AUTH_TOKEN}` placeholder; if it is empty, run §2 of [authentication.md](./authentication.md).
+2. Using the placeholder form? Confirm the env var is set in the current shell:
+   ```bash
+   echo $NODE_AUTH_TOKEN
+   ```
+   If it is empty, your shell rc hasn't run §1 of [authentication.md](./authentication.md) yet — open a new shell or run `exec $SHELL`.
+3. The `gh` token may have expired or lost the `read:packages` scope. Refresh it:
+   ```bash
+   gh auth refresh --scopes read:packages
+   exec $SHELL   # re-evaluates export NODE_AUTH_TOKEN=$(gh auth token)
+   ```
+4. Verify the token is live: `gh auth token` should print a non-empty value.
+
+## `401` on a deploy build (Cloudflare, Vercel, Docker) while CI is green
+
+The builder is not a GitHub Actions runner: it has no `~/.npmrc` and no kit CI authentication step, so nothing supplies the credential once an existing project `.npmrc` carries only the registry mapping. CI cannot reproduce it — the kit CI template writes a GitHub Packages credential placeholder before dependency installation — so the failure surfaces first at deploy time.
+
+- Give the builder a credential from a source pnpm reads: see [§4 of authentication.md](./authentication.md#4-build-platforms-with-no-user-level-npmrc).
+- Restoring `//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}` to the project `.npmrc` fixes nothing **on its own** — pnpm ignores that line by default (next section). It becomes the credential only together with `npmrcAuthFile`, which is option (d) of that section.
+- Did this start right after a kit upgrade, on a project that was using `npmrcAuthFile`? Kit before `1.60.0` stripped the line on every `josh sync`. Upgrade to `1.60.0` or later, restore the line, and it stays.
+
+## `[WARN] Ignored project-level auth setting "//npm.pkg.github.com/:_authToken"`
+
+Since pnpm 11.6, environment variables are not expanded in registry credentials read from a project `.npmrc` **unless `npmrcAuthFile` declares that file trusted**, because the file is committed and could leak the token to an attacker-controlled registry. The warning means the opt-in is absent, so the line contributes no auth — whatever currently works is coming from somewhere else — and it repeats on every pnpm command.
+
+- Want the line to do nothing? Delete it from the project `.npmrc` and keep the credential in a source pnpm expands by default — see §2 of [authentication.md](./authentication.md). `josh sync` neither adds nor removes it, so the deletion sticks.
+- Want the line to be the credential (typically on a deploy builder with no user-level npmrc)? Set `npmrcAuthFile` to that file — see [§4(d) of authentication.md](./authentication.md#4-build-platforms-with-no-user-level-npmrc). The warning disappears and the token is expanded.
+
 ## Still stuck?
 
-- Re-read [authentication.md](./authentication.md) end to end — the ordering (token → env var → `~/.npmrc` credential → project registry mapping) matters.
+- Installing from GitHub Packages? Re-read [authentication.md](./authentication.md) end to end — the ordering (token → env var → `~/.npmrc` credential → project registry mapping) matters.
 - Check installed vs. latest version: `josh version`.
 - Open an issue: <https://github.com/joshuafolkken/kit/issues>.

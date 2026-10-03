@@ -1,6 +1,6 @@
 # josh sync — Detailed Behavior
 
-For projects already set up with `josh init`, after upgrading kit: which files `josh sync` overwrites, merges or leaves alone. `josh sync` overwrites managed files in your project with the latest versions from the installed `@joshuafolkken/kit` package. Run it after upgrading the package.
+For projects already set up with `josh init`, after upgrading kit: which files `josh sync` overwrites, merges or leaves alone. `josh sync` overwrites managed files in your project with the latest versions from the installed `@joshuafolkken/kit` package. Run it after upgrading the package. The reasons behind each behavior below are in [sync-rationale.md](./maintainers/sync-rationale.md), cited section by section as "Rationale:".
 
 ```bash
 pnpm josh sync

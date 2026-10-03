@@ -26,10 +26,10 @@ In a `basic` project, `josh gate`, `josh lint` and the other checks skip each to
 
 1. **Install** — [Set up the basic profile](./setup/basic.md) for `basic`, [Set up the full profile](./setup/full.md) for `full`.
 2. **Init** — run `josh init` once. It creates or merges the config files for the profile, copies AI files and adds the profile's `package.json` scripts and development dependencies, then runs `pnpm install` (which installs the Git hooks in a `full` project with Git) and `josh format`. For the GitHub Issue workflow, run `josh start` instead: it runs the same setup and carries it to GitHub ([init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start)).
-3. **Sync** — run `josh sync` after upgrading the package to pull in updated AI files, workflow templates, and other managed files. It follows the recorded profile, so a `basic` project gets only its own file set ([#2827](https://github.com/joshuafolkken/kit/issues/2827)).
+3. **Sync** — run `josh sync` after upgrading the package to pull in updated AI files, workflow templates, and other managed files. It follows the recorded profile, so a `basic` project gets only its own file set.
 4. **josh CLI** — a single `josh` binary (available as `pnpm josh` after init) gives you git workflow helpers, version management, security auditing, and more.
 
-To walk the Issue-driven loop once — file an Issue, have an agent plan and implement it, verify, merge — follow [tutorial.md](./tutorial.md). To find the steps for a task — updating kit or dependencies, releasing, running Issues — start at [how-to.md](./how-to.md). The full list of guides is below.
+To walk the Issue-driven loop once — file an Issue, have an agent plan and implement it, verify, merge — follow [tutorial.md](./tutorial.md). To find the steps for a task — updating kit or dependencies, running Issues — start at [how-to.md](./how-to.md). The full list of guides is below.
 
 ## Documentation
 
@@ -60,9 +60,11 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 
 - [scripts-ai.md](./scripts-ai.md) — Issue workflow commands and Telegram notifications
 - [cloud-session.md](./cloud-session.md) — running in an agent container
-- [eval.md](./eval.md) — measuring rule adherence
 - [authentication.md](./authentication.md) — existing GitHub Packages installs only
 
-**Maintaining kit**
+**Maintaining kit** — for kit's own maintainers; projects that use kit can skip this group
 
-- [publishing.md](./publishing.md) — releasing a new version
+- [maintainers/README.md](./maintainers/README.md) — where every maintainer page starts
+- [maintainers/release.md](./maintainers/release.md) — releasing a new version
+- [publishing.md](./publishing.md) — the publish jobs and the public npm setup
+- [eval.md](./eval.md) — measuring rule adherence

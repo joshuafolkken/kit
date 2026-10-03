@@ -1,6 +1,6 @@
 # AI Workflow Automation
 
-For projects using the AI Issue workflow (`josh followup`, `josh notify`): the Telegram settings and what the scripts do. The scripts that power the `josh git`, `josh followup` and `josh notify` commands live under `scripts/git/` (they were a separate `scripts-ai/` directory until [#2903](https://github.com/joshuafolkken/kit/issues/2903)).
+For projects using the AI Issue workflow (`josh followup`, `josh notify`): the Telegram settings and what the commands do.
 
 ## Required Environment Variables
 
@@ -38,19 +38,21 @@ Identifies the chat or user that receives notifications.
 
 ### `JOSH_NOTIFY`
 
-Optional. Set `JOSH_NOTIFY=off` when you do not use Telegram at all ([#2821](https://github.com/joshuafolkken/kit/issues/2821)). Every notification is then skipped with one `🔕 Telegram notifications are disabled` line and exit code 0, and neither Telegram variable is needed. Only `off` (case-insensitive) disables them: unset or any other value keeps the behavior below, so a forgotten setup still fails rather than passing quietly.
+Optional. Set `JOSH_NOTIFY=off` when you do not use Telegram at all. Every notification is then skipped with one `🔕 Telegram notifications are disabled` line and exit code 0, and neither Telegram variable is needed. Only `off` (case-insensitive) disables them: unset or any other value keeps the behavior below, so a forgotten setup still fails rather than passing quietly.
 
 ## Commands
 
-| Command         | Script                                 | Description                                                   |
-| --------------- | -------------------------------------- | ------------------------------------------------------------- |
-| `josh followup` | `scripts/git/git-followup-workflow.ts` | Wait for CI, scan AI reviews, notify, and optionally merge PR |
-| `josh notify`   | `scripts/git/telegram-test.ts`         | Send a one-off Telegram notification with a task-type header  |
-| `josh git`      | `scripts/git/git-workflow.ts`          | AI-assisted commit, push, and PR creation workflow            |
+| Command         | Description                                                   |
+| --------------- | ------------------------------------------------------------- |
+| `josh followup` | Wait for CI, scan AI reviews, notify, and optionally merge PR |
+| `josh notify`   | Send a one-off Telegram notification with a task-type header  |
+| `josh git`      | AI-assisted commit, push, and PR creation workflow            |
+
+Which source file implements each command: `docs/maintainers/scripts-ai-rationale.md` → "Where the scripts live".
 
 ## Notification Behavior
 
-**A notification that reached nobody is a failure, not a skip** ([#1564](https://github.com/joshuafolkken/kit/issues/1564)). Missing credentials and a refused request are treated the same way, and what happens next depends only on whose job the notification was.
+**A notification that reached nobody is a failure, not a skip.** Missing credentials and a refused request are treated the same way, and what happens next depends only on whose job the notification was.
 
 An explicit [`JOSH_NOTIFY=off`](#josh_notify) is the one exception: it records that nobody is meant to be notified, so every send is skipped and nothing below applies.
 
@@ -59,4 +61,4 @@ When `TELEGRAM_BOT_TOKEN` or `TELEGRAM_CHAT_ID` is missing or empty, or the send
 - `josh notify` **exits non-zero**. The message names the missing variables, or the HTTP status the API answered with — never the value of either credential.
 - `josh followup` **reports the failure and carries on**, because it sends its completion message on the way to the merge and a gateway timeout at Telegram is not a reason to leave a reviewed, green pull request unmerged. The report is its own `❗` block on stderr, carrying the recovery command where one exists. The rest of that run — CI watching, the merge, the completion comment, the epic close — happens exactly as it would have; only the Telegram delivery is missing.
 
-**This is why the notification commands no longer die on a machine with no `.env`.** `josh notify` and `josh followup` used to pass node's mandatory `--env-file=.env`, which aborts before the script's first line when the file is missing — loud, but by accident, and it stopped a cloud session that carried both credentials as real environment variables. They now use `--env-file-if-exists=.env` like every other command, and the loudness above is what replaces it. A machine that genuinely has no Telegram configured will therefore see `josh notify` fail rather than pass quietly; `josh followup` still completes.
+A missing `.env` file is not itself an error: both commands also read the two variables from the environment, so a cloud session that sets them there notifies normally. Rationale: `docs/maintainers/scripts-ai-rationale.md` → "Why a missing .env no longer stops the notification commands".
