@@ -131,7 +131,7 @@ One tool call, wait, another call. While tests run, the agent just waits. Howeve
 
 **Less waiting, and everything that can run in parallel does.**
 
-- **Independent Issues run side by side**: Issues that don't depend on each other run at once, up to the number of free lanes in each repository. An Issue that changes the verification machinery itself carries a solo label and runs alone.
+- **Independent Issues run side by side**: Issues that don't depend on each other run at once, up to the number of free lanes in each repository. An Issue fixing a defect in kit's own verification that makes unrelated PRs answer wrongly on `main` today carries a solo label and runs alone.
 - **Calls that can go together go in one turn**: three turns in a row of single calls are stopped on the spot.
 - **Work continues while waiting**: verification runs concurrently, and long commands run in the background while the review proceeds.
 
