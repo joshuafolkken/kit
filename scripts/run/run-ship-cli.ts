@@ -324,6 +324,19 @@ function should_detach(args: ShipArguments): boolean {
 	return !run_ship_detach.is_supervised() && lane_child_marker.is_child_of(process.cwd())
 }
 
+// joshuafolkken/kit#2966: the preflight is deterministic and fast, so it runs here, in the agent's own
+// turn, before the hand-off — a stop it finds is fixed by the same session instead of relaunching one
+// from the supervisor. Only the slow stages go to the supervisor, which re-asks the preflight itself.
+async function detach_after_preflight(args: ShipArguments): Promise<number> {
+	const section = await run_stage(run_ship_steps.PREFLIGHT_STEP, args, await open_context(args))
+
+	if (section.code === SUCCESS_EXIT_CODE) return await detach(args)
+
+	console.info(run_ship.format_report([section]))
+
+	return run_ship.exit_code([section])
+}
+
 async function supervised_repository(): Promise<string | undefined> {
 	return run_ship_detach.is_supervised() ? await run_ship_probe.repository_directory() : undefined
 }
@@ -346,7 +359,7 @@ async function run_ship_command(args: ShipArguments): Promise<number> {
 	if (should_detach(args)) {
 		if (!args.is_detach) console.error(LANE_CHILD_DETACH_NOTE)
 
-		return await detach(args)
+		return await detach_after_preflight(args)
 	}
 
 	await claim_supervised_identity(args)

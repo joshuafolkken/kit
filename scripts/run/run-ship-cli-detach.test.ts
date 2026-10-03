@@ -9,6 +9,7 @@ const return_mock = vi.hoisted(() => vi.fn())
 const repository_mock = vi.hoisted(() => vi.fn())
 const is_lane_child_mock = vi.hoisted(() => vi.fn())
 const mark_result_mock = vi.hoisted(() => vi.fn())
+const preflight_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('./run-ship-probe', () => ({
@@ -24,9 +25,7 @@ vi.mock('./run-ship-probe', () => ({
 }))
 vi.mock('./run-event-stream-emit', () => ({ run_event_stream_emit: { emit: vi.fn() } }))
 // The preflight's own branches are pinned in `run-ship-preflight.test.ts`; here it passes.
-vi.mock('./run-ship-preflight', () => ({
-	run_ship_preflight: { stage: vi.fn().mockResolvedValue({ code: 0, out: 'ready' }) },
-}))
+vi.mock('./run-ship-preflight', () => ({ run_ship_preflight: { stage: preflight_mock } }))
 vi.mock('./run-ship-scoped', async (import_original) => {
 	const actual = await import_original<{ run_ship_scoped: typeof real_scoped }>()
 	const scoped_pair = vi
@@ -63,6 +62,7 @@ const TITLE = 'Hand the region over #2428'
 const NUMBER = '2428'
 const REPOSITORY = '/repo/.git'
 const STOPPED_REPORT = '=== gate ===\nred'
+const PREFLIGHT_REFUSAL = '1 pull-request precondition(s) unmet before the review and the gate:'
 
 const info_lines: Array<string> = []
 
@@ -83,6 +83,7 @@ beforeEach(() => {
 
 beforeEach(() => {
 	mark_result_mock.mockReset()
+	preflight_mock.mockReset().mockResolvedValue({ code: OK, out: 'ready' })
 })
 
 describe('run_ship_cli.run — --detach hands the region to a supervisor', () => {
@@ -134,6 +135,33 @@ describe('run_ship_cli.run — a lane child always ships through the supervisor'
 		expect(await run_ship_cli.run([TITLE])).toBe(OK)
 		expect(detach_mock).not.toHaveBeenCalled()
 		expect(josh_run_mock).toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#2966: a preflight stop returns to the lane child rather than to a relaunched session.
+describe('run_ship_cli.run — the preflight runs before the hand-off', () => {
+	it('does not detach and reports the refusal when the preflight fails in a lane child', async () => {
+		is_lane_child_mock.mockReturnValue(true)
+		preflight_mock.mockResolvedValue({ code: FAILED, out: PREFLIGHT_REFUSAL })
+
+		expect(await run_ship_cli.run([TITLE])).toBe(FAILED)
+		expect(detach_mock).not.toHaveBeenCalled()
+		expect(info_lines.join('\n')).toContain(PREFLIGHT_REFUSAL)
+	})
+
+	it('detaches once the preflight passes in a lane child', async () => {
+		is_lane_child_mock.mockReturnValue(true)
+
+		expect(await run_ship_cli.run([TITLE])).toBe(OK)
+		expect(preflight_mock).toHaveBeenCalledWith({ title: TITLE, body_path: undefined })
+		expect(detach_mock).toHaveBeenCalledOnce()
+	})
+
+	it('does not detach on a failed preflight under an explicit --detach', async () => {
+		preflight_mock.mockResolvedValue({ code: FAILED, out: PREFLIGHT_REFUSAL })
+
+		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(FAILED)
+		expect(detach_mock).not.toHaveBeenCalled()
 	})
 })
 
