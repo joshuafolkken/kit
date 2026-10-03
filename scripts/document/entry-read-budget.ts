@@ -82,8 +82,9 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// joshuafolkken/kit#2998 split the command reference, so every reference to an automation command
 	// now names `josh-commands-automation.md`; the longer path tipped backlogrun one block over.
 	// joshuafolkken/kit#2994 moved `CLAUDE.md`'s explanations to `docs/maintainers/claude-md-history.md`,
-	// lowering kickoff and backlogrun one block each.
-	{ entry: 'kickoff', bytes: 225_280 },
+	// lowering backlogrun one block; kickoff's reduction was offset by joshuafolkken/kit#3024's longer
+	// `wip-cap.md`, so its ceiling stays.
+	{ entry: 'kickoff', bytes: 229_376 },
 	{ entry: 'fullrun', bytes: 225_280 },
 	{ entry: 'halfrun', bytes: 225_280 },
 	{ entry: 'backlogrun', bytes: 229_376 },
