@@ -20,7 +20,6 @@ const USER_GUIDE_PAGES: ReadonlyArray<string> = [
 	OVERVIEW,
 	'docs/tutorial.md',
 	HOW_TO_INDEX,
-	'docs/scripts-ai.md',
 	TROUBLESHOOTING,
 ]
 const USER_GUIDE_DIRECTORIES: ReadonlyArray<string> = ['docs/how-to', 'docs/setup']

@@ -281,7 +281,7 @@ pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file 
 - `--body-file` — read the body from a file (`-` reads stdin); use whenever the body carries a backtick or `$`. Passing both body forms is refused.
 - `--repo-name` / `--issue-url` / `--pr-url` — header repository, resolved in that order, then the working directory. The issue title is read from `--issue-url`.
 
-**Output / exit codes:** a send that reached nobody exits non-zero, naming the missing variables or the HTTP status (never the token values). `.env` is read via `--env-file-if-exists`. Requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, or [`JOSH_NOTIFY=off`](scripts-ai.md#josh_notify) to skip.
+**Output / exit codes:** a send that reached nobody exits non-zero, naming the missing variables or the HTTP status (never the token values). `.env` is read via `--env-file-if-exists`. Requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, or [`JOSH_NOTIFY=off`](environment-variables.md#notification-behavior) to skip.
 
 ### `josh observations:flush`
 

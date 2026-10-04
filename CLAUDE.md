@@ -36,7 +36,7 @@ Classify each decision point into one tier and act; stop **only** when the choic
 
 ## Environment Variables
 
-A `.env` at the project root: `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are required for notifications; `JOSH_SESSION_LANG`, `PORT_SEED` and `JOSH_REPO_PATHS` are optional and personal. Setup and semantics: [docs/scripts-ai.md](https://github.com/joshuafolkken/kit/blob/main/docs/scripts-ai.md) and [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md).
+A `.env` at the project root: `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are required for notifications; `JOSH_SESSION_LANG`, `PORT_SEED` and `JOSH_REPO_PATHS` are optional and personal. Details: [environment-variables.md](https://github.com/joshuafolkken/kit/blob/main/docs/environment-variables.md), [josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md).
 
 **GitHub operations are `gh api` (REST) — instructing prose included — and need `gh` installed; some environments lack it.** Auth: `gh auth login`; `GH_TOKEN` in CI/cloud. `prompts/collaboration-workflow/gh-rest.md`.
 

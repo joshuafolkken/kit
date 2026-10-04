@@ -14,10 +14,23 @@ All of them are optional except the two Telegram credentials, which notification
 
 | Variable             | Required                      | Default                                        | Used when                                                                                                                                                            |
 | -------------------- | ----------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TELEGRAM_BOT_TOKEN` | Yes, unless `JOSH_NOTIFY=off` | —                                              | Every notification a workflow sends ([how to get it](./scripts-ai.md#telegram_bot_token)).                                                                           |
-| `TELEGRAM_CHAT_ID`   | Yes, unless `JOSH_NOTIFY=off` | —                                              | The chat that receives them ([how to get it](./scripts-ai.md#telegram_chat_id)).                                                                                     |
-| `JOSH_NOTIFY`        | No                            | on                                             | `off` skips every notification with exit code 0 and makes the two credentials unnecessary ([details](./scripts-ai.md#josh_notify)).                                  |
+| `TELEGRAM_BOT_TOKEN` | Yes, unless `JOSH_NOTIFY=off` | —                                              | Every notification a workflow sends ([how to get it](./how-to/set-up-notifications.md#telegram_bot_token)).                                                          |
+| `TELEGRAM_CHAT_ID`   | Yes, unless `JOSH_NOTIFY=off` | —                                              | The chat that receives them ([how to get it](./how-to/set-up-notifications.md#telegram_chat_id)).                                                                    |
+| `JOSH_NOTIFY`        | No                            | on                                             | `off` skips every notification with exit code 0 and makes the two credentials unnecessary ([details](#notification-behavior)).                                       |
 | `JOSH_SESSION_LANG`  | No                            | `ja` (`josh init` seeds it from the OS locale) | The language of session dialogue, Issue bodies, comments and notification bodies, e.g. `en` ([`josh session:lang`](./josh-commands-automation.md#josh-sessionlang)). |
+
+#### Notification behavior
+
+**A notification that reached nobody is a failure, not a skip.** Missing credentials and a refused request are treated the same way, and what happens next depends only on whose job the notification was.
+
+An explicit `JOSH_NOTIFY=off` is the one exception: it records that nobody is meant to be notified, so every send is skipped with one `🔕 Telegram notifications are disabled` line and exit code 0, and nothing below applies. Only `off` (case-insensitive) disables them: unset or any other value keeps the behavior below, so a forgotten setup still fails rather than passing quietly.
+
+When `TELEGRAM_BOT_TOKEN` or `TELEGRAM_CHAT_ID` is missing or empty, or the send itself fails:
+
+- `josh notify` **exits non-zero**. The message names the missing variables, or the HTTP status the API answered with — never the value of either credential.
+- `josh followup` **reports the failure and carries on**, because it sends its completion message on the way to the merge and a gateway timeout at Telegram is not a reason to leave a reviewed, green pull request unmerged. The report is its own `❗` block on stderr, carrying the recovery command where one exists. The rest of that run — CI watching, the merge, the completion comment, the epic close — happens exactly as it would have; only the Telegram delivery is missing.
+
+A missing `.env` file is not itself an error: both commands also read the two variables from the environment, so a cloud session that sets them there notifies normally. Rationale: `docs/maintainers/environment-variables-rationale.md` → "Why a missing .env no longer stops the notification commands".
 
 ### Ports and lanes
 

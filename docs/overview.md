@@ -59,7 +59,7 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 
 **AI workflow and operations**
 
-- [scripts-ai.md](./scripts-ai.md) — Issue workflow commands and Telegram notifications
+- [set-up-notifications.md](./how-to/set-up-notifications.md) — Telegram notifications for the Issue workflow
 - [cloud-session.md](./cloud-session.md) — running in an agent container
 - [authentication.md](./authentication.md) — existing GitHub Packages installs only
 
