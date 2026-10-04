@@ -10,6 +10,7 @@ import {
 	type RunCarry,
 } from './run-carry'
 import { run_carry_args, type CountRequest, type Request } from './run-carry-args'
+import { run_carry_conversation } from './run-carry-conversation'
 import { run_carry_stash } from './run-carry-stash'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
@@ -331,7 +332,8 @@ async function count(
 
 	if (blocked !== undefined) return blocked
 
-	const carry = run_carry.apply_change(target, read.carry, request.change)
+	const owned = run_carry_conversation.reclaim_owner(read.carry, request.owner)
+	const carry = run_carry.apply_change(target, owned, request.change)
 
 	await record_retrospective(request)
 

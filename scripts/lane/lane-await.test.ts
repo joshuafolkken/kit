@@ -267,3 +267,27 @@ describe('wait_for_any -- a child that ended before the call', () => {
 it('NEVER_APPEARED_TIMEOUT_MS is exported for use in the CLI', () => {
 	expect(NEVER_APPEARED_TIMEOUT_MS).toBeGreaterThan(0)
 })
+
+// joshuafolkken/kit#3137: `--owner` is how a resumed parent reclaims its carry record before waiting.
+describe('parse_arguments', () => {
+	it('reads the issues and the waiting session’s pid', () => {
+		expect(lane_await.parse_arguments([ISSUE, OTHER, '--owner', '55250'])).toStrictEqual({
+			issues: [ISSUE, OTHER],
+			owner: 55_250,
+		})
+	})
+
+	it('reads issues alone with no owner', () => {
+		expect(lane_await.parse_arguments([ISSUE])).toStrictEqual({ issues: [ISSUE], owner: undefined })
+	})
+
+	it.each([
+		['no issue', ['--owner', '55250']],
+		['a non-number issue', [ISSUE, 'abc']],
+		['a malformed pid', [ISSUE, '--owner', 'abc']],
+		['an owner flag without its value', [ISSUE, '--owner']],
+		['an unknown flag', [ISSUE, '--max', '3']],
+	])('refuses %s', (_label, rest) => {
+		expect(lane_await.parse_arguments(rest)).toBeUndefined()
+	})
+})

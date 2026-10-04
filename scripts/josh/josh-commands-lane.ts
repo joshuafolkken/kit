@@ -59,7 +59,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Block until any of the named in-flight lane children completes; prints which one finished',
 		category: 'AI tools',
-		reference: ['<issue> [<issue>...]', 'automation', ['processes']],
+		reference: ['<issue> [<issue>...] [--owner <pid>]', 'automation', ['files', 'processes']],
 		default_script_arguments: ['await'],
 	},
 	'lane:launch': {

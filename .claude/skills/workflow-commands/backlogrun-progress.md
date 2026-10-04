@@ -177,10 +177,10 @@ run in lanes".
    that lane's `lane:open`.
 
    **Start the unit without blocking on it — `pnpm josh lane:dispatch <N>` when the child runs in a
-   lane — and in the same turn start `pnpm josh lane:await <N...>` in the background** (joshuafolkken/kit#2113).
+   lane — and in the same turn start `pnpm josh lane:await <N...> --owner "$PPID"` in the background** (joshuafolkken/kit#2113).
    `lane:await` watches local process presence and exits when any named child confirms-complete. **The
    re-confirm delay and poll interval are the command's, not the agent's** — pass only the issue
-   numbers. Without that wake (Codex), hand off instead — "A parent without a completion callback".
+   numbers and `--owner` (why: `docs/josh-commands-automation.md` → `josh lane:await`). Without that wake (Codex), hand off instead — "A parent without a completion callback".
 
    **A `lane:await` wake is a confirmed-gone process, so classify the ending at once — do not wait out
    the silent-unit window** (joshuafolkken/kit#2277). On a `lane:await` wake go straight to `pnpm josh run:merge <N> --output <path>` — the composite reads the child's **exit

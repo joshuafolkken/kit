@@ -6,6 +6,7 @@ import type { OpenIssueData } from '#scripts/git/schemas'
 import { issue_cite, type IssueCiter } from '#scripts/issue/issue-cite'
 import { error_text } from '#scripts/lib/error-message'
 import { run_carry } from '#scripts/run/run-carry'
+import { run_carry_reclaim } from '#scripts/run/run-carry-reclaim'
 import { lane_await } from './lane-await'
 import { lane_close, type CloseOutcome, type SweepOutcome } from './lane-close'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
@@ -40,7 +41,7 @@ const USAGE = [
 	'       josh lane:prune',
 	'       josh lane:output <issue-number> [<path>]',
 	'       josh lane:dispatch <issue-number>',
-	'       josh lane:await <issue-number> ...',
+	'       josh lane:await <issue-number> ... [--owner <pid>]',
 ].join('\n')
 
 type Handler = (rest: ReadonlyArray<string>) => Promise<number>
@@ -356,22 +357,19 @@ async function dispatch_command(rest: ReadonlyArray<string>): Promise<number> {
 	return await report_dispatch(await lane_dispatch.dispatch_child(issue), issue)
 }
 
-// Each valid argument is an issue number; any non-number stops parsing and triggers usage.
-function parse_issues(rest: ReadonlyArray<string>): ReadonlyArray<string> | undefined {
-	if (rest.length === 0) return undefined
-	const issues = rest.filter((value) => lane_await.ISSUE_PATTERN.test(value))
-
-	return issues.length === rest.length ? issues : undefined
-}
-
 // The completed issue number goes to standard output so `N=$(pnpm josh lane:await ...)` captures
-// which child finished without parsing stderr.
+// which child finished without parsing stderr. `--owner` reclaims the carry record for a resumed
+// conversation before the wait (`run-carry-reclaim.ts`).
 async function await_command(rest: ReadonlyArray<string>): Promise<number> {
-	const issues = parse_issues(rest)
+	const parsed = lane_await.parse_arguments(rest)
 
-	if (issues === undefined) return report_usage()
+	if (parsed === undefined) return report_usage()
 
-	const completed = await lane_await.wait_for_any(issues)
+	if (parsed.owner !== undefined) {
+		await run_carry_reclaim.reclaim_carry(run_carry.owner_of(parsed.owner))
+	}
+
+	const completed = await lane_await.wait_for_any(parsed.issues)
 
 	console.info(completed)
 

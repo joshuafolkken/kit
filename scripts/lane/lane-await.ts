@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
+import { parseArgs } from 'node:util'
 import { run_liveness } from '#scripts/run/run-liveness'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_handoff } from './lane-handoff'
@@ -31,6 +32,16 @@ interface AwaitState {
 	disappeared_at: number | undefined
 	first_polled_at: number | undefined
 	is_settled?: boolean
+}
+
+interface AwaitArguments {
+	issues: ReadonlyArray<string>
+	owner: number | undefined
+}
+
+interface RawAwaitArguments {
+	positionals: Array<string>
+	values: { owner?: string | undefined }
 }
 
 // Injectable for testing -- the CLI never overrides these.
@@ -65,6 +76,39 @@ function is_process_running_default(issue: string): boolean {
 // The same positive evidence `run:liveness` answers `settled` on: the issue closed, or it was parked.
 async function is_settled_default(issue: string): Promise<boolean> {
 	return (await run_liveness.read_child_settled(issue)) === true
+}
+
+// An unknown flag or a flag without its value is `undefined`, which is usage.
+function read_await_args(rest: ReadonlyArray<string>): RawAwaitArguments | undefined {
+	try {
+		return parseArgs({
+			args: [...rest],
+			allowPositionals: true,
+			strict: true,
+			options: { owner: { type: 'string' } },
+		})
+	} catch {
+		return undefined
+	}
+}
+
+// Every positional is an issue number, at least one is given, and `--owner` is a pid.
+function is_valid(raw: RawAwaitArguments): boolean {
+	const { owner } = raw.values
+	const numbers = owner === undefined ? raw.positionals : [...raw.positionals, owner]
+
+	return raw.positionals.length > 0 && numbers.every((value) => ISSUE_PATTERN.test(value))
+}
+
+// The issues to wait on and the waiting session's pid, or `undefined` for anything else.
+function parse_arguments(rest: ReadonlyArray<string>): AwaitArguments | undefined {
+	const raw = read_await_args(rest)
+
+	if (raw === undefined || !is_valid(raw)) return undefined
+
+	const { owner } = raw.values
+
+	return { issues: raw.positionals, owner: owner === undefined ? undefined : Number(owner) }
 }
 
 function make_initial_state(is_settled: boolean): AwaitState {
@@ -187,13 +231,13 @@ async function wait_for_any(
 }
 
 const lane_await = {
-	ISSUE_PATTERN,
 	NEVER_APPEARED_TIMEOUT_MS,
 	RECONFIRM_MS,
 	check_issue,
 	is_process_running_default,
+	parse_arguments,
 	wait_for_any,
 }
 
-export type { AwaitState, CheckConfig }
+export type { AwaitArguments, AwaitState, CheckConfig }
 export { lane_await }

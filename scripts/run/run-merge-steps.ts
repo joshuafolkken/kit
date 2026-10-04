@@ -10,6 +10,7 @@ import { lane_reap } from '#scripts/lane/lane-reap'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { run_carry, type CarryChange, type CarryOwner, type RunCarry } from './run-carry'
+import { run_carry_conversation } from './run-carry-conversation'
 import { run_cut, type RunCut } from './run-cut'
 import { run_merge } from './run-merge'
 
@@ -105,7 +106,9 @@ async function apply_carry(
 		return { kind: 'refused', carry: record.carry }
 	}
 
-	return { kind: 'applied', carry: run_carry.apply_change(record.target, record.carry, change) }
+	const owned = run_carry_conversation.reclaim_owner(record.carry, ctx.owner)
+
+	return { kind: 'applied', carry: run_carry.apply_change(record.target, owned, change) }
 }
 
 // The carry record when this session may not act on it — the same ownership guard `apply_carry` asks —
