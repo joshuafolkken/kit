@@ -1,10 +1,5 @@
 #!/usr/bin/env tsx
-import { existsSync, readFileSync } from 'node:fs'
-import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { git_command } from '#scripts/git/git-command'
-import { error_text } from '#scripts/lib/error-message'
-import { timed_fetch } from '#scripts/lib/timed-fetch'
 import { managed_config_scope } from '#scripts/sync/managed-config-scope'
 import { z } from 'zod'
 import {
@@ -13,6 +8,7 @@ import {
 	type HotspotDisposition,
 	type HotspotFetch,
 } from './sonar-hotspots'
+import { sonar_project } from './sonar-project'
 
 // `josh sonar:hotspots <PR>` — fetch the SonarCloud hotspots on a pull request and print the Step B
 // disposition of each (joshuafolkken/kit#2182).
@@ -25,10 +21,7 @@ import {
 
 const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh sonar:hotspots <PR>'
-const SONAR_HOST = 'https://sonarcloud.io'
 const HOTSPOTS_PATH = '/api/hotspots/search'
-const PROPERTIES_FILE = 'sonar-project.properties'
-const PROJECT_KEY_PREFIX = 'sonar.projectKey='
 const FAILURE_EXIT_CODE = 1
 const UNKNOWN_LINE = '?'
 
@@ -44,34 +37,17 @@ const hotspot_schema = z.looseObject({
 })
 const response_schema = z.looseObject({ hotspots: z.array(hotspot_schema).optional() })
 
-function read_project_key(root: string): string | undefined {
-	const file = path.join(root, PROPERTIES_FILE)
-	if (!existsSync(file)) return undefined
-
-	const line = readFileSync(file, 'utf8')
-		.split('\n')
-		.find((entry) => entry.startsWith(PROJECT_KEY_PREFIX))
-
-	return line?.slice(PROJECT_KEY_PREFIX.length).trim()
-}
-
 function hotspots_url(project_key: string, pull_request: string): string {
-	const query = new URLSearchParams({ projectKey: project_key, pullRequest: pull_request })
-
-	return `${SONAR_HOST}${HOTSPOTS_PATH}?${query.toString()}`
+	return sonar_project.api_url(HOTSPOTS_PATH, {
+		projectKey: project_key,
+		pullRequest: pull_request,
+	})
 }
 
 async function fetch_hotspots(url: string): Promise<HotspotFetch> {
-	try {
-		const response = await timed_fetch(url)
-		if (!response.ok) return { error: `HTTP ${String(response.status)}` }
+	const read = await sonar_project.fetch_json(url, response_schema)
 
-		const parsed = response_schema.parse(await response.json())
-
-		return { hotspots: parsed.hotspots ?? [] }
-	} catch (error) {
-		return { error: error_text.message_of(error) }
-	}
+	return 'error' in read ? read : { hotspots: read.data.hotspots ?? [] }
 }
 
 function is_managed(component: string): boolean {
@@ -108,23 +84,10 @@ async function fetch_and_print(project_key: string, pull_request: string): Promi
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const [pull_request] = argv
+	const target = await sonar_project.resolve_target(argv, USAGE)
+	if (target === undefined) return FAILURE_EXIT_CODE
 
-	if (pull_request === undefined || pull_request.startsWith('-')) {
-		console.error(USAGE)
-
-		return FAILURE_EXIT_CODE
-	}
-
-	const project_key = read_project_key(await git_command.repository_root())
-
-	if (project_key === undefined) {
-		console.error(`no ${PROJECT_KEY_PREFIX} found in ${PROPERTIES_FILE}`)
-
-		return FAILURE_EXIT_CODE
-	}
-
-	await fetch_and_print(project_key, pull_request)
+	await fetch_and_print(target.project_key, target.pull_request)
 
 	return 0
 }
@@ -137,7 +100,6 @@ const sonar_hotspots_cli = {
 	fetch_hotspots,
 	format_hotspot,
 	print_disposition,
-	read_project_key,
 	USAGE,
 }
 

@@ -315,6 +315,16 @@ Fetch SonarCloud hotspots on a pull request and print each one's Step B disposit
 
 ---
 
+### `josh sonar:new-code`
+
+> **Audience:** automation · **Side effects:** network
+
+`<PR>`
+
+Fail when a pull request adds any new SonarCloud issue or duplicated block
+
+---
+
 ### `josh start` · `josh st`
 
 > **Audience:** developer · **Side effects:** files, git, network, processes

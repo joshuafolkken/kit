@@ -1028,6 +1028,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
+    "sonar:new-code": [
+      "<PR>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
     "split:assess": [
       "[--json]",
       "automation",

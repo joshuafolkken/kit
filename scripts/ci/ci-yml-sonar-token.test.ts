@@ -17,13 +17,19 @@ const SCAN_ACTION = 'SonarSource/sonarqube-scan-action'
 const CHECKOUT_ACTION = 'actions/checkout'
 const SET_TOKEN = 'sqp_example'
 const UNSET_TOKEN = ''
+// The new-code steps run on a pull request only (joshuafolkken/kit#3045), so the token is exercised on
+// the event where every step can run.
+const PULL_REQUEST_EVENT = 'pull_request'
 
 function sonar_steps(): ReadonlyArray<WorkflowStep> {
 	return ci_yml_fixture.find_job(SONAR_YML, SONAR_JOB)?.steps ?? []
 }
 
 function step_runs(step: WorkflowStep, token: string): boolean {
-	const context: ContextTree = { [ENV_CONTEXT]: { [TOKEN_KEY]: token } }
+	const context: ContextTree = {
+		[ENV_CONTEXT]: { [TOKEN_KEY]: token },
+		github: { event_name: PULL_REQUEST_EVENT },
+	}
 
 	return step.if === undefined || workflow_expression_fixture.evaluate_condition(step.if, context)
 }

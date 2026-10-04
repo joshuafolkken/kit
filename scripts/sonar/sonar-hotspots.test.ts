@@ -17,6 +17,7 @@ import {
 	type HotspotFetch,
 } from './sonar-hotspots'
 import { sonar_hotspots_cli } from './sonar-hotspots-cli'
+import { sonar_project } from './sonar-project'
 
 const COMMAND = 'sonar:hotspots'
 const SCRIPT_PATH = 'scripts/sonar/sonar-hotspots-cli.ts'
@@ -49,7 +50,7 @@ function read_key_from_properties(contents: string): string | undefined {
 	try {
 		writeFileSync(path.join(directory, PROPERTIES_NAME), contents)
 
-		return sonar_hotspots_cli.read_project_key(directory)
+		return sonar_project.read_project_key(directory)
 	} finally {
 		rmSync(directory, { recursive: true, force: true })
 	}
@@ -169,7 +170,7 @@ describe('sonar_hotspots_cli.print_disposition', () => {
 	})
 })
 
-describe('sonar_hotspots_cli.read_project_key', () => {
+describe('sonar_project.read_project_key', () => {
 	it('reads the project key from the properties file', () => {
 		expect(read_key_from_properties('sonar.projectKey=demo_key\n')).toBe('demo_key')
 	})
