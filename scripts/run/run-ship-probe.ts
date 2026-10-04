@@ -1,5 +1,6 @@
 import { git_command } from '#scripts/git/git-command'
 import { git_worktree } from '#scripts/git/git-worktree'
+import { error_text } from '#scripts/lib/error-message'
 import { run_hold } from './run-hold'
 import { run_preflight } from './run-preflight'
 import { run_ship_stage, type ShipState } from './run-ship-stage'
@@ -20,7 +21,9 @@ const HEAD_REFERENCE = 'HEAD'
 async function or_false(is_true: () => Promise<boolean>): Promise<boolean> {
 	try {
 		return await is_true()
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('run_ship_probe.or_false', error)
+
 		return false
 	}
 }

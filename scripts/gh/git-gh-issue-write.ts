@@ -1,3 +1,4 @@
+import { error_text } from '#scripts/lib/error-message'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
 
@@ -43,7 +44,9 @@ async function did_write_succeed(write: () => Promise<unknown>): Promise<boolean
 		await write()
 
 		return true
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('git_gh_issue_write.did_write_succeed', error)
+
 		return false
 	}
 }

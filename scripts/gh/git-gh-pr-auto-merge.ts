@@ -1,3 +1,4 @@
+import { error_text } from '#scripts/lib/error-message'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
 import { read_pull, require_pr_number } from './git-gh-pr-read'
@@ -40,7 +41,9 @@ async function pr_enable_auto_merge(branch_name: string): Promise<void> {
 async function pr_is_merged(branch_name: string): Promise<boolean> {
 	try {
 		return git_gh_pr_rest.is_merged(await read_pull(await require_pr_number(branch_name)))
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('git_gh_pr_auto_merge.pr_is_merged', error)
+
 		return false
 	}
 }

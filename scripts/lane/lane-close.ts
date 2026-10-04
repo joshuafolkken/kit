@@ -1,6 +1,7 @@
 import { existsSync, rmSync } from 'node:fs'
 import { git_command } from '#scripts/git/git-command'
 import { git_worktree } from '#scripts/git/git-worktree'
+import { error_text } from '#scripts/lib/error-message'
 import { lane_paths } from './lane-paths'
 import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
@@ -147,7 +148,9 @@ async function try_close(issue: string): Promise<boolean> {
 		const outcome = await close_lane(issue)
 
 		return outcome.kind !== 'incomplete'
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('lane_close.try_close', error)
+
 		return false
 	}
 }
