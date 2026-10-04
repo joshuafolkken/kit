@@ -169,8 +169,12 @@ describe('josh read:set carries the rule beside the figures', () => {
 	})
 
 	// Listed rather than dropped: a saving with nowhere for the cost to have gone is not a measurement.
+	// Only the point-of-use documents the entry reaches are its cost (joshuafolkken/kit#3078).
 	it('lists what left the entry read instead of hiding it', () => {
+		const { point_of_use } = entry_read_set.costed(process.cwd(), FULLRUN)
+
 		expect(report).toContain(read_set_cli.POINT_OF_USE_LABEL)
-		for (const later of entry_read_set.POINT_OF_USE_FILES) expect(report).toContain(later)
+		expect(point_of_use.length).toBeGreaterThan(NOTHING)
+		for (const later of point_of_use) expect(report).toContain(later.file)
 	})
 })

@@ -89,7 +89,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/issue/measure-rerun-cli.ts',
 		description: 'Re-run a merged issue’s baseline command and print the before/after pair',
 		category: 'Workflow',
-		reference: ['<path>', 'automation', ['processes', 'files']],
+		reference: ['<issue-number>', 'automation', ['network', 'processes', 'files']],
 	},
 	// A script rather than an `sh -c` chain, because it has a precondition to enforce: run inside a
 	// linked work tree it would hijack the default branch from every other one (joshuafolkken/kit#1535).

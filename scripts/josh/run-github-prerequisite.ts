@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { repo_origin } from '#scripts/discovery/repo-origin'
-import { execaSync } from 'execa'
+import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 
 const GITHUB_RUN_COMMANDS = new Set([
 	'run:entry',
@@ -19,11 +19,8 @@ function explanation(root: string, command: string): string | undefined {
 		return `${command} requires Git and a GitHub origin. Run git init and add a GitHub origin first.`
 	}
 
-	const result = execaSync('git', ['config', '--get', 'remote.origin.url'], {
-		cwd: root,
-		reject: false,
-	})
-	if (result.exitCode === 0 && repo_origin.parse_origin_url(result.stdout)) return undefined
+	const url = git_spawn_sync.origin_url(root)
+	if (url !== undefined && repo_origin.parse_origin_url(url)) return undefined
 
 	return `${command} requires a GitHub origin. Add an origin pointing to GitHub first.`
 }

@@ -2,6 +2,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_pr_checks } from '#scripts/gh/git-pr-checks'
 import { git_command } from '#scripts/git/git-command'
 import { git_remote_branch, type RemoteAnswer } from '#scripts/git/git-remote-branch'
+import { repository_lock } from '#scripts/git/repository-lock'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReleasePlan } from './release-plan'
 import { release_publish } from './release-publish'
@@ -9,7 +10,7 @@ import { release_tag } from './release-tag'
 import { release_worktree } from './release-worktree'
 
 vi.mock('./release-worktree', () => ({
-	release_worktree: { create: vi.fn(), remove: vi.fn() },
+	release_worktree: { clear_leftover: vi.fn(), create: vi.fn(), remove: vi.fn() },
 }))
 
 vi.mock('#scripts/version/bump-version', () => ({ write_version: vi.fn() }))
@@ -32,7 +33,12 @@ function given(is_local: boolean, remote_answer: RemoteAnswer): void {
 	vi.spyOn(git_remote_branch, 'ask').mockResolvedValue(remote_answer)
 }
 
+function hold_release_lock(): void {
+	vi.spyOn(repository_lock, 'with_lock').mockImplementation(async (work) => await work())
+}
+
 function arrange_worktree(): void {
+	hold_release_lock()
 	given(false, 'absent')
 	vi.mocked(release_worktree.create).mockResolvedValue(WORKTREE_DIR)
 	vi.mocked(release_worktree.remove).mockResolvedValue(undefined)
@@ -144,6 +150,39 @@ describe('release_publish.publish', () => {
 		expect(code).toBe(release_publish.SUCCESS_EXIT_CODE)
 		expect(release_worktree.remove).toHaveBeenCalledTimes(1)
 		expect(release_worktree.remove).toHaveBeenCalledWith(WORKTREE_DIR, BRANCH)
+	})
+})
+
+describe('release_publish.publish around the work tree', () => {
+	// A leftover branch of the same name is cleared before the guard asks, or the guard would refuse
+	// it as a release already opened (joshuafolkken/kit#3058).
+	it('clears leftovers before the branch guard and before cutting the tree', async () => {
+		arrange_publish()
+
+		await release_publish.publish(PUBLISH_PLAN)
+
+		const cleared = vi.mocked(release_worktree.clear_leftover).mock.invocationCallOrder[0] ?? 0
+
+		expect(cleared).toBeGreaterThan(0)
+		expect(cleared).toBeLessThan(
+			vi.mocked(git_command.branch_exists).mock.invocationCallOrder[0] ?? 0,
+		)
+		expect(cleared).toBeLessThan(
+			vi.mocked(release_worktree.create).mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	// A live release looks like a leftover until it pushes, so a second run must refuse before it
+	// clears anything rather than remove the first run's tree (joshuafolkken/kit#3058).
+	it('refuses without clearing leftovers while another release holds the lock', async () => {
+		arrange_publish()
+		vi.spyOn(repository_lock, 'with_lock').mockResolvedValue(undefined)
+
+		await expect(release_publish.publish(PUBLISH_PLAN)).rejects.toThrow(
+			'Another `pnpm josh release` is running',
+		)
+		expect(release_worktree.clear_leftover).not.toHaveBeenCalled()
+		expect(release_worktree.create).not.toHaveBeenCalled()
 	})
 
 	// The teardown is in a `finally`, so a failed CI wait cleans the work tree up rather than leaving

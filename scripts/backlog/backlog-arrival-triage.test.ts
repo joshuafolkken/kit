@@ -47,7 +47,7 @@ describe('backlog_arrival.start — triage', () => {
 
 		pool.issues = ['2445', '2446']
 
-		expect(probe).toBe(backlog_arrival.INERT)
 		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
+		await expect(probe.has_arrived(START_MS + MINUTE_MS + MINUTE_MS)).resolves.toBe(false)
 	})
 })

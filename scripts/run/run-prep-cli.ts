@@ -4,6 +4,7 @@ import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_read_cli, type BlockRead } from '#scripts/issue/issue-read-cli'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { error_text } from '#scripts/lib/error-message'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
 import { run_prep, type PrepParts } from './run-prep'
 import { run_prep_locate } from './run-prep-locate'
@@ -82,7 +83,9 @@ async function lane_has_changes(): Promise<boolean> {
 
 	try {
 		return await git_stash.has_changes(process.cwd())
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('run_prep_cli.lane_has_changes', error)
+
 		return false
 	}
 }

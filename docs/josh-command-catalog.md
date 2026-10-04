@@ -301,7 +301,7 @@ Carry the published release into every consumer repository next to this one
 
 _No arguments._
 
-Migrate a kit-only project from GitHub Packages to public npm
+Migrate a project from GitHub Packages to public npm
 
 ---
 
@@ -407,9 +407,9 @@ Checkout default branch, pull latest, and prune merged remote-gone branches (ref
 
 ### `josh measure:rerun`
 
-> **Audience:** automation · **Side effects:** processes, files
+> **Audience:** automation · **Side effects:** network, processes, files
 
-`<path>`
+`<issue-number>`
 
 Re-run a merged issue’s baseline command and print the before/after pair
 

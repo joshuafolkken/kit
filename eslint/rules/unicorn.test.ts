@@ -1,6 +1,9 @@
+import { Linter } from 'eslint'
 import unicorn from 'eslint-plugin-unicorn'
 import { describe, expect, it } from 'vitest'
 import { NAME_REPLACEMENTS_ALLOW_LIST, unicorn_rules } from './unicorn.js'
+
+const NO_EMPTY_FILE = 'unicorn/no-empty-file'
 
 interface NameReplacementsOptions {
 	allowList: Record<string, boolean>
@@ -48,6 +51,31 @@ describe('unicorn_rules — filename-case directory checking (regression #528)',
 		expect(severity).toBe('error')
 		expect(options.case).toBe('kebabCase')
 		expect(options.checkDirectories).toBe(false)
+	})
+})
+
+// The `sv create` scaffold ships `src/lib/index.ts` as a single comment line, so an untouched
+// project must lint clean while a truly empty file is still reported (issue #3069).
+function lint_empty_file_rule(code: string): ReadonlyArray<string> {
+	const linter = new Linter({ configType: 'flat' })
+	const config: Linter.Config = {
+		files: ['**/*.ts'],
+		plugins: { unicorn },
+		rules: { [NO_EMPTY_FILE]: unicorn_rules[NO_EMPTY_FILE] as Linter.RuleEntry },
+	}
+
+	return linter.verify(code, [config], 'index.ts').map((message) => String(message.ruleId))
+}
+
+describe('unicorn_rules — no-empty-file on a comment-only file (regression #3069)', () => {
+	it('accepts a file that holds only a comment', () => {
+		expect(
+			lint_empty_file_rule('// place files you want to import through the `#lib` alias\n'),
+		).toEqual([])
+	})
+
+	it('still reports a file with no content at all', () => {
+		expect(lint_empty_file_rule('\n')).toEqual([NO_EMPTY_FILE])
 	})
 })
 

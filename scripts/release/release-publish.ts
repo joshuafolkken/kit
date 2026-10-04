@@ -2,6 +2,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_pr_checks } from '#scripts/gh/git-pr-checks'
 import { git_command } from '#scripts/git/git-command'
 import { git_remote_branch } from '#scripts/git/git-remote-branch'
+import { repository_lock } from '#scripts/git/repository-lock'
 import { write_version } from '#scripts/version/bump-version'
 import { version_targets } from '#scripts/version/version-targets'
 import type { ReleasePlan } from './release-plan'
@@ -20,6 +21,9 @@ const { PACKAGE_JSON } = version_targets
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const IGNORE_FOR_RELEASE_LABEL = 'ignore-for-release'
+const RELEASE_LOCK_PREFIX = 'josh-release-lock-'
+// A release waits on CI for minutes, so a second run refuses rather than queueing behind it.
+const RELEASE_LOCK_MAX_WAIT_MS = 0
 
 function branch_name_for(version: string): string {
 	return `release/v${version}`
@@ -87,6 +91,14 @@ async function refuse_existing_branch(branch_name: string): Promise<void> {
 	throw new Error(existing_branch_message(branch_name))
 }
 
+// **The leftovers go before the guard asks** (joshuafolkken/kit#3058). A run cut off before its
+// `finally`, or a `worktree add` that failed after creating its branch, leaves a local
+// `release/v<version>` that the guard would otherwise refuse as a release already opened.
+async function clear_the_way(branch_name: string): Promise<void> {
+	await release_worktree.clear_leftover()
+	await refuse_existing_branch(branch_name)
+}
+
 // **No `checkout -b` and no branch guard here** (joshuafolkken/kit#2411). The work tree is already
 // sitting on the release branch — `release_worktree.create` cut it that way — and the guard ran
 // before that creation, because `worktree_add` makes the branch local and `branch_exists` would then
@@ -121,10 +133,10 @@ async function merge_and_tag(plan: ReleasePlan, branch_name: string): Promise<nu
 // branch guard runs before the tree exists, `process.chdir` points the version write and the git
 // commands at the tree, and the `finally` returns to the root and removes the tree — whichever way
 // the wait ended, so a failed tag watch cleans up rather than leaving debris behind.
-async function publish(plan: ReleasePlan): Promise<number> {
+async function publish_locked(plan: ReleasePlan): Promise<number> {
 	const branch_name = branch_name_for(plan.next_version)
 
-	await refuse_existing_branch(branch_name)
+	await clear_the_way(branch_name)
 
 	const directory = await release_worktree.create(branch_name)
 	const previous_cwd = process.cwd()
@@ -138,6 +150,28 @@ async function publish(plan: ReleasePlan): Promise<number> {
 		process.chdir(previous_cwd)
 		await release_worktree.remove(directory, branch_name)
 	}
+}
+
+function release_running_message(target: string): string {
+	return `Another \`pnpm josh release\` is running in this repository (lock \`${target}\`); wait for it to finish, then run it again.`
+}
+
+// **One release at a time per repository, held for the whole run** (joshuafolkken/kit#3058).
+// `clear_leftover` removes an unpushed, commit-less release branch, which is also what a live run
+// looks like while it installs dependencies — so it may only run once no other release is alive. The
+// lock answers that: a run cut off before its `finally` leaves a record whose owner is gone, which
+// `repository_lock` clears on the next claim, while a live owner makes this run refuse at once.
+async function publish(plan: ReleasePlan): Promise<number> {
+	const target = repository_lock.lock_path(RELEASE_LOCK_PREFIX)
+	const exit_code = await repository_lock.with_lock(
+		async () => await publish_locked(plan),
+		target,
+		RELEASE_LOCK_MAX_WAIT_MS,
+	)
+
+	if (exit_code === undefined) throw new Error(release_running_message(target))
+
+	return exit_code
 }
 
 const release_publish = {

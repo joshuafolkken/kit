@@ -12,7 +12,7 @@
 [![CI](https://github.com/joshuafolkken/kit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/joshuafolkken/kit/actions/workflows/ci.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=joshuafolkken_kit&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=joshuafolkken_kit)
 
-**Write a GitHub Issue. Your AI agent takes it to a merged PR — the same way in every project.**
+**Tell your AI agent the change. It files the GitHub Issue and takes it to a merged PR — the same way in every project.**
 
 kit gives Claude Code or Codex (or Gemini, Cursor) your project's rules, checks and an Issue-driven workflow.
 
@@ -54,6 +54,7 @@ Each kit includes the one to its left: app-kit builds on kit, game-kit builds on
 | ------------ | ------------------------------------------------ |
 | `kickoff`    | Writes the plan on the Issue, then stops         |
 | `halfrun`    | Implements and self-reviews, stops before commit |
+| `prrun`      | Opens a green pull request, stops before merge   |
 | `fullrun`    | Plans if needed, implements through to merge     |
 | `backlogrun` | Runs many Issues unattended                      |
 
@@ -66,12 +67,16 @@ Each keyword in full: [Run Issues with the workflow keywords](./docs/how-to/run-
 
 ## Quick start
 
-Requires Node.js, pnpm and the gh CLI — [how to install them](./docs/setup/prerequisites.md).
+Requires Node.js, pnpm (kit is installed and run with pnpm only) and the gh CLI — [how to install them](./docs/setup/prerequisites.md). Sign in once with `gh auth login` before `josh start`.
 
 ```bash
 pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit
 pnpm exec josh start
 ```
+
+`josh start` picks the project's profile, writes kit's rules and checks, and creates the GitHub repository and workflow labels when they are missing. On a repository that already has history it opens a setup pull request instead of committing to `main` — merge it before your first run ([what it does](./docs/init.md#josh-init-or-josh-start)).
+
+Add the two Telegram credentials to `.env` so a run that needs you can reach you, or `JOSH_NOTIFY=off` to go without — [Set up notifications](./docs/how-to/set-up-notifications.md).
 
 Then open your agent and follow the [tutorial](./docs/tutorial.md).
 
@@ -81,4 +86,4 @@ No Issue workflow? [Node projects](./docs/setup/full.md#2-install-and-initialize
 
 [Tutorial](./docs/tutorial.md) · [How-to](./docs/how-to.md) · [Commands](./docs/josh-commands.md) · [Troubleshooting](./docs/troubleshooting.md) · [All docs](./docs/overview.md)
 
-[Releases](https://github.com/joshuafolkken/kit/releases) · [Security](./SECURITY.md) · [Contributing](./CLAUDE.md) · [Maintaining kit](./docs/maintainers/README.md) · [MIT](./LICENSE)
+[Releases](https://github.com/joshuafolkken/kit/releases) · [Security](./SECURITY.md) · [Contributing](./docs/maintainers/README.md) · [MIT](./LICENSE)

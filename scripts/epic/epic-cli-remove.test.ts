@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DECISION_FLAG, epic_cli, REMOVE_FLAG } from './epic-cli'
+import { DECISION_FLAG } from './epic-cli'
+import { epic_cli_remove, REMOVE_FLAG } from './epic-cli-remove'
 
 // `--remove <E> <M> <N> …`'s argument rules (joshuafolkken/kit#1712). Kept out of `epic-cli.test.ts`
 // for the reason `--add`'s were: that file is at its line ceiling, and each form's rules read as one
@@ -8,14 +9,14 @@ import { DECISION_FLAG, epic_cli, REMOVE_FLAG } from './epic-cli'
 const EPIC = '900'
 const RECORD_PATH = 'records/why.md'
 
-function parse(...argv: Array<string>): ReturnType<typeof epic_cli.parse_remove_arguments> {
-	return epic_cli.parse_remove_arguments([REMOVE_FLAG, ...argv])
+function parse(...argv: Array<string>): ReturnType<typeof epic_cli_remove.parse_remove_arguments> {
+	return epic_cli_remove.parse_remove_arguments([REMOVE_FLAG, ...argv])
 }
 
 describe('is_removal', () => {
 	it('is true only when the flag is present', () => {
-		expect(epic_cli.is_removal([REMOVE_FLAG, EPIC, '101', '102'])).toBe(true)
-		expect(epic_cli.is_removal(['--add', EPIC, '101'])).toBe(false)
+		expect(epic_cli_remove.is_removal([REMOVE_FLAG, EPIC, '101', '102'])).toBe(true)
+		expect(epic_cli_remove.is_removal(['--add', EPIC, '101'])).toBe(false)
 	})
 })
 

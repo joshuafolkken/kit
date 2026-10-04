@@ -6,7 +6,7 @@ For anyone who wants `josh` on their PATH, for both project profiles. Install `@
 
 The public npm registry serves `@joshuafolkken/kit` without a GitHub token or registry mapping. If your existing `~/.npmrc` maps `@joshuafolkken` to GitHub Packages, that mapping still takes precedence; see [authentication.md](./authentication.md) for the existing setup until you migrate it.
 
-For an existing project that installs only `@joshuafolkken/kit`, run `pnpm josh registry:migrate` inside that project. It reports the current routing and planned change, checks the locked kit version on public npm, and updates the project `.npmrc` and lockfile. It leaves `~/.npmrc` untouched. If another scoped package is installed or resolution still points to GitHub Packages, it stops and explains why.
+For an existing project that routes `@joshuafolkken` to GitHub Packages, run `pnpm josh registry:migrate` inside that project. It reports the current routing and planned change, checks every locked `@joshuafolkken` package version on public npm, and updates the project `.npmrc` and lockfile. It leaves `~/.npmrc` untouched. If a scoped package version is unpublished on npm or resolution still points to GitHub Packages, it stops and explains why.
 
 pnpm requires a one-time setup before any global install — it registers `PNPM_HOME` and appends it to your `PATH` via your shell rc file:
 
@@ -27,10 +27,6 @@ josh help
 ## 2. If `josh` isn't found
 
 The pnpm global bin directory isn't on your `PATH` yet. Run `pnpm setup`, then open a new terminal; the full steps are in [troubleshooting.md](./troubleshooting.md#josh-command-not-found-after-pnpm-add--g).
-
-## 3. Migrating from older versions
-
-Versions prior to `0.200.0` installed a project-pinned shim at `~/.local/bin/josh` that can break or shadow the global `josh`. `josh doctor --fix` removes it; the details are in [troubleshooting.md](./troubleshooting.md#stale-localbinjosh-shim-from-an-old-version).
 
 ## Next
 

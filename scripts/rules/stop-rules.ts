@@ -162,15 +162,18 @@ const HEADLESS_WAIT_MARKER = '⛔ headless parent:'
 const HEADLESS_REFUSAL_CAP = 3
 
 // The foreground waits as they appear in a transcript's tool-call input — the JSON `command` field, so
-// the refusal's own prose, which names the same commands, never matches.
-const HEADLESS_WAIT_CALLS = ['"command":"pnpm josh lane:await', '"command":"pnpm josh run:progress']
+// the refusal's own prose, which names the same commands, never matches. `run:progress --wait` is not
+// one (joshuafolkken/kit#3102): it streams its reports and runs until work arrives, so it is started in
+// the background, where it lives as long as the turn the foreground wait keeps open.
+const HEADLESS_WAIT_CALLS = ['"command":"pnpm josh lane:await']
 
 const HEADLESS_WAIT_BODY =
 	' this is a `claude -p` `backlogrun` parent (`JOSH_RUN_HEADLESS`) with lanes still ' +
 	'in flight, and ending this turn ends the process — its background waits are killed with it and the ' +
 	'lanes are left without a parent. Wait in the foreground instead: run `pnpm josh lane:await <N...>` ' +
-	'for the in-flight lanes (and `pnpm josh run:progress --wait` for the heartbeat) as foreground ' +
-	'commands within the tool timeout, act on what they report, and continue the loop. End the turn only ' +
+	'for the in-flight lanes as a foreground command within the tool timeout (with ' +
+	'`pnpm josh run:progress --wait` in the background for the heartbeat, which streams its reports ' +
+	'itself and lives while this turn does), act on what it reports, and continue the loop. End the turn only ' +
 	'after `pnpm josh run:carry --cut` or `--end` (`backlogrun-progress.md` → "The parent keeps no clock ' +
 	'of its own").'
 

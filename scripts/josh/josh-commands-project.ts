@@ -40,7 +40,7 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'registry:migrate': {
 		script: 'scripts/registry-migration/migrate.ts',
-		description: 'Migrate a kit-only project from GitHub Packages to public npm',
+		description: 'Migrate a project from GitHub Packages to public npm',
 		category: 'Project',
 		reference: ['', 'developer', ['files', 'network', 'processes']],
 	},

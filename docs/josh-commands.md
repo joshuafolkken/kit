@@ -306,13 +306,13 @@ See [init.md](./init.md) for the full file list and [`josh doctor`](#josh-doctor
 
 ### `josh registry:migrate`
 
-Migrate an existing kit-only project from GitHub Packages to public npm. Prints the current registry and proposed change, checks locked scoped packages and their exact versions, then updates the project `.npmrc` and lockfile. It leaves user-level configuration untouched and restores both project files if dependency resolution fails.
+Migrate an existing project from GitHub Packages to public npm. Prints the current registry and proposed change, checks that every locked `@joshuafolkken` package (kit, `app-kit` and the rest) has its exact version on public npm, then updates the project `.npmrc` and rewrites the lockfile entries of all of them. It leaves user-level configuration and any `//npm.pkg.github.com/:_authToken=` line untouched and restores both project files if dependency resolution fails.
 
 ```bash
 pnpm josh registry:migrate
 ```
 
-**Output / exit codes:** exits non-zero without changing settings when another scoped package is installed, a version is unavailable on public npm, configuration is ambiguous, or the resolved lockfile still points to GitHub Packages. Re-running a completed migration is a no-op. See [authentication.md](./authentication.md) for the setup being replaced.
+**Output / exit codes:** exits non-zero without changing settings when a locked scoped package version is unavailable on public npm, configuration is ambiguous, or the resolved lockfile still points to GitHub Packages. Re-running a completed migration is a no-op. See [authentication.md](./authentication.md) for the setup being replaced.
 
 ### `josh sync`
 

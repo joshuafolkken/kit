@@ -32,8 +32,8 @@ call reports `hold`.
    `pnpm josh run:release`: `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress
    2>/dev/null || true`. A `needs-human-review` stop keeps both hold and label.
 3. **Ask the session boundary in the same turn as the hold** — `pnpm josh cost --cut`. `under`
-   continues; `over` (or unanswerable) stops before the title with a `confirmation` Telegram carrying
-   the figure and the resume command (`fullrun #<N>` / `fullrun new`), then `pnpm josh run:release`.
+   continues; `over` (or unanswerable) stops before the title — `run:entry` sends this and step 1's
+   `confirmation` Telegram and runs `run:release` (`stop notified: …`); by hand only for `new`.
    **Skip it when dispatched by `backlogrun`** (that batch owns the question). `backlogrun-progress.md`
    → "The hand-off" is the single source of the check and the shared 135,000 threshold.
 4. **Gather the mechanical reads — `pnpm josh run:prep <N>`**: `issue:read`'s body/comments
@@ -51,7 +51,7 @@ call reports `hold`.
 ## The progress step and the lane-child seam
 
 - **Start the progress watcher once the hold is claimed** — `pnpm josh run:progress --wait` in the
-  background, presented as-is when it exits, and `pnpm josh run:progress --mark` in the same turn as
+  background, started once and relayed never, and `pnpm josh run:progress --mark` in the same turn as
   every real report (`backlogrun-progress.md` → "Progress while the run is quiet"). A `fullrun`
   dispatched as a lane child starts none and never reads that document (`pnpm josh read:set
   lane-child`). **The watcher is a per-session heartbeat; the run's report surface is not it** — the
@@ -62,7 +62,8 @@ call reports `hold`.
   before the hold, joshuafolkken/kit#2760); on `resume` it skips the title, plan, hold and implementation and goes to the gate. At the pre-gate
   boundary — immediately after `pnpm josh main:merge`, before the gate — it takes the cut with
   `pnpm josh run:cut <N>` (the ordered step in `chain-rule.md`), and it records any park on the Issue before the stop notify.
-  `pre-gate-cut.md` is the single source of both.
+  `pre-gate-cut.md` → "Resuming — the fresh process's entry check" and `pre-gate-cut.md` → "Taking
+  the cut" are the single sources of the two.
 - **`resume: halfrun`** adopted a stopped `halfrun` (#2796): gate in full; `resume: prrun-*` a stopped
   `prrun` (#3023); `working-tree-hold.md`.
 

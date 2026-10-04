@@ -7,9 +7,14 @@ in full in the procedure document, and a change to a rule is made there first.
 
 ## Why the heartbeat reads as it does
 
-**Why `--wait` exits after one line.** The exit is what makes the line arrive. A harness that delivers a
-background command's output _when that command exits_ — Claude Code is one — relays nothing from a
-watcher that never exits, so the long-running form is right only where output is streamed.
+**Why `--wait` no longer exits on a report** (joshuafolkken/kit#3102). It used to print one line and
+exit, because a harness that delivers a background command's output _when that command exits_ — Claude
+Code is one — relays nothing from a watcher that never exits. But every such exit woke the parent for a
+turn that asked it for no judgement: relay the line, start the next one. The report's reader is the
+event stream and the ambient log, never the parent's turn, so the watcher writes there and keeps
+running; it exits only where the parent has something to decide — an arrival — or nothing left to do.
+The eight-hour bound for `--wait` is `run:hold`'s expiry, so it bounds a run rather than adding a wake
+an hour.
 
 **Why a sleep-only `Bash` call is refused.** A call that only sleeps adds a second clock nobody
 reconciles with the watcher's, which is why `scripts/rules/early-heartbeat.ts` → `decide` refuses it on
@@ -19,8 +24,8 @@ is up, or when the wait runs longer than the interval — so a single correctly-
 live timer is counted from the record the guard writes when it allows one, never from the machine's
 `sleep` processes.
 
-**Why nothing in flight keeps the watcher waiting.** Otherwise the "start the next one in the same
-turn" step would make it a poll.
+**Why nothing in flight keeps the watcher waiting.** Otherwise each exit, and the restart the parent owes
+it in the same turn, would make it a poll.
 
 **Why `--mark` at every real report.** Restarting the silence clock keeps a heartbeat from landing
 immediately behind a real report.

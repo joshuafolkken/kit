@@ -13,18 +13,19 @@ that holds its detail.
 
 1. **Claim the working tree first** — `pnpm josh run:entry <N> --to halfrun` (bare `pnpm josh
    run:hold` for `new`), ahead of the title and a `new` filing; it folds steps 3 and 5 and starts
-   at its stage line's `start:` (`SKILL.md` → §2k). `busy` / `unknown` stop with a `confirmation` Telegram. **The stop
+   at its stage line's `start:` (`SKILL.md` → §2k). `busy` / `unknown` stop with a `confirmation` Telegram (`run:entry` sends it). **The stop
    before commit keeps the hold** (a second run would trample the uncommitted work); a stop on a
    split, prerequisite or third-party target releases it. `working-tree-hold.md` is the single source; a
    cross-repository target resolves its checkout from `pnpm josh doctor` first (`target-repository.md`).
 2. **Apply `in-progress` the moment `run:hold` answered `hold`** — the stop before commit keeps it on;
    a stop that leaves the tree clean removes it in the same turn as `pnpm josh run:release` (`gh api -X
    DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`).
-3. **Ask the session boundary** — `pnpm josh cost --cut` (folded into `run:entry`); `over` stops with a `confirmation` Telegram and the resume command (`halfrun #<N>` /
-   `halfrun new`). **Skip it when dispatched by a batch.** `backlogrun-progress.md` → "The hand-off" is
+3. **Ask the session boundary** — `pnpm josh cost --cut` (folded into `run:entry`); `over` stops — `run:entry` notifies and releases
+   (`halfrun new`: by hand). **Skip it when dispatched by a batch.** `backlogrun-progress.md` → "The hand-off" is
    the single source of the check and the shared 135,000 threshold.
 4. **Start the progress watcher once the hold is claimed** — `pnpm josh run:progress --wait` in the
-   background, `--mark` in the same turn as every real report; the stop before commit ends the watcher
+   background, started once — it reports to the event stream itself and nothing is relayed — and
+   `--mark` in the same turn as every real report; the stop before commit ends the watcher
    itself (`backlogrun-progress.md` → "Progress while the run is quiet").
 5. **The mechanical reads** — `run:entry` folds `run:prep` (body/comments — `SKILL.md` → §2g;
    `human_review`; `latest:scope`); a `new` entry runs `pnpm josh run:prep <N>` once filed.

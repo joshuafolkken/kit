@@ -2,6 +2,7 @@ import { git_spawn } from '#scripts/git/git-spawn'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { error_text } from '#scripts/lib/error-message'
 import { run_hold } from './run-hold'
 import { run_tidy, type Outcome, type Verdict } from './run-tidy'
 
@@ -31,7 +32,9 @@ async function has_unpushed(directory: string): Promise<boolean> {
 		])
 
 		return count !== '0'
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('run_tidy_lanes.has_unpushed', error)
+
 		return true
 	}
 }

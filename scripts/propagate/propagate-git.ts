@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { ls_remote_branch_arguments } from '#scripts/git/git-ls-remote'
-import { execaSync } from 'execa'
+import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 
 // The git probes propagation needs before it writes anything into a working tree.
 //
@@ -16,7 +16,6 @@ const GIT_TIMEOUT_MS = 10_000
 // `rev-parse` and tight for an ssh handshake, and a probe that times out answers "no" — which for
 // the two below would report a push that never reached origin as a push nobody attempted.
 const REMOTE_TIMEOUT_MS = 60_000
-const SUCCESS_EXIT_CODE = 0
 const DEFAULT_BRANCH_REF = 'refs/remotes/origin/HEAD'
 const FALLBACK_DEFAULT_BRANCH = 'main'
 const ORIGIN_PREFIX = 'refs/remotes/origin/'
@@ -54,15 +53,11 @@ function run_git(
 	args: ReadonlyArray<string>,
 	timeout_ms: number = GIT_TIMEOUT_MS,
 ): string | undefined {
-	const result = execaSync('git', args, {
+	return git_spawn_sync.read(args, {
 		cwd: repository_path,
-		reject: false,
 		timeout: timeout_ms,
-		env: { LC_ALL: 'C', LANGUAGE: 'C', ...git_location_environment.location_free_environment() },
-		extendEnv: true,
+		env: { ...git_spawn_sync.C_LOCALE, ...git_location_environment.location_free_environment() },
 	})
-
-	return result.exitCode === SUCCESS_EXIT_CODE ? result.stdout.trim() : undefined
 }
 
 // The repository's default branch, from the remote's own HEAD. Falls back to `main` when the ref is

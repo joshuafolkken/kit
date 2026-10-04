@@ -38,6 +38,25 @@ describe('issue_cite.citer', () => {
 	})
 })
 
+// joshuafolkken/kit#3099: a renderer holding one title cites through the same decision `citer` makes.
+describe('issue_cite.reference', () => {
+	it('cites with the title when one is given', () => {
+		expect(issue_cite.reference(LOCAL_REPO, NUMBER, 'A title')).toBe(
+			issue_cite.citation_line(LOCAL_REPO, NUMBER, 'A title'),
+		)
+	})
+
+	it('falls back to the number-link without a title', () => {
+		expect(issue_cite.reference(LOCAL_REPO, NUMBER, undefined)).toBe(
+			`[#${NUMBER}](${issue_cite.issue_url(LOCAL_REPO, NUMBER)})`,
+		)
+	})
+
+	it('keeps the plain number without a repository', () => {
+		expect(issue_cite.reference(undefined, NUMBER, 'A title')).toBe(`#${NUMBER}`)
+	})
+})
+
 // Exported so the printing-side `linkify` builds a link the same way rather than restating the URL
 // shape (joshuafolkken/kit#2329).
 describe('issue_cite.issue_url', () => {

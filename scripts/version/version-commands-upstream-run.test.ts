@@ -82,7 +82,7 @@ describe('version_commands.run_upgrade with upstreams', () => {
 				'-c',
 				`${UPSTREAM_UPGRADE_COMMAND} && node_modules/.bin/tsx node_modules/${UPSTREAM_PACKAGE}/scripts/gh/fix-gh-packages.ts`,
 			],
-			{ stdio: 'inherit', reject: false },
+			expect.objectContaining({ stdio: 'inherit', reject: false }),
 		)
 	})
 
@@ -111,10 +111,11 @@ describe('version_commands.run_upgrade with a stale effective upstream', () => {
 
 		expect(version_commands.run_upgrade(CHAINED_CONFIG_WITH_EFFECTIVE)).toBe(0)
 		expect(mocked_execa_sync).toHaveBeenCalledTimes(1)
-		expect(mocked_execa_sync).toHaveBeenCalledWith('sh', ['-c', GLOBAL_UPGRADE_COMMAND], {
-			stdio: 'inherit',
-			reject: false,
-		})
+		expect(mocked_execa_sync).toHaveBeenCalledWith(
+			'sh',
+			['-c', GLOBAL_UPGRADE_COMMAND],
+			expect.objectContaining({ stdio: 'inherit', reject: false }),
+		)
 	})
 })
 

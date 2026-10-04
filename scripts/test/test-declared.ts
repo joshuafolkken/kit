@@ -1,8 +1,8 @@
 #!/usr/bin/env tsx
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { project_checks } from '#scripts/gate/project-checks'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { test_declared_changed } from './test-declared-changed'
 import { test_declared_logic, type Verdict } from './test-declared-logic'
 import { test_declared_match, type MatchResult } from './test-declared-match'
@@ -55,13 +55,9 @@ interface Options {
 // The parsed flags, or `undefined` when an unknown one was passed — the strict parse is what turns a
 // typo into a refusal rather than a silent re-print of the verdict.
 function parse(argv: ReadonlyArray<string>): Options | undefined {
-	try {
-		const { values } = parseArgs({ args: [...argv], options: PARSE_ARGS_OPTIONS, strict: true })
+	const values = cli_flags.values_of(argv, PARSE_ARGS_OPTIONS)
 
-		return { is_help: values.help, is_match: values.match }
-	} catch {
-		return undefined
-	}
+	return values === undefined ? undefined : { is_help: values.help, is_match: values.match }
 }
 
 // The next command a verdict leaves to run, or `undefined` when there is nothing to do next. Only

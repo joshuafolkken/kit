@@ -7,6 +7,8 @@ import { registry_migration, type MigrationDependencies } from './migrate'
 const GH = '@joshuafolkken:registry=https://npm.pkg.github.com\n'
 const NPMRC_PATH = '.npmrc'
 const LOCKFILE_PATH = 'pnpm-lock.yaml'
+const MANIFEST_PATH = 'package.json'
+const ALREADY_MIGRATED = 'Already using public npm'
 const PUBLIC_HOST = 'registry.npmjs.org'
 const RESTORED = 'original settings restored'
 const LOCKFILE = `lockfileVersion: '9.0'\npackages:\n  '@joshuafolkken/kit@1.2.3':\n    resolution:\n      integrity: sha512-example\n      tarball: https://npm.pkg.github.com/download/@joshuafolkken/kit/1.2.3/example\n`
@@ -15,6 +17,8 @@ const FIRST_VERSION = '1.2.3'
 const SECOND_VERSION = '2.0.0'
 const SLOW_PROBE_MS = 20
 const TWO_VERSION_LOCKFILE = `${LOCKFILE}  '${KIT_PACKAGE}@${SECOND_VERSION}':\n    resolution:\n      integrity: sha512-second\n`
+const APP_KIT_PACKAGE = '@joshuafolkken/app-kit'
+const APP_KIT_LOCKFILE = `${LOCKFILE}  '${APP_KIT_PACKAGE}@${FIRST_VERSION}':\n    resolution:\n      integrity: sha512-app\n      tarball: https://npm.pkg.github.com/download/${APP_KIT_PACKAGE}/${FIRST_VERSION}/app\n`
 const ROOTS: Array<string> = []
 
 function fixture(): string {
@@ -24,7 +28,7 @@ function fixture(): string {
 	writeFileSync(path.join(root, NPMRC_PATH), GH)
 	writeFileSync(path.join(root, LOCKFILE_PATH), LOCKFILE)
 	writeFileSync(
-		path.join(root, 'package.json'),
+		path.join(root, MANIFEST_PATH),
 		'{"devDependencies":{"@joshuafolkken/kit":"1.2.3"}}',
 	)
 
@@ -59,7 +63,7 @@ describe('registry migration success', () => {
 		const second = await registry_migration.migrate(root, adapters)
 
 		expect(first).toContain('Migrated')
-		expect(second).toContain('Already using public npm')
+		expect(second).toContain(ALREADY_MIGRATED)
 		expect(readFileSync(path.join(root, NPMRC_PATH), 'utf8')).toContain(PUBLIC_HOST)
 	})
 })
@@ -153,5 +157,54 @@ describe('registry migration rollback', () => {
 		expect(result).toContain(RESTORED)
 		expect(existsSync(workspace_path)).toBe(false)
 		expect(readFileSync(path.join(root, NPMRC_PATH), 'utf8')).toBe(GH)
+	})
+})
+
+function app_kit_fixture(): string {
+	const root = fixture()
+
+	writeFileSync(path.join(root, LOCKFILE_PATH), APP_KIT_LOCKFILE)
+	writeFileSync(
+		path.join(root, MANIFEST_PATH),
+		`{"devDependencies":{"${KIT_PACKAGE}":"${FIRST_VERSION}","${APP_KIT_PACKAGE}":"${FIRST_VERSION}"}}`,
+	)
+
+	return root
+}
+
+async function public_integrity(name: string): Promise<string> {
+	return `sha512-public-${name}`
+}
+
+// joshuafolkken/kit#3107: a scoped package other than kit migrates once its locked version is public.
+describe('registry migration with app-kit', () => {
+	it('migrates kit and app-kit when both are on public npm', async () => {
+		const root = app_kit_fixture()
+		const adapters = dependencies()
+
+		adapters.fetch_version = vi.fn().mockImplementation(public_integrity)
+		const first = await registry_migration.migrate(root, adapters)
+		const lockfile = readFileSync(path.join(root, LOCKFILE_PATH), 'utf8')
+
+		expect(first).toContain('Migrated')
+		expect(lockfile).toContain(`integrity: sha512-public-${APP_KIT_PACKAGE}`)
+		expect(lockfile).not.toContain('npm.pkg.github.com')
+		expect(await registry_migration.migrate(root, adapters)).toContain(ALREADY_MIGRATED)
+	})
+
+	it('changes nothing when app-kit is unpublished on npm', async () => {
+		const root = app_kit_fixture()
+		const adapters = dependencies()
+
+		adapters.fetch_version = vi.fn().mockImplementation(async (name: string) => {
+			return name === APP_KIT_PACKAGE ? undefined : await public_integrity(name)
+		})
+
+		expect(await registry_migration.migrate(root, adapters)).toContain(
+			`unpublished on npm: ${APP_KIT_PACKAGE}@${FIRST_VERSION}.`,
+		)
+		expect(readFileSync(path.join(root, NPMRC_PATH), 'utf8')).toBe(GH)
+		expect(readFileSync(path.join(root, LOCKFILE_PATH), 'utf8')).toBe(APP_KIT_LOCKFILE)
+		expect(adapters.install).not.toHaveBeenCalled()
 	})
 })

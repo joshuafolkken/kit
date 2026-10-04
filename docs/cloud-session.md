@@ -85,7 +85,7 @@ policy solves directly.
 A missing Telegram credential now **fails loudly**: `pnpm josh notify` exits non-zero rather than
 warning and returning success, and a send from inside `pnpm josh followup` prints an `❗` block
 saying nobody was notified while the merge carries on. See
-[Notification behavior](./scripts-ai.md#notification-behavior).
+[Notification behavior](./environment-variables.md#notification-behavior).
 
 ## `gh` — REST only, and it has to be installed
 
@@ -161,4 +161,4 @@ Lanes work in a cloud container: `pnpm josh lane:open` creates the linked work t
 
 - [`josh audit` / `josh audit:provision`](./josh-commands.md#josh-audit)
 - [`josh run:liveness`](./josh-commands-automation.md#josh-runliveness)
-- [AI workflow automation — notification behavior](./scripts-ai.md#notification-behavior)
+- [Environment variables — notification behavior](./environment-variables.md#notification-behavior)

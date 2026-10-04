@@ -27,7 +27,7 @@
 
 PR マージ・ブランチ削除・force push・共有ブランチへの push・外部通知の追加送信・リポジトリ設定の変更など、**共有状態に影響する操作はその場でユーザーに明示指示されたものだけ実行する**。
 
-- `fullrun` の auto-merge は `fullrun` の指示自体に含まれるため許可される（本文は [`followup.md`](../../.claude/skills/workflow-commands/followup.md)）。それ以外の状況で勝手にマージしてはならない
+- `fullrun` と `backlogrun` の auto-merge は、それぞれの指示自体に含まれるため許可される（本文は [`followup.md`](../../.claude/skills/workflow-commands/followup.md)、`backlogrun` の子への継承は [`backlogrun-child.md`](../../.claude/skills/workflow-commands/backlogrun-child.md)）。`prrun` はマージを認可しない。それ以外の状況で勝手にマージしてはならない
 - `kickoff` / `pnpm josh followup` 単独実行は文書化されたスコープで終了する。PR が OPEN のまま完了したら状態を報告して停止する
 - 「チェックが全部 green だから次のステップに進む」は承認ではない
 - **`gh pr merge` の直接実行は kit 配布の `.claude/settings.json` の `permissions.deny` で機械的に遮断されている。** パターンの一覧はそのファイルが一次情報であり、ここでは書き写さない。 `fullrun` の auto-merge は `pnpm josh followup` が node スクリプト内部から gh を起動するため影響を受けない — Bash マッチャに見えるのは `pnpm josh …` だけである。**ただし deny は実装であって規則ではない** — パターンが取りこぼす綴りを禁じているのは本節の規則のほうである

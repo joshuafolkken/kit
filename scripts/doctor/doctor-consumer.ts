@@ -1,10 +1,9 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { json_value } from '#scripts/lib/json-value'
 import { file_reader } from '#scripts/lib/read-file'
-import { read_spawn_stdout } from '#scripts/lib/spawn-exit'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
-import { execaSync } from 'execa'
 import { z } from 'zod'
 
 // The consumer-setup checks `josh doctor` runs in a repository that installs kit (joshuafolkken/kit#1930).
@@ -77,11 +76,9 @@ function is_plugin_declared(root: string): boolean {
 // The value of `core.hooksPath`, or undefined when it is unset. A set value is what stops lefthook
 // from installing kit's git hooks — the failure is silent but for one stderr line.
 function configured_hooks_path(root: string): string | undefined {
-	const result = execaSync('git', ['-C', root, 'config', '--get', 'core.hooksPath'], {
-		reject: false,
+	const value = git_spawn_sync.read(['-C', root, 'config', '--get', 'core.hooksPath'], {
 		timeout: GIT_TIMEOUT_MS,
 	})
-	const value = read_spawn_stdout(result).trim()
 
 	return value === '' ? undefined : value
 }
@@ -159,6 +156,7 @@ function report_consumer_setup(root: string): void {
 const doctor_consumer = {
 	claude_md_line,
 	claude_md_state,
+	configured_hooks_path,
 	hooks_path_line,
 	is_kit_consumer,
 	is_plugin_declared,

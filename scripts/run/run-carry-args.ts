@@ -76,17 +76,13 @@ type Request =
 const READ_REQUEST: Request = { kind: 'read' }
 
 function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
-	return cli_flags.parse_or_undefined({ args: [...argv], options: OPTIONS, strict: true })?.values
-}
-
-function text_of(value: OptionValue): string | undefined {
-	return typeof value === 'string' ? value : undefined
+	return cli_flags.values_of(argv, OPTIONS)
 }
 
 // Absent is zero; present but not a count is `undefined`, which invalidates the whole invocation
 // rather than quietly counting nothing.
 function to_count(value: OptionValue): number | undefined {
-	const text = text_of(value)
+	const text = cli_flags.string_of(value)
 
 	if (text === undefined) return NO_INCREMENT
 
@@ -99,7 +95,7 @@ function to_count(value: OptionValue): number | undefined {
 // than a zero: there is no issue to record, which is a different fact from recording issue zero. A
 // present-but-malformed value invalidates the whole invocation, exactly as a bad `--merged` does.
 function to_done(value: OptionValue): Pick<CarryChange, 'done'> | undefined {
-	const text = text_of(value)
+	const text = cli_flags.string_of(value)
 
 	if (text === undefined) return {}
 
@@ -165,7 +161,7 @@ function group_count(values: ParsedValues): number {
 // the record simply declares no owner and every standing record reads as not provably live, which
 // refuses rather than resumes.
 function to_owner(value: OptionValue): CarryOwner | undefined {
-	const text = text_of(value)
+	const text = cli_flags.string_of(value)
 
 	if (text === undefined) return run_carry.NO_OWNER
 
@@ -179,7 +175,7 @@ function to_owner(value: OptionValue): CarryOwner | undefined {
 // A non-empty `--summary`, or nothing. An empty string is nothing here, so it reads as absent and the
 // pairing check below refuses it against `--retrospective`.
 function summary_text(values: ParsedValues): string | undefined {
-	const summary = text_of(values.summary)
+	const summary = cli_flags.string_of(values.summary)
 
 	return summary === undefined || summary === '' ? undefined : summary
 }
@@ -220,17 +216,17 @@ function to_claim_request(
 }
 
 function to_other_request(values: ParsedValues, owner: CarryOwner): Request | undefined {
-	if (values.end === true) return { kind: 'end', stopped: text_of(values.stopped) }
+	if (values.end === true) return { kind: 'end', stopped: cli_flags.string_of(values.stopped) }
 
 	return has_count(values) ? to_count_request(values, owner) : READ_REQUEST
 }
 
 function to_named_request(values: ParsedValues, owner: CarryOwner): Request | undefined {
-	const begun = text_of(values.begin)
+	const begun = cli_flags.string_of(values.begin)
 
 	if (begun !== undefined) return to_claim_request(begun, owner, false)
 
-	const adopted = text_of(values.resume)
+	const adopted = cli_flags.string_of(values.resume)
 
 	if (adopted !== undefined) return to_claim_request(adopted, owner, true)
 

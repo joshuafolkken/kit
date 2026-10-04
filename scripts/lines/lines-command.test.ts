@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { git_command } from '#scripts/git/git-command'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { line_budget, type FileBudget } from './line-budget'
 import { line_targets } from './line-targets'
@@ -154,7 +155,7 @@ describe('lines_command.run_lines', () => {
 	// No argument scans the repository and reports only what is near the limit, least headroom first:
 	// the far file is left out and the over-limit file leads.
 	it('scans and lists near-limit files least headroom first when no path is given', async () => {
-		vi.spyOn(line_targets, 'repo_root').mockResolvedValue(PROJECT_ROOT)
+		vi.spyOn(git_command, 'repository_root').mockResolvedValue(PROJECT_ROOT)
 		vi.spyOn(line_targets, 'lint_target_files').mockResolvedValue([])
 		vi.spyOn(line_budget, 'budgets_for').mockResolvedValue([FAR, NEAR, OVER])
 		const written = captured_output()
@@ -170,7 +171,7 @@ describe('lines_command.run_lines', () => {
 	// The defined answer when nothing is near the limit is a "none" line and a clean exit, never a
 	// usage failure.
 	it('reports none and succeeds when the scan finds nothing near the limit', async () => {
-		vi.spyOn(line_targets, 'repo_root').mockResolvedValue(PROJECT_ROOT)
+		vi.spyOn(git_command, 'repository_root').mockResolvedValue(PROJECT_ROOT)
 		vi.spyOn(line_targets, 'lint_target_files').mockResolvedValue([])
 		vi.spyOn(line_budget, 'budgets_for').mockResolvedValue([FAR])
 		const written = captured_output()

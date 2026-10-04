@@ -321,8 +321,10 @@ describe('entry_read_set — pre-gate-cut.md is point-of-use (joshuafolkken/kit#
 	})
 
 	// The saving is not a disappearance: the run reads it later, so the cost report accounts for it
-	// under the point-of-use, and the total read counts the ~7k tokens the old figure was short.
-	it.each([...IMPLEMENTING])('reports pre-gate-cut.md under the %s point-of-use', (entry) => {
+	// under the point-of-use, and the total read counts the ~7k tokens the old figure was short. Only the
+	// entries whose manifest names it reach it (joshuafolkken/kit#3078): `halfrun` stops before the cut
+	// and the `backlogrun` parent never gates.
+	it.each(['fullrun', 'prrun'])('reports pre-gate-cut.md under the %s point-of-use', (entry) => {
 		const files = entry_read_set.costed(ROOT, entry).point_of_use.map((one) => one.file)
 
 		expect(files).toContain(PRE_GATE_CUT)

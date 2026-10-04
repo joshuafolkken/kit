@@ -12,6 +12,12 @@ import { run_progress_config } from './run-progress-config'
 // only a heartbeat the caller restarts on the next interval, so the two guard different things and
 // only one has anything to lose by being short.
 const DEFAULT_MAX_HOURS = 1
+// **`--wait` is bounded by a run, not by three intervals** (joshuafolkken/kit#3102). It no longer exits
+// at its first report — the reports go to the event stream — so its one-hour bound would be the last
+// wake that asks the parent for no judgement, a restart an hour. Eight hours is `run:hold`'s expiry;
+// what ends a finished run's watcher sooner is `josh followup` removing its life record, and a stop
+// tearing it down in the same turn.
+const DEFAULT_WAIT_MAX_HOURS = 8
 const MS_PER_HOUR = 3_600_000
 
 const OPTIONS = {
@@ -37,7 +43,7 @@ interface ParsedValues {
 }
 
 function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
-	return cli_flags.parse_or_undefined({ args: [...argv], options: OPTIONS })?.values
+	return cli_flags.values_of(argv, OPTIONS)
 }
 
 // A hand-typed `--interval` outranks the environment, the environment outranks the interval the
@@ -48,14 +54,24 @@ function to_interval_ms(raw: string | undefined): number {
 	return run_progress_config.resolve_interval_ms(raw)
 }
 
-function to_max_ms(raw: string | undefined): number {
+function default_hours(is_wait: boolean): number {
+	return is_wait ? DEFAULT_WAIT_MAX_HOURS : DEFAULT_MAX_HOURS
+}
+
+function to_max_ms(raw: string | undefined, is_wait = false): number {
 	const hours = Number(raw)
 	const is_usable = raw !== undefined && Number.isFinite(hours) && hours > 0
 
-	return (is_usable ? hours : DEFAULT_MAX_HOURS) * MS_PER_HOUR
+	return (is_usable ? hours : default_hours(is_wait)) * MS_PER_HOUR
 }
 
-const run_progress_args = { DEFAULT_MAX_HOURS, read_arguments, to_interval_ms, to_max_ms }
+const run_progress_args = {
+	DEFAULT_MAX_HOURS,
+	DEFAULT_WAIT_MAX_HOURS,
+	read_arguments,
+	to_interval_ms,
+	to_max_ms,
+}
 
 export type { ParsedValues }
 export { run_progress_args }

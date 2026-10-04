@@ -52,13 +52,16 @@ function has_line(body: string, text: string): boolean {
 	return has_unfenced_line(body, text)
 }
 
-// The lines between `heading` and the next `## ` heading, trimmed of the heading line itself; an empty
-// array when the heading is absent. A heading matched inside a sentence is not the section heading, so
-// only a line that is exactly the heading opens the section.
-function section_lines(body: string, heading: string): ReadonlyArray<string> {
+// The lines between the first unfenced line `is_target` accepts and the next unfenced `## ` heading,
+// trimmed of the heading line itself; an empty array when no line is accepted. A `## ` line inside a
+// code fence is example text, so it neither opens nor closes a section (joshuafolkken/kit#3066).
+function section_lines_matching(
+	body: string,
+	is_target: (line: string) => boolean,
+): ReadonlyArray<string> {
 	const lines = body.split('\n')
 	const visible = unfenced_lines(body)
-	const start = visible.findIndex((line) => is_the_heading(line, heading))
+	const start = visible.findIndex((line) => is_target(line))
 
 	if (start === -1) return []
 
@@ -68,6 +71,18 @@ function section_lines(body: string, heading: string): ReadonlyArray<string> {
 	return end === -1 ? rest : rest.slice(0, end)
 }
 
-const markdown_section = { section_lines, has_line, has_unfenced_line }
+// A heading matched inside a sentence is not the section heading, so only a line that is exactly the
+// heading opens the section.
+function section_lines(body: string, heading: string): ReadonlyArray<string> {
+	return section_lines_matching(body, (line) => is_the_heading(line, heading))
+}
+
+const markdown_section = {
+	section_lines,
+	section_lines_matching,
+	unfenced_lines,
+	has_line,
+	has_unfenced_line,
+}
 
 export { markdown_section }

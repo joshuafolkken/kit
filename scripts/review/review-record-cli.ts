@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_finding_ledger, type Finding } from './review-finding-ledger'
 import { review_record, type RecordVerdict } from './review-record'
@@ -71,21 +71,14 @@ function parse_findings(specs: ReadonlyArray<string>): ReadonlyArray<Finding> | 
 }
 
 function parse_argv(argv: ReadonlyArray<string>): Parsed | undefined {
-	try {
-		const parsed = parseArgs({
-			args: [...argv],
-			options: OPTIONS,
-			strict: true,
-			allowPositionals: true,
-		})
+	const parsed = cli_flags.arguments_of(argv, OPTIONS)
 
-		return {
-			check: parsed.values.check === true,
-			issue: parsed.values.issue,
-			positionals: parsed.positionals,
-		}
-	} catch {
-		return undefined
+	if (parsed === undefined) return undefined
+
+	return {
+		check: parsed.values.check === true,
+		issue: parsed.values.issue,
+		positionals: parsed.positionals,
 	}
 }
 

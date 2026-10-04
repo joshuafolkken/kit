@@ -18,9 +18,11 @@ describe('unit projects — isolate has to take effect', () => {
 // left without a file extension — the deprecation surfaced by the joshuafolkken/kit#2200 vite bump.
 // A config that emits a warning makes the gate withhold its green reuse stamp, so a dropped extension
 // here also blinds `josh run:review --join`. These pin the explicit `.ts` on the local helper imports.
+// The loader follows the config's import graph, so `unit-projects.ts` is held to the same rule; it
+// reaches its siblings through `#scripts/*`, which Node resolves and TypeScript accepts.
 describe('vitest configs — native config loader resolves local imports', () => {
-	it.each(ROOT_CONFIGS)(
-		'gives %s local helper imports an explicit .ts extension',
+	it.each([...ROOT_CONFIGS, UNIT_PROJECTS_PATH])(
+		'leaves no extensionless relative import in %s',
 		(config_path) => {
 			const source = readFileSync(config_path, 'utf8')
 			const extensionless_local_import = /from '\.\/[^']*(?<!\.ts)'/u

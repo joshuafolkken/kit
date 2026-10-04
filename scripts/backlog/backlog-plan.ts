@@ -3,6 +3,7 @@ import type { IssueReference } from '#scripts/epic/epic-reference'
 import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
 import { epic_solo } from '#scripts/epic/epic-solo'
 import { epic_triage } from '#scripts/epic/epic-triage'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_label_name, IN_PROGRESS_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import type { OutOfScopeRow } from './backlog-scope'
 
@@ -57,23 +58,29 @@ interface PlanContext {
 
 // A child elsewhere is qualified, because a bare number would name *this* repository's issue of that
 // number — a different issue (joshuafolkken/kit#1016). Takes the reference rather than the child, so
-// a `blocked_by` edge is named by the same rule the child itself is.
-function reference_of(reference: IssueReference, repo: string): string {
+// a `blocked_by` edge is named by the same rule the child itself is. This repository's issue is cited
+// (joshuafolkken/kit#3099): the plan is copied into a report verbatim, so the line it prints is the
+// citation the report carries.
+function cite_of(reference: IssueReference, repo: string, title: string | undefined): string {
 	const number = String(reference.number)
 
-	return reference.repo === repo ? `#${number}` : `${reference.repo}#${number}`
+	return reference.repo === repo
+		? issue_cite.reference(repo, number, title)
+		: `${reference.repo}#${number}`
+}
+
+function reference_of(reference: IssueReference, repo: string): string {
+	return cite_of(reference, repo, undefined)
 }
 
 // A title is only known for this repository's issues — the open listing the titles come from is this
 // repository's. A child elsewhere is still named, just without one.
-function title_of(child: EpicChild, context: PlanContext): string {
-	return child.repo === context.repo ? (context.titles.get(child.number) ?? '') : ''
+function title_of(child: EpicChild, context: PlanContext): string | undefined {
+	return child.repo === context.repo ? context.titles.get(child.number) : undefined
 }
 
-function join_row(reference: string, title: string, note: string): string {
-	const parts = [reference, title, note === '' ? '' : `— ${note}`].filter((part) => part !== '')
-
-	return `${ROW_INDENT}${parts.join('  ')}`
+function join_row(reference: string, note: string): string {
+	return note === '' ? `${ROW_INDENT}${reference}` : `${ROW_INDENT}${reference}  — ${note}`
 }
 
 // A `run:solo` child is marked beside its number, so a person reading the plan sees which issues
@@ -89,15 +96,15 @@ function mark_of(child: EpicChild): string | undefined {
 	return epic_triage.is_triaged(child) ? undefined : UNTRIAGED_MARK
 }
 
-function marked_reference(child: EpicChild, repo: string): string {
-	const reference = reference_of(child, repo)
+function marked_reference(child: EpicChild, repo: string, title?: string): string {
+	const reference = cite_of(child, repo, title)
 	const mark = mark_of(child)
 
 	return mark === undefined ? reference : `${reference} ${mark}`
 }
 
 function row_of(child: EpicChild, context: PlanContext, note: string): string {
-	return join_row(marked_reference(child, context.repo), title_of(child, context), note)
+	return join_row(marked_reference(child, context.repo, title_of(child, context)), note)
 }
 
 // Why this one is not offered yet. The blocker numbers are the answer whenever there are any — that
@@ -164,8 +171,10 @@ function waiting_lines(children: ReadonlyArray<EpicChild>, context: PlanContext)
 	})
 }
 
-function scope_lines(rows: ReadonlyArray<OutOfScopeRow>): Array<string> {
-	return rows.map((row) => join_row(`#${String(row.number)}`, row.title, row.reason))
+function scope_lines(rows: ReadonlyArray<OutOfScopeRow>, repo: string): Array<string> {
+	return rows.map((row) =>
+		join_row(issue_cite.reference(repo, String(row.number), row.title), row.reason),
+	)
 }
 
 // The classification could not be made, so every section below it would be rendered from buckets
@@ -186,10 +195,12 @@ interface NamedPlan {
 	only: boolean
 }
 
-// The named issues are this repository's own, so a bare `#N` names them and a title is looked up the
-// same way the pool's rows are. The order is the invocation's, never sorted.
+// The named issues are this repository's own, so they are cited against it and a title is looked up
+// the same way the pool's rows are. The order is the invocation's, never sorted.
 function named_lines(named: ReadonlyArray<number>, context: PlanContext): Array<string> {
-	return named.map((issue) => join_row(`#${String(issue)}`, context.titles.get(issue) ?? '', ''))
+	return named.map((issue) =>
+		join_row(issue_cite.reference(context.repo, String(issue), context.titles.get(issue)), ''),
+	)
 }
 
 // The section leads the plan when the invocation named issues, and is absent otherwise — a bare
@@ -230,7 +241,7 @@ function format_plan(
 		'',
 		section(HUMAN_HEADING, child_lines(result.blocked_on_people, context, no_note)),
 		'',
-		section(SCOPE_HEADING, scope_lines(out_of_scope)),
+		section(SCOPE_HEADING, scope_lines(out_of_scope, context.repo)),
 	].join('\n')
 }
 

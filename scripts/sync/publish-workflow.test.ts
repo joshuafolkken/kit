@@ -7,7 +7,7 @@ import { z } from 'zod'
 const WORKFLOW_PATH = '.github/workflows/publish.yml'
 const PACKAGE_GUIDE = 'docs/setup/full.md'
 const CLI_GUIDE = 'docs/cli.md'
-const DOCTOR_FIX = 'josh doctor --fix'
+const AUTHENTICATION_GUIDE = 'docs/authentication.md'
 const PACKAGE_API_REFERENCE = 'docs/package-api.md'
 const TROUBLESHOOTING_GUIDE = 'docs/troubleshooting.md'
 const TEMPLATE_CI_YML = 'templates/workflows/ci.yml'
@@ -19,6 +19,8 @@ const PRODUCTION_WORKFLOW = './.github/workflows/production.yml'
 const PACKAGE_PUBLISH_GROUP = 'package-publish'
 const CHECKOUT_ACTION = 'actions/checkout@'
 const SETUP_PNPM_ACTION = './.github/actions/setup-pnpm'
+const SETUP_NODE_ACTION = './.github/actions/setup-node'
+const PUBLISH_TAG_ARGUMENT = '--tag "$PUBLISH_TAG"'
 const MANIFEST_SCHEMA = z.object({
 	repository: z.object({ url: z.string() }),
 	publishConfig: z.unknown().optional(),
@@ -197,11 +199,12 @@ describe('release workflow concurrency', () => {
 		(job_name) => {
 			const job = read_workflow().jobs[job_name]
 			const commands = job.steps.map((step) => step.run ?? '').join('\n')
+			const publish = job.steps.find((step) => step.run?.includes(PUBLISH_TAG_ARGUMENT))
 
 			expect(job.concurrency.group).toBe(PACKAGE_PUBLISH_GROUP)
 			expect(commands).toContain('dist-tags.latest')
 			expect(commands).toContain('publish-tag-cli.ts')
-			expect(commands).toContain('--tag ${{ steps.publish-tag.outputs.tag }}')
+			expect(publish?.env?.['PUBLISH_TAG']).toBe('${{ steps.publish-tag.outputs.tag }}')
 			expect(commands).not.toContain('--tag latest')
 		},
 	)
@@ -266,7 +269,7 @@ describe('installation guidance', () => {
 	)
 
 	it('keeps the existing GitHub Packages guidance scoped to existing projects', () => {
-		const content = readFileSync('docs/authentication.md', 'utf8')
+		const content = readFileSync(AUTHENTICATION_GUIDE, 'utf8')
 
 		expect(content).toContain('Existing GitHub Packages authentication')
 		expect(content).toContain('New installations')
@@ -278,16 +281,23 @@ describe('installation guidance', () => {
 		expect(content).toMatch(/public npm, without credentials[^\n]*GitHub Packages versions/u)
 	})
 
-	it('keeps the migration steps in troubleshooting, linked from the CLI guide', () => {
+	it('keeps the CI credential placeholder guidance in troubleshooting', () => {
 		const content = readFileSync(TROUBLESHOOTING_GUIDE, 'utf8')
 
-		const cli_guide = readFileSync(CLI_GUIDE, 'utf8')
-
-		expect(cli_guide).toContain(DOCTOR_FIX)
-		expect(cli_guide).toContain('./troubleshooting.md#stale-')
-		expect(content).toContain(DOCTOR_FIX)
 		expect(content).toContain('kit CI template writes a GitHub Packages credential placeholder')
 	})
+})
+
+describe('obsolete migration notes', () => {
+	it.each([CLI_GUIDE, TROUBLESHOOTING_GUIDE, AUTHENTICATION_GUIDE, 'docs/sync.md'])(
+		'carries no migration note for an obsolete kit version in %s',
+		(filename: string) => {
+			const content = readFileSync(filename, 'utf8')
+
+			expect(content).not.toMatch(/`(?:< |>= )?(?:0\.200|1\.17|1\.60)\.0`/u)
+			expect(content).not.toContain('./troubleshooting.md#stale-')
+		},
+	)
 })
 
 describe('publishing guidance', () => {
@@ -317,11 +327,12 @@ describe('new project CI registry', () => {
 		const steps = template_steps(job_name)
 		const setup = steps.find((step) => step.name === 'Setup Node.js')
 		const auth_index = command_index(steps, GITHUB_AUTH_LINE)
-		const install_index = command_index(steps, 'pnpm install')
+		const install_index = steps.findIndex((step) => step.uses === SETUP_PNPM_ACTION)
 
-		expect(setup?.with).not.toHaveProperty('registry-url')
+		expect(setup).toMatchObject({ uses: SETUP_NODE_ACTION })
+		expect(setup).not.toHaveProperty(['with', 'registry-url'])
 		expect(auth_index).toBeGreaterThanOrEqual(0)
 		expect(install_index).toBeGreaterThan(auth_index)
-		expect(steps[install_index]?.env?.['NODE_AUTH_TOKEN']).toContain('GITHUB_TOKEN')
+		expect(steps[install_index]?.with?.['node-auth-token']).toContain('GITHUB_TOKEN')
 	})
 })

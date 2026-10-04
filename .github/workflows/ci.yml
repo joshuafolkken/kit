@@ -224,9 +224,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: ./.github/actions/setup-node
         with:
-          node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
 
       - name: Setup ESLint cache
@@ -327,8 +326,9 @@ jobs:
 
   # The other half of the gate, on a runner of its own. A GitHub job is its own machine, so this job
   # sets Node up again; the pnpm preamble is the shared `.github/actions/setup-pnpm` action
-  # (joshuafolkken/kit#2982), whose own action pins `scripts/ci/ci-yml-action-parity.test.ts` counts
-  # as this file's when it compares them with `templates/workflows/ci.yml`.
+  # (joshuafolkken/kit#2982), which `templates/workflows/ci.yml` calls the same way, so
+  # `scripts/ci/ci-yml-action-parity.test.ts` compares the two files without the action's own pins
+  # (joshuafolkken/kit#3095).
   #
   # No ESLint cache here — nothing in this job lints — and no `--maxWorkers`: `gate-plan.ts` leaves
   # any machine below its measured 11 cores uncapped, so vitest sizes its own pool from the runner
@@ -347,9 +347,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: ./.github/actions/setup-node
         with:
-          node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
 
       - name: Setup pnpm and install dependencies
@@ -525,9 +524,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: ./.github/actions/setup-node
         with:
-          node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
 
       - name: Setup build cache
@@ -595,6 +593,7 @@ jobs:
       needs.e2e-detect.result == 'success' &&
       (needs.e2e.result == 'success' || needs.e2e.result == 'skipped')
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: write
     steps:

@@ -1,6 +1,7 @@
-import { parseArgs } from 'node:util'
+import type { parseArgs } from 'node:util'
 import { epic_issue } from '#scripts/epic/epic-issue'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { issue_backlinks } from './issue-backlinks'
 import { issue_classification } from './issue-classification'
 import { DEPTH_LABEL_ORDER, FILING_ROUTE_LABELS, has_label_name } from './issue-labels'
@@ -103,19 +104,11 @@ function arguments_of(values: ParsedValues, title: string | undefined): FileArgu
 	return { title, body_file, ...labelled, labels: values.label ?? [], repo: values.repo }
 }
 
-// An unknown flag makes `parseArgs` throw; caught so the answer is the usage line, not a stack trace.
+// An unknown flag is `undefined` rather than a throw, so the answer is the usage line, not a stack trace.
 function parse(argv: ReadonlyArray<string>): FileArguments | undefined {
-	try {
-		const { values, positionals } = parseArgs({
-			args: [...argv],
-			options: OPTIONS,
-			allowPositionals: true,
-		})
+	const parsed = cli_flags.arguments_of(argv, OPTIONS)
 
-		return arguments_of(values, positionals[0])
-	} catch {
-		return undefined
-	}
+	return parsed === undefined ? undefined : arguments_of(parsed.values, parsed.positionals[0])
 }
 
 // A classification label is the body's to declare, so an extra `--label` naming one the body does not

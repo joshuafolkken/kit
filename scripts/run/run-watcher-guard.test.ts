@@ -117,4 +117,11 @@ describe('check — lanes in-flight, watcher stale', () => {
 
 		expect(result.note).toBe(run_watcher_guard.STALE_NOTE)
 	})
+
+	// joshuafolkken/kit#3102: the restart it asks for is a single background start, not a relay loop.
+	it('tells the parent the watcher reports on its own and exits only on an arrival', () => {
+		expect(run_watcher_guard.STALE_NOTE).toContain('reports to the run event stream on its own')
+		expect(run_watcher_guard.STALE_NOTE).toContain('exits only when newly runnable work arrives')
+		expect(run_watcher_guard.STALE_NOTE).toContain('relay nothing')
+	})
 })

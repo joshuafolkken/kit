@@ -54,6 +54,7 @@ describe('version_commands.run_upgrade_command', () => {
 		expect(mocked_execa_sync).toHaveBeenCalledWith('sh', ['-c', upgrade_command], {
 			stdio: 'inherit',
 			reject: false,
+			timeout: expect.any(Number) as number,
 		})
 	})
 

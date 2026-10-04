@@ -25,41 +25,6 @@ which josh   # should now print a path
 
 `pnpm setup` registers `PNPM_HOME` and appends it to `PATH` via your shell rc. If `which josh` is still empty, open a new terminal so the updated `PATH` takes effect. You can print the directory to add manually with `pnpm bin -g`.
 
-## Stale `~/.local/bin/josh` shim from an old version
-
-Versions prior to `0.200.0` wrote a project-pinned shim to `~/.local/bin/josh`. After that project's `node_modules` is removed, running `josh` fails with something like `…/node_modules/.bin/tsx: No such file or directory`, or the shim shadows the global bin. The quickest diagnosis and fix is the built-in command:
-
-```bash
-josh doctor          # shows the running binary, the PATH josh, and the pnpm-global josh
-josh doctor --fix    # removes the stale kit shim so the global josh takes over
-```
-
-`josh version` (alias `josh v`) also warns automatically whenever the `josh` on `PATH` is not the pnpm-global install. You can still remove the shim by hand if you prefer:
-
-```bash
-rm -f ~/.local/bin/josh
-which josh   # should now resolve to the pnpm global bin
-```
-
-If the shim reappears after every `pnpm install`, a project pinned `< 0.200.0` is regenerating it — upgrade that project (`pnpm add -D @joshuafolkken/kit@latest`). See [josh-commands.md → `josh doctor`](./josh-commands.md#josh-doctor).
-
-## `josh <command>` fails with `MODULE_NOT_FOUND` pointing at a pnpm store path
-
-```text
-Error: Cannot find module '/…/node_modules/.pnpm/tsx@<old>/node_modules/tsx/dist/cli.mjs'
-  code: 'MODULE_NOT_FOUND'
-```
-
-pnpm's generated `node_modules/@joshuafolkken/kit/node_modules/.bin/tsx` shim hardcodes the absolute store path of the tsx version present when it was written. After a tsx bump the old store entry is pruned, but the nested shim is not regenerated — so it points at a path that no longer exists. `pnpm install` (even `--force`) is a no-op here, because the lockfile is already satisfied.
-
-Kit `>= 1.17.0` no longer uses that shim: it resolves the tsx CLI entry from tsx's own manifest at runtime, so a stale shim cannot break the command. On older versions, delete the dead shim or reinstall from scratch:
-
-```bash
-rm node_modules/@joshuafolkken/kit/node_modules/.bin/tsx   # resolution falls back to the hoisted tsx
-# or
-rm -rf node_modules && pnpm install
-```
-
 ## Wrong Node or pnpm version
 
 kit needs **pnpm 12 or later** and **Node ≥ 22.19** (see `engines`). A `full` project that ran `josh init` pins pnpm exactly in `packageManager` and `devEngines.packageManager.version`; use that version there. Check:
@@ -147,7 +112,6 @@ The builder is not a GitHub Actions runner: it has no `~/.npmrc` and no kit CI a
 
 - Give the builder a credential from a source pnpm reads: see [§4 of authentication.md](./authentication.md#4-build-platforms-with-no-user-level-npmrc).
 - Restoring `//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}` to the project `.npmrc` fixes nothing **on its own** — pnpm ignores that line by default (next section). It becomes the credential only together with `npmrcAuthFile`, which is option (d) of that section.
-- Did this start right after a kit upgrade, on a project that was using `npmrcAuthFile`? Kit before `1.60.0` stripped the line on every `josh sync`. Upgrade to `1.60.0` or later, restore the line, and it stays.
 
 ## `[WARN] Ignored project-level auth setting "//npm.pkg.github.com/:_authToken"`
 

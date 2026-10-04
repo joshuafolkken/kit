@@ -1,5 +1,6 @@
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { error_text } from '#scripts/lib/error-message'
 import { z } from 'zod'
 
 // The report clock `josh run:progress` keeps, in the one form both of its readers can use
@@ -232,7 +233,9 @@ function is_life_fresh(target: string, threshold_ms: number): boolean {
 		const pinged_ms = parse_pinged_at(raw)
 
 		return pinged_ms !== undefined && Date.now() - pinged_ms < threshold_ms
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('run_progress_clock.is_life_fresh', error)
+
 		return false
 	}
 }

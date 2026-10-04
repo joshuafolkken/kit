@@ -255,3 +255,15 @@ describe('rule_delivery — the row, through the hook that carries it', () => {
 		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#3102: the refusal hands over a watcher that is started once and relayed never — the
+// old relay-and-restart instruction is what spent an orchestrator turn per heartbeat.
+describe('EARLY_HEARTBEAT_REASON — the watcher it hands over', () => {
+	it('says the watcher reports to the event stream itself and asks for no relay', () => {
+		const reason = delivered_rules.EARLY_HEARTBEAT_REASON
+
+		expect(reason).toContain("to the run's event stream on its own")
+		expect(reason).toContain('relay nothing')
+		expect(reason).not.toContain('start the next one')
+	})
+})

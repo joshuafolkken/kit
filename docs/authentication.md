@@ -4,7 +4,9 @@ New installations of `@joshuafolkken/kit` use the public npm registry and need n
 
 On a fresh checkout, run `pnpm config get "@joshuafolkken:registry"` from the project root before `pnpm install`. This shows the effective scoped registry, including a mapping in your user-level `~/.npmrc` when the project does not override it. If it points to `https://npm.pkg.github.com`, complete §§1–2 below first, then install dependencies and reread the project's `CLAUDE.md`. If it does not point to GitHub Packages, the public npm installation needs no GitHub Packages authentication.
 
-To migrate an existing kit-only project, run `pnpm josh registry:migrate` from its root. The command shows the current and proposed registry, checks every locked scoped package version on public npm, then updates the project `.npmrc` and lockfile only if the result resolves from public npm. It restores both files if the install check fails. It never edits the user-level `~/.npmrc`; a project mapping overrides a user mapping. Keep GitHub Packages routing when `app-kit`, `game-kit`, `config`, or another scoped package remains unpublished on npm. If the command reports a missing lockfile, run `pnpm install` with the current registry first and retry.
+To migrate an existing project, run `pnpm josh registry:migrate` from its root. The command shows the current and proposed registry, checks every locked `@joshuafolkken` package version (kit, `app-kit` and the rest) on public npm, then updates the project `.npmrc` and lockfile only if the result resolves from public npm. It restores both files if the install check fails. It never edits the user-level `~/.npmrc`; a project mapping overrides a user mapping. If any locked scoped package or version is still unpublished on npm (for example `game-kit` or `config`), it names it and changes nothing; keep GitHub Packages routing until it is published. If the command reports a missing lockfile, run `pnpm install` with the current registry first and retry.
+
+The command leaves any `//npm.pkg.github.com/:_authToken=` line in place, in the project `.npmrc` as well as in `~/.npmrc`. After a migration the migrated packages no longer need it, so remove it yourself once nothing else you install comes from GitHub Packages.
 
 ## 1. Get a token from the `gh` CLI
 
@@ -103,7 +105,7 @@ PNPM_CONFIG_NPMRC_AUTH_FILE=.npmrc
 NODE_AUTH_TOKEN=<token>
 ```
 
-Unlike (b) and (c), this needs no build step of your own, so it also works on a platform that installs dependencies before running any command you control — Cloudflare Workers Builds among them. The committed file still holds no secret, only the placeholder; the token stays in the dashboard. `josh sync` leaves the line alone from kit `1.60.0` on. **Earlier versions removed it on every run**, which broke exactly this arrangement — and invisibly, because the pnpm store keeps serving already-resolved versions until the next `@joshuafolkken/*` bump. If you are on an older kit, upgrade before relying on (d).
+Unlike (b) and (c), this needs no build step of your own, so it also works on a platform that installs dependencies before running any command you control — Cloudflare Workers Builds among them. The committed file still holds no secret, only the placeholder; the token stays in the dashboard. `josh sync` leaves the line alone ([sync.md](./sync.md)).
 
 > **Which of (a)–(d) should I use?** (a) whenever the platform allows arbitrary variable names — it is the least setup. (d) when it does not, since a dashboard that rejects `npm_config_//…` still accepts `PNPM_CONFIG_NPMRC_AUTH_FILE`. (b) and (c) only where you control a step that runs before dependency installation.
 

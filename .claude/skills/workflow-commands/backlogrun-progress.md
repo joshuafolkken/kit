@@ -18,14 +18,16 @@ by that supervisor; an AI parent is started only for a driver branch that requir
 pnpm josh run:progress --wait --output <the transcript path of each delegated unit>   # in the background
 ```
 
-**`--wait` waits one silence interval out, prints one line and exits** — the long-running form (no
-`--wait`) is right only where output is streamed. The parent changes no value on the line. **Every
-interval is three moves and no fourth:**
+**Start it once; it reports by itself** (joshuafolkken/kit#3102). Each silence interval appends the
+five labelled lines to the run's event stream as a heartbeat and to the ambient log, prints nothing to
+standard output and keeps running — so a scheduled report never wakes the parent, and the parent
+relays none. **It exits only on one of three, and the command computes which:**
 
-1. Start `pnpm josh run:progress --wait --output <transcript paths>` **in the background**.
-2. When it exits, **present what it printed as-is** — the command prints the five labelled lines and the
-   next report time itself.
-3. **In that same turn, start the next one.** The interval is measured from the last report.
+| Exit                                                    | What the parent does                                                   |
+| ------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Newly runnable backlog work (the `ready #N` line)       | Read the ready line, act on it, and restart the watcher in that turn  |
+| `pnpm josh followup` removed the run's life record      | Nothing — the run has ended                                            |
+| `--hours` elapsed (8 by default for `--wait`)           | Restart the watcher in that turn                                       |
 
 **`pnpm josh run:watcher:guard` detects a missed restart** (joshuafolkken/kit#2113): it refuses when
 lane children are in-flight but the watcher's life record has gone stale. **It is wired into
@@ -33,18 +35,18 @@ lane children are in-flight but the watcher's life record has gone stale. **It i
 until the watcher is restarted — once per run, so the `pnpm josh run:progress --wait` that fixes it is
 not blocked.
 
-**`run:progress` prints the five labelled lines itself (joshuafolkken/kit#2026); present them as-is.** It emits the observation instant (`at`, local first and UTC beside it), the elapsed figures
+**`run:progress` writes the five labelled lines itself (joshuafolkken/kit#2026).** It emits the observation instant (`at`, local first and UTC beside it), the elapsed figures
 (`quiet` and `unchanged`), the children in flight, the run state (`lanes`, `load`, `record`), and the
-scheduled `next`, each behind its own label and on its own line — so relay the output verbatim and
-round, rephrase or re-label nothing. How each field reads when it has nothing to report (`record
+scheduled `next`, each behind its own label and on its own line — so where a session does present them
+(`--once`), it relays the output verbatim and rounds, rephrases or re-labels nothing. How each field reads when it has nothing to report (`record
 unread`, `no in-progress child yet`, `lanes none`, an absent `next`) is fixed by the command's own unit
 tests. **A value said that way is still an observation, never a state**: `record unread` means no
 `--output` path was given, not *not stalled*; `lanes none` is *no lane is open*, not *nothing is
 running*; and the `next` line is a schedule — the time *if the silence continues*, superseded when a
 real report resets the clock through `--mark`.
 
-**It exits only when it has a line to hand over**, or when `--hours` runs out having never gone quiet
-for a whole interval (that exit says so on standard error). **Nothing in flight keeps it waiting.**
+**A report is not an exit, and neither is a decline** — with no run recorded it keeps waiting, and the
+`--hours` exit says so on standard error.
 
 **`--mark` at every real report.** Whenever this loop reports something of its own — a child merged,
 parked, a stop — run `pnpm josh run:progress --mark` in the same turn to restart the silence clock. The clock is silence, never a timer
@@ -130,21 +132,13 @@ in the same turn as each: **the Step 0 work summary, the pull request opening, e
 verdict, and any `confirmation` / `failure` / `completion` notification or stop.** **A tool result only
 you read is not one** — a gate run, a `gh` read, an edit.
 
-**On a quiet tick the turn is the relayed line plus at most two lines of the run's own prose**, saying
-only what changed stage and what is being waited on. **A tick is quiet when none of the real reports
-happened since the last one**; a gate that went green, a review round, a file edited, a poll answering
-`wait` are the run working, not a report. **No table, no re-listing of children, no restating of the
-plan** — `epic:next`, the epic body and the progress comment hold all three. **A real report is not
-bounded by that**: `--mark` restarts the clock, so a merge, a park or a stop is where the run may be
-long.
-
 **`--output` is omitted in a single-issue run, and `record` reads `unread`.** Rationale for the
 watcher's scope and placement: `docs/maintainers/backlogrun-progress-rationale.md` → "Why the watcher
 runs where it does".
 
 **A run that merges needs no teardown; a run that stops has to end the reporting itself.** **A stop
 keeps the `in-progress` label on purpose** — so **no further `--wait` is started** after the stop
-notification, and any long-running watcher still in the background is stopped in the same turn. That
+notification, and the running `--wait` is stopped in the same turn, since no report ends it. That
 covers `halfrun`'s stop before commit, a `needs-human-review` stop, a split or prerequisite stop, and
 a `backlogrun` named issue's failure stop.
 
@@ -275,11 +269,12 @@ run in lanes".
    a session that cannot measure is read as `over`. **Never read the condition off `pnpm josh delegate
    epic-child`** ("The check is asked at every merge" below).
 3. **`wait`** — go back to step 1. **With something of this run's own in flight, that happens on the
-   wake the progress watcher's exit delivers** and the parent starts no sleep of its own; the 60 s
-   figure bounds how soon the ask may be repeated. **With nothing in flight the watcher declines and
-   never exits, so the parent keeps the interval** — the case for "another repository has work but this
-   one does not", and for a cross-repository publish wait. The table in "The wake exists only while
-   something is in flight" below decides which.
+   wake `lane:await` or the progress watcher's arrival exit delivers** and the parent starts no sleep
+   of its own; the 60 s figure bounds how soon the ask may be repeated. **A scheduled report is not one
+   of those wakes** (joshuafolkken/kit#3102). **With nothing in flight neither wake comes, so the parent
+   keeps the interval** — the case for "another repository has work but this one does not", and for a
+   cross-repository publish wait. "The wake exists only while something is in flight" below decides
+   which.
 4. **`stop`** — report the parked children and finish.
 5. **`complete`** — post the epic summary and finish.
 6. **Exit code 1** — `epic:next` refused a cyclic or contradictory graph, or could not read a child.
@@ -421,8 +416,8 @@ in the background, in the same turn as that first `lane:list`. The wired `run:wa
 
 **A carried-over child finishes in its own detached unit, and the resumed parent does not stand in front
 of its merge.** A lane handed over at the cut is still running its own `fullrun` — the foreground
-`pnpm josh followup` and the CI wait included — in a process of its own (background-commands.md →
-"`pnpm josh followup` — foreground": foreground is *within the unit*, the background from the parent).
+`pnpm josh followup` and the CI wait included — in a process of its own (`background-commands.md` →
+"Background the gate and push": foreground is *within the unit*, the background from the parent).
 **So the parent never runs a carried-over child's `followup` itself**: it polls the handed-over lane and
 opens new work beside it. **The reads and the dispatches go out together, in one turn** — `pnpm josh lane:list`,
 `pnpm josh run:liveness`, `epic:next --lanes`, and opening a lane for a child it offers take none of each
@@ -472,7 +467,7 @@ clock". A stale child's label is
 removed first, so the next poll can offer it. **A graph that has deadlocked on a cycle is not this loop's
 to untangle**: `epic:next` detects it and exits with an error.
 
-### The parent keeps no clock of its own — the watcher's exit is the wake
+### The parent keeps no clock of its own — a child's completion or an arrival is the wake
 
 **After hand-off, the supervisor's driver owns the mechanical clock.** `backlog:drive` polls lane
 completion and the backlog inside the detached process, without waking an AI parent; the parent-turn
@@ -483,12 +478,14 @@ source and `run:report` the final report.
 `docs/maintainers/backlogrun-progress-rationale.md` → "Why the parent waits on classification, not a
 clock".
 
-The watcher reports on its own interval, and a judgment session may take its exit as a prompt to act.
+The watcher reports on its own interval to the event stream and exits only on an arrival, so a judgment
+session takes that exit — or a `lane:await` completion — as its prompt to act, never a report.
 
 #### The wake exists only while something is in flight
 
-`run:progress --wait` prints only when it has a human-facing line. With no child in flight it may
-decline; the driver still polls for new work and enforces the idle and whole-run bounds. A GitHub
+`lane:await` wakes on a child's completion and `run:progress --wait` on an arrival; its reports wake
+nobody. With no child in flight it may decline; the driver still polls for new work and enforces the
+idle and whole-run bounds. A GitHub
 listing failure stays a retry or unreadable answer from the offer command, never an empty backlog.
 
 `epic:next` does not report when a label was applied, so read that from the issue's timeline:

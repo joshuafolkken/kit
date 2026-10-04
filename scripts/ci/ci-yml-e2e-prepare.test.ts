@@ -25,17 +25,19 @@ describe('ci.yml e2e prepare step (templates/workflows/ci.yml)', () => {
 		expect(prepare_index).toBeLessThan(playwright_index)
 	})
 
+	// The install is the setup-pnpm composite action the job calls (joshuafolkken/kit#3095).
 	it('runs prepare only after the dependency install that suppressed it', () => {
-		const install_index = step_index(e2e_job, INSTALL_RUN)
+		const install_index =
+			e2e_job?.steps?.findIndex((step) => step.uses === ci_yml_fixture.SETUP_PNPM_USES) ?? MISSING
 
 		expect(install_index).toBeGreaterThanOrEqual(0)
 		expect(install_index).toBeLessThan(step_index(e2e_job, PREPARE_RUN))
 	})
 
 	it('keeps the install step on --ignore-scripts', () => {
-		const install_step = e2e_job?.steps?.find((step) => step.run?.includes('pnpm install') === true)
+		const action_steps = ci_yml_fixture.load_action(ci_yml_fixture.SETUP_PNPM_ACTION).runs.steps
 
-		expect(install_step?.run).toContain('--ignore-scripts')
+		expect(action_steps.some((step) => step.run === INSTALL_RUN)).toBe(true)
 	})
 
 	it('mirrors the preparation the checks job already performs', () => {

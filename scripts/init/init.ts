@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_local_bin } from '#scripts/build/local-bin'
@@ -7,6 +7,7 @@ import { doctor_io } from '#scripts/doctor/doctor-io'
 import { error_text } from '#scripts/lib/error-message'
 import { package_version_schema, with_package_manager_schema } from '#scripts/lib/schemas'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
+import { pack_hook } from '#scripts/safe-chain/pack-hook'
 import { project_config } from '#scripts/safe-chain/project-config'
 import { security_updates } from '#scripts/security/security-updates'
 import { did_refuse_self_run } from '#scripts/self-sync-guard/self-sync-refusal'
@@ -14,10 +15,11 @@ import { sync } from '#scripts/sync/sync'
 import { package_manager_version } from '#scripts/version/package-manager-version'
 import { execaSync } from 'execa'
 import { z } from 'zod'
-import { init_actions, PRETTIER_CONFIG_JS, type FileAction } from './init-actions'
+import { init_actions, PRETTIER_CONFIG_JS } from './init-actions'
 import { init_ai_copy } from './init-ai-copy'
 import { init_basic } from './init-basic'
 import { init_bootstrap } from './init-bootstrap'
+import { init_file_action } from './init-file-action'
 import { init_install } from './init-install'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
@@ -27,68 +29,9 @@ import { project_profile, type ProjectProfile, type ProjectShape } from './proje
 const PACKAGE_JSON = 'package.json'
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
 const LEFTHOOK_BIN = 'lefthook'
-const SAMPLE_INDENT_WIDTH = 4
 const ARGUMENT_START_INDEX = 2
-const SAMPLE_INDENT = ' '.repeat(SAMPLE_INDENT_WIDTH)
 const INSTALL_HINT = '→ run `pnpm install` to install what package.json lists'
 const INIT_USAGE = 'josh init [--profile basic|full] [--no-install]'
-
-function write_new_file(action: FileAction, destination_path: string): void {
-	mkdirSync(path.dirname(destination_path), { recursive: true })
-	writeFileSync(destination_path, action.create())
-	console.info(`  ✔ created   ${action.dest}`)
-}
-
-function show_sample(action: FileAction): void {
-	console.info(`  ⚠ exists    ${action.dest} — add manually:`)
-	console.info('')
-	console.info(action.create().replaceAll(/^/gmu, () => SAMPLE_INDENT))
-}
-
-// A file that already holds the sample needs nothing added, so only one that differs gets it shown.
-function report_unchanged(action: FileAction, existing: string): void {
-	const is_sample_missing = existing !== action.create()
-
-	if (is_sample_missing && action.should_show_sample_when_unchanged === true) show_sample(action)
-	else console.info(`  ✔ unchanged ${action.dest}`)
-}
-
-function merge_existing_file(
-	merge_function: (existing: string) => string,
-	destination_path: string,
-	action: FileAction,
-): void {
-	const existing = readFileSync(destination_path, 'utf8')
-	const merged = merge_function(existing)
-
-	if (merged === existing) {
-		report_unchanged(action, existing)
-
-		return
-	}
-
-	writeFileSync(destination_path, merged)
-	console.info(`  ✔ updated   ${action.dest}`)
-}
-
-function execute_file_action(action: FileAction): void {
-	const destination_path = path.join(PROJECT_ROOT, action.dest)
-	const is_existing = existsSync(destination_path)
-
-	if (!is_existing) {
-		write_new_file(action, destination_path)
-
-		return
-	}
-
-	if (action.merge === undefined) {
-		show_sample(action)
-
-		return
-	}
-
-	merge_existing_file(action.merge, destination_path, action)
-}
 
 const engine_pin_schema = z.looseObject({ name: z.string(), version: z.string() })
 
@@ -124,10 +67,10 @@ function get_kit_self_dependency(): Record<string, string> {
 }
 
 // Each config `init` generates runs a CLI or imports types the consumer has to resolve itself:
-// `prettier.config.js` → prettier, `cspell.config.yaml` → cspell, `playwright.config.ts` →
-// @types/node (with @playwright/test among the peers), `lefthook.yml` → lefthook. Without them the
-// first `josh gate` after `pnpm install` fails (joshuafolkken/kit#2710).
-const TOOL_DEVELOPMENT_DEPENDENCIES = ['prettier', 'cspell', '@types/node']
+// `cspell.config.yaml` → cspell, `playwright.config.ts` → @types/node, `lefthook.yml` → lefthook.
+// Prettier, its preset plugins and @playwright/test come in as peers. Without them the first
+// `josh gate` after `pnpm install` fails (joshuafolkken/kit#2710).
+const TOOL_DEVELOPMENT_DEPENDENCIES = ['cspell', '@types/node']
 const LEFTHOOK_DEVELOPMENT_DEPENDENCY = 'lefthook'
 
 function tool_dependency_names(has_git: boolean): ReadonlyArray<string> {
@@ -164,9 +107,8 @@ function apply_dependency_merges(content: string, has_git = true): string {
 			? suggested
 			: Object.fromEntries(Object.entries(suggested).filter(([key]) => key !== 'prepare')),
 	)
-	const with_prettier = init_logic.merge_prettier_plugin_development_deps(merged)
 	const with_toolchain = init_logic.merge_development_dependencies(
-		with_prettier,
+		merged,
 		get_toolchain_development_dependencies(has_git),
 	)
 	const with_secretlint = init_logic.merge_secretlint_development_deps(with_toolchain)
@@ -262,7 +204,7 @@ function run_config_file_actions(shape: ProjectShape): void {
 	}
 
 	for (const action of init_actions.build_file_actions(shape)) {
-		execute_file_action(action)
+		init_file_action.execute_file_action(action, PROJECT_ROOT)
 	}
 }
 
@@ -305,6 +247,7 @@ function initialize_project(shape: ProjectShape): void {
 	merge_project_package_json(shape)
 
 	run_ai_file_actions(shape)
+	pack_hook.sync_pack_hook(PROJECT_ROOT, PACKAGE_DIR)
 	if (shape.profile === 'full') project_config.sync_project_config(PROJECT_ROOT)
 }
 

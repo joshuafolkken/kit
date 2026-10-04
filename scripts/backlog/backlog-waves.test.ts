@@ -217,9 +217,11 @@ describe('backlog_waves.format_waves', () => {
 		)
 
 		expect(text).toContain(backlog_waves.HEADING_ASSUMPTION)
-		expect(text).toContain(`Wave 1  #${String(SOLO_FIRST)} ${backlog_plan.SOLO_MARK}\n`)
 		expect(text).toContain(
-			`Wave 2  #${String(FIRST)} #${String(SECOND)}   ${backlog_waves.PARALLEL_NOTE}`,
+			`Wave 1  ${backlog_fixture.cite(SOLO_FIRST)} ${backlog_plan.SOLO_MARK}\n`,
+		)
+		expect(text).toContain(
+			`Wave 2  ${backlog_fixture.cite(FIRST)} ${backlog_fixture.cite(SECOND)}   ${backlog_waves.PARALLEL_NOTE}`,
 		)
 	})
 
@@ -229,8 +231,12 @@ describe('backlog_waves.format_waves', () => {
 		const text = backlog_waves.format_waves(input, CONTEXT)
 
 		expect(text).toContain(backlog_waves.UNREACHED_HEADING)
-		expect(text).toContain(`#${String(PARKED)}  — ${backlog_waves.NEEDS_DECISION_NOTE}`)
-		expect(text).toContain(`#${String(SECOND)}  — waiting on #${String(PARKED)}`)
+		expect(text).toContain(
+			`${backlog_fixture.cite(PARKED)}  — ${backlog_waves.NEEDS_DECISION_NOTE}`,
+		)
+		expect(text).toContain(
+			`${backlog_fixture.cite(SECOND)}  — waiting on ${backlog_fixture.cite(PARKED)}`,
+		)
 	})
 
 	it('prints the unusable-graph report instead of waves for an error verdict', () => {

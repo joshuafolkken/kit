@@ -102,6 +102,23 @@ describe('git_gh_pr_auto_merge.pr_is_merged', () => {
 
 		await expect(git_gh_pr_auto_merge.pr_is_merged(PR_BRANCH)).resolves.toBe(false)
 	})
+
+	// joshuafolkken/kit#3067: JOSH_DEBUG surfaces the swallowed reason without changing the verdict.
+	it('still answers false under JOSH_DEBUG and writes the swallowed reason to stderr', async () => {
+		vi.stubEnv('JOSH_DEBUG', '1')
+		const stderr_spy = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+
+		mocked_api.mockImplementation(gh_api_routes({}))
+
+		await expect(git_gh_pr_auto_merge.pr_is_merged(PR_BRANCH)).resolves.toBe(false)
+		expect(stderr_spy).toHaveBeenCalledWith(
+			expect.stringMatching(
+				/^josh debug: git_gh_pr_auto_merge\.pr_is_merged: .*branch: feature-branch\n$/u,
+			),
+		)
+		stderr_spy.mockRestore()
+		vi.unstubAllEnvs()
+	})
 })
 
 describe('git_gh_pr_auto_merge.pr_list_open_with_head_prefix', () => {

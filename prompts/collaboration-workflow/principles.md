@@ -72,3 +72,12 @@
 - **導線文書に規則を書き戻さない。** そこに書かれた規則は、次の改訂で更新し忘れる 4 つ目の置き場になる
 - `scripts/document/ai-document-pointers.test.ts` が機械的に守る。導線文書に規則本体が再出現した場合、導線の一文が消えた場合、`CLAUDE.md` が単一ソースであることの記述が消えた場合に落ちる
 - 経緯は `docs/maintainers/principles-rationale.md` → "Why AGENTS and GEMINI are pointers"、`@CLAUDE.md` 行と他ツールでの未検証は `docs/maintainers/principles-rationale.md` → "The include line, and what has not been verified"
+
+### Claude Code 以外のエージェントでの読み替え
+
+`CLAUDE.md` は Claude Code 向けに書かれており、その機能を名指しする。Codex・Gemini CLI など別のエージェントは次のように読み替える。導線文書が持つのはツール固有の 1 行だけで、共通の読み替えはこの節にしか無い（joshuafolkken/kit#3079）。
+
+- **フック**: フックが走らない、または出力が見えないツールでは、フックが届ける規則を自分で適用する。その一覧は手書きせず、[`rule-delivery.md`](./rule-delivery.md) →「配送されている規則」の表を正とする — 表の各行が、そのツールでは自分で守る規則である。表の外でフックが担う 3 つも同じく自分で行う — 最初の実行時コード編集の前に Step 0 の作業サマリを提示する、編集ごとの整形フックに頼らず編集後に `pnpm josh lint:related` と `pnpm josh cspell:dot` を走らせる、`JOSH_SESSION_LANG` は注入を待たずに `.env` から解決する。フックの全体は `.claude/settings.json` の `hooks` が正である
+- **Skill・`/verify-ui`・`/code-review`**: `CLAUDE.md` が skill のロードやサブエージェントでの実行を指示する箇所では、その skill の `SKILL.md` を読み、自分のセッションで従う
+- **`.claude/settings.json` の deny list** は効かない。それが裏付ける規則 — 指示なしのコミット・マージ・ステージングその他の共有状態変更をしない — はそのまま拘束する
+- **`AskUserQuestion`** は、ユーザーに平文で尋ねることを指す

@@ -80,8 +80,9 @@ export const unicorn_rules = {
 	'unicorn/custom-error-definition': 'error',
 	// throw new Error()の形式を強制
 	'unicorn/throw-new-error': 'error',
-	// 空の配列をチェック
-	'unicorn/no-empty-file': 'error',
+	// 空ファイルを禁止する。コメントだけのファイルは許可する: `sv create` の足場 `src/lib/index.ts` は
+	// コメント 1 行だけで、手を加えていないプロジェクトで lint が落ちてしまうため（#3069）
+	'unicorn/no-empty-file': ['error', { allowComments: true }],
 	// 静的なみずからのみのクラスを禁止
 	'unicorn/no-static-only-class': 'error',
 	// this別名を禁止（arrow functionを使うべき）

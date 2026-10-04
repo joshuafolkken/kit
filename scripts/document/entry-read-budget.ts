@@ -3,8 +3,9 @@
 //
 // **The per-document ceiling was a proxy for a run's cost, not the cost.** A run does not pay "one
 // document's size"; it pays the total its entry reads — the mandated skill files, the sections they
-// point out to, the point-of-use documents reached later, and the resident `CLAUDE.md` every request
-// carries. `read:set` already computes that total, so this budgets it directly: the entry total is
+// point out to, the point-of-use documents that entry reaches later, and the resident `CLAUDE.md` every
+// request carries. `read:set`'s `total read` is that sum less `CLAUDE.md`, which `entry_total_bytes`
+// adds back (`RESIDENT_BASE`), so this budgets the whole directly: the entry total is
 // the primary ceiling, and the per-document ceiling (`document-byte-budget.ts`) falls back to the
 // documents no entry reads (`document-reachability.ts` draws the line). A document an entry reads is
 // held by the entry total and carries no per-document ceiling, so neither budget holds it twice.
@@ -86,11 +87,16 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// `wip-cap.md`, so its ceiling stays.
 	// joshuafolkken/kit#3023 added the `prrun` keyword to `SKILL.md` and `CLAUDE.md`, tipping backlogrun
 	// one block over; `prrun` reads `fullrun`'s set plus its own short manifest.
-	{ entry: 'kickoff', bytes: 229_376 },
-	{ entry: 'fullrun', bytes: 225_280 },
-	{ entry: 'halfrun', bytes: 225_280 },
-	{ entry: 'prrun', bytes: 229_376 },
-	{ entry: 'backlogrun', bytes: 233_472 },
+	// Lowered in joshuafolkken/kit#3078 — a correction of an over-count, not a trim: every entry was
+	// charged for every global point-of-use document, so `kickoff` paid for `followup.md` and the
+	// `backlogrun-*` phase documents it never opens. Each total now counts only what its path reaches.
+	// joshuafolkken/kit#3077 trimmed non-resident rule bodies from `CLAUDE.md`, lowering fullrun, prrun
+	// and backlogrun one block each.
+	{ entry: 'kickoff', bytes: 65_536 },
+	{ entry: 'fullrun', bytes: 126_976 },
+	{ entry: 'halfrun', bytes: 106_496 },
+	{ entry: 'prrun', bytes: 131_072 },
+	{ entry: 'backlogrun', bytes: 212_992 },
 	{ entry: LANE_CHILD, bytes: 77_824 },
 ]
 

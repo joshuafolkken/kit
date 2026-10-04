@@ -21,8 +21,9 @@ interface ReviewCheckout {
 	head: string
 }
 
-// Three git spawns that do not depend on each other, so they are issued together rather than one
-// after another: the brief is printed in front of a review the run is waiting on.
+// Three git reads that do not depend on each other, so they are issued together rather than one after
+// another: the brief is printed in front of a review the run is waiting on. The root is a near-instant
+// synchronous `rev-parse` (joshuafolkken/kit#3065); the branch and head still overlap.
 async function read_checkout(): Promise<ReviewCheckout> {
 	const [root, branch, head] = await Promise.all([
 		git_command.repository_root(),

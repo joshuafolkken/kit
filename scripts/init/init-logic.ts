@@ -92,10 +92,13 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'.github/workflows/production.yml',
 	'.github/workflows/sonar-qube.yml',
 	'.github/workflows/pr-classification.yml',
-	// Called by `pr-classification.yml` as `uses: ./.github/actions/setup-pnpm`; without it the
-	// consumer's job cannot resolve the action and the Release classification check fails
-	// (joshuafolkken/kit#3013).
+	// Called by `ci.yml` and `pr-classification.yml` as `uses: ./.github/actions/setup-pnpm`; without
+	// it the consumer's jobs cannot resolve the action and their checks fail (joshuafolkken/kit#3013,
+	// joshuafolkken/kit#3095).
 	'.github/actions/setup-pnpm/action.yml',
+	// The one place the workflows' Node.js version is written, called by every distributed workflow
+	// that sets Node.js up (joshuafolkken/kit#3084).
+	'.github/actions/setup-node/action.yml',
 	'.github/pull_request_template.md',
 	'.github/release.yml',
 	'.github/dependabot.yml',
@@ -218,20 +221,6 @@ const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	preinstall: SAFE_CHAIN_CMD,
 	prepare: PREPARE_CMD,
 	josh: 'josh',
-}
-
-// prettier resolves its `plugins[]` from the consumer project, not transitively through the kit,
-// so every package that uses the kit prettier preset must declare these as devDependencies. The
-// preset references all three unconditionally (prettier/index.js → plugins), hence all three are
-// added regardless of project — omitting any breaks `prettier`/`josh lint` with a
-// "Cannot find package" error. Versions mirror the kit's own devDependencies.
-const SORT_IMPORTS_PLUGIN_KEY = '@ianvs/prettier-plugin-sort-imports'
-const PRETTIER_SVELTE_PLUGIN_KEY = 'prettier-plugin-svelte'
-const PRETTIER_TAILWIND_PLUGIN_KEY = 'prettier-plugin-tailwindcss'
-const PRETTIER_PLUGIN_DEV_DEPS: Record<string, string> = {
-	[SORT_IMPORTS_PLUGIN_KEY]: '^4.7.1',
-	[PRETTIER_SVELTE_PLUGIN_KEY]: '^4.1.1',
-	[PRETTIER_TAILWIND_PLUGIN_KEY]: '^0.8.0',
 }
 
 // format_json rather than JSON.stringify: it lays arrays out the way prettier does — inline while
@@ -433,10 +422,6 @@ function strip_managed_postinstall(content: string): string {
 	)
 }
 
-function merge_prettier_plugin_development_deps(content: string): string {
-	return init_logic_json_merge.merge_development_dependencies(content, PRETTIER_PLUGIN_DEV_DEPS)
-}
-
 const init_logic = {
 	...init_logic_templates,
 	...init_logic_workspace,
@@ -454,7 +439,6 @@ const init_logic = {
 	generate_npmrc,
 	merge_npmrc,
 	merge_gitignore,
-	merge_prettier_plugin_development_deps,
 	get_tsconfig_extends_entry,
 	get_tsconfig_preset_filename,
 	get_lefthook_extends_value,

@@ -6,6 +6,7 @@ import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
 import type { ProjectShape } from '#scripts/init/project-profile'
 import { file_reader } from '#scripts/lib/read-file'
+import { pack_hook } from '#scripts/safe-chain/pack-hook'
 import { copy_directory_failure, directory_copy_blocker } from './directory-copy-guard'
 import { file_content } from './file-content'
 import { REMOVED_SKILL_MANIFEST } from './removed-skill-manifest'
@@ -189,6 +190,9 @@ function sync_ai_copy_all(is_force: boolean, shape?: ProjectShape): void {
 	}
 
 	migrate_removed_skills()
+	// Both profiles write the Safe Chain `preinstall`, so both get the hook that keeps it out of a
+	// published package (joshuafolkken/kit#3110).
+	pack_hook.sync_pack_hook(PROJECT_ROOT, PACKAGE_DIR)
 }
 
 const sync_ai_files = {

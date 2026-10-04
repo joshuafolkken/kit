@@ -62,9 +62,9 @@ describe('josh backlog:plan --waves', () => {
 		stub_backlog()
 
 		expect(await backlog_plan_cli.run(['--waves'])).toBe(SUCCESS_EXIT_CODE)
-		expect(stdout()).toContain(`Wave 1  #${String(SOLO)} ${backlog_plan.SOLO_MARK}\n`)
-		expect(stdout()).toContain(`Wave 2  #${String(FIRST)}\n`)
-		expect(stdout()).toContain(`Wave 3  #${String(BLOCKED)}\n`)
+		expect(stdout()).toContain(`Wave 1  ${backlog_fixture.cite(SOLO)} ${backlog_plan.SOLO_MARK}\n`)
+		expect(stdout()).toContain(`Wave 2  ${backlog_fixture.cite(FIRST)}\n`)
+		expect(stdout()).toContain(`Wave 3  ${backlog_fixture.cite(BLOCKED)}\n`)
 	})
 
 	it('opens on the same issue backlog:next prints for an idle repository', async () => {
@@ -75,7 +75,7 @@ describe('josh backlog:plan --waves', () => {
 		streams.reset()
 		await backlog_plan_cli.run(['--waves'])
 
-		expect(stdout()).toContain(`Wave 1  #${next} `)
+		expect(stdout()).toContain(`Wave 1  ${backlog_fixture.cite(Number(next))} `)
 	})
 
 	it('refuses to combine the waves with named issues', async () => {

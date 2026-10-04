@@ -11,13 +11,13 @@ import { implementation_cut } from './implementation-cut'
 // **The measurement is the load-bearing half.** Without the 0-of-5 / 33.9% figures the row reads as a
 // precaution, and a precaution is the first thing dropped when the enumeration is next trimmed.
 const TOPIC_FILE = '.claude/skills/workflow-commands/pre-gate-cut.md'
+const RATIONALE_FILE = 'docs/maintainers/pre-gate-cut-rationale.md'
 const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
 const FIRING_SUITE = 'scripts/rules/implementation-cut.test.ts'
 const RULE_SUITE = 'scripts/rules/implementation-cut-rule.test.ts'
 // The section this rule's procedure is single-sourced under; a marker test exists so a rewrite of the
 // document is caught rather than silently dropping the heading a sibling rule leans on.
-const TOPIC_HEADING =
-	'### It is a guard, fired at the edit that crosses the threshold (joshuafolkken/kit#2310)'
+const TOPIC_HEADING = '### It is a guard, fired at the edit that crosses the threshold'
 const CUT_COMMAND = 'pnpm josh run:cut --impl <N>'
 
 describe('the delivered text — what the refusal states', () => {
@@ -52,15 +52,21 @@ describe('the delivered text — what the refusal states', () => {
 	})
 })
 
-describe(`${TOPIC_FILE} — the single source for the rule and the measurement behind it`, () => {
+describe(`${RATIONALE_FILE} — the measurement behind the rule`, () => {
+	const content = read_unwrapped(RATIONALE_FILE)
+
+	// The figures the enforcement rests on, kept off the read path beside the procedure it explains.
+	it.each(['the cut fired **0 times**', '33.9%'])('states %j', (marker) => {
+		expect(content).toContain(marker)
+	})
+})
+
+describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 	const content = read_unwrapped(TOPIC_FILE)
 
 	it.each([
 		TOPIC_HEADING,
-		'**This step was carried as prose and fired exactly never**',
-		// The figures the enforcement rests on.
-		'the cut fired **0 times**',
-		'33.9%',
+		`${RATIONALE_FILE}\` → "Why the rules are guards, not prose"`,
 		'pnpm josh rule:guard',
 	])('states %j', (marker) => {
 		expect(content).toContain(marker)

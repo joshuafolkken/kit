@@ -104,6 +104,13 @@ describe('reading the Git state', () => {
 		})
 	})
 
+	it('reads the origin from its configured URL and an unset one as no origin', () => {
+		mocked_execa.mockReturnValueOnce(result(1))
+
+		expect(start_steps.read_git_state(ROOT, SHAPE).has_origin).toBe(false)
+		expect(commands()[0]).toContain('config --get remote.origin.url')
+	})
+
 	it('reads whether the checked-out commit records kit (#2816)', () => {
 		mocked_execa.mockReturnValue(result(0, '{"devDependencies":{"@joshuafolkken/kit":"1.0.0"}}'))
 

@@ -25,6 +25,7 @@ import { describe, expect, it } from 'vitest'
 // not fail a test for a reason that has nothing to do with the rule.
 
 const SPLIT_SKILL = '.claude/skills/workflow-commands/split-assessment.md'
+const SPLIT_RATIONALE = 'docs/maintainers/split-assessment-rationale.md'
 const REVIEW_PROMPT = 'prompts/review.md'
 const WIP_TOPIC = 'prompts/collaboration-workflow/wip-cap.md'
 const LANES_DOC = '.claude/skills/workflow-commands/backlogrun-lanes.md'
@@ -41,7 +42,12 @@ const SPLIT_MARKERS: ReadonlyArray<string> = [
 	SPLIT_GUIDE,
 	// Test files are excluded so that adding tests does not push a change past the split threshold.
 	'(test files excluded)',
-	// The reason, without which the next reader restores the old test as an obvious simplification.
+	`${SPLIT_RATIONALE}\` → "Why the default is not to split"`,
+]
+
+// The reason, without which the next reader restores the old test as an obvious simplification. It
+// sits in the rationale document beside the procedure, off every run's read path.
+const SPLIT_RATIONALE_MARKERS: ReadonlyArray<string> = [
 	'**Separability is not scarce, which is why a test made only of it splits nearly everything.**',
 	'`route:split` accounted for **28 of the 119 open Issues (24%)**',
 ]
@@ -150,6 +156,14 @@ describe(`${SPLIT_SKILL} — the split default is raised, with its guide`, () =>
 	})
 })
 
+describe(`${SPLIT_RATIONALE} — the reason the split default is raised`, () => {
+	const content = read_unwrapped(SPLIT_RATIONALE)
+
+	it.each(SPLIT_RATIONALE_MARKERS)('states %j', (marker) => {
+		expect(content).toContain(marker)
+	})
+})
+
 describe(`${REVIEW_PROMPT} — the disposition default is branch 3`, () => {
 	const content = read_unwrapped(REVIEW_PROMPT)
 
@@ -173,14 +187,13 @@ describe(`${WIP_TOPIC} — the WIP cap and all three sides of its procedure`, ()
 	})
 })
 
-// The resident surface owes the trigger for each of the three and no more: a turn that never opens a
-// pointer still has to raise the split bar, drop rather than file, and count before filing. The
+// The resident surface owes the trigger for the defaults that bind outside a command and no more: a
+// turn that never opens a pointer still has to drop rather than file, and count before filing. The
 // procedures stay at their pointers, which is what keeps `CLAUDE.md` under its budget — the count
 // command included, so the one place it is written stays the one place it has to be kept correct.
+// The split default binds only once a command has started, so it is read from `split-assessment.md`
+// (pinned by `SPLIT_MARKERS` above) rather than restated resident (joshuafolkken/kit#3077).
 const RESIDENT_MARKERS: ReadonlyArray<string> = [
-	'**its default is not to split**',
-	// The guide's numbers stay at `split-assessment.md`; the resident line points there (joshuafolkken/kit#2996).
-	'the size guide in `split-assessment.md`, measured by `pnpm josh split:assess`',
 	'file it as a follow-up Issue only when it is a confirmed defect that reaches a runtime path',
 ]
 
@@ -212,39 +225,36 @@ describe('the delivered text — the WIP cap at the call that files', () => {
 	})
 })
 
-describe.each(AI_DOCS)(
-	'%s — carries the trigger for the two resident defaults',
-	(document_path) => {
-		const content = read_unwrapped(document_path)
+describe.each(AI_DOCS)('%s — carries the trigger for the resident defaults', (document_path) => {
+	const content = read_unwrapped(document_path)
 
-		it.each(RESIDENT_MARKERS)('states %j', (marker) => {
-			expect(content).toContain(marker)
-		})
+	it.each(RESIDENT_MARKERS)('states %j', (marker) => {
+		expect(content).toContain(marker)
+	})
 
-		// **The cap keeps its trigger resident and loses its section.** A hook reaches this harness
-		// alone, so removing the line outright would leave a Codex, Gemini or Cursor session — each
-		// reading `CLAUDE.md` through a pointer and running no hook — able to file past 30 with nothing
-		// telling it to count. What the relocation takes out is the heading and the procedure.
-		it.each([
-			"**Count the target repository's open Issues before filing; above the WIP cap, close one first.**",
-			'and so is an **interrupt** — three tests decide that, never judgement',
-			'a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository',
-			// Without these two the three tests are listed with nothing saying what happens when none is
-			// met, and no instruction to state the overage — for the agent that runs no hook, which is
-			// the whole audience the resident line exists for.
-			'Meeting none of the three, a finding stays discretionary',
-			'both exemptions proceed, stating the overage',
-			'`pnpm josh rule:guard` states it again at the call that files',
-			WIP_TOPIC,
-		])('keeps the trigger %j resident', (marker) => {
-			expect(content).toContain(marker)
-		})
+	// **The cap keeps its trigger resident and loses its section.** A hook reaches this harness
+	// alone, so removing the line outright would leave a Codex, Gemini or Cursor session — each
+	// reading `CLAUDE.md` through a pointer and running no hook — able to file past 30 with nothing
+	// telling it to count. What the relocation takes out is the heading and the procedure.
+	it.each([
+		"**Count the target repository's open Issues before filing; above the WIP cap, close one first.**",
+		'and so is an **interrupt** — three tests decide that, never judgement',
+		'a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository',
+		// Without these two the three tests are listed with nothing saying what happens when none is
+		// met, and no instruction to state the overage — for the agent that runs no hook, which is
+		// the whole audience the resident line exists for.
+		'Meeting none of the three, a finding stays discretionary',
+		'both exemptions proceed, stating the overage',
+		'`pnpm josh rule:guard` states it again at the call that files',
+		WIP_TOPIC,
+	])('keeps the trigger %j resident', (marker) => {
+		expect(content).toContain(marker)
+	})
 
-		it('no longer carries a section of its own', () => {
-			expect(read_repo_file(document_path)).not.toContain('### Backlog WIP cap (30 open Issues)')
-		})
-	},
-)
+	it('no longer carries a section of its own', () => {
+		expect(read_repo_file(document_path)).not.toContain('### Backlog WIP cap (30 open Issues)')
+	})
+})
 
 // The index is how a topic file is reached at all: a file nothing links to is a file nobody opens.
 // **`read_index` and not `read_repo_file`** — the fixture resolves the workflow prompt to the index

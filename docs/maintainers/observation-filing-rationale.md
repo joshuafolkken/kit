@@ -81,7 +81,9 @@ given a destination and no route out of the working tree the line was written in
 nobody was going to commit one**: the parent session that appends never runs `pnpm josh git`, a child
 runs it inside a lane work tree that cannot see the parent's checkout, and in the primary checkout
 `git add -u` swept the line into whatever unrelated pull request that run was opening. Measured on
-the day the ledger shipped, `docs/observations.md` had exactly one commit — the one that created
+the day the ledger shipped, `docs/observations.md` (the single-file ledger, since moved under
+`docs/maintainers/` by joshuafolkken/kit#2724 and split into a directory by joshuafolkken/kit#2919)
+had exactly one commit — the one that created
 it — and seven lines had never left a working tree. **So the repeat count was reading a file
 that is empty on every other machine**, and every sighting was a first one, which is the state
 joshuafolkken/kit#1728 created the ledger to end.

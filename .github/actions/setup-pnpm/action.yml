@@ -10,10 +10,10 @@ description: >
 # job that calls this action cannot install without the scan.
 #
 # Distributed: `josh sync` writes this file into a consumer beside the workflows that call it
-# (`pr-classification.yml`), stamped as managed like they are (joshuafolkken/kit#3013).
-# `templates/workflows/ci.yml` still carries the same steps inline — it was written before this file
-# was distributed, and moving it onto the action is a change of its own. `workflow_pin_logic` reads
-# this file as a source of canonical action pins, so the template's refs still resolve from here.
+# (`ci.yml` and `pr-classification.yml`), stamped as managed like they are (joshuafolkken/kit#3013).
+# The distributed `ci.yml` calls it exactly as kit's own does, so a consumer's CI prepares pnpm on
+# the path kit's CI runs (joshuafolkken/kit#3095). `workflow_pin_logic` reads this file as a source
+# of canonical action pins.
 
 inputs:
   install:

@@ -1,5 +1,6 @@
 import { git_command } from '#scripts/git/git-command'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { error_text } from '#scripts/lib/error-message'
 import { z } from 'zod'
 
 // joshuafolkken/kit#1091: `epicrun` asks `epic-busy.ts` whether a *repository* already has a child in
@@ -196,7 +197,9 @@ async function is_tree_dirty(directory?: string): Promise<boolean> {
 		const status = await git_command.status(directory)
 
 		return status.trim() !== ''
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('run_hold.is_tree_dirty', error)
+
 		return true
 	}
 }

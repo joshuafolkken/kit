@@ -96,7 +96,8 @@ The stamp is applied by the same write-time transform that resolves the action p
 distributed as a file or a renamed mapping cannot arrive without it. Two write paths bypass the
 transform: the directory copy, which a kit unit test holds to an empty list, and `deploy-vps.yml`,
 which is deliberately left unstamped for the reason below.
-A local composite action a distributed workflow calls (`.github/actions/setup-pnpm/action.yml`) is
+A local composite action a distributed workflow calls (`.github/actions/setup-pnpm/action.yml`,
+`.github/actions/setup-node/action.yml`) is
 written through the same transform and stamped the same way: the distributed `dependabot.yml` bumps
 `/.github/actions/*`, so an unstamped action would merge its own bumps and have them written back by
 the next sync (joshuafolkken/kit#3013).
@@ -400,7 +401,7 @@ running that or any other destructive rewrite.
 **`git commit` is denied as a whole subcommand, and was not always.** `git commit -a` stages every
 tracked file and commits it, which is the fallback a refused `git add` pushes an agent toward, so
 the two spellings of that flag were denied first and alone. Plain `git commit -m "…"` was left
-reachable deliberately: `prompts/git-automation.md` — shipped to consumers in the same package —
+reachable deliberately: `prompts/git-automation.md` — then shipped to consumers in the same package, deleted since —
 instructed the agent to run exactly that command, and denying it here would have broken a
 documented flow from the other half of the distribution. **That reason is gone.**
 joshuafolkken/kit#1064 retired the prompt, and no distributed document instructs the agent to run a
