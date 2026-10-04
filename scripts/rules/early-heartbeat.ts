@@ -185,10 +185,11 @@ function decide(call: GuardedCall, run: GuardRun, can_record: boolean): boolean 
 // is the half that makes the rule believable — the promise was kept and the interval was not.
 const EARLY_HEARTBEAT_REASON =
 	'⛔ early heartbeat: this call arms a wait timer of its own, and the progress clock is not yours ' +
-	'to keep. `pnpm josh run:progress --wait` waits the interval out for you ' +
+	'to keep. `pnpm josh run:progress --wait` keeps it for you ' +
 	'(`JOSH_PROGRESS_INTERVAL_MINUTES`, or `josh.progress_interval_minutes` in `package.json`, ' +
-	'default 20 minutes), prints the five labelled lines and exits — start it in the background, relay ' +
-	'the lines it printed when it exits, and start the next one. Two timers armed at ' +
+	'default 20 minutes): start it once in the background and it reports the five labelled lines to ' +
+	"the run's event stream on its own, without waking you — relay nothing, and start it again only " +
+	'after it exits, which it does when newly runnable work arrives. Two timers armed at ' +
 	'once is what produced reports 3–5 minutes apart on a 15-minute setting ' +
 	'(joshuafolkken/kit#1570): a new one was armed on the turn a timer fired and again on the turn a ' +
 	"child's completion woke the run, and `--mark` recorded each report without anything refusing the " +

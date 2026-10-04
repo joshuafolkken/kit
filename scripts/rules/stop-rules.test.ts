@@ -292,6 +292,18 @@ describe('stop_rules.stop_outcome — headless parent', () => {
 	})
 })
 
+describe('stop_rules — the headless heartbeat runs in the background', () => {
+	// joshuafolkken/kit#3102: `--wait` runs until work arrives, so in the foreground it would block the
+	// parent from `lane:await`'s completions — it is a background heartbeat, not a foreground wait.
+	it('names the heartbeat as a background command and does not count it as a foreground wait', () => {
+		const refusal = stop_rules.HEADLESS_WAIT_REASON
+		const tail = `${refusal} {"command":"pnpm josh run:progress --wait"} ${refusal}`
+
+		expect(refusal).toContain('`pnpm josh run:progress --wait` in the background')
+		expect(stop_rules.count_headless_refusals(tail)).toBe(2)
+	})
+})
+
 // joshuafolkken/kit#2445: a lane child stopped to ask a person for `git add` on a tree the
 // sanctioned commit flow could already finish.
 const INDEX_REQUEST =

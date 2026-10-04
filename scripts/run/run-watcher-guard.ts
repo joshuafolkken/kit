@@ -2,13 +2,15 @@ import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_headless } from './run-headless'
 import { run_progress_clock } from './run-progress-clock'
 
-// A watcher that stopped while children are still in-flight leaves the parent blind to completions
-// for up to the full heartbeat interval. This guard detects that state so a hook can refuse the
-// calls that follow a missed restart (joshuafolkken/kit#2113).
+// A watcher that stopped while children are still in-flight leaves the run's event stream without a
+// heartbeat and the parent without the wake an arrival would deliver. This guard detects that state so
+// a hook can refuse the calls that follow a missed restart (joshuafolkken/kit#2113).
 //
 // **Staleness threshold is `TICK_MULTIPLIER` watcher ticks.** The watcher pings its life record on
 // every tick (every 30 s), so a gap wider than three ticks means the process has almost certainly
-// stopped: either the bound expired or the session was cut without a restart. Three gives one missed
+// stopped: it exited on an arrival, its bound expired, or the session was cut without a restart. A
+// report is no longer one of those (joshuafolkken/kit#3102) — `--wait` streams its reports and keeps
+// running — so a restart is owed only after an exit the parent was woken for. Three gives one missed
 // tick of slack before the guard fires.
 //
 // **It watches no relay** (joshuafolkken/kit#2492). A session following the run's event stream after a
@@ -24,7 +26,9 @@ const STALE_THRESHOLD_S = STALE_THRESHOLD_MS / MS_PER_SECOND
 
 const STALE_NOTE =
 	`Lane children are in-flight but the progress watcher has not pinged in the last ` +
-	`${String(STALE_THRESHOLD_S)}s — run \`pnpm josh run:progress --wait\` in the background before proceeding`
+	`${String(STALE_THRESHOLD_S)}s — run \`pnpm josh run:progress --wait\` in the background before proceeding. ` +
+	'It reports to the run event stream on its own and exits only when newly runnable work arrives, so ' +
+	'start it once and relay nothing'
 
 type GuardResult = { kind: 'ok' } | { kind: 'stale'; note: string }
 

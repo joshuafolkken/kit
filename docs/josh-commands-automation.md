@@ -1529,9 +1529,10 @@ pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 **Options:**
 
 - `--mark` — record that a real report happened without printing a line (keeps the last line for `run:wake --list`).
-- `--path` — print the ambient heartbeat log's path and exit. Every heartbeat line is mirrored there beside the report clock, so a person keeps it open with `tail -F "$(pnpm josh run:progress --path)"` to watch the run stream on across a `backlogrun` session cut without typing for `--list`. Reads no run state, so it answers in a lane child too.
+- `--path` — print the ambient heartbeat log's path and exit. Every heartbeat line is mirrored there, so `tail -F "$(pnpm josh run:progress --path)"` follows the run across a `backlogrun` session cut (joshuafolkken/kit#2156). Reads no run state, so it answers in a lane child too.
 - `--interval <min>` — silence interval (default 20; also `JOSH_PROGRESS_INTERVAL_MINUTES`, then `josh.progress_interval_minutes`).
-- `--hours <n>` — how long the watcher lives (default 1); `--repo <owner/name>` scopes the read.
+- `--wait` — start once in the background: each report goes to the event stream and ambient log, never stdout (joshuafolkken/kit#3102); exits only on an arrival, `josh followup` ending the run, or `--hours`.
+- `--hours <n>` — how long the watcher lives (default 8 with `--wait`, 1 otherwise); `--repo <owner/name>` scopes the read.
 
 **Output / exit codes:** stdout carries only the five labelled progress lines; notices go to stderr. `--once` with no run recorded prints nothing and exits 0; an unreadable listing exits 1. It sends no Telegram; `JOSH_PROGRESS=0` reports nothing (`--mark` still records).
 

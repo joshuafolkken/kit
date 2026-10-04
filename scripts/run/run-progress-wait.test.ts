@@ -5,11 +5,11 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import type { WatchOptions } from './run-progress-cli'
 import type { ObservationRead } from './run-progress-read'
 
-// joshuafolkken/kit#1576. `--wait` exists because a harness that only delivers a background command's
-// standard output **when that command exits** relays nothing at all from a watcher that never exits —
-// `epicrun #1474` was measured at 2h36m of silence with children in flight. So what is pinned here is
-// the exit: one interval of silence, exactly one line, and a return. The interval is set in
-// milliseconds so the wait is real without the suite waiting out a real one.
+// joshuafolkken/kit#3102. `--wait` once ended at its first line so the session would relay it, which
+// woke the orchestrating session once per heartbeat for a relay it could not change. What is pinned
+// here is the opposite: a report goes to the event stream and the ambient log and **not** to standard
+// output, and it does not end the wait — only an arrival, `josh followup` or the bound does. The
+// interval is set in milliseconds so the wait is real without the suite waiting out a real one.
 
 vi.mock('#scripts/gh/gh-spawn', () => ({
 	gh_spawn: { get_repo_name_with_owner: vi.fn(), get_repo_name_with_owner_within: vi.fn() },
@@ -42,9 +42,14 @@ vi.mock('#scripts/backlog/backlog-ready', () => ({
 vi.mock('#scripts/backlog/backlog-arrival', () => ({
 	backlog_arrival: { start: vi.fn() },
 }))
+// The stream append is the delivery path under test; the stream file itself is `run-event-stream`'s.
+vi.mock('./run-event-stream-emit', () => ({
+	run_event_stream_emit: { emit_heartbeat: vi.fn() },
+}))
 
 const { backlog_arrival } = await import('#scripts/backlog/backlog-arrival')
 const { backlog_ready } = await import('#scripts/backlog/backlog-ready')
+const { run_event_stream_emit } = await import('./run-event-stream-emit')
 const { run_progress_read } = await import('./run-progress-read')
 const { run_progress_clock } = await import('./run-progress-clock')
 const { run_progress_cli } = await import('./run-progress-cli')
@@ -125,47 +130,72 @@ afterAll(() => {
 	rmSync(TEMPORARY, { force: true, recursive: true })
 })
 
-describe('--wait — one interval, one line, and then it exits', () => {
-	it('prints straight away when the run is already overdue', async () => {
-		read_last_report.mockReturnValue(Date.now() - INTERVAL_MS)
+// One report due at the first tick and none after: the seed and the first tick read a silence of
+// `quiet_ms`, and every later tick reads a report just made, the way the real recorded clock would.
+function report_once(quiet_ms: number): void {
+	const last_ms = Date.now() - quiet_ms
 
-		await expect(run_progress_cli.wait_once(options_of())).resolves.toBe(SUCCESS)
-		expect(output.printed).toHaveLength(ONE_LINE)
+	read_last_report
+		.mockReturnValueOnce(last_ms)
+		.mockReturnValueOnce(last_ms)
+		.mockImplementation(() => Date.now())
+}
+
+// The line a report recorded — what the stream and the ambient log carry in place of standard output.
+function recorded_line(): string | undefined {
+	return mark.mock.calls[0]?.[2]
+}
+
+describe('--wait — a report reaches the stream without waking the caller', () => {
+	// The regression the Issue was filed on: a report used to end the wait, and the exit was the wake.
+	it('reports to the event stream and keeps waiting rather than exiting', async () => {
+		report_once(INTERVAL_MS)
+
+		await expect(wait_bounded()).resolves.toBe(SUCCESS)
+		expect(run_event_stream_emit.emit_heartbeat).toHaveBeenCalledTimes(ONE_LINE)
+		expect(output.warned).toContain(run_progress_cli.WAIT_EXPIRED_NOTICE)
 	})
 
-	// The regression the Issue was filed on: the caller needs the command to *end*, and to end having
-	// said exactly one thing — a second line would be the double report joshuafolkken/kit#1570 removed.
-	it('waits the interval out, then prints exactly one line and returns', async () => {
-		await expect(run_progress_cli.wait_once(options_of())).resolves.toBe(SUCCESS)
-		expect(output.printed).toHaveLength(ONE_LINE)
+	// Standard output is what a background command hands the session on exit; a line there is one the
+	// session would be tempted to relay, and the stream already carries it.
+	it('keeps the report off standard output', async () => {
+		report_once(INTERVAL_MS)
+
+		await wait_bounded()
+
+		expect(output.printed).toHaveLength(NOTHING)
 	})
 
-	// The clock stays this command's: the line it printed is recorded, so the next `--wait` measures a
-	// full interval from it and the caller never has to time anything itself.
-	it('records the report it made', async () => {
-		await expect(run_progress_cli.wait_once(options_of())).resolves.toBe(SUCCESS)
+	// The clock stays this command's: the line it reported is recorded, so the next report waits a full
+	// interval from it and the caller never has to time anything itself.
+	it('records the report it made and streams that same line', async () => {
+		report_once(QUIET_MINUTES * MINUTE_MS)
+
+		await wait_bounded()
+
 		expect(mark).toHaveBeenCalledTimes(ONE_LINE)
+		expect(recorded_line()).toContain(`quiet ${String(QUIET_MINUTES)}m`)
+		expect(run_event_stream_emit.emit_heartbeat).toHaveBeenCalledWith(recorded_line())
 	})
 
-	// joshuafolkken/kit#2452: every wake carries the pick-up reading, whether it reported or ran out.
+	// joshuafolkken/kit#2452: every wake carries the pick-up reading, whether it arrived or ran out.
 	it('prints the pick-up reading on every exit', async () => {
-		await run_progress_cli.wait_once(options_of())
+		await wait_bounded()
 		await wait_bounded()
 
 		expect(backlog_ready.print_ready_line).toHaveBeenCalledTimes(2)
 	})
 
-	it('measures the silence from the last report on record', async () => {
-		read_last_report.mockReturnValue(Date.now() - QUIET_MINUTES * MINUTE_MS)
-
-		await expect(run_progress_cli.wait_once(options_of())).resolves.toBe(SUCCESS)
-		expect(output.printed[0]).toContain(`quiet ${String(QUIET_MINUTES)}m`)
+	it('builds the expiry notice from the `--wait` default rather than a hardcoded number', () => {
+		expect(run_progress_cli.WAIT_EXPIRED_NOTICE).toContain(
+			`${String(run_progress_cli.DEFAULT_WAIT_MAX_HOURS)} by default`,
+		)
 	})
 })
 
 describe('--wait — nothing to report is not something to exit on', () => {
 	// Returning on a decline would hand the caller an instant answer, and the documented restart turns
-	// that into a poll: `backlogrun.md` says to start the next one in the same turn.
+	// that into a poll: `backlogrun-progress.md` restarts the watcher in the turn it exits.
 	it('keeps waiting while no child is in flight, and reports nothing', async () => {
 		read_observations.mockResolvedValue({ kind: 'idle' })
 

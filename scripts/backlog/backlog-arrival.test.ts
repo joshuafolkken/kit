@@ -90,7 +90,7 @@ describe('backlog_arrival.start — what never wakes the parent', () => {
 		expect(ports.ready_issues).not.toHaveBeenCalled()
 	})
 
-	it('stays inert when the baseline cannot be read, rather than reading it as empty', async () => {
+	it('does not read an unreadable baseline as empty', async () => {
 		const ports = ports_of({ issues: ['2445'], free: FREE })
 
 		vi.mocked(ports.ready_issues).mockRejectedValueOnce(new Error('offline'))
@@ -99,7 +99,26 @@ describe('backlog_arrival.start — what never wakes the parent', () => {
 
 		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
 	})
+})
 
+// joshuafolkken/kit#3102: the report no longer ends `--wait`, so an inert probe would leave the parent
+// without a wake until the bound.
+describe('backlog_arrival.start — a baseline that did not answer', () => {
+	it('retries an unreadable baseline and wakes on an issue that arrives after it answers', async () => {
+		const pool = { issues: ['2445'], free: FREE }
+		const ports = ports_of(pool)
+
+		vi.mocked(ports.ready_issues).mockRejectedValueOnce(new Error('offline'))
+
+		const probe = await backlog_arrival.start(START_MS, ports, parent)
+
+		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
+		pool.issues.push('2493')
+		await expect(probe.has_arrived(START_MS + MINUTE_MS + MINUTE_MS)).resolves.toBe(true)
+	})
+})
+
+describe('backlog_arrival.start — a failed probe', () => {
 	it('reads a failed probe as no arrival', async () => {
 		const ports = ports_of({ issues: [], free: FREE })
 		const probe = await backlog_arrival.start(START_MS, ports, parent)
