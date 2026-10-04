@@ -100,12 +100,14 @@ A `.env` at the project root: `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are re
 
 For every code modification, in order:
 
-0. **Work summary + test declaration** _(before writing any implementation code)_: a two-layer summary — a plain-language overview a non-programmer can follow (three lines, **Now / Change / Check**, one sentence each, in the session language; name the concrete subject in each line — subject-less prose is not acceptable; no file paths, function or type names, or CLI option flags — only internal identifiers are banned, not names the reader sees on screen), **Details**, then **every change with its test** (`<what changes> — Test: <Unit|E2E> — <file path> — <what it verifies>`). Ordinary markdown, **never wrapped in a code fence**, once per Issue before implementation — required in fullrun/halfrun/backlogrun even when the Issue body was filled (`kickoff` is exempt); completion reports lead with **Cause / Fix / Result**. `prompts/collaboration-workflow/report-format.md`; `pnpm josh report:lint` checks the form, and a session's first runtime `Edit` / `Write` points here. Presentation only, never a confirmation stop.
+0. **Work summary + test declaration** _(before writing any implementation code)_: once per Issue, present a two-layer summary in ordinary markdown, **never wrapped in a code fence** — required in fullrun/halfrun/backlogrun even when the Issue body was filled (`kickoff` is exempt). Presentation only, never a confirmation stop. `prompts/collaboration-workflow/report-format.md`; `pnpm josh report:lint` checks the form.
 
+   - **Overview** — three lines, **Now / Change / Check**, one sentence each, in the session language, that a non-programmer can follow; name the concrete subject in each line — subject-less prose is not acceptable. Use no file paths, function or type names, or CLI option flags — only internal identifiers are banned, not names the reader sees on screen.
+   - **Details**, then **every change with its test**: `<what changes> — Test: <Unit|E2E> — <file path> — <what it verifies>`. Completion reports lead with **Cause / Fix / Result**.
    - **Tests are required for ALL changes** — zero tests without explicit approval is a violation (bug fixes, timing/animation fixes and refactors included): bug fix → regression test; UI/animation/timing → E2E for the observable change; logic/utility → unit; refactor → tests pinning existing behavior BEFORE the change (`prompts/refactoring.md`).
-   - **Non-runtime updates (pre-approved manual-only exception)**: a change touching no executable runtime code path may proceed with manual verification — declare it in Step 0 and state why. It covers docs, non-executable config, editor/IDE files, and cosmetic asset swaps with no selector/path change; the mechanically exempt (`*.md`, `.editorconfig`, `.idea/**`, `.vscode/**`, `prompts/**`) are recognized by the command below, and the rest stay the exemption a person declares. A test infeasible for a runtime change needs its reason stated and user approval.
-   - **Basic-profile manual-check exception:** when `package.json` records `josh.profile: basic` (or its former name `static`) and the change touches only files in languages kit cannot test (HTML/CSS, or sources such as Lua), verify by hand instead of with an automated test. For HTML/CSS, open the page in a browser and check layout, links and interactions in the HTML at the intended screen widths; for any other source, actually run the changed code. Report what you observed either way. JavaScript and TypeScript files still need automated tests, even when changed alongside. `pnpm josh test:declared` prints `exempt` with the reason in this case only.
-   - **The commit stage answers this mechanically**: `pnpm josh test:declared` prints `required` / `exempt` / `satisfied` from the changed paths, and a runtime change with no test is refused at `pnpm josh git -y` on `required` — add the declared test or declare the non-runtime exception, then reissue (`prompts/collaboration-workflow/rule-delivery.md`).
+   - **Non-runtime updates (pre-approved manual-only exception)**: a change touching no executable runtime code path — docs, non-executable config, editor/IDE files, cosmetic asset swaps with no selector/path change — may be verified by hand; declare it in Step 0 with the reason. The mechanically exempt (`*.md`, `.editorconfig`, `.idea/**`, `.vscode/**`, `prompts/**`) need no declaration. A runtime change whose test is infeasible needs the reason and user approval.
+   - **Basic-profile manual-check exception:** under `josh.profile: basic` (or `static`), a change touching only languages kit cannot test (HTML/CSS, Lua …) is verified by hand — a browser check of layout, links and interactions in the HTML, or actually run the changed code — and reported; JavaScript and TypeScript still need tests. `prompts/testing-guide.md`.
+   - **`pnpm josh test:declared`** answers `required` / `exempt` / `satisfied` from the changed paths; a runtime change with no test is refused at `pnpm josh git -y` on `required`.
    - **Read a target's line headroom before editing: `pnpm josh lines <path>`** — near the limit, `Target` carries the splitting plan.
 
 1. **Refactor first** — before any refactoring, read and follow `prompts/refactoring.md`; apply high/medium refactoring to all new/modified code and do not proceed until none remain.
@@ -129,7 +131,11 @@ Run the full verification set **in order**; do not skip, reorder, or report comp
 
 ## Pre-commit Self-Review (mandatory)
 
-Before every `git commit` (follow-up commits included), self-review against `prompts/review.md` — a subagent runs `/code-review`, never a main-line `Skill` load: the staged diff, and `git diff main...HEAD` before opening or updating a PR. Level from `pnpm josh review:brief --level-only`; resolve all high/medium findings; iterate — **no further than the round cap**, the last round a verification pass over the fix delta. Then route each remaining non-High finding through the three-way disposition: fix in place, file it as a follow-up Issue only when it is a confirmed defect that reaches a runtime path (`pnpm josh disposition <path>` answers `runtime` / `non-runtime`) — or drop it with a one-line PR note (the default). **A filed finding is run through `pnpm josh epic:bundle <new>` before the current Issue closes.** A confirmed High blocks rather than buying a round past the cap. `prompts/review.md` → "Review round cap".
+Before every `git commit` (follow-up commits included), self-review against `prompts/review.md` — a subagent runs `/code-review`, never a main-line `Skill` load. `prompts/review.md` → "Review round cap".
+
+- **Scope** — the staged diff, and `git diff main...HEAD` before opening or updating a PR; level from `pnpm josh review:brief --level-only`.
+- **Rounds** — resolve all high/medium findings, **no further than the round cap**, the last round a verification pass over the fix delta. A confirmed High blocks rather than buying a round past the cap.
+- **Each remaining non-High finding** — fix in place, file it as a follow-up Issue only when it is a confirmed defect that reaches a runtime path (`pnpm josh disposition <path>`), or drop it with a one-line PR note (the default). **A filed finding is run through `pnpm josh epic:bundle <new>` before the current Issue closes.**
 
 ## Doc Sync Rules
 
@@ -137,14 +143,14 @@ Before every `git commit` (follow-up commits included), self-review against `pro
 
 ## Git Rules
 
-- **No commits** unless explicitly requested. **No PR merges, branch deletions, force pushes or other shared-state mutations** unless explicitly requested in the current turn — the default end state is PR still OPEN. **Exception**: invoking `fullrun` authorizes the merge, via `pnpm josh followup`. `.claude/settings.json` denies these, but the deny is narrower than the rule — never read "the tool let me" as permission. `prompts/collaboration-workflow/operating-rules.md` → "指示されていない行動は取らない".
+- **No commits** unless explicitly requested. **No PR merges, branch deletions, force pushes or other shared-state mutations** unless explicitly requested in the current turn — the default end state is PR still OPEN. **Exception**: invoking `fullrun` or `backlogrun` authorizes the merge, via `pnpm josh followup` — `prrun` does not. `.claude/settings.json` denies these, but the deny is narrower than the rule — never read "the tool let me" as permission. `prompts/collaboration-workflow/operating-rules.md` → "指示されていない行動は取らない".
 - **Never stage or mutate the git index on your own.** `git add` / `git rm --cached` / `git restore --staged` / `git commit` overwrite the user's snapshot and are denied by settings; inspection is read-only. Staging is allowed only on an explicit current-turn instruction or an authorized commit flow (`pnpm josh git`). `prompts/collaboration-workflow/operating-rules.md` → "git index を勝手に変更しない".
 - **For git operations use `pnpm josh git`.** After a failed push, fix, push manually, then `pnpm josh pr` — **never** `gh pr create` directly, which bypasses `closes #N` generation so the Issue will not auto-close.
 - **Start-of-conversation git status is a stale snapshot.** Before acting on any working-tree / index / stash / branch assumption, run `git status` (and `git stash list`) live first.
 
 ## Collaboration Workflow
 
-- For the issue-driven proposal/plan/execution/notification flow, follow `prompts/collaboration-workflow/` (indexed by `prompts/collaboration-workflow.md`; each topic is its own file).
+- The issue-driven flow is `prompts/collaboration-workflow/`, indexed by `prompts/collaboration-workflow.md`.
 - **Before writing a rule as prose, place it by `prompts/collaboration-workflow/residency.md`** — its single source. A computable answer goes to `pnpm josh oracle:list` and an ordering rule to `pnpm josh run:step`, never into `CLAUDE.md` or a prompt file.
 - **Count the target repository's open Issues before filing; above the WIP cap, close one first.** Nothing honestly closable means do not file. A filing the run is blocked by is exempt, and so is an **interrupt** — three tests decide that, never judgement: a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository; both exemptions proceed, stating the overage. Meeting none of the three, a finding stays discretionary. `pnpm josh rule:guard` states it again at the call that files. The count command and both procedures: `prompts/collaboration-workflow/wip-cap.md`.
 
@@ -162,11 +168,13 @@ Before every `git commit` (follow-up commits included), self-review against `pro
 | `halfrun [#N \| new]`    | Implement + gate, then **stop before commit** for manual verification                                                                                                 | + `halfrun.md` + `split-assessment.md`                           |
 | `backlogrun [#N1 #N2 …]` | Run named Issues and epics in order (an epic runs its children first), then drain the opted-in backlog — dependency order, lanes. `--only` stops after the named list | + `backlogrun.md` + `split-assessment.md` + the `fullrun` set    |
 
-**`queue` and `epicrun` were removed** — tell a user who types `queue` to run `backlogrun #N1 #N2 …`, and one who types `epicrun` to run `backlogrun #E --only` (drop `--only` to also drain the backlog).
+**`queue` and `epicrun` were removed** — point `queue` to `backlogrun #N1 #N2 …` and `epicrun` to `backlogrun #E --only`.
 
-**Three rules decide what a run does when the work turns out not to be one Issue** — the split assessment every entry point applies identically (**its default is not to split**: separability **and** a scope clearly exceeding one verification gate — the size guide in `split-assessment.md`, measured by `pnpm josh split:assess` — must both hold), a prerequisite discovered mid-run (a dependency, not parked), and a named `backlogrun` item that is not an epic. All bind only after a command has started, so all are read from the `workflow-commands` skill: `split-assessment.md`, `SKILL.md` → §2d, `backlogrun-child.md` → "When `#N` is not an epic", and `fullrun.md` / `halfrun.md` / `backlogrun.md` for the branch each entry takes.
+**The `josh epic:*` commands have their own skill** — `epic:audit`, `epic:next`, `epic:bundle`, and how an epic spans repositories. **Read the `epic-commands` skill before running any of them, before writing an epic that tracks a child in another repository, and right after filing an issue.** Three rules bind outside those commands:
 
-**The `josh epic:*` commands have their own skill** — `epic:audit`, `epic:next`, `epic:bundle`, and how an epic spans repositories. **Read the `epic-commands` skill before running any of them, before writing an epic that tracks a child in another repository, and right after filing an issue.** Three rules stay here because they bind outside those commands: **recording a decision removes that child's `needs-decision` label** (Tier A); **fixing what the audit finds is Tier A**, park only when the contradiction is a design choice nobody has made; and **an epic in another repository is referenced as `owner/repo#N`** (a bare `#N` resolves to this repository's issue). Canonical reference: `.claude/skills/epic-commands/SKILL.md`.
+- Recording a decision removes that child's `needs-decision` label (Tier A).
+- **Fixing what the audit finds is Tier A**; park only when the contradiction is a design choice nobody has made.
+- **An epic in another repository is referenced as `owner/repo#N`** — a bare `#N` resolves to this repository's issue.
 
 #### Explicit invocation required (MANDATORY)
 
@@ -177,18 +185,17 @@ Never start a `kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun` workflo
 - Instead, **prompt the user to type the command themselves**, with the exact phrasing: "Please run \`<command>\` to start this task." (e.g. "Please run \`halfrun new\` to start this task.").
 - This applies even when the user authorized a related workflow in an earlier turn — each invocation must be re-typed in the current turn.
 
-**A session cut inside a declared budget is not a new invocation** — a `backlogrun` cut and resumed is the one invocation a person typed, and it continues rather than waiting to be retyped; **`backlogrun` alone**, though — a `fullrun` cut still waits for the keyword. Single source: `backlogrun-steps.md` → "The session cut is inside the invocation".
+**A session cut inside a declared budget is not a new invocation — for `backlogrun` alone**: a resumed `backlogrun` continues, while a `fullrun` cut still waits for the keyword. `backlogrun-steps.md` → "The session cut is inside the invocation".
 
-**A `backlogrun` parks a child instead of stopping the run**, and its procedure is read from `backlogrun-park.md` → "park and continue", which is that rule's single source.
+**A `backlogrun` parks a child instead of stopping the run** — `backlogrun-park.md` → "park and continue".
 
 #### Mid-workflow stop notification (`confirmation`)
 
-Whenever you pause **any** run mid-execution to wait for the user — a `kickoff` / `halfrun` / `prrun` / `fullrun` stop, an upstream-Issue interrupt, a Tier C confirmation — you MUST send a Telegram notification **before** stopping, so the user is alerted off-screen. `halfrun`'s built-in stop before commit is a confirmation pause and follows this same rule.
+Before pausing **any** run to wait for the user — a command's stop (`halfrun`'s stop before commit included), an upstream-Issue interrupt, a Tier C confirmation — you MUST send this Telegram, so the user is alerted off-screen:
 
 ```bash
 pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'<one-line reason>\n<what is needed from the user>'
 ```
 
-- Use `--body=...` (single token) when the body starts with `-`, otherwise `parseArgs` rejects it
-- Send only once per stop — do not spam if you re-evaluate within the same pause
-- Skip the notification when the stop was explicitly requested by the user in the same turn (they already know)
+- Send it once per stop; skip it when the user asked for the stop in this same turn.
+- Pass `--body=...` as one token when the body starts with `-`, otherwise `parseArgs` rejects it.
