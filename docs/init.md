@@ -202,16 +202,13 @@ All other toolchain tasks are available as `pnpm josh <command>` subcommands —
 
 The `full` profile adds the packages below to `devDependencies`. The `basic` profile adds kit and, when Web files exist, Prettier. An entry is only added when it is missing — an existing version is never overwritten, so re-running `josh init` is idempotent.
 
-| Package                                                      | Version                                                                                                         |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `@joshuafolkken/kit`                                         | pinned to the running kit version (the generated configs import from this package, so it must be present)       |
-| `@ianvs/prettier-plugin-sort-imports`                        | `^4.7.1`                                                                                                        |
-| `prettier-plugin-svelte`                                     | `^4.1.1`                                                                                                        |
-| `prettier-plugin-tailwindcss`                                | `^0.8.0`                                                                                                        |
-| ESLint, TypeScript and `@playwright/test` (kit's peers)      | versions from kit's own development dependencies                                                                |
-| `prettier`, `cspell`, `@types/node`                          | versions from kit's own development dependencies                                                                |
-| `lefthook`                                                   | version from kit's own development dependencies; only when Git exists (the only case `lefthook.yml` is written) |
-| `secretlint`, `@secretlint/secretlint-rule-preset-recommend` | `^13.0.2`; see [Secret scanning](#secret-scanning-pre-commit)                                                   |
+| Package                                                                                     | Version                                                                                                         |
+| ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `@joshuafolkken/kit`                                                                        | pinned to the running kit version (the generated configs import from this package, so it must be present)       |
+| ESLint, TypeScript, `@playwright/test`, Prettier and its three preset plugins (kit's peers) | versions from kit's own development dependencies                                                                |
+| `cspell`, `@types/node`                                                                     | versions from kit's own development dependencies                                                                |
+| `lefthook`                                                                                  | version from kit's own development dependencies; only when Git exists (the only case `lefthook.yml` is written) |
+| `secretlint`, `@secretlint/secretlint-rule-preset-recommend`                                | `^13.0.2`; see [Secret scanning](#secret-scanning-pre-commit)                                                   |
 
 Every generated config has its tool in this list, so `josh init` (which installs them) → `josh gate` passes in a new project with no manual install ([#2710](https://github.com/joshuafolkken/kit/issues/2710)): `prettier.config.js` needs `prettier`, `cspell.config.yaml` needs `cspell`, `playwright.config.ts` needs `@playwright/test` and `@types/node`, and `lefthook.yml` needs `lefthook`. The generated `tsconfig.json` names `"types": ["node"]`, because TypeScript 6 no longer loads installed `@types/*` packages by default. The `pnpm install` that `josh init` ends with runs the `prepare` script, which installs the hooks; under `--no-install` a new project has no lefthook yet, so `josh init` reports that and leaves the hooks to the `prepare` script of your own install.
 
