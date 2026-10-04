@@ -298,6 +298,17 @@ describe('patch_json_key.remove_json_key — re-layout', () => {
 		expect(result).toContain('/* keep */')
 	})
 
+	// Comment detection is string-aware: a URL's `//` is part of the value, so the value is still
+	// re-laid-out onto one line once its comma is gone.
+	it('re-lays-out a value whose string only looks like it holds a comment', () => {
+		const result = patch_json_key.remove_json_key(
+			'{\n\t"a": [\n\t\t"https://example.com"\n\t],\n\t"z": 2\n}\n',
+			'z',
+		)
+
+		expect(result).toBe('{\n\t"a": ["https://example.com"]\n}\n')
+	})
+
 	it('leaves no stray blank line when removing a first key in a CRLF document', () => {
 		const result = patch_json_key.remove_json_key('{\r\n\t"a": 1,\r\n\t"b": 2\r\n}\r\n', 'a')
 
