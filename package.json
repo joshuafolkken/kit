@@ -169,6 +169,7 @@
 	"peerDependencies": {
 		"@eslint/compat": "^2.1.1",
 		"@eslint/js": "^10.0.1",
+		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
 		"@playwright/test": ">=1.0.0",
 		"@stylistic/eslint-plugin": "^5.10.0",
 		"eslint": "^10.0.0",
@@ -179,6 +180,9 @@
 		"eslint-plugin-sonarjs": "^4.2.1",
 		"eslint-plugin-unicorn": "^76.0.0",
 		"globals": "^17.12.0",
+		"prettier": "^3.9.9",
+		"prettier-plugin-svelte": "^4.1.1",
+		"prettier-plugin-tailwindcss": "^0.8.1",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.70.1"
 	},
@@ -190,6 +194,9 @@
 			"optional": true
 		},
 		"@eslint/js": {
+			"optional": true
+		},
+		"@ianvs/prettier-plugin-sort-imports": {
 			"optional": true
 		},
 		"@stylistic/eslint-plugin": {
@@ -217,6 +224,15 @@
 			"optional": true
 		},
 		"globals": {
+			"optional": true
+		},
+		"prettier": {
+			"optional": true
+		},
+		"prettier-plugin-svelte": {
+			"optional": true
+		},
+		"prettier-plugin-tailwindcss": {
 			"optional": true
 		},
 		"typescript": {

@@ -124,10 +124,10 @@ function get_kit_self_dependency(): Record<string, string> {
 }
 
 // Each config `init` generates runs a CLI or imports types the consumer has to resolve itself:
-// `prettier.config.js` → prettier, `cspell.config.yaml` → cspell, `playwright.config.ts` →
-// @types/node (with @playwright/test among the peers), `lefthook.yml` → lefthook. Without them the
-// first `josh gate` after `pnpm install` fails (joshuafolkken/kit#2710).
-const TOOL_DEVELOPMENT_DEPENDENCIES = ['prettier', 'cspell', '@types/node']
+// `cspell.config.yaml` → cspell, `playwright.config.ts` → @types/node, `lefthook.yml` → lefthook.
+// Prettier, its preset plugins and @playwright/test come in as peers. Without them the first
+// `josh gate` after `pnpm install` fails (joshuafolkken/kit#2710).
+const TOOL_DEVELOPMENT_DEPENDENCIES = ['cspell', '@types/node']
 const LEFTHOOK_DEVELOPMENT_DEPENDENCY = 'lefthook'
 
 function tool_dependency_names(has_git: boolean): ReadonlyArray<string> {
@@ -164,9 +164,8 @@ function apply_dependency_merges(content: string, has_git = true): string {
 			? suggested
 			: Object.fromEntries(Object.entries(suggested).filter(([key]) => key !== 'prepare')),
 	)
-	const with_prettier = init_logic.merge_prettier_plugin_development_deps(merged)
 	const with_toolchain = init_logic.merge_development_dependencies(
-		with_prettier,
+		merged,
 		get_toolchain_development_dependencies(has_git),
 	)
 	const with_secretlint = init_logic.merge_secretlint_development_deps(with_toolchain)
