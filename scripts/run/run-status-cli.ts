@@ -1,8 +1,8 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryRead } from './run-carry'
 import { run_status, type StatusParts } from './run-status'
 
@@ -41,19 +41,6 @@ interface StatusReads {
 	cost: CostVerdict
 }
 
-interface ParsedArguments {
-	positionals: ReadonlyArray<string>
-	values: { repo?: string }
-}
-
-function read_args(argv: ReadonlyArray<string>): ParsedArguments | undefined {
-	try {
-		return parseArgs({ args: [...argv], options: OPTIONS, allowPositionals: true, strict: true })
-	} catch {
-		return undefined
-	}
-}
-
 // Exactly one issue number, or the call is refused: `run:status` reports one run, and a second number
 // would print a second issue's state a caller reads as this run's own.
 function valid_issue(positionals: ReadonlyArray<string>): string | undefined {
@@ -65,7 +52,7 @@ function valid_issue(positionals: ReadonlyArray<string>): string | undefined {
 }
 
 function parse(argv: ReadonlyArray<string>): StatusRequest | undefined {
-	const parsed = read_args(argv)
+	const parsed = cli_flags.arguments_of(argv, OPTIONS)
 
 	if (parsed === undefined) return undefined
 

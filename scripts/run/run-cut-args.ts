@@ -47,12 +47,7 @@ type Request =
 	| { kind: 'end' }
 
 function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
-	return cli_flags.parse_or_undefined({
-		args: [...argv],
-		options: OPTIONS,
-		strict: true,
-		allowPositionals: true,
-	})
+	return cli_flags.arguments_of(argv, OPTIONS)
 }
 
 // The issue is the sole positional, and it must be a real issue number: a cut relaunches

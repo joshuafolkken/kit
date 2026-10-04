@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { josh_command } from '#scripts/josh/josh-run'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 
@@ -35,21 +35,15 @@ interface LaunchContext {
 }
 
 function read_context(argv: ReadonlyArray<string>): LaunchContext | undefined {
-	try {
-		const parsed = parseArgs({
-			args: [...argv],
-			options: OPTIONS,
-			strict: true,
-			allowPositionals: true,
-		})
-		const [issue, ...rest] = parsed.positionals
+	const parsed = cli_flags.arguments_of(argv, OPTIONS)
 
-		if (issue === undefined || rest.length > 0 || !ISSUE_PATTERN.test(issue)) return undefined
+	if (parsed === undefined) return undefined
 
-		return { issue, stash: parsed.values.stash }
-	} catch {
-		return undefined
-	}
+	const [issue, ...rest] = parsed.positionals
+
+	if (issue === undefined || rest.length > 0 || !ISSUE_PATTERN.test(issue)) return undefined
+
+	return { issue, stash: parsed.values.stash }
 }
 
 // The pop brought in the `pnpm-lock.yaml` `josh latest` rewrote, so this one lane installs a second

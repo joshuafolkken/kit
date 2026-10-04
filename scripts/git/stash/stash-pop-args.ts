@@ -21,12 +21,7 @@ interface Request {
 }
 
 function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
-	return cli_flags.parse_or_undefined({
-		args: [...argv],
-		options: OPTIONS,
-		strict: true,
-		allowPositionals: true,
-	})
+	return cli_flags.arguments_of(argv, OPTIONS)
 }
 
 // The message is the sole positional and must be a non-empty string: an empty message matches every

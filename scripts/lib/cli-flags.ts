@@ -1,4 +1,4 @@
-import { parseArgs, type ParseArgsConfig } from 'node:util'
+import { parseArgs, type ParseArgsConfig, type ParseArgsOptionsConfig } from 'node:util'
 
 // Argument reading for the commands under `scripts/`.
 //
@@ -32,6 +32,35 @@ function parse_or_undefined<T extends ParseArgsConfig>(
 	}
 }
 
-const cli_flags = { refuse_unknown_flags, parse_or_undefined }
+// The two shapes every command reads `argv` in: flags alone, or flags beside positionals. Both are
+// strict, so an unknown flag is `undefined` rather than a silently ignored typo; the commands had each
+// carried a one-line wrapper spelling these out (joshuafolkken/kit#3072).
+type FlagsOnly<T extends ParseArgsOptionsConfig> = ReturnType<
+	typeof parseArgs<{ args: Array<string>; options: T }>
+>
+type WithPositionals<T extends ParseArgsOptionsConfig> = ReturnType<
+	typeof parseArgs<{ args: Array<string>; options: T; allowPositionals: true }>
+>
+
+function values_of<T extends ParseArgsOptionsConfig>(
+	argv: ReadonlyArray<string>,
+	options: T,
+): FlagsOnly<T>['values'] | undefined {
+	return parse_or_undefined({ args: [...argv], options })?.values
+}
+
+function arguments_of<T extends ParseArgsOptionsConfig>(
+	argv: ReadonlyArray<string>,
+	options: T,
+): WithPositionals<T> | undefined {
+	return parse_or_undefined({ args: [...argv], options, allowPositionals: true })
+}
+
+// A string option's value, or `undefined` where the flag was absent or parsed as anything else.
+function string_of(value: unknown): string | undefined {
+	return typeof value === 'string' ? value : undefined
+}
+
+const cli_flags = { refuse_unknown_flags, parse_or_undefined, values_of, arguments_of, string_of }
 
 export { cli_flags }

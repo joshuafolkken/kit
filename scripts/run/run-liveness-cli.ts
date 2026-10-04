@@ -89,10 +89,6 @@ interface ParsedArguments {
 	values: ParsedValues
 }
 
-function read_arguments(argv: ReadonlyArray<string>): ParsedArguments | undefined {
-	return cli_flags.parse_or_undefined({ args: [...argv], options: OPTIONS, allowPositionals: true })
-}
-
 function is_valid_target(parsed: ParsedArguments): boolean {
 	return (
 		parsed.positionals.length === 1 &&
@@ -136,7 +132,7 @@ function to_request(parsed: ParsedArguments): LivenessRequest {
 }
 
 function parse_request(argv: ReadonlyArray<string>): LivenessRequest | undefined {
-	const parsed = read_arguments(argv)
+	const parsed = cli_flags.arguments_of(argv, OPTIONS)
 
 	if (parsed === undefined || !is_valid(parsed)) return undefined
 

@@ -37,7 +37,7 @@ interface ParsedValues {
 }
 
 function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
-	return cli_flags.parse_or_undefined({ args: [...argv], options: OPTIONS })?.values
+	return cli_flags.values_of(argv, OPTIONS)
 }
 
 // A hand-typed `--interval` outranks the environment, the environment outranks the interval the

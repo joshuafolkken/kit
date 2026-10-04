@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { agent_role_profile, type AgentProvider } from '#scripts/agent/agent-role-profile'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { codex_usage } from './codex-usage'
 import { CONTEXT_CUT_THRESHOLD } from './context-cut-threshold'
 import { cost_corpus } from './cost-corpus'
@@ -103,13 +103,9 @@ const PARSE_ARGS_OPTIONS = {
 } as const
 
 function parse_options(argv: ReadonlyArray<string>): Options | undefined {
-	try {
-		const { values } = parseArgs({ args: [...argv], options: PARSE_ARGS_OPTIONS, strict: true })
+	const values = cli_flags.values_of(argv, PARSE_ARGS_OPTIONS)
 
-		return to_options(values)
-	} catch {
-		return undefined
-	}
+	return values === undefined ? undefined : to_options(values)
 }
 
 // An empty corpus is reported, never priced at zero. "No transcript was found" and "this run was

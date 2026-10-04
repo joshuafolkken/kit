@@ -119,14 +119,6 @@ function note_to_stderr(note: string): void {
 	console.error(`wake: ${note}`)
 }
 
-function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
-	return cli_flags.parse_or_undefined({ args: [...argv], options: OPTIONS, strict: true })?.values
-}
-
-function text_of(value: string | boolean | undefined): string | undefined {
-	return typeof value === 'string' ? value : undefined
-}
-
 function to_interval_ms(value: string | boolean | undefined): number | undefined {
 	if (typeof value !== 'string') return DEFAULT_INTERVAL_SECONDS * MS_PER_SECOND
 	if (!INTERVAL_PATTERN.test(value)) return undefined
@@ -379,14 +371,14 @@ async function dispatch(
 	interval_ms: number,
 ): Promise<number> {
 	if (values.loop === true) return await loop(context, interval_ms)
-	if (values.start === true) return start(context, text_of(values.interval))
+	if (values.start === true) return start(context, cli_flags.string_of(values.interval))
 	if (values.stop === true) return stop_supervisor(context)
 
 	return list(context)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const values = read_arguments(argv)
+	const values = cli_flags.values_of(argv, OPTIONS)
 
 	if (values === undefined || group_count(values) !== ONE_GROUP) return usage()
 

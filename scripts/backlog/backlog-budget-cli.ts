@@ -32,11 +32,7 @@ type ParsedValues = Partial<Record<OptionName, string | boolean>>
 // A misspelled flag is refused rather than defaulted, the contract `path_decision.has_unknown_flag`
 // states for the path-decided commands: an invocation nobody can read is never answered.
 function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
-	return cli_flags.parse_or_undefined({ args: [...argv], options: OPTIONS, strict: true })?.values
-}
-
-function text_of(value: string | boolean | undefined): string | undefined {
-	return typeof value === 'string' ? value : undefined
+	return cli_flags.values_of(argv, OPTIONS)
 }
 
 // `find` rather than a cast: an unrecognized word has to be refused, and a type assertion would
@@ -79,15 +75,15 @@ type Counts = Record<(typeof COUNT_NAMES)[number], number | undefined>
 
 function counts_of(values: ParsedValues): Counts {
 	return {
-		idle: to_count(text_of(values.idle)),
-		max: to_count(text_of(values.max)),
-		merged: to_count(text_of(values.merged)),
-		running: to_count(text_of(values.running)),
+		idle: to_count(cli_flags.string_of(values.idle)),
+		max: to_count(cli_flags.string_of(values.max)),
+		merged: to_count(cli_flags.string_of(values.merged)),
+		running: to_count(cli_flags.string_of(values.running)),
 	}
 }
 
 function are_counts_readable(values: ParsedValues, counts: Counts): boolean {
-	return COUNT_NAMES.every((name) => is_readable(text_of(values[name]), counts[name]))
+	return COUNT_NAMES.every((name) => is_readable(cli_flags.string_of(values[name]), counts[name]))
 }
 
 // **`--idle 0` is how the watch is turned off, and omitting the flag takes the default**
@@ -116,14 +112,17 @@ function to_idle_ms(idle_minutes: number | undefined): number | undefined {
 // lands on the very first ask, before the run has started anything, and the fix is one flag the loop
 // already holds: it always knows when it last had work.
 function is_watch_readable(values: ParsedValues): boolean {
-	if (to_idle_ms(to_count(text_of(values.idle))) === undefined) return true
+	if (to_idle_ms(to_count(cli_flags.string_of(values.idle))) === undefined) return true
 
-	return text_of(values.active) !== undefined
+	return cli_flags.string_of(values.active) !== undefined
 }
 
 function are_values_readable(values: ParsedValues): boolean {
 	return (
-		is_readable(text_of(values.active), to_time_ms(text_of(values.active))) &&
+		is_readable(
+			cli_flags.string_of(values.active),
+			to_time_ms(cli_flags.string_of(values.active)),
+		) &&
 		is_watch_readable(values) &&
 		are_counts_readable(values, counts_of(values))
 	)
@@ -138,7 +137,7 @@ function input_of(values: ParsedValues, base: InputBase): BudgetInput {
 
 	return {
 		...base,
-		active_at_ms: to_time_ms(text_of(values.active)) ?? base.started_at_ms,
+		active_at_ms: to_time_ms(cli_flags.string_of(values.active)) ?? base.started_at_ms,
 		merged: counts.merged ?? 0,
 		running: counts.running ?? 0,
 		max_issues: counts.max,
@@ -147,11 +146,11 @@ function input_of(values: ParsedValues, base: InputBase): BudgetInput {
 }
 
 function build_input(values: ParsedValues, now_ms: number): BudgetInput | undefined {
-	const answer = to_answer(text_of(values.answer))
+	const answer = to_answer(cli_flags.string_of(values.answer))
 
 	if (answer === undefined) return undefined
 
-	const started_at_ms = to_time_ms(text_of(values.started))
+	const started_at_ms = to_time_ms(cli_flags.string_of(values.started))
 
 	if (started_at_ms === undefined) return undefined
 	if (!are_values_readable(values)) return undefined

@@ -1,11 +1,11 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { api_outage } from '#scripts/agent/api-outage'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { issue_closing_pr } from '#scripts/issue/issue-closing-pr'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryOwner, type RunCarry } from './run-carry'
 import { run_ending } from './run-ending'
 import { run_event_stream } from './run-event-stream'
@@ -67,14 +67,6 @@ const OPTIONS = {
 interface ParsedArguments {
 	positionals: ReadonlyArray<string>
 	values: Partial<Record<'epic' | 'output' | 'over' | 'owner' | 'repo', string>>
-}
-
-function read_args(argv: ReadonlyArray<string>): ParsedArguments | undefined {
-	try {
-		return parseArgs({ args: [...argv], options: OPTIONS, allowPositionals: true, strict: true })
-	} catch {
-		return undefined
-	}
 }
 
 // Absent owner is "no owner declared", which the carry guard reads as not provably foreign; a present
@@ -170,7 +162,7 @@ function to_context(parsed: ParsedArguments): MergeContext | undefined {
 }
 
 function parse(argv: ReadonlyArray<string>): MergeContext | undefined {
-	const parsed = read_args(argv)
+	const parsed = cli_flags.arguments_of(argv, OPTIONS)
 
 	return parsed === undefined ? undefined : to_context(parsed)
 }

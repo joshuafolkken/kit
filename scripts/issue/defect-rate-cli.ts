@@ -1,10 +1,10 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_label_schema } from '#scripts/git/schemas'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { z } from 'zod'
 import { defect_rate, type DefectRate, type RateIssue } from './defect-rate'
 
@@ -48,18 +48,17 @@ interface SearchResult {
 }
 
 function read_days(argv: ReadonlyArray<string>): number | undefined {
-	try {
-		const { values } = parseArgs({ args: [...argv], options: OPTIONS, strict: true })
-		const raw = values.days ?? String(defect_rate.DEFAULT_WINDOW_DAYS)
+	const values = cli_flags.values_of(argv, OPTIONS)
 
-		if (!DAYS_PATTERN.test(raw)) return undefined
+	if (values === undefined) return undefined
 
-		const days = Number(raw)
+	const raw = values.days ?? String(defect_rate.DEFAULT_WINDOW_DAYS)
 
-		return days <= MAX_WINDOW_DAYS ? days : undefined
-	} catch {
-		return undefined
-	}
+	if (!DAYS_PATTERN.test(raw)) return undefined
+
+	const days = Number(raw)
+
+	return days <= MAX_WINDOW_DAYS ? days : undefined
 }
 
 function search_path(query: string): string {
