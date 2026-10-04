@@ -8,6 +8,7 @@ jobs:
   create-tag:
     name: Create Git Tag if Version Changed
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       actions: write
       contents: write
@@ -19,9 +20,7 @@ jobs:
           fetch-depth: 2
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
+        uses: ./.github/actions/setup-node
 
       - name: Check if package.json changed
         id: pkg_changed

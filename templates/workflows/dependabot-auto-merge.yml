@@ -27,6 +27,7 @@ jobs:
   # what stays restricted to Dependabot's own events, on the step below.
   auto-merge:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
       # Whether the pull request touches a workflow some upstream package overwrites. Decided from
