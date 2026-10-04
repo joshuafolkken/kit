@@ -85,7 +85,9 @@ Refuse a file read once the run has read the threshold's worth of un-edited file
 ]
 ```
 
-- On the `Bash` side only read-only lines are refused (`bat`, `cat`, `head`, `less`, `more`, `nl`, `sed`, `tail`); a delegation clears the pending set. Excludes the run's own instructions (`CLAUDE.md`, `prompts/`, `.claude/skills/`) and harness session files.
+- On the `Bash` side only read-only lines are refused (`bat`, `cat`, `head`, `less`, `more`, `nl`, `sed`, `tail`); a delegation clears the pending set.
+- **Search turns are counted as well** (`fd`, `find`, `grep`, `rg`): the third search turn since the last delegation or successful write is refused, parallel searches in one turn counting once. Every read-only search counts, the run's own instructions included — a search's named files cannot show a bare directory beside them, so no search can be proven to touch the instructions alone.
+- The refusal points at the `investigator` agent (`.claude/agents/investigator.md`, shipped through the plugin as `kit:investigator`): no `model` key, so it inherits the parent's, with `effort: low` and read-only tools. Excludes the run's own instructions (`CLAUDE.md`, `prompts/`, `.claude/skills/`) and harness session files.
 - **A notice, not a refusal, in a dispatched lane child** (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn, so the guard delivers the same guidance as a non-blocking notice — the read proceeds with the guidance attached, and the notice **names the concrete unedited files** the run read. Why: `docs/maintainers/josh-commands-automation-rationale.md` → "The investigation guard is a notice in a lane child". Decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts`.
 - Set `JOSH_INVESTIGATION_GUARD` to `off` / `0` / `false` / `no` to disable.
 
@@ -179,6 +181,22 @@ pnpm josh sync:scope --json    # {"scope":"managed","reason":"..."}
 - `--json` — emit `{"scope","reason"}` as JSON.
 
 **Output / exit codes:** the answer (`managed` or `clean`) goes to stdout, the reason to stderr. Exit status is `0` for both — this reports, it does not gate.
+
+### `josh dogfood:commit`
+
+Make the first commit of a test project a dogfood run created itself. Kit-only.
+
+```bash
+pnpm josh dogfood:commit ~/Development/kit-test-html-start
+```
+
+An agent's own `git add` / `git commit` is refused wherever it points — the index guard cannot tell a throwaway project from the user's work — so this is the sanctioned route to a dogfood project's `Initial commit`. It runs `git init --initial-branch=main` when the directory has no `.git`, stages everything, commits `Initial commit` and names the branch `main`.
+
+It refuses, changing nothing and exiting `1`, unless the directory:
+
+- is named `kit-test-*` and exists;
+- lies outside the kit checkout it is run from;
+- has no commit yet, and is not inside another git repository — a `.git` without history, as `sv create` leaves, is accepted.
 
 ### `josh sonar:hotspots`
 
@@ -376,20 +394,21 @@ pnpm josh release:scope --json   # {"scope":"…","reason":"…"} on one line
 
 ### `josh release:github`
 
-Create the GitHub Release for a tag `josh release` cut, with notes generated from `.github/release.yml`. Run by CI, not by a person: kit's own `publish.yml` runs it in its `create-release` job, and every consumer receives `.github/workflows/github-release.yml` from `josh init` / `josh sync`, which runs it once the consumer's `Publish` workflow has succeeded for the tag — or, in a repository with no `publish.yml`, when `auto-tag.yml` announces the tag (`new-tag-created`).
+Create the GitHub Release for a tag `josh release` cut, with notes generated from `.github/release.yml`. Run by CI, not by a person: kit's own `publish.yml` runs it in its `create-release` job, and every consumer receives `.github/workflows/github-release.yml` from `josh init` / `josh sync`, which runs it when `auto-tag.yml` announces the tag (`new-tag-created`) and, in a repository with a `publish.yml`, waits there for the consumer's `Publish <tag>` run to succeed before releasing (a `workflow_run` on `Publish` never fires for a run the `GITHUB_TOKEN` started).
 
 ```bash
 GH_TOKEN=… RELEASE_TAG=v1.2.0 GITHUB_REPOSITORY=owner/repo pnpm josh release:github
 ```
 
-| Environment         | Meaning                                                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------------------------- |
-| `GH_TOKEN`          | Token with `contents: write` and `actions: read`. Required                                              |
-| `RELEASE_TAG`       | The tag to release. Required                                                                            |
-| `GITHUB_REPOSITORY` | `owner/repo` to release in — set by GitHub Actions. Required                                            |
-| `RELEASE_START_TAG` | Last tag before automatic releases. Unset: the latest release is the floor; none: the nearest lower tag |
-| `RELEASE_WORKFLOW`  | Publish workflow (file or id) whose failed run for a lower tag skips it. Unset: wait for its release    |
-| `RELEASE_JOBS`      | Comma-separated jobs in that workflow whose failure counts. Unset: any failed job                       |
+| Environment             | Meaning                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- |
+| `GH_TOKEN`              | Token with `contents: write` and `actions: read`. Required                                              |
+| `RELEASE_TAG`           | The tag to release. Required                                                                            |
+| `GITHUB_REPOSITORY`     | `owner/repo` to release in — set by GitHub Actions. Required                                            |
+| `RELEASE_START_TAG`     | Last tag before automatic releases. Unset: the latest release is the floor; none: the nearest lower tag |
+| `RELEASE_WORKFLOW`      | Publish workflow (file or id) whose failed run for a lower tag skips it. Unset: wait for its release    |
+| `RELEASE_JOBS`          | Comma-separated jobs in that workflow whose failure counts. Unset: any failed job                       |
+| `RELEASE_AWAIT_PUBLISH` | `true`: wait for the tag's own `Publish <tag>` run in `RELEASE_WORKFLOW` to succeed; skip when it fails |
 
 Releases are created in version order: a later tag waits for the nearest lower tag above the floor to get its release, and skips it when that tag's publication failed. A tag that already has a release is left alone. The consumer's release workflow needs the `.github/release.yml` categories and a `Publish` workflow titled `Publish <tag>` (`run-name`) when it has one.
 
@@ -564,7 +583,7 @@ pnpm josh issue:read 1715
 pnpm josh issue:read 1715 1567 1605          # several numbers, read concurrently
 ```
 
-Attribute each block by its `issue:` line, never by position. A number that resolves to nothing prints `does not resolve`; a failed read prints `could not read`; non-zero exit if any number went unanswered. Any non-numeric token refuses the whole call.
+Attribute each block by its `issue:` line, never by position. Output past the Bash cap is written as part files under it, and only their paths are printed — read every part with the Read tool in one turn. A number that resolves to nothing prints `does not resolve`; a failed read prints `could not read`; non-zero exit if any number went unanswered. Any non-numeric token refuses the whole call.
 
 ### `josh issue:state`
 
@@ -580,7 +599,7 @@ pnpm josh issue:state 42 43 --repo joshuafolkken/app-kit   # a child in another 
 
 - `--repo <owner/repo>` — read a child in another repository; applies to every number.
 
-State is `OPEN` / `CLOSED` / `MERGED`. `human_review:` answers whether the issue carries `needs-human-review`, matched case-insensitively. A number that resolves to nothing prints `does not resolve`; a failed read prints `could not read`; non-zero exit if any went unanswered.
+State is `OPEN` / `CLOSED` / `MERGED`. `human_review:` answers whether the issue carries `needs-human-review`, matched case-insensitively. Output past the Bash cap is written as part files under it, as `issue:read` does. A number that resolves to nothing prints `does not resolve`; a failed read prints `could not read`; non-zero exit if any went unanswered.
 
 ### `josh issue:scout`
 
@@ -1641,8 +1660,11 @@ evaluation procedure](./maintainers/backlogrun-worker-evaluation.md).
 Block until any of the named in-flight lane children confirms it has completed, then print which issue finished.
 
 ```bash
-pnpm josh lane:await 1749 1750   # block until either lane completes
+pnpm josh lane:await 1749 1750                  # block until either lane completes
+pnpm josh lane:await 1749 1750 --owner "$PPID"  # reclaim the carry record for a resumed conversation first
 ```
+
+`--owner <pid>` names the waiting session's process. When the carry record belongs to the same conversation under an earlier process — a restart resumed it in a new one — the record is moved to this pid before the wait, so a wait longer than the conversation's quiet window cannot read as a crash to `run:wake`. Any other record is left alone.
 
 Polls each child's process every 5 s with a 15 s re-confirm window, so a process that briefly disappears (the pre-gate cut handoff) is not mistakenly declared done. Prints the issue number of the first child that confirms completion and exits 0; does not exit until one confirms.
 
@@ -1686,6 +1708,7 @@ pnpm josh doc:section backlogrun.md "The hand-off"
 - The section prints verbatim with its subsections (a `##` heading carries its `###` children).
 - The heading matches as a prefix, exact match first; two prefix matches is a refusal naming both.
 - Fenced blocks are skipped so a `#`-column comment inside a fence does not end the section early.
+- **Past the Bash cap the section is written as part files**, each under the cap and together exactly the section, and only their paths are printed — read every part with the Read tool in one turn. `issue:read` and `issue:state` do the same.
 
 **Output / exit codes:** an unresolvable heading exits non-zero and lists the document's own headings.
 

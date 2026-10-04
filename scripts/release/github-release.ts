@@ -15,7 +15,12 @@ const POLL_INTERVAL_MS = 30_000
 const MAX_WAIT_ATTEMPTS = 120
 const RELEASE_SCHEMA = z.object({ tag_name: z.string().min(1) })
 const NOTES_SCHEMA = z.object({ name: z.string().min(1), body: z.string().min(1) })
-const RUN_SCHEMA = z.object({ id: z.number(), display_title: z.string() })
+const RUN_SCHEMA = z.object({
+	id: z.number(),
+	display_title: z.string(),
+	status: z.string().optional(),
+	conclusion: z.string().nullable().optional(),
+})
 const JOB_SCHEMA = z.object({
 	name: z.string(),
 	status: z.string(),
@@ -26,15 +31,19 @@ const JOBS_SCHEMA = z.object({ jobs: z.array(JOB_SCHEMA) })
 
 type ReleaseRequest = (url: string, init: RequestInit) => Promise<Response>
 type Wait = () => Promise<void>
+type PollState = 'ready' | 'failed' | 'pending'
 
 // What differs between repositories. `start_tag` is the last tag that predates automatic releases;
 // without it the latest existing release is the floor. `workflow` names the publish workflow whose
 // failed run lets a lower tag be skipped, and `jobs` the jobs in it that count (empty: every job).
+// `await_publish` holds the tag's own release until its run in that workflow has succeeded, for a
+// release started beside the publication rather than from inside it.
 interface ReleaseSettings {
 	repository: string
 	start_tag?: string | undefined
 	workflow?: string | undefined
 	jobs?: ReadonlyArray<string> | undefined
+	await_publish?: boolean | undefined
 }
 
 interface PublishOptions extends ReleaseSettings {
@@ -56,7 +65,14 @@ interface Ladder {
 	tags: ReadonlyArray<string>
 	floor: string | undefined
 	fallback?: () => Promise<string>
+	budget: Budget
+}
+
+// One allowance shared by every wait a release makes: waiting for its own publication and then for
+// lower tags' releases must end inside the job's `timeout-minutes` together, not each on its own.
+interface Budget {
 	wait: Wait
+	remaining: number
 }
 
 function request_options(token: string, method: string, body?: object): RequestInit {
@@ -130,13 +146,22 @@ function is_failed_job(job: z.infer<typeof JOB_SCHEMA>, names: ReadonlyArray<str
 	return names.some((name) => job.name === name || job.name.startsWith(`${name} /`))
 }
 
+async function publish_run(
+	client: Client,
+	workflow_name: string,
+	tag: string,
+): Promise<z.infer<typeof RUN_SCHEMA> | undefined> {
+	const workflow = encodeURIComponent(workflow_name)
+	const runs_response = await api_get(client, `/actions/workflows/${workflow}/runs?per_page=100`)
+	const runs = RUNS_SCHEMA.parse(await read_response(runs_response)).workflow_runs
+
+	return runs.find((item) => item.display_title === `Publish ${tag}`)
+}
+
 async function failed_publication(client: Client, tag: string): Promise<boolean> {
 	if (client.workflow === undefined) return false
 
-	const workflow = encodeURIComponent(client.workflow)
-	const runs_response = await api_get(client, `/actions/workflows/${workflow}/runs?per_page=100`)
-	const runs = RUNS_SCHEMA.parse(await read_response(runs_response)).workflow_runs
-	const run = runs.find((item) => item.display_title === `Publish ${tag}`)
+	const run = await publish_run(client, client.workflow, tag)
 	if (!run) return false
 
 	const jobs_response = await api_get(client, `/actions/runs/${String(run.id)}/jobs?per_page=100`)
@@ -149,24 +174,72 @@ async function default_wait(): Promise<void> {
 	await setTimeout(POLL_INTERVAL_MS)
 }
 
-async function release_state(client: Client, tag: string): Promise<'ready' | 'failed' | 'pending'> {
+async function release_state(client: Client, tag: string): Promise<PollState> {
 	if (await existing_release(client, tag)) return 'ready'
 	if (await failed_publication(client, tag)) return 'failed'
 
 	return 'pending'
 }
 
-async function wait_for_release(client: Client, tag: string, wait: Wait): Promise<boolean> {
-	for (let attempt = 0; attempt < MAX_WAIT_ATTEMPTS; attempt += 1) {
+// A run not listed yet is pending too: the announcement that starts this release also starts the
+// publication, so the release can ask before GitHub has queued that run.
+async function publication_state(
+	client: Client,
+	workflow: string,
+	tag: string,
+): Promise<PollState> {
+	const run = await publish_run(client, workflow, tag)
+	if (run?.status !== 'completed') return 'pending'
+
+	return run.conclusion === 'success' ? 'ready' : 'failed'
+}
+
+async function poll(
+	read: () => Promise<PollState>,
+	budget: Budget,
+	subject: string,
+): Promise<boolean> {
+	while (budget.remaining > 0) {
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		const state = await release_state(client, tag)
+		const state = await read()
 		if (state !== 'pending') return state === 'ready'
 
+		budget.remaining -= 1
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await wait()
+		await budget.wait()
 	}
 
-	throw new Error(`Timed out waiting for previous GitHub Release ${tag}`)
+	throw new Error(`Timed out waiting for ${subject}`)
+}
+
+async function wait_for_release(client: Client, tag: string, budget: Budget): Promise<boolean> {
+	return await poll(
+		async () => await release_state(client, tag),
+		budget,
+		`previous GitHub Release ${tag}`,
+	)
+}
+
+async function wait_for_publication(client: Client, tag: string, budget: Budget): Promise<boolean> {
+	const { workflow } = client
+	if (workflow === undefined) throw new Error('Waiting for the publication needs RELEASE_WORKFLOW')
+
+	return await poll(
+		async () => await publication_state(client, workflow, tag),
+		budget,
+		`Publish ${tag}`,
+	)
+}
+
+async function is_publication_ready(
+	client: Client,
+	tag: string,
+	options: PublishOptions,
+	budget: Budget,
+): Promise<boolean> {
+	if (options.await_publish !== true) return true
+
+	return await wait_for_publication(client, tag, budget)
 }
 
 async function ladder_end(ladder: Ladder): Promise<string | undefined> {
@@ -184,7 +257,7 @@ async function baseline_tag(
 	if (ladder.floor === undefined) return prior
 	if (!prior) return await ladder_end(ladder)
 
-	return (await wait_for_release(client, prior, ladder.wait))
+	return (await wait_for_release(client, prior, ladder.budget))
 		? prior
 		: await baseline_tag(client, prior, ladder)
 }
@@ -195,16 +268,19 @@ function assert_older(previous: string | undefined, tag: string): void {
 	}
 }
 
-async function build_ladder(client: Client, options: PublishOptions): Promise<Ladder> {
+async function build_ladder(
+	client: Client,
+	options: PublishOptions,
+	budget: Budget,
+): Promise<Ladder> {
 	const tags = options.tags ?? []
-	const wait = options.wait ?? default_wait
 	const { start_tag } = options
 
 	if (start_tag !== undefined) {
-		return { tags, wait, floor: start_tag, fallback: async () => await previous_tag(client) }
+		return { tags, budget, floor: start_tag, fallback: async () => await previous_tag(client) }
 	}
 
-	return { tags, wait, floor: await latest_release(client) }
+	return { tags, budget, floor: await latest_release(client) }
 }
 
 async function generate_notes(
@@ -252,6 +328,10 @@ function create_client(request: ReleaseRequest, token: string, settings: Release
 	}
 }
 
+function create_budget(options: PublishOptions): Budget {
+	return { wait: options.wait ?? default_wait, remaining: MAX_WAIT_ATTEMPTS }
+}
+
 async function publish(
 	request: ReleaseRequest,
 	token: string,
@@ -263,7 +343,13 @@ async function publish(
 	const client = create_client(request, token, options)
 	if (await existing_release(client, tag)) return 'already-published'
 
-	const previous = await baseline_tag(client, tag, await build_ladder(client, options))
+	const budget = create_budget(options)
+
+	if (!(await is_publication_ready(client, tag, options, budget))) {
+		return `skipped ${tag}: Publish ${tag} did not succeed`
+	}
+
+	const previous = await baseline_tag(client, tag, await build_ladder(client, options, budget))
 
 	assert_older(previous, tag)
 	await create_release(client, tag, previous)

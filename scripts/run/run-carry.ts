@@ -4,6 +4,7 @@ import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
 import { run_carry_change } from './run-carry-change'
+import { run_carry_conversation } from './run-carry-conversation'
 import { run_invocation } from './run-invocation'
 
 // joshuafolkken/kit#1714: a `backlogrun` declares a budget — `--max`, `--idle` and the 8-hour
@@ -106,6 +107,9 @@ interface RunCarry {
 	// them apart would be asserting a distinction nothing here can observe.
 	owner_pid?: number | undefined
 	owner_start?: string | undefined
+	// The owner conversation's transcript, which outlives a restart of its process
+	// (`run-carry-conversation.ts`, joshuafolkken/kit#3137). Optional for the same reason as the pid.
+	owner_transcript?: string | undefined
 	// Set by `--cut`, and by nothing else. A crash never reaches `--cut`, which is what makes a
 	// declared cut the only standing record carried without a person deciding.
 	is_handed_off?: boolean | undefined
@@ -129,10 +133,12 @@ interface RunCarry {
 }
 
 // The identity of a process, as `process-identity.ts` keeps it: the pid plus an opaque start-time
-// token, so a reissued pid is never mistaken for the process that wrote the record.
+// token, so a reissued pid is never mistaken for the process that wrote the record — and the
+// transcript of the conversation that process runs, which outlives it (`run-carry-conversation.ts`).
 interface CarryOwner {
 	pid?: number | undefined
 	start?: string | undefined
+	transcript?: string | undefined
 }
 
 // **`resume` is the only one of the four that establishes anything.** The other three are refusals,
@@ -201,6 +207,7 @@ const run_carry_schema = z.object({
 	// which is the not-provably-live answer rather than a live one.
 	owner_pid: z.number().optional(),
 	owner_start: z.string().optional(),
+	owner_transcript: z.string().optional(),
 	is_handed_off: z.boolean().optional(),
 	done: z.array(z.number()).optional(),
 	// Optional, so a record written before the retrospective existed still parses (joshuafolkken/kit#2328).
@@ -256,12 +263,14 @@ function read_carry(target: string, now: Date = new Date()): CarryRead {
 
 // The identity to record for a pid the caller declared. `read_start` is what makes the pair an
 // identity rather than a number; injected in tests so the sandbox branch is exercised without
-// changing the machine's process capabilities.
+// changing the machine's process capabilities. The transcript is the calling session's own — the
+// declared pid is that session's process (`--owner "$PPID"`).
 function owner_of(
 	pid: number,
 	read: (owner_pid: number) => string | undefined = process_identity.read_start,
+	transcript: string | undefined = run_carry_conversation.own_transcript(),
 ): CarryOwner {
-	return { pid, start: read(pid) }
+	return { pid, start: read(pid), transcript }
 }
 
 function fresh_carry(invocation: string, owner: CarryOwner, now: Date): RunCarry {
@@ -275,6 +284,7 @@ function fresh_carry(invocation: string, owner: CarryOwner, now: Date): RunCarry
 		outages: NO_INCREMENT,
 		owner_pid: owner.pid,
 		owner_start: owner.start,
+		owner_transcript: owner.transcript,
 	}
 }
 
@@ -329,6 +339,7 @@ function adopt_carry(
 		...carry,
 		owner_pid: owner.pid,
 		owner_start: owner.start,
+		owner_transcript: owner.transcript,
 		is_handed_off: false,
 	}
 
@@ -340,11 +351,16 @@ function adopt_carry(
 // A live pid with no readable start token is conservatively held rather than replaced. The command
 // cannot prove its generation inside that sandbox, but a false `busy` stops for a person while a
 // false `standing` can put two parents on one budget. A record with no pid still resolves false.
-function is_owner_live(carry: RunCarry): boolean {
-	return process_identity.is_same_process(carry.owner_pid, carry.owner_start) !== false
+// A gone process whose conversation is still being continued is live (`run-carry-conversation.ts`).
+function is_owner_live(carry: RunCarry, now: Date = new Date()): boolean {
+	if (process_identity.is_same_process(carry.owner_pid, carry.owner_start) !== false) return true
+
+	return run_carry_conversation.is_conversation_live(carry, now)
 }
 
 function is_owned_by(carry: RunCarry, owner: CarryOwner): boolean {
+	if (run_carry_conversation.is_same_conversation(carry, owner)) return true
+
 	return carry.owner_pid === owner.pid && carry.owner_start === owner.start
 }
 

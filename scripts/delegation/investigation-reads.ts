@@ -55,10 +55,23 @@ const CONTENT_READ_LABELS: ReadonlySet<string> = new Set(
 	CONTENT_READ_COMMANDS.map((command) => time_shell.bash_label(command)),
 )
 
+// **The searches carry no file text, so they are counted in turns rather than files**
+// (joshuafolkken/kit#3139). The file count above never saw a `grep`, yet searches were the commonest
+// exploration turn a lane took — 457 of them in one day, each re-reading the main line's whole context.
+// What a search costs is the turn, so a turn is the unit: parallel searches in one turn count once.
+const SEARCH_COMMANDS: ReadonlyArray<string> = ['fd', 'find', 'grep', 'rg']
+const SEARCH_LABELS: ReadonlySet<string> = new Set(
+	SEARCH_COMMANDS.map((command) => time_shell.bash_label(command)),
+)
+
+// The unit the refusal sends the reading to (joshuafolkken/kit#3139): `.claude/agents/investigator.md`,
+// the parent's model at a lowered effort. A consumer receives it through the plugin as `kit:investigator`.
+const INVESTIGATOR_AGENT = 'investigator'
+
 // What the refusal tells the model. It has to name the count, the command and the return shape,
 // because the deny reason is the only text that reaches the model — a run that is refused and told
 // nothing reads it as a broken tool.
-const REASON = `⛔ investigation: ${String(delegation_policy.INVESTIGATION_FILE_THRESHOLD)} files read and not edited since the last delegated unit, so the reading from here goes to a unit of its own. Ask \`pnpm josh delegate investigation\`, then brief a unit with what the main line has already concluded and what is left to find out; it returns the conclusion plus its \`file:line\` citations, never the file text. Keep a read in the main line only where this run will edit that file — an \`Edit\` cannot be issued against text you do not hold. This run's own instructions and the harness's own session files — a backgrounded call's output, a persisted tool result, this session's scratchpad — are never counted, so they are not what took the count here. The rule is \`.claude/skills/workflow-commands/SKILL.md\` → §2b, "The pre-implementation reading".`
+const REASON = `⛔ investigation: ${String(delegation_policy.INVESTIGATION_FILE_THRESHOLD)} files read and not edited, or ${String(delegation_policy.INVESTIGATION_SEARCH_TURN_THRESHOLD)} search turns, since the last delegated unit, so the reading from here goes to a unit of its own (a successful write also starts the search count over). Ask \`pnpm josh delegate investigation\`, then dispatch the \`${INVESTIGATOR_AGENT}\` agent (\`kit:${INVESTIGATOR_AGENT}\` in a consumer) with a brief of what the main line has already concluded and what is left to find out; it returns the conclusion plus its \`file:line\` citations, never the file text. Keep a read in the main line only where this run will edit that file — an \`Edit\` cannot be issued against text you do not hold. This run's own instructions and the harness's own session files — a backgrounded call's output, a persisted tool result, this session's scratchpad — never count toward the files, so they are not what took the file count here; every read-only search turn counts, whatever it names. The rule is \`.claude/skills/workflow-commands/SKILL.md\` → §2b, "The pre-implementation reading".`
 
 interface ReadTally {
 	// The files read and not since edited, resolved so the two ways a target reaches here compare.
@@ -74,6 +87,10 @@ interface ReadTally {
 	// The first instant the window covers. A refusal recorded before it cannot be checked against a
 	// delegation any more, because the delegation that would re-arm it has scrolled out.
 	window_start_ms: number
+	// The search turns since the last delegation or successful write, and how many of them came after
+	// the instant asked about — the search-side `pending` / `pending_since` (joshuafolkken/kit#3139).
+	searches: number
+	searches_since: number
 	// The files this run has successfully edited within the window, resolved (joshuafolkken/kit#1840).
 	// A re-read of one of them is a read of a file the run edited, which §2b keeps in the main line — so
 	// it is excluded from the count and from a call's projected growth rather than counted as fresh
@@ -279,18 +296,65 @@ function add_all(
 // the edit's own span, so a read issued *after* the edit was added and stayed. `sed -i`, `MultiEdit`
 // and `NotebookEdit` need no special case any more — each is a write, so its target is in `edited` and
 // never enters the read count.
-function apply_span(pending: Map<string, number>, span: Span, edited: ReadonlySet<string>): void {
-	if (DELEGATION_TOOLS.has(span.label)) {
-		pending.clear()
+interface Accumulation {
+	// Read files, keyed by resolved path, valued by the instant each entered.
+	pending: Map<string, number>
+	// Search turns, keyed by message id so a turn's parallel searches count once, valued the same way.
+	searches: Map<string, number>
+}
+
+function is_read_only_search(span: Span): boolean {
+	return SEARCH_LABELS.has(span.label) && span.is_bundleable && !span.may_write
+}
+
+// **A span with no message id belongs to no known turn, so it is a turn of its own** — the reading every
+// other turn counter gives `NO_MESSAGE_ID` (`time-round-trips.ts`, `time-bundles.ts`). Keyed by the
+// id, every untagged search would collapse into one entry and the count would never reach its threshold.
+function search_turn_key(searches: ReadonlyMap<string, number>, span: Span): string {
+	if (span.message_id !== time_spans.NO_MESSAGE_ID) return span.message_id
+
+	return `${time_spans.NO_MESSAGE_ID}#${String(searches.size)}`
+}
+
+// **A successful write ends the streak.** The measurement behind the threshold counted searches since
+// the last edit or delegation: a run that has started writing is implementing, and the searches that
+// follow locate the next edit rather than continue an investigation.
+//
+// **Every read-only search counts, whatever it names** (joshuafolkken/kit#3139). The file count can
+// exempt the run's own instructions because a read names each file it reads; a search does not — the
+// targets drop a bare directory, so `grep -rn foo CLAUDE.md scripts` looked like a search of
+// `CLAUDE.md` alone and an exemption let the whole sweep through. `is_bundleable` without `may_write`
+// is the read-only test `is_search_call` asks at the call, so the transcript never counts a search the
+// guard could not have refused.
+function apply_search(searches: Map<string, number>, span: Span): void {
+	if (span.is_writing) {
+		searches.clear()
 
 		return
 	}
 
-	if (!is_content_read(span.label) || is_failed_outcome(span)) return
+	const turn = search_turn_key(searches, span)
+
+	if (is_read_only_search(span) && !searches.has(turn)) searches.set(turn, span.ended_ms)
+}
+
+function apply_span(accumulation: Accumulation, span: Span, edited: ReadonlySet<string>): void {
+	if (DELEGATION_TOOLS.has(span.label)) {
+		accumulation.pending.clear()
+		accumulation.searches.clear()
+
+		return
+	}
+
+	if (is_failed_outcome(span)) return
+
+	apply_search(accumulation.searches, span)
+
+	if (!is_content_read(span.label)) return
 
 	const fresh = subject_targets(span.targets).filter((target) => !edited.has(target))
 
-	add_all(pending, fresh, span.ended_ms)
+	add_all(accumulation.pending, fresh, span.ended_ms)
 }
 
 function last_delegation_ms(spans: ReadonlyArray<Span>): number {
@@ -307,15 +371,17 @@ function pending_after(pending: ReadonlyMap<string, number>, since_ms: number): 
 function tally_of(text: string, since_ms: number = hook_decision.NEVER_MS): ReadTally {
 	const { spans, started_ms } = time_spans.parse_timeline(text)
 	const edited = edited_files(spans)
-	const pending = new Map<string, number>()
+	const accumulation: Accumulation = { pending: new Map(), searches: new Map() }
 
-	for (const span of spans) apply_span(pending, span, edited)
+	for (const span of spans) apply_span(accumulation, span, edited)
 
 	return {
-		pending: [...pending.keys()],
-		pending_since: pending_after(pending, since_ms),
+		pending: [...accumulation.pending.keys()],
+		pending_since: pending_after(accumulation.pending, since_ms),
 		reset_ms: last_delegation_ms(spans),
 		window_start_ms: started_ms,
+		searches: accumulation.searches.size,
+		searches_since: pending_after(accumulation.searches, since_ms),
 		edited,
 	}
 }
@@ -345,6 +411,11 @@ function projected_count(
 // files had already been read. The boundary is crossed by a call, not jumped over by one.
 function is_at_threshold(pending_count: number): boolean {
 	return pending_count + 1 >= delegation_policy.INVESTIGATION_FILE_THRESHOLD
+}
+
+// The search turn that takes the count up to its threshold is the boundary, as above.
+function is_at_search_threshold(search_count: number): boolean {
+	return search_count + 1 >= delegation_policy.INVESTIGATION_SEARCH_TURN_THRESHOLD
 }
 
 // **One refusal per accumulation, re-armed by a delegation and by nothing else.** A run that reads on
@@ -386,7 +457,7 @@ function is_rearmed(tally: ReadTally, refused_at_ms: number): boolean {
 		return true
 	}
 
-	return is_at_threshold(tally.pending_since)
+	return is_at_threshold(tally.pending_since) || is_at_search_threshold(tally.searches_since)
 }
 
 // A transcript under a session's `subagents/` directory is a delegated unit's. The segment is
@@ -403,10 +474,19 @@ function is_unit_run(run: GuardRun | undefined): boolean {
 	return run !== undefined && is_unit_transcript(run.transcript)
 }
 
-function is_refusable_command(call: GuardedCall): boolean {
+function is_read_only_command(call: GuardedCall, labels: ReadonlySet<string>): boolean {
+	if (call.name !== cost_blocks.BASH_TOOL) return false
+
 	const label = time_shell.bash_label(time_shell.bash_command(call.input))
 
-	return CONTENT_READ_LABELS.has(label) && time_batch_guard.is_read_only_call(call)
+	return labels.has(label) && time_batch_guard.is_read_only_call(call)
+}
+
+// **A search is refusable without a subject target**, unlike a read: `grep -rn foo scripts` names a
+// bare directory, which `call_facts` deliberately does not take as a target, and such a sweep is exactly
+// the search this count exists for.
+function is_search_call(call: GuardedCall): boolean {
+	return is_read_only_command(call, SEARCH_LABELS)
 }
 
 // **A `Read` is always safe to refuse; a `Bash` line is refused only where it writes nothing.** This
@@ -427,10 +507,20 @@ function is_refusable_command(call: GuardedCall): boolean {
 // rule being enforced — and a call whose targets could not be read at all, which cannot move the count
 // and so has nothing to be refused for.
 function is_refusable_call(call: GuardedCall): boolean {
+	if (is_search_call(call)) return true
 	if (call_targets(call).length === 0) return false
 	if (READ_TOOLS.has(call.name)) return true
 
-	return call.name === cost_blocks.BASH_TOOL && is_refusable_command(call)
+	return is_read_only_command(call, CONTENT_READ_LABELS)
+}
+
+// A search call grows the search count by its own turn; a read grows the file count only by a file the
+// count does not already hold.
+function is_growing_past_threshold(tally: ReadTally, call: GuardedCall): boolean {
+	if (is_search_call(call)) return is_at_search_threshold(tally.searches)
+	if (!is_at_threshold(tally.pending.length)) return false
+
+	return projected_count(tally.pending, call, tally.edited) > tally.pending.length
 }
 
 function should_block(
@@ -446,15 +536,11 @@ function should_block(
 
 	const tally = tally_of(text, refused_at_ms)
 
-	if (!is_at_threshold(tally.pending.length)) return false
-
-	return (
-		projected_count(tally.pending, call, tally.edited) > tally.pending.length &&
-		is_rearmed(tally, refused_at_ms)
-	)
+	return is_growing_past_threshold(tally, call) && is_rearmed(tally, refused_at_ms)
 }
 
 const investigation_reads = {
+	INVESTIGATOR_AGENT,
 	READ_TOOLS,
 	REASON,
 	is_at_threshold,

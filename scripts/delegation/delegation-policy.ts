@@ -32,6 +32,13 @@ interface DelegatableStep {
 // wait per turn — and below the threshold that round trip costs more than carrying the text.
 const INVESTIGATION_FILE_THRESHOLD = 3
 
+// The same boundary for searches, counted in turns (joshuafolkken/kit#3139). A `grep` carries no file
+// text, so it never reached the file count — yet across 100 lane transcripts on 2026-10-04, 424 turns
+// were searches alone and 160 of them came third or later since the last edit or delegation, each
+// re-reading the whole main-line context. Three keeps the first two searches, which locate an edit
+// target, in the main line and sends the continuing sweep to a unit.
+const INVESTIGATION_SEARCH_TURN_THRESHOLD = 3
+
 // The enumeration. Short on purpose: every entry had to name a verifier, and most candidates could
 // not (below).
 const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
@@ -88,7 +95,7 @@ const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
 		// verifiers differ, so widening `survey` would put both in one field and lose the boundary below.
 		// **No ordinal.** `${N}rd` would print `1rd` for any other threshold, past a test that only looks
 		// for the numeral, so the count is phrased as a plain "N or more".
-		does: `read the Issue's subject to find out how it currently works — once ${String(INVESTIGATION_FILE_THRESHOLD)} or more files the run will not edit have to be read — and return the conclusion plus the \`file:line\` citations that support it, never the file text, which would put the cost back where it was. A throwaway probe script is written, run and deleted inside the unit, which returns its output alone`,
+		does: `read the Issue's subject to find out how it currently works — once ${String(INVESTIGATION_FILE_THRESHOLD)} or more files the run will not edit have to be read, or ${String(INVESTIGATION_SEARCH_TURN_THRESHOLD)} or more search turns run without an edit — and return the conclusion plus the \`file:line\` citations that support it, never the file text, which would put the cost back where it was. A throwaway probe script is written, run and deleted inside the unit, which returns its output alone`,
 		verifier:
 			'the parent opens the cited lines; a conclusion those lines do not support fails there, and reading a handful of cited regions costs far less than redoing the reading. The unit reports what the code does and never what to change — deciding that is `diagnosis`, which stays kept, so a unit returning a root cause would be delegating the rejected row under this name',
 	},
@@ -176,6 +183,7 @@ function reason_for(name: string): string {
 const delegation_policy = {
 	DELEGATE_VERDICT,
 	INVESTIGATION_FILE_THRESHOLD,
+	INVESTIGATION_SEARCH_TURN_THRESHOLD,
 	KEEP_VERDICT,
 	DELEGATABLE_STEPS,
 	REJECTED_STEPS,

@@ -195,9 +195,10 @@ describe('the labels and failures of josh start', () => {
 	})
 
 	it('opens the setup pull request through its own step, in the project root (#2816)', async () => {
+		vi.mocked(start_setup_pr.changed_paths).mockReturnValue([])
 		await start_steps.run_steps(['setup_pr'], CONTEXT)
 
-		expect(start_setup_pr.open).toHaveBeenCalledWith(ROOT, undefined)
+		expect(start_setup_pr.open).toHaveBeenCalledWith(ROOT, [])
 	})
 
 	it('hands the setup pull request what was changed before a caller command ran (#2872)', async () => {
@@ -219,5 +220,22 @@ describe('the labels and failures of josh start', () => {
 		await expect(start_steps.run_steps(['git_init', 'repository'], CONTEXT)).rejects.toThrow(
 			/stopped at: Create the GitHub repository[\s\S]*Completed: Create a Git repository[\s\S]*name already exists/u,
 		)
+	})
+})
+
+describe('the baseline the setup pull request is handed (#3136)', () => {
+	it('is read for kit own initialize too, so the files its format rewrote join the PR', async () => {
+		vi.mocked(start_setup_pr.changed_paths).mockReturnValue(['notes.md'])
+
+		await start_steps.run_steps(['initialize', 'setup_pr'], CONTEXT)
+
+		expect(start_setup_pr.changed_paths).toHaveBeenCalledWith(ROOT)
+		expect(start_setup_pr.open).toHaveBeenCalledWith(ROOT, ['notes.md'])
+	})
+
+	it('is not read when no setup pull request follows', async () => {
+		await start_steps.run_steps(['labels'], CONTEXT)
+
+		expect(start_setup_pr.changed_paths).not.toHaveBeenCalled()
 	})
 })

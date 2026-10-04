@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { capped_print_fixture } from './capped-print-fixture'
 import { document_section_cli } from './document-section-cli'
 import { read_set_cli } from './read-set-cli'
 import { read_set_pricing } from './read-set-pricing'
@@ -43,10 +44,11 @@ function captured(act: () => number): Captured {
 describe('josh doc:section', () => {
 	it('prints the named section of a sibling workflow document', () => {
 		const { code, out } = captured(() => document_section_cli.run([PROGRESS_DOC, HAND_OFF]))
+		const section = capped_print_fixture.restored(out)
 
 		expect(code).toBe(SUCCESS)
-		expect(out).toContain(`## ${HAND_OFF}`)
-		expect(out).not.toContain('## Waiting, and never waiting forever')
+		expect(section).toContain(`## ${HAND_OFF}`)
+		expect(section).not.toContain('## Waiting, and never waiting forever')
 	})
 
 	it('refuses a heading the document does not have, and lists what it does', () => {

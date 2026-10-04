@@ -239,6 +239,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "files",
       ],
     ],
+    "dogfood:commit": [
+      "<dir>",
+      "automation",
+      [
+        "files",
+        "git",
+      ],
+    ],
     "duplicate-read:guard": [
       "",
       "automation",
@@ -445,9 +453,10 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "lane:await": [
-      "<issue> [<issue>...]",
+      "<issue> [<issue>...] [--owner <pid>]",
       "automation",
       [
+        "files",
         "processes",
       ],
     ],

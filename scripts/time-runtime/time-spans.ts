@@ -138,6 +138,9 @@ interface ToolCall {
 	// second write to one file is independent work, a read of a file just written is not
 	// (joshuafolkken/kit#1509).
 	is_writing: boolean
+	// The conservative write answer `is_read_only_call` asks of a live call, carried so a reader of the
+	// transcript asks the same read-only question as the guard (joshuafolkken/kit#3139).
+	may_write: boolean
 	// Whether this is a subagent launch whose prompt builds on an earlier launch's finding
 	// (joshuafolkken/kit#1854). Carried for the reason every field here is — the prompt it is read from
 	// is the input, and a span keeps none. `time-agent-bundles.ts` reads it.
@@ -474,6 +477,7 @@ function to_spans(events: ReadonlyArray<TimelineEvent>, finished: FinishedAt): A
 		is_bundleable: event.is_bundleable,
 		targets: event.targets,
 		is_writing: event.is_writing,
+		may_write: event.may_write,
 		has_prior_reference: event.has_prior_reference,
 		writes: event.writes,
 		message_id: event.message_id,

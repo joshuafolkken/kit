@@ -265,6 +265,16 @@ Upgrade every installed @joshuafolkken toolkit here and open the pull request
 
 ---
 
+### `josh dogfood:commit`
+
+> **Audience:** automation · **Side effects:** files, git · **kit only**
+
+`<dir>`
+
+Make the first commit of a dogfood run's own kit-test-* project
+
+---
+
 ### `josh init` · `josh i`
 
 > **Audience:** developer · **Side effects:** files, network, processes
@@ -1047,9 +1057,9 @@ Print each issue's state and labels, in the spelling the documents compare again
 
 ### `josh lane:await`
 
-> **Audience:** automation · **Side effects:** processes
+> **Audience:** automation · **Side effects:** files, processes
 
-`<issue> [<issue>...]`
+`<issue> [<issue>...] [--owner <pid>]`
 
 Block until any of the named in-flight lane children completes; prints which one finished
 

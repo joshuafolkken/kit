@@ -51,13 +51,13 @@ describe('issue_report_failures.report_failures', () => {
 
 describe('issue_report_failures.print_blocks', () => {
 	it('joins the blocks with the separator in one print', () => {
-		issue_report_failures.print_blocks(['a', 'b'], '\n---\n')
+		issue_report_failures.print_blocks(['a', 'b'], '\n---\n', 'label')
 
 		expect(info_spy).toHaveBeenCalledExactlyOnceWith('a\n---\nb')
 	})
 
 	it('prints nothing when there is no block', () => {
-		issue_report_failures.print_blocks([], '\n')
+		issue_report_failures.print_blocks([], '\n', 'label')
 
 		expect(info_spy).not.toHaveBeenCalled()
 	})

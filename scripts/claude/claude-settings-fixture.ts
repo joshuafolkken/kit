@@ -48,10 +48,13 @@ interface EnvironmentBlock {
 	BASH_MAX_OUTPUT_LENGTH?: string
 }
 
+// `enableArtifact` is optional so a settings file without it reads as the harness default (the
+// Artifact tool loaded) rather than failing to parse.
 interface SettingsShape {
 	permissions: PermissionsBlock
 	env: EnvironmentBlock
 	hooks: HooksBlock
+	enableArtifact?: boolean
 }
 
 function read_settings_text(): string {

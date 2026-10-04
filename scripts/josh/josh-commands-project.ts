@@ -22,6 +22,13 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 			['files', 'git', 'network', 'processes'],
 		],
 	},
+	'dogfood:commit': {
+		script: 'scripts/dogfood/dogfood-commit-cli.ts',
+		description: "Make the first commit of a dogfood run's own kit-test-* project",
+		category: 'Project',
+		reference: ['<dir>', 'automation', ['files', 'git']],
+		is_kit_only: true,
+	},
 	init: {
 		script: 'scripts/init/init.ts',
 		description: 'Initialize config in a new project',
