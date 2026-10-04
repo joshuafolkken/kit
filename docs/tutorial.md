@@ -2,14 +2,14 @@
 
 For anyone who has installed kit and wants to see the Issue-driven loop once, end to end. There are two ways to run it: **Pattern A** takes one Issue at a time from plan to merge, and **Pattern B** files several Issues first and then lets the agent work through them unattended. Each step names the one thing to type and links to the guide or reference that holds the details — this page is the map, not the manual.
 
-`kickoff`, `halfrun`, `fullrun` and `backlogrun` are keywords you type to the agent, not `josh` commands; the agent drives `josh` and `gh` for you. [Run Issues with the workflow keywords](./how-to/run-issues.md) explains each one.
+`kickoff`, `halfrun`, `prrun`, `fullrun` and `backlogrun` are keywords you type to the agent, not `josh` commands; the agent drives `josh` and `gh` for you. [Run Issues with the workflow keywords](./how-to/run-issues.md) explains each one.
 
 ## Before you start
 
 - kit is set up with `josh start`, and its setup is on `main` — merge the setup pull request it opened, if it opened one ([init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start)). The profile guides walk through it: [Set up the basic profile](./setup/basic.md) for `basic`, [Set up the full profile](./setup/full.md) for `full`.
 - Use a **practice repository** on GitHub that you are happy to experiment in, with `gh` installed and signed in (`gh auth login`).
 - An agent that reads the repository's `CLAUDE.md`, such as Claude Code, is open in the repository.
-- Optional: Telegram notifications, so a stopped run reaches you off-screen — [Set up notifications](./how-to/set-up-notifications.md).
+- Telegram notifications are set up, so a stopped run reaches you off-screen — or turned off with `JOSH_NOTIFY=off` in `.env`. Without either, `josh notify` exits non-zero ([Set up notifications](./how-to/set-up-notifications.md)).
 
 ## Pattern A: one Issue at a time
 
@@ -42,6 +42,8 @@ fullrun #N
 ```
 
 The agent writes the plan on the Issue if it has none (the one `kickoff new` filed already does), implements the change, runs the gate and the self-review, opens the pull request with the `closes #N` line, waits for CI and merges it. The run ends with the Issue closed and a notification; it stops only when something needs you.
+
+To merge the pull request by hand instead, type `prrun #N`: it goes as far as a green, mergeable pull request and stops there ([Run Issues with the workflow keywords](./how-to/run-issues.md)).
 
 If you ran `halfrun` in step 2, its changes are still uncommitted in the working tree, and `fullrun` will not start on a tree with uncommitted changes. Finish that run with the commit command its stop notification gives instead — it opens the pull request and merges it the same way ([Recover a stopped run](./how-to/recover-a-run.md)).
 
