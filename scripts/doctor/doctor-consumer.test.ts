@@ -1,7 +1,8 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { doctor } from './doctor'
 import { doctor_consumer } from './doctor-consumer'
 
@@ -55,6 +56,32 @@ describe('plugin_line', () => {
 
 		expect(line).toContain('⚠')
 		expect(line).toContain('pnpm josh sync')
+	})
+})
+
+describe('configured_hooks_path', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('reads core.hooksPath in the given repository', () => {
+		const read = vi.spyOn(git_spawn_sync, 'read').mockReturnValue('.husky')
+
+		expect(doctor_consumer.configured_hooks_path('/repo')).toBe('.husky')
+		expect(read.mock.calls[0]?.[0]).toStrictEqual([
+			'-C',
+			'/repo',
+			'config',
+			'--get',
+			'core.hooksPath',
+		])
+	})
+
+	it('is undefined when the setting is unset or empty', () => {
+		vi.spyOn(git_spawn_sync, 'read').mockReturnValueOnce(undefined).mockReturnValueOnce('')
+
+		expect(doctor_consumer.configured_hooks_path('/repo')).toBeUndefined()
+		expect(doctor_consumer.configured_hooks_path('/repo')).toBeUndefined()
 	})
 })
 

@@ -18,10 +18,11 @@ import { git_ssh_keepalive } from './git-ssh-keepalive'
 // **`git-push-transport.ts` is the one deliberate exception among the command modules** and is not a
 // second helper of this kind: a push needs a transport-fault retry that no other command has, so it
 // spawns git itself. The timeout it carries is shared here by `read_remote` / `with_output_remote`. Those two files are the spawn sites of the ordinary command
-// modules — the claim stops there. Other parts of this package spawn git for their own purposes
-// (`scripts/run/run-progress-clock.ts`, `scripts/propagate/propagate-git.ts`,
-// `scripts/doctor/doctor-io.ts`, `scripts/git/git-fixture-workspace.ts`), and an audit of how the git
-// binary is resolved has to read those too.
+// modules — the claim stops there. A synchronous caller goes through `git-spawn-sync.ts`, the same
+// binary resolution with a result instead of an exception (joshuafolkken/kit#3065). Other parts of
+// this package spawn git for their own purposes (`scripts/run/run-progress-clock.ts`,
+// `scripts/git/git-fixture-workspace.ts`), and an audit of how the git binary is resolved has to read
+// those too.
 
 async function read(arguments_: Array<string>): Promise<string> {
 	const git_cmd = git_utilities.get_git_command_for_spawn()

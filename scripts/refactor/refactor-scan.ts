@@ -1,3 +1,4 @@
+import { git_command } from '#scripts/git/git-command'
 import { line_targets } from '#scripts/lines/line-targets'
 import { import_graph } from './import-graph'
 import { refactor_lint, type CategoryResult } from './refactor-lint'
@@ -97,7 +98,7 @@ async function scan(root: string): Promise<ScanResult> {
 }
 
 async function run_scan(): Promise<number> {
-	const root = await line_targets.repo_root()
+	const root = await git_command.repository_root()
 	const result = await scan(root)
 
 	process.stdout.write(`${render_result(result)}\n`)

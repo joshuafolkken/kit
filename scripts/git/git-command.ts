@@ -1,6 +1,8 @@
 import { PORCELAIN_FLAG, UNTRACKED_FILES_FLAG } from './constants'
+import { create_spawn_error } from './git-execa-error'
 import { git_push_transport } from './git-push-transport'
 import { git_spawn } from './git-spawn'
+import { git_spawn_sync } from './git-spawn-sync'
 
 async function branch(): Promise<string> {
 	return await git_spawn.read(['rev-parse', '--abbrev-ref', 'HEAD'])
@@ -31,7 +33,10 @@ async function status(directory?: string): Promise<string> {
 // onto the working directory resolves to nothing, and a digest map built that way collapses to
 // "every file absent" — which compares *equal* to another such map (joshuafolkken/kit#1241).
 async function repository_root(): Promise<string> {
-	return await git_spawn.read(['rev-parse', '--show-toplevel'])
+	const result = git_spawn_sync.toplevel()
+	if (result.exit_code !== 0) throw create_spawn_error('rev-parse', result.exit_code)
+
+	return result.stdout.trim()
 }
 
 // The commit this checkout is sitting on, as opposed to `change_base_commit`'s commit a change is
