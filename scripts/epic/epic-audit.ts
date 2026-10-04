@@ -1,3 +1,4 @@
+import { markdown_section } from '#scripts/issue/markdown-section'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 
 // Reading an epic's children against each other.
@@ -43,7 +44,6 @@ const ACCEPTANCE_HEADINGS: ReadonlySet<string> = new Set([
 	'## 受け入れ条件',
 	'## Acceptance criteria',
 ])
-const HEADING_PREFIX = '## '
 
 type FindingLevel = 'error' | 'warning'
 
@@ -169,26 +169,11 @@ function is_acceptance_heading(line: string): boolean {
 	return ACCEPTANCE_HEADINGS.has(line.trim())
 }
 
-function is_heading(line: string): boolean {
-	return line.trimStart().startsWith(HEADING_PREFIX)
-}
-
-// The lines under the acceptance-criteria heading, up to the next `##`. Shaped like the other
-// section readers in this repository, for the same reason: a regex spanning the block backtracks.
-function section_lines(lines: ReadonlyArray<string>): Array<string> {
-	const start = lines.findIndex((line) => is_acceptance_heading(line))
-	if (start === -1) return []
-	const rest = lines.slice(start + 1)
-	const end = rest.findIndex((line) => is_heading(line))
-
-	return end === -1 ? rest : rest.slice(0, end)
-}
-
-// The acceptance-criteria section of a child's body, or an empty string.
+// The acceptance-criteria section of a child's body, up to the next unfenced `##`, or an empty string.
 function acceptance_section(body: string | undefined): string {
 	if (body === undefined) return ''
 
-	return section_lines(body.split('\n')).join('\n')
+	return markdown_section.section_lines_matching(body, is_acceptance_heading).join('\n')
 }
 
 // Everything `node` depends on, directly or through a chain. Walked iteratively so a graph that

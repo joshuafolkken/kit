@@ -5,6 +5,7 @@ const UPSTREAM_HEADING = '## Upstream issues'
 const UPSTREAM_REF = 'joshuafolkken/kit#42'
 const WRONG_HEADING = 'wrong-heading'
 const MISSING_UPSTREAM = 'missing-upstream'
+const MISSING_ORIGIN = 'missing-origin'
 const NEAR_MISS_HEADING = '## Upstream'
 const NO_UPSTREAM_BODY = '## 背景\n\nnothing'
 
@@ -39,7 +40,7 @@ describe('issue_backlinks.classify_backlinks — broken pairs', () => {
 			{ ref: UPSTREAM_REF, body: '## 背景\n\nno origin heading' },
 		])
 
-		expect(verdict).toBe('missing-origin')
+		expect(verdict).toBe(MISSING_ORIGIN)
 	})
 
 	it('is wrong-heading for a near-miss heading', () => {
@@ -66,6 +67,33 @@ describe('issue_backlinks.classify_backlinks — broken pairs', () => {
 describe('issue_backlinks.upstream_refs', () => {
 	it('lists the qualified upstream references', () => {
 		expect(issue_backlinks.upstream_refs(ORIGIN_WITH_UPSTREAM)).toEqual([UPSTREAM_REF])
+	})
+
+	// A `## ` line inside a code fence is example text, not the next heading (joshuafolkken/kit#3066).
+	it('reads past a heading-shaped line inside a code fence', () => {
+		const body = [UPSTREAM_HEADING, '', '```md', '## Example', '```', '', `- ${UPSTREAM_REF}`]
+
+		expect(issue_backlinks.upstream_refs(body.join('\n'))).toEqual([UPSTREAM_REF])
+	})
+})
+
+describe('issue_backlinks.classify_backlinks — fenced headings', () => {
+	it('does not read a fenced near-miss heading as a wrong heading', () => {
+		const body = [ORIGIN_WITH_UPSTREAM, '', '```md', NEAR_MISS_HEADING, '```'].join('\n')
+		const verdict = issue_backlinks.classify_backlinks(body, [
+			{ ref: UPSTREAM_REF, body: UPSTREAM_CITING_BACK },
+		])
+
+		expect(verdict).toBe('ok')
+	})
+
+	it('does not count a fenced origin heading as the upstream citing back', () => {
+		const fenced_origin = ['```md', '## Origin', '```'].join('\n')
+		const verdict = issue_backlinks.classify_backlinks(ORIGIN_WITH_UPSTREAM, [
+			{ ref: UPSTREAM_REF, body: fenced_origin },
+		])
+
+		expect(verdict).toBe(MISSING_ORIGIN)
 	})
 })
 
