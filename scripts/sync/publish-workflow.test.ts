@@ -324,11 +324,11 @@ describe('new project CI registry', () => {
 		const steps = template_steps(job_name)
 		const setup = steps.find((step) => step.name === 'Setup Node.js')
 		const auth_index = command_index(steps, GITHUB_AUTH_LINE)
-		const install_index = command_index(steps, 'pnpm install')
+		const install_index = steps.findIndex((step) => step.uses === SETUP_PNPM_ACTION)
 
 		expect(setup?.with).not.toHaveProperty('registry-url')
 		expect(auth_index).toBeGreaterThanOrEqual(0)
 		expect(install_index).toBeGreaterThan(auth_index)
-		expect(steps[install_index]?.env?.['NODE_AUTH_TOKEN']).toContain('GITHUB_TOKEN')
+		expect(steps[install_index]?.with?.['node-auth-token']).toContain('GITHUB_TOKEN')
 	})
 })

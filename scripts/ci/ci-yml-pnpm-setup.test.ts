@@ -19,13 +19,14 @@ const INSTALL_COMMAND = 'pnpm install --frozen-lockfile --ignore-scripts'
 const SAFE_CHAIN_STEP = 'Setup safe-chain'
 const WHEN_INSTALLING = "inputs.install == 'true'"
 const ACTION_STEPS = ci_yml_fixture.load_action(ci_yml_fixture.SETUP_PNPM_ACTION).runs.steps
-// The jobs of kit's own workflows that prepare pnpm, all through the composite action.
+// The jobs that prepare pnpm, all through the composite action: kit's own workflows, and the
+// distributed template, which calls the action `josh sync` writes beside it (joshuafolkken/kit#3095).
 const ACTION_CALLERS = [
 	{ path: ci_yml_fixture.RUNTIME_CI_YML, jobs: [STATIC_CHECKS_JOB, 'unit', E2E_JOB, NODE_26_JOB] },
 	{ path: PUBLISH_YML, jobs: PUBLISH_JOBS },
 	{ path: '.github/workflows/pr-classification.yml', jobs: ['classification'] },
+	{ path: ci_yml_fixture.TEMPLATE_CI_YML, jobs: ['checks', E2E_JOB] },
 ]
-const TEMPLATE_JOBS = ['checks', E2E_JOB]
 type Steps = ReadonlyArray<WorkflowStep>
 
 function required_steps(workflow_path: string, job_name: string): Steps {
@@ -148,21 +149,6 @@ describe('pnpm setup across every kit workflow', () => {
 	})
 })
 
-describe.each(TEMPLATE_JOBS)('pnpm setup in the distributed template job %s', (job_name) => {
-	it('installs pnpm before use', () => {
-		expect_pnpm_before_use(required_steps(ci_yml_fixture.TEMPLATE_CI_YML, job_name))
-	})
-
-	it('uses the composite action version extraction', () => {
-		const template = required_steps(ci_yml_fixture.TEMPLATE_CI_YML, job_name)
-		const runs = [template, ACTION_STEPS].map(
-			(steps) => steps.find((step) => step.id === RESOLVER_ID)?.run,
-		)
-
-		expect(new Set(runs).size).toBe(1)
-	})
-})
-
 describe.each([
 	{ pin: 'pnpm@12.6.0+sha512.abc123', version: '12.6.0' },
 	{ pin: 'pnpm@12.7.0+sha512.def456', version: '12.7.0' },
@@ -177,28 +163,17 @@ describe.each([
 	})
 })
 
-const RESOLVER_CASES = [
-	{ source: ci_yml_fixture.SETUP_PNPM_ACTION, steps: ACTION_STEPS },
-	{
-		source: ci_yml_fixture.TEMPLATE_CI_YML,
-		steps: required_steps(ci_yml_fixture.TEMPLATE_CI_YML, 'checks'),
-	},
-]
-
-it.each(RESOLVER_CASES)('uses devEngines when packageManager is absent in $source', ({ steps }) => {
+it('uses devEngines when packageManager is absent', () => {
 	const manifest = {
 		devEngines: { packageManager: { name: 'pnpm', version: '11.4.0+sha512.abc' } },
 	}
 
-	expect(run_resolver(steps, manifest)).toBe('version=11.4.0\n')
+	expect(run_resolver(ACTION_STEPS, manifest)).toBe('version=11.4.0\n')
 })
 
-it.each(RESOLVER_CASES)(
-	'uses the latest pnpm when no version is declared in $source',
-	({ steps }) => {
-		expect(run_resolver(steps, { name: 'consumer' })).toBe('version=latest\n')
-	},
-)
+it('uses the latest pnpm when no version is declared', () => {
+	expect(run_resolver(ACTION_STEPS, { name: 'consumer' })).toBe('version=latest\n')
+})
 
 describe('Node 26 smoke job', () => {
 	it('installs pnpm and runs it with Node 26', () => {

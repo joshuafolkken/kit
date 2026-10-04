@@ -2,11 +2,11 @@ import { ci_installer_pin } from '#scripts/safe-chain/ci-installer-pin'
 import { describe, expect, it } from 'vitest'
 import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
 
-// kit's own workflows install through the composite action, which carries the pin on its
-// safe-chain step; the distributed template, which travels without it, carries the pin at workflow
-// level (joshuafolkken/kit#2982).
+// Every workflow installs through the composite action, which carries the pin on its safe-chain
+// step (joshuafolkken/kit#2982) — the distributed template included, since the action travels with
+// it (joshuafolkken/kit#3095). The action is therefore the one place the pin lives.
 const ACTION_YML = ci_yml_fixture.SETUP_PNPM_ACTION
-const WORKFLOWS = [ACTION_YML, ci_yml_fixture.TEMPLATE_CI_YML]
+const WORKFLOWS = [ACTION_YML]
 const LEGACY_SETUP = 'pnpm dlx @aikidosec/safe-chain'
 const SAFE_CHAIN_STEP = 'Setup safe-chain'
 const SHA256_RE = /^[0-9a-f]{64}$/u
@@ -118,5 +118,18 @@ describe('safe-chain installer pin parity', () => {
 
 	it('the pinned workflows are the ones josh latest moves', () => {
 		expect(new Set(pinned_workflow_paths())).toEqual(new Set(WORKFLOWS))
+	})
+})
+
+// joshuafolkken/kit#3095: the template carried the installer step inline in each job and its own
+// copy of the pin, a second path kit's CI never ran.
+describe('safe-chain setup in the distributed template', () => {
+	it('carries no installer step and no pin of its own', () => {
+		const template = ci_yml_fixture.TEMPLATE_CI_YML
+
+		expect(safe_chain_steps(template)).toEqual([])
+		expect(
+			ci_installer_pin.extract_pinned_version(ci_yml_fixture.read_workflow(template)),
+		).toBeUndefined()
 	})
 })
