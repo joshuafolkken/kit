@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { file_reader } from '#scripts/lib/read-file'
 import { file_content } from '#scripts/sync/file-content'
@@ -24,7 +24,7 @@ const PNPMFILE_SETTINGS: ReadonlySet<string> = new Set(['pnpmfile', 'pnpmfiles']
 const SETTING_KEY_END = /[\s:=]/u
 const manifest_schema = z.looseObject({ private: z.boolean().optional() })
 
-type PackHookResult = 'written' | 'unchanged' | 'private' | 'owned'
+type PackHookResult = 'written' | 'unchanged' | 'private' | 'owned' | 'withdrawn'
 
 function is_published(manifest_text: string): boolean {
 	return manifest_schema.parse(JSON.parse(manifest_text)).private !== true
@@ -44,22 +44,26 @@ function has_own_hook_source(project_root: string): boolean {
 	)
 }
 
-// A pnpmfile without the managed line is the project's own; overwriting it would drop its hooks.
-function is_owned(project_root: string, existing: string | undefined): boolean {
-	if (existing !== undefined && !existing.startsWith(MANAGED_LINE)) return true
-
-	return has_own_hook_source(project_root)
-}
-
 function write_hook(destination: string, package_directory: string): PackHookResult {
 	const source = readFileSync(path.join(package_directory, PACK_HOOK_FILE), 'utf8')
 
 	return file_content.write_text_if_changed(destination, source) ? 'written' : 'unchanged'
 }
 
+// A copy kit wrote before the project added its own pnpmfile would still shadow that one.
+function withdraw(destination: string, existing: string | undefined): PackHookResult {
+	if (existing === undefined) return 'owned'
+	rmSync(destination)
+
+	return 'withdrawn'
+}
+
+// A pnpmfile without the managed line is the project's own; overwriting it would drop its hooks.
 function apply(project_root: string, package_directory: string): PackHookResult {
 	const destination = path.join(project_root, PACK_HOOK_FILE)
-	if (is_owned(project_root, file_reader.read_optional(destination))) return 'owned'
+	const existing = file_reader.read_optional(destination)
+	if (existing !== undefined && !existing.startsWith(MANAGED_LINE)) return 'owned'
+	if (has_own_hook_source(project_root)) return withdraw(destination, existing)
 
 	return write_hook(destination, package_directory)
 }
@@ -69,6 +73,7 @@ const MESSAGES: Readonly<Record<PackHookResult, string | undefined>> = {
 	unchanged: `  ✔ unchanged ${PACK_HOOK_FILE}`,
 	private: undefined,
 	owned: `  ⚠ skipped   ${PACK_HOOK_FILE} — the project has its own pnpmfile; strip the safe-chain preinstall at pack time there`,
+	withdrawn: `  ⚠ removed   ${PACK_HOOK_FILE} — it shadowed the project's own pnpmfile; strip the safe-chain preinstall at pack time there`,
 }
 
 function sync_pack_hook(project_root: string, package_directory: string): PackHookResult {

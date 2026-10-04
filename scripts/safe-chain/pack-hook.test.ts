@@ -15,6 +15,7 @@ const PACK_TIMEOUT_MS = 60_000
 const OWN_HOOK = 'export const hooks = {}\n'
 const OWN_POSTINSTALL = 'node download-binary.js'
 const WORKSPACE_FILE = 'pnpm-workspace.yaml'
+const LEGACY_HOOK_FILE = '.pnpmfile.cjs'
 const directories: Array<string> = []
 
 interface Manifest {
@@ -104,7 +105,7 @@ describe('a project with its own pnpmfile', () => {
 	// pnpm prefers `.pnpmfile.mjs` over `.pnpmfile.cjs` and loads neither once a setting names another
 	// file, so writing ours there would drop the project's hooks or report one pnpm never runs.
 	it.each([
-		['.pnpmfile.cjs', OWN_HOOK],
+		[LEGACY_HOOK_FILE, OWN_HOOK],
 		[WORKSPACE_FILE, 'pnpmfile: hooks.cjs\n'],
 		[WORKSPACE_FILE, 'pnpmfiles:\n  - hooks.cjs\n'],
 		['.npmrc', 'pnpmfile=hooks.cjs\n'],
@@ -114,6 +115,16 @@ describe('a project with its own pnpmfile', () => {
 		writeFileSync(path.join(root, name), content)
 
 		expect(pack_hook.sync_pack_hook(root, PACKAGE_DIRECTORY)).toBe('owned')
+		expect(() => hook_text(root)).toThrow()
+	})
+
+	it('removes the kit copy written before the project added its own .pnpmfile.cjs', () => {
+		const root = published()
+
+		pack_hook.sync_pack_hook(root, PACKAGE_DIRECTORY)
+		writeFileSync(path.join(root, LEGACY_HOOK_FILE), OWN_HOOK)
+
+		expect(pack_hook.sync_pack_hook(root, PACKAGE_DIRECTORY)).toBe('withdrawn')
 		expect(() => hook_text(root)).toThrow()
 	})
 })
