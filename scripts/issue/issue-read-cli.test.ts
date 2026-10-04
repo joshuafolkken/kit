@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs'
+import { bash_output_cap_reader } from '#scripts/document/bash-output-cap'
+import { capped_print_fixture } from '#scripts/document/capped-print-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_read } from './issue-read'
 
@@ -25,6 +27,8 @@ const { issue_read_cli } = await import('./issue-read-cli')
 
 const SUCCESS = 0
 const FAILURE = 1
+// A thread of `cap / 10` thirty-character lines runs to three times the cap.
+const LINE_FRACTION = 10
 const ISSUE = '1715'
 const OTHER_ISSUE = '1567'
 const FIELDS_JSON = JSON.stringify({ title: 'A title', state: 'open', body: 'The body' })
@@ -121,6 +125,25 @@ describe('issue_read_cli.run — a number that produced nothing', () => {
 	it('prints the usage and exits non-zero when nothing usable was given', async () => {
 		expect(await issue_read_cli.run([])).toBe(FAILURE)
 		expect(reported()).toContain(issue_read_cli.USAGE)
+	})
+})
+
+// A long thread used to overflow the Bash output cap into a saved file read a second time
+// (joshuafolkken/kit#3143); past the cap the output is now part files, each one read.
+describe('issue_read_cli.run — a thread past the Bash output cap', () => {
+	const cap = bash_output_cap_reader.bash_output_cap(process.cwd())
+	const long_body = 'a line of a long issue thread\n'.repeat(cap / LINE_FRACTION)
+	const long_comments = JSON.stringify([
+		{ user: { login: 'someone' }, created_at: 'then', body: long_body },
+	])
+
+	it('prints under the cap and loses none of the thread', async () => {
+		classified_mock.mockResolvedValue(READ)
+		comments_mock.mockResolvedValue(long_comments)
+
+		expect(await issue_read_cli.run([ISSUE])).toBe(SUCCESS)
+		expect(capped_print_fixture.largest_read(printed())).toBeLessThanOrEqual(cap)
+		expect(capped_print_fixture.restored(printed())).toContain(long_body)
 	})
 })
 

@@ -129,6 +129,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	issue_report_failures.print_blocks(
 		reports.flatMap((report) => issue_blocks(report)),
 		BLOCK_SEPARATOR,
+		`issue:read ${issue_numbers.join(' ')}`,
 	)
 
 	return issue_report_failures.report_failures(reports, FAILURE_TERMS)
