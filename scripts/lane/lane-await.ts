@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
+import { run_liveness } from '#scripts/run/run-liveness'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_handoff } from './lane-handoff'
 
@@ -22,15 +23,20 @@ const MS_PER_SECOND = 1000
 const ISSUE_PATTERN = /^[1-9]\d*$/u
 const PROCESS_FOUND = 0
 
+// `is_settled` is read once, when the wait starts: a child that ended between two `lane:await` calls
+// never appears in the second one, and only its settled issue tells it apart from one not yet
+// launched (joshuafolkken/kit#3133).
 interface AwaitState {
 	appeared: boolean
 	disappeared_at: number | undefined
 	first_polled_at: number | undefined
+	is_settled?: boolean
 }
 
 // Injectable for testing -- the CLI never overrides these.
 interface AwaitOptions {
 	is_running?: (issue: string) => boolean
+	is_settled?: (issue: string) => Promise<boolean>
 	poll_ms?: number
 	reconfirm_ms?: number
 	never_appeared_timeout_ms?: number
@@ -43,6 +49,7 @@ interface CheckConfig {
 }
 
 interface RunConfig extends CheckConfig {
+	is_settled: (issue: string) => Promise<boolean>
 	poll_ms: number
 }
 
@@ -55,20 +62,39 @@ function is_process_running_default(issue: string): boolean {
 	return lane_handoff.is_ship_running(issue, process.cwd())
 }
 
-function make_initial_state(): AwaitState {
-	return { appeared: false, disappeared_at: undefined, first_polled_at: undefined }
+// The same positive evidence `run:liveness` answers `settled` on: the issue closed, or it was parked.
+async function is_settled_default(issue: string): Promise<boolean> {
+	return (await run_liveness.read_child_settled(issue)) === true
 }
 
-function make_states(issues: ReadonlyArray<string>): Map<string, AwaitState> {
-	return new Map(issues.map((issue) => [issue, make_initial_state()]))
+function make_initial_state(is_settled: boolean): AwaitState {
+	return { appeared: false, disappeared_at: undefined, first_polled_at: undefined, is_settled }
+}
+
+async function make_states(
+	issues: ReadonlyArray<string>,
+	is_settled: (issue: string) => Promise<boolean>,
+): Promise<Map<string, AwaitState>> {
+	const settled = await Promise.all(issues.map(async (issue) => await is_settled(issue)))
+
+	return new Map(issues.map((issue, index) => [issue, make_initial_state(settled[index] === true)]))
+}
+
+function resolve_timing(
+	options: AwaitOptions,
+): Pick<RunConfig, 'never_appeared_timeout_ms' | 'poll_ms' | 'reconfirm_ms'> {
+	return {
+		poll_ms: options.poll_ms ?? DEFAULT_POLL_MS,
+		reconfirm_ms: options.reconfirm_ms ?? RECONFIRM_MS,
+		never_appeared_timeout_ms: options.never_appeared_timeout_ms ?? NEVER_APPEARED_TIMEOUT_MS,
+	}
 }
 
 function resolve_options(options: AwaitOptions): RunConfig {
 	return {
 		is_running: options.is_running ?? is_process_running_default,
-		poll_ms: options.poll_ms ?? DEFAULT_POLL_MS,
-		reconfirm_ms: options.reconfirm_ms ?? RECONFIRM_MS,
-		never_appeared_timeout_ms: options.never_appeared_timeout_ms ?? NEVER_APPEARED_TIMEOUT_MS,
+		is_settled: options.is_settled ?? is_settled_default,
+		...resolve_timing(options),
 	}
 }
 
@@ -79,13 +105,16 @@ function update_liveness(state: AwaitState, is_live: boolean): void {
 	state.disappeared_at = undefined
 }
 
-// Throws if the issue never appeared within the timeout window; otherwise records the first-seen time.
+// Returns the issue when it had already settled before the wait started — it ended and will never
+// appear. Otherwise throws if it never appeared within the timeout window, and records the first-seen time.
 function check_not_appeared(
 	issue: string,
 	state: AwaitState,
 	now_ms: number,
 	timeout_ms: number,
-): void {
+): string | undefined {
+	if (state.is_settled === true) return issue
+
 	state.first_polled_at ??= now_ms
 	const elapsed_ms = now_ms - state.first_polled_at
 
@@ -94,10 +123,13 @@ function check_not_appeared(
 			`lane child ${issue} never appeared within ${String(timeout_ms / MS_PER_SECOND)}s`,
 		)
 	}
+
+	return undefined
 }
 
 // Returns the issue that has confirmed-completed this tick, `undefined` if none yet.
-// The `appeared` guard prevents a process that never showed up from being declared done.
+// The `appeared` guard prevents a process that never showed up from being declared done, unless its
+// issue had already settled when the wait started.
 function check_issue(
 	issue: string,
 	state: AwaitState,
@@ -111,9 +143,7 @@ function check_issue(
 	if (is_live) return undefined
 
 	if (!state.appeared) {
-		check_not_appeared(issue, state, now_ms, config.never_appeared_timeout_ms)
-
-		return undefined
+		return check_not_appeared(issue, state, now_ms, config.never_appeared_timeout_ms)
 	}
 
 	if (state.disappeared_at === undefined) {
@@ -144,7 +174,7 @@ async function wait_for_any(
 	options: AwaitOptions = {},
 ): Promise<string> {
 	const config = resolve_options(options)
-	const states = make_states(issues)
+	const states = await make_states(issues, config.is_settled)
 
 	for (;;) {
 		const completed = check_any(states, Date.now(), config)

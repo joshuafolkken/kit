@@ -1,6 +1,7 @@
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { run_liveness } from '#scripts/run/run-liveness'
 import { run_ship_detach } from '#scripts/run/run-ship-detach'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_await, type AwaitState, type CheckConfig } from './lane-await'
 
 // joshuafolkken/kit#2113. The re-confirm guard is the invariant being tested: a process that
@@ -13,6 +14,13 @@ const { RECONFIRM_MS, NEVER_APPEARED_TIMEOUT_MS } = lane_await
 const SHORT_RECONFIRM_MS = 10
 const POLL_MS = 1
 const NOW = 1_000_000
+const NEVER_APPEARED_MESSAGE = 'never appeared'
+
+// The default settled read asks GitHub; every test answers "not settled" unless it says otherwise.
+beforeEach(() => {
+	vi.restoreAllMocks()
+	vi.spyOn(run_liveness, 'read_child_settled').mockResolvedValue(false)
+})
 
 function make_state(overrides: Partial<AwaitState> = {}): AwaitState {
 	return { appeared: false, disappeared_at: undefined, first_polled_at: undefined, ...overrides }
@@ -103,7 +111,7 @@ describe('check_issue -- not yet appeared', () => {
 				reconfirm_ms: RECONFIRM_MS,
 				never_appeared_timeout_ms: SHORT_RECONFIRM_MS,
 			}),
-		).toThrow('never appeared')
+		).toThrow(NEVER_APPEARED_MESSAGE)
 	})
 })
 
@@ -215,6 +223,44 @@ describe('wait_for_any -- first to complete wins', () => {
 		})
 
 		expect(result).toBe(ISSUE)
+	})
+})
+
+// joshuafolkken/kit#3133. A child that ended between two `lane:await` calls never appears in the
+// second one; its settled issue is what separates it from a child not yet launched.
+describe('wait_for_any -- a child that ended before the call', () => {
+	it('returns a closed child with no process without waiting', async () => {
+		const read = vi.spyOn(run_liveness, 'read_child_settled').mockResolvedValue(true)
+
+		const result = await lane_await.wait_for_any([ISSUE], {
+			is_running: () => false,
+			poll_ms: POLL_MS,
+			never_appeared_timeout_ms: SHORT_RECONFIRM_MS,
+		})
+
+		expect(result).toBe(ISSUE)
+		expect(read).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('keeps waiting on an open child with no process until the never-appeared timeout', async () => {
+		await expect(
+			lane_await.wait_for_any([ISSUE], {
+				is_running: () => false,
+				is_settled: async () => false,
+				poll_ms: POLL_MS,
+				never_appeared_timeout_ms: SHORT_RECONFIRM_MS,
+			}),
+		).rejects.toThrow(NEVER_APPEARED_MESSAGE)
+	})
+
+	it('returns the settled child while another is still running', async () => {
+		const result = await lane_await.wait_for_any([ISSUE, OTHER], {
+			is_running: (issue: string) => issue === ISSUE,
+			is_settled: async (issue: string) => issue === OTHER,
+			poll_ms: POLL_MS,
+		})
+
+		expect(result).toBe(OTHER)
 	})
 })
 
