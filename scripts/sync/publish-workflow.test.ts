@@ -18,6 +18,7 @@ const TAG_REF_GUARD = "startsWith(github.ref, 'refs/tags/v')"
 const PRODUCTION_WORKFLOW = './.github/workflows/production.yml'
 const PACKAGE_PUBLISH_GROUP = 'package-publish'
 const CHECKOUT_ACTION = 'actions/checkout@'
+const SETUP_PNPM_ACTION = './.github/actions/setup-pnpm'
 const MANIFEST_SCHEMA = z.object({
 	repository: z.object({ url: z.string() }),
 	publishConfig: z.unknown().optional(),
@@ -224,6 +225,21 @@ describe('registry dist-tag lookup', () => {
 
 			expect(lines.length).toBeGreaterThan(0)
 			for (const line of lines) expect(line).toContain('cd "$RUNNER_TEMP" && npm view')
+		},
+	)
+
+	it.each(PUBLISH_JOB_NAMES)(
+		'reads the registry latest in %s before setup-pnpm puts the safe-chain shims on PATH',
+		(job_name) => {
+			const { steps } = read_workflow().jobs[job_name]
+			const lookups = steps.flatMap((step, index) =>
+				(step.run ?? '').includes('npm view') ? [index] : [],
+			)
+			const setup = steps.findIndex((step) => step.uses === SETUP_PNPM_ACTION)
+
+			expect(setup).toBeGreaterThan(0)
+			expect(lookups).toHaveLength(1)
+			expect(lookups[0]).toBeLessThan(setup)
 		},
 	)
 })
