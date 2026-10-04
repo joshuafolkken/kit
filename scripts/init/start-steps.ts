@@ -119,13 +119,15 @@ async function open_setup_pull_request(context: RunContext): Promise<void> {
 	await start_setup_pr.open(context.root, context.baseline)
 }
 
-// What was already changed before a caller's initialize command ran, read only when the setup pull
-// request will need to tell that command's files from the user's own (#2872).
+// What was already changed before the setup ran, read whenever a setup pull request will follow, so
+// it can tell the setup's files from the user's own (#2872). Kit's own `josh init` needs it as much as
+// a caller's command: its `josh format` rewrites the project's own sources, which kit cannot name, and
+// leaving them out failed the pull request's Prettier check (joshuafolkken/kit#3136).
 function baseline_of(
 	steps: ReadonlyArray<StartStep>,
 	context: StepContext,
 ): ReadonlyArray<string> | undefined {
-	if (context.init_command === undefined || !steps.includes('setup_pr')) return undefined
+	if (!steps.includes('setup_pr')) return undefined
 
 	return start_setup_pr.changed_paths(context.root)
 }

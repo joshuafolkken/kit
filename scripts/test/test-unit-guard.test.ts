@@ -111,6 +111,29 @@ describe('test_unit_guard.resolve_guard_action', () => {
 	})
 })
 
+describe('test_unit_guard.is_skipping (#3136)', () => {
+	it('skips a project without vitest, where no unit check can vouch for the tree', () => {
+		expect(test_unit_guard.guard_action(ctx.project_directory)).toBe(
+			test_unit_guard.resolve_guard_action(false, true),
+		)
+		expect(test_unit_guard.is_skipping(ctx.project_directory)).toBe(true)
+	})
+
+	it('does not skip a project whose unit suite runs', () => {
+		add_vitest_package()
+		add_unit_file(UNIT_FILE)
+
+		expect(test_unit_guard.guard_action(ctx.project_directory)).toBe('run')
+		expect(test_unit_guard.is_skipping(ctx.project_directory)).toBe(false)
+	})
+
+	it('does not skip a full project whose installed vitest found no test file', () => {
+		add_vitest_package()
+
+		expect(test_unit_guard.is_skipping(ctx.project_directory)).toBe(false)
+	})
+})
+
 describe('test_unit_guard.is_vitest_installed', () => {
 	it('returns false when vitest is absent', () => {
 		expect(test_unit_guard.is_vitest_installed(ctx.project_directory)).toBe(false)

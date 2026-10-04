@@ -2,6 +2,7 @@ import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { review_brief } from '#scripts/review/review-brief'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { gate_tree, type GateTree } from './gate-tree'
 
 // Whether the two scoped checks have been green on *this exact tree* by the time the review is
@@ -60,26 +61,36 @@ interface ScopedCheck {
 
 // The record paths, overridable so a test can plant one without overwriting the record a real run in
 // this checkout relies on — the same reason `gate_skip.reusable_green_gate` takes a `source`.
+// `is_unit_skipped` is overridable for the same reason, so a suite running in a checkout with vitest
+// can stand in for a project without one.
 interface ScopedSources {
 	lint?: string
 	test?: string
+	is_unit_skipped?: boolean
 }
 
+// **`test:related` is required only where it can ever answer** (joshuafolkken/kit#3136). In a project
+// whose unit guard skips — vitest absent, or a basic project with no test file — `test:related` runs
+// nothing and so writes no record, and requiring one refused the gate forever with no way through.
+// The guard's own decision is asked rather than re-derived, so the writer and this reader agree; a
+// project with a unit suite still needs the record, and a run that executed nothing still writes none.
 function checks_of(sources: ScopedSources): ReadonlyArray<ScopedCheck> {
-	return [
-		{
-			script: LINT_SCRIPT,
-			command: LINT_COMMAND,
-			stamp: review_stamps.lint_related_stamp,
-			source: sources.lint,
-		},
-		{
-			script: TEST_SCRIPT,
-			command: TEST_COMMAND,
-			stamp: review_stamps.test_related_stamp,
-			source: sources.test,
-		},
-	]
+	const lint = {
+		script: LINT_SCRIPT,
+		command: LINT_COMMAND,
+		stamp: review_stamps.lint_related_stamp,
+		source: sources.lint,
+	}
+	const test = {
+		script: TEST_SCRIPT,
+		command: TEST_COMMAND,
+		stamp: review_stamps.test_related_stamp,
+		source: sources.test,
+	}
+
+	return (sources.is_unit_skipped ?? test_unit_guard.is_skipping(process.cwd()))
+		? [lint]
+		: [lint, test]
 }
 
 // **An unreadable record reads as an absent one, and that is the safe direction.** `read` swallows a

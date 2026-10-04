@@ -26,12 +26,7 @@ import { test_unit_guard } from './test-unit-guard'
 function conclusive_tree(before: GateTree | undefined): GateTree | undefined {
 	if (before === undefined) return undefined
 
-	const action = test_unit_guard.resolve_guard_action(
-		test_unit_guard.is_vitest_installed(process.cwd()),
-		test_unit_guard.has_unit_tests(process.cwd()),
-	)
-
-	return action === 'run' ? before : undefined
+	return test_unit_guard.guard_action(process.cwd()) === 'run' ? before : undefined
 }
 
 async function run_related_tests(command_arguments: ReadonlyArray<string>): Promise<number> {
