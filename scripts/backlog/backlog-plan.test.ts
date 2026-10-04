@@ -46,11 +46,7 @@ function open_row(number: number, labels: ReadonlyArray<string> = []): OpenIssue
 }
 
 function plan_context(open_numbers: ReadonlyArray<number>): PlanContext {
-	return {
-		repo: backlog_fixture.REPO,
-		titles: new Map(),
-		open_numbers: new Set(open_numbers),
-	}
+	return { repo: backlog_fixture.REPO, titles: new Map(), open_numbers: new Set(open_numbers) }
 }
 
 function epic_child(blockers: ReadonlyArray<number>, labels: ReadonlyArray<string>): EpicChild {
@@ -135,7 +131,7 @@ describe('the four sections a person reads before the run starts', () => {
 
 		await backlog_plan_cli.run([])
 
-		expect(stdout()).toContain(`#${String(READY_CHILD)}  issue ${String(READY_CHILD)}`)
+		expect(stdout()).toContain(backlog_fixture.cite(READY_CHILD, `issue ${String(READY_CHILD)}`))
 	})
 
 	it('answers success when the plan was rendered', async () => {
@@ -151,7 +147,7 @@ describe('what a waiting child is waiting on', () => {
 
 		await backlog_plan_cli.run([])
 
-		expect(stdout()).toContain(`waiting on #${String(READY_CHILD)}`)
+		expect(stdout()).toContain(`waiting on ${backlog_fixture.cite(READY_CHILD)}`)
 	})
 
 	it('reads the label before the edges, so a child a run holds is not called blocked', () => {
@@ -175,7 +171,9 @@ describe('what a waiting child is waiting on', () => {
 		const child = epic_child([READY_CHILD], [])
 		const unknown = { repo: backlog_fixture.REPO, titles: new Map(), open_numbers: undefined }
 
-		expect(backlog_plan.waiting_note(child, unknown)).toBe(`waiting on #${String(READY_CHILD)}`)
+		expect(backlog_plan.waiting_note(child, unknown)).toBe(
+			`waiting on ${backlog_fixture.cite(READY_CHILD)}`,
+		)
 	})
 
 	it('says a child is merely next in line when it declares nothing and carries no label', () => {

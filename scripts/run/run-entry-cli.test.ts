@@ -10,8 +10,10 @@ const is_pending_mock = vi.hoisted(() => vi.fn())
 const prrun_adopt_mock = vi.hoisted(() => vi.fn())
 const prrun_token_mock = vi.hoisted(() => vi.fn())
 const read_issue_mock = vi.hoisted(() => vi.fn())
+const confirm_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
+vi.mock('#scripts/notify/telegram-notify', () => ({ telegram_notify: { confirm: confirm_mock } }))
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
 }))
@@ -31,6 +33,7 @@ vi.mock('./run-prrun-resume', () => ({
 
 const { run_entry_cli } = await import('./run-entry-cli')
 const { run_stage } = await import('./run-stage')
+const { lane_park } = await import('#scripts/rules/lane-park')
 
 const OK = 0
 const FRESH = { code: OK, out: 'fresh' }
@@ -39,6 +42,7 @@ const UNDER = { code: OK, out: 'under\n43630 billed input tokens' }
 const PREP_BODY = '=== issue ===\nbody'
 const ISSUE = '2372'
 const PRRUN_TOKEN = 'prrun-merge'
+const RELEASE_CALL = ['run:release', ISSUE]
 
 const info_lines: Array<string> = []
 
@@ -77,6 +81,7 @@ beforeEach(() => {
 	to_parts_mock.mockReset().mockReturnValue(state_parts('OPEN'))
 	format_report_mock.mockReset().mockReturnValue(PREP_BODY)
 	reset_resume_mocks()
+	confirm_mock.mockReset().mockResolvedValue(true)
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
@@ -136,7 +141,8 @@ describe('run_entry_cli.run — a halfrun stop is resumed rather than claimed (j
 
 		expect(code).not.toBe(OK)
 		expect(adopt_mock).not.toHaveBeenCalled()
-		expect(last_line()).toContain('cost: over')
+		expect(info_lines[1]).toContain('cost: over')
+		expect(calls()).not.toContainEqual(RELEASE_CALL)
 	})
 })
 
@@ -165,7 +171,7 @@ describe('run_entry_cli.run — a prrun stop is resumed rather than claimed (jos
 		const code = await run_entry_cli.run([ISSUE])
 
 		expect(code).not.toBe(OK)
-		expect(last_line()).toContain('hold: busy')
+		expect(info_lines[1]).toContain('hold: busy')
 	})
 
 	it('asks nothing of the prrun stop when a halfrun stop is pending', async () => {
@@ -188,20 +194,25 @@ describe('run_entry_cli.run — a stop short-circuits before the reads it would 
 		expect(code).not.toBe(OK)
 		expect(josh_run_mock).toHaveBeenCalledTimes(2)
 		expect(gather_mock).not.toHaveBeenCalled()
-		expect(last_line()).toContain(`entry #${ISSUE} — hold: busy · cost: skipped · verdict: -`)
+		expect(info_lines[1]).toContain(`entry #${ISSUE} — hold: busy · cost: skipped · verdict: -`)
+		expect(confirm_mock).toHaveBeenCalledTimes(1)
 	})
 
-	it('stops on a spent budget without reading the issue', async () => {
+	// joshuafolkken/kit#3099: the stop's Telegram and release are the command's, not the agent's.
+	it('stops on a spent budget without reading the issue, releasing its claim and notifying', async () => {
 		josh_run_mock
 			.mockResolvedValueOnce(FRESH)
 			.mockResolvedValueOnce(HELD)
 			.mockResolvedValueOnce({ code: OK, out: 'over' })
+			.mockResolvedValueOnce({ code: OK, out: '' })
 
 		const code = await run_entry_cli.run([ISSUE])
 
 		expect(code).not.toBe(OK)
 		expect(gather_mock).not.toHaveBeenCalled()
-		expect(last_line()).toContain('cost: over · verdict: -')
+		expect(info_lines[1]).toContain('cost: over · verdict: -')
+		expect(calls().at(-1)).toStrictEqual(RELEASE_CALL)
+		expect(last_line()).toBe(lane_park.COMMAND_NOTIFY_MARKER)
 	})
 })
 
@@ -326,33 +337,4 @@ describe('run_entry_cli.run — a closed issue keeps its prrun hand-off (joshuaf
 			])
 		},
 	)
-})
-
-describe('run_entry_cli.parse_number — exactly one issue number', () => {
-	it('refuses zero, two, or a non-number', () => {
-		expect(run_entry_cli.parse_number([])).toBeUndefined()
-		expect(run_entry_cli.parse_number([ISSUE, '99'])).toBeUndefined()
-		expect(run_entry_cli.parse_number(['x'])).toBeUndefined()
-		expect(run_entry_cli.parse_number([ISSUE])).toBe(ISSUE)
-	})
-})
-
-describe('run_entry_cli.parse_request — an issue number and an optional --to command', () => {
-	it('defaults to fullrun and accepts a named ladder command', () => {
-		expect(run_entry_cli.parse_request([ISSUE])).toStrictEqual({
-			issue_number: ISSUE,
-			command: 'fullrun',
-		})
-		expect(run_entry_cli.parse_request([ISSUE, '--to', 'halfrun'])?.command).toBe('halfrun')
-	})
-
-	it.each([
-		[[ISSUE, '--to']],
-		[[ISSUE, '--to', 'ship']],
-		[[ISSUE, '--from', 'prrun']],
-		[[ISSUE, '--to', 'prrun', 'extra']],
-		[['--to', 'prrun']],
-	])('refuses %j', (argv) => {
-		expect(run_entry_cli.parse_request(argv)).toBeUndefined()
-	})
 })
