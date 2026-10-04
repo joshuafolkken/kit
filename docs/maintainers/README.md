@@ -3,6 +3,19 @@
 For the people who maintain `@joshuafolkken/kit` itself. Projects that use kit can skip everything
 reached from this page — the user documentation starts at [overview.md](../overview.md).
 
+## Language
+
+Every page here is written in English, one language per document. A rationale explaining a
+Japanese-language prompt file (`prompts/collaboration-workflow/*.md`, `.claude/skills/**`) quotes that
+file's headings and rule text verbatim so the pointer still resolves; the explanation around the quote
+is English. A page that still carries Japanese prose is brought to English when it is next edited. The
+user documentation (`docs/`, `docs/how-to/`, `docs/setup/`) follows the same rule, keeping Japanese
+only where it names a literal a command matches (an issue-body heading such as `## 背景`, a prompt
+heading a pointer cites).
+
+The reference pages state each command's behavior, options, exit codes and examples; why a behavior
+is the way it is, and the issues it came from, live in the matching `*-rationale.md` here.
+
 ## Release and publish
 
 - [release.md](./release.md) — releasing a new version
@@ -41,6 +54,10 @@ from the page it explains.
   [backlogrun-lanes-rationale.md](./backlogrun-lanes-rationale.md),
   [backlogrun-progress-rationale.md](./backlogrun-progress-rationale.md) — `backlogrun`
 - [pre-gate-cut-rationale.md](./pre-gate-cut-rationale.md) — the pre-gate session cut
+- [background-commands-rationale.md](./background-commands-rationale.md) — backgrounding the gate
+  and the push
+- [latest-gate-rationale.md](./latest-gate-rationale.md) — the dependency-update window
+- [split-assessment-rationale.md](./split-assessment-rationale.md) — the split assessment
 - [josh-commands-rationale.md](./josh-commands-rationale.md) — the `josh` commands
 - [josh-commands-automation-rationale.md](./josh-commands-automation-rationale.md) — the automation
   `josh` commands

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { gh_subcommand_guard, type GhSpawn } from './gh-subcommand-guard'
 
 // joshuafolkken/kit#1063: the mechanical check joshuafolkken/kit#1022's survey did not have. That
@@ -43,6 +43,14 @@ const PACKAGE_JSON = path.join(
 // wall-clock only; the assertions are unchanged.
 const SCAN_TIMEOUT_MS = 60_000
 
+// The scan only reads, so the suites that inspect the repository share one pass instead of parsing
+// every file under scripts/ once each (joshuafolkken/kit#3083).
+const repository: { spawns: ReadonlyArray<GhSpawn> } = { spawns: [] }
+
+beforeAll(() => {
+	repository.spawns = gh_subcommand_guard.scan_repository()
+}, SCAN_TIMEOUT_MS)
+
 function scan(source: string): Array<GhSpawn> {
 	return gh_subcommand_guard.find_gh_spawns(source, FIXTURE_FILE)
 }
@@ -64,9 +72,7 @@ describe('gh subcommand guard — the repository as it stands', () => {
 	it(
 		'spawns gh only through `gh api`, apart from the allowlisted calls',
 		() => {
-			const violations = gh_subcommand_guard
-				.scan_repository()
-				.filter((spawn) => !gh_subcommand_guard.is_allowed(spawn))
+			const violations = repository.spawns.filter((spawn) => !gh_subcommand_guard.is_allowed(spawn))
 
 			expect(
 				violations.map((spawn) => gh_subcommand_guard.describe_violation(spawn)),
@@ -83,9 +89,9 @@ describe('gh subcommand guard — the shared REST layer', () => {
 	it(
 		'spawns `gh api` only inside the shared REST layer',
 		() => {
-			const outside = gh_subcommand_guard
-				.scan_repository()
-				.filter((spawn) => REST_SUBCOMMANDS.has(spawn.subcommand) && spawn.file !== GH_EXEC_FILE)
+			const outside = repository.spawns.filter(
+				(spawn) => REST_SUBCOMMANDS.has(spawn.subcommand) && spawn.file !== GH_EXEC_FILE,
+			)
 
 			expect(outside.map((spawn) => gh_subcommand_guard.describe_violation(spawn))).toStrictEqual(
 				[],
@@ -109,7 +115,7 @@ describe('gh subcommand guard — what the scan reaches', () => {
 	it(
 		'finds the gh spawns that do exist',
 		() => {
-			const found = gh_subcommand_guard.scan_repository()
+			const found = repository.spawns
 
 			expect(found.length).toBeGreaterThan(0)
 			expect(found.map((spawn) => spawn.file)).toContain(GH_EXEC_FILE)
@@ -124,7 +130,7 @@ describe('gh subcommand guard — the allowlist', () => {
 	it(
 		'keeps no entry that matches nothing',
 		() => {
-			const found = gh_subcommand_guard.scan_repository()
+			const found = repository.spawns
 			const unmatched = gh_subcommand_guard.ALLOWED_SPAWNS.filter((entry) =>
 				found.every((spawn) => spawn.file !== entry.file || spawn.subcommand !== entry.subcommand),
 			)

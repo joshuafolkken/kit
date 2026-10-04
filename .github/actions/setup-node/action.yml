@@ -1,0 +1,33 @@
+name: Setup Node.js
+description: >
+  Set Node.js up at the version every kit workflow runs on, optionally pointed at a package
+  registry.
+
+# The one place the Node.js version of kit's workflows is written (joshuafolkken/kit#3084). Every
+# job used to call actions/setup-node with its own `node-version` literal, so a version move had to
+# find all of them. A job that needs a different runtime says so explicitly — `node-26-pnpm` in
+# `ci.yml` passes its own runtime to `.github/actions/setup-pnpm` instead of calling this.
+#
+# Distributed: `josh sync` writes this file into a consumer beside the workflows that call it, the
+# same way as `.github/actions/setup-pnpm`. `workflow_pin_logic` reads this file as a source of
+# canonical action pins.
+
+inputs:
+  registry-url:
+    description: Passed to actions/setup-node's `registry-url`; empty writes no `.npmrc`.
+    required: false
+    default: ''
+  scope:
+    description: Passed to actions/setup-node's `scope`, for a scoped registry.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '24'
+        registry-url: ${{ inputs.registry-url }}
+        scope: ${{ inputs.scope }}

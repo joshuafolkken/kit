@@ -64,21 +64,13 @@ merge is CI**: the `Security Audit` job runs on every pull request and is one of
 whatever this gate answered locally. The local reading is a head start on a failure CI would catch
 anyway; it was never the only net.
 
-## Why an elapsed-time window rather than "once per batch"
+## The lock file lands with the issue that ran the update
 
-The batch entry points had already hoisted the update to the head of a batch, and that hoist is
-correct — but it says nothing about a standalone `fullrun`, which **is** the head of its own
-one-issue batch and therefore updated on every invocation. A session that runs six issues one at a
-time paid the full cost six times while a batch of the same six paid it once, for no difference
-anybody chose. An elapsed-time window is the one condition that reads the same at every entry point,
-so no entry needs a rule of its own — and the batch hoists survive it unchanged, because a batch's
-second child asks the same command and is told `skip`.
-
-**The lock file the update rewrites still lands with whichever issue ran it.** `josh latest` leaves
-`pnpm-lock.yaml` modified and that issue's `pnpm josh git -y` commits it, exactly as before. What the
-window removes is the other runs carrying the same bumps; it does not make that one diff clean.
-Should the issue then fail CI on a bump rather than on its own change, that is a dependency problem
-found once — fix it forward before parking the issue for it.
+**The lock file the update rewrites lands with whichever issue ran it.** `josh latest` leaves
+`pnpm-lock.yaml` modified and that issue's `pnpm josh git -y` commits it. Should the issue then fail
+CI on a bump rather than on its own change, fix it forward before parking the issue for it. Rationale
+for the elapsed-time window: `docs/maintainers/latest-gate-rationale.md` → "Why an elapsed-time
+window rather than once per batch".
 
 This file is the single source of the rule. `fullrun.md`, `halfrun.md`, `backlogrun.md` and `backlogrun.md`
 each name `pnpm josh latest:scope` at the point their procedure reaches it and route here for

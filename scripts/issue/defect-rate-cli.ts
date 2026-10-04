@@ -3,14 +3,22 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
-import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
+import { parse_json } from '#scripts/git/parse-json-array'
 import { issue_label_schema } from '#scripts/git/schemas'
+import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { z } from 'zod'
 import { defect_rate, type DefectRate, type RateIssue } from './defect-rate'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const PER_PAGE = '100'
+const FIRST_PAGE = 1
+const SECOND_PAGE = 2
+// The search API serves at most this many results, so a window past it holds no further page.
+const SEARCH_RESULT_CEILING = 1000
+// The search API allows 30 requests a minute; both searches together stay at the ~10 requests the
+// sequential walk made, so this bounds only how many are in flight at once.
+const PAGE_CONCURRENCY = 4
 const USAGE = 'Usage: pnpm josh defect:rate [--days <n>]'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so no issue can be searched — check `gh auth status` and that this is a checkout with an `origin` remote.'
@@ -33,7 +41,7 @@ const search_item_schema = z.object({
 	labels: z.array(issue_label_schema),
 })
 
-// One page of `search/issues`. `--paginate --slurp` hands back every page as one array.
+// One page of `search/issues`.
 const search_page_schema = z.object({
 	total_count: z.number(),
 	incomplete_results: z.boolean(),
@@ -62,8 +70,47 @@ function read_days(argv: ReadonlyArray<string>): number | undefined {
 	}
 }
 
-function search_path(query: string): string {
-	return `search/issues?${new URLSearchParams({ q: query, per_page: PER_PAGE }).toString()}`
+function search_path(query: string, page: number = FIRST_PAGE): string {
+	const parameters = new URLSearchParams({ q: query, per_page: PER_PAGE })
+
+	if (page !== FIRST_PAGE) parameters.set('page', String(page))
+
+	return `search/issues?${parameters.toString()}`
+}
+
+// How many pages the search holds, read off the first page's own count. Bounded by the API's
+// ceiling, past which GitHub serves no page at all — so this asks for exactly the pages `gh api
+// --paginate` used to walk to.
+function page_count(first: SearchPage): number {
+	return Math.ceil(Math.min(first.total_count, SEARCH_RESULT_CEILING) / Number(PER_PAGE))
+}
+
+async function read_page(query: string, page: number): Promise<SearchPage | undefined> {
+	const raw = await git_gh_exec.exec_gh_api({ path: search_path(query, page) })
+
+	return parse_json.parse_json_object_safe(raw, search_page_schema)
+}
+
+// Every page of one search. joshuafolkken/kit#3103: `--paginate` follows each page's `next` link, so
+// a two-week window of ~5 pages cost ~1.5 s a page, one after another, on every `backlog:plan`. The
+// first page names the total, so the rest are fetched together; any page that does not read fails
+// the whole search, as a failed `--paginate` did.
+async function read_pages(query: string): Promise<ReadonlyArray<SearchPage> | undefined> {
+	const first = await read_page(query, FIRST_PAGE)
+
+	if (first === undefined) return undefined
+
+	const rest_numbers = Array.from(
+		{ length: Math.max(page_count(first) - FIRST_PAGE, 0) },
+		(_value, index) => index + SECOND_PAGE,
+	)
+	const rest = await bounded_pool.bounded_map(
+		rest_numbers,
+		PAGE_CONCURRENCY,
+		async (page) => await read_page(query, page),
+	)
+
+	return rest.every((page) => page !== undefined) ? [first, ...rest] : undefined
 }
 
 function to_result(pages: ReadonlyArray<SearchPage>): SearchResult {
@@ -83,12 +130,7 @@ function to_result(pages: ReadonlyArray<SearchPage>): SearchResult {
 
 async function search(query: string): Promise<SearchResult | undefined> {
 	try {
-		const raw = await git_gh_exec.exec_gh_api({
-			path: search_path(query),
-			should_paginate: true,
-			should_slurp: true,
-		})
-		const pages = parse_json_array_or_undefined(raw, search_page_schema)
+		const pages = await read_pages(query)
 
 		return pages === undefined ? undefined : to_result(pages)
 	} catch {

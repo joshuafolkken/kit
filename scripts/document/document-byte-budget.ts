@@ -82,13 +82,13 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
 	// joshuafolkken/kit#2998 split the reference: the developer commands stay, the rest moved out.
-	// joshuafolkken/kit#3102 documented `run:progress --wait` with 15 bytes of headroom left.
-	{ path: 'docs/josh-commands-automation.md', bytes: 159_744 },
+	{ path: 'docs/josh-commands-automation.md', bytes: 155_648 },
 	{ path: 'docs/josh-commands.md', bytes: 36_864 },
 	{ path: 'prompts/coding-standards.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/gh-rest.md', bytes: 8192 },
+	{ path: 'prompts/collaboration-workflow/glossary.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 8192 },
 	// #2662 adds the feature and compatibility declarations to the canonical filing procedure.
 	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 28_672 },

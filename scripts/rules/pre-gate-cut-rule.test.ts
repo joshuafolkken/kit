@@ -10,6 +10,7 @@ import { delivered_rules } from './delivered-rules'
 // **The measurement is the load-bearing half.** Without the 0-of-6 figure the row reads as a
 // precaution, and a precaution is the first thing dropped when the enumeration is next trimmed.
 const TOPIC_FILE = '.claude/skills/workflow-commands/pre-gate-cut.md'
+const RATIONALE_FILE = 'docs/maintainers/pre-gate-cut-rationale.md'
 const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
 const COMMANDS_DOCUMENT = 'docs/josh-commands-automation.md'
 const FIRING_SUITE = 'scripts/rules/pre-gate-cut.test.ts'
@@ -45,14 +46,24 @@ describe('the delivered text — what the refusal states', () => {
 	})
 })
 
-describe(`${TOPIC_FILE} — the single source for the rule and the measurement behind it`, () => {
+describe(`${RATIONALE_FILE} — the measurement behind the rule`, () => {
+	const content = read_unwrapped(RATIONALE_FILE)
+
+	// The figure the enforcement rests on, kept off the read path beside the procedure it explains.
+	it.each(['the step fired exactly never', 'the cut was taken **0 times**'])(
+		'states %j',
+		(marker) => {
+			expect(content).toContain(marker)
+		},
+	)
+})
+
+describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 	const content = read_unwrapped(TOPIC_FILE)
 
 	it.each([
-		'### The gate refuses until the cut has been taken (joshuafolkken/kit#1864)',
-		'**This step was carried as prose and fired exactly never.**',
-		// The figure the enforcement rests on.
-		'the cut was taken **0 times**',
+		'### The gate refuses until the cut has been taken',
+		`${RATIONALE_FILE}\` → "Why the rules are guards, not prose"`,
 		GUARD_COMMAND,
 	])('states %j', (marker) => {
 		expect(content).toContain(marker)

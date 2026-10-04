@@ -90,11 +90,13 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// Lowered in joshuafolkken/kit#3078 — a correction of an over-count, not a trim: every entry was
 	// charged for every global point-of-use document, so `kickoff` paid for `followup.md` and the
 	// `backlogrun-*` phase documents it never opens. Each total now counts only what its path reaches.
+	// joshuafolkken/kit#3077 trimmed non-resident rule bodies from `CLAUDE.md`, lowering fullrun, prrun
+	// and backlogrun one block each.
 	{ entry: 'kickoff', bytes: 65_536 },
-	{ entry: 'fullrun', bytes: 131_072 },
+	{ entry: 'fullrun', bytes: 126_976 },
 	{ entry: 'halfrun', bytes: 106_496 },
-	{ entry: 'prrun', bytes: 135_168 },
-	{ entry: 'backlogrun', bytes: 217_088 },
+	{ entry: 'prrun', bytes: 131_072 },
+	{ entry: 'backlogrun', bytes: 212_992 },
 	{ entry: LANE_CHILD, bytes: 77_824 },
 ]
 

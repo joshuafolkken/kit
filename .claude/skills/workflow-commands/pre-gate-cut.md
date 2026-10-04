@@ -69,9 +69,8 @@ pnpm josh run:cut <N>
 **`cut` is the only verdict that ends the turn.** Every other one — `under-threshold` included — leaves
 the current process to carry the run on itself.
 
-### The gate refuses until the cut has been taken (joshuafolkken/kit#1864)
+### The gate refuses until the cut has been taken
 
-**This step was carried as prose and fired exactly never.** In measured lane children the cut was taken **0 times**, so
 `pnpm josh rule:guard` **refuses `pnpm josh gate`** while this checkout is a lane and no cut record is
 carried, handing back the command above. Rationale:
 `docs/maintainers/pre-gate-cut-rationale.md` → "Why the rules are guards, not prose".
@@ -165,13 +164,10 @@ hand-off". The parent's seam and the child's `run_cut.IMPLEMENTATION_CONTEXT_THR
 **135_000** `CONTEXT_CUT_THRESHOLD` (aliased so the tests cannot drift). No separate measurement is
 built for the lane child.
 
-### It is a guard, fired at the edit that crosses the threshold (joshuafolkken/kit#2310)
+### It is a guard, fired at the edit that crosses the threshold
 
-**This step was carried as prose and fired exactly never** — the cut fired **0 times** while 33.9% of
-lane requests ran past 200,000 tokens. Rationale:
-`docs/maintainers/pre-gate-cut-rationale.md` → "Why the rules are guards, not prose".
-
-So `pnpm josh rule:guard` **refuses an `Edit` / `Write`** while this checkout is a dispatched lane child
+Rationale: `docs/maintainers/pre-gate-cut-rationale.md` → "Why the rules are guards, not prose".
+`pnpm josh rule:guard` **refuses an `Edit` / `Write`** while this checkout is a dispatched lane child
 whose recent-context cost is over threshold, handing back `pnpm josh run:cut --impl <N> --handoff <path>` — the
 refusal lands _before_ the edit. `cut` ends the turn, the rest leave this process implementing; a fresh
 process's `pnpm josh run:cut --resume <N>` then answers **`resume-impl`**, so it **skips the title, plan,
