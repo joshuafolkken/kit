@@ -2,6 +2,7 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { capped_output } from './capped-print'
 import { document_section } from './document-section'
 import { entry_read_set } from './entry-read-set'
 
@@ -56,12 +57,12 @@ function report_missing(markdown: string, heading: string): number {
 	return FAILURE_EXIT_CODE
 }
 
-function print_section(markdown: string, heading: string): number {
+function print_section(markdown: string, heading: string, root: string): number {
 	const found = document_section.section(markdown, heading)
 
 	if (found === undefined) return report_missing(markdown, heading)
 
-	console.info(found.text)
+	capped_output.capped_print(found.text, heading, root)
 
 	return 0
 }
@@ -87,7 +88,7 @@ function run(argv: ReadonlyArray<string>, root: string = process.cwd()): number 
 
 	const markdown = read_named(name, root)
 
-	return markdown === undefined ? FAILURE_EXIT_CODE : print_section(markdown, heading)
+	return markdown === undefined ? FAILURE_EXIT_CODE : print_section(markdown, heading, root)
 }
 
 function main(argv: ReadonlyArray<string>): void {

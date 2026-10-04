@@ -188,7 +188,7 @@ function print_states(reports: ReadonlyArray<IssueReport>): void {
 	const should_attribute = reports.length > 1
 	const blocks = reports.flatMap((report) => state_blocks(report, should_attribute))
 
-	issue_report_failures.print_blocks(blocks, BLOCK_SEPARATOR)
+	issue_report_failures.print_blocks(blocks, BLOCK_SEPARATOR, 'issue:state')
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

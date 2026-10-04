@@ -1,3 +1,5 @@
+import { capped_output } from '#scripts/document/capped-print'
+
 // The failure report `issue:read` and `issue:state` share (joshuafolkken/kit#3046). Both read a batch
 // of numbers, print a block for each one that answered, and name every one that did not; only the
 // result kind that counts as an answer and what a gap must not be mistaken for differ between them.
@@ -22,10 +24,12 @@ interface FailureTerms<K extends string> {
 	misreading: string
 }
 
-function print_blocks(blocks: ReadonlyArray<string>, separator: string): void {
+// Under the Bash output cap, or as part files past it — a batch of long threads is the shape that
+// overflowed (joshuafolkken/kit#3143).
+function print_blocks(blocks: ReadonlyArray<string>, separator: string, label: string): void {
 	if (blocks.length === 0) return
 
-	console.info(blocks.join(separator))
+	capped_output.capped_print(blocks.join(separator), label)
 }
 
 // A number that resolves to nothing is an answer — a typo, or another repository's number quoted in

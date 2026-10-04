@@ -564,7 +564,7 @@ pnpm josh issue:read 1715
 pnpm josh issue:read 1715 1567 1605          # several numbers, read concurrently
 ```
 
-Attribute each block by its `issue:` line, never by position. A number that resolves to nothing prints `does not resolve`; a failed read prints `could not read`; non-zero exit if any number went unanswered. Any non-numeric token refuses the whole call.
+Attribute each block by its `issue:` line, never by position. Output past the Bash cap is written as part files under it, and only their paths are printed — read every part with the Read tool in one turn. A number that resolves to nothing prints `does not resolve`; a failed read prints `could not read`; non-zero exit if any number went unanswered. Any non-numeric token refuses the whole call.
 
 ### `josh issue:state`
 
@@ -580,7 +580,7 @@ pnpm josh issue:state 42 43 --repo joshuafolkken/app-kit   # a child in another 
 
 - `--repo <owner/repo>` — read a child in another repository; applies to every number.
 
-State is `OPEN` / `CLOSED` / `MERGED`. `human_review:` answers whether the issue carries `needs-human-review`, matched case-insensitively. A number that resolves to nothing prints `does not resolve`; a failed read prints `could not read`; non-zero exit if any went unanswered.
+State is `OPEN` / `CLOSED` / `MERGED`. `human_review:` answers whether the issue carries `needs-human-review`, matched case-insensitively. Output past the Bash cap is written as part files under it, as `issue:read` does. A number that resolves to nothing prints `does not resolve`; a failed read prints `could not read`; non-zero exit if any went unanswered.
 
 ### `josh issue:scout`
 
@@ -1686,6 +1686,7 @@ pnpm josh doc:section backlogrun.md "The hand-off"
 - The section prints verbatim with its subsections (a `##` heading carries its `###` children).
 - The heading matches as a prefix, exact match first; two prefix matches is a refusal naming both.
 - Fenced blocks are skipped so a `#`-column comment inside a fence does not end the section early.
+- **Past the Bash cap the section is written as part files**, each under the cap and together exactly the section, and only their paths are printed — read every part with the Read tool in one turn. `issue:read` and `issue:state` do the same.
 
 **Output / exit codes:** an unresolvable heading exits non-zero and lists the document's own headings.
 
