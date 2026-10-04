@@ -1,3 +1,4 @@
+import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
 import { read_blocked_by } from './git-gh-issue-read'
@@ -198,21 +199,21 @@ async function fetch_selected(request: IssueListRequest): Promise<SelectedRows> 
 // issue GitHub itself reports as unblocked costs no request. A backlog with no declared blockers
 // therefore costs exactly what `gh` cost — one listing — rather than one request per row.
 //
-// Sequential rather than a burst: the only caller that asks for the field is the `auto-ok` pickup,
-// whose listing is already narrowed by a label, and a rate limit reached in parallel would fail rows
-// that a paced pass reads.
+// Bounded rather than sequential (joshuafolkken/kit#3103): the pass was paced one request at a time,
+// which made every `backlog:plan` wait about 0.7 s per opted-in issue declaring a blocker. The width
+// is the one `epic:bundle` already reads the same endpoint at, so the burst stays bounded while a
+// rate-limited read still fails the whole listing rather than a row (`bounded-pool.ts`).
+const RELATION_CONCURRENCY = 8
+
 async function read_relations(
 	rows: ReadonlyArray<RestIssue>,
 	repo?: string,
 ): Promise<Array<BlockedBy>> {
-	const relations: Array<BlockedBy> = []
-
-	for (const row of rows) {
-		// eslint-disable-next-line no-await-in-loop -- paced reads, so a rate limit does not fail rows
-		relations.push(await read_blocked_by(String(row.number), row, repo))
-	}
-
-	return relations
+	return await bounded_pool.bounded_map(
+		rows,
+		RELATION_CONCURRENCY,
+		async (row) => await read_blocked_by(String(row.number), row, repo),
+	)
 }
 
 // The listing, plus what it could not cover. `json` is `undefined` — never `'[]'` — when the listing
