@@ -11,6 +11,7 @@ const SONAR_JOB = 'sonarqube'
 const CHECK_STEP_NAME = 'Fail on new Sonar issues or duplicated blocks'
 const VERSION_STEP_ID = 'project-version'
 const SCAN_STEP_NAME = 'SonarQube Scan'
+const INSTALL_STEP_NAME = 'Setup pnpm and install dependencies'
 const SET_TOKEN = 'sqp_example'
 const PULL_REQUEST_EVENT = 'pull_request'
 const PUSH_EVENT = 'push'
@@ -55,6 +56,17 @@ describe('sonar-qube.yml new-code check', () => {
 
 	it('does not run without SONAR_TOKEN', () => {
 		expect(ran_step_names('', PULL_REQUEST_EVENT)).not.toContain(CHECK_STEP_NAME)
+	})
+})
+
+// joshuafolkken/kit#3082: `tsconfig.sonar.json` extends the kit base by its package specifier, which a
+// consumer resolves only from node_modules, so the install has to land before the scan on every event.
+describe('sonar-qube.yml dependency install', () => {
+	it.each([PUSH_EVENT, PULL_REQUEST_EVENT])('installs before the scan on a %s', (event_name) => {
+		const names = ran_step_names(SET_TOKEN, event_name)
+
+		expect(names).toContain(INSTALL_STEP_NAME)
+		expect(names.indexOf(INSTALL_STEP_NAME)).toBeLessThan(names.indexOf(SCAN_STEP_NAME))
 	})
 })
 
