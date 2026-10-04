@@ -1,6 +1,6 @@
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
-import { PURE_FILES } from './pure-files'
-import { VITEST_INCLUDE_GLOBS } from './vitest-include-globs'
+import { PURE_FILES } from '#scripts/test/pure-files'
+import { VITEST_INCLUDE_GLOBS } from '#scripts/test/vitest-include-globs'
 
 // The unit suite runs as two Vitest projects so the isolation-safe files can skip per-file worker
 // isolation, which re-evaluates every shared module once per file (joshuafolkken/kit#2170). Measured

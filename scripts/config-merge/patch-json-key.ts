@@ -1,5 +1,11 @@
-import { createScanner, findNodeAtLocation, getNodeValue, parseTree, type Node } from 'jsonc-parser'
-import strip_json_comments from 'strip-json-comments'
+import {
+	createScanner,
+	findNodeAtLocation,
+	getNodeValue,
+	parseTree,
+	stripComments,
+	type Node,
+} from 'jsonc-parser'
 import { json_format } from './json-format'
 
 // Set or remove one top-level key while leaving every other byte of the document alone.
@@ -163,13 +169,14 @@ function target_value_end(property: Node | undefined): number | undefined {
 	return value_node === undefined ? undefined : value_node.offset + value_node.length
 }
 
-// Whether the span holds a comment. `strip_json_comments` blanks comments while preserving length
-// and is string-aware, so a `//` inside a string value is not counted — a scanner-based check would
-// need `SyntaxKind`, which is an ambient const enum this project cannot import.
+// Whether the span holds a comment. `stripComments` drops every comment token the scanner finds, so
+// it changes the text exactly when a comment is present, and a `//` inside a string value is not
+// counted — comparing token kinds directly would need `SyntaxKind`, an ambient const enum this
+// project cannot import.
 function contains_comment(content: string, node: Node): boolean {
 	const text = content.slice(node.offset, node.offset + node.length)
 
-	return strip_json_comments(text) !== text
+	return stripComments(text) !== text
 }
 
 // Re-lay-out a property whose trailing comma has just appeared or disappeared. That one column
