@@ -17,11 +17,16 @@ const LABEL_PATTERN = /(?:labels\[\]=|\/labels\/|labels -f name=)([a-z][a-z0-9:_
 // A section reference: a markdown file, an arrow, and the cited heading in straight or Japanese
 // quotes — `` `backlogrun-progress.md` → "The hand-off" ``. The code span is optional and a section
 // number may sit between the arrow and the heading (`` `SKILL.md` → §1, "…" ``): both forms are in
-// the documents, and a pattern that skipped them let a broken reference of each form through
-// (joshuafolkken/kit#3076). The backreference pairs the code span's backticks, and the lookbehind
-// keeps a bare name from starting mid-path — inside a URL or after an unpaired backtick.
+// the documents, as is a name linked to its file (`` [`residency.md`](./residency.md) →「…」 ``), and a
+// pattern that skipped them let a broken reference of each form through (joshuafolkken/kit#3076).
+// The backreference pairs the code span's backticks, and the lookbehind keeps a bare name from
+// starting mid-path — inside a URL or after an unpaired backtick.
 const SECTION_PATTERN =
 	/(?<![\w./:`-])(?<tick>`?)(?<file>[\w./-]+\.md)\k<tick>\s*→\s*(?:§\w+,\s*)?["「](?<heading>[^"」]+)["」]/gu
+
+// A markdown link's `(target)`, dropped before the section scan so a linked name sits right before its
+// arrow — the link text already carries the file the reference names.
+const LINK_TARGET_PATTERN = /\]\([^)\s]*\)/gu
 
 // A relative markdown link target, with an optional `#anchor`. External `https://…` links carry no
 // `.md`, so the pattern never matches them.
@@ -69,7 +74,7 @@ interface SectionReference {
 }
 
 function section_references(text: string): Array<SectionReference> {
-	return matches(text, SECTION_PATTERN)
+	return matches(text.replaceAll(LINK_TARGET_PATTERN, ''), SECTION_PATTERN)
 		.map(({ groups }) => ({ file: groups?.['file'] ?? '', heading: groups?.['heading'] ?? '' }))
 		.filter((reference) => !is_placeholder_file(reference.file))
 }

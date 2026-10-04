@@ -124,6 +124,14 @@ describe('every cross-document reference resolves', () => {
 		])
 	})
 
+	it('flags a reference whose file name is a markdown link', () => {
+		const text = 'see [`chain-rule.md`](./chain-rule.md) →「No Such Heading Here」'
+
+		expect(broken_section_references(text)).toStrictEqual([
+			'chain-rule.md → "No Such Heading Here"',
+		])
+	})
+
 	it('reads no section reference out of a URL or an unpaired code span', () => {
 		const text =
 			'https://github.com/o/r/blob/main/docs/x/missing.md → "No Such Heading Here" and `missing.md → "No Such Heading Either"'
