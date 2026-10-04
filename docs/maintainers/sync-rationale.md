@@ -400,7 +400,7 @@ running that or any other destructive rewrite.
 **`git commit` is denied as a whole subcommand, and was not always.** `git commit -a` stages every
 tracked file and commits it, which is the fallback a refused `git add` pushes an agent toward, so
 the two spellings of that flag were denied first and alone. Plain `git commit -m "…"` was left
-reachable deliberately: `prompts/git-automation.md` — shipped to consumers in the same package —
+reachable deliberately: `prompts/git-automation.md` — then shipped to consumers in the same package, deleted since —
 instructed the agent to run exactly that command, and denying it here would have broken a
 documented flow from the other half of the distribution. **That reason is gone.**
 joshuafolkken/kit#1064 retired the prompt, and no distributed document instructs the agent to run a
