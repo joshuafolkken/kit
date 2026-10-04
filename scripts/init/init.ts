@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_local_bin } from '#scripts/build/local-bin'
@@ -14,10 +14,11 @@ import { sync } from '#scripts/sync/sync'
 import { package_manager_version } from '#scripts/version/package-manager-version'
 import { execaSync } from 'execa'
 import { z } from 'zod'
-import { init_actions, PRETTIER_CONFIG_JS, type FileAction } from './init-actions'
+import { init_actions, PRETTIER_CONFIG_JS } from './init-actions'
 import { init_ai_copy } from './init-ai-copy'
 import { init_basic } from './init-basic'
 import { init_bootstrap } from './init-bootstrap'
+import { init_file_action } from './init-file-action'
 import { init_install } from './init-install'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
@@ -27,68 +28,9 @@ import { project_profile, type ProjectProfile, type ProjectShape } from './proje
 const PACKAGE_JSON = 'package.json'
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
 const LEFTHOOK_BIN = 'lefthook'
-const SAMPLE_INDENT_WIDTH = 4
 const ARGUMENT_START_INDEX = 2
-const SAMPLE_INDENT = ' '.repeat(SAMPLE_INDENT_WIDTH)
 const INSTALL_HINT = '→ run `pnpm install` to install what package.json lists'
 const INIT_USAGE = 'josh init [--profile basic|full] [--no-install]'
-
-function write_new_file(action: FileAction, destination_path: string): void {
-	mkdirSync(path.dirname(destination_path), { recursive: true })
-	writeFileSync(destination_path, action.create())
-	console.info(`  ✔ created   ${action.dest}`)
-}
-
-function show_sample(action: FileAction): void {
-	console.info(`  ⚠ exists    ${action.dest} — add manually:`)
-	console.info('')
-	console.info(action.create().replaceAll(/^/gmu, () => SAMPLE_INDENT))
-}
-
-// A file that already holds the sample needs nothing added, so only one that differs gets it shown.
-function report_unchanged(action: FileAction, existing: string): void {
-	const is_sample_missing = existing !== action.create()
-
-	if (is_sample_missing && action.should_show_sample_when_unchanged === true) show_sample(action)
-	else console.info(`  ✔ unchanged ${action.dest}`)
-}
-
-function merge_existing_file(
-	merge_function: (existing: string) => string,
-	destination_path: string,
-	action: FileAction,
-): void {
-	const existing = readFileSync(destination_path, 'utf8')
-	const merged = merge_function(existing)
-
-	if (merged === existing) {
-		report_unchanged(action, existing)
-
-		return
-	}
-
-	writeFileSync(destination_path, merged)
-	console.info(`  ✔ updated   ${action.dest}`)
-}
-
-function execute_file_action(action: FileAction): void {
-	const destination_path = path.join(PROJECT_ROOT, action.dest)
-	const is_existing = existsSync(destination_path)
-
-	if (!is_existing) {
-		write_new_file(action, destination_path)
-
-		return
-	}
-
-	if (action.merge === undefined) {
-		show_sample(action)
-
-		return
-	}
-
-	merge_existing_file(action.merge, destination_path, action)
-}
 
 const engine_pin_schema = z.looseObject({ name: z.string(), version: z.string() })
 
@@ -261,7 +203,7 @@ function run_config_file_actions(shape: ProjectShape): void {
 	}
 
 	for (const action of init_actions.build_file_actions(shape)) {
-		execute_file_action(action)
+		init_file_action.execute_file_action(action, PROJECT_ROOT)
 	}
 }
 
