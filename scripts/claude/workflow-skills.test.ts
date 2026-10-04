@@ -361,6 +361,9 @@ describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (
 		'**A prerequisite discovered mid-run is a dependency, not a park.**',
 		'**`epicrun` also accepts an Issue that is not an epic.**',
 		'**`epicrun` parks instead of stopping.**',
+		// joshuafolkken/kit#3077: the routing paragraph for the same three rules went too — the table's
+		// "Read first" column already names `split-assessment.md` for every entry.
+		'**Three rules decide what a run does when the work turns out not to be one Issue**',
 	])('no longer inlines %j', (marker) => {
 		expect(content).not.toContain(marker)
 	})
@@ -368,9 +371,8 @@ describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (
 	// Removing a procedure is only half of it. Without the routing the rule reaches no run at all,
 	// which reads exactly like the rule having been deleted.
 	it.each([
-		'**Three rules decide what a run does when the work turns out not to be one Issue**',
 		'split-assessment.md',
-		'`fullrun.md` / `halfrun.md` / `backlogrun.md`',
+		'+ `fullrun.md` + `split-assessment.md`',
 		'**A `backlogrun` parks a child instead of stopping the run**',
 	])('routes to the moved procedures with %j', (marker) => {
 		expect(content).toContain(marker)
@@ -380,12 +382,12 @@ describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (
 	// types the old keyword must be pointed at the command that runs the same scope, so the guidance is
 	// pinned resident — the mid-workflow turn that mistypes it loads no skill. The history moved to
 	// docs/maintainers/claude-md-rationale.md (joshuafolkken/kit#2889); the redirect stays.
-	it.each([
-		'**`queue` and `epicrun` were removed**',
-		'one who types `epicrun` to run `backlogrun #E --only`',
-	])('guides a typed `epicrun` to `backlogrun #E --only` with %j', (marker) => {
-		expect(content).toContain(marker)
-	})
+	it.each(['**`queue` and `epicrun` were removed**', '`epicrun` to `backlogrun #E --only`'])(
+		'guides a typed `epicrun` to `backlogrun #E --only` with %j',
+		(marker) => {
+			expect(content).toContain(marker)
+		},
+	)
 })
 
 // The rules that pass the residency criterion: each one binds on a turn where the workflow skill was
@@ -406,12 +408,22 @@ describe.each(AI_DOCS)('%s — keeps what cannot move', (document_path) => {
 		'**NEVER** modify the `devEngines` field in `package.json` without explicit user confirmation.',
 		// The three `epic:*` rules the criterion's list names. They fire the moment an issue is filed
 		// or a decision is written, on turns where no `epic:*` command was run.
-		"recording a decision removes that child's `needs-decision` label",
-		'**fixing what the audit finds is Tier A**',
-		'**an epic in another repository is referenced as `owner/repo#N`**',
+		"Recording a decision removes that child's `needs-decision` label",
+		'**Fixing what the audit finds is Tier A**',
+		'**An epic in another repository is referenced as `owner/repo#N`**',
 	])('keeps %j resident', (marker) => {
 		expect(content).toContain(marker)
 	})
+
+	// joshuafolkken/kit#3077: the merge exception named `fullrun` alone, though a `backlogrun` merges
+	// too and a `prrun` stops before the merge. The exception is resident because it binds the merge
+	// itself, which a turn can reach without the skill loaded.
+	it.each(['invoking `fullrun` or `backlogrun` authorizes the merge', '`prrun` does not'])(
+		'states the merge exception with %j',
+		(marker) => {
+			expect(content).toContain(marker)
+		},
+	)
 
 	// The criterion itself is what keeps the next rule from landing resident by default. It is stated
 	// in full in the skill; what the documents carry is the question.
