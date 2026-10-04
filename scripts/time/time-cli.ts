@@ -1,8 +1,8 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { transcript_cwd } from '#scripts/cost-runtime/transcript-cwd'
 import { cost_run_report } from '#scripts/cost/cost-run-report'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { time_run_state } from './time-run-state'
 import { time_run_state_collect } from './time-run-state-collect'
 
@@ -39,13 +39,9 @@ const PARSE_ARGS_OPTIONS = {
 // An unknown flag is a refusal rather than a default: a misspelled or retired flag must not quietly
 // report the run tree as though the mistake had been understood.
 function parse_options(argv: ReadonlyArray<string>): Options | undefined {
-	try {
-		const { values } = parseArgs({ args: [...argv], options: PARSE_ARGS_OPTIONS, strict: true })
+	const values = cli_flags.values_of(argv, PARSE_ARGS_OPTIONS)
 
-		return { is_json: values.json, path: values.path }
-	} catch {
-		return undefined
-	}
+	return values === undefined ? undefined : { is_json: values.json, path: values.path }
 }
 
 // The run-state lead the run-tree path prepends: the run this checkout is carrying, read from the

@@ -1,8 +1,8 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { transcript_cwd } from '#scripts/cost-runtime/transcript-cwd'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { time_round_trips } from '#scripts/time-runtime/time-round-trips'
 import { time_spans } from '#scripts/time-runtime/time-spans'
 
@@ -72,16 +72,15 @@ interface DensitySummary {
 // A misspelled or retired flag is a refusal rather than a default: a run must not read the density as
 // though the mistake had been understood, the same reason `josh time` refuses an unknown flag.
 function parse_options(argv: ReadonlyArray<string>): Options | undefined {
-	try {
-		const { values } = parseArgs({ args: [...argv], options: PARSE_ARGS_OPTIONS, strict: true })
-		const lanes = values.lanes === undefined ? DEFAULT_LANES : Number(values.lanes)
+	const values = cli_flags.values_of(argv, PARSE_ARGS_OPTIONS)
 
-		if (!Number.isSafeInteger(lanes) || lanes <= NONE) return undefined
+	if (values === undefined) return undefined
 
-		return { lanes, path: values.path }
-	} catch {
-		return undefined
-	}
+	const lanes = values.lanes === undefined ? DEFAULT_LANES : Number(values.lanes)
+
+	if (!Number.isSafeInteger(lanes) || lanes <= NONE) return undefined
+
+	return { lanes, path: values.path }
 }
 
 // One transcript's contribution, counted through the guard's own module so the two cannot disagree

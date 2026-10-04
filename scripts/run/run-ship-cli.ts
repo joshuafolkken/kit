@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_ship, type ShipSection } from './run-ship'
@@ -121,13 +121,6 @@ interface ParsedValues extends NotifyValues {
 	cite?: Array<string>
 }
 
-function parse_values(argv: ReadonlyArray<string>): {
-	values: ParsedValues
-	positionals: Array<string>
-} {
-	return parseArgs({ args: [...argv], options: OPTIONS, allowPositionals: true, strict: true })
-}
-
 function ship_args(
 	title: string,
 	rest: ReadonlyArray<string>,
@@ -155,9 +148,10 @@ function log_command(number: string, positionals: ReadonlyArray<string>): ShipCo
 	return CITE_PATTERN.test(number) && positionals.length === 0 ? { kind: 'log', number } : undefined
 }
 
-function read_args(argv: ReadonlyArray<string>): ShipCommand | undefined {
-	const { values, positionals } = parse_values(argv)
-
+function command_of(
+	values: ParsedValues,
+	positionals: ReadonlyArray<string>,
+): ShipCommand | undefined {
 	if (values.log !== undefined) return log_command(values.log, positionals)
 
 	const title = positionals[FIRST]
@@ -170,11 +164,9 @@ function read_args(argv: ReadonlyArray<string>): ShipCommand | undefined {
 // Numbers-only tail and a strict parse, so a title with no `#<N>` or a stray flag is refused rather
 // than shipped past the wrong step.
 function parse(argv: ReadonlyArray<string>): ShipCommand | undefined {
-	try {
-		return read_args(argv)
-	} catch {
-		return undefined
-	}
+	const parsed = cli_flags.arguments_of(argv, OPTIONS)
+
+	return parsed === undefined ? undefined : command_of(parsed.values, parsed.positionals)
 }
 
 async function run_step(step: Step, args: ShipArguments, state: ShipState): Promise<ShipSection> {

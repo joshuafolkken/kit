@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { josh_command } from '#scripts/josh/josh-run'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { rule_value_cache } from '#scripts/rules/rule-value-cache'
 import { run_event_stream } from '#scripts/run/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
@@ -61,15 +61,7 @@ type ParsedValues = Partial<Record<OptionName, string | boolean | ReadonlyArray<
 const FORWARDED = ['started', 'active', 'merged', 'running', 'max', 'idle'] as const
 
 function read_values(argv: ReadonlyArray<string>): ParsedValues | undefined {
-	try {
-		return parseArgs({ args: [...argv], options: OPTIONS, strict: true }).values
-	} catch {
-		return undefined
-	}
-}
-
-function text_of(value: string | boolean | ReadonlyArray<string> | undefined): string | undefined {
-	return typeof value === 'string' ? value : undefined
+	return cli_flags.values_of(argv, OPTIONS)
 }
 
 function to_count(raw: string | undefined): number | undefined {
@@ -94,8 +86,8 @@ interface OfferCounts {
 // The two counts the mapping needs: `--running` decides `wait`, `--retries` decides `retry`. Either
 // given but unreadable refuses the whole invocation.
 function counts_of(values: ParsedValues): OfferCounts | undefined {
-	const running = count_of(text_of(values.running), DEFAULT_COUNT)
-	const retries = count_of(text_of(values.retries), DEFAULT_COUNT)
+	const running = count_of(cli_flags.string_of(values.running), DEFAULT_COUNT)
+	const retries = count_of(cli_flags.string_of(values.retries), DEFAULT_COUNT)
 
 	if (running === undefined || retries === undefined) return undefined
 
@@ -109,7 +101,7 @@ function excludes_of(values: ParsedValues): ReadonlyArray<string> {
 }
 
 function next_argv(values: ParsedValues): ReadonlyArray<string> {
-	const repo = text_of(values.repo)
+	const repo = cli_flags.string_of(values.repo)
 
 	return [
 		'backlog:next',
@@ -120,7 +112,7 @@ function next_argv(values: ParsedValues): ReadonlyArray<string> {
 
 function budget_argv(values: ParsedValues, answer: string): ReadonlyArray<string> {
 	const forwarded = FORWARDED.flatMap((name) => {
-		const value = text_of(values[name])
+		const value = cli_flags.string_of(values[name])
 
 		return value === undefined ? [] : [`--${name}`, value]
 	})
