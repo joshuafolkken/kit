@@ -46,7 +46,8 @@ from the page it explains.
   `josh` commands
 - [init-rationale.md](./init-rationale.md) — `josh init`
 - [sync-rationale.md](./sync-rationale.md) — `josh sync`
-- [scripts-ai-rationale.md](./scripts-ai-rationale.md) — the notification commands
+- [environment-variables-rationale.md](./environment-variables-rationale.md) — the notification
+  commands
 
 ## The observation ledger
 
