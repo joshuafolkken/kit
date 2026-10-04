@@ -62,7 +62,8 @@ call reports `hold`.
   before the hold, joshuafolkken/kit#2760); on `resume` it skips the title, plan, hold and implementation and goes to the gate. At the pre-gate
   boundary — immediately after `pnpm josh main:merge`, before the gate — it takes the cut with
   `pnpm josh run:cut <N>` (the ordered step in `chain-rule.md`), and it records any park on the Issue before the stop notify.
-  `pre-gate-cut.md` is the single source of both.
+  `pre-gate-cut.md` → "Resuming — the fresh process's entry check" and `pre-gate-cut.md` → "Taking
+  the cut" are the single sources of the two.
 - **`resume: halfrun`** adopted a stopped `halfrun` (#2796): gate in full; `resume: prrun-*` a stopped
   `prrun` (#3023); `working-tree-hold.md`.
 

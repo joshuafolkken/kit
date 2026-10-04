@@ -25,6 +25,7 @@ import { describe, expect, it } from 'vitest'
 // not fail a test for a reason that has nothing to do with the rule.
 
 const SPLIT_SKILL = '.claude/skills/workflow-commands/split-assessment.md'
+const SPLIT_RATIONALE = 'docs/maintainers/split-assessment-rationale.md'
 const REVIEW_PROMPT = 'prompts/review.md'
 const WIP_TOPIC = 'prompts/collaboration-workflow/wip-cap.md'
 const LANES_DOC = '.claude/skills/workflow-commands/backlogrun-lanes.md'
@@ -41,7 +42,12 @@ const SPLIT_MARKERS: ReadonlyArray<string> = [
 	SPLIT_GUIDE,
 	// Test files are excluded so that adding tests does not push a change past the split threshold.
 	'(test files excluded)',
-	// The reason, without which the next reader restores the old test as an obvious simplification.
+	`${SPLIT_RATIONALE}\` → "Why the default is not to split"`,
+]
+
+// The reason, without which the next reader restores the old test as an obvious simplification. It
+// sits in the rationale document beside the procedure, off every run's read path.
+const SPLIT_RATIONALE_MARKERS: ReadonlyArray<string> = [
 	'**Separability is not scarce, which is why a test made only of it splits nearly everything.**',
 	'`route:split` accounted for **28 of the 119 open Issues (24%)**',
 ]
@@ -146,6 +152,14 @@ describe(`${SPLIT_SKILL} — the split default is raised, with its guide`, () =>
 	const content = read_unwrapped(SPLIT_SKILL)
 
 	it.each(SPLIT_MARKERS)('states %j', (marker) => {
+		expect(content).toContain(marker)
+	})
+})
+
+describe(`${SPLIT_RATIONALE} — the reason the split default is raised`, () => {
+	const content = read_unwrapped(SPLIT_RATIONALE)
+
+	it.each(SPLIT_RATIONALE_MARKERS)('states %j', (marker) => {
 		expect(content).toContain(marker)
 	})
 })

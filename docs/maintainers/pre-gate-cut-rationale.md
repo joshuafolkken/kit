@@ -31,7 +31,7 @@ request, so a long implementation is billed like a long `backlogrun` parent, whi
 
 **The pre-gate cut.** Carried as prose, the step fired exactly never: joshuafolkken/kit#1850 measured
 six lane children, and four issued the _entry_ check `pnpm josh run:cut --resume <N>`, were answered
-`fresh`, and went to the gate; not one issued the cut. A step a run is free to skip is the step skipped
+`fresh`, and went to the gate; not one issued the cut — the cut was taken **0 times**. A step a run is free to skip is the step skipped
 under time pressure, hence the `rule:guard` refusal of the gate (joshuafolkken/kit#1864). The asking
 spellings (`--resume`, `--end`, `--json`) are not counted as the cut because they ask about one rather
 than take it — counting them would have credited four of the six measured children. The refusal fires
@@ -46,8 +46,8 @@ became insurance rather than the primary trigger.
 **The implementation-phase cut.** joshuafolkken/kit#1933 reasoned it _could not_ be a guard, because the
 per-request cost was read asynchronously; but `cost_cli.session_verdict` is synchronous and is the exact
 verdict `pnpm josh cost --cut` prints. joshuafolkken/kit#2310 measured the child-side check across five
-lanes: the verdict was read once each at session entry, before the context grew, so the cut never fired
-while a third of their requests ran past 200,000 tokens. A `PreToolUse` refusal lands _before_ the edit,
+lanes: the verdict was read once each at session entry, before the context grew, so the cut fired
+**0 times** while 33.9% of their requests ran past 200,000 tokens. A `PreToolUse` refusal lands _before_ the edit,
 so the tree is at the state the previous edit left.
 
 joshuafolkken/kit#2385 replaced its once-per-run firing: once per run silenced the row after its first
