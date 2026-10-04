@@ -167,7 +167,6 @@ const adopt_toolkits = {
 	TOOLKIT_SCOPE,
 	LATEST_VERSION,
 	is_toolkit_package,
-	compare_toolkits,
 	declared_toolkits,
 	misplaced_toolkits,
 	pick_bin_name,
@@ -175,7 +174,6 @@ const adopt_toolkits = {
 	read_bin_name,
 	all_declared_toolkits,
 	is_unreachable_toolkit,
-	resolve_toolkit,
 	discover_toolkits,
 	unresolved_toolkits,
 }

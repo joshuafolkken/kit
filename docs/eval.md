@@ -1,5 +1,7 @@
 # `josh eval` — measuring agent rule compliance
 
+For kit maintainers changing the documents kit distributes; projects that use kit can skip this page.
+
 `@joshuafolkken/kit` distributes the documents and skills that decide how an AI agent behaves in a
 project: `CLAUDE.md` (the rules), `AGENTS.md` / `GEMINI.md` (pointers to it), `prompts/` and
 `.claude/skills/`. `pnpm josh eval` measures whether editing them changed what an agent does. It
@@ -268,9 +270,8 @@ Every scenario runs in a fresh throwaway directory containing the documents, ski
 distributes, plus the scenario's own `fixture_files`. It never runs in a real repository, and the
 directory is removed afterwards even when the scenario threw.
 
-`.claude/settings.json` is copied through a filter rather than verbatim. Its `UserPromptSubmit` hooks
-are plain `echo`s stating behavioral rules — exactly what a scenario should read — and they run
-anywhere. Its `PostToolUse` hook runs the project formatter through pnpm, which in a directory with no
+`.claude/settings.json` is copied through a filter rather than verbatim. A plain `echo` hook runs
+anywhere and is kept. Its `PostToolUse` hook runs the project formatter through pnpm, which in a directory with no
 `package.json` dies and feeds that error back to the agent after every `Edit` and `Write`. Any hook
 whose command invokes `pnpm`, `npm`, `yarn`, `npx` or `josh` is dropped for that reason, so a change
 to one of those is **not** something this suite can measure.

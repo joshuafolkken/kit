@@ -41,7 +41,6 @@ const session_language_cli = {
 	DEFAULT_SESSION_LANG,
 	ENV_KEY,
 	format_line,
-	main,
 	resolve_session_lang,
 	SCOPE_NOTE,
 }

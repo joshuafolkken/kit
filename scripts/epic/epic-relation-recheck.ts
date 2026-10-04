@@ -103,7 +103,7 @@ async function recheck_missing_relations(
 	)
 }
 
-const epic_relation_recheck = { recheck_missing_relations, suspect_children, RECHECK_LIMIT }
+const epic_relation_recheck = { recheck_missing_relations, RECHECK_LIMIT }
 
 export type { BlockersReader }
 export { epic_relation_recheck }

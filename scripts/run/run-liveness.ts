@@ -3,8 +3,8 @@ import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { agent_event, type AgentEventState } from '#scripts/agent/agent-event'
-import { git_gh_issue_read } from '#scripts/git/git-gh-issue-read'
-import { ALREADY_DONE_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
+import { ALREADY_DONE_LABEL, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { issue_state } from '#scripts/issue/issue-state'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { run_hold } from './run-hold'
@@ -401,7 +401,6 @@ const run_liveness = {
 	decide,
 	describe_agent_state,
 	read_child_settled,
-	read_agent_state,
 	read_output_frozen,
 	sample_output,
 	to_safe_path,

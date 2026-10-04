@@ -1,4 +1,4 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { epic_fetch } from './epic-fetch'
 import { epic_graph, type EpicChild } from './epic-graph'
 import { epic_parse } from './epic-parse'
@@ -65,7 +65,6 @@ async function read_epic(epic_number: number): Promise<EpicReading | { error: st
 }
 
 const epic_read = {
-	UNKNOWN_REPO,
 	read_epic,
 }
 

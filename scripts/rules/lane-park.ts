@@ -1,5 +1,6 @@
-import { NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { shell_segments } from './shell-segments'
 
 // A dispatched lane child records its park before it stops, delivered at the call it binds on
@@ -70,13 +71,18 @@ function mentions_confirmation_notify(text: string): boolean {
 // confirmation stop, not on every `Bash` call in the run. `is_child_of` is the same mechanical
 // human-or-child fact the pre-gate cut reads: a person working in a lane carries no mark and sees no
 // refusal, and a mark that leaked in naming another issue is read as a person too.
-function is_unparked_stop(
-	command: string,
-	is_lane_child: boolean = lane_child_marker.is_child_of(process.cwd()),
-): boolean {
+//
+// **A child that handed its region to the detached ship is not parking** (joshuafolkken/kit#2962): its
+// stop waits on nobody, so the park checklist is the wrong advice. `lane_handoff.is_handed_off` is the
+// reading the `Stop` hook stands its notify demand down on, so the two hooks cannot disagree.
+function is_parking_child(directory: string = process.cwd()): boolean {
+	return lane_child_marker.is_child_of(directory) && !lane_handoff.is_handed_off(directory)
+}
+
+function is_unparked_stop(command: string, is_child: () => boolean = is_parking_child): boolean {
 	if (!is_confirmation_notify(command)) return false
 
-	return is_lane_child
+	return is_child()
 }
 
 // **Keeping this rule is applying `needs-decision`**, the one act the park asks for before the stop.
@@ -113,6 +119,7 @@ const LANE_PARK_REASON =
 const lane_park = {
 	LANE_PARK_REASON,
 	is_confirmation_notify,
+	is_parking_child,
 	is_unparked_stop,
 	mentions_confirmation_notify,
 	records_the_park,

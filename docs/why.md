@@ -1,216 +1,251 @@
-# AI にコードを書かせていて、たぶん全員がぶつかるやつ
+# Why kit exists
 
-AI コーディングは、最初の 1 週間はめちゃくちゃ楽しいです。問題が出てくるのは、**同じプロジェクトを 2 ヶ月続けたあたり**から。能力の話ではなく、段取りの話で詰まります。
+AI coding is great fun for the first week. The trouble starts **around month two on the same project** — and it is not about how capable the model is, it is about how the work is run.
 
-kit は、そこで詰まったところを 1 個ずつ潰していったら、いつのまにかパッケージになっていたものです。心当たりのある項目だけ読んでください。
+kit is what came out of fixing those snags one at a time, until the fixes had become a package. Read only the sections that sound familiar.
 
-> ここで紹介する仕組みは、**Node のツールを使うプロジェクト**（`full` プロファイル）向けのものです。HTML/CSS だけのサイトや他の言語のプロジェクト（`basic` プロファイル）には、短い AI 向けルールと整形・Git・エディターの設定など、最小限のものだけが入ります。プロファイルごとに何が入るかは [overview.md](./overview.md) を見てください。
+> These mechanisms are for **projects that use Node tooling** (the `full` profile). An HTML/CSS-only site or a project in another language (the `basic` profile) gets the minimum: short AI rules plus formatting, Git and editor settings. What each profile gets is in [overview.md](./overview.md).
 
-## 「同じことを毎回言っている」
+## Done doesn't mean done
 
-### あるある
+### Sound familiar?
 
-規約ファイルに書いたのに守られない。だからもう一段詳しく書く。ファイルが育つ。育ちすぎて今度は**読まれない、そしてコンテキストを食う**。気づくと規約ファイルが数千行あって、肝心のコードを読む余裕がなくなっている。
+- "Implementation complete" — **and not a single test was added**
+- "This should pass" — it doesn't
+- "Done" with lint errors still on the screen
+- "Refactored" — and nobody checked that nothing broke
 
-### kit の答え
+This is the part that wears you down most. **If you have to check everything yourself anyway, handing it over only saved you half the work.**
 
-規約は **「いつ発火するか」と「詳細はどこにあるか」だけ**を書いて、手順の本体は外に出してあります。本体は「スキル」として置いてあり、**その作業に入る瞬間にだけ読み込まれる。**
+### What kit does
 
-実装を始めるときは実装の手順だけ、依存を更新するときは依存更新の手順だけを読む。**常に全部を抱えない。** 規約とスキルの文書は合わせて 68 ファイル・約 98,000 語ありますが、1 回の作業で読まれるのはそのごく一部です。
+**Compliance is decided by a command, not by the agent's own report.**
 
-## 「できました」が信用できない
+- **Verification is one command**: lint, type checking, spell checking and unit tests run concurrently. "It should pass" is not an answer.
+- **A commit without a test is refused**: kit reads the changed files and decides whether the change needs a test; if one is needed and missing, the commit stops. A docs-only change is exempt, and kit tells the two apart on its own.
+- **Refactoring starts with tests**: pin the existing behavior first, then change the code — that order is a rule.
 
-### あるある
+The point is that **kit stopped writing "please be careful" into prompts.** Instead of asking for care, it makes the careless path impassable.
 
-- 「実装完了しました」→ **テストが 1 行も増えていない**
-- 「通るはずです」→ 通らない
-- lint エラーが残ったまま「完了しました」
-- リファクタしたと言うが、壊れていないことは誰も確認していない
+## Quality slips with every change
 
-一番削られるのはここだと思います。**結局こちらが毎回確認するなら、任せた意味が半分になる。**
+### Sound familiar?
 
-### kit の答え
+It works. But the function is 200 lines long, naming changes from file to file, and the same logic is pasted in three places. Point it out and it gets fixed — **then the next file does the same thing.**
 
-**遵守を AI の自己申告ではなく、コマンドの判定にしてあります。**
+### What kit does
 
-- **検証は 1 コマンド**：lint・型チェック・スペルチェック・ユニットテストを並行実行。「通るはず」は成立しません。
-- **テスト無しのコミットは拒否されます**：変更したファイルから「テストが必要な変更か」を機械的に判定し、必要なのに無ければコミットが止まる。ドキュメントだけの変更なら免除、と自動で区別します。
-- **リファクタは先にテストを書いてから**：既存の挙動を固定してから触る、という順番がルールとして入っています。
+**The quality bar ships as tool configuration, not as a request.**
 
-ポイントは、**プロンプトに「気をつけてね」と書くのをやめたこと**です。気をつけさせるのではなく、通れないようにする。
+- **ESLint**: caps on complexity, length, nesting depth and parameter count; magic numbers and `any` are banned, and kit adds rules of its own.
+- **Prettier and cspell**: formatting and spelling are uniform, so diffs don't churn over style.
+- **Coding conventions**: naming and file layout rules, plus a "refactor first, then proceed" step on every change.
 
-## 「コードの品質が、なんだか低い」
+All of it is judged by the verification gate, so as long as a violation remains, the work is not "done".
 
-### あるある
+## I keep repeating the same instructions
 
-動くには動く。でも関数は 200 行、命名はファイルごとにバラバラ、同じ処理が 3 箇所にコピペされている。指摘すれば直すけれど、**次のファイルでまた同じことが起きる。**
+### Sound familiar?
 
-### kit の答え
+You wrote it in the rules file and it still isn't followed, so you write it again in more detail. The file grows until **nobody reads it, and it eats the context.** One day the rules run to thousands of lines and there is no room left to read the actual code.
 
-**品質の基準を「お願い」ではなく、ツールの設定として配っています。**
+### What kit does
 
-- **ESLint**：関数の複雑さ・行数・ネストの深さ・引数の数に上限があり、マジックナンバーや `any` も禁止。kit 独自のルールも入っています。
-- **Prettier と cspell**：整形とスペルを揃えます。書き方の好みで差分が荒れません。
-- **コーディング方針**：命名やファイル構成の規約があり、変更のたびに「先にリファクタしてから進む」手順が走ります。
+The rules file says only **when a rule fires and where its details live**; the procedures themselves live outside it, as skills that are **loaded only at the moment that work begins.**
 
-どれも検証ゲートでまとめて判定されるので、違反が残っている限り「完了」になりません。
+Starting an implementation loads the implementation procedure; updating dependencies loads the dependency procedure. **Nothing carries everything all the time.** The rules and skills add up to 68 files and about 98,000 words, yet one piece of work reads only a small part of them.
 
-## 「テストでは判定できない変更まで、そのまま出荷される」
+And because kit is a package, `josh sync` brings every project up to the latest rules — you say it once, in one place.
 
-### あるある
+## The agent does things I never asked for
 
-公開する文章の出来や、複数の案からどれを選ぶかのように、**テストが通っても良し悪しが分からない変更**がある。それでも自動の流れに乗ると、誰も見ないままマージまで進んでしまう。
+### Sound familiar?
 
-### kit の答え
+- A commit you didn't ask for
+- A merge into `main` you didn't ask for
+- `git add` **wiping out the staging you had carefully built**
+- "While I was at it, I also fixed…" files unrelated to the request
+- A force push or a deleted branch (there goes your day)
 
-**人間だけが付けるラベル（`needs-human-review`）があります。** これが付いた Issue は、実装と検証ゲートまでは普段どおり進みますが、**コミットせずに作業ツリーをそのまま残して止まり、通知を送ります。** 人間が中身を見て、良ければそこから続ける。自動化の中に「ここは人間が見る」という止まりどころを置けます。
+### What kit does
 
-## 「頼んでないことを勝手にやる」
+**Dangerous operations are physically blocked by deny rules**: force push, branch deletion, index operations including `git add`, `git reset`, PR merges, `rm -rf`, `sudo`. Shared-state changes nobody asked for simply cannot run.
 
-### あるある
+On top of that, **a workflow never starts unless you type its keyword.** A conversational request like "clear the backlog" or "implement this" does not start one — and the agent is forbidden from asking "shall I run it?", **because a yes to that question would be a back door.** If you want it to run, you type the keyword. That's all.
 
-- 勝手にコミットされている
-- 勝手に `main` にマージされている
-- `git add` で**自分が積んでいたステージングが吹き飛ぶ**
-- 頼んだ修正のついでに、関係ないファイルまで「ついでに直しておきました」
-- force push、ブランチ削除（これをやられた日は仕事にならない）
+## Reviewing every change is a chore
 
-### kit の答え
+### Sound familiar?
 
-**危険な操作は 29 本の拒否ルールで物理的に塞いであります。** force push、ブランチ削除、`git add` を含むインデックス操作、`git reset`、PR のマージ、`rm -rf`、`sudo`。頼んでいない共有状態の変更は、そもそも実行できません。
+The agent writes fast, so the diffs pile up faster than you can read them. You either skim and merge, or **you become the bottleneck.**
 
-加えて、**ワークフローは合言葉を打たない限り起動しません。** 「バックログ片付けといて」「これ実装して」のような会話調の依頼は起動条件になりません。さらに AI 側から「〜を実行していいですか？」と聞くことも禁止されています。**確認を取れば走っていい、という抜け道を塞ぐため**です。走らせたいなら人間がキーワードを打つ。それだけ。
+### What kit does
 
-## 「作業途中の変更が、別の作業に上書きされる」
+**The agent reviews its own diff before every commit**, with a fresh reviewer that has not seen the implementation. High and medium findings must be fixed before the commit; the review runs at most two rounds, the second only verifying the fixes. A merge is refused when no review record exists for the tree being merged.
 
-### あるある
+What reaches you is the result — and the places where kit decided [a human eye is needed](#some-changes-need-a-human-eye).
 
-AI に別の作業を頼んだら、**前の作業のまだコミットしていない変更が消えていた。** 同じ作業ツリーで 2 つの作業が走ると、後から来た方が前の状態を平気で踏み潰します。
+## Some changes need a human eye
 
-### kit の答え
+### Sound familiar?
 
-**実装を伴うワークフローは、最初の 1 手で作業ツリーを確保します。** 別の作業が使っている最中なら、どの作業が使っているかを示して止まります。確保は作業が終わるまで続き、コミット前で止めて人間の確認を待っている間も手放しません。**残っている未コミットの変更こそ、守るべきものだから**です。
+Some changes can't be judged by tests passing — the quality of published prose, or which of several options to pick. Yet once they are on the automated track, **they reach a merge without anyone looking.**
 
-## 「止まっているのか、動いているのか、終わったのか分からない」
+### What kit does
 
-### あるある
+**A label only humans apply (`needs-human-review`).** An Issue carrying it is implemented and run through the verification gate as usual, but then **stops without committing, leaves the working tree as it is, and notifies you.** You look at it and, if it's good, the run continues from there. You can place "a human looks here" inside the automation.
 
-30 分後に戻ったら、**最初の 3 分で質問して以降ずっと待っていた。** 逆に、まだ走っていると思って放っておいたら、とっくに終わっていた。結局、画面を見に行かないと今どうなっているのか分からない。
+## I spend all day talking to the agent
 
-### kit の答え
+### Sound familiar?
 
-**人間の出番がある状態は、Telegram でスマホに届きます。**
+Explain one task, wait for it, check it, explain the next… **You spend more time talking to the agent than the agent spends working.** And there are 30 Issues, but you hand them over one at a time — **sorting out which comes first and which is waiting on what is still your job.**
 
-- **止まるとき**：人間の判断を待つときは、止まる前に通知を送るのがルールです。
-- **終わったとき・失敗したとき**：完了も失敗も通知されます。
-- **誰も手を付けていないとき**：着手できる作業があるのに止まっている状態も、聞かれる前に知らせます。
-- **動いているとき**：通知が無いまま長く走っている間は、セッションの画面に進捗を定期的に書き出します。スマホには送りません。定期連絡でスマホを鳴らすと、本当に大事な通知が埋もれるからです。
+### What kit does
 
-スマホが鳴らなければ、人間の出番はまだ来ていません。ただし、セッションやマシンごと落ちたときは通知も出ないので、静かな時間が長いときは画面の進捗を確かめてください。
+**You only talk about the plan.** Work the plan out with `kickoff`, leave it on the Issue, and add the approval label. Then type `backlogrun` once, and **it works through several Issues in dependency order.**
 
-## 「セッションが切れて、どこまでやったか分からない」
+You don't decide the order or what can run side by side either. One command sorts the whole backlog into "runnable now", "waiting on something", "waiting for a human decision" and "out of scope", with dependencies resolved — even across repositories, where kit knows **a dependency in another repository is satisfied only once it is published, not when its Issue closes.** Implementation, verification, review and merge are the agent's; you look at the results and at the decisions it asks you for.
 
-### あるある
+## Big requests come back sloppy
 
-長い作業の途中でコンテキストが尽きる。再開しようとするが、**どこまで終わっていてどこから再開なのか、本人も自分も分からない。** 結局やり直す。
+### Sound familiar?
 
-### kit の答え
+Ask for a big feature in one go and the direction drifts halfway, tests go missing, and the diff is too big to review. **The bigger the request, the rougher the result.**
 
-**進捗はセッションの中ではなく GitHub 上にあります。** どの Issue が終わったか、何が待ちか、残りの予算はいくらか。全部リポジトリ側に記録されているので、セッションが切れても続きから拾えます。
+### What kit does
 
-そして、**バックログを消化する合言葉（`backlogrun`）は、途中で切れて再開しても「新しい依頼」ではなく「同じ依頼の続き」**として扱われます。もう一度合言葉を打たされることはありません。Issue 1 件だけの作業は、切れたらもう一度合言葉を打って再開します。
+**Work moves in Issue-sized pieces.**
 
-## 「まとめて頼むと、品質が下がる」
+- **Plan before starting**: `kickoff` writes what will change and how into the Issue, then stops. Implementation reads that first.
+- **One Issue = one PR = one verification**: every change passes the gate and the review, so a diff stays a size you can read.
+- **Split when too big**: when the work separates into independently shippable parts and exceeds one verification (roughly 10 files or 400 lines), kit creates child Issues under an epic and stops; `backlogrun` works through them later. The split decision uses the same criteria every time, and the default is not to split.
 
-### あるある
+## I want many Issues solved at once
 
-大きな機能を一度に頼むと、途中で方針がぶれる。テストが抜ける。出てきた差分は大きすぎて、レビューしきれない。**頼む単位が大きいほど、仕上がりが雑になる。**
+### Sound familiar?
 
-### kit の答え
+One tool call, wait, another call. While tests run, the agent just waits. However many Issues there are, they go one at a time. **Each step is quick, yet the whole thing is slow.**
 
-**作業は Issue 単位で小分けにして進めます。**
+### What kit does
 
-- **着手前に計画を立てる**：合言葉 `kickoff` で、何をどう変えるかを Issue に書き出して止まります。実装はそれを読んでからです。
-- **1 Issue ＝ 1 PR ＝ 1 回の検証**：変更ごとにゲートとレビューを通すので、差分が見られる大きさに収まります。
-- **大きすぎたら分ける**：独立して出荷できる部分に分かれ、1 回の検証に収まらない規模（目安は 10 ファイル・400 行）なら、エピックの下に子 Issue を作っていったん止まります。子 Issue は、あとで `backlogrun` がまとめて消化します。分けるかどうかは毎回同じ基準で判定し、基本は分けません。
+**Less waiting, and everything that can run in parallel does.**
 
-## 「次に何をやらせるか、毎回自分が考えている」
+- **Independent Issues run side by side**: Issues that don't depend on each other run at once, up to the number of free lanes in each repository. An Issue fixing a defect in kit's own verification that makes unrelated PRs answer wrongly on `main` today carries a solo label and runs alone.
+- **Calls that can go together go in one turn**: three turns in a row of single calls are stopped on the spot.
+- **Work continues while waiting**: verification runs concurrently, and long commands run in the background while the review proceeds.
 
-### あるある
+## AI costs keep climbing
 
-Issue は 30 件ある。でも AI に渡せるのは 1 件ずつ。**どれが先でどれが依存待ちかを整理しているのは、結局自分。** これが地味にいちばん時間を食う。
+### Sound familiar?
 
-### kit の答え
+Every request re-sends everything the session has read so far. A long session or a bloated rules file **quietly multiplies the bill**, and the most expensive model ends up doing the simplest steps.
 
-**バックログ全体を 1 コマンドで「今すぐやれるもの／何を待っているもの／人間の判断待ち／対象外」に仕分けます。** 依存関係も解決済み。同時に走らせられるものは束にして提示されます。
+### What kit does
 
-別のリポジトリに跨る依存も扱えて、**「向こうの Issue が閉じただけでは解決せず、公開されて初めて解決する」**ところまで見ています。
+- **Rules load only when needed**: procedures are skills read at the moment their work begins, and long documents are read section by section, so the context each request carries stays small.
+- **Light steps go to a cheaper model**: `josh delegate` says whether a step may go to a cheaper tier — only steps whose mistakes the parent catches cheaply qualify; judgement stays with the stronger model.
+- **Sessions are cut when context gets expensive**: `josh cost` measures the input each request carries and says when starting fresh pays for itself.
 
-## 「AI と話しているだけで、一日が終わる」
+## Writing Issues is a chore
 
-### あるある
+### Sound familiar?
 
-1 件説明して、実装を待って、確認して、次の 1 件を説明して……。**AI が作業している時間より、AI とやり取りしている時間のほうが長い。**
+You know an Issue-driven flow is the right way to work with an agent. But writing the title, the background and the acceptance criteria every time **feels like more work than the change itself.**
 
-### kit の答え
+### What kit does
 
-**人間が話すのは計画だけです。** `kickoff` で計画を詰めて Issue に残し、承認ラベルを付けておく。あとは合言葉 `backlogrun` を 1 回打てば、**複数の Issue を依存順にまとめて消化します。** 実行の順番と、並べて走らせてよいかどうかも、人間が決める必要はありません。開始時に AI が各 Issue を読み、先に終えるべきものを依存関係として記録します。検証の仕組みそのものを変える Issue には単独実行のラベルを付けます。ラベルの付いた Issue は、ほかの Issue と並べずに 1 件だけで実行されます。 実装・検証・レビュー・マージまで AI が進め、人間が見るのは結果と、判断を求められたところだけです。
+**`kickoff new` turns the conversation into the Issue.** It derives the title, files the Issue in a fixed template, posts the plan, and stops for you to read. Before filing, it scans for an existing Issue that covers the same work and [stops rather than filing a duplicate](#the-backlog-fills-with-duplicate-issues). Filing always goes through `josh issue:file`, so every Issue meets the same bar.
 
-## 「AI が起票する Issue が、似たようなもので溢れる」
+## Wiring AI up to GitHub is a chore
 
-### あるある
+### Sound familiar?
 
-作業中に気づいたことを AI に起票させていたら、**同じ内容の Issue が言い回しを変えて 3 件並んでいる。** バックログは膨らむ一方で、整理するのはまた自分。
+Branch, push, open a PR, link the Issue, wait for CI, merge, close the Issue. Getting an agent to do all of that reliably means **writing your own scripts and prompts — again, in every repository.**
 
-### kit の答え
+### What kit does
 
-**起票の前に、既存の Issue との重複を必ず確認します。** 重複があれば新しく作らずに既存の Issue へ寄せ、関連するエピックがあればそこに入れます。確認を飛ばした起票は、その場で止められます。
+**One keyword covers the whole path.** `josh start` sets a project up for the Issue workflow — including the GitHub repository. From there `fullrun` goes Issue → branch → PR → merge: `josh pr` writes the `closes #N` link so the Issue closes itself, and `josh followup` waits for CI and merges only when it is green. GitHub is driven through the `gh` CLI, which is all you need to install.
 
-さらに**オープンな Issue が 30 件を超えているときは、1 件閉じるまで新しく起票しません。** 閉じられるものが無ければ、起票自体を見送ります。例外は、作業を進めるのに必要な起票と、検証が間違った答えを出す・データが失われるといった割り込みだけです。
+## I can't tell if the agent is stuck or done
 
-## 「なんだか遅い」
+### Sound familiar?
 
-### あるある
+You come back after 30 minutes to find **it asked a question in minute three and has been waiting ever since.** Or you leave it alone thinking it's still running, and it finished long ago. You can't tell without going to look.
 
-ツールを 1 回呼んで、結果を待って、また 1 回。テストを流している間、AI はただ待っている。Issue が何件あっても 1 件ずつ順番。**1 手 1 手は速いのに、全体がなぜか遅い。**
+### What kit does
 
-### kit の答え
+**Anything that needs you reaches your phone on Telegram.**
 
-**待ち時間を減らし、並べられるものは並べて走らせます。**
+- **When it stops**: before stopping to wait for your decision, it must send a notification.
+- **When it finishes or fails**: both are notified.
+- **When nobody has picked up the work**: if runnable work is sitting idle, you hear about it before you ask.
+- **While it runs**: a long run with no notification writes its progress to the session screen periodically — not to your phone, because routine pings would bury the notifications that matter.
 
-- **まとめて呼べる処理は 1 ターンにまとめる**：1 つずつ呼ぶ状態が 3 ターン続くと、その場で止められます。
-- **待ち時間に別の作業を進める**：検証は並行実行です。時間のかかるコマンドは裏で走らせて、その間にレビューを進めます。
-- **Issue も並列に消化**：互いに依存しない Issue は、リポジトリごとの空きレーンの数だけ同時に走ります。
-- **軽い工程は安いモデルへ**：その工程を安いモデルに回していいかを判定する仕組みもあります。
+If your phone is quiet, it's not your turn yet. But if the session or the machine dies, no notification goes out either — after a long silence, check the progress on screen.
 
-# で、これが全部噛み合うと何が起きるか
+## One task overwrote another's work
 
-ここまでは全部「事故を減らす」話です。ところがこれを積み上げていくと、**質が変わる瞬間**があります。
+### Sound familiar?
 
-**AI の出力を人間が毎回確認しなくてよくなると、人間が見ていなくても走らせられる。**
+You give the agent a new task, and **the uncommitted changes from the previous one are gone.** When two tasks run in the same working tree, the later one happily tramples the earlier state.
 
-kit で合言葉をひとつ打つと、AI は**承認済みの Issue を依存順に消化し始めます。** 1 件ごとに、計画を立てて、実装して、検証ゲートを通して、セルフレビューして、PR を出して、CI が緑になるのを待って、マージする。それを次の 1 件、また次の 1 件と続けていく。並列に走らせられる分は同時に走ります。
+### What kit does
 
-判断が要るものに当たったら、**そこで止まらずに脇へ置いて次に進みます。** 人間の判断が必要なものには印が付いて残る。進捗と完了は通知で届く。セッションが切れても続きから再開する。
+**A workflow that implements claims the working tree as its very first step.** If another task is using it, kit says which one and stops. The claim holds until the work ends — including while it waits before a commit for your check — **because the uncommitted changes are exactly what needs protecting.**
 
-**そして AI が着手できるのは、人間が承認ラベル（`auto-ok`）を付けた Issue だけ**です。承認ラベルが付いたエピックの配下に入った Issue も対象になります。このラベルを AI が自分で付けることは、ルールで禁じています。例外は、kit 本体の開発で実行の最後に行う振り返りで AI 自身が起票した改善 Issue だけで、これも件数と予算の上限付きで、初期設定では無効です。**やっていい範囲を決めるのは、最後まで人間の仕事として残してあります。**
+## A session cut off and I lost track
 
-# 一番大事なところ：これは「配布物」です
+### Sound familiar?
 
-ここまで読んで「自分のリポジトリにも似たようなものを作った」と思った人は多いと思います。私もそうでした。**問題は、それが 1 つのリポジトリの中でしか生きないこと**です。プロジェクトが 2 つ 3 つに増えた瞬間、育てたはずの仕組みはコピペと劣化コピーになります。
+The context runs out in the middle of a long task. You try to resume, but **neither you nor the agent knows what finished and where to pick up.** So it starts over.
 
-kit はこれを**パッケージとして配ります。**
+### What kit does
 
-devDependency に入れて初期化すれば、規約も、検証スクリプトも、危険操作の拒否ルールも、そのプロジェクトに届く。手順のスキルは Claude Code のプラグインとして届きます（CLI では最初に 1 回だけプラグインのインストールが要ります）。kit を更新すれば同期コマンドで追従する。**どのプロジェクトでも同じ合言葉が同じように効きます。**（ここまでの全部が届くのは `full` プロファイルのプロジェクトです。`basic` プロファイルには短い規約と整形・Git などの最小限の設定だけが入ります。）
+**Progress lives on GitHub, not in the session.** Which Issues are done, what is waiting, how much budget is left — all recorded in the repository, so a run picks up where it stopped even after the session ends.
 
-規模感でいうと、`josh` コマンドは 145 本あって、**そのうち 101 本は人間ではなく AI が叩くためのもの**です。AI 対応を後から足したのではなく、AI が主な利用者として作られている、というのはこういう意味です。
+And **a `backlogrun` that is cut and resumed counts as the same request continuing, not a new one** — you don't have to type the keyword again. A single-Issue run that is cut waits for you to type its keyword again.
 
-# 正直に言っておくこと
+## The backlog fills with duplicate Issues
 
-- **GitHub の Issue 運用が前提**です。Issue を書かない開発スタイルには噛み合いません。
-- **`gh` CLI が必要**です。GitHub の操作は `gh api` を通して行います。
-- **強制の全部がコマンドで塞がれているわけではありません。** 危険な git 操作・テスト無しのコミット・セルフレビューの記録が残っていない（または別の作業ツリーを読んでいた）マージはコマンドが止めますが、承認ラベルを付けない、固定バージョンを勝手に変えない、といった一部はプロンプト上のルールと事後の確認手順で守らせています。
-- **どの Issue を AI に任せるかの判断は、人間に残ります。** ここは自動化していませんし、するつもりもありません。
-- 万能ではありません。**やっているのは「AI を賢くすること」ではなく「AI を信用しなくても任せられる状態を作ること」**です。
+### Sound familiar?
 
-信用しなくていいから、任せられる。これが kit の全部です。
+You let the agent file what it notices along the way, and **three Issues say the same thing in different words.** The backlog only grows, and cleaning it up is your job again.
+
+### What kit does
+
+**Every filing checks the existing Issues for a duplicate first.** A duplicate is folded into the existing Issue instead of filed, and a related epic takes it in. A filing that skips the check is stopped on the spot.
+
+And **when more than 30 Issues are open, nothing new is filed until one is closed.** If nothing can honestly be closed, the filing is dropped. The only exceptions are a filing the work itself needs, and an interrupt such as a verification giving a wrong answer or data being lost.
+
+# What happens when it all fits together
+
+Everything so far is about "fewer accidents". Stack enough of it, though, and **something changes in kind.**
+
+**Once you no longer have to check every output, the agent can run while nobody is watching.**
+
+Type one keyword and the agent **starts working through the approved Issues in dependency order.** For each one it plans, implements, passes the verification gate, reviews itself, opens a PR, waits for CI to go green, and merges. Then the next one, and the next. Whatever can run in parallel does.
+
+When it hits something that needs a decision, **it sets that aside and moves on instead of stopping.** What needs a human is marked and left for you. Progress and completion arrive as notifications. A cut session resumes where it stopped.
+
+**And the agent can only touch Issues a human has given the approval label (`auto-ok`)** — or Issues under an epic carrying it. The rules forbid the agent from applying that label itself. The one exception is improvement Issues the agent files in the retrospective at the end of a run in kit's own development, and even that is capped by count and budget and off by default. **Deciding what the agent may do stays a human job, to the very end.**
+
+# The most important part: it ships as a package
+
+If you read this far thinking "I built something like this in my own repository", you're not alone — so did I. **The problem is that it only lives in that one repository.** The moment you have two or three projects, the system you grew becomes copies and degraded copies.
+
+kit **ships it as a package.**
+
+Add it as a devDependency and initialize, and the rules, the verification scripts and the deny rules for dangerous operations all reach that project. The procedure skills arrive as a Claude Code plugin, with nothing to install. Update kit and the sync command brings the project along. **The same keyword works the same way in every project.** (Everything above reaches a `full`-profile project; a `basic` project gets only short rules and minimal formatting and Git settings.)
+
+For scale: there are 145 `josh` commands, and **101 of them are meant to be run by the agent, not by a person.** That is what it means to be built with the agent as the primary user, rather than having AI support bolted on later.
+
+# What to know up front
+
+- **It assumes you work from GitHub Issues.** It doesn't fit a style of development that never writes one.
+- **It needs the `gh` CLI.** GitHub operations go through `gh api`.
+- **Not every rule is enforced by a command.** Dangerous git operations, commits without a test, and merges with no self-review record (or a review that read a different working tree) are stopped by commands; others — such as never applying the approval label, or never changing pinned versions on its own — are held by prompt rules and an after-the-fact check.
+- **Deciding which Issues to hand to the agent stays with you.** That is not automated, and it won't be.
+- It isn't magic. **kit does not make the agent smarter; it makes it possible to hand work over without having to trust the agent.**
+
+You don't have to trust it to hand it the work. That is all kit is.

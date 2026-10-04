@@ -29,7 +29,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Before filing: say whether an issue like this exists and which epic it belongs to',
 		category: 'AI tools',
-		reference: ['<title> [--body <summary>]', 'automation', ['network']],
+		reference: ['<title> [--body <summary> | --body-file <path>]', 'automation', ['network']],
 	},
 	'defect:rate': {
 		script: 'scripts/issue/defect-rate-cli.ts',
@@ -49,7 +49,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/issue/issue-fold-existing-cli.ts',
 		description: 'Assess whether a complete draft can join an unstarted issue',
 		category: 'AI tools',
-		reference: ['<assessment.json>', 'automation', ['none']],
+		reference: ['<assessment.json> [--json]', 'automation', ['none']],
 	},
 	'issue:cite': {
 		script: 'scripts/issue/issue-cite-cli.ts',

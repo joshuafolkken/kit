@@ -26,7 +26,7 @@ in outline: refactor → `pnpm josh main:merge` → **a dispatched lane child ha
 joshuafolkken/kit#2428) → otherwise `pnpm josh run:cut <N>` (the pre-gate cut, before the gate; a no-op
 outside a lane) → start `pnpm josh gate` and a subagent `/code-review`
 with the brief `pnpm josh review:brief` prints on `git diff main`, join the gate before the commit,
-iterate to no high/medium findings, at most two reviews → **the clean path folds the ship region into
+iterate to no high/medium findings, within the round cap (`prompts/review.md`) → **the clean path folds the ship region into
 one call**, `pnpm josh ship "<title> #<N>"` (gate → commit/push/PR → the CI-wait `followup` → the
 `run:tail` report bookkeeping, stopping at the first failed step; joshuafolkken/kit#2398), with any
 branch-2 filing (`pnpm josh issue:file`, which runs `epic:bundle` itself) run before it → **when a second round is due `ship` does not
@@ -44,7 +44,8 @@ implementation summary via `--notify-message` in the session language, leading w
 plain-language lines: `"Implemented <title>\nCause: ...\nFix: ...\nResult: ...\n\nDetails:\n-
 <change1>\n- <change2>"`. **`pnpm josh followup` waits for CI, verifies AI review findings, sends the
 completion notification, then merges; if blockers are found it exits non-zero — fix and re-run.**
-**マージ後に `pnpm josh ms` を実行する。** Codex レーンでは省略し、親の `run:merge` が主チェックアウトで同期する。Claude は従来どおり。
+**Run `pnpm josh ms` after the merge.** A Codex lane skips it — the parent's `run:merge` syncs the
+primary checkout; a Claude run keeps it.
 
 ## The `fullrun new` step list
 

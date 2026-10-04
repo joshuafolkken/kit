@@ -89,6 +89,7 @@ async function delete_each(names: ReadonlyArray<string>): Promise<PruneResult> {
 
 	for (const name of names) {
 		try {
+			// eslint-disable-next-line no-await-in-loop -- branch deletions write the same refs, one at a time
 			await git_spawn.read(['branch', '-d', name])
 			result.deleted.push(name)
 		} catch {

@@ -37,7 +37,7 @@ function main(argv: ReadonlyArray<string>): void {
 	process.exitCode = run(argv)
 }
 
-const disposition_cli = { USAGE, main, reason_line, run }
+const disposition_cli = { USAGE, reason_line, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 

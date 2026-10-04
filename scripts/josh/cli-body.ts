@@ -91,6 +91,6 @@ function resolve(input: {
 	return read_file_or_stdin(file_path)
 }
 
-const cli_body = { read_file_or_stdin, expand_escaped_newlines, has_value, resolve }
+const cli_body = { read_file_or_stdin, has_value, resolve }
 
 export { cli_body }

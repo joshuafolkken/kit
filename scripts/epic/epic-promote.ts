@@ -1,14 +1,6 @@
 import { epic_body } from './epic-body'
 import { epic_parse } from './epic-parse'
 
-// Promoting an existing issue into an epic.
-//
-// The discussion that concluded "this is really several issues" is almost always *inside* an
-// existing issue, and that discussion is usually the split rationale itself. Creating a separate
-// epic leaves two issues tracking one topic, so the promotion appends the epic's sections to the
-// body rather than replacing it (joshuafolkken/kit#865).
-
-const EPIC_SECTION_MARKER = '## Progress'
 const PROMOTED_HEADING = '## Split into children'
 
 interface PromoteInput {
@@ -90,7 +82,6 @@ function find_tracking_error(body: string, children: ReadonlyArray<number>): str
 }
 
 const epic_promote = {
-	EPIC_SECTION_MARKER,
 	PROMOTED_HEADING,
 	has_conflicting_tracking,
 	conflict_reason,

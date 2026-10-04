@@ -5,6 +5,7 @@ import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { run_parent_cut_hook } from '#scripts/run/run-parent-cut-hook'
 import { run_watcher_hook } from '#scripts/run/run-watcher-hook'
 import { batch_outcome } from './batch-guard'
+import { step_zero_notice } from './step-zero-notice'
 
 // One PreToolUse process for the three guards that used to be three (joshuafolkken/kit#1930). A Bash
 // call used to spawn `batch:guard`, `investigation:guard` and `rule:guard` separately — three pnpm
@@ -49,10 +50,20 @@ function with_duplicate_notice(combined: GuardOutcome, notice: string | undefine
 	return { reason: undefined, notice, fault: undefined }
 }
 
+// The Step 0 reminder is the last word (joshuafolkken/kit#2994): asked only where every guard stayed
+// clear, so a refusal or another notice never spends its once-per-session stamp unseen.
+function with_step_zero_notice(outcome: GuardOutcome, raw_payload: string): GuardOutcome {
+	if (!is_clear(outcome)) return outcome
+
+	const notice = step_zero_notice.notice(raw_payload)
+
+	return notice === undefined ? outcome : { reason: undefined, notice, fault: undefined }
+}
+
 // All guards run unconditionally, exactly as the separate PreToolUse entries did: each records its own
 // once-per-run stamp, so short-circuiting on the first refusal would change which guard is allowed to
 // fire on a later call.
-function pretool_outcome(raw_payload: string): GuardOutcome {
+function guard_outcome(raw_payload: string): GuardOutcome {
 	const batch = batch_outcome(raw_payload)
 	const investigation = investigation_refusal(raw_payload)
 	const duplicate = duplicate_read_outcome(raw_payload)
@@ -61,6 +72,11 @@ function pretool_outcome(raw_payload: string): GuardOutcome {
 	const combined = combine_outcomes(batch, investigation ?? duplicate_refusal ?? rule)
 
 	return with_duplicate_notice(combined, duplicate.notice)
+}
+
+// The synchronous verdict the Codex adapter asks for, with the Step 0 reminder as its last layer.
+function pretool_outcome(raw_payload: string): GuardOutcome {
+	return with_step_zero_notice(guard_outcome(raw_payload), raw_payload)
 }
 
 // The watcher guard is the one composed rule that cannot answer synchronously — it reads the lane
@@ -81,15 +97,17 @@ async function async_reason(raw_payload: string): Promise<string | undefined> {
 }
 
 async function pretool_outcome_async(raw_payload: string): Promise<GuardOutcome> {
-	const base = pretool_outcome(raw_payload)
+	const base = guard_outcome(raw_payload)
 
 	if (!is_clear(base)) return base
 
 	const reason = await async_reason(raw_payload)
 
-	return reason === undefined ? base : { reason, notice: undefined, fault: undefined }
+	if (reason !== undefined) return { reason, notice: undefined, fault: undefined }
+
+	return with_step_zero_notice(base, raw_payload)
 }
 
-const pretool_guard = { combine_outcomes, pretool_outcome, pretool_outcome_async }
+const pretool_guard = { combine_outcomes, pretool_outcome }
 
 export { pretool_guard, pretool_outcome, pretool_outcome_async }

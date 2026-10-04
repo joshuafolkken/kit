@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto'
 import { linkSync, renameSync, rmSync } from 'node:fs'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { process_identity } from '#scripts/josh/process-identity'
+import { process_owner_schema, type ProcessOwner } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { git_common_directory } from './git-common-directory'
 
 // One holder at a time per repository, for work that every work tree of that repository shares
@@ -14,32 +16,29 @@ import { git_common_directory } from './git-common-directory'
 
 const POLL_INTERVAL_MS = 200
 
-interface LockOwner {
-	pid: number
-	process_start?: string
+type IsGone = (owner: ProcessOwner) => boolean
+
+// Without a `cwd` the read keeps the inherited git location variables, as every other git call of the
+// running process does; an explicit `cwd` clears them so that directory is the one answered for.
+function lock_path(prefix: string, cwd?: string): string {
+	return stamp_file.stamp_path(prefix, git_common_directory.repository(cwd) ?? cwd ?? process.cwd())
 }
 
-type IsGone = (owner: LockOwner) => boolean
-
-function lock_path(prefix: string, cwd: string = process.cwd()): string {
-	return stamp_file.stamp_path(prefix, git_common_directory.repository(cwd) ?? cwd)
-}
-
-function parse_owner(raw: string | undefined): LockOwner | undefined {
+// A record that is not JSON, or is JSON of any other shape — `null`, an array, an object with no
+// numeric `pid` — is unreadable rather than an owner, so it is never judged and never cleared.
+function parse_owner(raw: string | undefined): ProcessOwner | undefined {
 	if (raw === undefined) return undefined
 
-	try {
-		return JSON.parse(raw) as LockOwner
-	} catch {
-		return undefined
-	}
+	const parsed = process_owner_schema.safeParse(json_value.parse_or_undefined(raw))
+
+	return parsed.success ? parsed.data : undefined
 }
 
-function read_owner(target: string): LockOwner | undefined {
+function read_owner(target: string): ProcessOwner | undefined {
 	return parse_owner(stamp_file.read_stamp_text(target))
 }
 
-function is_owner_gone(owner: LockOwner): boolean {
+function is_owner_gone(owner: ProcessOwner): boolean {
 	return process_identity.is_same_process(owner.pid, owner.process_start) === false
 }
 
@@ -111,6 +110,7 @@ async function acquire(target: string, max_wait_ms: number): Promise<boolean> {
 
 	while (!claim(target)) {
 		if (Date.now() >= deadline) return false
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await sleep(POLL_INTERVAL_MS)
 	}
 

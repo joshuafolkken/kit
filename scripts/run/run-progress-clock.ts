@@ -1,6 +1,5 @@
-import { git_utilities } from '#scripts/git/constants'
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { execaSync } from 'execa'
 import { z } from 'zod'
 
 // The report clock `josh run:progress` keeps, in the one form both of its readers can use
@@ -16,9 +15,10 @@ import { z } from 'zod'
 //
 // **The key is the work tree's own git directory**, the way `run_hold` keys its record: two lanes of
 // one repository are two runs, and one lane's report must not silence the other's clock. The
-// synchronous twin asks `git rev-parse --absolute-git-dir`, which is the first of the two lines
-// `git_command.git_directories` reads and the one the asynchronous path already takes — so the two
-// spellings cannot name different files.
+// synchronous twin is `git_common_directory.own()`, which asks the same two lines
+// `git_command.git_directories` reads and takes the first — so the two spellings cannot name different
+// files. A git read that fails or times out answers `undefined`, which reads as "no clock here" and
+// lets the call through.
 
 const PROGRESS_PREFIX = 'josh-run-progress-'
 // The watcher's own liveness record, kept apart from the report clock above: that one says *when* the
@@ -55,14 +55,6 @@ const MS_PER_MINUTE = 60_000
 const LOG_STALE_MINUTES = 90
 const LOG_STALE_MS = LOG_STALE_MINUTES * MS_PER_MINUTE
 const BLOCK_SEPARATOR = '\n\n'
-// The lookup only ever decides whether a rule speaks, so a git call that hangs must not hold the hook
-// that is holding the user's call. A timeout answers `undefined`, which reads as "no clock here" and
-// lets the call through — the direction every other failure in this path already takes.
-const GIT_TIMEOUT_MS = 5000
-// The first of the two lines `git_command.git_directories` reads, asked on its own because that is the
-// one the record is keyed on. Asking git rather than assuming a directory named `.git` is what makes a
-// linked work tree, a bare repository and a `--separate-git-dir` clone all answer correctly.
-const GIT_DIRECTORY_ARGUMENTS: ReadonlyArray<string> = ['rev-parse', '--absolute-git-dir']
 
 // `line` is the last heartbeat the watcher printed, kept verbatim beside the clock so a reader that
 // cannot see the watcher's transcript — a person checking a woken headless `backlogrun` through
@@ -259,25 +251,8 @@ function end_life(target: string): void {
 	stamp_file.remove_stamp(target)
 }
 
-// execa runs the binary directly with an argument array and no `shell` option, so CLI args cannot
-// break out of a shell sandbox; the git command and args are internally controlled, never untrusted
-// input. tssecurity:S8705 is a false positive here.
-function git_directory_sync(): string | undefined {
-	const git_binary = git_utilities.get_git_command_for_spawn()
-	const result = execaSync(git_binary, GIT_DIRECTORY_ARGUMENTS, {
-		reject: false,
-		timeout: GIT_TIMEOUT_MS,
-	}) // NOSONAR
-
-	if (result.exitCode !== 0) return undefined
-
-	const output = result.stdout.trim()
-
-	return output === '' ? undefined : output
-}
-
 function stamp_target_sync(): string | undefined {
-	const directory = git_directory_sync()
+	const directory = git_common_directory.own()
 
 	return directory === undefined ? undefined : stamp_target_of(directory)
 }
@@ -299,8 +274,6 @@ const run_progress_clock = {
 	LIFE_PREFIX,
 	LOG_KEEP,
 	LOG_STALE_MS,
-	PROGRESS_PREFIX,
-	append_line,
 	begin_life,
 	end_life,
 	is_life_ended,
@@ -314,7 +287,6 @@ const run_progress_clock = {
 	read_last_report,
 	read_last_report_sync,
 	stamp_target_of,
-	stamp_target_sync,
 }
 
 export { run_progress_clock }

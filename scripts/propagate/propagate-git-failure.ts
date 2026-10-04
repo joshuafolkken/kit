@@ -178,7 +178,6 @@ const propagate_git_failure = {
 	NO_COMMIT,
 	NOT_OPENED,
 	PUSH_FAILED,
-	TAIL_LINE_COUNT,
 	UNCOMMITTED,
 	attribute,
 	describe_failure,

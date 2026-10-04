@@ -1,4 +1,4 @@
-import { has_label_name, RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
+import { has_label_name, RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import type { EpicChild } from './epic-graph'
 

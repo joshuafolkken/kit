@@ -11,7 +11,7 @@ const SYNC_DOC_PATH = fileURLToPath(
 const { load_settings } = claude_settings_fixture
 
 // Every command that rewrites the index or ships work without going through `pnpm josh git`. The
-// same list is what each paired document has to enumerate, so drift shows up as a failing test
+// maintainer sync rationale has to enumerate the same list, so drift shows up as a failing test
 // rather than as a document that describes a weaker guard than the one being distributed.
 const INDEX_DENY_PATTERNS: ReadonlyArray<string> = [
 	'Bash(git add*)',
@@ -76,9 +76,20 @@ const FORCE_PUSH_DENY_PATTERNS: ReadonlyArray<string> = [
 // incidental formatting choice, and an entry missing it still passes every deny assertion.
 const SHORT_FLAG_NO_SPACE_PATTERN = /\*-[a-zA-Z](?![a-zA-Z-])/u
 
+// The entrance entries for the destructive commands joshuafolkken/kit#2983 decided to stop. They
+// catch only the plain spelling; the `destructive-command` row of `pnpm josh rule:guard` reads the
+// argv and catches the rest (`rm -r -f`, `env gh pr close`).
+const DESTRUCTIVE_DENY_PATTERNS: ReadonlyArray<string> = [
+	'Bash(rm -fr *)',
+	'Bash(gh repo delete*)',
+	'Bash(gh repo archive*)',
+	'Bash(gh pr close*)',
+]
+
 const REQUIRED_DENY_PATTERNS: ReadonlyArray<string> = [
 	'Bash(rm -rf *)',
 	'Bash(rm -rf /*)',
+	...DESTRUCTIVE_DENY_PATTERNS,
 	...FORCE_PUSH_DENY_PATTERNS,
 	...SHARED_STATE_DENY_PATTERNS,
 	...INDEX_DENY_PATTERNS,
@@ -123,6 +134,9 @@ function is_denied(deny_entries: ReadonlyArray<string>, command: string): boolea
 }
 
 const DENIED_COMMANDS: ReadonlyArray<string> = [
+	'gh repo delete joshuafolkken/kit --yes',
+	'gh repo archive joshuafolkken/kit',
+	'gh pr close 850',
 	'git add .',
 	'git add -A',
 	'git add --all src',
@@ -192,6 +206,10 @@ const UNBLOCKED_COMMANDS: ReadonlyArray<string> = [
 	'git restore src/app.ts',
 	'gh pr view 850 --json url',
 	'gh issue comment 850 --body "done"',
+	// joshuafolkken/kit#2983 keeps these open: the WIP-cap procedure closes Issues, and a single
+	// non-forced removal is not the recursive forced `rm` the new entries stop.
+	'gh issue close 850',
+	'rm -r dist',
 	// The reads the REST-era workflow is built on. Each was run against the live API while the new
 	// entries were in force, so the merge and ref guards are known not to have taken the workflow
 	// with them.
@@ -337,9 +355,11 @@ const AI_DOC_MARKERS: ReadonlyArray<string> = [
 	'never read "the tool let me" as permission',
 ]
 
+// joshuafolkken/kit#2996 made `.claude/settings.json` the single source of the pattern list: the
+// workflow prompt states that the deny exists and why, and points at the file instead of copying it.
 const WORKFLOW_MARKERS: ReadonlyArray<string> = [
-	...INDEX_DENY_PATTERNS,
-	'`Bash(gh pr merge*)`）で機械的に遮断されている',
+	'`permissions.deny` で機械的に遮断されている',
+	'パターンの一覧はそのファイルが一次情報であり、ここでは書き写さない',
 	'deny には「そのターンでユーザーが明示指示した」という例外がないため',
 	'ユーザー自身の端末で実行してもらう',
 	'「拒否される操作」と「禁止された操作」は同じ集合ではない',
@@ -362,4 +382,11 @@ describe(`${WORKFLOW_PROMPT} — canonical deny rationale`, () => {
 	it.each(WORKFLOW_MARKERS)('states %j', (marker) => {
 		expect(content).toContain(marker)
 	})
+
+	it.each([...INDEX_DENY_PATTERNS, PR_MERGE_DENY])(
+		'does not copy the deny pattern %j',
+		(pattern) => {
+			expect(content).not.toContain(pattern)
+		},
+	)
 })

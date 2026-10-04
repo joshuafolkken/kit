@@ -5,6 +5,7 @@ import { api_outage } from '#scripts/agent/api-outage'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { issue_closing_pr } from '#scripts/issue/issue-closing-pr'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
+import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { run_carry, type CarryOwner, type RunCarry } from './run-carry'
 import { run_ending } from './run-ending'
 import { run_event_stream } from './run-event-stream'
@@ -12,8 +13,6 @@ import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_issue_number } from './run-issue-number'
 import { run_merge, type ChildOutcome, type EndingSignals } from './run-merge'
 import { run_merge_steps, type MergeContext } from './run-merge-steps'
-import { run_ship_detach } from './run-ship-detach'
-import { run_ship_probe } from './run-ship-probe'
 
 // `josh run:merge <N>` — one composite command for a `backlogrun` merge event (joshuafolkken/kit#2024).
 // The parent's context is the largest and its per-turn cost the highest, and the event was two turns:
@@ -316,7 +315,10 @@ async function on_cut(ctx: MergeContext): Promise<MergeVerdict> {
 
 // A child that parked itself: nothing is counted, but the park is written to the stream as a failed
 // child's is, so a reader restoring the run from its events sees the child settled (joshuafolkken/kit#2508).
+// Its `in-progress` is dropped as a failed child's is: left on, it outlived the `needs-decision` a
+// person later lifted, and a `run:solo` child then held the whole backlog (joshuafolkken/kit#3017).
 async function on_parked(ctx: MergeContext): Promise<MergeVerdict> {
+	await run_merge_steps.remove_in_progress(ctx.child)
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.PARK, `#${ctx.child} parked`)
 
 	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
@@ -355,18 +357,10 @@ const HANDLERS: Readonly<Record<ChildOutcome, (ctx: MergeContext) => Promise<Mer
 	shipping: on_shipping,
 }
 
-async function is_ship_running(child: string): Promise<boolean> {
-	const repository = await run_ship_probe.repository_directory()
-
-	return (
-		repository !== undefined && run_ship_detach.read_result(repository, child)?.result === 'running'
-	)
-}
-
 // The whole merge event for one returned child, in-process: read its state, classify it, and run the
 // handler. The CLI prints the token; `backlog:drive` branches on the outcome (joshuafolkken/kit#2508).
 async function merge_child(ctx: MergeContext): Promise<MergeResult> {
-	if (await is_ship_running(ctx.child)) {
+	if (lane_handoff.is_ship_running(ctx.child, process.cwd())) {
 		return { outcome: 'shipping', ...(await on_shipping()) }
 	}
 
@@ -405,8 +399,6 @@ const run_merge_cli = {
 	RESUMED_TOKEN,
 	RETRY_TOKEN,
 	STOP_TOKEN,
-	USAGE,
-	main,
 	merge_child,
 	parse,
 	run,

@@ -60,6 +60,6 @@ function check_key(josh_command: string, command: string): string {
 	return [josh_command, ...argument_key(command)].join(KEY_SEPARATOR)
 }
 
-const time_single_check = { CHECK_COMMANDS, NO_CHECK, check_key }
+const time_single_check = { NO_CHECK, check_key }
 
 export { time_single_check }

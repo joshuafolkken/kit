@@ -1,7 +1,7 @@
+import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
-import { git_gh_api_path } from '#scripts/git/git-gh-api-path'
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
-import { git_gh_repo } from '#scripts/git/git-gh-repo'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 
@@ -88,6 +88,6 @@ async function read_closing_pr(issue: string): Promise<string | undefined> {
 	}
 }
 
-const issue_closing_pr = { parse_references, pick_closing_pr, read_closing_pr }
+const issue_closing_pr = { read_closing_pr }
 
 export { issue_closing_pr }

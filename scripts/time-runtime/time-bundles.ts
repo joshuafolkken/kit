@@ -520,11 +520,7 @@ function bundle_lines(totals: BundleTotals, price: TripPrice): Array<string> {
 
 const time_bundles = {
 	HEADING,
-	SEQUENCE_LABEL,
-	RECOVERABLE_LABEL,
-	SAVING_LABEL,
 	BY_TOOL_LABEL,
-	MIN_SEQUENCE,
 	NO_BUNDLES,
 	build_bundles,
 	bundle_lines,

@@ -34,10 +34,23 @@ const REFERENCE_BOUNDARY = /[\s#()[\]<>|]/u
 // `issue:cite`'s parser accepts. A path-like run (`src/lib`, `a/b/c`) is not one, so it is not emitted
 // as a prefix that would make the suggested `issue:cite` call refuse the very reference it names.
 const OWNER_REPO = /^[^\s/#]+\/[^\s/#]+$/u
-// A markdown link, with its text captured as group 1: `[text](target)`. Each class excludes *both*
-// of its delimiters — no `[`/`]` in the text, no `(`/`)` in the target — so neither star is ambiguous
-// against a nested bracket and there is nothing to backtrack.
-const MARKDOWN_LINK = /\[([^[\]]*)\]\([^()]*\)/gu
+// A markdown link: `[text](target)`. Each class excludes *both* of its delimiters — no `[`/`]` in the
+// text, no `(`/`)` in the target — so neither star is ambiguous against a nested bracket and there is
+// nothing to backtrack.
+const MARKDOWN_LINK = /\[[^[\]]*\]\([^()]*\)/gu
+// What continues a `#N` into something longer, read off the two characters after its last digit: a
+// word character (a hex color, `#1e90ff`) or a hyphen and a letter (a heading anchor, `#12-setup`) —
+// never an Issue number (joshuafolkken/kit#2995). A hyphen before a digit or `#` is a range
+// (`#12-#15`, `#3-5`), whose first number is still a citation.
+const NUMBER_CONTINUATION = /^(?:\w|-[a-z])/iu
+// The width of the window `NUMBER_CONTINUATION` reads: a hyphen and the letter after it.
+const CONTINUATION_WIDTH = 2
+// What, in the run of non-boundary characters before a `#N`, glues it into a longer token: the `&` of
+// an HTML entity (`&#39;`), the `.` of a file fragment (`README.md#12`), the `/` of a path or URL
+// fragment (`src/lib/x#5`, `example.com/#12`). Any other lead leaves it a citation — a repository
+// without its owner (`kit#12`), a verb (`fixes#12`), prose in a non-Latin script or emphasis
+// (`**#12**`) is a slip all the same. A well-formed `owner/repo#N` is read off `repo_prefix` first.
+const GLUED_LEAD = /[&./]/u
 // A fenced-code delimiter line: three or more backticks or tildes after optional indentation — both
 // delimiters CommonMark allows. Toggling on each one brackets the fenced block, so a `closes #N` shown
 // in a `gh api` example never reads as a slip whichever fence the reply drew it with.
@@ -53,25 +66,32 @@ const PR_PREFIX = /\b(?:pr|pull request)\s*$/iu
 // sits inside a span.
 const BACKTICK_PAIR = 2
 
-// Whether a markdown link's *text* span — between the `[` and the `]`, never its `(target)` — covers
-// `index`. A `#N` inside the text is the approved `[#N](url)` citation; one in the target is not
-// reachable, since an issues URL carries no `#N`.
-function text_span_covers(link: RegExpMatchArray, index: number): boolean {
-	const start = (link.index ?? 0) + 1
-	const end = start + (link[1] ?? '').length
+// Whether a markdown link covers `index`, text or target alike. A `#N` in the text is the approved
+// `[#N](url)` citation; one in the target is a page fragment (`[setup](#12)`), not an Issue.
+function link_covers(link: RegExpMatchArray, index: number): boolean {
+	const start = link.index ?? 0
 
-	return index >= start && index < end
+	return index >= start && index < start + link[0].length
 }
 
-// The line is searched for a link whose text span covers this index, so `see [#12](url) and #34`
-// reads the first as linked and the second as bare. The scan is line-based (`is_bare_at` passes one
-// line), so a link and the `#N` it wraps must sit on the same line — which they always do.
+// The line is searched for a link covering this index, so `see [#12](url) and #34` reads the first as
+// linked and the second as bare. The scan is line-based (`is_bare_at` passes one line), so a link and
+// the `#N` it wraps must sit on the same line — which they always do.
 function is_linked_at(line: string, index: number): boolean {
 	for (const link of line.matchAll(MARKDOWN_LINK)) {
-		if (text_span_covers(link, index)) return true
+		if (link_covers(link, index)) return true
 	}
 
 	return false
+}
+
+// The run of non-boundary characters that ends at the `#` — what `repo_prefix` keeps when it is an
+// `owner/repo` and `is_glued` weighs when it is not.
+function lead_token(message: string, hash_index: number): string {
+	let start = hash_index
+	while (start > 0 && !REFERENCE_BOUNDARY.test(message.charAt(start - 1))) start -= 1
+
+	return message.slice(start, hash_index)
 }
 
 // **The message text alone, never a GitHub-bound artifact.** An Issue body or comment is passed to
@@ -83,10 +103,7 @@ function is_linked_at(line: string, index: number): boolean {
 // non-boundary characters ending at the `#`, kept only when it holds a `/`. Read backwards a
 // character at a time so a repository name of any length costs its own length and no more.
 function repo_prefix(message: string, hash_index: number): string {
-	let start = hash_index
-	while (start > 0 && !REFERENCE_BOUNDARY.test(message.charAt(start - 1))) start -= 1
-
-	const token = message.slice(start, hash_index)
+	const token = lead_token(message, hash_index)
 
 	return OWNER_REPO.test(token) ? token : ''
 }
@@ -115,17 +132,25 @@ interface LineReference {
 	text: string
 }
 
-// The bare references on one line, in order — the excluded mentions (linked, inline-code, PR) already
-// dropped by `is_bare_at`, so a caller acts on citations alone.
+// Whether the `#N` is part of a longer token rather than an Issue number of its own — continued past
+// its digits, or led by an entity, file or path run (`GLUED_LEAD`) that is not an `owner/repo`.
+function is_glued(line: string, reference: LineReference): boolean {
+	const end = reference.index + reference.text.length
+
+	if (NUMBER_CONTINUATION.test(line.slice(end, end + CONTINUATION_WIDTH))) return true
+
+	return reference.prefix === '' && GLUED_LEAD.test(lead_token(line, reference.index))
+}
+
+// The bare references on one line, in order — the glued tokens (`is_glued`) and the excluded mentions
+// (linked, inline-code, PR, `is_bare_at`) already dropped, so a caller acts on citations alone.
 function line_references(line: string): ReadonlyArray<LineReference> {
 	const references: Array<LineReference> = []
 
 	for (const match of line.matchAll(ISSUE_NUMBER)) {
-		const { index } = match
+		const reference = { index: match.index, prefix: repo_prefix(line, match.index), text: match[0] }
 
-		if (is_bare_at(line, index)) {
-			references.push({ index, prefix: repo_prefix(line, index), text: match[0] })
-		}
+		if (!is_glued(line, reference) && is_bare_at(line, match.index)) references.push(reference)
 	}
 
 	return references

@@ -12,7 +12,7 @@
 // section level, and the point-of-use documents a leaf never reaches dropped — applied by the shared
 // `read-set-trim`, which the `backlogrun` parent trim uses too (joshuafolkken/kit#2256).
 
-import type { Cost, ReadSetCost } from './entry-read-set'
+import type { ReadSetCost } from './entry-read-set'
 import { read_set_trim } from './read-set-trim'
 
 const LANE_CHILD = 'lane-child'
@@ -73,16 +73,11 @@ function costed(root: string): ReadSetCost {
 	})
 }
 
-function unused_skill_cost(root: string): Cost {
-	return read_set_trim.unused_skill_cost(root, UNUSED_SKILL_SECTIONS)
-}
-
 const lane_child_read_set = {
 	LANE_CHILD,
 	SKIPPED_POINT_OF_USE,
 	UNUSED_SKILL_SECTIONS,
 	costed,
-	unused_skill_cost,
 }
 
 export { lane_child_read_set }

@@ -28,7 +28,7 @@ function is_owed(facts: RetrospectiveFacts): boolean {
 	return !facts.is_lane_child && !facts.is_retrospective_done && !facts.is_consumer
 }
 
-const run_retrospective = { RETROSPECTIVE_ENV_KEY, is_enabled, is_owed }
+const run_retrospective = { is_enabled, is_owed }
 
 export type { RetrospectiveFacts }
 export { run_retrospective }

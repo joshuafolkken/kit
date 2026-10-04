@@ -151,7 +151,6 @@ function has_issue_record(content: string, issue: number): boolean {
 
 const review_finding_ledger = {
 	CATEGORIES,
-	SEVERITIES,
 	category_counts,
 	finding_line,
 	has_issue_record,

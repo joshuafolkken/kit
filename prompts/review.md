@@ -27,8 +27,8 @@ points to them rather than restating them:
 The workflow review uses the `reviewer` role profile printed by `pnpm josh review:brief`. Pass its
 model and effort explicitly to the review subagent; do not substitute the review level for effort.
 
-Re-run after applying fixes until **no high or medium findings remain — or until two reviews have run
-in total, the first included — whichever comes first.** The cap below is not optional. The second round
+Re-run after applying fixes until **no high or medium findings remain — or until the round cap below is
+reached, the first review included — whichever comes first.** The cap below is not optional. The second round
 is a verification pass over the fixes, not the first review again
 (`prompts/review-rubric.md` → "The second round is a verification pass, not a second full review").
 
@@ -197,7 +197,7 @@ Only branch 2 files an Issue. What follows applies to that branch.
   1. File the follow-up Issue referencing the current one, tagged `route:review-cap` — **before the current Issue closes.**
      `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --route review-cap`.
      The command lints the body, applies the classification labels it declares, runs the duplicate scan
-     and then `epic:bundle` on the new Issue (`docs/josh-commands.md` → `josh issue:file`). The
+     and then `epic:bundle` on the new Issue (`docs/josh-commands-automation.md` → `josh issue:file`). The
      `epic:bundle` candidate search reads open issues only, so once the parent has closed it answers
      `none` permanently.
   2. Act on the `epic:bundle` answer it prints. **`epic:bundle` recommends and writes nothing**, so acting means running the

@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 import { issue_backlinks, type UpstreamEntry } from './issue-backlinks'
@@ -90,8 +90,4 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const issue_backlinks_cli = { run, USAGE }
-
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
-
-export { issue_backlinks_cli }

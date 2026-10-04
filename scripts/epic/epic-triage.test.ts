@@ -1,4 +1,4 @@
-import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
+import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import type { EpicChild } from './epic-graph'
 import { epic_triage } from './epic-triage'

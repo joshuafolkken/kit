@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, type Dirent } from 'node:fs'
 import path from 'node:path'
 import { repo_origin } from '#scripts/discovery/repo-origin'
+import { json_value } from '#scripts/lib/json-value'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { execaSync } from 'execa'
 
@@ -73,32 +74,26 @@ function read_manifest(root: string): Record<string, unknown> | undefined {
 	if (!existsSync(filename)) return undefined
 	const parsed: unknown = JSON.parse(readFileSync(filename, 'utf8'))
 
-	if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-		throw new Error('package.json must contain an object')
-	}
+	if (!json_value.is_record(parsed)) throw new Error('package.json must contain an object')
 
-	return parsed as Record<string, unknown>
-}
-
-function is_record(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value)
+	return parsed
 }
 
 function recorded_profile(manifest: Record<string, unknown>): ProjectProfile | undefined {
 	const { josh } = manifest
 
-	return is_record(josh) ? parse_profile(josh['profile']) : undefined
+	return json_value.is_record(josh) ? parse_profile(josh['profile']) : undefined
 }
 
 function has_build_script(value: unknown): boolean {
-	return is_record(value) && ('build' in value || 'dev' in value)
+	return json_value.is_record(value) && ('build' in value || 'dev' in value)
 }
 
 // kit itself is not evidence of a Node toolchain: `pnpm add -D @joshuafolkken/kit` before
 // `josh init` is the documented order, and it must still leave an `index.html` site on the basic
 // profile (joshuafolkken/kit#2693).
 function has_project_dependencies(value: unknown): boolean {
-	if (!is_record(value)) return false
+	if (!json_value.is_record(value)) return false
 
 	return Object.keys(value).some((name) => name !== KIT_PACKAGE_NAME)
 }

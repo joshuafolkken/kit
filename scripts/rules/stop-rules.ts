@@ -45,6 +45,9 @@ interface StopContext {
 	hold_present: boolean
 	// `git status --porcelain` came back empty.
 	tree_clean: boolean
+	// That record carries a `prrun` stop mark (joshuafolkken/kit#3023): the run stopped at a green pull
+	// request and keeps the hold over a clean tree on purpose, so a person can look before it merges.
+	prrun_stopped: boolean
 	// A `confirmation` notify is on this run's transcript tail.
 	notified: boolean
 	// The turn's session-facing reply text.
@@ -75,6 +78,9 @@ interface StopContext {
 	// A backgrounded subagent this run launched has not finished — `lane_background.pending_agent_ids`
 	// (joshuafolkken/kit#2774). Apart from `background_pending`, since only a subagent is sure to end.
 	agent_pending: boolean
+	// This lane child handed its region to a running detached ship — `lane_handoff.is_handed_off`
+	// (joshuafolkken/kit#2962). The supervisor notifies on its own outcome, so nobody waits on this stop.
+	handed_off: boolean
 	// The resolved `JOSH_SESSION_LANG` — `session_language.resolve_session_lang` (joshuafolkken/kit#2470).
 	session_lang: string
 }
@@ -105,8 +111,8 @@ const HOLD_RELEASE_REASON =
 	'place, so the next run here runs `git switch main && git pull` believing the tree is free while ' +
 	'you hold it. `.claude/skills/workflow-commands/SKILL.md` → §2f: a stop that leaves the tree clean ' +
 	'releases the hold with `pnpm josh run:release <N>` (bare for a `new` entry). A `halfrun` ' +
-	'pre-commit stop and a `needs-human-review` stop keep the hold because their tree is dirty — this ' +
-	'row is silent there. Release it, then end with a one-line confirmation that it was released — do ' +
+	'pre-commit stop and a `needs-human-review` stop keep the hold because their tree is dirty, and a ' +
+	'`prrun` stop keeps it by its stop mark — this row is silent there. Release it, then end with a one-line confirmation that it was released — do ' +
 	'not repeat your previous reply.'
 
 // **A refusal that corrects rather than advises** (joshuafolkken/kit#2247). The bare `#N` is already
@@ -232,8 +238,11 @@ function needs_filing(context: StopContext): boolean {
 // notify there says "nothing needed" and dilutes the ones that do. A backgrounded command does not
 // count: a dev server never ends, and a stop behind it would leave a person silently waiting. A lane
 // child never reaches this with a task running: `needs_background_wait` answers it first.
+//
+// **A lane handed to the detached ship stands them down too** (joshuafolkken/kit#2962): the hold now
+// belongs to the supervisor driving the merge, and the person hears from that supervisor's own notify.
 function is_held_idle(context: StopContext): boolean {
-	return context.hold_present && !context.agent_pending
+	return context.hold_present && !context.agent_pending && !context.handed_off
 }
 
 function needs_notify(context: StopContext): boolean {
@@ -241,7 +250,7 @@ function needs_notify(context: StopContext): boolean {
 }
 
 function needs_release(context: StopContext): boolean {
-	return is_held_idle(context) && context.tree_clean
+	return is_held_idle(context) && context.tree_clean && !context.prrun_stopped
 }
 
 function citation_reason(context: StopContext): string | undefined {
@@ -345,7 +354,6 @@ const stop_rules = {
 	STOP_NOTIFY_REASON,
 	SWITCH_ENV_KEY,
 	block_envelope,
-	block_reason,
 	build_language_reason,
 	count_headless_refusals,
 	is_enabled,

@@ -18,6 +18,7 @@ jobs:
     name: SonarQube
     permissions:
       contents: read
+      packages: read
     runs-on: ubuntu-latest
     # A consumer that does not use SonarCloud has no SONAR_TOKEN, and the scan would fail on
     # authentication and turn a required check red (joshuafolkken/kit#2815). `secrets` cannot be read
@@ -34,11 +35,43 @@ jobs:
         if: env.SONAR_TOKEN != ''
         with:
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+      # SonarCloud's New Code starts at the previous version, so an analysis without
+      # `sonar.projectVersion` never moves that start and New Code grows without end, diluting every
+      # ratio the Quality Gate judges (joshuafolkken/kit#3045). The version is `package.json`'s, so
+      # each `josh bump` that reaches main starts a new New Code period.
+      - name: Resolve project version
+        id: project-version
+        if: env.SONAR_TOKEN != ''
+        run: |
+          version=$(jq -r '.version // empty' package.json)
+          echo "args=${version:+-Dsonar.projectVersion=$version}" >> "$GITHUB_OUTPUT"
       - name: SonarQube Scan
         if: env.SONAR_TOKEN != ''
         uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
         with:
-          # Wait for the SonarCloud Quality Gate and fail this job (a required PR check) when the
-          # gate is red, so a PR that introduces a Maintainability / code-smell finding cannot be
-          # merged green. Without this flag the scan only uploads results and never blocks.
-          args: -Dsonar.qualitygate.wait=true
+          # Wait for the SonarCloud Quality Gate and fail this job when the gate is red. The gate
+          # judges ratings and ratios, not counts, so it alone lets a few new code smells or a small
+          # copied block through; the new-code check below is what fails on a single finding.
+          args: -Dsonar.qualitygate.wait=true ${{ steps.project-version.outputs.args }}
+      # The new-code check reads the pull request's analysis from the SonarCloud API and fails this
+      # job (a required PR check) when the pull request adds any new issue, of any type or severity,
+      # or any new duplicated block (joshuafolkken/kit#3045). An issue resolved in SonarCloud as
+      # accepted or a false positive is not counted. A push to main has no pull request to read.
+      - name: Setup Node.js
+        if: env.SONAR_TOKEN != '' && github.event_name == 'pull_request'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Configure GitHub Packages authentication for existing projects
+        if: env.SONAR_TOKEN != '' && github.event_name == 'pull_request'
+        run: printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' >> "$HOME/.npmrc"
+      - name: Setup pnpm and install dependencies
+        if: env.SONAR_TOKEN != '' && github.event_name == 'pull_request'
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fail on new Sonar issues or duplicated blocks
+        if: env.SONAR_TOKEN != '' && github.event_name == 'pull_request'
+        env:
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
+        run: pnpm josh sonar:new-code "$PULL_REQUEST"

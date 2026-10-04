@@ -48,6 +48,7 @@ async function is_approved(lane_directory: string, nonce: string): Promise<boole
 		const decision = read(lane_directory, nonce)?.decision
 		if (decision !== undefined) return decision === 'approved'
 
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await new Promise((resolve) => setTimeout(resolve, APPROVAL_POLL_MS))
 	}
 
@@ -58,6 +59,6 @@ function remove(lane_directory: string, nonce: string): void {
 	stamp_file.remove_stamp(target(lane_directory, nonce))
 }
 
-const openai_lane_supervisor_decision = { approve, cancel, is_approved, remove, target }
+const openai_lane_supervisor_decision = { approve, cancel, is_approved, remove }
 
 export { openai_lane_supervisor_decision }

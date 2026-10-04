@@ -1,4 +1,4 @@
-import { capped_listing_outcome, listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
+import { capped_listing_outcome, listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { close_completed_epics, EPIC_LIST_LIMIT, truncated_epic_list_note } from './epic-close'
 
@@ -8,7 +8,7 @@ import { close_completed_epics, EPIC_LIST_LIMIT, truncated_epic_list_note } from
 //
 // Kept out of `epic-close.test.ts` because that suite is already at its file-length ceiling.
 
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
 		issue_list_by_label: vi.fn(),
 		issue_get_state_and_relations: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock('#scripts/git/git-gh-command', () => ({
 	},
 }))
 
-const { git_gh_command } = await import('#scripts/git/git-gh-command')
+const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const mocked_list = vi.mocked(git_gh_command.issue_list_by_label)
 
 const MERGED_ISSUE = '103'

@@ -29,6 +29,7 @@ import { sonarjs_rules } from './rules/sonarjs.js'
 
 const REVIEW_RUBRIC = 'prompts/review-rubric.md'
 const REFACTORING_PROMPT = 'prompts/refactoring.md'
+const MAINTAINER_HISTORY = 'docs/maintainers/claude-md-history.md'
 
 const COGNITIVE_COMPLEXITY = 'sonarjs/cognitive-complexity'
 const MAX_LINES = 'max-lines'
@@ -105,8 +106,15 @@ const DOCUMENT_SPECS: ReadonlyArray<DocumentSpec> = [
 // `prompts/refactoring.md` states the limits as a search checklist rather than a table, so it is
 // pinned on the option names alone. It is a mandatory Completion-gate step: left unguarded it went
 // on telling readers to split at 300 physical lines while the gate counted code lines.
+//
+// `CLAUDE.md` keeps only the rule ("code lines, not physical lines"); the option names that explain
+// it moved to the maintainer history with the other explanations (joshuafolkken/kit#2994), so that
+// is where they are pinned.
 const COUNTING_DOCUMENTS: ReadonlyArray<string> = [
-	...DOCUMENT_SPECS.map((spec) => spec.path),
+	...DOCUMENT_SPECS.map((spec) => spec.path).filter(
+		(document_path) => document_path !== CANONICAL_DOC,
+	),
+	MAINTAINER_HISTORY,
 	REFACTORING_PROMPT,
 ]
 

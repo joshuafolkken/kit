@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { epic_index } from '#scripts/epic/epic-index'
 import type { EpicNextResult } from '#scripts/epic/epic-report'
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { read_json_listing } from '#scripts/git/parse-json-array'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/schemas'
 import { run_invocation } from '#scripts/run/run-invocation'
@@ -263,13 +263,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 const backlog_plan_cli = {
 	OPEN_TRUNCATED_MESSAGE,
 	OPEN_UNREADABLE_MESSAGE,
-	USAGE,
 	WAVES_WITH_NAMED_MESSAGE,
-	classify,
-	fetch_open,
-	main,
-	print_plan,
-	report,
 	run,
 }
 

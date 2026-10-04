@@ -5,6 +5,7 @@ import type { StopContext } from './stop-rules'
 const BASE: StopContext = {
 	hold_present: false,
 	tree_clean: false,
+	prrun_stopped: false,
 	notified: false,
 	message: '',
 	prompt: '',
@@ -17,6 +18,7 @@ const BASE: StopContext = {
 	lane_child: false,
 	background_pending: false,
 	agent_pending: false,
+	handed_off: false,
 	session_lang: 'en',
 }
 

@@ -96,7 +96,6 @@ const time_cli = {
 	USAGE,
 	parse_options,
 	run,
-	main,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) void main(process.argv.slice(ARGV_OFFSET))

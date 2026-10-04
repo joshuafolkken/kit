@@ -1,4 +1,4 @@
-import { telegram_notify } from '#scripts/git/telegram-notify'
+import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_event_stream, type RunEvent } from '#scripts/run/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
 import { backlog_ready, type ReadyPorts } from './backlog-ready'
@@ -137,7 +137,7 @@ async function run_stall_check(ready: ReadyPorts = backlog_ready.DEFAULT_PORTS):
 	}
 }
 
-const backlog_stalled_detect = { DEFAULT_PORTS, detect_and_report, gather, report, run_stall_check }
+const backlog_stalled_detect = { detect_and_report, run_stall_check }
 
 export { backlog_stalled_detect }
 export type { DetectPorts }

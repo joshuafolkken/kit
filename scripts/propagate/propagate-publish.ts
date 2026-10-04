@@ -1,4 +1,4 @@
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { poll } from '#scripts/lib/poll'
 import { with_page_size } from '#scripts/version/version-remote'
 
@@ -161,6 +161,7 @@ async function wait_for_publish(
 		const { state } = probe_once(resolved, versions_endpoint, target_version, progress)
 
 		if (state !== undefined) return finish(state, target_version, progress.attempts)
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await resolved.sleep(resolved.interval_ms)
 	}
 
@@ -168,8 +169,6 @@ async function wait_for_publish(
 }
 
 const propagate_publish = {
-	DEFAULT_TIMEOUT_MS,
-	DEFAULT_INTERVAL_MS,
 	UNREADABLE_THRESHOLD,
 	is_version_published,
 	should_keep_waiting,

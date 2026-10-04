@@ -1,15 +1,17 @@
 import { auto_ok_fixture } from '#scripts/auto-ok/auto-ok-fixture'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { epic_schema } from '#scripts/epic/epic-index'
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
-import { listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
-import type { IssueRead } from '#scripts/git/git-gh-issue-read'
-import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
+import { epic_solo_stale } from '#scripts/epic/epic-solo-stale'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
+import type { IssueRead } from '#scripts/gh/git-gh-issue-read'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import type { OpenIssueData } from '#scripts/git/schemas'
 import { defect_rate, type DefectRate } from '#scripts/issue/defect-rate'
 import { defect_rate_cli } from '#scripts/issue/defect-rate-cli'
+import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
+import { lane_await } from '#scripts/lane/lane-await'
 import { vi } from 'vitest'
 
 // One description of a backlog, stubbed across every read `josh backlog:next` makes.
@@ -61,6 +63,9 @@ interface BacklogInput {
 	// The repository's open `in-progress` issues, which the `run:solo` gate reads on a `run` answer
 	// (joshuafolkken/kit#2776). Left out, nothing is running.
 	in_progress?: ReadonlyArray<OpenIssueData>
+	// The `in-progress` holders no process is running for, each with a lane on this machine — a stale
+	// label (joshuafolkken/kit#3017). Left out, every holder is running.
+	stale?: ReadonlyArray<number>
 	// The issues left without `run:solo` or `run:lane` (joshuafolkken/kit#2779). Every other child and
 	// opted-in row is given `run:lane` unless it carries `run:solo`, so a case about something else is
 	// not answered `triage`.
@@ -190,6 +195,14 @@ function stub_listings(input: BacklogInput, epics: ReadonlyArray<EpicInput>): vo
 	vi.spyOn(git_gh_command, 'issue_list_by_label_in_repo').mockResolvedValue(
 		listing_outcome(JSON.stringify(input.in_progress ?? [])),
 	)
+
+	const stale = new Set((input.stale ?? []).map(String))
+
+	vi.spyOn(lane_await, 'is_process_running_default').mockImplementation(
+		(child) => !stale.has(child),
+	)
+	vi.spyOn(epic_solo_stale.io, 'local_lanes').mockResolvedValue(stale)
+	vi.spyOn(epic_solo_stale.io, 'settle').mockResolvedValue()
 }
 
 function stub_backlog(input: BacklogInput): void {
@@ -215,11 +228,7 @@ function stub_backlog(input: BacklogInput): void {
 
 const backlog_fixture = {
 	AT_BASELINE,
-	CHECKOUT_PATH,
-	REACHABLE_STATUS,
 	REPO,
-	gh_child,
-	stub_environment,
 	stub_backlog,
 }
 

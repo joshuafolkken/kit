@@ -52,6 +52,10 @@ interface RunHold {
 	// the positive record that the run has *ended* over its verified diff, which is what lets
 	// `fullrun #N` adopt the hold. A running `halfrun` or a `backlogrun` child never carries it.
 	is_halfrun_stop?: boolean | undefined
+	// Set only at a `prrun`'s stop before merge (`run:hold <N> --prrun-stop`, joshuafolkken/kit#3023): the
+	// commit the green pull request stood on, so `fullrun #N` can tell an untouched branch — merge it —
+	// from one that moved since and has to pass the gate and the review again.
+	prrun_stop_head?: string | undefined
 }
 
 type HoldRead =
@@ -92,6 +96,7 @@ const run_hold_schema = z.object({
 	pid: z.number(),
 	is_fullrun: z.boolean().optional(),
 	is_halfrun_stop: z.boolean().optional(),
+	prrun_stop_head: z.string().optional(),
 })
 
 // `undefined` for anything that is not a well-formed record, so the caller decides what a broken one
@@ -161,9 +166,24 @@ function create_hold(
 	return stamp_file.create_stamp(target, build_hold(issue, now, is_fullrun))
 }
 
-// The claim a `halfrun` stop leaves behind: the same exclusive create, carrying the stop mark.
+// What a stopped run's record carries on top of the claim: the `halfrun` stop's flag, or the commit a
+// `prrun` stop stood on (joshuafolkken/kit#3023).
+type StopMarkFields = Pick<RunHold, 'is_halfrun_stop' | 'prrun_stop_head'>
+
+const HALFRUN_STOP_FIELDS: StopMarkFields = { is_halfrun_stop: true }
+
+// The claim a stop leaves behind: the same exclusive create, carrying the stop mark.
+function create_stop_hold(
+	target: string,
+	issue: string,
+	mark: StopMarkFields,
+	now: Date = new Date(),
+): boolean {
+	return stamp_file.create_stamp(target, { ...build_hold(issue, now), ...mark })
+}
+
 function create_halfrun_stop_hold(target: string, issue: string, now: Date = new Date()): boolean {
-	return stamp_file.create_stamp(target, { ...build_hold(issue, now), is_halfrun_stop: true })
+	return create_stop_hold(target, issue, HALFRUN_STOP_FIELDS, now)
 }
 
 // **A tree with uncommitted work in it is never handed over, however old its record is.** No age can
@@ -260,8 +280,9 @@ const run_hold = {
 	UNNUMBERED_ISSUE,
 	classify,
 	create_halfrun_stop_hold,
+	create_stop_hold,
+	HALFRUN_STOP_FIELDS,
 	create_hold,
-	describe_holder,
 	foreign_release_message,
 	forced_release_message,
 	held_message,
@@ -270,7 +291,6 @@ const run_hold = {
 	is_own_hold,
 	is_tree_dirty,
 	own_release_command,
-	parse_hold,
 	race_message,
 	read_hold,
 	release_hold,
@@ -282,5 +302,5 @@ const run_hold = {
 	write_hold,
 }
 
-export type { HoldRead, RunHold }
+export type { HoldRead, RunHold, StopMarkFields }
 export { run_hold }

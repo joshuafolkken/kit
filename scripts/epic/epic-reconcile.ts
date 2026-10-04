@@ -1,4 +1,4 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { epic_add_body } from './epic-add-body'
 import { epic_chains } from './epic-chains'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'

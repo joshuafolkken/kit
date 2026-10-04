@@ -66,6 +66,11 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 	{ label: TYPE_CHECK_LABEL, target: 'check', reserved_cores: 1 },
 	{ label: 'cspell', target: 'cspell:dot', reserved_cores: 1 },
 	{ label: BEHAVIOR_LABEL, target: BEHAVIOR_LABEL, reserved_cores: 0 },
+	// **The unused-member check reserves no core** (joshuafolkken/kit#2987): it builds one TypeScript
+	// program and walks it single-threaded for about 5s — over well before lint and the type check, so
+	// a reservation would only take a place from the four-core CI runner's fan-out and a worker from
+	// the unit suite for the whole gate.
+	{ label: 'exports', target: 'exports:unused', reserved_cores: 0 },
 ]
 
 // The checks, in the order their output is printed — the static set, then the unit suite last (the
@@ -91,8 +96,8 @@ function has_unit_check(checks: ReadonlyArray<GateCheck>): boolean {
 	return checks.some((check) => check.label === UNIT_LABEL)
 }
 
-// What the three non-elastic checks hold between them: 2 + 1 + 1. Reduced over `STATIC_CHECKS`
-// rather than over all four, because that is the set the sentence above names: `resolve_unit_worker_cap`
+// What the non-elastic checks hold between them: 2 + 1 + 1. Reduced over `STATIC_CHECKS`
+// rather than over every check, because that is the set the sentence above names: `resolve_unit_worker_cap`
 // spends this as the cores the unit suite must leave to its siblings, so summing the unit check into
 // it would have the suite subtract its own reservation from its own budget the day that reservation
 // stops being zero. The two sets give the same number today, which is exactly why the narrower one
@@ -331,7 +336,6 @@ function format_gate_plan(
 }
 
 const gate_plan = {
-	BEHAVIOR_LABEL,
 	GATE_CHECKS,
 	LINT_LABEL,
 	MEASURED_CORES,
@@ -343,7 +347,6 @@ const gate_plan = {
 	check_weight,
 	format_gate_plan,
 	format_machine,
-	format_unit_cap,
 	has_unit_check,
 	plan_of,
 	resolve_concurrency,

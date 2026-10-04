@@ -42,8 +42,4 @@ async function main(): Promise<void> {
 	process.exitCode = await read_and_run()
 }
 
-const report_lint_cli = { run, OK_MESSAGE }
-
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
-
-export { report_lint_cli }

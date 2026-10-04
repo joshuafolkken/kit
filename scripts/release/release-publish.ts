@@ -1,6 +1,6 @@
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_pr_checks } from '#scripts/gh/git-pr-checks'
 import { git_command } from '#scripts/git/git-command'
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { git_pr_checks } from '#scripts/git/git-pr-checks'
 import { git_remote_branch } from '#scripts/git/git-remote-branch'
 import { write_version } from '#scripts/version/bump-version'
 import { version_targets } from '#scripts/version/version-targets'
@@ -150,7 +150,6 @@ const release_publish = {
 	publish,
 	pull_request_body,
 	unreachable_remote_message,
-	FAILURE_EXIT_CODE,
 	SUCCESS_EXIT_CODE,
 }
 

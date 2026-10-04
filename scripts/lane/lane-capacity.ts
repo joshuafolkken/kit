@@ -1,4 +1,5 @@
 import type { LaneEnvironment } from './lane-paths'
+import { lane_seed_policy } from './lane-seed'
 
 // How many lanes one repository may run at once, and how many of them are free
 // (joshuafolkken/kit#1491).
@@ -54,14 +55,16 @@ function lane_limit(environment: LaneEnvironment = process.env): LimitChoice {
 // Never negative: a repository holding more `in-progress` issues than the limit allows — the limit
 // was lowered, or a stale label outlived its run — has no free lane, and a negative count read as
 // "how many to offer" would be a slice nobody meant.
+//
+// **A limit above the seat count is capped at the seats** (joshuafolkken/kit#3027). `lane:open` refuses
+// a tenth lane however high `JOSH_LANE_LIMIT` is set, so counting free lanes past the seats offers a
+// launch that is bound to be refused.
 function free_lanes(limit: number, occupied: number): number {
-	return Math.max(NO_LANES, limit - occupied)
+	return Math.max(NO_LANES, Math.min(limit, lane_seed_policy.LAST_LANE_SEAT) - occupied)
 }
 
 const lane_capacity = {
-	DEFAULT_LANE_LIMIT,
 	LANE_LIMIT_KEY,
-	read_limit,
 	lane_limit,
 	free_lanes,
 }

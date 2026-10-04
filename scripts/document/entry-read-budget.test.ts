@@ -84,6 +84,8 @@ const PRE_2294_CEILING: ReadonlyMap<string, number> = new Map([
 	['kickoff', 270_336],
 	['fullrun', 270_336],
 	['halfrun', 270_336],
+	// `prrun` (joshuafolkken/kit#3023) postdates #2294 and reads `fullrun`'s set, so it holds fullrun's.
+	['prrun', 270_336],
 	['backlogrun', 274_432],
 	['lane-child', 143_360],
 ])

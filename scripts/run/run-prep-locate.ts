@@ -159,7 +159,7 @@ async function locate(text: string): Promise<string> {
 	return format_locations(located)
 }
 
-const run_prep_locate = { extract_targets, format_locations, locate, parse_hits }
+const run_prep_locate = { extract_targets, locate, parse_hits }
 
 export type { Hit, Located }
 export { run_prep_locate }

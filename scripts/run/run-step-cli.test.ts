@@ -13,6 +13,7 @@ const read_events_mock = vi.hoisted(() => vi.fn())
 const cut_cap_mock = vi.hoisted(() => vi.fn(() => false))
 // The session's own process ancestry, which a handed-off record's owner is checked against.
 const ancestry_mock = vi.hoisted(() => vi.fn((): ReadonlySet<number> => new Set()))
+const lane_child_mock = vi.hoisted(() => vi.fn(() => false))
 const info_mock = vi.hoisted(() => vi.fn())
 const error_mock = vi.hoisted(() => vi.fn())
 // Hoisted so the mock's EVENT_KIND and the stale-event regression test name the one kind once
@@ -36,6 +37,10 @@ vi.mock('./run-carry', () => ({
 }))
 
 vi.mock('#scripts/lane/lane-reap', () => ({ lane_reap: { own_ancestry: ancestry_mock } }))
+// Mocked so a test run from inside a lane worktree does not read itself as a lane child.
+vi.mock('#scripts/lane/lane-child-marker', () => ({
+	lane_child_marker: { is_child_of: lane_child_mock },
+}))
 
 vi.mock('./run-event-stream', () => ({
 	run_event_stream: {
@@ -257,6 +262,21 @@ describe('run_step_cli.run — the invocation scope of the position', () => {
 		await run_step_cli.run([ISSUE])
 
 		expect(printed()).toBe(`pnpm josh ship --log ${ISSUE}`)
+	})
+
+	// joshuafolkken/kit#3039: another lane's merge under the batch's carry scope was read as a planned lane
+	// child's position, so `run:step` told it to stop while `run:entry` / `run:next` said implement.
+	it('answers implement to a lane child whose stream ends in another issue’s merge', async () => {
+		lane_child_mock.mockReturnValueOnce(true)
+		read_carry_mock.mockReturnValue(carried())
+		read_events_mock.mockReturnValue([
+			{ pos: 1, at: RUN_START, kind: 'plan', text: `planned #${ISSUE}` },
+			{ pos: 2, at: RUN_START, kind: 'merge', text: '#3027 merged' },
+		])
+
+		await run_step_cli.run([ISSUE])
+
+		expect(printed()).toBe(run_step.IMPLEMENT)
 	})
 })
 

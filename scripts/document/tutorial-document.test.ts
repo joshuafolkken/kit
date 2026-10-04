@@ -34,6 +34,9 @@ const PATTERNS: ReadonlyArray<Pattern> = [
 		steps: [KICKOFF_NEW, 'auto-ok', 'backlogrun'],
 	},
 ]
+// How the tutorial was verified is a maintainer record (joshuafolkken/kit#2993): it lives under
+// `docs/maintainers/`, linked back to the tutorial, and the user-facing page carries only the steps.
+const VERIFICATION_RECORD = 'docs/maintainers/guide-verification.md'
 const VERIFYING_HEADING = '## Verifying this guide'
 
 function section(text: string, heading: string, next_heading: string): string {
@@ -59,8 +62,9 @@ describe('the first-change tutorial', () => {
 		expect(positions).toStrictEqual(positions.toSorted((left, right) => left - right))
 	})
 
-	it('records how the guide was verified', () => {
-		expect(read_document(TUTORIAL)).toContain(VERIFYING_HEADING)
+	it('keeps how the guide was verified in the maintainer record, not on the page', () => {
+		expect(linked_paths(VERIFICATION_RECORD)).toContain(TUTORIAL)
+		expect(read_document(TUTORIAL)).not.toContain(VERIFYING_HEADING)
 	})
 
 	it.each(ENTRY_DOCUMENTS)('%s links to the tutorial', (path) => {

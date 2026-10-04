@@ -48,8 +48,8 @@ Each step is a terse trigger and a pointer; the procedure is read on demand from
    that bounds the amount. `auto-ok` is a person's alone.
 4. **Report the plan before the first child** — `pnpm josh backlog:plan`, then resolve every
    `needs-decision` issue decidable from its body in one pass. In the same pass, record `blocked-by`
-   between issues that must land in order, and apply `run:solo` where the verification-path
-   enumeration holds, `run:lane` elsewhere. `backlogrun-steps.md` → "The plan,
+   between issues that must land in order, and apply `run:solo` where all three of the
+   `wip-cap.md` → 「実行のしかた」 conditions hold, `run:lane` elsewhere. `backlogrun-steps.md` → "The plan,
    before the first child starts" and its "Resolve what the plan can resolve, before starting".
 5. **Named issues run first, in order** — `backlogrun-steps.md` → "Named issues run first, in order":
    the supervisor's driver dispatches each as a delegated `fullrun`, one at a time, then drains the

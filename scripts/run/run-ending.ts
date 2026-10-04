@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { agent_exit_record } from '#scripts/agent/agent-exit-record'
 import { api_outage } from '#scripts/agent/api-outage'
 import type { ClaudeResultEvent } from '#scripts/agent/claude-result-event'
-import { git_gh_issue_read } from '#scripts/git/git-gh-issue-read'
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { issue_state } from '#scripts/issue/issue-state'
 import { run_cut } from './run-cut'
 import { run_hold } from './run-hold'
@@ -222,9 +222,6 @@ async function check(request: EndingRequest): Promise<EndingDecision> {
 const run_ending = {
 	check,
 	decide,
-	describe_exit,
-	read_child_closed,
-	read_cut_taken,
 	read_exit,
 }
 

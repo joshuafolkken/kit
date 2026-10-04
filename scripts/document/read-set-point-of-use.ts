@@ -62,6 +62,7 @@ const POINT_OF_USE_BY_ENTRY: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 	['kickoff', DEFERRED_DECISIONS],
 	['fullrun', DEFERRED_DECISIONS],
 	['halfrun', DEFERRED_DECISIONS],
+	['prrun', DEFERRED_DECISIONS],
 	['backlogrun', new Set([...DEFERRED_DECISIONS, 'fullrun.md', 'split-assessment.md'])],
 ])
 

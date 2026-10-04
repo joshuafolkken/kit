@@ -42,6 +42,14 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Versioning',
 		reference: ['[--json]', 'automation', ['none']],
 	},
+	// Run by the release workflows, kit's and the one sync distributes, after a tag has published
+	// (joshuafolkken/kit#3007). Settings come from the environment, so the workflow decides them.
+	'release:github': {
+		script: 'scripts/release/github-release-cli.ts',
+		description: 'Create the GitHub Release for a published tag, with generated notes',
+		category: 'Versioning',
+		reference: ['', 'automation', ['network', 'release']],
+	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 

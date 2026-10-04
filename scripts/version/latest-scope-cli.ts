@@ -130,9 +130,7 @@ function main(argv: ReadonlyArray<string>): void {
 
 const latest_scope_cli = {
 	decide,
-	describe_stamp,
 	JSON_KEY,
-	main,
 	NO_STAMP_REASON,
 	RECORD_FLAG,
 	REQUIRED_SCOPE,

@@ -1,6 +1,6 @@
 # josh sync — Detailed Behavior
 
-For projects already set up with `josh init`, after upgrading kit: which files `josh sync` overwrites, merges or leaves alone. `josh sync` overwrites managed files in your project with the latest versions from the installed `@joshuafolkken/kit` package. Run it after upgrading the package.
+For projects already set up with `josh init`, after upgrading kit: which files `josh sync` overwrites, merges or leaves alone. `josh sync` overwrites managed files in your project with the latest versions from the installed `@joshuafolkken/kit` package. Run it after upgrading the package. The reasons behind each behavior below are in [sync-rationale.md](./maintainers/sync-rationale.md), cited section by section as "Rationale:".
 
 ```bash
 pnpm josh sync
@@ -25,9 +25,11 @@ SECURITY.md         tsconfig.sonar.json
 .github/workflows/ci.yml
 .github/workflows/auto-tag.yml
 .github/workflows/dependabot-auto-merge.yml
+.github/workflows/github-release.yml
 .github/workflows/pr-classification.yml
 .github/workflows/production.yml
 .github/workflows/sonar-qube.yml
+.github/actions/setup-pnpm/action.yml
 .github/pull_request_template.md
 .github/release.yml
 .github/dependabot.yml
@@ -40,12 +42,12 @@ The Codex project files are managed by kit. Sync overwrites both files, and rewr
 
 What else a consumer should know about the files above. Each item is the behavior; why it is that way, and the history behind it, is maintainer rationale in `docs/maintainers/sync-rationale.md`.
 
-- **The distributed skills ship as the `kit` Claude Code plugin, not as copies.** `.claude/settings.json` declares the `kit` marketplace and enables the `kit` plugin; the skill bodies load from `node_modules/@joshuafolkken/kit/.claude/skills/`. The CLI does not install a plugin from settings alone, so run once: `claude plugin marketplace add ./node_modules/@joshuafolkken/kit && claude plugin install kit@kit` (or `/plugin`). Sync removes a leftover copied skill directory — including one for a skill no longer distributed — only while it still matches what kit shipped; a copy you edited or authored is kept with a warning. Rationale: `docs/maintainers/sync-rationale.md` → "The skills ship as a plugin".
+- **The distributed skills ship as the `kit` Claude Code plugin, not as copies.** `.claude/settings.json` declares the `kit` marketplace and enables the `kit` plugin; the skill bodies load from `node_modules/@joshuafolkken/kit/.claude/skills/`. Nothing needs installing: once you trust the workspace, Claude Code reads the declaration and loads the skills as `kit:<name>` — an interactive session from its first session, a headless one (`claude -p`) from its second. An untrusted workspace loads none. Sync removes a leftover copied skill directory — including one for a skill no longer distributed — only while it still matches what kit shipped; a copy you edited or authored is kept with a warning. Rationale: `docs/maintainers/sync-rationale.md` → "The skills ship as a plugin".
 - **Every distributed workflow is overwritten on each sync**, so its action SHA pins come from kit. The distributed `dependabot.yml` keeps a `github-actions` entry as a backstop for workflows you add yourself, and its `npm` entry sets `open-pull-requests-limit: 0`: npm version-update PRs are off, and only security advisories open npm PRs — which requires the repository's **Dependabot security updates** setting. `josh init`, `josh sync` and `josh doctor` report that setting as `enabled`, `paused`, `disabled` or `could not be read` (`sync` always; `init` and `doctor` only where kit's `dependabot.yml` is present) and never fail on it. When it is off they print the enabling command; a paused repository is resumed from its Security → Dependabot page. kit never changes the setting itself. Rationale: `docs/maintainers/sync-rationale.md` → "Dependabot: the github-actions backstop and npm version updates".
 - **`.github/workflows/dependabot-auto-merge.yml` auto-merges Dependabot `github-actions` patch and minor bumps only** — never an npm bump, never a major — and never a bump to a workflow an upstream package overwrites (one carrying the header below), because the next sync would write that pin back. Rationale: `docs/maintainers/sync-rationale.md` → "The auto-merge workflow and what it never merges".
 - **It also withdraws an auto-merge the run is not entitled to**, including one armed by hand, while leaving a hand-armed bump that merely does not qualify alone. Arming is refused if the branch moved since the run decided (`--match-head-commit`); a withdrawal that still fails after its retries leaves a comment on the pull request; and runs are serialized per pull request by a `concurrency` group. Rationale: `docs/maintainers/sync-rationale.md` → "Arming and withdrawing auto-merge".
 - **That workflow needs the repository's Allow auto-merge setting**, which is off by default. `josh init`, `josh sync` and `josh doctor` report it as `enabled`, `disabled` or `could not be read` (`sync` always; `init` and `doctor` only where a workflow calling `gh pr merge --auto` is present) and print the enabling command when it is off; kit never runs it, `josh doctor --fix` included. Rationale: `docs/maintainers/sync-rationale.md` → "The Allow auto-merge prerequisite".
-- **Every workflow kit writes starts with a managed header**:
+- **Every workflow kit writes starts with a managed header** — and so does `.github/actions/setup-pnpm/action.yml`, the local composite action `pr-classification.yml` installs through:
 
   ```yaml
   # josh-managed-workflow: @joshuafolkken/kit
@@ -71,7 +73,7 @@ What else a consumer should know about the files above. Each item is the behavio
 - **The same file caps a Bash result** with `BASH_MAX_OUTPUT_LENGTH` in its `env` block; `prompts/collaboration-workflow/output-bounds.md` has the value. Rationale: `docs/maintainers/sync-rationale.md` → "The Bash output cap".
 - **`verify-ui` is the skill behind the UI verification gate.** It captures the affected routes through your toolkit's screenshot command (`josh-app shot`), and where none exists it says so and leaves the gate open. Rationale: `docs/maintainers/sync-rationale.md` → "The verify-ui skill".
 - **The `workflow-commands` and `dependency-update` skills hold the workflow procedures** the AI documents point to. A skill directory copy merges and never prunes: a file removed upstream stays until you delete it, and a file you add beside `SKILL.md` survives every sync. Rationale: `docs/maintainers/sync-rationale.md` → "Skills that hold what the AI documents used to inline".
-- **The same file wires the session hooks**: `pnpm josh audit:provision` on `SessionStart`; the work-summary reminder and `pnpm josh session:lang` on `UserPromptSubmit`; one `PreToolUse` process, `pnpm josh pretool:guard`, on `Bash`, `Edit`, `Read`, `Write` and `AskUserQuestion`, which runs the batching, investigation and rule guards together; `pnpm josh format:edited` after every `Edit` and `Write`; and `pnpm josh stop:guard` on `Stop`. Each guard is switched off by `JOSH_BATCH_GUARD=off`, `JOSH_INVESTIGATION_GUARD=off` or `JOSH_RULE_GUARD=off` in the environment or `.env`; [josh-commands.md](./josh-commands.md) documents each command. The rationale section records how the hooks were first introduced, as separate entries. Rationale: `docs/maintainers/sync-rationale.md` → "The hooks in .claude/settings.json".
+- **The same file wires the session hooks**: `pnpm josh audit:provision` on `SessionStart`; `pnpm josh session:lang` on `UserPromptSubmit`; one `PreToolUse` process, `pnpm josh pretool:guard`, on `Bash`, `Edit`, `Read`, `Write` and `AskUserQuestion`, which runs the batching, investigation and rule guards together and states the work-summary reminder once, on a session's first `Edit` / `Write` of a runtime file; `pnpm josh format:edited` after every `Edit` and `Write`; and `pnpm josh stop:guard` on `Stop`. Each guard is switched off by `JOSH_BATCH_GUARD=off`, `JOSH_INVESTIGATION_GUARD=off` or `JOSH_RULE_GUARD=off` in the environment or `.env`; [josh-commands.md](./josh-commands.md) documents each command. The rationale section records how the hooks were first introduced, as separate entries. Rationale: `docs/maintainers/sync-rationale.md` → "The hooks in .claude/settings.json".
 
 ### `pnpm-workspace.yaml` (merged)
 
@@ -91,6 +93,7 @@ These are fully-managed files whose package source has a different name than the
 | ----------------------------------------------- | --------------------------------------------- |
 | `templates/workflows/ci.yml`                    | `.github/workflows/ci.yml`                    |
 | `templates/workflows/dependabot-auto-merge.yml` | `.github/workflows/dependabot-auto-merge.yml` |
+| `templates/workflows/github-release.yml`        | `.github/workflows/github-release.yml`        |
 
 If the source file does not exist in the installed package, the destination is skipped with a warning.
 

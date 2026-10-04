@@ -76,7 +76,6 @@ function setup(): () => void {
 
 const test_state_guard = {
 	GIT_ENV_KEYS,
-	capture_state,
 	env_diff: environment_diff,
 	format_violations,
 }

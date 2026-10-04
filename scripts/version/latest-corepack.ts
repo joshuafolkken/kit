@@ -37,11 +37,11 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { json_value } from '#scripts/lib/json-value'
 import { execaSync } from 'execa'
 import semver from 'semver'
 import { z } from 'zod'
 import { package_manager_version } from './package-manager-version'
-import { safe_json_parse } from './parse-json'
 import { release_age } from './release-age'
 
 const PACKAGE_JSON_PATH = 'package.json'
@@ -59,7 +59,9 @@ const DEV_ENGINES_SCHEMA = z.object({ packageManager: PNPM_DEVELOPMENT_MANAGER_S
 const DEV_ENGINES_PNPM_SCHEMA = z.object({ devEngines: DEV_ENGINES_SCHEMA.optional() })
 
 function extract_development_engines_version(package_json_content: string): string | undefined {
-	const parsed = DEV_ENGINES_PNPM_SCHEMA.safeParse(safe_json_parse(package_json_content))
+	const parsed = DEV_ENGINES_PNPM_SCHEMA.safeParse(
+		json_value.parse_or_undefined(package_json_content),
+	)
 
 	return parsed.success ? parsed.data.devEngines?.packageManager.version : undefined
 }
@@ -108,7 +110,7 @@ function extract_times_json(stdout: string): Record<string, string> | undefined 
 	const end = stdout.lastIndexOf('}')
 	if (start === -1 || end <= start) return undefined
 	const parsed = release_age.release_times_schema.safeParse(
-		safe_json_parse(stdout.slice(start, end + 1)),
+		json_value.parse_or_undefined(stdout.slice(start, end + 1)),
 	)
 
 	return parsed.success ? parsed.data : undefined
@@ -236,7 +238,7 @@ function decode_integrity(encoded: string): string | undefined {
 function extract_encoded_integrity(stdout: string): string | undefined {
 	const payload = /"sha512-[A-Za-z0-9+/]+={0,2}"/u.exec(stdout)?.[0]
 	if (payload === undefined) return undefined
-	const parsed: unknown = safe_json_parse(payload)
+	const parsed: unknown = json_value.parse_or_undefined(payload)
 	if (typeof parsed !== 'string') return undefined
 
 	return INTEGRITY_RE.exec(parsed)?.[1]
@@ -319,7 +321,7 @@ function restore_after_update(original: string, target: string, integrity: strin
 }
 
 function pin_unpinned_manifest(original: string, target: string, integrity: string): void {
-	const manifest = z.record(z.string(), z.unknown()).parse(safe_json_parse(original))
+	const manifest = z.record(z.string(), z.unknown()).parse(json_value.parse_or_undefined(original))
 	const pinned = JSON.stringify(
 		{ ...manifest, packageManager: `${target}+${integrity}` },
 		undefined,
@@ -386,18 +388,14 @@ const latest_corepack = {
 	is_target_not_newer_than_pin,
 	notify_skipped_bump,
 	extract_times_json,
-	query_release_times,
 	query_major_latest_version,
 	resolve_corepack_target,
-	warn_skip,
-	warn_unresolved,
 	run_pnpm_update,
 	query_integrity,
 	restore_integrity,
 	did_warn_skip,
 	sync_development_engines,
 	restore_package_json,
-	bump_package_manager,
 	main,
 }
 

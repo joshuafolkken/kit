@@ -221,8 +221,6 @@ const migrate_logic = {
 	github_tarballs,
 	is_github_tarball,
 	rewrite_kit_lockfile,
-	registry_of,
-	scoped_packages,
 	scoped_versions,
 }
 

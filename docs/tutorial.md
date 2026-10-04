@@ -41,7 +41,7 @@ Type:
 fullrun #N
 ```
 
-The agent implements the change, runs the gate and the self-review, opens the pull request with the `closes #N` line, waits for CI and merges it. The run ends with the Issue closed and a notification; it stops only when something needs you.
+The agent writes the plan on the Issue if it has none (the one `kickoff new` filed already does), implements the change, runs the gate and the self-review, opens the pull request with the `closes #N` line, waits for CI and merges it. The run ends with the Issue closed and a notification; it stops only when something needs you.
 
 If you ran `halfrun` in step 2, its changes are still uncommitted in the working tree, and `fullrun` will not start on a tree with uncommitted changes. Finish that run with the commit command its stop notification gives instead — it opens the pull request and merges it the same way ([Recover a stopped run](./how-to/recover-a-run.md)).
 
@@ -53,7 +53,7 @@ Repeat step 1 of Pattern A for each change: agree the plan with the agent, then 
 
 ### 2. Opt them in with the `auto-ok` label
 
-Add the `auto-ok` label to each Issue the agent may implement and merge without you — or to the epic, which opts in every Issue under it. Only a person applies this label; the agent never adds it. Create the label once per repository as [`josh auto-ok:next`](./josh-commands.md#josh-auto-oknext) shows.
+Add the `auto-ok` label to each Issue the agent may implement and merge without you — or to the epic, which opts in every Issue under it. Only a person applies this label; the agent never adds it. Create the label once per repository as [`josh auto-ok:next`](./josh-commands-automation.md#josh-auto-oknext) shows.
 
 ### 3. Run them all with `backlogrun`
 
@@ -63,7 +63,7 @@ Type:
 backlogrun
 ```
 
-The agent runs every opted-in Issue in dependency order, each one from implementation through the gate, the review and the merge, and notifies you as each finishes. You do not order the Issues or decide which may run side by side: before the first one starts, the agent reads them, records which must land before another as a `blocked-by` relation, and labels `run:solo` any Issue that changes the verification path itself (the gate, the review, the push hook or the merge checks) and `run:lane` every other one. The run then starts a `run:solo` Issue alone, and runs the rest in parallel lanes. An Issue you opt in while the run is going is judged the same way before anything else starts. [Run the backlog unattended](./how-to/run-backlog.md) covers naming Issues to run first, running one epic only, and where the run stops.
+The agent runs every opted-in Issue in dependency order, each one from implementation through the gate, the review and the merge, and notifies you as each finishes. You do not order the Issues or decide which may run side by side: before the first one starts, the agent reads them, records which must land before another as a `blocked-by` relation, and labels `run:solo` any Issue fixing a defect in kit's own verification (the gate, the review, the push hook or the merge checks) that makes unrelated PRs answer wrongly on `main` today, and `run:lane` every other one. The run then starts a `run:solo` Issue alone, and runs the rest in parallel lanes. An Issue you opt in while the run is going is judged the same way before anything else starts. [Run the backlog unattended](./how-to/run-backlog.md) covers naming Issues to run first, running one epic only, and where the run stops.
 
 ## Separately: pull in kit's updates with `josh sync`
 
@@ -75,14 +75,3 @@ Not part of the loop above. After upgrading `@joshuafolkken/kit`, run `pnpm josh
 - A run stopped and you want to continue or clean up: [Recover a stopped run](./how-to/recover-a-run.md).
 - A run fails on the gate or CI: [Fix a failing gate or CI](./how-to/fix-gate-and-ci.md).
 - Every command: [josh-commands.md](./josh-commands.md).
-
-## Verifying this guide
-
-The Issue that added this page ([#2714](https://github.com/joshuafolkken/kit/issues/2714)) was run with `fullrun` on this repository, which exercised Pattern A's step 3: the gate went green and the pull request opened with `closes #2714`.
-
-| Environment                                                                   | Status                                                   |
-| ----------------------------------------------------------------------------- | -------------------------------------------------------- |
-| macOS (Darwin 25.6.0), Node.js 25.3.0, pnpm 12.6.0, kit 1.947.0, Claude Code  | Pattern A step 3 (`fullrun`) verified on this repository |
-| Pattern A steps 1–2 (`kickoff new`, `halfrun`) in a fresh practice repository | Not verified end to end                                  |
-| Pattern B (`auto-ok` + `backlogrun`) in a fresh practice repository           | Not verified end to end                                  |
-| Linux and Windows                                                             | Not verified end to end                                  |

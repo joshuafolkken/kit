@@ -45,7 +45,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const split_assess_cli = { JSON_KEY, USAGE, main, parse_is_json, run }
+const split_assess_cli = { parse_is_json }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

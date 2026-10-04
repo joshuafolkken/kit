@@ -22,7 +22,7 @@ const FULLRUN_SKILL = '.claude/skills/workflow-commands/fullrun.md'
 const HALFRUN_SKILL = '.claude/skills/workflow-commands/halfrun.md'
 const KICKOFF_SKILL = '.claude/skills/workflow-commands/kickoff.md'
 const DELIVERY_TOPIC = 'prompts/collaboration-workflow/rule-delivery.md'
-const GUARD_DOC = 'docs/josh-commands.md'
+const GUARD_DOC = 'docs/josh-commands-automation.md'
 
 const ENTRY_POINTS = [FULLRUN_SKILL, HALFRUN_SKILL, KICKOFF_SKILL]
 // The portable spelling. `gh issue view <N> --comments` is GraphQL-backed and a cloud session is

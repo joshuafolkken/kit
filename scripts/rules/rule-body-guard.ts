@@ -192,11 +192,8 @@ const ROW = {
 const rule_body_guard = {
 	RULE_BODY_REASON,
 	ROW,
-	adds_rule_prose,
 	answered_placement,
 	is_rule_document,
-	prose_of,
-	runs_placement_oracle,
 	writes_rule_prose,
 }
 

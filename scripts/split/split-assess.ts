@@ -27,7 +27,8 @@ interface SizeMeasurement {
 	verdict: SplitVerdict
 }
 
-// The guide from `split-assessment.md`. Strictly greater than: "about 10 changed files" and a change
+// The guide's single source: `split-assessment.md` states these once and a test pins the two equal
+// (joshuafolkken/kit#2996). Strictly greater than: "about 10 changed files" and a change
 // that "lands at 11 files is not thereby a split" put the bar above the round number, not at it.
 const FILE_GUIDE = 10
 const LINE_GUIDE = 400
@@ -112,12 +113,8 @@ const split_assess = {
 	SPLIT_VERDICT,
 	SINGLE_VERDICT,
 	assess,
-	measure,
-	non_test_changes,
 	parse_numstat,
-	parse_row,
 	reason,
-	verdict_for,
 }
 
 export type { FileChange, SizeMeasurement, SplitVerdict }

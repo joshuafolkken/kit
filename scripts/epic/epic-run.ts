@@ -1,5 +1,5 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { EPIC_LABEL } from '#scripts/git/issue-labels'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { EPIC_LABEL } from '#scripts/issue/issue-labels'
 import { epic_body } from './epic-body'
 import { epic_promote } from './epic-promote'
 import { epic_relations } from './epic-relations'
@@ -213,7 +213,6 @@ async function check_epic(epic_number: number): Promise<number> {
 }
 
 const epic_run = {
-	parse_created_number,
 	create_epic,
 	promote_epic,
 	check_epic,

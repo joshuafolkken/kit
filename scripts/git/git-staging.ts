@@ -62,6 +62,7 @@ async function stage_untracked_files(files: ReadonlyArray<string>): Promise<void
 	if (files.length === 0) return
 
 	for (const file of files) {
+		// eslint-disable-next-line no-await-in-loop -- git add holds the index lock, so two at once fail
 		await git_command.add_path(file)
 	}
 

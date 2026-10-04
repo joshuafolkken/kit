@@ -28,6 +28,7 @@ const HANDED_OFF: CarryRead = {
 	},
 }
 const NO_WINDOW = { poll_ms: 0, offer_ms: 0, window_ms: undefined }
+const FREE_LANES = 6
 
 interface World {
 	started: boolean
@@ -42,7 +43,7 @@ function drive_ports(world: World): DrivePorts {
 		merge: async () => {
 			world.merged = true
 
-			return 'none'
+			return { token: 'none', outcome: 'merged' }
 		},
 		offer: async (state: DriveState) => ({
 			verdict: world.merged ? 'stop' : 'run',
@@ -53,8 +54,9 @@ function drive_ports(world: World): DrivePorts {
 		launch: async () => {
 			world.started = true
 
-			return true
+			return 'launched'
 		},
+		free_lanes: async () => FREE_LANES,
 		now: () => NOW,
 		sleep: async () => undefined,
 		on_state: () => undefined,

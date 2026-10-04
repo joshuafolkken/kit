@@ -74,6 +74,7 @@ async function resolve_toolkit_step(
 // The command the gate spawns through `pnpm`, so a toolkit step resolves the same shim `pnpm` would.
 async function resolve_type_check_args(start_directory: string): Promise<ReadonlyArray<string>> {
 	for (const bin_name of TOOLKIT_BINS) {
+		// eslint-disable-next-line no-await-in-loop -- the first toolkit bin that resolves wins
 		const step = await resolve_toolkit_step(start_directory, bin_name)
 		if (step !== undefined) return step
 	}
@@ -83,7 +84,6 @@ async function resolve_type_check_args(start_directory: string): Promise<Readonl
 
 const type_check_step = {
 	parse_usage_commands,
-	resolve_toolkit_step,
 	resolve_type_check_args,
 }
 

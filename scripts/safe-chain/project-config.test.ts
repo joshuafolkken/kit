@@ -1,8 +1,8 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { yaml_document } from '#scripts/lib/yaml-document'
 import { release_age } from '#scripts/version/release-age'
-import { yaml_document } from '#scripts/yaml/yaml-document'
 import { describe, expect, it } from 'vitest'
 import { project_config } from './project-config'
 

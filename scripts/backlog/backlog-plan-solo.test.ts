@@ -1,5 +1,5 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
-import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
+import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_plan, type PlanContext } from './backlog-plan'

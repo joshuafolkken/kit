@@ -69,7 +69,7 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// list, so its ~48KB read crossed a block downward and the recorded ceiling drops to the block multiple
 	// the stale-ratchet message named. The other entries still read it, so their rows hold.
 	// joshuafolkken/kit#2345 added the `implementation-unit` delegation row (full fan-out procedure in
-	// `docs/josh-commands.md` → "`josh fanout`"); `SKILL.md` §2b gained only a one-clause mention and a
+	// `docs/josh-commands-automation.md` → "`josh fanout`"); `SKILL.md` §2b gained only a one-clause mention and a
 	// pointer, folded into the existing enumeration and offset by tightening §2b prose, so every entry
 	// stayed within its block (kickoff has no block of headroom — its pre-#2294 ceiling is the next
 	// multiple, which the downward ratchet holds shut).
@@ -79,10 +79,18 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// joshuafolkken/kit#2762 moved the rationale of five point-of-use documents to
 	// `docs/maintainers/*-rationale.md`, and the ratchet holds the reduction. joshuafolkken/kit#2895 did
 	// the same for eight more, lowering fullrun, halfrun and backlogrun one block each.
+	// joshuafolkken/kit#2998 split the command reference, so every reference to an automation command
+	// now names `josh-commands-automation.md`; the longer path tipped backlogrun one block over.
+	// joshuafolkken/kit#2994 moved `CLAUDE.md`'s explanations to `docs/maintainers/claude-md-history.md`,
+	// lowering backlogrun one block; kickoff's reduction was offset by joshuafolkken/kit#3024's longer
+	// `wip-cap.md`, so its ceiling stays.
+	// joshuafolkken/kit#3023 added the `prrun` keyword to `SKILL.md` and `CLAUDE.md`, tipping backlogrun
+	// one block over; `prrun` reads `fullrun`'s set plus its own short manifest.
 	{ entry: 'kickoff', bytes: 229_376 },
 	{ entry: 'fullrun', bytes: 225_280 },
 	{ entry: 'halfrun', bytes: 225_280 },
-	{ entry: 'backlogrun', bytes: 229_376 },
+	{ entry: 'prrun', bytes: 229_376 },
+	{ entry: 'backlogrun', bytes: 233_472 },
 	{ entry: LANE_CHILD, bytes: 77_824 },
 ]
 

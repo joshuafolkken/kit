@@ -61,6 +61,6 @@ function closure(seeds: Array<string>): Set<string> {
 	return visited
 }
 
-const import_closure = { value_import_specs, resolve_spec, imports_of, closure }
+const import_closure = { closure }
 
 export { import_closure, SCRIPTS_DIR }

@@ -1,5 +1,5 @@
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
-import { REPOSITORY_LABELS, type LabelDefinition } from '#scripts/git/issue-labels'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { REPOSITORY_LABELS, type LabelDefinition } from '#scripts/issue/issue-labels'
 
 // Creates the labels kit's workflow and the distributed `pr-classification.yml` rely on, and only
 // those the repository is missing (joshuafolkken/kit#2797). The one place labels are created: `josh
@@ -86,6 +86,6 @@ function ensure_labels(repo: string | undefined): ReadonlyArray<string> {
 	return create_missing(missing_labels(existing), repo)
 }
 
-const repository_labels = { missing_labels, ensure_labels }
+const repository_labels = { ensure_labels }
 
 export { repository_labels }

@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { file_reader } from '#scripts/lib/read-file'
+import { yaml_document } from '#scripts/lib/yaml-document'
 import { release_age } from '#scripts/version/release-age'
-import { yaml_document } from '#scripts/yaml/yaml-document'
 import { dump } from 'js-yaml'
 import { z } from 'zod'
 

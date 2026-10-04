@@ -9,6 +9,7 @@ import { epic_graph, type EpicChild } from './epic-graph'
 import { epic_rank } from './epic-rank'
 import type { EpicVerdict } from './epic-report'
 import { epic_solo } from './epic-solo'
+import { epic_solo_stale } from './epic-solo-stale'
 import { epic_triage, type TriageVerdict } from './epic-triage'
 
 // Which children a repository has room to start right now (joshuafolkken/kit#1491).
@@ -168,6 +169,7 @@ async function collect(
 	for (const pool of pools) {
 		if (children.length >= wanted) break
 
+		// eslint-disable-next-line no-await-in-loop -- pools are asked in order until enough children are found
 		const answer = await ask_pool(pool, wanted - children.length)
 
 		children.push(...answer.children)
@@ -228,7 +230,13 @@ async function offer_for_repo(
 
 	if (triage !== undefined) return triage
 
-	const read = await epic_busy.read_repository(request.repo)
+	const { read, notice } = await epic_solo_stale.release(
+		await epic_busy.read_repository(request.repo),
+		request.repo,
+	)
+
+	if (notice !== undefined) console.error(notice)
+
 	const free = free_lanes(read, request.limit)
 
 	if (free === NO_LANES) {
@@ -245,15 +253,8 @@ async function offer_for_repo(
 }
 
 const epic_lane_offer = {
-	is_held,
-	free_lanes,
-	wanted_of,
 	combine_verdicts,
-	candidates_in,
-	unseen_candidates,
 	dedupe_pools,
-	withheld_message,
-	collect,
 	offer_for_repo,
 }
 

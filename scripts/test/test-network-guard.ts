@@ -417,11 +417,7 @@ function setup(): () => void {
 const test_network_guard = {
 	BLOCKED_MESSAGE,
 	GIT_BINARY,
-	GIT_NETWORK_SUBCOMMANDS,
 	GIT_SHIM_NAME,
-	GIT_VALUE_OPTIONS,
-	GUARDED_GIT_DIRECTORY,
-	GUARD_DIRECTORY,
 	GUARD_PREFIX,
 	SHIM_NAME,
 	UNREADABLE_LOG_HEADING,
@@ -430,13 +426,10 @@ const test_network_guard = {
 	calls_of,
 	describe_violations,
 	disarm,
-	git_shim_script,
 	install_shim,
 	install_shim_guarding,
 	log_in,
 	resolve_binary,
-	shim_script,
-	TEMPORARY_ROOT,
 }
 
 export { setup, test_network_guard }

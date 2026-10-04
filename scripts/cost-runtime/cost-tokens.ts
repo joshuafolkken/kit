@@ -74,7 +74,6 @@ function ascii_bytes_to_tokens(bytes: number): number {
 
 const cost_tokens = {
 	ASCII_CHARS_PER_TOKEN,
-	WIDE_TOKENS_PER_CHAR,
 	count_chars,
 	estimate,
 	ascii_bytes_to_tokens,

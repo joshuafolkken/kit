@@ -310,7 +310,6 @@ const epic_parse = {
 	fence_mask,
 	is_task_list_line,
 	is_declaration_line,
-	chain_links,
 	parse_dependency_chains,
 	parse_task_list_issue_numbers,
 	has_external_task_list_entry,

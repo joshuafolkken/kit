@@ -327,6 +327,7 @@ async function run_command(command: FormatCommand, project_root: string): Promis
 	let outcome: CommandOutcome = { exit_code: 0, stdout: '' }
 
 	for (const invocation of resolve_invocations(command, project_root)) {
+		// eslint-disable-next-line no-await-in-loop -- a fallback route runs only when the previous one failed to start
 		outcome = await spawn_invocation(invocation, project_root)
 		if (!is_start_failure(outcome)) return outcome
 	}
@@ -374,6 +375,7 @@ async function collect_unfixed(
 
 	for (const command of plan) {
 		try {
+			// eslint-disable-next-line no-await-in-loop -- formatters rewrite the same file, in plan order
 			unfixed = eslint_unfixed(command, await runner(command, project_root)) ?? unfixed
 		} catch {
 			// One formatter failing to start is not a reason to skip the next: prettier runs last, and

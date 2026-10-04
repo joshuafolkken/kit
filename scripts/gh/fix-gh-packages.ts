@@ -1,7 +1,9 @@
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { file_reader } from '#scripts/lib/read-file'
+import { timed_fetch } from '#scripts/lib/timed-fetch'
 import { z } from 'zod'
 import { fix_gh_packages_logic, type LockfilePackage } from './fix-gh-packages-logic'
 import { gh_cli_token } from './gh-cli-token'
@@ -9,7 +11,8 @@ import { gh_cli_token } from './gh-cli-token'
 const LOCKFILE = 'pnpm-lock.yaml'
 const NPMRC = '.npmrc'
 const GH_PACKAGES_HOST = 'npm.pkg.github.com'
-const FETCH_TIMEOUT_MS = 10_000
+// The packument reads are independent; the width keeps a large lockfile from bursting the registry.
+const FETCH_CONCURRENCY = 8
 
 const npm_distribution_schema = z.looseObject({ tarball: z.string().optional() })
 const npm_version_schema = z.looseObject({ dist: npm_distribution_schema.optional() })
@@ -42,10 +45,7 @@ async function fetch_tarball_url(
 	token: string,
 ): Promise<string | undefined> {
 	const url = `https://${GH_PACKAGES_HOST}/${package_path}`
-	const response = await fetch(url, {
-		headers: { Authorization: `Bearer ${token}` },
-		signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-	})
+	const response = await timed_fetch(url, { headers: { Authorization: `Bearer ${token}` } })
 
 	if (!response.ok) {
 		console.warn(`fix-gh-packages: fetch failed for ${package_path} (${String(response.status)})`)
@@ -79,14 +79,13 @@ async function collect_fixes(
 	scopes: Set<string>,
 	token: string,
 ): Promise<Map<string, string>> {
-	const fixes = new Map<string, string>()
+	const pairs = await bounded_pool.bounded_map(
+		Object.entries(packages),
+		FETCH_CONCURRENCY,
+		async ([key, entry]) => await process_package_entry(key, entry, scopes, token),
+	)
 
-	for (const [key, entry] of Object.entries(packages)) {
-		const pair = await process_package_entry(key, entry, scopes, token)
-		if (pair !== undefined) fixes.set(pair[0], pair[1])
-	}
-
-	return fixes
+	return new Map(pairs.filter((pair) => pair !== undefined))
 }
 
 async function apply_fixes(cwd: string, scopes: Set<string>, token: string): Promise<void> {
@@ -128,3 +127,7 @@ async function main(): Promise<void> {
 
 const [, argv1] = process.argv
 if (argv1 !== undefined && realpathSync(argv1) === fileURLToPath(import.meta.url)) await main()
+
+const fix_gh_packages = { collect_fixes }
+
+export { fix_gh_packages }

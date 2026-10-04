@@ -30,8 +30,4 @@ async function main(): Promise<void> {
 	process.exitCode = await run()
 }
 
-const run_watcher_guard_cli = { run }
-
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
-
-export { run_watcher_guard_cli }

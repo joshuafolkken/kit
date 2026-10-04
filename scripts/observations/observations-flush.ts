@@ -1,5 +1,5 @@
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_command } from '#scripts/git/git-command'
-import { git_gh_command } from '#scripts/git/git-gh-command'
 import { main_sync } from '#scripts/git/main-sync'
 import { error_text } from '#scripts/lib/error-message'
 import { observation_ledger, OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger'
@@ -308,6 +308,7 @@ async function stage_ledger(): Promise<void> {
 	const ledger_paths = observation_ledger.ledger_paths(await git_command.status())
 
 	for (const file_path of ledger_paths) {
+		// eslint-disable-next-line no-await-in-loop -- git add holds the index lock, so two at once fail
 		await git_command.add_path(file_path)
 	}
 }
@@ -423,7 +424,6 @@ const observations_flush = {
 	broken_lines_message,
 	CLEAN_MESSAGE,
 	COMMIT_MESSAGE,
-	empty_flush_message,
 	flush,
 	flush_branch_message,
 	has_ledger_change,

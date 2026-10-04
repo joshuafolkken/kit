@@ -5,13 +5,13 @@ import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-thresho
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
-import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
+import { lane_launch_cli, type LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 import { run_carry, type RunCarry } from '#scripts/run/run-carry'
 import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
-import { run_merge_cli } from '#scripts/run/run-merge-cli'
+import { run_merge_cli, type MergeResult } from '#scripts/run/run-merge-cli'
 import { z } from 'zod'
 import {
 	backlog_drive,
@@ -28,6 +28,7 @@ import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_offer_cli } from './backlog-offer-cli'
+import { backlog_ready } from './backlog-ready'
 
 // `josh backlog:drive` — the backlogrun parent's loop as one resident wait (joshuafolkken/kit#2499).
 // The parent issues it once, in the background, and is woken only when it exits — with a token the model
@@ -217,7 +218,7 @@ function merge_token(out: string, code: number): string {
 
 // The child's transcript, where its lane recorded one, so `run:merge` can tell an API outage from a
 // failure exactly as it does for the parent that passes `--output` by hand.
-async function merge(issue: string, owner: string): Promise<string> {
+async function merge(issue: string, owner: string): Promise<MergeResult> {
 	await backlog_drive_owner.assert_current(owner)
 	const lane = await lane_registry.find_open_lane(issue)
 	const result = await run_merge_cli.merge_child({
@@ -231,13 +232,15 @@ async function merge(issue: string, owner: string): Promise<string> {
 
 	await backlog_drive_named.mark_done(issue, result, owner)
 
-	return result.token
+	return result
 }
 
-async function launch(issue: string, owner: string): Promise<boolean> {
+async function launch(issue: string, owner: string): Promise<LaunchOutcome['kind']> {
 	await backlog_drive_owner.assert_current(owner)
 
-	return (await lane_launch_cli.launch_lane({ issue, stash: undefined })) !== undefined
+	const outcome = await lane_launch_cli.launch_lane({ issue, stash: undefined })
+
+	return outcome.kind
 }
 
 // `lane:await`'s re-confirmed check, one state per child. A child already gone when the loop starts —
@@ -304,6 +307,7 @@ function ports_of(
 		merge: async (issue) => await merge(issue, context.owner),
 		offer: async (state) => await read_offer(state, context),
 		launch: async (issue) => await launch(issue, context.owner),
+		free_lanes: backlog_ready.drive_free_lane_count,
 		now: () => new Date(),
 		sleep: async (milliseconds) => {
 			await sleep(milliseconds)
@@ -375,14 +379,12 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const backlog_drive_cli = {
-	USAGE,
 	end_line,
 	finish: backlog_drive_finish.finish,
 	merge_token,
 	offer_argv: backlog_drive_offer_argv.offer_argv,
 	parse,
 	resume_line,
-	run,
 	to_offer,
 }
 

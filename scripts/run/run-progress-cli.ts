@@ -28,7 +28,7 @@ import { run_progress_read, type ObservationRead } from './run-progress-read'
 // `backlogrun` parent — `ready #N · free lanes N` — which is itself something the parent acts on.
 //
 // **It cannot send a Telegram.** That is structural rather than a promise — nothing here imports
-// `scripts/git/telegram-notify`, which is the only egress there is. A heartbeat every twenty minutes on
+// `scripts/notify/telegram-notify`, which is the only egress there is. A heartbeat every twenty minutes on
 // a phone is notification fatigue, and it would cheapen the `confirmation` and `completion` messages
 // that do need to interrupt someone.
 
@@ -347,10 +347,13 @@ async function run_ticks(
 	let loop = seed_loop(target, started_ms)
 
 	while (Date.now() - started_ms < options.max_ms && !run_progress_clock.is_life_ended(life)) {
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await sleep(options.tick_ms)
 		run_progress_clock.ping_life(life)
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		loop = await step(options, target, loop)
 
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		const exit = await wait_exit(loop, wait)
 
 		if (exit !== undefined) return exit
@@ -491,27 +494,21 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const run_progress_cli = {
-	DECLINE_RETRY_SECONDS,
 	DEFAULT_MAX_HOURS,
 	DISABLED_NOTICE,
 	FAILED_TICK_PREFIX,
 	FRESH_LOOP,
 	IDLE_NOTICE,
 	LANE_CHILD_NOTICE,
-	MARKED_NOTICE,
 	REPO_UNRESOLVED_NOTICE,
-	TICK_SECONDS,
 	UNREADABLE_NOTICE,
 	USAGE,
 	WAIT_EXPIRED_NOTICE,
-	main,
 	read_arguments: run_progress_args.read_arguments,
-	report_decline,
 	run,
 	step,
 	to_interval_ms: run_progress_args.to_interval_ms,
 	to_max_ms: run_progress_args.to_max_ms,
-	to_options,
 	wait_once,
 }
 

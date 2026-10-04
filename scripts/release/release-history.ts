@@ -125,7 +125,6 @@ const release_history = {
 	read_current_version,
 	read_release_plan,
 	BASE_SEARCH_LIMIT,
-	DEFAULT_TIP,
 }
 
 export { release_history }

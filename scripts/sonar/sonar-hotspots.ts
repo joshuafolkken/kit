@@ -95,7 +95,6 @@ const sonar_hotspots = {
 	classify_fetch,
 	classify_hotspot,
 	component_path,
-	HOTSPOT_BRANCHES,
 	UNREADABLE,
 }
 

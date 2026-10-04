@@ -66,7 +66,6 @@ function has_unknown_flag(argv: ReadonlyArray<string>, known: ReadonlySet<string
 }
 
 const epic_cli_argv = {
-	is_flag,
 	read_flag_value,
 	to_positional_arguments,
 	count_flag,

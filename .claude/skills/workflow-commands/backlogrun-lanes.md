@@ -65,7 +65,7 @@ it is".
 
 `pnpm josh epic:next <E> --repo <owner/repo> --lanes` answers with **one issue number per line**, up to
 the number of free lanes, and each of those children runs in a **lane** of its own: a linked git work
-tree with its own branch, its own `.env` and its own dev and preview ports (`docs/josh-commands.md` →
+tree with its own branch, its own `.env` and its own dev and preview ports (`docs/josh-commands-automation.md` →
 "`josh lane:open` / `josh lane:close` / `josh lane:list` / `josh lane:prune`"). **Implementation, the
 verification gate and the review run in parallel; the merges stay serial** — each one lands on the
 `main` the next is then measured against.
@@ -76,12 +76,14 @@ verification are `pre-gate-cut.md`, the single source. **The child is told apart
 resume stage is handed to it, by a mark the dispatch sets** — `JOSH_LANE_CHILD`, the lane's issue
 number (`pre-gate-cut.md` → "The dispatch mark" and "The stage is passed to the resumed child").
 
-**One kind of child takes no lane beside anything: an interrupt whose subject is a defect in the
-verification path itself.** It runs alone, and the batch resumes only once it has merged. **Decide it
-from the enumeration, never from how serious it looks** — does the defect reach the verification gate
+**One kind of child takes no lane beside anything: a defect in kit's own verification that makes
+unrelated PRs answer wrongly on `main` today.** It runs alone, and the batch resumes only once it has
+merged. **Decide it from three conditions that must all hold, never from how serious it looks** — is
+it a defect (not an improvement, refactor, removal or feature)? Is it in kit's own verification gate
 (lint / type check / spell check / unit tests), the code review, the pre-push hook, or the merge
-checks? One of those, and the issue carries `run:solo`; none, and it carries `run:lane` and fills a
-lane like any other child. `backlog:next` and `epic:next --lanes` enforce both (joshuafolkken/kit#2776,
+checks — not a consumer repository's CI or template? Does it, on `main` now, make unrelated PRs
+answer wrongly (a false green or a false red)? All three, and the issue carries `run:solo`; any one
+missing, and it carries `run:lane` and fills a lane like any other child. `backlog:next` and `epic:next --lanes` enforce both (joshuafolkken/kit#2776,
 #2779). The rule is
 `prompts/collaboration-workflow/wip-cap.md` → 「実行のしかた」, its single source.
 

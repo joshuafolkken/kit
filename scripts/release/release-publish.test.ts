@@ -1,6 +1,6 @@
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_pr_checks } from '#scripts/gh/git-pr-checks'
 import { git_command } from '#scripts/git/git-command'
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { git_pr_checks } from '#scripts/git/git-pr-checks'
 import { git_remote_branch, type RemoteAnswer } from '#scripts/git/git-remote-branch'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReleasePlan } from './release-plan'

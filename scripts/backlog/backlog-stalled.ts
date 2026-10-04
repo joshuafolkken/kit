@@ -118,7 +118,6 @@ const backlog_stalled = {
 	count_ready_tokens,
 	describe,
 	dispatch_age_ms,
-	is_stalled,
 	needs_triage,
 	ready_tokens,
 }

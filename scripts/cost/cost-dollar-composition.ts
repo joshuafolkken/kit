@@ -1,4 +1,3 @@
-import { cost_format } from '#scripts/cost-runtime/cost-format'
 import {
 	cost_pricing,
 	type CostComposition,
@@ -68,21 +67,7 @@ function build(costs: ReadonlyArray<ModelCost>): DollarComposition {
 	return { ...parts, total_usd: total_of(parts), unpriced_models: unpriced }
 }
 
-const HEADING = 'Cost composition (dollars):'
-
-function format(composition: DollarComposition): Array<string> {
-	return [
-		'',
-		HEADING,
-		`  uncached input   ${cost_format.format_usd(composition.input_usd)}`,
-		`  cache write 5m   ${cost_format.format_usd(composition.cache_write_5m_usd)}`,
-		`  cache write 1h   ${cost_format.format_usd(composition.cache_write_1h_usd)}`,
-		`  cache read       ${cost_format.format_usd(composition.cache_read_usd)}`,
-		`  output           ${cost_format.format_usd(composition.output_usd)}`,
-	]
-}
-
-const cost_dollar_composition = { HEADING, build, format }
+const cost_dollar_composition = { build }
 
 export type { DollarComposition }
 export { cost_dollar_composition }

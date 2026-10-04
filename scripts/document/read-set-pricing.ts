@@ -45,7 +45,6 @@ function dollars_per_run(tokens: number): number {
 
 const read_set_pricing = {
 	ASSUMED_REQUESTS,
-	REFERENCE_MODEL,
 	dollars_per_run,
 }
 

@@ -1,4 +1,4 @@
-import { MAX_SCANNED } from './git-gh-issue-list'
+import { MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
 
 // Why an open-issue listing stopped short of the end of the backlog, or that it did not
 // (joshuafolkken/kit#1067).

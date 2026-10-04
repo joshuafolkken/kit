@@ -2,6 +2,8 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The workflow command that stops at a green, mergeable pull request (#3023).
+  - prrun
   # A rationale section no procedure document cites (#2762).
   - uncited
   # GitHub Release API field used to select the commit for generated notes.
@@ -221,7 +223,7 @@ words:
   - refusable
   - runnability
   # The outcome `josh lane:dispatch` answers with when a lane's log path could not be recorded
-  # (joshuafolkken/kit#1749), and the anchor of `docs/josh-commands.md` → "`josh run:wake`", which a
+  # (joshuafolkken/kit#1749), and the anchor of `docs/josh-commands-automation.md` → "`josh run:wake`", which a
   # document-rule test quotes verbatim.
   - unrecordable
   - runwake
@@ -235,7 +237,6 @@ words:
   - testuser
   - myorg
   - myrepo
-  - ncurc
   # The `tsc --noEmit` flag, folded to lower case: a lowercased command line is matched against
   # tool signatures, so the pattern cannot keep the camel case that would let the spell checker
   # split it (joshuafolkken/kit#1313).

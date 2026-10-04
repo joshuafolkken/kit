@@ -2,6 +2,8 @@ import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { file_reader } from '#scripts/lib/read-file'
+import { timed_fetch } from '#scripts/lib/timed-fetch'
+import { COMMAND_TIMEOUT_MS, INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import { z } from 'zod'
 import { migrate_logic, type MigrationPlan } from './migrate-logic'
@@ -11,7 +13,6 @@ const NPMRC = '.npmrc'
 const LOCKFILE = 'pnpm-lock.yaml'
 const WORKSPACE = 'pnpm-workspace.yaml'
 const PUBLIC_REGISTRY = 'https://registry.npmjs.org/'
-const FETCH_TIMEOUT_MS = 10_000
 const SCOPE = '@joshuafolkken/'
 const manifest_schema = z.looseObject({
 	dependencies: z.record(z.string(), z.string()).optional(),
@@ -104,11 +105,16 @@ async function verify_public_versions(
 	lockfile: string,
 	probe_version: MigrationDependencies['fetch_version'],
 ): Promise<VersionCheck> {
+	const versions = migrate_logic.scoped_versions(lockfile)
+	// Each probe reads its own package, so they run together; the report keeps the lockfile's order.
+	const probed = await Promise.all(
+		versions.map(async ([name, version]) => await probe_integrity(name, version, probe_version)),
+	)
 	const missing: Array<string> = []
 	const integrities = new Map<string, string>()
 
-	for (const [name, version] of migrate_logic.scoped_versions(lockfile)) {
-		const integrity = await probe_integrity(name, version, probe_version)
+	for (const [index, [name, version]] of versions.entries()) {
+		const integrity = probed[index]
 		if (integrity === undefined) missing.push(`${name}@${version}`)
 		else integrities.set(version, integrity)
 	}
@@ -238,9 +244,7 @@ async function migrate(cwd: string, dependencies: MigrationDependencies): Promis
 
 async function fetch_version(name: string, version: string): Promise<string | undefined> {
 	const encoded = encodeURIComponent(name)
-	const response = await fetch(`${PUBLIC_REGISTRY}${encoded}/${encodeURIComponent(version)}`, {
-		signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-	})
+	const response = await timed_fetch(`${PUBLIC_REGISTRY}${encoded}/${encodeURIComponent(version)}`)
 
 	if (!response.ok) return undefined
 	const parsed = version_schema.safeParse(await response.json())
@@ -250,11 +254,17 @@ async function fetch_version(name: string, version: string): Promise<string | un
 }
 
 async function install(cwd: string): Promise<void> {
-	await execa('pnpm', ['install', '--lockfile-only', '--ignore-scripts', '--force'], { cwd })
+	await execa('pnpm', ['install', '--lockfile-only', '--ignore-scripts', '--force'], {
+		cwd,
+		timeout: INSTALL_TIMEOUT_MS,
+	})
 }
 
 async function effective_registry(cwd: string): Promise<string> {
-	const result = await execa('pnpm', ['config', 'get', '@joshuafolkken:registry'], { cwd })
+	const result = await execa('pnpm', ['config', 'get', '@joshuafolkken:registry'], {
+		cwd,
+		timeout: COMMAND_TIMEOUT_MS,
+	})
 
 	return result.stdout.trim()
 }
@@ -275,7 +285,7 @@ async function main(): Promise<void> {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 
-const registry_migration = { migrate }
+const registry_migration = { migrate, install, effective_registry }
 
 export { registry_migration }
 export type { MigrationDependencies }

@@ -81,7 +81,7 @@ function run(cwd: string = process.cwd()): number {
 	return file === undefined ? report_no_transcript() : check_session(file)
 }
 
-const behavior_cli = { LABEL, check_session, current_session, run }
+const behavior_cli = { check_session, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = run()
 

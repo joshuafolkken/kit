@@ -111,6 +111,6 @@ function is_mismatch(message: string, lang: string): boolean {
 	return matches_share(prose, script, pattern) < MATCH_SHARE_FLOOR
 }
 
-const reply_language = { MIN_PROSE_LETTERS, is_mismatch, script_of }
+const reply_language = { is_mismatch, script_of }
 
 export { reply_language }

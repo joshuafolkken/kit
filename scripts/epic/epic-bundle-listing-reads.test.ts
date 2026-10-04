@@ -1,5 +1,5 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { listing_of } from '#scripts/git/git-gh-issue-list-fixture'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { listing_of } from '#scripts/gh/git-gh-issue-list-fixture'
 import { describe, expect, it, vi, type MockInstance } from 'vitest'
 import { epic_bundle_cli } from './epic-bundle-cli'
 

@@ -1,4 +1,4 @@
-import { git_gh_issue_rest } from '#scripts/git/git-gh-issue-rest'
+import { git_gh_issue_rest } from '#scripts/gh/git-gh-issue-rest'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
 import { blocked_by_schema } from '#scripts/git/schemas'
 import { z } from 'zod'
@@ -77,18 +77,6 @@ function blocker_references_of(
 	)
 }
 
-// The same blockers as bare numbers, for the callers that predate the qualified read: the planner and
-// the bundler. A projection of the read above rather than a second unwrapping of the connection.
-//
-// **The number alone is lossy, and those callers inherit that.** A blocker in another repository
-// collapses to its number here and can then match a local issue that happens to share it —
-// joshuafolkken/kit#1130 carries the case, which is `epic:bundle` reading a false relation and
-// recording one onto the wrong issue. It predates joshuafolkken/kit#1126 rather than being introduced
-// by it, and threading the repository through the bundler is its own change with its own reach.
-function blockers_of(issue: EpicIssue): Array<number> {
-	return blocker_references_of(issue).map((blocker) => blocker.number)
-}
-
 function label_names(issue: EpicIssue): Array<string> {
 	return issue.labels.map((label) => label.name)
 }
@@ -157,9 +145,7 @@ function parse_epic_reference(raw = ''): EpicReference | undefined {
 const epic_issue = {
 	CLOSED,
 	blocker_references_of,
-	UNKNOWN_STATE,
 	parse_epic_issue,
-	blockers_of,
 	label_names,
 	normalize_state,
 	is_open,

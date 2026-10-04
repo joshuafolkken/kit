@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 
 const COMMAND = 'pnpm josh latest:scope'
 const GATE = '.claude/skills/workflow-commands/latest-gate.md'
-const COMMAND_DOC = 'docs/josh-commands.md'
+const COMMAND_DOC = 'docs/josh-commands-automation.md'
 const RECORD_STEP = 'pnpm josh latest:scope --record'
 const OLD_RULE = 'mandatory, never skip'
 

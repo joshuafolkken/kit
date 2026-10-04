@@ -1,7 +1,7 @@
 import os from 'node:os'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/run-event-stream'

@@ -38,8 +38,6 @@ function read_top_level_entries(): Array<string> {
 }
 
 const top_level_scripts_guard = {
-	SCRIPTS_ROOT,
-	TOP_LEVEL_ALLOWLIST,
 	top_level_offenders,
 	read_top_level_entries,
 }

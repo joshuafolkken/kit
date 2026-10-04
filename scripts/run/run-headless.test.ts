@@ -5,8 +5,8 @@ import type { CarryRead, RunCarry } from './run-carry'
 // lanes in flight must keep waiting; everything else — an attached session, a lane child, a parent
 // whose cut handed the record off — may stop as before.
 
-vi.mock('./run-watcher-guard', () => ({
-	run_watcher_guard: { has_lanes_in_flight: vi.fn() },
+vi.mock('#scripts/lane/lane-registry', () => ({
+	lane_registry: { has_lanes_in_flight: vi.fn() },
 }))
 
 vi.mock('./run-carry', () => ({
@@ -17,11 +17,11 @@ vi.mock('./run-carry', () => ({
 	},
 }))
 
-const { run_watcher_guard } = await import('./run-watcher-guard')
+const { lane_registry } = await import('#scripts/lane/lane-registry')
 const { run_carry } = await import('./run-carry')
 const { run_headless } = await import('./run-headless')
 
-const lanes_in_flight = vi.mocked(run_watcher_guard.has_lanes_in_flight)
+const lanes_in_flight = vi.mocked(lane_registry.has_lanes_in_flight)
 const repository_directory = vi.mocked(run_carry.repository_directory)
 const read_carry = vi.mocked(run_carry.read_carry)
 

@@ -94,7 +94,7 @@ child over" in `backlogrun-lanes.md` carries the command.
 JSONL. `JOSH_WORKER_MODEL` overrides Claude Code only; `JOSH_WORKER_EFFORT` covers both providers,
 and legacy `JOSH_LANE_*` applies only here. Bad markers, missing CLI/auth and failure
 refuse or park without fallback or retry.
-`docs/josh-commands.md` → "`josh lane:dispatch`" is the single source.
+`docs/josh-commands-automation.md` → "`josh lane:dispatch`" is the single source.
 
 **The parent reads GitHub, never the summary.** That is `epic-child`'s verifier: a unit that reports
 a child finished without its PR merged leaves that child open, and `pnpm josh issue:state <N>` says so

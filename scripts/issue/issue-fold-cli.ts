@@ -90,7 +90,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const issue_fold_cli = { JSON_KEY, USAGE, REASONS, read_arguments, size_verdict, run, main }
+const issue_fold_cli = { read_arguments, size_verdict, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

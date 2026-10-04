@@ -12,8 +12,9 @@
 // arguments is what makes the judgement independent of the spelling.
 
 // The wrapper words that may stand in front of `git`, the same ones `run-tail.ts` skips in front of
-// `josh`: environment assignments, the package-manager launchers, `sudo`, and an opening subshell
-// parenthesis. Left in, `sudo git push --force` and `(git push -f)` are silently not a git command.
+// `josh`: environment assignments, the package-manager launchers, `sudo`, `env`, and an opening
+// subshell parenthesis. Left in, `sudo git push --force`, `env git commit` and `(git push -f)` are
+// silently not a git command (joshuafolkken/kit#2983).
 const ENV_ASSIGNMENT = /^[A-Za-z_]\w*=/u
 const WRAPPER_WORDS: ReadonlySet<string> = new Set([
 	'pnpm',
@@ -22,6 +23,7 @@ const WRAPPER_WORDS: ReadonlySet<string> = new Set([
 	'run',
 	'sudo',
 	'command',
+	'env',
 ])
 const SUBSHELL_OPEN = '('
 
@@ -92,17 +94,26 @@ function after_globals(words: ReadonlyArray<string>, start: number): number {
 	return index
 }
 
+// The words after `command` once the wrapper is skipped, or `undefined` when the segment does not
+// invoke it. `gh` and `rm` are judged by the same wrapper cut as `git` (joshuafolkken/kit#2983), so
+// `env gh pr close` and `sudo rm -rf` are read as the calls they are.
+function arguments_of(segment: string, command: string): Array<string> | undefined {
+	const words = words_of(segment)
+	const command_index = after_wrapper(words)
+
+	return words[command_index] === command ? words.slice(command_index + NEXT) : undefined
+}
+
 // The subcommand and the arguments after it, or `undefined` when the segment is not a git invocation.
 // **`pnpm josh git` is deliberately not one**: the word after the wrapper is `josh`, not `git`, so a
 // run's own authorized `pnpm josh git -y` push is invisible here — which is exactly what keeps this row
 // off the node route the deny list already leaves alone.
 function parse(segment: string): GitCall | undefined {
-	const words = words_of(segment)
-	const git_index = after_wrapper(words)
+	const words = arguments_of(segment, GIT_COMMAND)
 
-	if (words[git_index] !== GIT_COMMAND) return undefined
+	if (words === undefined) return undefined
 
-	const subcommand_index = after_globals(words, git_index + NEXT)
+	const subcommand_index = after_globals(words, 0)
 
 	return { subcommand: words[subcommand_index], args: words.slice(subcommand_index + NEXT) }
 }
@@ -124,6 +135,6 @@ function short_cluster_has(token: string, letters: string): boolean {
 	return false
 }
 
-const git_argv = { parse, short_cluster_has, words_of }
+const git_argv = { arguments_of, parse, short_cluster_has }
 
 export { git_argv }

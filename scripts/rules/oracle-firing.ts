@@ -99,6 +99,7 @@ const NOT_NAMED: ReadonlyMap<string, string> = new Map([
 	['epic:next', READ],
 	['run:merge', PHASE],
 	['run:step', SELF],
+	['run:entry', SELF],
 	['refactor:scan', PHASE],
 	['split:assess', PHASE],
 	['sonar:hotspots', READ],

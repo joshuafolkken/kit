@@ -204,7 +204,7 @@ function shares_total(roles: ReadonlyArray<RoleTotals>): number {
 	return roles.reduce((total, role) => total + role.cost_share, NONE)
 }
 
-const cost_run_roles = { ROLE_ORDER, WHOLE, build, measure_lane_issue, shares_total }
+const cost_run_roles = { WHOLE, build, measure_lane_issue, shares_total }
 
 export type { RoleTotals, RunRoles, SessionRow }
 export { cost_run_roles }

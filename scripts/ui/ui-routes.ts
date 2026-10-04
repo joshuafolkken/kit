@@ -92,11 +92,6 @@ function derive_routes(
 
 const ui_routes = {
 	derive_routes,
-	is_route_file,
-	is_shared_svelte,
-	route_path_of,
-	ROUTES_PREFIX,
-	SVELTE_EXTENSION,
 }
 
 export { ui_routes }

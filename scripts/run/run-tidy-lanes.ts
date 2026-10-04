@@ -1,5 +1,5 @@
 import { git_spawn } from '#scripts/git/git-spawn'
-import { git_stash } from '#scripts/git/git-stash'
+import { git_stash } from '#scripts/git/stash/git-stash'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { run_hold } from './run-hold'
@@ -96,6 +96,7 @@ async function tidy_lanes(is_merged: IsMerged): Promise<Array<Outcome>> {
 	const lanes = await lane_registry.list_lanes()
 
 	for (const lane of lanes) {
+		// eslint-disable-next-line no-await-in-loop -- a close prunes the worktree list the next one reads
 		const outcome = await tidy_lane(lane, is_merged)
 
 		if (outcome !== undefined) outcomes.push(outcome)

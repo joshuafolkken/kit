@@ -33,6 +33,7 @@ const MANAGED_GATE = dependabot_workflow_fixture.managed_gate(false)
 const STALE_REFERENCE = '0000000000000000000000000000000000000000 # v0.0.0'
 const WORKFLOWS_ROOT = '.github/workflows'
 const WORKFLOWS_PREFIX = `${WORKFLOWS_ROOT}/`
+const ACTIONS_PREFIX = '.github/actions/'
 
 // True for the workflow directory itself, anything under it, and any ancestor of it — `.github`
 // alone, or the repository root, would carry every workflow through the directory copy just as
@@ -246,8 +247,15 @@ describe('dependabot-auto-merge.yml upstream-managed detection', () => {
 	it('narrows to workflow files inside the query rather than through grep', () => {
 		const run = managed_step_run()
 
-		expect(run).toContain(`select(.filename | startswith("${WORKFLOWS_PREFIX}"))`)
+		expect(run).toContain(`select(.filename | startswith("${WORKFLOWS_PREFIX}")`)
 		expect(run).not.toContain('grep')
+	})
+
+	// The distributed `dependabot.yml` bumps `/.github/actions/*` too, and kit stamps and overwrites
+	// the composite action it distributes, so a bump to one would merge and then be written back
+	// (joshuafolkken/kit#3013).
+	it('also reads the local composite actions under .github/actions', () => {
+		expect(managed_step_run()).toContain(`or startswith("${ACTIONS_PREFIX}"))`)
 	})
 
 	// The stamp is matched at the start of the file: this workflow declares the token in its own

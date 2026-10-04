@@ -135,7 +135,6 @@ async function parent_cut_reason(
 const run_parent_cut_hook = {
 	PARENT_CUT_REASON,
 	QUIET_WINDOW_MS,
-	STAMP_PREFIX,
 	SWITCH_ENV_KEY,
 	parent_cut_reason,
 }

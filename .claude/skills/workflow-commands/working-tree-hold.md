@@ -63,12 +63,13 @@ or release once the work is done; only an expired record over a clean tree is re
 **The batch entry points claim per child, not per batch.** `backlogrun` never
 call it themselves; each child runs the `fullrun` procedure, so it claims on entry and `pnpm josh
 followup` releases it at that child's merge. The command's behavior and the answer table are
-`docs/josh-commands.md` → "`josh run:hold` / `josh run:release`"; this file is the single source of
+`docs/josh-commands-automation.md` → "`josh run:hold` / `josh run:release`"; this file is the single source of
 the procedure.
 
 ## The halfrun resume
 
-**`fullrun #<N>` after a `halfrun` stop resumes it instead of claiming** (joshuafolkken/kit#2796). The
+**`fullrun #<N>` or `prrun #<N>` after a `halfrun` stop resumes it instead of claiming**
+(joshuafolkken/kit#2796, #3042). The
 stop is **recorded, never inferred**: the `halfrun` ends with `pnpm josh run:hold <N> --halfrun-stop`,
 which marks its own record (re-keying a `halfrun new`'s unnumbered one to the filed issue) — a
 `halfrun` still implementing or a `backlogrun` child leaves the same hold over the same dirty tree, and
@@ -79,3 +80,22 @@ halfrun`. **Skip the title, the plan, the split assessment, `git switch main && 
 issue (`pnpm josh issue:read <N>`), then run the gate **in full** from the refactor (`chain-rule.md` →
 "Run the review-to-merge chain") — a fix made during the manual check has had no gate — and ship as
 any `fullrun` does.
+
+## The prrun resume
+
+**`fullrun #<N>` after a `prrun` stop resumes it the same way** (joshuafolkken/kit#3023). The `prrun`
+ends with `pnpm josh run:hold <N> --prrun-stop`, which writes the commit its pull request is on into its
+own record; only a record carrying that commit is adopted. `run:entry` asks the session budget, adopts
+the hold with the `fullrun` mark and prints one of three tokens — read, never inferred:
+
+- **`resume: prrun-merged`** — a person merged the pull request. Run `pnpm josh followup "<title>
+  #<N>"` alone: it detects the merge and runs only the post-merge tail.
+- **`resume: prrun-merge`** — the branch is still on the stop's commit, both here and on the pull
+  request, and the tree is clean, so what was verified is what would merge. Skip the gate and the
+  review; run `pnpm josh followup` to merge.
+- **`resume: prrun-gate`** — the branch moved (locally, or by a push made on GitHub), its pull request
+  could not be read, or the tree is dirty: a person changed something. Run the
+  gate **in full** and the review (`chain-rule.md` → "Run the review-to-merge chain"), then ship as any
+  `fullrun` does.
+
+All three skip the title, the plan, the split assessment and the implementation.

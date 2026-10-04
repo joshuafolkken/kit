@@ -15,7 +15,7 @@ vi.mock('#scripts/git/git-preflight', () => ({
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: paths_mock },
 }))
-vi.mock('#scripts/git/git-gh-command', () => ({ git_gh_command: { pr_get_body: pr_body_mock } }))
+vi.mock('#scripts/gh/git-gh-command', () => ({ git_gh_command: { pr_get_body: pr_body_mock } }))
 vi.mock('#scripts/git/git-branch', () => ({
 	git_branch: { current: vi.fn().mockResolvedValue('2946-lane') },
 }))

@@ -253,11 +253,8 @@ const file_map_stamp = {
 	changed_since,
 	create,
 	describes_base,
-	is_file_map,
-	is_writer_gone,
 	is_writer_running,
 	parse_stamp,
-	read_at,
 }
 
 export type { FileMapStamp, FileMapStampAccess }

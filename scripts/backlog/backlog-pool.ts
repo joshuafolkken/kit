@@ -5,14 +5,14 @@ import { epic_index } from '#scripts/epic/epic-index'
 import { epic_issue } from '#scripts/epic/epic-issue'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_outside_blocker } from '#scripts/epic/epic-outside-blocker'
-import { git_next_issues } from '#scripts/git/git-next-issues'
+import type { OpenIssueData } from '#scripts/git/schemas'
+import { git_next_issues } from '#scripts/issue/git-next-issues'
 import {
 	ALREADY_DONE_LABEL,
 	EPIC_LABEL,
 	has_any_label,
 	NEEDS_DECISION_LABEL,
-} from '#scripts/git/issue-labels'
-import type { OpenIssueData } from '#scripts/git/schemas'
+} from '#scripts/issue/issue-labels'
 
 // The candidate pool `josh backlog:next` answers from (joshuafolkken/kit#1630).
 //
@@ -328,14 +328,11 @@ const backlog_pool = {
 	standalone_keys,
 	drop_excluded,
 	epic_classification,
-	is_epic_row,
-	keys_of,
 	merge_classifications,
 	opted_in_epics,
 	standalone_rows,
 	to_child,
 	to_children,
-	unique_children,
 }
 
 export { backlog_pool }

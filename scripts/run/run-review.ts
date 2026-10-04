@@ -105,12 +105,10 @@ const run_review = {
 	GATE_RED,
 	GATE_RUNNING,
 	adopt_verdict,
-	format_seconds,
 	format_timing,
 	gate_state,
 	is_gate_settled,
 	overlap_seconds,
-	span_seconds,
 }
 
 export type { AdoptVerdict, GateState, ReviewTiming, TimingStart }

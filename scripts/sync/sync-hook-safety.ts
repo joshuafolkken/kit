@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { json_value } from '#scripts/lib/json-value'
 import { package_version_schema } from '#scripts/lib/schemas'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
-import { safe_json_parse } from '#scripts/version/parse-json'
 import semver from 'semver'
 
 // `josh sync` writes the consumer's Claude and Codex hook files, whose hooks invoke bundles under
@@ -21,7 +21,7 @@ const NODE_MODULES = 'node_modules'
 function read_version_at(package_json_path: string): string | undefined {
 	if (!existsSync(package_json_path)) return undefined
 	const parsed = package_version_schema.safeParse(
-		safe_json_parse(readFileSync(package_json_path, 'utf8')),
+		json_value.parse_or_undefined(readFileSync(package_json_path, 'utf8')),
 	)
 
 	return parsed.success ? parsed.data.version : undefined
@@ -75,7 +75,6 @@ const sync_hook_safety = {
 	hook_write_warning,
 	installed_consumer_version,
 	is_safe_to_write_hooks,
-	outdated_install_warning,
 	read_version_at,
 }
 

@@ -3,10 +3,10 @@ import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
-import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
-import { github_issue_url } from '#scripts/git/github-issue-url'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
+import { github_issue_url } from '#scripts/gh/github-issue-url'
 import { error_text } from '#scripts/lib/error-message'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_lint_cli } from './issue-lint-cli'
@@ -182,7 +182,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const issue_file_cli = { USAGE, THIRD_PARTY_MESSAGE, UNKNOWN_REPO_MESSAGE, run, main }
+const issue_file_cli = { THIRD_PARTY_MESSAGE, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

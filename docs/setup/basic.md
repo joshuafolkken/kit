@@ -1,6 +1,6 @@
 # Set up the basic profile
 
-The detailed version of the [Quick start](../../README.md#quick-start) for the `basic` [profile](../init.md#project-profiles). It takes a directory that holds only an `index.html` file — or a Python, Rust or other project without Web files — from an empty machine to a formatted, verified project. It needs no Git repository, no GitHub account and no npm token; only the optional GitHub Issue workflow at the end of step 3 needs Git and GitHub. For a JavaScript / TypeScript project, see [Set up the full profile](./full.md).
+The `josh init` path for the `basic` [profile](../init.md#project-profiles) — the README's "Other projects" link. The [Quick start](../../README.md#quick-start) runs `josh start` instead, for a project that will use the GitHub Issue workflow; [init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start) decides which applies. This guide takes a directory that holds only an `index.html` file — or a Python, Rust or other project without Web files — from an empty machine to a formatted, verified project. It needs no Git repository, no GitHub account and no npm token; only the optional GitHub Issue workflow at the end of step 3 needs Git and GitHub. For a JavaScript / TypeScript project, see [Set up the full profile](./full.md).
 
 ## 1. Install the prerequisites
 
@@ -54,26 +54,3 @@ Open `index.html` in a browser and check the layout, links and any interaction a
 - Make your first change with an agent, from Issue to merge: [tutorial.md](../tutorial.md).
 - Task guides: [how-to.md](../how-to.md).
 - Hitting an error? See [troubleshooting.md](../troubleshooting.md).
-
-## Verifying this guide
-
-The guide is checked by running [the prerequisites' step 2](./prerequisites.md#2-install-pnpm-and-nodejs) and steps 2–3 here in a fresh container with no Git, no `~/.npmrc` and no Node.js. `buildpack-deps:bookworm-curl` is a Debian image with curl and without Git. The pnpm installer reads `SHELL` to pick the profile it edits, and a container does not set it:
-
-```bash
-docker run --rm -it -e SHELL=/bin/bash buildpack-deps:bookworm-curl bash
-# inside the container
-curl -fsSL https://get.pnpm.io/install.sh | sh - && source ~/.bashrc
-pnpm runtime set node 22 -g
-mkdir /site && cd /site && printf '<!doctype html><html><body><h1>Hello</h1></body></html>\n' > index.html
-pnpm --allow-build=esbuild dlx @joshuafolkken/kit init
-pnpm josh gate
-ls -A   # no .git, .github or lefthook.yml
-```
-
-For a project without Web files, replace `index.html` with, for example, `pyproject.toml` and `main.py`; `josh init` then creates no `prettier.config.mjs`.
-
-| Platform | Status                                                                                                                     |
-| -------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | Verified — Debian bookworm, pnpm 12.6.0, Node.js 22.23.3 (`index.html` and Python projects)                                |
-| macOS    | Step 3 verified — pnpm 12.6.0, an empty `index.html` directory ([#2794](https://github.com/joshuafolkken/kit/issues/2794)) |
-| Windows  | Not verified end to end                                                                                                    |

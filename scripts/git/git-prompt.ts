@@ -1,8 +1,7 @@
 import { stdin as input, stdout as output } from 'node:process'
 import { createInterface, type Interface } from 'node:readline/promises'
+import { OperationCancelledError } from './git-error'
 import { git_prompt_display } from './git-prompt-display'
-
-const OPERATION_CANCELLED_MESSAGE = '💡 Operation cancelled.'
 
 const PROMPT_MESSAGES = {
 	unstaged_files: '💬 Unstaged files found. Continue anyway? (y/n): ',
@@ -85,16 +84,10 @@ async function with_prompt<T>(callback: PromptCallback<T>, fallback_value?: T): 
 	}
 }
 
-async function confirm_with_exit_on_cancel(should_continue: () => Promise<boolean>): Promise<void> {
+async function confirm_or_cancel(should_continue: () => Promise<boolean>): Promise<void> {
 	const is_confirmed = await should_continue()
 
-	if (is_confirmed) {
-		return
-	}
-
-	console.info(OPERATION_CANCELLED_MESSAGE)
-	console.info('')
-	process.exit(1)
+	if (!is_confirmed) throw new OperationCancelledError()
 }
 
 function create_confirm_function(message: string): () => Promise<boolean> {
@@ -112,11 +105,11 @@ async function confirm_without_package_json(): Promise<boolean> {
 }
 
 async function confirm_unstaged_files(): Promise<void> {
-	await confirm_with_exit_on_cancel(confirm_continue)
+	await confirm_or_cancel(confirm_continue)
 }
 
 async function confirm_missing_package_json(): Promise<void> {
-	await confirm_with_exit_on_cancel(confirm_without_package_json)
+	await confirm_or_cancel(confirm_without_package_json)
 }
 
 async function confirm_version_not_updated(): Promise<boolean> {
@@ -124,19 +117,7 @@ async function confirm_version_not_updated(): Promise<boolean> {
 }
 
 async function confirm_without_version_update(): Promise<void> {
-	await confirm_with_exit_on_cancel(confirm_version_not_updated)
-}
-
-async function confirm_commit(): Promise<boolean> {
-	return await create_confirm_function(PROMPT_MESSAGES.commit)()
-}
-
-async function confirm_push(): Promise<boolean> {
-	return await create_confirm_function(PROMPT_MESSAGES.push)()
-}
-
-async function confirm_pr(): Promise<boolean> {
-	return await create_confirm_function(PROMPT_MESSAGES.pr)()
+	await confirm_or_cancel(confirm_version_not_updated)
 }
 
 async function ask_issue_info(prompt: Interface, question: string): Promise<string> {
@@ -190,15 +171,9 @@ async function confirm_workflow_steps(): Promise<WorkflowConfirmations> {
 }
 
 const git_prompt = {
-	confirm_continue,
 	confirm_unstaged_files,
-	confirm_without_package_json,
 	confirm_missing_package_json,
-	confirm_version_not_updated,
 	confirm_without_version_update,
-	confirm_commit,
-	confirm_push,
-	confirm_pr,
 	get_issue_info,
 	confirm_workflow_steps,
 }

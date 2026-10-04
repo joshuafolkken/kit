@@ -3,8 +3,9 @@ import { availableParallelism } from 'node:os'
 import path from 'node:path'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { process_identity } from '#scripts/josh/process-identity'
+import { process_owner_schema, type ProcessOwner } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { z } from 'zod'
+import { json_value } from '#scripts/lib/json-value'
 
 // How wide one vitest run may fan out when it is not the only one on the machine
 // (joshuafolkken/kit#1515).
@@ -41,12 +42,9 @@ const MIN_WORKERS = 1
 // One run in flight is this run alone, which is the case that changes nothing.
 const SOLO_RUNS = 1
 
-// `process_start` is optional because a marker written before joshuafolkken/kit#1245, or on a platform
-// whose start time cannot be read, carries only the pid — and that case has an answer of its own
-// below rather than being rejected here.
-const run_marker_schema = z.object({ pid: z.number(), process_start: z.string().optional() })
-
-type RunMarker = z.infer<typeof run_marker_schema>
+// A marker is the writing process's identity and nothing else; a pid-only marker has an answer of its
+// own below (`is_running`) rather than being rejected here.
+type RunMarker = ProcessOwner
 
 function marker_path(pid: number = process.pid): string {
 	return stamp_file.stamp_path(RUN_PREFIX, String(pid))
@@ -82,13 +80,9 @@ function read_marker(source: string): RunMarker | undefined {
 
 	if (raw === undefined) return undefined
 
-	try {
-		const parsed = run_marker_schema.safeParse(JSON.parse(raw))
+	const parsed = process_owner_schema.safeParse(json_value.parse_or_undefined(raw))
 
-		return parsed.success ? parsed.data : undefined
-	} catch {
-		return undefined
-	}
+	return parsed.success ? parsed.data : undefined
 }
 
 // An unreadable temp directory answers "no other run", which is the direction that leaves behavior
@@ -235,12 +229,9 @@ const unit_worker_share = {
 	NESTED_KEY,
 	RUN_PREFIX,
 	SOLO_RUNS,
-	WORKER_FLAG,
 	current_share,
 	is_nested_run,
-	is_running,
 	live_run_count,
-	marker_files,
 	marker_path,
 	read_marker,
 	resolve_unit_workers,

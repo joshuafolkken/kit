@@ -57,9 +57,15 @@ const MAX_BACKLOGRUN_TOKENS = 90_000
 const MAX_BACKLOGRUN_ENTRY_TOKENS = 20_000
 const NOTHING = 0
 
-const IMPLEMENTING: ReadonlyArray<string> = ['fullrun', 'halfrun', 'backlogrun']
+const IMPLEMENTING: ReadonlyArray<string> = ['fullrun', 'halfrun', 'prrun', 'backlogrun']
 const PLAN_ONLY = 'kickoff'
-const EXPECTED_ENTRIES: ReadonlyArray<string> = ['backlogrun', 'fullrun', 'halfrun', 'kickoff']
+const EXPECTED_ENTRIES: ReadonlyArray<string> = [
+	'backlogrun',
+	'fullrun',
+	'halfrun',
+	'kickoff',
+	'prrun',
+]
 
 function alphabetical(left: string, right: string): number {
 	return left.localeCompare(right)

@@ -1,4 +1,4 @@
-import { telegram_notify } from '#scripts/git/telegram-notify'
+import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_carry, type CarryRead, type RunCarry } from './run-carry'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
@@ -128,7 +128,7 @@ async function run_stranded_check(): Promise<void> {
 	}
 }
 
-const run_stranded_detect = { DEFAULT_PORTS, detect_and_report, gather, report, run_stranded_check }
+const run_stranded_detect = { detect_and_report, run_stranded_check }
 
 export { run_stranded_detect }
 export type { DetectPorts, RecordTargets }

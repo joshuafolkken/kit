@@ -1,9 +1,11 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { step_zero_notice } from '#scripts/hooks/step-zero-notice'
 import { execa } from 'execa'
 import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest'
 import { build_hooks, HOOK_BUNDLES, outfile_for } from './build-hooks'
+import { hook_bundle_stamp } from './hook-bundle-stamp'
 import { lane_cut_fixture } from './lane-cut-fixture'
 
 const BUILD_TIMEOUT_MS = 60_000
@@ -13,6 +15,10 @@ const CODEX_ADAPTER_SOURCE = 'scripts/hooks/codex-hook-adapter.ts'
 const CODEX_ADAPTER_BUNDLE = 'dist/hooks/codex-hook-adapter.js'
 const PRETOOL_BUNDLE = 'dist/hooks/pretool-guard.js'
 const FORMAT_BUNDLE = 'dist/hooks/format-edited.js'
+
+const directory = mkdtempSync(path.join(tmpdir(), 'build-hooks-'))
+const format_directory = mkdtempSync(path.join(process.cwd(), '.codex-hook-fixture-'))
+const TRANSCRIPT_PATH = path.join(directory, 't.jsonl')
 
 interface RunResult {
 	stdout: string
@@ -24,6 +30,9 @@ async function run(
 	args: ReadonlyArray<string>,
 	input: string,
 ): Promise<RunResult> {
+	// The Step 0 notice speaks once per transcript (joshuafolkken/kit#2994), so the first of a
+	// source-then-bundle pair would spend it and the second run silently. Each run starts unstamped.
+	rmSync(step_zero_notice.stamp_path(TRANSCRIPT_PATH), { force: true })
 	const { stdout, exitCode: exit_code } = await execa(command, [...args], {
 		input,
 		// `JOSH_WATCHER_GUARD` is off so the composed watcher guard (joshuafolkken/kit#2353) does not read
@@ -55,10 +64,7 @@ async function expect_adapter_parity(mode: string, input: string): Promise<void>
 	expect(bundle).toEqual(source)
 }
 
-const directory = mkdtempSync(path.join(tmpdir(), 'build-hooks-'))
-const format_directory = mkdtempSync(path.join(process.cwd(), '.codex-hook-fixture-'))
-
-writeFileSync(path.join(directory, 't.jsonl'), '{"type":"assistant","message":{"content":[]}}\n')
+writeFileSync(TRANSCRIPT_PATH, '{"type":"assistant","message":{"content":[]}}\n')
 
 beforeAll(async () => {
 	await build_hooks()
@@ -70,9 +76,7 @@ afterAll(() => {
 })
 
 function payload(tool_name: string, tool_input: Record<string, unknown>): string {
-	const transcript_path = path.join(directory, 't.jsonl')
-
-	return JSON.stringify({ transcript_path, tool_name, tool_input })
+	return JSON.stringify({ transcript_path: TRANSCRIPT_PATH, tool_name, tool_input })
 }
 
 function patch_payload(file_path: string): string {
@@ -149,18 +153,25 @@ describe('launched hook bundles run their main', () => {
 	})
 })
 
+function create_out_directory(): string {
+	const out_directory = mkdtempSync(path.join(tmpdir(), 'build-hooks-out-'))
+
+	onTestFinished(() => {
+		rmSync(out_directory, { recursive: true, force: true })
+	})
+
+	return out_directory
+}
+
 // joshuafolkken/kit#2885: split builds emit freshly hashed chunks each time, so a chunk left from an
 // earlier build has to be gone after the next one rather than shipping beside the live chunks.
 describe('build_hooks output directory', () => {
 	it(
 		'removes a stale chunk left from an earlier build',
 		async () => {
-			const out_directory = mkdtempSync(path.join(tmpdir(), 'build-hooks-out-'))
+			const out_directory = create_out_directory()
 			const stale_chunk = path.join(out_directory, 'chunk-STALE.js')
 
-			onTestFinished(() => {
-				rmSync(out_directory, { recursive: true, force: true })
-			})
 			writeFileSync(stale_chunk, 'export {}\n')
 			await build_hooks(out_directory)
 
@@ -170,6 +181,24 @@ describe('build_hooks output directory', () => {
 			)
 
 			expect(built.every(Boolean)).toBe(true)
+		},
+		BUILD_TIMEOUT_MS,
+	)
+
+	// joshuafolkken/kit#2984: every file is renamed in from a private staging directory, which must not
+	// be left beside the output, and the stamp it places last reads the fresh build as current.
+	it(
+		'places the build and its stamp without leaving the staging directory behind',
+		async () => {
+			const out_directory = create_out_directory()
+
+			await build_hooks(out_directory)
+
+			expect(existsSync(path.join(out_directory, hook_bundle_stamp.STAMP_NAME))).toBe(true)
+			expect(hook_bundle_stamp.is_fresh(out_directory, process.cwd())).toBe(true)
+			expect(readdirSync(path.dirname(out_directory))).not.toContainEqual(
+				expect.stringMatching(/^\.hooks-staging-/u),
+			)
 		},
 		BUILD_TIMEOUT_MS,
 	)

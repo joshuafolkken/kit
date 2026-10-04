@@ -87,10 +87,7 @@ function parse_json_object_safe<T>(raw_json: string, schema: z.ZodType<T>): T | 
 }
 
 const parse_json = {
-	parse_json_array_safe,
-	parse_json_array_or_undefined,
 	parse_json_object_safe,
-	read_json_listing,
 }
 
 export {

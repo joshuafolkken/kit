@@ -1,6 +1,7 @@
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { process_identity } from '#scripts/josh/process-identity'
+import { process_owner_schema } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
 import type { CarryRead } from './run-carry'
@@ -209,11 +210,9 @@ const STOP_REASONS: Record<'none' | 'expired' | 'unreadable', WakeStopReason> = 
 	unreadable: 'unreadable',
 }
 
-const run_wake_schema = z.object({
+const run_wake_schema = process_owner_schema.extend({
 	invocation: z.string(),
 	started_at: z.string(),
-	pid: z.number(),
-	process_start: z.string().optional(),
 	woke: z.number(),
 	woke_at: z.string().optional(),
 	// **Every optional field of `RunWake` has to be listed here.** `z.object` strips what it does not
@@ -583,7 +582,6 @@ const run_wake = {
 	IDLE_CEILING_MS,
 	MAX_WAKE_ATTEMPTS,
 	WAKE_GRACE_MS,
-	WAKE_PREFIX,
 	claim,
 	count_claim,
 	count_wake,

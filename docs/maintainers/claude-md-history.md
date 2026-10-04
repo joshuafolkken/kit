@@ -28,3 +28,26 @@ them, and Pre-commit Self-Review carries the review round cap. The hook that res
 Rules Step 0 was cut to its trigger and pointer — `pnpm josh report:lint` checks the format — and the
 hook stating that deleting a git-tracked file is reversible was moved into the Tier C definition,
 which `CLAUDE.md` loads on every session anyway.
+
+## Explanations moved out of `CLAUDE.md`
+
+joshuafolkken/kit#2994 moved the sentences that explained a rule rather than stated one, so the file
+every session loads carries the trigger and the pointer alone:
+
+- **How a rule is written.** Each rule is a trigger plus a pointer — enough to act safely with nothing
+  else loaded, with the steps and rationale at the pointer (`prompts/collaboration-workflow/residency.md`).
+- **What `pnpm josh pkg:scout` measures.** It ranks the candidate packages by downloads, last publish,
+  bundled types, license and install size, and prints `clear` when the leader is ahead by at least the
+  near-tie threshold or `close` when the top two are within it — so "clearly best" and "genuine
+  toss-up" are read off the output rather than decided by impression.
+- **Who reads `.env`.** The AI scripts, `josh port` and `playwright.config.ts`.
+- **Why the code-line limits are not `wc -l`.** `max-lines` / `max-lines-per-function` run with
+  `skipBlankLines` + `skipComments`.
+- **Why the self-review is authoritative.** CI runs no Claude review, so the pre-commit pass is the only
+  one. `pnpm josh disposition <path>` answers whether a finding reaches a runtime path, so the only
+  judgement left when routing a finding is whether the defect is confirmed.
+
+The same Issue moved the Step 0 reminder off `UserPromptSubmit`. As an `echo` it was injected into every
+prompt — a question that writes nothing included — and re-read as context on each later turn; it now
+fires once, on a session's first `Edit` / `Write` of a runtime file (`scripts/hooks/step-zero-notice.ts`),
+and the prompt hook is the single session-language process.

@@ -1,6 +1,6 @@
 import type { EpicNextResult } from '#scripts/epic/epic-report'
-import { AUTO_OK_LABEL, EPIC_LABEL, has_any_label } from '#scripts/git/issue-labels'
 import type { OpenIssueData } from '#scripts/git/schemas'
+import { AUTO_OK_LABEL, EPIC_LABEL, has_any_label } from '#scripts/issue/issue-labels'
 
 // Which open issues the backlog will not run, and why (joshuafolkken/kit#1652).
 //
@@ -135,8 +135,6 @@ const backlog_scope = {
 	OPTED_IN_UNPLACED_REASON,
 	open_numbers_of,
 	out_of_scope,
-	planned_numbers,
-	reason_for,
 	titles_of,
 }
 

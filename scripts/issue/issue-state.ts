@@ -1,6 +1,6 @@
-import { has_any_label, NEEDS_HUMAN_REVIEW_LABEL } from '#scripts/git/issue-labels'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
+import { has_any_label, NEEDS_HUMAN_REVIEW_LABEL } from './issue-labels'
 
 // The answer `josh issue:state` prints, kept apart from the reading and the printing so the shape of
 // the report is decided by one pure function (joshuafolkken/kit#1054).
@@ -96,10 +96,6 @@ function format_attributed_issue_state(issue_number: string, state: IssueState):
 
 const issue_state = {
 	NO_LABELS,
-	STATE_LABEL,
-	LABELS_LABEL,
-	HUMAN_REVIEW_LABEL_LINE,
-	ISSUE_LABEL,
 	parse_issue_state,
 	format_issue_state,
 	format_attributed_issue_state,

@@ -279,16 +279,12 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const propagate = {
-	DRY_RUN_REASON,
 	KNOWN_FLAGS,
 	TARGET_FLAG,
 	parse_options,
 	refuse_outside_source_repository,
 	resolve_target_version,
 	resolve_run_version,
-	announce_run_version,
-	run,
-	main,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))

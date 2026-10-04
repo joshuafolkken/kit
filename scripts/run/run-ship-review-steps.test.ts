@@ -5,6 +5,8 @@ const launch_mock = vi.hoisted(() => vi.fn())
 const resolve_in_mock = vi.hoisted(() => vi.fn())
 const missing_mock = vi.hoisted(() => vi.fn())
 const is_child_mock = vi.hoisted(() => vi.fn())
+// Unrecorded by default; a test that needs another answer sets it once.
+const record_check_mock = vi.hoisted(() => vi.fn(async () => ({ status: 'missing' })))
 const stamps = vi.hoisted(() => ({
 	read_stamp_text: vi.fn(),
 	remove_stamp: vi.fn(),
@@ -23,6 +25,7 @@ vi.mock('#scripts/gate/scoped-green', () => ({ scoped_green: { missing_scripts: 
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: is_child_mock },
 }))
+vi.mock('#scripts/review/review-record', () => ({ review_record: { check: record_check_mock } }))
 
 const { run_ship_review_steps } = await import('./run-ship-review-steps')
 const { run_ship_review } = await import('./run-ship-review')
@@ -129,6 +132,26 @@ describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
 	})
 })
 
+// joshuafolkken/kit#2964: a ship relaunched with `--review` after a round-1 stop leaves the fix delta
+// to round 2 rather than reviewing the whole change again as round 1.
+describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
+	it('skips the review when the issue already has a recorded round', async () => {
+		record_check_mock.mockResolvedValueOnce({ status: 'ok' })
+
+		expect(await stage_code()).toBe(OK)
+		expect(record_check_mock).toHaveBeenCalledWith(Number(ISSUE))
+		expect(commands()).toStrictEqual([])
+		expect(launch_mock).not.toHaveBeenCalled()
+	})
+
+	it.each(['missing', 'not-required'])('runs the review when the record is %s', async (status) => {
+		record_check_mock.mockResolvedValueOnce({ status })
+
+		expect(await stage_code()).toBe(OK)
+		expect(commands()).toContain(OPEN)
+	})
+})
+
 describe('run_ship_review_steps.review_stage — the clean path', () => {
 	it('opens, reviews, joins, attests and records a clean round without stopping', async () => {
 		expect(await stage_code()).toBe(OK)
@@ -228,11 +251,14 @@ describe('run_ship_review_steps.review_stage — findings fixed in place', () =>
 		expect(commands().at(-1)).toBe(JOIN)
 	})
 
-	it('stops on a Medium left unfixed, after recording it', async () => {
+	// joshuafolkken/kit#2961: a partial fix still edited the tree the gate read, so the join is drained
+	// and the round stops on the Medium left unfixed rather than on a misleading `Gate RED`.
+	it('stops on a Medium left unfixed, after recording it, past a join the fix turned red', async () => {
 		stamps.read_stamp_text.mockReturnValue(`${FIXED_MEDIUM}\n${MEDIUM_UNFIXED}`)
+		answer_with(JOIN)
 
 		expect(await stage_code()).toBe(FAILED)
-		expect(commands()).toContain(`${RECORD} ${MEDIUM} ${MEDIUM_UNFIXED}`)
+		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, `${RECORD} ${MEDIUM} ${MEDIUM_UNFIXED}`])
 	})
 })
 

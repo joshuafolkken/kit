@@ -13,9 +13,10 @@ const PLUGIN_ID = 'kit@kit'
 const MARKETPLACE_PATH = './node_modules/@joshuafolkken/kit'
 const CLAUDE_SETTINGS_DESTINATION = path.join('.claude', 'settings.json')
 
-// `enabledPlugins` declares the plugin; `extraKnownMarketplaces` says where to find it. The CLI does
-// not auto-install from these alone — a consumer runs `claude plugin install kit@kit` once — so the
-// declaration is what makes that one command resolve without further arguments.
+// `enabledPlugins` declares the plugin; `extraKnownMarketplaces` says where to find it. Nothing needs
+// installing: in a trusted workspace Claude Code registers the marketplace from this declaration and
+// loads the skills — an interactive session from its first session, a headless one (`claude -p`) from
+// its second (joshuafolkken/kit#2990).
 const PLUGIN_SETTINGS: Record<string, unknown> = {
 	extraKnownMarketplaces: {
 		[MARKETPLACE_NAME]: { source: { source: 'directory', path: MARKETPLACE_PATH } },
@@ -39,11 +40,9 @@ function apply_plugin_config_for_destination(destination_path: string, content: 
 }
 
 const claude_plugin_config = {
-	MARKETPLACE_NAME,
 	PLUGIN_ID,
 	MARKETPLACE_PATH,
 	CLAUDE_SETTINGS_DESTINATION,
-	PLUGIN_SETTINGS,
 	inject_plugin_config,
 	apply_plugin_config_for_destination,
 }

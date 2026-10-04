@@ -7,8 +7,10 @@ Review results and successful pushes are never turn boundaries.
 
 0. **A lane child** (#2428): `pnpm josh main:merge`, the scoped pair, `pnpm josh ship --detach --review
    "<title> #<N>"` (`--cite <N>`), then **end the turn** on `launched`/`busy`. A stop relaunches a child
-   whose `run:step` names `ship --log <N>`: fix, re-detach (`--review` only if no round is recorded,
-   else step 4). `failed` → step 1.
+   whose prompt names `pnpm josh ship --log <N>` and (Anthropic lane, #2964) the re-detach to run after
+   the fix — `pnpm josh ship --detach`, `--review` only if the stopped ship carried it and stopped before
+   round 2, which is final (`scripts/run/run-ship-next.ts`); the supervisor skips a recorded round 1.
+   `failed` → step 1.
 1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before the scoped pair and
    the gate** — the pre-gate cut (a no-op outside a lane, joshuafolkken/kit#2177). Then run the final scoped lint/test pair and `pnpm josh run:review`: it starts
    `pnpm josh gate` in the background and prints the `/code-review` brief in one call, so the two overlap

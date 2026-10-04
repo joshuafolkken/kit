@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { json_value } from '#scripts/lib/json-value'
 import { file_reader } from '#scripts/lib/read-file'
 import { read_spawn_stdout } from '#scripts/lib/spawn-exit'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
-import { safe_json_parse } from '#scripts/version/parse-json'
 import { execaSync } from 'execa'
 import { z } from 'zod'
 
@@ -40,7 +40,7 @@ type ClaudeMdState = typeof STATE_OK | typeof STATE_TARGET_MISSING | typeof STAT
 function parse_manifest(root: string): ManifestShape | undefined {
 	const content = file_reader.read_if_readable(path.join(root, 'package.json'))
 	if (content === undefined) return undefined
-	const parsed = manifest_schema.safeParse(safe_json_parse(content))
+	const parsed = manifest_schema.safeParse(json_value.parse_or_undefined(content))
 
 	return parsed.success ? parsed.data : undefined
 }
@@ -69,7 +69,7 @@ function is_kit_consumer(root: string): boolean {
 function is_plugin_declared(root: string): boolean {
 	const content = file_reader.read_if_readable(path.join(root, SETTINGS_PATH))
 	if (content === undefined) return false
-	const parsed = settings_schema.safeParse(safe_json_parse(content))
+	const parsed = settings_schema.safeParse(json_value.parse_or_undefined(content))
 
 	return parsed.success && parsed.data.enabledPlugins?.[PLUGIN_ID] === true
 }
@@ -107,7 +107,7 @@ function status_line(is_ok: boolean, ok_text: string, warn_text: string): string
 function plugin_line(is_declared: boolean): string {
 	return status_line(
 		is_declared,
-		`kit plugin declared (run \`claude plugin install ${PLUGIN_ID}\` once if skills are missing)`,
+		'kit plugin declared (skills load in a trusted workspace; headless from its second session)',
 		'kit plugin not declared in .claude/settings.json — run `pnpm josh sync`',
 	)
 }
@@ -159,8 +159,6 @@ function report_consumer_setup(root: string): void {
 const doctor_consumer = {
 	claude_md_line,
 	claude_md_state,
-	configured_hooks_path,
-	consumer_setup_lines,
 	hooks_path_line,
 	is_kit_consumer,
 	is_plugin_declared,

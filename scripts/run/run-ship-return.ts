@@ -5,6 +5,7 @@ import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
+import type { ShipResume } from './run-ship-next'
 import type { Stage } from './run-ship-stage'
 
 // How a detached `josh ship` supervisor hands a stopped stage back (joshuafolkken/kit#2428). The agent
@@ -47,14 +48,18 @@ function note(text: string): void {
 	process.stderr.write(`${text}\n`)
 }
 
-async function return_control(issue: string, stage: Stage): Promise<ReturnOutcome> {
+async function return_control(
+	issue: string,
+	stage: Stage,
+	resume: ShipResume,
+): Promise<ReturnOutcome> {
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.SHIP_STOP, stop_text(issue, stage))
 
 	const lane = await lane_to_relaunch(issue)
 
 	if (lane === undefined) return 'recorded'
 
-	const invocation = lane_child_invocation.ship_stop_invocation(issue)
+	const invocation = lane_child_invocation.ship_stop_invocation(issue, { stage, ...resume })
 	const result = lane_relaunch.relaunch(
 		lane,
 		invocation,
@@ -69,7 +74,7 @@ async function return_control(issue: string, stage: Stage): Promise<ReturnOutcom
 	return 'recorded'
 }
 
-const run_ship_return = { return_control, stop_text }
+const run_ship_return = { return_control }
 
 export type { ReturnOutcome }
 export { run_ship_return }

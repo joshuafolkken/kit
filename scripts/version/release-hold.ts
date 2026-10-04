@@ -129,13 +129,9 @@ function build_release_hold_notes(
 }
 
 const release_hold = {
-	HOLD_LABEL,
-	is_at_or_above,
-	is_latest_withheld,
 	resolve_installable,
 	is_release_age_hold,
 	format_window,
-	format_release_hold_note,
 	build_release_hold_notes,
 }
 

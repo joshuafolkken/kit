@@ -1,5 +1,5 @@
-import { AUTO_OK_LABEL, EPIC_LABEL } from '#scripts/git/issue-labels'
 import type { OpenIssueData } from '#scripts/git/schemas'
+import { AUTO_OK_LABEL, EPIC_LABEL } from '#scripts/issue/issue-labels'
 
 // Fixtures shared by the `auto-ok:next` suites. Split out when the pickup gained its dependency
 // check and the tests outgrew one file (joshuafolkken/kit#996) — a second copy of these builders is

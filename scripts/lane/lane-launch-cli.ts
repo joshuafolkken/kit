@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { josh_command } from '#scripts/josh/josh-run'
+import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 
 // `josh lane:launch <issue> [--stash <message>]` — one composite command for a `backlogrun` lane-start
@@ -57,6 +58,7 @@ function read_context(argv: ReadonlyArray<string>): LaunchContext | undefined {
 async function install(directory: string): Promise<boolean> {
 	const result = await execa(PNPM, ['--dir', directory, 'install', '--frozen-lockfile'], {
 		reject: false,
+		timeout: INSTALL_TIMEOUT_MS,
 	})
 
 	if ((result.exitCode ?? FAILURE_EXIT_CODE) === SUCCESS_EXIT_CODE) return true
@@ -82,29 +84,37 @@ async function prepare(stash: string | undefined, directory: string): Promise<bo
 	return await install(directory)
 }
 
-// The launch chain in-process: the dispatched child's pid, or `undefined` when a step refused. The CLI
-// prints the pid; `backlog:drive` launches through this same chain (joshuafolkken/kit#2508).
-async function launch_lane(context: LaunchContext): Promise<string | undefined> {
+// Where the chain ended. `unopened` is a `lane:open` refusal — no lane was taken; `failed` is a step
+// after it, which leaves the opened lane holding a seat, so a caller cannot read the two alike
+// (joshuafolkken/kit#3027).
+type LaunchOutcome = { kind: 'launched'; pid: string } | { kind: 'unopened' } | { kind: 'failed' }
+
+const UNOPENED: LaunchOutcome = { kind: 'unopened' }
+const FAILED: LaunchOutcome = { kind: 'failed' }
+
+// The launch chain in-process. The CLI prints the pid; `backlog:drive` launches through this same
+// chain (joshuafolkken/kit#2508).
+async function launch_lane(context: LaunchContext): Promise<LaunchOutcome> {
 	const opened = await josh_command.josh_run(['lane:open', context.issue], should_forward_stderr)
 
-	if (opened.code !== SUCCESS_EXIT_CODE) return undefined
+	if (opened.code !== SUCCESS_EXIT_CODE) return UNOPENED
 
-	if (!(await prepare(context.stash, opened.out))) return undefined
+	if (!(await prepare(context.stash, opened.out))) return FAILED
 
 	const dispatched = await josh_command.josh_run(
 		['lane:dispatch', context.issue],
 		should_forward_stderr,
 	)
 
-	return dispatched.code === SUCCESS_EXIT_CODE ? dispatched.out : undefined
+	return dispatched.code === SUCCESS_EXIT_CODE ? { kind: 'launched', pid: dispatched.out } : FAILED
 }
 
 async function launch(context: LaunchContext): Promise<number> {
-	const pid = await launch_lane(context)
+	const outcome = await launch_lane(context)
 
-	if (pid === undefined) return FAILURE_EXIT_CODE
+	if (outcome.kind !== 'launched') return FAILURE_EXIT_CODE
 
-	console.info(pid)
+	console.info(outcome.pid)
 
 	return SUCCESS_EXIT_CODE
 }
@@ -125,9 +135,9 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const lane_launch_cli = { USAGE, install, launch, launch_lane, prepare, read_context, run }
+const lane_launch_cli = { launch_lane, read_context, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
-export type { LaunchContext }
+export type { LaunchContext, LaunchOutcome }
 export { lane_launch_cli }

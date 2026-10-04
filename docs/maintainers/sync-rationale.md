@@ -12,9 +12,10 @@ behavior. It used to sit inline in that page's "AI files (overwritten)" section
 (joshuafolkken/kit#1879).** `.claude/settings.json` still overwrites the consumer's file — it
 carries the `permissions.deny` rules a plugin cannot provide — and now also declares the `kit`
 marketplace and enables the `kit` plugin. The skill bodies load from the package
-(`node_modules/@joshuafolkken/kit/.claude/skills/`). The CLI does not auto-install a plugin from
-settings alone, so a consumer runs a one-time `claude plugin marketplace add
-./node_modules/@joshuafolkken/kit && claude plugin install kit@kit` (or `/plugin`). `josh sync`
+(`node_modules/@joshuafolkken/kit/.claude/skills/`). Nothing needs installing: in a trusted
+workspace Claude Code registers the marketplace from the declaration and loads the skills — an
+interactive session from its first session, a headless one from its second (joshuafolkken/kit#2990,
+which replaced the one-time `claude plugin install kit@kit` #1930 had asked for). `josh sync`
 removes a stale copied skill directory only when its content still matches the shipment, and keeps —
 with a warning — one the consumer edited or authored.
 
@@ -95,6 +96,10 @@ The stamp is applied by the same write-time transform that resolves the action p
 distributed as a file or a renamed mapping cannot arrive without it. Two write paths bypass the
 transform: the directory copy, which a kit unit test holds to an empty list, and `deploy-vps.yml`,
 which is deliberately left unstamped for the reason below.
+A local composite action a distributed workflow calls (`.github/actions/setup-pnpm/action.yml`) is
+written through the same transform and stamped the same way: the distributed `dependabot.yml` bumps
+`/.github/actions/*`, so an unstamped action would merge its own bumps and have them written back by
+the next sync (joshuafolkken/kit#3013).
 `josh init` still leaves an existing file alone — it does not stamp one, because the destination may
 hold a workflow the consumer wrote themselves and a header claiming this package owns it would hold
 every bump to it back on a false premise. It warns instead: until `sync` writes a header, the
@@ -503,7 +508,7 @@ like. `Bash` is in that list for the live round-trip density line the same hook 
 formatting — a shell payload names a command rather than a file, and seven of the ten most recent
 sessions in this checkout never called `Edit` or `Write` once, so on the narrower matcher the line
 reached none of them (joshuafolkken/kit#1337). It reaches a consumer the same way the deny list
-does, and `docs/josh-commands.md` documents what the command does, why the matcher names exactly
+does, and `docs/josh-commands-automation.md` documents what the command does, why the matcher names exactly
 those three tools, and why it never fails.
 
 **And it wires the batching guard, on the earlier side of the same event pair.** A `PreToolUse` hook
@@ -525,7 +530,7 @@ applied edit in silence. Within `Bash` the
 mutation words still exclude every `pnpm josh` command, commit and Issue write — a matcher is settings
 a consumer can widen, and what a call is stays the script's answer whatever the wiring says.
 `JOSH_BATCH_GUARD=off` in the environment or in `.env` switches it off without editing the settings
-file. `docs/josh-commands.md` carries the conditions, what the guard
+file. `docs/josh-commands-automation.md` carries the conditions, what the guard
 cannot know about the turn it interrupts, and the bound on how often a refusal can repeat.
 
 **A second `PreToolUse` hook runs `pnpm josh investigation:guard`, on `Read` and `Bash`**
@@ -537,7 +542,7 @@ reading is split between the two, and on the `Bash` side it refuses only a line 
 nothing** — the test the batching guard itself asked until joshuafolkken/kit#1762 widened that one,
 kept under a name of its own so the two guards cannot be moved together by accident. A
 `sed -n` read is therefore counted and never refused. `JOSH_INVESTIGATION_GUARD=off` switches it off,
-and `docs/josh-commands.md` carries which commands count as reading, the one-refusal-per-accumulation
+and `docs/josh-commands-automation.md` carries which commands count as reading, the one-refusal-per-accumulation
 bound and how to verify it.
 
 **A third `PreToolUse` hook runs `pnpm josh rule:guard`, on `Bash`** (joshuafolkken/kit#1524). It is

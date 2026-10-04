@@ -85,6 +85,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run_reserved(process.argv.slice(FIRST_ARGUMENT_INDEX))
 }
 
-const reserved_run = { parse_arguments, run_command, run_reserved }
+const reserved_run = { parse_arguments, run_reserved }
 
 export { reserved_run }

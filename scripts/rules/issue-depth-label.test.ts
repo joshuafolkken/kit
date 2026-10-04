@@ -8,7 +8,7 @@ import {
 	EPIC_LABEL,
 	INTERRUPT_ROUTE_LABEL,
 	TIER_A_ROUTE_LABEL,
-} from '#scripts/git/issue-labels'
+} from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#1729: joshuafolkken/kit#1698 set the depth-0 share of the open backlog as a
@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest'
 // something worth filing rather than at every entry. The depth labels, the provisioning commands and
 // the denominator rule all went with it; `SKILL.md` → §2i keeps the rule they carry out.
 const WORKFLOW_SKILL = '.claude/skills/workflow-commands/observation-filing.md'
-const LABEL_MODULE = 'scripts/git/issue-labels.ts'
+const LABEL_MODULE = 'scripts/issue/issue-labels.ts'
 const DEPTH_LABEL_COUNT = 3
 // The placeholder spelling every filing template carries — the depth itself varies per Issue, so the
 // template names the flag and §2i names how to choose the number.

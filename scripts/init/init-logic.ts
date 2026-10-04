@@ -92,6 +92,10 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'.github/workflows/production.yml',
 	'.github/workflows/sonar-qube.yml',
 	'.github/workflows/pr-classification.yml',
+	// Called by `pr-classification.yml` as `uses: ./.github/actions/setup-pnpm`; without it the
+	// consumer's job cannot resolve the action and the Release classification check fails
+	// (joshuafolkken/kit#3013).
+	'.github/actions/setup-pnpm/action.yml',
 	'.github/pull_request_template.md',
 	'.github/release.yml',
 	'.github/dependabot.yml',
@@ -118,6 +122,9 @@ const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
 		src: 'templates/workflows/dependabot-auto-merge.yml',
 		dest: '.github/workflows/dependabot-auto-merge.yml',
 	},
+	// A template rather than a copy of kit's own file: kit releases from its publish.yml, so the file
+	// must not run in kit as well (joshuafolkken/kit#3007).
+	{ src: 'templates/workflows/github-release.yml', dest: '.github/workflows/github-release.yml' },
 ]
 
 // Empty since joshuafolkken/kit#1879: the five skill directories kit used to copy whole

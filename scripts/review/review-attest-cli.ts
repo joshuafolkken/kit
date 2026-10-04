@@ -101,13 +101,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const review_attest_cli = {
-	CHECK_FLAG,
-	main,
-	NOT_REQUIRED_LINE,
 	run,
-	run_check,
-	UNKNOWN_NONCE_LINE,
-	USAGE,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))

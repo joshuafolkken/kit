@@ -1,5 +1,5 @@
-import { has_label_name, INTERRUPT_ROUTE_LABEL } from '#scripts/git/issue-labels'
 import { behavior_change_lint } from './behavior-change-lint'
+import { has_label_name, INTERRUPT_ROUTE_LABEL } from './issue-labels'
 import { markdown_section } from './markdown-section'
 
 // The defect rate of merged work over a window (joshuafolkken/kit#2449): issues filed as defects
@@ -132,7 +132,6 @@ const defect_rate = {
 	filed_query,
 	format,
 	is_above_baseline,
-	is_behavior_change,
 	is_defect,
 	kind_of,
 	measure,

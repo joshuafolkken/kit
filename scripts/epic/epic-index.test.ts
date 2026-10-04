@@ -1,6 +1,6 @@
 import { auto_ok_fixture } from '#scripts/auto-ok/auto-ok-fixture'
-import { AUTO_OK_LABEL, EPIC_LABEL } from '#scripts/git/issue-labels'
 import type { OpenIssueData } from '#scripts/git/schemas'
+import { AUTO_OK_LABEL, EPIC_LABEL } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import { epic_index } from './epic-index'
 

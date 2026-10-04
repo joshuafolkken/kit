@@ -6,6 +6,7 @@
 // not by prose. Single source: `prompts/collaboration-workflow/residency.md` → question 0.
 //
 // Anything not on this list is answered by prose or by a hook-delivered rule, never by a command.
+import { RUN_ENTRY_ORACLE } from './decision-oracle-stage'
 
 // Paths that appear in more than one entry's `single_source` field.
 const CHAIN_RULE_MD = '.claude/skills/workflow-commands/chain-rule.md'
@@ -22,11 +23,11 @@ const BACKLOGRUN_MD = '.claude/skills/workflow-commands/backlogrun.md'
 // now has its verdict contract only in this reference. That makes it the single source and the section
 // a reader is routed to, in the same `file.md → \`josh <command>\`` form the `epic:reconcile` and
 // `lane:list` entries already use. joshuafolkken/kit#2254.
-const RUN_MERGE_REFERENCE = 'docs/josh-commands.md → `josh run:merge`'
-const EPIC_NEXT_REFERENCE = 'docs/josh-commands.md → `josh epic:next`'
-const BACKLOG_BUDGET_REFERENCE = 'docs/josh-commands.md → `josh backlog:budget`'
-const RUN_LIVENESS_REFERENCE = 'docs/josh-commands.md → `josh run:liveness`'
-const AUTO_OK_NEXT_REFERENCE = 'docs/josh-commands.md → `josh auto-ok:next`'
+const RUN_MERGE_REFERENCE = 'docs/josh-commands-automation.md → `josh run:merge`'
+const EPIC_NEXT_REFERENCE = 'docs/josh-commands-automation.md → `josh epic:next`'
+const BACKLOG_BUDGET_REFERENCE = 'docs/josh-commands-automation.md → `josh backlog:budget`'
+const RUN_LIVENESS_REFERENCE = 'docs/josh-commands-automation.md → `josh run:liveness`'
+const AUTO_OK_NEXT_REFERENCE = 'docs/josh-commands-automation.md → `josh auto-ok:next`'
 
 // Command used by two separate oracle entries (run:cut:resume and run:cut:gate).
 const RUN_CUT_CMD = 'run:cut'
@@ -311,7 +312,7 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 			"Whether an epic's declaration matches its recorded relations, and the repair when it does not",
 		args: '--reconcile <E>',
 		vocabulary: [RECONCILED, NOTHING_TO_RECONCILE],
-		single_source: 'docs/josh-commands.md → `josh epic --reconcile`',
+		single_source: 'docs/josh-commands-automation.md → `josh epic --reconcile`',
 	},
 	{
 		name: 'lane:list',
@@ -319,8 +320,9 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 			'Whether each in-progress issue holds a live lane, and the two-directional difference',
 		args: '',
 		vocabulary: [LIVE, STOPPED, UNKNOWN],
-		single_source: 'docs/josh-commands.md → The `in-progress` / lane difference',
+		single_source: 'docs/josh-commands-automation.md → The `in-progress` / lane difference',
 	},
+	RUN_ENTRY_ORACLE,
 ]
 
 // Returns the command name for an oracle entry. When `command` is omitted from the entry,
@@ -339,4 +341,5 @@ const decision_oracle = {
 	get_command,
 }
 
+export type { DecisionOracle }
 export { decision_oracle }

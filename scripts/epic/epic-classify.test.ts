@@ -3,7 +3,7 @@ import {
 	EPIC_LABEL,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
-} from '#scripts/git/issue-labels'
+} from '#scripts/issue/issue-labels'
 import { describe, expect, it, vi } from 'vitest'
 import { epic_classify, type DependencyVerdict } from './epic-classify'
 import type { EpicChild, IssueReference } from './epic-graph'

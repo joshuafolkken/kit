@@ -1,7 +1,7 @@
 import { repo_map_logic } from '#scripts/discovery/repo-map-logic'
 import { repo_origin } from '#scripts/discovery/repo-origin'
-import { git_gh_api_path } from '#scripts/git/git-gh-api-path'
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
+import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { propagate_publish } from '#scripts/propagate/propagate-publish'
 import { derive_versions_endpoint } from '#scripts/version/version-command-config'
 import { load } from 'js-yaml'
@@ -336,11 +336,9 @@ function is_same_owner_repo(repo: string, current_owner: string): boolean {
 
 const epic_cross_repo = {
 	publishes_nothing,
-	read_manifest,
 	read_default_branch_version,
 	reset_publish_cache,
 	package_name_for,
-	is_published,
 	resolve_cross_repo,
 	owner_of,
 	is_same_owner_repo,

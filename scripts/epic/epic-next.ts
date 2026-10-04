@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
@@ -441,27 +441,18 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const epic_next = {
-	USAGE,
 	EXTERNAL_NOTICE,
 	FOREIGN_EPIC,
-	body_anomaly,
-	unreadable_anomaly,
 	is_order_declared,
 	repo_verdict,
-	offer_children,
-	report_offer,
 	UNCHECKED_EXCLUSION,
 	split_at_flag,
-	parse_references,
 	parse_options,
-	note_external,
 	refuse_reads,
 	views_of,
 	run_epics,
 	decide,
 	report,
-	run,
-	main,
 }
 
 // `.env` is read here rather than through the dispatcher's `tsx_arguments`: declaring any would

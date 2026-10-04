@@ -1,11 +1,11 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { EPIC_LABEL } from '#scripts/git/issue-labels'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { cutoff_cause, cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import {
 	parse_json_array_or_undefined,
 	parse_json_object_safe,
 } from '#scripts/git/parse-json-array'
 import { epic_child_schema, epic_issue_schema, type EpicChildData } from '#scripts/git/schemas'
+import { EPIC_LABEL } from '#scripts/issue/issue-labels'
 import { error_text } from '#scripts/lib/error-message'
 import { epic_close_comment } from './epic-close-comment'
 import { epic_parse, type ExternalChild } from './epic-parse'
@@ -296,6 +296,7 @@ async function close_parents_of(
 	const closed: Array<number> = []
 
 	for (const epic of parents_of(open_epics, child_number)) {
+		// eslint-disable-next-line no-await-in-loop -- each close updates the evaluated set the next one reads
 		const number = await close_if_unseen(epic, child_number, evaluated)
 		if (number !== undefined) closed.push(number)
 	}
@@ -311,6 +312,7 @@ async function close_next_level(
 	const next: Array<number> = []
 
 	for (const child_number of frontier) {
+		// eslint-disable-next-line no-await-in-loop -- each close updates the evaluated set the next one reads
 		next.push(...(await close_parents_of(open_epics, child_number, evaluated)))
 	}
 
@@ -328,6 +330,7 @@ async function cascade_close(
 
 	for (let depth = 0; depth < MAX_CASCADE_DEPTH; depth++) {
 		if (frontier.length === 0) return
+		// eslint-disable-next-line no-await-in-loop -- the cascade closes one level before reading the next
 		frontier = await close_next_level(open_epics, frontier, evaluated)
 	}
 

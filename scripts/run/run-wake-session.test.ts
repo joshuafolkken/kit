@@ -131,6 +131,7 @@ async function logged_text(): Promise<string> {
 
 		if (text.includes(MARKER)) return text
 
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await settle()
 	}
 

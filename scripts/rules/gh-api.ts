@@ -40,8 +40,13 @@ function is_gh_api(segment: string): boolean {
 }
 
 // A read is a `GET` — explicit via a method flag, or implicit when no field flag makes it a POST.
+// The explicit `-X` / `--method` value, upper-cased, or `undefined` when the call names none.
+function method_of(segment: string): string | undefined {
+	return API_METHOD.exec(segment)?.[1]?.toUpperCase()
+}
+
 function is_read(segment: string): boolean {
-	const method = API_METHOD.exec(segment)?.[1]
+	const method = method_of(segment)
 
 	if (method !== undefined) return method.toUpperCase() === READ_METHOD
 
@@ -60,6 +65,6 @@ function repo_target(segment: string): RepoTarget | undefined {
 	return { owner: match[OWNER_GROUP] ?? '', repo: match[REPO_GROUP] ?? '' }
 }
 
-const gh_api = { GH_API_COMMAND, GH_FLAGS, is_gh_api, is_read, is_write, repo_target }
+const gh_api = { GH_FLAGS, is_gh_api, is_read, is_write, method_of, repo_target }
 
 export { gh_api }

@@ -19,7 +19,10 @@ bullets. Use the file option whenever it contains a command or path.
 
 It waits for required CI, checks CodeRabbit and top-level AI review comments, sends the completion
 Telegram, merges by default, posts the Issue report, closes completed epics, removes `in-progress`,
-and releases the hold. Only `--no-merge` stops the merge; `--merge` is a deprecated no-op. Keep the
+and releases the hold. Only `--no-merge` stops the merge; `--merge` is a deprecated no-op. **A pull
+request already merged by hand** (a `prrun` stop, joshuafolkken/kit#3023) skips the CI wait, the AI
+review scan and the merge and runs only the post-merge tail; a completion report already on the Issue
+is not posted or notified twice, so re-running is safe. Keep the
 default Issue target. Ignore a finding only after verifying it is inapplicable; rate-limit text is not
 a finding.
 
@@ -174,8 +177,9 @@ pnpm josh ms
   Review findings before merging. If blockers are found, it sends a `confirmation` Telegram and exits
   non-zero — fix the findings and re-run. **Green CI is not authorization to merge while AI review
   findings are open.** (SonarCloud findings are not scanned by `followup`; the `sonar-qube.yml` CI
-  workflow runs the scan with `sonar.qualitygate.wait=true`, so a red Quality Gate fails the required
-  `SonarQube` check, which `followup` waits on.)
+  workflow runs the scan with `sonar.qualitygate.wait=true` and then `josh sonar:new-code`, so a red
+  Quality Gate or a single new Sonar issue or duplicated block fails the required `SonarQube` check,
+  which `followup` waits on.)
 - **CodeRabbit rate-limit is not a finding.** If the only CodeRabbit comment is a rate-limit warning
   (`rate limited by coderabbit.ai` or `Rate limit exceeded`) and there is no substantive review, treat
   it as "no findings" and proceed. Same if CodeRabbit produced no comment on the latest commit.

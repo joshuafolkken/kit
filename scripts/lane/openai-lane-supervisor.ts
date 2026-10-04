@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { agent_argv } from '#scripts/agent/agent-argv'
 import type { AgentProfile } from '#scripts/agent/agent-role-profile'
 import { process_identity } from '#scripts/josh/process-identity'
+import { process_owner_schema } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { run_cut, type RunCut } from '#scripts/run/run-cut'
@@ -22,11 +23,12 @@ const CHILD_POLL_MS = 250
 const CLAIM_POLL_MS = 50
 const CLAIM_POLL_LIMIT = 40
 const SUPERVISOR_SCRIPT = fileURLToPath(new URL('openai-lane-supervisor-cli.ts', import.meta.url))
-const owner_schema = z.object({
+// The shared owner pair, with the pid narrowed: this record is written only by a live supervisor, so a
+// pid that is not a real one marks it as corrupt rather than as a dead owner.
+const owner_schema = process_owner_schema.extend({
 	issue: z.string(),
 	nonce: z.string(),
 	pid: z.number().int().positive(),
-	process_start: z.string().optional(),
 })
 const state_schema = z.object({
 	owner_nonce: z.string(),
@@ -81,6 +83,7 @@ async function wait_for_active(lane_directory: string): Promise<SupervisorOwner 
 	for (let attempt = 0; attempt < CLAIM_POLL_LIMIT; attempt += 1) {
 		const owner = active(lane_directory)
 		if (owner !== undefined) return owner
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await new Promise((resolve) => setTimeout(resolve, CLAIM_POLL_MS))
 	}
 
@@ -298,6 +301,7 @@ async function wait_for_inherited_child(
 	child_process_start: string | undefined,
 ): Promise<void> {
 	while (process_identity.is_same_process(child_pid, child_process_start) !== false) {
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await new Promise((resolve) => setTimeout(resolve, CHILD_POLL_MS))
 	}
 }
@@ -350,10 +354,8 @@ const openai_lane_supervisor = {
 	approve: openai_lane_supervisor_decision.approve,
 	cancel: openai_lane_supervisor_decision.cancel,
 	claim,
-	decision_path: openai_lane_supervisor_decision.target,
 	marker_path,
 	new_nonce: randomUUID,
-	read,
 	release,
 	state_path,
 	supervise,

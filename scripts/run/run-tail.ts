@@ -9,6 +9,7 @@
 // each step's output under a header and answers the exit code from the collected codes, so a test pins
 // the composite without a ledger ever being committed or a release ever read.
 
+const SYNC_HEADER = '=== sync ==='
 const OBSERVATIONS_HEADER = '=== observations ==='
 const CITATIONS_HEADER = '=== citations ==='
 const RELEASE_HEADER = '=== release ==='
@@ -52,6 +53,7 @@ const run_tail = {
 	CITATIONS_HEADER,
 	OBSERVATIONS_HEADER,
 	RELEASE_HEADER,
+	SYNC_HEADER,
 	exit_code,
 	format_report,
 	section_body,

@@ -21,7 +21,7 @@ single sources). Step 2 — the `in-progress` label — stays its own call, appl
 call reports `hold`.
 
 1. **Claim the working tree — first, before anything else.** For `fullrun #N`, first run the folded
-   `pnpm josh run:entry <N>` above; it calls `run:hold` as its first step. For `fullrun new`, call
+   `pnpm josh run:entry <N>` above (no `--to` is `fullrun`, §2k); it calls `run:hold` as its first step. For `fullrun new`, call
    bare `pnpm josh run:hold`, ahead of the title and filing. `hold` continues; `busy` / `unknown` stop
    with a `confirmation` Telegram carrying stderr.
    `working-tree-hold.md` is the single source; a cross-repository target resolves its checkout from
@@ -63,7 +63,8 @@ call reports `hold`.
   boundary — immediately after `pnpm josh main:merge`, before the gate — it takes the cut with
   `pnpm josh run:cut <N>` (the ordered step in `chain-rule.md`), and it records any park on the Issue before the stop notify.
   `pre-gate-cut.md` is the single source of both.
-- **`resume: halfrun`** adopted a stopped `halfrun` (#2796): gate in full; `working-tree-hold.md`.
+- **`resume: halfrun`** adopted a stopped `halfrun` (#2796): gate in full; `resume: prrun-*` a stopped
+  `prrun` (#3023); `working-tree-hold.md`.
 
 ## The stop branches
 

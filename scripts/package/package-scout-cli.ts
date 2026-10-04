@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { timed_fetch } from '#scripts/lib/timed-fetch'
 import { z } from 'zod'
 import {
 	package_scout,
@@ -23,7 +24,6 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const DEFAULT_SIZE = 10
-const FETCH_TIMEOUT_MS = 10_000
 const REGISTRY = 'https://registry.npmjs.org'
 const DOWNLOADS_API = 'https://api.npmjs.org/downloads/point/last-week'
 const USAGE = 'Usage: josh pkg:scout <keywords> [--size <n>]'
@@ -51,7 +51,7 @@ type Latest = z.infer<typeof latest_schema>
 
 async function fetch_json<T>(url: string, schema: z.ZodType<T>): Promise<T | undefined> {
 	try {
-		const response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
+		const response = await timed_fetch(url)
 		if (!response.ok) return undefined
 
 		return schema.parse(await response.json())
@@ -172,14 +172,9 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 const package_scout_cli = {
 	USAGE,
-	SEARCH_FAILED_MESSAGE,
 	DEFAULT_SIZE,
 	read_arguments,
-	facts_of,
-	license_of,
-	to_candidate,
 	run,
-	main,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))

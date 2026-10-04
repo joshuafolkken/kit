@@ -257,7 +257,7 @@ interface LineTiming {
  * this is that same move for one value.
  *
  * **It is a schedule rather than an observation, and the two conditions on it are said in prose**
- * (`docs/josh-commands.md` → `josh run:progress`): it holds only while the silence continues, and a
+ * (`docs/josh-commands-automation.md` → `josh run:progress`): it holds only while the silence continues, and a
  * real report arriving first restarts the clock through `--mark` and supersedes it. The line printing
  * it is itself a report, so the clock starts at this observation.
  */
@@ -367,7 +367,6 @@ const run_progress = {
 	format_line,
 	format_next_line,
 	format_next_report,
-	format_record,
 	format_report,
 	is_due,
 	minutes_from,

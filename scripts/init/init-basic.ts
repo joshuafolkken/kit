@@ -1,14 +1,11 @@
 import { json_format } from '#scripts/config-merge/json-format'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { init_logic } from './init-logic'
 import type { ProjectShape } from './project-profile'
 
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
 const record_schema = z.record(z.string(), z.unknown())
-
-function is_record(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 interface BasicVersions {
 	kit: string
@@ -23,7 +20,7 @@ function with_recorded_profile(content: string, profile: ProjectShape['profile']
 	const parsed: unknown = JSON.parse(content)
 	const manifest = record_schema.parse(parsed)
 	const existing = manifest['josh']
-	const josh = is_record(existing) ? existing : {}
+	const josh = json_value.is_record(existing) ? existing : {}
 
 	manifest['josh'] = { ...josh, profile }
 

@@ -1,8 +1,8 @@
 import { agent_argv, type AgentArgv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
-import { telegram_notify } from '#scripts/git/telegram-notify'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
+import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_ending } from '#scripts/run/run-ending'
 import { run_event_stream } from '#scripts/run/run-event-stream'
@@ -444,7 +444,6 @@ async function warn_of_problem(outcome: DispatchOutcome, issue: string): Promise
 }
 
 const lane_dispatch = {
-	CHILD_INVOCATION: lane_child_invocation.CHILD_INVOCATION,
 	child_invocation,
 	default_log_path,
 	describe,

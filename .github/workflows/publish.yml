@@ -7,6 +7,10 @@ run-name: Publish ${{ github.ref_name }}
 on:
   workflow_dispatch:
 
+# Every job installs through `.github/actions/setup-pnpm`, so the jobs holding the publish rights
+# install behind the same hash-verified safe-chain scan as CI (joshuafolkken/kit#2982). The store
+# cache is off here: a cache entry another run saved never reaches a job with publish credentials.
+
 jobs:
   publish-github:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -27,29 +31,28 @@ jobs:
           registry-url: 'https://npm.pkg.github.com'
           scope: '@joshuafolkken'
 
-      - name: Resolve pnpm version
-        id: pnpm-version
+      # Read before setup-pnpm puts the safe-chain shims on PATH: safe-chain hides recent versions from
+      # registry metadata and prints a notice to stdout, which corrupts the value (joshuafolkken/kit#3060).
+      - name: Read registry latest
+        id: registry-latest
         run: |
-          version=$(node -p "const m = require('./package.json'); m.packageManager?.match(/^pnpm@([^+]+)/)?.[1] ?? (m.devEngines?.packageManager?.name === 'pnpm' ? m.devEngines.packageManager.version?.split('+')[0] : 'latest') ?? 'latest'")
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          latest=$(cd "$RUNNER_TEMP" && npm view @joshuafolkken/kit dist-tags.latest --registry https://npm.pkg.github.com)
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+      - uses: ./.github/actions/setup-pnpm
         with:
-          version: ${{ steps.pnpm-version.outputs.version }}
-          install: false
-
-      - run: pnpm install --frozen-lockfile --ignore-scripts
+          cache: 'false'
 
       - name: Select GitHub Packages tag
         id: publish-tag
         run: |
           version=$(node -p "require('./package.json').version")
-          latest=$(cd "$RUNNER_TEMP" && npm view @joshuafolkken/kit dist-tags.latest --registry https://npm.pkg.github.com)
-          tag=$(pnpm exec tsx scripts/release/publish-tag-cli.ts "$version" "$latest")
+          tag=$(pnpm exec tsx scripts/release/publish-tag-cli.ts "$version" "$LATEST")
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LATEST: ${{ steps.registry-latest.outputs.latest }}
 
       - run: pnpm publish --no-git-checks --tag ${{ steps.publish-tag.outputs.tag }} --registry https://npm.pkg.github.com
         env:
@@ -73,19 +76,16 @@ jobs:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Resolve pnpm version
-        id: pnpm-version
+      # Before setup-pnpm, for the same reason as publish-github's lookup (joshuafolkken/kit#3060).
+      - name: Read registry latest
+        id: registry-latest
         run: |
-          version=$(node -p "const m = require('./package.json'); m.packageManager?.match(/^pnpm@([^+]+)/)?.[1] ?? (m.devEngines?.packageManager?.name === 'pnpm' ? m.devEngines.packageManager.version?.split('+')[0] : 'latest') ?? 'latest'")
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          latest=$(cd "$RUNNER_TEMP" && npm view @joshuafolkken/kit dist-tags.latest --registry https://registry.npmjs.org)
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
 
-      - uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+      - uses: ./.github/actions/setup-pnpm
         with:
-          version: ${{ steps.pnpm-version.outputs.version }}
-          install: false
-
-      - run: pnpm install --frozen-lockfile --ignore-scripts
+          cache: 'false'
 
       - run: pnpm pack --out "$RUNNER_TEMP/kit.tgz"
 
@@ -93,9 +93,10 @@ jobs:
         id: publish-tag
         run: |
           version=$(node -p "require('./package.json').version")
-          latest=$(cd "$RUNNER_TEMP" && npm view @joshuafolkken/kit dist-tags.latest --registry https://registry.npmjs.org)
-          tag=$(pnpm exec tsx scripts/release/publish-tag-cli.ts "$version" "$latest")
+          tag=$(pnpm exec tsx scripts/release/publish-tag-cli.ts "$version" "$LATEST")
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        env:
+          LATEST: ${{ steps.registry-latest.outputs.latest }}
 
       - name: Publish to npm
         run: cd "$RUNNER_TEMP" && npm publish kit.tgz --access public --tag ${{ steps.publish-tag.outputs.tag }} --registry https://registry.npmjs.org --userconfig /dev/null
@@ -124,22 +125,16 @@ jobs:
         with:
           node-version: 24
 
-      - name: Resolve pnpm version
-        id: pnpm-version
-        run: |
-          version=$(node -p "const m = require('./package.json'); m.packageManager?.match(/^pnpm@([^+]+)/)?.[1] ?? (m.devEngines?.packageManager?.name === 'pnpm' ? m.devEngines.packageManager.version?.split('+')[0] : 'latest') ?? 'latest'")
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+      - uses: ./.github/actions/setup-pnpm
         with:
-          version: ${{ steps.pnpm-version.outputs.version }}
-          install: false
+          cache: 'false'
 
-      - run: pnpm install --frozen-lockfile --ignore-scripts
-
+      # Tags through v1.887.0 predate automatic GitHub Releases and must not block the first new one.
       - name: Publish GitHub Release
-        run: pnpm exec tsx scripts/release/github-release-cli.ts
+        run: pnpm josh release:github
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_START_TAG: v1.887.0
+          RELEASE_WORKFLOW: publish.yml
+          RELEASE_JOBS: publish-github,publish-npm,update-production

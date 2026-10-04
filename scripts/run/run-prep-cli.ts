@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { git_stash } from '#scripts/git/git-stash'
+import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_read_cli, type BlockRead } from '#scripts/issue/issue-read-cli'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
@@ -150,7 +150,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 // `gather` and `to_parts` are exported so `run:next` reads the same state from the same three reads
 // rather than growing a second copy of the gather (joshuafolkken/kit#2188) — `run:next` is the
 // consumer of `run:prep` the epic #2166 wanted.
-const run_prep_cli = { USAGE, gather, main, parse_number, run, to_parts }
+const run_prep_cli = { gather, parse_number, run, to_parts }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

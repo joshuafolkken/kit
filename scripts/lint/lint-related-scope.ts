@@ -116,7 +116,6 @@ function eslint_arguments(files: ReadonlyArray<string>): ReadonlyArray<string> {
 
 const lint_related_scope = {
 	COMMAND_LABEL,
-	COMMAND_NAME,
 	NOTHING_LINTABLE_REASON,
 	describe_scope,
 	eslint_arguments,

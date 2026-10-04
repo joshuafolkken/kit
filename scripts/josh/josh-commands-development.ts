@@ -46,7 +46,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'automation', ['processes']],
 	},
 	bytes: {
-		script: 'scripts/bytes/bytes-command.ts',
+		script: 'scripts/lines/bytes-command.ts',
 		description:
 			"Print an agent-read document's byte size against its ceiling and the headroom left",
 		category: 'Development',
@@ -127,6 +127,13 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			"Check the current run's recorded transcript against the behavior assertions (no model call)",
 		category: 'Development',
 		reference: ['', 'developer', ['files']],
+	},
+	'exports:unused': {
+		script: 'scripts/exports/unused-members-cli.ts',
+		description:
+			'Report exported namespace members nothing reads (kit only; a consumer project skips it)',
+		category: 'Development',
+		reference: ['', 'developer', ['none']],
 	},
 	'test:unit': {
 		script: 'scripts/test/test-unit-guard.ts',

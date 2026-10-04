@@ -21,6 +21,13 @@ interface ReadyPorts {
 	ready_issues: () => Promise<ReadonlyArray<string>>
 }
 
+async function free_under(limit: number): Promise<number> {
+	const lanes = await lane_registry.list_lanes()
+	const live = lanes.filter((lane) => !lane.is_stranded).length
+
+	return lane_capacity.free_lanes(limit, live)
+}
+
 // Free lanes right now: the limit less the live lanes. An unreadable limit reads as no free lane — the
 // safe direction, since both the stall and the ready line need a free lane and reporting one that is
 // not there is the false positive neither may raise.
@@ -35,10 +42,18 @@ async function free_lane_count(): Promise<number> {
 
 	if (limit.kind !== 'limit') return NO_FREE
 
-	const lanes = await lane_registry.list_lanes()
-	const live = lanes.filter((lane) => !lane.is_stranded).length
+	return await free_under(limit.limit)
+}
 
-	return lane_capacity.free_lanes(limit.limit, live)
+// **The drive's count throws on an unreadable limit** (joshuafolkken/kit#3027). The drive launches no
+// more than this count, so the safe-direction zero above would leave it launching nothing and reporting
+// nothing for good; a bad setting is the hard error `lane_capacity` says it is, ending the drive loudly.
+async function drive_free_lane_count(): Promise<number> {
+	const limit = lane_capacity.lane_limit()
+
+	if (limit.kind !== 'limit') throw new Error(limit.problem)
+
+	return await free_under(limit.limit)
 }
 
 // **A `--only` run has no pool to drain** (joshuafolkken/kit#2472). `backlog:next` lists the opted-in
@@ -135,6 +150,7 @@ const backlog_ready = {
 	read_backlog_next,
 	print_offer_hint,
 	free_lane_count,
+	drive_free_lane_count,
 	drains_pool,
 	print_ready_line,
 	read_ready,

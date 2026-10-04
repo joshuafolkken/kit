@@ -1,6 +1,8 @@
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
+import type { RequiredChecksReport } from '#scripts/repo/required-checks-report'
+import { ruleset_check } from '#scripts/repo/ruleset-check'
 import { security_updates } from '#scripts/security/security-updates'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { doctor } from './doctor'
@@ -19,6 +21,13 @@ const OUTSIDE: GitTopLevel = { state: 'outside' }
 const UNDETERMINED: GitTopLevel = { state: 'undetermined' }
 const DISCOVER = 'discover_repositories'
 const APP_KIT_KEY = 'joshuafolkken/app-kit'
+const UNREADABLE_CHECKS: RequiredChecksReport = {
+	repo: REPO,
+	branch: undefined,
+	source: { kind: 'unreadable' },
+	expected: [],
+	missing: [],
+}
 
 // The IO the report reads from, all stubbed: `doctor` otherwise spawns `which`, `pnpm bin -g` and
 // `git` from the unit suite, and scans the real parent directory of the checkout it runs in.
@@ -45,6 +54,11 @@ beforeEach(() => {
 	// Stubbed rather than left to call through: a regression of a gate would otherwise spawn a live
 	// `gh api` from the unit suite instead of failing cleanly.
 	vi.spyOn(auto_merge_setting, 'report_auto_merge_section').mockReturnValue('enabled')
+	// The same reason, for the required-checks report (joshuafolkken/kit#3012). Its gate reads the
+	// workflows on disk, and the undetermined case falls back to this very checkout, which has them —
+	// so the gate is stubbed shut and the cases that care about it open it.
+	vi.spyOn(ruleset_check, 'expected_in').mockReturnValue([])
+	vi.spyOn(ruleset_check, 'report_required_checks_section').mockReturnValue(UNREADABLE_CHECKS)
 	// The same reason, for the other report — and here it was not a hypothetical regression: the four
 	// cases that drive `doctor.main()` without naming this report spawned a live
 	// `gh api …/automated-security-fixes` on every run (joshuafolkken/kit#1353). A case that asserts
@@ -247,6 +261,30 @@ describe('josh doctor — repository auto-merge setting', () => {
 
 		expect(security).not.toHaveBeenCalled()
 		expect(report).toHaveBeenCalledTimes(1)
+	})
+})
+
+// joshuafolkken/kit#3012: a distributed workflow's check does nothing until the default branch
+// requires it, so `doctor` reports the gap — only where one of those workflows exists, and at the
+// repository root the gate read them from.
+describe('josh doctor — required status checks', () => {
+	it('reports the required checks of the repository root when a distributed workflow is present', () => {
+		vi.spyOn(doctor_io, 'has_distributed_dependabot_config').mockReturnValue(false)
+		vi.spyOn(ruleset_check, 'expected_in').mockReturnValue(['Checks'])
+		const report = vi.spyOn(ruleset_check, 'report_required_checks_section')
+
+		doctor.main()
+
+		expect(report).toHaveBeenCalledWith(REPO, TOP_LEVEL)
+	})
+
+	it('skips the report when no distributed workflow is present', () => {
+		const report = vi.spyOn(ruleset_check, 'report_required_checks_section')
+
+		vi.spyOn(security_updates, 'report_security_updates_section').mockReturnValue('enabled')
+		doctor.main()
+
+		expect(report).not.toHaveBeenCalled()
 	})
 })
 

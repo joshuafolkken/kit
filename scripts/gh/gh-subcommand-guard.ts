@@ -119,8 +119,8 @@ const SCRIPT_TAG = '$'
 // caller cannot word it differently.
 const GUIDANCE = [
 	'Replace it with a REST request — `git_gh_exec.exec_gh_api` (or `exec_gh_api_sync` where the',
-	'caller cannot await), through the helpers in `scripts/git/git-gh-issue-*.ts` and',
-	'`scripts/git/git-gh-pr-*.ts`. If it genuinely is not an API call, add it to ALLOWED_SPAWNS in',
+	'caller cannot await), through the helpers in `scripts/gh/git-gh-issue-*.ts` and',
+	'`scripts/gh/git-gh-pr-*.ts`. If it genuinely is not an API call, add it to ALLOWED_SPAWNS in',
 	'`scripts/gh/gh-subcommand-guard.ts` together with the reason it is allowed.',
 ].join(' ')
 
@@ -140,13 +140,13 @@ const ALLOWED_SPAWNS: ReadonlyArray<AllowedSpawn> = [
 			'`gh auth token` prints the credential the local CLI already holds. It contacts no GitHub endpoint, so there is no REST request it could be expressed as.',
 	},
 	{
-		file: 'scripts/git/git-gh-check.ts',
+		file: 'scripts/gh/git-gh-check.ts',
 		subcommand: '--version',
 		reason:
 			'`gh --version` is the probe that decides whether the CLI is installed at all. It runs before every API call and contacts nothing.',
 	},
 	{
-		file: 'scripts/git/git-gh-exec.ts',
+		file: 'scripts/gh/git-gh-exec.ts',
 		subcommand: DYNAMIC_SUBCOMMAND,
 		reason:
 			'This file is the REST layer. Its spawns forward the argument list `to_gh_api_args` built, and that builder puts `api` first unconditionally — pinned by `git-gh-exec.test.ts` and `git-gh-exec-sync.test.ts` rather than by reading the call site.',

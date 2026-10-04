@@ -2,6 +2,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
+import { bash_output_cap_reader } from '#scripts/document/bash-output-cap'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
@@ -16,6 +17,8 @@ import { run_ship_review } from '#scripts/run/run-ship-review'
 import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
+import type { DiffParts } from './review-diff-parts'
+import { review_diff_write } from './review-diff-write'
 import { review_level, type ReviewLevel } from './review-level'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
@@ -197,8 +200,26 @@ interface ComposeRequest {
 	profile: AgentProfile
 }
 
+// **Swallowed, and the brief keeps its target line** (joshuafolkken/kit#2963): parts that could not be
+// written leave the reviewer the whole `git diff` to read, which costs truncated output rather than
+// scope — the direction every failure here falls.
+async function read_diff(
+	root: string,
+	base: string,
+	paths: ReadonlyArray<string>,
+): Promise<{ parts: DiffParts; cap: number } | undefined> {
+	const cap = bash_output_cap_reader.bash_output_cap(root)
+
+	try {
+		return { parts: await review_diff_write.write_parts({ root, base, paths, cap }), cap }
+	} catch {
+		return undefined
+	}
+}
+
 async function compose_brief(request: ComposeRequest): Promise<string> {
 	const { round, paths, tree, base, profile } = request
+	const contract = await open_contract()
 	const stamps = {
 		gate: review_stamps.gate_stamp.read(),
 		in_flight: review_stamps.in_flight_stamp.read(),
@@ -218,7 +239,8 @@ async function compose_brief(request: ComposeRequest): Promise<string> {
 		// the map is stored against is the same one the brief printed (joshuafolkken/kit#1537).
 		base,
 		rubric_path: RUBRIC_PATH,
-		...(await open_contract()),
+		...contract,
+		diff: await read_diff(contract.checkout.root, base, paths),
 	})
 }
 
@@ -321,15 +343,10 @@ const review_brief_cli = {
 	FIRST_ROUND,
 	format_reason,
 	KEPT_NOTE_PREFIX,
-	kept_note,
-	LEVEL_ONLY_FLAG,
-	main,
 	parse_round,
 	record_round_one,
 	report_error,
 	run,
-	run_level,
-	USAGE,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))

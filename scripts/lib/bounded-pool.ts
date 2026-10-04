@@ -70,6 +70,7 @@ async function drain<Item, Result>(
 		const [index, item] = entry
 
 		try {
+			// eslint-disable-next-line no-await-in-loop -- one consumer runs one task at a time; the pool's width is the concurrency
 			pool.results.push({ index, value: await worker(item, index) })
 		} catch (error) {
 			pool.failures.push(error)

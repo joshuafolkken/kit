@@ -11,7 +11,7 @@ import { delivered_rules } from './delivered-rules'
 // precaution, and a precaution is the first thing dropped when the enumeration is next trimmed.
 const TOPIC_FILE = '.claude/skills/workflow-commands/pre-gate-cut.md'
 const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
-const COMMANDS_DOCUMENT = 'docs/josh-commands.md'
+const COMMANDS_DOCUMENT = 'docs/josh-commands-automation.md'
 const FIRING_SUITE = 'scripts/rules/pre-gate-cut.test.ts'
 // Named once: the enumeration, the topic file and the command reference have to agree on both
 // commands, and a string kept correct in one of three places is not kept.

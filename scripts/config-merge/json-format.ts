@@ -120,7 +120,6 @@ function format_package_json(value: unknown): string {
 }
 
 const json_format = {
-	inline_short_arrays,
 	format_json,
 	format_package_json,
 }

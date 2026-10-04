@@ -118,10 +118,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const run_review_cli = {
-	JOIN_FLAG,
-	USAGE,
 	join_exit_code,
-	main,
 	run,
 }
 

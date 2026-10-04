@@ -10,6 +10,11 @@ const LOCKFILE_PATH = 'pnpm-lock.yaml'
 const PUBLIC_HOST = 'registry.npmjs.org'
 const RESTORED = 'original settings restored'
 const LOCKFILE = `lockfileVersion: '9.0'\npackages:\n  '@joshuafolkken/kit@1.2.3':\n    resolution:\n      integrity: sha512-example\n      tarball: https://npm.pkg.github.com/download/@joshuafolkken/kit/1.2.3/example\n`
+const KIT_PACKAGE = '@joshuafolkken/kit'
+const FIRST_VERSION = '1.2.3'
+const SECOND_VERSION = '2.0.0'
+const SLOW_PROBE_MS = 20
+const TWO_VERSION_LOCKFILE = `${LOCKFILE}  '${KIT_PACKAGE}@${SECOND_VERSION}':\n    resolution:\n      integrity: sha512-second\n`
 const ROOTS: Array<string> = []
 
 function fixture(): string {
@@ -83,7 +88,32 @@ describe('registry migration refusals', () => {
 		expect(readFileSync(path.join(root, NPMRC_PATH), 'utf8')).toBe(GH)
 		expect(readFileSync(path.join(root, LOCKFILE_PATH), 'utf8')).toBe(LOCKFILE)
 	})
+})
 
+// The first version's probe answers after the second's, so a sequential report order would be lost.
+async function probe_first_version_last(_name: string, version: string): Promise<undefined> {
+	if (version === FIRST_VERSION) await new Promise((resolve) => setTimeout(resolve, SLOW_PROBE_MS))
+
+	return undefined
+}
+
+// joshuafolkken/kit#3047: the version probes run together, and the report keeps lockfile order.
+describe('registry migration concurrent version probes', () => {
+	it('lists unpublished versions in lockfile order when the first probe answers last', async () => {
+		const root = fixture()
+		const adapters = dependencies()
+
+		writeFileSync(path.join(root, LOCKFILE_PATH), TWO_VERSION_LOCKFILE)
+		adapters.fetch_version = vi.fn().mockImplementation(probe_first_version_last)
+
+		expect(await registry_migration.migrate(root, adapters)).toContain(
+			`unpublished on npm: ${KIT_PACKAGE}@${FIRST_VERSION}, ${KIT_PACKAGE}@${SECOND_VERSION}.`,
+		)
+		expect(adapters.fetch_version).toHaveBeenCalledTimes(2)
+	})
+})
+
+describe('registry migration environment refusals', () => {
 	it('blocks an environment registry override', async () => {
 		const root = fixture()
 		const adapters = dependencies()

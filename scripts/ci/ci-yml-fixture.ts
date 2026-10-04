@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { package_path } from '#scripts/init/init-paths'
-import { yaml_config_fixture } from '#scripts/yaml/yaml-config-fixture'
+import { yaml_config_fixture } from '#scripts/lib/yaml-config-fixture'
 
 // GitHub spells some workflow keys in kebab-case. They are declared verbatim — with the naming
 // rule disabled on the line, as elsewhere for external field names — rather than reached through
@@ -45,10 +45,18 @@ interface Workflow {
 	jobs: Record<string, WorkflowJob>
 }
 
+interface CompositeAction {
+	runs: { using: string; steps: ReadonlyArray<WorkflowStep> }
+}
+
 // The template is the artifact `josh sync` distributes to consumers; the .github/ copy is
 // kit's own runtime workflow and the source every action pin is resolved from.
 const TEMPLATE_CI_YML = 'templates/workflows/ci.yml'
 const RUNTIME_CI_YML = '.github/workflows/ci.yml'
+// The composite action every kit workflow prepares pnpm through, and the `uses:` that calls it
+// (joshuafolkken/kit#2982).
+const SETUP_PNPM_ACTION = '.github/actions/setup-pnpm/action.yml'
+const SETUP_PNPM_USES = './.github/actions/setup-pnpm'
 
 // Resolved from the package root rather than process.cwd() so a test keeps reading the
 // workflow it names no matter which directory the runner was started in.
@@ -58,6 +66,10 @@ function read_workflow(relative_path: string): string {
 
 function load_workflow(relative_path: string): Workflow {
 	return yaml_config_fixture.load_yaml_config(relative_path) as Workflow
+}
+
+function load_action(relative_path: string): CompositeAction {
+	return yaml_config_fixture.load_yaml_config(relative_path) as CompositeAction
 }
 
 function find_job(relative_path: string, job_name: string): WorkflowJob | undefined {
@@ -156,6 +168,8 @@ function e2e_log_directory(job: WorkflowJob | undefined): string {
 const ci_yml_fixture = {
 	TEMPLATE_CI_YML,
 	RUNTIME_CI_YML,
+	SETUP_PNPM_ACTION,
+	SETUP_PNPM_USES,
 	UPLOAD_NAME_INPUT,
 	UPLOAD_PATH_INPUT,
 	UPLOAD_MISSING_FILES_INPUT,
@@ -166,6 +180,7 @@ const ci_yml_fixture = {
 	ATTEMPT_SUFFIX,
 	read_workflow,
 	load_workflow,
+	load_action,
 	find_job,
 	workflow_concurrency,
 	concurrency_cancels_in_progress,
@@ -182,4 +197,4 @@ const ci_yml_fixture = {
 }
 
 export { ci_yml_fixture }
-export type { Workflow, WorkflowConcurrency, WorkflowJob, WorkflowStep }
+export type { CompositeAction, Workflow, WorkflowConcurrency, WorkflowJob, WorkflowStep }

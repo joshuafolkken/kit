@@ -118,6 +118,7 @@ async function read_snapshots(
 	const notices: Array<string> = []
 
 	for (const reference of unique_references(references, current_repo)) {
+		// eslint-disable-next-line no-await-in-loop -- the first refusal ends the read, so later reads are not spent
 		const outcome = await read_one(reference, current_repo)
 
 		if (outcome.refusal !== undefined) return { reads, notices, refusal: outcome.refusal }
@@ -129,11 +130,8 @@ async function read_snapshots(
 
 const epic_next_read = {
 	FOREIGN_EPIC,
-	epic_repo_of,
 	childless,
 	unique_references,
-	is_childless,
-	read_one,
 	read_snapshots,
 }
 

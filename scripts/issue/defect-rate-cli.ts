@@ -1,8 +1,8 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { git_gh_command } from '#scripts/git/git-gh-command'
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_label_schema } from '#scripts/git/schemas'
 import { z } from 'zod'
@@ -160,7 +160,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const defect_rate_cli = { USAGE, read_days, search_path, measure_window, run, main }
+const defect_rate_cli = { USAGE, read_days, search_path, measure_window, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

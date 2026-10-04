@@ -72,7 +72,7 @@ const REVIEW_MARKERS: ReadonlyArray<string> = [
 const WIP_MARKERS: ReadonlyArray<string> = [
 	'repos/{owner}/{repo}/issues?state=open&per_page=100',
 	'select(.pull_request == null)',
-	'オープン Issue が 30 件を超えている状態で新しく起票するときは、先に 1 件閉じる',
+	'オープン Issue が上限を超えている状態で新しく起票するときは、先に 1 件閉じる',
 	'**判定するのは「起票 1 件」ではなく「起票のひとまとまり」である。**',
 	'正直に閉じられるものが無いなら、起票しない',
 	'場所を空けるために、まだ意味のある Issue を閉じてはならない',
@@ -101,7 +101,7 @@ const INTERRUPT_MARKERS: ReadonlyArray<string> = [
 	'**偽の依存関係**',
 	'**割り込みは上限の例外であって、明示起動規則の例外ではない。**',
 	// The `--add` without a position, and the ban on `--before` / `--after`. `--before <M>` really does write
-	// a `blocked-by` (docs/josh-commands.md → `josh epic --add`), so prescribing it and forbidding a
+	// a `blocked-by` (docs/josh-commands-automation.md → `josh epic --add`), so prescribing it and forbidding a
 	// false dependency in the same breath is unsatisfiable — and the relation it writes is exactly
 	// what makes `epic:next` withhold the child the interrupt does not block.
 	'**`--before` / `--after` を使ってはならない。**',
@@ -118,14 +118,19 @@ const INTERRUPT_MARKERS: ReadonlyArray<string> = [
 	// joshuafolkken/kit#1518's added requirement: how an interrupt is *run*. Pinned as the enumeration
 	// rather than as the conclusion, because the conclusion alone ("run it alone if it is serious") is
 	// the judgement the whole rule is written to remove — the same loophole the three tests close.
-	'実行のしかた — 検証経路そのものの欠陥は単独で走らせる',
+	// joshuafolkken/kit#3024 narrowed it to three conditions that must all hold, so each condition and
+	// the AND are pinned: dropping one silently widens solo runs back to anything near the gate.
+	'実行のしかた — `main` で誤答している検証の欠陥は単独で走らせる',
+	'**欠陥である**（`- 種別: 不具合`）',
+	'**kit 自身の検証の欠陥である。**',
 	'**検証ゲート**（lint / 型チェック / スペルチェック / 単体テスト）',
 	'**コードレビュー**',
 	'**push 時のフック**',
 	'**マージ時のチェック**',
-	'**いずれかに当たれば単独実行。**',
+	'**今の `main` で、その Issue と無関係な PR の判定まで誤らせている**（嘘の緑 / 嘘の赤）',
+	'**3 条件すべてに当たれば単独実行、1 つでも外れれば `run:lane`。**',
 	'**「重大だと感じるか」は判定条件ではない**',
-	'**理由は 2 つあり、どちらか一方だけでも単独実行の根拠として十分である。**',
+	'**他レーンを止める根拠は 1 つ — 壊れた検証の上でバッチを回すと、全員の結果が信用できないこと。**',
 	// "Landed" is three different points in a lane run — PR opened, review converged, merged — so the
 	// resume point is pinned as the one the section's own premise requires.
 	'バッチを再開するのはそれが `main` へマージされてからとする。**',
@@ -174,7 +179,8 @@ describe(`${WIP_TOPIC} — the WIP cap and all three sides of its procedure`, ()
 // command included, so the one place it is written stays the one place it has to be kept correct.
 const RESIDENT_MARKERS: ReadonlyArray<string> = [
 	'**its default is not to split**',
-	'about 10 changed files, about 400 changed lines (test files excluded)',
+	// The guide's numbers stay at `split-assessment.md`; the resident line points there (joshuafolkken/kit#2996).
+	'the size guide in `split-assessment.md`, measured by `pnpm josh split:assess`',
 	'file it as a follow-up Issue only when it is a confirmed defect that reaches a runtime path',
 ]
 
@@ -184,7 +190,7 @@ const RESIDENT_MARKERS: ReadonlyArray<string> = [
 // survive, because dropping one changes what an agent does at the only moment it will read them.
 const DELIVERED_CAP_MARKERS: ReadonlyArray<string> = [
 	"count the target repository's open Issues",
-	'With more than 30 open, close one first',
+	`With more than ${String(delivered_rules.WIP_CAP)} open, close one first`,
 	'nothing honestly closable means do not file',
 	'one the run is blocked by',
 	// joshuafolkken/kit#1518. The three tests travel with the exemption rather than being left at the
@@ -220,7 +226,7 @@ describe.each(AI_DOCS)(
 		// reading `CLAUDE.md` through a pointer and running no hook — able to file past 30 with nothing
 		// telling it to count. What the relocation takes out is the heading and the procedure.
 		it.each([
-			"**Count the target repository's open Issues before filing; with more than 30 open, close one first.**",
+			"**Count the target repository's open Issues before filing; above the WIP cap, close one first.**",
 			'and so is an **interrupt** — three tests decide that, never judgement',
 			'a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository',
 			// Without these two the three tests are listed with nothing saying what happens when none is
@@ -246,7 +252,7 @@ describe.each(AI_DOCS)(
 // topic happened to quote the label, and the assertion would pass on a link that no longer exists.
 describe(`${WORKFLOW_PROMPT} — the WIP cap is reachable from the index`, () => {
 	it('links the topic file', () => {
-		expect(read_index()).toContain('| オープン Issue の WIP 上限（30 件）')
+		expect(read_index()).toContain('| オープン Issue の WIP 上限 ')
 	})
 })
 
@@ -264,12 +270,18 @@ describe(`${WORKFLOW_PROMPT} — the WIP cap is reachable from the index`, () =>
 const SOLO_RUN_REACH: ReadonlyArray<{ doc: string; marker: string }> = [
 	{
 		doc: LANES_DOC,
-		marker: 'an interrupt whose subject is a defect in the verification path itself',
+		marker:
+			"a defect in kit's own verification that makes unrelated PRs answer wrongly on `main` today.",
 	},
 	{
 		doc: LANES_DOC,
 		marker:
-			'the verification gate (lint / type check / spell check / unit tests), the code review, the pre-push hook, or the merge checks?',
+			"kit's own verification gate (lint / type check / spell check / unit tests), the code review, the pre-push hook, or the merge checks",
+	},
+	{
+		doc: LANES_DOC,
+		marker:
+			'All three, and the issue carries `run:solo`; any one missing, and it carries `run:lane`',
 	},
 	{ doc: LANES_DOC, marker: 'It runs alone, and the batch resumes only once it has merged.' },
 ]

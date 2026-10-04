@@ -1,8 +1,9 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { issue_read, type IssueComment, type IssueFields } from './issue-read'
+import { issue_report_failures, type ReadFailureKind } from './issue-report-failures'
 
 // `josh issue:read <N> [<N> ...]` — the body *and* the comments of every issue named, in one call
 // (joshuafolkken/kit#1715).
@@ -25,7 +26,6 @@ import { issue_read, type IssueComment, type IssueFields } from './issue-read'
 // "no comments" — the block says which of the two it holds, because §2g's rule is that the later text
 // wins, and a comment nobody read cannot win anything.
 
-const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
@@ -35,8 +35,7 @@ const BLOCK_SEPARATOR = '\n\n---\n\n'
 // process, and an unbounded fan-out is answered with secondary rate limiting rather than with issues.
 const READ_CONCURRENCY = 8
 const ISSUE_FIELDS = 'title,state,body'
-
-type ReadFailureKind = 'missing' | 'unreadable'
+const FAILURE_TERMS = { success_kind: 'issue', misreading: 'the issue is empty' } as const
 
 interface IssueContent {
 	fields: IssueFields
@@ -67,16 +66,6 @@ function parse_numbers(argv: ReadonlyArray<string>): ReadonlyArray<string> | und
 	// In the order they were typed, with a repeat dropped: repeating a number spends a second read on
 	// an answer already in hand and prints a second block a caller counting rows counts twice.
 	return [...new Set(numbers)]
-}
-
-function report_failure(kind: ReadFailureKind, issue_number: string): void {
-	if (kind === 'missing') {
-		console.error(`✖ issue #${issue_number} does not resolve — check the number and the repository`)
-	} else {
-		console.error(
-			`✖ could not read issue #${issue_number} — a rate limit, expired auth, or a dropped connection. This is not "the issue is empty"`,
-		)
-	}
 }
 
 // The comments are read beside the fields rather than after them: the two requests need nothing from
@@ -126,34 +115,6 @@ function issue_blocks(report: IssueReport): ReadonlyArray<string> {
 	return [issue_read.format_issue(report.issue_number, fields, comments)]
 }
 
-function print_issues(reports: ReadonlyArray<IssueReport>): void {
-	const blocks = reports.flatMap((report) => issue_blocks(report))
-
-	if (blocks.length === 0) return
-
-	console.info(blocks.join(BLOCK_SEPARATOR))
-}
-
-function report_one_failure(report: IssueReport): boolean {
-	if (report.result.kind === 'issue') return false
-
-	report_failure(report.result.kind, report.issue_number)
-
-	return true
-}
-
-// Every number that produced no issue is named, so a caller is told which ones it has no answer for
-// rather than being left to subtract the printed blocks from what it asked.
-function report_failures(reports: ReadonlyArray<IssueReport>): number {
-	let has_failure = false
-
-	for (const report of reports) {
-		has_failure = report_one_failure(report) || has_failure
-	}
-
-	return has_failure ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
-}
-
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const issue_numbers = parse_numbers(argv)
 
@@ -165,9 +126,12 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	const reports = await read_all(issue_numbers)
 
-	print_issues(reports)
+	issue_report_failures.print_blocks(
+		reports.flatMap((report) => issue_blocks(report)),
+		BLOCK_SEPARATOR,
+	)
 
-	return report_failures(reports)
+	return issue_report_failures.report_failures(reports, FAILURE_TERMS)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {
@@ -175,10 +139,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const issue_read_cli = {
-	BLOCK_SEPARATOR,
-	ISSUE_FIELDS,
 	USAGE,
-	main,
 	parse_numbers,
 	read_block,
 	run,

@@ -1,4 +1,4 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { epic_audit_logic } from './epic-audit'
 import type { BacklogIssue } from './epic-bundle'
@@ -181,11 +181,7 @@ async function referenced_candidates(
 
 const epic_bundle_referenced = {
 	REFERENCED_LOOKUP_LIMIT,
-	LOOKUP_CONCURRENCY,
 	referenced_lookups,
-	is_failed_read,
-	to_backlog_issue,
-	is_usable_candidate,
 	collect_referenced,
 	fetch_referenced,
 	referenced_candidates,

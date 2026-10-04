@@ -1,7 +1,7 @@
 import { pr_classification } from '#scripts/ci/pr-classification'
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
-import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
-import { OTHER_CHANGE_LABEL } from '#scripts/git/issue-labels'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
+import { OTHER_CHANGE_LABEL } from '#scripts/issue/issue-labels'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { error_text } from '#scripts/lib/error-message'
 import { build_upgrade_shell_command } from '#scripts/version/upgrade-shell-command'
@@ -428,14 +428,12 @@ function describe_step(target: PropagateTarget, step: string): StepResult {
 }
 
 const propagate_steps = {
-	STEP_COMMANDS,
 	JOSH_BIN,
 	PROPAGATE_ORIGIN,
 	sync_command,
 	upgrade_command,
 	upgrade_commands,
 	sync_commands,
-	return_step,
 	VERIFY_SCRIPT,
 	issue_title,
 	issue_body,

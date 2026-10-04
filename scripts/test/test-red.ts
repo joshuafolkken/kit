@@ -40,13 +40,20 @@ async function changed_tests(): Promise<Array<string>> {
 	return test_red_logic.unit_test_files(paths).filter((file) => existsSync(file))
 }
 
-async function copy_in(tree: string, files: ReadonlyArray<string>): Promise<void> {
-	for (const file of files) {
-		const target = path.join(tree, file)
+async function copy_one(tree: string, file: string): Promise<void> {
+	const target = path.join(tree, file)
 
-		await mkdir(path.dirname(target), { recursive: true })
-		await copyFile(file, target)
-	}
+	await mkdir(path.dirname(target), { recursive: true })
+	await copyFile(file, target)
+}
+
+// Each file has its own target, and a recursive `mkdir` tolerates a sibling creating the same parent.
+async function copy_in(tree: string, files: ReadonlyArray<string>): Promise<void> {
+	await Promise.all(
+		files.map(async (file) => {
+			await copy_one(tree, file)
+		}),
+	)
 }
 
 async function prepare(tree: string, base: string, files: ReadonlyArray<string>): Promise<void> {
@@ -148,7 +155,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await main(process.argv.slice(ARGV_OFFSET))
 }
 
-const test_red = { USAGE, run }
+const test_red = { run }
 
 export type { RedRun }
 export { test_red }

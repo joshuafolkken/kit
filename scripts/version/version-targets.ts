@@ -1,8 +1,8 @@
 import path from 'node:path'
+import { json_value } from '#scripts/lib/json-value'
 import { file_reader } from '#scripts/lib/read-file'
 import { package_version_schema, pnpm_ls_global_schema } from '#scripts/lib/schemas'
 import { execaSync } from 'execa'
-import { safe_json_parse } from './parse-json'
 
 const NODE_MODULES = 'node_modules'
 const PACKAGE_JSON = 'package.json'
@@ -15,7 +15,7 @@ function build_pnpm_ls_arguments(package_name: string): Array<string> {
 // Read the globally installed version from `pnpm ls -g --json` output. Returns undefined when
 // the package is absent or the output cannot be parsed (e.g. pnpm missing, empty stdout).
 function parse_global_version(stdout: string, package_name: string): string | undefined {
-	const parsed = pnpm_ls_global_schema.safeParse(safe_json_parse(stdout))
+	const parsed = pnpm_ls_global_schema.safeParse(json_value.parse_or_undefined(stdout))
 	if (!parsed.success) return undefined
 
 	return parsed.data[0]?.dependencies?.[package_name]?.version
@@ -25,7 +25,7 @@ function parse_global_version(stdout: string, package_name: string): string | un
 // file is missing (raw is undefined) or malformed.
 function parse_project_version(raw: string | undefined): string | undefined {
 	if (raw === undefined) return undefined
-	const parsed = package_version_schema.safeParse(safe_json_parse(raw))
+	const parsed = package_version_schema.safeParse(json_value.parse_or_undefined(raw))
 
 	return parsed.success ? parsed.data.version : undefined
 }
@@ -61,7 +61,7 @@ function read_workspace_version(cwd: string): string | undefined {
 // `📦 project version: <v>` for the end of a workflow. Both are gone (joshuafolkken/kit#1486): a
 // child no longer bumps, so the local manifest names the *previous* release rather than what the run
 // ships, and every caller now prints the count of unreleased merges instead
-// (`scripts/git/git-followup-pending.ts`). Removed rather than left unused, so nothing reaches for
+// (`scripts/followup/git-followup-pending.ts`). Removed rather than left unused, so nothing reaches for
 // the misleading reading again.
 
 const version_targets = {

@@ -1,6 +1,6 @@
 # josh init — Detailed Behavior
 
-`josh init` selects a project profile, then creates or merges the settings that apply to that project. It can initialize a directory without Git or an existing `package.json`.
+`josh init` selects a project profile, then creates or merges the settings that apply to that project. It can initialize a directory without Git or an existing `package.json`. The reasons behind its choices are in [init-rationale.md](./maintainers/init-rationale.md).
 
 ```bash
 pnpm josh init
@@ -240,9 +240,11 @@ SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
 .github/workflows/ci.yml
 .github/workflows/auto-tag.yml
 .github/workflows/dependabot-auto-merge.yml
+.github/workflows/github-release.yml
 .github/workflows/pr-classification.yml
 .github/workflows/production.yml
 .github/workflows/sonar-qube.yml
+.github/actions/setup-pnpm/action.yml
 .github/pull_request_template.md
 .github/release.yml
 .github/dependabot.yml
@@ -252,7 +254,7 @@ SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
 sonar-project.properties  (generated from GitHub repo name)
 ```
 
-`CLAUDE.md` carries every agent rule, but it is **not byte-copied** — since [#1878](https://github.com/joshuafolkken/kit/issues/1878) it is distributed by import. The package ships an already-path-transformed copy at `node_modules/@joshuafolkken/kit/dist/CLAUDE.md` (generated at publish time by `scripts/build/build-claude-md.ts`). The consumer's tracked `CLAUDE.md` starts with a bootstrap instruction: when kit is absent, run `pnpm install` and reread the file before other work. It then imports `@node_modules/@joshuafolkken/kit/dist/CLAUDE.md`, followed by any project additions. A package update alone keeps the rules current — no `josh sync` needed. `josh init` writes this file when the consumer has none, and leaves an existing one untouched. `AGENTS.md`, `GEMINI.md` and `.cursorrules` **remain byte-copies**, because the other tools that read them (Codex, Gemini CLI, Cursor) do not follow CLAUDE.md's `@import`; `AGENTS.md` and `GEMINI.md` are short pointers to `CLAUDE.md` and hold no rules of their own ([#963](https://github.com/joshuafolkken/kit/issues/963)). The copied files have their `prompts/` and `eslint/` paths rewritten to `node_modules/@joshuafolkken/kit/…` so they resolve in the consuming project — the pointers included, since each one tells the reader to open `prompts/*.md` when `CLAUDE.md` names one. The four skills (`workflow-commands`, `epic-commands`, `dependency-update`, `verify-ui`) are no longer copied: they ship as the `kit` Claude Code plugin and load from the package (joshuafolkken/kit#1879). `.claude/settings.json` still carries the `permissions.deny` rules a plugin cannot provide, and now also declares the `kit` marketplace and enables the `kit` plugin; the CLI needs a one-time `claude plugin install kit@kit` (settings alone do not auto-install it). `josh sync` removes any stale copied skill directory whose content still matches the shipment.
+`CLAUDE.md` carries every agent rule, but it is **not byte-copied** — since [#1878](https://github.com/joshuafolkken/kit/issues/1878) it is distributed by import. The package ships an already-path-transformed copy at `node_modules/@joshuafolkken/kit/dist/CLAUDE.md` (generated at publish time by `scripts/build/build-claude-md.ts`). The consumer's tracked `CLAUDE.md` starts with a bootstrap instruction: when kit is absent, run `pnpm install` and reread the file before other work. It then imports `@node_modules/@joshuafolkken/kit/dist/CLAUDE.md`, followed by any project additions. A package update alone keeps the rules current — no `josh sync` needed. `josh init` writes this file when the consumer has none, and leaves an existing one untouched. `AGENTS.md`, `GEMINI.md` and `.cursorrules` **remain byte-copies**, because the other tools that read them (Codex, Gemini CLI, Cursor) do not follow CLAUDE.md's `@import`; `AGENTS.md` and `GEMINI.md` are short pointers to `CLAUDE.md` and hold no rules of their own ([#963](https://github.com/joshuafolkken/kit/issues/963)). The copied files have their `prompts/` and `eslint/` paths rewritten to `node_modules/@joshuafolkken/kit/…` so they resolve in the consuming project — the pointers included, since each one tells the reader to open `prompts/*.md` when `CLAUDE.md` names one. The four skills (`workflow-commands`, `epic-commands`, `dependency-update`, `verify-ui`) are no longer copied: they ship as the `kit` Claude Code plugin and load from the package (joshuafolkken/kit#1879). `.claude/settings.json` still carries the `permissions.deny` rules a plugin cannot provide, and now also declares the `kit` marketplace and enables the `kit` plugin; nothing needs installing — in a trusted workspace an interactive session loads the skills from its first session, a headless one (`claude -p`) from its second ([#2990](https://github.com/joshuafolkken/kit/issues/2990)). `josh sync` removes any stale copied skill directory whose content still matches the shipment.
 
 `sonar-project.properties` is generated from the GitHub repo name fetched via `gh api repos/{owner}/{repo}`. If `gh` is not available or the repo cannot be identified, the file is skipped with a warning.
 
@@ -304,7 +306,7 @@ The kit pre-commit hook runs [secretlint](https://github.com/secretlint/secretli
 
 `josh init` provisions everything needed: `.secretlintrc.json` (recommend preset) plus the `secretlint` and `@secretlint/secretlint-rule-preset-recommend` devDependencies. The devDependencies live in the **consumer** project rather than in kit, because pnpm's isolated `node_modules` never exposes a kit dependency's bin to the consumer's `pnpm exec`.
 
-The hook runs through [`josh secretlint-scan`](./josh-commands.md#josh-secretlint-scan), which skips with a notice when the binary is absent instead of failing the commit.
+The hook runs through [`josh secretlint-scan`](./josh-commands-automation.md#josh-secretlint-scan), which skips with a notice when the binary is absent instead of failing the commit.
 
 > **Upgrading an existing project:** `josh sync` adds the same config and devDependencies, but the packages are not present until you run `pnpm install`. Until then every commit prints the skip notice and the secret scan does **not** run — run `pnpm install` immediately after syncing to restore it.
 

@@ -1,4 +1,4 @@
-import { git_gh_issue_read } from '#scripts/git/git-gh-issue-read'
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { test_red, type RedRun } from './test-red'
 import { test_red_logic } from './test-red-logic'
 
@@ -45,7 +45,7 @@ async function assert_reproduces(
 	if (test_red_logic.is_refused(body, verdict)) throw new Error(reason_for(issue_number, files))
 }
 
-const test_red_commit = { assert_reproduces, reason_for }
+const test_red_commit = { assert_reproduces }
 
 export type { RedCommitPorts }
 export { test_red_commit }

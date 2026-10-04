@@ -57,6 +57,12 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Project',
 		reference: ['<PR>', 'automation', ['network']],
 	},
+	'sonar:new-code': {
+		script: 'scripts/sonar/sonar-new-code-cli.ts',
+		description: 'Fail when a pull request adds any new SonarCloud issue or duplicated block',
+		category: 'Project',
+		reference: ['<PR>', 'automation', ['network']],
+	},
 	'ui:routes': {
 		script: 'scripts/ui/ui-routes-cli.ts',
 		description: 'List the screenshot-target routes the current change touches',

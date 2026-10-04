@@ -1,10 +1,5 @@
-import {
-	BREAKING_CHANGE_LABEL,
-	BUG_LABEL,
-	ENHANCEMENT_LABEL,
-	has_label_name,
-} from '#scripts/git/issue-labels'
 import { issue_bug_label } from './issue-bug-label'
+import { BREAKING_CHANGE_LABEL, BUG_LABEL, ENHANCEMENT_LABEL, has_label_name } from './issue-labels'
 import { markdown_section } from './markdown-section'
 
 const FEATURE_DECLARATIONS = ['- 目的: 機能追加', '- 目的: 機能改善']
@@ -62,10 +57,7 @@ function problems(body: string): ReadonlyArray<string> {
 }
 
 const issue_classification = {
-	BREAKING_DECLARATION,
 	CLASSIFICATION_LABELS,
-	FEATURE_DECLARATIONS,
-	NON_BUG_DECLARATION,
 	labels_for,
 	problems,
 	required_labels,

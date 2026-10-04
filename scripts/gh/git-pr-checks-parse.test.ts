@@ -1,0 +1,212 @@
+import { describe, expect, it } from 'vitest'
+import {
+	CHECK_STATUS_FAIL,
+	CHECK_STATUS_MISSING,
+	CHECK_STATUS_PASS,
+	CHECK_STATUS_PENDING,
+	parse_rollup_checks,
+	read_string,
+} from './git-pr-checks-parse'
+
+const CODE_RABBIT = 'CodeRabbit'
+const SONAR_QUBE = 'SonarQube'
+const AUTO_MERGE = 'auto-merge'
+const NON_STRING_VALUE = 'not a string'
+
+describe('read_string', () => {
+	it('returns the trimmed string for a non-empty value', () => {
+		expect(read_string('  hello  ')).toBe('hello')
+	})
+
+	it('returns undefined for an empty string', () => {
+		expect(read_string('')).toBeUndefined()
+	})
+
+	it('returns undefined for a whitespace-only string', () => {
+		expect(read_string(' '.repeat(3))).toBeUndefined()
+	})
+
+	it('returns undefined for a number', () => {
+		expect(read_string(42)).toBeUndefined()
+	})
+
+	it('returns undefined for undefined', () => {
+		expect(read_string(undefined)).toBeUndefined()
+	})
+})
+
+function check_run_item(name: string): Record<string, string> {
+	return {
+		// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
+		__typename: 'CheckRun',
+		name,
+		status: 'COMPLETED',
+		conclusion: 'SUCCESS',
+	}
+}
+
+function status_context_item(context: string, state: string): Record<string, string> {
+	return {
+		// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
+		__typename: 'StatusContext',
+		context,
+		state,
+	}
+}
+
+describe('parse_rollup_checks — CheckRun items', () => {
+	it('returns pass for a completed successful CheckRun', () => {
+		const raw = JSON.stringify({ statusCheckRollup: [check_run_item(CODE_RABBIT)] })
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks).toHaveLength(1)
+		expect(checks[0]).toStrictEqual({ name: CODE_RABBIT, status: CHECK_STATUS_PASS })
+	})
+
+	it('returns pending for an in-progress CheckRun', () => {
+		const raw = JSON.stringify({
+			statusCheckRollup: [{ name: SONAR_QUBE, status: 'IN_PROGRESS' }],
+		})
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks[0]?.status).toBe(CHECK_STATUS_PENDING)
+	})
+
+	it('returns fail for a completed CheckRun with failure conclusion', () => {
+		const raw = JSON.stringify({
+			statusCheckRollup: [{ name: CODE_RABBIT, status: 'COMPLETED', conclusion: 'FAILURE' }],
+		})
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks[0]?.status).toBe(CHECK_STATUS_FAIL)
+	})
+})
+
+describe('parse_rollup_checks — CheckRun conclusions', () => {
+	// Regression guard for #793: a job whose `if:` condition was false completes with conclusion
+	// SKIPPED, which GitHub counts as satisfied. Reading it as fail put a non-CodeRabbit entry into
+	// the non-passing set and disabled the kit#753 escape hatch on every PR with a conditional job.
+	it('returns pass for a completed CheckRun with skipped conclusion', () => {
+		const raw = JSON.stringify({
+			statusCheckRollup: [{ name: AUTO_MERGE, status: 'COMPLETED', conclusion: 'SKIPPED' }],
+		})
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks[0]?.status).toBe(CHECK_STATUS_PASS)
+	})
+
+	it('returns fail for a completed CheckRun with no conclusion at all', () => {
+		const raw = JSON.stringify({ statusCheckRollup: [{ name: AUTO_MERGE, status: 'COMPLETED' }] })
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks[0]?.status).toBe(CHECK_STATUS_FAIL)
+	})
+
+	// GitHub's rollup counts a neutral conclusion as satisfied, so such a pull request reports CLEAN
+	// and merges. Since joshuafolkken/kit#990 a `fail` here ends the wait outright rather than merely
+	// leaving it pending, so reading neutral as a failure would kill a run GitHub considers mergeable.
+	it('returns pass for a completed CheckRun with neutral conclusion', () => {
+		const raw = JSON.stringify({
+			statusCheckRollup: [{ name: AUTO_MERGE, status: 'COMPLETED', conclusion: 'NEUTRAL' }],
+		})
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks[0]?.status).toBe(CHECK_STATUS_PASS)
+	})
+
+	// GitHub does not count these as satisfied, so they stay failures — and a wrongly-blocked run
+	// costs one re-run of `followup`, while a wrongly-passed one ships code no gate ever cleared.
+	it.each(['ACTION_REQUIRED', 'STALE'])('returns fail for a %s conclusion', (conclusion) => {
+		const raw = JSON.stringify({
+			statusCheckRollup: [{ name: AUTO_MERGE, status: 'COMPLETED', conclusion }],
+		})
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks[0]?.status).toBe(CHECK_STATUS_FAIL)
+	})
+})
+
+describe('parse_rollup_checks — StatusContext items', () => {
+	it('returns pass for a SUCCESS StatusContext', () => {
+		const raw = JSON.stringify({
+			statusCheckRollup: [status_context_item(CODE_RABBIT, 'SUCCESS')],
+		})
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks[0]?.status).toBe(CHECK_STATUS_PASS)
+	})
+
+	it('returns pending for a PENDING StatusContext', () => {
+		const raw = JSON.stringify({
+			statusCheckRollup: [status_context_item(CODE_RABBIT, 'PENDING')],
+		})
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks[0]?.status).toBe(CHECK_STATUS_PENDING)
+	})
+
+	// A required context that has not been posted yet is still to come, not failed: ending the wait on
+	// it would be a premature red exit on a run that is still progressing (joshuafolkken/kit#990).
+	it('returns pending for an EXPECTED StatusContext', () => {
+		const raw = JSON.stringify({
+			statusCheckRollup: [status_context_item(CODE_RABBIT, 'EXPECTED')],
+		})
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks[0]?.status).toBe(CHECK_STATUS_PENDING)
+	})
+
+	it('returns fail for an ERROR StatusContext', () => {
+		const raw = JSON.stringify({
+			statusCheckRollup: [status_context_item(CODE_RABBIT, 'ERROR')],
+		})
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks[0]?.status).toBe(CHECK_STATUS_FAIL)
+	})
+})
+
+describe('parse_rollup_checks — edge cases', () => {
+	it('skips items with no name or context', () => {
+		const raw = JSON.stringify({ statusCheckRollup: [{ status: 'COMPLETED' }] })
+
+		expect(parse_rollup_checks(raw)).toHaveLength(0)
+	})
+
+	it('returns empty array for invalid JSON', () => {
+		expect(parse_rollup_checks(NON_STRING_VALUE)).toStrictEqual([])
+	})
+
+	it('returns empty array when statusCheckRollup is missing', () => {
+		expect(parse_rollup_checks('{}')).toStrictEqual([])
+	})
+
+	it('parses multiple checks in one payload', () => {
+		const raw = JSON.stringify({
+			statusCheckRollup: [check_run_item(CODE_RABBIT), check_run_item(SONAR_QUBE)],
+		})
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks).toHaveLength(2)
+		expect(checks[0]?.name).toBe(CODE_RABBIT)
+		expect(checks[1]?.name).toBe(SONAR_QUBE)
+	})
+})
+
+describe('CHECK_STATUS constants', () => {
+	it('has correct pass value', () => {
+		expect(CHECK_STATUS_PASS).toBe('pass')
+	})
+
+	it('has correct pending value', () => {
+		expect(CHECK_STATUS_PENDING).toBe('pending')
+	})
+
+	it('has correct fail value', () => {
+		expect(CHECK_STATUS_FAIL).toBe('fail')
+	})
+
+	it('has correct missing value', () => {
+		expect(CHECK_STATUS_MISSING).toBe('missing')
+	})
+})

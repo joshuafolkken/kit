@@ -16,6 +16,9 @@
 // **Everything it touches is a port**, the pattern `run-wake-loop.ts` set, so the sequencing is pinned
 // without a process, a network or a clock.
 
+import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
+import type { MergeResult } from '#scripts/run/run-merge-cli'
+
 const RUN_VERDICT = 'run'
 const STOP_VERDICT = 'stop'
 // The `run:merge` tokens that end the loop at once: a hand-off, a person's stop, the environment down,
@@ -32,6 +35,7 @@ const IMMEDIATE_TOKENS: ReadonlySet<string> = new Set([
 // and the children still in flight are collected before the loop ends (joshuafolkken/kit#2881).
 const HANDOFF_TOKENS: ReadonlySet<string> = new Set([...IMMEDIATE_TOKENS, STOP_VERDICT])
 const RESUMED_TOKEN = 'resumed'
+const MERGED_OUTCOME = 'merged'
 const WATCH_VERDICT = 'watch'
 // The verdicts the loop acts on without the parent. Any other is handed back as it was printed.
 const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
@@ -41,6 +45,9 @@ const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
 	'wait',
 ])
 const NO_RETRIES = 0
+const NO_FREE_LANES = 0
+const LAUNCHED = 'launched'
+const UNOPENED = 'unopened'
 
 interface OfferRead {
 	verdict: string
@@ -57,7 +64,9 @@ interface OfferRead {
 interface DriveState {
 	// The children this run has in flight — seeded from the open lanes, so a restarted loop resumes them.
 	in_flight: Array<string>
-	// Every child collected, fed back to `backlog:offer` because GitHub closes a merged issue late.
+	// Every child merged, fed back to `backlog:offer` because GitHub closes a merged issue late. A parked
+	// child is left out: its labels classify it, so one a person released is offered again
+	// (joshuafolkken/kit#3041).
 	exclude: Array<string>
 	// When the run last did something, handed to `backlog:budget` as `--active`.
 	active: string
@@ -80,14 +89,20 @@ interface DriveEnd {
 	is_finish?: boolean | undefined
 }
 
+type Collected = Pick<MergeResult, 'token' | 'outcome'>
+
 interface DrivePorts {
 	// Whether a child's process has confirmed-ended — `lane:await`'s re-confirmed check in production.
 	is_finished: (issue: string) => boolean
-	// `run:merge <N>`'s first stdout token.
-	merge: (issue: string) => Promise<string>
+	// `run:merge <N>`'s first stdout token and the outcome it handled the child as.
+	merge: (issue: string) => Promise<Collected>
 	// `backlog:offer`'s answer for the state, or `undefined` when it exited non-zero.
 	offer: (state: DriveState) => Promise<OfferRead | undefined>
-	launch: (issue: string) => Promise<boolean>
+	// Where `lane:launch`'s chain ended — `launched`, `unopened` (no lane taken) or `failed` (one taken).
+	launch: (issue: string) => Promise<LaunchOutcome['kind']>
+	// The lanes free right now — `backlog_ready.drive_free_lane_count` in production, the limit less the
+	// open lanes.
+	free_lanes: () => Promise<number>
 	now: () => Date
 }
 
@@ -150,29 +165,40 @@ function merge_stopped(issue: string, state: DriveState): DriveState {
 	}
 }
 
-// The child collected and excluded, and — unless its cut was resumed in place — out of flight.
+// Only a merged child is excluded: `backlog:next` may still read it OPEN. Any other is classified by
+// its labels, so excluding it would hide a child a person released for the rest of the process.
+function excluded(issue: string, outcome: Collected['outcome'], state: DriveState): Array<string> {
+	if (outcome !== MERGED_OUTCOME || state.exclude.includes(issue)) return state.exclude
+
+	return [...state.exclude, issue]
+}
+
+// The child collected, and — unless its cut was resumed in place — out of flight.
 function collected_state(
 	issue: string,
-	token: string,
+	collected: Collected,
 	state: DriveState,
 	active: string,
 ): DriveState {
 	const in_flight =
-		token === RESUMED_TOKEN ? state.in_flight : state.in_flight.filter((item) => item !== issue)
-	const exclude = state.exclude.includes(issue) ? state.exclude : [...state.exclude, issue]
+		collected.token === RESUMED_TOKEN
+			? state.in_flight
+			: state.in_flight.filter((item) => item !== issue)
+	const exclude = excluded(issue, collected.outcome, state)
 
 	return { ...state, in_flight, exclude, active }
 }
 
 // One finished child: handed back on an immediate token, otherwise collected.
 async function collect(issue: string, state: DriveState, ports: DrivePorts): Promise<PassResult> {
-	const token = await ports.merge(issue)
+	const collected = await ports.merge(issue)
+	const { token } = collected
 
 	// An empty first line is a `run:merge` that failed before printing one: never read as a collection.
 	if (token === '') return ended('merge', state, undefined, issue)
 	if (IMMEDIATE_TOKENS.has(token)) return ended('merge', state, token, issue)
 
-	const next = collected_state(issue, token, state, ports.now().toISOString())
+	const next = collected_state(issue, collected, state, ports.now().toISOString())
 
 	return { kind: 'continue', state: token === STOP_VERDICT ? merge_stopped(issue, next) : next }
 }
@@ -182,6 +208,7 @@ async function collect_finished(state: DriveState, ports: DrivePorts): Promise<P
 	let current = state
 
 	for (const issue of finished) {
+		// eslint-disable-next-line no-await-in-loop -- each collect starts from the state the previous one returned
 		const result = await collect(issue, current, ports)
 
 		if (result.kind === 'end') return { ...result, state: current }
@@ -192,22 +219,55 @@ async function collect_finished(state: DriveState, ports: DrivePorts): Promise<P
 	return { kind: 'continue', state: current }
 }
 
+// A `lane:open` refused with every lane taken is a wait, not a judgement (joshuafolkken/kit#3027): the
+// next offer after a lane frees retries it. A step failing after the lane opened is always handed back —
+// that lane holds the last seat itself, so the free count would read the failure as a full pool.
+async function refused(
+	issue: string,
+	outcome: LaunchOutcome['kind'],
+	state: DriveState,
+	ports: DrivePorts,
+): Promise<PassResult> {
+	if (outcome !== UNOPENED) return ended('launch', state, undefined, issue)
+	if ((await ports.free_lanes()) <= NO_FREE_LANES) return { kind: 'continue', state }
+
+	return ended('launch', state, undefined, issue)
+}
+
+// **No more launches than free lanes** (joshuafolkken/kit#3027). `backlog:offer` lists every ready issue
+// without reading the lanes, so launching all of them overran `JOSH_LANE_LIMIT` until `lane:open` ran
+// out of seats. The free count is read once, before the first launch, because every launch here opens
+// a lane the count would otherwise have to be told about.
+//
+// **Only a launch is activity** (joshuafolkken/kit#3027): a pass that started nothing — every lane taken
+// — keeps `active` where it was, or the once-a-minute offer would restart the idle budget for good.
+function launched(state: DriveState, in_flight: Array<string>, ports: DrivePorts): DriveState {
+	if (in_flight.length === state.in_flight.length) return { ...state, in_flight }
+
+	return { ...state, in_flight, active: ports.now().toISOString() }
+}
+
 async function launch_all(
 	issues: ReadonlyArray<string>,
 	state: DriveState,
 	ports: DrivePorts,
 ): Promise<PassResult> {
 	const in_flight = [...state.in_flight]
+	const free = await ports.free_lanes()
 
-	for (const issue of issues) {
-		const is_launched = await ports.launch(issue)
+	for (const issue of issues.slice(0, free)) {
+		// eslint-disable-next-line no-await-in-loop -- lanes launch in order and the first refusal ends the pass
+		const outcome = await ports.launch(issue)
 
-		if (!is_launched) return ended('launch', { ...state, in_flight }, undefined, issue)
+		if (outcome !== LAUNCHED) {
+			// eslint-disable-next-line no-await-in-loop -- lanes launch in order and the first refusal ends the pass
+			return await refused(issue, outcome, launched(state, in_flight, ports), ports)
+		}
 
 		in_flight.push(issue)
 	}
 
-	return { kind: 'continue', state: { ...state, in_flight, active: ports.now().toISOString() } }
+	return { kind: 'continue', state: launched(state, in_flight, ports) }
 }
 
 // A watch with nothing in flight is the drain: `run:step` owes the retrospective there, so it is the
@@ -337,7 +397,9 @@ async function run_loop(
 	let step = await loop_step(first, config, ports)
 
 	while (step.kind === 'next') {
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await ports.sleep(config.poll_ms)
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		step = await loop_step(step.run, config, ports)
 	}
 
@@ -348,10 +410,8 @@ async function run_loop(
 
 const backlog_drive = {
 	HANDOFF_TOKENS,
-	collect,
 	initial_state,
 	merge_stopped,
-	on_verdict,
 	run_loop,
 	run_pass,
 }

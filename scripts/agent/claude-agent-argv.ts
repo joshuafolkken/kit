@@ -143,8 +143,6 @@ const claude_agent_argv = {
 	build,
 	build_resume,
 	resolve,
-	tool_flags,
-	with_profile,
 }
 
 export type { ClaudeArgv, ClaudeArgvResult }

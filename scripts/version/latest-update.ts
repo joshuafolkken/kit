@@ -190,10 +190,8 @@ const latest_update = {
 	main,
 	build_update_commands,
 	run_update_stages,
-	update_without_downgrading,
 	take_snapshot,
 	restore_snapshot,
-	report_lockfile_overrides,
 }
 
 export { latest_update }

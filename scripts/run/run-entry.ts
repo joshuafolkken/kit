@@ -84,7 +84,6 @@ const run_entry = {
 	COST_SKIPPED,
 	COST_UNDER,
 	NO_VERDICT,
-	SUMMARY_PREFIX,
 	exit_code,
 	format_report,
 	can_proceed,

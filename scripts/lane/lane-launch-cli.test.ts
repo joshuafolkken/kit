@@ -1,3 +1,4 @@
+import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -100,7 +101,7 @@ describe('lane_launch_cli.run — the first lane pops and re-installs', () => {
 		expect(mocked_execa).toHaveBeenCalledWith(
 			'pnpm',
 			['--dir', DIR, 'install', '--frozen-lockfile'],
-			{ reject: false },
+			{ reject: false, timeout: INSTALL_TIMEOUT_MS },
 		)
 		expect(info_lines).toStrictEqual([PID])
 	})
@@ -135,14 +136,28 @@ describe('lane_launch_cli.launch_lane — the chain an in-process caller shares'
 	it('returns the dispatched pid without printing it', async () => {
 		stub({ open: { code: OK, out: DIR }, dispatch: { code: OK, out: PID } })
 
-		expect(await lane_launch_cli.launch_lane({ issue: ISSUE, stash: undefined })).toBe(PID)
+		expect(await lane_launch_cli.launch_lane({ issue: ISSUE, stash: undefined })).toStrictEqual({
+			kind: 'launched',
+			pid: PID,
+		})
 		expect(info_lines).toStrictEqual([])
 	})
 
-	it('returns undefined when a step refused', async () => {
+	it('reads a refused lane:open as unopened', async () => {
 		stub({ open: { code: FAILED, out: '' } })
 
-		expect(await lane_launch_cli.launch_lane({ issue: ISSUE, stash: undefined })).toBeUndefined()
+		expect(await lane_launch_cli.launch_lane({ issue: ISSUE, stash: undefined })).toStrictEqual({
+			kind: 'unopened',
+		})
+	})
+
+	// joshuafolkken/kit#3027: the opened lane still holds a seat, so this is not a full pool.
+	it('reads a refusal after the lane opened as failed', async () => {
+		stub({ open: { code: OK, out: DIR }, dispatch: { code: FAILED, out: '' } })
+
+		expect(await lane_launch_cli.launch_lane({ issue: ISSUE, stash: undefined })).toStrictEqual({
+			kind: 'failed',
+		})
 	})
 })
 

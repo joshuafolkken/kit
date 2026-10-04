@@ -126,8 +126,6 @@ function resolve_in(
 }
 
 const agent_argv = {
-	build,
-	build_resume,
 	resolve,
 	resolve_in,
 	resume_argv,

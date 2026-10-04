@@ -158,6 +158,7 @@ async function close_each(issues: ReadonlyArray<string>): Promise<SweepOutcome> 
 	const sweep: SweepOutcome = { closed: [], failed: [] }
 
 	for (const issue of issues) {
+		// eslint-disable-next-line no-await-in-loop -- worktree writes contend for the same registration directory
 		const bucket = (await try_close(issue)) ? sweep.closed : sweep.failed
 
 		bucket.push(issue)
@@ -186,10 +187,7 @@ async function close_all_lanes(): Promise<SweepOutcome> {
 const lane_close = {
 	close_all_lanes,
 	close_lane,
-	lane_root_directory,
-	lane_targets,
 	prune_lanes,
-	remove_lane,
 	resolve_lane,
 }
 

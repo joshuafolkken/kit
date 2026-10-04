@@ -193,16 +193,10 @@ function report_gate_steps(
 
 const gate_report = {
 	format_failure_actions,
-	format_seconds,
-	gate_step_header,
 	has_checker_warning,
-	has_warnings,
 	is_gate_step_failed,
 	is_skip_notice,
-	print_gate_step,
-	print_gate_summary,
 	report_gate_steps,
-	should_print_body,
 }
 
 export type { GateReport, GateStep, GateStepResult }

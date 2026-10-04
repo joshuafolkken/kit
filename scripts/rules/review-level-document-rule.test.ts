@@ -12,10 +12,10 @@ const REVIEW_PROMPT = 'prompts/review.md'
 // `review:brief --level-only`, so the documents now name that spelling. The rule is unchanged: the
 // level comes from a command, never from a typed judgement.
 const COMMAND = 'pnpm josh review:brief --level-only'
-const COMMAND_DOC = 'docs/josh-commands.md'
+const COMMAND_DOC = 'docs/josh-commands-automation.md'
 // joshuafolkken/kit#1924 slimmed `CLAUDE.md` to the resident review-level trigger — it names the
 // command and caps the rounds at two, while the inert enumeration, the "never by judgement" phrasing
-// and "documentation is not inert" moved to `prompts/review.md` and `docs/josh-commands.md`, which
+// and "documentation is not inert" moved to `prompts/review.md` and `docs/josh-commands-automation.md`, which
 // still carry and pin them. So the detailed set is asserted at those two, not resident.
 const INERT_DOCUMENTS: ReadonlyArray<string> = [REVIEW_PROMPT, COMMAND_DOC]
 

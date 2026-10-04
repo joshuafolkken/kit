@@ -1,4 +1,4 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { epic_decision } from './epic-decision'
 import { epic_read } from './epic-read'
 import { format_dependency_links } from './epic-reference'

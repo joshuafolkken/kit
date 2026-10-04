@@ -241,8 +241,6 @@ const refactor_lint = {
 	parse_results,
 	scan_categories,
 	CATEGORIES,
-	HIGH,
-	MEDIUM,
 	LOW,
 }
 

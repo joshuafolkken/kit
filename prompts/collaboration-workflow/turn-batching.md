@@ -50,7 +50,7 @@
 
 - **PreToolUse フックが「1 件の呼び出しだけを見て、それが独立かどうかを判定する」。** 採れない。**呼び出しの独立性は、1 件の呼び出しからは観測できない。** フックが見るのはこれから走る 1 件だけで、それが直前の結果に依存しているかどうかはフックの入力に無い。依存している正当な直列実行（`grep` → `sed -n`、Edit の前の読み取り）を止めてしまい、しかも止めた側は理由を説明できない。`output-bounds.md` が「形で見分ける案は実データ上で外れる」として PreToolUse guard を却下したのと同じ形である。
 
-  **却下したのはこの判定のしかたであって、`PreToolUse` という機構そのものではない。** joshuafolkken/kit#1390 は**まさに `PreToolUse` フックとして** `pnpm josh batch:guard` を実装し、`.claude/settings.json` で配布している。判定に使うのは、いま出そうとしている 1 件ではなく**閉じた履歴** — 結果が返り終わったターンの並び — である。単発呼び出しのターンが 2 つ続いたことは 1 件からは見えないが、履歴からは見える。上に並べた懸念は、それぞれ設計で避けてある。依存は**共有ターゲット**で見るので `grep` → `sed -n` は止まらず、**書き込みも読み取りとまったく同じ基準で拒否され**（joshuafolkken/kit#1762）、**手元の呼び出しが直前の列と共有ターゲットを持つときは拒否を取り下げる**（書き込み同士を含む）。拒否は 1 つの単発連続につき **1 回だけ**である（窓を超える連続は `docs/maintainers/turn-batching-rationale.md` →「`batch:guard` の拒否窓」）。委譲された子やレビューエージェントは、親の記録を共有せず、それぞれに配送される（`docs/maintainers/turn-batching-rationale.md` →「フォークへの配送の実装（joshuafolkken/kit#1424）」）。機構の全体は `docs/josh-commands.md` →「`josh batch:guard`」にある。範囲が `Bash|Edit|Read` に広がった経緯（joshuafolkken/kit#1509 を含む）は `docs/maintainers/turn-batching-rationale.md` →「書き込みが範囲に入った経緯（joshuafolkken/kit#1762）」、`docs/maintainers/turn-batching-rationale.md` →「読み取りが範囲に入った経緯（joshuafolkken/kit#1798）」、`docs/maintainers/turn-batching-rationale.md` →「事務コマンドが範囲に入った経緯（joshuafolkken/kit#1875）」。
+  **却下したのはこの判定のしかたであって、`PreToolUse` という機構そのものではない。** joshuafolkken/kit#1390 は**まさに `PreToolUse` フックとして** `pnpm josh batch:guard` を実装し、`.claude/settings.json` で配布している。判定に使うのは、いま出そうとしている 1 件ではなく**閉じた履歴** — 結果が返り終わったターンの並び — である。単発呼び出しのターンが 2 つ続いたことは 1 件からは見えないが、履歴からは見える。上に並べた懸念は、それぞれ設計で避けてある。依存は**共有ターゲット**で見るので `grep` → `sed -n` は止まらず、**書き込みも読み取りとまったく同じ基準で拒否され**（joshuafolkken/kit#1762）、**手元の呼び出しが直前の列と共有ターゲットを持つときは拒否を取り下げる**（書き込み同士を含む）。拒否は 1 つの単発連続につき **1 回だけ**である（窓を超える連続は `docs/maintainers/turn-batching-rationale.md` →「`batch:guard` の拒否窓」）。委譲された子やレビューエージェントは、親の記録を共有せず、それぞれに配送される（`docs/maintainers/turn-batching-rationale.md` →「フォークへの配送の実装（joshuafolkken/kit#1424）」）。機構の全体は `docs/josh-commands-automation.md` →「`josh batch:guard`」にある。範囲が `Bash|Edit|Read` に広がった経緯（joshuafolkken/kit#1509 を含む）は `docs/maintainers/turn-batching-rationale.md` →「書き込みが範囲に入った経緯（joshuafolkken/kit#1762）」、`docs/maintainers/turn-batching-rationale.md` →「読み取りが範囲に入った経緯（joshuafolkken/kit#1798）」、`docs/maintainers/turn-batching-rationale.md` →「事務コマンドが範囲に入った経緯（joshuafolkken/kit#1875）」。
 
   **ガードが見えないところ — ここでは自分で規則を当てる。**
 
@@ -89,9 +89,9 @@ Round trips:
 
 **梃子の本体は読み取りと編集の脱交互化（de-interleave）。** 交互の並びで編集を分けているのは直前の読み取りへの依存で、読み取りを 1 回に畳めば続く別ファイルへの編集は互いにも直前の読み取りにも依存せず 1 ターンに載る。#2178 の並び — `Read A` / `Edit A` / `Read B` / `Edit B` … の **9 ターン** — が、`read:files A B C D` → `Edit A` ＋ `Edit B` ＋ `Edit C` ＋ `Edit D` の **2 ターン**になる。
 
-上限超過時は `read:files` が「Read ツールで 1 ターンにまとめて読め」と返しフォールバックでも読み取りは畳まれたまま。詳細は `docs/josh-commands.md` →「`josh read:files`」。
+上限超過時は `read:files` が「Read ツールで 1 ターンにまとめて読め」と返しフォールバックでも読み取りは畳まれたまま。詳細は `docs/josh-commands-automation.md` →「`josh read:files`」。
 
-書き込みは `pnpm josh edit:files` で畳む（joshuafolkken/kit#2366） — 編集を **プラン（`=====` のパスヘッダ＋ git conflict マーカー対）** として受け取り 1 呼び出しで適用し、各編集は content-addressed なので `old` が 1 箇所に一致しなければ拒否して報告する。#2493 で `-`（標準入力）を受け、依存編集は `dependent` で拒否する。詳細は `docs/josh-commands.md` →「`josh edit:files`」。
+書き込みは `pnpm josh edit:files` で畳む（joshuafolkken/kit#2366） — 編集を **プラン（`=====` のパスヘッダ＋ git conflict マーカー対）** として受け取り 1 呼び出しで適用し、各編集は content-addressed なので `old` が 1 箇所に一致しなければ拒否して報告する。#2493 で `-`（標準入力）を受け、依存編集は `dependent` で拒否する。詳細は `docs/josh-commands-automation.md` →「`josh edit:files`」。
 
 ## ガード発火時にも合成コマンドを手渡す（joshuafolkken/kit#2311）
 

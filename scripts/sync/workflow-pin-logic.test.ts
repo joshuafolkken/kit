@@ -1,12 +1,15 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { workflow_pin_logic } from './workflow-pin-logic'
 
+const PNPM_SETUP = 'pnpm/setup'
 const CHECKOUT = 'actions/checkout'
 const OLD_REF = 'de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
 const NEW_REF = 'df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3'
 const TEMPLATE = 'templates/workflows/ci.yml'
 const SETUP_NODE = 'actions/setup-node'
 const WORKFLOW_DESTINATION = '.github/workflows/ci.yml'
+const SETUP_PNPM_ACTION = '.github/actions/setup-pnpm/action.yml'
 
 function uses_block(action: string, reference: string): string {
 	return `      - name: Checkout\n        uses: ${action}@${reference}`
@@ -127,6 +130,8 @@ describe('workflow_pin_logic.is_workflow_destination', () => {
 		['/srv/project/.github/workflows/ci.yml'],
 		['.github/workflows/deploy-vps.yaml'],
 		[String.raw`C:\project\.github\workflows\ci.yml`],
+		[SETUP_PNPM_ACTION],
+		['/srv/project/.github/actions/setup-pnpm/action.yaml'],
 	])('accepts a consumer workflow destination: %s', (destination) => {
 		expect(workflow_pin_logic.is_workflow_destination(destination)).toBe(true)
 	})
@@ -136,6 +141,9 @@ describe('workflow_pin_logic.is_workflow_destination', () => {
 		[TEMPLATE],
 		['CLAUDE.md'],
 		['.github/workflows/nested/ci.yml'],
+		['.github/actions/setup-pnpm/README.md'],
+		['.github/actions/action.yml'],
+		['.github/actions/setup-pnpm/nested/action.yml'],
 	])('rejects a destination that is not a consumer workflow: %s', (destination) => {
 		expect(workflow_pin_logic.is_workflow_destination(destination)).toBe(false)
 	})
@@ -167,6 +175,19 @@ describe('workflow_pin_logic.apply_pins_for_destination', () => {
 describe('workflow_pin_logic repository guard', () => {
 	it('runtime workflows pin each action to a single ref', () => {
 		expect(() => workflow_pin_logic.build_canonical_pins()).not.toThrow()
+	})
+
+	// joshuafolkken/kit#2982: pnpm/setup is pinned only in the setup-pnpm composite action, which
+	// every kit workflow calls, so the action has to count as a canonical source.
+	it('reads the local composite actions as canonical sources', () => {
+		const action = readFileSync(SETUP_PNPM_ACTION, 'utf8')
+		const pin = action
+			.split('\n')
+			.map((line) => workflow_pin_logic.parse_uses_line(line))
+			.find((candidate) => candidate?.name === PNPM_SETUP)
+
+		expect(pin).toBeDefined()
+		expect(canonical_reference(PNPM_SETUP)).toBe(pin?.ref)
 	})
 
 	// Ref equality between the template and .github/workflows is deliberately NOT asserted:

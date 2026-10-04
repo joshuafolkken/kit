@@ -1,10 +1,8 @@
-import { execFileSync } from 'node:child_process'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
-import { git_utilities } from '#scripts/git/constants'
 import { git_command } from '#scripts/git/git-command'
-import { git_location_environment } from '#scripts/git/git-location-environment'
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { z } from 'zod'
@@ -59,14 +57,6 @@ const IMPLEMENTATION_CONTEXT_THRESHOLD = CONTEXT_CUT_THRESHOLD
 // cut rather than blocking it.
 const CUT_MAX_AGE_MS = backlog_budget.WHOLE_RUN_BUDGET_MS
 const CUT_MAX_AGE_HOURS = backlog_budget.WHOLE_RUN_BUDGET_HOURS
-
-// The synchronous git read runs inside a `PreToolUse` hook, which holds the tool call for as long as
-// it takes; `rev-parse` takes no lock, so anything past a second is a fault rather than slow work.
-const GIT_READ_TIMEOUT_MS = 5000
-
-// The two lines `GIT_DIRECTORY_ARGUMENTS` prints, in order: the work tree's own git directory, then the
-// common one every lane of a repository shares. `git_directories` reads the same two asynchronously.
-const WORKTREE_DIRECTORY_INDEX = 0
 
 const END_COMMAND = 'pnpm josh run:cut --end'
 const READ_COMMAND = 'pnpm josh run:cut --json'
@@ -224,10 +214,10 @@ function read_cut(target: string, now: Date = new Date()): CutRead {
 
 // **The same read as `read_cut(cut_path(await worktree_directory()))`, taken synchronously**
 // (joshuafolkken/kit#1864). The pre-gate cut is enforced from a `PreToolUse` guard, and a guard
-// answers synchronously or not at all — so the one git call the path derivation needs is made here
-// with `git_command.GIT_DIRECTORY_ARGUMENTS`, the same argument list the asynchronous reader uses,
-// rather than a second spelling of it. Everything after the path is already shared: `cut_path` keys
-// the record and `classify` parses and expires it.
+// answers synchronously or not at all — so the one git call the path derivation needs is
+// `git_common_directory.own()`, the synchronous twin of the asynchronous reader, rather than a second
+// spelling of it. Everything after the path is already shared: `cut_path` keys the record and
+// `classify` parses and expires it.
 //
 // **A fault reads as "no cut was taken", and that direction is deliberate rather than fail-open.** A
 // checkout git cannot describe, a record that will not parse and an expired one all come back
@@ -235,47 +225,11 @@ function read_cut(target: string, now: Date = new Date()): CutRead {
 // The alternative errs the other way: a read fault would be taken for "already cut" and the guard
 // would go quiet on exactly the run it exists for. The cost of this direction is one refusal a lane
 // can answer by reissuing, since that row is delivered once per run.
-function git_directories_sync(cwd?: string): ReadonlyArray<string> {
-	try {
-		// The binary is resolved through `git_utilities` exactly as `git-spawn.ts` resolves it, so this
-		// call does not answer to whatever `PATH` happens to hold. It runs the binary directly with an
-		// argument array and no `shell` option, and both are internally controlled, never untrusted
-		// input.
-		const output = execFileSync(
-			git_utilities.get_git_command_for_spawn(),
-			[...git_command.GIT_DIRECTORY_ARGUMENTS],
-			// git's own diagnostics are discarded: a checkout it cannot describe is already the
-			// `undefined` below, and a hook that let `fatal: not a git repository` through would print it
-			// in front of a tool call that is about to be allowed.
-			// A `PreToolUse` hook holds the tool call while it runs, so the read is bounded rather than
-			// left to whatever git does.
-			// `cwd` is set only by `lane_cut_sync`, which reads another lane's record from the parent.
-			// With a `cwd`, the git location variables are cleared so it is what git answers for: a hook
-			// exports `GIT_DIR`, which beats `cwd` and would name the hook's checkout instead
-			// (joshuafolkken/kit#2515). Without one the environment is kept, so this read resolves the same
-			// checkout as the asynchronous `git_directories` that writes the record.
-			{
-				cwd,
-				env:
-					cwd === undefined
-						? process.env
-						: { ...process.env, ...git_location_environment.location_free_environment() },
-				encoding: 'utf8',
-				stdio: ['ignore', 'pipe', 'ignore'],
-				timeout: GIT_READ_TIMEOUT_MS,
-			},
-		) // NOSONAR
-
-		return output.split('\n').filter((line) => line !== '')
-	} catch {
-		return []
-	}
-}
-
+//
 // The work tree's own git directory (index 0), the same read `git_directories` makes asynchronously —
 // the record and the pre-gate guard both key on it.
 function worktree_git_directory_sync(): string | undefined {
-	return git_directories_sync()[WORKTREE_DIRECTORY_INDEX]
+	return git_common_directory.own()
 }
 
 // **The directory is injectable so a test never has to write to the live record.** Keyed to the work
@@ -297,7 +251,7 @@ function carried_cut_sync(
 // lane's own git directory, so the parent — standing in the main checkout — resolves that directory
 // from the lane's path rather than its own, and gets the record path back to mark it.
 function lane_cut_sync(lane_directory: string): { target: string; cut: RunCut } | undefined {
-	const directory = git_directories_sync(lane_directory)[WORKTREE_DIRECTORY_INDEX]
+	const directory = git_common_directory.own(lane_directory)
 
 	if (directory === undefined) return undefined
 

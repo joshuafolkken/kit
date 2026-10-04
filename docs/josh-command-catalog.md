@@ -65,6 +65,16 @@ Report whether the preview server crashed during a failed E2E attempt (CI)
 
 ---
 
+### `josh exports:unused` · `josh eu`
+
+> **Audience:** developer · **Side effects:** none
+
+_No arguments._
+
+Report exported namespace members nothing reads (kit only; a consumer project skips it)
+
+---
+
 ### `josh format` · `josh f`
 
 > **Audience:** developer · **Side effects:** files, processes
@@ -305,6 +315,16 @@ Fetch SonarCloud hotspots on a pull request and print each one's Step B disposit
 
 ---
 
+### `josh sonar:new-code`
+
+> **Audience:** automation · **Side effects:** network
+
+`<PR>`
+
+Fail when a pull request adds any new SonarCloud issue or duplicated block
+
+---
+
 ### `josh start` · `josh st`
 
 > **Audience:** developer · **Side effects:** files, git, network, processes
@@ -475,6 +495,16 @@ Release the merges main has taken since the version last changed
 
 ---
 
+### `josh release:github`
+
+> **Audience:** automation · **Side effects:** network, release
+
+_No arguments._
+
+Create the GitHub Release for a published tag, with generated notes
+
+---
+
 ### `josh release:scope`
 
 > **Audience:** automation · **Side effects:** none
@@ -593,6 +623,16 @@ _No arguments._
 
 Record template source hashes (--check to verify drift)
 
+---
+
+### `josh ruleset:check` · `josh rc`
+
+> **Audience:** maintainer · **Side effects:** network
+
+`[--apply]`
+
+Check that the default branch requires every status check kit's workflows report (--apply adds the missing ones)
+
 ## Git hooks
 
 ### `josh check-commit-message`
@@ -709,7 +749,7 @@ Collapse a backlogrun loop-head event into one call: read backlog:next, ask back
 
 > **Audience:** automation · **Side effects:** network
 
-`[issue...] [--only]`
+`[issue...] [--only] [--waves] [--exclude <n>[,<n>...]]`
 
 Print the whole backlog as a plan: ready now, waiting on what, waiting on a person, out of scope
 
@@ -749,9 +789,9 @@ Count code duplication across files and first-party repositories, printing each 
 
 > **Audience:** automation · **Side effects:** none
 
-`[--cut|--over]`
+`(--cut | --over <tokens-per-request>) [--path <dir>]`
 
-Report a run's token and credit cost from Claude Code's session transcripts
+Say whether the next turn of a run crosses the context-cut threshold (--cut) or a given tokens-per-request figure (--over)
 
 ---
 
@@ -869,7 +909,7 @@ Check an epic issue against the tracking requirements
 
 > **Audience:** automation · **Side effects:** network
 
-`<epic>`
+`<epic>... [--repo <owner/repo>] [--lanes]`
 
 List an epic's runnable children, bundled per repository
 
@@ -959,7 +999,7 @@ Before a second filing: say whether findings from this session fold into one iss
 
 > **Audience:** automation · **Side effects:** none
 
-`<assessment.json>`
+`<assessment.json> [--json]`
 
 Assess whether a complete draft can join an unstarted issue
 
@@ -989,7 +1029,7 @@ Print each issue's title, body and every comment on it, in one call
 
 > **Audience:** automation · **Side effects:** network
 
-`<title> [--body <summary>]`
+`<title> [--body <summary> | --body-file <path>]`
 
 Before filing: say whether an issue like this exists and which epic it belongs to
 
@@ -1239,7 +1279,7 @@ Classify how a dispatched lane child ended (merged, cut, abandoned, unreadable)
 
 > **Audience:** automation · **Side effects:** git, network, files
 
-`<issue>`
+`<issue> [--to <command>]`
 
 Open a run in one call: claim the tree, read the budget, bundle the reads, decide the pre-implementation step
 
@@ -1259,7 +1299,7 @@ Append to, read or watch the run’s append-only event stream (--append <kind> <
 
 > **Audience:** automation · **Side effects:** files
 
-`[issue]`
+`[<issue> [--fullrun | --halfrun-stop | --prrun-stop]]`
 
 Claim this working tree for a run, or say which run already holds it
 
@@ -1309,7 +1349,7 @@ Bundle a run’s pre-edit reads: body, comments, state, dependency scope
 
 > **Audience:** automation · **Side effects:** files
 
-`[--wait|--mark]`
+`[--once | --wait] [--interval <minutes>] [--hours <hours>] [--repo <owner/repo>] [--output <path>] | --mark | --path`
 
 Report an unattended run’s progress once it has gone quiet for an interval
 
@@ -1381,7 +1421,7 @@ Report whether the run is stranded — budget handed off, owner gone, and no sup
 
 `[<issue> ...]`
 
-Close a run in one call: commit the observation ledger, read the citations, decide the release scope
+Close a run in one call: return to the default branch, commit the observation ledger, read the citations, decide the release scope
 
 ---
 
@@ -1419,7 +1459,7 @@ Guard: exits non-zero when lane children are in-flight but the watcher has not p
 
 > **Audience:** automation · **Side effects:** git, network
 
-`"<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--notify-message <text> | --notify-message-file <path>] | --log <N>`
+`"<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | --log <N>`
 
 Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step
 

@@ -141,9 +141,6 @@ function epic_item_outcome(
 }
 
 const backlog_named = {
-	BACKLOG_KIND,
-	END_KIND,
-	NAMED_KIND,
 	NOTHING_TO_RUN,
 	after_failure,
 	epic_item_outcome,

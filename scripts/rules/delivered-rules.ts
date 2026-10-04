@@ -18,6 +18,7 @@ import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
 import { lane_switch_main } from './lane-switch-main'
 import { oracle_consulted } from './oracle-consulted'
+import { permission_guards } from './permission-guards'
 import { piped_verification } from './piped-verification'
 import { poll_loop } from './poll-loop'
 import { pre_gate_cut } from './pre-gate-cut'
@@ -143,8 +144,10 @@ const { is_issue_filing, on_bash_command } = bash_triggers
 // exemptions and the three tests that decide the second one. The three tests are spelled out rather
 // than named, because a delivery that said only "an interrupt is exempt" would hand the deciding back
 // to judgement at exactly the moment nothing else is open to read (joshuafolkken/kit#1518).
+// `WIP_CAP` is the number's single source; `wip-cap.md` states it once and a test pins the two equal.
+const WIP_CAP = 30
 const WIP_CAP_REASON =
-	"⛔ backlog WIP cap: count the target repository's open Issues before filing. With more than 30 " +
+	`⛔ backlog WIP cap: count the target repository's open Issues before filing. With more than ${String(WIP_CAP)} ` +
 	'open, close one first; nothing honestly closable means do not file. Two filings are exempt and ' +
 	'proceed while stating the overage — one the run is blocked by, and an interrupt, decided by ' +
 	'three tests rather than judgement: a verification answers wrongly, a documented workflow cannot ' +
@@ -482,6 +485,10 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	git_force.ROW,
 	worktree_guard.ROW,
 	file_body.ROW,
+	// **The deny-list bypasses closed by argv and path rather than glob** (joshuafolkken/kit#2983) — an
+	// index mutation, a recursive forced `rm` or destructive `gh` call, and a protected file. Each
+	// claims a command or file no row above does and refuses every occurrence (`permission-guards.ts`).
+	...permission_guards.ROWS,
 	// **The hand-written wait loop a lane child improvises over a backgrounded command's output**
 	// (joshuafolkken/kit#2371). `early-heartbeat` refuses a bare `sleep` and stands down on any loop
 	// keyword; this is the loop it left — a `while`/`until` that sleeps between probes of an output
@@ -788,6 +795,7 @@ const delivered_rules = {
 	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,
 	THIRD_PARTY_WRITE_REASON: third_party_write.THIRD_PARTY_WRITE_REASON,
+	WIP_CAP,
 	WIP_CAP_REASON,
 	WORKTREE_MUTATION_REASON: worktree_guard.WORKTREE_MUTATION_REASON,
 	delivery,

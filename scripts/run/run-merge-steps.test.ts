@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
-import { git_stash } from '#scripts/git/git-stash'
+import { git_stash } from '#scripts/git/stash/git-stash'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
@@ -15,7 +15,7 @@ const add_label_mock = vi.hoisted(() => vi.fn())
 const remove_label_mock = vi.hoisted(() => vi.fn())
 const comment_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('#scripts/git/git-gh-issue-write', () => ({
+vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 	git_gh_issue_write: {
 		issue_add_label: add_label_mock,
 		issue_remove_label: remove_label_mock,

@@ -70,9 +70,27 @@ async function prune_quietly(default_branch: string): Promise<void> {
 	}
 }
 
+// **The local default branch is fast-forwarded before it is checked out** (joshuafolkken/kit#2979).
+// A run's ledger file is committed on its feature branch and merged; a line appended afterwards leaves
+// it dirty, and git refuses to check out a stale default branch that lacks the file — so `run:tail`'s
+// sync failed exactly when the flush after it had work. Once fast-forwarded, the default branch holds
+// the committed file and the checkout carries the dirty lines over (the same step the flush takes,
+// joshuafolkken/kit#2462). Skipped on the default branch, where `fetch` refuses to update the checked-out
+// ref; a refusal elsewhere — a local default ahead of origin — is left to the checkout and pull to judge.
+async function fast_forward_quietly(default_branch: string): Promise<void> {
+	if ((await git_command.branch()) === default_branch) return
+
+	try {
+		await git_command.fast_forward_local(default_branch)
+	} catch {
+		// The checkout and `pull --ff-only` below decide, exactly as before this step existed.
+	}
+}
+
 async function synchronize(): Promise<number> {
 	const default_branch = await git_command.get_default_branch()
 
+	await fast_forward_quietly(default_branch)
 	await git_command.checkout(default_branch)
 	await git_command.pull_fast_forward()
 	await prune_quietly(default_branch)
@@ -115,7 +133,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const main_sync = { COMMAND_NAME, LANE_REFUSAL, main, run }
+const main_sync = { run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

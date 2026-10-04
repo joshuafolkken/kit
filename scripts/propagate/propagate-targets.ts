@@ -159,11 +159,7 @@ function resolve_targets(
 }
 
 const propagate_targets = {
-	has_checkout,
 	read_manifest,
-	classify_manifest_absence,
-	classify_before_dependency,
-	declared_range,
 	installed_version,
 	classify_target,
 	resolve_targets,

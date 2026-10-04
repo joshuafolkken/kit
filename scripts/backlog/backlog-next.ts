@@ -9,8 +9,9 @@ import { epic_next } from '#scripts/epic/epic-next'
 import { epic_next_read, type EpicRead } from '#scripts/epic/epic-next-read'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_report, type EpicNextResult, type EpicVerdict } from '#scripts/epic/epic-report'
+import { epic_solo_stale } from '#scripts/epic/epic-solo-stale'
 import { epic_triage, type TriageVerdict } from '#scripts/epic/epic-triage'
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { backlog_defect_priority } from './backlog-defect-priority'
@@ -294,7 +295,13 @@ async function gate_solo(result: EpicNextResult, context: PoolContext): Promise<
 	if (result.verdict !== 'run') return result
 
 	const { repo } = context
-	const read = await epic_busy.read_repository(repo)
+	const { read, notice } = await epic_solo_stale.release(
+		await epic_busy.read_repository(repo),
+		repo,
+	)
+
+	if (notice !== undefined) console.error(notice)
+
 	const gated = backlog_rank.gate(result, read, repo, standalone_keys(context))
 
 	if (gated.notice !== undefined) console.error(gated.notice)
@@ -410,23 +417,10 @@ const backlog_next = {
 	RETRY_MESSAGE,
 	READ_FAILURES,
 	VERDICT_TOKENS,
-	tokens_of,
-	warn_epic_gap,
-	warn_gaps,
-	report,
-	combine,
-	views_from,
 	resolve,
 	standalone_keys,
-	is_transport_failure,
-	report_retry,
-	report_triage,
 	context_of,
-	answer_pool,
-	report_none,
-	answer,
 	run,
-	main,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))

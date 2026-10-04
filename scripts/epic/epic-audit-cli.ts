@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_read } from '#scripts/issue/issue-read'
 import { epic_audit_logic, type AuditFinding, type ReferenceState } from './epic-audit'
 import { epic_audit_checks, type AuditChild } from './epic-audit-checks'
@@ -356,16 +356,13 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const epic_audit_cli = {
-	USAGE,
 	UNREADABLE_REPO,
 	parse_epic_number: epic_issue.parse_epic_number,
 	attach_bodies,
 	resolve_reference_states,
 	outside_references,
-	read_order_comments,
 	audit,
 	run,
-	main,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))

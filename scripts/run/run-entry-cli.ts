@@ -9,6 +9,9 @@ import { run_hold_cli } from './run-hold-cli'
 import { run_next } from './run-next'
 import { run_prep } from './run-prep'
 import { run_prep_cli } from './run-prep-cli'
+import { run_prrun_resume } from './run-prrun-resume'
+import { run_stage, type StageCommand, type StageDecision } from './run-stage'
+import { run_stage_read, type StageRead } from './run-stage-read'
 import { run_step } from './run-step'
 
 // `josh run:entry <N>` — one call for the fixed entry sequence a lane opens on (joshuafolkken/kit#2372).
@@ -27,7 +30,10 @@ const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
-const USAGE = 'Usage: josh run:entry <issue-number>'
+const USAGE = 'Usage: josh run:entry <issue-number> [--to kickoff|halfrun|prrun|fullrun]'
+const TO_FLAG = '--to'
+// The flag and its command.
+const TO_ARGUMENT_COUNT = 2
 const should_forward_stderr = true
 const NEWLINE = '\n'
 
@@ -48,16 +54,42 @@ function parse_number(argv: ReadonlyArray<string>): string | undefined {
 	return first
 }
 
+interface EntryRequest {
+	issue_number: string
+	command: StageCommand
+}
+
+// `--to <command>` names how far the run goes (joshuafolkken/kit#3042); absent, it is `fullrun`.
+// Anything else is refused.
+function parse_command(rest: ReadonlyArray<string>): StageCommand | undefined {
+	if (rest.length === 0) return run_stage.DEFAULT_COMMAND
+
+	const [flag, value] = rest
+
+	if (flag !== TO_FLAG || rest.length !== TO_ARGUMENT_COUNT) return undefined
+
+	return run_stage.to_command(value)
+}
+
+function parse_request(argv: ReadonlyArray<string>): EntryRequest | undefined {
+	const issue_number = parse_number(argv.slice(0, 1))
+	const command = parse_command(argv.slice(1))
+
+	return issue_number === undefined || command === undefined ? undefined : { issue_number, command }
+}
+
 function first_line(out: string): string {
 	return out.split(NEWLINE)[0] ?? ''
 }
 
 // `run:hold <N>` prints one token — `hold`, `busy` or `unknown` — and forwards its explanation to
 // stderr, so the composite branches on the token and the reader still sees why. `--fullrun` marks the
-// hold as this entry's, since `run:entry` is `fullrun #N`'s alone (joshuafolkken/kit#2760).
-async function claim_hold(issue_number: string): Promise<string> {
+// hold as a run whose implementation cut resumes as `fullrun #N` (joshuafolkken/kit#2760) — a
+// `fullrun`'s, and a `prrun`'s, which runs `fullrun`'s steps; a `halfrun`'s hold is never marked.
+async function claim_hold(issue_number: string, command: StageCommand): Promise<string> {
+	const mark = command === run_stage.HALFRUN ? [] : ['--fullrun']
 	const held = await josh_command.josh_run(
-		['run:hold', issue_number, '--fullrun'],
+		['run:hold', issue_number, ...mark],
 		should_forward_stderr,
 	)
 
@@ -131,31 +163,51 @@ function resume_report(issue_number: string, resume: Resume): number {
 // **A `halfrun` stopped before its commit is resumed, not claimed** (joshuafolkken/kit#2796): its hold
 // is kept over the verified diff, so the claim below would answer `busy` against it. The budget is asked
 // first, as for any run; then the hold is adopted and the run goes to the gate, skipping everything up
-// to and including implementation.
-async function resume_halfrun(issue_number: string): Promise<number> {
+// to and including implementation. **A `prrun` stopped before its merge is resumed the same way**
+// (joshuafolkken/kit#3023), under the token that says what is left of it.
+async function resume_stopped(
+	issue_number: string,
+	token: string,
+	stopped_run: { adopt: (issue: string) => Promise<boolean> },
+): Promise<number> {
 	const cost = await check_cost()
 
-	if (cost === run_entry.COST_OVER) {
-		return stop_report(issue_number, HALFRUN_RESUME_TOKEN, cost, COST_STOP_NOTE)
-	}
+	if (cost === run_entry.COST_OVER) return stop_report(issue_number, token, cost, COST_STOP_NOTE)
 
-	if (!(await run_halfrun_resume.adopt(issue_number))) {
+	if (!(await stopped_run.adopt(issue_number))) {
 		return stop_report(issue_number, run_hold_cli.BUSY_VERDICT, cost, HOLD_STOP_NOTE)
 	}
 
-	console.info(`entry #${issue_number} — resume: ${HALFRUN_RESUME_TOKEN}`)
+	console.info(`entry #${issue_number} — resume: ${token}`)
 
 	return SUCCESS_EXIT_CODE
 }
 
-async function open_run(issue_number: string): Promise<number> {
-	const resume = await ask_resume(issue_number)
+// The stopped run a decision picks up: a `halfrun` stop resumes at the gate, a `prrun` stop at
+// `followup` under its own token. `undefined` for any other start, so the ordinary claim decides.
+async function resume_any(
+	issue_number: string,
+	decision: StageDecision,
+	stage: StageRead,
+): Promise<number | undefined> {
+	if (decision.state === run_stage.HALFRUN_STOPPED) {
+		return await resume_stopped(issue_number, HALFRUN_RESUME_TOKEN, run_halfrun_resume)
+	}
 
-	if (resume.token !== run_cut_report.FRESH_VERDICT) return resume_report(issue_number, resume)
+	return stage.prrun_token === undefined
+		? undefined
+		: await resume_stopped(issue_number, stage.prrun_token, run_prrun_resume)
+}
 
-	if (await run_halfrun_resume.is_pending(issue_number)) return await resume_halfrun(issue_number)
+// **A command whose stopping point the issue has already reached redoes nothing** (joshuafolkken/kit#3042)
+// — the stage line is the whole report. A merged issue is the exception: the ordinary entry already
+// answers it (`already-done`, or `keep-work` over a lane's uncommitted work), so it is left to that.
+function is_settled(decision: StageDecision): boolean {
+	return decision.is_reached && decision.state !== run_stage.MERGED
+}
 
-	const hold = await claim_hold(issue_number)
+async function claim_run({ issue_number, command }: EntryRequest): Promise<number> {
+	const hold = await claim_hold(issue_number, command)
 
 	if (hold !== run_hold_cli.HOLD_VERDICT) {
 		return stop_report(issue_number, hold, run_entry.COST_SKIPPED, HOLD_STOP_NOTE)
@@ -170,16 +222,45 @@ async function open_run(issue_number: string): Promise<number> {
 	return emit({ issue_number, hold, cost, verdict: reads.verdict, report: reads.report })
 }
 
-async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const issue_number = parse_number(argv)
+// A carried cut is asked first, before anything is read (`run:cut --resume`); `kickoff` claims and cuts
+// nothing, so it never asks. `undefined` when no cut is waiting.
+async function resume_cut(request: EntryRequest): Promise<number | undefined> {
+	if (request.command === run_stage.KICKOFF) return undefined
 
-	if (issue_number === undefined) {
+	const resume = await ask_resume(request.issue_number)
+
+	return resume.token === run_cut_report.FRESH_VERDICT
+		? undefined
+		: resume_report(request.issue_number, resume)
+}
+
+// `kickoff` stops at the stage line whatever it says — it plans, and claims nothing.
+async function open_run(request: EntryRequest): Promise<number> {
+	const { issue_number, command } = request
+	const cut = await resume_cut(request)
+
+	if (cut !== undefined) return cut
+
+	const stage = await run_stage_read.read_stage(issue_number)
+	const decision = run_stage.decide(stage.state, command)
+
+	console.info(run_stage.format_decision(issue_number, decision))
+
+	if (command === run_stage.KICKOFF || is_settled(decision)) return SUCCESS_EXIT_CODE
+
+	return (await resume_any(issue_number, decision, stage)) ?? (await claim_run(request))
+}
+
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	const request = parse_request(argv)
+
+	if (request === undefined) {
 		console.error(USAGE)
 
 		return FAILURE_EXIT_CODE
 	}
 
-	return await open_run(issue_number)
+	return await open_run(request)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {
@@ -188,12 +269,8 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 const run_entry_cli = {
 	HALFRUN_RESUME_TOKEN,
-	SUCCESS_EXIT_CODE,
-	USAGE,
-	check_cost,
-	claim_hold,
-	main,
 	parse_number,
+	parse_request,
 	run,
 }
 

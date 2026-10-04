@@ -3,11 +3,11 @@ import { CLOSE_ANNOUNCEMENT, epic_close_comment } from './epic-close-comment'
 
 const { build_close_comment, read_close_comment_state } = epic_close_comment
 
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_list_comments: vi.fn() },
 }))
 
-const { git_gh_command } = await import('#scripts/git/git-gh-command')
+const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const mocked_comments = vi.mocked(git_gh_command.issue_list_comments)
 
 const EPIC_NUMBER = '200'

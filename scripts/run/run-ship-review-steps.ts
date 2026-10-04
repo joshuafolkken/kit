@@ -5,6 +5,7 @@ import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { openai_review_broker } from '#scripts/lane/openai-review-broker'
+import { review_record } from '#scripts/review/review-record'
 import { detached_launch } from './detached-launch'
 import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
 import { run_ship_scoped, type Phase } from './run-ship-scoped'
@@ -43,8 +44,10 @@ const ROUND_TWO_DECISION = ['review:round2', '--round-1-closed']
 const ROUND_TWO_BRIEF = ['review:brief', '--round', '2']
 const ROUND_TWO_REQUIRED = 'required'
 const FIXED_JOIN_NOTE =
-	'the round-1 gate read the tree before the review fixes — drained, not judged; the gate stage re-runs it.'
+	'the round-1 gate read the tree before the review fixes — drained, not judged; the gate re-runs once the tree is fixed.'
 const ROUND_TWO_SKIPPED_NOTE = 'round 2 not due — nothing left to verify; shipping on.'
+const ROUND_ONE_RECORDED_NOTE =
+	'round 1 already recorded for this issue — not reviewed again; the gate reads the fixed tree and round 2 decides after the commit.'
 
 // The scoped pair's precondition, met by the supervisor itself rather than stopped on
 // (joshuafolkken/kit#2500), single-sourced with the preflight and gate stages (joshuafolkken/kit#2946).
@@ -125,12 +128,14 @@ function current_verdict(): ReturnType<typeof run_ship_review.read_verdict> {
 
 // A red join blocks unless the reviewer fixed findings in place: the background gate then read the
 // tree before the fixes, so its verdict describes a tree that no longer exists. The join still ran to
-// its end, so the gate stage that follows never races it.
+// its end, so the gate stage that follows never races it. Any fix drains it, not only a round whose
+// every finding was fixed — a partial fix moved the tree just the same, and the round then stops on its
+// unfixed finding at the record rather than on a `Gate RED` the gate never earned (joshuafolkken/kit#2961).
 async function join_gate(): Promise<JoshResult> {
 	const joined = await josh([RUN_REVIEW, '--join'])
 
 	if (joined.code === SUCCESS_EXIT_CODE) return joined
-	if (current_verdict().kind !== run_ship_review.VERDICT.FIXED) return joined
+	if (!run_ship_review.has_fixes(stamp_file.read_stamp_text(paths().findings))) return joined
 
 	note(FIXED_JOIN_NOTE)
 
@@ -191,7 +196,16 @@ async function round_one_record(issue: string): Promise<JoshResult> {
 
 // The round-1 review, beside the gate: scoped pair → open → review → join → attest → record, stopping
 // at the first that did not pass.
+//
+// **A recorded round 1 is not run again** (joshuafolkken/kit#2964). A ship relaunched with `--review`
+// after a round-1 stop would otherwise review the whole change a second time as round 1 — a new Medium
+// there stops it again, and round 2 after the commit makes a third. The fix delta is round 2's to
+// verify, and `round_two_stage` asks whether it is due after the commit.
 async function review_stage(issue: string): Promise<JoshResult> {
+	const recorded = await review_record.check(Number(issue))
+
+	if (recorded.status === 'ok') return { code: SUCCESS_EXIT_CODE, out: ROUND_ONE_RECORDED_NOTE }
+
 	return await run_phases([
 		scoped_pair,
 		...reviewed([RUN_REVIEW], run_ship_review.reviewer_prompt, issue, '1'),
@@ -221,6 +235,6 @@ async function round_two_stage(issue: string): Promise<JoshResult> {
 	])
 }
 
-const run_ship_review_steps = { paths, review_stage, round_two_stage }
+const run_ship_review_steps = { review_stage, round_two_stage }
 
 export { run_ship_review_steps }

@@ -1,3 +1,4 @@
+import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import { backlog_drive, type DriveState, type LoopPorts, type OfferRead } from './backlog-drive'
 
 // The scripted ports every `backlog_drive` suite drives the loop through — one copy, so the suites
@@ -14,6 +15,8 @@ const OFFERED = '2500'
 const OFFERED_TOO = '2501'
 // The next-issue token `run:merge` prints after an ordinary merge.
 const NEXT_TOKEN = '2600'
+// A free-lane answer above any offer a suite queues, so only a suite that sets one meets the limit.
+const ROOMY_POOL = 6
 
 interface Harness {
 	ports: LoopPorts
@@ -25,8 +28,14 @@ interface Harness {
 interface Script {
 	finished?: ReadonlyArray<string>
 	merges?: ReadonlyMap<string, string>
+	// Children `run:merge` handled as parked rather than merged; every other reads as merged.
+	parked?: ReadonlyArray<string>
 	offers?: ReadonlyArray<OfferRead | undefined>
+	// Launches that failed after `lane:open` took a lane, and ones `lane:open` itself refused.
 	failed_launches?: ReadonlyArray<string>
+	unopened_launches?: ReadonlyArray<string>
+	// The free-lane answers in order, the last repeating; unset reads as a pool with room to spare.
+	free_lanes?: ReadonlyArray<number>
 }
 
 function offer(verdict: string, issues: ReadonlyArray<string> = []): OfferRead {
@@ -46,9 +55,17 @@ function child_ports(
 			calls.push(`merge ${issue}`)
 			finished.delete(issue)
 
-			return script.merges?.get(issue) ?? NEXT_TOKEN
+			const outcome = script.parked?.includes(issue) === true ? 'parked' : 'merged'
+
+			return { token: script.merges?.get(issue) ?? NEXT_TOKEN, outcome }
 		},
 	}
+}
+
+function launch_outcome(script: Script, issue: string): LaunchOutcome['kind'] {
+	if (script.failed_launches?.includes(issue) === true) return 'failed'
+
+	return script.unopened_launches?.includes(issue) === true ? 'unopened' : 'launched'
 }
 
 // The dispatch-facing ports: offers answer from the script's queue, then `wait`.
@@ -56,10 +73,12 @@ function dispatch_ports(
 	script: Script,
 	calls: Array<string>,
 	offers: Array<DriveState>,
-): Pick<LoopPorts, 'offer' | 'launch'> {
+): Pick<LoopPorts, 'offer' | 'launch' | 'free_lanes'> {
 	const queue = [...(script.offers ?? [])]
+	const free = [...(script.free_lanes ?? [ROOMY_POOL])]
 
 	return {
+		free_lanes: async () => (free.length > 1 ? free.shift() : free[0]) ?? ROOMY_POOL,
 		offer: async (asked) => {
 			calls.push('offer')
 			offers.push(asked)
@@ -69,7 +88,7 @@ function dispatch_ports(
 		launch: async (issue) => {
 			calls.push(`launch ${issue}`)
 
-			return !(script.failed_launches ?? []).includes(issue)
+			return launch_outcome(script, issue)
 		},
 	}
 }

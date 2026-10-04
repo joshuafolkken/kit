@@ -17,7 +17,9 @@ async function wait_for_ship(issue: string, prior_launch: string | undefined): P
 	if (read === undefined || read.launch_id === prior_launch) return 'none'
 
 	while (read.result === 'running') {
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await sleep(POLL_MS)
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		read = await current(issue)
 		if (read === undefined) return 'abnormal'
 	}

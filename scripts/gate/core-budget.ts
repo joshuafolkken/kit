@@ -4,6 +4,7 @@ import { availableParallelism } from 'node:os'
 import path from 'node:path'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { process_identity } from '#scripts/josh/process-identity'
+import { process_owner_schema } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
 
@@ -45,9 +46,7 @@ const WAIT_CAP_MS = 120_000
 // The head of the ledger is always admitted, so the smallest budget worth planning against is one core.
 const MIN_BUDGET = 1
 
-const reservation_schema = z.object({
-	pid: z.number(),
-	process_start: z.string().optional(),
+const reservation_schema = process_owner_schema.extend({
 	weight: z.number(),
 	claimed_at: z.number(),
 })
@@ -228,6 +227,7 @@ async function await_admission(context: WaitContext): Promise<void> {
 	while (!is_admitted(context.key, live_reservations(context.directory), context.budget)) {
 		if (context.now() >= context.deadline) return
 
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await context.sleep(context.poll_interval_ms)
 	}
 }
@@ -273,16 +273,10 @@ async function with_core_reservation<T>(
 }
 
 const core_budget = {
-	MIN_BUDGET,
-	POLL_INTERVAL_MS,
 	RESERVED_PREFIX,
-	WAIT_CAP_MS,
 	admitted_keys,
 	admitted_load,
-	is_admitted,
-	is_running,
 	live_reservations,
-	read_reservation,
 	release,
 	reserve,
 	with_core_reservation,

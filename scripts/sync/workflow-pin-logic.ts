@@ -1,5 +1,6 @@
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { composite_actions } from '#scripts/ci/composite-actions'
 import { is_workflow_destination } from '#scripts/claude/workflow-destination'
 import { package_path } from '#scripts/init/init-paths'
 
@@ -9,7 +10,8 @@ import { package_path } from '#scripts/init/init-paths'
 //
 // The refs committed in templates/workflows/* are NOT authoritative: every consumer
 // workflow is written through apply_pins_for_destination, which resolves the pins from
-// .github/workflows at write time. Dependabot only ever updates .github/workflows (its
+// .github/workflows (and the composite actions under .github/actions) at write time. Dependabot
+// only ever updates .github (its
 // github-actions ecosystem cannot scan templates/), so a stale template ref must not be
 // able to reach a consumer — and must not fail CI either. `josh sync-workflow-pins`
 // stays available to refresh the committed refs, but nothing depends on it having run.
@@ -144,8 +146,19 @@ function list_workflow_sources(relative_directory: string): Array<WorkflowSource
 		.map((name) => read_source(relative_directory, name))
 }
 
+// The local composite actions are runtime sources too: `.github/actions/setup-pnpm` is the only
+// place kit's own workflows still pin pnpm/setup (joshuafolkken/kit#2982).
+function list_composite_action_sources(): Array<WorkflowSource> {
+	return composite_actions
+		.list(package_path)
+		.map((file) => ({ file, text: readFileSync(package_path(file), 'utf8') }))
+}
+
 function build_canonical_pins(): Map<string, string> {
-	return collect_canonical(list_workflow_sources(RUNTIME_WORKFLOWS_DIR))
+	return collect_canonical([
+		...list_workflow_sources(RUNTIME_WORKFLOWS_DIR),
+		...list_composite_action_sources(),
+	])
 }
 
 // An action the templates use but .github/workflows does not: write-time injection has no
@@ -181,30 +194,8 @@ function scan_templates<T>(
 	return list_workflow_sources(TEMPLATE_WORKFLOWS_DIR).flatMap((source) => scan(source, canonical))
 }
 
-function find_pin_drift(): Array<PinDrift> {
-	return scan_templates((source, canonical) =>
-		find_drift_in_text(source.file, source.text, canonical),
-	)
-}
-
 function find_unknown_template_actions(): Array<UnknownAction> {
 	return scan_templates(unknown_actions_in_source)
-}
-
-function write_synced(source: WorkflowSource, canonical: ReadonlyMap<string, string>): void {
-	const synced = apply_to_text(source.text, canonical)
-	if (synced !== source.text) writeFileSync(package_path(source.file), synced)
-}
-
-function sync_pins(): Array<PinDrift> {
-	const canonical = build_canonical_pins()
-	const drifts = find_pin_drift()
-
-	for (const source of list_workflow_sources(TEMPLATE_WORKFLOWS_DIR)) {
-		write_synced(source, canonical)
-	}
-
-	return drifts
 }
 
 function format_drift_message(drifts: ReadonlyArray<PinDrift>): string {
@@ -222,7 +213,6 @@ function format_drift_message(drifts: ReadonlyArray<PinDrift>): string {
 
 const workflow_pin_logic = {
 	RUNTIME_WORKFLOWS_DIR,
-	TEMPLATE_WORKFLOWS_DIR,
 	parse_uses_line,
 	collect_canonical,
 	find_drift_in_text,
@@ -230,9 +220,7 @@ const workflow_pin_logic = {
 	is_workflow_destination,
 	apply_pins_for_destination,
 	build_canonical_pins,
-	find_pin_drift,
 	find_unknown_template_actions,
-	sync_pins,
 	format_drift_message,
 }
 

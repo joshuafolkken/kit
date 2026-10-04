@@ -1,8 +1,8 @@
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_bundle_referenced } from './epic-bundle-referenced'
 
-vi.mock('#scripts/git/git-gh-command', () => ({
+vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_get_plan_fields_classified: vi.fn() },
 }))
 

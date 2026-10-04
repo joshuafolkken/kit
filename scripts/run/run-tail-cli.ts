@@ -22,7 +22,6 @@ import { run_tail, type TailSection } from './run-tail'
 // step for a line written on the default branch outside any issue's run.
 
 const ARGV_OFFSET = 2
-const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = 'Usage: josh run:tail [<issue-number> ...]'
@@ -33,21 +32,27 @@ interface Step {
 	argv: (issues: ReadonlyArray<string>) => ReadonlyArray<string>
 }
 
-// The steps in the order a run closes on: any ledger line the run's own commit did not carry
-// (joshuafolkken/kit#2763) is committed first so the recurrence count is on main — on most runs the
-// flush answers `clean` — the citations are read for the completion report, and the release scope is
-// decided last.
-const FLUSH_STEP: Step = {
-	header: run_tail.OBSERVATIONS_HEADER,
-	argv: () => ['observations:flush'],
-}
+// The steps in the order a run closes on: the checkout returns to the default branch, any ledger line
+// the run's own commit did not carry (joshuafolkken/kit#2763) is committed so the recurrence count is on
+// main — on most runs the flush answers `clean` — the citations are read for the completion report, and
+// the release scope is decided last.
+//
+// **The return comes first because the flush refuses anywhere else** (joshuafolkken/kit#2979). A run
+// closes right after its merge, still on the feature branch it shipped from, and `josh ship` reaches
+// this report with nothing in between — so the flush stopped a merged run as failed. `main:sync` is the
+// step a person used to type after the fact; it fast-forwards the local default branch before the
+// checkout, so a ledger line appended after the merge is carried along rather than refused.
+const LEDGER_STEPS: ReadonlyArray<Step> = [
+	{ header: run_tail.SYNC_HEADER, argv: () => ['main:sync'] },
+	{ header: run_tail.OBSERVATIONS_HEADER, argv: () => ['observations:flush'] },
+]
 const REPORT_STEPS: ReadonlyArray<Step> = [
 	{ header: run_tail.CITATIONS_HEADER, argv: (issues) => ['issue:cite', ...issues] },
 	{ header: run_tail.RELEASE_HEADER, argv: () => ['release:scope'] },
 ]
 
 function steps_for(is_lane_child: boolean): ReadonlyArray<Step> {
-	return is_lane_child ? REPORT_STEPS : [FLUSH_STEP, ...REPORT_STEPS]
+	return is_lane_child ? REPORT_STEPS : [...LEDGER_STEPS, ...REPORT_STEPS]
 }
 
 // Numbers only — a target `issue:cite` reads as an issue, so a stray flag is refused rather than
@@ -75,6 +80,7 @@ async function close_run(issues: ReadonlyArray<string>): Promise<ReadonlyArray<T
 
 	const is_lane_child = lane_child_marker.is_child_of(process.cwd())
 
+	// eslint-disable-next-line no-await-in-loop -- the tail steps run in their declared order
 	for (const step of steps_for(is_lane_child)) sections.push(await run_step(step, issues))
 
 	return sections
@@ -100,7 +106,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const run_tail_cli = { SUCCESS_EXIT_CODE, USAGE, close_run, main, parse_issues, run }
+const run_tail_cli = { run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

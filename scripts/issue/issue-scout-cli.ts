@@ -5,7 +5,7 @@ import { epic_audit_logic } from '#scripts/epic/epic-audit'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from '#scripts/epic/epic-bundle'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
-import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import {
@@ -403,16 +403,10 @@ const issue_scout_cli = {
 	NO_REFERENCE_LINE,
 	CLOSED_UNREADABLE_LINE,
 	CLOSED_CEILING_LINE,
-	DRAFT_NUMBER,
 	read_arguments,
 	with_draft_body,
-	draft_of,
-	format_duplicates,
-	format_epic_decision,
-	format_report,
 	scout,
 	run,
-	main,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
