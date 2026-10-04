@@ -51,7 +51,7 @@ const TICK_SECONDS = 30
 const DECLINE_RETRY_SECONDS = 120
 // The clock a fresh loop starts with: nothing has declined yet, so nothing is being waited out.
 const NO_RETRY = 0
-const { DEFAULT_MAX_HOURS } = run_progress_args
+const { DEFAULT_WAIT_MAX_HOURS } = run_progress_args
 const ENVIRONMENT_KEY = 'JOSH_PROGRESS'
 const DISABLED_VALUE = '0'
 
@@ -74,7 +74,7 @@ const UNREADABLE_NOTICE =
 	'The `in-progress` listing could not be read, so nothing is reported. That is not "nothing is running" — check `gh auth status` and ask again.'
 const FAILED_TICK_PREFIX =
 	'A progress reading failed, so nothing is reported for it. The watcher is still running, and will read again after the cooldown:'
-const WAIT_EXPIRED_NOTICE = `The watch bound (\`--hours\`, ${String(DEFAULT_MAX_HOURS)} by default) ran out before the run had been quiet for a whole interval, so there is nothing to report. Starting another \`--wait\` resumes the same clock.`
+const WAIT_EXPIRED_NOTICE = `The watch bound (\`--hours\`, ${String(DEFAULT_WAIT_MAX_HOURS)} by default for \`--wait\`) ran out with no newly runnable work arriving. Every report it made is already on the run's event stream (\`pnpm josh run:event --watch\`), so there is nothing to relay. Starting another \`--wait\` resumes the same clock.`
 // The repository name is only ever printed, never written against, so the bounded lookup is the right
 // one: a `gh` call that hangs would otherwise block the synchronous read at startup and leave the
 // watcher neither running nor saying so.
@@ -104,6 +104,10 @@ interface WatchOptions {
 	output_paths: ReadonlyArray<string>
 	repo: string
 	tick_ms: number
+	// `--wait` alone: the line goes to the run's event stream and the ambient log, never to standard
+	// output, because a background command's output reaches the session only as a wake
+	// (joshuafolkken/kit#3102).
+	is_stream_only?: boolean
 }
 
 interface EmitContext {
@@ -202,7 +206,7 @@ async function emit(options: WatchOptions, context: EmitContext): Promise<EmitRe
 		unchanged_since_ms: state.unchanged_since_ms,
 	})
 
-	console.info(line)
+	if (options.is_stream_only !== true) console.info(line)
 
 	return { kind: 'observed', state, line }
 }
@@ -287,8 +291,8 @@ async function step(options: WatchOptions, target: string, loop: WatchLoop): Pro
 /**
  * The loop both reporting forms are, with one difference between them.
  *
- * `watch` runs until `--hours` expires; `--wait` stops at the first line it prints
- * (joshuafolkken/kit#1576). Everything else — where the clock is seeded from, the tick, the decline
+ * `watch` runs until `--hours` expires; `--wait` stops at the first arrival and keeps its lines off
+ * standard output (joshuafolkken/kit#3102). Everything else — where the clock is seeded from, the tick, the decline
  * cooldown `step` keeps — is one implementation on purpose: two copies would let a fix to the bound or
  * to the initial silence reach one form and not the other, and `--wait` is the form a run starts.
  */
@@ -301,17 +305,14 @@ function seed_loop(target: string, started_ms: number): WatchLoop {
 // Why the loop stopped, so `drive` prints the bound-expired notice only when the bound is what
 // expired — not when `josh followup` ended the watcher, which is a clean stop with nothing to report.
 // `arrived` is a `--wait` ended early by newly runnable work (joshuafolkken/kit#2503).
-type WatchExit = 'reported' | 'arrived' | 'ended' | 'bound'
+type WatchExit = 'arrived' | 'ended' | 'bound'
 
-// `wait` is present for `--wait` alone, which ends at the first line it prints or at the first arrival
-// its probe sees. `state` is set by the one branch of `step` that printed a line and by no other, so
-// this asks "was anything reported" without keeping a second copy of the loop's own bookkeeping.
-async function wait_exit(
-	loop: WatchLoop,
-	wait: ArrivalProbe | undefined,
-): Promise<WatchExit | undefined> {
+// `wait` is present for `--wait` alone, which ends at the first arrival its probe sees. **A report is
+// not an exit** (joshuafolkken/kit#3102): every exit wakes the session that started it, and a wake
+// spent relaying a line the event stream already carries is the most expensive turn a run takes, so
+// only what the parent has to act on ends the wait.
+async function wait_exit(wait: ArrivalProbe | undefined): Promise<WatchExit | undefined> {
 	if (wait === undefined) return undefined
-	if (loop.state !== undefined) return 'reported'
 
 	return (await wait.has_arrived(Date.now())) ? 'arrived' : undefined
 }
@@ -335,8 +336,8 @@ function final_exit(life: string): WatchExit {
 // The loop both reporting forms share, reading its own liveness record at the top of each pass — the
 // `run-wake-loop.ts` `run_loop` shape (joshuafolkken/kit#1727). A record gone means `josh followup`
 // removed it at the merge, so the watcher stops at once instead of waiting out its bound
-// (joshuafolkken/kit#1821); `--wait` also stops at the first line it prints, and otherwise the loop
-// runs until `--hours` expires.
+// (joshuafolkken/kit#1821); `--wait` also stops at the first arrival, and otherwise the loop runs
+// until `--hours` expires.
 async function run_ticks(
 	options: WatchOptions,
 	target: string,
@@ -354,7 +355,7 @@ async function run_ticks(
 		loop = await step(options, target, loop)
 
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		const exit = await wait_exit(loop, wait)
+		const exit = await wait_exit(wait)
 
 		if (exit !== undefined) return exit
 	}
@@ -397,14 +398,16 @@ async function once(options: WatchOptions): Promise<number> {
 }
 
 /**
- * One interval of silence, one line, and then exit — the form that reports where a long-running
- * command cannot (joshuafolkken/kit#1576).
+ * The form a run starts in the background: it reports on its own and wakes the caller only for work
+ * (joshuafolkken/kit#3102).
  *
- * **The exit is the whole point.** A harness that only delivers a background command's standard
- * output *when that command exits* — Claude Code is one — relays nothing at all from `watch`, which
- * by design never exits: `epicrun #1474` was measured at 2h36m without a single progress line while
- * children were in flight. This form waits the same clock out and then ends, so the line it printed
- * is delivered; the caller relays it and starts the next one.
+ * **A report is not a wake.** It once ended at its first line so a harness that delivers a background
+ * command's output only on exit would relay it (joshuafolkken/kit#1576) — which cost the orchestrating
+ * session one turn per heartbeat, re-reading a hundred thousand tokens of context to pass on a line it
+ * was forbidden to change. Every line already reaches the run's event stream as a `heartbeat` and the
+ * ambient log, which a person's `run:event --watch` pane reads with no model in between, so this form
+ * keeps its lines off standard output and exits only on an arrival, on `josh followup` ending its life
+ * record, or on its bound. The caller starts it once and restarts it only after one of those.
  *
  * **The clock is still this command's, not the caller's.** It is the watch loop itself, a tick at a
  * time, rather than a second reading of the same record — so a real report elsewhere pushes the next
@@ -419,10 +422,10 @@ async function once(options: WatchOptions): Promise<number> {
  * carried budget, no lane, and no `in-progress` child — so a genuinely idle repository keeps the loop
  * waiting instead of ending it; returning there would hand the caller an instant answer to restart,
  * and the documented restart makes that a poll rather than a heartbeat. Once a run has started the
- * loop reports and exits even before the first child carries `in-progress` (joshuafolkken/kit#1900).
+ * loop reports even before the first child carries `in-progress` (joshuafolkken/kit#1900).
  */
 async function wait_once(options: WatchOptions): Promise<number> {
-	return await drive(options, true)
+	return await drive({ ...options, is_stream_only: true }, true)
 }
 
 async function mark_now(): Promise<number> {
@@ -448,7 +451,7 @@ function to_options(values: ParsedValues): WatchOptions | undefined {
 
 	return {
 		interval_ms: run_progress_args.to_interval_ms(values.interval),
-		max_ms: run_progress_args.to_max_ms(values.hours),
+		max_ms: run_progress_args.to_max_ms(values.hours, values.wait === true),
 		output_paths: values.output ?? [],
 		repo,
 		tick_ms: TICK_SECONDS * run_progress.MS_PER_SECOND,
@@ -494,7 +497,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const run_progress_cli = {
-	DEFAULT_MAX_HOURS,
+	DEFAULT_WAIT_MAX_HOURS,
 	DISABLED_NOTICE,
 	FAILED_TICK_PREFIX,
 	FRESH_LOOP,
@@ -508,7 +511,6 @@ const run_progress_cli = {
 	run,
 	step,
 	to_interval_ms: run_progress_args.to_interval_ms,
-	to_max_ms: run_progress_args.to_max_ms,
 	wait_once,
 }
 

@@ -18,10 +18,11 @@ import { backlog_stalled } from './backlog-stalled'
 //
 // **"New" is measured against the watcher's own start**, so one issue wakes the parent once: the next
 // `--wait` the parent starts takes the pool as it stands then — the woken issue included, dispatched or
-// not — as its baseline. A reading that fails is not an arrival; the probe says nothing and the
-// interval still wakes the parent. A baseline that cannot be read leaves that one wait inert rather than
-// reading it as empty — an empty one would wake the parent for the whole pool — and the next `--wait`
-// reads it again.
+// not — as its baseline. A reading that fails is not an arrival; the probe says nothing and reads again
+// a minute later. A baseline that cannot be read is never read as empty — an empty one would wake the
+// parent for the whole pool — but it is not given up on either: the scheduled report no longer ends the
+// wait (joshuafolkken/kit#3102), so an inert probe would leave the parent without a wake until `--hours`. The
+// probe reads the baseline again each minute until one answers.
 //
 // **Every read is bounded.** The probe is awaited inside the watcher's tick loop, so a `gh` call that
 // hangs would otherwise freeze the loop — its `--hours` bound, its liveness ping and the exit that is
@@ -116,18 +117,39 @@ async function never_arrives(): Promise<boolean> {
 
 const INERT: ArrivalProbe = { has_arrived: never_arrives }
 
-// Only the next-probe instant changes between probes, and it is set before the read is awaited.
+// A probe spent on the baseline reports no arrival, whether or not the baseline answered.
+async function retry_baseline(
+	answered: Array<ReadonlySet<string>>,
+	ports: ReadyPorts,
+): Promise<boolean> {
+	const late = await read_baseline(ports)
+
+	if (late !== undefined) answered.push(late)
+
+	return false
+}
+
+// The next-probe instant is set before any read is awaited. A baseline that did not answer is read again
+// at the next probe instead of the reading, and the first one that answers is the baseline from then on
+// — never an arrival itself, since it is the pool as it stands.
 function probe_of(
-	baseline: ReadonlySet<string>,
+	initial: ReadonlySet<string> | undefined,
 	first_ms: number,
 	ports: ReadyPorts,
 ): ArrivalProbe {
 	let next_ms = first_ms
+	// At most one entry, held in a list so the baseline that answers after an await is added rather than
+	// reassigned over the value read before it.
+	const answered: Array<ReadonlySet<string>> = initial === undefined ? [] : [initial]
 
 	async function has_arrived(now_ms: number): Promise<boolean> {
 		if (now_ms < next_ms) return false
 
 		next_ms = now_ms + PROBE_INTERVAL_MS
+
+		const [baseline] = answered
+
+		if (baseline === undefined) return await retry_baseline(answered, ports)
 
 		const reading = await read_reading(ports)
 
@@ -146,12 +168,10 @@ async function start(
 ): Promise<ArrivalProbe> {
 	if (!(await is_parent_safely(is_parent))) return INERT
 
-	const baseline = await read_baseline(ports)
-
-	return baseline === undefined ? INERT : probe_of(baseline, now_ms + PROBE_INTERVAL_MS, ports)
+	return probe_of(await read_baseline(ports), now_ms + PROBE_INTERVAL_MS, ports)
 }
 
-const backlog_arrival = { INERT, PROBE_INTERVAL_MS, answered_issues, arrivals, start }
+const backlog_arrival = { PROBE_INTERVAL_MS, answered_issues, arrivals, start }
 
 export type { ArrivalProbe }
 export { backlog_arrival }

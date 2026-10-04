@@ -82,7 +82,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
 	// joshuafolkken/kit#2998 split the reference: the developer commands stay, the rest moved out.
-	{ path: 'docs/josh-commands-automation.md', bytes: 155_648 },
+	// joshuafolkken/kit#3102 documented `run:progress --wait` with 15 bytes of headroom left.
+	{ path: 'docs/josh-commands-automation.md', bytes: 159_744 },
 	{ path: 'docs/josh-commands.md', bytes: 36_864 },
 	{ path: 'prompts/coding-standards.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 8192 },

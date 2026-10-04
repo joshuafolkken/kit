@@ -51,7 +51,7 @@ call reports `hold`.
 ## The progress step and the lane-child seam
 
 - **Start the progress watcher once the hold is claimed** — `pnpm josh run:progress --wait` in the
-  background, presented as-is when it exits, and `pnpm josh run:progress --mark` in the same turn as
+  background, started once and relayed never, and `pnpm josh run:progress --mark` in the same turn as
   every real report (`backlogrun-progress.md` → "Progress while the run is quiet"). A `fullrun`
   dispatched as a lane child starts none and never reads that document (`pnpm josh read:set
   lane-child`). **The watcher is a per-session heartbeat; the run's report surface is not it** — the
