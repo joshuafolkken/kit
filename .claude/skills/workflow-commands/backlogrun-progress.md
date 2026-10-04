@@ -421,8 +421,8 @@ in the background, in the same turn as that first `lane:list`. The wired `run:wa
 
 **A carried-over child finishes in its own detached unit, and the resumed parent does not stand in front
 of its merge.** A lane handed over at the cut is still running its own `fullrun` — the foreground
-`pnpm josh followup` and the CI wait included — in a process of its own (background-commands.md →
-"`pnpm josh followup` — foreground": foreground is *within the unit*, the background from the parent).
+`pnpm josh followup` and the CI wait included — in a process of its own (`background-commands.md` →
+"Background the gate and push": foreground is *within the unit*, the background from the parent).
 **So the parent never runs a carried-over child's `followup` itself**: it polls the handed-over lane and
 opens new work beside it. **The reads and the dispatches go out together, in one turn** — `pnpm josh lane:list`,
 `pnpm josh run:liveness`, `epic:next --lanes`, and opening a lane for a child it offers take none of each

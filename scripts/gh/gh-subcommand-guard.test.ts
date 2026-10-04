@@ -121,14 +121,18 @@ describe('gh subcommand guard — what the scan reaches', () => {
 describe('gh subcommand guard — the allowlist', () => {
 	// A stale exemption is a hole nobody can see. Every entry must name a spawn that is really
 	// there, and say why it cannot be a REST call.
-	it('keeps no entry that matches nothing', () => {
-		const found = gh_subcommand_guard.scan_repository()
-		const unmatched = gh_subcommand_guard.ALLOWED_SPAWNS.filter((entry) =>
-			found.every((spawn) => spawn.file !== entry.file || spawn.subcommand !== entry.subcommand),
-		)
+	it(
+		'keeps no entry that matches nothing',
+		() => {
+			const found = gh_subcommand_guard.scan_repository()
+			const unmatched = gh_subcommand_guard.ALLOWED_SPAWNS.filter((entry) =>
+				found.every((spawn) => spawn.file !== entry.file || spawn.subcommand !== entry.subcommand),
+			)
 
-		expect(unmatched).toStrictEqual([])
-	})
+			expect(unmatched).toStrictEqual([])
+		},
+		SCAN_TIMEOUT_MS,
+	)
 
 	it('gives every entry a reason', () => {
 		for (const entry of gh_subcommand_guard.ALLOWED_SPAWNS) {

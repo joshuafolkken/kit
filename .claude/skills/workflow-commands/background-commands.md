@@ -46,7 +46,7 @@ the condition it ends on is the wrong one.
 This document is read at its point of use, not at the entry: it binds only after the first edit —
 at the gate, the push, the CI wait and `pnpm josh followup` — so it is fetched in full, in the turn
 that reaches the first backgroundable command (`pnpm josh gate`), by the run that has to obey it
-(`SKILL.md` → §1, "Five documents are read at the point of use"). `SKILL.md` → §2h is the resident
+(`SKILL.md` → §1, "Four documents are read at the point of use"). `SKILL.md` → §2h is the resident
 pointer to it, and carries the one thing it does not: the same rule at a batch's scale.
 
 **A run's idle time collects in its tail, and the two ways it collects there are one mistake**
