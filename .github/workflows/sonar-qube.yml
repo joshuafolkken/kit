@@ -35,6 +35,23 @@ jobs:
         if: env.SONAR_TOKEN != ''
         with:
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+      # The dependencies are installed before the scan, on a push as well as on a pull request:
+      # `tsconfig.sonar.json` extends `@joshuafolkken/kit/tsconfig/base`, which a consumer resolves
+      # only from node_modules, so a scan ahead of the install read a config it could not load
+      # (joshuafolkken/kit#3082). The new-code check below runs `pnpm josh` from the same install.
+      - name: Setup Node.js
+        if: env.SONAR_TOKEN != ''
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Configure GitHub Packages authentication for existing projects
+        if: env.SONAR_TOKEN != ''
+        run: printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' >> "$HOME/.npmrc"
+      - name: Setup pnpm and install dependencies
+        if: env.SONAR_TOKEN != ''
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
       # SonarCloud's New Code starts at the previous version, so an analysis without
       # `sonar.projectVersion` never moves that start and New Code grows without end, diluting every
       # ratio the Quality Gate judges (joshuafolkken/kit#3045). The version is `package.json`'s, so
@@ -57,19 +74,6 @@ jobs:
       # job (a required PR check) when the pull request adds any new issue, of any type or severity,
       # or any new duplicated block (joshuafolkken/kit#3045). An issue resolved in SonarCloud as
       # accepted or a false positive is not counted. A push to main has no pull request to read.
-      - name: Setup Node.js
-        if: env.SONAR_TOKEN != '' && github.event_name == 'pull_request'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-      - name: Configure GitHub Packages authentication for existing projects
-        if: env.SONAR_TOKEN != '' && github.event_name == 'pull_request'
-        run: printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' >> "$HOME/.npmrc"
-      - name: Setup pnpm and install dependencies
-        if: env.SONAR_TOKEN != '' && github.event_name == 'pull_request'
-        uses: ./.github/actions/setup-pnpm
-        with:
-          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Fail on new Sonar issues or duplicated blocks
         if: env.SONAR_TOKEN != '' && github.event_name == 'pull_request'
         env:
