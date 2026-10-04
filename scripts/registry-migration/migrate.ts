@@ -115,8 +115,9 @@ async function verify_public_versions(
 
 	for (const [index, [name, version]] of versions.entries()) {
 		const integrity = probed[index]
-		if (integrity === undefined) missing.push(`${name}@${version}`)
-		else integrities.set(version, integrity)
+		const id = `${name}@${version}`
+		if (integrity === undefined) missing.push(id)
+		else integrities.set(id, integrity)
 	}
 
 	return { missing, integrities }
@@ -183,7 +184,7 @@ async function verify_resolution(
 	const old_tarballs = migrate_logic.github_tarballs(lockfile)
 	if (old_tarballs.length > 0) throw new Error(`GitHub tarballs remain: ${old_tarballs.join(', ')}`)
 
-	if (migrate_logic.rewrite_kit_lockfile(lockfile, integrities) !== lockfile) {
+	if (migrate_logic.rewrite_scoped_lockfile(lockfile, integrities) !== lockfile) {
 		throw new Error('lockfile integrity does not match public npm')
 	}
 }
@@ -197,7 +198,7 @@ async function apply(
 		writeFileSync(context.npmrc_path, context.plan.content)
 		writeFileSync(
 			context.lockfile_path,
-			migrate_logic.rewrite_kit_lockfile(context.original_lockfile, integrities),
+			migrate_logic.rewrite_scoped_lockfile(context.original_lockfile, integrities),
 		)
 		await verify_resolution(context, dependencies, integrities)
 	} catch (error) {
@@ -215,7 +216,7 @@ function is_already_migrated(
 ): boolean {
 	return (
 		context.plan.content === context.original_npmrc &&
-		migrate_logic.rewrite_kit_lockfile(context.original_lockfile, integrities) ===
+		migrate_logic.rewrite_scoped_lockfile(context.original_lockfile, integrities) ===
 			context.original_lockfile
 	)
 }
