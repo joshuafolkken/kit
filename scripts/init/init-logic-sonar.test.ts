@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { init_logic } from './init-logic'
+import { init_logic_sonar } from './init-logic-sonar'
 
 const SONAR_TEMPLATE = 'sonar.projectKey={{PROJECT_KEY}}\nsonar.organization={{ORGANIZATION}}\n'
 const REPO_NAME = 'joshuafolkken/myapp'
@@ -8,6 +9,8 @@ const PROJECT_KEY = 'joshuafolkken_myapp'
 const ORGANIZATION = 'joshuafolkken'
 const SONAR_EXCLUSIONS_LINE = 'sonar.exclusions=.claude/**'
 const EXISTING = 'sonar.projectKey=org_repo\nsonar.organization=org\n'
+const SONAR_TEMPLATE_SOURCE = 'templates/sonar-project.properties'
+const SONAR_TEMPLATE_DESTINATION = 'sonar-project.properties'
 
 describe('apply_sonar_template', () => {
 	it('replaces PROJECT_KEY placeholder with given project key', () => {
@@ -49,13 +52,13 @@ describe('derive_sonar_identifiers', () => {
 
 describe('get_sonar_template_source', () => {
 	it('returns the template source path', () => {
-		expect(init_logic.get_sonar_template_source()).toBe('templates/sonar-project.properties')
+		expect(init_logic.get_sonar_template_source()).toBe(SONAR_TEMPLATE_SOURCE)
 	})
 })
 
 describe('get_sonar_template_destination', () => {
 	it('returns sonar-project.properties', () => {
-		expect(init_logic.get_sonar_template_destination()).toBe('sonar-project.properties')
+		expect(init_logic.get_sonar_template_destination()).toBe(SONAR_TEMPLATE_DESTINATION)
 	})
 })
 
@@ -182,5 +185,81 @@ describe('merge_sonar_properties template ID conflicts', () => {
 		expect(result).toContain('sonar.issue.ignore.multicriteria.e7.ruleKey=template:B\n')
 		expect(result).toContain('sonar.issue.ignore.multicriteria.e7.resourceKey=b/**\n')
 		expect(init_logic.merge_sonar_properties(result, template)).toBe(result)
+	})
+})
+
+const MC = 'sonar.issue.ignore.multicriteria'
+
+describe('init_logic_sonar direct — template and identifiers', () => {
+	it('replaces every placeholder occurrence and inserts replacement patterns literally', () => {
+		const template = '{{PROJECT_KEY}} {{PROJECT_KEY}} {{ORGANIZATION}}'
+
+		expect(init_logic_sonar.apply_sonar_template(template, '$&_x', '$1')).toBe('$&_x $&_x $1')
+	})
+
+	it('trims surrounding whitespace before deriving identifiers', () => {
+		expect(init_logic_sonar.derive_sonar_identifiers('  owner/repo \n')).toStrictEqual({
+			organization: 'owner',
+			project_key: 'owner_repo',
+		})
+	})
+
+	it('throws with the raw input when the owner is empty', () => {
+		expect(() => init_logic_sonar.derive_sonar_identifiers('/repo')).toThrow(
+			'Invalid GitHub repository nameWithOwner: /repo',
+		)
+	})
+
+	it('throws when the repository is empty', () => {
+		expect(() => init_logic_sonar.derive_sonar_identifiers('owner/')).toThrow()
+	})
+
+	it('exposes the template source and destination paths', () => {
+		expect(init_logic_sonar.get_sonar_template_source()).toBe(SONAR_TEMPLATE_SOURCE)
+		expect(init_logic_sonar.get_sonar_template_destination()).toBe(SONAR_TEMPLATE_DESTINATION)
+	})
+})
+
+describe('init_logic_sonar direct — merge_sonar_properties appending', () => {
+	it('adds a trailing newline to existing content before appending new keys', () => {
+		expect(init_logic_sonar.merge_sonar_properties('a=1', 'a=2\nb=3')).toBe('a=1\n\nb=3\n')
+	})
+
+	it('appends the whole template exclusion list when existing has none', () => {
+		const template = `${MC}=e1\n${MC}.e1.ruleKey=r\n`
+
+		expect(init_logic_sonar.merge_sonar_properties('a=1\n', template)).toBe(`a=1\n\n${template}`)
+	})
+
+	it('leaves the existing exclusion list alone when the template has none', () => {
+		expect(init_logic_sonar.merge_sonar_properties(`${MC}=e1\n`, 'a=1\n')).toBe(`${MC}=e1\n\na=1\n`)
+	})
+})
+
+describe('init_logic_sonar direct — merge_sonar_properties criterion conflicts', () => {
+	it('reuses an existing custom ID whose criterion matches the conflicting template one', () => {
+		const custom = `${MC}.custom.ruleKey=t\n${MC}.custom.resourceKey=t/**\n`
+		const existing = `${MC}=e1,custom\n${MC}.e1.ruleKey=mine\n${MC}.e1.resourceKey=m/**\n${custom}`
+		const template = `${MC}=e1\n${MC}.e1.ruleKey=t\n${MC}.e1.resourceKey=t/**\n`
+
+		expect(init_logic_sonar.merge_sonar_properties(existing, template)).toBe(existing)
+	})
+
+	it('does not treat a field missing on one side as a conflict', () => {
+		const existing = `${MC}=e1\n${MC}.e1.ruleKey=t\n`
+		const template = `${MC}=e1\n${MC}.e1.resourceKey=x/**\n`
+
+		expect(init_logic_sonar.merge_sonar_properties(existing, template)).toBe(
+			`${existing}\n${MC}.e1.resourceKey=x/**\n`,
+		)
+	})
+
+	it('allocates e1 when no existing ID is numeric', () => {
+		const existing = `${MC}=a\n${MC}.a.ruleKey=x\n`
+		const template = `${MC}=a\n${MC}.a.ruleKey=y\n`
+
+		expect(init_logic_sonar.merge_sonar_properties(existing, template)).toBe(
+			`${MC}=a,e1\n${MC}.a.ruleKey=x\n\n${MC}.e1.ruleKey=y\n`,
+		)
 	})
 })
