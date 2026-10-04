@@ -7,7 +7,7 @@ import { z } from 'zod'
 const WORKFLOW_PATH = '.github/workflows/publish.yml'
 const PACKAGE_GUIDE = 'docs/setup/full.md'
 const CLI_GUIDE = 'docs/cli.md'
-const DOCTOR_FIX = 'josh doctor --fix'
+const AUTHENTICATION_GUIDE = 'docs/authentication.md'
 const PACKAGE_API_REFERENCE = 'docs/package-api.md'
 const TROUBLESHOOTING_GUIDE = 'docs/troubleshooting.md'
 const TEMPLATE_CI_YML = 'templates/workflows/ci.yml'
@@ -266,7 +266,7 @@ describe('installation guidance', () => {
 	)
 
 	it('keeps the existing GitHub Packages guidance scoped to existing projects', () => {
-		const content = readFileSync('docs/authentication.md', 'utf8')
+		const content = readFileSync(AUTHENTICATION_GUIDE, 'utf8')
 
 		expect(content).toContain('Existing GitHub Packages authentication')
 		expect(content).toContain('New installations')
@@ -278,16 +278,23 @@ describe('installation guidance', () => {
 		expect(content).toMatch(/public npm, without credentials[^\n]*GitHub Packages versions/u)
 	})
 
-	it('keeps the migration steps in troubleshooting, linked from the CLI guide', () => {
+	it('keeps the CI credential placeholder guidance in troubleshooting', () => {
 		const content = readFileSync(TROUBLESHOOTING_GUIDE, 'utf8')
 
-		const cli_guide = readFileSync(CLI_GUIDE, 'utf8')
-
-		expect(cli_guide).toContain(DOCTOR_FIX)
-		expect(cli_guide).toContain('./troubleshooting.md#stale-')
-		expect(content).toContain(DOCTOR_FIX)
 		expect(content).toContain('kit CI template writes a GitHub Packages credential placeholder')
 	})
+})
+
+describe('obsolete migration notes', () => {
+	it.each([CLI_GUIDE, TROUBLESHOOTING_GUIDE, AUTHENTICATION_GUIDE, 'docs/sync.md'])(
+		'carries no migration note for an obsolete kit version in %s',
+		(filename: string) => {
+			const content = readFileSync(filename, 'utf8')
+
+			expect(content).not.toMatch(/`(?:< |>= )?(?:0\.200|1\.17|1\.60)\.0`/u)
+			expect(content).not.toContain('./troubleshooting.md#stale-')
+		},
+	)
 })
 
 describe('publishing guidance', () => {

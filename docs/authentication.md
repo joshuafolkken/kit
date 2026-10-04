@@ -103,7 +103,7 @@ PNPM_CONFIG_NPMRC_AUTH_FILE=.npmrc
 NODE_AUTH_TOKEN=<token>
 ```
 
-Unlike (b) and (c), this needs no build step of your own, so it also works on a platform that installs dependencies before running any command you control — Cloudflare Workers Builds among them. The committed file still holds no secret, only the placeholder; the token stays in the dashboard. `josh sync` leaves the line alone from kit `1.60.0` on. **Earlier versions removed it on every run**, which broke exactly this arrangement — and invisibly, because the pnpm store keeps serving already-resolved versions until the next `@joshuafolkken/*` bump. If you are on an older kit, upgrade before relying on (d).
+Unlike (b) and (c), this needs no build step of your own, so it also works on a platform that installs dependencies before running any command you control — Cloudflare Workers Builds among them. The committed file still holds no secret, only the placeholder; the token stays in the dashboard. `josh sync` leaves the line alone ([sync.md](./sync.md)).
 
 > **Which of (a)–(d) should I use?** (a) whenever the platform allows arbitrary variable names — it is the least setup. (d) when it does not, since a dashboard that rejects `npm_config_//…` still accepts `PNPM_CONFIG_NPMRC_AUTH_FILE`. (b) and (c) only where you control a step that runs before dependency installation.
 

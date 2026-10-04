@@ -28,10 +28,6 @@ josh help
 
 The pnpm global bin directory isn't on your `PATH` yet. Run `pnpm setup`, then open a new terminal; the full steps are in [troubleshooting.md](./troubleshooting.md#josh-command-not-found-after-pnpm-add--g).
 
-## 3. Migrating from older versions
-
-Versions prior to `0.200.0` installed a project-pinned shim at `~/.local/bin/josh` that can break or shadow the global `josh`. `josh doctor --fix` removes it; the details are in [troubleshooting.md](./troubleshooting.md#stale-localbinjosh-shim-from-an-old-version).
-
 ## Next
 
 - Set up a project: `josh start` for a project that will use the GitHub Issue workflow — it also carries the setup to GitHub — and `josh init` for one that will not, or for a re-run; see [init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start).
