@@ -31,6 +31,16 @@ jobs:
           registry-url: 'https://npm.pkg.github.com'
           scope: '@joshuafolkken'
 
+      # Read before setup-pnpm puts the safe-chain shims on PATH: safe-chain hides recent versions from
+      # registry metadata and prints a notice to stdout, which corrupts the value (joshuafolkken/kit#3060).
+      - name: Read registry latest
+        id: registry-latest
+        run: |
+          latest=$(cd "$RUNNER_TEMP" && npm view @joshuafolkken/kit dist-tags.latest --registry https://npm.pkg.github.com)
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: ./.github/actions/setup-pnpm
         with:
           cache: 'false'
@@ -39,11 +49,10 @@ jobs:
         id: publish-tag
         run: |
           version=$(node -p "require('./package.json').version")
-          latest=$(cd "$RUNNER_TEMP" && npm view @joshuafolkken/kit dist-tags.latest --registry https://npm.pkg.github.com)
-          tag=$(pnpm exec tsx scripts/release/publish-tag-cli.ts "$version" "$latest")
+          tag=$(pnpm exec tsx scripts/release/publish-tag-cli.ts "$version" "$LATEST")
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LATEST: ${{ steps.registry-latest.outputs.latest }}
 
       - run: pnpm publish --no-git-checks --tag ${{ steps.publish-tag.outputs.tag }} --registry https://npm.pkg.github.com
         env:
@@ -67,6 +76,13 @@ jobs:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'
 
+      # Before setup-pnpm, for the same reason as publish-github's lookup (joshuafolkken/kit#3060).
+      - name: Read registry latest
+        id: registry-latest
+        run: |
+          latest=$(cd "$RUNNER_TEMP" && npm view @joshuafolkken/kit dist-tags.latest --registry https://registry.npmjs.org)
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+
       - uses: ./.github/actions/setup-pnpm
         with:
           cache: 'false'
@@ -77,9 +93,10 @@ jobs:
         id: publish-tag
         run: |
           version=$(node -p "require('./package.json').version")
-          latest=$(cd "$RUNNER_TEMP" && npm view @joshuafolkken/kit dist-tags.latest --registry https://registry.npmjs.org)
-          tag=$(pnpm exec tsx scripts/release/publish-tag-cli.ts "$version" "$latest")
+          tag=$(pnpm exec tsx scripts/release/publish-tag-cli.ts "$version" "$LATEST")
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        env:
+          LATEST: ${{ steps.registry-latest.outputs.latest }}
 
       - name: Publish to npm
         run: cd "$RUNNER_TEMP" && npm publish kit.tgz --access public --tag ${{ steps.publish-tag.outputs.tag }} --registry https://registry.npmjs.org --userconfig /dev/null
