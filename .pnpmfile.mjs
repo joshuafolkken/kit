@@ -1,18 +1,29 @@
-// Strips the install-time lifecycle scripts from the packed manifest only (joshuafolkken/kit#2693).
-// kit's own `preinstall` runs Safe Chain for kit's development installs; shipped, it becomes a build
-// script every consumer's pnpm refuses to run unapproved, and it could not protect them anyway —
-// their install has already started by the time a dependency's `preinstall` runs. The repository's
-// package.json keeps it; `pnpm pack` and `pnpm publish` call this hook on the copy they write.
-const install_lifecycle_scripts = new Set(['preinstall', 'install', 'postinstall'])
+// josh-managed-pnpmfile: @joshuafolkken/kit
+// `josh init` / `josh sync` copy this file into every project that publishes (joshuafolkken/kit#3110)
+// and overwrite it while this first line stays; edit it in kit, not here.
+// Strips the Safe Chain `preinstall` from the packed manifest only (joshuafolkken/kit#2693).
+// kit writes it to run Safe Chain for the repository's own development installs; shipped, it becomes
+// a build script every consumer's pnpm refuses to run unapproved, and it could not protect them
+// anyway — their install has already started by the time a dependency's `preinstall` runs. The
+// repository's package.json keeps it; `pnpm pack` and `pnpm publish` call this hook on the copy they
+// write. Any other lifecycle script — a native build, a binary download — is the package's own and
+// ships untouched.
+const SAFE_CHAIN_PACKAGE = '@aikidosec/safe-chain'
 
-function strip_install_lifecycle(manifest) {
+function is_safe_chain_preinstall(name, command) {
+	return name === 'preinstall' && command.includes(SAFE_CHAIN_PACKAGE)
+}
+
+function strip_safe_chain_preinstall(manifest) {
 	const scripts = Object.fromEntries(
-		Object.entries(manifest.scripts ?? {}).filter(([name]) => !install_lifecycle_scripts.has(name)),
+		Object.entries(manifest.scripts ?? {}).filter(
+			([name, command]) => !is_safe_chain_preinstall(name, command),
+		),
 	)
 
 	return { ...manifest, scripts }
 }
 
-const hooks = { beforePacking: strip_install_lifecycle }
+const hooks = { beforePacking: strip_safe_chain_preinstall }
 
-export { hooks, install_lifecycle_scripts }
+export { hooks, is_safe_chain_preinstall }

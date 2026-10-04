@@ -1,3 +1,4 @@
+import { PACK_HOOK_FILE } from '#scripts/safe-chain/pack-hook'
 import { PROJECT_CONFIG_FILE } from '#scripts/safe-chain/project-config'
 import { managed_config_scope } from '#scripts/sync/managed-config-scope'
 import { BASIC_PRETTIER_CONFIG } from './init-actions'
@@ -13,6 +14,7 @@ const SETUP_ONLY_PATHS: ReadonlySet<string> = new Set([
 	CLAUDE_MD_FILENAME,
 	BASIC_PRETTIER_CONFIG,
 	PROJECT_CONFIG_FILE,
+	PACK_HOOK_FILE,
 	MANIFEST_FILE,
 	LOCKFILE,
 ])

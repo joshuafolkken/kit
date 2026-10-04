@@ -41,6 +41,10 @@ ignorePaths:
   #   - '**/*.min.js'
   #   - '**/*.svg'
 words:
+  # pnpm's `.pnpmfile.mjs` hook file that strips the safe-chain preinstall at pack time
+  # (joshuafolkken/kit#2693). Distributed, because `josh init` / `josh sync` copy that file, which
+  # names itself, into a published consumer (joshuafolkken/kit#3110).
+  - pnpmfile
   # Git's `--show-toplevel` flag is added to every Codex hook command when `josh sync` copies the
   # hooks into a consumer. The consumer spell-checks that transformed file with this dictionary.
   - toplevel

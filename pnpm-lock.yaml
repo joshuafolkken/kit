@@ -166,7 +166,7 @@ overrides:
   svelte: ^5.55.7
   vite: ^8.0.16
 
-pnpmfileChecksum: sha256-eX0fMaLKFVDx4auhM/ew0B4lF7anSQZ9lBkjC8h/mjI=
+pnpmfileChecksum: sha256-JIZ4YrJ+ncP7h+RQyzE7GBUzrscG466nzF8h0A0NHVg=
 
 importers:
 
