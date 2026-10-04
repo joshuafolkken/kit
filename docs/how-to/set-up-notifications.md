@@ -2,7 +2,7 @@
 
 ## When to use it
 
-You want a Telegram message when a workflow run needs you or finishes. Every workflow keyword sends them, so set this up before your first run.
+You want a Telegram message when a workflow run needs you or finishes. Every workflow keyword sends them and `josh notify` exits non-zero without the credentials, so set this up — or turn notifications off with `JOSH_NOTIFY=off` — before your first run.
 
 ## Steps
 
