@@ -241,6 +241,84 @@ it('stops on a rejected or timed-out request', async () => {
 	await expect(github_release.publish(request, TOKEN, TAG, KIT)).rejects.toThrow(CONNECTION_ERROR)
 })
 
+// A consumer released from the tag announcement, beside its own Publish run (joshuafolkken/kit#3138).
+const CONSUMER = { repository: 'acme/app', workflow: KIT.workflow, await_publish: true }
+
+function publish_runs(status: string, conclusion?: string): Response {
+	return response(200, {
+		workflow_runs: [{ id: 7, display_title: `Publish ${TAG}`, status, conclusion }],
+	})
+}
+
+describe('GitHub Release awaiting its own publication', () => {
+	it('releases the tag once its Publish run has succeeded', async () => {
+		const request = vi
+			.fn()
+			.mockResolvedValueOnce(missing_response())
+			.mockResolvedValueOnce(response(200, { workflow_runs: [] }))
+			.mockResolvedValueOnce(publish_runs('in_progress'))
+			.mockResolvedValueOnce(publish_runs('completed', 'success'))
+			.mockResolvedValueOnce(missing_response())
+			.mockResolvedValueOnce(response(200, NOTES))
+			.mockResolvedValueOnce(response(201, { tag_name: TAG }))
+		const wait = vi.fn().mockResolvedValue(undefined)
+
+		expect(await github_release.publish(request, TOKEN, TAG, { ...CONSUMER, wait })).toBe(
+			`published ${TAG} from the first commit`,
+		)
+		expect(wait).toHaveBeenCalledTimes(2)
+		expect(request.mock.calls[1]?.[0]).toMatch(/\/actions\/workflows\/publish\.yml\/runs/u)
+		expect(request.mock.calls[6]?.[0]).toMatch(/\/releases$/u)
+	})
+})
+
+it('creates no release when its own Publish run failed', async () => {
+	const request = vi
+		.fn()
+		.mockResolvedValueOnce(missing_response())
+		.mockResolvedValueOnce(publish_runs('completed', 'failure'))
+
+	expect(await github_release.publish(request, TOKEN, TAG, CONSUMER)).toBe(
+		`skipped ${TAG}: Publish ${TAG} did not succeed`,
+	)
+	expect(request).toHaveBeenCalledTimes(2)
+})
+
+const PUBLISH_WAITS = 100
+const WAIT_BUDGET = 120
+
+it('spends one wait budget across its own publication and the lower release', async () => {
+	const wait = vi.fn().mockResolvedValue(undefined)
+
+	// The tag's own Publish run finishes after PUBLISH_WAITS waits; the lower tag never gets a release.
+	function answer(url: string): Response {
+		if (url.includes('/releases/tags/')) return missing_response()
+		const status = wait.mock.calls.length >= PUBLISH_WAITS ? 'completed' : 'queued'
+		const run = { id: 7, display_title: 'Publish v1.889.0', status, conclusion: 'success' }
+
+		return response(200, { workflow_runs: [run] })
+	}
+
+	const request = vi.fn(async (url: string): Promise<Response> => {
+		return answer(url)
+	})
+	const settings = { ...CONSUMER, start_tag: KIT.start_tag, tags: [TAG], wait }
+
+	await expect(github_release.publish(request, TOKEN, 'v1.889.0', settings)).rejects.toThrow(
+		`Timed out waiting for previous GitHub Release ${TAG}`,
+	)
+	expect(wait).toHaveBeenCalledTimes(WAIT_BUDGET)
+})
+
+it('refuses to wait for a publication without the publish workflow', async () => {
+	const request = vi.fn().mockResolvedValueOnce(missing_response())
+	const settings = { ...CONSUMER, workflow: undefined }
+
+	await expect(github_release.publish(request, TOKEN, TAG, settings)).rejects.toThrow(
+		'RELEASE_WORKFLOW',
+	)
+})
+
 it('rejects an invalid tag before calling the API', async () => {
 	const request = vi.fn()
 

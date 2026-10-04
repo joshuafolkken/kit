@@ -18,7 +18,13 @@ describe('release:github environment', () => {
 		expect(input).toEqual({
 			token: 'token',
 			tag: 'v1.0.0',
-			settings: { repository: REPOSITORY, start_tag: undefined, workflow: undefined, jobs: [] },
+			settings: {
+				repository: REPOSITORY,
+				start_tag: undefined,
+				workflow: undefined,
+				jobs: [],
+				await_publish: false,
+			},
 		})
 	})
 
@@ -35,14 +41,28 @@ describe('release:github environment', () => {
 			start_tag: START_TAG,
 			workflow: WORKFLOW,
 			jobs: ['publish-github', 'publish-npm', 'update-production'],
+			await_publish: false,
 		})
 	})
+})
 
-	it.each(['GH_TOKEN', 'RELEASE_TAG', 'GITHUB_REPOSITORY'])('requires %s', (name) => {
-		expect(() =>
-			github_release_environment.read_release_input({ ...REQUIRED, [name]: '' }),
-		).toThrow('GH_TOKEN, RELEASE_TAG and GITHUB_REPOSITORY are required')
+it.each(['GH_TOKEN', 'RELEASE_TAG', 'GITHUB_REPOSITORY'])('requires %s', (name) => {
+	expect(() => github_release_environment.read_release_input({ ...REQUIRED, [name]: '' })).toThrow(
+		'GH_TOKEN, RELEASE_TAG and GITHUB_REPOSITORY are required',
+	)
+})
+
+it.each([
+	['true', true],
+	['', false],
+	['false', false],
+])('reads RELEASE_AWAIT_PUBLISH %o as %s', (value, expected) => {
+	const input = github_release_environment.read_release_input({
+		...REQUIRED,
+		RELEASE_AWAIT_PUBLISH: value,
 	})
+
+	expect(input.settings.await_publish).toBe(expected)
 })
 
 it('is the command the release workflows run', () => {

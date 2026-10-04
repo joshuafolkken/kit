@@ -1,14 +1,13 @@
 name: GitHub Release
 
 # Creates the GitHub Release, with notes generated from `.github/release.yml`, for each tag
-# `josh release` cuts (joshuafolkken/kit#3007). A repository with a Publish workflow gets its release
-# once that workflow has succeeded for the tag; one without it gets the release when auto-tag.yml
-# announces the tag. kit's own release is the `create-release` job of its publish.yml, which runs the
-# same `josh release:github`, so this file is distributed but never runs in kit.
+# `josh release` cuts (joshuafolkken/kit#3007). It starts when auto-tag.yml announces the tag; a
+# repository with a Publish workflow gets its release once that workflow has succeeded for the tag,
+# waited for inside `josh release:github`. A `workflow_run` on Publish is not used: a Publish run
+# started by the GITHUB_TOKEN never fires one (joshuafolkken/kit#3138). kit's own release is the
+# `create-release` job of its publish.yml, which runs the same `josh release:github`, so this file is
+# distributed but never runs in kit.
 on:
-  workflow_run:
-    workflows: [Publish]
-    types: [completed]
   repository_dispatch:
     types: [new-tag-created]
 
@@ -17,12 +16,6 @@ on:
 
 jobs:
   release:
-    # The Publish run is titled `Publish <tag>`; its head branch is not the tag when it was started by
-    # repository_dispatch, so the title is where the tag is read from.
-    if: >-
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
-      startsWith(github.event.workflow_run.display_title, 'Publish v')) ||
-      github.event_name == 'repository_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 65
     permissions:
@@ -36,23 +29,17 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # A repository with a Publish workflow is released from the workflow_run above, after its
-      # publication, so the tag announcement is left alone there and one tag never starts two releases.
+      # A repository with a Publish workflow waits for that workflow's `Publish <tag>` run to succeed
+      # before releasing; the announcement is the only trigger, so one tag never starts two releases.
       - name: Select release tag
         id: release
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          RUN_TITLE: ${{ github.event.workflow_run.display_title }}
-          RUN_WORKFLOW: ${{ github.event.workflow_run.workflow_id }}
           DISPATCH_TAG: ${{ github.event.client_payload.tag }}
         run: |
-          if [ "$EVENT_NAME" = workflow_run ]; then
-            echo "tag=${RUN_TITLE#Publish }" >> "$GITHUB_OUTPUT"
-            echo "workflow=$RUN_WORKFLOW" >> "$GITHUB_OUTPUT"
-          elif [ -f .github/workflows/publish.yml ]; then
-            echo "ℹ️ publish.yml releases this tag once it has published, skipping"
-          else
-            echo "tag=$DISPATCH_TAG" >> "$GITHUB_OUTPUT"
+          echo "tag=$DISPATCH_TAG" >> "$GITHUB_OUTPUT"
+          if [ -f .github/workflows/publish.yml ]; then
+            echo "workflow=publish.yml" >> "$GITHUB_OUTPUT"
+            echo "await=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Setup Node.js
@@ -77,3 +64,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_WORKFLOW: ${{ steps.release.outputs.workflow }}
+          RELEASE_AWAIT_PUBLISH: ${{ steps.release.outputs.await }}

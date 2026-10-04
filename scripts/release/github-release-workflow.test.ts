@@ -3,7 +3,6 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { ci_yml_fixture } from '#scripts/ci/ci-yml-fixture'
-import { workflow_expression_fixture } from '#scripts/ci/workflow-expression-fixture'
 import { init_logic } from '#scripts/init/init-logic'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -19,16 +18,6 @@ const directories: Array<string> = []
 afterEach(() => {
 	for (const directory of directories.splice(0)) rmSync(directory, { recursive: true })
 })
-
-function release_job_condition(): string {
-	return ci_yml_fixture.find_job(TEMPLATE, 'release')?.if ?? ''
-}
-
-function starts(event_name: string, workflow_run: Record<string, string> = {}): boolean {
-	return workflow_expression_fixture.evaluate_condition(release_job_condition(), {
-		github: { event_name, event: { workflow_run } },
-	})
-}
 
 function checkout(has_publish: boolean): string {
 	const directory = mkdtempSync(path.join(tmpdir(), 'github-release-'))
@@ -68,20 +57,14 @@ describe('distributed GitHub Release workflow', () => {
 		})
 	})
 
-	it('starts after a successful Publish run or a tag announcement', () => {
+	// A Publish run started by the GITHUB_TOKEN never fires workflow_run (joshuafolkken/kit#3138), and
+	// a second trigger would start a second release for the same tag.
+	it('starts from the tag announcement alone', () => {
 		const workflow = ci_yml_fixture.read_workflow(TEMPLATE)
 
-		expect(workflow).toMatch(/workflow_run:\n\s+workflows: \[Publish\]\n\s+types: \[completed\]/u)
 		expect(workflow).toMatch(/repository_dispatch:\n\s+types: \[new-tag-created\]/u)
-	})
-
-	it.each([
-		['workflow_run', { conclusion: 'success', display_title: `Publish ${TAG}` }, true],
-		['workflow_run', { conclusion: 'failure', display_title: `Publish ${TAG}` }, false],
-		['workflow_run', { conclusion: 'success', display_title: 'Publish main' }, false],
-		['repository_dispatch', {}, true],
-	])('decides whether a %s event %o releases: %s', (event_name, workflow_run, expected) => {
-		expect(starts(event_name, workflow_run)).toBe(expected)
+		expect(workflow).not.toContain('workflow_run:')
+		expect(ci_yml_fixture.find_job(TEMPLATE, 'release')?.if).toBeUndefined()
 	})
 
 	it('runs josh release:github with the selected tag and publish workflow', () => {
@@ -94,28 +77,21 @@ describe('distributed GitHub Release workflow', () => {
 				GH_TOKEN: '${{ github.token }}',
 				RELEASE_TAG: '${{ steps.release.outputs.tag }}',
 				RELEASE_WORKFLOW: '${{ steps.release.outputs.workflow }}',
+				RELEASE_AWAIT_PUBLISH: '${{ steps.release.outputs.await }}',
 			},
 		})
 	})
 })
 
 describe('release tag selection', () => {
-	it('reads the tag and workflow from the Publish run', () => {
-		const run = { EVENT_NAME: 'workflow_run', RUN_TITLE: `Publish ${TAG}`, RUN_WORKFLOW: '42' }
+	const dispatch = { DISPATCH_TAG: TAG }
 
-		expect(select_outputs(run, true)).toBe(`tag=${TAG}\nworkflow=42\n`)
-	})
-
-	it('releases an announced tag in a repository without publish.yml', () => {
-		const dispatch = { EVENT_NAME: 'repository_dispatch', DISPATCH_TAG: TAG }
-
+	it('releases an announced tag at once in a repository without publish.yml', () => {
 		expect(select_outputs(dispatch, false)).toBe(`tag=${TAG}\n`)
 	})
 
-	it('leaves an announced tag to the Publish run when publish.yml exists', () => {
-		const dispatch = { EVENT_NAME: 'repository_dispatch', DISPATCH_TAG: TAG }
-
-		expect(select_outputs(dispatch, true)).toBe('')
+	it('waits for the Publish run of an announced tag when publish.yml exists', () => {
+		expect(select_outputs(dispatch, true)).toBe(`tag=${TAG}\nworkflow=publish.yml\nawait=true\n`)
 	})
 })
 

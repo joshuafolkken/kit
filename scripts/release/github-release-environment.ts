@@ -37,6 +37,7 @@ function read_release_input(environment: Environment): ReleaseInput {
 			start_tag: optional(environment['RELEASE_START_TAG']),
 			workflow: optional(environment['RELEASE_WORKFLOW']),
 			jobs: job_names(environment['RELEASE_JOBS']),
+			await_publish: environment['RELEASE_AWAIT_PUBLISH'] === 'true',
 		},
 	}
 }
