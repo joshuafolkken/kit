@@ -22,6 +22,7 @@ const EXCLUDED_PREFIXES = [
 	'scripts/time/',
 	'scripts/cost/',
 	'scripts/retrospective/',
+	'scripts/dogfood/',
 	'evals/',
 ]
 const EXCLUDED_FILES = new Set(['docs/eval.md'])
