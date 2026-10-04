@@ -259,7 +259,7 @@ describe('merge_package_scripts retired scripts', () => {
 	})
 
 	it('removes all retired managed scripts', () => {
-		const existing = Object.fromEntries(RETIRED_SCRIPTS.map((k) => [k, 'some-value']))
+		const existing = Object.fromEntries(RETIRED_SCRIPTS.map((k) => [k, `josh ${k}`]))
 		const content = JSON.stringify({ scripts: { ...existing, josh: 'josh' } })
 		const result = JSON.parse(init_logic.merge_package_scripts(content, {})) as {
 			scripts: Record<string, string>
