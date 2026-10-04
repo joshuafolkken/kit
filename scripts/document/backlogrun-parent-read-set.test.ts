@@ -92,7 +92,8 @@ describe('backlogrun_parent_read_set.costed — the reduction', () => {
 
 	it('reports under the backlogrun label, and drops no point-of-use document', () => {
 		const report = backlogrun_parent_read_set.costed(ROOT)
-		const base = entry_read_set.costed(ROOT, BACKLOGRUN)
+		const reached = backlogrun_parent_read_set.REACHED_POINT_OF_USE
+		const base = entry_read_set.costed(ROOT, BACKLOGRUN, reached)
 
 		expect(report.entry).toBe(BACKLOGRUN)
 		expect(report.point_of_use.map((one) => one.file)).toEqual(

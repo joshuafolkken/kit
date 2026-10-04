@@ -64,17 +64,24 @@ const SKIPPED_POINT_OF_USE: ReadonlySet<string> = new Set([
 	'retrospective.md',
 ])
 
+// **A child that parks reads `backlogrun-park.md`** (`SKILL.md` §1, "A lane child that parks"), a
+// document a standalone `fullrun`'s path never names — so the child's reach adds it to its base
+// entry's (joshuafolkken/kit#3078).
+const REACHED_POINT_OF_USE: ReadonlySet<string> = new Set(['backlogrun-park.md'])
+
 function costed(root: string): ReadSetCost {
 	return read_set_trim.costed(root, {
 		base_entry: FULLRUN,
 		label: LANE_CHILD,
 		unused_skill_sections: UNUSED_SKILL_SECTIONS,
 		skipped_point_of_use: SKIPPED_POINT_OF_USE,
+		reached_point_of_use: REACHED_POINT_OF_USE,
 	})
 }
 
 const lane_child_read_set = {
 	LANE_CHILD,
+	REACHED_POINT_OF_USE,
 	SKIPPED_POINT_OF_USE,
 	UNUSED_SKILL_SECTIONS,
 	costed,

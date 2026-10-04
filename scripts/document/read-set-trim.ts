@@ -24,6 +24,8 @@ interface TrimSpec {
 	unused_skill_sections: ReadonlyArray<string>
 	// The point-of-use documents this role's parent owns; empty when the role owns them all.
 	skipped_point_of_use: ReadonlySet<string>
+	// The point-of-use documents this role reaches that its base entry's path does not name.
+	reached_point_of_use: ReadonlySet<string>
 }
 
 function subtract(left: Cost, right: Cost): Cost {
@@ -59,7 +61,7 @@ function reduce_skill(file: FileCost, saving: Cost): FileCost {
 // **`whole` and `scoped` both carry the own-files cost identically**, so the `SKILL.md` saving lands
 // on each by the same amount — there is no need to re-derive the referenced-section split.
 function costed(root: string, spec: TrimSpec): ReadSetCost {
-	const base = entry_read_set.costed(root, spec.base_entry)
+	const base = entry_read_set.costed(root, spec.base_entry, spec.reached_point_of_use)
 	const saving = unused_skill_cost(root, spec.unused_skill_sections)
 
 	return {
