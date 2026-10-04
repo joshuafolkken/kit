@@ -9,6 +9,7 @@ import {
 } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { git_location_environment } from '#scripts/git/git-location-environment'
 import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { dogfood_commit_cli } from './dogfood-commit-cli'
@@ -29,8 +30,12 @@ const IDENTITY = 'Dogfood'
 const IDENTITY_EMAIL = 'dogfood@example.com'
 const fixture = { sandbox: '', kit_root: '' }
 
+// Under the pre-push hook `GIT_DIR` and friends point at the repository being pushed and beat `cwd`,
+// so this file's own reads and setup clear them for the one command.
 function git(cwd: string, args: ReadonlyArray<string>): string {
-	return execaSync('git', args, { cwd }).stdout.trim()
+	const environment = git_location_environment.location_free_environment()
+
+	return execaSync('git', args, { cwd, env: environment, extendEnv: true }).stdout.trim()
 }
 
 function make_project(parent: string, name: string = TEST_PROJECT): string {
@@ -85,6 +90,20 @@ describe('dogfood_commit_cli.run — commits', () => {
 		expect(run(project)).toBe(0)
 		expect(git(project, LOG_SUBJECTS)).toBe(INITIAL_COMMIT)
 		expect(git(project, CURRENT_BRANCH)).toBe(MAIN)
+	})
+
+	// joshuafolkken/kit#3151: run from a git hook, an inherited `GIT_DIR` must not carry the commit
+	// into the repository it points at.
+	it('commits the test project, not the repository an inherited GIT_DIR points at', () => {
+		const project = make_project(fixture.sandbox)
+		const other = make_project(fixture.sandbox, 'other')
+
+		git(other, INIT_MAIN)
+		vi.stubEnv('GIT_DIR', path.join(other, '.git'))
+
+		expect(run(project)).toBe(0)
+		expect(git(project, LOG_SUBJECTS)).toBe(INITIAL_COMMIT)
+		expect(git(other, ['rev-list', '--all'])).toBe('')
 	})
 })
 
