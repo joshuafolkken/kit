@@ -67,6 +67,7 @@
 		".ncurc.json",
 		".prettierignore",
 		"pnpm-workspace.yaml",
+		".pnpmfile.mjs",
 		"tsconfig.sonar.json",
 		"playwright.config.ts",
 		"!**/*.test.ts",

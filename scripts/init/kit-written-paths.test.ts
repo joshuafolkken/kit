@@ -17,6 +17,7 @@ describe('the paths the kit setup writes (#2816)', () => {
 		'sonar-project.properties',
 		'prettier.config.mjs',
 		'.aikido',
+		'.pnpmfile.mjs',
 		MANIFEST,
 		'pnpm-lock.yaml',
 	])('counts %s as written by kit', (file_path) => {

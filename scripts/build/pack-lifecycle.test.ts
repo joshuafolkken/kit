@@ -20,11 +20,11 @@ interface Manifest {
 }
 
 interface PnpmfileModule {
-	install_lifecycle_scripts: ReadonlySet<string>
+	is_safe_chain_preinstall: (name: string, command: string) => boolean
 }
 
 const pnpmfile_url = pathToFileURL(path.join(REPO_ROOT, '.pnpmfile.mjs')).href
-const { install_lifecycle_scripts } = (await import(pnpmfile_url)) as PnpmfileModule
+const { is_safe_chain_preinstall } = (await import(pnpmfile_url)) as PnpmfileModule
 const out_directory = mkdtempSync(path.join(os.tmpdir(), 'josh-pack-lifecycle-'))
 
 afterAll(() => {
@@ -57,11 +57,15 @@ describe('the published package lifecycle scripts', () => {
 	})
 
 	it(
-		'ships no install-time lifecycle script and keeps the rest',
+		'ships no Safe Chain preinstall and keeps the rest',
 		() => {
 			const scripts = packed_manifest().scripts ?? {}
+			const shipped = Object.entries(scripts)
 
-			expect(Object.keys(scripts).filter((name) => install_lifecycle_scripts.has(name))).toEqual([])
+			expect(shipped.filter(([name, command]) => is_safe_chain_preinstall(name, command))).toEqual(
+				[],
+			)
+			expect(scripts['preinstall']).toBeUndefined()
 			expect(scripts['josh']).toBe(repository_manifest().scripts?.['josh'])
 		},
 		PACK_TIMEOUT_MS,

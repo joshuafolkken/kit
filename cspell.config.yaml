@@ -12,8 +12,8 @@ words:
   - postdev
   - predev
   - prepreview
-  # pnpm's .pnpmfile.mjs hook file that strips kit-only lifecycle scripts at pack time (#2693).
-  - pnpmfile
+  # pnpm's setting that names several pnpmfiles; one makes pnpm skip the default file (#3110).
+  - pnpmfiles
   # Docker image and Python manifest named by the Git-free basic setup guide (#2606).
   - buildpack
   - pyproject
