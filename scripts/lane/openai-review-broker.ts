@@ -6,6 +6,7 @@ import { agent_argv } from '#scripts/agent/agent-argv'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { error_text } from '#scripts/lib/error-message'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_ship_review } from '#scripts/run/run-ship-review'
 import { z } from 'zod'
@@ -102,7 +103,9 @@ function write_response(target: string, body: z.infer<typeof response_schema>): 
 async function launched(lane: LaneInfo, round: ReviewRound): Promise<boolean> {
 	try {
 		return await launch_review(lane, round)
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('openai_review_broker.launched', error)
+
 		return false
 	}
 }

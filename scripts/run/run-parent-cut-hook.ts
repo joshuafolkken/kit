@@ -3,6 +3,7 @@ import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_format } from '#scripts/cost-runtime/cost-format'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { hook_decision } from '#scripts/josh/hook-decision'
+import { error_text } from '#scripts/lib/error-message'
 import { implementation_cut_verdict } from '#scripts/rules/implementation-cut-verdict'
 import { run_carry, type RunCarry } from './run-carry'
 import { run_headless } from './run-headless'
@@ -104,7 +105,9 @@ async function refusal_for(
 function is_unit_call(raw_payload: string): boolean {
 	try {
 		return (hook_decision.parse_hook_payload(raw_payload)?.agent_id ?? '') !== ''
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('run_parent_cut_hook.is_unit_call', error)
+
 		return false
 	}
 }

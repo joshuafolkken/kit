@@ -1,3 +1,4 @@
+import { error_text } from '#scripts/lib/error-message'
 import { run_carry } from './run-carry'
 import { run_event_scope } from './run-event-scope'
 import { run_event_stream, type RunEvent } from './run-event-stream'
@@ -62,8 +63,10 @@ async function emit_once(kind: string, text: string): Promise<boolean> {
 		if (target === undefined || run_event_stream.read_last(target)?.kind === kind) return false
 
 		return run_event_stream.append(target, kind, text, now_iso()).appended
-	} catch {
+	} catch (error) {
 		// Best-effort: a failed append is dropped rather than raised into the loop's work.
+		error_text.trace_swallowed('run_event_stream_emit.emit_once', error)
+
 		return false
 	}
 }
@@ -98,8 +101,10 @@ async function emit_once_since(kind: string, text: string, reset_kind: string): 
 		}
 
 		return run_event_stream.append(target, kind, text, now_iso()).appended
-	} catch {
+	} catch (error) {
 		// Best-effort: a failed append is dropped rather than raised into the caller's work.
+		error_text.trace_swallowed('run_event_stream_emit.emit_once_since', error)
+
 		return false
 	}
 }
