@@ -301,7 +301,7 @@ Carry the published release into every consumer repository next to this one
 
 _No arguments._
 
-Migrate a kit-only project from GitHub Packages to public npm
+Migrate a project from GitHub Packages to public npm
 
 ---
 

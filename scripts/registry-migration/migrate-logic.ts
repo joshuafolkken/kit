@@ -99,25 +99,33 @@ function is_github_tarball_line(line: string): boolean {
 	return line.trimStart().startsWith('tarball: https://npm.pkg.github.com/')
 }
 
-function clean_kit_line(
+// Integrities are keyed by `name@version`, so two scoped packages sharing a version never collide.
+function package_id(key: string): string {
+	const name = fix_gh_packages_logic.package_path_from_key(key)
+
+	return `${name}@${fix_gh_packages_logic.package_version_from_key(key)}`
+}
+
+function clean_scoped_line(
 	line: string,
-	version: string,
+	id: string,
 	integrities: ReadonlyMap<string, IntegrityPair>,
 ): string | undefined {
-	if (!version) return line
+	if (!id) return line
 	if (is_github_tarball_line(line)) return undefined
 	const cleaned = remove_flow_tarball(line)
-	const pair = integrities.get(version)
+	const pair = integrities.get(id)
 	if (pair === undefined) return cleaned
 
 	return cleaned.split(`integrity: ${pair[0]}`).join(`integrity: ${pair[1]}`)
 }
 
-function next_kit_version(line: string, version: string): string {
-	if (!is_package_entry(line)) return version
-	const prefix = "  '@joshuafolkken/kit@"
+function next_scoped_id(line: string, id: string): string {
+	if (!is_package_entry(line)) return id
+	const prefix = `  '${SCOPE}/`
+	if (!line.startsWith(prefix)) return ''
 
-	return line.startsWith(prefix) ? (line.slice(prefix.length).split("'", 1)[0] ?? '') : ''
+	return package_id(line.slice("  '".length).split("'", 1)[0] ?? '')
 }
 
 function integrity_pair(
@@ -135,12 +143,12 @@ function lock_integrities(
 ): Map<string, IntegrityPair> {
 	const packages = fix_gh_packages_logic.parse_lockfile_packages(lockfile)
 	const pairs = new Map<string, IntegrityPair>()
-	const kit_entries = Object.entries(packages).filter(([key]) => key.startsWith(`${SCOPE}/kit@`))
+	const scoped_entries = Object.entries(packages).filter(([key]) => key.startsWith(`${SCOPE}/`))
 
-	for (const [key, entry] of kit_entries) {
-		const version = fix_gh_packages_logic.package_version_from_key(key)
-		const pair = integrity_pair(entry.resolution?.integrity, npm_integrities.get(version))
-		if (pair !== undefined) pairs.set(version, pair)
+	for (const [key, entry] of scoped_entries) {
+		const id = package_id(key)
+		const pair = integrity_pair(entry.resolution?.integrity, npm_integrities.get(id))
+		if (pair !== undefined) pairs.set(id, pair)
 	}
 
 	return pairs
@@ -150,17 +158,17 @@ function push_if_defined(lines: Array<string>, cleaned: string | undefined): voi
 	if (cleaned !== undefined) lines.push(cleaned)
 }
 
-function rewrite_kit_lockfile(
+function rewrite_scoped_lockfile(
 	lockfile: string,
 	npm_integrities: ReadonlyMap<string, string>,
 ): string {
-	let kit_version = ''
+	let id = ''
 	const lines: Array<string> = []
 	const integrities = lock_integrities(lockfile, npm_integrities)
 
 	for (const line of lockfile.split('\n')) {
-		kit_version = next_kit_version(line, kit_version)
-		const cleaned = clean_kit_line(line, kit_version, integrities)
+		id = next_scoped_id(line, id)
+		const cleaned = clean_scoped_line(line, id, integrities)
 
 		push_if_defined(lines, cleaned)
 	}
@@ -206,7 +214,8 @@ function previous_registry(project_npmrc: string, user_npmrc: string): string {
 
 function plan(project_npmrc: string, user_npmrc: string, lockfile: string): MigrationPlan {
 	const packages = scoped_packages(lockfile)
-	const blocked = packages.filter((name) => name !== `${SCOPE}/kit`)
+	// Every scoped package may migrate; `migrate` blocks any whose locked version is not on public npm.
+	const blocked: Array<string> = []
 	if (has_duplicate_mapping(project_npmrc, user_npmrc)) blocked.push('duplicate registry mappings')
 	const unsupported = unsupported_registry(project_npmrc)
 	if (unsupported !== undefined) blocked.push(unsupported)
@@ -220,7 +229,7 @@ const migrate_logic = {
 	plan,
 	github_tarballs,
 	is_github_tarball,
-	rewrite_kit_lockfile,
+	rewrite_scoped_lockfile,
 	scoped_versions,
 }
 
