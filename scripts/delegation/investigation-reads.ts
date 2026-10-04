@@ -71,7 +71,7 @@ const INVESTIGATOR_AGENT = 'investigator'
 // What the refusal tells the model. It has to name the count, the command and the return shape,
 // because the deny reason is the only text that reaches the model — a run that is refused and told
 // nothing reads it as a broken tool.
-const REASON = `⛔ investigation: ${String(delegation_policy.INVESTIGATION_FILE_THRESHOLD)} files read and not edited, or ${String(delegation_policy.INVESTIGATION_SEARCH_TURN_THRESHOLD)} search turns, since the last delegated unit, so the reading from here goes to a unit of its own. Ask \`pnpm josh delegate investigation\`, then dispatch the \`${INVESTIGATOR_AGENT}\` agent (\`kit:${INVESTIGATOR_AGENT}\` in a consumer) with a brief of what the main line has already concluded and what is left to find out; it returns the conclusion plus its \`file:line\` citations, never the file text. Keep a read in the main line only where this run will edit that file — an \`Edit\` cannot be issued against text you do not hold. This run's own instructions and the harness's own session files — a backgrounded call's output, a persisted tool result, this session's scratchpad — are never counted, so they are not what took the count here. The rule is \`.claude/skills/workflow-commands/SKILL.md\` → §2b, "The pre-implementation reading".`
+const REASON = `⛔ investigation: ${String(delegation_policy.INVESTIGATION_FILE_THRESHOLD)} files read and not edited, or ${String(delegation_policy.INVESTIGATION_SEARCH_TURN_THRESHOLD)} search turns, since the last delegated unit, so the reading from here goes to a unit of its own (a successful write also starts the search count over). Ask \`pnpm josh delegate investigation\`, then dispatch the \`${INVESTIGATOR_AGENT}\` agent (\`kit:${INVESTIGATOR_AGENT}\` in a consumer) with a brief of what the main line has already concluded and what is left to find out; it returns the conclusion plus its \`file:line\` citations, never the file text. Keep a read in the main line only where this run will edit that file — an \`Edit\` cannot be issued against text you do not hold. This run's own instructions and the harness's own session files — a backgrounded call's output, a persisted tool result, this session's scratchpad — never count toward the files, so they are not what took the file count here; every read-only search turn counts, whatever it names. The rule is \`.claude/skills/workflow-commands/SKILL.md\` → §2b, "The pre-implementation reading".`
 
 interface ReadTally {
 	// The files read and not since edited, resolved so the two ways a target reaches here compare.
@@ -307,6 +307,15 @@ function is_read_only_search(span: Span): boolean {
 	return SEARCH_LABELS.has(span.label) && span.is_bundleable && !span.may_write
 }
 
+// **A span with no message id belongs to no known turn, so it is a turn of its own** — the reading every
+// other turn counter gives `NO_MESSAGE_ID` (`time-round-trips.ts`, `time-bundles.ts`). Keyed by the
+// id, every untagged search would collapse into one entry and the count would never reach its threshold.
+function search_turn_key(searches: ReadonlyMap<string, number>, span: Span): string {
+	if (span.message_id !== time_spans.NO_MESSAGE_ID) return span.message_id
+
+	return `${time_spans.NO_MESSAGE_ID}#${String(searches.size)}`
+}
+
 // **A successful write ends the streak.** The measurement behind the threshold counted searches since
 // the last edit or delegation: a run that has started writing is implementing, and the searches that
 // follow locate the next edit rather than continue an investigation.
@@ -324,9 +333,9 @@ function apply_search(searches: Map<string, number>, span: Span): void {
 		return
 	}
 
-	if (is_read_only_search(span) && !searches.has(span.message_id)) {
-		searches.set(span.message_id, span.ended_ms)
-	}
+	const turn = search_turn_key(searches, span)
+
+	if (is_read_only_search(span) && !searches.has(turn)) searches.set(turn, span.ended_ms)
 }
 
 function apply_span(accumulation: Accumulation, span: Span, edited: ReadonlySet<string>): void {

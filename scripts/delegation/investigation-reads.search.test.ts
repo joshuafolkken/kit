@@ -8,8 +8,16 @@ import { investigation_reads } from './investigation-reads'
 // turns are counted from the transcript, a turn's parallel searches count once, and a delegation or a
 // write starts the count over.
 
-const { BRANCH, edit_call_line, error_result_line, ms, result_line, call_line, turn_call_line } =
-	time_transcript_fixture
+const {
+	BRANCH,
+	edit_call_line,
+	error_result_line,
+	josh_call_line,
+	ms,
+	result_line,
+	call_line,
+	turn_call_line,
+} = time_transcript_fixture
 
 const THRESHOLD = delegation_policy.INVESTIGATION_SEARCH_TURN_THRESHOLD
 const BELOW_THRESHOLD = THRESHOLD - 1
@@ -46,12 +54,28 @@ function search_text(turns: number, start = 0): string {
 		.join('\n')
 }
 
+// `turns` closed searches whose lines carry no message id, as an older transcript writes them.
+function untagged_search_text(turns: number): string {
+	return Array.from({ length: turns }, (_unused, turn) => {
+		const minute = turn * TURN_MINUTES
+		const id = `untagged-${String(turn)}`
+
+		return [josh_call_line(minute, BRANCH, SEARCH, id), result_line(minute + 1, BRANCH, id)]
+	})
+		.flat()
+		.join('\n')
+}
+
 const AT_THRESHOLD_TEXT = search_text(BELOW_THRESHOLD)
 const LATE_MINUTE = BELOW_THRESHOLD * TURN_MINUTES
 
 describe('investigation_reads.tally_of — search turns', () => {
 	it('counts every closed search turn', () => {
 		expect(investigation_reads.tally_of(search_text(THRESHOLD)).searches).toBe(THRESHOLD)
+	})
+
+	it('counts each search with no message id as a turn of its own', () => {
+		expect(investigation_reads.tally_of(untagged_search_text(THRESHOLD)).searches).toBe(THRESHOLD)
 	})
 
 	it('counts a turn of parallel searches once', () => {
@@ -164,5 +188,10 @@ describe('investigation_reads.REASON', () => {
 
 	it('names the search-turn threshold', () => {
 		expect(investigation_reads.REASON).toContain(`${String(THRESHOLD)} search turns`)
+	})
+
+	it('does not claim the instruction exemption covers searches', () => {
+		expect(investigation_reads.REASON).toContain('every read-only search turn counts')
+		expect(investigation_reads.REASON).not.toContain('are never counted, so')
 	})
 })
