@@ -6,6 +6,7 @@ import {
 	read_repo_file,
 	read_unwrapped,
 } from './ai-document-fixture'
+import { document_section } from './document-section'
 
 // The rules live in one document; `AGENTS.md` and `GEMINI.md` point at it
 // (joshuafolkken/kit#963). Every other marker suite now reads `CLAUDE.md` alone, so nothing else
@@ -28,6 +29,52 @@ const RULE_BODY_MARKERS: ReadonlyArray<string> = [
 ]
 
 const READ_IN_FULL = 'Read it in full'
+const DO_NOT_COPY = 'Do not copy rules back into this file'
+
+// joshuafolkken/kit#3079: how another agent reads `CLAUDE.md`'s Claude Code features lives once, in
+// this section, and the list of hook-delivered rules it applies by hand is the delivery table — never
+// a hand-written copy in a pointer, which drifted from the table the moment a rule was added.
+const READING_DOC = 'prompts/collaboration-workflow/principles.md'
+const READING_SECTION = 'Claude Code 以外のエージェントでの読み替え'
+const DELIVERY_TABLE_DOC = 'rule-delivery.md'
+const DELIVERY_TABLE_SECTION = '配送されている規則'
+const OFF_TABLE_HOOK_MARKERS: ReadonlyArray<string> = [
+	'Step 0',
+	'pnpm josh lint:related',
+	'pnpm josh cspell:dot',
+	'JOSH_SESSION_LANG',
+]
+// A hand-written rule list names the commands it tells the reader to run.
+const JOSH_COMMAND = 'pnpm josh '
+
+// The sentences every pointer is required to carry, pinned by the suite below. Identical text there
+// is the pointer contract, not a clone; any other sentence the two pointers share is.
+const CONTRACT_PHRASES: ReadonlyArray<string> = [
+	'All rules for this repository live in',
+	READ_IN_FULL,
+	'This file exists only to point at it',
+	DO_NOT_COPY,
+	'Every change to how agents work',
+]
+
+function sentences_of(document_path: string): ReadonlyArray<string> {
+	return read_repo_file(document_path)
+		.replaceAll(/[#*>]/gu, ' ')
+		.split(/(?<=\.)\s+/u)
+		.map((sentence) => sentence.replaceAll(/\s+/gu, ' ').trim())
+		.filter((sentence) => sentence.length > 0)
+}
+
+function is_contract(sentence: string): boolean {
+	return CONTRACT_PHRASES.some((phrase) => sentence.includes(phrase))
+}
+
+function shared_sentences(): ReadonlyArray<string> {
+	const [first = '', ...others] = POINTER_DOCS
+	const other_sentences = new Set(others.flatMap((document_path) => sentences_of(document_path)))
+
+	return sentences_of(first).filter((sentence) => other_sentences.has(sentence))
+}
 
 describe('the rules have exactly one home', () => {
 	it('names only the canonical document', () => {
@@ -67,13 +114,47 @@ describe.each(POINTER_DOCS)('%s — points at the rules instead of copying them'
 	// The prohibition is in the file itself, because the next agent to add a rule reads this file
 	// before it reads any test.
 	it('says not to copy rules back into it', () => {
-		expect(unwrapped).toContain('Do not copy rules back into this file')
+		expect(unwrapped).toContain(DO_NOT_COPY)
 	})
 
 	// joshuafolkken/kit#2894: the explanation of why this file is a pointer lives once, in
 	// `docs/maintainers/principles-rationale.md`. A copy here is the clone this suite exists to stop.
 	it('carries no copy of the pointer rationale', () => {
 		expect(unwrapped).not.toContain('## Why this file is a pointer')
+	})
+
+	it('carries no hand-written list of rules to apply by hand', () => {
+		expect(unwrapped).not.toContain(JOSH_COMMAND)
+	})
+
+	it('sends the reader to the shared reading section', () => {
+		expect(unwrapped).toContain(READING_DOC)
+		expect(unwrapped).toContain(READING_SECTION)
+	})
+})
+
+describe('the pointers share nothing but their contract', () => {
+	it('carries no common sentence outside the pointer contract', () => {
+		expect(shared_sentences().filter((sentence) => !is_contract(sentence))).toStrictEqual([])
+	})
+})
+
+describe('the reading section is the single home of the shared readings', () => {
+	const found = document_section.section(read_repo_file(READING_DOC), READING_SECTION)
+
+	it('exists under the heading the pointers name', () => {
+		expect(found?.title).toBe(READING_SECTION)
+	})
+
+	it('takes its list of hook-delivered rules from the delivery table', () => {
+		expect(found?.text).toContain(DELIVERY_TABLE_DOC)
+		expect(found?.text).toContain(DELIVERY_TABLE_SECTION)
+	})
+
+	// The table enumerates the guard-delivered rules only; the format-on-edit hook and the Step 0
+	// notice have no row there, and a hookless agent that read the table alone would lose both.
+	it.each(OFF_TABLE_HOOK_MARKERS)('names the off-table hook duty — %s', (marker) => {
+		expect(found?.text).toContain(marker)
 	})
 })
 
