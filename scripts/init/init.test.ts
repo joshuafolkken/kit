@@ -127,12 +127,13 @@ describe('apply_package_json_merges', () => {
 		expect(merge_development_dependencies(existing)[KIT_PACKAGE_NAME]).toBe('0.1.0')
 	})
 
-	it('adds the prettier preset plugins', () => {
-		const deps = merge_development_dependencies('{}\n')
-
-		expect(deps['@ianvs/prettier-plugin-sort-imports']).toBe('^4.7.1')
-		expect(deps['prettier-plugin-svelte']).toBe('^4.1.1')
-		expect(deps['prettier-plugin-tailwindcss']).toBe('^0.8.0')
+	// A version below the peer floor makes the consumer's install warn on an unmet peer (#3085).
+	it.each([
+		'@ianvs/prettier-plugin-sort-imports',
+		'prettier-plugin-svelte',
+		'prettier-plugin-tailwindcss',
+	])('adds the prettier preset plugin %s at the kit development version', (name: string) => {
+		expect(merge_development_dependencies('{}\n')[name]).toBe(KIT_MANIFEST.devDependencies[name])
 	})
 
 	it('adds every public peer from the kit development versions', () => {

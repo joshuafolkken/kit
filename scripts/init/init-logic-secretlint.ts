@@ -5,7 +5,7 @@ const SECRETLINT_RULE_PRESET = '@secretlint/secretlint-rule-preset-recommend'
 
 // secretlint resolves both its CLI and every rule package from the project it runs in, not
 // transitively through the kit — the same constraint that forces the prettier plugins into
-// consumer devDependencies (see PRETTIER_PLUGIN_DEV_DEPS in init-logic.ts). Omitting either
+// consumer devDependencies (as kit peers, see init.ts). Omitting either
 // entry makes the pre-commit hook fail with "Cannot find module". Versions mirror the kit's
 // own devDependencies.
 const SECRETLINT_DEV_DEPS: Record<string, string> = {
