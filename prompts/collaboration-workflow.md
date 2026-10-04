@@ -29,6 +29,7 @@
 | 引き金つき配送 — 規則を効く瞬間に届ける                                                           | [`rule-delivery.md`](./collaboration-workflow/rule-delivery.md)           |
 | コマンド出力が文脈へ持ち込む量の上限                                                              | [`output-bounds.md`](./collaboration-workflow/output-bounds.md)           |
 | 運用ルール                                                                                        | [`operating-rules.md`](./collaboration-workflow/operating-rules.md)       |
+| 用語集 — lane・cut・hold・park などの定義と単一ソース                                             | [`glossary.md`](./collaboration-workflow/glossary.md)                     |
 
 **どの 1 本を開けばよいかを決めるのに必要なのは、この索引だけである。** バイト数はここに書かない — 手で保守した数字は本文より先に古くなり、古い数字は無いより悪い。実サイズは `ls -l prompts/collaboration-workflow/` が答える。
 
