@@ -46,14 +46,19 @@ function citation_line(slug: string, number: string, summary: string): string {
 // and the plain `#N` only when the repository could not be read at all.
 type IssueCiter = (number: string) => string
 
+// One issue, named from what the caller holds — the single decision every listing's citation goes
+// through (joshuafolkken/kit#3099), so a renderer holding one title never re-derives the fallback.
+function reference(slug: string | undefined, number: string, title: string | undefined): string {
+	if (slug === undefined) return `#${number}`
+
+	return title === undefined
+		? `[#${number}](${issue_url(slug, number)})`
+		: citation_line(slug, number, title)
+}
+
 function citer(slug: string | undefined, titles: ReadonlyMap<string, string>): IssueCiter {
 	return function cite(number: string): string {
-		if (slug === undefined) return `#${number}`
-		const title = titles.get(number)
-
-		return title === undefined
-			? `[#${number}](${issue_url(slug, number)})`
-			: citation_line(slug, number, title)
+		return reference(slug, number, titles.get(number))
 	}
 }
 
@@ -111,6 +116,7 @@ const issue_cite = {
 	missing_line,
 	no_repo_line,
 	parse_target,
+	reference,
 	unreadable_line,
 }
 

@@ -4,6 +4,7 @@ import { josh_command } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_cut_report } from './run-cut-report'
 import { run_entry, type EntryParts } from './run-entry'
+import { run_entry_stop } from './run-entry-stop'
 import { run_halfrun_resume } from './run-halfrun-resume'
 import { run_hold_cli } from './run-hold-cli'
 import { run_next } from './run-next'
@@ -40,6 +41,7 @@ const NEWLINE = '\n'
 const HOLD_STOP_NOTE =
 	'(tree not held — see the reason above; clean up and retry, or release with `pnpm josh run:release`)'
 const COST_STOP_NOTE = '(session budget spent — see the figure above; resume in a fresh session)'
+const { BUDGET_REASON, HOLD_REASON } = run_entry_stop
 const HALFRUN_RESUME_TOKEN = 'halfrun'
 
 // Exactly one issue number, or the call is refused — `run:entry` opens one run, and a second number
@@ -135,6 +137,23 @@ function stop_report(issue_number: string, hold: string, cost: string, report: s
 	return emit({ issue_number, hold, cost, verdict: run_entry.NO_VERDICT, report })
 }
 
+// A stop this command decided carries its own chores (joshuafolkken/kit#3099): the `confirmation`
+// Telegram always, and the release where this call claimed the hold — `run_entry_stop` says why.
+interface StopCall {
+	parts: Pick<EntryParts, 'issue_number' | 'hold' | 'cost' | 'report'>
+	command: StageCommand
+	reason: string
+	should_release: boolean
+}
+
+async function stop_run({ parts, command, reason, should_release }: StopCall): Promise<number> {
+	const code = stop_report(parts.issue_number, parts.hold, parts.cost, parts.report)
+
+	await run_entry_stop.stop({ issue_number: parts.issue_number, command, reason, should_release })
+
+	return code
+}
+
 interface Resume {
 	token: string
 	code: number
@@ -166,16 +185,22 @@ function resume_report(issue_number: string, resume: Resume): number {
 // to and including implementation. **A `prrun` stopped before its merge is resumed the same way**
 // (joshuafolkken/kit#3023), under the token that says what is left of it.
 async function resume_stopped(
-	issue_number: string,
+	{ issue_number, command }: EntryRequest,
 	token: string,
 	stopped_run: { adopt: (issue: string) => Promise<boolean> },
 ): Promise<number> {
 	const cost = await check_cost()
 
-	if (cost === run_entry.COST_OVER) return stop_report(issue_number, token, cost, COST_STOP_NOTE)
+	if (cost === run_entry.COST_OVER) {
+		const parts = { issue_number, hold: token, cost, report: COST_STOP_NOTE }
+
+		return await stop_run({ parts, command, reason: BUDGET_REASON, should_release: false })
+	}
 
 	if (!(await stopped_run.adopt(issue_number))) {
-		return stop_report(issue_number, run_hold_cli.BUSY_VERDICT, cost, HOLD_STOP_NOTE)
+		const parts = { issue_number, hold: run_hold_cli.BUSY_VERDICT, cost, report: HOLD_STOP_NOTE }
+
+		return await stop_run({ parts, command, reason: HOLD_REASON, should_release: false })
 	}
 
 	console.info(`entry #${issue_number} — resume: ${token}`)
@@ -186,17 +211,17 @@ async function resume_stopped(
 // The stopped run a decision picks up: a `halfrun` stop resumes at the gate, a `prrun` stop at
 // `followup` under its own token. `undefined` for any other start, so the ordinary claim decides.
 async function resume_any(
-	issue_number: string,
+	request: EntryRequest,
 	decision: StageDecision,
 	stage: StageRead,
 ): Promise<number | undefined> {
 	if (decision.state === run_stage.HALFRUN_STOPPED) {
-		return await resume_stopped(issue_number, HALFRUN_RESUME_TOKEN, run_halfrun_resume)
+		return await resume_stopped(request, HALFRUN_RESUME_TOKEN, run_halfrun_resume)
 	}
 
 	return stage.prrun_token === undefined
 		? undefined
-		: await resume_stopped(issue_number, stage.prrun_token, run_prrun_resume)
+		: await resume_stopped(request, stage.prrun_token, run_prrun_resume)
 }
 
 // **A command whose stopping point the issue has already reached redoes nothing** (joshuafolkken/kit#3042)
@@ -210,12 +235,18 @@ async function claim_run({ issue_number, command }: EntryRequest): Promise<numbe
 	const hold = await claim_hold(issue_number, command)
 
 	if (hold !== run_hold_cli.HOLD_VERDICT) {
-		return stop_report(issue_number, hold, run_entry.COST_SKIPPED, HOLD_STOP_NOTE)
+		const parts = { issue_number, hold, cost: run_entry.COST_SKIPPED, report: HOLD_STOP_NOTE }
+
+		return await stop_run({ parts, command, reason: HOLD_REASON, should_release: false })
 	}
 
 	const cost = await check_cost()
 
-	if (cost === run_entry.COST_OVER) return stop_report(issue_number, hold, cost, COST_STOP_NOTE)
+	if (cost === run_entry.COST_OVER) {
+		const parts = { issue_number, hold, cost, report: COST_STOP_NOTE }
+
+		return await stop_run({ parts, command, reason: BUDGET_REASON, should_release: true })
+	}
 
 	const reads = await gather_reads(issue_number)
 
@@ -248,7 +279,7 @@ async function open_run(request: EntryRequest): Promise<number> {
 
 	if (command === run_stage.KICKOFF || is_settled(decision)) return SUCCESS_EXIT_CODE
 
-	return (await resume_any(issue_number, decision, stage)) ?? (await claim_run(request))
+	return (await resume_any(request, decision, stage)) ?? (await claim_run(request))
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

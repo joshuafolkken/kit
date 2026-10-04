@@ -8,7 +8,11 @@ import { backlog_ready, type ReadyPorts } from './backlog-ready'
 // next issue while a runnable one sat idle beside free lanes.
 
 const FREE = 4
-const READY_LINE = 'ready #2445 #2446 · free lanes 4'
+const REPO = 'joshuafolkken/kit'
+// joshuafolkken/kit#3099: the parent copies this line into its report, so each issue is a number-link.
+const READY_LINE =
+	'ready [#2445](https://github.com/joshuafolkken/kit/issues/2445) ' +
+	'[#2446](https://github.com/joshuafolkken/kit/issues/2446) · free lanes 4'
 const EARLY = '2026-09-23T12:00:00.000Z'
 
 function ports(overrides: Partial<ReadyPorts> = {}): ReadyPorts {
@@ -27,6 +31,10 @@ async function not_parent(): Promise<boolean> {
 	return false
 }
 
+async function read_repo(): Promise<string | undefined> {
+	return REPO
+}
+
 afterEach(() => {
 	vi.restoreAllMocks()
 	vi.unstubAllEnvs()
@@ -34,14 +42,20 @@ afterEach(() => {
 
 describe('backlog_ready.ready_line', () => {
 	it('names the runnable issues and the free lanes', () => {
-		const line = backlog_ready.ready_line({ issues: ['2445', '2446'], free_lanes: FREE })
+		const line = backlog_ready.ready_line({ issues: ['2445', '2446'], free_lanes: FREE }, REPO)
 
 		expect(line).toBe(READY_LINE)
 	})
 
+	it('keeps the plain number when the repository could not be read', () => {
+		expect(backlog_ready.ready_line({ issues: ['2445'], free_lanes: FREE }, undefined)).toBe(
+			'ready #2445 · free lanes 4',
+		)
+	})
+
 	it('prints nothing with no runnable issue or no free lane', () => {
-		expect(backlog_ready.ready_line({ issues: [], free_lanes: FREE })).toBeUndefined()
-		expect(backlog_ready.ready_line({ issues: ['2445'], free_lanes: 0 })).toBeUndefined()
+		expect(backlog_ready.ready_line({ issues: [], free_lanes: FREE }, REPO)).toBeUndefined()
+		expect(backlog_ready.ready_line({ issues: ['2445'], free_lanes: 0 }, REPO)).toBeUndefined()
 	})
 })
 
@@ -70,7 +84,7 @@ describe('backlog_ready.print_ready_line', () => {
 	it('prints the ready line to the driving parent on a wake', async () => {
 		const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
 
-		await backlog_ready.print_ready_line(ports(), parent)
+		await backlog_ready.print_ready_line(ports(), parent, read_repo)
 
 		expect(info).toHaveBeenCalledWith(READY_LINE)
 	})
@@ -78,7 +92,7 @@ describe('backlog_ready.print_ready_line', () => {
 	it('prints nothing outside a backlogrun parent', async () => {
 		const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
 
-		await backlog_ready.print_ready_line(ports(), not_parent)
+		await backlog_ready.print_ready_line(ports(), not_parent, read_repo)
 
 		expect(info).not.toHaveBeenCalled()
 	})
@@ -90,7 +104,9 @@ describe('backlog_ready.print_ready_line', () => {
 			},
 		})
 
-		await expect(backlog_ready.print_ready_line(failing, parent)).resolves.toBeUndefined()
+		await expect(
+			backlog_ready.print_ready_line(failing, parent, read_repo),
+		).resolves.toBeUndefined()
 	})
 })
 

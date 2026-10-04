@@ -23,7 +23,7 @@ function child(labels: ReadonlyArray<string>): EpicChild {
 describe('backlog_plan.row_of', () => {
 	it('marks a run:solo child beside its number', () => {
 		expect(backlog_plan.row_of(child([RUN_SOLO_LABEL]), CONTEXT, '')).toContain(
-			`#${String(CHILD)} ${backlog_plan.SOLO_MARK}  ${TITLE}`,
+			`${backlog_fixture.cite(CHILD, TITLE)} ${backlog_plan.SOLO_MARK}`,
 		)
 	})
 
@@ -37,7 +37,7 @@ describe('backlog_plan.row_of', () => {
 	// joshuafolkken/kit#2779: a child with neither label is the one `backlog:next` answers `triage` for.
 	it('marks a child with neither label as untriaged', () => {
 		expect(backlog_plan.row_of(child([]), CONTEXT, '')).toContain(
-			`#${String(CHILD)} ${backlog_plan.UNTRIAGED_MARK}  ${TITLE}`,
+			`${backlog_fixture.cite(CHILD, TITLE)} ${backlog_plan.UNTRIAGED_MARK}`,
 		)
 	})
 

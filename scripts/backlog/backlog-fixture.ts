@@ -10,6 +10,7 @@ import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import type { OpenIssueData } from '#scripts/git/schemas'
 import { defect_rate, type DefectRate } from '#scripts/issue/defect-rate'
 import { defect_rate_cli } from '#scripts/issue/defect-rate-cli'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { lane_await } from '#scripts/lane/lane-await'
 import { vi } from 'vitest'
@@ -226,9 +227,16 @@ function stub_backlog(input: BacklogInput): void {
 	stub_defect_priority(input)
 }
 
+// How a plan row names this repository's issue (joshuafolkken/kit#3099), so a case asserts the citation
+// through `issue_cite` rather than restating the link's shape.
+function cite(number: number, title?: string): string {
+	return issue_cite.reference(REPO, String(number), title)
+}
+
 const backlog_fixture = {
 	AT_BASELINE,
 	REPO,
+	cite,
 	stub_backlog,
 }
 

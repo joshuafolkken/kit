@@ -1,3 +1,5 @@
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_registry } from '#scripts/lane/lane-registry'
@@ -92,14 +94,19 @@ async function read_ready(ports: ReadyPorts = DEFAULT_PORTS): Promise<ReadyReadi
 	return { issues: await ports.ready_issues(), free_lanes }
 }
 
-// `undefined` unless there is both runnable work and a lane for it — the only state worth a line.
-function ready_line(reading: ReadyReading): string | undefined {
+// `undefined` unless there is both runnable work and a lane for it — the only state worth a line. Each
+// issue is a number-link against `slug` (joshuafolkken/kit#3099): the parent copies this line into its
+// report, so a bare `#N` here is the citation the Stop guard sends back.
+function ready_line(reading: ReadyReading, slug: string | undefined): string | undefined {
 	if (reading.issues.length === NONE || reading.free_lanes <= NO_FREE) return undefined
 
-	const issues = reading.issues.map((issue) => `#${issue}`).join(' ')
+	const cite = issue_cite.citer(slug, new Map())
+	const issues = reading.issues.map((issue) => cite(issue)).join(' ')
 
 	return `ready ${issues} · free lanes ${String(reading.free_lanes)}`
 }
+
+type RepoRead = () => Promise<string | undefined>
 
 // The watcher's line on exit, for the driving parent alone — a `fullrun` watcher has no pool to pick
 // from. Best-effort: a reading that fails prints nothing rather than failing the watcher whose exit is
@@ -107,20 +114,26 @@ function ready_line(reading: ReadyReading): string | undefined {
 async function parent_ready_line(
 	ports: ReadyPorts,
 	is_parent: () => Promise<boolean>,
+	read_repo: RepoRead,
 ): Promise<string | undefined> {
 	if (!(await is_parent())) return undefined
 
-	return ready_line(await read_ready(ports))
+	const reading = await read_ready(ports)
+
+	return reading.issues.length === NONE ? undefined : ready_line(reading, await read_repo())
+}
+
+function print_line(line: string | undefined): void {
+	if (line !== undefined) console.info(line)
 }
 
 async function print_ready_line(
 	ports: ReadyPorts = DEFAULT_PORTS,
 	is_parent: () => Promise<boolean> = run_headless.is_backlog_parent,
+	read_repo: RepoRead = git_gh_command.repo_get_name_with_owner,
 ): Promise<void> {
 	try {
-		const line = await parent_ready_line(ports, is_parent)
-
-		if (line !== undefined) console.info(line)
+		print_line(await parent_ready_line(ports, is_parent, read_repo))
 	} catch {
 		// A pick-up line is a hint; the wake it rides must still be delivered.
 	}
