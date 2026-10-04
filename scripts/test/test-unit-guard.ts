@@ -79,6 +79,24 @@ function has_unit_tests(project_directory: string): boolean {
 	return matches.length > 0
 }
 
+// The guard's decision for one project, asked here once so the run, the scoped record and the gate's
+// precondition can never disagree about whether this project's vitest runs (joshuafolkken/kit#3136).
+function guard_action(project_directory: string): GuardAction {
+	return resolve_guard_action(
+		is_vitest_installed(project_directory),
+		has_unit_tests(project_directory),
+		project_checks.is_basic(project_directory),
+	)
+}
+
+// **A skip is the project having no unit suite, so no unit check can ever vouch for its tree.** The
+// failing branch is not one: it is a broken suite, and it is left to fail where it is reported.
+function is_skipping(project_directory: string): boolean {
+	const action = guard_action(project_directory)
+
+	return action === SKIP_ACTION || action === SKIP_NO_TESTS_ACTION
+}
+
 // A lane's port allocation belongs to its development and preview servers, not to unit fixtures.
 // Passing it into Vitest makes every case that deliberately omits or replaces the seed inherit the
 // checkout's seat instead. Keep the rest of the caller's environment, including CI and PATH guards.
@@ -155,13 +173,7 @@ async function run_guarded_vitest(
 	command_label: string = UNIT_COMMAND_LABEL,
 	announcement?: string,
 ): Promise<number> {
-	const is_installed = is_vitest_installed(project_directory)
-	const has_tests = has_unit_tests(project_directory)
-	const action = resolve_guard_action(
-		is_installed,
-		has_tests,
-		project_checks.is_basic(project_directory),
-	)
+	const action = guard_action(project_directory)
 
 	if (action !== 'run') return report_no_run(action, command_label)
 	if (announcement !== undefined) process.stdout.write(`${announcement}\n`)
@@ -185,6 +197,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
 const test_unit_guard = {
 	SKIP_MARKER,
+	guard_action,
+	is_skipping,
 	resolve_guard_action,
 	is_vitest_installed,
 	has_unit_tests,

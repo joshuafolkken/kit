@@ -40,7 +40,12 @@ function tree_of(digest: string = DIGEST): Record<string, string> {
 const DIRECTORY = path.join(tmpdir(), `josh-scoped-green-suite-${String(process.pid)}`)
 
 function sources(): ScopedSources {
-	return { lint: path.join(DIRECTORY, 'lint.json'), test: path.join(DIRECTORY, 'test.json') }
+	// Pinned to a project whose unit suite runs, so the answer never depends on this checkout's vitest.
+	return {
+		lint: path.join(DIRECTORY, 'lint.json'),
+		test: path.join(DIRECTORY, 'test.json'),
+		is_unit_skipped: false,
+	}
 }
 
 function plant(target: string | undefined, digest: string, base: string): void {
@@ -123,6 +128,34 @@ describe('missing_checks — the three states that must never refuse', () => {
 		vi.stubEnv(scoped_green.SWITCH_ENV_KEY, hook_decision.DISABLED_VALUES[0])
 
 		expect(scoped_green.missing_checks(tree_of(), BASE, sources())).toStrictEqual([])
+	})
+})
+
+describe('missing_checks — a project whose unit guard skips (#3136)', () => {
+	it('asks only for the lint record, since test:related there can never write one', () => {
+		const skipped = { ...sources(), is_unit_skipped: true }
+
+		expect(scoped_green.missing_checks(tree_of(), BASE, skipped)).toStrictEqual([
+			scoped_green.LINT_COMMAND,
+		])
+	})
+
+	it('refuses nothing once the lint record describes this tree', () => {
+		const planted = { ...sources(), is_unit_skipped: true }
+
+		plant(planted.lint, DIGEST, BASE)
+
+		expect(scoped_green.refusal_for(tree_of(), BASE, planted)).toBeUndefined()
+	})
+
+	it('still asks for the test record where the unit suite runs', () => {
+		const planted = { ...sources(), is_unit_skipped: false }
+
+		plant(planted.lint, DIGEST, BASE)
+
+		expect(scoped_green.missing_checks(tree_of(), BASE, planted)).toStrictEqual([
+			scoped_green.TEST_COMMAND,
+		])
 	})
 })
 

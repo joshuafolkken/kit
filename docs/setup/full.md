@@ -12,8 +12,11 @@ Which one to run is decided in [init.md → `josh init` or `josh start`](../init
 
 ```bash
 pnpm --allow-build=esbuild dlx @joshuafolkken/kit init
+pnpm josh lint:related && pnpm josh test:related
 pnpm josh gate
 ```
+
+On a branch, `josh gate` refuses to start until the scoped checks `lint:related` and `test:related` have passed on the files the branch changed, so the second line runs them first. A project without vitest needs only `lint:related`: `test:related` skips there and the gate does not ask for it.
 
 `pnpm dlx` fetches kit from the public npm registry without a GitHub token or project `.npmrc` mapping, adds `@joshuafolkken/kit` to the project's development dependencies, and hands the run to the `josh init` of the kit it just added ([init.md → Run from outside the project](../init.md#run-from-outside-the-project)). Existing projects with a `@joshuafolkken` mapping to GitHub Packages keep using it; see [authentication.md](../authentication.md) until those projects migrate.
 

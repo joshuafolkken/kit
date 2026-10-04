@@ -11,9 +11,7 @@ vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.
 vi.mock('#scripts/git/changed-paths', () => ({ changed_paths: { read_changed_paths: vi.fn() } }))
 vi.mock('./test-unit-guard', () => ({
 	test_unit_guard: {
-		has_unit_tests: vi.fn(),
-		is_vitest_installed: vi.fn(),
-		resolve_guard_action: vi.fn(),
+		guard_action: vi.fn(),
 		run_guarded_vitest: vi.fn(),
 	},
 }))
@@ -29,7 +27,7 @@ const mocked_changed = vi.mocked(changed_paths.read_changed_paths)
 const mocked_run = vi.mocked(test_unit_guard.run_guarded_vitest)
 const mocked_record = vi.mocked(scoped_green.record_if_green)
 const mocked_before = vi.mocked(scoped_green.read_before)
-const mocked_action = vi.mocked(test_unit_guard.resolve_guard_action)
+const mocked_action = vi.mocked(test_unit_guard.guard_action)
 
 // Real paths in this repository, because the CLI drops a path the tree does not hold — a fixture
 // name would be filtered out before the assertion could see it.
