@@ -107,7 +107,7 @@ function status_line(is_ok: boolean, ok_text: string, warn_text: string): string
 function plugin_line(is_declared: boolean): string {
 	return status_line(
 		is_declared,
-		`kit plugin declared (run \`claude plugin install ${PLUGIN_ID}\` once if skills are missing)`,
+		'kit plugin declared (skills load in a trusted workspace; headless from its second session)',
 		'kit plugin not declared in .claude/settings.json — run `pnpm josh sync`',
 	)
 }

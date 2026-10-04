@@ -22,7 +22,6 @@ import { init_install } from './init-install'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
 import { kit_setup_state } from './kit-setup-state'
-import { plugin_install_hint_module } from './plugin-install-hint'
 import { project_profile, type ProjectProfile, type ProjectShape } from './project-profile'
 
 const PACKAGE_JSON = 'package.json'
@@ -295,8 +294,6 @@ function run_ai_file_actions(shape: ProjectShape): void {
 	const name_with_owner = init_ai_copy.run_ai_copies(shape)
 
 	if (shape.has_github) report_repository_settings(name_with_owner)
-
-	if (shape.profile === 'full') plugin_install_hint_module.report_plugin_install_hint()
 }
 
 function initialize_project(shape: ProjectShape): void {
