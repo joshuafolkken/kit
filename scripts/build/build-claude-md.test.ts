@@ -10,6 +10,7 @@ import {
 
 const KIT_PACKAGE_PREFIX = 'node_modules/@joshuafolkken/kit/'
 const BASIC_RULES = 'CLAUDE.basic.md'
+const CJK_PATTERN = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u
 
 // Every backtick-quoted token in the transformed CLAUDE.md that looks like a path (contains a slash).
 function backtick_paths(content: string): ReadonlyArray<string> {
@@ -77,5 +78,12 @@ describe('basic profile rules under both names', () => {
 			'CLAUDE.static.md',
 		])
 		for (const file of DIST_BASIC_CLAUDE_MDS) expect(readFileSync(file, 'utf8')).toBe(template)
+	})
+
+	// joshuafolkken/kit#3094: the CLAUDE.md layer kit distributes is English, whatever the session language.
+	it('writes the basic rules template in English only', () => {
+		const template = readFileSync(path.join(REPO_ROOT, 'templates', BASIC_RULES), 'utf8')
+
+		expect(template).not.toMatch(CJK_PATTERN)
 	})
 })

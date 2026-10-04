@@ -1,8 +1,8 @@
 # Project instructions
 
-- 既存のファイルと利用者の設定を尊重し、変更する前に内容を確認する。
-- 変更には検証を付け、実行した結果を報告する。
-- HTML、CSS、JavaScript のファイルがある場合は Prettier で整形する。
-- 画面に見える変更をした場合はブラウザーで表示と操作を確認する。
-- JavaScript または TypeScript の動作を変更した場合は、その動作を確認する自動テストを追加する。
-- Git や GitHub を使う場合だけ、それぞれのワークフローを利用する。
+- Respect existing files and the user's settings, and read a file's contents before changing it.
+- Verify every change, and report the results you actually observed.
+- Format HTML, CSS and JavaScript files with Prettier when the project has any.
+- After a change that is visible on screen, check its display and interaction in a browser.
+- After changing JavaScript or TypeScript behavior, add an automated test that checks that behavior.
+- Use the Git or GitHub workflow only when you use Git or GitHub.
