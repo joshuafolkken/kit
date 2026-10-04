@@ -420,16 +420,40 @@ function point_of_use_cost(
 	return { file, heading: '', cost: cost_of(read_document(root, file)), is_resolved: true }
 }
 
-function point_of_use_costs(root: string, entry: string): Array<SectionCost> {
-	const found = document_section.section(read_document(root, SKILL_FILE), TABLE_SECTION)
-	const references = all_matches(found?.text ?? '', SECTION_REFERENCE).map((match) =>
-		to_reference(match),
-	)
+// **What an entry's path names: its own manifests, and the §1 trigger rows that name the entry**
+// (joshuafolkken/kit#3078). `SKILL.md`'s other text is left out for the reason `sections_for` gives —
+// §2 names every document, so counting it would charge a `kickoff` for `followup.md`. One hop only:
+// the point-of-use documents cite one another, and following them would reach the whole set again.
+// `also` is what a role reaches beside its base entry's path (`read-set-trim.ts`).
+function cited_by(
+	root: string,
+	entry: string,
+	table_text: string,
+	also: ReadonlySet<string>,
+): Set<string> {
+	const manifests = files_for(root, entry).filter((file) => file !== SKILL_FILE)
+	const rows = table_text
+		.split('\n')
+		.filter((line) => line.startsWith('|') && line.includes(`\`${entry}\``))
+	const texts = [...manifests.map((file) => read_document(root, file)), ...rows]
 
-	return point_of_use_files(entry).map((file) => point_of_use_cost(root, file, references))
+	return new Set([...also, ...texts.flatMap((text) => names_in(text))])
 }
 
-function costed(root: string, entry: string): ReadSetCost {
+function point_of_use_costs(
+	root: string,
+	entry: string,
+	also: ReadonlySet<string>,
+): Array<SectionCost> {
+	const table_text =
+		document_section.section(read_document(root, SKILL_FILE), TABLE_SECTION)?.text ?? ''
+	const references = all_matches(table_text, SECTION_REFERENCE).map((match) => to_reference(match))
+	const cited = cited_by(root, entry, table_text, also)
+
+	return point_of_use_files(entry, cited).map((file) => point_of_use_cost(root, file, references))
+}
+
+function costed(root: string, entry: string, also: ReadonlySet<string> = new Set()): ReadSetCost {
 	const { files, sections } = read_set(root, entry)
 	const own_costs = file_costs(root, files)
 	const section_costs = sections.map((reference) => section_cost(root, reference))
@@ -439,7 +463,7 @@ function costed(root: string, entry: string): ReadSetCost {
 		entry,
 		files: own_costs,
 		sections: section_costs,
-		point_of_use: point_of_use_costs(root, entry),
+		point_of_use: point_of_use_costs(root, entry, also),
 		bash_output_cap: bash_output_cap_reader.bash_output_cap(root),
 		whole: total([own, referenced_cost(root, sections)]),
 		scoped: total([own, scoped_cost(root, sections)]),

@@ -75,9 +75,14 @@ function is_point_of_use(entry: string, file: string): boolean {
 	return (POINT_OF_USE_BY_ENTRY.get(entry) ?? NO_PER_ENTRY_FILES).has(file)
 }
 
-// The global point-of-use files plus the ones this entry names in its own row.
-function point_of_use_files(entry: string): Array<string> {
-	return [...POINT_OF_USE_FILES, ...(POINT_OF_USE_BY_ENTRY.get(entry) ?? NO_PER_ENTRY_FILES)]
+// **Only the global files the entry reaches, plus the ones this entry names in its own row**
+// (joshuafolkken/kit#3078). `cited` is every document the entry's path names; a global file outside it
+// is one this entry never opens — a `kickoff` never issues `followup` — so charging it made every
+// entry's total the same figure and the per-entry ratchet measured nothing.
+function point_of_use_files(entry: string, cited: ReadonlySet<string>): Array<string> {
+	const reached = [...POINT_OF_USE_FILES].filter((file) => cited.has(file))
+
+	return [...reached, ...(POINT_OF_USE_BY_ENTRY.get(entry) ?? NO_PER_ENTRY_FILES)]
 }
 
 const read_set_point_of_use = {

@@ -34,15 +34,26 @@ const UNUSED_SKILL_SECTIONS: ReadonlyArray<string> = [
 // the park — so it drops none. Named empty so the shared trim reads the same shape as the worker's.
 const SKIPPED_POINT_OF_USE: ReadonlySet<string> = new Set<string>()
 
+// **The parent runs the end-of-run retrospective** (`SKILL.md` §2j) when `run:step` prints it, but its
+// manifest names `retrospective.md` only through `backlogrun-steps.md` — one hop further than the
+// derivation follows — so the parent's reach names it (joshuafolkken/kit#3078).
+const REACHED_POINT_OF_USE: ReadonlySet<string> = new Set(['retrospective.md'])
+
 function costed(root: string): ReadSetCost {
 	return read_set_trim.costed(root, {
 		base_entry: BACKLOGRUN,
 		label: BACKLOGRUN,
 		unused_skill_sections: UNUSED_SKILL_SECTIONS,
 		skipped_point_of_use: SKIPPED_POINT_OF_USE,
+		reached_point_of_use: REACHED_POINT_OF_USE,
 	})
 }
 
-const backlogrun_parent_read_set = { BACKLOGRUN, UNUSED_SKILL_SECTIONS, costed }
+const backlogrun_parent_read_set = {
+	BACKLOGRUN,
+	REACHED_POINT_OF_USE,
+	UNUSED_SKILL_SECTIONS,
+	costed,
+}
 
 export { backlogrun_parent_read_set }
