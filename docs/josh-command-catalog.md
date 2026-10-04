@@ -1047,9 +1047,9 @@ Print each issue's state and labels, in the spelling the documents compare again
 
 ### `josh lane:await`
 
-> **Audience:** automation · **Side effects:** processes
+> **Audience:** automation · **Side effects:** files, processes
 
-`<issue> [<issue>...]`
+`<issue> [<issue>...] [--owner <pid>]`
 
 Block until any of the named in-flight lane children completes; prints which one finished
 

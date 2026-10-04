@@ -1641,8 +1641,11 @@ evaluation procedure](./maintainers/backlogrun-worker-evaluation.md).
 Block until any of the named in-flight lane children confirms it has completed, then print which issue finished.
 
 ```bash
-pnpm josh lane:await 1749 1750   # block until either lane completes
+pnpm josh lane:await 1749 1750                  # block until either lane completes
+pnpm josh lane:await 1749 1750 --owner "$PPID"  # reclaim the carry record for a resumed conversation first
 ```
+
+`--owner <pid>` names the waiting session's process. When the carry record belongs to the same conversation under an earlier process — a restart resumed it in a new one — the record is moved to this pid before the wait, so a wait longer than the conversation's quiet window cannot read as a crash to `run:wake`. Any other record is left alone.
 
 Polls each child's process every 5 s with a 15 s re-confirm window, so a process that briefly disappears (the pre-gate cut handoff) is not mistakenly declared done. Prints the issue number of the first child that confirms completion and exits 0; does not exit until one confirms.
 

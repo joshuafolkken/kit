@@ -445,9 +445,10 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "lane:await": [
-      "<issue> [<issue>...]",
+      "<issue> [<issue>...] [--owner <pid>]",
       "automation",
       [
+        "files",
         "processes",
       ],
     ],
