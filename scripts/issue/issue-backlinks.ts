@@ -4,12 +4,13 @@
 // undetected. This classifies an origin issue's filed backlinks into one of four fixed words
 // (joshuafolkken/kit#2123). The headings are the single source's, pinned by the document test.
 
+import { markdown_section } from './markdown-section'
+
 const ORIGIN_HEADING = '## Origin'
 const UPSTREAM_ISSUES_HEADING = '## Upstream issues'
 const UPSTREAM_CANDIDATE_HEADING = '## Upstream candidate'
 const CHECKBOX_PATTERN = /^\s*-\s*\[[ xX]\]/u
 const WRONG_UPSTREAM_HEADING_PATTERN = /^##\s+Upstream\b/iu
-const SUBHEADING_PATTERN = /^##\s/u
 const BARE_REFERENCE_PATTERN = /^#\d+$/u
 const DIGITS_PATTERN = /^\d+$/u
 const REFERENCE_MARK = '#'
@@ -27,31 +28,23 @@ interface UpstreamEntry {
 	body: string
 }
 
-function trimmed_lines(body: string): ReadonlyArray<string> {
-	return body.split('\n').map((line) => line.trimEnd())
-}
-
+// A heading inside a code fence is example text, so neither lookup counts one (joshuafolkken/kit#3066).
 function has_heading(body: string, heading: string): boolean {
-	return trimmed_lines(body).some((line) => line.trim() === heading)
+	return markdown_section.has_line(body, heading)
 }
 
 // The lines under `heading`, up to the next `##` heading; `undefined` when the heading is absent.
 function section_lines(body: string, heading: string): ReadonlyArray<string> | undefined {
-	const lines = trimmed_lines(body)
-	const start = lines.findIndex((line) => line.trim() === heading)
-	if (start === -1) return undefined
+	if (!has_heading(body, heading)) return undefined
 
-	const rest = lines.slice(start + 1)
-	const end = rest.findIndex((line) => SUBHEADING_PATTERN.test(line.trim()))
-
-	return end === -1 ? rest : rest.slice(0, end)
+	return markdown_section.section_lines(body, heading)
 }
 
 // A heading that looks like the upstream one but is not exactly it (`## Upstream`, `## Upstreams`,
 // wrong case) — the grep the template promises would miss it, so it is a wrong-heading rather than a
 // missing one. `## Upstream candidate` is a legitimate separate heading and is excluded.
 function has_wrong_upstream_heading(body: string): boolean {
-	return trimmed_lines(body).some((line) => {
+	return markdown_section.unfenced_lines(body).some((line) => {
 		const heading = line.trim()
 		if (heading === UPSTREAM_ISSUES_HEADING || heading === UPSTREAM_CANDIDATE_HEADING) return false
 

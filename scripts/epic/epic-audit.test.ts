@@ -77,6 +77,13 @@ describe('epic_audit_logic.acceptance_section', () => {
 		expect(epic_audit_logic.acceptance_section(body)).not.toContain('#3')
 	})
 
+	// A `## ` line inside a code fence is example text, not the next heading (joshuafolkken/kit#3066).
+	it('does not stop at a heading-shaped line inside a code fence', () => {
+		const body = '## 受け入れ条件\n\n```md\n## Example\n```\n\n- [ ] needs #2'
+
+		expect(epic_audit_logic.acceptance_section(body)).toContain('#2')
+	})
+
 	it('returns nothing when the section is absent', () => {
 		expect(epic_audit_logic.acceptance_section('## 背景\n\ntext')).toBe('')
 	})
