@@ -36,6 +36,7 @@ The `files` field of `package.json` decides what the published `@joshuafolkken/k
 
 - `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules`, `prompts/` — the rules and procedures AI agents follow.
 - `.claude/skills/`, `.claude/.claude-plugin/`, `.claude-plugin/` — the Claude Code skills, shipped as the `kit` plugin and its marketplace entry.
+- `.claude/agents/` — the Claude Code subagent definitions (the read-only `investigator`), shipped beside the skills. They grant no editing tool.
 - `.mcp.json` — the MCP server configuration for the Svelte documentation server. It contains only the public endpoint `https://mcp.svelte.dev/mcp`.
 - `.coderabbit.yaml` — CodeRabbit review settings.
 

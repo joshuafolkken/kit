@@ -308,6 +308,7 @@ const UNVARIED_SPAN = {
 	marker: time_markers.NO_MARKER,
 	is_bundleable: false,
 	is_writing: false,
+	may_write: false,
 	has_prior_reference: false,
 	targets: [],
 	writes: [],

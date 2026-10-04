@@ -50,6 +50,7 @@
 		"lefthook",
 		".claude/settings.json",
 		".claude/skills",
+		".claude/agents",
 		".claude/.claude-plugin",
 		".claude-plugin",
 		".codex",

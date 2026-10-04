@@ -40,7 +40,11 @@ a temporary probe script and return its output.
 **The threshold is 3 files, and it is a count, not a forecast.** When the next read reaches it,
 delegate the unread investigation. Brief the unit on what was already read; do not re-read it there.
 **A delegation resets the counter rather than spending it**; `pnpm josh investigation:guard` counts
-unedited files and refuses the threshold read. `pnpm josh delegate --list` prints the threshold.
+unedited files and search turns and refuses the threshold call. `pnpm josh delegate --list` prints
+the threshold.
+
+**Dispatch the unit as the `investigator` agent** (`kit:investigator` in a consumer) — the parent's
+model at a lowered effort, read-only.
 `docs/josh-commands-automation.md` → "`josh investigation:guard`" carries the command's counting details.
 
 **The main line does not idle while the unit reads:** read files this run will edit, then verify the
