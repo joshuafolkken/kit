@@ -33,27 +33,13 @@ does. **There is no second criterion.** §2i's observation, the review round cap
 prerequisite each route a second filing through it, delivered by `pnpm josh rule:guard` at the run's
 second `pnpm josh issue:file` call, never the first.
 
-## Why the default is not to split
-
-**The rules were manufacturing Issues faster than runs could close them.** Execution was never the
-bottleneck; arrival was, and this assessment was one of the routes producing it: `route:split`
-accounted for **28 of the 119 open Issues (24%)**.
-
-**Separability is not scarce, which is why a test made only of it splits nearly everything.** Almost
-any request can be described as several deliverables that could each ship alone, so the old test bit on
-requests worth a handful of lines. The second question is what makes the test bite only where one Issue
-would genuinely be unverifiable in one pass. The review round cap's default and the WIP cap changed
-alongside it, in one commit.
-
 ## Diff size is not a reason to split, and that is measured
 
 **Size is a bar a split has to clear; it is never a reason to split.** Question 2 is a *minimum* — below
-it the work stays whole — and nothing makes a large diff a reason to divide one. Splitting an Issue in
-two to shorten review round 1 lengthens it, because each Issue pays round 1's fixed cost again while
-the size-dependent part is merely divided between the halves (measured in joshuafolkken/kit#1436:
-round 1's cost is dominated by a fixed part that two Issues pay twice, so there is no diff size at
-which splitting to cut it pays). **A proposal to add a size threshold that splits more is required to
-say why that data does not reach it.**
+it the work stays whole — and nothing makes a large diff a reason to divide one. **A proposal to add a
+size threshold that splits more is required to say why the round-1 measurement does not reach it.**
+Rationale: `docs/maintainers/split-assessment-rationale.md` → "Why the default is not to split" and
+`docs/maintainers/split-assessment-rationale.md` → "Why diff size is not a reason to split".
 
 **The size half is measured, not eyeballed — `pnpm josh split:assess`.** It counts the branch's
 changed files and changed lines with test files excluded and answers `split` / `single` on size

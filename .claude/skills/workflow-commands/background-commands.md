@@ -28,83 +28,39 @@ command finished.
 
 **Never hand-write a `while`/`until` … `sleep` loop over the output file.** The loop does not know
 when the command finished: a regex that never matches waits to the block limit, and one that matches
-a mid-run line exits too early — either way a full-context round trip is spent for nothing. Six lanes
-lost about 45 minutes, 13% of their wall clock, to exactly this (joshuafolkken/kit#2371), and in the
-worst case a lane grepped a merged PR's output file for 30 minutes after the merge had already
-landed. `pnpm josh rule:guard` refuses the poll loop and hands back this route, so the guarantee is a
-mechanism rather than prose to remember (`prompts/collaboration-workflow/rule-delivery.md`).
+a mid-run line exits too early. `pnpm josh rule:guard` refuses the poll loop and hands back this route
+(`prompts/collaboration-workflow/rule-delivery.md`). Rationale:
+`docs/maintainers/background-commands-rationale.md` → "Why a poll loop is refused".
 
 **To glance at interim output, `Read` the output file once** — the notification names its path — and
 never in a sleep loop. If what you are waiting on is CI, `pnpm josh followup` waits on it for you in
 the foreground; a bare `sleep` that arms a progress heartbeat is `run:progress --wait`'s job, refused
-in front of a hand-armed timer by `early-heartbeat` (joshuafolkken/kit#1570). This loop is the case
-that rule leaves alone by design, because a loop ends on a condition rather than a clock — and here
-the condition it ends on is the wrong one.
+in front of a hand-armed timer by `early-heartbeat`.
 
-## Decision record
+## The tail and what overlaps each wait
 
-This document is read at its point of use, not at the entry: it binds only after the first edit —
-at the gate, the push, the CI wait and `pnpm josh followup` — so it is fetched in full, in the turn
-that reaches the first backgroundable command (`pnpm josh gate`), by the run that has to obey it
-(`SKILL.md` → §1, "Four documents are read at the point of use"). `SKILL.md` → §2h is the resident
-pointer to it, and carries the one thing it does not: the same rule at a batch's scale.
+**Never give a foreground call a timeout above the harness cap** — the cap decides how long a
+foreground call waits, so a larger number detaches the call without the completion notification.
+Rationale: `docs/maintainers/background-commands-rationale.md` → "Why the tail collects idle time".
 
-**A run's idle time collects in its tail, and the two ways it collects there are one mistake**
-(joshuafolkken/kit#1510). `fullrun #1501` ran 45m03s on about 17 minutes of work. Of the 25 minutes
-nothing was running, **6m28s** was a `pnpm josh git -y` issued in the **foreground** with a
-900-second tool timeout — above the harness's own 600-second cap, so the harness detached it at the
-cap and nothing read the output file for six and a half minutes afterwards — and **6m06s** was bare
-CI: the push landed, the turn ended, and the merge started only once the person asked whether it was
-merging. Both halves handed the deciding of *when to look back* to something that was never going to
-decide it.
-
-**Issue it in the background, and never give a foreground call a timeout above the harness cap.**
-The cap decides how long a foreground call waits, not the number passed to it, so a number above the
-cap chooses the detached path without choosing the completion notification that should come with it.
-A call issued detached from the start re-invokes the run when it exits — which is what makes the
-completion *delivered* rather than something to remember to poll for.
-
-The measured outliers were a 6m28s foreground `git -y`, 6m06s of unattended CI and a 19m26s push
-transport fault. The operational section above maps those waits to background gate/push and a
-foreground `followup`; `followup.md` remains its command procedure.
-
-**A tail does follow the merge, and it is not small** (joshuafolkken/kit#1462). This section first
-gave a different reason for that last bullet — that the merge ends the run, leaving no tail to
-overlap — and the measurement says otherwise. The run-timing report charges to **`post-run`** exactly what runs
-after the last `followup` span ends: **3.0 min, 5.9% of a 50.5-minute run**, in the lane child
-`--issue 1599` (PR #1602); **2 min 31 s, 14% of 20m15s**, in the plain `fullrun #1597` (PR #1603);
-**3.1 min** hand-measured in run #1441's delegated child, which is where this Issue started. **What
-was wrong is the premise, not the conclusion** — `followup` stays foreground, and what changes is
-*where the tail's work is done*.
-
-**So the tail is emptied before `followup` is issued, rather than worked through after it returns.**
+**The tail is emptied before `followup` is issued, rather than worked through after it returns.**
 One question decides each step, and it is asked of the step rather than judged: **does it read the
 merge result?**
 
 - **It does — the step stays after `followup`.** `pnpm josh ms`, `pnpm josh issue:state <N>`,
   `pnpm josh epic:next`, `pnpm josh backlog:next --exclude <N>`, and `pnpm josh lane:close` /
-  `pnpm josh lane:list`. Each is a verifier or is keyed to a merge that has to have happened, and
-  bringing one forward would have it read a state nobody has reached yet. **De-duplicating a step is
-  not removing it**: the parent reads the child's state from GitHub *because* a summary is not a
-  verifier ("Each child runs in a delegated unit"), so none of these may be dropped or answered from
-  memory.
+  `pnpm josh lane:list`. **De-duplicating a step is not removing it**: none of these may be dropped or
+  answered from memory.
 - **It does not — the step is composed in the turn that issues `followup`.** The epic progress
-  comment's counter *values* (children run, Issues filed, consecutive failures, the run's start time)
-  are all counted inside the run, and the completion report body is already
-  placed beside `pnpm josh git -y` in the table below. **Only the write follows the merge.** The
-  comment exists because a compaction takes the counters at a moment nobody chooses (`backlogrun-progress.md` →
-  "The counters live in the record"), so composing the values earlier moves no write and loses
-  no counter.
-- **`pnpm josh cost --cut` stays after the merge, and reads nothing from it.** It measures
-  this session's own transcript, so the question above would bring it forward — but its answer grows
-  with the session, and asking it a call early under-reads the very number the hand-off is decided
-  on. It is seconds of tail against a guard on session size, so it keeps its documented seam
-  (`backlogrun-progress.md` → "The check is asked at every merge").
+  comment's counter *values* and the completion report body (placed beside `pnpm josh git -y` in the
+  table below). **Only the write follows the merge.**
+- **`pnpm josh cost --cut` stays after the merge, and reads nothing from it** — its answer grows with
+  the session, so it keeps its documented seam (`backlogrun-progress.md` → "The check is asked at
+  every merge").
 
-**What runs beside a backgrounded command is the work that writes nothing to the working tree.** That
-is the whole test, and it is the same one that lets the gate and the review overlap (`SKILL.md` →
-§2): a step that edits makes the background command's result stale, so it is not something to overlap
-with. Applied to the three waits a run actually has:
+**What runs beside a backgrounded command is the work that writes nothing to the working tree** — a
+step that edits makes the background command's result stale. Applied to the three waits a run
+actually has:
 
 | While this runs | Do this beside it |
 | --------------- | ----------------- |
@@ -115,26 +71,21 @@ with. Applied to the three waits a run actually has:
 
 **The turn never ends at the push.** The completion notification for `pnpm josh git -y` is what
 resumes the run, and the turn that reads it goes straight through any branch-2 filing and
-`pnpm josh epic:bundle` to `pnpm josh followup`. joshuafolkken/kit#1333 had already settled that end
-state for a clean second round, and symptom 2 above is its regression — **so the guarantee is a
-mechanism and not only the procedure**: `pnpm josh rule:guard` refuses the foreground push step and
-states both halves at that call (`prompts/collaboration-workflow/rule-delivery.md`). A turn *ending*
-is the absence of a call and no `PreToolUse` hook can see one, so the last call before the seam is
-where the rule can be put; the push reissued detached is not refused again, so a run that obeys pays
-nothing.
+`pnpm josh epic:bundle` to `pnpm josh followup`. `pnpm josh rule:guard` refuses the foreground push
+step and states both halves at that call (`prompts/collaboration-workflow/rule-delivery.md`); the push
+reissued detached is not refused again. Rationale: `docs/maintainers/background-commands-rationale.md`
+→ "Why the push is guarded".
 
-**One turn does end before the push, and only one: a dispatched lane child's pre-gate cut**
-(joshuafolkken/kit#1839). It ends the turn before the gate and relaunches a fresh process in the same
-act, so the run continues rather than stalling — the sanctioned boundary distinct from the push
-turn-end this section forbids. The boundary, its two commands and the resume verification are the
-`pre-gate-cut.md` skill document, its single source.
+**One turn does end before the push, and only one: a dispatched lane child's pre-gate cut.** It ends
+the turn before the gate and relaunches a fresh process in the same act — `pre-gate-cut.md` → "Taking
+the cut" is its single source.
 
 **A headless lane child (`claude -p`) is where "a background command re-invokes the run" does not
-hold: its background Bash tasks are killed when its turn ends** (joshuafolkken/kit#2704). It hands the
-gate-to-merge region to a foreground `pnpm josh ship --detach` instead (`chain-rule.md` step 0) —
-its preflight runs before the supervisor exists, so a backgrounded `ship` dies with the turn
-(joshuafolkken/kit#3027); `pnpm josh rule:guard` refuses a backgrounded `josh gate` / `git` /
-`followup` / `ship` there, and the `Stop` hook sends a child with a task still running back to wait.
+hold: its background Bash tasks are killed when its turn ends.** It hands the gate-to-merge region to
+a foreground `pnpm josh ship --detach` instead (`chain-rule.md` step 0) — its preflight runs before the
+supervisor exists, so a backgrounded `ship` dies with the turn; `pnpm josh rule:guard` refuses a
+backgrounded `josh gate` / `git` / `followup` / `ship` there, and the `Stop` hook sends a child with a
+task still running back to wait.
 
 The operational section above is the single source of the rule. `followup.md`, `chain-rule.md` and
 `backlogrun-progress.md` → "Progress while the run is quiet" route here for it rather than restating it.

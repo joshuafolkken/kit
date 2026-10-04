@@ -41,6 +41,10 @@ from the page it explains.
   [backlogrun-lanes-rationale.md](./backlogrun-lanes-rationale.md),
   [backlogrun-progress-rationale.md](./backlogrun-progress-rationale.md) — `backlogrun`
 - [pre-gate-cut-rationale.md](./pre-gate-cut-rationale.md) — the pre-gate session cut
+- [background-commands-rationale.md](./background-commands-rationale.md) — backgrounding the gate
+  and the push
+- [latest-gate-rationale.md](./latest-gate-rationale.md) — the dependency-update window
+- [split-assessment-rationale.md](./split-assessment-rationale.md) — the split assessment
 - [josh-commands-rationale.md](./josh-commands-rationale.md) — the `josh` commands
 - [josh-commands-automation-rationale.md](./josh-commands-automation-rationale.md) — the automation
   `josh` commands

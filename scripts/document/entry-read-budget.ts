@@ -93,7 +93,7 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	{ entry: 'kickoff', bytes: 65_536 },
 	{ entry: 'fullrun', bytes: 131_072 },
 	{ entry: 'halfrun', bytes: 106_496 },
-	{ entry: 'prrun', bytes: 135_168 },
+	{ entry: 'prrun', bytes: 131_072 },
 	{ entry: 'backlogrun', bytes: 217_088 },
 	{ entry: LANE_CHILD, bytes: 77_824 },
 ]
