@@ -447,6 +447,27 @@ it and the two designs it was chosen over are in
 `prompts/collaboration-workflow/output-bounds.md`; `scripts/lib/bash-output-cap.test.ts` fails a value
 that would not fire.
 
+## The Artifact tool is switched off in kit only
+
+**kit's own `.claude/settings.json` sets `"enableArtifact": false` (joshuafolkken/kit#3140).** An
+interactive session that loaded the claude.ai connectors and the Artifact tool was seen starting at
+about 48k tokens of context against about 27k for one that did not — a gap re-read on every API
+call, which the Issue estimated at roughly 2M tokens over a 93-call `backlogrun` orchestrator.
+Measured on Claude Code 2.1.289 as the first call of an interactive session in a kit checkout:
+47.5k with neither switch, 47.5k with `"disableClaudeAiConnectors": true` alone and 35.6k with
+`"enableArtifact": false`. So the Artifact switch recovers about 12k of that gap per call — roughly
+1.1M tokens over the same 93 calls — and the rest is not explained by either switch. The connector
+switch changed nothing at the first call, so it is not set. Headless `claude -p` showed it removing
+1.9k, but the run that pays the cost is interactive.
+
+**The key is kit-only because it cannot be undone below the layer that sets it.** Claude Code
+switches the tool off when any settings layer sets `enableArtifact` to `false` (or sets
+`CLAUDE_CODE_DISABLE_ARTIFACT`). A `true` in `.claude/settings.local.json` or on `--settings` does
+not bring it back, and the same 35.6k was measured with each. A shipped `false` would therefore take
+the tool from every consumer with no personal way back, so `claude-kit-only-settings.ts` removes
+the key from the copy `josh init` and `josh sync` write. A consumer who wants the saving sets it
+in their own settings. In kit, delete the key on a branch to get the tool back.
+
 ## The verify-ui skill
 
 **`.claude/skills/verify-ui/` is the UI gate's implementation.** The completion gate in the rule

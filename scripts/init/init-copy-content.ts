@@ -1,6 +1,7 @@
 import { managed_marker_logic } from '#scripts/managed-marker/managed-marker-logic'
 import { workflow_pin_logic } from '#scripts/sync/workflow-pin-logic'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
+import { claude_kit_only_settings } from './claude-kit-only-settings'
 import { claude_plugin_config } from './claude-plugin-config'
 import { hook_command_rewrite } from './hook-command-rewrite'
 import { init_logic } from './init-logic'
@@ -19,7 +20,8 @@ import { init_logic } from './init-logic'
  * workflow-pin-logic.ts for why the template refs are not authoritative, and
  * managed-marker-logic.ts for why the stamp is on the file rather than in a list.
  *
- * The consumer's `.claude/settings.json` gets two further passes. The kit plugin's marketplace and
+ * The consumer's `.claude/settings.json` gets three further passes. The keys kit sets only for its
+ * own sessions are removed (joshuafolkken/kit#3140, see claude-kit-only-settings.ts). The kit plugin's marketplace and
  * `enabledPlugins` declaration is injected, because the skills that used to be copied now ship as the
  * `kit` plugin and load from that declaration (joshuafolkken/kit#1879). And its hook commands are
  * rewritten from `pnpm josh` to the published bundle invoked directly with node
@@ -36,9 +38,13 @@ function transform_copied_content(destination_path: string, content: string): st
 		with_pins,
 		KIT_PACKAGE_NAME,
 	)
-	const with_plugin = claude_plugin_config.apply_plugin_config_for_destination(
+	const with_kit_only_stripped = claude_kit_only_settings.apply_kit_only_strip_for_destination(
 		destination_path,
 		with_marker,
+	)
+	const with_plugin = claude_plugin_config.apply_plugin_config_for_destination(
+		destination_path,
+		with_kit_only_stripped,
 	)
 
 	return hook_command_rewrite.apply_hook_command_rewrite_for_destination(
