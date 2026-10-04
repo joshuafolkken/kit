@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { git_command } from '#scripts/git/git-command'
 import { line_budget, type FileBudget, type LineBudget } from './line-budget'
 import { line_targets } from './line-targets'
 
@@ -122,10 +123,11 @@ function render(budgets: ReadonlyArray<FileBudget>, project_root: string): strin
 	return [header(budgets), ...rows_for(budgets, project_root)].join('\n')
 }
 
-// The scan resolves the repository root first — `budgets_for` and the row display both key off it — so
-// a run started from a subdirectory reports the same files as one started from the root.
+// The scan resolves the repository root first — `budgets_for` and the row display both key off it, and
+// `git ls-files --full-name` names files relative to it — so a run started from a subdirectory reports
+// the same files as one started from the root.
 async function run_scan(): Promise<number> {
-	const root = await line_targets.repo_root()
+	const root = await git_command.repository_root()
 	const budgets = await scan_budgets(root)
 
 	process.stdout.write(`${render(budgets, root)}\n`)

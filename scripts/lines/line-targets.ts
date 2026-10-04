@@ -40,10 +40,6 @@ const LS_FILES_FLAGS: ReadonlyArray<string> = [
 	'-z',
 ]
 const NUL = '\0'
-// `--show-toplevel` prints the absolute repository (or worktree) root from anywhere inside it, so the
-// root-relative names `--full-name` returns resolve to the right absolute paths wherever the command
-// was invoked.
-const SHOW_TOPLEVEL: ReadonlyArray<string> = ['rev-parse', '--show-toplevel']
 
 function is_lint_target(relative_path: string): boolean {
 	return LINT_EXTENSIONS.has(path.extname(relative_path))
@@ -51,12 +47,6 @@ function is_lint_target(relative_path: string): boolean {
 
 function split_names(output: string): ReadonlyArray<string> {
 	return output.split(NUL).filter((name) => name.length > 0)
-}
-
-// `git_spawn.read` is the one place ordinary git commands are spawned from, so this reuses it rather
-// than growing a second spawn site (joshuafolkken/kit#1640).
-async function repo_root(): Promise<string> {
-	return await git_spawn.read([...SHOW_TOPLEVEL])
 }
 
 // The names resolve against the repository `root`, never the process cwd: `--full-name` prints them
@@ -73,7 +63,6 @@ async function lint_target_files(root: string): Promise<ReadonlyArray<string>> {
 const line_targets = {
 	is_lint_target,
 	lint_target_files,
-	repo_root,
 	split_names,
 }
 

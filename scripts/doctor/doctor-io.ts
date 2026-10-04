@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { read_spawn_stderr, read_spawn_stdout } from '#scripts/lib/spawn-exit'
+import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
+import { read_spawn_stdout } from '#scripts/lib/spawn-exit'
 import { execaSync } from 'execa'
 import { doctor_logic } from './doctor-logic'
 
@@ -69,18 +70,13 @@ function classify_git_failure(exit_code: number | undefined, stderr: string): Gi
 // caller's check, because reporting an unknown as a clean result is the false all-clear
 // joshuafolkken/kit#805 exists to remove. See the two classifiers above for what proves what.
 function resolve_git_top_level(): GitTopLevel {
-	const result = execaSync('git', ['rev-parse', '--show-toplevel'], {
-		reject: false,
-		timeout: GIT_TIMEOUT_MS,
-		// git translates its messages, so the match below would fail under any non-English locale and
-		// the spurious warning would come back. `C` pins the output this code was written against.
-		env: { LC_ALL: 'C', LANGUAGE: 'C' },
-		extendEnv: true,
-	})
+	// The C locale `toplevel` asks under is what keeps the stderr match below from failing on a
+	// translated message and bringing the spurious warning back.
+	const result = git_spawn_sync.toplevel(GIT_TIMEOUT_MS)
 
-	if (result.exitCode === 0) return classify_top_level(read_spawn_stdout(result).trim())
+	if (result.exit_code === 0) return classify_top_level(result.stdout.trim())
 
-	return classify_git_failure(result.exitCode, read_spawn_stderr(result))
+	return classify_git_failure(result.exit_code, result.stderr)
 }
 
 // Whether one line is the setting itself rather than prose about it. kit's own template explains the

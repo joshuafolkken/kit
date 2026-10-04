@@ -26,4 +26,16 @@ describe('GitHub run prerequisites', () => {
 		mocked_execa.mockReturnValue(result as ReturnType<typeof execaSync>)
 		expect(run_github_prerequisite.explanation(root, 'run:entry')).toContain('GitHub origin')
 	})
+
+	it('passes a GitHub origin', () => {
+		const result: unknown = { exitCode: 0, stdout: 'git@github.com:owner/repo.git\n' }
+
+		mocked_execa.mockReturnValue(result as ReturnType<typeof execaSync>)
+		expect(run_github_prerequisite.explanation(root, 'run:entry')).toBeUndefined()
+		expect(mocked_execa.mock.calls.at(-1)?.[1]).toStrictEqual([
+			'config',
+			'--get',
+			'remote.origin.url',
+		])
+	})
 })

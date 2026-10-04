@@ -1,5 +1,6 @@
 import { project_checks } from '#scripts/gate/project-checks'
-import { describe, expect, it, vi } from 'vitest'
+import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { test_declared_changed } from './test-declared-changed'
 
 // joshuafolkken/kit#2118: the sync reader parses `git status --porcelain`, so the two non-trivial
@@ -25,6 +26,34 @@ describe('test_declared_changed.path_of', () => {
 
 	it('follows the arrow to the new path of a rename', () => {
 		expect(test_declared_changed.path_of(`R  old.ts -> ${NEW_FILE}`)).toBe(NEW_FILE)
+	})
+})
+
+describe('test_declared_changed.read_changed_paths_sync', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('reads every changed path from the porcelain status', () => {
+		const run = vi.spyOn(git_spawn_sync, 'run').mockReturnValue({
+			exit_code: 0,
+			stdout: `?? ${NEW_FILE}\n M ${RUNTIME_FILE}\n`,
+			stderr: '',
+		})
+
+		expect(test_declared_changed.read_changed_paths_sync()).toStrictEqual([NEW_FILE, RUNTIME_FILE])
+		// Unbounded, so a slow status never reads as an empty — exempt — change set.
+		expect(run).toHaveBeenCalledWith(['status', '--porcelain'], { timeout: 0 })
+	})
+
+	it('reads a failed status — outside a repository — as no changes', () => {
+		vi.spyOn(git_spawn_sync, 'run').mockReturnValue({
+			exit_code: 128,
+			stdout: '',
+			stderr: 'fatal: not a git repository',
+		})
+
+		expect(test_declared_changed.read_changed_paths_sync()).toStrictEqual([])
 	})
 })
 

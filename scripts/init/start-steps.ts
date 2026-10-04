@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { error_text } from '#scripts/lib/error-message'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
@@ -44,7 +45,7 @@ function read_git_state(root: string, shape: ProjectShape): GitState {
 		}
 	}
 
-	const has_origin = succeeds('git', ['remote', 'get-url', 'origin'], root)
+	const has_origin = git_spawn_sync.origin_url(root) !== undefined
 	const branch = read_output('git', ['symbolic-ref', '--short', 'HEAD'], root)
 	const has_commits = succeeds('git', ['rev-parse', '--verify', '--quiet', 'HEAD'], root)
 	const has_kit_committed = kit_setup_state.is_kit_committed(root)

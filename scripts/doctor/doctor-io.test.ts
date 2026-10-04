@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
+import { git_utilities } from '#scripts/git/constants'
 import { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { doctor_io } from './doctor-io'
@@ -131,13 +132,17 @@ describe('resolve_git_top_level — when git cannot answer', () => {
 		mocked_execa_sync.mockReturnValue(git_ran('true\n'))
 		doctor_io.resolve_git_top_level()
 
-		expect(mocked_execa_sync).toHaveBeenCalledWith('git', ['rev-parse', '--show-toplevel'], {
-			reject: false,
-			timeout: doctor_io.GIT_TIMEOUT_MS,
-			// Pinned so the stderr match below is not defeated by a translated git message.
-			env: { LC_ALL: 'C', LANGUAGE: 'C' },
-			extendEnv: true,
-		})
+		expect(mocked_execa_sync).toHaveBeenCalledWith(
+			git_utilities.get_git_command_for_spawn(),
+			['rev-parse', '--show-toplevel'],
+			{
+				reject: false,
+				timeout: doctor_io.GIT_TIMEOUT_MS,
+				// Pinned so the stderr match below is not defeated by a translated git message.
+				env: { LC_ALL: 'C', LANGUAGE: 'C' },
+				extendEnv: true,
+			},
+		)
 	})
 })
 

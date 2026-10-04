@@ -1,5 +1,6 @@
-import { execFileSync } from 'node:child_process'
 import { project_checks } from '#scripts/gate/project-checks'
+import { PORCELAIN_FLAG } from '#scripts/git/constants'
+import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { test_declared_logic, type Verdict } from './test-declared-logic'
 
 // The working-tree change set and the verdict over it, read **synchronously** for the `PreToolUse`
@@ -30,21 +31,17 @@ function path_of(line: string): string {
 }
 
 function read_changed_paths_sync(): Array<string> {
-	try {
-		// stderr is discarded: outside a repository git prints `fatal: not a git repository`, which the
-		// catch below already handles as an empty change set — surfacing it would only be noise.
-		const output = execFileSync('git', ['status', '--porcelain'], {
-			encoding: 'utf8',
-			stdio: ['ignore', 'pipe', 'ignore'],
-		})
+	// Outside a repository git fails with `fatal: not a git repository`, which reads as an empty change
+	// set; its stderr is captured rather than surfaced, since it would only be noise.
+	// Unbounded (`timeout: 0`) on purpose: a timed-out status would read as an empty change set, and so
+	// as `exempt`, letting an untested runtime change through on a slow checkout.
+	const output = git_spawn_sync.run(['status', PORCELAIN_FLAG], { timeout: 0 })
+	if (output.exit_code !== 0) return []
 
-		return output
-			.split('\n')
-			.filter((line) => line.length > STATUS_PREFIX_LENGTH)
-			.map((line) => path_of(line))
-	} catch {
-		return []
-	}
+	return output.stdout
+		.split('\n')
+		.filter((line) => line.length > STATUS_PREFIX_LENGTH)
+		.map((line) => path_of(line))
 }
 
 // The working-tree read behind `current_verdict`, injectable so the delivery path can be exercised

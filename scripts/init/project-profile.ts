@@ -1,9 +1,9 @@
 import { existsSync, readdirSync, readFileSync, type Dirent } from 'node:fs'
 import path from 'node:path'
 import { repo_origin } from '#scripts/discovery/repo-origin'
+import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { json_value } from '#scripts/lib/json-value'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
-import { execaSync } from 'execa'
 
 type ProjectProfile = 'basic' | 'full'
 
@@ -159,12 +159,9 @@ function scan_files(root: string): { has_web: boolean; has_typescript: boolean }
 }
 
 function has_github_remote(root: string): boolean {
-	const result = execaSync('git', ['config', '--get', 'remote.origin.url'], {
-		cwd: root,
-		reject: false,
-	})
+	const url = git_spawn_sync.origin_url(root)
 
-	return result.exitCode === 0 && repo_origin.parse_origin_url(result.stdout) !== undefined
+	return url !== undefined && repo_origin.parse_origin_url(url) !== undefined
 }
 
 function inspect_project(root: string, requested?: ProjectProfile): ProjectShape {
