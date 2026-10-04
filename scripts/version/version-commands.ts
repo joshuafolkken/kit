@@ -24,6 +24,8 @@ import { version_targets } from './version-targets'
 const FAILURE_EXIT_CODE = 1
 const ALREADY_UP_TO_DATE = 'Already up to date'
 const NO_QUARANTINE_MINUTES = 0
+// A global install that goes to the network — the same ten minutes `lane-install.ts` gives one.
+const UPGRADE_TIMEOUT_MS = 600_000
 
 // What the local minimum-release-age policy permits for one package. Resolved per package because
 // the newest installable release is a property of that package's own publish history. Returns a hold
@@ -195,8 +197,16 @@ function run_check(config: VersionCommandConfig): void {
 	)
 }
 
+// Through `sh -c` because an upgrade command is the user's own configured string — `pnpm add -g …`,
+// or a chain with `&&` — so it is inside the trust boundary and needs a shell to mean what it says.
+// The bound keeps a registry that never answers from holding `josh version` open forever; a timed-out
+// run has no exit code, so it falls through to the failure code like any other failed step.
 function run_upgrade_command(command: string): number {
-	const result = execaSync('sh', ['-c', command], { stdio: 'inherit', reject: false })
+	const result = execaSync('sh', ['-c', command], {
+		stdio: 'inherit',
+		reject: false,
+		timeout: UPGRADE_TIMEOUT_MS,
+	})
 
 	return result.exitCode ?? FAILURE_EXIT_CODE
 }

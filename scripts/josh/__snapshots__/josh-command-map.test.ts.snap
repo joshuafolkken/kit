@@ -582,9 +582,10 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "measure:rerun": [
-      "<path>",
+      "<issue-number>",
       "automation",
       [
+        "network",
         "processes",
         "files",
       ],

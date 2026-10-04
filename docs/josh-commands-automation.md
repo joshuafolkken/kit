@@ -297,11 +297,13 @@ Related: [`josh followup`](#josh-followup).
 
 ### `josh measure:rerun`
 
-Re-run a behavior-change Issue's declared baseline after it merges and print the before/after pair. It reads the `## ベースライン` section of a body file, runs each `` `<command>` → <value> `` entry, and prints the recorded value beside the re-measured one — the merge-time re-read a prose rule never gets (joshuafolkken/kit#2178).
+Re-run a behavior-change Issue's declared baseline after it merges and print the before/after pair. It reads the Issue's `## ベースライン` section, runs each `` `<command>` → <value> `` entry, and prints the recorded value beside the re-measured one — the merge-time re-read a prose rule never gets (joshuafolkken/kit#2178).
 
 ```bash
-pnpm josh measure:rerun /tmp/issue-body.md
+pnpm josh measure:rerun 2212
 ```
+
+**Trust:** a baseline is shell, so it runs only for an `OWNER` / `MEMBER` / `COLLABORATOR` author; any other author, or an unreadable issue, exits 1 before any command runs (joshuafolkken/kit#3064). A command over its one-minute budget prints `(command failed: …)` and the rest still run.
 
 **Behavior:** when a value has not moved, the premise the rule rested on is recorded as refuted — one line appended to the observation ledger (`docs/maintainers/observations/`, in the file for the issue the checked-out branch leads with, or a date-named file outside any issue's branch), keyed to the command so a second refutation of the same measurement is a same-key repeat the promotion rule counts. It reuses that append-only ledger rather than a second one. A section written in prose (no `` `command` → value `` line) is refused, since a natural-language measurement cannot be re-run. `pnpm josh observations:flush` is the ledger's commit path.
 

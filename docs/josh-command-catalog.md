@@ -407,9 +407,9 @@ Checkout default branch, pull latest, and prune merged remote-gone branches (ref
 
 ### `josh measure:rerun`
 
-> **Audience:** automation · **Side effects:** processes, files
+> **Audience:** automation · **Side effects:** network, processes, files
 
-`<path>`
+`<issue-number>`
 
 Re-run a merged issue’s baseline command and print the before/after pair
 
