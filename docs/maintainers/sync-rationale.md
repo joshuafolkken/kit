@@ -12,9 +12,10 @@ behavior. It used to sit inline in that page's "AI files (overwritten)" section
 (joshuafolkken/kit#1879).** `.claude/settings.json` still overwrites the consumer's file — it
 carries the `permissions.deny` rules a plugin cannot provide — and now also declares the `kit`
 marketplace and enables the `kit` plugin. The skill bodies load from the package
-(`node_modules/@joshuafolkken/kit/.claude/skills/`). The CLI does not auto-install a plugin from
-settings alone, so a consumer runs a one-time `claude plugin marketplace add
-./node_modules/@joshuafolkken/kit && claude plugin install kit@kit` (or `/plugin`). `josh sync`
+(`node_modules/@joshuafolkken/kit/.claude/skills/`). Nothing needs installing: in a trusted
+workspace Claude Code registers the marketplace from the declaration and loads the skills — an
+interactive session from its first session, a headless one from its second (joshuafolkken/kit#2990,
+which replaced the one-time `claude plugin install kit@kit` #1930 had asked for). `josh sync`
 removes a stale copied skill directory only when its content still matches the shipment, and keeps —
 with a warning — one the consumer edited or authored.
 

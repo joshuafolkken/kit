@@ -42,6 +42,14 @@ describe('plugin_line', () => {
 		expect(doctor_consumer.plugin_line(true)).toContain('✓')
 	})
 
+	it('names the trusted workspace instead of an install command for a declared plugin', () => {
+		const line = doctor_consumer.plugin_line(true)
+
+		expect(line).not.toContain('claude plugin install')
+		expect(line).toContain('trusted workspace')
+		expect(line).toContain('headless from its second session')
+	})
+
 	it('warns and names josh sync when the plugin is not declared', () => {
 		const line = doctor_consumer.plugin_line(false)
 

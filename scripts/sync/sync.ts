@@ -7,7 +7,6 @@ import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { basic_path_migration } from '#scripts/init/basic-path-migration'
 import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
-import { plugin_install_hint_module } from '#scripts/init/plugin-install-hint'
 import { project_profile } from '#scripts/init/project-profile'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
 import { repository_labels } from '#scripts/repo/repository-labels'
@@ -247,11 +246,6 @@ function sync_basic_artifacts(is_force: boolean): void {
 	sync_basic_prettier_config(path.join(PROJECT_ROOT, BASIC_PRETTIER_CONFIG))
 }
 
-function sync_full_artifacts(is_force: boolean): void {
-	sync_project_artifacts(is_force)
-	plugin_install_hint_module.report_plugin_install_hint()
-}
-
 // Checked before anything is written, never per file: the damage is the whole run, and a partial
 // sync that stopped halfway would leave the source repository in a state neither `git checkout` nor
 // a re-run describes (joshuafolkken/kit#868).
@@ -265,7 +259,7 @@ function main(): void {
 
 	console.info('\n🔄 Syncing @joshuafolkken/kit AI files\n')
 	if (project_checks.is_basic(PROJECT_ROOT)) sync_basic_artifacts(is_force)
-	else sync_full_artifacts(is_force)
+	else sync_project_artifacts(is_force)
 	console.info('\n✅ Done.\n')
 }
 
