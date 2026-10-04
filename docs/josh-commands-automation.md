@@ -188,6 +188,14 @@ Fetch the SonarCloud hotspots on a pull request and print each one's Step B bran
 pnpm josh sonar:hotspots 42
 ```
 
+### `josh sonar:new-code`
+
+Fail when a pull request adds any new SonarCloud issue — of any type or severity — or any new duplicated block. It reads the pull request's unresolved issues (`api/issues/search`) and its `new_duplicated_blocks` measure, prints one line per issue and then the verdict: `clean` (exit `0`), `findings: …` or `unreadable: …` (exit `1`) — a failed read fails too, so an outage never passes a pull request as clean. An issue resolved in SonarCloud as accepted or a false positive is not counted. `SONAR_TOKEN` is sent when set. The distributed `sonar-qube.yml` runs it after the scan on every pull request; full handling: `prompts/sonar-hotspot-handling.md`.
+
+```bash
+pnpm josh sonar:new-code 42
+```
+
 ### `josh ui:routes`
 
 List the screenshot-target routes the change touches: a changed `+page` / `+layout` gives its own route, a changed shared component the routes that import it (a one-level `src/routes` scan). Empty output prints "no route derived" rather than guessing; the `verify-ui` skill's §1 narrows the list.

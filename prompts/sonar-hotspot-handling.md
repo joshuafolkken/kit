@@ -9,9 +9,13 @@ AI tools cannot perform OAuth browser login to SonarCloud, so this guide assumes
 ## Quality Gate enforcement (CI blocks PRs)
 
 The distributed `.github/workflows/sonar-qube.yml` runs the SonarCloud scan with
-`-Dsonar.qualitygate.wait=true`. The scanner waits for SonarCloud to evaluate the project's
-Quality Gate and **fails the `SonarQube` job — a required PR check — when the gate is red**, so a
-PR that introduces a finding cannot be merged green. This is the single enforcement point:
+`-Dsonar.qualitygate.wait=true`, so the `SonarQube` job — a required PR check — fails when the
+Quality Gate is red. **The gate alone is not enough**: `Sonar way` judges ratings and ratios, so a
+few MINOR code smells keep the maintainability rating at A and a small copied block stays under the
+duplication threshold. On a pull request the job therefore ends with `pnpm josh sonar:new-code <PR>`,
+which **fails on a single new issue of any type or severity, or a single new duplicated block**
+(joshuafolkken/kit#3045). An issue resolved in SonarCloud as accepted or a false positive is not
+counted — that resolution is the route for a deliberate exception. This job is the single enforcement point:
 `josh followup` does **not** scan SonarCloud findings (it only scans CodeRabbit / Claude Review
 comments), but it **does** wait on the required `SonarQube` CI check, so a red gate also blocks the
 `followup` merge. Consumers pick the workflow up verbatim via `josh sync`; do not re-implement the
@@ -24,6 +28,10 @@ run without the secret in the Dependabot store), so a repository that relies on 
 `SONAR_TOKEN` in both secret stores.
 
 ### New Code vs Overall Code semantics
+
+The scan passes `package.json`'s `version` as `sonar.projectVersion`, so New Code — "since the
+previous version" — restarts at every `josh bump` that reaches main instead of growing from the
+first analysis on.
 
 SonarCloud's default **Sonar way** Quality Gate evaluates **New Code only** — conditions
 (new bugs, new code smells above the Maintainability rating, new coverage/duplication) apply to
