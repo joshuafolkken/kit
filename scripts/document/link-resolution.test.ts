@@ -114,6 +114,31 @@ describe('every cross-document reference resolves', () => {
 		expect(broken_section_references('`CLAUDE.md` → "No Such Heading Here"')).not.toStrictEqual([])
 	})
 
+	it('flags a reference that carries a section number or no code span', () => {
+		const text =
+			'`SKILL.md` → §1, "No Such Heading Here" and (chain-rule.md →\n"No Such Heading Either")'
+
+		expect(broken_section_references(text)).toStrictEqual([
+			'SKILL.md → "No Such Heading Here"',
+			'chain-rule.md → "No Such Heading Either"',
+		])
+	})
+
+	it('flags a reference whose file name is a markdown link', () => {
+		const text = 'see [`chain-rule.md`](./chain-rule.md) →「No Such Heading Here」'
+
+		expect(broken_section_references(text)).toStrictEqual([
+			'chain-rule.md → "No Such Heading Here"',
+		])
+	})
+
+	it('reads no section reference out of a URL or an unpaired code span', () => {
+		const text =
+			'https://github.com/o/r/blob/main/docs/x/missing.md → "No Such Heading Here" and `missing.md → "No Such Heading Either"'
+
+		expect(broken_section_references(text)).toStrictEqual([])
+	})
+
 	it('flags a relative link to a missing file', () => {
 		expect(broken_links('CLAUDE.md', 'see [x](does-not-exist.md)')).toStrictEqual([
 			'does-not-exist.md',
