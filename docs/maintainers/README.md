@@ -53,6 +53,13 @@ from the page it explains.
 - [environment-variables-rationale.md](./environment-variables-rationale.md) — the notification
   commands
 
+## Directories that are never published
+
+`scripts/cost`, `scripts/time`, `scripts/retrospective` and `scripts/eval` are excluded by
+`package.json` `files` because they run only in this repository; a `*-runtime` sibling
+(`scripts/cost-runtime`, `scripts/time-runtime`) holds the part the published `josh` commands import,
+so a split is a publish boundary, not a topic one.
+
 ## The observation ledger
 
 [observations/](./observations/) holds one file per Issue: the review findings and observations a run

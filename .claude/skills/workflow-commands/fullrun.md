@@ -32,8 +32,8 @@ call reports `hold`.
    `pnpm josh run:release`: `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress
    2>/dev/null || true`. A `needs-human-review` stop keeps both hold and label.
 3. **Ask the session boundary in the same turn as the hold** — `pnpm josh cost --cut`. `under`
-   continues; `over` (or unanswerable) stops before the title with a `confirmation` Telegram carrying
-   the figure and the resume command (`fullrun #<N>` / `fullrun new`), then `pnpm josh run:release`.
+   continues; `over` (or unanswerable) stops before the title — `run:entry` sends this and step 1's
+   `confirmation` Telegram and runs `run:release` (`stop notified: …`); by hand only for `new`.
    **Skip it when dispatched by `backlogrun`** (that batch owns the question). `backlogrun-progress.md`
    → "The hand-off" is the single source of the check and the shared 135,000 threshold.
 4. **Gather the mechanical reads — `pnpm josh run:prep <N>`**: `issue:read`'s body/comments

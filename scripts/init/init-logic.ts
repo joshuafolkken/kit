@@ -220,20 +220,6 @@ const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	josh: 'josh',
 }
 
-// prettier resolves its `plugins[]` from the consumer project, not transitively through the kit,
-// so every package that uses the kit prettier preset must declare these as devDependencies. The
-// preset references all three unconditionally (prettier/index.js → plugins), hence all three are
-// added regardless of project — omitting any breaks `prettier`/`josh lint` with a
-// "Cannot find package" error. Versions mirror the kit's own devDependencies.
-const SORT_IMPORTS_PLUGIN_KEY = '@ianvs/prettier-plugin-sort-imports'
-const PRETTIER_SVELTE_PLUGIN_KEY = 'prettier-plugin-svelte'
-const PRETTIER_TAILWIND_PLUGIN_KEY = 'prettier-plugin-tailwindcss'
-const PRETTIER_PLUGIN_DEV_DEPS: Record<string, string> = {
-	[SORT_IMPORTS_PLUGIN_KEY]: '^4.7.1',
-	[PRETTIER_SVELTE_PLUGIN_KEY]: '^4.1.1',
-	[PRETTIER_TAILWIND_PLUGIN_KEY]: '^0.8.0',
-}
-
 // format_json rather than JSON.stringify: it lays arrays out the way prettier does — inline while
 // they fit within printWidth, one element per line once they do not — so the file kit writes is
 // `prettier --check`-clean in the consumer whatever the entry count happens to be (#660).
@@ -433,10 +419,6 @@ function strip_managed_postinstall(content: string): string {
 	)
 }
 
-function merge_prettier_plugin_development_deps(content: string): string {
-	return init_logic_json_merge.merge_development_dependencies(content, PRETTIER_PLUGIN_DEV_DEPS)
-}
-
 const init_logic = {
 	...init_logic_templates,
 	...init_logic_workspace,
@@ -454,7 +436,6 @@ const init_logic = {
 	generate_npmrc,
 	merge_npmrc,
 	merge_gitignore,
-	merge_prettier_plugin_development_deps,
 	get_tsconfig_extends_entry,
 	get_tsconfig_preset_filename,
 	get_lefthook_extends_value,

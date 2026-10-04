@@ -99,7 +99,9 @@ describe('backlog:plan while the defect rate is above its baseline', () => {
 
 		const plan = stdout()
 
-		expect(plan.indexOf(`#${String(DEFECT)} `)).toBeLessThan(plan.indexOf(`#${String(MECHANISM)} `))
+		expect(plan.indexOf(`[#${String(DEFECT)}]`)).toBeLessThan(
+			plan.indexOf(`[#${String(MECHANISM)}]`),
+		)
 	})
 })
 

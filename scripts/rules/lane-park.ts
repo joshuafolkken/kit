@@ -62,7 +62,15 @@ const NOTIFY_INVOCATION = /josh\s+(?:notify|nf)\b/u
 // notify appears and a `--task-type confirmation` appears. That is looser than `is_confirmation_notify`
 // on purpose — the guard's safe direction is to read a real stop notification as present, so a run
 // that sent one is never told it did not.
+//
+// **A command that sent the Telegram itself prints this line instead** (joshuafolkken/kit#3099):
+// `run:entry` notifies from inside its own stop, so no `josh notify` invocation reaches the transcript,
+// and the line it prints is what the tail carries. One constant, printed there and matched here.
+const COMMAND_NOTIFY_MARKER = 'stop notified: a confirmation Telegram was sent by this command'
+
 function mentions_confirmation_notify(text: string): boolean {
+	if (text.includes(COMMAND_NOTIFY_MARKER)) return true
+
 	return NOTIFY_INVOCATION.test(text) && CONFIRMATION_TASK_TYPE.test(text)
 }
 
@@ -117,6 +125,7 @@ const LANE_PARK_REASON =
 	'before it stops", and the park itself is `backlogrun-park.md` → "park and continue".'
 
 const lane_park = {
+	COMMAND_NOTIFY_MARKER,
 	LANE_PARK_REASON,
 	is_confirmation_notify,
 	is_parking_child,

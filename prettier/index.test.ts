@@ -1,6 +1,17 @@
+import { readFileSync } from 'node:fs'
 import type { Options } from 'prettier'
+import semver from 'semver'
 import { describe, expect, it } from 'vitest'
 import { config } from './index.js'
+
+const MANIFEST = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+	devDependencies: Record<string, string>
+	peerDependencies: Record<string, string>
+	peerDependenciesMeta: Record<string, { optional?: boolean }>
+}
+
+// Every package the exported config loads by name, plus Prettier itself.
+const LOADED_PACKAGES = ['prettier', ...config.plugins]
 
 // prettier-plugin-svelte v4 removed these options; keeping them triggers
 // "Ignored unknown option { ... }" warnings on every .svelte file.
@@ -34,5 +45,26 @@ describe('shared Prettier config — *.svelte override', () => {
 		for (const required of REQUIRED_SVELTE_OPTIONS) {
 			expect(options).toHaveProperty(required)
 		}
+	})
+})
+
+describe('shared Prettier config — peer dependencies', () => {
+	it.each(LOADED_PACKAGES)('declares %s as an optional peer', (name: string) => {
+		expect(MANIFEST.peerDependenciesMeta[name]?.optional).toBe(true)
+	})
+
+	// `pnpm update --latest` lifts devDependencies but never peerDependencies, so the peer range is a
+	// floor that has to admit the verified version rather than equal its range.
+	it.each(LOADED_PACKAGES)('admits the verified %s version in its peer range', (name: string) => {
+		const peer_range = MANIFEST.peerDependencies[name]
+		const development_range = MANIFEST.devDependencies[name]
+
+		expect(peer_range).toBeDefined()
+		expect(development_range).toBeDefined()
+
+		const verified = semver.minVersion(development_range ?? '')
+
+		expect(verified).not.toBeNull()
+		expect(semver.satisfies(verified ?? '', peer_range ?? '')).toBe(true)
 	})
 })

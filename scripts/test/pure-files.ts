@@ -214,7 +214,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/init/init-logic.cspell.test.ts',
 	'scripts/init/init-logic.merge.test.ts',
 	'scripts/init/init-logic.package-files.test.ts',
-	'scripts/init/init-logic.prettier-plugins.test.ts',
 	'scripts/init/init-logic.test.ts',
 	'scripts/init/init-logic.transform.test.ts',
 	'scripts/init/init-logic.tsconfig.test.ts',

@@ -103,6 +103,19 @@ describe('is_confirmation_notify', () => {
 	})
 })
 
+// joshuafolkken/kit#3099: `run:entry` sends the Telegram itself, so its printed line is the notify.
+describe('mentions_confirmation_notify', () => {
+	it('reads the line a notifying command prints as the notify', () => {
+		const tail = `entry #${ISSUE} — hold: hold · cost: over\n${lane_park.COMMAND_NOTIFY_MARKER}`
+
+		expect(lane_park.mentions_confirmation_notify(tail)).toBe(true)
+	})
+
+	it('says nothing about a tail with neither the line nor a notify', () => {
+		expect(lane_park.mentions_confirmation_notify(PROGRESS_NOTIFY)).toBe(false)
+	})
+})
+
 describe('is_unparked_stop', () => {
 	// The dispatched-child case the refusal exists for.
 	it('fires on a confirmation stop from a dispatched lane child', () => {
