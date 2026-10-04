@@ -180,6 +180,22 @@ pnpm josh sync:scope --json    # {"scope":"managed","reason":"..."}
 
 **Output / exit codes:** the answer (`managed` or `clean`) goes to stdout, the reason to stderr. Exit status is `0` for both — this reports, it does not gate.
 
+### `josh dogfood:commit`
+
+Make the first commit of a test project a dogfood run created itself. Kit-only.
+
+```bash
+pnpm josh dogfood:commit ~/Development/kit-test-html-start
+```
+
+An agent's own `git add` / `git commit` is refused wherever it points — the index guard cannot tell a throwaway project from the user's work — so this is the sanctioned route to a dogfood project's `Initial commit`. It runs `git init --initial-branch=main` when the directory has no `.git`, stages everything, commits `Initial commit` and names the branch `main`.
+
+It refuses, changing nothing and exiting `1`, unless the directory:
+
+- is named `kit-test-*` and exists;
+- lies outside the kit checkout it is run from;
+- has no commit yet, and is not inside another git repository — a `.git` without history, as `sv create` leaves, is accepted.
+
 ### `josh sonar:hotspots`
 
 Fetch the SonarCloud hotspots on a pull request and print each one's Step B branch (`excluded` / `local` / `fix` / `defer`); a failed read prints `unreadable`, distinct from finding none. The project key comes from `sonar-project.properties` and the upstream-synced branch key from `sync:scope`'s own detection. Full handling: `prompts/sonar-hotspot-handling.md`.

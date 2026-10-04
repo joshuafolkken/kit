@@ -265,6 +265,16 @@ Upgrade every installed @joshuafolkken toolkit here and open the pull request
 
 ---
 
+### `josh dogfood:commit`
+
+> **Audience:** automation · **Side effects:** files, git · **kit only**
+
+`<dir>`
+
+Make the first commit of a dogfood run's own kit-test-* project
+
+---
+
 ### `josh init` · `josh i`
 
 > **Audience:** developer · **Side effects:** files, network, processes

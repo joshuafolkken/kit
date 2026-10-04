@@ -6,6 +6,7 @@ import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
 import { parseCommandString } from 'execa'
 import { main as init_main } from './init'
 import { PACKAGE_DIR } from './init-paths'
+import { initial_commit } from './initial-commit'
 import { kit_setup_state } from './kit-setup-state'
 import type { ProjectProfile, ProjectShape } from './project-profile'
 import { start_exec } from './start-exec'
@@ -23,7 +24,6 @@ interface RunContext extends StepContext {
 	baseline: ReadonlyArray<string> | undefined
 }
 
-const DEFAULT_BRANCH = 'main'
 const GH_INSTALL_HINT =
 	'GitHub CLI (gh) is not installed. Install it from https://cli.github.com/, run gh auth login, then run josh start again. Nothing was changed.'
 const GH_AUTH_HINT =
@@ -70,7 +70,7 @@ function self_run_refusal(root: string): string | undefined {
 }
 
 function create_git_repository(context: StepContext): void {
-	run('git', ['init', `--initial-branch=${DEFAULT_BRANCH}`], context.root)
+	initial_commit.create_repository(context.root)
 }
 
 // The same setup `josh init` runs, called rather than copied, with the profile the user confirmed.
@@ -90,13 +90,7 @@ function initialize(context: StepContext): void {
 }
 
 function commit_all(context: StepContext): void {
-	run('git', ['add', '--all'], context.root)
-	// The first commit of a new repository has no branch to come from, so the hook that keeps commits
-	// off main — installed by the initialize step in a full project — would refuse the only commit
-	// that has to land there.
-	run('git', ['commit', '--no-verify', '--message', 'Initial commit'], context.root)
-	// A repository created by an older `git init` may name its unborn branch `master`.
-	run('git', ['branch', '--move', '--force', DEFAULT_BRANCH], context.root)
+	initial_commit.commit_all(context.root)
 }
 
 function create_github_repository(context: StepContext): void {

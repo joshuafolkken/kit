@@ -33,6 +33,7 @@ describe('index_guard.is_index_mutation — is silent on', () => {
 		'git restore src/app.ts',
 		'git restore -S -W src/app.ts',
 		'pnpm josh git -y "title #1"',
+		'pnpm josh dogfood:commit ~/Development/kit-test-html-start',
 		'echo "git commit -m x"',
 	])('%j', (command) => {
 		expect(index_guard.is_index_mutation(command)).toBe(false)
