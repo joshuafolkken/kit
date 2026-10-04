@@ -15,6 +15,7 @@ jobs:
       group: production-update
       queue: max
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:

@@ -96,6 +96,9 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	// it the consumer's jobs cannot resolve the action and their checks fail (joshuafolkken/kit#3013,
 	// joshuafolkken/kit#3095).
 	'.github/actions/setup-pnpm/action.yml',
+	// The one place the workflows' Node.js version is written, called by every distributed workflow
+	// that sets Node.js up (joshuafolkken/kit#3084).
+	'.github/actions/setup-node/action.yml',
 	'.github/pull_request_template.md',
 	'.github/release.yml',
 	'.github/dependabot.yml',

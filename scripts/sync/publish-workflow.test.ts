@@ -19,6 +19,8 @@ const PRODUCTION_WORKFLOW = './.github/workflows/production.yml'
 const PACKAGE_PUBLISH_GROUP = 'package-publish'
 const CHECKOUT_ACTION = 'actions/checkout@'
 const SETUP_PNPM_ACTION = './.github/actions/setup-pnpm'
+const SETUP_NODE_ACTION = './.github/actions/setup-node'
+const PUBLISH_TAG_ARGUMENT = '--tag "$PUBLISH_TAG"'
 const MANIFEST_SCHEMA = z.object({
 	repository: z.object({ url: z.string() }),
 	publishConfig: z.unknown().optional(),
@@ -197,11 +199,12 @@ describe('release workflow concurrency', () => {
 		(job_name) => {
 			const job = read_workflow().jobs[job_name]
 			const commands = job.steps.map((step) => step.run ?? '').join('\n')
+			const publish = job.steps.find((step) => step.run?.includes(PUBLISH_TAG_ARGUMENT))
 
 			expect(job.concurrency.group).toBe(PACKAGE_PUBLISH_GROUP)
 			expect(commands).toContain('dist-tags.latest')
 			expect(commands).toContain('publish-tag-cli.ts')
-			expect(commands).toContain('--tag ${{ steps.publish-tag.outputs.tag }}')
+			expect(publish?.env?.['PUBLISH_TAG']).toBe('${{ steps.publish-tag.outputs.tag }}')
 			expect(commands).not.toContain('--tag latest')
 		},
 	)
@@ -326,7 +329,8 @@ describe('new project CI registry', () => {
 		const auth_index = command_index(steps, GITHUB_AUTH_LINE)
 		const install_index = steps.findIndex((step) => step.uses === SETUP_PNPM_ACTION)
 
-		expect(setup?.with).not.toHaveProperty('registry-url')
+		expect(setup).toMatchObject({ uses: SETUP_NODE_ACTION })
+		expect(setup).not.toHaveProperty(['with', 'registry-url'])
 		expect(auth_index).toBeGreaterThanOrEqual(0)
 		expect(install_index).toBeGreaterThan(auth_index)
 		expect(steps[install_index]?.with?.['node-auth-token']).toContain('GITHUB_TOKEN')

@@ -52,12 +52,18 @@ function chain_minutes(
 	return (ci_yml_fixture.job_timeout_minutes(job) ?? 0) + Math.max(0, ...upstream)
 }
 
+// Jobs that run only on a push to main, after the checks have passed. A pull request never waits on
+// them — they are skipped there — so their caps sit outside the budget the wait has to cover
+// (joshuafolkken/kit#3084).
+const PUSH_ONLY_JOBS: ReadonlySet<string> = new Set(['notify-auto-tag'])
+
 // Per workflow rather than over one merged map: `needs` resolves inside a workflow, so merging two
 // would invent edges between jobs that happen to share a name.
 function longest_chain_minutes(workflow_path: string): number {
 	const { jobs } = ci_yml_fixture.load_workflow(workflow_path)
+	const watched = Object.keys(jobs).filter((name) => !PUSH_ONLY_JOBS.has(name))
 
-	return Math.max(0, ...Object.keys(jobs).map((name) => chain_minutes(jobs, name, new Set())))
+	return Math.max(0, ...watched.map((name) => chain_minutes(jobs, name, new Set())))
 }
 
 describe('DEFAULT_TIMEOUT_SECONDS', () => {

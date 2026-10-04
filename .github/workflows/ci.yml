@@ -224,9 +224,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: ./.github/actions/setup-node
         with:
-          node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
 
       - name: Setup ESLint cache
@@ -348,9 +347,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: ./.github/actions/setup-node
         with:
-          node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
 
       - name: Setup pnpm and install dependencies
@@ -526,9 +524,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: ./.github/actions/setup-node
         with:
-          node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
 
       - name: Setup build cache
@@ -596,6 +593,7 @@ jobs:
       needs.e2e-detect.result == 'success' &&
       (needs.e2e.result == 'success' || needs.e2e.result == 'skipped')
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: write
     steps:
