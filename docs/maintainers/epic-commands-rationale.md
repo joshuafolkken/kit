@@ -82,3 +82,73 @@ less often than they used to — a changed default, not a skipped step.
 **Why a nonexistent number is dropped in silence** (joshuafolkken/kit#957). Reported as a gap, one
 mistyped `#N` in prose put `⚠ Could not read #N.` above the verdict and stopped an unattended run for a
 reference that never existed.
+
+## Creating an epic by hand
+
+This used to live, in Japanese, in `prompts/collaboration-workflow/issue-template.md`, which now keeps
+only the "always create an epic" trigger and points at the skill (joshuafolkken/kit#3178).
+
+**Why every split gets an epic.** Kept as a comment on the first child, the split rationale ends up
+inside the issue a batch merges and closes first, burying the plan for the rest. An earlier caveat
+("with few children, the epic costs more than it organizes") lost its ground once `followup` began
+auto-closing an epic whose children are all closed (`scripts/epic/epic-close.ts`): with no abandoned
+epic left to manage, the only risk is misjudging the branch. A `closes #<epic>` in the last PR was
+rejected because it also fires when a batch fails midway.
+
+**The body template** `pnpm josh epic` renders:
+
+```md
+## Split rationale
+
+<why this split>
+
+## Dependencies
+
+#101 -> #102 -> #103
+
+## Execution
+
+backlogrun #<E> --only
+
+## Progress
+
+- [ ] #101 <title>
+- [ ] #102 <title>
+```
+
+- `Progress` is a task list because GitHub ticks only that notation when the child closes; it never
+  closes the epic itself, which is `followup`'s job (and why the `epic` label and the task list are both
+  required — either missing leaves the epic open).
+- `Dependencies` is an arrow chain (`->` or `→`) because `followup`'s missing-relation warning fires
+  only on that notation. Order-free batches write `None — the children are independent; any execution
+order works.` rather than deleting the section, so "no order" and "forgot" stay distinct. A reason
+  appended to the chain line (`#101 -> #102 (uses #101's API)`) is not read as a declaration: the three
+  readers (`epic:check`, `epic:next`, `epic --add`) accept only chain-only lines so a prose
+  "recommended order" outside the section is never misread (joshuafolkken/kit#858,
+  joshuafolkken/kit#1155). The chain and `None — …` together is a contradiction `epic:check` refuses.
+- The warning checks only that at least one native relation exists, not the chain's shape — inferring
+  order from the task list would produce false positives, and an order-free epic legitimately has zero.
+- A task-list child in another repository disables auto-close, because its state cannot be read
+  without naming that repository; a backlink written as a checkbox line hits the same rule.
+
+**The fallback, where `josh` is unavailable,** stays in `prompts/collaboration-workflow/issue-template.md`
+→ "複数 Issue に分割するときの epic Issue": it is the one part a consumer without a working `josh` must
+reach, and `docs/` is not shipped. Its four steps are explained here.
+
+**Why step 4 resolves a database id.** The endpoint takes a database id, not an issue number, and does
+not check the id belongs to this repository: a raw number returns 200 and records an unrelated issue in
+some other repository (measured in joshuafolkken/kit#1026). `pnpm josh epic` resolves the id before
+writing. Relations are added after creation so that a relation failure loses only the relation, never
+the issue; the command reports the count and continues.
+
+**Why step 2's `|| true` is safe.** It swallows REST's 422 `already_exists`. `POST /issues` creates a
+missing label on the spot with default color and description (joshuafolkken/kit#1026), so a swallowed
+failure loses only those, and `epic:next` and auto-close read the name alone.
+
+**Native relations, and why sub-issues were not adopted.** `gh issue edit --add-blocked-by` /
+`--parent` and `gh issue view --json blockedBy,subIssues` exist from `gh` 2.94.0 (confirmed on 2.97.0),
+but they go through GraphQL and fail with 403 in cloud sessions (joshuafolkken/kit#1022), so no
+procedure uses them — everything goes through the REST endpoint via `gh api`. Dependencies are adopted:
+a child shows what it waits for in the UI and API, though they only display and never block, so order
+is still enforced by `--ordered` and `backlogrun`. Sub-issues are not: they express containment, not
+order, and are limited to one repository owner — neither reason depends on CLI support.
