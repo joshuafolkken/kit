@@ -25,15 +25,21 @@ describe('run_ship_review.reviewer_prompt', () => {
 
 describe('run_ship_review.read_verdict', () => {
 	it('reads an empty file as a clean round with no findings', () => {
-		expect(run_ship_review.read_verdict('\n')).toStrictEqual({ kind: VERDICT.CLEAN, specs: [] })
+		expect(run_ship_review.read_verdict('\n')).toStrictEqual({
+			kind: VERDICT.CLEAN,
+			specs: [],
+			report: [],
+		})
 	})
 
 	it('reads Low-only findings as clean, keeping them to record', () => {
 		const text = 'tests:low:scripts/a.ts:3\ncomments:low:scripts/b.ts\n'
+		const specs = ['tests:low:scripts/a.ts:3', 'comments:low:scripts/b.ts']
 
 		expect(run_ship_review.read_verdict(text)).toStrictEqual({
 			kind: VERDICT.CLEAN,
-			specs: ['tests:low:scripts/a.ts:3', 'comments:low:scripts/b.ts'],
+			specs,
+			report: specs,
 		})
 	})
 
@@ -61,11 +67,13 @@ describe('run_ship_review.read_verdict', () => {
 // supervisor ships on through a round-2 pass rather than handing the lane child back.
 describe('run_ship_review.read_verdict — findings fixed in place', () => {
 	const FIXED_MEDIUM = `${run_ship_review.FIXED_PREFIX}bug-risks:medium:b.ts:9`
+	const LOW_COMMENT = 'comments:low:a.ts'
 
 	it('reads a fixed Medium as fixed, recording it without the mark', () => {
-		expect(run_ship_review.read_verdict(`comments:low:a.ts\n${FIXED_MEDIUM}`)).toStrictEqual({
+		expect(run_ship_review.read_verdict(`${LOW_COMMENT}\n${FIXED_MEDIUM}`)).toStrictEqual({
 			kind: VERDICT.FIXED,
-			specs: ['comments:low:a.ts', 'bug-risks:medium:b.ts:9'],
+			specs: [LOW_COMMENT, 'bug-risks:medium:b.ts:9'],
+			report: [LOW_COMMENT, FIXED_MEDIUM],
 		})
 	})
 
@@ -96,7 +104,9 @@ describe('run_ship_review — the two rounds route differently', () => {
 		[VERDICT.FIXED, true],
 		[VERDICT.BLOCKING, false],
 	] as const)('round 1 reads %s as passing: %s', (kind, is_passing) => {
-		expect(run_ship_review.round_one_outcome({ kind, specs: SPECS }).is_passing).toBe(is_passing)
+		const verdict = { kind, specs: SPECS, report: SPECS }
+
+		expect(run_ship_review.round_one_outcome(verdict).is_passing).toBe(is_passing)
 	})
 
 	it.each([
@@ -104,7 +114,46 @@ describe('run_ship_review — the two rounds route differently', () => {
 		[VERDICT.FIXED, false],
 		[VERDICT.BLOCKING, false],
 	] as const)('round 2 reads %s as passing: %s', (kind, is_passing) => {
-		expect(run_ship_review.round_two_outcome({ kind, specs: SPECS }).is_passing).toBe(is_passing)
+		const verdict = { kind, specs: SPECS, report: SPECS }
+
+		expect(run_ship_review.round_two_outcome(verdict).is_passing).toBe(is_passing)
+	})
+})
+
+// joshuafolkken/kit#3159: a stopped ship's log carried only `<category>:<severity>:<file>`, so the
+// resumed lane child re-derived every finding from the code. The description now rides along.
+describe('run_ship_review.read_verdict — a finding carries its description', () => {
+	const DESCRIBED = `${MEDIUM_OPEN} — the guard misses a glob search, so the count never trips`
+
+	it('records the spec alone and reports the whole line', () => {
+		expect(run_ship_review.read_verdict(`${DESCRIBED}\n`)).toStrictEqual({
+			kind: VERDICT.BLOCKING,
+			specs: [MEDIUM_OPEN],
+			report: [DESCRIBED],
+		})
+	})
+
+	it('reads a fixed mark and a description together', () => {
+		const text = `${run_ship_review.FIXED_PREFIX}${DESCRIBED}`
+
+		expect(run_ship_review.read_verdict(text)).toStrictEqual({
+			kind: VERDICT.FIXED,
+			specs: [MEDIUM_OPEN],
+			report: [text],
+		})
+	})
+
+	it.each([' - ', ' -- ', ' – '])('ends the spec at a %j dash as well', (separator) => {
+		const verdict = run_ship_review.read_verdict(`${MEDIUM_OPEN}${separator}the count never trips`)
+
+		expect(verdict).toMatchObject({ specs: [MEDIUM_OPEN] })
+	})
+
+	it.each([
+		run_ship_review.reviewer_prompt(BRIEF, FINDINGS),
+		run_ship_review.verification_prompt(BRIEF, FINDINGS),
+	])('asks each reviewer for the description after the spec', (prompt) => {
+		expect(prompt).toContain('<category>:<severity>:<file>[:<line>] — <one sentence')
 	})
 })
 
