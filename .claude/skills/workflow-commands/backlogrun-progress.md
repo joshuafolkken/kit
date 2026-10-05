@@ -99,7 +99,7 @@ run in lanes".
    **Beyond the offer `epic:next` prints** (`run` becomes numbers; `wait` / `stop` / `complete` /
    `error` pass through), the composite adds six verdict tokens: `over` — the merge crossed the budget,
    so hand the lanes over and take the cut ("The hand-off" below); `human-review` — the child stopped
-   before its commit, the run's own ending (SKILL.md → §2z), so stop — leave `in-progress` on, and send
+   before its commit, the run's own ending (needs-human-review.md), so stop — leave `in-progress` on, and send
    no second `confirmation` Telegram, since the unit already sent one (where the child ran in this
    session's own context, that first notification is yours to send); `stop` — the consecutive-failure
    guard tripped; `environment` — the consecutive-**outage** guard tripped, so the API is down and the

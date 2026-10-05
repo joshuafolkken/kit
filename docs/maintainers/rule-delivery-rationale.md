@@ -76,7 +76,7 @@ WIP 上限の引き金は Issue の**作成**だけを見る。`…/issues/<N>/c
 
 **`-c` は「コメント込み」と見なさない。** `gh issue view <N> -c` は正しい読み取りだが、`-c` は `wc` ／ `grep` ／ `sort` のものである方が圧倒的に多く、これを行全体で許すとパイプで終わる複合行すべてで規則が黙る。誤って 1 往復ぶん止める側に倒し、`--comments` ／ `--json` の `comments` ／ `…/comments` エンドポイントの 3 綴りだけを「コメント込み」とする。最後の 1 つが要るのは、バッチングが本文とコメントを 1 行にまとめさせるからである。
 
-**それでもシェル文字列しか見えない。** node の中から REST で本文を読む経路は最初から掛からない。だからこそ手順本体は `SKILL.md` → §2g に置かれており、フックはそれを補強するだけである。
+**それでもシェル文字列しか見えない。** node の中から REST で本文を読む経路は最初から掛からない。だからこそ手順本体は `issue-comments.md` に置かれており、フックはそれを補強するだけである。
 
 ## 配送は 1 ラン 1 回
 
@@ -114,7 +114,7 @@ WIP 上限の引き金は Issue の**作成**だけを見る。`…/issues/<N>/c
 - `scripts/backlog/backlog-manufacturing-rule.test.ts` — WIP 上限が `wip-cap.md` に単一ソースとして存在し、配送文が数え方・拒否・2 つの免除・免除を決める 3 条件を運ぶこと
 - `scripts/rules/turn-batching-rule.test.ts` — バッチングの配送文が判断基準を運び、参照先が `CLAUDE.md` ではなくこのディレクトリの `turn-batching.md` であること
 - `scripts/document/document-markers.test.ts` — 早すぎる進捗報告の手順が `.claude/skills/workflow-commands/backlogrun.md` の該当節に単一ソースとして存在し、この文書が行と 1 ラン 1 回の例外を書いていること。発火・非発火と「毎回発火する」ことは `scripts/rules/early-heartbeat.test.ts` が固定する
-- `scripts/rules/issue-comments-rule.test.ts` — コメント読み取りの手順が `SKILL.md` → §2g に単一ソースとして存在し、3 つの `#N` 入口がそれを**再掲せずに指す**こと（矛盾時の規則を 3 箇所に写せばクローンになる）。フックが届かないセッションでも規則が残ることを、この対で担保する
+- `scripts/rules/issue-comments-rule.test.ts` — コメント読み取りの手順が `issue-comments.md` に単一ソースとして存在し、3 つの `#N` 入口がそれを**再掲せずに指す**こと（矛盾時の規則を 3 箇所に写せばクローンになる）。フックが届かないセッションでも規則が残ることを、この対で担保する
 - `scripts/rules/shell-body-rule.test.ts` — 本文のシェル評価が `shell-body.md` に単一ソースとして存在し、配送文が被害・安全な綴り・再発行の指示を運ぶこと
 - `scripts/rules/raw-field-body.test.ts` — 生フィールドの `body=@` 誤射（joshuafolkken/kit#2304）の述語と配送文の文言を固定する。実際の配送経路での発火（`-f` ／ `--raw-field body=@`）・無言（`-F` ／ `--field body=@`・`@` を含まない本文・`pnpm josh issue:comment`）と「1 コマンドを 1 行だけが主張する」ことは `scripts/rules/delivered-rules-bash.test.ts` が固定する
 - `scripts/rules/piped-verification-rule.test.ts` — 検証コマンドのパイプが `output-bounds.md` に単一ソースとして存在し、配送文が仕組み・逃げ道・境界の 3 つを運び、読み取り専用の一覧を巻き込んでいないこと
@@ -128,4 +128,4 @@ WIP 上限の引き金は Issue の**作成**だけを見る。`…/issues/<N>/c
 - `scripts/rules/git-argv.test.ts` ／ `scripts/rules/git-force.test.ts` ／ `scripts/rules/worktree-guard.test.ts` ／ `scripts/rules/file-body.test.ts` — Bash 文字列の 3 群（joshuafolkken/kit#2120）の述語と配送文の文言を固定する。実際の配送経路での発火・無言と「1 コマンドを 1 行だけが主張する」ことは `scripts/rules/delivered-rules-bash.test.ts` が固定する
 - `scripts/rules/index-guard.test.ts` ／ `scripts/rules/destructive-command.test.ts` ／ `scripts/rules/protected-files.test.ts` — deny の先頭一致をすり抜ける言い換え（joshuafolkken/kit#2983）を引数・パスの解析で止める 3 行の述語を固定する。`permission-guards.ts` がこの 3 行を 1 つにまとめて配送表へ渡す
 - `scripts/rules/rule-body-guard.test.ts` — 規則本文を散文に書き足す `Edit` ／ `Write`（joshuafolkken/kit#2272）の述語・配送文・列挙表掲載を固定する。発火（規則ドキュメントへの追記）と無言（誤字・リンク張り替え・削除・非規則ファイル・非 Edit/Write）、および実際の配送経路での「2 つのコマンドを実行するまで毎回拒否」はこの 1 スイートが固定する。配送文が第 0 問（`oracle:list`）と順序の問い（`run:step`）を運び、単一ソースが `residency.md` であることも同じスイートが押さえる
-- `scripts/rules/stop-rules-rule.test.ts` — 停止時 4 規則の単一ソース（`CLAUDE.md` の停止通知・`SKILL.md` → §2f・`SKILL.md` → §2i・`issue-citation.md`）と `rule-delivery.md` の列挙表掲載を固定する。発火・無言（押さえ×未通知でブロック／綺麗×押さえでブロック／汚れ・通知済みで無言／`stop_hook_active` で無言／起票の申し出×未起票でブロック・起票済み／第三者リポジトリ／owner 不明で無言／裸 `#N` でブロック・リンク形式やコードフェンス／インラインコード／引用行／PR 参照の中で無言）は `scripts/rules/stop-rules.test.ts`・`scripts/rules/filing-offer.test.ts`・`scripts/rules/issue-citation.test.ts` が、`Stop` フックの配線は `scripts/claude/claude-settings-hooks.test.ts` が固定する
+- `scripts/rules/stop-rules-rule.test.ts` — 停止時 4 規則の単一ソース（`CLAUDE.md` の停止通知・`working-tree-hold.md`・`observation-filing.md`・`issue-citation.md`）と `rule-delivery.md` の列挙表掲載を固定する。発火・無言（押さえ×未通知でブロック／綺麗×押さえでブロック／汚れ・通知済みで無言／`stop_hook_active` で無言／起票の申し出×未起票でブロック・起票済み／第三者リポジトリ／owner 不明で無言／裸 `#N` でブロック・リンク形式やコードフェンス／インラインコード／引用行／PR 参照の中で無言）は `scripts/rules/stop-rules.test.ts`・`scripts/rules/filing-offer.test.ts`・`scripts/rules/issue-citation.test.ts` が、`Stop` フックの配線は `scripts/claude/claude-settings-hooks.test.ts` が固定する

@@ -28,8 +28,7 @@ function contains_threshold(content: string): boolean {
 const CONTEXT_CUT_DOCS = [
 	'.claude/skills/workflow-commands/SKILL.md',
 	'.claude/skills/workflow-commands/backlogrun-progress.md',
-	'.claude/skills/workflow-commands/fullrun.md',
-	'.claude/skills/workflow-commands/halfrun.md',
+	'.claude/skills/workflow-commands/entry-sequence.md',
 	'.claude/skills/workflow-commands/pre-gate-cut.md',
 	'docs/josh-commands-automation.md',
 ]

@@ -57,6 +57,23 @@ the label-clearing rule itself is `backlogrun-park.md` → "park and continue".
 - 決定日: <YYYY-MM-DD>
 ```
 
+## Creating an epic
+
+A split into two or more issues always gets an epic (`prompts/collaboration-workflow/issue-template.md`).
+Create it with the command, never by hand-writing the body:
+
+```bash
+pnpm josh epic "<epic-title>" <N1> <N2> ...            # order-free batch
+pnpm josh epic "<epic-title>" <N1> <N2> ... --ordered  # argument order is the dependency order
+# --rationale-file <path|-> fills Split rationale; --origin <owner/repo#N> adds the backlink
+```
+
+The body format is the command's output, and `pnpm josh epic:check <E>` answers whether a body still
+meets it (the parser auto-close reads; exit 1 on a miss) — run it after any hand edit. `pnpm josh
+followup` closes the epic once every task-list child is closed; one tracking a cross-repository child
+is closed by hand. The by-hand fallback where `josh` is unavailable: `issue-template.md`; the format's
+reasons and the history: `docs/maintainers/epic-commands-rationale.md` → "Creating an epic by hand".
+
 ## `josh epic:audit <E>` — contradictions across the children
 
 `epic:check` verifies one epic's *format*. Nothing verified that the children agree, and a hand audit

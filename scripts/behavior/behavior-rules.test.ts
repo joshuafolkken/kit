@@ -8,6 +8,7 @@ const {
 	bash_line,
 	bash_result_line,
 	DENIED_BASH,
+	DENIED_HOOK,
 	GIT_STATUS,
 	GIT_COMMIT,
 	GIT_ADD_DRY,
@@ -92,8 +93,13 @@ describe('behavior_rules.command_of', () => {
 })
 
 describe('behavior_rules.index_mutation_assertion', () => {
-	it.each([GIT_COMMIT, 'git add .'])('ignores a denied Bash call: %s', (command) => {
-		const text = [bash_line(command), bash_result_line(TOOL_ID, true, DENIED_BASH)].join('\n')
+	it.each([
+		[GIT_COMMIT, DENIED_BASH],
+		['git add .', DENIED_BASH],
+		[GIT_COMMIT, DENIED_HOOK],
+		['git add .', DENIED_HOOK],
+	])('ignores a Bash call refused before it ran: %s / %s', (command, denial) => {
+		const text = [bash_line(command), bash_result_line(TOOL_ID, true, denial)].join('\n')
 
 		const findings = behavior_rules.index_mutation_assertion.scan(
 			behavior_assertion.parse_transcript(text),
@@ -126,6 +132,21 @@ describe('behavior_rules.index_mutation_assertion', () => {
 		)
 
 		expect(findings.map((finding) => finding.detail)).toEqual([GIT_COMMIT])
+	})
+})
+
+describe('behavior_rules.index_mutation_assertion hook results', () => {
+	it('still flags a call whose PostToolUse hook errored after it ran', () => {
+		const text = [
+			bash_line('git add .'),
+			bash_result_line(TOOL_ID, true, `PostToolUse:Bash hook error: ${EXECUTION_ERROR}`),
+		].join('\n')
+
+		const findings = behavior_rules.index_mutation_assertion.scan(
+			behavior_assertion.parse_transcript(text),
+		)
+
+		expect(findings).toHaveLength(1)
 	})
 })
 

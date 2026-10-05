@@ -1,7 +1,7 @@
-# The observation filing procedure — `SKILL.md` §2i's body
+# The observation filing procedure
 
-**This is `SKILL.md` → §2i's procedure, and it is read when an observation turns up — not at the
-entry** (joshuafolkken/kit#1797). §2i keeps the rule itself: file it without asking, apply the depth
+**This is the observation filing procedure, and it is read when an observation turns up — not at the
+entry** (joshuafolkken/kit#1797). `SKILL.md` → §2's table keeps the rule itself: file it without asking, apply the depth
 test, record what the test turns away, and carry the run on. Everything that decides *how* — the
 depth table and its labels, the depth-0 share, the ledger's grammar and commit path, the promotion on
 a second sighting, and what a delegated child does instead — is here, because none of it binds until
@@ -12,7 +12,7 @@ the one that does reads it in full, in the same turn, before it files.
 turn all file; an offer to file is sent back by the `Stop` hook (joshuafolkken/kit#2422).
 
 **A run that judges something worth filing files it, and does not ask.** An upstream defect stops the
-run, a split replaces it, and a prerequisite goes in front of it (`SKILL.md` → §2d). An ordinary
+run, a split replaces it, and a prerequisite goes in front of it (`prerequisite.md`). An ordinary
 observation changes none of those: it carries no `route:` label, causes no stash or park, and the run
 continues. A first-party target is Tier A, decided by `pnpm josh repo:party`; a third-party target is
 Tier C (`CLAUDE.md`). Name what was filed in the completion report. An observation nobody would act
@@ -44,7 +44,7 @@ The detail below is read at the filing decision, and the marker suite pins the r
 (joshuafolkken/kit#1729). `depth:0`, `depth:1` and `depth:2` are the three, defined once in
 `scripts/issue/issue-labels.ts` and carrying no definition of their own — **the table above is the
 single source**, and a label description that paraphrased it would be a second copy of the rule.
-**Every filing route applies one**, this route and the other three of §2d's table alike: a `new`
+**Every filing route applies one**, this route and the other three of `prerequisite.md`'s table alike: a `new`
 entry point, a `route:tier-a` prerequisite, a `route:interrupt`, a split child and a review round
 cap's branch-2 filing all pass through a `pnpm josh issue:file` call, and the depth goes in it as
 `--depth <n>` beside whatever `--route` that call already carries.
@@ -61,9 +61,9 @@ is the single source of the colors and descriptions, and `scripts/rules/issue-de
 these lines to it so the two cannot drift.
 
 ```bash
-gh api repos/{owner}/{repo}/labels -f name=depth:0 -f color=0e8a16 -f description="Depth 0 — what a consumer of this package touches (SKILL.md §2i)" --silent 2>/dev/null || true
-gh api repos/{owner}/{repo}/labels -f name=depth:1 -f color=fbc02d -f description="Depth 1 — the run orchestration that executes an Issue (SKILL.md §2i)" --silent 2>/dev/null || true
-gh api repos/{owner}/{repo}/labels -f name=depth:2 -f color=c5def5 -f description="Depth 2 — what measures a run (SKILL.md §2i)" --silent 2>/dev/null || true
+gh api repos/{owner}/{repo}/labels -f name=depth:0 -f color=0e8a16 -f description="Depth 0 — what a consumer of this package touches (observation-filing.md)" --silent 2>/dev/null || true
+gh api repos/{owner}/{repo}/labels -f name=depth:1 -f color=fbc02d -f description="Depth 1 — the run orchestration that executes an Issue (observation-filing.md)" --silent 2>/dev/null || true
+gh api repos/{owner}/{repo}/labels -f name=depth:2 -f color=c5def5 -f description="Depth 2 — what measures a run (observation-filing.md)" --silent 2>/dev/null || true
 ```
 
 - **It is read off the subject, exactly as the table is** — so applying it is not a judgement and not
@@ -105,7 +105,7 @@ Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why the depth
 
 Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why depth gates a discretionary filing".
 
-**It governs this route only — the fourth row of §2d's table.** A review finding routed to branch 2
+**It governs this route only — the fourth row of `prerequisite.md`'s table.** A review finding routed to branch 2
 of `prompts/review.md` → "Review round cap" is filed under that section's own bar — a confirmed
 defect reaching a runtime path, with a written failure scenario — and **does not take the depth
 test**: it has already cleared a bar this route has not, so gating it on a citation as well would
@@ -159,7 +159,7 @@ ledger exists".
   default branch outside any issue's run. Parallel lanes therefore write different files, and their
   pull requests never conflict on the ledger. **The count and the append are both run in that
   repository's checkout** — in this repository, the work tree the run is in, a lane's inside a lane —
-  resolved the way §2c (`target-repository.md`) resolves any cross-repository target, and the
+  resolved the way `target-repository.md` (`target-repository.md`) resolves any cross-repository target, and the
   directory is created on the first append where that repository has none. **The subject decides, never the
   working directory**: an observation about this package's own orchestration, seen while a run is
   inside a repository that consumes it, is recorded here rather than there — the append follows the
@@ -305,6 +305,6 @@ count and writes the line. **The 10-per-run ceiling for this route is the parent
 Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why a delegated child neither files
 nor appends".
 
-**This file is the single source of every procedure above**, and `SKILL.md` → §2i is the single
-source of the rule they carry out; nothing under `prompts/collaboration-workflow/` restates either
+**This file is the single source of every procedure above**, and `SKILL.md` → §2's table carries the
+trigger of the rule they carry out; nothing under `prompts/collaboration-workflow/` restates either
 (joshuafolkken/kit#1649, joshuafolkken/kit#1797).

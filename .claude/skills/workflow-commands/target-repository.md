@@ -1,9 +1,9 @@
 # The `owner/repo#` prefix — which repository the run acts on
 
-**This is `SKILL.md` → §2c's body, read at its point of use — the moment an entry is typed with an
+**This file is the prefix's single source, read at its point of use — the moment an entry is typed with an
 `owner/repo#` prefix (or a short `repo#` name), not at any entry** (joshuafolkken/kit#2161). A run
 given a bare `#N` or `new` targets the session's own repository and never reaches it, so it costs a
-workflow entry nothing to leave it here. `SKILL.md` → §2c keeps the trigger and points here.
+workflow entry nothing to leave it here. `SKILL.md` → §2's table keeps the trigger and points here.
 
 Every entry point takes the target repository in front of the Issue reference. Without it the target
 is the repository the session runs in.

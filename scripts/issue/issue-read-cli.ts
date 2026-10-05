@@ -8,7 +8,7 @@ import { issue_report_failures, type ReadFailureKind } from './issue-report-fail
 // `josh issue:read <N> [<N> ...]` — the body *and* the comments of every issue named, in one call
 // (joshuafolkken/kit#1715).
 //
-// It replaces the two `gh api` reads `.claude/skills/workflow-commands/SKILL.md` §2g tells an agent
+// It replaces the two `gh api` reads `.claude/skills/workflow-commands/issue-comments.md` tells an agent
 // to type per issue. Measured over four recorded `backlogrun` parents, `issue bookkeeping` was the
 // largest single contributor to the parent's turn count — 110 of 414 turns, 26.6% — and one issue
 // read at a time was its dominant shape: 19 `…/issues/<N>` calls and 5 `…/comments` calls, each its
@@ -23,7 +23,7 @@ import { issue_report_failures, type ReadFailureKind } from './issue-report-fail
 // prevent.
 //
 // **A failed read is never printed as an issue**, and neither is a failed comment listing printed as
-// "no comments" — the block says which of the two it holds, because §2g's rule is that the later text
+// "no comments" — the block says which of the two it holds, because `issue-comments.md`'s rule is that the later text
 // wins, and a comment nobody read cannot win anything.
 
 const FAILURE_EXIT_CODE = 1
@@ -88,7 +88,7 @@ async function read_issue(issue_number: string): Promise<NumberResult> {
 
 // One issue's block for a caller that wants the text rather than the printing — `run:prep` composes it
 // with the state block and the dependency-update line. A failed read is returned as its kind, never as
-// an empty block, so §2g's "a comment nobody read cannot win anything" holds through the bundle too.
+// an empty block, so `issue-comments.md`'s "a comment nobody read cannot win anything" holds through the bundle too.
 async function read_block(issue_number: string): Promise<BlockRead> {
 	const result = await read_issue(issue_number)
 

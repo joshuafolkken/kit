@@ -1,9 +1,9 @@
 # The `into <target>` suffix — where the new Issue lands
 
-**This is `SKILL.md` → §2a's body, read at its point of use — the moment a `new` entry is typed with
-an `into <target>` suffix, not at any entry** (joshuafolkken/kit#2161). A run given a `#N` or a bare
-`new` never reaches it, so it costs a workflow entry nothing to leave it here. `SKILL.md` → §2a keeps
-the trigger and points here.
+**This file is the suffix's single source, read at its point of use — the moment a `new` entry is
+typed with an `into <target>` suffix, not at any entry** (joshuafolkken/kit#2161). A run given a `#N`
+or a bare `new` never reaches it, so it costs a workflow entry nothing to leave it here. `SKILL.md` →
+§2's table keeps the trigger and points here.
 
 `kickoff new` / `fullrun new` / `halfrun new` accept a suffix naming the epic the run's artifact
 belongs to. Without it the artifact belongs to no epic, and `epic:next` only ever offers an epic's

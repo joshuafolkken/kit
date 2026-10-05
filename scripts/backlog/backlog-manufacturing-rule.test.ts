@@ -144,7 +144,7 @@ const INTERRUPT_MARKERS: ReadonlyArray<string> = [
 	// 105 bytes of slack under `RESIDENT_CEILING_BYTES`, and the interrupt's three tests had to be
 	// paid for out of it. Moving is only moving if the destination is pinned, so the list is asserted
 	// here — the trade is deliberate and recorded in `residency.md`, not a silent loss.
-	'前提 Issue（`SKILL.md` → §2d）、別パッケージ起因の割り込み Issue、ユーザーが `new` と打った入口',
+	'前提 Issue（`prerequisite.md`）、別パッケージ起因の割り込み Issue、ユーザーが `new` と打った入口',
 	'そして分割判定が作る子 Issue と epic',
 ]
 

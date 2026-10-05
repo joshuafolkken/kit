@@ -35,22 +35,24 @@ describe('decision procedures are delivered when needed', () => {
 	})
 
 	it('keeps the trigger at entry and the delegation safeguards at their pointer', () => {
-		expect(document('SKILL.md')).toContain('Read `delegation.md` at the first delegation decision')
+		expect(document('SKILL.md')).toMatch(
+			/\| Before delegating any run step \|.*\| `delegation\.md` \|/u,
+		)
 		expect(document(DELEGATION)).toContain('Anything not on the list is `keep`')
 		expect(document(DELEGATION)).toContain('The threshold is 3 files')
 		expect(document(DELEGATION)).toContain('`human_review:`')
 	})
 
 	it('keeps the filing trigger and the duplicate decisions reachable', () => {
-		expect(document('SKILL.md')).toContain('Read `issue-scout.md` at that point')
+		expect(document('SKILL.md')).toMatch(/\| Filing any new Issue \|.*\| `issue-scout\.md` \|/u)
 		expect(document(SCOUT)).toContain('A candidate marked `(closed)`')
 		expect(document(SCOUT)).toContain('`Epic: not asked`')
 		expect(document('observation-filing.md')).toContain('second filing of the run')
 	})
 
 	it('starts a numbered fullrun with the folded entry command', () => {
-		expect(document('SKILL.md')).toContain('a `#N` entry first runs')
-		expect(document('SKILL.md')).toContain('`pnpm josh run:entry <N> --to <command>`')
-		expect(document('fullrun.md')).toContain('For `fullrun #N`, first run the folded')
+		expect(document('SKILL.md')).toContain('`#N`: `pnpm josh run:entry <N> --to <command>`')
+		expect(document('entry-sequence.md')).toContain('`#N`: `pnpm josh run:entry <N> --to')
+		expect(document('fullrun.md')).toContain('`pnpm josh run:entry <N>` is `fullrun`')
 	})
 })

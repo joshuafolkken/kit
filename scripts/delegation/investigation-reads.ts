@@ -71,7 +71,7 @@ const INVESTIGATOR_AGENT = 'investigator'
 // What the refusal tells the model. It has to name the count, the command and the return shape,
 // because the deny reason is the only text that reaches the model — a run that is refused and told
 // nothing reads it as a broken tool.
-const REASON = `⛔ investigation: ${String(delegation_policy.INVESTIGATION_FILE_THRESHOLD)} files read and not edited, or ${String(delegation_policy.INVESTIGATION_SEARCH_TURN_THRESHOLD)} search turns, since the last delegated unit, so the reading from here goes to a unit of its own (a successful write also starts the search count over). Ask \`pnpm josh delegate investigation\`, then dispatch the \`${INVESTIGATOR_AGENT}\` agent (\`kit:${INVESTIGATOR_AGENT}\` in a consumer) with a brief of what the main line has already concluded and what is left to find out; it returns the conclusion plus its \`file:line\` citations, never the file text. Keep a read in the main line only where this run will edit that file — an \`Edit\` cannot be issued against text you do not hold. This run's own instructions and the harness's own session files — a backgrounded call's output, a persisted tool result, this session's scratchpad — never count toward the files, so they are not what took the file count here; every read-only search turn counts, whatever it names. The rule is \`.claude/skills/workflow-commands/SKILL.md\` → §2b, "The pre-implementation reading".`
+const REASON = `⛔ investigation: ${String(delegation_policy.INVESTIGATION_FILE_THRESHOLD)} files read and not edited, or ${String(delegation_policy.INVESTIGATION_SEARCH_TURN_THRESHOLD)} search turns, since the last delegated unit, so the reading from here goes to a unit of its own (a successful write also starts the search count over). Ask \`pnpm josh delegate investigation\`, then dispatch the \`${INVESTIGATOR_AGENT}\` agent (\`kit:${INVESTIGATOR_AGENT}\` in a consumer) with a brief of what the main line has already concluded and what is left to find out; it returns the conclusion plus its \`file:line\` citations, never the file text. Keep a read in the main line only where this run will edit that file — an \`Edit\` cannot be issued against text you do not hold. This run's own instructions and the harness's own session files — a backgrounded call's output, a persisted tool result, this session's scratchpad — never count toward the files, so they are not what took the file count here; every read-only search turn counts, whatever it names. The rule is \`.claude/skills/workflow-commands/delegation.md\` → "The pre-implementation reading".`
 
 interface ReadTally {
 	// The files read and not since edited, resolved so the two ways a target reaches here compare.
@@ -92,13 +92,13 @@ interface ReadTally {
 	searches: number
 	searches_since: number
 	// The files this run has successfully edited within the window, resolved (joshuafolkken/kit#1840).
-	// A re-read of one of them is a read of a file the run edited, which §2b keeps in the main line — so
+	// A re-read of one of them is a read of a file the run edited, which `delegation.md` keeps in the main line — so
 	// it is excluded from the count and from a call's projected growth rather than counted as fresh
 	// investigation.
 	edited: ReadonlySet<string>
 }
 
-// **The run's own instructions are not the Issue's subject, so reading them is not what §2b delegates.**
+// **The run's own instructions are not the Issue's subject, so reading them is not what `delegation.md` delegates.**
 // #1426's rule is about reading to find out how the subject works; `CLAUDE.md`, a `prompts/` topic and
 // a skill file are read to find out what to *do*, they are read by nearly every run, and a unit cannot
 // be sent to read them on the main line's behalf. #1441's own measurement excluded 5 of them by hand
@@ -264,7 +264,7 @@ function is_failed_outcome(span: Span): boolean {
 
 // **Every file the run successfully wrote within the window, resolved** (joshuafolkken/kit#1840). It
 // is the one source of "this run edited that file", shared by the live tally and the replay: a read of
-// a file the run edits is reading §2b keeps in the main line, so it is never counted — whether the read
+// a file the run edits is reading `delegation.md` keeps in the main line, so it is never counted — whether the read
 // came before the edit or after it. A failed edit wrote nothing and so exempts nothing, and a file
 // edited outside the window is unknown rather than assumed: the set is only ever as wide as the tail
 // the hook read, which is the bound joshuafolkken/kit#1764 already holds the accumulation to.
@@ -444,7 +444,7 @@ function is_at_search_threshold(search_count: number): boolean {
 //
 // **A delegated unit is not re-armed here because it is not refused at all** (joshuafolkken/kit#1840).
 // The hook counts a unit's reading against the unit (joshuafolkken/kit#1424), and the refusal asks for
-// a dispatch — but a unit is already where §2b sends the reading, and a read-only one (`Explore`,
+// a dispatch — but a unit is already where `delegation.md` sends the reading, and a read-only one (`Explore`,
 // `Plan`) has no `Agent` tool to dispatch with. It was formerly degraded to a single first refusal,
 // which still asked for an action the unit could not take; now the unit short circuit in `should_block`
 // turns it off entirely, so this function is the parent's alone and needs no delegation condition.

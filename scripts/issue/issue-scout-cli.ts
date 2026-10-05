@@ -107,7 +107,7 @@ function format_duplicate(candidate: DuplicateCandidate): string {
 	const epic = candidate.epic === undefined ? '' : ` (epic #${String(candidate.epic)})`
 	// The reader does two different things with the two states, so the row has to say which it is: an
 	// open candidate means somebody is already tracking this, a closed one means it may already be
-	// done — and the second is the exit `SKILL.md` → §2g names, not a second filing.
+	// done — and the second is the exit `issue-comments.md` names, not a second filing.
 	const closed = candidate.is_closed === true ? ' (closed)' : ''
 
 	return `  #${String(candidate.number)}  ${score}  ${candidate.title}${closed}${epic}`
@@ -211,7 +211,7 @@ function named_epics(draft: BacklogIssue, issues: ReadonlyArray<BacklogIssue>): 
 		.map((issue) => issue.number)
 }
 
-// A person naming the epic is the strongest signal there is — it is what §2a's `into <target>` suffix
+// A person naming the epic is the strongest signal there is — it is what `into-target.md`'s `into <target>` suffix
 // means — so it is reported ahead of whatever the candidate search concluded, with the candidates
 // still named beside it.
 function format_named_epics(epics: ReadonlyArray<number>, decision: BundleDecision): Array<string> {

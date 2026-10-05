@@ -34,7 +34,7 @@ const SKILL_ROOT = '.claude/skills/workflow-commands'
 
 // Each filing route, the constant that names its label, and the document whose filing command must
 // carry it. Tier A files from two procedures — a prerequisite (same repo) and an upstream defect
-// (a first-party target) — so both are pinned. joshuafolkken/kit#2189 relocated §2d's body out of
+// (a first-party target) — so both are pinned. joshuafolkken/kit#2189 relocated `prerequisite.md`'s body out of
 // `SKILL.md` into `prerequisite.md`, so the prerequisite's `issue:file` filing command now lives
 // there and the `SKILL.md` stub carries only the trigger and the pointer.
 const FILING_ROUTE_COMMANDS: ReadonlyArray<{ route: string; label: string; doc: string }> = [
@@ -85,10 +85,10 @@ describe('every filing route labels the issue it creates', () => {
 // The it.each case name shared by the two label-mention suites below.
 const NAMES_LABEL_CASE = '$doc names $label'
 const OPERATIONAL_FILING_DOCS: ReadonlyArray<{ doc: string; label: string }> = [
-	...[`${SKILL_ROOT}/fullrun.md`, `${SKILL_ROOT}/halfrun.md`].flatMap((document_) => [
-		{ doc: document_, label: SPLIT_ROUTE_LABEL },
-		{ doc: document_, label: TIER_A_ROUTE_LABEL },
-	]),
+	// joshuafolkken/kit#3174 moved the stop branches `fullrun` and `halfrun` shared into
+	// `entry-sequence.md`, so both labels are pinned there once.
+	{ doc: `${SKILL_ROOT}/entry-sequence.md`, label: SPLIT_ROUTE_LABEL },
+	{ doc: `${SKILL_ROOT}/entry-sequence.md`, label: TIER_A_ROUTE_LABEL },
 	// joshuafolkken/kit#2010 split `backlogrun.md` into point-of-use phase documents, moving its
 	// mid-run filing prose off the entry file: the split-child filing to `backlogrun-child.md` and the
 	// prerequisite filing to `backlogrun-park.md`, so each label is pinned where its command now lives.

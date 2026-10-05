@@ -9,7 +9,7 @@ const REFERENCE = readFileSync('docs/josh-commands-automation.md', 'utf8')
 describe('existing issue fold procedure', () => {
 	it('requires reading the candidate and its comments before assessment', () => {
 		expect(SKILL).toContain('issue-scout.md')
-		expect(SKILL).toContain('issue-fold-existing.md')
+		expect(SCOUT).toContain('issue-fold-existing.md')
 		expect(SCOUT).toContain('complete duplicate of an **open** Issue')
 		expect(PROCEDURE).toContain('pnpm josh issue:read')
 		expect(PROCEDURE).toContain('the later comment wins')

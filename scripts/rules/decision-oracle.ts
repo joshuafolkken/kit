@@ -11,7 +11,7 @@ import { RUN_ENTRY_ORACLE } from './decision-oracle-stage'
 // Paths that appear in more than one entry's `single_source` field.
 const CHAIN_RULE_MD = '.claude/skills/workflow-commands/chain-rule.md'
 const BACKLOGRUN_PROGRESS_MD = '.claude/skills/workflow-commands/backlogrun-progress.md'
-const SKILL_2E = '.claude/skills/workflow-commands/SKILL.md → §2e'
+const SKILL_2E = '.claude/skills/workflow-commands/issue-scout.md'
 const SPLIT_ASSESSMENT_QUESTION =
 	'.claude/skills/workflow-commands/split-assessment.md → The question'
 const PRE_GATE_CUT_MD = '.claude/skills/workflow-commands/pre-gate-cut.md'
@@ -82,7 +82,7 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		decision: 'Whether a run step may be delegated to a cheaper execution tier',
 		args: '<step>',
 		vocabulary: ['delegate', 'keep'],
-		single_source: '.claude/skills/workflow-commands/SKILL.md → §2b',
+		single_source: '.claude/skills/workflow-commands/delegation.md',
 	},
 	{
 		name: 'review:level',
@@ -125,7 +125,7 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		decision: 'Whether this working tree is free for a run to claim',
 		args: `[${ISSUE_N_ARG}]`,
 		vocabulary: ['hold', BUSY, UNKNOWN],
-		single_source: '.claude/skills/workflow-commands/SKILL.md → §2f',
+		single_source: '.claude/skills/workflow-commands/working-tree-hold.md',
 	},
 	{
 		name: 'cost:cut',
@@ -191,7 +191,7 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		decision: "An issue's state, labels, and human-review flag",
 		args: ISSUE_N_ARG,
 		vocabulary: ['human_review: yes', 'human_review: no'],
-		single_source: '.claude/skills/workflow-commands/SKILL.md → §2z',
+		single_source: '.claude/skills/workflow-commands/needs-human-review.md',
 	},
 	{
 		name: 'run:cut:resume',
@@ -228,7 +228,7 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		decision: 'Whether a named stash entry exists and can be applied',
 		args: '<message>',
 		vocabulary: ['popped', 'conflicted', 'no-match', 'ambiguous'],
-		single_source: '.claude/skills/workflow-commands/SKILL.md → §2d',
+		single_source: '.claude/skills/workflow-commands/prerequisite.md',
 	},
 	{
 		name: 'backlog:next',

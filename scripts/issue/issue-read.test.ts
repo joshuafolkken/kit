@@ -5,7 +5,7 @@ import { issue_read } from './issue-read'
 //
 // The cases are about the one distinction the command exists to preserve: a comment listing that came
 // back empty and a comment listing nobody could read are different answers, and
-// `.claude/skills/workflow-commands/SKILL.md` §2g decides from the later text — so a block that shows
+// `.claude/skills/workflow-commands/issue-comments.md` decides from the later text — so a block that shows
 // no comment where the read failed hands the reader a body a comment may already have overturned.
 
 const ISSUE = '1715'

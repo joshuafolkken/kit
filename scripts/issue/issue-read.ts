@@ -6,7 +6,7 @@ import { z } from 'zod'
 // (joshuafolkken/kit#1715).
 //
 // **It exists because reading one issue costs a parent two turns.** `.claude/skills/workflow-commands/SKILL.md`
-// §2g requires the body *and* the comments, since a decision recorded after the body was written
+// `issue-comments.md` requires the body *and* the comments, since a decision recorded after the body was written
 // lives only in a comment; typed by hand that is `gh api repos/{owner}/{repo}/issues/<N>` followed by
 // `gh api repos/{owner}/{repo}/issues/<N>/comments`. Measured over four recorded `backlogrun`
 // parents, `issue bookkeeping` was the single largest contributor to the parent's turn count — 110 of
@@ -15,7 +15,7 @@ import { z } from 'zod'
 // distribution this collapses.
 //
 // **The comments are never silently absent.** A listing that could not be read prints a line saying
-// so, because a block showing no comment where the read failed is exactly the misread §2g exists to
+// so, because a block showing no comment where the read failed is exactly the misread `issue-comments.md` exists to
 // prevent: the agreement in force would be taken from a body a comment had already overturned.
 
 const ISSUE_LABEL = 'issue: '
