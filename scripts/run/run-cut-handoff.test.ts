@@ -94,12 +94,40 @@ describe('loading a handoff for a cut to carry', () => {
 		expect(run_cut_handoff.load_handoff(path.join(scratch, 'missing.json'), BOUND).kind).toBe('bad')
 	})
 
+	it('names the expected JSON format when refusing a Markdown handoff', () => {
+		const handoff_path = path.join(scratch, 'handoff.md')
+
+		writeFileSync(handoff_path, '## Instruction\nfix it\n')
+
+		const load = run_cut_handoff.load_handoff(handoff_path, BOUND)
+
+		expect(load.kind === 'bad' ? load.note : '').toContain(run_cut_handoff.HANDOFF_FORMAT)
+	})
+
 	it('refuses a handoff that would push the record past its bound', () => {
 		const handoff_path = path.join(scratch, 'big.json')
 
 		writeFileSync(handoff_path, JSON.stringify(HANDOFF))
 
 		expect(run_cut_handoff.load_handoff(handoff_path, 1).kind).toBe('bad')
+	})
+})
+
+describe('the handoff format stated to the agent', () => {
+	const KEYS = run_cut_handoff.handoff_schema.keyof().options
+
+	it.each(KEYS)('names the schema key %j', (key) => {
+		expect(run_cut_handoff.HANDOFF_FORMAT).toContain(`"${key}"`)
+	})
+
+	it('carries an example the parser accepts, with exactly the schema keys', () => {
+		const example = run_cut_handoff.HANDOFF_FORMAT.slice(
+			run_cut_handoff.HANDOFF_FORMAT.indexOf('{'),
+		)
+		const parsed: unknown = JSON.parse(example)
+
+		expect(Object.keys(parsed as object)).toStrictEqual([...KEYS])
+		expect(run_cut_handoff.parse_handoff(example)).toBeDefined()
 	})
 })
 
