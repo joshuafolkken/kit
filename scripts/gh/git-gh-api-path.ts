@@ -97,10 +97,17 @@ function tag_reference_api_path(tag: string, repo?: string): string {
 	return `${repo_api_path(repo)}/git/ref/tags/${tag}`
 }
 
+// The GitHub Release published for one tag. REST answers 404 until `publish.yml`'s `create-release`
+// job has run, which is what the release command's progress watch asks (joshuafolkken/kit#3193).
+function release_by_tag_api_path(tag: string, repo?: string): string {
+	return `${repo_api_path(repo)}/releases/tags/${tag}`
+}
+
 const git_gh_api_path = {
 	FULL_PAGE_QUERY,
 	repo_api_path,
 	tag_ref_api_path: tag_reference_api_path,
+	release_by_tag_api_path,
 	issues_api_path,
 	issue_api_path,
 	blocked_by_api_path,

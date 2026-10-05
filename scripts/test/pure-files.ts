@@ -285,7 +285,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/refactor/refactor-targets.test.ts',
 	'scripts/release/release-history.test.ts',
 	'scripts/release/release-plan.test.ts',
-	'scripts/release/release-tag.test.ts',
 	'scripts/repo/auto-merge-setting-logic.test.ts',
 	'scripts/repo/repo-setting-wiring.test.ts',
 	'scripts/report/report-lint.test.ts',

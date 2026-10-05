@@ -49,27 +49,40 @@ async function tag_exists(version: string): Promise<boolean> {
 	return status === HTTP_OK
 }
 
-async function wait_for_tag(
-	version: string,
+// The poll budget for one watched stage, read from that stage's environment variable. Every stage
+// `josh release` waits on — the tag, npm and the GitHub Release — is tuned the same way
+// (joshuafolkken/kit#3193).
+function poll_options_for(
+	timeout_environment: string,
 	sleeper?: (duration_ms: number) => Promise<void>,
-): Promise<boolean> {
-	const timeout_seconds = configured_timeout_seconds(process.env[TIMEOUT_ENV])
+): PollOptions {
+	const timeout_seconds = configured_timeout_seconds(process.env[timeout_environment])
+
 	// Spread rather than a conditional call: `exactOptionalPropertyTypes` refuses an explicit
 	// `sleeper: undefined`, and writing the call twice to satisfy it would duplicate the predicate.
-	const options: PollOptions = {
+	return {
 		attempts: attempts_for(timeout_seconds),
 		interval_ms: TAG_POLL_INTERVAL_MS,
 		...(sleeper !== undefined && { sleeper }),
 	}
+}
 
-	return await poll.poll_until(async () => await tag_exists(version), options)
+async function wait_for_tag(
+	version: string,
+	sleeper?: (duration_ms: number) => Promise<void>,
+): Promise<boolean> {
+	return await poll.poll_until(
+		async () => await tag_exists(version),
+		poll_options_for(TIMEOUT_ENV, sleeper),
+	)
 }
 
 // **The failure text says what did not happen rather than what went wrong**, because the command
 // cannot know which link broke — only that the tag it was waiting for is not there, and that nothing
-// downstream of the tag can have run.
+// downstream of the tag can have run. **The tag is not the release** (joshuafolkken/kit#3193): npm and
+// the GitHub Release follow it, so the success line names only the tag.
 function format_result(version: string, is_tagged: boolean): string {
-	if (is_tagged) return `🏷 ${tag_name(version)} exists — the release is published.`
+	if (is_tagged) return `🏷 Tag ${tag_name(version)} created`
 
 	return [
 		`❌ ${tag_name(version)} never appeared.`,
@@ -82,6 +95,7 @@ const release_tag = {
 	attempts_for,
 	configured_timeout_seconds,
 	format_result,
+	poll_options_for,
 	tag_name,
 	wait_for_tag,
 	DEFAULT_TIMEOUT_SECONDS,

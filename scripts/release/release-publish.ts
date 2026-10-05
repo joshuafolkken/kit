@@ -6,11 +6,13 @@ import { repository_lock } from '#scripts/git/repository-lock'
 import { write_version } from '#scripts/version/bump-version'
 import { version_targets } from '#scripts/version/version-targets'
 import type { ReleasePlan } from './release-plan'
+import { release_progress } from './release-progress'
 import { release_tag } from './release-tag'
 import { release_worktree } from './release-worktree'
 
-// The write half of `pnpm josh release`: the branch, the commit, the pull request, the merge and the
-// wait for the tag (joshuafolkken/kit#1169).
+// The write half of `pnpm josh release`: the branch, the commit, the pull request, the merge, the
+// wait for the tag (joshuafolkken/kit#1169) and the watch on what the tag publishes
+// (`release-progress.ts`, joshuafolkken/kit#3193).
 //
 // **The merge goes through the same gate every other pull request does.** `wait_for_pr_success` is
 // the merge gate `pnpm josh followup` waits on, and it is called here rather than reimplemented —
@@ -104,7 +106,7 @@ async function clear_the_way(branch_name: string): Promise<void> {
 // before that creation, because `worktree_add` makes the branch local and `branch_exists` would then
 // report every release as already taken. This runs after `process.chdir` into the work tree, so the
 // version write and the git commands all act on it rather than on the root.
-async function commit_release(plan: ReleasePlan): Promise<void> {
+async function commit_release(plan: ReleasePlan): Promise<string> {
 	write_version(plan.next_version)
 	await git_command.add_path(PACKAGE_JSON)
 	await git_command.commit(commit_message(plan.next_version))
@@ -115,18 +117,27 @@ async function commit_release(plan: ReleasePlan): Promise<void> {
 		IGNORE_FOR_RELEASE_LABEL,
 	)
 
-	console.info(pr_url)
+	console.info(release_progress.pr_opened_line(pr_url))
+
+	return pr_url
 }
 
-async function merge_and_tag(plan: ReleasePlan, branch_name: string): Promise<number> {
+// No tag means nothing downstream ran, so the npm and GitHub Release watches are not started.
+async function merge_and_tag(
+	plan: ReleasePlan,
+	branch_name: string,
+	pr_url: string,
+): Promise<number> {
 	await git_pr_checks.wait_for_pr_success(branch_name)
 	await git_gh_command.pr_merge(branch_name)
+	console.info(release_progress.pr_merged_line(pr_url))
 
 	const is_tagged = await release_tag.wait_for_tag(plan.next_version)
 
 	console.info(release_tag.format_result(plan.next_version, is_tagged))
+	if (!is_tagged) return FAILURE_EXIT_CODE
 
-	return is_tagged ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+	return await release_progress.wait_for_distribution(plan.next_version)
 }
 
 // The whole release happens inside a work tree cut for it, so the root checkout is never touched: the
@@ -143,9 +154,9 @@ async function publish_locked(plan: ReleasePlan): Promise<number> {
 
 	try {
 		process.chdir(directory)
-		await commit_release(plan)
+		const pr_url = await commit_release(plan)
 
-		return await merge_and_tag(plan, branch_name)
+		return await merge_and_tag(plan, branch_name, pr_url)
 	} finally {
 		process.chdir(previous_cwd)
 		await release_worktree.remove(directory, branch_name)
