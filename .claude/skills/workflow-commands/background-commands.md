@@ -88,4 +88,4 @@ backgrounded `josh gate` / `git` / `followup` / `ship` there, and the `Stop` hoo
 task still running back to wait.
 
 The operational section above is the single source of the rule. `followup.md`, `chain-rule.md` and
-`backlogrun-progress.md` → "Progress while the run is quiet" route here for it rather than restating it.
+`progress-watcher.md` → "Progress while the run is quiet" route here for it rather than restating it.

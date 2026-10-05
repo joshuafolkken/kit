@@ -45,7 +45,7 @@
 - **検証コマンドのパイプ**（`output-bounds.md`）
   - 発火点: `pnpm josh rule:guard` — 合否を意味する josh のチェック（`gate` ／ `check` ／ `lint*` ／ `cspell*` ／ `test*` ／ `eval` ／ `overrides` ／ `ranges`）がパイプの手前に立った `Bash`
   - 発火しないとき: 検証の終了コードが握りつぶされていない ＝ 失敗が失敗として伝わる
-- **早すぎる進捗報告**（`.claude/skills/workflow-commands/backlogrun-progress.md` → 「Progress while the run is quiet」）
+- **早すぎる進捗報告**（`.claude/skills/workflow-commands/progress-watcher.md` → 「Progress while the run is quiet」）
   - 発火点: `pnpm josh rule:guard` — 待つことだけが目的の `Bash`（`sleep` だけ、または `echo` ／ `:` ／ `date` を並べただけ）を、タイマーが生きている回か報告が間隔前に着地する回に出したとき。**毎回発火する**
   - 発火しないとき: 待機タイマーを自前で張っていない ＝ 時計は `run:progress` が 1 本だけ持っている
 - **run 末尾の空転**（`background-commands.md`）
