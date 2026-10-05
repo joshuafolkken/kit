@@ -29,8 +29,15 @@ interface WorkflowJob {
 	outputs?: Record<string, string>
 	needs?: string | ReadonlyArray<string>
 	steps?: ReadonlyArray<WorkflowStep>
+	strategy?: WorkflowStrategy
 	// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub workflow key
 	'timeout-minutes'?: number
+}
+
+interface WorkflowStrategy {
+	// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub workflow key
+	'fail-fast'?: boolean
+	matrix?: Record<string, ReadonlyArray<string | number>>
 }
 
 interface WorkflowConcurrency {
