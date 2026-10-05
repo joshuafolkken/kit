@@ -19,11 +19,10 @@ short-circuits with a non-zero exit. The numbered steps are the detail behind ea
    `confirmation` Telegram carrying stderr (`run:entry` sends it). `working-tree-hold.md` is the single
    source; a cross-repository target resolves its checkout from `pnpm josh doctor` first
    (`target-repository.md`).
-2. **Apply `in-progress` the moment `run:hold` answered `hold`** — a `#N` counts as holding its lane
-   from the claim; a `new` entry applies it right after filing (`fullrun-steps.md` carries the
-   create/apply commands). Every stop that leaves the tree clean removes it in the same turn as `pnpm
-   josh run:release`: `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null
-   || true`.
+2. **`in-progress` rides on the hold** — for a `#N`, `run:entry` applies it once the tree is held and
+   the budget allows the run; a `new` entry applies it right after filing (`fullrun-steps.md`). Every
+   stop that leaves the tree clean ends with `pnpm josh run:release <N>`, which removes the label with
+   the record (a `new` entry's bare release does not — `working-tree-hold.md`).
 3. **Ask the session boundary in the same turn as the hold** — `pnpm josh cost --cut`. `under`
    continues; `over` (or unanswerable) stops before the title — `run:entry` sends the `confirmation`
    Telegram and runs `run:release` (`stop notified: …`); by hand only for `new`. **Skip it when

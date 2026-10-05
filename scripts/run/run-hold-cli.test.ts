@@ -20,6 +20,9 @@ vi.mock('./run-preflight', () => ({
 // The sweep a successful claim runs reads git and GitHub; `run-hold-cli-tidy.test.ts` pins the call.
 vi.mock('./run-tidy-cli', () => ({ run_tidy_cli: { sweep: vi.fn() } }))
 
+// A numbered release strips the issue's `in-progress` on GitHub; `run-hold-cli-release.test.ts` pins it.
+vi.mock('./run-label', () => ({ run_label: { unmark: vi.fn() } }))
+
 const git_directories = vi.mocked(git_command.git_directories)
 const git_status = vi.mocked(git_command.status)
 const preflight_check = vi.mocked(run_preflight.check)
@@ -250,84 +253,6 @@ describe('releasing', () => {
 
 		expect(await run_hold_cli.run(['--release'])).toBe(SUCCESS_EXIT_CODE)
 		expect(out).toEqual([run_hold_cli.RELEASED_VERDICT])
-	})
-})
-
-// joshuafolkken/kit#1799: the record carried no owner, so this command removed whatever was there —
-// and the `busy` stop message is what sends a person here to clear a record they judged stale from
-// outside the run that wrote it.
-describe('releasing a record another run wrote', () => {
-	beforeEach(async () => {
-		await run_hold_cli.run([ISSUE])
-		reset_output()
-	})
-
-	it('answers held and exits non-zero', async () => {
-		expect(await run_hold_cli.run(['--release', OTHER_ISSUE])).toBe(FAILURE_EXIT_CODE)
-		expect(out).toEqual([run_hold_cli.HELD_VERDICT])
-	})
-
-	it('leaves the record in place', async () => {
-		await run_hold_cli.run(['--release', OTHER_ISSUE])
-
-		const read = run_hold.read_hold(run_hold.hold_path(WORKTREE))
-
-		expect(read.kind === 'held' ? read.hold.issue : undefined).toBe(ISSUE)
-	})
-
-	it('names both ways forward on standard error', async () => {
-		await run_hold_cli.run(['--release', OTHER_ISSUE])
-
-		expect(errors.join('\n')).toContain(run_hold.own_release_command(ISSUE))
-		expect(errors.join('\n')).toContain(run_hold.FORCE_RELEASE_COMMAND)
-	})
-
-	// The bare spelling is the unnumbered run's own release, so it is a claimant like any other.
-	it('refuses a bare release while a numbered run holds the tree', async () => {
-		await run_hold_cli.run(['--release'])
-
-		expect(out).toEqual([run_hold_cli.HELD_VERDICT])
-	})
-})
-
-// A record nothing can parse names no run, so no claimant matches it — and removing it anyway is the
-// one thing this path exists to refuse.
-describe('releasing a record that cannot be read', () => {
-	it('answers unknown and removes nothing', async () => {
-		vi.spyOn(run_hold, 'read_hold').mockReturnValue({ kind: 'unreadable' })
-		const removed = vi.spyOn(run_hold, 'release_hold')
-
-		expect(await run_hold_cli.run(['--release', ISSUE])).toBe(FAILURE_EXIT_CODE)
-		expect(out).toEqual([run_hold_cli.UNKNOWN_VERDICT])
-		expect(removed).not.toHaveBeenCalled()
-	})
-})
-
-// The one path that removes a record without matching it: a session that crashed leaves no run
-// behind to release its own record, and an expired one over a dirty tree never frees itself.
-describe('a forced release', () => {
-	it('removes a record another run wrote', async () => {
-		await run_hold_cli.run([ISSUE])
-		reset_output()
-
-		expect(await run_hold_cli.run(['--release', '--force'])).toBe(SUCCESS_EXIT_CODE)
-		expect(out).toEqual([run_hold_cli.RELEASED_VERDICT])
-		expect(run_hold.read_hold(run_hold.hold_path(WORKTREE)).kind).toBe('free')
-	})
-
-	it('says whose record it removed', async () => {
-		await run_hold_cli.run([ISSUE])
-		reset_output()
-
-		await run_hold_cli.run(['--release', '--force'])
-
-		expect(errors.join('\n')).toContain(`#${ISSUE}`)
-	})
-
-	it('answers none when nothing held the tree', async () => {
-		await run_hold_cli.run(['--release', '--force'])
-
-		expect(out).toEqual([run_hold_cli.NONE_VERDICT])
 	})
 })
 

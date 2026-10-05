@@ -110,8 +110,10 @@ human-in-the-loop cycle, not an optional tidy-up.
 
 ## `in-progress` is removed by whoever finds it stale
 
-Nothing in the codebase removes `in-progress`; a normal finish closes the issue. An interrupted run
-leaves it behind, and a child that carries it is excluded from every future `epic:next` — permanently.
+A run's own ending removes `in-progress` — `pnpm josh followup` on a merge, `pnpm josh run:release <N>`
+on a stop. An interrupted run reaches neither and leaves it behind, and a child that carries it is
+excluded from every future `epic:next` — permanently. The removal below is the one hand-written call
+left, for a label no live run owns: another tree's record is not this tree's to release.
 **A session that detects a stale child removes the label itself** (Tier A) and reports it, before
 continuing the loop.
 
@@ -166,7 +168,7 @@ source; what follows is this entry's branch.
 3. `pnpm josh epic --add <E> <N> --before <M>` — one command writes the task-list row, the declaration
    and the `blocked-by` relation together. Never edit the body by hand: the declaration and the relations
    then disagree, `epic:next` returns `error`, and the unattended run stops.
-4. **Remove `in-progress` from `<M>`** — `gh api -X DELETE repos/{owner}/{repo}/issues/<M>/labels/in-progress 2>/dev/null || true`.
+4. **Remove `in-progress` from `<M>`** — `pnpm josh run:release <M>`, which removes the label with the hold.
    This is what lets `<M>` run again: `epic:next` classifies a child carrying `in-progress` as waiting on
    time **before** it looks at any blocker, so a child left labelled is never offered again.
 5. **Do not park.** Go back to step 1 of the loop. `epic:next` classifies the original child as resolving

@@ -153,6 +153,21 @@ describe('time_markers.bash_issue', () => {
 		expect(time_markers.bash_issue(command)).toBe(1269)
 	})
 
+	// joshuafolkken/kit#3182: `run:entry` applies the label itself, so its own call is the declaration.
+	it('reads the issue run:entry opens, and marks it as the workflow boundary', () => {
+		const command = 'pnpm josh run:entry 3182 --to fullrun 2>&1 | tail -30'
+
+		expect(time_markers.bash_issue(command)).toBe(3182)
+		expect(time_markers.bash_marker(command)).toBe(time_markers.WORKFLOW_MARKER)
+	})
+
+	it('reads no issue from run:release, which ends a hold rather than opening one', () => {
+		const command = 'pnpm josh run:release 3182'
+
+		expect(time_markers.bash_issue(command)).toBe(time_markers.NO_ISSUE)
+		expect(time_markers.bash_marker(command)).toBe(time_markers.NO_MARKER)
+	})
+
 	it('reads no issue from removing the label, which ends a run rather than opening one', () => {
 		const command = `gh api -X DELETE ${ISSUE_PATH}/labels/in-progress`
 
