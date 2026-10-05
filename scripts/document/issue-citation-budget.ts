@@ -75,9 +75,8 @@ const ISSUE_CITATION_BUDGET: ReadonlyArray<CitationBudget> = [
 	{ path: 'prompts/collaboration-workflow/wip-cap.md', citations: 3 },
 	{ path: 'prompts/refactoring.md', citations: 1 },
 	{ path: 'prompts/review-rubric.md', citations: 1 },
-	{ path: 'prompts/review.md', citations: 14 },
 	{ path: 'prompts/sonar-hotspot-handling.md', citations: 2 },
-	{ path: 'prompts/testing-guide.md', citations: 13 },
+	{ path: 'prompts/testing-guide.md', citations: 6 },
 ]
 
 const BUDGET_FILE = 'scripts/document/issue-citation-budget.ts'
