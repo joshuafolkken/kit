@@ -36,8 +36,7 @@ pnpm josh issue:file "<title>" --body-file <complete-draft.md> --depth <n> --dis
   cap's branch-2 filing alike; the guard refuses any other filing call
   (`prompts/collaboration-workflow/rule-delivery.md`).
 - **A `#N` entry point does not file *the Issue it was handed*.** `fullrun #N` / `halfrun #N` /
-  `kickoff #N` are given an Issue that already exists. That says nothing about an Issue such a run goes
-  on to file later, which the bullet above covers.
+  `kickoff #N` are given an Issue that already exists; one such a run files later still goes through it.
 - **The split path files each child through the same command.** The epic is created with
   `pnpm josh epic` over children that were scanned.
 
