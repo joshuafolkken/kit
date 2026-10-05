@@ -4,6 +4,7 @@ import { epic_rank } from '#scripts/epic/epic-rank'
 import type { EpicNextResult } from '#scripts/epic/epic-report'
 import { epic_solo, type SoloGate, type SoloSelection } from '#scripts/epic/epic-solo'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
+import { backlog_restructure, type Declared } from './backlog-restructure'
 
 // What the backlog offers, in the order it is decided (joshuafolkken/kit#2928): rank, then the
 // `run:solo` gate, then the cap. `backlog:next` and `backlog:plan --waves` both call `select`, so the
@@ -78,29 +79,37 @@ interface OfferInput {
 	repo: string
 	// The keys of the standalone rows — the ones the cap bounds.
 	standalone: ReadonlySet<string>
+	// The paths each issue restructures; two candidates claiming one are not offered together
+	// (joshuafolkken/kit#3221). Absent, nothing is separated.
+	declared?: Declared
 }
 
+// The restructure separation runs before the cap, for the reason the gate does: the cap only ever
+// removes what would otherwise be offered.
 function select(input: OfferInput): SoloSelection {
 	const ranked = rank(input.candidates, input.pool)
+	const { read, repo } = input
+	const gated = epic_solo.select(ranked, read, repo)
+	const separated = backlog_restructure.separate(gated, input.declared ?? new Map(), { read, repo })
 
-	return cap(epic_solo.select(ranked, input.read, input.repo), input.standalone)
+	return cap(separated, input.standalone)
+}
+
+interface GateScope {
+	standalone: ReadonlySet<string>
+	declared: Declared
 }
 
 // `backlog:next`'s gate: `epic_solo.gate` with this selection in place of its bare one.
-function gate(
-	result: EpicNextResult,
-	read: BusyRead,
-	repo: string,
-	standalone: ReadonlySet<string>,
-): SoloGate {
+function gate(result: EpicNextResult, read: BusyRead, repo: string, scope: GateScope): SoloGate {
 	const pool = everything_in(result)
 
 	return epic_solo.gate(result, read, repo, (candidates) =>
-		select({ candidates, pool, read, repo, standalone }),
+		select({ candidates, pool, read, repo, ...scope }),
 	)
 }
 
 const backlog_rank = { everything_in, gate, rank_result, select }
 
 export { backlog_rank }
-export type { OfferInput }
+export type { GateScope, OfferInput }

@@ -20,6 +20,7 @@ const STAGE = {
 	PREFLIGHT: 'preflight',
 	REVIEW: 'review',
 	GATE: 'gate',
+	SYNC: 'sync',
 	COMMIT: 'commit',
 	ROUND_TWO: 'round-2',
 	FOLLOWUP: 'followup',
@@ -99,6 +100,9 @@ const DONE_BY: Record<Stage, (done: ReadonlySet<string>, state: ShipState) => bo
 	// the recorded round, and only a commit pins the tree that round read.
 	[STAGE.REVIEW]: (_done, state) => state.is_merged || state.is_committed,
 	[STAGE.GATE]: (_done, state) => state.is_merged || state.is_committed,
+	// The merge of the default branch before the commit (joshuafolkken/kit#3221): once committed, a
+	// conflicting pull request is the followup's to merge again.
+	[STAGE.SYNC]: (_done, state) => state.is_merged || state.is_committed,
 	[STAGE.COMMIT]: (done, state) => state.is_merged || (done.has(STAGE.COMMIT) && is_shipped(state)),
 	// The round-2 pass (joshuafolkken/kit#2489) reads the pushed fix delta, so its record is honored only
 	// while that push still stands — new work pushed on top reruns it.
@@ -138,6 +142,14 @@ function event_text(issue: string, stage: Stage, phase: Phase): string {
 	return `#${issue} ${stage} ${phase}`
 }
 
+// A stop on a merge git could not finish is named `conflict` rather than by the stage it happened in
+// (joshuafolkken/kit#3221), so the event stream reads the cause without anyone opening the report.
+const CONFLICT = 'conflict'
+
+function stop_reason(stage: Stage, conflicts: ReadonlyArray<string> = []): string {
+	return conflicts.length > 0 ? CONFLICT : stage
+}
+
 const run_ship_stage = {
 	PHASE,
 	STAGE,
@@ -148,6 +160,7 @@ const run_ship_stage = {
 	mark_done,
 	read_done,
 	record_path,
+	stop_reason,
 }
 
 export type { Phase, ShipState, Stage }

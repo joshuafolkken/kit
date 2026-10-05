@@ -1,3 +1,4 @@
+import { PrConflictError } from '#scripts/gh/git-pr-checks-eval'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { git_followup_stages, type StageLog } from './git-followup-stages'
 
@@ -58,6 +59,19 @@ describe('git_followup_stages.lap', () => {
 
 	it('totals the laps it recorded', () => {
 		expect(git_followup_stages.total_ms(two_lap_log().stages)).toBe(FIRST_LAP_MS + SECOND_LAP_MS)
+	})
+})
+
+// joshuafolkken/kit#3221: a wait that failed on a merge conflict names its last lap `conflict`.
+describe('git_followup_stages.stopped_lap', () => {
+	it('names the lap conflict for a merge conflict', () => {
+		expect(git_followup_stages.stopped_lap(new PrConflictError('merge conflict'))).toBe(
+			STAGE.conflict,
+		)
+	})
+
+	it('keeps interrupted for any other failure', () => {
+		expect(git_followup_stages.stopped_lap(new Error('failed checks'))).toBe(STAGE.interrupted)
 	})
 })
 

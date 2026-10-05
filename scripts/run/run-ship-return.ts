@@ -6,7 +6,7 @@ import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
 import type { ShipResume } from './run-ship-next'
-import type { Stage } from './run-ship-stage'
+import { run_ship_stage, type Stage } from './run-ship-stage'
 
 // How a detached `josh ship` supervisor hands a stopped stage back (joshuafolkken/kit#2428). The agent
 // ended when it handed the region over, so a red gate, a High/Medium review, a failed push or red CI has
@@ -28,8 +28,8 @@ const OPENAI_PROVIDER = 'openai'
 
 type ReturnOutcome = 'relaunched' | 'recorded'
 
-function stop_text(issue: string, stage: Stage): string {
-	return `#${issue} ${stage} failed — pnpm josh ship --log ${issue}`
+function stop_text(issue: string, stage: Stage, resume: ShipResume): string {
+	return `#${issue} ${run_ship_stage.stop_reason(stage, resume.conflicts)} failed — pnpm josh ship --log ${issue}`
 }
 
 function can_relaunch(lane: LaneInfo | undefined): lane is LaneInfo {
@@ -53,7 +53,10 @@ async function return_control(
 	stage: Stage,
 	resume: ShipResume,
 ): Promise<ReturnOutcome> {
-	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.SHIP_STOP, stop_text(issue, stage))
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.SHIP_STOP,
+		stop_text(issue, stage, resume),
+	)
 
 	const lane = await lane_to_relaunch(issue)
 

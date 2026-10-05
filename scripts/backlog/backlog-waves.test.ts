@@ -12,7 +12,8 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_plan, type PlanContext } from './backlog-plan'
-import { backlog_rank } from './backlog-rank'
+import { backlog_rank, type GateScope } from './backlog-rank'
+import { backlog_restructure } from './backlog-restructure'
 import { backlog_waves } from './backlog-waves'
 
 // joshuafolkken/kit#2778: the order a `backlogrun` takes, wave by wave, assuming every wave merges
@@ -151,22 +152,54 @@ describe('backlog_waves.build — the same offer backlog:next makes', () => {
 	const standalone_children = STANDALONE_NUMBERS.map((number) => child(number))
 	const keys = new Set(standalone_children.map((entry) => epic_graph.key_of(entry)))
 
+	const scope: GateScope = { standalone: keys, declared: new Map() }
+
 	it('matches what backlog:next offers an idle repository in its first wave', () => {
 		const input = result([child(FIRST), solo(SOLO_FIRST), ...standalone_children])
 		const offered = epic_report.candidates_for_repo(
-			backlog_rank.gate(input, { kind: 'idle' }, REPO, keys).result,
+			backlog_rank.gate(input, { kind: 'idle' }, REPO, scope).result,
 			REPO,
 		)
 
-		expect(backlog_waves.build(input, REPO, keys).waves[0]).toStrictEqual(offered)
+		expect(backlog_waves.build(input, REPO, scope).waves[0]).toStrictEqual(offered)
 	})
 
 	it('caps a wave of standalone rows at five, as backlog:next does', () => {
-		const wave = backlog_waves.build(result(standalone_children), REPO, keys).waves[0] ?? []
+		const wave = backlog_waves.build(result(standalone_children), REPO, scope).waves[0] ?? []
 
 		expect(wave.map((entry) => entry.number)).toStrictEqual(
 			STANDALONE_NUMBERS.slice(0, git_next_issues.DISPLAY_LIMIT),
 		)
+	})
+})
+
+// joshuafolkken/kit#3221: two issues that restructure the same file are separated in the plan as in
+// the run, so wave 1 still matches backlog:next and the second issue moves to the next wave.
+describe('backlog_waves.build — issues that restructure the same file', () => {
+	const SHARED_PATH = 'scripts/run/run-ship.ts'
+	const declared = backlog_restructure.declared_of([
+		{ number: FIRST, body: `Split \`${SHARED_PATH}\` into two modules.` },
+		{ number: SECOND, body: `Move \`${SHARED_PATH}\` under a new directory.` },
+	])
+	const scope: GateScope = { standalone: new Set(), declared }
+	const input = result([child(FIRST), child(SECOND), child(THIRD)])
+
+	it('separates its first wave exactly as backlog:next separates an idle offer', () => {
+		const offered = epic_report.candidates_for_repo(
+			backlog_rank.gate(input, { kind: 'idle' }, REPO, scope).result,
+			REPO,
+		)
+
+		expect(backlog_waves.build(input, REPO, scope).waves[0]).toStrictEqual(offered)
+	})
+
+	it('puts the second restructure of a path in the wave after the first', () => {
+		const { waves } = backlog_waves.build(input, REPO, scope)
+
+		expect(waves.map((wave) => wave.map((entry) => entry.number))).toStrictEqual([
+			[FIRST, THIRD],
+			[SECOND],
+		])
 	})
 })
 

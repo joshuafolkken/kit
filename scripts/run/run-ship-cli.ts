@@ -171,8 +171,9 @@ function parse(argv: ReadonlyArray<string>): ShipCommand | undefined {
 
 async function run_step(step: Step, args: ShipArguments, state: ShipState): Promise<ShipSection> {
 	const result = await step.run(args, state)
+	const section = { header: step.header, body: result.out, code: result.code }
 
-	return { header: step.header, body: result.out, code: result.code }
+	return result.conflicts === undefined ? section : { ...section, conflicts: result.conflicts }
 }
 
 async function emit_phase(args: ShipArguments, stage: Stage, phase: Phase): Promise<void> {
@@ -249,7 +250,14 @@ async function stopped(
 	stage: Stage,
 ): Promise<ReadonlyArray<ShipSection>> {
 	if (run_ship_detach.is_supervised()) {
-		await run_ship_return.return_control(args.number, stage, run_ship_next.resume_of(args))
+		const conflicts = sections.at(-1)?.conflicts
+		const resume = run_ship_next.resume_of(args)
+
+		await run_ship_return.return_control(
+			args.number,
+			stage,
+			conflicts === undefined ? resume : { ...resume, conflicts },
+		)
 	}
 
 	return sections

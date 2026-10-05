@@ -27,6 +27,7 @@ const { git_spawn } = await import('./git-spawn')
 
 const CHANGED_FILE = 'scripts/a.ts'
 const MODIFIED_STATUS = ` M ${CHANGED_FILE}`
+const CONFLICT_STATUS = `UU ${CHANGED_FILE}`
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -89,10 +90,44 @@ describe('merging the default branch into the current branch', () => {
 
 	it('tells a conflicted merge how to finish through the commit flow', async () => {
 		merge_branch.mockRejectedValue(MERGE_FAILURE)
+		vi.mocked(git_command.status).mockResolvedValueOnce('').mockResolvedValueOnce(CONFLICT_STATUS)
 
 		await main_merge.run(NO_ARGUMENTS)
 
 		expect(console.error).toHaveBeenCalledWith(main_merge_guard.CONFLICT_HINT)
+	})
+})
+
+// joshuafolkken/kit#3221: `josh ship` branches on what the merge came to, not on an exit code.
+describe('the outcome of one merge', () => {
+	it('answers current when the default branch brings nothing in', async () => {
+		expect(await main_merge.merge()).toStrictEqual({ kind: 'current', branch: 'main' })
+	})
+
+	it('answers merged when the default branch brings paths in', async () => {
+		vi.mocked(git_spawn.read).mockResolvedValue(CHANGED_FILE)
+
+		expect(await main_merge.merge()).toStrictEqual({ kind: 'merged', branch: 'main' })
+	})
+
+	it('answers refused with the guard message and merges nothing', async () => {
+		vi.mocked(git_command.status).mockResolvedValue(`UU ${CHANGED_FILE}`)
+
+		expect(await main_merge.merge()).toMatchObject({ kind: 'refused' })
+		expect(merge_branch).not.toHaveBeenCalled()
+	})
+
+	it('answers conflict with the paths git left unmerged', async () => {
+		merge_branch.mockRejectedValue(MERGE_FAILURE)
+		vi.mocked(git_command.status).mockResolvedValueOnce('').mockResolvedValueOnce(CONFLICT_STATUS)
+
+		expect(await main_merge.merge()).toStrictEqual({ kind: 'conflict', files: [CHANGED_FILE] })
+	})
+
+	it('rethrows a merge failure that left no unmerged path', async () => {
+		merge_branch.mockRejectedValue(MERGE_FAILURE)
+
+		await expect(main_merge.merge()).rejects.toThrow(MERGE_FAILURE.message)
 	})
 })
 
