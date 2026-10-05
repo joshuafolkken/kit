@@ -188,3 +188,61 @@ describe('a full project keeps every check it ran before', () => {
 		expect(scripts.some((script) => script.startsWith(GATE_COMMAND))).toBe(false)
 	})
 })
+
+// joshuafolkken/kit#3217: kit never installs size-limit, so the bundle-size step failed every full
+// consumer that had not added it. The step's own script runs under `sh -e`, the container's shell,
+// against a `pnpm` stub that records what it was asked to run.
+const BUNDLE_SIZE_STEP_ID = 'bundle-size'
+const PNPM_CALL_LOG = 'pnpm-calls'
+const SIZE_LIMIT = 'size-limit'
+
+function write_recording_pnpm(directory: string): string {
+	const stub_directory = path.join(directory, 'stub-bin')
+	const stub_path = path.join(stub_directory, 'pnpm')
+
+	mkdirSync(stub_directory, { recursive: true })
+	writeFileSync(stub_path, `#!/bin/sh\necho "$*" >> "${path.join(directory, PNPM_CALL_LOG)}"\n`)
+	chmodSync(stub_path, EXECUTABLE_MODE)
+
+	return stub_directory
+}
+
+function install_size_limit(directory: string): void {
+	const binary_directory = path.join(directory, 'node_modules', '.bin')
+	const binary_path = path.join(binary_directory, SIZE_LIMIT)
+
+	mkdirSync(binary_directory, { recursive: true })
+	writeFileSync(binary_path, '#!/bin/sh\n')
+	chmodSync(binary_path, EXECUTABLE_MODE)
+}
+
+function run_bundle_size_step(name: string, has_size_limit: boolean): string {
+	const project_directory = path.join(workspace, name)
+	const script = step_run(
+		find_step_by_id(find_job(TEMPLATE_CI_YML, CHECKS_JOB), BUNDLE_SIZE_STEP_ID),
+	)
+
+	mkdirSync(project_directory, { recursive: true })
+	writeFileSync(path.join(project_directory, PNPM_CALL_LOG), '')
+	if (has_size_limit) install_size_limit(project_directory)
+	const stub_directory = write_recording_pnpm(project_directory)
+	const result = spawnSync('sh', ['-e', '-c', script], {
+		cwd: project_directory,
+		env: { ...process.env, PATH: `${stub_directory}:${process.env['PATH'] ?? ''}` },
+		encoding: 'utf8',
+	})
+
+	expect(result.status, result.stderr).toBe(0)
+
+	return readFileSync(path.join(project_directory, PNPM_CALL_LOG), 'utf8')
+}
+
+describe('the bundle-size step runs only where size-limit is installed', () => {
+	it('skips without calling pnpm when size-limit is not installed', () => {
+		expect(run_bundle_size_step('no-size-limit', false)).toBe('')
+	})
+
+	it('runs pnpm size-limit when size-limit is installed', () => {
+		expect(run_bundle_size_step('with-size-limit', true)).toBe(`${SIZE_LIMIT}\n`)
+	})
+})
