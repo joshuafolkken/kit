@@ -14,9 +14,9 @@ const SETTINGS_DESTINATION = path.join('.claude', 'settings.json')
 const CODEX_HOOKS_DESTINATION = path.join('.codex', 'hooks.json')
 const CODEX_HOOKS_SOURCE = fileURLToPath(new URL('../../.codex/hooks.json', import.meta.url))
 const SESSION_LANG_COMMAND = '{"command": "pnpm josh session:lang"}'
-// A kit-side fallback-form command: prefers the built bundle, drops to `pnpm josh` when it is absent.
-const KIT_FALLBACK_FORM =
-	'{"command": "if [ -f dist/hooks/pretool-guard.js ]; then node dist/hooks/pretool-guard.js; else pnpm josh pretool:guard; fi"}'
+// A kit-side launcher command: the hook launcher picks the built bundle or the live source itself.
+const KIT_LAUNCHER_FORM = '{"command": "sh scripts/hooks/run-hook.sh pretool-guard"}'
+const CONSUMER_LAUNCHER = 'sh ./node_modules/@joshuafolkken/kit/scripts/hooks/run-hook.sh'
 const PRETOOL_SOURCE = '{"command": "pnpm josh pretool:guard"}'
 const INSTALL_NOTICE = 'run pnpm install, then reread CLAUDE.md'
 const GUARD_OUTPUT = 'guard ran'
@@ -65,23 +65,19 @@ describe('rewrite_hook_commands', () => {
 		expect(rewrite_hook_commands(prose)).toBe(prose)
 	})
 
-	// A fallback-form command carries two paths: the bundle it prefers and the `pnpm josh` fallback.
-	// Both are rebased onto the installed package, so a consumer's fallback is the dispatcher bundle
-	// rather than a pnpm launch (joshuafolkken/kit#2023).
-	it('rebases both the bundle path and the pnpm fallback of a fallback-form command', () => {
-		const rewritten = rewrite_hook_commands(KIT_FALLBACK_FORM)
+	// The launcher is rebased onto the installed package, where it picks the installed bundle or the
+	// dispatcher on its own (joshuafolkken/kit#3184).
+	it('rebases the hook launcher onto the installed package', () => {
+		const rewritten = rewrite_hook_commands(KIT_LAUNCHER_FORM)
 
 		expect(rewritten).toContain(INSTALL_NOTICE)
-		expect(rewritten).toContain(
-			'node ./node_modules/@joshuafolkken/kit/dist/hooks/pretool-guard.js',
-		)
-		expect(rewritten).toContain(CONSUMER_JOSH_COMMAND)
+		expect(rewritten).toContain(`${CONSUMER_LAUNCHER} pretool-guard`)
 	})
 
-	// The rebased bundle path still contains `dist/hooks/`, so a blind rerun would rewrite it onto
+	// The rebased launcher path still ends in the source path, so a blind rerun would rewrite it onto
 	// itself. A second pass over already-rewritten output must be a no-op (joshuafolkken/kit#2023).
 	it('is idempotent — a second rewrite leaves an already-rebased command unchanged', () => {
-		const once = rewrite_hook_commands(KIT_FALLBACK_FORM)
+		const once = rewrite_hook_commands(KIT_LAUNCHER_FORM)
 
 		expect(rewrite_hook_commands(once)).toBe(once)
 	})
@@ -121,7 +117,7 @@ describe('bootstrap without installed dependencies', () => {
 	)
 
 	it('runs a present hook bundle even if the dispatcher is missing', () => {
-		const rewritten = rewrite_hook_commands(KIT_FALLBACK_FORM)
+		const rewritten = rewrite_hook_commands(KIT_LAUNCHER_FORM)
 		const { command } = JSON.parse(rewritten) as { command: string }
 		const result = hook_command_bootstrap.run_in_temporary_checkout(command, true)
 
@@ -133,7 +129,7 @@ describe('bootstrap without installed dependencies', () => {
 
 describe('installed hook from a project subdirectory', () => {
 	it('runs the hook bundle instead of reporting an inactive installation', () => {
-		const rewritten = rewrite_hook_commands(KIT_FALLBACK_FORM)
+		const rewritten = rewrite_hook_commands(KIT_LAUNCHER_FORM)
 		const { command } = JSON.parse(rewritten) as { command: string }
 		const result = hook_command_bootstrap.run_in_temporary_checkout(command, true, true)
 
@@ -144,7 +140,7 @@ describe('installed hook from a project subdirectory', () => {
 
 	it('runs the hook bundle when Git points to another work tree', () => {
 		const foreign_root = mkdtempSync(path.join(tmpdir(), FOREIGN_DIRECTORY_PREFIX))
-		const rewritten = rewrite_hook_commands(KIT_FALLBACK_FORM)
+		const rewritten = rewrite_hook_commands(KIT_LAUNCHER_FORM)
 		const { command } = JSON.parse(rewritten) as { command: string }
 
 		try {
@@ -161,7 +157,7 @@ describe('installed hook from a project subdirectory', () => {
 	})
 
 	it('runs the hook bundle when Git metadata is outside the work tree', () => {
-		const rewritten = rewrite_hook_commands(KIT_FALLBACK_FORM)
+		const rewritten = rewrite_hook_commands(KIT_LAUNCHER_FORM)
 		const { command } = JSON.parse(rewritten) as { command: string }
 		const result = hook_command_bootstrap.run_in_temporary_checkout(command, true, true, {
 			is_external_git: true,
@@ -174,7 +170,7 @@ describe('installed hook from a project subdirectory', () => {
 })
 
 describe('apply_hook_command_rewrite_for_destination', () => {
-	it('rebases Codex hook commands to the installed adapter bundle', () => {
+	it('rebases Codex hook commands to the installed launcher', () => {
 		const source = readFileSync(CODEX_HOOKS_SOURCE, 'utf8')
 		const transformed = transform_copied_content(CODEX_HOOKS_DESTINATION, source)
 
@@ -182,17 +178,14 @@ describe('apply_hook_command_rewrite_for_destination', () => {
 
 		const commands = [...transformed.matchAll(/"command":\s*"((?:[^"\\]|\\.)*)"/gu)]
 			.map((match) => match[1] ?? '')
-			.filter((command) => command.includes('codex-hook-adapter.js'))
+			.filter((command) => command.includes('codex-hook-adapter'))
 
 		expect(commands).toHaveLength(2)
 
 		for (const command of commands) {
 			expect(command).toContain(ROOT_COMMAND)
-			expect(command).toContain(
-				'node ./node_modules/@joshuafolkken/kit/dist/hooks/codex-hook-adapter.js',
-			)
-			expect(command).not.toContain('pnpm exec tsx')
-			expect(command).not.toContain('node dist/hooks/')
+			expect(command).toContain(`${CONSUMER_LAUNCHER} codex-hook-adapter`)
+			expect(command).not.toContain('sh scripts/hooks/')
 		}
 	})
 
@@ -245,15 +238,15 @@ describe('the distributed settings.json a consumer receives', () => {
 
 	// The per-hook bundles are launched from the installed package, so a consumer's guarded call pays
 	// neither a pnpm launch nor the dispatcher's tsx re-spawn (joshuafolkken/kit#2023).
-	it('launches each per-hook bundle from the installed package', () => {
+	it('launches each per-hook bundle through the installed launcher', () => {
 		const bundle_hooks = consumer_hook_commands().filter((command) =>
-			command.includes('dist/hooks/'),
+			command.includes(hook_launch.RUN_HOOK_SCRIPT),
 		)
 
 		expect(bundle_hooks.length).toBeGreaterThan(0)
 
 		for (const command of bundle_hooks) {
-			expect(command).toContain('node ./node_modules/@joshuafolkken/kit/dist/hooks/')
+			expect(command).toContain(`${CONSUMER_LAUNCHER} `)
 		}
 	})
 })
@@ -269,7 +262,7 @@ describe("kit's own launch command as a consumer receives it", () => {
 	})
 
 	it.each([SETTINGS_DESTINATION, CODEX_HOOKS_DESTINATION])(
-		'drops the source-tree ready gate from %s',
+		'launches no hook from the source tree in %s',
 		(destination) => {
 			const source =
 				destination === CODEX_HOOKS_DESTINATION
@@ -277,14 +270,14 @@ describe("kit's own launch command as a consumer receives it", () => {
 					: claude_settings_fixture.read_settings_text()
 
 			expect(transform_copied_content(destination, source)).not.toContain(
-				hook_launch.BUNDLE_READY_GATE,
+				`sh ${hook_launch.RUN_HOOK_SCRIPT}`,
 			)
 		},
 	)
 
 	it('runs the installed bundle from a project subdirectory', () => {
 		const source = JSON.stringify({
-			command: hook_launch.hook_launch_command('pretool-guard.js', 'pretool:guard'),
+			command: hook_launch.hook_launch_command('pretool-guard'),
 		})
 		const { command } = JSON.parse(rewrite_hook_commands(source)) as { command: string }
 		const result = hook_command_bootstrap.run_in_temporary_checkout(command, true, true)

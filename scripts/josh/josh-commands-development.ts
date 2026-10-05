@@ -115,6 +115,16 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		// `UserPromptSubmit`, so it must stay eligible for in-process dispatch rather than pay a second
 		// tsx start each turn. It calls `process.loadEnvFile` itself through the shared loader.
 	},
+	'codex:hook-adapter': {
+		script: 'scripts/hooks/codex-hook-adapter.ts',
+		description:
+			'Codex hook: run the pretool or posttool guard on a Codex payload (reads the tool call on stdin)',
+		category: 'Development',
+		reference: ['<pretool|posttool>', 'automation', ['none']],
+		// The live-source fallback `scripts/hooks/run-hook.sh` derives from the `codex-hook-adapter`
+		// bundle name (joshuafolkken/kit#3184). **No `tsx_arguments`**, the same as `pretool:guard`
+		// above: it runs before every guarded Codex call.
+	},
 	'cspell:dot': {
 		script: 'scripts/lint/cspell-cached.ts',
 		description: 'Run spell check including dotfiles',

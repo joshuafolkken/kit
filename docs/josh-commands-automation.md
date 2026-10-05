@@ -42,7 +42,7 @@ Refuse a tool call that would make a third consecutive single-call turn, pushing
 		"hooks": [
 			{
 				"type": "command",
-				"command": "<project-root prefix> if node --disable-warning=ExperimentalWarning scripts/hooks/hook-bundle-ready.ts; then node dist/hooks/pretool-guard.js; else pnpm josh pretool:guard; fi",
+				"command": "<project-root prefix> sh scripts/hooks/run-hook.sh pretool-guard",
 				"timeout": 20
 			}
 		]
@@ -50,11 +50,12 @@ Refuse a tool call that would make a third consecutive single-call turn, pushing
 ]
 ```
 
-Every kit hook command that launches a `dist/hooks/` bundle has this shape (`scripts/init/hook-launch.ts`):
+Every kit hook command, Claude Code and Codex alike, has this shape (`scripts/init/hook-launch.ts`):
 
 - **`<project-root prefix>`** — `cd`s to `git rev-parse --show-toplevel` (with the git location variables a git hook exports cleared first), so a hook fired from a subdirectory still finds its relative paths. It is the same prefix the consumer rewrite applies, written out in full in the real file.
+- **The launcher** (`scripts/hooks/run-hook.sh <name> [arguments]`) holds everything the hooks share, once: it clears the git location variables for the hook itself when the root resolves without them, runs `dist/hooks/<name>.js` once the ready gate passes, and otherwise runs the live source through `pnpm josh <command>` — the name with its first `-` turned into `:` (`pretool-guard` → `pretool:guard`).
 - **The ready gate** (`scripts/hooks/hook-bundle-ready.ts`, run by plain `node`) compares a content digest of the bundle inputs recorded at build time (`dist/hooks/inputs.json`) with the source on disk. Fresh → the bundle runs. Stale → it rebuilds `dist/hooks/` in-process (a fraction of a second) and says so on stderr, so an edited guard is never shadowed by its old bundle. A checkout that cannot build drops to the `pnpm josh` fallback with a stderr warning — that path is slow and a hook exceeding its timeout lets the call through unguarded.
-- A consumer receives the gate rewritten to a presence check on the installed `node_modules/@joshuafolkken/kit/dist/hooks/`, since the published bundles have no source beside them to go stale against.
+- A consumer's command is rewritten to the installed launcher (`node_modules/@joshuafolkken/kit/scripts/hooks/run-hook.sh`), whose gate is a presence check on the installed `dist/hooks/` — the published bundles have no source beside them to go stale against — and whose fallback is the `dist/josh.js` dispatcher.
 
 - The batch guard reaches `Bash`, `Edit`, `Read`, `Write`; the trailing `AskUserQuestion` in the matcher is the rule guard's, not this one's. `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
 - **Silent in a dispatched lane child** (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn, and a `PreToolUse` hook cannot see the turn it is in, so the notice is **`off`**; the lever that moves the density is a composite command (`read:files` / `edit:files`). Decided in `scripts/lane/lane-guard-policy.ts` — `refuse` / `notice` / `off`. Why: `docs/maintainers/josh-commands-automation-rationale.md` → "The batching guard is off in a lane child".
@@ -134,6 +135,10 @@ Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. Some rows deli
 The `PreToolUse` dispatcher that routes each pending tool call to the delivered-rule guards (`batch:guard`, `investigation:guard`, `duplicate-read:guard`, `rule:guard`). A refusal leaves through `hookSpecificOutput.permissionDecision`; an unclaimed call writes nothing.
 
 **How each of the four behaves in a dispatched lane child is an enumeration, not a judgement**. A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `notice` (it names the concrete unedited files rather than refusing), `batching` is `off` (a notice is structurally unable to reach the turn it would pack), `duplicate-read` is `notice` (a refusal would kill the child, and the unchanged re-reads it catches are measured in those very children — so it nudges rather than silences), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
+
+### `josh codex:hook-adapter`
+
+The Codex counterpart of `pretool:guard` and `format:edited`: `pretool` or `posttool` reads a Codex hook payload on stdin, runs the same guard the Claude Code hook runs, and answers in Codex's hook format. `.codex/hooks.json` launches it as `sh scripts/hooks/run-hook.sh codex-hook-adapter <pretool|posttool>`; this command is the launcher's live-source fallback when the bundle cannot run.
 
 ### `josh stop:guard`
 
