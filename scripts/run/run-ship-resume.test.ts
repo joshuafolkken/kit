@@ -25,6 +25,14 @@ vi.mock('./run-ship-scoped', async (import_original) => {
 
 	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_pair } }
 })
+// The sync stage's merge of the default branch is pinned in `run-ship-sync.test.ts`; here it is
+// current, so no test ever merges into the checkout it runs in.
+vi.mock('#scripts/git/main-merge', () => ({
+	main_merge: { merge: vi.fn().mockResolvedValue({ kind: 'current', branch: 'main' }) },
+}))
+vi.mock('#scripts/gh/git-gh-pr-read', () => ({
+	git_gh_pr_read: { pr_get_merge_state: vi.fn().mockResolvedValue(undefined) },
+}))
 // Outside a lane, so a gate run inside a lane child never hands these ships to a real supervisor.
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: vi.fn().mockReturnValue(false) },
@@ -106,7 +114,11 @@ describe('josh ship — a restart with a record', () => {
 		})
 
 		expect(await run_ship_cli.run([TITLE])).toBe(FAILED)
-		expect([...run_ship_stage.read_done(current.target)]).toStrictEqual(['preflight', 'gate'])
+		expect([...run_ship_stage.read_done(current.target)]).toStrictEqual([
+			'preflight',
+			'gate',
+			'sync',
+		])
 	})
 })
 
@@ -151,6 +163,7 @@ describe('josh ship — the stage trace on the event stream', () => {
 		expect(events()).toStrictEqual([
 			'ship-stage #2426 preflight skipped',
 			'ship-stage #2426 gate skipped',
+			'ship-stage #2426 sync skipped',
 			'ship-stage #2426 commit skipped',
 			'ship-stage #2426 followup skipped',
 			'ship-stage #2426 report start',

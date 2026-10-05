@@ -18,7 +18,8 @@ const COMMIT_BY_HAND = 'josh git'
 const ROUND_TWO_ASK = 'review:round2'
 const { COMMAND } = run_ship_next
 const { STAGE } = run_ship_stage
-const BEFORE_ROUND_TWO = [STAGE.PREFLIGHT, STAGE.REVIEW, STAGE.GATE, STAGE.COMMIT]
+const BEFORE_ROUND_TWO = [STAGE.PREFLIGHT, STAGE.REVIEW, STAGE.GATE, STAGE.SYNC, STAGE.COMMIT]
+const CONFLICTED = ['scripts/a.ts', 'scripts/b.ts']
 
 describe('run_ship_next.next_step', () => {
 	it.each(Object.values(STAGE))('names the stopped report first for %s', (stage: Stage) => {
@@ -43,6 +44,18 @@ describe('run_ship_next.next_step', () => {
 			expect(step).not.toContain('``')
 		},
 	)
+})
+
+// joshuafolkken/kit#3221: a ship stopped on a merge git could not finish names the unmerged paths, so
+// the resumed session resolves them without reading the report first.
+describe('run_ship_next.next_step for a conflict with the default branch', () => {
+	it.each([STAGE.SYNC, STAGE.FOLLOWUP])('lists the conflicted files for %s', (stage: Stage) => {
+		const step = run_ship_next.next_step(ISSUE, stage, { ...RESUME, conflicts: CONFLICTED })
+
+		expect(step).toContain('scripts/a.ts, scripts/b.ts')
+		expect(step).toContain('conflict markers')
+		expect(step).toContain(COMMAND.DETACH)
+	})
 })
 
 describe('run_ship_next.next_step for a ship started without a review', () => {

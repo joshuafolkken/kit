@@ -41,7 +41,12 @@ beforeEach(() => {
 
 describe('git_followup_merged.to_merge_plan — what a run does about the merge', () => {
 	it('runs the tail as merged for a pull request a person already merged', () => {
-		const state = { is_merged: true, merged_at: MERGED_AT, head_sha: HEAD_SHA }
+		const state = {
+			is_merged: true,
+			merged_at: MERGED_AT,
+			head_sha: HEAD_SHA,
+			merge_state_status: undefined,
+		}
 
 		expect(git_followup_merged.to_merge_plan(state, false)).toStrictEqual({
 			is_merged: true,
@@ -51,7 +56,12 @@ describe('git_followup_merged.to_merge_plan — what a run does about the merge'
 	})
 
 	it('keeps the requested merge on an open pull request', () => {
-		const state = { is_merged: false, merged_at: undefined, head_sha: HEAD_SHA }
+		const state = {
+			is_merged: false,
+			merged_at: undefined,
+			head_sha: HEAD_SHA,
+			merge_state_status: undefined,
+		}
 
 		expect(git_followup_merged.to_merge_plan(state, true)).toStrictEqual({
 			is_merged: false,
@@ -75,6 +85,7 @@ describe('git_followup_merged.read_merge_plan — the pull request is asked, not
 			is_merged: true,
 			merged_at: MERGED_AT,
 			head_sha: HEAD_SHA,
+			merge_state_status: undefined,
 		})
 
 		await expect(git_followup_merged.read_merge_plan(BRANCH, false)).resolves.toStrictEqual({

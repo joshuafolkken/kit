@@ -437,7 +437,7 @@ async function run(input: FollowupInput): Promise<string | undefined> {
 	try {
 		return await run_stages(input, log)
 	} catch (error) {
-		lap(log, STAGE.interrupted)
+		lap(log, git_followup_stages.stopped_lap(error))
 
 		throw error
 	} finally {

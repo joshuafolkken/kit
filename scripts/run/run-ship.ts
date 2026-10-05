@@ -13,6 +13,7 @@ const PREFLIGHT_HEADER = '=== preflight ==='
 const PRE_DETACH_HEADER = '=== pre-detach checks ==='
 const REVIEW_HEADER = '=== review ==='
 const GATE_HEADER = '=== gate ==='
+const SYNC_HEADER = '=== sync origin/main ==='
 const COMMIT_HEADER = '=== commit/push/PR ==='
 const ROUND_TWO_HEADER = '=== round-2 review ==='
 const FOLLOWUP_HEADER = '=== followup ==='
@@ -30,6 +31,8 @@ interface ShipSection {
 	header: string
 	body: string
 	code: number
+	// The paths a stopped merge left unmerged (joshuafolkken/kit#3221), handed to the stop prompt.
+	conflicts?: ReadonlyArray<string>
 }
 
 function section_report(section: ShipSection): string {
@@ -71,6 +74,7 @@ const run_ship = {
 	REVIEW_HEADER,
 	ROUND_TWO_HEADER,
 	SKIPPED_BODY,
+	SYNC_HEADER,
 	STOPPED_PREFIX,
 	exit_code,
 	failed_section,

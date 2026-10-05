@@ -2,6 +2,7 @@ import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_helpers } from './git-gh-helpers'
 import { git_gh_pr_rest, type RestPull } from './git-gh-pr-rest'
+import { to_gh_state } from './git-gh-rest-state'
 
 // Reading pull requests through REST, in the answers `gh pr view` used to give.
 //
@@ -81,6 +82,8 @@ interface PullMergeState {
 	is_merged: boolean
 	merged_at: string | undefined
 	head_sha: string | undefined
+	// `josh ship` reads `DIRTY` here to re-merge a conflicting pull request (joshuafolkken/kit#3221).
+	merge_state_status: string | undefined
 }
 
 type PullNumberRead =
@@ -234,6 +237,7 @@ async function pr_get_merge_state(branch_name: string): Promise<PullMergeState |
 		is_merged: git_gh_pr_rest.is_merged(pull),
 		merged_at: pull.merged_at ?? undefined,
 		head_sha: pull.head?.sha,
+		merge_state_status: to_gh_state(pull.mergeable_state),
 	}
 }
 

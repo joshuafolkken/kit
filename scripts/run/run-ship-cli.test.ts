@@ -32,6 +32,14 @@ vi.mock('./run-ship-scoped', async (import_original) => {
 
 	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_pair: scoped_mock } }
 })
+// The sync stage's merge of the default branch is pinned in `run-ship-sync.test.ts`; here it is
+// current, so no test ever merges into the checkout it runs in.
+vi.mock('#scripts/git/main-merge', () => ({
+	main_merge: { merge: vi.fn().mockResolvedValue({ kind: 'current', branch: 'main' }) },
+}))
+vi.mock('#scripts/gh/git-gh-pr-read', () => ({
+	git_gh_pr_read: { pr_get_merge_state: vi.fn().mockResolvedValue(undefined) },
+}))
 // Outside a lane, so a gate run inside a lane child never hands these ships to a real supervisor.
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: vi.fn().mockReturnValue(false) },
@@ -154,7 +162,7 @@ describe('run_ship_cli.run — folds the four ship steps into one call', () => {
 		await run_ship_cli.run([TITLE])
 
 		expect(info_lines[0]).toBe(
-			`${PREFLIGHT_SECTION}=== gate ===\ngreen\n\n=== commit/push/PR ===\npushed\n\n=== followup ===\nmerged\n\n=== report ===\nshipped`,
+			`${PREFLIGHT_SECTION}=== gate ===\ngreen\n\n=== sync origin/main ===\nmain brings nothing in\n\n=== commit/push/PR ===\npushed\n\n=== followup ===\nmerged\n\n=== report ===\nshipped`,
 		)
 	})
 })

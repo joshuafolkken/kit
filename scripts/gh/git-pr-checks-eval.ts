@@ -240,7 +240,14 @@ function is_auto_merge_blocked(snapshot: PrStateSnapshot): boolean {
 	)
 }
 
+// A failed wait whose cause is a merge conflict (joshuafolkken/kit#3221), so `followup` names its last
+// lap `conflict` rather than `interrupted` and the cause is read from the stage block, not looked up.
+class PrConflictError extends Error {
+	override name = 'PrConflictError'
+}
+
 export {
+	PrConflictError,
 	evaluate_pr_state,
 	is_auto_merge_blocked,
 	is_review_decision_decisive,
@@ -251,5 +258,6 @@ export {
 	REQUIRED_CHECKS,
 	CODERABBIT_CHECK_NAME,
 	is_required_check,
+	is_merge_conflict,
 }
 export type { PrEvaluation }

@@ -44,44 +44,79 @@ function merge_message(default_branch: string, current_branch: string): string |
 	return `Merge ${default_branch} into ${current_branch} #${issue_number}`
 }
 
-// The refusal is read after the fetch, so the incoming paths are the ones the merge would bring in
-// (joshuafolkken/kit#2445).
-async function merge_refusal(default_branch: string): Promise<string | undefined> {
-	const status = await git_command.status()
-	const incoming = await main_merge_guard.incoming_paths(default_branch)
+// What one merge of the default branch came to (joshuafolkken/kit#3221). `josh ship` merges it again
+// before the commit and on a conflicting pull request, and branches on the answer rather than on an
+// exit code: `current` brought nothing in, so the tree is unchanged; `merged` changed it; `refused`
+// is the guard's answer, nothing attempted; `conflict` names the paths git left unmerged, so a resumed
+// session goes straight to them instead of asking git again.
+type MergeOutcome =
+	| { kind: 'current'; branch: string }
+	| { kind: 'merged'; branch: string }
+	| { kind: 'refused'; message: string }
+	| { kind: 'conflict'; files: ReadonlyArray<string> }
 
-	return main_merge_guard.refusal(status, incoming, default_branch)
+interface MergeTarget {
+	default_branch: string
+	current_branch: string
+	is_current: boolean
 }
 
-// A merge that stops on a conflict keeps git's report and adds how to finish it, so the next step is
-// the sanctioned commit rather than a request for `git add`.
-async function merge_with_hint(default_branch: string, message: string | undefined): Promise<void> {
+// A failure that left no unmerged path — a remote that cannot be reached, a hook that refused — is not
+// a conflict, so it is rethrown rather than reported as one with nothing to resolve.
+async function merge_into(target: MergeTarget): Promise<MergeOutcome> {
+	const { default_branch, current_branch } = target
+
 	try {
-		await git_command.merge_branch(default_branch, message)
+		await git_command.merge_branch(default_branch, merge_message(default_branch, current_branch))
 	} catch (error) {
-		console.error(main_merge_guard.CONFLICT_HINT)
-		throw error
+		const files = main_merge_guard.unmerged_paths(await git_command.status())
+
+		if (files.length === 0) throw error
+
+		return { kind: 'conflict', files }
 	}
+
+	return { kind: target.is_current ? 'current' : 'merged', branch: default_branch }
 }
 
 // The fetch is what makes `origin/<default>` current before the merge reads it. `git pull` did the
-// two together, which is the only thing it was doing here that is worth keeping.
-async function merge_default_branch(): Promise<number> {
+// two together, which is the only thing it was doing here that is worth keeping. The refusal is read
+// after the fetch, so the incoming paths are the ones the merge would bring in (joshuafolkken/kit#2445).
+async function merge(): Promise<MergeOutcome> {
 	const default_branch = await git_command.get_default_branch()
 	const current_branch = await git_command.branch()
 
 	await git_command.fetch_branch(default_branch)
 
-	const refusal = await merge_refusal(default_branch)
+	const status = await git_command.status()
+	const incoming = await main_merge_guard.incoming_paths(default_branch)
+	const message = main_merge_guard.refusal(status, incoming, default_branch)
 
-	if (refusal !== undefined) {
-		console.error(refusal)
+	if (message !== undefined) return { kind: 'refused', message }
+
+	return await merge_into({ default_branch, current_branch, is_current: incoming.length === 0 })
+}
+
+// A merge that stops on a conflict keeps git's report and adds how to finish it, so the next step is
+// the sanctioned commit rather than a request for `git add`.
+function failure_text(outcome: MergeOutcome): string | undefined {
+	if (outcome.kind === 'refused') return outcome.message
+	if (outcome.kind === 'conflict') return main_merge_guard.CONFLICT_HINT
+
+	return undefined
+}
+
+async function merge_default_branch(): Promise<number> {
+	const outcome = await merge()
+	const failure = failure_text(outcome)
+
+	if (failure !== undefined) {
+		console.error(failure)
 
 		return FAILURE_EXIT_CODE
 	}
 
-	await merge_with_hint(default_branch, merge_message(default_branch, current_branch))
-	console.info(default_branch)
+	if ('branch' in outcome) console.info(outcome.branch)
 
 	return SUCCESS_EXIT_CODE
 }
@@ -114,8 +149,9 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const main_merge = { run }
+const main_merge = { merge, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { main_merge }
+export type { MergeOutcome }

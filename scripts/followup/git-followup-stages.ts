@@ -1,3 +1,4 @@
+import { PrConflictError } from '#scripts/gh/git-pr-checks-eval'
 import { time_format } from '#scripts/time-runtime/time-format'
 
 // Where `pnpm josh followup` spends its own wall clock (joshuafolkken/kit#1349).
@@ -73,7 +74,14 @@ const STAGE = {
 	// blocker and on a red check, and those are the runs whose wait is longest — reporting nothing for
 	// them would leave the measurement blind to exactly the invocations worth measuring.
 	interrupted: 'interrupted',
+	// The interrupted lap when the wait failed on a merge conflict (joshuafolkken/kit#3221), so the
+	// stage block names the cause a resumed session used to look up with `gh pr view`.
+	conflict: 'conflict',
 } as const
+
+function stopped_lap(error: unknown): string {
+	return error instanceof PrConflictError ? STAGE.conflict : STAGE.interrupted
+}
 
 interface FollowupStage {
 	name: string
@@ -143,6 +151,7 @@ const git_followup_stages = {
 	total_ms,
 	format_stages,
 	print_stages,
+	stopped_lap,
 }
 
 export type { FollowupStage, StageLog }
