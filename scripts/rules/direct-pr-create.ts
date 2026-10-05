@@ -20,32 +20,62 @@ const FLAG_PREFIX = '-'
 // The repository selector gh accepts before `pr` or between `pr` and its action; with no `=` it
 // swallows the next word, so that word is not read as the group or the action.
 const VALUE_TAKING_FLAGS: ReadonlySet<string> = new Set(['-R', '--repo'])
-// The pull-request collection itself — a write there opens a PR. Anchored on the whole argument, so
-// `…/pulls/5/comments` and a path quoted inside a field value are not read as the endpoint. A full
-// API URL names the same endpoint.
+// `gh api`'s own flags that take a value as the next word, beside the repository selector — skipped
+// so `-X POST` or `-f body=…` is not read as the endpoint.
+const API_VALUE_TAKING_FLAGS: ReadonlySet<string> = new Set([
+	...VALUE_TAKING_FLAGS,
+	'-X',
+	'--method',
+	'-f',
+	'--raw-field',
+	'-F',
+	'--field',
+	'-H',
+	'--header',
+	'--input',
+	'-q',
+	'--jq',
+	'-t',
+	'--template',
+	'--hostname',
+	'-p',
+	'--preview',
+	'--cache',
+])
+const API_SUBCOMMAND = 'api'
+// The pull-request collection itself — a write there opens a PR. Anchored on the whole endpoint
+// argument, so `…/pulls/5/comments` is not read as the collection. A full API URL names the same
+// endpoint.
 const PULLS_PATH =
 	/^['"]?(?:https:\/\/api\.github\.com)?\/?repos\/[^/\s'"]+\/[^/\s'"]+\/pulls\/?['"]?$/u
 
+// The words that are neither a flag nor a value-taking flag's value, so `gh -R o/r pr create` and
+// `gh pr --repo o/r create` reach the same `pr` / `create` pair as the bare spelling.
+function positional_words(
+	args: ReadonlyArray<string>,
+	value_taking_flags: ReadonlySet<string>,
+): Array<string> {
+	return args.filter((argument, index) => {
+		if (argument.startsWith(FLAG_PREFIX)) return false
+
+		return !value_taking_flags.has(args[index - 1] ?? '')
+	})
+}
+
+// Only the endpoint — the first positional word after `api` — is tested, so a field value that
+// happens to spell the collection path (`-f body='… repos/o/r/pulls'`) is not read as the target.
 function is_pr_create_api_call(args: ReadonlyArray<string>): boolean {
 	const call = [GH_COMMAND, ...args].join(' ')
 
 	if (!gh_api.is_gh_api(call) || !gh_api.is_write(call)) return false
 
-	return args.some((argument) => PULLS_PATH.test(argument))
-}
+	const [subcommand, endpoint = ''] = positional_words(args, API_VALUE_TAKING_FLAGS)
 
-// The words that are neither a flag nor a value-taking flag's value, so `gh -R o/r pr create` and
-// `gh pr --repo o/r create` reach the same `pr` / `create` pair as the bare spelling.
-function positional_words(args: ReadonlyArray<string>): Array<string> {
-	return args.filter((argument, index) => {
-		if (argument.startsWith(FLAG_PREFIX)) return false
-
-		return !VALUE_TAKING_FLAGS.has(args[index - 1] ?? '')
-	})
+	return subcommand === API_SUBCOMMAND && PULLS_PATH.test(endpoint)
 }
 
 function is_pr_create_cli_call(args: ReadonlyArray<string>): boolean {
-	const [group, action = ''] = positional_words(args)
+	const [group, action = ''] = positional_words(args, VALUE_TAKING_FLAGS)
 
 	return group === PR_GROUP && PR_CREATE_ACTIONS.has(action)
 }

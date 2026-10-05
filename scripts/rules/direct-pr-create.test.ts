@@ -38,6 +38,8 @@ describe('direct_pr_create.is_direct_pr_create — is silent on', () => {
 		'gh api -X GET repos/joshuafolkken/kit/pulls -f state=open',
 		'gh api repos/joshuafolkken/kit/pulls/5/comments -f body=x',
 		'gh api -X PATCH repos/joshuafolkken/kit/pulls/5 -f title=x',
+		'gh api repos/o/r/issues/5/comments -f body=x repos/o/r/pulls',
+		"gh api repos/o/r/issues/5/comments -f body='Opened via repos/o/r/pulls'",
 		'echo "gh pr create"',
 	])('%j', (command) => {
 		expect(direct_pr_create.is_direct_pr_create(command)).toBe(false)
