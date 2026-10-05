@@ -145,7 +145,7 @@ Before every `git commit` (follow-up commits included), self-review against `pro
 
 - **No commits** unless explicitly requested. **No PR merges, branch deletions, force pushes or other shared-state mutations** unless explicitly requested in the current turn — the default end state is PR still OPEN. **Exception**: invoking `fullrun` or `backlogrun` authorizes the merge, via `pnpm josh followup` — `prrun` does not. `.claude/settings.json` denies these, but the deny is narrower than the rule — never read "the tool let me" as permission. `prompts/collaboration-workflow/operating-rules.md` → "指示されていない行動は取らない".
 - **Never stage or mutate the git index on your own.** `git add` / `git rm --cached` / `git restore --staged` / `git commit` overwrite the user's snapshot and are denied by settings; inspection is read-only. Staging is allowed only on an explicit current-turn instruction or an authorized commit flow (`pnpm josh git`). `prompts/collaboration-workflow/operating-rules.md` → "git index を勝手に変更しない".
-- **For git operations use `pnpm josh git`.** After a failed push, fix, push manually, then `pnpm josh pr` — **never** `gh pr create` directly, which bypasses `closes #N` generation so the Issue will not auto-close.
+- **For git operations use `pnpm josh git`; open a PR with `pnpm josh pr`** — `pnpm josh rule:guard` refuses a direct `gh pr create`.
 - **Start-of-conversation git status is a stale snapshot.** Before acting on any working-tree / index / stash / branch assumption, run `git status` (and `git stash list`) live first.
 
 ## Collaboration Workflow

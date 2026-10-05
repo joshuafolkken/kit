@@ -4,6 +4,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { delivered_rules_harness } from './delivered-rules-harness'
 import { destructive_command } from './destructive-command'
+import { direct_pr_create } from './direct-pr-create'
 import { index_guard } from './index-guard'
 import { josh_git_bare } from './josh-git-bare'
 import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
@@ -19,6 +20,7 @@ const NOW_MS = 1_700_000_000_000
 const ONE_RULE = 1
 // The literals each used both in an it.each row and in the exactly-one-rule assertion below.
 const CLAIMED_TITLE = 'is claimed by exactly one rule'
+const DELIVERS_TITLE = 'delivers on the %s spelling, claimed by one rule'
 // Shared by the delivery blocks' silent-form assertions, so a row cannot pass under a title another
 // does not use.
 const SILENT_TITLE = 'is silent on a %s'
@@ -139,13 +141,29 @@ describe('permission guards — the index, destructive and protected-file rows',
 			destructive_command.DESTRUCTIVE_COMMAND_REASON,
 		],
 		['clean', 'git clean -fdx', delivered_rules.WORKTREE_MUTATION_REASON],
-	])('delivers on the %s spelling, claimed by one rule', (name, command, reason) => {
+	])(DELIVERS_TITLE, (name, command, reason) => {
 		expect(delivered_for(`pg-${name}`, command)).toBe(reason)
 		expect(rules_claiming(command)).toBe(ONE_RULE)
 	})
 
 	it.each(['gh issue close 5', 'git status', 'rm -r dist'])(SILENT_TITLE, (command) => {
 		expect(delivered_for(`pg-silent-${command}`, command)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#3183: the direct PR creation that skips `closes #N`, delivered through the real
+// path and claimed by one row. The `gh api` path is first-party so `third-party-write` stays silent.
+describe('direct-pr-create — the PR opened outside pnpm josh pr', () => {
+	it.each([
+		['cli', 'gh pr create --fill'],
+		['api', 'gh api repos/joshuafolkken/kit/pulls -f title=x -f head=a -f base=main'],
+	])(DELIVERS_TITLE, (name, command) => {
+		expect(delivered_for(`pr-${name}`, command)).toBe(direct_pr_create.DIRECT_PR_CREATE_REASON)
+		expect(rules_claiming(command)).toBe(ONE_RULE)
+	})
+
+	it.each(['pnpm josh pr', 'gh pr view 12'])(SILENT_TITLE, (command) => {
+		expect(delivered_for(`pr-silent-${command}`, command)).toBeUndefined()
 	})
 })
 
