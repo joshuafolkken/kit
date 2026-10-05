@@ -11,6 +11,8 @@ const INVOCATION = 'backlogrun #2509 --max 5 --only'
 const OUTPUT = 'merge over #2509\nresume: --owner 1 --exclude 2509'
 const LONG_STDERR_REPEAT = 1000
 const EPIC_OUTPUT = 'epic #1\nresume: --owner 1'
+const CUT_COMMAND = 'pnpm josh run:carry --cut --owner "$PPID"'
+const DEFAULT_NEXT = `act on the result by backlogrun-steps.md → "The loop", then hand the loop back with ${CUT_COMMAND}`
 const scratch = { directory: '', target: '' }
 
 beforeEach(() => {
@@ -47,7 +49,7 @@ test('claims the carry record and supplies a judgment branch with its resume mat
 
 	expect(result).toStrictEqual({
 		kind: 'judgment',
-		material: `Driver result: ${OUTPUT}\nDetails: budget spent`,
+		material: `Driver result: ${OUTPUT}\nNext: ${DEFAULT_NEXT}\nDetails: budget spent`,
 	})
 	expect(run_carry.read_carry(scratch.target)).toMatchObject({
 		kind: 'carried',
@@ -92,6 +94,20 @@ test('tells an epic judgment session how to advance the named carry', () => {
 	if (result.kind !== 'judgment') return
 	expect(result.material).toContain('run:carry --done <epic-number> --owner "$PPID"')
 	expect(result.material).toContain('Follow backlogrun-steps.md named epic procedure')
+})
+
+test.each([
+	['launch #2500\nresume: --owner 1', CUT_COMMAND],
+	['retrospective\nresume: --owner 1', 'pnpm josh run:carry --retrospective --summary'],
+	['merge human-review #2500\nresume: --owner 1', 'needs-human-review.md'],
+	[EPIC_OUTPUT, 'Named issues run first, in order'],
+])('names the next move for a judgment branch: %j', (out, next) => {
+	const result = run_wake_driver.driver_result(out, { kind: 'none' })
+
+	expect(result.kind).toBe('judgment')
+	if (result.kind !== 'judgment') return
+	expect(result.material).toMatch(/\nNext: /u)
+	expect(result.material.slice(result.material.indexOf('\nNext: '))).toContain(next)
 })
 
 test('does not take a live owner over on supervisor restart', async () => {

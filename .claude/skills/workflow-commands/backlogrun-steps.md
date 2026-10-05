@@ -516,7 +516,8 @@ Termination is decided by what the loop is told, never by a judgement that enoug
   what happens to its lane.
 - **The hand-off check** — `pnpm josh cost --cut` at every child's merge, and the lane
   hand-over that follows an `over` — is `backlogrun-progress.md` → "The hand-off", unchanged. It is
-  **not** asked during an idle watch: "The cost check is not asked during a watch" above.
+  **not** asked during an idle watch: "The cost check is not asked during a watch" above, nor by the
+  supervisor's `backlog:drive`, which has no session to cut (joshuafolkken/kit#3156).
 - **Parking is not stopping.** A child that needs a decision, and a delegated unit that stopped
   without reporting, are **parked** and the run continues (`backlogrun-park.md` → "park and
   continue"); only the consecutive-failure guard above can turn repeated parks into a stop.

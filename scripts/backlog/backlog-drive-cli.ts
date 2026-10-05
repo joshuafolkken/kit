@@ -1,7 +1,6 @@
 #!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
-import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
@@ -217,7 +216,8 @@ function merge_token(out: string, code: number): string {
 }
 
 // The child's transcript, where its lane recorded one, so `run:merge` can tell an API outage from a
-// failure exactly as it does for the parent that passes `--output` by hand.
+// failure exactly as it does for the parent that passes `--output` by hand. No hand-off threshold: the
+// supervisor runs this loop, and a process has no context to cut (joshuafolkken/kit#3156).
 async function merge(issue: string, owner: string): Promise<MergeResult> {
 	await backlog_drive_owner.assert_current(owner)
 	const lane = await lane_registry.find_open_lane(issue)
@@ -225,7 +225,7 @@ async function merge(issue: string, owner: string): Promise<MergeResult> {
 		child: issue,
 		epic: undefined,
 		repo: undefined,
-		over: CONTEXT_CUT_THRESHOLD,
+		over: undefined,
 		owner: run_carry.owner_of(Number(owner)),
 		output: lane?.output,
 	})
@@ -381,6 +381,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 const backlog_drive_cli = {
 	end_line,
 	finish: backlog_drive_finish.finish,
+	merge,
 	merge_token,
 	offer_argv: backlog_drive_offer_argv.offer_argv,
 	parse,

@@ -37,13 +37,36 @@ function details_tail(details: string): string {
 		: details
 }
 
+// **The hand-off names its next move, so the woken session never searches the procedure for it**
+// (joshuafolkken/kit#3156). Whatever the branch, the session acts on it and hands the loop back to the
+// supervisor with a cut; only a person's stop ends the run instead.
+const HAND_BACK = 'then hand the loop back with pnpm josh run:carry --cut --owner "$PPID"'
+const NEXT_BY_VERDICT: ReadonlyArray<readonly [string, string]> = [
+	[
+		'retrospective',
+		`run what pnpm josh run:step prints (retrospective.md), close it with pnpm josh run:carry --retrospective --summary "<result>" --owner "$PPID", ${HAND_BACK}`,
+	],
+	[
+		'merge human-review',
+		'the child stopped before its commit for a person; stop the run (needs-human-review.md)',
+	],
+	['epic #', `follow backlogrun-steps.md → "Named issues run first, in order", ${HAND_BACK}`],
+]
+const NEXT_DEFAULT = `act on the result by backlogrun-steps.md → "The loop", ${HAND_BACK}`
+
+function next_move(verdict: string): string {
+	const found = NEXT_BY_VERDICT.find(([prefix]) => verdict.startsWith(prefix))
+
+	return `\nNext: ${found?.[1] ?? NEXT_DEFAULT}`
+}
+
 function handoff_material(verdict: string, resume: string, details: string): string {
 	const context = details === '' ? '' : `\nDetails: ${details_tail(details)}`
 	const epic = verdict.startsWith('epic #')
 		? '\nThe named item is an epic. Follow backlogrun-steps.md named epic procedure; do not launch the epic root as a fullrun child. After all children merge or park, record the root with pnpm josh run:carry --done <epic-number> --owner "$PPID" before continuing to the next named item.'
 		: ''
 
-	return `Driver result: ${verdict}\n${resume}${epic}${context}`
+	return `Driver result: ${verdict}\n${resume}${epic}${next_move(verdict)}${context}`
 }
 
 function driver_result(out: string, read: CarryRead, details = ''): DriveResult {
