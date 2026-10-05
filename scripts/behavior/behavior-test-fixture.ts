@@ -10,6 +10,7 @@ const TOOL_USE = 'tool_use'
 const TOOL_RESULT = 'tool_result'
 const TOOL_ID = 'tool-1'
 const DENIED_BASH = 'Permission to use Bash with command git commit has been denied.'
+const DENIED_HOOK = 'PreToolUse:Bash hook error: ⛔ git index mutation: use `pnpm josh git`.'
 
 // Command strings the suites reuse — a read-only one, a mutation, a dry run and the josh wrapper —
 // named once so the duplicate-literal rule is satisfied and the intent reads off the name.
@@ -58,6 +59,7 @@ function bash_block(command: string): Block {
 
 const behavior_test_fixture = {
 	DENIED_BASH,
+	DENIED_HOOK,
 	GIT_ADD_DRY,
 	GIT_COMMIT,
 	GIT_STATUS,
