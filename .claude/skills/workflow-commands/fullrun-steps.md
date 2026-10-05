@@ -9,10 +9,8 @@ the run is at, and the sections below carry that step in full.
 
 File Issues with `pnpm josh issue:file` (it applies the classification labels); see `prompts/collaboration-workflow/issue-template.md`.
 
-**Add `in-progress` the moment `run:hold` answered `hold`** (create if missing:
-`gh api repos/{owner}/{repo}/labels -f name=in-progress -f color=0075ca -f description="Work is
-actively in progress" --silent 2>/dev/null || true`, then `gh api
-repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=in-progress'`) → Read Issue #N and its comments
+**`in-progress` is already on the Issue** — `run:entry` applied it once the tree was held and the
+budget allowed the run, and `run:release <N>` takes it back off → Read Issue #N and its comments
 (`issue-comments.md`) → **normalize the title** (if not in English or can be phrased more clearly,
 derive a better English title and `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"`)
 → post the agreed plan only if the Issue body is blank (`gh api -X PATCH
@@ -53,8 +51,9 @@ primary checkout; a Claude run keeps it.
 (2) Create Issue: `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>` (per
 `prompts/collaboration-workflow/issue-template.md`) — its duplicate scan runs first, and a candidate
 that covers the same work stops the run rather than filing a second Issue (`issue-scout.md`). Capture
-`<N>`. (3) Add
-`in-progress` (as above). (4) Post the agreed plan in the session language: fill the body if blank,
+`<N>`. (3) Add `in-progress` (the bare hold named no issue):
+`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=in-progress'`. (4) Post the agreed plan
+in the session language: fill the body if blank,
 otherwise add a comment. (5) If the working tree already has staged or modified files,
 `git stash push -m "fullrun new: pre-existing changes" -- ':!docs/maintainers/observations'` first
 (joshuafolkken/kit#2919). (6) `git switch main && git pull`. (7)

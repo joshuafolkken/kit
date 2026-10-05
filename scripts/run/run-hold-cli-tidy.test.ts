@@ -17,6 +17,7 @@ vi.mock('./run-preflight', () => ({
 }))
 
 vi.mock('./run-tidy-cli', () => ({ run_tidy_cli: { sweep: vi.fn() } }))
+vi.mock('./run-label', () => ({ run_label: { unmark: vi.fn() } }))
 
 const sweep = vi.mocked(run_tidy_cli.sweep)
 const scratch = mkdtempSync(path.join(tmpdir(), 'run-hold-cli-tidy-test-'))

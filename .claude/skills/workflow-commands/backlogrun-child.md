@@ -24,7 +24,7 @@ bare Issue promotes itself under `backlogrun` but not under `fullrun`"):
 2. **Stash the work in progress and remove `in-progress` from `#<N>`**, exactly as steps 2 and 4 of
    "A prerequisite discovered mid-run" do — `git stash push -u -m "..."` with the `-u`, the
    `gh api repos/{owner}/{repo}/issues/<N>/comments` post that records the stash, and
-   `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`.
+   `pnpm josh run:release <N>`, which removes the label with the hold.
 3. **Ask `pnpm josh epic:bundle <N>` whether an epic already tracks `#<N>` before creating one.**
 
    | Answer | What to do |

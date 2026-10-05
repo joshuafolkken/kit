@@ -47,7 +47,9 @@ ordinary one.
 **Release what the claim recorded, which is not always the Issue number.** A `#N` entry claimed `<N>`
 and releases `<N>`; a **`new` entry claimed before its Issue existed**, so it releases with the
 **bare** form however many numbers the run has acquired since — so a `fullrun new` that stops on a
-split types `pnpm josh run:release`, not `pnpm josh run:release <N>`.
+split types `pnpm josh run:release`, not `pnpm josh run:release <N>`. The bare form removes no
+label, so that stop also runs `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress
+2>/dev/null || true`.
 
 **Releasing is the run's, not a person's memory.** `pnpm josh followup` releases the hold on a merged
 run, and a record abandoned by a crashed session expires after 8 hours. **A stop that leaves the tree
