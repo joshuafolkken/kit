@@ -26,7 +26,9 @@ import { run_tail } from './run-tail'
 // but only after its preflight — the scoped checks — has passed in the calling process, so a
 // backgrounded `ship` is killed at the turn's end before any supervisor exists: the #3022 child did
 // exactly that and was parked as a failure. Issued in the foreground it returns at `launched` within the
-// tool timeout, and the supervisor carries the rest.
+// tool timeout, and the supervisor carries the rest. A backgrounded `ship` alone is no longer refused but
+// rewritten into that foreground call (`foreground_input`, joshuafolkken/kit#3154); one chained after
+// another long command is still refused.
 //
 // **Its stop-time half reads the same fact from the other side.** A backgrounded task the transcript
 // launched but never saw finish is still running, and in a child the stop about to happen kills it —
@@ -35,29 +37,61 @@ import { run_tail } from './run-tail'
 
 // The josh subcommands that run long enough to be backgrounded, as `time_shell` names them — canonical,
 // so the `ga` / `g` / `fu` aliases are covered by the one spelling.
-const LONG_RUNNING_COMMANDS: ReadonlySet<string> = new Set(
-	['gate', 'git', 'followup', 'ship'].map((name) => `${time_shell.JOSH_PREFIX}${name}`),
-)
+const SHIP_COMMAND = `${time_shell.JOSH_PREFIX}ship`
+const LONG_RUNNING_COMMANDS: ReadonlySet<string> = new Set([
+	...['gate', 'git', 'followup'].map((name) => `${time_shell.JOSH_PREFIX}${name}`),
+	SHIP_COMMAND,
+])
 
 const BACKGROUND_KEY = 'run_in_background'
+const TIMEOUT_KEY = 'timeout'
+// The longest a foreground Bash call may run. A backgrounded call rarely carries a `timeout`, and one that
+// does may exceed the foreground cap, so the rewrite sets it: left at the two-minute default, a preflight
+// whose scoped pair outruns it is cut before `launched`, the #3027 failure the rewrite exists to avoid.
+const FOREGROUND_TIMEOUT_MS = 600_000
 
 function is_backgrounded(input: unknown): boolean {
 	return json_value.is_record(input) && input[BACKGROUND_KEY] === true
 }
 
-function runs_long_command(command: string): boolean {
-	return time_shell.josh_commands_of(command).some((name) => LONG_RUNNING_COMMANDS.has(name))
+function long_commands_of(command: string): Array<string> {
+	return time_shell.josh_commands_of(command).filter((name) => LONG_RUNNING_COMMANDS.has(name))
+}
+
+// A call whose long-running work is `ship` alone. In a child a foreground `ship` already detaches
+// itself after its preflight (`run-ship-cli.ts` → `should_detach`), so the only fault in backgrounding
+// it is the flag — and the flag is what the hook rewrites (joshuafolkken/kit#3154).
+function ships_alone(command: string): boolean {
+	const names = long_commands_of(command)
+
+	return names.length > 0 && names.every((name) => name === SHIP_COMMAND)
+}
+
+function backgrounded_bash_command(call: GuardedCall): string | undefined {
+	if (call.name !== cost_blocks.BASH_TOOL || !is_backgrounded(call.input)) return undefined
+
+	return time_shell.bash_command(call.input)
+}
+
+function is_backgrounded_ship(call: GuardedCall): boolean {
+	const command = backgrounded_bash_command(call)
+
+	return command !== undefined && ships_alone(command)
 }
 
 // The call's own fields alone: a backgrounded Bash call that runs a long josh command, or the push step
 // in either spelling. A child's foreground push is claimed too, because `run-tail` would otherwise answer
 // it with "reissue it backgrounded" — the one reissue this row then refuses — so the child is handed the
-// detached route on its first refusal rather than two contradictory ones.
+// detached route on its first refusal rather than two contradictory ones. A backgrounded `ship` alone is
+// not refused: `foreground_input` turns it into the foreground call the refusal used to ask for.
 function is_candidate(call: GuardedCall): boolean {
 	if (run_tail.is_push_step_call(call)) return true
-	if (call.name !== cost_blocks.BASH_TOOL || !is_backgrounded(call.input)) return false
 
-	return runs_long_command(time_shell.bash_command(call.input))
+	const command = backgrounded_bash_command(call)
+
+	if (command === undefined || is_backgrounded_ship(call)) return false
+
+	return long_commands_of(command).length > 0
 }
 
 // True when this session is a dispatched lane child backgrounding a long-running josh command. The call's
@@ -68,6 +102,26 @@ function is_background_long_run(
 ): boolean {
 	return is_candidate(call) && is_lane_child()
 }
+
+// **A backgrounded `ship` in a child is rewritten, not refused** (joshuafolkken/kit#3154). The refusal
+// asked for nothing but the same call in the foreground — 14 of 41 lane `ship` refusals in one measured
+// backlogrun were that round trip, paid at the run's largest context. The input with the flag cleared,
+// or `undefined` for every call this does not apply to.
+function foreground_input(
+	call: GuardedCall,
+	is_lane_child: () => boolean = () => lane_child_marker.is_child_of(process.cwd()),
+): Record<string, unknown> | undefined {
+	if (!is_backgrounded_ship(call) || !json_value.is_record(call.input)) return undefined
+
+	if (!is_lane_child()) return undefined
+
+	return { ...call.input, [BACKGROUND_KEY]: false, [TIMEOUT_KEY]: FOREGROUND_TIMEOUT_MS }
+}
+
+const FOREGROUND_NOTE =
+	'lane background: this lane child backgrounded `josh ship`, which would die with the headless turn ' +
+	'before its supervisor exists — so it was run in the foreground instead, where it detaches itself ' +
+	'after the preflight. End the turn on `launched` / `busy` (joshuafolkken/kit#3154).'
 
 // The launches `launched_ids` reads off the transcript tail that never saw their finish. A launch is
 // read off its own tool result and a finish off the harness notice, both by `time_transcript_line`.
@@ -103,7 +157,8 @@ const LANE_BACKGROUND_REASON =
 	'verification done, the run parked instead of merged). Hand the gate-to-merge region to the detached ' +
 	'supervisor instead: `pnpm josh ship --detach --review "<title> #<N>"` (add `--cite <N>`) issued in ' +
 	'the foreground — its preflight runs in this process before the supervisor exists, so a backgrounded ' +
-	'`ship` dies with the turn (joshuafolkken/kit#3027) — then end the turn on `launched` / `busy`. ' +
+	'`ship` dies with the turn (joshuafolkken/kit#3027; a backgrounded `ship` issued alone is moved to ' +
+	'the foreground for you, joshuafolkken/kit#3154) — then end the turn on `launched` / `busy`. ' +
 	'`.claude/skills/workflow-commands/chain-rule.md` step 0 is the single source. A ' +
 	'single check you must read before continuing runs in the foreground within the tool timeout; the ' +
 	'commit-push step does not — in a child it too belongs to the detached ship, in either spelling. This ' +
@@ -128,9 +183,11 @@ const ROW = {
 }
 
 const lane_background = {
+	FOREGROUND_NOTE,
 	LANE_BACKGROUND_REASON,
 	LANE_BACKGROUND_STOP_REASON,
 	ROW,
+	foreground_input,
 	is_background_long_run,
 	pending_agent_ids,
 	pending_background_ids,

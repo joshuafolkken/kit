@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_pr } from '#scripts/gh/git-pr'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_preflight } from '#scripts/git/git-preflight'
@@ -22,6 +23,7 @@ import { run_ship_scoped } from './run-ship-scoped'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const EVIDENCE_PROBLEM = `This change touches runtime code, but the PR body has no ${live_evidence.EVIDENCE_HEADING} section: run the acceptance criteria for real and pass the body with --body-file <path>.`
+const EVIDENCE_PENDING = `This change touches runtime code and no PR is open yet: write the ${live_evidence.EVIDENCE_HEADING} section to a file and hand it to josh ship with --body-file <path>, or the ship refuses.`
 
 interface PreflightRequest {
 	title: string
@@ -34,13 +36,20 @@ async function body_text(body_path: string | undefined): Promise<string | undefi
 	return await git_gh_command.pr_get_body(await git_branch.current())
 }
 
-async function evidence_problems(body_path: string | undefined): Promise<Array<string>> {
+// `no_body_problem` answers a runtime change with no body to read at all — no `--body-file` and no open
+// PR, which is every run before its ship opens one.
+async function evidence_problems(
+	body_path: string | undefined,
+	no_body_problem: string = EVIDENCE_PROBLEM,
+): Promise<Array<string>> {
 	const [paths, body] = await Promise.all([
 		changed_paths.read_changed_paths(false),
 		body_text(body_path),
 	])
 
-	return live_evidence.verdict_for(paths, body) === 'required' ? [EVIDENCE_PROBLEM] : []
+	if (live_evidence.verdict_for(paths, body) !== 'required') return []
+
+	return [body === undefined ? no_body_problem : EVIDENCE_PROBLEM]
 }
 
 function refusal(problems: ReadonlyArray<string>): JoshResult {
@@ -81,7 +90,29 @@ async function stage(request: PreflightRequest): Promise<JoshResult> {
 	return scoped.code === SUCCESS_EXIT_CODE ? { code: SUCCESS_EXIT_CODE, out: 'ready' } : scoped
 }
 
-const run_ship_preflight = { EVIDENCE_PROBLEM, stage }
+async function classification_problems(issue_number: string): Promise<Array<string>> {
+	await git_pr.release_classification(issue_number, await git_branch.current())
+
+	return []
+}
+
+// **The same two refusals, asked before the ship rather than by it** (joshuafolkken/kit#3154). In one
+// measured backlogrun 20 of 41 lane `ship` refusals were a missing classification or missing evidence —
+// facts fixed long before the ship, refused at the run's largest context. `run:prep` (and so `run:entry`)
+// and `run:step` print this, so the Issue body and the evidence are met while they are cheap. Nothing
+// here replaces `stage`: the ship and `followup` still refuse on both. Before the PR exists the evidence
+// can only live in the file the ship will be handed, so it is asked for as that file, not reported as a
+// body that already failed.
+async function ahead(issue_number: string): Promise<Array<string>> {
+	const [classification, evidence] = await Promise.all([
+		caught(classification_problems(issue_number)),
+		caught(evidence_problems(undefined, EVIDENCE_PENDING)),
+	])
+
+	return [...classification, ...evidence]
+}
+
+const run_ship_preflight = { EVIDENCE_PENDING, EVIDENCE_PROBLEM, ahead, stage }
 
 export type { PreflightRequest }
 export { run_ship_preflight }

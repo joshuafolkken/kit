@@ -24,6 +24,10 @@ const CONTENT_HEADER = '=== issue ==='
 const STATE_HEADER = '=== state ==='
 const LATEST_HEADER = '=== dependency update ==='
 const LOCATIONS_HEADER = '=== code locations ==='
+const SHIP_HEADER = '=== ship preconditions ==='
+const SHIP_MET = 'met — nothing `josh ship` refuses on as the tree stands'
+const SHIP_UNMET =
+	'unmet — `josh ship` will refuse until these are fixed; fix them before the gate:'
 const SECTION_SEPARATOR = '\n\n'
 const LATEST_JOINER = ' — '
 
@@ -41,6 +45,9 @@ interface PrepParts {
 	// Whether a lane child's tree holds uncommitted work — read for the verdict, not printed in the
 	// report (joshuafolkken/kit#2476).
 	has_changes: boolean
+	// What `josh ship` would refuse on as the tree stands — `run_ship_preflight.ahead`
+	// (joshuafolkken/kit#3154).
+	ship_problems: ReadonlyArray<string>
 }
 
 function human_review_value(state: IssueState | undefined): string {
@@ -72,6 +79,12 @@ function section(header: string, body: string): string {
 	return `${header}\n${body}`
 }
 
+function ship_body(problems: ReadonlyArray<string>): string {
+	if (problems.length === 0) return SHIP_MET
+
+	return [SHIP_UNMET, ...problems.map((problem) => `  - ${problem}`)].join('\n')
+}
+
 function format_report(parts: PrepParts): string {
 	return [
 		summary(parts),
@@ -79,6 +92,7 @@ function format_report(parts: PrepParts): string {
 		section(STATE_HEADER, state_body(parts)),
 		section(LATEST_HEADER, `${parts.latest_scope}${LATEST_JOINER}${parts.latest_reason}`),
 		section(LOCATIONS_HEADER, parts.locations),
+		section(SHIP_HEADER, ship_body(parts.ship_problems)),
 	].join(SECTION_SEPARATOR)
 }
 
@@ -86,9 +100,12 @@ const run_prep = {
 	CONTENT_HEADER,
 	LATEST_HEADER,
 	LOCATIONS_HEADER,
+	SHIP_HEADER,
+	SHIP_UNMET,
 	STATE_HEADER,
 	SUMMARY_PREFIX,
 	format_report,
+	ship_body,
 }
 
 export type { PrepParts }

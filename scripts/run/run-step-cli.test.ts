@@ -1,7 +1,7 @@
 import type { IssueState } from '#scripts/issue/issue-state'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PrepParts } from './run-prep'
+import { run_prep, type PrepParts } from './run-prep'
 import { run_step } from './run-step'
 
 const parse_number_mock = vi.hoisted(() => vi.fn())
@@ -109,6 +109,7 @@ function parts(overrides: Partial<PrepParts>): PrepParts {
 		latest_reason: 'window is 12h',
 		has_changes: false,
 		locations: '',
+		ship_problems: [],
 		...overrides,
 	}
 }
@@ -186,6 +187,31 @@ describe('run_step_cli.run', () => {
 
 		expect(await run_step_cli.run([])).toBe(FAILURE)
 		expect(gather_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#3154: what `josh ship` would refuse on is said at every step, on stderr, so the
+// one-line action on stdout is unchanged.
+describe('run_step_cli.run — the ship preconditions', () => {
+	const evidence_problem =
+		'This change touches runtime code, but the PR body has no ## 実機証跡 section'
+
+	it('reports an unmet precondition on stderr and keeps stdout the action line', async () => {
+		to_parts_mock.mockReturnValue(parts({ ship_problems: [evidence_problem] }))
+
+		await run_step_cli.run([ISSUE])
+
+		const reported = error_mock.mock.calls.map((call) => String(call[0])).join('\n')
+
+		expect(printed()).toBe(run_step.IMPLEMENT)
+		expect(reported).toContain(run_prep.SHIP_UNMET)
+		expect(reported).toContain(evidence_problem)
+	})
+
+	it('reports nothing when every precondition is met', async () => {
+		await run_step_cli.run([ISSUE])
+
+		expect(error_mock).not.toHaveBeenCalled()
 	})
 })
 

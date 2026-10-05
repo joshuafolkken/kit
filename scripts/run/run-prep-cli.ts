@@ -8,6 +8,7 @@ import { error_text } from '#scripts/lib/error-message'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
 import { run_prep, type PrepParts } from './run-prep'
 import { run_prep_locate } from './run-prep-locate'
+import { run_ship_preflight } from './run-ship-preflight'
 
 // `josh run:prep <N>` — one call for the reads a `fullrun` makes before its first edit
 // (joshuafolkken/kit#1978): the issue body and comments (`issue:read`), the state, labels and
@@ -41,6 +42,7 @@ interface PrepReads {
 	latest: LatestDecision
 	has_changes: boolean
 	locations: string
+	ship_problems: ReadonlyArray<string>
 }
 
 // Exactly one issue number, or the call is refused: `run:prep` prepares one run, and a second number
@@ -91,15 +93,16 @@ async function lane_has_changes(): Promise<boolean> {
 }
 
 async function gather(issue_number: string): Promise<PrepReads> {
-	const [content, state, has_changes] = await Promise.all([
+	const [content, state, has_changes, ship_problems] = await Promise.all([
 		issue_read_cli.read_block(issue_number),
 		issue_state_cli.read_issue(issue_number),
 		lane_has_changes(),
+		run_ship_preflight.ahead(issue_number),
 	])
 	// Located from the body just read, so it waits for that read rather than joining the batch above.
 	const locations = await run_prep_locate.locate(content.kind === 'ok' ? content.block : '')
 
-	return { content, state, latest: latest_decision(), has_changes, locations }
+	return { content, state, latest: latest_decision(), has_changes, locations, ship_problems }
 }
 
 function content_body(issue_number: string, content: BlockRead): string {
@@ -119,6 +122,7 @@ function to_parts(issue_number: string, reads: PrepReads): PrepParts {
 		latest_reason: reads.latest.reason,
 		has_changes: reads.has_changes,
 		locations: reads.locations,
+		ship_problems: reads.ship_problems,
 	}
 }
 
