@@ -112,7 +112,7 @@ describe('run-hook.sh in kit checkout', () => {
 	it('falls back to the josh command when the gate fails', () => {
 		const result = launch(LAUNCHER, { STUB_GATE: String(FAILED) })
 
-		expect(result.stdout.trim()).toBe('pnpm josh demo:hook first second')
+		expect(result).toEqual({ status: 0, stdout: 'pnpm josh demo:hook first second\n' })
 	})
 
 	it('passes a refusal through without running the fallback', () => {
@@ -139,6 +139,14 @@ describe('run-hook.sh in installed package', () => {
 		const result = launch(installed_launcher)
 
 		expect(result.stdout).toBe('dispatcher demo:hook first second')
+	})
+
+	it('passes a refusal through without running the dispatcher', () => {
+		create_package(INSTALLED_PACKAGE)
+
+		const result = launch(installed_launcher, { STUB_EXIT: String(REFUSED) })
+
+		expect(result).toEqual({ status: REFUSED, stdout: BUNDLE_RAN })
 	})
 })
 
