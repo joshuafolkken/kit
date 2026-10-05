@@ -2,6 +2,7 @@ import {
 	AI_DOCS,
 	read_unwrapped,
 	read_unwrapped_rule_surface,
+	RULE_DELIVERY_RATIONALE,
 	WORKFLOW_PROMPT_DIRECTORY,
 } from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
@@ -113,8 +114,12 @@ describe.each(AI_DOCS)('%s — leaves the reasoning at the pointer', (document_p
 describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, () => {
 	const content = read_unwrapped(DELIVERY)
 
-	it.each([TOPIC_FILE, GUARD_COMMAND, SUITE_PATH])('states %j', (marker) => {
+	it.each([TOPIC_FILE, GUARD_COMMAND])('states %j', (marker) => {
 		expect(content).toContain(marker)
+	})
+
+	it('leaves the pinning suite to the rationale', () => {
+		expect(read_unwrapped(RULE_DELIVERY_RATIONALE)).toContain(SUITE_PATH)
 	})
 
 	// Every row of that table has to have a non-firing state that means the rule is being kept, or the

@@ -1,4 +1,8 @@
-import { read_unwrapped, WORKFLOW_PROMPT_DIRECTORY } from '#scripts/document/ai-document-fixture'
+import {
+	read_unwrapped,
+	RULE_DELIVERY_RATIONALE,
+	WORKFLOW_PROMPT_DIRECTORY,
+} from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 import { implementation_cut } from './implementation-cut'
 
@@ -92,11 +96,11 @@ describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 describe(`${DELIVERY} — the enumeration names this rule and its suites`, () => {
 	const content = read_unwrapped(DELIVERY)
 
-	it.each([
-		TOPIC_HEADING.replace('### ', '').replace(' (joshuafolkken/kit#2310)', ''),
-		RULE_SUITE,
-		FIRING_SUITE,
-	])('states %j', (marker) => {
-		expect(content).toContain(marker)
+	it('states the section the procedure lives under', () => {
+		expect(content).toContain(TOPIC_HEADING.replace('### ', ''))
+	})
+
+	it.each([RULE_SUITE, FIRING_SUITE])('leaves %j to the rationale', (suite) => {
+		expect(read_unwrapped(RULE_DELIVERY_RATIONALE)).toContain(suite)
 	})
 })

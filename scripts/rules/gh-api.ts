@@ -30,6 +30,11 @@ const REPO_PATH = /repos\/([^/\s'"?]+)\/([^/\s'"?]+)/u
 const OWNER_GROUP = 1
 const REPO_GROUP = 2
 
+// The placeholders `gh api` expands to its base repository's owner before it sends the request
+// (joshuafolkken/kit#3188) — `{owner}`, and the legacy `:owner` it still accepts. Which owner that is
+// depends on the checkout's remotes, so the caller resolves it rather than this parser.
+const OWNER_PLACEHOLDERS: ReadonlySet<string> = new Set(['{owner}', ':owner'])
+
 interface RepoTarget {
 	owner: string
 	repo: string
@@ -65,6 +70,18 @@ function repo_target(segment: string): RepoTarget | undefined {
 	return { owner: match[OWNER_GROUP] ?? '', repo: match[REPO_GROUP] ?? '' }
 }
 
-const gh_api = { GH_FLAGS, is_gh_api, is_read, is_write, method_of, repo_target }
+function is_owner_placeholder(owner: string): boolean {
+	return OWNER_PLACEHOLDERS.has(owner)
+}
+
+const gh_api = {
+	GH_FLAGS,
+	is_gh_api,
+	is_owner_placeholder,
+	is_read,
+	is_write,
+	method_of,
+	repo_target,
+}
 
 export { gh_api }

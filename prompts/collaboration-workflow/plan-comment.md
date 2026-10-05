@@ -1,7 +1,7 @@
 ## Step 3: 計画コメントを記録して通知する
 
 1. 提案を人間が判断する
-2. 採用した計画を Issue に記録する（Issue body が空の場合は `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f body="<plan>"` で body に書き込む。body が既にある場合は `pnpm josh issue:comment <N> --body-file <path>` でコメント追加する）
+2. 採用した計画を Issue に記録する（Issue body が空の場合は計画をファイルに書き、`gh api -X PATCH repos/{owner}/{repo}/issues/<N> --field body=@<path>` で body に書き込む — 本文はパスで渡し、シェルの二重引用符には載せない（`shell-body.md`）。body が既にある場合は `pnpm josh issue:comment <N> --body-file <path>` でコメント追加する）
 3. Telegram で計画開始を通知する:
 
    ```bash
@@ -17,17 +17,13 @@
 
 4. ワークフロー開始時点で作業ツリーにステージング済みまたは変更済みのファイルが既にある場合（例: ユーザーが事前に kit/設定ファイルをステージングした場合）、先に変更を退避する:
    ```bash
-   git stash push -m "plan: pre-existing changes"
+   git stash push -u -m "plan: pre-existing changes"
    ```
 5. メインブランチへ切り替えて最新を取得する:
    ```bash
    git switch main && git pull
    ```
-6. 依存関係を最新化し、脆弱性を確認する（**必須—作業ツリーに変更があっても省略してはならない**。`pnpm latest` は内部で `pnpm audit` も実行する）:
-   ```bash
-   pnpm latest
-   # 脆弱性が見つかった場合: package.json の overrides に対象バージョンを追加して pnpm install 後に再確認
-   ```
+6. 依存関係の更新はコマンドに問う — `pnpm josh latest:scope` が `required` と答えたときだけ `pnpm josh latest` を実行し、`dependency-update` スキルに従う（単一ソースは `.claude/skills/workflow-commands/latest-gate.md`）。脆弱性への override は `pnpm-workspace.yaml` の `overrides` に書く（pnpm 11/12 は `package.json` の `pnpm.overrides` を無視する）。
    ステップ 4 で stash した場合は、ここでメッセージ指定で復元する（位置指定や引数なしの `git stash pop` は使わない — stash は全 work tree が共有する 1 本のスタックで、別のレーンの stash を取り込む恐れがある。joshuafolkken/kit#2050）:
    ```bash
    pnpm josh stash:pop "plan: pre-existing changes"
@@ -66,13 +62,13 @@ pnpm josh pr
 
 **Do not** run `gh pr create` directly — it bypasses `build_body` which generates `closes #N`, causing the Issue to remain open after merge.
 
-`fullrun` フローでは、コミットの前に `/code-review` スキルを実行する（下記「レビュー工程は実装セッションがコミット前に実行する」と同じ時期であり、以前ここに書かれていた「コミット後」は誤りだった）。高・中優先度の指摘が見つかった場合は修正を行い、再度 `pnpm josh review:brief` と `/code-review <what it printed>` を実行してから次のステップへ進む（**2 周目は差分全体の読み直しではなく修正の検証パス**。下記「レビュー工程は実装セッションがコミット前に実行する」）。**レビューは合計 2 回まで**であり、2 回目を終えた時点で残る Low/Medium は follow-up Issue に切り出し、**現在の Issue が閉じる前に `pnpm josh epic:bundle <新規>` を実行して答えに従う** — `add_to_epic` / `create_epic` は Tier A で、対応する `pnpm josh epic --add` / `pnpm josh epic` を実行する（本文の手編集は不可）。`ask` も Tier A であり、推奨する epic を選んで追加し理由を記録する（停止も park もしない — joshuafolkken/kit#1339）。`none` は何もしない。**この起票と束ね直しは `pnpm josh git -y` の後・`pnpm josh followup` の前に置く** — コードを変えない作業なので CI 待ちの中に収まり、Issue が閉じるのはマージ時点なので期限も満たす（`prompts/review.md` → "Review round cap"、→「後追い Issue は起票した直後に EPIC へ束ね直す」）。
+`fullrun` フローでは、コミットの前にサブエージェントで `/code-review` を実行する（下記「レビュー工程は実装セッションがコミット前に実行する」と同じ時期であり、以前ここに書かれていた「コミット後」は誤りだった）。高・中優先度の指摘が見つかった場合は修正を行い、再度 `pnpm josh review:brief` と `/code-review <what it printed>` を実行してから次のステップへ進む（**2 周目は差分全体の読み直しではなく修正の検証パス**。下記「レビュー工程は実装セッションがコミット前に実行する」）。**レビューは合計 2 回まで**であり、2 回目を終えた時点で残る Low/Medium は follow-up Issue に切り出し、**現在の Issue が閉じる前に `pnpm josh epic:bundle <新規>` を実行して答えに従う** — `add_to_epic` / `create_epic` は Tier A で、対応する `pnpm josh epic --add` / `pnpm josh epic` を実行する（本文の手編集は不可）。`ask` も Tier A であり、推奨する epic を選んで追加し理由を記録する（停止も park もしない — joshuafolkken/kit#1339）。`none` は何もしない。**この起票と束ね直しは `pnpm josh git -y` の後・`pnpm josh followup` の前に置く** — コードを変えない作業なので CI 待ちの中に収まり、Issue が閉じるのはマージ時点なので期限も満たす（`prompts/review.md` → "Review round cap"、→「後追い Issue は起票した直後に EPIC へ束ね直す」）。
 
 **`/code-review` の出力で停止してはならない**という連鎖規則の本文は、`.claude/skills/workflow-commands/chain-rule.md` にある — 停止してよい 2 状況、決定表、アンチパターン集、ターン終端セルフチェックはすべてそこが単一ソースである（joshuafolkken/kit#1186）。
 
 ### レビュー工程は実装セッションがコミット前に実行する
 
-ワークフロー内のレビュー工程（各フローの `pnpm josh review:brief` と `/code-review <what it printed>`）は、**実装したセッション自身が、コミットの前に**インラインで実行する。対象は `git diff main`、実行時期は検証ゲートの後半（refactor → **`pnpm josh gate` をレビューと同時に開始し、コミット前に join する** → `/code-review` with the brief `pnpm josh review:brief` prints）であり、`fullrun` / `halfrun` / `backlogrun` のいずれも同じ時期・同じ対象でレビューする。1 周目の High/Medium はその場で修正し、**指摘を潰し切ってから最初のコミットを作る**。ただし**2 周目は 1 周目の反復ではなく、修正の検証パスである** — 対象は差分全体ではなく 1 周目の修正が触った範囲（fix delta）で、問いは「各指摘は実際に閉じたか／修正自体が欠陥を入れていないか」に変わる。基準は変わらず、閉じていない指摘は元の severity のまま残る（`prompts/review-rubric.md` → "The second round is a verification pass, not a second full review"）。**再実行は 2 周まで**であり、2 周を終えた時点で残る High 以外の指摘は、**内容から機械的に決まる 3 分岐**に振り分ける（`prompts/review.md` → "Review round cap"）。分岐は、既に触れているファイル内で数行・設計判断なしに閉じるなら**その場で直す（新しいレビュー巡は起こさない）**、実行経路に届くか判断が要るなら**起票する**、利用者に届かない Low なら**PR に 1 行残して落とす**、の 3 つ。同じ根本判断に帰着する複数の指摘は**1 件の Issue にまとめる**。起票する場合、**切り出しは起票では終わらない** — 起票に続けて `pnpm josh epic:bundle <新規>` を実行し、`add_to_epic` / `create_epic` は確認せずに実行する。**ただし PR を開くフロー（`fullrun` / `backlogrun`）では、起票と束ね直しの実行位置はコミットの前ではなく `pnpm josh git -y` の後・`pnpm josh followup` の前**である。`halfrun` は PR を開かず、隠れる先の CI が無いので、振り分けが決まった時点で実行する（→「後追い Issue は起票した直後に EPIC へ束ね直す」）。したがって PR に貼るレビューコメントは発生しない。
+ワークフロー内のレビュー工程（各フローの `pnpm josh review:brief` と `/code-review <what it printed>`）は、**実装したセッション自身が、コミットの前に**起動する（レビュー本体はサブエージェントが実行する — 本節末尾）。対象は `git diff main`、実行時期は検証ゲートの後半（refactor → **`pnpm josh gate` をレビューと同時に開始し、コミット前に join する** → `/code-review` with the brief `pnpm josh review:brief` prints）であり、`fullrun` / `halfrun` / `backlogrun` のいずれも同じ時期・同じ対象でレビューする。1 周目の High/Medium はその場で修正し、**指摘を潰し切ってから最初のコミットを作る**。ただし**2 周目は 1 周目の反復ではなく、修正の検証パスである** — 対象は差分全体ではなく 1 周目の修正が触った範囲（fix delta）で、問いは「各指摘は実際に閉じたか／修正自体が欠陥を入れていないか」に変わる。基準は変わらず、閉じていない指摘は元の severity のまま残る（`prompts/review-rubric.md` → "The second round is a verification pass, not a second full review"）。**再実行は 2 周まで**であり、2 周を終えた時点で残る High 以外の指摘は、**内容から機械的に決まる 3 分岐**に振り分ける（`prompts/review.md` → "Review round cap"）。分岐は、既に触れているファイル内で数行・設計判断なしに閉じるなら**その場で直す（新しいレビュー巡は起こさない）**、実行経路に届くか判断が要るなら**起票する**、利用者に届かない Low なら**PR に 1 行残して落とす**、の 3 つ。同じ根本判断に帰着する複数の指摘は**1 件の Issue にまとめる**。起票する場合、**切り出しは起票では終わらない** — 起票に続けて `pnpm josh epic:bundle <新規>` を実行し、`add_to_epic` / `create_epic` は確認せずに実行する。**ただし PR を開くフロー（`fullrun` / `backlogrun`）では、起票と束ね直しの実行位置はコミットの前ではなく `pnpm josh git -y` の後・`pnpm josh followup` の前**である。`halfrun` は PR を開かず、隠れる先の CI が無いので、振り分けが決まった時点で実行する（→「後追い Issue は起票した直後に EPIC へ束ね直す」）。したがって PR に貼るレビューコメントは発生しない。
 
 **PR を開く位置は 2 周の間である**（joshuafolkken/kit#1261）。1 周目の修正が入ったら `pnpm josh gate` → join → `pnpm josh git -y` の順で進め、**2 周目は そのコミットが起動した CI と並走させる**。join とコミットの間でツリーを書き換えるものは何も無い（joshuafolkken/kit#1486 で子のバージョン上げが消えた）ので、コミットが乗るゲートはそのツリーちょうどを覆い、2 周目のブリーフは `Already verified` のままである。2 周目がその場修正を出した場合だけ、同一ブランチへの追加コミットが 1 つ増え、そのコミットに対して CI が回り直す — マージが待つのはその結果である。1 周目が clean なら 2 周目自体が無いので、順序は従来どおり。単一ソースは `.claude/skills/workflow-commands/chain-rule.md` → "The pull request opens between the rounds, so CI runs beside round 2"。
 
@@ -82,4 +78,4 @@ pnpm josh pr
 
 **そのゲートは 1 ラン 1 回であって、1 編集 1 回ではない**（joshuafolkken/kit#1246）。kit#1242 が決めたのは 1 回のゲートを**いつ**開始するかであって、**何回**回るかには触れていない。実測（kit#1241）では 49.1 分のランでゲートが 10 回・合計 8.2 分を占め、うち 6 回はレビュー開始前の「いま入れた編集が通ったか」の確認で、答えを出したのは毎回 lint か cspell の 1 チェックだけだった。**実装中は、単一チェックを名前で回す**（`pnpm josh lint:related` / `pnpm josh cspell:dot` / `pnpm josh test:related` / そのプロジェクト自身の型チェック）。**そこでのユニットチェックは絞り込んだ側**である（joshuafolkken/kit#1257）— `pnpm josh test:related` は変更ファイルが到達するテストだけを走らせ、絞り込めないときは全件に戻ってその旨を印字する。全件を走らせる `pnpm josh test:unit` は、コミット前のゲートが回すものとして変わらない。一度ゲートを回した後は、各ブロックのヘッダが実際に走ったコマンドを印字しているので、そこからコピーすればよい。全ゲートか単一チェックかは**「レビューが始まったか」**だけで決まり、編集の大きさでは決まらない。レビューと同時にゲートを開始した後は、赤の修正も指摘の修正もツリーを変えて前の結果を陳腐化させるので、単一チェックに戻るのではなく全ゲートを回し直す。分岐表は `.claude/skills/workflow-commands/chain-rule.md` → "The gate runs beside this review, not in front of it" にある。
 
-**フレッシュコンテキストのサブエージェントに委譲する方式（kit#752）と、PR 作成後に実行して結果を PR コメントとして投稿する方式（kit#758）は、これを置き換えるものではなく、これに置き換えられた。** 別コンテキストのレビュアーは実装者のバイアスを持ち込まない利点があったが、毎ラウンド変更を読み直し、指摘のたびに修正コミット・push・必須チェック 6 件の CI 再実行が走るため、PR 作成からレビュー確定まで 10 分を超えるのが常態だった（kit#758 の PR 自身が 3 ラウンドで 10 分 53 秒）。**レビュアーが実装者と同一コンテキストである点は、この方式が受け入れているトレードオフである** — 作者の思い込みが素通りする確率は上がるが、コミット前セルフレビュー（`prompts/review.md`）は従来どおり必須のゲートとして残る。
+**PR 作成後に実行して結果を PR コメントとして投稿する方式（kit#758）は、これに置き換えられた。** その方式では指摘のたびに修正コミット・push・必須チェック 6 件の CI 再実行が走るため、PR 作成からレビュー確定まで 10 分を超えるのが常態だった（kit#758 の PR 自身が 3 ラウンドで 10 分 53 秒）。**レビュー本体は `Agent` ツールで起動するサブエージェントが独自のコンテキストで実行し、メインラインで `Skill` として読み込まない** — 単一ソースは `.claude/skills/workflow-commands/chain-rule.md` → "The review runs in a subagent, never a main-line skill load"（joshuafolkken/kit#1855）。実行の時期と対象（コミット前・`git diff main`）を決め、結果を読んで修正するのは実装セッションである。
