@@ -1,5 +1,7 @@
+import { unused_members_cli } from '#scripts/exports/unused-members-cli'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
+import { SKIP_MARKER } from '#scripts/test/skip-marker'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_plan } from './gate-plan'
 import { gate_test_fixture } from './gate-test-fixture'
@@ -22,6 +24,8 @@ const VITE_DEPRECATION =
 	"(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`.\n" +
 	'Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.'
 const ESLINT_WARNING = 'src/a.ts:1:1  warning  Unexpected console statement'
+const EXPORTS_LABEL = 'exports'
+const UNIT_SKIP_NOTICE = `josh test:unit: vitest is not installed ${SKIP_MARKER} vitest unit tests.`
 
 const RECORDS = gate_test_fixture.suite_records('record-warning')
 
@@ -64,6 +68,32 @@ describe('record_green_gate — a benign warning does not withhold the record', 
 			plain(gate_plan.TYPE_CHECK_LABEL),
 			plain(CSPELL_LABEL),
 			plain(gate_plan.UNIT_LABEL),
+		])
+
+		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#3162: in a consumer the exports check prints its out-of-scope notice on every run,
+// and while that notice carried `SKIP_MARKER` no consumer gate ever wrote its green record.
+describe('record_green_gate — a consumer exports notice does not withhold the record', () => {
+	it('writes the record when the exports step printed the consumer notice', async () => {
+		await record_with([
+			plain(gate_plan.LINT_LABEL),
+			plain(gate_plan.TYPE_CHECK_LABEL),
+			plain(CSPELL_LABEL),
+			green_saying(EXPORTS_LABEL, unused_members_cli.CONSUMER_NOTICE),
+			plain(gate_plan.UNIT_LABEL),
+		])
+
+		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeDefined()
+	})
+
+	it('still withholds the record when the unit suite passed without running', async () => {
+		await record_with([
+			plain(gate_plan.LINT_LABEL),
+			green_saying(EXPORTS_LABEL, unused_members_cli.CONSUMER_NOTICE),
+			green_saying(gate_plan.UNIT_LABEL, UNIT_SKIP_NOTICE),
 		])
 
 		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeUndefined()

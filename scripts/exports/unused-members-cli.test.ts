@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { SKIP_MARKER } from '#scripts/test/skip-marker'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { unused_members_cli } from './unused-members-cli'
@@ -57,7 +58,12 @@ describe('unused_members_cli.run_unused_members', () => {
 		writeFileSync(path.join(root, 'package.json'), JSON.stringify(manifest))
 
 		expect(await unused_members_cli.run_unused_members(root)).toBe(PASS_EXIT_CODE)
-		expect(output.info.join('\n')).toContain('not a consumer project')
+		expect(output.info).toStrictEqual([unused_members_cli.CONSUMER_NOTICE])
 		expect(output.error).toStrictEqual([])
+	})
+
+	it('says a consumer is out of scope without the skip marker that withholds the green record', () => {
+		expect(unused_members_cli.CONSUMER_NOTICE).toContain('nothing to check in a consumer project')
+		expect(unused_members_cli.CONSUMER_NOTICE).not.toContain(SKIP_MARKER)
 	})
 })
