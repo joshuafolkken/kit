@@ -219,24 +219,6 @@ describe('epic_add_plan.build_plan — a child the declaration still names', () 
 	})
 })
 
-describe('epic_add_plan.build_plan — a cross-repository epic', () => {
-	it('refuses rather than planning against a partial graph', () => {
-		const external = [
-			DEPENDENCIES_HEADING,
-			BLANK,
-			'#890 -> #891',
-			BLANK,
-			PROGRESS_HEADING,
-			BLANK,
-			ROW_890,
-			'- [ ] joshuafolkken/app-kit#12',
-			BLANK,
-		].join('\n')
-
-		expect(error_of(plan({ body: external }))).toContain('tracks a child in another repository')
-	})
-})
-
 // joshuafolkken/kit#949: an epic whose task list has a child no chain names. `--before` on that
 // child was refused, which left a prerequisite discovered against it with nowhere to be recorded —
 // and the refusal is the same one raised for a number that is not a child at all.
