@@ -2,6 +2,7 @@ import { accessSync, chmodSync, constants, mkdirSync, rmSync, writeFileSync } fr
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { shim_shell } from '#scripts/build/shim-shell'
+import { GIT_BINARY_KEY } from '#scripts/git/constants'
 import { platform_temporary } from '#scripts/josh/platform-temporary'
 import { file_reader } from '#scripts/lib/read-file'
 import { test_repository_guard, type WriteGuard } from './test-repository-guard'
@@ -378,6 +379,7 @@ function arm(directory: string = GUARD_DIRECTORY, temporary_root: string = TEMPO
 	install_shim(directory)
 	mkdirSync(temporary_root, { recursive: true })
 	process.env['PATH'] = `${directory}${path.delimiter}${process.env['PATH'] ?? ''}`
+	if (GIT_BINARY !== undefined) process.env[GIT_BINARY_KEY] = path.join(directory, GIT_SHIM_NAME)
 	process.env[GUARD_LOG_KEY] = log_in(directory)
 	process.env[platform_temporary.TEMP_ROOT_KEY] = temporary_root
 }

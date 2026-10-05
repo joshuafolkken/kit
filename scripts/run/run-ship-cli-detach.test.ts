@@ -11,6 +11,7 @@ const is_lane_child_mock = vi.hoisted(() => vi.fn())
 const mark_result_mock = vi.hoisted(() => vi.fn())
 const preflight_mock = vi.hoisted(() => vi.fn())
 const pre_detach_mock = vi.hoisted(() => vi.fn())
+const merge_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('./run-ship-probe', () => ({
@@ -47,6 +48,12 @@ vi.mock('./run-ship-detach', () => ({
 		mark_result: mark_result_mock,
 		claim_identity: vi.fn(),
 	},
+}))
+// The sync stage's merge of the default branch is pinned in `run-ship-sync.test.ts`; here it is
+// current, so no test ever fetches or merges into the checkout it runs in (joshuafolkken/kit#3234).
+vi.mock('#scripts/git/main-merge', () => ({ main_merge: { merge: merge_mock } }))
+vi.mock('#scripts/gh/git-gh-pr-read', () => ({
+	git_gh_pr_read: { pr_get_merge_state: vi.fn().mockResolvedValue(undefined) },
 }))
 vi.mock('./run-ship-return', () => ({ run_ship_return: { return_control: return_mock } }))
 vi.mock('#scripts/lane/lane-child-marker', () => ({
@@ -88,6 +95,7 @@ beforeEach(() => {
 	mark_result_mock.mockReset()
 	preflight_mock.mockReset().mockResolvedValue({ code: OK, out: 'ready' })
 	pre_detach_mock.mockReset().mockResolvedValue({ code: OK, out: 'passed' })
+	merge_mock.mockReset().mockResolvedValue({ kind: 'current', branch: 'main' })
 })
 
 describe('run_ship_cli.run — --detach hands the region to a supervisor', () => {
@@ -231,6 +239,14 @@ describe('run_ship_cli.run — --cite is a follow-up citation like a trailing po
 		await run_ship_cli.run([TITLE, '2500', '--cite', '2501'])
 
 		expect(josh_run_mock.mock.calls.at(-1)?.[0]).toStrictEqual(['run:tail', NUMBER, '2500', '2501'])
+	})
+})
+
+// joshuafolkken/kit#3234: the sync stage merged the default branch into the checkout the suite ran in.
+describe('run_ship_cli.run — a foreground ship merges the default branch through the stub', () => {
+	it('asks the stubbed merge once, before the commit, and reports it as current', async () => {
+		expect(await run_ship_cli.run([TITLE])).toBe(OK)
+		expect(merge_mock).toHaveBeenCalledOnce()
 	})
 })
 
