@@ -21,6 +21,7 @@ const TOPIC_FILE = 'shell-body.md'
 const CANONICAL = `${WORKFLOW_PROMPT_DIRECTORY}/${TOPIC_FILE}`
 const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
 const RESIDENCY = `${WORKFLOW_PROMPT_DIRECTORY}/residency.md`
+const SHELL_BODY_RATIONALE = 'docs/maintainers/shell-body-rationale.md'
 const SUITE_PATH = 'scripts/rules/shell-body-rule.test.ts'
 // The trigger's own suite, split out of the enumeration's so the reading of a call is read beside the
 // cases it has to keep. The marker list has to name it, or the split loses its coverage claim.
@@ -121,18 +122,27 @@ describe(`${CANONICAL} — carries the damage, the measurement and the safe spel
 			expect(content).toContain(marker)
 		},
 	)
+})
 
-	// **The marker list is a claim about other suites, and nothing was checking it.** The list said
-	// `cli-body.test.ts` pinned the stdin `-` form while no case in it passed `-` at all — a
-	// documentation line that read as coverage and was not. So each suite the list credits is asserted
-	// here by name, and the one claim that had drifted is asserted as text: the suites themselves carry
-	// the cases, and this is what fails when the list and the suites part company again.
+// **The marker list is a claim about other suites, and nothing was checking it.** The list said
+// `cli-body.test.ts` pinned the stdin `-` form while no case in it passed `-` at all — a
+// documentation line that read as coverage and was not. So each suite the list credits is asserted
+// here by name, and the one claim that had drifted is asserted as text: the suites themselves carry
+// the cases, and this is what fails when the list and the suites part company again. The list is
+// writer-facing, so it lives in the rationale rather than the procedure (joshuafolkken/kit#3179).
+describe(`${SHELL_BODY_RATIONALE} — carries the marker list`, () => {
+	const content = read_unwrapped(SHELL_BODY_RATIONALE)
+
 	it.each([TRIGGER_SUITE, 'scripts/josh/cli-body.test.ts', SUITE_PATH, STDIN_CLAIM])(
 		'credits %j in the marker list',
 		(marker) => {
 			expect(content).toContain(marker)
 		},
 	)
+
+	it('leaves the marker list out of the procedure', () => {
+		expect(read_unwrapped(CANONICAL)).not.toContain('### マーカーテスト')
+	})
 })
 
 // The residency list is the second half of the rule: a rule the criterion moved and that is not

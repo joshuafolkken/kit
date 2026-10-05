@@ -39,8 +39,12 @@ The history behind a procedure, kept off every run's read path. Each one is cite
 from the page it explains.
 
 - [claude-md-history.md](./claude-md-history.md) — `CLAUDE.md`
+- [overview-rationale.md](./overview-rationale.md) — the workflow overview and session language
 - [principles-rationale.md](./principles-rationale.md) — the collaboration principles
 - [operating-rules-rationale.md](./operating-rules-rationale.md) — the operating rules
+- [upstream-interrupt-rationale.md](./upstream-interrupt-rationale.md) — the upstream interrupt
+- [issue-citation-rationale.md](./issue-citation-rationale.md) — citing Issues in session output
+- [gh-rest-rationale.md](./gh-rest-rationale.md) — `gh` in REST
 - [residency-rationale.md](./residency-rationale.md) — where a rule is written down
 - [rule-delivery-rationale.md](./rule-delivery-rationale.md) — how a rule reaches the agent
 - [file-edits-rationale.md](./file-edits-rationale.md) — file edits
