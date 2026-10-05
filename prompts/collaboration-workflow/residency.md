@@ -131,4 +131,4 @@ no になり skill 側に本体を置くものの例:
 
 ### 経緯
 
-この基準の適用の記録は保守者向けの文書に移してあり、規則は持たない。配送済み規則の一覧から件数を外した経緯は `docs/maintainers/residency-rationale.md` → "Why the delivered list carries no count"、二重の一覧を 1 つにした経緯は `docs/maintainers/residency-rationale.md` → "One list, not two" にある。
+この基準の適用の記録は保守者向けの文書に移してあり、規則は持たない。配送済み規則の一覧から件数を外した経緯は `docs/maintainers/residency-rationale.md` → "Why the delivered list carries no count"、二重の一覧を 1 つにした経緯は `docs/maintainers/residency-rationale.md` → "One list, not two"、索引を話題ごとに分けた経緯は `docs/maintainers/residency-rationale.md` → "Why the workflow index is split by topic" にある。

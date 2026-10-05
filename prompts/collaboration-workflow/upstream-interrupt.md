@@ -4,37 +4,35 @@
 
 ### 無条件ルール: 起票は確認なし、停止は必ず
 
-**この手順に「これは今の作業をブロックするか？」という判定は一切存在しない。** 上流の欠陥は、ブロックするものもしないものも、**発見した時点で**同じ手順を通る。例外はない。
+**この手順に「これは今の作業をブロックするか？」という判定は一切存在しない。** 上流の欠陥は、ブロックするものもしないものも、**発見した時点で**同じ手順を通る。例外はない。判定を置かない理由は `docs/maintainers/upstream-interrupt-rationale.md` → "Why there is no blocking test" にある。
 
-- **トリガーは「発見」であって「ブロックし始めたとき」ではない**。ブロック判定は作業を先へ進めたい圧力の下で下されるため、回避策が最も魅力的な瞬間に「ブロックしない」へ倒れる。しかも「ブロックするか」の線は発見時点には存在しない — 非ブロックに見えた欠陥が完了ゲートで初めて牙を剥いたときには、既に手心が加えられた後である。判定そのものを置かないことで、一時凌ぎがツリーに入る前にルールが発火する
-- **起票は Tier A（確認なし）**。起票してよいか、どのリポジトリへ起票するか、いずれもユーザー確認を取らない。起票は元々このルールが指示している行動であり、確認は何も生まない。**ただしこれが成り立つのは対象が first-party のときだけ**であり、third-party リポジトリへの書き込みは Tier C として明示指示を要する（→「第三者リポジトリへの書き込みは Tier C（明示指示が必要）」）
+- **トリガーは「発見」であって「ブロックし始めたとき」ではない**
+- **起票は Tier A（確認なし）**。起票してよいか、どのリポジトリへ起票するか、いずれもユーザー確認を取らない。対象は first-party に限る（→「第三者リポジトリへの書き込みは Tier C（明示指示が必要）」）
 - **停止は無条件**。Issue が存在する状態にしてから停止する。上流の修正を待つか先送りするかは、Issue を目の前にしたユーザーが決める
-- **多少の冗長さは許容コスト**。ユーザーが素通りさせたはずの発見で停止しても往復 1 回で済むが、見送るべきだった発見を素通りさせると、回避策が全消費者に配布されるリポジトリへ入る。たまに外す判断より、毎回適用する一律ルールを採る
-- **`backlogrun` の中では、停止の範囲がセッション全体ではなくその子 Issue に限定される**。起票は変わらず無条件（first-party なら Tier A）で、回避策の禁止も変わらない。変わるのは停止の及ぶ範囲だけであり、該当の子に `needs-decision` を付けて park し、依存していない他の子へ進む（→「backlogrun — 子 Issue の無人実行」）。回避策を書かせないという本来の目的は、起票と回避策禁止が保たれることで維持される
+- **`backlogrun` の中では、停止の範囲がセッション全体ではなくその子 Issue に限定される**。起票と回避策の禁止は変わらない。該当の子に `needs-decision` を付けて park し、依存していない他の子へ進む（→ `.claude/skills/workflow-commands/backlogrun-park.md` → "park and continue"）
 
 手順:
 
 1. **現在の作業を退避する**: `git stash push -u -m "upstream-interrupt: paused #<N>"`（WIP コミットでも可）。退避したことを忘れないよう、この時点で stash を作る。メッセージ付きで積むのは、復元をメッセージで特定するため（下記ステップ 5）
 2. **進行中の Issue に状況を明記する**: `pnpm josh issue:comment <N> --body-file <path>` で、(a) 作業を stash したこと、(b) 中断理由（どの別パッケージの・どんな問題で中断したか）、(c) 対象パッケージに作成した新 Issue へのリンクを `## Upstream issues` 見出しの下に `owner/repo#N` 形式で、を記載する。これにより「なぜこの Issue が一時停止しているか」と「何を待っているのか」が後から監査できる（→「起票元へのバックリンク」）
-3. **対象パッケージのリポジトリに新しい Issue を作成する（確認なし）**: `pnpm josh issue:file "<root-cause title>" --body-file <body-file> --depth <n> --route tier-a --repo <owner>/<repo>`（`route:tier-a` は実装中の Tier A 起票を経路として集計するためのラベル — joshuafolkken/kit#1083。付与するのは first-party の場合だけで、third-party はコマンド自身が拒否し起票しない）。本文の検査、本文が宣言する分類ラベルの付与、`## Origin` 節の確認、起票先での重複探し、`epic:bundle` はこのコマンドが実行する（`docs/josh-commands-automation.md` → `josh issue:file`）。分類の単一ソースは `prompts/collaboration-workflow/issue-template.md`。根本原因・再現・期待結果を Step 1 のテンプレに沿って記載し、**本文に `## Origin` 節を置いて起票元 Issue を `owner/repo#N` 形式で書く**（→「起票元へのバックリンク」）。上流 Issue は欠陥を、起票元 Issue は証拠を持つため、リンクがないと上流 Issue は後から解釈できなくなる。ここで「起票してよいか」を尋ねて停止してはならない。**ただし確認なしで起票してよいのは対象が first-party のときだけ**で、third-party（owner が自リポジトリと一致しないリポジトリ）なら起票せずに停止する（→「第三者リポジトリへの書き込みは Tier C（明示指示が必要）」）
+3. **対象パッケージのリポジトリに新しい Issue を作成する（確認なし）**: `pnpm josh issue:file "<root-cause title>" --body-file <body-file> --depth <n> --route tier-a --repo <owner>/<repo>`（`route:tier-a` は実装中の Tier A 起票を経路として集計するためのラベル — joshuafolkken/kit#1083）。本文の検査、本文が宣言する分類ラベルの付与、`## Origin` 節の確認、起票先での重複探し、`epic:bundle` はこのコマンドが実行する（`docs/josh-commands-automation.md` → `josh issue:file`）。分類の単一ソースは `prompts/collaboration-workflow/issue-template.md`。根本原因・再現・期待結果を Step 1 のテンプレに沿って記載し、**本文に `## Origin` 節を置いて起票元 Issue を `owner/repo#N` 形式で書く**（→「起票元へのバックリンク」）。ここで「起票してよいか」を尋ねて停止してはならない
 4. **`confirmation` Telegram を送って停止する**: 上流 Issue の URL と、何が止まっているかを本文に書く（→ `CLAUDE.md` → "Mid-workflow stop notification (`confirmation`)"）。無人実行でも画面外でユーザーが気付ける。停止は Issue が既に存在する状態で行うので、ユーザーは「待つ / 先送りする」を Issue を見ながら 1 語で答えられる
 5. **元の作業を再開する**: 上流の修正がマージされた、または**ユーザーが先送りを明示判断した**後に `pnpm josh stash:pop "upstream-interrupt: paused #<N>"`（位置指定や引数なしの `git stash pop` は使わない — stash は全 work tree が共有する 1 本のスタックで、別のレーンの stash を取り込む恐れがある）して、退避していた元タスクを続行する。上流 Issue を割り込みで実装するかどうかもユーザーの判断（上流パッケージの実装・PR・マージはそれぞれのワークフロー規則に従う）
 
 ### 第三者リポジトリへの書き込みは Tier C（明示指示が必要）
 
-上の「起票は確認なし」は **first-party**（`pnpm josh repo:party` が `first-party` と答えるリポジトリ。判定は下記）を前提に書かれている。トラッカーが自分たちのもので、重複起票のコストがバックログ 1 行で済むからである。**自分たちが所有しないリポジトリへの書き込みは、これとは別物**として扱う。
+上の「起票は確認なし」は **first-party**（`pnpm josh repo:party` が `first-party` と答えるリポジトリ）だけに成り立つ。**自分たちが所有しないリポジトリへの書き込みは、これとは別物**として扱う。
 
-- **判定は機械的に行い、判断に委ねない**: `pnpm josh repo:party [<owner/repo>]` が `first-party` / `third-party` / `unknown` の 1 語で答える（対象リポジトリの owner がセッションのリポジトリの owner と一致すれば **first-party**、owner を読めなければ **unknown** で third-party 扱いはしない）。**それ以外は全て third-party** で、fork も、単に contribute しているだけの org リポジトリも third-party に入る。この判定は `delivered-rules.ts` の `third-party-write` ルールが同じ計算を使って third-party への `gh api` 書き込みを拒否する（読み取りは素通し）
-- **first-party は従来どおり**: Tier A。確認なしで起票し、双方向バックリンクを書き、停止する。first-party のフローに新しい摩擦は加わらない
-- **third-party は書き込みの種別を問わず Tier C**: Issue・コメント・PR・Discussion・レビューのいずれも、**その turn におけるユーザーの明示指示**なしに行ってはならない。公開は外向きかつ実質不可逆で、Issue はユーザーの GitHub アカウント名義で公開され、watcher へ通知され、検索に載る。後からクローズしてもそのいずれも取り消せない。加えて、誰も差し出すと約束していないメンテナの時間を消費する
+- **判定は機械的に行い、判断に委ねない**: `pnpm josh repo:party [<owner/repo>]` が `first-party` / `third-party` / `unknown` の 1 語で答える（対象リポジトリの owner がセッションのリポジトリの owner と一致すれば **first-party**、owner を読めなければ **unknown** で third-party 扱いはしない）。**それ以外は全て third-party** で、fork も、単に contribute しているだけの org リポジトリも third-party に入る
+- **first-party は従来どおり**: Tier A。確認なしで起票し、双方向バックリンクを書き、停止する
+- **third-party は書き込みの種別を問わず Tier C**: Issue・コメント・PR・Discussion・レビューのいずれも、**その turn におけるユーザーの明示指示**なしに行ってはならない。公開は外向きかつ実質不可逆である（`docs/maintainers/upstream-interrupt-rationale.md` → "Why third-party writes are Tier C"）
 - **third-party だと判明したときの手順**: (1) **自分たちの側の Issue** に証拠込みで所見を記録する。見出しは `## Upstream candidate` を使い、`## Upstream issues` は使わない（後者は「起票済み」を主張する見出しであるため）。(2) 報告本文の下書きをその Issue 内に用意し、ユーザーが 1 メッセージで承認できる状態にする。(3) 対象プロジェクト名と報告しようとしている内容を書いた `confirmation` Telegram を送って**停止する**
 - **third-party 報告の証拠バー**（下書きを提示する前に満たす）:
   - **自プロジェクトの外で成立する最小再現**（対象の依存だけを入れた素の scaffold）。用意できない場合は「プロジェクト組み込みの再現しかない」ことを下書きに明記する
   - **本文の全主張が検証済み**であること。推測を事実として書かない
   - 同じ欠陥を扱う**既存 Issue の検索**
 - **取り下げも外向きの行為**: 既に起票した third-party Issue のクローズ・編集・コメントも、同じく明示指示を要する
-- **正しい診断は公開の許可ではない**。sveltejs/kit#16623 の事例では所見自体は上流のソースで検証可能な正しいものだったが、手順として誤っていた。所見の正しさは、この節のどの要求も免除しない
-- このルールは横断ドキュメント（CLAUDE.md「Third-party repositories are Tier C」）のカノニカル参照
+- **正しい診断は公開の許可ではない**。所見の正しさは、この節のどの要求も免除しない（事例: `docs/maintainers/upstream-interrupt-rationale.md` → "Why a correct diagnosis is not authorization"）
 
 ### 検証ゲートを緩めることも「回避策」である
 
@@ -47,5 +45,5 @@
 注意:
 
 - **即席回避と根本対応は「迷って選ぶもの」ではない**。上流起因と分かった時点で選択肢は根本対応だけであり、「今回は軽いから即席で」という判断はこの手順に存在しない
-- 別パッケージへの新 Issue 作成・stash・Issue コメントは可逆かつ低コストな調査/起票操作なので、Tier C（不可逆・共有状態の操作）ではなく Tier A として確認なしで進める。ただし上流パッケージの **マージ等の共有状態操作** は通常どおりそれぞれのワークフローの明示起動を要する。**「可逆かつ低コスト」という前提が成り立つのは自分たちが所有するリポジトリに対してだけ**で、third-party への起票は外向き・実質不可逆なので Tier C になる（→「第三者リポジトリへの書き込みは Tier C（明示指示が必要）」）
+- 上流パッケージの **マージ等の共有状態操作** は、起票と違って Tier A ではない。通常どおりそれぞれのワークフローの明示起動を要する
 - このルールは横断ドキュメント（CLAUDE.md「Cross-package problems → file the upstream Issue, then stop」）のカノニカル参照

@@ -357,16 +357,35 @@ const AI_DOC_MARKERS: ReadonlyArray<string> = [
 
 // joshuafolkken/kit#2996 made `.claude/settings.json` the single source of the pattern list: the
 // workflow prompt states that the deny exists and why, and points at the file instead of copying it.
+// joshuafolkken/kit#3179 moved the guard-row enumeration to the delivery list in `rule-delivery.md`
+// and left one pointer here, so the markers pin the rule each paragraph carries rather than its former
+// wording.
 const WORKFLOW_MARKERS: ReadonlyArray<string> = [
-	'`permissions.deny` で機械的に遮断されている',
-	'パターンの一覧はそのファイルが一次情報であり、ここでは書き写さない',
-	'deny には「そのターンでユーザーが明示指示した」という例外がないため',
+	'`.claude/settings.json` の `permissions.deny`',
+	'**deny と配送ガードは実装であって規則ではない。**',
+	'deny には「そのターンでユーザーが明示指示した」という例外がない',
 	'ユーザー自身の端末で実行してもらう',
-	'「拒否される操作」と「禁止された操作」は同じ集合ではない',
-	'**ただし deny は実装であって規則ではない**',
-	'**deny は規則より狭いが、その差は配送ガードが埋めている**',
-	'「マージ経路は deny が保証している」とは読まないこと',
+	'**ツールが通したことを許可と読み替えてはならない。**',
+	'規則より狭い',
 ]
+
+// The guard rows the workflow prompt names by id alone must each keep an entry in the delivery list
+// its pointer sends readers to, or what they refuse is written nowhere (joshuafolkken/kit#3179).
+const RULE_DELIVERY = 'prompts/collaboration-workflow/rule-delivery.md'
+const GUARD_ROW_ENTRIES: ReadonlyArray<string> = [
+	'強制 `git clean -f`',
+	'**index の書き換え**',
+	'**破壊的コマンド**',
+	'**保護ファイル**',
+]
+
+describe(`${RULE_DELIVERY} — guard rows the workflow prompt points at`, () => {
+	const content = read_repo_file(RULE_DELIVERY)
+
+	it.each(GUARD_ROW_ENTRIES)('lists %j', (entry) => {
+		expect(content).toContain(entry)
+	})
+})
 
 describe.each(AI_DOCS)('%s — deny rule reaches every paired doc', (document_path) => {
 	const content = read_repo_file(document_path)

@@ -89,12 +89,12 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/gh-rest.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/glossary.md', bytes: 4096 },
-	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 8192 },
+	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 4096 },
 	// #3178 left the template and the judgement tables; the epic commands moved to `epic-commands`, the by-hand fallback stayed.
 	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 8192 },
-	{ path: 'prompts/collaboration-workflow/operating-rules.md', bytes: 16_384 },
+	{ path: 'prompts/collaboration-workflow/operating-rules.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/output-bounds.md', bytes: 16_384 },
-	{ path: 'prompts/collaboration-workflow/overview.md', bytes: 8192 },
+	{ path: 'prompts/collaboration-workflow/overview.md', bytes: 4096 },
 	// #3178 replaced the review-chain restatement with a pointer to `chain-rule.md`.
 	{ path: 'prompts/collaboration-workflow/plan-comment.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/principles.md', bytes: 12_288 },
@@ -102,9 +102,10 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// #3178 dropped the restatements `report:lint` and `chain-rule.md` already carry.
 	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 16_384 },
 	{ path: 'prompts/collaboration-workflow/residency.md', bytes: 28_672 },
-	// #3186 moved the hook wiring and history to `docs/maintainers/rule-delivery-rationale.md`.
-	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 16_384 },
-	{ path: 'prompts/collaboration-workflow/shell-body.md', bytes: 12_288 },
+	// #3186 moved the hook wiring and history to `docs/maintainers/rule-delivery-rationale.md`;
+	// #3179 adds the `index-mutation` / `destructive-command` / `protected-file` entries.
+	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 20_480 },
+	{ path: 'prompts/collaboration-workflow/shell-body.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/turn-batching.md', bytes: 20_480 },
 	{ path: 'prompts/collaboration-workflow/upstream-interrupt.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/wip-cap.md', bytes: 16_384 },

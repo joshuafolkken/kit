@@ -83,6 +83,22 @@ joshuafolkken/kit#2891 the table in `rule-delivery.md` carried about twenty-five
 paragraph itself warned about. The merged criterion therefore names `rule-delivery.md` as the single
 source of the enumeration and carries no number at all.
 
+## Why the workflow index is split by topic
+
+`prompts/collaboration-workflow.md` used to be one 169 KB file, so checking a single section meant
+reading all of it. Whatever a session reads is billed again as accumulated prefix on every remaining
+turn, so the cost of one check grew with the length of the conversation (joshuafolkken/kit#965). Each
+topic now has its own file, and the index exists only to pick one.
+
+The index records no byte counts: a hand-maintained number goes stale before the prose does, and a
+stale number is worse than none. `ls -l prompts/collaboration-workflow/` answers the real sizes.
+
+A citation names the file that holds the body because routing through the index
+(`prompts/collaboration-workflow.md` followed by a section name) forces a second read and dead-ends
+silently when the section is renamed. `scripts/claude/collaboration-prompt-split.test.ts` checks that
+every cited file exists, that every cited section resolves, and that the index lists every topic file.
+These notes moved out of the index in joshuafolkken/kit#3179.
+
 ## One list, not two
 
 Until joshuafolkken/kit#2891 the resident-rule list and the delivered-rule list each existed twice —
