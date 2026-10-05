@@ -80,7 +80,8 @@ named step reaches it, exactly as `backlogrun-steps.md` and the shared gate docu
 | --- | --- | --- |
 | `backlogrun-child.md` | dispatching the first child (`pnpm josh delegate epic-child`, `pnpm josh lane:dispatch`) | the shared per-child `fullrun`, a bare non-epic `#N`, the delegated unit and its summary bound, liveness recovery, and the once-per-session setup (audit, `josh latest`, preflight) |
 | `backlogrun-lanes.md` | opening the first lane (`pnpm josh lane:open`) | the per-repository lane ceiling and the lane lifecycle, and how a merge conflict is resolved |
-| `backlogrun-progress.md` | starting the progress watcher (`pnpm josh run:progress --wait`) and the hand-off check at a merge (`pnpm josh cost --cut`) | the heartbeat, the hand-off and the cut/resume, waiting without waiting forever, and the end-of-run summary and propagate |
+| `progress-watcher.md` | starting the progress watcher (`pnpm josh run:progress --wait`) | the heartbeat, shared with every implementing run |
+| `backlogrun-progress.md` | dispatching the first child and the hand-off check at a merge (`pnpm josh cost --cut`) | the hand-off and the cut/resume, waiting without waiting forever, and the end-of-run summary and propagate |
 | `backlogrun-park.md` | a child cannot finish | park-and-continue, the `needs-human-review` stop, a stale `in-progress`, a prerequisite discovered mid-run, and a mid-run split |
 
 ## Guards

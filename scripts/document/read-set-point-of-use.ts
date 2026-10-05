@@ -32,13 +32,18 @@
 // cut, a step every implementing run — and every dispatched lane child — reaches after the entry, so
 // its read is a point-of-use read the count was silently omitting. Measured on the backlogrun of
 // 2026-09-21, the lane children read it 21 times across 13 runs — the largest single document read,
-// and the one the point-of-use list had no row for.
+// and the one the point-of-use list had no row for. Only a lane child reaches it (joshuafolkken/kit#3172):
+// `fullrun.md` no longer names it, so it is charged to the lane child's role alone.
+// **`progress-watcher.md` joins them** (joshuafolkken/kit#3172): the heartbeat every implementing run
+// starts once its hold is claimed, split out of `backlogrun-progress.md` so a single-issue run stops
+// paying for the batch's hand-off and waiting procedure to read it.
 const POINT_OF_USE_FILES: ReadonlySet<string> = new Set([
 	'latest-gate.md',
 	'followup.md',
 	'chain-rule.md',
 	'background-commands.md',
 	'pre-gate-cut.md',
+	'progress-watcher.md',
 	'backlogrun-child.md',
 	'backlogrun-lanes.md',
 	'backlogrun-progress.md',

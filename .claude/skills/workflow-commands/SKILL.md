@@ -88,6 +88,11 @@ the pointer names that heading rather than the whole file: the entry read is cha
 procedure alone, and the rest of `backlogrun-park.md` is read only when it is reached
 (joshuafolkken/kit#2189).
 
+**Every implementing run reads `progress-watcher.md` → "Progress while the run is quiet" at the
+point of use** — before starting `pnpm josh run:progress --wait` once its hold is claimed — so a
+single-issue run never pays for `backlogrun-progress.md` to reach the heartbeat
+(joshuafolkken/kit#3172).
+
 ### A section reference is read as a section
 
 **A pointer written `` `X.md` → "Heading" `` is read as that section, never by opening `X.md` whole:**
