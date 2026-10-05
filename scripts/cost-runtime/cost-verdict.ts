@@ -3,42 +3,31 @@
 // of a session will cost, and takes only the figures its verdict needs — an over measurement — never
 // a whole report. The `--cap` counterfactual it once sat beside was retired in #2016 as readerless.
 
-import { RECENT_REQUEST_WINDOW } from './context-cut-threshold'
-
 const FAILURE_EXIT_CODE = 1
 const OVER_VERDICT = 'over'
 const UNDER_VERDICT = 'under'
 
-// What `--over` reads of a session: the billed input each request paid, oldest first. The whole
-// per-request sequence is carried rather than a single sum because the hand-off prices the recent
-// tail alone (joshuafolkken/kit#2295) — a long session's whole-session average lags its current
-// context by dozens of requests, so a sum could not answer what the recent window actually cost.
+// What `--over` reads of a session: the billed input each request paid, oldest first. The sequence
+// is carried rather than a single sum because the hand-off prices the newest request alone
+// (joshuafolkken/kit#3224) — a sum could not answer what the session's current context costs.
 interface OverMeasurement {
 	billed_input_per_request: ReadonlyArray<number>
 }
 
-// The most recent requests the hand-off prices, oldest first — the whole sequence when it is shorter
-// than the window, so a session with fewer than `RECENT_REQUEST_WINDOW` requests is priced on what it
-// has rather than padded.
-function recent_requests(measurement: OverMeasurement): ReadonlyArray<number> {
-	return measurement.billed_input_per_request.slice(-RECENT_REQUEST_WINDOW)
-}
-
 // What a turn costs is decided by the accumulated preamble, not by what the turn does, so the
-// marginal cost of a session is the billed input its recent requests paid. Measured across one
+// marginal cost of a session is the billed input its newest request paid. Measured across one
 // `epicrun` that ran six children in one context: 222k per request during the first child, 645k
 // during the sixth — the same work at 2.9x the price (joshuafolkken/kit#968).
 //
-// The recent window rather than the whole session, because a long parent's whole-session average
-// lags its current context by dozens of requests (joshuafolkken/kit#2295); the recent average says
-// what the *next* turn will cost, which is the thing a hand-off decision turns on.
+// **The newest request, not an average.** joshuafolkken/kit#2295 replaced the whole-session average,
+// which lagged a long parent by dozens of requests, with the average of the last ten; that still
+// lagged. A session's billed input only grows between compactions (a unit writes its own transcript),
+// so an average smooths no outlier — it only trails the context it averages. On 2026-10-05 wake
+// session 03367124 crossed the threshold at request 65 and its ten-request average at request 70
+// (joshuafolkken/kit#3224). The threshold is a break-even on the *current* context
+// (`context-cut-payback.ts`), so the current context is what it is compared against.
 function per_request_cost(measurement: OverMeasurement): number {
-	const window = recent_requests(measurement)
-	if (window.length === 0) return 0
-
-	const total = window.reduce((sum, billed) => sum + billed, 0)
-
-	return Math.round(total / window.length)
+	return measurement.billed_input_per_request.at(-1) ?? 0
 }
 
 // The bare over/under decision, without a report: `run:status` reads this same verdict read-only
@@ -51,14 +40,12 @@ function classify(
 	return per_request_cost(measurement) > limit ? OVER_VERDICT : UNDER_VERDICT
 }
 
-// The stderr line names the window the average covers, so the reader can tell a recent-tail average
-// from a whole-session one (joshuafolkken/kit#2295): "the last W of T request(s)" reads W when the
-// session is longer than the window and the whole count when it is shorter.
+// The stderr line names which request was priced, so the reader can tell the newest request's cost
+// from an average over the session (joshuafolkken/kit#3224).
 function over_summary(measurement: OverMeasurement, limit: number): string {
 	const total = measurement.billed_input_per_request.length
-	const window = recent_requests(measurement).length
 
-	return `${String(per_request_cost(measurement))} billed input tokens per request over the last ${String(window)} of ${String(total)} request(s); limit ${String(limit)}`
+	return `${String(per_request_cost(measurement))} billed input tokens per request, on the newest of ${String(total)} request(s); limit ${String(limit)}`
 }
 
 // A verdict, not a table: the point of the flag is that the hand-off is decided by a number rather

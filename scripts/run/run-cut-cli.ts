@@ -60,7 +60,7 @@ const {
 } = run_cut_report
 
 // **The pre-gate cut is conditional on the same statistic the implementation-phase cut reads**
-// (joshuafolkken/kit#2312). `cost_cli.session_verdict` prices the recent `RECENT_REQUEST_WINDOW`
+// (joshuafolkken/kit#2312). `cost_cli.session_verdict` prices the newest request
 // against `CONTEXT_CUT_THRESHOLD`, so no second threshold is introduced — an `under` session skips the
 // cut, and an unmeasurable one keeps the old unconditional cut as the safety net joshuafolkken/kit#1933
 // relies on. Only the pre-gate phase is checked here; the implementation-phase caller gates its own
