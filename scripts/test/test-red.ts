@@ -11,7 +11,7 @@ import { execa } from 'execa'
 import { test_red_logic, type RedVerdict } from './test-red-logic'
 
 // `josh test:red` — run the added and changed Vitest files against the pre-fix tree and print `red`,
-// `green` or `no-test` (joshuafolkken/kit#2448).
+// `green`, `no-test` or `test-only` (joshuafolkken/kit#2448).
 //
 // **The pre-fix tree is a detached worktree at the merge-base, never the caller's checkout.** The tests
 // are copied in from the working tree, so what runs is the new test against the old code, and the
@@ -26,7 +26,7 @@ const REPORT_NAME = 'report.json'
 const NODE_MODULES = 'node_modules'
 const VITEST_BIN = path.join(NODE_MODULES, '.bin', 'vitest')
 const USAGE =
-	'Usage: josh test:red — prints red / green / no-test for the changed tests on the merge-base'
+	'Usage: josh test:red — prints red / green / no-test / test-only for the changed tests on the merge-base'
 
 interface RedRun {
 	verdict: RedVerdict
@@ -34,9 +34,7 @@ interface RedRun {
 }
 
 // The changed Vitest files that still exist — a deleted test has nothing to run.
-async function changed_tests(): Promise<Array<string>> {
-	const paths = await changed_paths.read_changed_paths(false)
-
+function changed_tests(paths: ReadonlyArray<string>): Array<string> {
 	return test_red_logic.unit_test_files(paths).filter((file) => existsSync(file))
 }
 
@@ -126,12 +124,15 @@ async function verdict_on(base: string, files: ReadonlyArray<string>): Promise<R
 }
 
 // The verdict over the current checkout. No merge-base (not a repository, no default branch) reads as
-// `no-test` — there is no pre-fix tree to run against, and a guard fails open.
+// `no-test` — there is no pre-fix tree to run against, and a guard fails open. A change whose every path
+// is a test file is `test-only` without a run: the merge-base runs the same code as HEAD.
 async function run(): Promise<RedRun> {
 	const base = await change_base.resolved()
-	const files = await changed_tests()
+	const paths = await changed_paths.read_changed_paths(false)
+	const files = changed_tests(paths)
 
 	if (base === undefined || files.length === 0) return { verdict: 'no-test', files }
+	if (test_red_logic.is_test_only(paths)) return { verdict: 'test-only', files }
 
 	return { verdict: await verdict_on(base, files), files }
 }

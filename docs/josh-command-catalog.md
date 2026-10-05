@@ -241,7 +241,7 @@ Run E2E tests with Playwright (skips when absent or no e2e files)
 
 _No arguments._
 
-Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test
+Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test/test-only
 
 ---
 

@@ -26,18 +26,13 @@ describe('test_red_commit.assert_reproduces', () => {
 		)
 	})
 
-	it('lets a declared bug fix through when a test is red or none changed', async () => {
+	it.each<RedRun>([
+		{ verdict: 'red', files: FILES },
+		{ verdict: 'no-test', files: [] },
+		{ verdict: 'test-only', files: FILES },
+	])('lets a declared bug fix through when the verdict is $verdict', async (run) => {
 		await expect(
-			test_red_commit.assert_reproduces(
-				ISSUE,
-				ports_of(BUG_BODY, { verdict: 'red', files: FILES }),
-			),
-		).resolves.toBeUndefined()
-		await expect(
-			test_red_commit.assert_reproduces(
-				ISSUE,
-				ports_of(BUG_BODY, { verdict: 'no-test', files: [] }),
-			),
+			test_red_commit.assert_reproduces(ISSUE, ports_of(BUG_BODY, run)),
 		).resolves.toBeUndefined()
 	})
 
