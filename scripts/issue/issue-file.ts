@@ -31,6 +31,8 @@ interface FileArguments {
 	labels: ReadonlyArray<string>
 	repo: string | undefined
 	distinct: ReadonlyArray<number>
+	// `--over-cap`: the run is blocked by this filing, so the WIP cap does not hold it (`issue-wip.ts`).
+	is_over_cap: boolean
 }
 
 const OPTIONS = {
@@ -40,6 +42,7 @@ const OPTIONS = {
 	label: { type: 'string', multiple: true },
 	repo: { type: 'string' },
 	distinct: { type: 'string', multiple: true },
+	'over-cap': { type: 'boolean' },
 } as const
 
 // The label a `--depth` / `--route` value names, or `undefined` when it names none — read against the
@@ -101,7 +104,14 @@ function arguments_of(values: ParsedValues, title: string | undefined): FileArgu
 
 	if (labelled === undefined || !has_text(title) || !has_text(body_file)) return undefined
 
-	return { title, body_file, ...labelled, labels: values.label ?? [], repo: values.repo }
+	return {
+		title,
+		body_file,
+		...labelled,
+		labels: values.label ?? [],
+		repo: values.repo,
+		is_over_cap: values['over-cap'] === true,
+	}
 }
 
 // An unknown flag is `undefined` rather than a throw, so the answer is the usage line, not a stack trace.

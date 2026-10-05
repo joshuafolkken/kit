@@ -6,7 +6,7 @@ import { epic_report, type EpicNextResult } from './epic-report'
 
 // The `run:solo` gate on what a run is offered (joshuafolkken/kit#2776).
 //
-// `wip-cap.md`'s run-alone section says an issue whose defect reaches the verification path runs
+// `backlogrun-lanes.md`'s run-alone rule says an issue whose defect reaches the verification path runs
 // alone, and until this gate that was a judgement made at dispatch — the offer handed such an issue
 // out beside others and `backlog:drive` launched every number it was given. The label records the
 // judgement once; this applies it to every ask, so it holds without an agent in the loop.

@@ -110,7 +110,7 @@ When `josh bump` changes the version, update `docs/` for any changed behavior be
 ## Collaboration Workflow
 
 - The issue-driven flow: `prompts/collaboration-workflow.md`. **Before writing a rule as prose, place it by `prompts/collaboration-workflow/residency.md`** — computable answers go to `pnpm josh oracle:list`, ordering to `pnpm josh run:step`.
-- **Count the target repository's open Issues before filing; above the WIP cap, close one first.** Nothing honestly closable means do not file. A filing the run is blocked by is exempt, and so is an **interrupt** — three tests decide that, never judgement: a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository; both exemptions proceed, stating the overage. Meeting none of the three, a finding stays discretionary. `pnpm josh rule:guard` states it again at the call that files. `prompts/collaboration-workflow/wip-cap.md`.
+- **File through `pnpm josh issue:file` — it counts the target repository's open Issues, never a hand count; above the WIP cap, close one first.** Nothing honestly closable means do not file. A filing the run is blocked by is exempt, and so is an **interrupt** — three tests decide that, never judgement: a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository; both exemptions proceed, stating the overage. Meeting none of the three, a finding stays discretionary. `pnpm josh rule:guard` states it again at the call that files. `prompts/collaboration-workflow/wip-cap.md`.
 
 ### Shorthand Commands
 
@@ -118,7 +118,7 @@ When `josh bump` changes the version, update `docs/` for any changed behavior be
 
 **`queue` and `epicrun` were removed** — point `queue` to `backlogrun #N1 #N2 …` and `epicrun` to `backlogrun #E --only`.
 
-Read the `epic-commands` skill before any `josh epic:*` command, before writing an epic that tracks a child in another repository, and right after filing an issue. Three rules bind outside it:
+Read the `epic-commands` skill before any `josh epic:*` command, before writing an epic that tracks a child in another repository, and when `epic:bundle` places a filed issue. Three rules bind outside it:
 
 - Recording a decision removes that child's `needs-decision` label (Tier A).
 - **Fixing what the audit finds is Tier A**; park only when the contradiction is a design choice nobody has made.

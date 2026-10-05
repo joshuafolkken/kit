@@ -31,7 +31,8 @@ pnpm josh issue:file "<title>" --body-file <complete-draft.md> --depth <n> --dis
   names. **Cite `#N` in the body whenever the work follows an existing Issue** — one line is enough,
   and naming the epic itself (`part of epic #<E>`) is answered with that epic.
 - **`epic:bundle` then runs on the new Issue, in the same call.** Act on its printed answer; a `⚠`
-  means rerun `pnpm josh epic:bundle <N>` — the Issue exists, so never refile.
+  means rerun `pnpm josh epic:bundle <N>` — the Issue exists, so never refile; a placing answer
+  reads the `epic-commands` skill.
 - **Every filing route goes through it** — `prerequisite.md`'s prerequisite, `observation-filing.md`'s observation and the review round
   cap's branch-2 filing alike; the guard refuses any other filing call
   (`prompts/collaboration-workflow/rule-delivery.md`).

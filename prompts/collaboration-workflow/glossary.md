@@ -14,4 +14,4 @@
 - **interrupt** — WIP 上限を超えても起票できる、3 条件で決まる発見。別パッケージ起因の上流起票（割り込み Issue）とは別の区分。→ `prompts/collaboration-workflow/wip-cap.md` → "割り込み起票"、`prompts/collaboration-workflow/upstream-interrupt.md` → "別パッケージ起因の問題は割り込み Issue で対応する"
 - **Tier** — 判断点の 3 区分。A は可逆で自分で決める、B は拮抗していて人に聞く、C は不可逆・共有状態で明示指示が要る。→ `CLAUDE.md` → "Decision autonomy"、`prompts/collaboration-workflow/operating-rules.md` → "意思決定の自律ポリシー"
 - **carry** — `backlogrun` の 1 回の起動の予算と進捗を、セッション cut をまたいで引き継ぐ記録（`pnpm josh run:carry`）。→ `.claude/skills/workflow-commands/backlogrun-steps.md` → "The session cut is inside the invocation"
-- **wave** — エピックの子をまとめて並行実行する組。仕組みではなく、依存宣言で表す形。→ `.claude/skills/epic-commands/SKILL.md` → "Execution waves"
+- **wave** — エピックの子をまとめて並行実行する組。仕組みではなく、依存宣言で表す形。→ `.claude/skills/epic-commands/execution-waves.md` → "Execution waves — parallel, then one alone, then the rest"

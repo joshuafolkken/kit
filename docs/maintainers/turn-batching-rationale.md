@@ -1,85 +1,198 @@
-# 独立した呼び出しは同じターンに載せる — rationale
+# Independent calls go in the same turn — rationale
 
-これは `prompts/collaboration-workflow/turn-batching.md` の背後にある、メンテナー専用の根拠である — 手順の境界・ガードの範囲・計測を正当化する実測、経緯、議論を置く。run の最中に読まれることはない。エージェントが従うトリガ・行動・判定・上限・ガードの死角はすべて手順文書側に残っており、このファイルを変えても規則は何も変わらない。
+This is maintainer-only rationale behind `prompts/collaboration-workflow/turn-batching.md`: the
+measurements, history and argument that justify the procedure's boundaries, the guard's scope and the
+measurement. It is never read during a run. Every trigger, action, criterion, threshold and guard
+blind spot an agent obeys stays in the procedure document, so a change to this file changes no rule.
+The measurements, the rejected mechanisms and the history moved here from the procedure in
+joshuafolkken/kit#3177, and the text already here was brought to English at the same time.
 
-## ゲートを削っても run が縮まなかった理由
+## Why the number of turns is the cost
 
-epic #1262 の子（#1256〜#1260）がゲートを 133 秒から中央値 5 秒まで削ったのに run 全体が 5% しか縮まなかったのは、これが理由である。削った先が壁時計を決めていなかった。
+**The cost is in the round trips, not in the amount of work.** Measured on the joshuafolkken/kit#1295
+run (1,471 seconds / 153 turns):
 
-## `Edit` が最大の単一項目だった理由
+| Kind                                                                 | Count | Total tool time |
+| -------------------------------------------------------------------- | ----: | --------------: |
+| `Edit`                                                               |    34 |            48 s |
+| Small read-only `Bash` (`grep` 12 / `sed` 11 / `cat` 4 and the rest) |    32 |             6 s |
 
-実測で最大の単一項目が `Edit` 34 回だったのは、そこが最も守られていなかったからである。
+**The tools themselves ran for about 54 seconds in total.** The same 66 round trips cost
+66 × 9–13 seconds ≈ 600–850 seconds of wall clock, an order of magnitude more. The wall clock per turn
+sits in a narrow 9–13 second band, so **the number of turns sets the floor of a run.**
 
-## `batch:guard` の拒否窓
+That is why the children of epic #1262 (#1256–#1260) cut the gate from 133 seconds to a 5-second
+median and the whole run shrank by only 5%: what they cut was not what set the wall clock.
 
-拒否は 1 つの単発連続につき **1 回だけ**である（フックが読む窓を超えて続く連続では、列の開始が窓の外へ出るため窓ごとに 1 回になる — 詳細は `docs/josh-commands-automation.md` →「`josh batch:guard`」）。
+The largest single item measured was the 34 `Edit` calls because that was where the rule was kept
+least — which is why the procedure says `Edit` is covered exactly as reads are.
 
-## フォークへの配送の実装（joshuafolkken/kit#1424）
+## Rejected mechanisms
 
-joshuafolkken/kit#1424 以降、判定も「1 回だけ」の記録も、親ではなく**フォーク自身の transcript** を鍵にする — フックの入力にある `agent_id` から解決する `time_hook_transcript.transcript_of`（`scripts/time-runtime/time-hook-transcript.ts`）が単一ソースで、ガードは `scripts/josh/hook-decision.ts` 経由でそこを通る。
+- **A PreToolUse hook that "looks at one call and decides whether it is independent".** Not
+  adoptable. **The independence of a call cannot be observed from that one call.** The hook sees only
+  the call about to run; whether it depends on the previous result is not in its input. It would stop
+  legitimate dependent sequences (`grep` → `sed -n`, the read before an `Edit`), and the side it stops
+  could not explain why. It is the same shape `output-bounds.md` rejected as "telling by shape misses
+  on real data".
 
-## 書き込みが範囲に入った経緯（joshuafolkken/kit#1762）
+  **What was rejected is that way of judging, not the `PreToolUse` mechanism itself.**
+  joshuafolkken/kit#1390 implemented `pnpm josh batch:guard` **as exactly a `PreToolUse` hook**, shipped
+  in `.claude/settings.json`. It judges from **closed history** — the sequence of turns whose results
+  have come back — rather than from the one call in hand. Two single-call turns in a row are invisible
+  from one call and visible from the history. Each concern above is avoided by design: dependence is
+  read through **shared targets**, so `grep` → `sed -n` is not stopped; **writes are refused on exactly
+  the same criterion as reads** (joshuafolkken/kit#1762); and **the refusal is withdrawn when the call in
+  hand shares a target with the preceding run** (write-to-write included). The limitation that
+  remained open at the time is joshuafolkken/kit#1509, described under "How the guard's scope grew".
 
-それまでの限界は 2 つあり、どちらも書き込みに一度も届かないという同じ結果になっていた。joshuafolkken/kit#1509 が、同じファイルを続けて編集する区間では共有ターゲットの判定が列を毎回捨てて数え直すため拒否に必要な 2 件に列が届かないことを特定し（`time-bundles.ts` の write→write 例外として解消済み）、そのうえで**配線が `Bash` のみだったので `Edit` の連続にはそもそもフックが呼ばれなかった**。実測 19 run で、回収できる往復 261 件のうち **184 件（70.5%）が書き込み**、`Edit` だけで 158 件（60.5%）— 最大の寄与源が構造上ずっと圏外だった。
+- **Assume a tool that bundles several edits into one call.** Not adoptable: the harnesses this
+  repository targets do not always have one, and on the side without it the rule never fires.
+  `pnpm josh` exists on every harness, so writes are folded by the composite `pnpm josh edit:files`
+  ("The composite commands" below).
+- **Impose a minimum number of calls per turn.** Rejected. Through a run of dependent calls one per turn
+  is the right answer, and a minimum punishes correct behavior. Neither a maximum nor a minimum is
+  right; **a measurement after the fact stands in its place.**
 
-**却下されていたのは「マッチャだけを広げる案」であって、「書き込みを拒否可能にする案」ではない。** 判定述語が書き込みに常に `false` を返す状態でマッチャだけ広げれば、必ず「許可」としか答えられないプロセスが編集ごとに 1 つ増える — この費用の議論は正しく、いまも有効である。joshuafolkken/kit#1762 は**先に述語を広げて**から配線を `Bash|Edit` にしたので、マッチャが届く先には答えのある問いがある。
+The harness's general instruction ("issue calls with no dependency in the same block") **already
+existed and did not fire in measurement** — 1.13 / 1.04 / 1.03 / 1.00 calls per round trip over four
+runs. A general statement alone moves nothing, so the procedure replaced it with three things: **one
+fixed question as the criterion, naming the concrete shapes that were not being kept, and making the
+result visible as a number** — the same three that moved output tokens in `file-edits.md`.
 
-**「拒否された編集は兄弟だけが適用されて自分は残らない」という安全側の懸念は、除外ではなく依存判定の絞り込みで塞いである。** 実害が出るのは「いま書き換え中のファイル」を名指す編集だけなので、共有ターゲットを持つときは拒否を取り下げる。残るのは列がまったく触れていないファイルへの編集で、その再発行は書いたときとまったく同じ本文に当たる。
+## How the guard's scope grew
 
-## 中断中のターンと `Write` の除外の根拠
+**The refusal window.** A refusal fires **once** per run of single-call turns. A run that continues past
+the window the hook reads gets one per window, since its start leaves the window — details in
+`docs/josh-commands-automation.md` → "`josh batch:guard`".
 
-拒否されうる書き込みはいずれも本文で位置を決める形なので、再発行された編集が誤った位置に当たることはない。通常は 1 往復、この場合でも編集 1 件のやり直しで、読み取り側が既に受け入れている誤検知の代償と同じ大きさである。
+**Delivery to forks (joshuafolkken/kit#1424).** Since joshuafolkken/kit#1424 the judgement and the
+"once only" record key on **the fork's own transcript**, not the parent's.
+`time_hook_transcript.transcript_of` (`scripts/time-runtime/time-hook-transcript.ts`), resolving from
+the hook input's `agent_id`, is the single source, and the guard reaches it through
+`scripts/josh/hook-decision.ts`. A delegated child or review agent does not share the parent's record.
 
-`Write` を拒否しないこと自体がこの上限を成り立たせている。1 つのファイルを `Write` してから `Edit` するターンは実際に起きる形なので、例外ではなくツール名で除外してある。`>` によるシェルの上書きも同じ性質だが、衝突するには 1 ターンに同じパスへの書き込みが 2 件必要で、そういう形は起きない。
+**Writes joined the scope (joshuafolkken/kit#1762).** There had been two limits, both with the same
+result — the guard never reached a write. joshuafolkken/kit#1509 found that across consecutive edits to
+the same file the shared-target judgement discarded and recounted the sequence every time, so it never
+reached the two calls a refusal needs (fixed as the write→write exception in `time-bundles.ts`); and
+**the wiring was `Bash` only, so a run of `Edit`s never called the hook at all**. Over 19 measured runs,
+of 261 recoverable round trips **184 (70.5%) were writes**, 158 (60.5%) `Edit` alone — the largest
+contributor had always been structurally out of reach. **What had been rejected was "widen only the
+matcher", not "make writes refusable".** Widening the matcher while the predicate always returned
+`false` for writes would add one process per edit that can only ever answer "allow" — that cost
+argument was right and still holds. joshuafolkken/kit#1762 **widened the predicate first** and then
+wired `Bash|Edit`, so the matcher reaches a question with an answer. **The safety concern "a refused
+edit lets its siblings apply and is itself lost" is closed by narrowing the dependence check, not by an
+exclusion**: the harm comes only from an edit naming a file being rewritten right now, so a shared
+target withdraws the refusal; what remains is an edit to a file the sequence never touched, whose
+reissue meets exactly the text it was written against.
 
-## 読み取りが範囲に入った経緯（joshuafolkken/kit#1798）
+**The interrupted turn and the `Write` exclusion.** Every refusable write positions itself by its text,
+so a reissued edit never lands in the wrong place. The cost is normally one round trip — here, one
+edit redone — the same size as the false-positive cost the read side already accepts. Not refusing
+`Write` is what makes that bound hold: a turn that `Write`s a file and then `Edit`s it is a real shape,
+so `Write` is excluded by tool name rather than as an exception. A shell overwrite with `>` has the same
+nature, but colliding needs two writes to one path in one turn, and that shape does not occur.
 
-`Read` は述語（`is_guarded_call`）では最初から候補として扱われていた — 配線が `Bash|Edit` のままだったので、フックがそもそも呼ばれなかっただけである。`fullrun #1783` の実測では、本流 76 リクエストのうち **46 が単発**、3 連続以上の塊が **7 つ**あったのに対し、拒否は **2 回**しか発火していない。7 つのうち 4 つが `Read` / `Write` / `Agent` を含み、いずれも配線の外だった。**計数側は正しかった** — 単発ターンが連続を延長するかどうかは `is_bundleable` が決めており、`Read` / `Glob` / `Grep` / `Write` はいずれも延長する。したがって直したのは配線だけで、`Bash|Edit|Read` になった。
+**Reads joined the scope (joshuafolkken/kit#1798).** The predicate (`is_guarded_call`) had treated
+`Read` as a candidate from the start — the wiring stayed `Bash|Edit`, so the hook was simply never
+called. On `fullrun #1783`, of 76 main-line requests **46 were single** and there were **7** runs of three
+or more, yet the refusal fired only **twice**; four of the seven contained `Read` / `Write` / `Agent`, all
+outside the wiring. **The counting was right** — `is_bundleable` decides whether a single-call turn
+extends a run, and `Read` / `Glob` / `Grep` / `Write` all extend it. So only the wiring changed, to
+`Bash|Edit|Read`.
 
-## 事務コマンドが範囲に入った経緯（joshuafolkken/kit#1875）
+**Administrative commands joined the scope (joshuafolkken/kit#1875).** `is_bundleable` judges by a
+leading-word allow-list (`READ_COMMANDS`) and a mutation deny-list, so **every `pnpm josh …` starting
+with `pnpm` was non-bundleable** — the `pnpm` that kept out writing josh commands (`gate` / `followup` /
+`git`) also dropped read-only ones such as `issue:state` / `release:scope`. Administrative round trips
+never appeared in `Bundling:`'s recoverable count or in `batch:guard`'s judgement, and the largest
+administrative category, in the most expensive late part of a run, was always out of reach. **The
+judgement was fixed, not the rule** (that Issue's acceptance condition). What stays off the allow-list
+follows the module's consistent asymmetry: a miss costs a floor, a wrong inclusion a claim. **It
+strengthens the guard by reaching calls it could not see, rather than weakening it.**
 
-`is_bundleable` は先頭語の allow-list（`READ_COMMANDS`）と mutation deny-list で判定するので、**`pnpm` で始まる `pnpm josh …` はすべて非バンドル**だった — 書き込む josh コマンド（`gate` / `followup` / `git`）を弾くための `pnpm` が、読み取り専用の `issue:state` / `release:scope` まで一緒に落としていた。結果として事務往復は `Bundling:` の回収可能数にも `batch:guard` の判定にも一度も現れず、run の最も高い終盤で最大の事務カテゴリが構造上ずっと圏外だった。**直したのは判定であって規則ではない**（この Issue の受け入れ条件そのもの）。allow-list に入れない側の判断は、取りこぼしは floor、誤って入れれば claim、というこのモジュール一貫の非対称性に従う。**guard を弱めるのではなく、これまで見えていなかった呼び出しに届かせる強化である。**
+## Reading the round-trip measurement
 
-## 複数編集ツールの前提を joshuafolkken/kit#2366 が反証した経緯
+`Round trips:` in the timing report counts a round trip as one batch of calls a turn issued, so
+batching lowers round trips without lowering calls — the number shows directly whether cost fell
+without the work falling. The 1.50 calls-per-round-trip floor detects **not batching** rather than
+grading how much. A report reads, for example:
 
-**同じターンに複数の `Edit` を並べる形はどの harness でも成立する**ので、規則はそちらで書く — これが当初の判断だった。**ただし joshuafolkken/kit#2366 が「そちらで書く」前提を実測で反証した** — 直近 6 レーンで 230 ターンすべてが単発（密度 1.000）、native な複数編集は一度も起きていない。却下されたのは _harness の_ ツールを前提にすることで、`pnpm josh` はどの harness にも存在するから、#2366 は合成コマンド `pnpm josh edit:files` を置いた。却下はそのまま有効で、答えはその外側にある。
+```
+Round trips:
+  tool calls                    104   over 153 turn(s)
+  round trips                   104   1.00 calls per round trip
+  ⚠ independent calls are going out one per turn (floor 1.50 calls per round trip)
+```
 
-## 一般指示が発火しなかったことの帰結
+The `tool-less turns` line (`turn_count − round_trips`, joshuafolkken/kit#1875) exists because
+`batch:guard` cannot refuse a speech-only turn — with no tool call, `PreToolUse` never fires — and
+`Bundling:` structurally cannot see one. Measured: run #1864 had 149 turns with calls out of 177, and
+**28 with no tool at all**.
 
-一般論だけでは動かないので、手順文書は **判断基準を 1 問に固定し、守られていなかった具体形を名指しし、結果を数字で見えるようにする**という 3 点で置き換えている。`file-edits.md` が同じ 3 点で出力トークン側を動かしたのと同じ形である。
+## The composite commands
 
-## `tool-less turns` の実測
+**`read:files` (joshuafolkken/kit#2202).** `pnpm josh batch:guard` (the refusal) moved density on the
+main line, but in a lane child (headless `claude -p`) a refusal ends the turn and kills the child, so
+it could not fire (#2138); the notice that replaced it did not move the numbers (#2164), so #2178 set
+the guard to `off` in children. What remained was the 9-turn sequence of alternating `Read` → `Edit`
+across separate files (#2178's measurement); the edit set was not a fixed shape known in advance, so no
+existing composite command could fold it. Only composite commands had a record of moving density —
+#2165 / #2162 — while advice, presentation and notices moved nothing, so placing `read:files` at the
+Step 0 seam is not "saying it again". **What #2164 / #2178 achieved does not regress** — neither the
+batching guard nor the lane guard policy is touched, so a child is not killed by a refusal and does not
+pay every turn for advice that does not work. De-interleaving is the lever: #2178's `Read A` /
+`Edit A` / `Read B` / `Edit B` … **9 turns** become `read:files A B C D` → four `Edit`s, **2 turns**.
 
-実測 run #1864 は 177 ターン中 149 が呼び出しあり、**28 がツールなし**だった。
+**`edit:files` (joshuafolkken/kit#2366).** #2202 placed no command to fold the edits themselves,
+preferring native multi-edit (the first rejected mechanism above). joshuafolkken/kit#2366 refuted that
+preference by measurement — 230 of 230 turns across the latest six lanes were single (density 1.000);
+native multi-edit never happened once. What was rejected was assuming a _harness_ tool; `pnpm josh`
+exists on every harness, so writes are folded by a composite command for the same reason only
+composite commands moved density. #2493 made it accept `-` (stdin) and refuse a dependent edit as
+`dependent`.
 
-## 合成コマンドに至った経緯（joshuafolkken/kit#2202）
+**Handing the composite command out when the guard fires (joshuafolkken/kit#2311).** **#2276 had the
+notice name the concrete calls just issued one at a time, and density did not move (1.084 measured,
+below the 1.147 baseline).** Naming them still asked the model to "reissue them together in one turn",
+which is a request for parallel `tool_use` blocks — the very thing the model is structurally weak at.
+Composite commands were the only lever with a record (#2165 / #2162), so the notice carries a ready-to-paste
+one. It is implemented in `scripts/time-runtime/time-batch-guard.ts`'s `recent_candidates`
+(`read_fold_directive`, and `write_fold_directive` for edits since #2366), the single point every
+notice passes through; density is measured in lane children (`notice` mode), so this is where the
+measurement surface is. It widens #2202's fold at the Step 0 seam to the point mid-implementation where
+the guard fires — not another "say it again".
 
-`pnpm josh batch:guard`（拒否）は本流で密度を動かしたが、レーン子（headless `claude -p`）では拒否がターンを終わらせて子を殺すため発火できず（#2138）、代わりの通知も数字を動かさなかった（#2164）ので #2178 は子でガードを `off` にした。残ったのが、別々のファイルへ `Read` → `Edit` を交互に出す 9 ターンの並び（#2178 計測）で、編集集合が事前確定の定型でないため既存の合成コマンドでは畳めなかった。
+## Why it left residency (joshuafolkken/kit#1524)
 
-密度を動かした実績があるのは合成コマンドだけ — #2165 / #2162 — で、助言・提示・通知はいずれも動かさなかった。`read:files` を Step 0 の継ぎ目へ置くのは「もう一度言う」形ではない。
+**The prose lost on the move was not working in the first place.** Measured with the resident general
+instruction in place, runs issued 1.13 / 1.04 / 1.03 / 1.00 calls per round trip — the rule was not kept
+throughout its residency. What moved the numbers was joshuafolkken/kit#1390's hook. So **leaving
+residency loses only sentences that were being skipped**, and the path that actually worked remains.
 
-**#2164 / #2178 の成果は後退しない** — バッチガードにもレーンガードポリシーにも触れないので、子は拒否で殺されず、効かない助言の毎ターンの文脈費用も払わない。
+**It does not contradict the first rejected mechanism.** That rejected judging independence from one
+call; joshuafolkken/kit#1390 judges from **closed history**. Three single-call turns in a row are
+invisible from one call and visible from the history.
 
-**編集自体を畳むコマンドは #2202 では置かず（native な複数編集を優先、却下案第 1 項）、joshuafolkken/kit#2366 がそれを置いた。** #2202 の「native に委ねる」判断は 230/230・密度 1.000 で反証済み。合成コマンドだけが密度を動かしたのと同じ理由で、書き込みも合成コマンドで畳む。
+The delivered text (`scripts/time-runtime/time-batch-guard.ts`'s `REASON`, and `time-density.ts`'s
+runtime line) carries the same two points the resident copy carried, uncut: a call that does not depend
+on another call's result goes in the same turn; and the criterion is dependence, not the kind of call
+(reads and edits alike), while fewer round trips never means less work. **On a turn where the trigger
+does not fire nothing happens, and that is correct** — not firing means calls per round trip are above
+the 1.50 floor, which is the state of the rule being kept.
 
-## ガード通知に合成コマンドを載せた経緯（joshuafolkken/kit#2311）
+## What the marker test pins
 
-**#2276 は通知に「直前に 1 件ずつ出した具体的な呼び出し」を名指しさせたが、密度は動かなかった（実測 1.084、ベースライン 1.147 を下回った）。** 名指しても通知は依然「1 ターンにまとめて出し直せ」と求めており、これはモデルが構造的に苦手とする並列 `tool_use` ブロックの要求である。梃子として実績があるのは合成コマンドだけ（#2165 / #2162）なので、通知に貼り付け可能な合成コマンドを載せた。
+`scripts/rules/turn-batching-rule.test.ts` pins:
 
-実装は `scripts/time-runtime/time-batch-guard.ts` の `recent_candidates`（`read_fold_directive`）で、全通知配送が通る唯一の地点である。密度が計測されるのはレーン子（`notice` モード）なので、ここに合成コマンドを差し込むのが計測面に一致する。#2202 の Step 0 継ぎ目での畳み込みを、ガードが発火する実装中の一点へ広げたものであり、「もう一度言う」形の追加ではない。
-
-## 常駐から外した根拠（joshuafolkken/kit#1524）
-
-**移設で失われた散文は、そもそも効いていなかった。** 手順文書の「却下した案」の直後に記録したとおり、常駐の一般指示があった状態での実測は 1 往復あたり 1.13 / 1.04 / 1.03 / 1.00 呼び出しであり、常駐している間ずっと守られていなかった。数値を動かしたのは joshuafolkken/kit#1390 のフックである。したがって**常駐をやめても失われるのは「読み飛ばされていた文」だけ**で、実際に効いていた経路は残る。
-
-**「却下した案」の第 1 項と矛盾しない。** あれが却下したのは「1 件の呼び出しだけを見て独立性を判定する」形であり、joshuafolkken/kit#1390 が実装したのは**閉じた履歴**（既に終わったターンの並び）から判定する形である。単発呼び出しのターンが 3 つ続いたことは 1 件の呼び出しからは見えないが、履歴からは見える。
-
-## マーカーテストが固定するもの
-
-`scripts/rules/turn-batching-rule.test.ts` が次を固定する。
-
-- 配送文が規則のトリガ文と判断基準の一文を運んでいること
-- 配送文の指し先が `CLAUDE.md` ではなく手順文書であること（規則が常駐していない以上、`CLAUDE.md` を指す参照は何も指していない）
-- 手順文書が判断基準・却下した機構案・ゲートを弱めない条件・計測の読み方を持っていること
-- 実測値（`600〜850`、`1.13`）が常駐側にも residency 一覧にも貼り戻されていないこと
-- 配送されている規則の一覧（`rule-delivery.md`）と residency の一覧（`.claude/skills/workflow-commands/SKILL.md` と `prompts/collaboration-workflow/residency.md`）にこの規則が載っていること
+- that the delivered text carries the rule's trigger sentence and its criterion
+- that the delivered text points at the procedure document, not `CLAUDE.md` (with the rule no longer
+  resident, a reference to `CLAUDE.md` points at nothing)
+- that the procedure document carries the criterion, the condition never to weaken a gate, and how the
+  measurement is read; and that this file carries the rejected mechanisms and the measurements
+- that the measurements (`600–850`, `1.13`) have not been pasted back into the resident documents or
+  the residency list
+- that the delivered-rule enumeration (`rule-delivery.md`) and the residency list
+  (`docs/maintainers/residency-rationale.md` → "The resident-rule list") name this rule

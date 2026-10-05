@@ -50,6 +50,7 @@ from the page it explains.
 - [file-edits-rationale.md](./file-edits-rationale.md) — file edits
 - [shell-body-rationale.md](./shell-body-rationale.md) — shell bodies
 - [turn-batching-rationale.md](./turn-batching-rationale.md) — turn batching
+- [output-bounds-rationale.md](./output-bounds-rationale.md) — the Bash output cap and piped checks
 - [wip-cap-rationale.md](./wip-cap-rationale.md) — the open-Issue cap
 - [observation-filing-rationale.md](./observation-filing-rationale.md) — filing observations
 - [observation-ledger-rationale.md](./observation-ledger-rationale.md) — the observation ledger

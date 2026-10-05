@@ -16,7 +16,7 @@ const PLANNED_LABEL = 'run:planned'
 // forever (joshuafolkken/kit#860).
 const NEEDS_DECISION_LABEL = 'needs-decision'
 // Marks an issue whose defect reaches the verification path, so it runs with nothing beside it
-// (joshuafolkken/kit#2776). A run applies it from the verification-path enumeration in `wip-cap.md`;
+// (joshuafolkken/kit#2776). A run applies it from the verification-path enumeration in `backlogrun-lanes.md`;
 // `backlog:next` enforces it (`backlog-solo.ts`), so the rule no longer rests on a judgement at
 // dispatch time.
 const RUN_SOLO_LABEL = 'run:solo'

@@ -38,15 +38,12 @@ const POINTER_DECLARATION = new RegExp(
 	String.raw`^\*\*${POINTER_MARKER}[^${BACKTICK}]*${BACKTICK}(\.claude/skills/[\w./-]+\.md)${BACKTICK}`,
 	'mu',
 )
-const RESIDENCY = 'prompts/collaboration-workflow/residency.md'
+// The convention's prose left the topic directory in joshuafolkken/kit#3177, so no topic file quotes
+// the marker while explaining it and none needs exempting from the candidate check below.
+const RESIDENCY_RATIONALE = 'docs/maintainers/residency-rationale.md'
 // `collaboration-workflow` — the one segment `prompts/collaboration-workflow/x.md` and a relative
 // `./collaboration-workflow/x.md` link both carry.
 const TOPIC_DIRECTORY_NAME = WORKFLOW_PROMPT_DIRECTORY.slice(PROMPT_ROOT.length + 1)
-
-// The topic file that states the convention rather than living under it. It quotes the marker while
-// explaining the declaration, so the candidate check below would otherwise read it as a conversion
-// whose declaration is malformed.
-const CONVENTION_TOPICS: ReadonlySet<string> = new Set([RESIDENCY])
 
 interface PointerTopic {
 	topic: string
@@ -66,9 +63,7 @@ function pointer_topics(): ReadonlyArray<PointerTopic> {
 // joshuafolkken/kit#1176 with the sentence phrased differently would otherwise fall out of every
 // assertion here and take its citations with it, and the suite would stay green.
 function candidate_topics(): ReadonlyArray<string> {
-	return workflow_prompt_files().filter(
-		(path) => read_repo_file(path).includes(POINTER_MARKER) && !CONVENTION_TOPICS.has(path),
-	)
+	return workflow_prompt_files().filter((path) => read_repo_file(path).includes(POINTER_MARKER))
 }
 
 // Every document a reader could be routed from. The pointer's own file is excluded because it is
@@ -166,7 +161,7 @@ describe('a pointer is reached from the index, never from a citation', () => {
 // what joshuafolkken/kit#1178 was filed about.
 describe('the decision is written where the next conversion will read it', () => {
 	it('is recorded in the residency topic with its criterion', () => {
-		const content = read_unwrapped(RESIDENCY)
+		const content = read_unwrapped(RESIDENCY_RATIONALE)
 
 		expect(content).toContain('指し先になった話題ファイルは引用しない')
 		expect(content).toContain('その話題の本文はどのファイルにあるか')

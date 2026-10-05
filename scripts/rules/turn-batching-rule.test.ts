@@ -25,13 +25,17 @@ const TOPIC_FILE = 'turn-batching.md'
 const CANONICAL = `${WORKFLOW_PROMPT_DIRECTORY}/${TOPIC_FILE}`
 const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
 const RESIDENCY = `${WORKFLOW_PROMPT_DIRECTORY}/residency.md`
+// joshuafolkken/kit#3177 moved the measurements, the rejected mechanisms and the resident-rule list
+// out of the topic files into these English rationale documents, so the markers follow them there.
+const RATIONALE = 'docs/maintainers/turn-batching-rationale.md'
+const RESIDENCY_RATIONALE = 'docs/maintainers/residency-rationale.md'
 const SUITE_PATH = 'scripts/rules/turn-batching-rule.test.ts'
 // The trigger that now delivers the rule. Named once: the enumeration, the residency list and this
 // suite have to agree on the command, and a string kept correct in one of three places is not kept.
 const GUARD_COMMAND = 'pnpm josh batch:guard'
 // The figures the issue was filed on. Quotable enough to be the first thing pasted back into an
 // always-loaded document, which is what makes them the marker for "the reasoning stayed put".
-const MEASUREMENTS: ReadonlyArray<string> = ['600〜850', '1.13']
+const MEASUREMENTS: ReadonlyArray<string> = ['600–850', '1.13']
 
 // Every sentence here changes what an agent does. Drop the criterion and it reads as a rule about
 // reading, which a turn issuing one `Edit` at a time walks straight past; drop the last and "fewer
@@ -94,7 +98,8 @@ describe.each(AI_DOCS)('%s — keeps the trigger, not the body', (document_path)
 	it.each(MEASUREMENTS)('leaves the measurement %j at the pointer', (measurement) => {
 		expect(read_unwrapped_rule_surface(document_path)).not.toContain(measurement)
 		expect(read_unwrapped(RESIDENCY)).not.toContain(measurement)
-		expect(read_unwrapped(CANONICAL)).toContain(measurement)
+		expect(read_unwrapped(CANONICAL)).not.toContain(measurement)
+		expect(read_unwrapped(RATIONALE)).toContain(measurement)
 	})
 })
 
@@ -118,11 +123,11 @@ describe(`${CANONICAL} — carries the criterion and the reasoning`, () => {
 	// The first is the one that looks obviously right and is not: a hook sees one call and cannot see
 	// what it depends on.
 	it.each([
-		'**呼び出しの独立性は、1 件の呼び出しからは観測できない。**',
-		'複数編集を 1 呼び出しにまとめるツールを前提にする。',
-		'ターンごとに件数の下限を課す。',
+		'**The independence of a call cannot be observed from that one call.**',
+		'**Assume a tool that bundles several edits into one call.**',
+		'**Impose a minimum number of calls per turn.**',
 	])('records the rejected mechanism %j', (marker) => {
-		expect(content).toContain(marker)
+		expect(read_unwrapped(RATIONALE)).toContain(marker)
 	})
 
 	it('says how the result is read back', () => {
@@ -137,15 +142,15 @@ describe(`${CANONICAL} — carries the criterion and the reasoning`, () => {
 // **The reconciliation has to sit with the rejection**, not 30 lines below it: a reader who stops at
 // the bullet meets a distributed mechanism described as impossible to build, and then reads the
 // refusal it issues as unexpected behavior.
-describe(`${CANONICAL} — reconciles the rejection with the shipped guard`, () => {
-	const content = read_unwrapped(CANONICAL)
+describe(`${RATIONALE} — reconciles the rejection with the shipped guard`, () => {
+	const content = read_unwrapped(RATIONALE)
 
 	// The limitation is named because the correction is about the record, not about the mechanism
 	// working: #1509 is open, so a reader told only that the guard ships would read it as effective.
 	it.each([
-		'却下したのはこの判定のしかたであって、`PreToolUse` という機構そのものではない。',
+		'**What was rejected is that way of judging, not the `PreToolUse` mechanism itself.**',
 		'joshuafolkken/kit#1390',
-		'**閉じた履歴**',
+		'**closed history**',
 		'joshuafolkken/kit#1509',
 	])('states %j', (marker) => {
 		expect(content).toContain(marker)
@@ -155,15 +160,15 @@ describe(`${CANONICAL} — reconciles the rejection with the shipped guard`, () 
 	// marker above passes beside it — the reconciliation can be added without the false claim being
 	// taken out, and that half-fix is the regression this pins.
 	it('no longer calls the distributed mechanism unavailable', () => {
-		expect(content).not.toContain(
+		expect(read_unwrapped(CANONICAL)).not.toContain(
 			'**PreToolUse フックが「2 ターン連続で単発呼び出し」を拒否する。** 採れない。',
 		)
 	})
 })
 
 // The residency list is the second half of the rule: a rule the criterion moved and that is not
-// listed as moved has not been checked against it (`residency.md`).
-describe.each([RESIDENCY])('%s — lists the rule as delivered', (list_path) => {
+// listed as moved has not been checked against it (`residency-rationale.md`).
+describe.each([RESIDENCY_RATIONALE])('%s — lists the rule as delivered', (list_path) => {
 	const content = read_unwrapped(list_path)
 
 	it('names the rule', () => {
@@ -193,9 +198,9 @@ describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, 
 	})
 })
 
-describe(`${RESIDENCY} — names the suite that pins the rule`, () => {
+describe(`${RESIDENCY_RATIONALE} — names the suite that pins the rule`, () => {
 	it('cites this file', () => {
-		expect(read_unwrapped(RESIDENCY)).toContain(SUITE_PATH)
+		expect(read_unwrapped(RESIDENCY_RATIONALE)).toContain(SUITE_PATH)
 	})
 })
 
