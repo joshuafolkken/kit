@@ -88,8 +88,8 @@ function format_issue_state(state: IssueState): string {
 
 // The same three lines, under the number they belong to. Kept as a separate function rather than a
 // flag on the one above, so the single-number report has no branch that could ever prepend a fourth
-// line to it: `.claude/skills/workflow-commands/SKILL.md` §2z and `.claude/skills/diag/SKILL.md`
-// read those three verbatim, and §2z's `needs-human-review` stop is decided from them.
+// line to it: `.claude/skills/workflow-commands/needs-human-review.md` and `.claude/skills/diag/SKILL.md`
+// read those three verbatim, and `needs-human-review.md`'s `needs-human-review` stop is decided from them.
 function format_attributed_issue_state(issue_number: string, state: IssueState): string {
 	return `${ISSUE_LABEL}${issue_number}\n${format_issue_state(state)}`
 }

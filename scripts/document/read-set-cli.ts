@@ -48,15 +48,15 @@ const POINT_OF_USE_LABEL = '-- read at the point of use, not at the entry --'
 const LANE_CHILD_NOTE: ReadonlyArray<string> = [
 	'  a dispatched lane child (`JOSH_LANE_CHILD`) reads this trimmed set:',
 	'  - skips the point-of-use documents the parent owns — child dispatch, lane opening, the progress watcher and the hand-off',
-	'  - omits SKILL.md §0/§2a/§2b/§2c/§2e/§2i/§3 — dispatch already authorized the run and a leaf child never uses them',
+	'  - omits SKILL.md §0/§3 — dispatch already authorized the run and a leaf child edits no rule',
 ]
 // **The `backlogrun` parent reads a trimmed set of its own** — a scheduler that never implements, so
 // the implementer-only `SKILL.md` sections are read section by section rather than whole
-// (joshuafolkken/kit#2256). A *different* trim from the lane child's: the parent keeps §0/§2b/§2c/§2e/
-// §2i, which are the scheduler's own, and drops no point-of-use document.
+// (joshuafolkken/kit#2256). A *different* trim from the lane child's: the parent keeps §0, which is the
+// scheduler's own, and drops no point-of-use document.
 const BACKLOGRUN_PARENT_NOTE: ReadonlyArray<string> = [
 	'  the backlogrun parent (scheduler) reads this trimmed set:',
-	'  - omits SKILL.md §2a/§2f/§2g/§3 — the parent never implements, so it claims no tree and files no `into` target',
+	'  - omits SKILL.md §3 — the parent edits no rule mid-run',
 	'  - keeps every point-of-use document — the parent is the one dispatching children and running lanes',
 ]
 const FETCH_RULE =

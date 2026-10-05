@@ -21,7 +21,7 @@
 - **ターン内バッチング**（`turn-batching.md`）
   - 発火点: `pnpm josh batch:guard` — 単発呼び出しのターンが 3 つ続いた次の `Bash` / `Edit` / `Read`。単発が続くかぎり、さらに 3 ターンごとに**再び発火する**（joshuafolkken/kit#2164）
   - 発火しないとき: 往復あたりの呼び出し数が下限を上回っている ＝ 規則は既に守られている
-- **調査の委譲しきい値**（`SKILL.md` → §2b）
+- **調査の委譲しきい値**（`delegation.md`）
   - 発火点: `pnpm josh investigation:guard` — 編集しないファイルの読み取りが 3 件目に達した `Read` / `Bash`。拒否の後も読み取りがもう一度しきい値まで積み上がれば**再び発火する**
   - 発火しないとき: 読み取りがしきい値未満 ＝ 委譲する対象がまだ無い
 - **バックログ WIP 上限**（`wip-cap.md`）
@@ -30,10 +30,10 @@
 - **直接起票の禁止**（`docs/josh-commands-automation.md` → `josh issue:file`、joshuafolkken/kit#2808）
   - 発火点: `pnpm josh rule:guard` — `josh issue:file` を通さずに Issue を作成する `Bash`（`gh issue create`、または `…/issues` への `title` 付き POST）。拒否文は `pnpm josh issue:file` の書式を渡す。**毎回発火する**
   - 発火しないとき: `pnpm josh issue:file` で起票している ＝ 重複探し・本文の検査・`epic:bundle` までの全段がそろっている
-- **1 ラン 10 件の起票上限**（`.claude/skills/workflow-commands/SKILL.md` → §2d、`observation-filing.md`）
+- **1 ラン 10 件の起票上限**（`.claude/skills/workflow-commands/prerequisite.md`、`observation-filing.md`）
   - 発火点: `pnpm josh rule:guard` — 拒否されていない起票が既に 10 件あるランの 11 件目の `pnpm josh issue:file`。失敗した呼び出しは数えない。**毎回発火する**
   - 発火しないとき: 拒否されていない起票が 10 件未満 ＝ 上限に触れていない
-- **Issue コメントの読み取り**（`SKILL.md` → §2g）
+- **Issue コメントの読み取り**（`issue-comments.md`）
   - 発火点: `pnpm josh rule:guard` — Issue 本文だけを読む `Bash`（`gh issue view <N>`、または `…/issues/<N>` で終わる GET）。コメント込みで読み直すまで毎回拒否する
   - 発火しないとき: Issue を読んでいない、または最初から `--comments` ／ `--json comments` ／ `…/comments` で読んでいる
 - **本文をシェルに載せない**（`shell-body.md`）
@@ -78,13 +78,13 @@
 - **停止時の通知**（`CLAUDE.md` →「Mid-workflow stop notification」、joshuafolkken/kit#2121）
   - 発火点: `pnpm josh stop:guard` — 作業ツリーを押さえたまま、その turn に `confirmation` 通知を出さずに止まる。**停止をブロックする**
   - 発火しないとき: 押さえが無い、`confirmation` 通知が末尾にある、または pre-gate cut を取った回 ＝ 人待ちの停止ではない
-- **hold の解放**（`.claude/skills/workflow-commands/SKILL.md` → §2f、joshuafolkken/kit#2121）
+- **hold の解放**（`.claude/skills/workflow-commands/working-tree-hold.md`、joshuafolkken/kit#2121）
   - 発火点: `pnpm josh stop:guard` — ツリーが綺麗なのに `run:hold` 記録が残ったまま止まる。**停止をブロックする**
   - 発火しないとき: ツリーが汚れている（`halfrun` の commit 前停止・`needs-human-review` 停止）、または解放済み ＝ 次のランが踏まない
 - **Issue 引用の書式**（`prompts/collaboration-workflow/issue-citation.md`、joshuafolkken/kit#2121・joshuafolkken/kit#2247）
   - 発火点: `pnpm josh stop:guard` — 最後の返信の地の文に裸の `#N` を含む。**停止をブロックする**。引用を直して返信を出し直させる
   - 発火しないとき: リンク形式・コード／引用行の中・`PR` 直後の `#N`・GitHub 向け成果物 ＝ 差し戻す裸の番号が無い
-- **起票の申し出**（`.claude/skills/workflow-commands/SKILL.md` → §2i、joshuafolkken/kit#2422）
+- **起票の申し出**（`.claude/skills/workflow-commands/observation-filing.md`、joshuafolkken/kit#2422）
   - 発火点: `pnpm josh stop:guard` — 最後の返信の地の文が起票を申し出る（「起票してよければ」等）のに、起票していない。**停止をブロックする**
   - 発火しないとき: 起票済み、フェンス／引用行の中、第三者の `owner/repo` を名指す、または owner 不明 ＝ 保留された Tier A 起票が無い
 - **規則本文を散文に書き足す前の第 0 問・順序の問い**（`residency.md`、joshuafolkken/kit#2272・joshuafolkken/kit#2324）

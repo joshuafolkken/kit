@@ -45,7 +45,7 @@ gh api "repos/{owner}/{repo}/issues?state=open&per_page=100" --paginate \
 
 ### 実行が詰まる起票 — 上限が効かない側
 
-前提 Issue（`SKILL.md` → §2d）、別パッケージ起因の割り込み Issue、ユーザーが `new` と打った入口、`issue:scout` が重複無しと答えた新規作業、**そして分割判定が作る子 Issue と epic**。**これらは起票しないと実行が進まない。**
+前提 Issue（`prerequisite.md`）、別パッケージ起因の割り込み Issue、ユーザーが `new` と打った入口、`issue:scout` が重複無しと答えた新規作業、**そして分割判定が作る子 Issue と epic**。**これらは起票しないと実行が進まない。**
 
 - **上限を理由に止めない。** 理由は `docs/maintainers/wip-cap-rationale.md` →「実行が詰まる起票を止めない理由」。
 - **分割の子がここに入る理由**: 分割を検出した `fullrun` / `halfrun` は「子と epic を起票して **STOP**」と定められている（`fullrun.md` / `halfrun.md`）。**分割するかどうかを決めるのは分割判定の側**で、既定はもう「分割しない」に上がっている — 上限が二重に効く必要はない。

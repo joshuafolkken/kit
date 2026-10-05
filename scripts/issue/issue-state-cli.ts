@@ -170,7 +170,7 @@ async function read_all(request: StateRequest): Promise<ReadonlyArray<IssueRepor
 }
 
 // `[]` for a number that produced no state, so one unresolvable number costs the others nothing.
-// The heading is withheld for a single number: `.claude/skills/workflow-commands/SKILL.md` §2z and
+// The heading is withheld for a single number: `.claude/skills/workflow-commands/needs-human-review.md` and
 // `.claude/skills/diag/SKILL.md` read that report's three lines verbatim.
 function state_blocks(report: IssueReport, should_attribute: boolean): ReadonlyArray<string> {
 	if (report.result.kind !== 'state') return []

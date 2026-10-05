@@ -29,7 +29,7 @@ whether *several findings from one session* are one Issue — and reads the **sa
 same conjunction**: separability, and whether the whole clearly exceeds one gate.
 `pnpm josh issue:fold "<title>" …` answers `fold` / `separate` / `no-fold-needed`; its size half is
 `pnpm josh split:assess`, called not recomputed, and `separate` needs both halves exactly as `split`
-does. **There is no second criterion.** §2i's observation, the review round cap's branch 2 and §2d's
+does. **There is no second criterion.** `observation-filing.md`'s observation, the review round cap's branch 2 and `prerequisite.md`'s
 prerequisite each route a second filing through it, delivered by `pnpm josh rule:guard` at the run's
 second `pnpm josh issue:file` call, never the first.
 
@@ -60,7 +60,7 @@ why a `split` from this command is the size condition met, not a decision to div
 
 "This needs something else done first" is a different answer from "this is really several things". A
 split means the request in hand contains two or more deliverables; a prerequisite means it is still
-**one** deliverable that has another one in front of it. The prerequisite rule is `SKILL.md` → §2d, its
+**one** deliverable that has another one in front of it. The prerequisite rule is `prerequisite.md`, its
 single source; each entry's own branch is in `backlogrun-park.md` → "A prerequisite discovered mid-run" and, for
 the stopping entry points, in `fullrun.md` / `halfrun.md`.
 

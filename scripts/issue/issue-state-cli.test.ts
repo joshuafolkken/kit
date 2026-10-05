@@ -20,7 +20,7 @@ const REPO = 'owner/repo'
 const READ_CLOSED = { kind: 'read', json: CLOSED_JSON }
 const READ_OPEN = { kind: 'read', json: OPEN_JSON }
 // The one-number report, spelled out rather than composed from the formatter: this is the shape
-// `.claude/skills/workflow-commands/SKILL.md` §2z and `.claude/skills/diag/SKILL.md` read verbatim,
+// `.claude/skills/workflow-commands/needs-human-review.md` and `.claude/skills/diag/SKILL.md` read verbatim,
 // so a test that built it the same way the code does would agree with any change to either.
 const SINGLE_REPORT = 'state: CLOSED\nlabels: in-progress\nhuman_review: no'
 
@@ -154,7 +154,7 @@ function answer_closed_then_open(): void {
 // joshuafolkken/kit#1302: several numbers in one call. A `diag` table reads a state per row, and one
 // process start plus one round trip per row is what made five rows cost about eight seconds.
 describe('issue_state_cli.run — several numbers in one call', () => {
-	// The load-bearing half: §2z's `needs-human-review` stop and the `diag` skill both read the three
+	// The load-bearing half: `needs-human-review.md`'s `needs-human-review` stop and the `diag` skill both read the three
 	// lines of a one-number report verbatim, so the batch may not add a fourth line to that case.
 	it('prints a one-number report exactly as it did before', async () => {
 		classified_mock.mockResolvedValue(READ_CLOSED)

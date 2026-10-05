@@ -115,7 +115,7 @@ summary is bounded the way it is".
 3. **Observations that could bite later** — something noticed and not filed, a flaky check, a
    surprising diff, work a later child will collide with. **This is the only route a child's
    discretionary observation has**: a child files `route:tier-a` and `route:interrupt` only, and the
-   parent files what survives — `SKILL.md` → §2i, the single source. **What the parent does with the
+   parent files what survives — `observation-filing.md`, the single source. **What the parent does with the
    rest is append it, not drop it**: an observation that cannot cite the depth-0 work it blocked
    becomes one line in the observation ledger, and a second line under the same key files it. **A
    child appends only to its own issue's file, `docs/maintainers/observations/<N>.md`, in its own

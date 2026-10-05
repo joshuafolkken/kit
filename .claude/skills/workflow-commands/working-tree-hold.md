@@ -1,8 +1,8 @@
 # The working-tree hold — one run per tree
 
-**This is the body of `SKILL.md` §2f, relocated here so the entry read carries the trigger and the
-pointer, not the procedure** (joshuafolkken/kit#2189). `SKILL.md` §2f is the resident stub, and
-`fullrun.md` / `halfrun.md` route here for the definition. It is read at its point of use — the moment
+**This file is the single source, so the entry read carries the trigger and the pointer, not the
+procedure** (joshuafolkken/kit#2189). `SKILL.md` → §2's table keeps the trigger, and
+`entry-sequence.md` routes here for the definition. It is read at its point of use — the moment
 a run is about to claim or release the tree.
 
 **Ask `pnpm josh run:hold` before anything else, and obey what it answers.** It is the first call of

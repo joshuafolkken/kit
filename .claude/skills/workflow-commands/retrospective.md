@@ -1,7 +1,7 @@
-# The end-of-run retrospective — `SKILL.md` §2j's body
+# The end-of-run retrospective
 
-**This is `SKILL.md` → §2j's procedure, and it is read when `run:step` prints the retrospective step —
-not at the entry** (joshuafolkken/kit#2328). §2j keeps the rule itself: run what `run:step` prints once,
+**This is the retrospective's procedure, and it is read when `run:step` prints the retrospective step —
+not at the entry** (joshuafolkken/kit#2328). `SKILL.md` → §2's table keeps the rule itself: run what `run:step` prints once,
 file the improvements worth carrying into the next run, stack the rest, and mark the step done.
 Everything that decides *how* — what the four sections mean, how the top two are chosen rather than
 rationed, the exclusions, and the `auto-ok` carve-out that lets the next run pick them up — is here,
@@ -53,7 +53,7 @@ ceiling on what may be recorded. **File nothing when nothing passes** — a run 
 improvement worth carrying files zero Issues, and that is what makes the "file → drain → file again"
 loop converge.
 
-**Exclude what is already filed or already done, through the existing scout** (`SKILL.md` → §2e). File
+**Exclude what is already filed or already done, through the existing scout** (`issue-scout.md`). File
 each with `pnpm josh issue:file`, which runs the scout before creating anything: an **open** candidate
 covering the same work means do not file it, and a `(closed)` candidate covering it means the work is
 already merged. Neither exclusion is a new mechanism. The same call runs `epic:bundle` on each new
