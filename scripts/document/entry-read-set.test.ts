@@ -14,7 +14,7 @@ const ROOT = process.cwd()
 // section ("The question"), so it exercises the section-saving measurement — reading that section
 // rather than the whole file it sits in. (joshuafolkken/kit#2189 turned the command files into
 // manifests: `split-assessment.md` left the entry table and became a section-cite of the split
-// decision, and the release-ask pointer at `followup-reference.md` moved into `fullrun-steps.md`,
+// decision, and the release-ask pointer at `followup.md` moved into `fullrun-steps.md`,
 // read on demand rather than at the entry.)
 const SECTION_CITER = 'fullrun'
 const SPLIT_QUESTION_HEADING = 'The question'

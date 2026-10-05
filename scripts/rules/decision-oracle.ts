@@ -140,7 +140,7 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		decision: 'Whether a release is owed after this merge',
 		args: '',
 		vocabulary: [REQUIRED, SKIP, UNKNOWN],
-		single_source: '.claude/skills/workflow-commands/followup-reference.md',
+		single_source: '.claude/skills/workflow-commands/followup.md',
 	},
 	{
 		name: 'epic:bundle',

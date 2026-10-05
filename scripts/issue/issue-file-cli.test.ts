@@ -5,6 +5,7 @@ import { repo_party } from '#scripts/discovery/repo-party'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { repository_labels } from '#scripts/repo/repository-labels'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_scout_cli } from './issue-scout-cli'
@@ -55,6 +56,7 @@ writeFileSync(origin_path, `${VALID_BODY}\n## Origin\n\n${HERE}#2808\n`)
 const scout = vi.spyOn(issue_scout_cli, 'scout')
 const exec_gh_api = vi.spyOn(git_gh_exec, 'exec_gh_api')
 const report_for = vi.spyOn(epic_bundle_cli, 'report_for')
+const ensure_labels = vi.spyOn(repository_labels, 'ensure_labels')
 
 function argv_of(body_path: string, ...extra: ReadonlyArray<string>): Array<string> {
 	return [TITLE, '--body-file', body_path, '--depth', '1', ...extra]
@@ -74,6 +76,7 @@ beforeEach(() => {
 	scout.mockResolvedValue({ report: 'Duplicates: none', candidates: [] })
 	exec_gh_api.mockResolvedValue(ISSUE_URL)
 	report_for.mockResolvedValue(SUCCESS_EXIT_CODE)
+	ensure_labels.mockReturnValue([])
 })
 
 afterEach(() => {
@@ -123,6 +126,18 @@ describe('issue_file_cli.run — a filing that clears every step', () => {
 	})
 })
 
+// joshuafolkken/kit#3176: a repository missing the depth labels gets them before the create call, so
+// the create never auto-creates one with a generated color.
+describe('issue_file_cli.run — the labels it applies exist first', () => {
+	it('provisions the missing labels in the target repository before the create call', async () => {
+		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', THERE))).toBe(SUCCESS_EXIT_CODE)
+		expect(ensure_labels).toHaveBeenCalledExactlyOnceWith(THERE)
+		expect(ensure_labels.mock.invocationCallOrder[0]).toBeLessThan(
+			exec_gh_api.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+})
+
 describe('issue_file_cli.run — a refused filing sends nothing', () => {
 	it('refuses a body the lint rejects', async () => {
 		expect(await issue_file_cli.run(argv_of(invalid_path))).toBe(FAILURE_EXIT_CODE)
@@ -142,6 +157,7 @@ describe('issue_file_cli.run — a refused filing sends nothing', () => {
 		)
 		expect(console.error).toHaveBeenCalledWith(issue_file_cli.THIRD_PARTY_MESSAGE)
 		expect(exec_gh_api).not.toHaveBeenCalled()
+		expect(ensure_labels).not.toHaveBeenCalled()
 	})
 })
 

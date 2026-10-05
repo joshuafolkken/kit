@@ -366,7 +366,7 @@ closing with the release tail below. Its output is the Telegram body too — pas
 `pnpm josh notify --body-file`.
 
 **That same session asks `pnpm josh release:scope` once, after the last child has merged** — in the
-primary checkout, after the last lane is closed, and never once per child. `followup-reference.md` →
+primary checkout, after the last lane is closed, and never once per child. `followup.md` →
 "When `pnpm josh release` runs" is the single source for the position and the three answers. `run:report`
 appends that answer as the summary's closing line: on `required` the request and the exact command, on
 `unknown` the word `unknown`, never rounded to `skip`.

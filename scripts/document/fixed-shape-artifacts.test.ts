@@ -16,7 +16,7 @@ function read_repo_file(relative_path: string): string {
 
 const REPORT_FORMAT = 'prompts/collaboration-workflow/report-format.md'
 const ISSUE_TEMPLATE = 'prompts/collaboration-workflow/issue-template.md'
-const OBSERVATION_FILING = '.claude/skills/workflow-commands/observation-filing.md'
+const OBSERVATION_LEDGER = '.claude/skills/workflow-commands/observation-ledger.md'
 
 describe('report:lint agrees with report-format.md', () => {
 	const document = read_repo_file(REPORT_FORMAT)
@@ -76,15 +76,15 @@ describe('issue:backlinks agrees with issue-template.md', () => {
 	})
 })
 
-describe('the observation ledger grammar agrees with observation-filing.md', () => {
+describe('the observation ledger grammar agrees with observation-ledger.md', () => {
 	it('the document defines the five-field line grammar', () => {
-		expect(read_repo_file(OBSERVATION_FILING)).toContain(
+		expect(read_repo_file(OBSERVATION_LEDGER)).toContain(
 			'- k:<slug> | d<n> | <YYYY-MM-DD> | <where> | <what>',
 		)
 	})
 
 	it('carries the user-found bug entry, keyed by the kind of miss at depth 1', () => {
-		const document = read_repo_file(OBSERVATION_FILING)
+		const document = read_repo_file(OBSERVATION_LEDGER)
 
 		expect(document).toContain('user-found')
 		expect(document).toContain('k:missed-')

@@ -643,8 +643,9 @@ pnpm josh issue:file "<title>" --body-file body.md --depth 1 --distinct 2801,279
 2. Check the body against the same criteria as [`josh issue:lint`](#josh-issuelint). Refuse on any problem.
 3. When the target is another repository, confirm the `## Origin` section names the originating issue (`owner/repo#N` or a URL). Refuse when it does not.
 4. Run the same duplicate search as [`josh issue:scout`](#josh-issuescout) and print its report. While there are candidates, file nothing until every one is named in `--distinct`. A duplicate is not filed; it is folded into the existing issue by `issue-fold-existing.md`. A filing to another repository points `GH_REPO` at the target, so the duplicate search and the epic decision run there.
-5. File the issue with the depth, the route, the classification label the body declares (`bug` / `enhancement` / `breaking-change`) and any extra labels in one create request, and print its URL.
-6. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run. The issue already exists, so the exit code stays 0.
+5. Create any missing workflow label (depth / route) with its color and description — the same set as [`josh sync`](josh-commands.md#josh-sync). A label that cannot be created is printed with a warning, and the filing goes on.
+6. File the issue with the depth, the route, the classification label the body declares (`bug` / `enhancement` / `breaking-change`) and any extra labels in one create request, and print its URL.
+7. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run. The issue already exists, so the exit code stays 0.
 
 A refusal in steps 1–4 files nothing and exits 1. The per-run filing cap (`filing-cap`) and the `issue:fold` required before a second filing (`issue-fold`) apply to calls of this command. A refused call is not counted.
 
