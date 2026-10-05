@@ -6,6 +6,7 @@ const BEHAVIOR_BODY = '## 背景\n\n- 種別: 振る舞い変更\n'
 const UNIT_TEST = 'scripts/a.test.ts'
 const RUNTIME_FILE = 'scripts/a.ts'
 const E2E_SPEC = 'src/page.e2e.ts'
+const LEDGER_ENTRY = 'docs/maintainers/observations/3208.md'
 
 describe('test_red_logic.is_bug_fix', () => {
 	it('reads the bug declaration line', () => {
@@ -40,6 +41,15 @@ describe('test_red_logic.is_test_only', () => {
 	it('is false once an exempt file a document-rule test reads changed beside the test', () => {
 		expect(test_red_logic.is_test_only([UNIT_TEST, 'docs/a.md'])).toBe(false)
 		expect(test_red_logic.is_test_only([UNIT_TEST, 'prompts/a.md'])).toBe(false)
+	})
+
+	it('ignores the observation ledger entry a run commits beside the test', () => {
+		expect(test_red_logic.is_test_only([UNIT_TEST, LEDGER_ENTRY])).toBe(true)
+		expect(test_red_logic.is_test_only([UNIT_TEST, LEDGER_ENTRY, 'docs/a.md'])).toBe(false)
+	})
+
+	it('is false when only the observation ledger changed', () => {
+		expect(test_red_logic.is_test_only([LEDGER_ENTRY])).toBe(false)
 	})
 })
 

@@ -1,4 +1,5 @@
 import { issue_bug_label } from '#scripts/issue/issue-bug-label'
+import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { z } from 'zod'
 import { test_declared_logic } from './test-declared-logic'
 
@@ -37,8 +38,12 @@ function unit_test_files(paths: ReadonlyArray<string>): Array<string> {
 // (joshuafolkken/kit#3214). The merge-base then runs the same code as HEAD, so its result equals HEAD's
 // and says nothing about the fix. Exempt paths do not count: a document-rule test reads `*.md` and
 // `prompts/` files, so a change to one of those is pre-fix content the test can be red against.
+// Observation ledger paths do not count either way (joshuafolkken/kit#3230): a run commits its own
+// ledger entry, and no test reads it as pre-fix content.
 function is_test_only(paths: ReadonlyArray<string>): boolean {
-	return paths.every((path) => test_declared_logic.is_test_file(path))
+	const counted = paths.filter((path) => !observation_ledger.is_ledger_path(path))
+
+	return counted.length > 0 && counted.every((path) => test_declared_logic.is_test_file(path))
 }
 
 // Vitest's JSON report carries one `testResults` entry per file it loaded — a file that failed to load
