@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { document_byte_budget } from '#scripts/document/document-byte-budget'
+import { resident_budget } from '#scripts/document/resident-budget'
 import { describe, expect, it } from 'vitest'
 import { bytes_command } from './bytes-command'
 
@@ -9,6 +10,7 @@ const { argument_row, entry_row, entry_rows, near_ceiling_statuses } = bytes_com
 const { scan_lines, status_row, NOT_A_FILE, NOT_BUDGETED } = bytes_command
 
 const JOSH_COMMANDS = 'docs/josh-commands.md'
+const CLAUDE_MD = 'CLAUDE.md'
 const TEMP_PREFIX = 'kit-bytes-'
 
 describe('status_row — one budgeted document', () => {
@@ -56,6 +58,36 @@ describe('argument_row — a path handed on the command line', () => {
 
 		try {
 			expect(argument_row(JOSH_COMMANDS, package_root)).toContain(NOT_A_FILE)
+		} finally {
+			rmSync(package_root, { recursive: true, force: true })
+		}
+	})
+})
+
+describe('argument_row — the resident CLAUDE.md', () => {
+	it('counts the resident CLAUDE.md against the resident limit', () => {
+		const row = argument_row(CLAUDE_MD)
+		const limit = resident_budget.RESIDENT_LIMIT_BYTES.toString()
+
+		expect(row).not.toContain(NOT_BUDGETED)
+		expect(row).toMatch(
+			new RegExp(String.raw`^${CLAUDE_MD} {2}\d+/${limit} bytes · \d+ left$`, 'u'),
+		)
+	})
+
+	it('names the overage of the resident document without a value to raise it to', () => {
+		const package_root = mkdtempSync(path.join(os.tmpdir(), TEMP_PREFIX))
+		const overage = 7
+
+		try {
+			writeFileSync(
+				path.join(package_root, CLAUDE_MD),
+				'a'.repeat(resident_budget.RESIDENT_LIMIT_BYTES + overage),
+			)
+			const row = argument_row(CLAUDE_MD, package_root)
+
+			expect(row).toContain(`over by ${overage.toString()}`)
+			expect(row).not.toContain('raise recorded')
 		} finally {
 			rmSync(package_root, { recursive: true, force: true })
 		}
