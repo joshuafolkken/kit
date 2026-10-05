@@ -52,6 +52,7 @@ function bash_block(command: string): Block {
 		followup_stages: [],
 		error_text: '',
 		refusal_guard: '',
+		token_lines: [],
 		background_id: '',
 		agent_id: '',
 	}
