@@ -60,28 +60,6 @@ The dispatch records where the child writes as it starts it, so "this lane recor
 a state the hand-off has to except. The brief the child used to be handed was replaced by the
 invocation itself.
 
-## Why a conflict is resolved in the lane rather than handed to a person
-
-Nothing is at risk while the child resolves, because the work is already committed and pushed: the
-pull request holds the branch, `git merge --abort` puts the tree back, and no step rewrites a pushed
-commit. A rebase would rewrite pushed commits and need a force push, which this package denies — hence
-merge, never rebase. A lost merge race is an ordinary outcome of running many lanes, so it is not
-counted against the consecutive-failure guard.
-
-Staying in the lane keeps the run clear of the reattach question, although `lane:open` can now reattach
-to a pushed branch so a lane closed by mistake is recoverable.
-
-Concluding with `pnpm josh git -y` is required because without it nothing changes on `origin`: GitHub
-still returns `mergeStateStatus: DIRTY`, the merge step reports the same conflict, and condition 3 reads
-that as a second one and parks the child for good. The distributed `.claude/settings.json` denies
-`Bash(git commit*)` and `Bash(git add*)`, so the node script is the only sanctioned way.
-
-The safeguard is the re-run verification, not who holds the pen. What is dangerous is unreviewed code
-merging onto a branch whose review has converged, and that happens identically whichever hand did the
-work — so routing the decision to a person does not address it, while re-running the gate and the review
-does. In this repository routing it to a person does not even resolve it: the user does not read code,
-so a code-level conflict handed over is a deferral rather than a decision.
-
 ## Why a committed child's lane is kept
 
 A committed child's lane is kept because it is the cheapest resume, not because closing it is final.
