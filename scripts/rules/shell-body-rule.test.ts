@@ -20,7 +20,8 @@ import { delivered_rules } from './delivered-rules'
 const TOPIC_FILE = 'shell-body.md'
 const CANONICAL = `${WORKFLOW_PROMPT_DIRECTORY}/${TOPIC_FILE}`
 const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
-const RESIDENCY = `${WORKFLOW_PROMPT_DIRECTORY}/residency.md`
+// The residency list moved here from `residency.md` in joshuafolkken/kit#3177.
+const RESIDENCY = 'docs/maintainers/residency-rationale.md'
 const SHELL_BODY_RATIONALE = 'docs/maintainers/shell-body-rationale.md'
 const SUITE_PATH = 'scripts/rules/shell-body-rule.test.ts'
 // The trigger's own suite, split out of the enumeration's so the reading of a call is read beside the
@@ -146,7 +147,7 @@ describe(`${SHELL_BODY_RATIONALE} — carries the marker list`, () => {
 })
 
 // The residency list is the second half of the rule: a rule the criterion moved and that is not
-// listed as moved has not been checked against it (`residency.md`).
+// listed as moved has not been checked against it (`residency-rationale.md`).
 describe.each([RESIDENCY])('%s — lists the rule as delivered', (list_path) => {
 	const content = read_unwrapped(list_path)
 

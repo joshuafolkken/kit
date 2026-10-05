@@ -29,7 +29,10 @@ const DEPENDENCY_SKILL = '.claude/skills/dependency-update'
 // `WORKFLOW_PROMPT`, which answers with the whole concatenated corpus: an assertion about where the
 // ceiling policy is argued has to fail when it is argued somewhere else.
 const RESIDENCY_TOPIC = 'prompts/collaboration-workflow/residency.md'
-const NOT_ASPIRATIONAL_MARKER = '**この基準は努力目標ではない。**'
+// joshuafolkken/kit#3177 cut the topic file down to its four questions; the resident-rule list, the
+// budget and its raise conditions moved here, so their markers are asserted at this file.
+const RESIDENCY_RATIONALE = 'docs/maintainers/residency-rationale.md'
+const NOT_ASPIRATIONAL_MARKER = '**This criterion is not aspirational.**'
 
 // Long enough that it says when to read the skill rather than merely naming it — the description is
 // what an agent matches the situation against, so a one-liner ships a skill nothing ever opens.
@@ -212,21 +215,21 @@ describe('the residency criterion — which rules may stay in the always-loaded 
 // routes to a prompt rather than to a skill at all. The axis is whether the rule has a counterpart.
 describe('the residency list says what it covers', () => {
 	// joshuafolkken/kit#2891 merged the English skill-side copy of this list into the canonical topic
-	// file; each marker below is the Japanese counterpart of the English one it used to assert there.
+	// file, and joshuafolkken/kit#3177 moved it on to the rationale, in English again.
 	it.each([
-		'この範囲の中では網羅的であり',
+		'Within that scope the list is exhaustive',
 		// The pointer has to name where each entry is actually guarded; two of them are asserted by their
 		// own suites, and a maintainer who looks only in this one concludes they are unguarded.
-		'UI 検証ゲートは `scripts/claude/verify-ui-skill.test.ts`',
-		'一覧に無いことは欠落ではない',
+		'the UI verification gate in `scripts/claude/verify-ui-skill.test.ts`',
+		'Absence from the list is not an omission',
 		// The six worked examples §3 used to carry (joshuafolkken/kit#1797).
-		'**明示起動の必須**',
-		'**停止時の `confirmation` 通知**',
-		'**`overrides` の保護**',
-		'**`josh epic:*` のうちコマンドの外側で効く 3 件**',
+		'**Explicit invocation required**',
+		'**The `confirmation` notification on a stop**',
+		'**`overrides` protection**',
+		'**The three `josh epic:*` rules that bind outside the commands**',
 		NOT_ASPIRATIONAL_MARKER,
 	])('scopes the claim at the single source: %j', (marker) => {
-		expect(read_unwrapped(RESIDENCY_TOPIC)).toContain(marker)
+		expect(read_unwrapped(RESIDENCY_RATIONALE)).toContain(marker)
 	})
 
 	// Asserted absent, not merely replaced: the unscoped sentence beside the scoped one leaves two
@@ -241,13 +244,17 @@ describe('the residency list says what it covers', () => {
 	it.each([
 		'## 常駐ドキュメントと skill の分担（何を常駐に残すか）',
 		'**その規則は、skill がロードされていないターンでも効く必要があるか。**',
-		NOT_ASPIRATIONAL_MARKER,
-		'**この一覧の対象範囲は、オンデマンド側に対応する手順を持つ常駐規則である**',
-		'**skill の数で線を引くのは誤りである**',
-		'**UI 検証ゲート**',
-		'**範囲の外にある常駐規則はこの一覧に載らないのが正常である。**',
 	])('is argued in the canonical prompt: %j', (marker) => {
 		expect(read_unwrapped(WORKFLOW_PROMPT)).toContain(marker)
+	})
+
+	it.each([
+		'**This list covers the resident rules that have a procedure on the on-demand side**',
+		'**Drawing the line by counting skills is wrong**',
+		'**The UI verification gate**',
+		'**A resident rule outside that scope is correctly absent from this list.**',
+	])('keeps the list argued in the rationale: %j', (marker) => {
+		expect(read_unwrapped(RESIDENCY_RATIONALE)).toContain(marker)
 	})
 })
 
@@ -258,11 +265,7 @@ describe('the residency list says what it covers', () => {
 // joshuafolkken/kit#1193 consistency sweep.
 describe('the ceiling can be raised, but only against written conditions', () => {
 	it.each([
-		'### 上限を引き上げてよい条件（反証条件）',
-		'**「引き上げない」は絶対の禁止ではなく、反証可能な既定である。**',
-		'**枯れたことは主張ではなく測定で示す**',
-		'**非対称なリスクがあるので、迷ったら回収を選ぶ。**',
-		'**引き上げは Tier C として扱う。**',
+		'**引き上げは Tier C として扱う**',
 		// The Tier C half protects the budget by naming its constants, so a rename made here and not
 		// there leaves the rule guarding a name nothing uses. All three are named because whichever
 		// one is actually binding is the one somebody will want to loosen.
@@ -271,6 +274,19 @@ describe('the ceiling can be raised, but only against written conditions', () =>
 		'RE_INLINE_GUARD_HEADROOM_BYTES',
 	])('states the rule for raising the ceiling: %j', (marker) => {
 		expect(read_unwrapped(RESIDENCY_TOPIC)).toContain(marker)
+	})
+
+	// The conditions themselves moved to the rationale in joshuafolkken/kit#3177; the topic file keeps
+	// the Tier C line and points at them.
+	it.each([
+		'## When the ceiling may be raised',
+		'**"Do not raise" is a falsifiable default, not an absolute prohibition.**',
+		'**Exhaustion is shown by measurement, not asserted**',
+		'**The risk is asymmetric, so when in doubt, recover.**',
+		'**A raise is Tier C.**',
+		'RE_INLINE_GUARD_HEADROOM_BYTES',
+	])('records the raise conditions in the rationale: %j', (marker) => {
+		expect(read_unwrapped(RESIDENCY_RATIONALE)).toContain(marker)
 	})
 })
 

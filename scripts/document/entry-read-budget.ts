@@ -102,7 +102,9 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// `backlogrun-recovery.md`, which the parent's reach still charges whole.
 	// joshuafolkken/kit#3171 cut `CLAUDE.md` to triggers and pointers (~12 KB), lowering every entry.
 	{ entry: 'kickoff', bytes: 45_056 },
-	{ entry: 'fullrun', bytes: 57_344 },
+	// Raised in joshuafolkken/kit#3177: #3173, #3181 and #3183 merged in parallel and together tipped
+	// fullrun 12 bytes over its block; none of #3177's documents are in its read set.
+	{ entry: 'fullrun', bytes: 61_440 },
 	{ entry: 'halfrun', bytes: 57_344 },
 	{ entry: 'prrun', bytes: 61_440 },
 	{ entry: 'backlogrun', bytes: 176_128 },
