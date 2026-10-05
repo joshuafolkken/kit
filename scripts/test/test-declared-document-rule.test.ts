@@ -9,6 +9,9 @@ import { test_declared_logic } from './test-declared-logic'
 // list* the code uses, the same guard `review-level-document-rule.test.ts` puts on the inert set.
 
 const CLAUDE = 'CLAUDE.md'
+// joshuafolkken/kit#3171 moved the exception bodies out of the resident document: the exempt list and
+// the basic manual check now live in the testing guide, and `CLAUDE.md` keeps the command and pointer.
+const TESTING_GUIDE = 'prompts/testing-guide.md'
 const COMMAND = 'pnpm josh test:declared'
 // The bounded region: the code-spans between this marker's parenthesis and its close. Taking the whole
 // line would sweep up `*.test.ts`, the command and the pointer that sit beside it.
@@ -16,7 +19,7 @@ const MARKER = 'mechanically exempt ('
 const CODE_SPAN = /`([^`]+)`/gu
 
 function listed_exempt_paths(): Array<string> {
-	const content = read_repo_file(CLAUDE)
+	const content = read_repo_file(TESTING_GUIDE)
 	const open = content.indexOf(MARKER) + MARKER.length - 1
 	const scope = content.slice(open + 1, content.indexOf(')', open))
 	const listed: Array<string> = []
@@ -48,20 +51,11 @@ describe('the test-declared rule is routed to the command in CLAUDE.md', () => {
 
 // joshuafolkken/kit#2820: the exception covers any source kit cannot test, not HTML/CSS alone, so the
 // manual run for those sources is pinned beside the browser check.
-// joshuafolkken/kit#2997: CLAUDE.md states it in English and the Japanese topic file in Japanese, so each
-// file is held to the phrases of its own language.
+// joshuafolkken/kit#3171: the testing guide is the exception's single source, so only it is held to
+// the phrases.
 const BASIC_EXCEPTION_PHRASES: ReadonlyArray<[string, ReadonlyArray<string>]> = [
 	[
-		CLAUDE,
-		[
-			'browser',
-			'interactions in the HTML',
-			'languages kit cannot test',
-			'actually run the changed code',
-		],
-	],
-	[
-		'prompts/testing-guide.md',
+		TESTING_GUIDE,
 		['ブラウザー', 'HTML 内の操作', 'テストできない言語', '変更した処理を実際に動かす'],
 	],
 ]

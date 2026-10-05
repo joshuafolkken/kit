@@ -92,12 +92,13 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// `backlogrun-*` phase documents it never opens. Each total now counts only what its path reaches.
 	// joshuafolkken/kit#3077 trimmed non-resident rule bodies from `CLAUDE.md`, lowering fullrun, prrun
 	// and backlogrun one block each.
-	{ entry: 'kickoff', bytes: 65_536 },
-	{ entry: 'fullrun', bytes: 126_976 },
-	{ entry: 'halfrun', bytes: 106_496 },
-	{ entry: 'prrun', bytes: 131_072 },
-	{ entry: 'backlogrun', bytes: 212_992 },
-	{ entry: LANE_CHILD, bytes: 77_824 },
+	// joshuafolkken/kit#3171 cut `CLAUDE.md` to triggers and pointers (~12 KB), lowering every entry.
+	{ entry: 'kickoff', bytes: 53_248 },
+	{ entry: 'fullrun', bytes: 114_688 },
+	{ entry: 'halfrun', bytes: 94_208 },
+	{ entry: 'prrun', bytes: 118_784 },
+	{ entry: 'backlogrun', bytes: 200_704 },
+	{ entry: LANE_CHILD, bytes: 65_536 },
 ]
 
 function byte_size(root: string, relative_path: string): number {

@@ -163,8 +163,14 @@ describe('the review flow routes to the command, never a typed level', () => {
 })
 
 describe('the round cap is untouched', () => {
-	it.each([...AI_DOCS, REVIEW_PROMPT])('%s still caps the rounds at two', (document_path) => {
-		expect(read_unwrapped(document_path)).toContain('two')
+	it('the review prompt still caps the rounds at two', () => {
+		expect(read_unwrapped(REVIEW_PROMPT)).toContain('two')
+	})
+
+	// joshuafolkken/kit#3171: the resident documents point at the cap rather than restating its number
+	// (`rule-numbers.test.ts`), so what they must keep is the pointer.
+	it.each(AI_DOCS)('%s still points at the round cap', (document_path) => {
+		expect(read_unwrapped(document_path)).toContain('"Review round cap"')
 	})
 
 	it('the review prompt still says a confirmed High blocks regardless of round count', () => {

@@ -7,6 +7,7 @@ import {
 	skill_documents,
 	WORKFLOW_PROMPT,
 } from '#scripts/document/ai-document-fixture'
+import { resident_budget } from '#scripts/document/resident-budget'
 import { init_logic } from '#scripts/init/init-logic'
 import { describe, expect, it } from 'vitest'
 import {
@@ -36,19 +37,9 @@ const NOT_ASPIRATIONAL_MARKER = '**この基準は努力目標ではない。**'
 // what an agent matches the situation against, so a one-liner ships a skill nothing ever opens.
 const MINIMUM_DESCRIPTION_LENGTH = 80
 
-// The documents sat at ~83 KB each before the joshuafolkken/kit#854 split and ~49 KB after, then
-// crept back to ~56 KB as duplicated procedure bodies returned. joshuafolkken/kit#1924 lifted the
-// reduction freeze and moved those bodies to their pointers, cutting CLAUDE.md below 30 KB. Minus the
-// two headrooms below, the re-inline floor lands at 30 KB, so the always-loaded documents cannot
-// creep back past that target. It is a guard against re-inlining, not a budget to tune prose against.
-const RESIDENT_CEILING_BYTES = 33_000
-
-// joshuafolkken/kit#951: the ceiling alone stops the wrong thing. Reached, it does not block the
-// next rule — it makes that rule pay for itself by deleting a neighboring sentence, and the
-// sentence chosen is whichever one no marker pinned rather than whichever one matters least. A
-// required margin turns "at the limit" into a failure while there is still room to write the fix,
-// which is the only point at which moving a procedure into a skill is still a choice.
-const RESIDENT_HEADROOM_BYTES = 2000
+// The resident budget's constants live in `resident-budget.ts` (joshuafolkken/kit#3171), so
+// `josh bytes CLAUDE.md` counts against the number this suite enforces.
+const { EFFECTIVE_CEILING_BYTES, RE_INLINE_GUARD_HEADROOM_BYTES } = resident_budget
 
 // joshuafolkken/kit#1151: the budget above is held in bytes and the bill arrives in tokens, so a
 // reduction could not be read in the unit it is paid in. This is the same limit expressed in that
@@ -64,18 +55,7 @@ const RESIDENT_HEADROOM_BYTES = 2000
 // Converted once, from the budget the documents are actually measured against. Converting the
 // ceiling and the headroom separately and subtracting would agree with this only by rounding
 // coincidence, so a constant bump that touched no document at all could fail the equality below.
-const EFFECTIVE_CEILING_BYTES = RESIDENT_CEILING_BYTES - RESIDENT_HEADROOM_BYTES
 const EFFECTIVE_CEILING_TOKENS = cost_tokens.ascii_bytes_to_tokens(EFFECTIVE_CEILING_BYTES)
-// joshuafolkken/kit#1275: what `CLAUDE.md` had left under the effective ceiling once the procedures
-// were already out — 30 bytes — was enough to pass the ceiling and not enough to write one sentence
-// with. Returning the label mapping, the worked before-and-after pair and a handful of rationales to
-// their pointers recovered 3,047 bytes.
-//
-// This is a floor under that recovery, not a second budget. It is set well below the 3,047 so the
-// next few resident rules are unaffected — spending the recovery on rules is what it was recovered
-// for — while a wholesale re-inlining of what went back to the pointers, which costs three times
-// this, fails here by name instead of silently returning the document to 30 bytes of headroom.
-const RE_INLINE_GUARD_HEADROOM_BYTES = 1000
 
 // A symbol rather than a letter, so a long run of it is not a word the spell check has to know.
 const TWO_BYTE_CHAR = '±'
@@ -369,11 +349,12 @@ describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (
 	})
 
 	// Removing a procedure is only half of it. Without the routing the rule reaches no run at all,
-	// which reads exactly like the rule having been deleted.
+	// which reads exactly like the rule having been deleted. joshuafolkken/kit#3171 dropped the per-command
+	// "Read first" table — the skill's own §1 is that table — so the routing is the one sentence that
+	// sends every command to the skill before its first call.
 	it.each([
-		'split-assessment.md',
-		'+ `fullrun.md` + `split-assessment.md`',
-		'**A `backlogrun` parks a child instead of stopping the run**',
+		'procedures in the `workflow-commands` skill',
+		'read it before any part of a command, including the first `gh` call',
 	])('routes to the moved procedures with %j', (marker) => {
 		expect(content).toContain(marker)
 	})
