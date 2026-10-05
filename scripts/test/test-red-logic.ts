@@ -11,7 +11,7 @@ import { test_declared_logic } from './test-declared-logic'
 // that test catches anything — the added and changed tests run against the merge-base, and at least one
 // of them has to fail there.
 
-type RedVerdict = 'red' | 'green' | 'no-test'
+type RedVerdict = 'red' | 'green' | 'no-test' | 'test-only'
 
 // The declaration a bug-fix Issue carries under its background heading, in the same slot as the
 // behavior-change declaration (`behavior-change-lint.ts`). Read from the declaration, never inferred,
@@ -31,6 +31,14 @@ function unit_test_files(paths: ReadonlyArray<string>): Array<string> {
 	return paths
 		.map((path) => path.trim())
 		.filter((path) => test_declared_logic.is_test_file(path) && path.endsWith(UNIT_TEST_SUFFIX))
+}
+
+// **A change whose every path is a test file has no pre-fix code to run against**
+// (joshuafolkken/kit#3214). The merge-base then runs the same code as HEAD, so its result equals HEAD's
+// and says nothing about the fix. Exempt paths do not count: a document-rule test reads `*.md` and
+// `prompts/` files, so a change to one of those is pre-fix content the test can be red against.
+function is_test_only(paths: ReadonlyArray<string>): boolean {
+	return paths.every((path) => test_declared_logic.is_test_file(path))
 }
 
 // Vitest's JSON report carries one `testResults` entry per file it loaded — a file that failed to load
@@ -58,7 +66,8 @@ function verdict_for(test_count: number, is_failed: boolean): RedVerdict {
 }
 
 // Only `green` on a declared bug fix is refused. `no-test` is already `josh test:declared`'s refusal
-// when a runtime file changed, and a declared fix that touched only docs has nothing to reproduce.
+// when a runtime file changed, a declared fix that touched only docs has nothing to reproduce, and a
+// `test-only` fix runs the same code on the merge-base as on HEAD.
 function is_refused(body: string, verdict: RedVerdict): boolean {
 	return verdict === 'green' && is_bug_fix(body)
 }
@@ -67,6 +76,7 @@ const test_red_logic = {
 	BUG_DECLARATION_LINE,
 	is_bug_fix,
 	is_refused,
+	is_test_only,
 	ran_file_count,
 	unit_test_files,
 	verdict_for,

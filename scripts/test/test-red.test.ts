@@ -73,6 +73,18 @@ async function build_fix_branch(
 	await symlink(PROJECT_NODE_MODULES, path.join(process.cwd(), NODE_MODULES), 'dir')
 }
 
+// main carries the buggy report and a shallow test; the `fix` branch changes only the test, so the
+// merge-base runs the same code as HEAD and its result says nothing (joshuafolkken/kit#3214).
+async function build_test_only_branch(): Promise<void> {
+	await git(['init', git_fixture_workspace.MAIN_BRANCH])
+	await write_base(undefined)
+	await write(TEST_FILE, SHALLOW_TEST)
+	await git(['add', '.'])
+	await git(['commit', '-m', 'base'])
+	await git(['switch', '-c', 'fix'])
+	await write(TEST_FILE, WHOLE_OUTPUT_TEST)
+}
+
 async function snapshot(): Promise<string> {
 	const status = await git(['status', PORCELAIN])
 	const head = await git(['rev-parse', 'HEAD'])
@@ -153,6 +165,18 @@ describe('test_red.run when nothing runs', () => {
 			await build_fix_branch(SHALLOW_TEST, EXCLUDING_CONFIG)
 
 			expect(await test_red.run()).toEqual({ verdict: 'no-test', files: [TEST_FILE] })
+		},
+		RUN_TIMEOUT,
+	)
+
+	it(
+		'is test-only without a run when no runtime file changed beside the test',
+		async () => {
+			await build_test_only_branch()
+			const before = await snapshot()
+
+			expect(await test_red.run()).toEqual({ verdict: 'test-only', files: [TEST_FILE] })
+			expect(await snapshot()).toBe(before)
 		},
 		RUN_TIMEOUT,
 	)

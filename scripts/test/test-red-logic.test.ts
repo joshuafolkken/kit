@@ -3,6 +3,9 @@ import { test_red_logic } from './test-red-logic'
 
 const BUG_BODY = '## 背景\n\n- 種別: 不具合\n\nThe symptom came back.\n'
 const BEHAVIOR_BODY = '## 背景\n\n- 種別: 振る舞い変更\n'
+const UNIT_TEST = 'scripts/a.test.ts'
+const RUNTIME_FILE = 'scripts/a.ts'
+const E2E_SPEC = 'src/page.e2e.ts'
 
 describe('test_red_logic.is_bug_fix', () => {
 	it('reads the bug declaration line', () => {
@@ -17,10 +20,26 @@ describe('test_red_logic.is_bug_fix', () => {
 
 describe('test_red_logic.unit_test_files', () => {
 	it('keeps the Vitest files and drops runtime files and E2E specs', () => {
-		const unit_tests = ['scripts/a.test.ts', 'src/Page.svelte.test.ts']
-		const paths = ['scripts/a.ts', ...unit_tests, 'src/page.e2e.ts']
+		const unit_tests = [UNIT_TEST, 'src/Page.svelte.test.ts']
+		const paths = [RUNTIME_FILE, ...unit_tests, E2E_SPEC]
 
 		expect(test_red_logic.unit_test_files(paths)).toEqual(unit_tests)
+	})
+})
+
+describe('test_red_logic.is_test_only', () => {
+	it('is true when every changed path is a test file', () => {
+		expect(test_red_logic.is_test_only(['scripts/lint/lint-related.test.ts'])).toBe(true)
+		expect(test_red_logic.is_test_only([UNIT_TEST, E2E_SPEC])).toBe(true)
+	})
+
+	it('is false once a runtime file changed beside the test', () => {
+		expect(test_red_logic.is_test_only([UNIT_TEST, RUNTIME_FILE])).toBe(false)
+	})
+
+	it('is false once an exempt file a document-rule test reads changed beside the test', () => {
+		expect(test_red_logic.is_test_only([UNIT_TEST, 'docs/a.md'])).toBe(false)
+		expect(test_red_logic.is_test_only([UNIT_TEST, 'prompts/a.md'])).toBe(false)
 	})
 })
 
@@ -52,6 +71,7 @@ describe('test_red_logic.is_refused', () => {
 		expect(test_red_logic.is_refused(BUG_BODY, 'green')).toBe(true)
 		expect(test_red_logic.is_refused(BUG_BODY, 'red')).toBe(false)
 		expect(test_red_logic.is_refused(BUG_BODY, 'no-test')).toBe(false)
+		expect(test_red_logic.is_refused(BUG_BODY, 'test-only')).toBe(false)
 		expect(test_red_logic.is_refused(BEHAVIOR_BODY, 'green')).toBe(false)
 	})
 })
