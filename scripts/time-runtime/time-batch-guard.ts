@@ -175,7 +175,7 @@ const REASON =
 	`the calls meant to follow it that do not need its result. **The criterion is whether this call's ` +
 	`input needs another call's result, not what kind of call it is** — edits are covered exactly as ` +
 	`reads are, and it never authorizes weakening a verification gate or a review: fewer turns, never ` +
-	`less work. The measured cost and the rejected mechanisms are in ` +
+	`less work. The rule, and where its measured cost and rejected mechanisms are, is in ` +
 	`\`prompts/collaboration-workflow/turn-batching.md\`. If this turn was already batching, or the call ` +
 	`genuinely has nothing to go beside it, reissue it as it was: this fires once per run of ` +
 	`single-call turns and cannot repeat on the call in hand.`
@@ -192,7 +192,7 @@ const NOTICE =
 	`write proceeds. Where the writes meant to follow it do not need its result, issue them in one turn ` +
 	`together. **The criterion is whether a call's input needs another call's result, not what kind of ` +
 	`call it is** — it never authorizes weakening a verification gate or a review: fewer turns, never ` +
-	`less work. The measured cost and the rejected mechanisms are in ` +
+	`less work. The rule, and where its measured cost and rejected mechanisms are, is in ` +
 	`\`prompts/collaboration-workflow/turn-batching.md\`. If this run was already batching, or the write ` +
 	`genuinely has nothing to go beside it, carry on: this recurs every ` +
 	`${String(NOTICE_REFIRE_EVERY)} further single-call turn(s).`
@@ -209,8 +209,8 @@ const LANE_NOTICE =
 	`proceeds, because a dispatched lane child ends its turn on a denial. Where the calls meant to follow ` +
 	`it do not need its result, issue them in one turn together. **The criterion is whether a call's ` +
 	`input needs another call's result, not what kind of call it is** — it never authorizes weakening a ` +
-	`verification gate or a review: fewer turns, never less work. The measured cost and the rejected ` +
-	`mechanisms are in \`prompts/collaboration-workflow/turn-batching.md\`. If this run was already ` +
+	`verification gate or a review: fewer turns, never less work. The rule, and where its measured cost ` +
+	`and rejected mechanisms are, is in \`prompts/collaboration-workflow/turn-batching.md\`. If this run was already ` +
 	`batching, or the call genuinely has nothing to go beside it, carry on: this recurs every ` +
 	`${String(NOTICE_REFIRE_EVERY)} further single-call turn(s).`
 
