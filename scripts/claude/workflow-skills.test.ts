@@ -4,7 +4,6 @@ import {
 	AI_DOCS,
 	read_repo_file,
 	read_unwrapped,
-	skill_documents,
 	WORKFLOW_PROMPT,
 } from '#scripts/document/ai-document-fixture'
 import { init_logic } from '#scripts/init/init-logic'
@@ -14,7 +13,6 @@ import {
 	package_file,
 	read_skill_file,
 	skill_description,
-	SKILL_ENTRY_FILE,
 	skill_frontmatter,
 	SKILL_ROOT,
 } from './skill-fixture'
@@ -159,15 +157,7 @@ describe(`${WORKFLOW_SKILL} — carries the procedures that left the documents`,
 		expect(entry).toContain(filename)
 	})
 
-	// A supporting file the entry never names is a file no run opens — the skill would ship the rule
-	// and still behave as though it had been deleted.
-	it('names every markdown file it ships', () => {
-		const supporting = skill_documents()
-			.filter((path) => path.startsWith(`${WORKFLOW_SKILL}/`) && !path.endsWith(SKILL_ENTRY_FILE))
-			.map((path) => basename_of(path))
-
-		for (const filename of supporting) expect(entry).toContain(filename)
-	})
+	// Every shipped file being reachable from the entry is pinned in `workflow-skill-reach.test.ts`.
 
 	// The stop rule itself is resident (asserted below); what the entry file owes the reader is the
 	// pointer, since `kickoff` and `halfrun` are routed away from `followup.md`.

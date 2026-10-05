@@ -44,7 +44,9 @@ describe('the stage table matches run_stage', () => {
 	})
 
 	it('the skill points at that table rather than carrying a second copy', () => {
-		expect(unwrapped(SKILL)).toContain(`Table: \`${HOW_TO}\``)
+		expect(unwrapped(SKILL)).toContain(
+			`stop (at \`merged\`, the next line answers) | \`${HOW_TO}\``,
+		)
 		expect(read(SKILL)).not.toContain(TABLE_HEADER)
 	})
 })

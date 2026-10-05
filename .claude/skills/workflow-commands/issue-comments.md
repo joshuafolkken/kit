@@ -1,8 +1,8 @@
 # An Issue's comments are part of the Issue
 
-**This is the body of `SKILL.md` §2g, relocated here so the entry read carries the trigger and the
-pointer, not the procedure** (joshuafolkken/kit#2189). `SKILL.md` §2g is the resident stub, and every
-`#N` entry file routes here for the definition. It is read at its point of use — before implementing a
+**This file is the single source, so the entry read carries the trigger and the pointer, not the
+procedure** (joshuafolkken/kit#2189). `SKILL.md` → §2's table keeps the trigger, and every `#N` entry
+file routes here for the definition. It is read at its point of use — before implementing a
 `#N` Issue.
 
 **Every `#N` entry point reads the Issue's comments before it implements** — `fullrun`, `halfrun` and
@@ -98,7 +98,7 @@ citations: a criterion you cannot point at merged code for is a criterion this r
 
 **The fetch is one call however long the thread is; what costs is carrying it afterwards** — which is
 why the call above projects each comment down to its author, its timestamp and its body. Once the
-thread runs longer than the Issue itself it is exactly the pre-implementation reading §2b describes:
+thread runs longer than the Issue itself it is exactly the pre-implementation reading `delegation.md` describes:
 brief a delegated unit to return **the agreements in force plus the comment URLs that carry them**,
 never the comment text.
 

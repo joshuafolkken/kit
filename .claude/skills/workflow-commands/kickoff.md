@@ -1,10 +1,10 @@
 # `kickoff` — Planning phase only (plan → Issue → Telegram notify → stop)
 
-- `kickoff #<N>`: **First `pnpm josh run:entry <N> --to kickoff`** (`SKILL.md` → §2k) — it claims
+- `kickoff #<N>`: **First `pnpm josh run:entry <N> --to kickoff`** (`docs/how-to/run-issues.md`) — it claims
   nothing and prints the stage line alone; `start: reached` means the Issue is already planned or further
   up the ladder, so report the stage line and **stop**. Otherwise read existing Issue #N **and every comment on it** — `pnpm josh issue:read <N>`; a
   decision recorded after the body was written lives only in a comment, and the later text is the
-  agreement in force (`SKILL.md` → §2g, which also carries the two answers that stop the run instead) →
+  agreement in force (`issue-comments.md`, which also carries the two answers that stop the run instead) →
   **normalize the title**: if the title is not in English or can be phrased more clearly, derive a
   better English title and run `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"` →
   analyze requirements → **scope assessment per `split-assessment.md`** → post the plan to the Issue (if
@@ -28,11 +28,11 @@
 is one branch, one index and one uncommitted diff; this command reads the Issue, normalizes the title,
 posts the plan, notifies and stops — every one of those against GitHub, none against the tree. So a
 `fullrun` running in this checkout never stops a `kickoff`, and a `kickoff` never touches the record
-that run is holding. It claims nothing, so it must not release anything either. `SKILL.md` → §2f is the
+that run is holding. It claims nothing, so it must not release anything either. `working-tree-hold.md` is the
 single source.
 
 **The target repository is named in front of the Issue reference** — `kickoff kit#new`,
-`kickoff joshuafolkken/kit#412`. The definition is `SKILL.md` → §2c, whose body is `target-repository.md`. `kickoff` is the entry that needs
+`kickoff joshuafolkken/kit#412`. The definition is `target-repository.md`, whose body is `target-repository.md`. `kickoff` is the entry that needs
 no checkout: name the target repository in the path of every `gh api` call — reads included — and never
 clone. The one exception is the split path's epic, since `pnpm josh epic` writes only the repository it
 runs in — and the promote arm has no remote fallback at all, so it stops when that repository is not
@@ -52,11 +52,11 @@ split is found.
   title. (2) Create Issue: `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>` (body
   per `prompts/collaboration-workflow/issue-template.md`) — its duplicate scan runs first, and a
   candidate that covers the same work stops the run rather than filing a second Issue (`SKILL.md` →
-  §2e). Capture `<N>`. (3)
+  `issue-scout.md`). Capture `<N>`. (3)
   Post the plan in the session language, using the same body/comment logic as `kickoff #<N>`. (4) Send
   Telegram notification. (5) **Stop** — do not implement. **Multi-issue split path**: (1) For each
   independent deliverable, derive a focused English title and create a separate Issue with the
-  `route:split` label (its duplicate scan is read per `SKILL.md` → §2e): `pnpm josh issue:file
+  `route:split` label (its duplicate scan is read per `issue-scout.md`): `pnpm josh issue:file
   "<sub-title>" --body-file <body-file> --depth <n> --route split`. Capture each Issue number. **When the split is filed into a repository other than
   the one this session is running in**, every child body gets the `## Origin` backlink described in the
   cross-package rule the AI documents keep resident, the epic body carries the same link as prose or a

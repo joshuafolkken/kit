@@ -1,8 +1,8 @@
 # `needs-human-review` — the child that stops before its commit
 
-**This is the body of `SKILL.md` §2z, relocated here so the entry read carries the trigger and the
-pointer, not the procedure** (joshuafolkken/kit#2189). `SKILL.md` §2z is the resident stub;
-`fullrun.md`, `halfrun.md` and `backlogrun.md` route here for the definition. It is read at its point
+**This file is the single source, so the entry read carries the trigger and the pointer, not the
+procedure** (joshuafolkken/kit#2189). `SKILL.md` → §2's table keeps the trigger;
+`entry-sequence.md` and `backlogrun.md` route here for the definition. It is read at its point
 of use — the moment `pnpm josh issue:state <N>` answers `human_review: yes`.
 
 An issue carrying **`needs-human-review`** is degraded to a `halfrun`-shaped stop, whichever entry

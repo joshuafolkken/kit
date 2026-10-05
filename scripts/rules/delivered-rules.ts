@@ -241,7 +241,7 @@ const ISSUE_COMMENTS_REASON =
 	"except for two answers that are not the run's to make: work a comment reassigns to another " +
 	'Issue is out of scope and is not implemented, and a comment saying the Issue no longer has a ' +
 	'reason to exist stops the run with a `confirmation` Telegram. The procedure is ' +
-	'`.claude/skills/workflow-commands/SKILL.md` → "An Issue\'s comments are part of the Issue". ' +
+	'`.claude/skills/workflow-commands/issue-comments.md`. ' +
 	'Every body-only read is refused until the comments are read.'
 
 // The reading of the call itself — which spellings carry a body inline, and what the shell does to

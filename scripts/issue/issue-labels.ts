@@ -154,7 +154,7 @@ const FILING_ROUTE_LABELS: ReadonlyArray<{
 //
 // **The depth is read off the subject, so a run applies it.** Unlike `auto-ok` and
 // `needs-human-review` this is not a person's judgement about authorization; it is the same reading
-// §2i already asks a run to make before it files, and none of the three withholds or widens anything
+// `observation-filing.md` already asks a run to make before it files, and none of the three withholds or widens anything
 // a run may do.
 const DEPTH_0_LABEL = 'depth:0'
 const DEPTH_1_LABEL = 'depth:1'
@@ -182,17 +182,17 @@ const DEPTH_LABELS: ReadonlyArray<{
 	{
 		name: DEPTH_0_LABEL,
 		color: '0e8a16',
-		description: 'Depth 0 — what a consumer of this package touches (SKILL.md §2i)',
+		description: 'Depth 0 — what a consumer of this package touches (observation-filing.md)',
 	},
 	{
 		name: DEPTH_1_LABEL,
 		color: 'fbc02d',
-		description: 'Depth 1 — the run orchestration that executes an Issue (SKILL.md §2i)',
+		description: 'Depth 1 — the run orchestration that executes an Issue (observation-filing.md)',
 	},
 	{
 		name: DEPTH_2_LABEL,
 		color: 'c5def5',
-		description: 'Depth 2 — what measures a run (SKILL.md §2i)',
+		description: 'Depth 2 — what measures a run (observation-filing.md)',
 	},
 ]
 

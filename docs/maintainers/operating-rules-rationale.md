@@ -24,7 +24,7 @@ addition or wording fix is written once:
   read it, together with why `kickoff` is exempt (joshuafolkken/kit#1799), why a release names its
   run (joshuafolkken/kit#1799) and why the unit is the working tree rather than the repository
   (joshuafolkken/kit#1091). All three are in `working-tree-hold.md`, and the trigger is resident in
-  the workflow skill's §2f.
+  the workflow skill's `working-tree-hold.md`.
 - **The overrides protection** was a near-verbatim copy of `.claude/skills/dependency-update/SKILL.md`
   §1–§2, which is now its single source.
 

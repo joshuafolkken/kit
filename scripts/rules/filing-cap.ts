@@ -8,7 +8,7 @@ import { tail_commands } from './tail-commands'
 // The trigger and the decision behind the `filing-cap` row of `delivered-rules.ts`
 // (joshuafolkken/kit#2119).
 //
-// **Automatic filing is capped at 10 Issues per run, refused at the eleventh filing.** §2d and
+// **Automatic filing is capped at 10 Issues per run, refused at the eleventh filing.** `prerequisite.md` and
 // `observation-filing.md` state the ceiling; nothing counted it, so a run that over-filed was held
 // only by self-restraint. The input is mechanical — how many Issues this run has already filed — so
 // it is a delivered rule rather than resident prose. **No new predicate**: the filing is
@@ -108,7 +108,7 @@ const FILING_CAP_REASON =
 	`⛔ filing cap: this run has already filed ${String(FILING_CAP)} Issues, the per-run ceiling — on ` +
 	'reaching it, stop and report rather than filing more. Automatic filing is capped so a run cannot ' +
 	'manufacture Issues faster than they can be closed (`.claude/skills/workflow-commands/SKILL.md` → ' +
-	"§2d, `observation-filing.md`). A further Issue that genuinely must exist is a person's call, not " +
+	"`prerequisite.md`, `observation-filing.md`). A further Issue that genuinely must exist is a person's call, not " +
 	"this run's. **This rule fires on every filing past the cap, not once per run**, so reissuing the " +
 	'same filing will be refused again.'
 

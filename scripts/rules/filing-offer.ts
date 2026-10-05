@@ -4,7 +4,7 @@ import { issue_citation } from './issue-citation'
 // The predicates behind the `filing-offer` row of the stop guard (joshuafolkken/kit#2422).
 //
 // **A first-party filing is Tier A, and an offer to file is that filing deferred to the user.**
-// `SKILL.md` → §2i says a run that judges something worth filing files it without asking, yet a reply
+// `observation-filing.md` says a run that judges something worth filing files it without asking, yet a reply
 // can still end on "it is worth filing — say so if you want it filed". The rule was resident; what was
 // missing was anything that fired at the moment of hesitation. That moment is one `Stop` payload: a
 // reply that offers to file, on a turn that filed nothing.

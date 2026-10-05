@@ -12,7 +12,7 @@ restating any of it.
 **One `backlogrun` approves every merge of every issue `pnpm josh backlog:next` offers** — the issues
 carrying `auto-ok`, every child of an epic whose root carries it, **and an issue this run filed, once
 it has become such a child**. A filing is placed into an epic by `pnpm josh epic:bundle`, which
-`prompts/review.md` → "Review round cap" and `SKILL.md` → §2i both make **Tier A rather than
+`prompts/review.md` → "Review round cap" and `observation-filing.md` both make **Tier A rather than
 optional**; where that epic's root carries `auto-ok`, the child is offered from the next ask onwards
 without anybody having labelled it.
 
@@ -53,23 +53,23 @@ inside the invocation" below):
 | --- | --- | --- |
 | `--max` | how many issues one invocation may merge — a run's own filing competes for that number rather than extending it | `run:carry --merged` |
 | `--idle`, and the 8-hour whole-run bound | how long one invocation may go on looking for more | the record's `started_at` |
-| **Ten filings per invocation** | how much one invocation may add to the pool at all, on **every** filing route (`SKILL.md` → §2d) | `run:carry --filed` |
+| **Ten filings per invocation** | how much one invocation may add to the pool at all, on **every** filing route (`prerequisite.md`) | `run:carry --filed` |
 | The WIP cap on open issues | how large the pool may become, across invocations | `prompts/collaboration-workflow/wip-cap.md` |
 
 One invocation may add at most ten issues to the pool and merge at most `--max` of them, after which
 the run ends and the next one waits for a person to type the keyword.
 
-**Two filing routes are exempt from the depth test (`SKILL.md` → §2i), and the ten-filings ceiling
+**Two filing routes are exempt from the depth test (`observation-filing.md`), and the ten-filings ceiling
 still covers them:**
 
-- **`route:tier-a` and `route:interrupt` stay exempt.** **Their number is still capped**: §2d's
+- **`route:tier-a` and `route:interrupt` stay exempt.** **Their number is still capped**: `prerequisite.md`'s
   ten-filings ceiling is stated "at every entry point", and `run:carry --filed` counts it across
   session cuts.
 - **A review branch-2 filing stays exempt** — a confirmed defect reaching a runtime path, with a
   written failure scenario.
 
 **This section is the single source of how the `epic:bundle` obligation and this authorization
-boundary meet.** `SKILL.md` → §2i points here rather than restating it.
+boundary meet.** `observation-filing.md` points here rather than restating it.
 
 ## Named issues run first, in order
 
@@ -95,7 +95,7 @@ issues it did not start. `backlog_named.after_failure` is the single source.
 
 - A named issue read back `CLOSED` — merged, or already `already-done` — is finished; continue with the
   next.
-- A **`needs-human-review`** named issue stops the whole run before its commit (`SKILL.md` → §2z),
+- A **`needs-human-review`** named issue stops the whole run before its commit (`needs-human-review.md`),
   exactly as any child does — the named issues after it are not started and neither is the pool.
 - Everything else about running one — the verification gate, the hand-off, the guards — is
   this file's and is not restated here.
@@ -291,7 +291,7 @@ children are enumerated individually rather than summarized under their root. Re
 stop at a time.**
 
 - **Decide everything decidable from the issue itself.** Read the issue's body **and its comments**
-  (`SKILL.md` → §2g), and where the answer is already there, record it as an Issue comment and
+  (`issue-comments.md`), and where the answer is already there, record it as an Issue comment and
   **remove the label** — `CLAUDE.md` → "Decision autonomy" already makes that Tier A. **Read them all in
   one `pnpm josh issue:read <N> <N> …` call**, not a `gh api` pair per issue.
 - **Never measure in order to decide.** A question needing a benchmark, a profile, or a run of the
@@ -313,7 +313,7 @@ stop at a time.**
   run does not wait on it.
 
 **`needs-decision`, `run:solo`, `run:lane` and `priority:high` are the workflow labels a run may
-apply, and none is `auto-ok` or `needs-human-review`.** Those two stay a person's alone (this file, `SKILL.md` → §2z); a
+apply, and none is `auto-ok` or `needs-human-review`.** Those two stay a person's alone (this file, `needs-human-review.md`); a
 run parks with `needs-decision` and a person clears it.
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the plan and the decision pass come first"
@@ -511,7 +511,7 @@ Termination is decided by what the loop is told, never by a judgement that enoug
   rather than per epic: children per run, Issues filed per run, and consecutive child failures. The
   maximum above is a person's declaration of scale and does not replace any of them — whichever binds
   first ends the run.
-- **A `needs-human-review` child stops the whole run** before its commit — `SKILL.md` → §2z, which is
+- **A `needs-human-review` child stops the whole run** before its commit — `needs-human-review.md`, which is
   the single source, and `backlogrun-park.md` → "`needs-human-review` — the one stop that is not a park" for
   what happens to its lane.
 - **The hand-off check** — `pnpm josh cost --cut` at every child's merge, and the lane

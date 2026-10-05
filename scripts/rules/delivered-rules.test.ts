@@ -159,7 +159,7 @@ describe('rule_delivery — the comments at the call that reads the body', () =>
 		'a comment supersedes the body it contradicts',
 		'reassigns to another Issue is out of scope',
 		'`confirmation` Telegram',
-		'`.claude/skills/workflow-commands/SKILL.md`',
+		'`.claude/skills/workflow-commands/issue-comments.md`',
 	])(CARRIES_MARKER, (marker) => {
 		expect(delivered_rules.ISSUE_COMMENTS_REASON).toContain(marker)
 	})
