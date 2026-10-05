@@ -78,6 +78,9 @@
 - **破壊的コマンド**（`operating-rules.md`、joshuafolkken/kit#2983）
   - 発火点: `pnpm josh rule:guard` — `rm -rf`（綴りによらず）・`gh repo delete` ／ `archive`・`gh pr close`・`gh api -X DELETE` の `Bash`。**毎回発火する**
   - 発火しないとき: `gh issue close`・Issue ラベルの削除 ＝ ワークフロー自身の手順
+- **PR の直接作成**（`CLAUDE.md` → Git Rules、joshuafolkken/kit#3183）
+  - 発火点: `pnpm josh rule:guard` — `gh pr create`・`repos/<o>/<r>/pulls` への `gh api` 書き込みの `Bash`。`pnpm josh pr` を案内する。**毎回発火する**
+  - 発火しないとき: `pnpm josh pr`・PR の閲覧 ＝ `closes #N` を生成する経路
 - **保護ファイル**（`operating-rules.md`、joshuafolkken/kit#2983）
   - 発火点: `pnpm josh rule:guard` — `.env` の `Read`、kit 以外のリポジトリでの `.claude/settings.json` の `Edit` ／ `Write`。**毎回発火する**
   - 発火しないとき: kit 自身とユーザー単位の `~/.claude/settings.json` の編集
