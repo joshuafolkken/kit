@@ -79,6 +79,13 @@ const ERROR_TEXT_LIMIT = 256
 // shared constant exists because each guard writes the literal in its own reason, so the one place a
 // refusal is *detected* names it here.
 const REFUSAL_MARKER = '⛔'
+// The label the harness puts in front of a PreToolUse hook's deny reason, naming the hook and the tool.
+const HOOK_ERROR_LABEL = /^PreToolUse:\S+ hook error: /u
+// A line that is one bare verdict token — `cut`, `busy`, `not-a-lane` — the single word a josh verdict
+// command prints on standard output (joshuafolkken/kit#3223). How many are kept bounds the field the
+// way `ERROR_TEXT_LIMIT` bounds `error_text`.
+const TOKEN_LINE = /^[a-z][a-z-]*$/u
+const TOKEN_LINE_LIMIT = 8
 
 interface Block {
 	type: string
@@ -111,6 +118,11 @@ interface Block {
 	// the parsed block rather than by re-scanning the body downstream. `''` where the result was not a
 	// `⛔` refusal, so a reader tells "no guard spoke" from "this guard spoke" without a second parse.
 	refusal_guard: string
+	// The bare-token lines of a result that did not fail, and `[]` for every other block
+	// (joshuafolkken/kit#3223). It obeys the same prohibition as `error_text` — what is kept is a few
+	// single words, never the body — and it exists so the verdict a josh command answered with
+	// (`run:cut`'s `cut`) is read from the parsed block rather than by searching the raw line.
+	token_lines: ReadonlyArray<string>
 	// The id the harness assigned to a command it took into the background, and `''` for every other
 	// block (joshuafolkken/kit#1662). It is the fourth field read off the body under the same
 	// prohibition as the three above — what is kept is the id, never the text it was read from — and
@@ -159,14 +171,26 @@ function block_names(
 // before the first `:` — `⛔ pre-gate cut: …` is `pre-gate cut`. A reason with no colon (a headline
 // like `⛔ scoped checks not green on this tree`) is taken whole. Reading the opening rather than
 // searching the body is what stops a result that merely quoted a reason being read as a refusal.
+//
+// **The harness writes the reason behind its own label** — `PreToolUse:Edit hook error: ⛔ …` — so that
+// label is stripped before the opening is read (joshuafolkken/kit#3223). Without it no live refusal
+// carried a guard: the fixtures wrote the bare `⛔` body and passed while every recorded one read `''`.
 function guard_from_refusal(text: string): string {
-	const trimmed = text.trimStart()
+	const trimmed = text.trimStart().replace(HOOK_ERROR_LABEL, '')
 	if (!trimmed.startsWith(REFUSAL_MARKER)) return ''
 
 	const headline = trimmed.slice(REFUSAL_MARKER.length).split('\n', 1)[0]?.trimStart() ?? ''
 	const colon = headline.indexOf(':')
 
 	return (colon === -1 ? headline : headline.slice(0, colon)).trim()
+}
+
+function token_lines_of(text: string): Array<string> {
+	return text
+		.split('\n')
+		.map((line) => line.trim())
+		.filter((line) => TOKEN_LINE.test(line))
+		.slice(0, TOKEN_LINE_LIMIT)
 }
 
 // **The body is flattened once and both readers are handed the text.** `result_text` is what turns a
@@ -185,6 +209,7 @@ function to_block(raw: z.infer<typeof BLOCK_SCHEMA>): Block {
 		followup_stages: time_followup_stage.read_stages(text),
 		error_text: is_error === true ? text.slice(0, ERROR_TEXT_LIMIT) : '',
 		refusal_guard: is_error === true ? guard_from_refusal(text) : '',
+		token_lines: is_error === true ? [] : token_lines_of(text),
 		background_id: time_background.launch_id(text),
 		agent_id: time_background.agent_launch_id(text),
 	}
@@ -248,6 +273,7 @@ function parse_line(line: string): TranscriptLine | undefined {
 const time_transcript_line = {
 	ERROR_TEXT_LIMIT,
 	NO_MESSAGE_ID,
+	TOKEN_LINE_LIMIT,
 	guard_from_refusal,
 	parse_line,
 }

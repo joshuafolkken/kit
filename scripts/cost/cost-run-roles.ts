@@ -51,6 +51,7 @@ interface SessionRow {
 	request_count: number
 	output_tokens: number
 	preamble_tokens: number
+	took_cut: boolean
 }
 
 interface SessionMeasurement {
@@ -154,6 +155,7 @@ function to_row(node: RunNode): SessionRow {
 		request_count: node.records.length,
 		output_tokens: cost_usage.sum_totals(node.records).output_tokens,
 		preamble_tokens: node.baseline_tokens,
+		took_cut: node.took_cut,
 	}
 }
 
