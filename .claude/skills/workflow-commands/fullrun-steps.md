@@ -74,7 +74,7 @@ ship "<title> #<N>" --notify-message "..."` (gate → commit/push/PR → the CI-
 stopping at the first failed step; joshuafolkken/kit#2398); **where a second round ran**, the PR opened
 at (11) and the region stays separate — `pnpm josh followup "<title> #<N>" --notify-message "..."` then
 `pnpm josh run:tail <N>`. (14) **After the merge, run `pnpm josh ms`.** (15) **Ask `pnpm josh
-release:scope` and close the completion summary with what it answered** (`followup-reference.md` →
+release:scope` and close the completion summary with what it answered** (`followup.md` →
 "When `pnpm josh release` runs").
 
 ## The release ask — the last step of either form
@@ -93,5 +93,5 @@ own end.
 Once the merge is done, `pnpm josh release:scope` says whether a release is owed — `required`, `skip`
 or `unknown`, and `unknown` is never read as `skip`. On `required` the completion summary closes with
 the request and the exact command; the run never types `pnpm josh release` itself, because publishing
-is Tier C (`followup-reference.md` → "When `pnpm josh release` runs", the single source). A `fullrun`
+is Tier C (`followup.md` → "When `pnpm josh release` runs", the single source). A `fullrun`
 invoked as one child of a `backlogrun` does not ask it — that batch asks once at its own end.

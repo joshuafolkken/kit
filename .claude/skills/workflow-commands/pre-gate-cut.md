@@ -166,103 +166,43 @@ built for the lane child.
 
 ### It is a guard, fired at the edit that crosses the threshold
 
-Rationale: `docs/maintainers/pre-gate-cut-rationale.md` → "Why the rules are guards, not prose".
-`pnpm josh rule:guard` **refuses an `Edit` / `Write`** while this checkout is a dispatched lane child
-whose recent-context cost is over threshold, handing back `pnpm josh run:cut --impl <N> --handoff <path>` — the
-refusal lands _before_ the edit. `cut` ends the turn, the rest leave this process implementing; a fresh
-process's `pnpm josh run:cut --resume <N>` then answers **`resume-impl`**, so it **skips the title, plan,
-hold claim and split assessment** and **continues implementation** rather than gating. Unlike the
-pre-gate cut, **the implementation resume clears the record** — it may fire again, unlike the
-once-per-lane pre-gate cut (joshuafolkken/kit#1935); `begin_cut`'s exclusive create still gives each
-crossing one successor.
+**The trigger**: `pnpm josh rule:guard` refuses an `Edit` / `Write` in a dispatched lane child whose
+recent-context cost is over threshold, handing back `pnpm josh run:cut --impl <N> --handoff <path>`.
+`cut` ends the turn; a fresh process's `run:cut --resume <N>` answers `resume-impl` and continues
+implementation — **the implementation resume clears the record**, so the cut may fire again. Outside
+a lane, a held run on a measured `over` keeps the hold, sends a `confirmation` Telegram naming
+`fullrun #<N>` and ends the turn. The refusal states the rest — **It fires on every threshold crossing,
+not once per run**; **An edit reissued right after a refusal passes**; **An unmeasurable session
+warrants the cut**; **It is silent between a cut and its resume**. Rationale:
+`docs/maintainers/pre-gate-cut-rationale.md` → "Why the rules are guards, not prose";
+`scripts/rules/implementation-cut.ts` implements it. A child that ended without cutting is detected
+after the fact by `pnpm josh run:ending <N> --output <path>` (joshuafolkken/kit#2139).
 
-- **It fires for a marked child, or a run held outside a lane on a measured `over`**
-  (joshuafolkken/kit#2760); a person's tree holds no run. Outside a lane `cut` relaunches nothing: keep
-  the hold, send a `confirmation` Telegram naming `fullrun #<N>`, end the turn.
-- **It fires on every threshold crossing, not once per run** — it re-asks on
-  each over-threshold edit, including after a `busy` / `failed` / `unready` verdict.
-- **An edit reissued right after a refusal passes** — so a `busy` / `failed` cut cannot wedge the run:
-  the reissue lands inside a short window and goes through, a genuinely new crossing past it refuses
-  again.
-- **An unmeasurable session warrants the cut** in a lane, as the pre-gate cut's does.
-- **It is silent between a cut and its resume** — a carried record naming this issue keeps it quiet; the
-  resume clears it, and the fresh process reads its own transcript under threshold.
-- **The verdict read is reused over a short window** — cached per checkout for a few seconds, so a
-  turn's burst of edits shares one read.
+## The threshold
 
-`scripts/rules/implementation-cut.ts` implements the trigger, and the row joins
-`prompts/collaboration-workflow/rule-delivery.md`. **A child that ended
-without cutting is still detected after the fact by `pnpm josh run:ending <N> --output <path>`**
-(joshuafolkken/kit#2139). **A single check (`lint:related` / `test:related`) is run after a batch of
-edits, not after each one.**
-
-## The threshold, and the statistic it is measured against
-
-**`CONTEXT_CUT_THRESHOLD` (135_000) is one value, and `cost_verdict.per_request_cost` — the one
-statistic the parent and the lane child both read — averages the most recent `RECENT_REQUEST_WINDOW`
-(10) requests, not the whole session**. The value is computed by
-`scripts/cost-runtime/context-cut-payback.ts`, its single source.
-
-**The cut is conditional**: taken only when the recent-window per-request cost
-is over `CONTEXT_CUT_THRESHOLD` — the same statistic and threshold the implementation-phase cut reads, so
-no second threshold exists. Below it `run:cut` answers `under-threshold` and the gate runs uncut; the
-guard reads the same verdict and stays silent. An **unmeasurable** session is always cut.
-Rationale: `docs/maintainers/pre-gate-cut-rationale.md` → "Why the threshold is a break-even".
-
-## Consistency with the chain rule
-
-The chain forbids ending a turn at the push, with CI in flight and nothing set to resume. **The pre-gate
-cut and the detached hand-off end it _before_ the gate** and start what carries the run on in the same
-act — a fresh process, or the supervisor — so the push is never a turn boundary. The implementation-phase
-cut is the same pattern one boundary earlier.
+`CONTEXT_CUT_THRESHOLD` and the recent-window `cost_verdict.per_request_cost` (the last
+`RECENT_REQUEST_WINDOW` requests) are computed by `scripts/cost-runtime/context-cut-payback.ts`, their
+single source; both cuts and the parent hand-off read the same verdict, and an unmeasurable session is
+always cut. Rationale: `docs/maintainers/pre-gate-cut-rationale.md` → "Why the threshold is a
+break-even". Both cuts end the turn **before** the gate, in the same act that starts the successor, so
+the push is never a turn boundary (`chain-rule.md`).
 
 ## A lane child records its park before it stops
 
-**A dispatched lane child records its park on the Issue before it stops for a decision**
-(joshuafolkken/kit#2034). A headless child's only route to ask a person is to park the Issue (#2012,
-#2011). Rationale:
-`docs/maintainers/pre-gate-cut-rationale.md` → "Why the rules are guards, not prose".
-
-**The record, before the Telegram, is the park procedure exactly** — `needs-decision` plus a comment
-carrying the question, the options, and whether work was stashed. Its single source is
-`backlogrun-park.md` → "park and continue", followed against the child's own Issue before the
-`confirmation` notify; with the label on the Issue, the parent's `pnpm josh run:liveness` reads the
-child as `settled`.
-
-**A `needs-human-review` or `already-done` stop needs nothing added** — those labels are already on the
-Issue. It is only a decision-stop (a Tier B toss-up, a Tier C action, an upstream defect, a split) that
-would otherwise leave the Issue bare.
-
-### The stop notify refuses until the park is recorded
-
-`pnpm josh rule:guard` **refuses `pnpm josh notify --task-type confirmation`** while this checkout is a
-lane child — the mark `JOSH_LANE_CHILD` names this lane's own issue — handing back the park commands.
-
-- **It fires for a marked child and nowhere else.** A person's own `fullrun` carries no mark and sends
-  its stop notify untouched.
-- **It fires once per run.** The child records the park and reissues the same notify; a
-  `needs-human-review` or `already-done` stop reissues after the one delivery, its label already on the
-  Issue.
-- **The park state is not readable synchronously**, so the delivery is a checklist — one wasted reissue
-  on the compliant path is safe.
-
-This section is the single source of the lane-child park rule; `scripts/rules/lane-park.ts` implements
-the trigger, and the row joins the enumeration in
-`prompts/collaboration-workflow/rule-delivery.md`.
+**The trigger**: a dispatched lane child about to stop for a decision (a Tier B toss-up, a Tier C
+action, an upstream defect, a split) parks its own Issue first — `backlogrun-park.md` → "park and
+continue" — so the parent's `pnpm josh run:liveness` reads it `settled` (joshuafolkken/kit#2034),
+after #2012 and #2011. A `needs-human-review` or `already-done` stop already carries its label.
+`pnpm josh rule:guard` refuses `pnpm josh notify --task-type confirmation` from a marked child until
+then — **It fires once per run.**, and a person's own `fullrun` is never refused
+(`scripts/rules/lane-park.ts`).
 
 ### The interactive ask is refused one call earlier
 
-(joshuafolkken/kit#2201) The harness refuses an interactive ask in a headless session by **ending the
-turn**, so the notify guard never fires (#2178 — the failure joshuafolkken/kit#2034 set out to prevent,
-one call upstream). So `pnpm josh rule:guard` **refuses `AskUserQuestion` for a marked lane child**; the
-deny returns to the model, and the instruction is to park the question. It fires on **every occurrence**
-and stays silent for a person working in a lane. Rationale:
-`docs/maintainers/pre-gate-cut-rationale.md` → "Why the rules are guards, not prose".
+**The trigger**: a headless session ends the turn on an interactive ask, so the notify guard never
+fires (#2178). `pnpm josh rule:guard` therefore refuses `AskUserQuestion` for a marked lane child on
+every occurrence — park the question instead (joshuafolkken/kit#2201), completing
+joshuafolkken/kit#2034. A child that slips past is recovered by `pnpm josh run:ending`, which lifts
+the refused ask into the park basis; `scripts/rules/lane-interactive-ask.ts` and the shared
+`scripts/agent/interactive-ask.ts` implement it.
 
-**A child that slips past it is still recoverable** — `pnpm josh run:ending` lifts the refused ask out
-of the exit record's `permission_denials` into the `abandoned` verdict's park basis, so the parent puts
-it into the park comment. `scripts/rules/lane-interactive-ask.ts` implements the trigger, and
-`scripts/agent/interactive-ask.ts` is the
-shared extractor the guard and `run:ending` both read.
-
-This file is the single source of the rule.
