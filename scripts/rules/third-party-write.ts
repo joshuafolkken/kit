@@ -27,23 +27,47 @@ import { shell_segments } from './shell-segments'
 // is not third-party — the rule stays silent rather than refusing a write it cannot prove is external.
 // The `{owner}` placeholder (joshuafolkken/kit#3188) is judged by every owner `gh` could expand it to:
 // first-party only when all of them are, so a fork checkout whose `upstream` is another owner's still
-// refuses the write `gh` may send there.
+// refuses the write `gh` may send there. A candidate whose owner could not be read counts as
+// third-party here — unlike an unreadable session owner, it is a remote `gh` may really write to.
 function is_third_party_write_segment(
 	segment: string,
 	session_owner: string | undefined,
-	resolve_placeholder_owners: () => Array<string>,
+	resolve_placeholder_owners: () => Array<string | undefined>,
 ): boolean {
 	if (!gh_api.is_gh_api(segment) || !gh_api.is_write(segment)) return false
 
 	const target = gh_api.repo_target(segment)
 	if (target === undefined) return false
-	const owners = gh_api.is_owner_placeholder(target.owner)
-		? resolve_placeholder_owners()
-		: [target.owner]
 
-	return owners.some(
-		(owner) => repo_party.classify(session_owner, owner) === repo_party.THIRD_PARTY,
+	if (!gh_api.is_owner_placeholder(target.owner)) {
+		return repo_party.classify(session_owner, target.owner) === repo_party.THIRD_PARTY
+	}
+
+	return resolve_placeholder_owners().some(
+		(owner) =>
+			owner === undefined || repo_party.classify(session_owner, owner) === repo_party.THIRD_PARTY,
 	)
+}
+
+// A segment that makes `gh` resolve the placeholder against something other than this process's
+// checkout: a directory change, or a `GH_REPO` assignment. The guard reads the hook's own cwd and
+// environment, so after either one its candidate set no longer describes what `gh` will expand.
+const GH_CONTEXT_CHANGE = /(?:^|\s)(?:cd|pushd)(?:\s|$)|(?:^|\s)(?:export\s+)?GH_REPO=/u
+
+function unreadable_candidates(): Array<string | undefined> {
+	return [undefined]
+}
+
+// The placeholder candidates for the segment at `index`: the checkout's own, unless an earlier
+// segment of the same line moved `gh` elsewhere — then one unreadable candidate, refused.
+function candidates_at(
+	segments: ReadonlyArray<string>,
+	index: number,
+	resolve_placeholder_owners: () => Array<string | undefined>,
+): () => Array<string | undefined> {
+	const has_moved = segments.slice(0, index).some((segment) => GH_CONTEXT_CHANGE.test(segment))
+
+	return has_moved ? unreadable_candidates : resolve_placeholder_owners
 }
 
 // The session owner is read only when a segment is actually a `gh api` write to a repository — so an
@@ -55,18 +79,23 @@ function is_third_party_write_segment(
 function writes_third_party(
 	command: string,
 	resolve_owner: () => string | undefined = repo_party.current_owner,
-	resolve_placeholder_owners: () => Array<string> = repo_party.placeholder_owners,
+	resolve_placeholder_owners: () => Array<string | undefined> = repo_party.placeholder_owners,
 ): boolean {
-	const targets = shell_segments
-		.segments_of(command)
-		.filter((segment) => gh_api.is_gh_api(segment) && gh_api.is_write(segment))
+	const segments = shell_segments.segments_of(command)
+	const has_write = segments.some(
+		(segment) => gh_api.is_gh_api(segment) && gh_api.is_write(segment),
+	)
 
-	if (targets.length === 0) return false
+	if (!has_write) return false
 
 	const session_owner = resolve_owner()
 
-	return targets.some((segment) =>
-		is_third_party_write_segment(segment, session_owner, resolve_placeholder_owners),
+	return segments.some((segment, index) =>
+		is_third_party_write_segment(
+			segment,
+			session_owner,
+			candidates_at(segments, index, resolve_placeholder_owners),
+		),
 	)
 }
 

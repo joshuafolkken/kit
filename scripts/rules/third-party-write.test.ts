@@ -68,6 +68,30 @@ describe('writes_third_party — the owner placeholder, against injected candida
 	})
 })
 
+describe('writes_third_party — the owner placeholder it cannot resolve', () => {
+	it('refuses the placeholder when a candidate remote owner is unreadable', () => {
+		const is_third_party = third_party_write.writes_third_party(
+			PLACEHOLDER_LABEL,
+			resolve_session,
+			() => [SESSION, undefined],
+		)
+
+		expect(is_third_party).toBe(true)
+	})
+
+	it.each([
+		['a directory change', `cd ../svelte && ${PLACEHOLDER_LABEL}`],
+		['an exported GH_REPO', `export GH_REPO=sveltejs/svelte && ${PLACEHOLDER_LABEL}`],
+		['an assigned GH_REPO', `GH_REPO=sveltejs/svelte; ${PLACEHOLDER_LABEL}`],
+	])('refuses the placeholder after %s earlier in the line', (_name, command) => {
+		const is_third_party = third_party_write.writes_third_party(command, resolve_session, () => [
+			SESSION,
+		])
+
+		expect(is_third_party).toBe(true)
+	})
+})
+
 const harness = delivered_rules_harness.create_harness('rule-guard-3p-')
 const { payload_of } = harness
 const NOW_MS = 1_700_000_000_000

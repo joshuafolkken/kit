@@ -52,6 +52,12 @@ describe('repo_party.placeholder_owners', () => {
 		])
 	})
 
+	it('answers an unreadable candidate for a malformed GH_REPO', () => {
+		expect(repo_party.placeholder_owners(process.cwd(), { GH_REPO: 'svelte' })).toStrictEqual([
+			undefined,
+		])
+	})
+
 	// With no GH_REPO, the candidates are the kit checkout's own remotes — all joshuafolkken's.
 	it('answers every remote owner when GH_REPO is unset', () => {
 		expect(repo_party.placeholder_owners(process.cwd(), {})).toContain('joshuafolkken')
