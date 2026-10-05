@@ -90,7 +90,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/gh-rest.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/glossary.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 8192 },
-	// #3178 left the template and the judgement tables; the epic procedure moved to `epic-commands`.
+	// #3178 left the template and the judgement tables; the epic commands moved to `epic-commands`, the by-hand fallback stayed.
 	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/operating-rules.md', bytes: 16_384 },
 	{ path: 'prompts/collaboration-workflow/output-bounds.md', bytes: 16_384 },

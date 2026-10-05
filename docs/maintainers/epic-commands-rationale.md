@@ -85,8 +85,9 @@ reference that never existed.
 
 ## Creating an epic by hand
 
-This used to live, in Japanese, in `prompts/collaboration-workflow/issue-template.md`, which now keeps
-only the "always create an epic" trigger and points at the skill (joshuafolkken/kit#3178).
+The reasoning below used to live, in Japanese, in `prompts/collaboration-workflow/issue-template.md`,
+which now keeps the "always create an epic" trigger, a pointer to the skill, and the by-hand fallback
+steps with the body template (joshuafolkken/kit#3178).
 
 **Why every split gets an epic.** Kept as a comment on the first child, the split rationale ends up
 inside the issue a batch merges and closes first, burying the plan for the rest. An earlier caveat
