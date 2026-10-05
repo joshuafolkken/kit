@@ -26,8 +26,18 @@ joshuafolkken/kit#1198 のコメントは `!` も発火すると書いていた�
 
 ## 引き金つき配送にした理由
 
-**規則を書くだけでは守られないことは、本リポジトリで繰り返し計測されている**（[`rule-delivery.md`](../../prompts/collaboration-workflow/rule-delivery.md)）。したがってこの規則は joshuafolkken/kit#1524 の機構に 1 行として載っており、`pnpm josh rule:guard` が該当する `Bash` 呼び出しを拒否して本文を突きつける。
+**規則を書くだけでは守られないことは、本リポジトリで繰り返し計測されている**（[`rule-delivery.md`](../../prompts/collaboration-workflow/rule-delivery.md)）。したがってこの規則は joshuafolkken/kit#1524 の機構に 1 行として載っており、`pnpm josh rule:guard` が該当する `Bash` 呼び出しを拒否して本文を突きつける。列挙表の行は `scripts/rules/delivered-rules.ts` の `shell-body` であり、その行が読む引き金 — どの綴りが本文をインラインで運ぶか、シェルがその値に何をするか — は `scripts/rules/shell-body-trigger.ts` にある。
+
+引き金が見えない綴りがあるため、`CLAUDE.md` の常駐 1 行は消していない。配送は Claude Code にしか届かず（Codex / Gemini / Cursor はフックを走らせない）、正規表現が知っている綴りだけが規則の適用範囲になってはならない。
 
 ## 引き金をフラグでなく本文で引く理由
 
 本リポジトリのプロンプトにある作例はいずれもプレースホルダ（`-f body="<plan>"`）を渡しており、これは無害である。フラグで引くと、規則が既に守られているそれらのターンでも拒否することになる。実際にバッククォートか `$` を含む本文が二重引用符に載った瞬間だけが、テキストが実行される呼び出しである。
+
+## マーカーテスト
+
+- `scripts/josh/cli-body.test.ts` — バッククォート・`$` を含む本文がファイル経由で無改変に通ること、`-` が標準入力を読むこと、通常ファイル以外の読める経路（`/dev/stdin`・プロセス置換）を開けること、インラインとファイルの同時指定を拒否すること
+- `scripts/rules/shell-body-trigger.test.ts` — 危険な綴りで発火し、プレースホルダ・`@file` 形式・エスケープ済み `\$` では無言であること。`body=` のどちら側に引用符があっても発火すること、`$( … )` で包んでもバッククォートは免除されないこと、`$( … )` の中の引用符で捕捉が切れないことを、いずれも発火・非発火の対で固定する
+- `scripts/rules/raw-field-body.test.ts` — `-f` ／ `--raw-field body=@` の綴りで発火し、`-F` ／ `--field body=@`・`@` を含まない本文・`labels[]=`・`pnpm josh issue:comment` では無言であること
+- `scripts/rules/delivered-rules.test.ts` — 上の引き金が列挙表の行に配線されており、非 `Bash` ツールでは無言であること
+- `scripts/rules/shell-body-rule.test.ts` — 常駐 1 行が手順文書を指しており、配送文が被害・安全な綴り・再発行の指示を運ぶこと。**この一覧そのものも固定する** — 一覧が「あるスイートが何を固定しているか」を書きながら、そのケースが存在しないという食い違いが実際に起きた（`-` の標準入力）。一覧は joshuafolkken/kit#3179 で手順文書からここへ移った

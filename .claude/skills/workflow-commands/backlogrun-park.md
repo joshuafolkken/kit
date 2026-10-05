@@ -15,7 +15,7 @@ authorization, whether it came from a named epic or from the opted-in pool:
 - **A stop that would end the run parks one issue and the run continues** — → "park
   and continue", which is that rule's single source, including what happens to the issue's lane.
 - **A prerequisite discovered mid-run is recorded as a dependency rather than parked** —
-  → "A prerequisite discovered mid-run", and `SKILL.md` → §2d for the three-way
+  → "A prerequisite discovered mid-run", and `prerequisite.md` for the three-way
   distinction between a prerequisite, a split and an upstream defect. **One thing is genuinely
   different**: with no epic, there is no `pnpm josh epic --add` to record the ordering into, so the
   prerequisite is filed with `route:tier-a` and the blocked issue is parked with `needs-decision`
@@ -59,7 +59,7 @@ person told to look at a working tree and not told which one has been told nothi
 flight finish; no new lane is opened.
 
 **Never apply or remove the label** — `auto-ok`'s rule, at `auto-ok`'s strength. Full definition and the
-`needs-decision` comparison: `SKILL.md` → §2z, which is the single source.
+`needs-decision` comparison: `needs-human-review.md`, which is the single source.
 
 ## park and continue
 
@@ -140,7 +140,7 @@ gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null 
 
 Finding that something else in **this** repository has to land first is not a split, and not an upstream
 defect. The child in hand is still one deliverable; it just needs another one before it. The three-way
-distinction, the `route:tier-a` filing command and the filing ceiling are `SKILL.md` → §2d, the single
+distinction, the `route:tier-a` filing command and the filing ceiling are `prerequisite.md`, the single
 source; what follows is this entry's branch.
 
 `<M>` below is the child being implemented when the prerequisite turned up; `<N>` is the new Issue.

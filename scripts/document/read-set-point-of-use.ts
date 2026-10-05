@@ -15,7 +15,7 @@
 // is joshuafolkken/kit#1856's addition**: it governs the `/code-review` → `followup` chain, which in
 // `fullrun` / `queue` / `epicrun` / `backlogrun` runs *after* the first edit, so its 7,396 tokens
 // were resident from the entry for no run that had yet reached a review.
-// **`background-commands.md` is joshuafolkken/kit#1873's**: it was §2h's resident body, governing the
+// **`background-commands.md` is joshuafolkken/kit#1873's**: it was `background-commands.md`'s resident body, governing the
 // background execution of the gate, the push and the merge tail — all after the first edit — so it
 // left `SKILL.md` for the point-of-use list. `SKILL.md` → §1, "Four documents are read at the point
 // of use", is the single source.

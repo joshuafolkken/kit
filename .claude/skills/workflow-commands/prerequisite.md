@@ -1,8 +1,8 @@
 # A prerequisite discovered mid-run — a dependency, not a park
 
-**This is the body of `SKILL.md` §2d, relocated here so the entry read carries the trigger and the
-pointer, not the procedure** (joshuafolkken/kit#2189). `SKILL.md` §2d is the resident stub, and each
-entry file (`fullrun.md` / `halfrun.md` / `backlogrun-park.md`) routes here for the definition. It is
+**This file is the single source, so the entry read carries the trigger and the pointer, not the
+procedure** (joshuafolkken/kit#2189). `SKILL.md` → §2's table keeps the trigger, and each entry file
+(`entry-sequence.md` / `backlogrun-park.md`) routes here for the definition. It is
 read at its point of use — the moment a run discovers that another Issue in this repository has to
 land first.
 
@@ -18,12 +18,12 @@ another is the failure this section exists to prevent:
 | A defect originating in **another package**                                 | File the upstream Issue and **stop** — Tier A for a first-party target; a third-party one is Tier C, recorded and drafted rather than filed (`CLAUDE.md` → "Cross-package problems"; `prompts/collaboration-workflow/upstream-interrupt.md`) |
 | This Issue was really **several** (a split)                                 | File the children and the epic and **stop** — except under `backlogrun`, whose authorization already covers a batch, so the children are filed and run through (`split-assessment.md`) |
 | Another Issue in **this** repository has to land first (**a prerequisite**) | This section                                                                                                            |
-| Something worth filing that is **none of the three** (**an observation**)   | File it **without asking** — Tier A for a first-party target — and **carry the run straight on**: nothing is stashed, nothing is parked (§2i). **A delegated child does not file here**, and a filing at depth 1 or deeper cites the depth-0 work it blocked; one that cannot cite it goes to the run's own `docs/maintainers/observations/<N>.md` and is filed on its second sighting — all of them §2i's |
+| Something worth filing that is **none of the three** (**an observation**)   | File it **without asking** — Tier A for a first-party target — and **carry the run straight on**: nothing is stashed, nothing is parked (`observation-filing.md`). **A delegated child does not file here**, and a filing at depth 1 or deeper cites the depth-0 work it blocked; one that cannot cite it goes to the run's own `docs/maintainers/observations/<N>.md` and is filed on its second sighting — all of them `observation-filing.md`'s |
 
 **File the prerequisite with the `route:tier-a` label**, so a Tier A filing made during implementation
 stays countable by filing route afterwards. **This paragraph belongs to the prerequisite row, not to
 the table** — the label means a filing the run is *blocked by*, so the observation row carries no
-`route:` label of its own (§2i):
+`route:` label of its own (`observation-filing.md`):
 
 ```bash
 pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --route tier-a
@@ -35,7 +35,7 @@ classification labels it declares, and runs the duplicate scan and `epic:bundle`
 
 Every "file the prerequisite" below means that labelled filing, and it always happens **first**: the
 steps after it name a number that does not exist until it is. **Its duplicate scan is read exactly as
-it is for a `new` entry** (§2e): a filing made mid-run is the one most likely to duplicate something.
+it is for a `new` entry** (`issue-scout.md`): a filing made mid-run is the one most likely to duplicate something.
 
 **Each entry point's own branch stays in that entry's file:**
 

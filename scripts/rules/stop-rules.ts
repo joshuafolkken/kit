@@ -103,13 +103,13 @@ const STOP_NOTIFY_REASON =
 	'your previous reply. This fires only while the hold is held and no notify is on the transcript, and ' +
 	'`stop_hook_active` lets a second stop through so a run is never wedged.'
 
-// **A clean tree that still holds is a tree the next run will trample.** `SKILL.md` → §2f: a stop that
+// **A clean tree that still holds is a tree the next run will trample.** `working-tree-hold.md`: a stop that
 // leaves the tree clean releases the hold; a `halfrun` pre-commit stop and a `needs-human-review` stop
 // keep it because their tree is dirty, which is why this row is silent whenever the tree is not clean.
 const HOLD_RELEASE_REASON =
 	'⛔ working-tree hold not released: this working tree is clean but its `run:hold` record is still in ' +
 	'place, so the next run here runs `git switch main && git pull` believing the tree is free while ' +
-	'you hold it. `.claude/skills/workflow-commands/SKILL.md` → §2f: a stop that leaves the tree clean ' +
+	'you hold it. The workflow-commands skill → `working-tree-hold.md`: a stop that leaves the tree clean ' +
 	'releases the hold with `pnpm josh run:release <N>` (bare for a `new` entry). A `halfrun` ' +
 	'pre-commit stop and a `needs-human-review` stop keep the hold because their tree is dirty, and a ' +
 	'`prrun` stop keeps it by its stop mark — this row is silent there. Release it, then end with a one-line confirmation that it was released — do ' +
@@ -139,11 +139,11 @@ function build_citation_reason(references: ReadonlyArray<string>): string {
 
 // **An offer to file is a Tier A filing deferred to the user** (joshuafolkken/kit#2422). The judgement
 // is already made, so the reason hands over the filing chain rather than a question; the rule itself
-// is resident in `SKILL.md` → §2i and only pointed at.
+// is resident in `observation-filing.md` and only pointed at.
 const FILING_OFFER_REASON =
 	'⛔ filing offer: your reply offers to file an Issue instead of filing it. Filing into a ' +
 	'first-party repository is Tier A — the trigger is the judgement that it is worth filing, not the ' +
-	"run's progress (`.claude/skills/workflow-commands/SKILL.md` → §2i, `observation-filing.md`). Run " +
+	"run's progress (the workflow-commands skill → `observation-filing.md`). Run " +
 	'`pnpm josh issue:file "<title>" --body-file <path> --depth <0|1|2>` — it scouts, lints, labels and ' +
 	'runs `epic:bundle` itself — then end with the one-line citation of what was filed; do not repeat ' +
 	'your previous reply. If it is not worth filing ' +

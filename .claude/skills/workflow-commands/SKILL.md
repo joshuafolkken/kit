@@ -6,64 +6,40 @@ description: The procedures for the Issue-driven shorthand commands `kickoff`, `
 # Issue-driven workflow commands
 
 `kickoff`, `fullrun`, `halfrun`, `prrun` and `backlogrun` are the shorthand commands this
-package's collaboration workflow is built on. Their procedures live here rather than in `CLAUDE.md`
-because each one applies only while its own command is running.
-
-Each topic file under `prompts/collaboration-workflow/` sources its own rule; this skill sources the
-procedures. Neither restates the other.
+package's collaboration workflow is built on. **This file is their manifest — triggers and pointers,
+never a procedure** (joshuafolkken/kit#3174): each rule is stated once, in the file its row names.
 
 ## 0. The rule that fires before any of them — explicit invocation
 
 **Never start a `kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun` workflow (including their
-`#N` and `new` variants) unless the user has typed the keyword in the current turn's prompt.** This rule is also
-resident in the AI documents, because it has to hold when this skill has *not* been loaded.
-
-- Conversational requests like "implement X", "fix Y", "open a PR for Z" are **NOT** implicit
-  invocations. Even if the task clearly fits one of these workflows, do not infer authorization from
-  the request shape.
-- Do **NOT** ask confirmation questions like "May I proceed with `halfrun new`?" or "Shall I run
-  `fullrun`?". A confirmation prompt is not an acceptable substitute for explicit invocation.
-- Instead, **prompt the user to type the command themselves**, with the exact phrasing: "Please run
-  \`<command>\` to start this task."
-- The rule applies even when the user authorized a related workflow in an earlier turn. Each
-  invocation must be re-typed by the user in the current turn.
-
-**A session cut inside a declared budget is not a new invocation — for `backlogrun` alone**; its
-single source is `backlogrun-steps.md` → "The session cut is inside the invocation".
+`#N` and `new` variants) unless the user has typed the keyword in the current turn's prompt.** Its
+single source is `CLAUDE.md` → "Explicit invocation required (MANDATORY)", resident because it holds
+when this skill is not loaded. **A session cut inside a declared budget is not a new invocation — for `backlogrun`
+alone**: `backlogrun-steps.md` → "The session cut is inside the invocation".
 
 ## 1. Which file to read
 
-Read this file, then the one for the command that was typed. The command file is a **manifest** — the
-ordered steps as terse triggers and pointers; `pnpm josh run:step <N>` prints the run's next single
-action — computed from the event stream, the carry record and the issue state, never the conversation
-(`run:next` is its pre-implementation degenerate form) — and each step's detail is read on demand from
-the file its pointer names (for `fullrun`, the step lists are `fullrun-steps.md`).
+Read this file, then the files the typed command's row names. A command file is a **manifest** of
+terse triggers and pointers; `pnpm josh run:step <N>` prints the run's next single action, computed
+from the event stream, the carry record and the issue state, never the conversation.
 
 | Typed keyword                            | Read                                        |
 | ---------------------------------------- | ------------------------------------------- |
 | `kickoff` / `kickoff #N` / `kickoff new` | `kickoff.md`                                |
-| `fullrun` / `fullrun #N` / `fullrun new` | `fullrun.md`                                |
-| `halfrun` / `halfrun #N` / `halfrun new` | `halfrun.md`                                |
-| `prrun` / `prrun #N` / `prrun new`       | `prrun.md` — the difference over `fullrun.md`, read with it |
+| `fullrun` / `fullrun #N` / `fullrun new` | `fullrun.md` + `entry-sequence.md`          |
+| `halfrun` / `halfrun #N` / `halfrun new` | `halfrun.md` + `entry-sequence.md`          |
+| `prrun` / `prrun #N` / `prrun new`       | `prrun.md` — the difference over `fullrun.md`, read with it and `entry-sequence.md` |
 | `backlogrun` / `backlogrun #N…` / `backlogrun #E…` | `backlogrun.md` — its dispatched child reads `fullrun.md` + `split-assessment.md` in its own unit, not the parent at entry |
 
-Each command manifest cites `split-assessment.md` → "The question" — the split decision, read at the
-entry as a section; the split-handling detail (what each entry does with the answer, promote or create
-an epic) is read on demand only when a split is found (joshuafolkken/kit#2189). `backlogrun`'s row
-lists `backlogrun.md` alone: its parent orchestrates and never implements, so `fullrun.md` and
-`split-assessment.md` are read by a dispatched child in its own delegated unit (`backlogrun-child.md`).
-Every procedure for *running* a `backlogrun` item — lanes (`backlogrun-lanes.md`), park-and-continue,
-the guards, failure-only recovery (`backlogrun-recovery.md`) — stays `backlogrun.md`'s. The on-demand sections `into-target.md` (an `into` suffix) and `target-repository.md`
-(an `owner/repo#` prefix) are read only when their trigger is typed, and §3's residency procedure lives
-in `prompts/collaboration-workflow/residency.md`, reached only when a rule is placed, moved or retired.
+`entry-sequence.md` holds the entry sequence and stop branches `fullrun`, `halfrun` and `prrun` share;
+each manifest carries only its difference. `split-assessment.md` → "The question" is read at the
+entry as a section, its split-handling detail only when a split is found.
 
 ### The fetch is one `Read` call per file
 
-**Fetch each file above with one `Read` call of its own — never `cat`, and never two of them in one
-command.** The distributed `.claude/settings.json` caps a Bash result at `BASH_MAX_OUTPUT_LENGTH`
-characters, and every document over it is handed back by `cat` as a middle-truncated preview, then
-read a second time. `pnpm josh read:set [<keyword>]` prints the cap and marks every file that exceeds
-it; `pnpm josh doc:read <file>` is the Bash-cap-safe whole-file read.
+**Fetch each file above with one `Read` call of its own — never `cat`, never two in one command.** A
+Bash result is capped at `BASH_MAX_OUTPUT_LENGTH` characters and truncates a longer document;
+`pnpm josh doc:read <file>` is the cap-safe whole-file read.
 
 ### Four documents are read at the point of use, not at the entry
 
@@ -74,24 +50,13 @@ Each is fetched at its named scope, in the same turn, by the named command that 
 | ----------------------- | ------------------------------------------------------------------------------ |
 | `latest-gate.md`        | `pnpm josh latest:scope` answers `required` — before `josh latest` runs         |
 | `followup.md` → "Run `pnpm josh followup`" | Before issuing `pnpm josh followup`, in that same turn |
-| `chain-rule.md` → "Run the review-to-merge chain" | Before the first `pnpm josh gate` launch (`fullrun` / `backlogrun`) — the section is how the gate starts, overlapped with the review, so it is read before the gate rather than before the `/code-review` step |
+| `chain-rule.md` → "Run the review-to-merge chain" | Before the first `pnpm josh gate` launch (`fullrun` / `backlogrun`) — the gate starts overlapped with the review, so the section is read before the gate |
 | `background-commands.md` → "Background the gate and push" | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `backlogrun`) |
 
-A `skip` answer from `latest:scope` reads nothing; `latest-gate.md` remains a whole-file read, while
-the other three fetch only the operational section named above. The trigger sentence for each is
-resident in §2 and in the command's manifest, so a run that never opens these documents still calls
-the right command at the right moment. `followup.md`'s post-execution reference is in
-`followup-reference.md`, reached through a section pointer from `followup.md`.
-
-**A lane child that parks reads `backlogrun-park.md` → "park and continue" at that point of use**, so
-the pointer names that heading rather than the whole file: the entry read is charged for the park
-procedure alone, and the rest of `backlogrun-park.md` is read only when it is reached
-(joshuafolkken/kit#2189).
-
-**Every implementing run reads `progress-watcher.md` → "Progress while the run is quiet" at the
-point of use** — before starting `pnpm josh run:progress --wait` once its hold is claimed — so a
-single-issue run never pays for `backlogrun-progress.md` to reach the heartbeat
-(joshuafolkken/kit#3172).
+A `skip` answer from `latest:scope` reads nothing. **A lane child that parks reads
+`backlogrun-park.md` → "park and continue" at that point of use**, and **every implementing run reads
+`progress-watcher.md` → "Progress while the run is quiet"** before starting `pnpm josh run:progress
+--wait` once its hold is claimed (joshuafolkken/kit#3172).
 
 ### A section reference is read as a section
 
@@ -102,162 +67,46 @@ pnpm josh doc:section <file.md> "<heading>"   # the section, verbatim
 pnpm josh read:set [<keyword>]                # what an entry reads, and what it costs
 ```
 
-The section is fetched in the same turn, printed verbatim with its subsections; **a heading that does
-not resolve is refused, with the file's own headings listed**, as is an ambiguous prefix. The set is
-derived from the table above and the documents themselves, not transcribed;
-`scripts/document/entry-read-set.test.ts` pins the derivation and
-`scripts/rules/entry-read-set-document-rule.test.ts` pins this rule.
+A heading that does not resolve is refused, with the file's own headings listed. The set is derived
+from the table above and the documents themselves, never transcribed.
 
 ## 2. What every one of them shares
 
 Each shared rule is a **trigger, a one-line action, and the single source** the procedure is read
-from. The single source is where the rule is stated in full — this list is the manifest, not the
-procedure.
+from — read at that trigger, never restated here.
 
 | Trigger | Action | Single source |
 | --- | --- | --- |
+| First call of any entry | `#N`: `pnpm josh run:entry <N> --to <command>` (claims the tree, except `kickoff`); `new` (not `kickoff`): `pnpm josh run:hold`; `busy` / `unknown` stop | `working-tree-hold.md` |
+| `run:entry` prints its stage line | The command sets how far a run goes, the Issue where it starts; **`start: reached` redoes nothing** — stop (at `merged`, the next line answers) | `docs/how-to/run-issues.md` |
+| Same turn as the hold (not a dispatched child, not `kickoff`) | `pnpm josh cost --cut`; `under` continues, `over` stops — `run:entry` notifies and runs `run:release` (by hand for `new`) | `backlogrun-progress.md` → "The hand-off" (shared 135,000 threshold) |
+| An entry typed with an `owner/repo#` prefix or a short `repo#` name | Resolve the target and its checkout; an explicit foreign owner stops the run | `target-repository.md` |
+| A `new` entry typed with an `into <target>` suffix | Insert the artifact into the named epic with `pnpm josh epic --add <E> <N>` | `into-target.md` |
+| Before any work starts (every entry) | The split assessment; the default is not to split — separability **and** a scope clearly over one gate must hold together; a `fullrun` / `halfrun` that finds a split files the epic and **stops** | `split-assessment.md` → "The question" |
+| Before implementing (every `#N` entry) | `pnpm josh issue:read <N>` — the body and the comments; the later of a body and a comment wins | `issue-comments.md` |
+| `pnpm josh issue:state <N>` answers `human_review: yes` | Implement and gate, then stop before the commit; the label is applied only by a person | `needs-human-review.md` |
 | Before implementing (every implementing entry) | `pnpm josh latest:scope`; on `required` read the doc and run `josh latest`, then load the `dependency-update` skill; `kickoff` never reaches it | `latest-gate.md` (read whole, only on `required`) |
-| Implementation is done | The verification gate: refactor → `pnpm josh main:merge` → `pnpm josh gate` started beside a subagent `/code-review` and joined before the commit → the two-round cap → PR opened between the rounds → merge; `kickoff` never reaches it | `chain-rule.md` → "Run the review-to-merge chain" |
-| While implementing | Re-run one check by name, not the whole gate — `pnpm josh lint:related`, `pnpm josh cspell:dot`, `pnpm josh test:related`; the last pair runs in front of the gate, and `pnpm josh review:brief` refuses a brief on a tree neither was green on | `chain-rule.md` |
+| Before delegating any run step | `pnpm josh delegate <step>` decides eligibility, never you | `delegation.md` |
+| The pre-implementation reading reaches 3 unedited files | Delegate the unread investigation; a file this run will edit is read in the main line | `delegation.md` → "The pre-implementation reading" |
+| Immediately before implementation | Present the two-layer work summary (once per Issue); `kickoff` posts a plan instead | `prompts/collaboration-workflow/report-format.md` |
+| While implementing | Re-run one check by name, not the whole gate — `pnpm josh lint:related`, `pnpm josh cspell:dot`, `pnpm josh test:related`; `pnpm josh review:brief` refuses a brief on a tree the last two were not green on | `chain-rule.md` |
+| Implementation is done | Refactor → `pnpm josh main:merge` → `pnpm josh gate` beside a subagent `/code-review`, joined before the commit → round cap → PR → merge | `chain-rule.md` → "Run the review-to-merge chain" |
 | A review has run | Its verdict counts only once `pnpm josh review:attest --check` answers `ok`; `missing` / `mismatch` are refusals `pnpm josh followup` blocks the merge on | `chain-rule.md` → "The brief names the checkout, and a review that read another one is refused" |
+| A command can take minutes | Issue it in the background; the turn never ends at the push (`pnpm josh followup` stays foreground) | `background-commands.md` → "Background the gate and push" |
 | E2E gate | The CI E2E job where the command ends in a PR (`fullrun` / `backlogrun`, enforced by `pnpm josh followup`); you run `pnpm josh test:e2e` yourself where it does not (`halfrun`) | `prompts/testing-guide.md` → "Closing the E2E gate without a human run" |
-| A defect in kit's own verification turns up | It runs alone, and a batch resumes only once it has merged, when three conditions all hold (a defect, in kit's own verification, making unrelated PRs answer wrongly on `main` now) — never from how serious it looks | `prompts/collaboration-workflow/wip-cap.md` → 「実行のしかた」 |
-| A command can take minutes | Issue it in the background; the turn never ends at the push (`pnpm josh followup` stays foreground) | §2h → `background-commands.md` → "Background the gate and push" |
-| `pnpm josh issue:state <N>` answers `human_review: yes` | Implement and gate, then stop before the commit | §2z → `needs-human-review.md` |
+| Filing any new Issue | `pnpm josh issue:file` — it runs the `issue:scout` scan first; read its duplicate and epic answers | `issue-scout.md` |
+| Another Issue here must land first | A prerequisite is a dependency, not a park — file it, stash, record the dependency; `fullrun` / `halfrun` stop, `backlogrun` continues | `prerequisite.md` |
+| Something worth filing, none of the three | File it without asking (Tier A, first-party) and carry on; a delegated child returns it to the parent instead | `observation-filing.md` |
+| A defect in kit's own verification turns up | It runs alone when all three conditions hold; a batch resumes once it merges | `prompts/collaboration-workflow/wip-cap.md` → 「実行のしかた」 |
 | Under `backlogrun`, a stop that would end a batch, or a named non-epic item | Park one child and continue; run a named non-epic item as a `fullrun` | `backlogrun-park.md` → "park and continue"; `backlogrun-child.md` → "When `#N` is not an epic" |
 | `backlogrun`'s authorization | The whole `auto-ok` opted-in pool as well as its named items; `pnpm josh backlog:next` offers them | `backlogrun.md` |
-| First call of any entry | `#N`: `pnpm josh run:entry <N> --to <command>` (claims the tree, except `kickoff`); `new` (not `kickoff`): `pnpm josh run:hold` | §2k; §2f → `working-tree-hold.md` |
-| Same turn as the hold (not a dispatched child, not `kickoff`) | `pnpm josh cost --cut`; `under` continues, `over` stops — `run:entry` notifies and runs `run:release` (by hand for `new`) | `backlogrun-progress.md` → "The hand-off" (shared 135,000 threshold) |
-| Before any work starts (every entry) | The split assessment; the default is not to split — separability **and** a scope clearly over one gate must hold together; a `fullrun` / `halfrun` that finds a split files the epic and **stops** | `split-assessment.md` → "The question" |
-| Another Issue here must land first | A prerequisite is a dependency, not a park (the third of four mid-run discoveries) | §2d → `prerequisite.md` |
-| Something worth filing, none of the three | File it without asking (Tier A, first-party) and carry on; a delegated child returns it to the parent instead | §2i → `observation-filing.md` |
-| `run:step` prints the retrospective step (a run drained its backlog and stopped, not a lane child) | Run what it prints once, file 0–2 improvements, then `pnpm josh run:carry --retrospective` | §2j → `retrospective.md` |
-| The pre-implementation reading reaches 3 unedited files | Delegate it; a file this run will edit is read in the main line | §2b → "The pre-implementation reading" |
-| Before implementing (every `#N` entry) | Read the Issue's comments — the later of a body and a comment wins | §2g → `issue-comments.md` |
-| Immediately before implementation | Present the two-layer work summary (once per Issue); `kickoff` posts a plan instead | `prompts/collaboration-workflow/report-format.md` |
+| `run:step` prints the retrospective step (a run drained its backlog and stopped, not a lane child) | Run what it prints once, file 0–2 improvements, then `pnpm josh run:carry --retrospective` | `retrospective.md` |
 | Any artifact prose (Issue bodies, comments, Telegram) | Session language (`JOSH_SESSION_LANG`, default `ja`); Issue/PR titles stay English | `prompts/collaboration-workflow/overview.md` |
 | Any mid-workflow stop | Send a `confirmation` Telegram first, so the user is alerted off-screen | `CLAUDE.md` → "Mid-workflow stop notification" |
-
-## 2z. `needs-human-review` — the child that stops before its commit
-
-**Trigger:** `pnpm josh issue:state <N>` answers `human_review: yes` — asked once, before implementing.
-**Then:** implement and run the verification gate normally, but commit nothing — leave the tree
-uncommitted and unstashed, send a `confirmation` Telegram with the resume command, and stop the whole
-run (inside a `backlogrun` this is the one child stop that is *not* park-and-continue). **The label is
-applied only by a person; never apply or remove it.** The full procedure — why it stops the *end* not
-the *start*, why the repository stays held, and the resume — is `needs-human-review.md`, its single
-source, read at that trigger.
-
-## 2a. The `into <target>` suffix — where the new Issue lands
-
-**The suffix and its procedure are `into-target.md`, read at its point of use — the moment a `new`
-entry (`kickoff new` / `fullrun new` / `halfrun new`) is typed with an `into <target>` suffix.** It
-names the epic the run's artifact joins, inserts it with `pnpm josh epic --add <E> <N>` as soon as the
-artifact exists, and refuses a target that is not an epic. A run given a `#N` or a bare `new` never
-reaches it. `into-target.md` is the single source.
-
-## 2b. Delegating a step to a cheaper tier
-
-**Before delegating any run step, ask `pnpm josh delegate <step>`; never decide eligibility yourself.**
-Read `delegation.md` at the first delegation decision for its units and verification rules. An item
-absent from the enumeration stays in the main line. A dispatched `epic-child` that returns open with
-`human_review: yes` is an authorized stop, not a failed child (§2z).
-
-### The pre-implementation reading — what goes to a unit, and from which file
-
-**When the next pre-implementation read would reach 3 files this run will not edit, delegate the
-unread investigation before that read.** Keep edit-target reads in the main line. The full procedure
-and the `file:line` verification are in `delegation.md` → "The pre-implementation reading"; the
-threshold is counted by `pnpm josh investigation:guard`.
-
-## 2c. The `owner/repo#` prefix — which repository the run acts on
-
-**The prefix and its procedure are `target-repository.md`, read at its point of use — the moment an
-entry is typed with an `owner/repo#` prefix or a short `repo#` name.** It names the repository the run
-acts on; a short name expands by the session owner and is first-party by construction, an explicit
-foreign owner is a third-party target that stops the run, and an implementing entry resolves that
-repository's checkout from `pnpm josh doctor` rather than cloning. No prefix leaves the target as the
-session's own repository, so a run without one never reaches it. `target-repository.md` is the single
-source.
-
-## 2d. A prerequisite discovered mid-run — a dependency, not a park
-
-**Trigger:** a run finds that another Issue in *this* repository has to land first. **Then:** it is
-still one deliverable with another in front of it — file the prerequisite with the `route:tier-a` label
-(scouted first, §2e), stash the work in progress with `git stash push -u` and record it on the Issue,
-record the dependency in the epic, and — under `fullrun` / `halfrun` — **stop**, or — under
-`backlogrun` — **continue** (`backlogrun-park.md` → "A prerequisite discovered mid-run"). It is the
-third of four mid-run discoveries, distinct from an upstream defect, a split (`split-assessment.md`)
-and an observation (§2i). The full table, the filing command, the `-u`/`stash:pop` steps and the
-10-per-run cap are `prerequisite.md`, its single source, read at that trigger. **When the prerequisite
-is the run's second filing, `pnpm josh issue:fold` runs first** (§2e), and `pnpm josh rule:guard`
-refuses the second `pnpm josh issue:file` call until it has.
-
-## 2e. Before filing a new Issue — `pnpm josh issue:scout`
-
-**Every new Issue is filed with `pnpm josh issue:file`, which runs the `issue:scout` scan first — read
-its duplicate and epic answers.** This applies inside every workflow, including observations and review
-follow-ups. The guard refuses any other filing call. Read `issue-scout.md` at that point for the
-duplicate, closed-Issue and epic decisions and for `--distinct`; `issue-fold-existing.md` handles a
-compatible duplicate. `docs/josh-commands-automation.md` → "`josh issue:file`" defines the command.
-
-## 2f. The working-tree hold — one run per tree
-
-**Trigger:** the first call of `fullrun` and `halfrun` alike — before the title is normalized, before
-`git switch main`, and before a `new` entry files its Issue. **Then:** a `#N` entry first runs
-`pnpm josh run:entry <N> --to <command>` (§2k, the tree claim included); `new` runs bare
-`pnpm josh run:hold`. `hold` continues; `busy` and `unknown` stop with a `confirmation` Telegram
-carrying what stderr printed. **`kickoff` is exempt** (it edits nothing). A stop that leaves the tree
-clean releases explicitly with `pnpm josh run:release [<N>]`; a `halfrun` or `needs-human-review` stop
-keeps the hold; `pnpm josh followup` releases a merged run. The answer table, the per-child rule and
-the `--force` spelling are `working-tree-hold.md`, its single source, read at that trigger.
-
-## 2g. An Issue's comments are part of the Issue
-
-**Trigger:** before implementing at every `#N` entry point (`fullrun`, `halfrun`, `kickoff`, and each
-`backlogrun` child in its own unit). **Then:** `pnpm josh issue:read <N> [<N> ...]` reads the body and
-the comments in one call — a decision recorded after the body was written lives only in a comment, and
-of a body and a comment that disagree the later text wins. Two comment kinds are not the run's to act
-on blindly — a scope reassigned to another Issue, and an Issue already merged (the `already-done`
-exit) — and both, the long-thread delegation and why `pnpm josh rule:guard` refuses the body-only read,
-are `issue-comments.md`, its single source, read at that trigger.
-
-## 2h. A command that can take minutes is issued in the background
-
-**Trigger:** before backgrounding the first long-running command (`pnpm josh gate`). **Then:** issue
-`pnpm josh git -y`, `pnpm josh gate` and the CI wait detached while `pnpm josh followup` stays in the
-foreground — the turn never ends at the push, bar a dispatched lane child's pre-gate cut
-(`pre-gate-cut.md`). A parent waiting on its children is the same rule at the batch's scale: a
-background command's completion re-invokes the session, so the `backlogrun` loop starts no sleep of
-its own. The single source is `background-commands.md` → "Background the gate and push", with the
-parent-wake half at `backlogrun-progress.md` → "The parent keeps no clock of its own".
-
-## 2i. An observation worth filing is filed without asking
-
-**When a first-party observation is worth filing, file it without asking and continue the run.**
-Read `observation-filing.md` in full before filing: it decides the depth test, filing ceilings, labels,
-second-filing fold, ledger fallback and delegated-child handoff. Use `pnpm josh repo:party` to decide
-first-party status, then file with `pnpm josh issue:file` (§2e). A third-party target remains
-Tier C (`CLAUDE.md`).
-
-## 2j. The end-of-run retrospective — read when `run:step` prints it
-
-**When `pnpm josh run:step` prints the retrospective step, read `retrospective.md` in full and run the
-digest it names once.** File up to two worthwhile improvements through `issue:file` (scout and
-`epic:bundle` included), stack the rest in the observation ledger, and close the step with the command described
-there. A dispatched lane child never runs the retrospective.
-
-## 2k. The stage ladder
-
-`kickoff` → `halfrun` → `prrun` → `fullrun` (joshuafolkken/kit#3042): the command sets how far a run
-goes, the Issue where it starts. `run:entry <N> --to <command>` prints `stage #<N> — at: … · start:
-…`; **`start: reached` redoes nothing — stop** (at `merged`, the next line answers). A
-stop's `Next:` line names the commands further up. Table: `docs/how-to/run-issues.md`.
 
 ## 3. What stays resident, and what is read from here
 
 **The residency criterion is `prompts/collaboration-workflow/residency.md`, its single source — read
-only when a rule is being placed, moved or retired, never at any entry and never during a run.** Its
-questions are asked there in order — question 0 (`pnpm josh oracle:list`), the ordering question
-(`pnpm josh run:step`), the first and the second — beside how much of a resident rule stays and the
-retirement route; none is restated here.
+only when a rule is placed, moved or retired, never during a run.** Its questions — question 0
+(`pnpm josh oracle:list`), the ordering question (`pnpm josh run:step`), the first and the second —
+are asked there in order; none is restated here.

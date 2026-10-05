@@ -211,7 +211,7 @@ describe('entry_read_set — chain-rule.md is point-of-use (joshuafolkken/kit#18
 })
 
 describe('entry_read_set — background-commands.md is point-of-use (joshuafolkken/kit#1873)', () => {
-	// §2h's body left SKILL.md for background-commands.md, read before the first backgroundable command
+	// `background-commands.md`'s body left SKILL.md for background-commands.md, read before the first backgroundable command
 	// (the gate). It binds only after the first edit, so it never belonged in the entry read — and
 	// because it was never a table row, the general loop above already keeps it out of every entry; what
 	// this pins is that it is classified point-of-use in the first place.

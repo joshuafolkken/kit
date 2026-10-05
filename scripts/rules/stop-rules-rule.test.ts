@@ -39,12 +39,12 @@ describe('stop_rules — each delivered text names its single source', () => {
 		expect(stop_rules.STOP_NOTIFY_REASON).toContain('CLAUDE.md')
 	})
 
-	it('the hold release reason points at SKILL.md §2f', () => {
-		expect(stop_rules.HOLD_RELEASE_REASON).toContain('§2f')
+	it('the hold release reason points at working-tree-hold.md', () => {
+		expect(stop_rules.HOLD_RELEASE_REASON).toContain('`working-tree-hold.md`')
 	})
 
-	it('the filing offer reason points at SKILL.md §2i', () => {
-		expect(stop_rules.FILING_OFFER_REASON).toContain('§2i')
+	it('the filing offer reason points at observation-filing.md', () => {
+		expect(stop_rules.FILING_OFFER_REASON).toContain('`observation-filing.md`')
 		expect(stop_rules.FILING_OFFER_REASON).toContain('observation-filing.md')
 		expect(stop_rules.FILING_OFFER_REASON).toContain('pnpm josh issue:file')
 	})
