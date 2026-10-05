@@ -1,5 +1,7 @@
+import { globSync } from 'node:fs'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import { GATE_TARGETS } from '#scripts/gate/verification-gate'
+import { package_path } from '#scripts/init/init-paths'
 import { describe, expect, it } from 'vitest'
 import { ci_yml_fixture, type WorkflowJob, type WorkflowStep } from './ci-yml-fixture'
 
@@ -52,15 +54,51 @@ function aggregate_script(): string {
 	return job_scripts(AGGREGATE_JOB).join('\n')
 }
 
+function shards(): ReadonlyArray<string | number> {
+	return runtime_job(UNIT_JOB)?.strategy?.matrix?.['shard'] ?? []
+}
+
+function unit_step(name: string): WorkflowStep | undefined {
+	return runtime_job(UNIT_JOB)?.steps?.find((step) => step.name === name)
+}
+
 describe('the unit suite has a job of its own', () => {
 	it('runs it through the guard that refuses to report a check which ran nothing', () => {
-		expect(job_scripts(UNIT_JOB)).toContain(GUARDED_UNIT_COMMAND)
+		expect(job_scripts(UNIT_JOB).some((script) => script.startsWith(GUARDED_UNIT_COMMAND))).toBe(
+			true,
+		)
 	})
 
 	// The guard is bypassed by calling the runner, not only by removing the step, so the negative is
 	// asserted beside the positive — as `scripts/ci/ci-yml-unit-step.test.ts` does for the template.
 	it('never reaches vitest directly, which would lose the zero-test failure', () => {
 		expect(aggregate_script() + job_scripts(UNIT_JOB).join('\n')).not.toContain('vitest')
+	})
+})
+
+// joshuafolkken/kit#3220: vitest already takes every core of one runner, so the suite is spread over
+// runners instead. Each shard still goes through the guard, and a shard can never be handed zero
+// files — vitest would fail it — because the suite has far more files than shards.
+describe('the unit suite is sharded across runners', () => {
+	it('runs one job per shard and lets every shard finish when one fails', () => {
+		expect(shards()).toEqual([1, 2, 3])
+		expect(runtime_job(UNIT_JOB)?.strategy?.['fail-fast']).toBe(false)
+	})
+
+	it('hands each shard its slice through the guard', () => {
+		expect(job_scripts(UNIT_JOB)).toContain(
+			`${GUARDED_UNIT_COMMAND} --shard=\${{ matrix.shard }}/${String(shards().length)}`,
+		)
+	})
+
+	it('verifies the optional ESLint install on one shard only', () => {
+		expect(unit_step('Verify optional ESLint consumer install')?.if).toBe('matrix.shard == 1')
+	})
+
+	it('has more test files than shards, so no shard runs empty', () => {
+		const test_files = globSync('scripts/**/*.test.ts', { cwd: package_path('.') })
+
+		expect(test_files.length).toBeGreaterThan(shards().length)
 	})
 })
 
