@@ -333,10 +333,21 @@ jobs:
   # No ESLint cache here — nothing in this job lints — and no `--maxWorkers`: `gate-plan.ts` leaves
   # any machine below its measured 11 cores uncapped, so vitest sizes its own pool from the runner
   # exactly as it did inside the gate step.
+  # **Sharded across runners, because one runner is already saturated** (joshuafolkken/kit#3220).
+  # Alone on a 4-core runner vitest takes every core, so the suite can only get faster by spreading
+  # its files over more machines. `fail-fast: false` keeps a red shard from cancelling the others,
+  # so one run reports every failing file. The `Checks` aggregate below reads `needs.unit.result`,
+  # which for a matrix is `success` only when every shard succeeded — no change there is needed.
+  # Only kit shards: the distributed template runs the unit suite inside its single `checks` job,
+  # where a small consumer suite would pay the duplicated setup and could leave a shard with no file.
   unit:
-    name: Unit Tests
+    name: Unit Tests (${{ matrix.shard }}/3)
     needs: reuse-pr-checks
     if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
@@ -366,9 +377,11 @@ jobs:
       # `scripts/ci/ci-yml-unit-job.test.ts` pins the command; the guard itself is
       # `scripts/test/test-unit-guard.ts`.
       - name: Run unit tests
-        run: pnpm josh test:unit
+        run: pnpm josh test:unit --shard=${{ matrix.shard }}/3
 
+      # One shard is enough: the check does not depend on which test files ran beside it.
       - name: Verify optional ESLint consumer install
+        if: matrix.shard == 1
         run: pnpm exec tsx scripts/package/verify-optional-eslint-install.ts
 
   # **The required status check. `Checks` is a name the branch ruleset already requires, and this job

@@ -16,7 +16,8 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { backlog_defect_priority } from './backlog-defect-priority'
 import { backlog_pool } from './backlog-pool'
-import { backlog_rank } from './backlog-rank'
+import { backlog_rank, type GateScope } from './backlog-rank'
+import { backlog_restructure } from './backlog-restructure'
 
 // `josh backlog:next` — what the whole opted-in backlog may run next (joshuafolkken/kit#1630).
 //
@@ -278,13 +279,23 @@ function report_retry(context: PoolContext): number {
 	return SUCCESS_EXIT_CODE
 }
 
-// The rows the offer's cap bounds — the standalone half, which `backlog:plan --waves` reads too.
+// The rows the offer's cap bounds — the standalone half.
 function standalone_keys(context: PoolContext): ReadonlySet<string> {
 	return backlog_pool.standalone_keys(context.opted_in.issues, {
 		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
 		exclude: context.exclude,
 		repo: context.repo,
 	})
+}
+
+// The running lanes still carry the pickup label, so the opted-in listing holds their bodies too —
+// which is what lets a candidate be held back from a restructure a running lane already makes
+// (joshuafolkken/kit#3221). `backlog:plan --waves` reads the same scope, so its first wave is this offer.
+function gate_scope(context: PoolContext): GateScope {
+	return {
+		standalone: standalone_keys(context),
+		declared: backlog_restructure.declared_of(context.opted_in.issues),
+	}
 }
 
 // The `run:solo` gate is applied here rather than in `resolve`, because `backlog:plan` shares
@@ -302,7 +313,7 @@ async function gate_solo(result: EpicNextResult, context: PoolContext): Promise<
 
 	if (notice !== undefined) console.error(notice)
 
-	const gated = backlog_rank.gate(result, read, repo, standalone_keys(context))
+	const gated = backlog_rank.gate(result, read, repo, gate_scope(context))
 
 	if (gated.notice !== undefined) console.error(gated.notice)
 
@@ -418,7 +429,7 @@ const backlog_next = {
 	READ_FAILURES,
 	VERDICT_TOKENS,
 	resolve,
-	standalone_keys,
+	gate_scope,
 	context_of,
 	run,
 }

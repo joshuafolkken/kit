@@ -100,7 +100,7 @@ interface LaneCutState {
 	directory: string
 	carried: (now?: Date) => RunCut | undefined
 	marked_issue: string | undefined
-	// **The recent-window context verdict, read lazily** (joshuafolkken/kit#2312). It is a thunk, like
+	// **The context verdict, read lazily** (joshuafolkken/kit#2312). It is a thunk, like
 	// `carried`, so `current_state` builds the object without pricing a session — the read happens only
 	// after the command and lane checks pass, off the handful of calls that actually run a lane's gate.
 	context_verdict: () => CostVerdict
@@ -136,7 +136,7 @@ function uncut_lane_issue(state: LaneCutState): string | undefined {
 	return state.carried()?.issue === issue ? undefined : issue
 }
 
-// **The cut is taken only when the recent-window context is worth its resume** (joshuafolkken/kit#2312).
+// **The cut is taken only when the current context is worth its resume** (joshuafolkken/kit#2312).
 // Below the shared `CONTEXT_CUT_THRESHOLD` a short lane has no accumulation a cut would drop, so the
 // gate runs uncut rather than paying for a relaunch; an unmeasurable session keeps the old
 // unconditional cut as the safety net joshuafolkken/kit#1933 relies on. The verdict is

@@ -37,6 +37,7 @@ function node(session_id: string, role: RunRole, output: number | undefined): Ru
 		records: output === undefined ? [] : [rec(session_id, output)],
 		baseline_tokens: 100,
 		is_readable: output !== undefined,
+		took_cut: false,
 	}
 }
 

@@ -38,6 +38,7 @@ function context(
 	return {
 		facts: (id) => ({ records: [rec(starts.get(id) ?? 0)], baseline_tokens: 0, is_readable: true }),
 		lane_issue: (file) => lanes.get(file.session_id),
+		took_cut: () => false,
 	}
 }
 

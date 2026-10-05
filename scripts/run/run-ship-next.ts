@@ -42,6 +42,8 @@ interface ShipResume {
 	title: string
 	flags: ReadonlyArray<string>
 	is_review: boolean
+	// The paths a merge of the default branch left unmerged (joshuafolkken/kit#3221).
+	conflicts?: ReadonlyArray<string>
 }
 
 // Single quotes, so a `$` or a backtick in a title is never expanded by the shell that runs it.
@@ -90,14 +92,25 @@ const AFTER_FIX: Record<Stage, (resume: ShipResume) => string> = {
 	[STAGE.PREFLIGHT]: detach_as_started,
 	[STAGE.REVIEW]: detach_as_started,
 	[STAGE.GATE]: detach_as_started,
+	[STAGE.SYNC]: detach_as_started,
 	[STAGE.COMMIT]: detach_as_started,
 	[STAGE.ROUND_TWO]: detach_again,
 	[STAGE.FOLLOWUP]: detach_again,
 	[STAGE.REPORT]: detach_again,
 }
 
+// A conflict names its paths (joshuafolkken/kit#3221), so the resumed session resolves them without
+// reading the report or asking git which files are unmerged.
+function conflict_step(conflicts: ReadonlyArray<string>): string {
+	return `Resolve the conflict with origin/main in ${conflicts.join(', ')} (the merge is left in progress: remove the conflict markers in those files), then`
+}
+
 // Two lines' worth: read the stopped report, then the one command that resumes after the fix.
 function next_step(issue: string, stage: Stage, resume: ShipResume): string {
+	const conflicts = resume.conflicts ?? []
+
+	if (conflicts.length > 0) return `${conflict_step(conflicts)} ${AFTER_FIX[stage](resume)}`
+
 	return `Read the stopped report with \`${COMMAND.LOG} ${issue}\`, fix the ${stage} failure, then ${AFTER_FIX[stage](resume)}`
 }
 

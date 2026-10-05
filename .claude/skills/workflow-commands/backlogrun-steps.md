@@ -308,8 +308,9 @@ Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the plan an
 whose head is `pnpm josh backlog:offer`: the answer-to-budget mapping, the retry count, the `--exclude`
 feedback and the lane count are its own (`docs/josh-commands-automation.md` → "`josh backlog:offer`"
 and "`josh backlog:drive`"). **An AI session reaches this section only when the driver hands a branch
-back** — the `Driver result:` line names it, and the session acts on it, then hands the loop back with
-`pnpm josh run:carry --cut --owner "$PPID"`:
+back** — the `Driver result:` line names it, and its `Next:` line is the order: claim the record with
+`pnpm josh run:carry --resume "<invocation>" --owner "$PPID"`, act on the branch, then hand the loop
+back with `pnpm josh run:carry --cut --owner "$PPID"`:
 
 | Handed back | What the session judges |
 | --- | --- |

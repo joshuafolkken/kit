@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import { lane_paths } from '#scripts/lane/lane-paths'
+import { cost_run_cut } from './cost-run-cut'
 import { cost_run_nodes, type NodeContext, type RunNode } from './cost-run-nodes'
 
 // Grouping a transcript store into runs and selecting one (joshuafolkken/kit#1937).
@@ -212,6 +213,7 @@ function to_context(
 	return {
 		facts: (id) => usage.get(id) ?? { records: [], baseline_tokens: 0, is_readable: false },
 		lane_issue: (file) => lane_issue_of(file, projects_root, prefix),
+		took_cut: (file) => cost_run_cut.took_cut(file),
 	}
 }
 

@@ -346,6 +346,7 @@ describe('pr_get_merge_state — where the branch pull request stands', () => {
 			is_merged: true,
 			merged_at: MERGED_AT,
 			head_sha: PR_HEAD_SHA,
+			merge_state_status: undefined,
 		})
 	})
 
@@ -356,6 +357,16 @@ describe('pr_get_merge_state — where the branch pull request stands', () => {
 			is_merged: false,
 			merged_at: undefined,
 			head_sha: PR_HEAD_SHA,
+			merge_state_status: undefined,
+		})
+	})
+
+	// joshuafolkken/kit#3221: `josh ship` re-merges the default branch when this reads `DIRTY`.
+	it('answers the merge state in gh casing for a conflicting pull request', async () => {
+		stub(pr_routes({ merged: false, mergeable_state: 'dirty' }))
+
+		await expect(git_gh_pr_read.pr_get_merge_state(PR_BRANCH)).resolves.toMatchObject({
+			merge_state_status: 'DIRTY',
 		})
 	})
 

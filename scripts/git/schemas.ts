@@ -140,6 +140,8 @@ const open_issue_schema = z.object({
 	labels: z.array(issue_label_schema).optional(),
 	createdAt: z.string(),
 	blockedBy: blocked_by_schema,
+	// Present only on the pickup listing, which reads it for the restructures each issue declares.
+	body: z.string().optional(),
 })
 
 type RollupItemData = z.infer<typeof rollup_item_schema>

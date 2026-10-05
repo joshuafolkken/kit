@@ -93,8 +93,9 @@ function lanes(): TwoLanes {
 	return state.current
 }
 
-// The message a parked lane child pushes its stash under, per `backlogrun-park.md`. The message is
-// the only thing that attributes an entry to a lane — there is no per-lane ref or namespace.
+// The message a lane's stash entry is pushed under — the shape an earlier `backlogrun-park.md` used
+// for a pre-commit park. The message is the only thing that attributes an entry to a lane — there is
+// no per-lane ref or namespace, which is why a park now keeps its work in the lane (kit#3228).
 function park_message(issue: string): string {
 	return `backlogrun: parked #${issue}`
 }

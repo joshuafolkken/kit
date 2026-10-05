@@ -8,6 +8,8 @@ const FIRST_LINE = 0
 const RESUME_PREFIX = 'resume: '
 const DETAILS_TAIL_LENGTH = 2048
 const TRUNCATION_MARK = '... '
+// The prefix `backlog-drive-cli.ts` gives the exception it catches.
+const ERROR_PREFIX = 'error '
 
 function driver_args(invocation: string): ReadonlyArray<string> | undefined {
 	const rebuilt = run_invocation.rebuild(invocation)
@@ -40,6 +42,11 @@ function details_tail(details: string): string {
 // **The hand-off names its next move, so the woken session never searches the procedure for it**
 // (joshuafolkken/kit#3156). Whatever the branch, the session acts on it and hands the loop back to the
 // supervisor with a cut; only a person's stop ends the run instead.
+//
+// **The claim comes first** (joshuafolkken/kit#3238). The supervisor hands the record off before the
+// wake, so until the session adopts it with `--resume` every count it writes — `--merged`, `--done`,
+// the closing `--cut` — is refused as advancing a handed-off budget, and the supervisor, seeing no
+// claim, ends the run as a failed wake.
 const HAND_BACK = 'then hand the loop back with pnpm josh run:carry --cut --owner "$PPID"'
 const NEXT_BY_VERDICT: ReadonlyArray<readonly [string, string]> = [
 	[
@@ -48,28 +55,38 @@ const NEXT_BY_VERDICT: ReadonlyArray<readonly [string, string]> = [
 	],
 	[
 		'merge human-review',
-		'the child stopped before its commit for a person; stop the run (needs-human-review.md)',
+		'stop the run, because the child stopped before its commit for a person (needs-human-review.md)',
 	],
 	['epic #', `follow backlogrun-steps.md → "Named issues run first, in order", ${HAND_BACK}`],
 ]
 const NEXT_DEFAULT = `act on the result by backlogrun-steps.md → "The loop", ${HAND_BACK}`
 
-function next_move(verdict: string): string {
+function next_move(verdict: string, invocation: string): string {
 	const found = NEXT_BY_VERDICT.find(([prefix]) => verdict.startsWith(prefix))
 
-	return `\nNext: ${found?.[1] ?? NEXT_DEFAULT}`
+	return `\nNext: first claim the carry record with ${run_carry.claim_command(invocation)}, then ${found?.[1] ?? NEXT_DEFAULT}`
 }
 
-function handoff_material(verdict: string, resume: string, details: string): string {
+function handoff_material(
+	verdict: string,
+	resume: string,
+	invocation: string,
+	details: string,
+): string {
 	const context = details === '' ? '' : `\nDetails: ${details_tail(details)}`
 	const epic = verdict.startsWith('epic #')
 		? '\nThe named item is an epic. Follow backlogrun-steps.md named epic procedure; do not launch the epic root as a fullrun child. After all children merge or park, record the root with pnpm josh run:carry --done <epic-number> --owner "$PPID" before continuing to the next named item.'
 		: ''
 
-	return `Driver result: ${verdict}\n${resume}${epic}${next_move(verdict)}${context}`
+	return `Driver result: ${verdict}\n${resume}${epic}${next_move(verdict, invocation)}${context}`
 }
 
-function driver_result(out: string, read: CarryRead, details = ''): DriveResult {
+function driver_result(
+	out: string,
+	read: CarryRead,
+	invocation: string,
+	details = '',
+): DriveResult {
 	const lines = out.split('\n')
 	const verdict = lines[FIRST_LINE]
 
@@ -80,13 +97,27 @@ function driver_result(out: string, read: CarryRead, details = ''): DriveResult 
 		return { kind: 'failed', note: `backlog:drive returned an incomplete result: ${out}` }
 	}
 
-	return { kind: 'judgment', material: handoff_material(verdict, resume, details) }
+	return { kind: 'judgment', material: handoff_material(verdict, resume, invocation, details) }
 }
 
-function read_result(result: JoshResult, target: string): DriveResult {
-	if (result.code !== SUCCESS) return { kind: 'failed', note: result.err ?? result.out }
+// **The cause is the driver's stdout `error …` line, so it leads the note** (joshuafolkken/kit#3242).
+// `backlog:drive` prints an exception only to stdout, and its stderr is never empty — every command it
+// ran is there — so reading `err ?? out` dropped the one line that said why. The stderr follows as its
+// tail, for the same reason `details_tail` cuts a judgment's details.
+function cause_of(out: string): string {
+	const errors = out.split('\n').filter((line) => line.startsWith(ERROR_PREFIX))
 
-	return driver_result(result.out, run_carry.read_carry(target), result.err)
+	return errors.length > 0 ? errors.join('\n') : details_tail(out)
+}
+
+function failure_note(result: JoshResult): string {
+	return [cause_of(result.out), details_tail(result.err ?? '')].filter(Boolean).join('\n')
+}
+
+function read_result(result: JoshResult, target: string, invocation: string): DriveResult {
+	if (result.code !== SUCCESS) return { kind: 'failed', note: failure_note(result) }
+
+	return driver_result(result.out, run_carry.read_carry(target), invocation, result.err)
 }
 
 function claim_record(target: string, invocation: string): boolean {
@@ -110,7 +141,7 @@ async function drive(target: string): Promise<DriveResult> {
 
 	const result = await josh_command.josh_run(args, true)
 
-	return read_result(result, target)
+	return read_result(result, target, read.carry.invocation)
 }
 
 export const run_wake_driver = { drive, driver_args, driver_result }

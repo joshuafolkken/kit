@@ -26,7 +26,7 @@ const DEFAULT_BRANCH = 'main'
 const LANE_DIRECTORY = '/lanes/1839'
 const DERIVED_LOG = path.join(scratch, 'lane-1839.log')
 const LAUNCHED_PID = 4242
-// The recent-window context verdicts as `CostVerdict` values (joshuafolkken/kit#2312). The exported
+// The context verdicts as `CostVerdict` values (joshuafolkken/kit#2312). The exported
 // tokens widen to `string` through their namespace objects, so a typed literal is what the spied
 // `session_verdict` return accepts.
 const CONTEXT_OVER: CostVerdict = 'over'
@@ -56,7 +56,7 @@ const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
 const log_path = vi.spyOn(lane_dispatch_log, 'default_log_path')
 const launch = vi.spyOn(detached_launch, 'launch')
 
-// joshuafolkken/kit#2312: the pre-gate cut is conditional on the recent-window context, so the suite
+// joshuafolkken/kit#2312: the pre-gate cut is conditional on the current context, so the suite
 // pins the verdict rather than reading the live session. `over` is the beforeEach default so the cases
 // that predate the condition still cut exactly as they did.
 const session_verdict = vi.spyOn(cost_cli, 'session_verdict')

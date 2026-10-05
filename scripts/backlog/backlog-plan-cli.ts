@@ -10,6 +10,7 @@ import { run_invocation } from '#scripts/run/run-invocation'
 import { backlog_named } from './backlog-named'
 import { backlog_next, type OptedIn } from './backlog-next'
 import { backlog_plan, type NamedPlan, type PlanContext } from './backlog-plan'
+import type { GateScope } from './backlog-rank'
 import { backlog_scope } from './backlog-scope'
 import { backlog_waves } from './backlog-waves'
 
@@ -104,9 +105,9 @@ interface Plan {
 	// past the listing cap. Carrying the *whole* index here instead would move that misreport rather
 	// than remove it: the sentence would name an epic that is withholding nothing.
 	tracked: ReadonlyMap<number, number>
-	// The rows the offer's cap bounds, so `--waves` cuts each wave where `backlog:next` does
-	// (joshuafolkken/kit#2928).
-	standalone: ReadonlySet<string>
+	// The rows the offer's cap bounds and the paths each issue restructures, so `--waves` cuts each
+	// wave where `backlog:next` does (joshuafolkken/kit#2928, joshuafolkken/kit#3221).
+	scope: GateScope
 }
 
 // The listing plus whether it was cut. Carried together because the rows alone cannot say whether
@@ -141,7 +142,7 @@ async function classify(
 		repo: context.repo,
 		exclude,
 		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
-		standalone: backlog_next.standalone_keys(context),
+		scope: backlog_next.gate_scope(context),
 	}
 }
 
@@ -172,7 +173,7 @@ function print_plan(plan: Plan, listing: OpenListing, view: PlanView): void {
 	const context = context_of(plan, listing)
 
 	if (view.is_waves) {
-		console.info(backlog_waves.format_waves(plan.result, context, plan.standalone))
+		console.info(backlog_waves.format_waves(plan.result, context, plan.scope))
 
 		return
 	}

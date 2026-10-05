@@ -75,52 +75,52 @@ The issues that introduced or reshaped each command, kept here so the reference 
 provenance citations. Read an issue for the decision behind a behavior; the reference states only
 the behavior.
 
-| Command                              | Issues                                                           |
-| ------------------------------------ | ---------------------------------------------------------------- |
-| `josh batch:guard`                   | #2138, #2164, #2178, #2276, #2405, #2984 (the hook launch shape) |
-| `josh time:density`                  | #2405                                                            |
-| `josh investigation:guard`           | #2138, #2382                                                     |
-| `josh duplicate-read:guard`          | #2298                                                            |
-| `josh rule:guard`                    | #2297, #2385, #2807                                              |
-| `josh pretool:guard`                 | #2138, #2164, #2178, #2276, #2298, #2382, #2405                  |
-| `josh stop:guard`                    | #2121, #2247, #2422                                              |
-| `josh followup`                      | #2446, #2770, #3023                                              |
-| `josh observations:flush`            | #2763, #2919                                                     |
-| `josh measure:rerun`                 | #2178, #3064                                                     |
-| `josh review:record`                 | #2325, #2343, #2419, #2919                                       |
-| `josh reserved-run`                  | #2351                                                            |
-| `josh issue:comment`                 | #2304                                                            |
-| `josh pkg:scout`                     | #2216                                                            |
-| `josh issue:lint`                    | #2123, #2212, #2353                                              |
-| `josh defect:rate`                   | #2449, #2455                                                     |
-| `josh report:lint`                   | #2123                                                            |
-| `josh stash:pop`                     | #2050                                                            |
-| `josh epic:next`                     | #2779                                                            |
-| `josh auto-ok:next`                  | #2928                                                            |
-| `josh backlog:next`                  | #2244, #2449, #2455, #2776, #2779, #2928                         |
-| `josh backlog:plan`                  | #2778                                                            |
-| `josh backlog:stalled`               | #2359                                                            |
-| `josh backlog:offer`                 | #2335                                                            |
-| `josh backlog:drive`                 | #2499, #2508, #2881                                              |
-| `josh oracle:list`                   | #2324, #2334, #2808                                              |
-| `josh run:hold` / `josh run:release` | #2760, #2796, #3023                                              |
-| `josh run:carry`                     | #2136, #2342, #2492, #2760                                       |
-| `josh run:cut`                       | #2346, #2354, #2382, #2484, #2489, #2760                         |
-| `josh run:ending`                    | #2240                                                            |
-| `josh run:entry`                     | #2372, #2760, #2796, #3023, #3042                                |
-| `josh run:status`                    | #2165                                                            |
-| `josh run:next`                      | #2165, #2166, #2188                                              |
-| `josh run:step`                      | #2248, #2297, #2370, #2653                                       |
-| `josh repo:party`                    | #2122                                                            |
-| `josh run:merge`                     | #2024, #2240, #2484                                              |
-| `josh run:review`                    | #2179                                                            |
-| `josh run:tail`                      | #2372, #2763, #2919, #2979                                       |
-| `josh ship`                          | #2398, #2426, #2427, #2428, #2457, #2489, #2500, #2946, #2966    |
-| `josh run:report`                    | #2249, #2393                                                     |
-| `josh run:event`                     | #2205, #2207, #2492                                              |
-| `josh run:progress`                  | #2156                                                            |
-| `josh cost`                          | #2406                                                            |
-| `josh read:set`                      | #2021, #2256, #2280, #2289                                       |
-| `josh doc:read`                      | #1797, #2188                                                     |
-| `josh read:files`                    | #2202                                                            |
-| `josh edit:files`                    | #2162, #2165, #2202, #2366, #2493                                |
+| Command                              | Issues                                                               |
+| ------------------------------------ | -------------------------------------------------------------------- |
+| `josh batch:guard`                   | #2138, #2164, #2178, #2276, #2405, #2984 (the hook launch shape)     |
+| `josh time:density`                  | #2405                                                                |
+| `josh investigation:guard`           | #2138, #2382                                                         |
+| `josh duplicate-read:guard`          | #2298                                                                |
+| `josh rule:guard`                    | #2297, #2385, #2807                                                  |
+| `josh pretool:guard`                 | #2138, #2164, #2178, #2276, #2298, #2382, #2405                      |
+| `josh stop:guard`                    | #2121, #2247, #2422                                                  |
+| `josh followup`                      | #2446, #2770, #3023                                                  |
+| `josh observations:flush`            | #2763, #2919                                                         |
+| `josh measure:rerun`                 | #2178, #3064                                                         |
+| `josh review:record`                 | #2325, #2343, #2419, #2919                                           |
+| `josh reserved-run`                  | #2351                                                                |
+| `josh issue:comment`                 | #2304                                                                |
+| `josh pkg:scout`                     | #2216                                                                |
+| `josh issue:lint`                    | #2123, #2212, #2353                                                  |
+| `josh defect:rate`                   | #2449, #2455                                                         |
+| `josh report:lint`                   | #2123                                                                |
+| `josh stash:pop`                     | #2050                                                                |
+| `josh epic:next`                     | #2779                                                                |
+| `josh auto-ok:next`                  | #2928                                                                |
+| `josh backlog:next`                  | #2244, #2449, #2455, #2776, #2779, #2928                             |
+| `josh backlog:plan`                  | #2778                                                                |
+| `josh backlog:stalled`               | #2359                                                                |
+| `josh backlog:offer`                 | #2335                                                                |
+| `josh backlog:drive`                 | #2499, #2508, #2881                                                  |
+| `josh oracle:list`                   | #2324, #2334, #2808                                                  |
+| `josh run:hold` / `josh run:release` | #2760, #2796, #3023                                                  |
+| `josh run:carry`                     | #2136, #2342, #2492, #2760                                           |
+| `josh run:cut`                       | #2346, #2354, #2382, #2484, #2489, #2760                             |
+| `josh run:ending`                    | #2240                                                                |
+| `josh run:entry`                     | #2372, #2760, #2796, #3023, #3042                                    |
+| `josh run:status`                    | #2165                                                                |
+| `josh run:next`                      | #2165, #2166, #2188                                                  |
+| `josh run:step`                      | #2248, #2297, #2370, #2653                                           |
+| `josh repo:party`                    | #2122                                                                |
+| `josh run:merge`                     | #2024, #2240, #2484                                                  |
+| `josh run:review`                    | #2179                                                                |
+| `josh run:tail`                      | #2372, #2763, #2919, #2979                                           |
+| `josh ship`                          | #2398, #2426, #2427, #2428, #2457, #2489, #2500, #2946, #2966, #3222 |
+| `josh run:report`                    | #2249, #2393                                                         |
+| `josh run:event`                     | #2205, #2207, #2492                                                  |
+| `josh run:progress`                  | #2156                                                                |
+| `josh cost`                          | #2406                                                                |
+| `josh read:set`                      | #2021, #2256, #2280, #2289                                           |
+| `josh doc:read`                      | #1797, #2188                                                         |
+| `josh read:files`                    | #2202                                                                |
+| `josh edit:files`                    | #2162, #2165, #2202, #2366, #2493                                    |

@@ -1,5 +1,6 @@
 import { cost_format } from '#scripts/cost-runtime/cost-format'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import { cost_run_issues, type IssueTotals } from './cost-run-issues'
 import type { RunNode } from './cost-run-nodes'
 import { cost_run_roles, type RoleTotals, type SessionRow } from './cost-run-roles'
 import { cost_run_tree } from './cost-run-tree'
@@ -37,6 +38,9 @@ interface RunCostReport {
 	total_elapsed_ms: number
 	roles: ReadonlyArray<RoleTotals>
 	sessions: ReadonlyArray<SessionRow>
+	// The sessions summed per Issue, with whether the implementation cut ended any of them — the
+	// comparison joshuafolkken/kit#3223 asks of a batch. Carried in `--json` only.
+	issues: ReadonlyArray<IssueTotals>
 }
 
 function build(
@@ -57,6 +61,7 @@ function build(
 		total_elapsed_ms: roles.total_elapsed_ms,
 		roles: roles.roles,
 		sessions: roles.sessions,
+		issues: cost_run_issues.build(roles.sessions),
 	}
 }
 

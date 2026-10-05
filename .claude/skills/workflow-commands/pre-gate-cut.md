@@ -58,7 +58,7 @@ pnpm josh run:cut <N>
 - `cut` (0) — record written and handed to the lane's launch owner (OpenAI supervisor starts the
   successor after this process exits; Anthropic relaunches directly). **End the turn immediately** —
   the fresh process owns the run.
-- `under-threshold` (0) — the recent-window per-request cost is under the shared `CONTEXT_CUT_THRESHOLD`,
+- `under-threshold` (0) — the newest request's billed input is under the shared `CONTEXT_CUT_THRESHOLD`,
   so nothing was cut; **continue to the gate.**
 - `not-a-lane` (0) — no open lane for this issue, so not a dispatched child. **Continue to the gate.**
 - `unready` (1) — the tree is clean or on the default branch, nothing to carry. Continue to the gate.
@@ -79,7 +79,7 @@ carried, handing back the command above. Rationale:
   `<lane root>/<issue number>` — **and** `JOSH_LANE_CHILD` names that same issue. An interactive
   `fullrun` carries no mark and runs its gate untouched. `run:cut` uses an open-lane lookup instead, so
   the guard and the command need not agree byte for byte.
-- **It fires only when the recent-window context warrants a cut**. The guard
+- **It fires only when the current context warrants a cut**. The guard
   reads the same `cost_cli.session_verdict` `run:cut` reads, so an `under`-threshold lane is let through
   to the gate rather than refused.
 - **It is silent once the cut is carried**, so the resumed process goes straight to the gate.
@@ -180,8 +180,8 @@ after the fact by `pnpm josh run:ending <N> --output <path>` (joshuafolkken/kit#
 
 ## The threshold
 
-`CONTEXT_CUT_THRESHOLD` and the recent-window `cost_verdict.per_request_cost` (the last
-`RECENT_REQUEST_WINDOW` requests) are computed by `scripts/cost-runtime/context-cut-payback.ts`, their
+`CONTEXT_CUT_THRESHOLD` and `cost_verdict.per_request_cost` (the newest request's billed input)
+are computed by `scripts/cost-runtime/context-cut-payback.ts`, their
 single source; both cuts and the parent hand-off read the same verdict, and an unmeasurable session is
 always cut. Rationale: `docs/maintainers/pre-gate-cut-rationale.md` → "Why the threshold is a
 break-even". Both cuts end the turn **before** the gate, in the same act that starts the successor, so

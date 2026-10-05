@@ -6,7 +6,9 @@ import {
 	describe_pr_failure,
 	evaluate_pr_state,
 	is_auto_merge_blocked,
+	is_merge_conflict,
 	is_review_decision_decisive,
+	PrConflictError,
 	type PrEvaluation,
 } from './git-pr-checks-eval'
 import { parse_pr_state_snapshot, read_string, type PrStateSnapshot } from './git-pr-checks-parse'
@@ -142,6 +144,12 @@ function advance_stable_count(previous: number, state: PrEvaluation): number {
 	return state === 'success' ? previous + 1 : 0
 }
 
+function failure_error(message: string, snapshot: PrStateSnapshot): Error {
+	return is_merge_conflict(snapshot.merge_state_status)
+		? new PrConflictError(message)
+		: new Error(message)
+}
+
 function classify_poll_result(input: {
 	snapshot: PrStateSnapshot
 	stable_count: number
@@ -150,7 +158,9 @@ function classify_poll_result(input: {
 }): { is_done: boolean; next_stable_count: number } {
 	const state = input.evaluator.evaluate(input.snapshot)
 
-	if (state === 'failure') throw new Error(input.evaluator.describe(input.snapshot))
+	if (state === 'failure') {
+		throw failure_error(input.evaluator.describe(input.snapshot), input.snapshot)
+	}
 
 	const next_stable_count = advance_stable_count(input.stable_count, state)
 

@@ -6,6 +6,7 @@ import { run_ship_review_steps } from './run-ship-review-steps'
 import { run_ship_scoped } from './run-ship-scoped'
 import { run_ship_stage, type ShipState } from './run-ship-stage'
 import { run_ship_steps, type ShipArguments, type Step } from './run-ship-steps'
+import { run_ship_sync } from './run-ship-sync'
 
 const OK: JoshResult = { code: 0, out: '' }
 const FAILED: JoshResult = { code: 1, out: '' }
@@ -32,6 +33,8 @@ const preflight_spy = vi.spyOn(run_ship_preflight, 'stage')
 const scoped_spy = vi.spyOn(run_ship_scoped, 'scoped_pair')
 const review_spy = vi.spyOn(run_ship_review_steps, 'review_stage')
 const round_two_spy = vi.spyOn(run_ship_review_steps, 'round_two_stage')
+const sync_spy = vi.spyOn(run_ship_sync, 'sync_stage')
+const followup_spy = vi.spyOn(run_ship_sync, 'followup_stage')
 
 beforeEach(() => {
 	josh_spy.mockReset().mockResolvedValue(OK)
@@ -56,6 +59,7 @@ describe('run_ship_steps.steps — the order a change ships in', () => {
 		expect(run_ship_steps.steps(ARGS).map((step) => [step.stage, step.header])).toStrictEqual([
 			[STAGE.PREFLIGHT, run_ship.PREFLIGHT_HEADER],
 			[STAGE.GATE, run_ship.GATE_HEADER],
+			[STAGE.SYNC, run_ship.SYNC_HEADER],
 			[STAGE.COMMIT, run_ship.COMMIT_HEADER],
 			[STAGE.FOLLOWUP, run_ship.FOLLOWUP_HEADER],
 			[STAGE.REPORT, run_ship.REPORT_HEADER],
@@ -69,6 +73,7 @@ describe('run_ship_steps.steps — the order a change ships in', () => {
 			STAGE.PREFLIGHT,
 			STAGE.REVIEW,
 			STAGE.GATE,
+			STAGE.SYNC,
 			STAGE.COMMIT,
 			STAGE.ROUND_TWO,
 			STAGE.FOLLOWUP,
@@ -137,5 +142,15 @@ describe('run_ship_steps — the commit, followup and report stages', () => {
 			[['followup', TITLE, '--notify', 'done'], true],
 			[['run:tail', ISSUE, '--cite', '#1'], true],
 		])
+	})
+
+	// joshuafolkken/kit#3221: the merge of the default branch between the gate and the commit.
+	it('sync and followup delegate to the sync module', async () => {
+		sync_spy.mockResolvedValue(OK)
+		followup_spy.mockResolvedValue(OK)
+
+		expect(await step_for(STAGE.SYNC).run(ARGS, FRESH)).toBe(OK)
+		expect(await step_for(STAGE.FOLLOWUP).run(ARGS, FRESH)).toBe(OK)
+		expect(followup_spy).toHaveBeenCalledWith(TITLE, ARGS.notify)
 	})
 })

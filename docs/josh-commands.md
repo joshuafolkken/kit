@@ -174,7 +174,7 @@ An unknown flag is refused with the usage rather than ignored, the same conventi
 
 ### `josh test:red`
 
-Run the changed `*.test.ts` files on a temporary merge-base worktree (the pre-fix tree; the working tree and index are untouched) and print `red`, `green` or `no-test`. On an Issue declaring `- 種別: 不具合`, `pnpm josh git -y` refuses `green`.
+Run the changed `*.test.ts` files on a temporary merge-base worktree (the pre-fix tree; the working tree and index are untouched) and print `red`, `green`, `no-test` or `test-only`. A change whose every path is a test file prints `test-only` without running anything — the merge-base runs the same code as HEAD, so its result would say nothing about the fix. A change to a doc or `prompts/` file is not test-only, because a document-rule test reads those files. On an Issue declaring `- 種別: 不具合`, `pnpm josh git -y` refuses `green`.
 
 ### `josh test:e2e`
 

@@ -4,6 +4,7 @@ import { run_ship_preflight } from './run-ship-preflight'
 import { run_ship_review_steps } from './run-ship-review-steps'
 import { run_ship_scoped } from './run-ship-scoped'
 import { run_ship_stage, type ShipState, type Stage } from './run-ship-stage'
+import { run_ship_sync, type StepResult } from './run-ship-sync'
 
 // The stages `josh ship` runs, in the order a change ships (joshuafolkken/kit#2398), kept apart from the
 // chaining CLI so the order is read in one place.
@@ -24,7 +25,7 @@ interface ShipArguments {
 interface Step {
 	stage: Stage
 	header: string
-	run: (args: ShipArguments, state: ShipState) => Promise<JoshResult>
+	run: (args: ShipArguments, state: ShipState) => Promise<StepResult>
 }
 
 const { STAGE } = run_ship_stage
@@ -56,6 +57,13 @@ const COMMIT_STEPS: ReadonlyArray<Step> = [
 				async () => await josh(['gate']),
 			]),
 	},
+	// joshuafolkken/kit#3221: the default branch merged again right before the commit, so the pull
+	// request opens on a branch that is current; a clean merge goes on without waking anyone.
+	{
+		stage: STAGE.SYNC,
+		header: run_ship.SYNC_HEADER,
+		run: async () => await run_ship_sync.sync_stage(),
+	},
 	{
 		stage: STAGE.COMMIT,
 		header: run_ship.COMMIT_HEADER,
@@ -69,7 +77,7 @@ const MERGE_STEPS: ReadonlyArray<Step> = [
 	{
 		stage: STAGE.FOLLOWUP,
 		header: run_ship.FOLLOWUP_HEADER,
-		run: async (args) => await josh(['followup', args.title, ...args.notify]),
+		run: async (args) => await run_ship_sync.followup_stage(args.title, args.notify),
 	},
 	{
 		stage: STAGE.REPORT,

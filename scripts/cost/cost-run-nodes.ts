@@ -32,6 +32,9 @@ interface SessionFacts {
 interface NodeContext {
 	facts: (session_id: string) => SessionFacts
 	lane_issue: (file: SessionFile) => number | undefined
+	// Whether the implementation-phase cut ended this session. Asked of lane children only, since the
+	// cut binds nowhere else and reading every transcript a second time would double the load.
+	took_cut: (file: SessionFile) => boolean
 }
 
 interface RunNode {
@@ -50,6 +53,9 @@ interface RunNode {
 	records: ReadonlyArray<UsageRecord>
 	baseline_tokens: number
 	is_readable: boolean
+	// Whether the implementation-phase cut ended this session (joshuafolkken/kit#3223); always `false`
+	// outside a lane child.
+	took_cut: boolean
 }
 
 function branch_issue(records: ReadonlyArray<UsageRecord>): number | undefined {
@@ -114,6 +120,7 @@ function to_node(
 		records: facts.records,
 		baseline_tokens: facts.baseline_tokens,
 		is_readable: facts.is_readable,
+		took_cut: false,
 		...head,
 	}
 }
@@ -134,8 +141,7 @@ function main_node(
 
 function lane_node(file: SessionFile, root_id: string | undefined, context: NodeContext): RunNode {
 	const facts = context.facts(file.session_id)
-
-	return to_node(
+	const node = to_node(
 		file,
 		'lane',
 		{
@@ -145,6 +151,8 @@ function lane_node(file: SessionFile, root_id: string | undefined, context: Node
 		},
 		facts,
 	)
+
+	return { ...node, took_cut: context.took_cut(file) }
 }
 
 // A subagent's depth counts from the root parent, so a unit under a lane child sits one below the

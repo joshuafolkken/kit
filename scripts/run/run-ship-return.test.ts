@@ -76,3 +76,18 @@ describe('run_ship_return.return_control', () => {
 		expect(emit_mock).toHaveBeenCalledTimes(1)
 	})
 })
+
+// joshuafolkken/kit#3221: a stop on a merge git could not finish reads as `conflict`, not as the stage.
+describe('run_ship_return.return_control on a merge conflict', () => {
+	const conflicted = 'scripts/a.ts'
+
+	it('records the stop as conflict and hands the files to the prompt', async () => {
+		await run_ship_return.return_control(ISSUE, 'followup', { ...RESUME, conflicts: [conflicted] })
+
+		expect(emit_mock).toHaveBeenCalledWith(
+			'ship-stop',
+			`#${ISSUE} conflict failed — pnpm josh ship --log ${ISSUE}`,
+		)
+		expect(String(relaunch_mock.mock.calls[0]?.[1])).toContain(conflicted)
+	})
+})

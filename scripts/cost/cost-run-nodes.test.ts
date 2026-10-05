@@ -51,9 +51,13 @@ const FACTS = new Map([
 	[SUB_LANE, [rec(LANE_1913, 220)]],
 ])
 
+const CUT_SESSIONS = new Set(['p', 'L1', 'p/agent-1'])
+
 const CONTEXT: NodeContext = {
 	facts: (id) => ({ records: FACTS.get(id) ?? [], baseline_tokens: 100, is_readable: true }),
 	lane_issue: (file) => LANES.get(file.session_id),
+	// Answers cut for a parent and a subagent too, so a test proves only a lane child is asked.
+	took_cut: (file) => CUT_SESSIONS.has(file.session_id),
 }
 
 // The acceptance tree: a parent, its wake/resume, two lane children, a subagent of the parent, a
@@ -107,6 +111,15 @@ describe('cost_run_nodes.build_nodes', () => {
 		const nodes = by_id()
 
 		expect(nodes.get(SUB_LANE)).toMatchObject({ role: 'subagent', depth: 2, parent_id: 'L1' })
+	})
+
+	it('reads the implementation cut for a lane child only', () => {
+		const nodes = by_id()
+
+		expect(nodes.get('L1')?.took_cut).toBe(true)
+		expect(nodes.get('L2')?.took_cut).toBe(false)
+		expect(nodes.get('p')?.took_cut).toBe(false)
+		expect(nodes.get('p/agent-1')?.took_cut).toBe(false)
 	})
 })
 

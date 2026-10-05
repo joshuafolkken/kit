@@ -14,7 +14,7 @@ const RESUME_VERDICT = 'resume'
 // re-reading the record.
 const RESUME_IMPL_VERDICT = 'resume-impl'
 const FRESH_VERDICT = 'fresh'
-// The recent-window context is under the shared cut threshold, so the pre-gate cut was not worth its
+// The current context is under the shared cut threshold, so the pre-gate cut was not worth its
 // resume and nothing was cut (joshuafolkken/kit#2312). A benign, non-failing answer: the run carries
 // on to the gate itself, exactly as `not-a-lane` does.
 const UNDER_THRESHOLD_VERDICT = 'under-threshold'
@@ -111,7 +111,7 @@ function refuse_unready(state: CutState): number {
 // relaunch costs more than it saves; the current process carries the run on to the gate uncut.
 function report_under_threshold(): number {
 	console.error(
-		'The recent-window context is under the shared cut threshold, so nothing was cut; a resume would cost more than the accumulation it would drop. Continue to the gate.',
+		'The current context is under the shared cut threshold, so nothing was cut; a resume would cost more than the accumulation it would drop. Continue to the gate.',
 	)
 
 	return report(UNDER_THRESHOLD_VERDICT, SUCCESS_EXIT_CODE)

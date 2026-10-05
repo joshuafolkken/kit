@@ -75,12 +75,10 @@ pnpm josh issue:comment <N> --body-file <path>   # what needs deciding, and the 
 `needs-decision` precedence over `in-progress`, so the next child is offered normally. Then return to
 step 1; the other children are unaffected unless they depend on this one.
 
-**What happens to a parked child's lane depends on whether it had committed, and the two answers are
-opposite.** **Parked before its commit**, the lane is stashed and closed:
-`git -C <dir> stash push -u -m "backlogrun: parked #<N>"`, the stash recorded on the Issue, then
-`pnpm josh lane:close <N>` (`epic:next` counts a parked child's lane as released, and `lane:close`
-removes the work tree by force). **Parked after its commit and push**, the lane is *kept*: nothing to
-stash, and closing would delete the local branch the resume needs. **A lost merge race is not one of
+**A parked child's lane is kept, whether or not it had committed.** **Parked before its commit**, the
+uncommitted work stays in the lane's tree — never in the stash, which every work tree shares — and
+`lane:close` would remove it by force. **Parked after its commit and push**, closing would delete the
+local branch the resume needs. **A lost merge race is not one of
 these rows** — it resolves in its lane (`backlogrun-recovery.md` → "Conflicts are not predicted"), and parks only under that
 section's four conditions, which take the after-commit row. Both rows and the `pnpm josh run:release
 <N>` every parked ending owes are "What happens to a lane" above, the single source.
@@ -101,7 +99,8 @@ gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/needs-decision 2>/dev/nu
 
 **The released child goes back to a lane, never into the parent's own context.** A parent that is
 *already* running, and clears a label mid-run because a person just answered, dispatches it the same way
-rather than picking up its diff itself — `pnpm josh lane:open <N>` then `pnpm josh lane:dispatch <N>`. A
+rather than picking up its diff itself — `pnpm josh lane:launch <N>`, which dispatches into the lane the
+park kept, or opens one where none is. A
 parent that implements the released child inline is the failure the orchestrator rule is written against:
 "The parent orchestrates and never implements a child in its own context" above.
 

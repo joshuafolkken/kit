@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { GIT_BINARY_KEY } from './constants'
 import { git_fixture_workspace, type FixtureWorkspace } from './git-fixture-workspace'
 import { git_spawn } from './git-spawn'
 import { SSH_COMMAND_VARIABLE } from './git-ssh-keepalive'
@@ -89,6 +90,9 @@ beforeEach(async () => {
 	await git(opened.workspace, ['init', MAIN_BRANCH, REPOSITORY])
 	await set_origin(path.join(opened.workspace, UPSTREAM))
 	process.chdir(fixture.repository_root)
+	// The fetch here is the subject and reaches only a local upstream, which the unit-suite guard's `git`
+	// shim cannot tell from a real remote — so the spawn runs the real binary (joshuafolkken/kit#3234).
+	vi.stubEnv(GIT_BINARY_KEY, '')
 }, TIMEOUT_MS)
 
 // The stand-in ssh is the one process git leaves behind — which is the keepalive's to end in

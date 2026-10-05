@@ -11,6 +11,7 @@ import {
 	parse_repo_name_from_package,
 	wait_for_pr_success,
 } from './git-pr-checks'
+import { PrConflictError } from './git-pr-checks-eval'
 import {
 	CODE_RABBIT,
 	make_pr_snapshot,
@@ -230,6 +231,31 @@ describe('wait_for_pr_success — failure and timeout', () => {
 				required_stable_reads: DEFAULT_STABLE_READS,
 			}),
 		).rejects.toThrow(/Timed out/u)
+	})
+})
+
+async function wait_on(snapshot: ReturnType<typeof make_pr_snapshot>): Promise<unknown> {
+	return await wait_for_pr_success({
+		branch_name: 'feature/x',
+		fetcher: make_sequence_fetcher([snapshot]).fetch,
+		interval_ms: 0,
+		max_attempts: 5,
+		required_stable_reads: DEFAULT_STABLE_READS,
+	})
+}
+
+// joshuafolkken/kit#3221: a conflict is told apart from a red check so `followup` can name it.
+describe('wait_for_pr_success — a conflicting pull request', () => {
+	it('throws a conflict error when the pull request is DIRTY', async () => {
+		await expect(wait_on(make_pr_snapshot({ merge_state_status: 'DIRTY' }))).rejects.toBeInstanceOf(
+			PrConflictError,
+		)
+	})
+
+	it('throws a plain error, not a conflict, for a review that requested changes', async () => {
+		const snapshot = make_pr_snapshot({ review_decision: 'CHANGES_REQUESTED' })
+
+		await expect(wait_on(snapshot)).rejects.not.toBeInstanceOf(PrConflictError)
 	})
 })
 
