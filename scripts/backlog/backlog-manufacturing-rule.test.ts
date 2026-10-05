@@ -65,7 +65,12 @@ const REVIEW_MARKERS: ReadonlyArray<string> = [
 	'**"It needs a decision" is no longer a branch-2 condition on its own**',
 	'**This is the default, and it takes everything the other two branches did not**',
 	'**The note is not optional**',
-	// The asymmetry that decides the trade, and the half a later reader mines for a reason to revert.
+]
+
+// The asymmetry that decides the trade, and the half a later reader mines for a reason to revert. It
+// sits in the review history beside the policy, off every review's read path (joshuafolkken/kit#3180).
+const REVIEW_HISTORY = 'docs/maintainers/review-history.md'
+const REVIEW_HISTORY_MARKERS: ReadonlyArray<string> = [
 	'**What it costs, and why that is the right trade.**',
 	'A filed finding that never mattered is carried forever',
 ]
@@ -168,6 +173,14 @@ describe(`${REVIEW_PROMPT} — the disposition default is branch 3`, () => {
 	const content = read_unwrapped(REVIEW_PROMPT)
 
 	it.each(REVIEW_MARKERS)('states %j', (marker) => {
+		expect(content).toContain(marker)
+	})
+})
+
+describe(`${REVIEW_HISTORY} — the reason the disposition default is branch 3`, () => {
+	const content = read_unwrapped(REVIEW_HISTORY)
+
+	it.each(REVIEW_HISTORY_MARKERS)('states %j', (marker) => {
 		expect(content).toContain(marker)
 	})
 })

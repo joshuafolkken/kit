@@ -113,10 +113,11 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/upstream-interrupt.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/wip-cap.md', bytes: 16_384 },
 	{ path: 'prompts/refactoring.md', bytes: 8192 },
-	{ path: 'prompts/review-rubric.md', bytes: 20_480 },
-	{ path: 'prompts/review.md', bytes: 20_480 },
+	// #3180 moved the history and the lint-settled proofs to `docs/maintainers/`.
+	{ path: 'prompts/review-rubric.md', bytes: 16_384 },
+	{ path: 'prompts/review.md', bytes: 16_384 },
 	{ path: 'prompts/sonar-hotspot-handling.md', bytes: 8192 },
-	{ path: 'prompts/testing-guide.md', bytes: 24_576 },
+	{ path: 'prompts/testing-guide.md', bytes: 20_480 },
 ]
 
 // The recorded ceiling for one path, or undefined when it carries no budget entry.

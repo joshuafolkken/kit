@@ -15,17 +15,10 @@ points to them rather than restating them:
 
 ## When to run
 
-- **Pre-commit self-review** (implementing session, inline): before every `git commit` on a feature
-  branch — scope: the staged diff (`git diff --staged`), level from
-  `pnpm josh review:brief --level-only`.
-- **Workflow review step** (same session, inline): the last stage of the verification gate in `fullrun`
-  / `halfrun` / `backlogrun`, driven by the brief `pnpm josh review:brief` prints. Round 1 runs before the
-  commit — scope: `git diff main`. Round 2 runs after it, beside the CI the commit started
-  (`.claude/skills/workflow-commands/chain-rule.md` → "The pull request opens between the rounds, so CI
-  runs beside round 2").
-
-The workflow review uses the `reviewer` role profile printed by `pnpm josh review:brief`. Pass its
-model and effort explicitly to the review subagent; do not substitute the review level for effort.
+When a review runs is `CLAUDE.md` → "Pre-commit Self-Review"; inside a workflow, round 1 runs before
+the commit and round 2 beside CI (`.claude/skills/workflow-commands/chain-rule.md`). Pass the
+`reviewer` profile's model and effort that `pnpm josh review:brief` prints to the review subagent;
+do not substitute the review level for effort.
 
 Re-run after applying fixes until **no high or medium findings remain — or until the round cap below is
 reached, the first review included — whichever comes first.** The cap below is not optional. The second round
@@ -46,10 +39,8 @@ pnpm josh review:brief --level-only            # the branch diff
 pnpm josh review:brief --level-only --staged   # the staged diff
 ```
 
-**The level is decided from the changed paths and nothing else.** "This one is small" is a judgement
-made under cost pressure, and cost pressure resolves it toward "small" exactly when a defect is most
-likely to be shipped. A rule an agent applies from memory is a rule an agent can talk itself out of;
-one it has to run answers the same way every time.
+**The level is decided from the changed paths and nothing else** — never "this one is small"
+(`docs/maintainers/review-history.md`).
 
 | Every changed path is…                                                                   | Level    | Rounds                  |
 | ---------------------------------------------------------------------------------------- | -------- | ----------------------- |
@@ -64,13 +55,8 @@ would hand a reduced level to a caller that failed to read the diff.
 in `package.json`'s `files` and are written into every consumer project by `josh init` / `josh sync`,
 so a defect in one reaches a consumer and is reviewed at `medium` like any other shipped file.
 
-**Documentation is not inert either, and that is deliberate.** `CLAUDE.md`, `prompts/**`, `.claude/**`
-and `docs/**` are all reviewed at `medium`. The "Non-runtime updates" exception in `prompts/testing-guide.md` exempts
-them from _testing_ — which asks whether an automated test could have caught the defect — while this
-asks whether a human reading the diff is the only thing that can. Measured on joshuafolkken/kit#963 and
-#965, both documentation-only by that classification: a `medium` review found ten real defects in each
-— pointers into sections that had been removed, and citations naming the wrong file, in artifacts
-distributed to every consumer — that nothing else would have caught.
+**Documentation is not inert either.** `CLAUDE.md`, `prompts/**`, `.claude/**` and `docs/**` are all
+reviewed at `medium`, though exempt from _testing_: a reader is the only detector a prose defect has.
 
 **A confirmed High blocks regardless of round count**, and the round cap below does not change that.
 
@@ -78,24 +64,17 @@ distributed to every consumer — that nothing else would have caught.
 
 ## Review round cap (2 rounds)
 
-The severity rule in the rubric is not a stopping condition on its own. Every fix creates new surface,
-and a review whose scope is the whole change finds something in it — so the loop is bounded by how much
-new code the fixes produce, which is unbounded.
+The severity rule in the rubric is not a stopping condition on its own: every fix creates new surface a
+further round would find something in.
 
 **Two rounds is the ceiling, not the schedule.** Whether the second one is due at all is
 `pnpm josh review:round2`'s answer — "When round 2 is skipped entirely, and when it is not" below is
-the single source of that condition (joshuafolkken/kit#1433).
-
-This is measured, not theorized. On joshuafolkken/kit#854 four rounds produced 18 findings; on #855
-two rounds produced 19. Almost none of them was a repeat: each round found new things, and many of
-those were about code the **previous round's fix** had just written. Two rounds of that is diligence; a
-third is the review chasing its own tail.
+the single source of that condition.
 
 ### A merge-conflict resolution review is not one of the two
 
 **When `pnpm josh followup` reports `PR checks failed (merge conflict)`, the child resolves the conflict
-in its own lane and reviews the resolution — and that round does not count against the cap**
-(joshuafolkken/kit#1623). The cap bounds re-reading _the change under review_; a resolution review reads
+in its own lane and reviews the resolution — and that round does not count against the cap**. The cap bounds re-reading _the change under review_; a resolution review reads
 a different subject — not the change, but what merging a moved `main` into it did.
 `.claude/skills/workflow-commands/backlogrun-recovery.md` → "Conflicts are not predicted" is the single source of
 the procedure and of the four conditions under which the run steps back instead of resolving.
@@ -105,7 +84,7 @@ parks the child rather than buying it a further round.
 ### When round 2 is skipped entirely, and when it is not
 
 **Two rounds is the ceiling; whether the second round runs at all is a command's answer, not a reading
-of a list** (joshuafolkken/kit#1433):
+of a list**:
 
 ```bash
 pnpm josh review:round2 --round-1-closed   # → required | skip ; the reason on stderr
@@ -116,8 +95,7 @@ round-1 High/Medium finding actually closed — by a fix in this working tree, o
 positive — and none was filed or deferred. **Without the flag the answer is `required`**, which is also
 what the command answers to every uncertainty it meets, a missing round-1 snapshot included.
 
-**`skip` has exactly two arms, and both are states in which round 1's fix code needs no review**
-(joshuafolkken/kit#1222 — the round exists because round 1's fix code is otherwise unreviewed):
+**`skip` has exactly two arms, and both are states in which round 1's fix code needs no review**:
 
 | Arm                    | What it is                                                                                                                   |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
@@ -126,9 +104,7 @@ what the command answers to every uncertainty it meets, a missing round-1 snapsh
 
 **Neither arm weakens the standard.** A round-1 High/Medium that did not close is not a closed finding,
 so the flag is not passable; the cap is still two rounds; and a confirmed High still blocks the merge.
-**The wider line joshuafolkken/kit#1433 proposed — exempting anything that is not a runtime code path —
-is not adopted**: a documentation-only diff is exactly where the review is the only detector (the #963 /
-#965 measurement above), so a prompt fix answers `required`.
+A documentation-only fix delta is not inert, so a prompt fix answers `required`.
 
 **A skipped round is recorded on the Issue**, so the condition stays auditable and can be withdrawn if
 a defect is later traced to a skipped delta:
@@ -142,7 +118,7 @@ a defect is later traced to a skipped delta:
 ### Three-way disposition after the cap
 
 **After the second round, place every remaining non-High finding in exactly one of three exits, decided
-from what the finding is rather than from the filer's discretion** (joshuafolkken/kit#1469). **The
+from what the finding is rather than from the filer's discretion**. **The
 default exit is branch 3, and branch 2 has to be earned**. Read them in order — branch 1 where the fix is
 trivial and local, branch 2 only where the finding clears the bar it names, branch 3 for everything
 left, which is most of them. "It might matter later" is branch 3.
@@ -167,12 +143,6 @@ left, which is most of them. "It might matter later" is branch 3.
    suspicion included. **The note is not optional**: one line naming the finding and why it was dropped
    is what keeps a dropped finding auditable rather than invisible.
 
-**What it costs, and why that is the right trade.** A dropped finding that later turns out to matter is
-re-found by the next review of that code, at the price of one round it would have paid anyway. A filed
-finding that never mattered is carried forever — placed in an epic, offered by `epic:next`, read by
-everyone who scans the backlog. The two errors are not symmetric, and the old default was on the
-expensive side of them.
-
 **Findings that reduce to one root judgement are filed as one Issue, not several** — a single follow-up
 Issue with a section per symptom (`## 現象 1` / `## 現象 2`).
 
@@ -187,7 +157,7 @@ Only branch 2 files an Issue. What follows applies to that branch.
   the commit.** Where the run opens a pull request — `fullrun`, `backlogrun` — they go after
   `pnpm josh git -y` and before `pnpm josh followup`; where it does not — `halfrun`, or a standalone
   pre-commit self-review — they run as soon as the disposition is decided. **The chain may run in a
-  delegated unit** — `pnpm josh delegate followup-filing` (joshuafolkken/kit#1892).
+  delegated unit** — `pnpm josh delegate followup-filing`.
 - **When the round files a second follow-up, run `pnpm josh issue:fold` first.** Several findings from
   one review fold into one Issue by default — the filing-time counterpart to the split assessment,
   reading the same two questions (`.claude/skills/workflow-commands/split-assessment.md` → "The same
@@ -204,13 +174,13 @@ Only branch 2 files an Issue. What follows applies to that branch.
      write command yourself — never a hand edit of the epic body, which leaves the task list and the
      `blocked-by` relations disagreeing and `epic:next` returning `error`.
 
-  | Answer                                                                                            | Do                                                                                                                                                                                                                                                                                                                                | Tier                    |
-  | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-  | `add_to_epic`                                                                                     | `pnpm josh epic --add <E> <new>` — add `--before <M>` / `--after <M>` when the relation carries an order                                                                                                                                                                                                                          | **A — no confirmation** |
-  | `create_epic`                                                                                     | `pnpm josh epic "<title>" <new> <other> [--ordered]`                                                                                                                                                                                                                                                                              | **A — no confirmation** |
-  | `ask` — candidates spread across two or more epics                                                | **Choose the epic you recommend, run its write command, and record the decision** — what was taken, what was rejected, why — on both the new Issue and that epic's `## Decisions`. This does not stop a run and does not park a child (joshuafolkken/kit#1339); stop only where the two epics are genuinely too close to separate | **A — no confirmation** |
-  | `none`                                                                                            | Nothing                                                                                                                                                                                                                                                                                                                           | —                       |
-  | **The command could not answer** — non-zero exit, or **any** ⚠ warning above `Nothing to bundle.` | Stop and report, naming what it said. **A `none` printed after such a warning is not "nothing to bundle"** — the search was incomplete                                                                                                                                                                                            | —                       |
+  | Answer                                                                                            | Do                                                                                                                                                                                                                                                                                                       | Tier                    |
+  | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+  | `add_to_epic`                                                                                     | `pnpm josh epic --add <E> <new>` — add `--before <M>` / `--after <M>` when the relation carries an order                                                                                                                                                                                                 | **A — no confirmation** |
+  | `create_epic`                                                                                     | `pnpm josh epic "<title>" <new> <other> [--ordered]`                                                                                                                                                                                                                                                     | **A — no confirmation** |
+  | `ask` — candidates spread across two or more epics                                                | **Choose the epic you recommend, run its write command, and record the decision** — what was taken, what was rejected, why — on both the new Issue and that epic's `## Decisions`. This does not stop a run and does not park a child; stop only where the two epics are genuinely too close to separate | **A — no confirmation** |
+  | `none`                                                                                            | Nothing                                                                                                                                                                                                                                                                                                  | —                       |
+  | **The command could not answer** — non-zero exit, or **any** ⚠ warning above `Nothing to bundle.` | Stop and report, naming what it said. **A `none` printed after such a warning is not "nothing to bundle"** — the search was incomplete                                                                                                                                                                   | —                       |
 
 - **A confirmed High is never deferred.** A real defect does not ship because a round counter ran out,
   so a standing High blocks the merge — never fixed-in-place, filed, or dropped as one of the three

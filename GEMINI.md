@@ -5,9 +5,4 @@
 
 @CLAUDE.md
 
-**No hooks run under Gemini**, so every rule a hook delivers is yours to apply unaided. How to read
-`CLAUDE.md`'s Claude Code features here — that list of rules included — is
-`prompts/collaboration-workflow/principles.md` → "Claude Code 以外のエージェントでの読み替え".
-
-**Do not copy rules back into this file.** Every change to how agents work in this repository belongs
-in `CLAUDE.md`.
+**No hooks run under Gemini** — apply every hook-delivered rule yourself, per `prompts/collaboration-workflow/principles.md` → "Claude Code 以外のエージェントでの読み替え". Do not copy rules back into this file.
