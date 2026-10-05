@@ -235,6 +235,7 @@ const UNMEASURABLE_ROWS: ReadonlyArray<string> = [
 	'index-mutation',
 	'destructive-command',
 	'protected-file',
+	'direct-pr-create',
 	'poll-loop',
 	INVESTIGATION,
 ]

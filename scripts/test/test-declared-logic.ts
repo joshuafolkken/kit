@@ -12,7 +12,7 @@
 // can catch a defect in it; this set keeps documentation *in* because a test could never have caught a
 // prose defect either way. The two answer different questions, so sharing one list would be wrong, not
 // a clone avoided. Here only paths that are mechanically certain to touch no runtime code are exempt —
-// the non-executable config and cosmetic-asset arms of `CLAUDE.md`'s "Non-runtime updates" exception
+// the non-executable config and cosmetic-asset arms of `prompts/testing-guide.md`'s "Non-runtime updates" exception
 // stay `required`, and a person declares that exception in the Step 0 work summary. Under-exempting
 // costs one declared exception; over-exempting ships an untested runtime change. The one widening is
 // the basic profile's manual check below, for files no runner kit has could test.

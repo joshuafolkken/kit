@@ -6,33 +6,20 @@ When this run files a new Issue, file it with `pnpm josh issue:file`, which lint
 implements the change and runs the full verification gate, then **stops before commit** — nothing is
 committed, pushed, or opened as a PR — so a person verifies the working tree by hand. Use it when a change needs human eyes before shipping.
 
-**This file is the manifest** (joshuafolkken/kit#2189): terse ordered steps, each pointing at the file
-that holds its detail.
+**This file is the manifest** (joshuafolkken/kit#2189). The entry sequence and the stop branches are
+`entry-sequence.md`, shared with `fullrun` and `prrun` (joshuafolkken/kit#3174); this file names only
+what is `halfrun`'s own.
 
-## The ordered entry sequence
+## The difference — the entry
 
-1. **Claim the working tree first** — `pnpm josh run:entry <N> --to halfrun` (bare `pnpm josh
-   run:hold` for `new`), ahead of the title and a `new` filing; it folds steps 3 and 5 and starts
-   at its stage line's `start:` (`SKILL.md` → §2k). `busy` / `unknown` stop with a `confirmation` Telegram (`run:entry` sends it). **The stop
-   before commit keeps the hold** (a second run would trample the uncommitted work); a stop on a
-   split, prerequisite or third-party target releases it. `working-tree-hold.md` is the single source; a
-   cross-repository target resolves its checkout from `pnpm josh doctor` first (`target-repository.md`).
-2. **Apply `in-progress` the moment `run:hold` answered `hold`** — the stop before commit keeps it on;
-   a stop that leaves the tree clean removes it in the same turn as `pnpm josh run:release` (`gh api -X
-   DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`).
-3. **Ask the session boundary** — `pnpm josh cost --cut` (folded into `run:entry`); `over` stops — `run:entry` notifies and releases
-   (`halfrun new`: by hand). **Skip it when dispatched by a batch.** `backlogrun-progress.md` → "The hand-off" is
-   the single source of the check and the shared 135,000 threshold.
-4. **Start the progress watcher once the hold is claimed** — `pnpm josh run:progress --wait` in the
-   background, started once — it reports to the event stream itself and nothing is relayed — and
-   `--mark` in the same turn as every real report; the stop before commit ends the watcher
-   itself (`backlogrun-progress.md` → "Progress while the run is quiet").
-5. **The mechanical reads** — `run:entry` folds `run:prep` (body/comments — `SKILL.md` → §2g;
-   `human_review`; `latest:scope`); a `new` entry runs `pnpm josh run:prep <N>` once filed.
+- **`pnpm josh run:entry <N> --to halfrun`** opens the run.
+- **The stop before commit keeps the hold and `in-progress`** — a second run would trample the
+  uncommitted work; a stop on a split, prerequisite or third-party target releases both. The stop also
+  ends the progress watcher itself.
 
 ## The step list
 
-`halfrun #<N>`: add `in-progress` → read Issue #N and its comments → **normalize the title** (same as
+`halfrun #<N>`: read Issue #N and its comments → **normalize the title** (same as
 `fullrun`) → post the agreed plan only if the body is blank → `git switch main && git pull`, then `pnpm
 josh latest:scope` and update dependencies only on `required` (`latest-gate.md`; the
 `dependency-update` skill) → implement → run the **full verification gate** (refactor →
@@ -56,23 +43,10 @@ back with fixes, treat each as a new round: implement, re-run `pnpm josh gate`, 
 `halfrun new` or `halfrun new "<title>"`: `kickoff new` + `halfrun #<N>` (no Issue exists yet). Steps
 mirror `fullrun new` (1)–(8): derive an English title (or use the provided one) → create the Issue
 (`pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>`, body per
-`prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `SKILL.md` → §2e) → add `in-progress` → post the agreed plan → stash
+`prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `issue-scout.md`) → add `in-progress` (as `fullrun new` (3)) → post the agreed plan → stash
 any pre-existing changes with `git stash push -m "halfrun new: pre-existing changes" -- ':!docs/maintainers/observations'`
 (the pathspec keeps the observation ledger in the tree for this run's commit; joshuafolkken/kit#2919), popped by
 message with `pnpm josh stash:pop "halfrun new: pre-existing changes"`, never a positional `git stash pop` →
 `git switch main && git pull` → `pnpm josh latest:scope` → implement → run the gate (as above, `pnpm
 josh test:e2e` run by **you**) → `pnpm josh run:hold <N> --halfrun-stop` → send the `confirmation`
 Telegram and **stop**.
-
-## The stop branches
-
-- **`needs-human-review`** — implement and gate, then stop before the commit; `needs-human-review.md`.
-- **A split** — the assessment (`split-assessment.md` → "The question") finds two or more
-  separately-mergeable deliverables over one gate: file the children (each `route:split`) and the epic,
-  then **STOP** with "Please run `backlogrun #<E> --only` to execute this epic." Typing `halfrun`
-  authorized **one** Issue, never a batch.
-- **A prerequisite** — file it (`route:tier-a`), stash, record the dependency, and **STOP**;
-  `prerequisite.md` is the single source of the filing, the `-u` stash and the epic:bundle branch.
-- **An observation** — file it without asking and carry on; `SKILL.md` → §2i.
-
-**Automatic filing is capped at 10 Issues per run.** On reaching it, stop and report.

@@ -9,10 +9,8 @@ the run is at, and the sections below carry that step in full.
 
 File Issues with `pnpm josh issue:file` (it applies the classification labels); see `prompts/collaboration-workflow/issue-template.md`.
 
-**Add `in-progress` the moment `run:hold` answered `hold`** (create if missing:
-`gh api repos/{owner}/{repo}/labels -f name=in-progress -f color=0075ca -f description="Work is
-actively in progress" --silent 2>/dev/null || true`, then `gh api
-repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=in-progress'`) → Read Issue #N and its comments
+**`in-progress` is already on the Issue** — `run:entry` applied it once the tree was held and the
+budget allowed the run, and `run:release <N>` takes it back off → Read Issue #N and its comments
 (`issue-comments.md`) → **normalize the title** (if not in English or can be phrased more clearly,
 derive a better English title and `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"`)
 → post the agreed plan only if the Issue body is blank (`gh api -X PATCH
@@ -52,9 +50,10 @@ primary checkout; a Claude run keeps it.
 `kickoff new` + `fullrun #N` in one run. Steps: (1) Derive an English title, or use the provided one.
 (2) Create Issue: `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>` (per
 `prompts/collaboration-workflow/issue-template.md`) — its duplicate scan runs first, and a candidate
-that covers the same work stops the run rather than filing a second Issue (`SKILL.md` → §2e). Capture
-`<N>`. (3) Add
-`in-progress` (as above). (4) Post the agreed plan in the session language: fill the body if blank,
+that covers the same work stops the run rather than filing a second Issue (`issue-scout.md`). Capture
+`<N>`. (3) Add `in-progress` (the bare hold named no issue):
+`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=in-progress'`. (4) Post the agreed plan
+in the session language: fill the body if blank,
 otherwise add a comment. (5) If the working tree already has staged or modified files,
 `git stash push -m "fullrun new: pre-existing changes" -- ':!docs/maintainers/observations'` first
 (joshuafolkken/kit#2919). (6) `git switch main && git pull`. (7)
@@ -74,7 +73,7 @@ ship "<title> #<N>" --notify-message "..."` (gate → commit/push/PR → the CI-
 stopping at the first failed step; joshuafolkken/kit#2398); **where a second round ran**, the PR opened
 at (11) and the region stays separate — `pnpm josh followup "<title> #<N>" --notify-message "..."` then
 `pnpm josh run:tail <N>`. (14) **After the merge, run `pnpm josh ms`.** (15) **Ask `pnpm josh
-release:scope` and close the completion summary with what it answered** (`followup-reference.md` →
+release:scope` and close the completion summary with what it answered** (`followup.md` →
 "When `pnpm josh release` runs").
 
 ## The release ask — the last step of either form
@@ -93,5 +92,5 @@ own end.
 Once the merge is done, `pnpm josh release:scope` says whether a release is owed — `required`, `skip`
 or `unknown`, and `unknown` is never read as `skip`. On `required` the completion summary closes with
 the request and the exact command; the run never types `pnpm josh release` itself, because publishing
-is Tier C (`followup-reference.md` → "When `pnpm josh release` runs", the single source). A `fullrun`
+is Tier C (`followup.md` → "When `pnpm josh release` runs", the single source). A `fullrun`
 invoked as one child of a `backlogrun` does not ask it — that batch asks once at its own end.

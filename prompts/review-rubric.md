@@ -50,10 +50,8 @@ for every finding that passes test 1, and to say so when the attempt failed**: "
 is a skipped step.
 
 **A distributed artifact is on that list deliberately.** `CLAUDE.md`, `prompts/**`, `.claude/**` and
-`docs/**` are reviewed at the same level as runtime code: measured on real documentation-only diffs,
-a review found ten real defects each — dangling pointers into removed sections, citations naming the
-wrong file, in artifacts distributed to every consumer — that no test covered, because prose is what
-they were. A severity rule that ranked documentation below runtime code would contradict that.
+`docs/**` are reviewed at the same level as runtime code — a dangling pointer or a citation naming the
+wrong file reaches every consumer, and no test covers prose.
 
 **`high` and `low`.** A `high` is fixed before committing and blocks the merge regardless of round
 count; a `low` that does not reach the user may be skipped with a one-line reason. This section
@@ -214,73 +212,12 @@ allowed.
 
 ### 4. Project conventions (`CLAUDE.md`)
 
-**The gate has already run — do not re-verify what lint enforces.** `pnpm josh gate` precedes this
-review, and `pnpm josh format:edited` runs `eslint --fix` and `prettier --write` after every `Edit` /
-`Write`, so anything ESLint decides has already failed as an error or been corrected before you read
-the diff. Re-checking it inflates the first round's finding count.
-
-**Settled by lint, and therefore not checked here** — each one verified against the rule that
-enforces it, never assumed:
-
-- **Naming** — `@typescript-eslint/naming-convention` (`eslint/rules/naming-convention.js`).
-- **`export default`** — `import/no-default-export` is `error` project-wide (`eslint/rules/import.js`),
-  switched off only for `*.d.ts` in `eslint/base.js`.
-- **Individually named exports of function declarations, and of consts that are not `UPPER_CASE`** —
-  `no-restricted-syntax` in `eslint/rules/code-quality.js`. **Its selector exempts
-  `ArrowFunctionExpression`**, so `export const helper = (s: string): string => s` passes it; that
-  gap is a reader's job, below.
-- **File names** — kebab-case through `unicorn/filename-case`.
-- **The `*.spec.*` suffix, and a top-level `tests/` directory** — `eslint/rules/test-filename.js`,
-  wired into `eslint/base.js` itself, so it holds in kit and in every project built on that base
-  config. **Both bans cover every JS/TS extension** (`.ts` `.tsx` `.mts` `.cts` `.js` `.jsx` `.mjs`
-  `.cjs`) and neither covers `.svelte`. **A trailing block switching `no-restricted-syntax` off is
-  what can still take it away** — so read a diff that adds one as a gate defect, per the last
-  paragraph of this category.
-- **Magic numbers** — `@typescript-eslint/no-magic-numbers`; **`any`, unused vars, floating promises
-  and explicit param and return types** — `eslint/rules/typescript.js` and `eslint/rules/promise.js`.
-- **Identical functions and repeated string literals** — `eslint/rules/sonarjs.js`.
-- **Every quality limit below.**
-
-- **Quality limits**: a reference, enforced by `eslint/rules/code-quality.js` and
-  `eslint/rules/sonarjs.js` rather than re-checked here — function complexity ≤5, nesting ≤2,
-  function ≤25 lines, file ≤300 lines, params ≤4, statements per function ≤10,
-  cognitive complexity ≤4 — **the line counts are code lines, not physical lines**: `max-lines` and
-  `max-lines-per-function` run with `skipBlankLines` and `skipComments`, so read what
-  `pnpm josh lint` reports rather than `wc -l`, and test files (`*.test.ts` / `*.e2e.ts`) allow
-  35 code lines per function instead of 25 — **`*.spec.ts` is not on that list**, because the same
-  config bans the name outright.
-
-**What only a reader can see — check these:**
-
-- **`function` syntax rather than an arrow const** — **no rule enforces this**: there is no
-  `func-style` and no arrow selector anywhere in `eslint/`, and the named-export selector above
-  explicitly exempts `ArrowFunctionExpression`. So `const do_thing = (n: number): number => n + 1` and
-  `export const helper = (s: string): string => s` both lint clean, and this review is the only thing
-  between either and the default branch. The route-file exemption in `CLAUDE.md` covers the named
-  route handlers and nothing else.
-- **The early-return one-liner** — `curly` is configured `['error', 'multi-line']`, which requires
-  braces on a multi-line body and never requires the one-liner form. A short `if (x) { return y }`
-  passes lint, so "single `return` under 100 chars → one-liner `if (x) return y`" is a reader's check.
-- **Duplication that is not identical** — `sonarjs/no-identical-functions` sees only functions that
-  match. Two implementations of one idea in different shapes are invisible to it, and they are exactly
-  what "No clones — single-source" is about, package boundaries included.
-- **A name that satisfies the convention and says the wrong thing** — `naming-convention` checks the
-  shape, never the meaning. An `is_` prefix on a function that returns a parsed value passes lint and
-  misleads every caller.
-- **Grouping and layout** — a namespace object that collects unrelated functions, or a file whose
-  contents no longer match what its name says. Structure is not something lint judges.
-- **Svelte semantics** — `$state` reassignment, `Props` as an interface name, restricted DOM
-  manipulation, and `PascalCase.svelte` / `PascalCase.svelte.ts` file names where the project's lint
-  does not cover them.
-- **Test placement beyond the two banned patterns** — the ban above decides the `*.spec.*` suffix and
-  the top-level `tests/` directory, and nothing else. **A `tests/Foo.svelte` is outside both**, so it
-  is a reader's check. Colocation itself is what it cannot see: a test that avoids both and still sits
-  in a directory away from the code it exercises lints clean, and so does an `*.e2e.ts` placed outside
-  `src/routes/**`.
-
-**A gate finding that got through is still a finding.** If lint could have caught something and did
-not — a disabled rule, an ignored path, an `// eslint-disable` the change added — say so. That is a
-defect in the gate, and no other step is looking at it.
+**Do not re-check what lint enforces — the gate has already run; lint does not catch `function`
+syntax over an arrow const (outside named route handlers), the early-return one-liner, duplication
+that is not identical, a name whose shape passes but whose meaning misleads, grouping and file layout,
+Svelte semantics, or test placement beyond the `*.spec.*` / top-level `tests/` bans, so check those.**
+A lint gap the change opens — a disabled rule, an ignored path, an added `eslint-disable`, a block
+switching `no-restricted-syntax` off — is itself a finding.
 
 ### 5. i18n
 

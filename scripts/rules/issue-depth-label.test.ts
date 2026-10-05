@@ -7,6 +7,7 @@ import {
 	DEPTH_LABELS,
 	EPIC_LABEL,
 	INTERRUPT_ROUTE_LABEL,
+	REPOSITORY_LABELS,
 	TIER_A_ROUTE_LABEL,
 } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
@@ -16,14 +17,14 @@ import { describe, expect, it } from 'vitest'
 // by reading every open Issue by eye — and two such counts a day apart took different denominators.
 // This suite pins the three halves of the repair to each other: the labels that record a depth, the
 // documented instruction to apply one at filing time, and the command that reads the share back.
-// §2i's procedure moved to its own file in joshuafolkken/kit#1797, so a run fetches it when it finds
+// `observation-filing.md`'s procedure moved to its own file in joshuafolkken/kit#1797, so a run fetches it when it finds
 // something worth filing rather than at every entry. The depth labels, the provisioning commands and
-// the denominator rule all went with it; `SKILL.md` → §2i keeps the rule they carry out.
+// the denominator rule all went with it; `observation-filing.md` keeps the rule they carry out.
 const WORKFLOW_SKILL = '.claude/skills/workflow-commands/observation-filing.md'
 const LABEL_MODULE = 'scripts/issue/issue-labels.ts'
 const DEPTH_LABEL_COUNT = 3
 // The placeholder spelling every filing template carries — the depth itself varies per Issue, so the
-// template names the flag and §2i names how to choose the number.
+// template names the flag and `observation-filing.md` names how to choose the number.
 const FILING_FLAG = '--depth <n>'
 const DEPTH_PREFIX = 'depth:'
 
@@ -57,25 +58,24 @@ describe('the depth labels', () => {
 		expect(DEPTH_LABELS.map((label) => label.name)).toStrictEqual([...DEPTH_LABEL_ORDER])
 	})
 
-	// The depth table is §2i's, and a description that paraphrased it would be a second copy of the
+	// The depth table is `observation-filing.md`'s, and a description that paraphrased it would be a second copy of the
 	// rule — so each one names the section instead.
 	it.each(DEPTH_LABELS)('points $name at the section that defines it', (label) => {
-		expect(label.description).toContain('SKILL.md §2i')
+		expect(label.description).toContain('observation-filing.md')
 	})
 
-	// Metadata nothing provisions is metadata a repository never sees: the first filing that applies
-	// the label auto-creates it with a generated color and no description, and the array below would
-	// go on asserting a color nobody had ever set. Prose cannot import this module, so the document's
-	// creation lines are keyed to it here instead.
-	it.each(DEPTH_LABELS)('is provisioned with $name’s own color and description', (label) => {
-		const skill = read_repo_file(WORKFLOW_SKILL)
-
-		expect(skill).toContain(`-f name=${label.name} -f color=${label.color}`)
-		expect(skill).toContain(`-f description="${label.description}"`)
-	})
+	// joshuafolkken/kit#3176: `josh issue:file` provisions the labels itself, so the document carries
+	// no hand creation command that could drift from this array.
+	it.each(DEPTH_LABELS)(
+		'is provisioned by the repository label set, not by a document command',
+		(label) => {
+			expect(REPOSITORY_LABELS).toContainEqual(label)
+			expect(read_repo_file(WORKFLOW_SKILL)).not.toContain(`-f name=${label.name}`)
+		},
+	)
 })
 
-describe('the filing-time rule in SKILL.md §2i', () => {
+describe('the filing-time rule in observation-filing.md', () => {
 	const skill = unwrapped(WORKFLOW_SKILL)
 
 	it.each([
@@ -93,7 +93,7 @@ describe('the filing-time rule in SKILL.md §2i', () => {
 		expect(read_repo_file(WORKFLOW_SKILL)).toContain(label_flag(label))
 	})
 
-	// **The rule in §2i is not enough on its own**: a run copies the `pnpm josh issue:file` line out of the
+	// **The rule in `observation-filing.md` is not enough on its own**: a run copies the `pnpm josh issue:file` line out of the
 	// entry point's own file, so a template without the flag files without the label and the share
 	// reports everything as `unlabelled`. Each document below carries a filing command of its own, and
 	// each is keyed here to the flag. An epic-creating template is deliberately absent — an epic takes
@@ -104,7 +104,7 @@ describe('the filing-time rule in SKILL.md §2i', () => {
 		// filing command lives there; `halfrun.md` keeps its own abbreviated template.
 		'.claude/skills/workflow-commands/fullrun-steps.md',
 		'.claude/skills/workflow-commands/halfrun.md',
-		// §2d's prerequisite filing command moved with the section body to `prerequisite.md`
+		// `prerequisite.md`'s prerequisite filing command moved with the section body to `prerequisite.md`
 		// (joshuafolkken/kit#2189).
 		'.claude/skills/workflow-commands/prerequisite.md',
 		'prompts/review.md',

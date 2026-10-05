@@ -1,8 +1,8 @@
 # The working-tree hold — one run per tree
 
-**This is the body of `SKILL.md` §2f, relocated here so the entry read carries the trigger and the
-pointer, not the procedure** (joshuafolkken/kit#2189). `SKILL.md` §2f is the resident stub, and
-`fullrun.md` / `halfrun.md` route here for the definition. It is read at its point of use — the moment
+**This file is the single source, so the entry read carries the trigger and the pointer, not the
+procedure** (joshuafolkken/kit#2189). `SKILL.md` → §2's table keeps the trigger, and
+`entry-sequence.md` routes here for the definition. It is read at its point of use — the moment
 a run is about to claim or release the tree.
 
 **Ask `pnpm josh run:hold` before anything else, and obey what it answers.** It is the first call of
@@ -47,12 +47,14 @@ ordinary one.
 **Release what the claim recorded, which is not always the Issue number.** A `#N` entry claimed `<N>`
 and releases `<N>`; a **`new` entry claimed before its Issue existed**, so it releases with the
 **bare** form however many numbers the run has acquired since — so a `fullrun new` that stops on a
-split types `pnpm josh run:release`, not `pnpm josh run:release <N>`.
+split types `pnpm josh run:release`, not `pnpm josh run:release <N>`. The bare form removes no
+label, so every `new` stop that releases — a split, a prerequisite or a third-party target — also runs `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress
+2>/dev/null || true`.
 
 **Releasing is the run's, not a person's memory.** `pnpm josh followup` releases the hold on a merged
 run, and a record abandoned by a crashed session expires after 8 hours. **A stop that leaves the tree
 clean releases it explicitly**: a `fullrun` / `halfrun` that stops on a split, a prerequisite or a
-third-party target ends with `pnpm josh run:release <N>` (bare where that run entered as `new`).
+third-party target ends with `pnpm josh run:release <N>` (bare where that run entered as `new`, followed by the label DELETE above).
 **`halfrun`'s stop before commit keeps the hold**, and so does a `needs-human-review` stop: the
 uncommitted work still in the tree is exactly what a second run would trample, so the release command
 goes in the stop report and the Telegram for the person to type. **`fullrun #<N>` of the same issue

@@ -227,9 +227,17 @@ jobs:
         if: steps.profile.outputs.is_basic == 'true'
         run: pnpm josh gate --verbose
 
+      # size-limit is an opt-in bundle budget kit does not install, so a full project that never
+      # added it skips the check instead of failing on a missing command (joshuafolkken/kit#3217).
       - name: Check bundle size
+        id: bundle-size
         if: steps.profile.outputs.is_basic != 'true'
-        run: pnpm size-limit
+        run: |
+          if [ -x node_modules/.bin/size-limit ]; then
+            pnpm size-limit
+          else
+            echo 'size-limit is not installed — skipping the bundle-size check.'
+          fi
 
   security:
     name: Security Audit

@@ -1,5 +1,5 @@
 {
-	"version": "1.1136.0",
+	"version": "1.1166.0",
 	"name": "@joshuafolkken/kit",
 	"description": "Development toolkit for AI-assisted projects: formatting, AI assistant rules and a Git/GitHub Issue workflow for any repository, plus lint, type check, tests and hooks for Node projects",
 	"keywords": [
@@ -102,6 +102,7 @@
 		"!scripts/exports/namespace-members.ts",
 		"!scripts/exports/unused-members.ts",
 		"!scripts/document/generate-catalog.ts",
+		"!scripts/document/issue-citation-budget.ts",
 		"!scripts/document/retired-phrases.ts",
 		"!scripts/document/review-agent-type.ts",
 		"!scripts/document/single-source.ts",

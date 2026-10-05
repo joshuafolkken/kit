@@ -1,8 +1,12 @@
 import { josh_command } from '#scripts/josh/josh-run'
+import { lane_registry } from '#scripts/lane/lane-registry'
 import type { RunCarry } from '#scripts/run/run-carry'
+import { run_merge_cli } from '#scripts/run/run-merge-cli'
 import { describe, expect, it, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
 import { backlog_drive_cli } from './backlog-drive-cli'
+import { backlog_drive_named } from './backlog-drive-named'
+import { backlog_drive_owner } from './backlog-drive-owner'
 
 const ACTIVE = '2026-09-24T00:00:00.000Z'
 const MS_PER_MINUTE = 60_000
@@ -80,10 +84,33 @@ describe('backlog_drive_cli.offer_argv', () => {
 			'--retries',
 			'1',
 			'--exclude',
-			'2400',
+			'2400,2500',
 			'--idle',
 			'0',
 		])
+	})
+
+	it('never offers a child still in flight, even one GitHub already reads unclaimed', () => {
+		const state = backlog_drive.initial_state(['2500', '2501'], ACTIVE)
+		const argv = backlog_drive_cli.offer_argv(state, CARRY, [])
+
+		expect(argv.slice(argv.indexOf('--exclude'))).toStrictEqual(['--exclude', '2500,2501'])
+	})
+})
+
+describe('backlog_drive_cli.merge', () => {
+	it('merges without a hand-off threshold, so the supervisor is never handed back over', async () => {
+		vi.spyOn(backlog_drive_owner, 'assert_current').mockResolvedValue()
+		vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
+		vi.spyOn(backlog_drive_named, 'mark_done').mockResolvedValue()
+		const merge_child = vi
+			.spyOn(run_merge_cli, 'merge_child')
+			.mockResolvedValue({ token: '2600', code: 0, outcome: 'merged' })
+
+		await backlog_drive_cli.merge('2500', '4242')
+
+		expect(merge_child).toHaveBeenCalledWith(expect.objectContaining({ over: undefined }))
+		vi.restoreAllMocks()
 	})
 })
 

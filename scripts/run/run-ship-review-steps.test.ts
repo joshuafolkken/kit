@@ -179,10 +179,13 @@ describe('run_ship_review_steps.review_stage — the clean path', () => {
 })
 
 describe('run_ship_review_steps.review_stage — a finding or a refusal stops it', () => {
-	it('records a High finding, then stops and lists it', async () => {
-		stamps.read_stamp_text.mockReturnValue(HIGH)
+	// joshuafolkken/kit#3159: the description reaches the stopped log, never the ledger record.
+	it('records a High finding by its spec, then stops and lists it with its description', async () => {
+		const described = `${HIGH} — the handle leaks on the early return`
 
-		expect(await stage_out()).toContain(HIGH)
+		stamps.read_stamp_text.mockReturnValue(described)
+
+		expect(await stage_out()).toContain(described)
 		expect(commands()).toContain(`${RECORD} ${HIGH}`)
 	})
 

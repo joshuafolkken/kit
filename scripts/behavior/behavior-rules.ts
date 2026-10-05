@@ -13,7 +13,13 @@ const TOOL_USE = 'tool_use'
 const COMMAND_KEY = 'command'
 const FIRST_POSITION_OFFSET = 1
 const TOOL_RESULT = 'tool_result'
-const DENIED_BASH_PREFIX = 'Permission to use Bash with command '
+// The openings of the two results that mean a Bash call never ran: the permission layer's refusal,
+// and a PreToolUse hook's block (joshuafolkken/kit#3197). A PostToolUse hook error is deliberately
+// absent — that hook fires after the command has already run.
+const DENIED_BASH_PREFIXES = [
+	'Permission to use Bash with command ',
+	'PreToolUse:Bash hook error: ',
+]
 
 // The git subcommands that stage or rewrite the index — the ones `CLAUDE.md` reserves for `pnpm josh
 // git` under "Never stage or mutate the git index on your own". An agent that runs one directly has
@@ -71,14 +77,15 @@ function is_index_mutation(command: string): boolean {
 		.some((segment) => INDEX_MUTATION_HEAD.test(segment) && !is_dry_run(segment))
 }
 
-// An errored result alone may mean a command ran and failed. Only the permission layer's refusal
-// identifies a Bash call that never ran; the parser keeps the opening of that result's text.
+// An errored result alone may mean a command ran and failed. Only a refusal before execution — the
+// permission layer's or a PreToolUse hook's — identifies a Bash call that never ran; the parser keeps
+// the opening of that result's text.
 function is_denied_result(block: Block): boolean {
 	return (
 		block.type === TOOL_RESULT &&
 		block.result_id !== '' &&
 		block.is_error === true &&
-		block.error_text.startsWith(DENIED_BASH_PREFIX)
+		DENIED_BASH_PREFIXES.some((prefix) => block.error_text.startsWith(prefix))
 	)
 }
 

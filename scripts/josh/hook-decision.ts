@@ -38,6 +38,7 @@ type HookPayload = z.infer<typeof payload_schema>
 
 const HOOK_EVENT_NAME = 'PreToolUse'
 const DENY_DECISION = 'deny'
+const ALLOW_DECISION = 'allow'
 // No record means nothing has been refused yet, and every span began after instant zero — which is
 // the answer wanted: the first qualifying accumulation of a run is refused.
 const NEVER_MS = 0
@@ -80,6 +81,21 @@ function deny_envelope(reason: string): string {
 			hookEventName: HOOK_EVENT_NAME,
 			permissionDecision: DENY_DECISION,
 			permissionDecisionReason: reason,
+		},
+	})
+}
+
+// **A rewrite, not a refusal** (joshuafolkken/kit#3154): the call proceeds with `updated_input` merged
+// over its own. `allow` is the decision the harness applies an `updatedInput` under; a settings `deny`
+// rule still wins over it, so this never widens what the call may do.
+function rewrite_envelope(updated_input: Record<string, unknown>, context: string): string {
+	return JSON.stringify({
+		systemMessage: context,
+		hookSpecificOutput: {
+			hookEventName: HOOK_EVENT_NAME,
+			permissionDecision: ALLOW_DECISION,
+			updatedInput: updated_input,
+			additionalContext: context,
 		},
 	})
 }
@@ -470,6 +486,7 @@ const hook_decision = {
 	notice_envelope,
 	parse_hook_payload,
 	report_no_payload,
+	rewrite_envelope,
 	stamp_fault,
 	write_decision,
 	write_outcome,

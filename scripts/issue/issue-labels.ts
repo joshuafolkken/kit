@@ -16,7 +16,7 @@ const PLANNED_LABEL = 'run:planned'
 // forever (joshuafolkken/kit#860).
 const NEEDS_DECISION_LABEL = 'needs-decision'
 // Marks an issue whose defect reaches the verification path, so it runs with nothing beside it
-// (joshuafolkken/kit#2776). A run applies it from the verification-path enumeration in `wip-cap.md`;
+// (joshuafolkken/kit#2776). A run applies it from the verification-path enumeration in `backlogrun-lanes.md`;
 // `backlog:next` enforces it (`backlog-solo.ts`), so the rule no longer rests on a judgement at
 // dispatch time.
 const RUN_SOLO_LABEL = 'run:solo'
@@ -36,11 +36,12 @@ const PRIORITY_HIGH_LABEL = 'priority:high'
 const AUTO_OK_LABEL = 'auto-ok'
 // Degrades one issue's run to a `halfrun`-shaped stop: it is implemented and taken through the
 // verification gate, and then nothing is committed, pushed, opened as a pull request or merged
-// (joshuafolkken/kit#1125). **Only a person applies it**, exactly as strongly as `auto-ok` — a mark a
-// run could clear for itself is not a mark.
+// (joshuafolkken/kit#1125). **Only a person applies it** — a mark a run could clear for itself is not
+// a mark.
 //
-// It is the opposite of `auto-ok` in what it does and its twin in who may apply it: one widens
-// unattended execution past an epic's edge, the other withholds the last step of it. `auto-ok`
+// It is the opposite of `auto-ok` in what it does: one widens unattended execution past an epic's
+// edge, the other withholds the last step of it. Unlike `auto-ok`, which `issue:file` applies by
+// default to work found by opted-in work (joshuafolkken/kit#3213), no run ever applies it. `auto-ok`
 // answers "may this run at all", this one answers "may its result ship without a person looking".
 //
 // **Not `needs-decision`, and the difference is what the two sets below encode.** A parked issue is
@@ -154,7 +155,7 @@ const FILING_ROUTE_LABELS: ReadonlyArray<{
 //
 // **The depth is read off the subject, so a run applies it.** Unlike `auto-ok` and
 // `needs-human-review` this is not a person's judgement about authorization; it is the same reading
-// §2i already asks a run to make before it files, and none of the three withholds or widens anything
+// `observation-filing.md` already asks a run to make before it files, and none of the three withholds or widens anything
 // a run may do.
 const DEPTH_0_LABEL = 'depth:0'
 const DEPTH_1_LABEL = 'depth:1'
@@ -171,9 +172,8 @@ const DEPTH_LABEL_ORDER: ReadonlyArray<string> = [DEPTH_0_LABEL, DEPTH_1_LABEL, 
 // description, so provisioning from here is what gives each one a stable color a reader can scan by.
 // Green, amber and pale blue, so the consumer-facing depth is the one that stands out in a listing.
 //
-// **The provisioning command lives in `observation-filing.md`**, because prose cannot import this module —
-// the same split `FILING_ROUTE_LABELS` above lives with. `scripts/rules/issue-depth-label.test.ts` keys
-// those three command lines to this array, so a color changed here without the document fails.
+// **`josh issue:file` provisions them** through `repository_labels.ensure_labels` before its create
+// call (joshuafolkken/kit#3176), so no document carries a creation command to keep in step.
 const DEPTH_LABELS: ReadonlyArray<{
 	name: string
 	color: string
@@ -182,17 +182,17 @@ const DEPTH_LABELS: ReadonlyArray<{
 	{
 		name: DEPTH_0_LABEL,
 		color: '0e8a16',
-		description: 'Depth 0 — what a consumer of this package touches (SKILL.md §2i)',
+		description: 'Depth 0 — what a consumer of this package touches (observation-filing.md)',
 	},
 	{
 		name: DEPTH_1_LABEL,
 		color: 'fbc02d',
-		description: 'Depth 1 — the run orchestration that executes an Issue (SKILL.md §2i)',
+		description: 'Depth 1 — the run orchestration that executes an Issue (observation-filing.md)',
 	},
 	{
 		name: DEPTH_2_LABEL,
 		color: 'c5def5',
-		description: 'Depth 2 — what measures a run (SKILL.md §2i)',
+		description: 'Depth 2 — what measures a run (observation-filing.md)',
 	},
 ]
 

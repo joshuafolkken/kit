@@ -1,4 +1,4 @@
-# Delegation decisions — `SKILL.md` §2b's procedure
+# Delegation decisions — the procedure
 
 Read this file when the first delegation decision arises during a run, not at workflow entry.
 
@@ -28,7 +28,7 @@ applies to named issues. `docs/josh-commands-automation.md` → "`josh fanout`" 
 **`followup-filing` delegates the late review-finding filing chain** with the parent's finding text;
 the parent verifies the new Issue using `pnpm josh issue:state <new>`. For `epic-child`, the parent
 likewise verifies `pnpm josh issue:state <N>` after the unit returns. Read `human_review:` too: an open
-`needs-human-review` child is the authorized stop (`SKILL.md` → §2z), not a failed child. The per-entry
+`needs-human-review` child is the authorized stop (`needs-human-review.md`), not a failed child. The per-entry
 classification lives in `backlogrun-child.md` → "Each child runs in a delegated unit".
 
 ## The pre-implementation reading — what goes to a unit, and from which file

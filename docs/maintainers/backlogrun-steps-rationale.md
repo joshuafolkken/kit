@@ -107,9 +107,11 @@ never measures because a benchmark or a profile would put the whole backlog behi
 Labelling what it finds moves the cost onto the label, so every later plan classifies by the label
 alone rather than re-reading the body.
 
-**Why `needs-decision` is the one label a run may apply.** `auto-ok` and `needs-human-review` widen or
-withhold what may be _executed_. `needs-decision` records only that a person's answer is needed, which
-is a finding rather than an authorization.
+**Why `needs-decision` is the one label a run may apply by hand.** `auto-ok` and `needs-human-review`
+widen or withhold what may be _executed_. `needs-decision` records only that a person's answer is
+needed, which is a finding rather than an authorization. `auto-ok` reaching a run's own filing through
+`issue:file`'s default (joshuafolkken/kit#3213) is computed from a person's earlier opt-in — the live
+carry record or the branch issue's label — so the run inherits an authorization rather than granting one.
 
 ## Why the loop's contract is shaped this way
 

@@ -15,7 +15,7 @@
 // is joshuafolkken/kit#1856's addition**: it governs the `/code-review` → `followup` chain, which in
 // `fullrun` / `queue` / `epicrun` / `backlogrun` runs *after* the first edit, so its 7,396 tokens
 // were resident from the entry for no run that had yet reached a review.
-// **`background-commands.md` is joshuafolkken/kit#1873's**: it was §2h's resident body, governing the
+// **`background-commands.md` is joshuafolkken/kit#1873's**: it was `background-commands.md`'s resident body, governing the
 // background execution of the gate, the push and the merge tail — all after the first edit — so it
 // left `SKILL.md` for the point-of-use list. `SKILL.md` → §1, "Four documents are read at the point
 // of use", is the single source.
@@ -32,18 +32,26 @@
 // cut, a step every implementing run — and every dispatched lane child — reaches after the entry, so
 // its read is a point-of-use read the count was silently omitting. Measured on the backlogrun of
 // 2026-09-21, the lane children read it 21 times across 13 runs — the largest single document read,
-// and the one the point-of-use list had no row for.
+// and the one the point-of-use list had no row for. Only a lane child reaches it (joshuafolkken/kit#3172):
+// `fullrun.md` no longer names it, so it is charged to the lane child's role alone.
+// **`progress-watcher.md` joins them** (joshuafolkken/kit#3172): the heartbeat every implementing run
+// starts once its hold is claimed, split out of `backlogrun-progress.md` so a single-issue run stops
+// paying for the batch's hand-off and waiting procedure to read it.
 const POINT_OF_USE_FILES: ReadonlySet<string> = new Set([
 	'latest-gate.md',
 	'followup.md',
 	'chain-rule.md',
 	'background-commands.md',
 	'pre-gate-cut.md',
+	'progress-watcher.md',
 	'backlogrun-child.md',
 	'backlogrun-lanes.md',
 	'backlogrun-progress.md',
 	'backlogrun-park.md',
 	'backlogrun-steps.md',
+	// Read only when a delegated unit goes silent or a lane's pull request conflicts with `main` — a
+	// failure path, so a run in which nothing fails never reads it (joshuafolkken/kit#3175).
+	'backlogrun-recovery.md',
 	// Read only when `run:step` prints `pnpm josh retrospective` at a run's stop position — the very
 	// end of a run, never the entry (joshuafolkken/kit#2328). Kept out of every entry's read for the
 	// same reason the phase documents above are: no run that never drains its backlog reaches it.

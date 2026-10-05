@@ -4,9 +4,9 @@ import {
 	AI_DOCS,
 	read_repo_file,
 	read_unwrapped,
-	skill_documents,
 	WORKFLOW_PROMPT,
 } from '#scripts/document/ai-document-fixture'
+import { resident_budget } from '#scripts/document/resident-budget'
 import { init_logic } from '#scripts/init/init-logic'
 import { describe, expect, it } from 'vitest'
 import {
@@ -14,7 +14,6 @@ import {
 	package_file,
 	read_skill_file,
 	skill_description,
-	SKILL_ENTRY_FILE,
 	skill_frontmatter,
 	SKILL_ROOT,
 } from './skill-fixture'
@@ -30,25 +29,18 @@ const DEPENDENCY_SKILL = '.claude/skills/dependency-update'
 // `WORKFLOW_PROMPT`, which answers with the whole concatenated corpus: an assertion about where the
 // ceiling policy is argued has to fail when it is argued somewhere else.
 const RESIDENCY_TOPIC = 'prompts/collaboration-workflow/residency.md'
-const NOT_ASPIRATIONAL_MARKER = '**この基準は努力目標ではない。**'
+// joshuafolkken/kit#3177 cut the topic file down to its four questions; the resident-rule list, the
+// budget and its raise conditions moved here, so their markers are asserted at this file.
+const RESIDENCY_RATIONALE = 'docs/maintainers/residency-rationale.md'
+const NOT_ASPIRATIONAL_MARKER = '**This criterion is not aspirational.**'
 
 // Long enough that it says when to read the skill rather than merely naming it — the description is
 // what an agent matches the situation against, so a one-liner ships a skill nothing ever opens.
 const MINIMUM_DESCRIPTION_LENGTH = 80
 
-// The documents sat at ~83 KB each before the joshuafolkken/kit#854 split and ~49 KB after, then
-// crept back to ~56 KB as duplicated procedure bodies returned. joshuafolkken/kit#1924 lifted the
-// reduction freeze and moved those bodies to their pointers, cutting CLAUDE.md below 30 KB. Minus the
-// two headrooms below, the re-inline floor lands at 30 KB, so the always-loaded documents cannot
-// creep back past that target. It is a guard against re-inlining, not a budget to tune prose against.
-const RESIDENT_CEILING_BYTES = 33_000
-
-// joshuafolkken/kit#951: the ceiling alone stops the wrong thing. Reached, it does not block the
-// next rule — it makes that rule pay for itself by deleting a neighboring sentence, and the
-// sentence chosen is whichever one no marker pinned rather than whichever one matters least. A
-// required margin turns "at the limit" into a failure while there is still room to write the fix,
-// which is the only point at which moving a procedure into a skill is still a choice.
-const RESIDENT_HEADROOM_BYTES = 2000
+// The resident budget's constants live in `resident-budget.ts` (joshuafolkken/kit#3171), so
+// `josh bytes CLAUDE.md` counts against the number this suite enforces.
+const { EFFECTIVE_CEILING_BYTES, RE_INLINE_GUARD_HEADROOM_BYTES } = resident_budget
 
 // joshuafolkken/kit#1151: the budget above is held in bytes and the bill arrives in tokens, so a
 // reduction could not be read in the unit it is paid in. This is the same limit expressed in that
@@ -64,18 +56,7 @@ const RESIDENT_HEADROOM_BYTES = 2000
 // Converted once, from the budget the documents are actually measured against. Converting the
 // ceiling and the headroom separately and subtracting would agree with this only by rounding
 // coincidence, so a constant bump that touched no document at all could fail the equality below.
-const EFFECTIVE_CEILING_BYTES = RESIDENT_CEILING_BYTES - RESIDENT_HEADROOM_BYTES
 const EFFECTIVE_CEILING_TOKENS = cost_tokens.ascii_bytes_to_tokens(EFFECTIVE_CEILING_BYTES)
-// joshuafolkken/kit#1275: what `CLAUDE.md` had left under the effective ceiling once the procedures
-// were already out — 30 bytes — was enough to pass the ceiling and not enough to write one sentence
-// with. Returning the label mapping, the worked before-and-after pair and a handful of rationales to
-// their pointers recovered 3,047 bytes.
-//
-// This is a floor under that recovery, not a second budget. It is set well below the 3,047 so the
-// next few resident rules are unaffected — spending the recovery on rules is what it was recovered
-// for — while a wholesale re-inlining of what went back to the pointers, which costs three times
-// this, fails here by name instead of silently returning the document to 30 bytes of headroom.
-const RE_INLINE_GUARD_HEADROOM_BYTES = 1000
 
 // A symbol rather than a letter, so a long run of it is not a word the spell check has to know.
 const TWO_BYTE_CHAR = '±'
@@ -159,15 +140,7 @@ describe(`${WORKFLOW_SKILL} — carries the procedures that left the documents`,
 		expect(entry).toContain(filename)
 	})
 
-	// A supporting file the entry never names is a file no run opens — the skill would ship the rule
-	// and still behave as though it had been deleted.
-	it('names every markdown file it ships', () => {
-		const supporting = skill_documents()
-			.filter((path) => path.startsWith(`${WORKFLOW_SKILL}/`) && !path.endsWith(SKILL_ENTRY_FILE))
-			.map((path) => basename_of(path))
-
-		for (const filename of supporting) expect(entry).toContain(filename)
-	})
+	// Every shipped file being reachable from the entry is pinned in `workflow-skill-reach.test.ts`.
 
 	// The stop rule itself is resident (asserted below); what the entry file owes the reader is the
 	// pointer, since `kickoff` and `halfrun` are routed away from `followup.md`.
@@ -242,21 +215,21 @@ describe('the residency criterion — which rules may stay in the always-loaded 
 // routes to a prompt rather than to a skill at all. The axis is whether the rule has a counterpart.
 describe('the residency list says what it covers', () => {
 	// joshuafolkken/kit#2891 merged the English skill-side copy of this list into the canonical topic
-	// file; each marker below is the Japanese counterpart of the English one it used to assert there.
+	// file, and joshuafolkken/kit#3177 moved it on to the rationale, in English again.
 	it.each([
-		'この範囲の中では網羅的であり',
+		'Within that scope the list is exhaustive',
 		// The pointer has to name where each entry is actually guarded; two of them are asserted by their
 		// own suites, and a maintainer who looks only in this one concludes they are unguarded.
-		'UI 検証ゲートは `scripts/claude/verify-ui-skill.test.ts`',
-		'一覧に無いことは欠落ではない',
+		'the UI verification gate in `scripts/claude/verify-ui-skill.test.ts`',
+		'Absence from the list is not an omission',
 		// The six worked examples §3 used to carry (joshuafolkken/kit#1797).
-		'**明示起動の必須**',
-		'**停止時の `confirmation` 通知**',
-		'**`overrides` の保護**',
-		'**`josh epic:*` のうちコマンドの外側で効く 3 件**',
+		'**Explicit invocation required**',
+		'**The `confirmation` notification on a stop**',
+		'**`overrides` protection**',
+		'**The three `josh epic:*` rules that bind outside the commands**',
 		NOT_ASPIRATIONAL_MARKER,
 	])('scopes the claim at the single source: %j', (marker) => {
-		expect(read_unwrapped(RESIDENCY_TOPIC)).toContain(marker)
+		expect(read_unwrapped(RESIDENCY_RATIONALE)).toContain(marker)
 	})
 
 	// Asserted absent, not merely replaced: the unscoped sentence beside the scoped one leaves two
@@ -271,13 +244,17 @@ describe('the residency list says what it covers', () => {
 	it.each([
 		'## 常駐ドキュメントと skill の分担（何を常駐に残すか）',
 		'**その規則は、skill がロードされていないターンでも効く必要があるか。**',
-		NOT_ASPIRATIONAL_MARKER,
-		'**この一覧の対象範囲は、オンデマンド側に対応する手順を持つ常駐規則である**',
-		'**skill の数で線を引くのは誤りである**',
-		'**UI 検証ゲート**',
-		'**範囲の外にある常駐規則はこの一覧に載らないのが正常である。**',
 	])('is argued in the canonical prompt: %j', (marker) => {
 		expect(read_unwrapped(WORKFLOW_PROMPT)).toContain(marker)
+	})
+
+	it.each([
+		'**This list covers the resident rules that have a procedure on the on-demand side**',
+		'**Drawing the line by counting skills is wrong**',
+		'**The UI verification gate**',
+		'**A resident rule outside that scope is correctly absent from this list.**',
+	])('keeps the list argued in the rationale: %j', (marker) => {
+		expect(read_unwrapped(RESIDENCY_RATIONALE)).toContain(marker)
 	})
 })
 
@@ -288,11 +265,7 @@ describe('the residency list says what it covers', () => {
 // joshuafolkken/kit#1193 consistency sweep.
 describe('the ceiling can be raised, but only against written conditions', () => {
 	it.each([
-		'### 上限を引き上げてよい条件（反証条件）',
-		'**「引き上げない」は絶対の禁止ではなく、反証可能な既定である。**',
-		'**枯れたことは主張ではなく測定で示す**',
-		'**非対称なリスクがあるので、迷ったら回収を選ぶ。**',
-		'**引き上げは Tier C として扱う。**',
+		'**引き上げは Tier C として扱う**',
 		// The Tier C half protects the budget by naming its constants, so a rename made here and not
 		// there leaves the rule guarding a name nothing uses. All three are named because whichever
 		// one is actually binding is the one somebody will want to loosen.
@@ -301,6 +274,19 @@ describe('the ceiling can be raised, but only against written conditions', () =>
 		'RE_INLINE_GUARD_HEADROOM_BYTES',
 	])('states the rule for raising the ceiling: %j', (marker) => {
 		expect(read_unwrapped(RESIDENCY_TOPIC)).toContain(marker)
+	})
+
+	// The conditions themselves moved to the rationale in joshuafolkken/kit#3177; the topic file keeps
+	// the Tier C line and points at them.
+	it.each([
+		'## When the ceiling may be raised',
+		'**"Do not raise" is a falsifiable default, not an absolute prohibition.**',
+		'**Exhaustion is shown by measurement, not asserted**',
+		'**The risk is asymmetric, so when in doubt, recover.**',
+		'**A raise is Tier C.**',
+		'RE_INLINE_GUARD_HEADROOM_BYTES',
+	])('records the raise conditions in the rationale: %j', (marker) => {
+		expect(read_unwrapped(RESIDENCY_RATIONALE)).toContain(marker)
 	})
 })
 
@@ -369,11 +355,12 @@ describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (
 	})
 
 	// Removing a procedure is only half of it. Without the routing the rule reaches no run at all,
-	// which reads exactly like the rule having been deleted.
+	// which reads exactly like the rule having been deleted. joshuafolkken/kit#3171 dropped the per-command
+	// "Read first" table — the skill's own §1 is that table — so the routing is the one sentence that
+	// sends every command to the skill before its first call.
 	it.each([
-		'split-assessment.md',
-		'+ `fullrun.md` + `split-assessment.md`',
-		'**A `backlogrun` parks a child instead of stopping the run**',
+		'procedures in the `workflow-commands` skill',
+		'read it before any part of a command, including the first `gh` call',
 	])('routes to the moved procedures with %j', (marker) => {
 		expect(content).toContain(marker)
 	})

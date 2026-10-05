@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { read_repo_file } from '#scripts/document/ai-document-fixture'
+import { read_repo_file, RULE_DELIVERY_RATIONALE } from '#scripts/document/ai-document-fixture'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
@@ -258,8 +258,12 @@ describe('RULE_BODY_REASON — what the refusal states', () => {
 describe(`${RULE_DELIVERY} — the enumeration names this rule`, () => {
 	const content = read_repo_file(RULE_DELIVERY)
 
-	it.each([FIRING_SUITE, EDIT, ORACLE_LIST])('states %j', (marker) => {
+	it.each([EDIT, ORACLE_LIST])('states %j', (marker) => {
 		expect(content).toContain(marker)
+	})
+
+	it('leaves the firing suite to the rationale', () => {
+		expect(read_repo_file(RULE_DELIVERY_RATIONALE)).toContain(FIRING_SUITE)
 	})
 })
 

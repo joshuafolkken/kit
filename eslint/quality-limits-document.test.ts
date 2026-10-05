@@ -27,7 +27,6 @@ import { sonarjs_rules } from './rules/sonarjs.js'
 // configuration — the rule objects and the tests-block override in `base.js` — and a suite under
 // `rules/` could not import the latter without a banned parent-relative import.
 
-const REVIEW_RUBRIC = 'prompts/review-rubric.md'
 const REFACTORING_PROMPT = 'prompts/refactoring.md'
 const MAINTAINER_HISTORY = 'docs/maintainers/claude-md-history.md'
 
@@ -95,12 +94,6 @@ const DOCUMENT_SPECS: ReadonlyArray<DocumentSpec> = [
 		phrases: ENGLISH_PHRASES,
 		test_override: ENGLISH_OVERRIDE,
 	},
-	{
-		path: REVIEW_RUBRIC,
-		marker: '**Quality limits**:',
-		phrases: ENGLISH_PHRASES,
-		test_override: ENGLISH_OVERRIDE,
-	},
 ]
 
 // `prompts/refactoring.md` states the limits as a search checklist rather than a table, so it is
@@ -118,7 +111,7 @@ const COUNTING_DOCUMENTS: ReadonlyArray<string> = [
 	REFACTORING_PROMPT,
 ]
 
-const ENGLISH_DOCUMENTS: ReadonlyArray<string> = [CANONICAL_DOC, REVIEW_RUBRIC]
+const ENGLISH_DOCUMENTS: ReadonlyArray<string> = [CANONICAL_DOC]
 
 function rule_entry(rules: RuleSet, name: string): ReadonlyArray<unknown> {
 	const entry = rules[name]

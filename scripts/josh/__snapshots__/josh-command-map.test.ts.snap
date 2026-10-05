@@ -183,6 +183,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "files",
       ],
     ],
+    "codex:hook-adapter": [
+      "<pretool|posttool>",
+      "automation",
+      [
+        "none",
+      ],
+    ],
     "cost": [
       "(--cut | --over <tokens-per-request>) [--path <dir>]",
       "automation",
@@ -404,7 +411,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "issue:file": [
-      "<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>]",
+      "<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok]",
       "automation",
       [
         "network",

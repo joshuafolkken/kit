@@ -2,6 +2,7 @@ import {
 	AI_DOCS,
 	read_unwrapped,
 	read_unwrapped_rule_surface,
+	RULE_DELIVERY_RATIONALE,
 	WORKFLOW_PROMPT_DIRECTORY,
 } from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
@@ -22,6 +23,7 @@ import { piped_verification } from './piped-verification'
 const TOPIC_FILE = 'output-bounds.md'
 const CANONICAL = `${WORKFLOW_PROMPT_DIRECTORY}/${TOPIC_FILE}`
 const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
+const RATIONALE = 'docs/maintainers/output-bounds-rationale.md'
 const SUITE_PATH = 'scripts/rules/piped-verification-rule.test.ts'
 // Named once: the enumeration, the topic file and this suite have to agree on the command, and a
 // string kept correct in one of three places is not kept.
@@ -90,31 +92,36 @@ describe(`${CANONICAL} — the single source for the rule and its rejected alter
 	})
 
 	// Recorded so the next reader proposes something else rather than re-deriving the same dead end.
+	// joshuafolkken/kit#3177 moved the alternatives to the English rationale.
 	it.each([
-		'**書き換える例が存在しない。**',
-		'**同じ案が既に却下されている**',
+		'**there is no example to rewrite**',
+		'**the same idea was already rejected**',
 		// Delivery and detection are not alternatives: a hook reaches this harness alone, and the
 		// detector is the only path that can measure whether the rule was obeyed.
-		'**検出器は残る。**',
+		'**The detector stays**',
 	])('records the rejected alternative %j', (marker) => {
-		expect(content).toContain(marker)
+		expect(read_unwrapped(RATIONALE)).toContain(marker)
 	})
 })
 
 // The reasoning belongs at the pointer, and the resident surface is the likeliest place it would be
-// pasted back into.
+// pasted back into. The rationale quotes the original Japanese wording, so the markers stay verbatim.
 describe.each(AI_DOCS)('%s — leaves the reasoning at the pointer', (document_path) => {
 	it.each(REASONING)('does not carry %j', (marker) => {
 		expect(read_unwrapped_rule_surface(document_path)).not.toContain(marker)
-		expect(read_unwrapped(CANONICAL)).toContain(marker)
+		expect(read_unwrapped(RATIONALE)).toContain(marker)
 	})
 })
 
 describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, () => {
 	const content = read_unwrapped(DELIVERY)
 
-	it.each([TOPIC_FILE, GUARD_COMMAND, SUITE_PATH])('states %j', (marker) => {
+	it.each([TOPIC_FILE, GUARD_COMMAND])('states %j', (marker) => {
 		expect(content).toContain(marker)
+	})
+
+	it('leaves the pinning suite to the rationale', () => {
+		expect(read_unwrapped(RULE_DELIVERY_RATIONALE)).toContain(SUITE_PATH)
 	})
 
 	// Every row of that table has to have a non-firing state that means the rule is being kept, or the

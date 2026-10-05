@@ -8,7 +8,7 @@ file changes no rule.
 The procedure is read at its point of use, not at the entry: it binds only after the first edit — at
 the gate, the push, the CI wait and `pnpm josh followup` — so it is fetched in full, in the turn that
 reaches the first backgroundable command (`pnpm josh gate`), by the run that has to obey it (`SKILL.md`
-→ §1, "Four documents are read at the point of use"). `SKILL.md` → §2h is the resident
+→ §1, "Four documents are read at the point of use"). `background-commands.md` is the resident
 pointer to it, and carries the one thing it does not: the same rule at a batch's scale.
 
 ## Why a poll loop is refused
@@ -72,4 +72,7 @@ The pre-gate cut (joshuafolkken/kit#1839) is the one sanctioned turn-end before 
 relaunches a fresh process in the same act, so the run continues rather than stalling. A headless lane
 child kills its background Bash tasks at its turn end (joshuafolkken/kit#2704), and a backgrounded
 `ship` dies before its supervisor exists (joshuafolkken/kit#3027), which is why that child hands the
-region to a foreground `pnpm josh ship --detach`.
+region to a foreground `pnpm josh ship --detach`. Because a foreground `ship` in a child already
+detaches itself after its preflight, the `PreToolUse` hook rewrites a backgrounded `ship` issued alone
+into that foreground call (`updatedInput`) instead of refusing it — the refusal only ever asked for the
+same call again (joshuafolkken/kit#3154).

@@ -8,25 +8,19 @@
 // (`lane-child-read-set.ts`) — through the shared `read-set-trim`.
 //
 // **This is a different set from the worker's.** The parent keeps §0 (its session-cut / resume
-// paragraph is the parent's own), §2b (the parent's whole job is the epic-child delegation §2b
-// defines), §2c (the parent is the entry that receives an `owner/repo#` prefix), §2e and §2i (the
-// parent files prerequisites and observations for the batch) — all of which the worker drops. What the
-// parent drops is the implementer-only set below. **The parent owns every point-of-use document**, so
-// unlike the worker it drops none of them: the trim is the `SKILL.md` sections alone.
+// paragraph is the parent's own), which the worker drops. **The parent owns every point-of-use
+// document**, so unlike the worker it drops none of them: the trim is the `SKILL.md` sections alone.
 
 import type { ReadSetCost } from './entry-read-set'
 import { read_set_trim } from './read-set-trim'
 
 const BACKLOGRUN = 'backlogrun'
 
-// **The `SKILL.md` sections the `backlogrun` parent never uses.** The parent has no `new` entry, so it
-// names no `into` target (§2a); it claims no working tree, a dispatched child does that in its own
-// unit (§2f, `backlogrun.md:47-49`); it implements nothing, so it reads no Issue's comments before
-// implementing (§2g); and it edits no rule mid-run (§3, read only on an editing turn).
+// **The `SKILL.md` sections the `backlogrun` parent never uses.** It edits no rule mid-run (§3, read
+// only on an editing turn). The implementer-only rules it used to skip — the `into` target, the
+// working-tree hold, the Issue's comments — are single rows of §2's table since joshuafolkken/kit#3174,
+// so there is no section of them left to trim.
 const UNUSED_SKILL_SECTIONS: ReadonlyArray<string> = [
-	'2a. The `into <target>` suffix — where the new Issue lands',
-	'2f. The working-tree hold — one run per tree',
-	"2g. An Issue's comments are part of the Issue",
 	'3. What stays resident, and what is read from here',
 ]
 
@@ -34,10 +28,15 @@ const UNUSED_SKILL_SECTIONS: ReadonlyArray<string> = [
 // the park — so it drops none. Named empty so the shared trim reads the same shape as the worker's.
 const SKIPPED_POINT_OF_USE: ReadonlySet<string> = new Set<string>()
 
-// **The parent runs the end-of-run retrospective** (`SKILL.md` §2j) when `run:step` prints it, but its
+// **The parent runs the end-of-run retrospective** (`retrospective.md`) when `run:step` prints it, but its
 // manifest names `retrospective.md` only through `backlogrun-steps.md` — one hop further than the
-// derivation follows — so the parent's reach names it (joshuafolkken/kit#3078).
-const REACHED_POINT_OF_USE: ReadonlySet<string> = new Set(['retrospective.md'])
+// derivation follows — so the parent's reach names it (joshuafolkken/kit#3078). **It polls a
+// delegated unit that went silent** through `backlogrun-recovery.md`, named only from
+// `backlogrun-child.md`, so the reach names that too (joshuafolkken/kit#3175).
+const REACHED_POINT_OF_USE: ReadonlySet<string> = new Set([
+	'retrospective.md',
+	'backlogrun-recovery.md',
+])
 
 function costed(root: string): ReadSetCost {
 	return read_set_trim.costed(root, {

@@ -1,5 +1,5 @@
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { release_tag } from './release-tag'
 
 const VERSION = '1.342.0'
@@ -40,8 +40,13 @@ describe('release_tag.attempts_for', () => {
 })
 
 describe('release_tag.format_result', () => {
-	it('names the tag when it exists', () => {
-		expect(release_tag.format_result(VERSION, true)).toContain('v1.342.0 exists')
+	// npm and the GitHub Release follow the tag, so the tag line must not claim the release is out
+	// (joshuafolkken/kit#3193).
+	it('names the tag as created without calling the release published', () => {
+		const text = release_tag.format_result(VERSION, true)
+
+		expect(text).toBe('🏷 Tag v1.342.0 created')
+		expect(text).not.toContain('published')
 	})
 
 	// The whole point of the watch: a merge that produced no tag published nothing, and reporting it
@@ -51,6 +56,28 @@ describe('release_tag.format_result', () => {
 
 		expect(text).toContain('never appeared')
 		expect(text).toContain('nothing was published')
+	})
+})
+
+describe('release_tag.poll_options_for', () => {
+	const STAGE_ENV = 'JOSH_RELEASE_TEST_STAGE_TIMEOUT_SECONDS'
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('takes the stage budget from its own environment variable', () => {
+		vi.stubEnv(STAGE_ENV, String(ONE_MINUTE_SECONDS))
+
+		expect(release_tag.poll_options_for(STAGE_ENV).attempts).toBe(
+			release_tag.attempts_for(ONE_MINUTE_SECONDS),
+		)
+	})
+
+	it('falls back to the default budget when the variable is unset', () => {
+		expect(release_tag.poll_options_for(STAGE_ENV).attempts).toBe(
+			release_tag.attempts_for(release_tag.DEFAULT_TIMEOUT_SECONDS),
+		)
 	})
 })
 

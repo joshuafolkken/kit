@@ -65,15 +65,19 @@ function block_ceiling(size: number): number {
 // unreached file, so the definition cannot rot as documents move on or off the execution path.
 const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/dependency-update/SKILL.md', bytes: 8192 },
-	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 36_864 },
+	// joshuafolkken/kit#3173 split the waves and the `epic:bundle` detail into lazily read references.
+	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 20_480 },
+	{ path: '.claude/skills/epic-commands/epic-bundle.md', bytes: 12_288 },
+	{ path: '.claude/skills/epic-commands/execution-waves.md', bytes: 12_288 },
 	{ path: '.claude/skills/verify-ui/SKILL.md', bytes: 8192 },
-	{ path: '.claude/skills/workflow-commands/followup-reference.md', bytes: 16_384 },
 	{ path: '.claude/skills/workflow-commands/fullrun-steps.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/into-target.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/issue-comments.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/issue-fold-existing.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/needs-human-review.md', bytes: 8192 },
-	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 24_576 },
+	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 12_288 },
+	// joshuafolkken/kit#3176 moved the ledger out of `observation-filing.md`, read only when it appends.
+	{ path: '.claude/skills/workflow-commands/observation-ledger.md', bytes: 12_288 },
 	// `pre-gate-cut.md` left this per-document budget in joshuafolkken/kit#2289: it became a point-of-use
 	// document, so its bytes are now held by every entry's total read (`entry-read-budget.ts`) and the
 	// two budgets must not hold it twice — the reachability line moved it from `unreached` to
@@ -82,34 +86,44 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
 	// joshuafolkken/kit#2998 split the reference: the developer commands stay, the rest moved out.
-	{ path: 'docs/josh-commands-automation.md', bytes: 155_648 },
+	// joshuafolkken/kit#3175 raised it: the supervisor, provider-table and answer-to-budget prose moved
+	// here out of `backlogrun-steps.md`, so a run reads it only when it asks about those commands.
+	{ path: 'docs/josh-commands-automation.md', bytes: 159_744 },
 	{ path: 'docs/josh-commands.md', bytes: 36_864 },
 	{ path: 'prompts/coding-standards.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/gh-rest.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/glossary.md', bytes: 4096 },
-	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 8192 },
-	// #2662 adds the feature and compatibility declarations to the canonical filing procedure.
-	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 28_672 },
-	{ path: 'prompts/collaboration-workflow/operating-rules.md', bytes: 16_384 },
-	{ path: 'prompts/collaboration-workflow/output-bounds.md', bytes: 16_384 },
-	{ path: 'prompts/collaboration-workflow/overview.md', bytes: 8192 },
-	{ path: 'prompts/collaboration-workflow/plan-comment.md', bytes: 20_480 },
+	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 4096 },
+	// #3178 left the template and the judgement tables; the epic commands moved to `epic-commands`, the by-hand fallback stayed.
+	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 8192 },
+	{ path: 'prompts/collaboration-workflow/operating-rules.md', bytes: 12_288 },
+	// #3177 moved the rationale to `docs/maintainers/output-bounds-rationale.md`.
+	{ path: 'prompts/collaboration-workflow/output-bounds.md', bytes: 4096 },
+	{ path: 'prompts/collaboration-workflow/overview.md', bytes: 4096 },
+	// #3178 replaced the review-chain restatement with a pointer to `chain-rule.md`.
+	{ path: 'prompts/collaboration-workflow/plan-comment.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/principles.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/proposal-request.md', bytes: 4096 },
-	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 28_672 },
-	{ path: 'prompts/collaboration-workflow/residency.md', bytes: 28_672 },
-	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 45_056 },
-	{ path: 'prompts/collaboration-workflow/shell-body.md', bytes: 12_288 },
-	{ path: 'prompts/collaboration-workflow/turn-batching.md', bytes: 20_480 },
+	// #3178 dropped the restatements `report:lint` and `chain-rule.md` already carry.
+	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 16_384 },
+	// #3177 cut it to the four questions; the history and lists moved to `docs/maintainers/residency-rationale.md`.
+	{ path: 'prompts/collaboration-workflow/residency.md', bytes: 8192 },
+	// #3186 moved the hook wiring and history to `docs/maintainers/rule-delivery-rationale.md`;
+	// #3179 adds the `index-mutation` / `destructive-command` / `protected-file` entries.
+	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 20_480 },
+	{ path: 'prompts/collaboration-workflow/shell-body.md', bytes: 8192 },
+	// #3177 moved the measurements and rejected mechanisms to `docs/maintainers/turn-batching-rationale.md`.
+	{ path: 'prompts/collaboration-workflow/turn-batching.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/upstream-interrupt.md', bytes: 12_288 },
-	{ path: 'prompts/collaboration-workflow/wip-cap.md', bytes: 16_384 },
+	{ path: 'prompts/collaboration-workflow/wip-cap.md', bytes: 12_288 },
 	{ path: 'prompts/refactoring.md', bytes: 8192 },
-	{ path: 'prompts/review-rubric.md', bytes: 20_480 },
-	{ path: 'prompts/review.md', bytes: 20_480 },
+	// #3180 moved the history and the lint-settled proofs to `docs/maintainers/`.
+	{ path: 'prompts/review-rubric.md', bytes: 16_384 },
+	{ path: 'prompts/review.md', bytes: 16_384 },
 	{ path: 'prompts/sonar-hotspot-handling.md', bytes: 8192 },
-	{ path: 'prompts/testing-guide.md', bytes: 24_576 },
+	{ path: 'prompts/testing-guide.md', bytes: 20_480 },
 ]
 
 // The recorded ceiling for one path, or undefined when it carries no budget entry.

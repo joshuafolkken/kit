@@ -16,6 +16,8 @@ type Party = 'first-party' | 'third-party' | 'unknown'
 const FIRST_PARTY: Party = 'first-party'
 const THIRD_PARTY: Party = 'third-party'
 const UNKNOWN: Party = 'unknown'
+const GH_REPO_ENV_KEY = 'GH_REPO'
+const GH_REPO_PATH_SEGMENTS = 2
 
 // `unknown` is not `third-party`. An owner that cannot be read — no `origin`, an unreadable config —
 // is a "cannot decide", and reading it as third-party would refuse first-party writes whenever the
@@ -40,7 +42,46 @@ function current_owner(repository_path: string = process.cwd()): string | undefi
 	return repo_discovery.resolve_current_owner(repository_path)
 }
 
-const repo_party = { FIRST_PARTY, THIRD_PARTY, UNKNOWN, classify, current_owner, target_owner }
+// The owner `GH_REPO` names, read from its last two segments so an optional host prefix is skipped.
+function gh_repo_owners(gh_repo: string): Array<string | undefined> {
+	return [target_owner(gh_repo.split('/').slice(-GH_REPO_PATH_SEGMENTS).join('/'))]
+}
+
+// The owner of every remote the work tree declares. A remote whose owner cannot be read stays in the
+// set as `undefined` rather than being dropped: an SSH host alias (`git@github-work:o/r.git`) is one
+// `gh` translates to github.com and may pick, so dropping it would hide the owner `gh` writes to.
+function remote_owners(repository_path: string): Array<string | undefined> {
+	return repo_discovery
+		.read_remote_urls(repository_path)
+		.map((url) => repo_origin.parse_origin_url(url)?.owner)
+}
+
+// Every owner `gh` could expand the `{owner}` placeholder to (joshuafolkken/kit#3188). `GH_REPO`
+// (`[HOST/]OWNER/REPO`) overrides the remotes outright; otherwise `gh` picks its base repository among
+// the GitHub remotes — `upstream` ahead of `origin`, or a `gh repo set-default` choice — so in a fork
+// checkout it can expand to the upstream owner. Answering the whole candidate set rather than
+// re-implementing that pick keeps the caller safe whichever remote `gh` chooses. An `undefined` entry
+// is a candidate whose owner could not be read, which the caller must not assume is first-party.
+function placeholder_owners(
+	repository_path: string = process.cwd(),
+	environment: NodeJS.ProcessEnv = process.env,
+): Array<string | undefined> {
+	const gh_repo = environment[GH_REPO_ENV_KEY]
+
+	return gh_repo === undefined || gh_repo === ''
+		? remote_owners(repository_path)
+		: gh_repo_owners(gh_repo)
+}
+
+const repo_party = {
+	FIRST_PARTY,
+	THIRD_PARTY,
+	UNKNOWN,
+	classify,
+	current_owner,
+	placeholder_owners,
+	target_owner,
+}
 
 export type { Party }
 export { repo_party }

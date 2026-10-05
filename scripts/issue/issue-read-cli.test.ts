@@ -18,7 +18,7 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 
 const { issue_read_cli } = await import('./issue-read-cli')
 
-// `josh issue:read` — the command that collapses the two `gh api` reads §2g requires per issue into
+// `josh issue:read` — the command that collapses the two `gh api` reads `issue-comments.md` requires per issue into
 // one call (joshuafolkken/kit#1715).
 //
 // The cases are about what the batch must not lose: a number that resolves to nothing is named rather
@@ -113,7 +113,7 @@ describe('issue_read_cli.run — a number that produced nothing', () => {
 	})
 
 	// A block showing no comment where the listing failed hands the reader a body a comment may
-	// already have overturned — the misread §2g exists to prevent.
+	// already have overturned — the misread `issue-comments.md` exists to prevent.
 	it('says the comments could not be read rather than showing none', async () => {
 		classified_mock.mockResolvedValue(READ)
 		comments_mock.mockResolvedValue(undefined)

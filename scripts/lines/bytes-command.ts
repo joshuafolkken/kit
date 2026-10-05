@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { document_byte_budget } from '#scripts/document/document-byte-budget'
 import { entry_read_budget } from '#scripts/document/entry-read-budget'
+import { resident_budget } from '#scripts/document/resident-budget'
 
 // The package root, resolved from this file rather than the caller's working directory.
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url))
@@ -75,14 +76,40 @@ function normalized_path(argument: string): string {
 	return argument.startsWith('./') ? argument.slice('./'.length) : argument
 }
 
+function remaining_phrase(remaining: number): string {
+	return remaining < 0 ? `over by ${(-remaining).toString()}` : `${remaining.toString()} left`
+}
+
+// The resident document is held by a fixed limit rather than a block ratchet, and loosening it is
+// Tier C, so its row names the headroom or the overage but never a value to raise it to
+// (joshuafolkken/kit#3171).
+function resident_row(status: DocumentStatus): string {
+	const counts = `${status.current.toString()}/${status.recorded.toString()} bytes`
+
+	return `${status.path}${ROW_GAP}${counts} · ${remaining_phrase(status.remaining)}`
+}
+
+function is_resident(relative_path: string): boolean {
+	return resident_budget.limit_bytes_for(relative_path) !== undefined
+}
+
+function recorded_for(relative_path: string): number | undefined {
+	return (
+		resident_budget.limit_bytes_for(relative_path) ??
+		document_byte_budget.recorded_bytes_for(relative_path)
+	)
+}
+
 function argument_row(argument: string, root: string = REPO_ROOT): string {
 	const relative_path = normalized_path(argument)
-	const recorded = document_byte_budget.recorded_bytes_for(relative_path)
+	const recorded = recorded_for(relative_path)
 
 	if (recorded === undefined) return `${relative_path}${ROW_GAP}${NOT_BUDGETED}`
 	if (!existsSync(path.join(root, relative_path))) return `${relative_path}${ROW_GAP}${NOT_A_FILE}`
 
-	return status_row(status_of(relative_path, recorded, root))
+	const status = status_of(relative_path, recorded, root)
+
+	return is_resident(relative_path) ? resident_row(status) : status_row(status)
 }
 
 // A document is "near its ceiling" once less than this is left before its recorded block ceiling —
@@ -116,10 +143,6 @@ function entry_status_of(entry: string, recorded: number): EntryStatus {
 	const remaining = document_byte_budget.remaining_bytes(recorded, current)
 
 	return { entry, current, recorded, remaining }
-}
-
-function remaining_phrase(remaining: number): string {
-	return remaining < 0 ? `over by ${(-remaining).toString()}` : `${remaining.toString()} left`
 }
 
 // The primary budget, one row per entry: the total each workflow entry reads against its recorded

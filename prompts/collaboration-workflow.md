@@ -8,7 +8,7 @@
 
 **これは人間が読むための索引であり、規則を定める場所ではない。** 常駐の引き金は `CLAUDE.md` に、実行中の操作手順は `.claude/skills/workflow-commands/` に、各話題の規則は下の表のファイルにあり、それぞれが自分の規則の一次情報である。この索引はそれらを言い直さない。
 
-**話題ごとにファイルが分かれている。** 以前はこの内容が 1 本の 169KB のファイルにあり、1 つの節を確かめるだけでも全体を読む必要があった。読んだものはそのセッションの残り全ターンで積み上がった前置きとして課金され続けるため、確認 1 回の費用が会話の長さに比例して効いていた（joshuafolkken/kit#965）。**必要な 1 本だけを開くこと。この索引を入口に、下の表から選ぶ。**
+**必要な 1 本だけを開くこと。この索引を入口に、下の表から選ぶ。** 他の文書からこれらの話題を指すときは、索引を経由せず**本文があるファイルを直接指す**（[`residency.md`](./collaboration-workflow/residency.md)）。
 
 | 話題                                                                                              | ファイル                                                                  |
 | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -30,15 +30,3 @@
 | コマンド出力が文脈へ持ち込む量の上限                                                              | [`output-bounds.md`](./collaboration-workflow/output-bounds.md)           |
 | 運用ルール                                                                                        | [`operating-rules.md`](./collaboration-workflow/operating-rules.md)       |
 | 用語集 — lane・cut・hold・park などの定義と単一ソース                                             | [`glossary.md`](./collaboration-workflow/glossary.md)                     |
-
-**どの 1 本を開けばよいかを決めるのに必要なのは、この索引だけである。** バイト数はここに書かない — 手で保守した数字は本文より先に古くなり、古い数字は無いより悪い。実サイズは `ls -l prompts/collaboration-workflow/` が答える。
-
-## 参照の書き方
-
-`CLAUDE.md` と `.claude/skills/` からこれらの話題を指すときは、**本文があるファイルを直接指す**（話題ファイル、skill へ単一ソース化済みならその skill。[`residency.md`](./collaboration-workflow/residency.md)）。索引や指し先を経由させる形（`prompts/collaboration-workflow.md` → 「節名」）は、読み手に 2 回読みを強いるうえ、節名が変わると黙って行き止まりになる。
-
-```md
-See `prompts/collaboration-workflow/upstream-interrupt.md`.
-```
-
-`scripts/claude/collaboration-prompt-split.test.ts` が、文書と skill が指すファイルの実在と、この索引が全ファイルを列挙していることを検査する。

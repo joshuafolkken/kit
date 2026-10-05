@@ -43,7 +43,7 @@ describe('run_wake_session.wake_argv — what the woken session is asked to do',
 		expect(argv?.args.filter((argument) => argument === INVOCATION)).toHaveLength(1)
 	})
 
-	// `auto-ok` decides what may be run unattended and is a person's to apply. A waker that could
+	// `auto-ok` decides what may be run unattended and reaches a run only through `issue:file`. A waker that could
 	// write it would be widening its own authorization, so nothing it spawns may mention it.
 	it('never names auto-ok anywhere in what it launches', () => {
 		expect(JSON.stringify(run_wake_session.wake_argv(INVOCATION))).not.toContain('auto-ok')

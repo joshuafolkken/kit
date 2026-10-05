@@ -5,7 +5,11 @@ import { repo_party } from '#scripts/discovery/repo-party'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
+import { repository_labels } from '#scripts/repo/repository-labels'
+import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { issue_auto_ok } from './issue-auto-ok'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_scout_cli } from './issue-scout-cli'
 
@@ -55,6 +59,20 @@ writeFileSync(origin_path, `${VALID_BODY}\n## Origin\n\n${HERE}#2808\n`)
 const scout = vi.spyOn(issue_scout_cli, 'scout')
 const exec_gh_api = vi.spyOn(git_gh_exec, 'exec_gh_api')
 const report_for = vi.spyOn(epic_bundle_cli, 'report_for')
+const ensure_labels = vi.spyOn(repository_labels, 'ensure_labels')
+const issue_list = vi.spyOn(git_gh_issue_list, 'issue_list')
+const resolve_auto_ok = vi.spyOn(issue_auto_ok, 'resolve')
+const NOT_APPLIED = { is_applied: false, reason: 'stubbed' }
+
+// A listing of `count` open Issues, in the JSON shape `issue_list` answers with.
+function listing_of(count: number): { json: string; is_capped: boolean } {
+	const rows = Array.from({ length: count }, (_unused, index) => ({ number: index + 1 }))
+
+	return { json: JSON.stringify(rows), is_capped: false }
+}
+
+const OVER_CAP_LISTING = listing_of(delivered_rules.WIP_CAP + 1)
+const OVER_CAP_FLAG = '--over-cap'
 
 function argv_of(body_path: string, ...extra: ReadonlyArray<string>): Array<string> {
 	return [TITLE, '--body-file', body_path, '--depth', '1', ...extra]
@@ -74,6 +92,9 @@ beforeEach(() => {
 	scout.mockResolvedValue({ report: 'Duplicates: none', candidates: [] })
 	exec_gh_api.mockResolvedValue(ISSUE_URL)
 	report_for.mockResolvedValue(SUCCESS_EXIT_CODE)
+	ensure_labels.mockReturnValue([])
+	issue_list.mockResolvedValue(listing_of(1))
+	resolve_auto_ok.mockResolvedValue(NOT_APPLIED)
 })
 
 afterEach(() => {
@@ -123,6 +144,101 @@ describe('issue_file_cli.run — a filing that clears every step', () => {
 	})
 })
 
+// joshuafolkken/kit#3176: a repository missing the depth labels gets them before the create call, so
+// the create never auto-creates one with a generated color.
+describe('issue_file_cli.run — the labels it applies exist first', () => {
+	it('provisions the missing labels in the target repository before the create call', async () => {
+		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', THERE))).toBe(SUCCESS_EXIT_CODE)
+		expect(ensure_labels).toHaveBeenCalledExactlyOnceWith(THERE)
+		expect(ensure_labels.mock.invocationCallOrder[0]).toBeLessThan(
+			exec_gh_api.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+})
+
+// joshuafolkken/kit#3213: the create call carries `auto-ok` when the filing opted in, unless
+// `--no-auto-ok` is declared, and the decision is printed with its reason.
+function stub_carried(): void {
+	resolve_auto_ok.mockImplementation(async (is_opted_out) => {
+		return issue_auto_ok.decide({
+			is_opted_out,
+			is_carried: true,
+			branch_labels: undefined,
+		})
+	})
+}
+
+describe('issue_file_cli.run — the auto-ok decision', () => {
+	it('adds auto-ok to the create call when the filing opted in', async () => {
+		stub_carried()
+
+		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(SUCCESS_EXIT_CODE)
+		expect(create_body()).toMatchObject({ labels: ['depth:1', 'bug', 'auto-ok'] })
+		expect(vi.mocked(console.info).mock.calls.join('\n')).toContain('auto-ok: applied — ')
+	})
+
+	it('leaves auto-ok off with --no-auto-ok, printing why', async () => {
+		stub_carried()
+
+		expect(await issue_file_cli.run(argv_of(valid_path, '--no-auto-ok'))).toBe(SUCCESS_EXIT_CODE)
+		expect(resolve_auto_ok).toHaveBeenCalledWith(true, HERE, HERE)
+		expect(create_body()).toMatchObject({ labels: ['depth:1', 'bug'] })
+		expect(vi.mocked(console.info).mock.calls.join('\n')).toContain('auto-ok: not applied — ')
+	})
+
+	it('decides auto-ok with both the target and the current repository', async () => {
+		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', THERE))).toBe(SUCCESS_EXIT_CODE)
+		expect(resolve_auto_ok).toHaveBeenCalledWith(false, THERE, HERE)
+	})
+
+	it('does not repeat an auto-ok already named with --label', async () => {
+		stub_carried()
+
+		expect(await issue_file_cli.run(argv_of(valid_path, '--label', 'auto-ok'))).toBe(
+			SUCCESS_EXIT_CODE,
+		)
+		expect(create_body()).toMatchObject({ labels: ['depth:1', 'auto-ok', 'bug'] })
+	})
+})
+
+describe('issue_file_cli.run — the WIP cap count', () => {
+	it('prints the count against the cap and files within it', async () => {
+		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(SUCCESS_EXIT_CODE)
+		expect(vi.mocked(console.info).mock.calls.join('\n')).toContain(`wip: 1 open in ${HERE}`)
+	})
+
+	it('counts the repository named by --repo', async () => {
+		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', THERE))).toBe(SUCCESS_EXIT_CODE)
+		expect(issue_list).toHaveBeenCalledWith(expect.objectContaining({ repo: THERE }))
+	})
+
+	it('holds a filing past the cap with no exemption, before the scout or the create', async () => {
+		issue_list.mockResolvedValue(OVER_CAP_LISTING)
+
+		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(OVER_CAP_FLAG)
+		expect(scout).not.toHaveBeenCalled()
+		expect(exec_gh_api).not.toHaveBeenCalled()
+	})
+
+	it.each([
+		[OVER_CAP_FLAG, [OVER_CAP_FLAG]],
+		['an exempt route', ['--route', 'interrupt']],
+	])('files past the cap with %s', async (_label, extra) => {
+		issue_list.mockResolvedValue(OVER_CAP_LISTING)
+
+		expect(await issue_file_cli.run(argv_of(valid_path, ...extra))).toBe(SUCCESS_EXIT_CODE)
+		expect(exec_gh_api).toHaveBeenCalledTimes(1)
+	})
+
+	it('warns and files when the count cannot be read', async () => {
+		issue_list.mockResolvedValue({ json: undefined, is_capped: false })
+
+		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(SUCCESS_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('could not count')
+	})
+})
+
 describe('issue_file_cli.run — a refused filing sends nothing', () => {
 	it('refuses a body the lint rejects', async () => {
 		expect(await issue_file_cli.run(argv_of(invalid_path))).toBe(FAILURE_EXIT_CODE)
@@ -142,6 +258,7 @@ describe('issue_file_cli.run — a refused filing sends nothing', () => {
 		)
 		expect(console.error).toHaveBeenCalledWith(issue_file_cli.THIRD_PARTY_MESSAGE)
 		expect(exec_gh_api).not.toHaveBeenCalled()
+		expect(ensure_labels).not.toHaveBeenCalled()
 	})
 })
 

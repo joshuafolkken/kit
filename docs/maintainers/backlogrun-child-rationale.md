@@ -58,29 +58,6 @@ The brief names the invocation it descends from because `CLAUDE.md` → "Explici
 forbids _inferring_ a workflow, not requiring the keystroke in the unit's own transcript. A brief
 that omits it leaves the unit guessing, and refusing is the correct answer to a guess.
 
-## Why liveness needs silence and no process together
-
-Each trace alone has an innocent reading: a unit inside a long check writes nothing, and a unit only
-reading has no check process. Together they do not.
-
-Which way an error falls is the whole design. A live unit booked as stopped has its work killed; a
-stopped one booked as alive only costs waiting. That is why a trace that could not be read answers
-`undetermined` and never `stopped`, and why two `undetermined` answers in a row are treated as a fault
-in the check rather than escalated.
-
-## Why the poll routes through `run:merge`
-
-The counting, the re-dispatch cap and the park all live in one place, so the poll cannot drift from
-the return path (joshuafolkken/kit#2277). Counting the outage into its streak is what lets the cap
-trip; skipping the count would re-dispatch into a dead API without bound. Reading the exit record from
-the poll — not waiting for a unit that an API outage may never return — is what turns a 400-minute wait
-into a same-run re-dispatch.
-
-The `outage` classification came from joshuafolkken/kit#2240, and resuming the child's own session on
-re-dispatch from joshuafolkken/kit#2317. An `abandoned` child is not silently retried because a retry
-would re-run a half-written tree, and the consecutive-failure guard is the only thing that notices that
-the environment rather than the children is at fault.
-
 ## Why the audit runs before the first child
 
 An epic whose children contradict each other stalls the moment the run reaches the contradiction, and

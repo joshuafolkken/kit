@@ -15,7 +15,7 @@ authorization, whether it came from a named epic or from the opted-in pool:
 - **A stop that would end the run parks one issue and the run continues** — → "park
   and continue", which is that rule's single source, including what happens to the issue's lane.
 - **A prerequisite discovered mid-run is recorded as a dependency rather than parked** —
-  → "A prerequisite discovered mid-run", and `SKILL.md` → §2d for the three-way
+  → "A prerequisite discovered mid-run", and `prerequisite.md` for the three-way
   distinction between a prerequisite, a split and an upstream defect. **One thing is genuinely
   different**: with no epic, there is no `pnpm josh epic --add` to record the ordering into, so the
   prerequisite is filed with `route:tier-a` and the blocked issue is parked with `needs-decision`
@@ -58,8 +58,8 @@ untouched**, for the same reason. **Name the lane directory in the stop report a
 person told to look at a working tree and not told which one has been told nothing. The lanes already in
 flight finish; no new lane is opened.
 
-**Never apply or remove the label** — `auto-ok`'s rule, at `auto-ok`'s strength. Full definition and the
-`needs-decision` comparison: `SKILL.md` → §2z, which is the single source.
+**Never apply or remove the label** — a person's alone. Full definition and the
+`needs-decision` comparison: `needs-human-review.md`, which is the single source.
 
 ## park and continue
 
@@ -81,7 +81,7 @@ opposite.** **Parked before its commit**, the lane is stashed and closed:
 `pnpm josh lane:close <N>` (`epic:next` counts a parked child's lane as released, and `lane:close`
 removes the work tree by force). **Parked after its commit and push**, the lane is *kept*: nothing to
 stash, and closing would delete the local branch the resume needs. **A lost merge race is not one of
-these rows** — it resolves in its lane ("Conflicts are not predicted" above), and parks only under that
+these rows** — it resolves in its lane (`backlogrun-recovery.md` → "Conflicts are not predicted"), and parks only under that
 section's four conditions, which take the after-commit row. Both rows and the `pnpm josh run:release
 <N>` every parked ending owes are "What happens to a lane" above, the single source.
 
@@ -110,8 +110,10 @@ human-in-the-loop cycle, not an optional tidy-up.
 
 ## `in-progress` is removed by whoever finds it stale
 
-Nothing in the codebase removes `in-progress`; a normal finish closes the issue. An interrupted run
-leaves it behind, and a child that carries it is excluded from every future `epic:next` — permanently.
+A run's own ending removes `in-progress` — `pnpm josh followup` on a merge, `pnpm josh run:release <N>`
+on a stop. An interrupted run reaches neither and leaves it behind, and a child that carries it is
+excluded from every future `epic:next` — permanently. The removal below is the one hand-written call
+left, for a label no live run owns: another tree's record is not this tree's to release.
 **A session that detects a stale child removes the label itself** (Tier A) and reports it, before
 continuing the loop.
 
@@ -140,7 +142,7 @@ gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null 
 
 Finding that something else in **this** repository has to land first is not a split, and not an upstream
 defect. The child in hand is still one deliverable; it just needs another one before it. The three-way
-distinction, the `route:tier-a` filing command and the filing ceiling are `SKILL.md` → §2d, the single
+distinction, the `route:tier-a` filing command and the filing ceiling are `prerequisite.md`, the single
 source; what follows is this entry's branch.
 
 `<M>` below is the child being implemented when the prerequisite turned up; `<N>` is the new Issue.
@@ -166,7 +168,7 @@ source; what follows is this entry's branch.
 3. `pnpm josh epic --add <E> <N> --before <M>` — one command writes the task-list row, the declaration
    and the `blocked-by` relation together. Never edit the body by hand: the declaration and the relations
    then disagree, `epic:next` returns `error`, and the unattended run stops.
-4. **Remove `in-progress` from `<M>`** — `gh api -X DELETE repos/{owner}/{repo}/issues/<M>/labels/in-progress 2>/dev/null || true`.
+4. **Remove `in-progress` from `<M>`** — `pnpm josh run:release <M>`, which removes the label with the hold.
    This is what lets `<M>` run again: `epic:next` classifies a child carrying `in-progress` as waiting on
    time **before** it looks at any blocker, so a child left labelled is never offered again.
 5. **Do not park.** Go back to step 1 of the loop. `epic:next` classifies the original child as resolving

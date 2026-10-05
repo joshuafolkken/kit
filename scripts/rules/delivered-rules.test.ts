@@ -159,7 +159,7 @@ describe('rule_delivery — the comments at the call that reads the body', () =>
 		'a comment supersedes the body it contradicts',
 		'reassigns to another Issue is out of scope',
 		'`confirmation` Telegram',
-		'`.claude/skills/workflow-commands/SKILL.md`',
+		'`.claude/skills/workflow-commands/issue-comments.md`',
 	])(CARRIES_MARKER, (marker) => {
 		expect(delivered_rules.ISSUE_COMMENTS_REASON).toContain(marker)
 	})
@@ -225,7 +225,7 @@ describe('rule_delivery — the WIP cap at the call that files', () => {
 	// count there is nothing to compare, without the refusal the cap is advisory, and without the three
 	// tests the interrupt exemption is decided by judgement — the failure joshuafolkken/kit#1518 named.
 	it.each([
-		"count the target repository's open Issues",
+		"`pnpm josh issue:file` counts the target repository's open Issues",
 		`With more than ${String(delivered_rules.WIP_CAP)} open, close one first`,
 		'nothing honestly closable means do not file',
 		'one the run is blocked by',
@@ -233,6 +233,8 @@ describe('rule_delivery — the WIP cap at the call that files', () => {
 		'a documented workflow cannot complete',
 		'data is lost or written outside the repository',
 		'`prompts/collaboration-workflow/wip-cap.md`',
+		'`--over-cap`',
+		'`--route interrupt`',
 	])(CARRIES_MARKER, (marker) => {
 		expect(delivered_rules.WIP_CAP_REASON).toContain(marker)
 	})
@@ -240,7 +242,7 @@ describe('rule_delivery — the WIP cap at the call that files', () => {
 	// A delivery that repeated would wedge the very call it asked for, so the reason has to say that
 	// reissuing is the expected next move.
 	it('tells the reader the call may be reissued', () => {
-		expect(delivered_rules.WIP_CAP_REASON).toContain('Reissue this call once you have counted')
+		expect(delivered_rules.WIP_CAP_REASON).toContain('Reissue this call and let the command count')
 	})
 
 	// A first filing, so neither the cap nor the fold claims the second call — this block is about the

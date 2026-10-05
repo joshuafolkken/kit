@@ -23,7 +23,7 @@ const OLD_RULE = 'mandatory, never skip'
 // that is where the `backlogrun` flow now names the command.
 const FLOW_DOCUMENTS: ReadonlyArray<string> = [
 	'.claude/skills/workflow-commands/SKILL.md',
-	'.claude/skills/workflow-commands/fullrun.md',
+	'.claude/skills/workflow-commands/entry-sequence.md',
 	'.claude/skills/workflow-commands/halfrun.md',
 	'.claude/skills/workflow-commands/backlogrun-steps.md',
 	GATE,

@@ -12,7 +12,8 @@ const COMMAND = 'pnpm josh repo:party'
 const MANUAL_PROCEDURE = '--jq .owner.login'
 
 const CLAUDE = 'CLAUDE.md'
-const SKILL = '.claude/skills/workflow-commands/SKILL.md'
+// joshuafolkken/kit#3174 cut `SKILL.md` to a manifest; the filing pointer lives in its single source.
+const SKILL = '.claude/skills/workflow-commands/observation-filing.md'
 const UPSTREAM = 'prompts/collaboration-workflow/upstream-interrupt.md'
 
 describe('the first-party/third-party test points at the command', () => {

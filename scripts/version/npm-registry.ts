@@ -92,6 +92,16 @@ function read_release_times(package_name: string): Record<string, string> | unde
 	return parsed.success ? parsed.data.time : undefined
 }
 
-const npm_registry = { packument_url, read_latest, read_release_times }
+// Whether public npm already carries `<name>@<version>`. **Asked of public npm regardless of how this
+// checkout routes the scope**, unlike the two readers above: `josh release` waits for `publish.yml`'s
+// `publish-npm` job and links the npmjs.com page, so GitHub Packages answering would not be the
+// question it asks (joshuafolkken/kit#3193).
+function has_public_version(package_name: string, version: string): boolean {
+	const parsed = times_schema.safeParse(read_packument(package_name, FULL_ACCEPT))
+
+	return parsed.success && parsed.data.time[version] !== undefined
+}
+
+const npm_registry = { has_public_version, packument_url, read_latest, read_release_times }
 
 export { npm_registry }

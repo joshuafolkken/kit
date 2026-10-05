@@ -147,14 +147,14 @@ const { is_issue_filing, on_bash_command } = bash_triggers
 // `WIP_CAP` is the number's single source; `wip-cap.md` states it once and a test pins the two equal.
 const WIP_CAP = 30
 const WIP_CAP_REASON =
-	`⛔ backlog WIP cap: count the target repository's open Issues before filing. With more than ${String(WIP_CAP)} ` +
-	'open, close one first; nothing honestly closable means do not file. Two filings are exempt and ' +
-	'proceed while stating the overage — one the run is blocked by, and an interrupt, decided by ' +
-	'three tests rather than judgement: a verification answers wrongly, a documented workflow cannot ' +
-	'complete, or data is lost or written outside the repository. Meeting none of the three, the ' +
-	'finding is discretionary and waits. The count command and both procedures are in ' +
-	'`prompts/collaboration-workflow/wip-cap.md`. Reissue this call once you have counted — it fires ' +
-	'once per run and cannot repeat on the call in hand.'
+	`⛔ backlog WIP cap: \`pnpm josh issue:file\` counts the target repository's open Issues before filing. With more than ${String(WIP_CAP)} ` +
+	'open, close one first; nothing honestly closable means do not file — the command holds such a filing. ' +
+	'Two filings are exempt and proceed while stating the overage — one the run is blocked by (`--over-cap`, ' +
+	'or the `tier-a` / `split` route), and an interrupt (`--route interrupt`), decided by three tests rather ' +
+	'than judgement: a verification answers wrongly, a documented workflow cannot complete, or data is lost ' +
+	'or written outside the repository. Meeting none of the three, the finding is discretionary and waits. ' +
+	'Both procedures are in `prompts/collaboration-workflow/wip-cap.md`. Reissue this call and let the ' +
+	'command count — it fires once per run and cannot repeat on the call in hand.'
 
 // **A shell line carries several commands, and the subcommand has to be the one being invoked.**
 // Each segment is judged on its own, anchored at its start, so `gh issue comment <N> -b "… gh issue
@@ -241,7 +241,7 @@ const ISSUE_COMMENTS_REASON =
 	"except for two answers that are not the run's to make: work a comment reassigns to another " +
 	'Issue is out of scope and is not implemented, and a comment saying the Issue no longer has a ' +
 	'reason to exist stops the run with a `confirmation` Telegram. The procedure is ' +
-	'`.claude/skills/workflow-commands/SKILL.md` → "An Issue\'s comments are part of the Issue". ' +
+	'`.claude/skills/workflow-commands/issue-comments.md`. ' +
 	'Every body-only read is refused until the comments are read.'
 
 // The reading of the call itself — which spellings carry a body inline, and what the shell does to
@@ -266,8 +266,8 @@ const OPEN_STATE = /--state[= ]open|state=open/u
 // `…/issues?labels=epic&state=open` ask which epics are open, which is what `epic:bundle` and the
 // Issue template do; counting either as the WIP count would credit the cap as kept by a run that
 // never counted the backlog. The residual the pattern cannot separate is named in
-// `docs/josh-commands.md`: the inventory command in the `diag` skill is byte-identical to the count
-// command in `wip-cap.md`, so no pattern can tell those two apart.
+// `docs/josh-commands.md`: the inventory command in the `diag` skill is byte-identical to a hand count
+// of the backlog, so no pattern can tell those two apart.
 const LABEL_FILTER = /--label\b|[?&]labels=/u
 
 function counts_open_issues(command: string): boolean {

@@ -151,3 +151,38 @@ describe('time_density_hook.density_notice — nothing it reads may fail the edi
 		expect(time_density_hook.density_notice(build(), NOW_MS)).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#3157: the line names the calls that could have shared a turn, and stays silent where
+// the call that just ran read a file the turns behind it touched — that pair could not have gone together.
+function single_read_turns(): string {
+	return Array.from({ length: ENOUGH_TURNS }, (_unused, turn) =>
+		time_transcript_fixture.target_turn_lines(turn, [`file-${String(turn)}.ts`]),
+	)
+		.flat()
+		.join('\n')
+}
+
+function call_payload(name: string, file_path: string): string {
+	return JSON.stringify({
+		hook_event_name: 'PostToolUse',
+		transcript_path: write_transcript(name, single_read_turns()),
+		tool_name: 'Read',
+		tool_input: { file_path },
+	})
+}
+
+describe('time_density_hook.density_notice — the calls it names', () => {
+	it('names the independent single-call reads and the call that just ran', () => {
+		const notice = time_density_hook.density_notice(call_payload('independent', 'fresh.ts'), NOW_MS)
+
+		expect(notice).toContain('could have shared a turn')
+		expect(notice).toContain('Read fresh.ts')
+		expect(notice).toContain('pnpm josh read:files')
+	})
+
+	it('says nothing when the call that just ran depends on the turns behind it', () => {
+		const notice = time_density_hook.density_notice(call_payload('dependent', 'file-1.ts'), NOW_MS)
+
+		expect(notice).toBeUndefined()
+	})
+})

@@ -39,25 +39,36 @@ The history behind a procedure, kept off every run's read path. Each one is cite
 from the page it explains.
 
 - [claude-md-history.md](./claude-md-history.md) — `CLAUDE.md`
+- [overview-rationale.md](./overview-rationale.md) — the workflow overview and session language
 - [principles-rationale.md](./principles-rationale.md) — the collaboration principles
 - [operating-rules-rationale.md](./operating-rules-rationale.md) — the operating rules
+- [upstream-interrupt-rationale.md](./upstream-interrupt-rationale.md) — the upstream interrupt
+- [issue-citation-rationale.md](./issue-citation-rationale.md) — citing Issues in session output
+- [gh-rest-rationale.md](./gh-rest-rationale.md) — `gh` in REST
 - [residency-rationale.md](./residency-rationale.md) — where a rule is written down
 - [rule-delivery-rationale.md](./rule-delivery-rationale.md) — how a rule reaches the agent
 - [file-edits-rationale.md](./file-edits-rationale.md) — file edits
 - [shell-body-rationale.md](./shell-body-rationale.md) — shell bodies
 - [turn-batching-rationale.md](./turn-batching-rationale.md) — turn batching
+- [output-bounds-rationale.md](./output-bounds-rationale.md) — the Bash output cap and piped checks
 - [wip-cap-rationale.md](./wip-cap-rationale.md) — the open-Issue cap
 - [observation-filing-rationale.md](./observation-filing-rationale.md) — filing observations
+- [observation-ledger-rationale.md](./observation-ledger-rationale.md) — the observation ledger
 - [epic-commands-rationale.md](./epic-commands-rationale.md) — the `josh epic:*` commands
 - [backlogrun-steps-rationale.md](./backlogrun-steps-rationale.md),
   [backlogrun-child-rationale.md](./backlogrun-child-rationale.md),
   [backlogrun-lanes-rationale.md](./backlogrun-lanes-rationale.md),
-  [backlogrun-progress-rationale.md](./backlogrun-progress-rationale.md) — `backlogrun`
+  [backlogrun-progress-rationale.md](./backlogrun-progress-rationale.md),
+  [backlogrun-recovery-rationale.md](./backlogrun-recovery-rationale.md) — `backlogrun`
+- [progress-watcher-rationale.md](./progress-watcher-rationale.md) — the progress watcher every
+  implementing run starts
 - [pre-gate-cut-rationale.md](./pre-gate-cut-rationale.md) — the pre-gate session cut
 - [background-commands-rationale.md](./background-commands-rationale.md) — backgrounding the gate
   and the push
 - [latest-gate-rationale.md](./latest-gate-rationale.md) — the dependency-update window
 - [split-assessment-rationale.md](./split-assessment-rationale.md) — the split assessment
+- [review-history.md](./review-history.md) — the review policy and rubric
+- [testing-guide-history.md](./testing-guide-history.md) — closing the E2E gate
 - [josh-commands-rationale.md](./josh-commands-rationale.md) — the `josh` commands
 - [josh-commands-automation-rationale.md](./josh-commands-automation-rationale.md) — the automation
   `josh` commands

@@ -6,6 +6,7 @@ import type { GuardRun } from '#scripts/josh/hook-decision'
 import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { run_cut, type RunCut } from '#scripts/run/run-cut'
+import { run_cut_handoff } from '#scripts/run/run-cut-handoff'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { bash_triggers } from './bash-triggers'
 import { implementation_cut_verdict } from './implementation-cut-verdict'
@@ -161,7 +162,8 @@ const IMPLEMENTATION_CUT_REASON =
 	`cost has crossed the shared ${THRESHOLD_TEXT} threshold mid-implementation, so the thinking accumulated ` +
 	'so far is now re-read on every later request. Take the cut before this edit. ' +
 	'First write a handoff file with the Write tool — the user’s instruction verbatim, what you have ' +
-	'completed, what remains, and what you deliberately did not touch — and pass it as `--handoff <path>`, ' +
+	'completed, what remains, and what you deliberately did not touch, as ' +
+	`${run_cut_handoff.HANDOFF_FORMAT} (Markdown is refused) — and pass it as \`--handoff <path>\`, ` +
 	'so the fresh process resumes on the original instruction rather than the working tree alone ' +
 	'(joshuafolkken/kit#2354); a resume that finds no instruction is refused `incomplete` rather than ' +
 	'continuing blind. ' +

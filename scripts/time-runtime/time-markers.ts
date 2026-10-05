@@ -111,6 +111,12 @@ const BODY_FLAG_PATTERN = /--body(?:-file)?\b/u
 const ISSUE_LABELS_PATTERN = /repos\/\S+\/issues\/(\d+)\/labels\b(?!\/)/u
 const IN_PROGRESS_FIELD = 'labels[]=in-progress'
 
+// **`run:entry` applies the label itself now** (joshuafolkken/kit#3182), so a run opened through it
+// leaves no `gh api` add form in its transcript — the call that opens the run and names its issue is
+// `pnpm josh run:entry <N>`, and it is read as the same declaration. `run:release` is not: like the
+// removal form above, it ends a hold rather than opening one.
+const RUN_ENTRY_PATTERN = /\bjosh\s+run:entry\s+(\d+)\b/u
+
 // "This call declares no issue", which is the attribution's own sentinel rather than a second one:
 // what `bash_issue` returns is read by `cost_attribute` and by nothing else, so two spellings of "no
 // issue" could only drift apart.
@@ -161,6 +167,10 @@ function is_in_progress_label(command: string): boolean {
 	return ISSUE_LABELS_PATTERN.test(command) && command.includes(IN_PROGRESS_FIELD)
 }
 
+function is_run_start(command: string): boolean {
+	return is_in_progress_label(command) || RUN_ENTRY_PATTERN.test(command)
+}
+
 // Which issue a Bash call declares its run to be running, or `undefined` where it declares nothing.
 //
 // **Attribution's other evidence is the branch, and a lane run has none to give**
@@ -185,15 +195,16 @@ function is_in_progress_label(command: string): boolean {
 // shape `sonarjs/super-linear-regex` refuses.
 const COMMAND_SEPARATOR = /&&|\|\||;/u
 
-function label_issue(part: string): number {
-	const matched = ISSUE_LABELS_PATTERN.exec(part)
+function declared_issue(part: string): number {
+	const pattern = is_in_progress_label(part) ? ISSUE_LABELS_PATTERN : RUN_ENTRY_PATTERN
+	const matched = pattern.exec(part)
 
 	return matched?.[1] === undefined ? NO_ISSUE : Number(matched[1])
 }
 
 function bash_issue(command: string): number {
 	for (const part of command.split(COMMAND_SEPARATOR)) {
-		if (is_in_progress_label(part)) return label_issue(part)
+		if (is_run_start(part)) return declared_issue(part)
 	}
 
 	return NO_ISSUE
@@ -207,7 +218,7 @@ function bash_issue(command: string): number {
 // auto-decision log take the same shape, so `time-phases.ts` accepts only a marker that closes
 // before the first edit. The label carries no body, so the two tests cannot both match one command.
 function bash_marker(command: string): PhaseMarker {
-	if (is_in_progress_label(command)) return WORKFLOW_MARKER
+	if (is_run_start(command)) return WORKFLOW_MARKER
 
 	return is_api_body_write(command) || is_issue_comment(command) ? PLAN_MARKER : NO_MARKER
 }

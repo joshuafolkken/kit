@@ -18,29 +18,29 @@ import { delivered_rules } from './delivered-rules'
 // fail a test for a reason that has nothing to do with the rule.
 
 const WORKFLOW_SKILL = '.claude/skills/workflow-commands/SKILL.md'
-const FULLRUN_SKILL = '.claude/skills/workflow-commands/fullrun.md'
-const HALFRUN_SKILL = '.claude/skills/workflow-commands/halfrun.md'
+// joshuafolkken/kit#3174: the entry sequence `fullrun` and `halfrun` share lives in one file.
+const ENTRY_SEQUENCE_SKILL = '.claude/skills/workflow-commands/entry-sequence.md'
 const KICKOFF_SKILL = '.claude/skills/workflow-commands/kickoff.md'
 const DELIVERY_TOPIC = 'prompts/collaboration-workflow/rule-delivery.md'
 const GUARD_DOC = 'docs/josh-commands-automation.md'
 
-const ENTRY_POINTS = [FULLRUN_SKILL, HALFRUN_SKILL, KICKOFF_SKILL]
+const ENTRY_POINTS = [ENTRY_SEQUENCE_SKILL, KICKOFF_SKILL]
 // The portable spelling. `gh issue view <N> --comments` is GraphQL-backed and a cloud session is
 // answered 403, which `scripts/gh/gh-document-guard.test.ts` enforces for runnable blocks — so the REST
 // call is what the procedure has to name. It is the read itself, so a trim keeps it.
 const REST_READ = 'gh api repos/{owner}/{repo}/issues/<N>/comments'
-// The stop answer that is not the run's to make. Stated once, in §2g, so an entry point that restated
+// The stop answer that is not the run's to make. Stated once, in `issue-comments.md`, so an entry point that restated
 // it would be the clone `CLAUDE.md` prohibits.
 const STOP_ANSWER = 'no longer has a reason to exist'
 
-// joshuafolkken/kit#1959: §2g's story and rationale moved out (joshuafolkken/kit#1925 trims the
-// section to its rule). joshuafolkken/kit#2189 relocated the §2g body to `issue-comments.md`, leaving
-// the `SKILL.md` §2g stub as a trigger and pointer; the portable comment read the rule cannot lose now
+// joshuafolkken/kit#1959: `issue-comments.md`'s story and rationale moved out (joshuafolkken/kit#1925 trims the
+// section to its rule). joshuafolkken/kit#2189 relocated the `issue-comments.md` body to `issue-comments.md`, leaving
+// the `issue-comments.md` stub as a trigger and pointer; the portable comment read the rule cannot lose now
 // lives in that companion, and the entry points still point at the single source rather than restating
 // it.
 const ISSUE_COMMENTS_DOC = '.claude/skills/workflow-commands/issue-comments.md'
 
-describe('§2g — the procedure every `#N` entry point owes', () => {
+describe('`issue-comments.md` — the procedure every `#N` entry point owes', () => {
 	it('names the portable comment read in its single source', () => {
 		expect(read_unwrapped(ISSUE_COMMENTS_DOC)).toContain(REST_READ)
 	})
@@ -52,11 +52,11 @@ describe('§2g — the procedure every `#N` entry point owes', () => {
 
 describe('the `#N` entry points point at the procedure', () => {
 	// An entry point owes the pointer, not a second copy: the conflict rule and its stop answers are
-	// stated once, in §2g, so a change to them cannot leave two files disagreeing.
-	it.each(ENTRY_POINTS)('%s points at §2g rather than restating it', (document) => {
+	// stated once, in `issue-comments.md`, so a change to them cannot leave two files disagreeing.
+	it.each(ENTRY_POINTS)('%s points at `issue-comments.md` rather than restating it', (document) => {
 		const content = read_unwrapped(document)
 
-		expect(content).toContain('§2g')
+		expect(content).toContain('`issue-comments.md`')
 		expect(content).not.toContain(STOP_ANSWER)
 	})
 })

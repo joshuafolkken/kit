@@ -7,51 +7,40 @@ import { GIT_LOCATION_VARIABLES } from '#scripts/git/git-location-environment'
 //
 // **The command starts from the project root, never from wherever the session happens to be**
 // (joshuafolkken/kit#2984). Every path after the prefix is relative, so a hook fired from a
-// subdirectory would otherwise miss its bundle. The root is git's, with the location variables a git
-// hook exports cleared first — the same resolution the consumer rewrite (`hook-command-rewrite.ts`)
-// applies, so both sides stay one mechanism for Claude Code and Codex alike.
+// subdirectory would otherwise miss its script. The root is git's, resolved with the location
+// variables a git hook exports cleared first, and resolved with them only when that fails — git
+// metadata outside the work tree. The consumer rewrite (`hook-command-rewrite.ts`) keeps this prefix,
+// so both sides stay one mechanism for Claude Code and Codex alike.
 //
-// **The bundle runs only once the ready gate passes** (`scripts/hooks/hook-bundle-ready.ts`): it
-// rebuilds `dist/hooks/` when the source beside it has changed, so an edited guard is never shadowed by
-// its old bundle. The gate failing — a checkout that cannot build — drops to the fallback, the live
-// source. **An `if`/`else`, never `&&`/`||`**: a guard's refusal is a non-zero exit, and a
-// `node … || pnpm josh …` chain would read that refusal as a missing bundle and run the hook twice.
+// **Everything after the root is one script** (`scripts/hooks/run-hook.sh`, joshuafolkken/kit#3184):
+// clearing the location variables for the hook itself, the bundle-ready gate and the live-source
+// fallback live there once, so each hook command names only its hook.
 
 const HOOK_DIST_DIR = 'dist/hooks'
+const RUN_HOOK_SCRIPT = 'scripts/hooks/run-hook.sh'
 const UNSET_OPTIONS = GIT_LOCATION_VARIABLES.map((name) => `-u ${name}`).join(' ')
-const PROJECT_ROOT_PREFIX = `if project_root="$(env ${UNSET_OPTIONS} git rev-parse --show-toplevel 2>/dev/null)"; then unset ${GIT_LOCATION_VARIABLES.join(' ')}; else project_root="$(git rev-parse --show-toplevel)" || exit 1; fi; cd "$project_root" && `
-// Plain `node` runs the gate's TypeScript directly; the flag keeps Node 22's type-stripping notice off
-// every hook's stderr.
-const BUNDLE_READY_GATE =
-	'node --disable-warning=ExperimentalWarning scripts/hooks/hook-bundle-ready.ts'
+const ROOT_LOOKUP = 'git rev-parse --show-toplevel'
+const PROJECT_ROOT_PREFIX = `project_root="$(env ${UNSET_OPTIONS} ${ROOT_LOOKUP} 2>/dev/null || ${ROOT_LOOKUP})" && cd "$project_root" && `
 
-// Run `primary_command` when `gate` exits 0, else `fallback_command` — both verbatim. Kept generic so
-// a test can exercise the branch selection with stub commands rather than real hooks.
-function launch_command(gate: string, primary_command: string, fallback_command: string): string {
-	return `if ${gate}; then ${primary_command}; else ${fallback_command}; fi`
+// `name` is the hook's bundle under `dist/hooks` without `.js` (e.g. `pretool-guard`), followed by any
+// arguments it takes (e.g. `codex-hook-adapter pretool`).
+function hook_launch_command(name: string): string {
+	return `${PROJECT_ROOT_PREFIX}sh ${RUN_HOOK_SCRIPT} ${name}`
 }
 
-// `invocation` is the hook's file under `dist/hooks` plus any arguments (e.g. `pretool-guard.js`);
-// `fallback_command` runs the same hook from source.
-function bundle_launch_command(invocation: string, fallback_command: string): string {
-	const primary = `node ${HOOK_DIST_DIR}/${invocation}`
-
-	return `${PROJECT_ROOT_PREFIX}${launch_command(BUNDLE_READY_GATE, primary, fallback_command)}`
-}
-
-// `bundle` is the hook's file under `dist/hooks` (e.g. `pretool-guard.js`); `command` is the josh
-// subcommand the fallback runs (e.g. `pretool:guard`).
-function hook_launch_command(bundle: string, command: string): string {
-	return bundle_launch_command(bundle, `pnpm josh ${command}`)
+// The josh subcommand the launcher falls back to for hook `name`: its first `-` becomes `:`
+// (`pretool-guard` → `pretool:guard`). The launcher derives it in shell; this is that rule for the tests
+// that hold every wired hook to a subcommand josh has.
+function fallback_command(name: string): string {
+	return name.replace('-', ':')
 }
 
 const hook_launch = {
-	BUNDLE_READY_GATE,
-	bundle_launch_command,
+	fallback_command,
 	HOOK_DIST_DIR,
 	hook_launch_command,
-	launch_command,
 	PROJECT_ROOT_PREFIX,
+	RUN_HOOK_SCRIPT,
 }
 
 export { hook_launch }

@@ -23,6 +23,12 @@ const LINE_SEPARATOR = /\r?\n/u
 const HIGH = 'high'
 const MEDIUM = 'medium'
 const FIXED_PREFIX = 'fixed '
+// What a finding line carries after its spec: one sentence saying what is wrong, so a stopped ship's
+// log tells the resumed lane child the defect rather than only its location (joshuafolkken/kit#3159).
+const DESCRIPTION_SEPARATOR = ' — '
+// Where the spec ends on read: a reviewer that types the dash as `-`, `--` or `–` still ends it there,
+// so its sentence never lands in the ledger's file field.
+const DESCRIPTION_BOUNDARY = / [—–-]{1,2} /u
 
 const VERDICT = {
 	CLEAN: 'clean',
@@ -35,6 +41,7 @@ type ReviewVerdict =
 	| {
 			kind: typeof VERDICT.CLEAN | typeof VERDICT.FIXED | typeof VERDICT.BLOCKING
 			specs: ReadonlyArray<string>
+			report: ReadonlyArray<string>
 	  }
 	| { kind: typeof VERDICT.INVALID; note: string }
 
@@ -49,6 +56,7 @@ interface RoundOutcome {
 interface Finding {
 	spec: string
 	is_fixed: boolean
+	line: string
 }
 
 const MISSING_NOTE = 'the reviewer wrote no findings file — the review did not complete'
@@ -69,7 +77,8 @@ function findings_instruction(findings_path: string, fixed_clause: string): stri
 	const categories = review_finding_ledger.CATEGORIES.join(', ')
 
 	return [
-		`Then write every finding to ${findings_path}, one per line as <category>:<severity>:<file>[:<line>]`,
+		`Then write every finding to ${findings_path}, one per line as`,
+		`<category>:<severity>:<file>[:<line>]${DESCRIPTION_SEPARATOR}<one sentence: what is wrong and why>`,
 		`(category one of ${categories}; severity high, medium or low)${fixed_clause},`,
 		'and an empty file when there is none.',
 	].join(' ')
@@ -99,10 +108,17 @@ function verification_prompt(brief_path: string, findings_path: string): string 
 	].join(' ')
 }
 
-function finding_of(line: string): Finding {
-	if (!line.startsWith(FIXED_PREFIX)) return { spec: line, is_fixed: false }
+// The spec is what `review:record` reads; the description after it travels only in the stage output.
+function spec_of(unmarked: string): string {
+	const end = unmarked.search(DESCRIPTION_BOUNDARY)
 
-	return { spec: line.slice(FIXED_PREFIX.length).trim(), is_fixed: true }
+	return (end === -1 ? unmarked : unmarked.slice(0, end)).trim()
+}
+
+function finding_of(line: string): Finding {
+	const is_fixed = line.startsWith(FIXED_PREFIX)
+
+	return { spec: spec_of(is_fixed ? line.slice(FIXED_PREFIX.length) : line), is_fixed, line }
 }
 
 function spec_findings(text: string): ReadonlyArray<Finding> {
@@ -133,7 +149,8 @@ function scored_kind(findings: ReadonlyArray<Finding>): ScoredVerdict['kind'] {
 
 // Absent means the reviewer never finished; a line outside the grammar means its verdict cannot be
 // recorded — both stop the ship rather than read as clean. The specs are recorded without the `fixed`
-// mark: a fixed finding was still a finding of that round.
+// mark: a fixed finding was still a finding of that round. The report keeps each line whole — mark and
+// description — for the stage output a resumed lane child reads.
 function read_verdict(text: string | undefined): ReviewVerdict {
 	if (text === undefined) return { kind: VERDICT.INVALID, note: MISSING_NOTE }
 
@@ -144,7 +161,11 @@ function read_verdict(text: string | undefined): ReviewVerdict {
 		return { kind: VERDICT.INVALID, note: `unreadable finding: ${invalid.spec}` }
 	}
 
-	return { kind: scored_kind(findings), specs: findings.map((finding) => finding.spec) }
+	return {
+		kind: scored_kind(findings),
+		specs: findings.map((finding) => finding.spec),
+		report: findings.map((finding) => finding.line),
+	}
 }
 
 // Round 1 passes clean or with every blocking finding fixed in place; round 2 follows the commit.

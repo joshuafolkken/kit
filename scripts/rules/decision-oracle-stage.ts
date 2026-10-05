@@ -12,7 +12,7 @@ const RUN_ENTRY_ORACLE: DecisionOracle = {
 		'Where a run on an issue starts, and whether the typed command has already been reached',
 	args: '<N> [--to kickoff|halfrun|prrun|fullrun]',
 	vocabulary: run_stage.START_TOKENS,
-	single_source: '.claude/skills/workflow-commands/SKILL.md → §2k',
+	single_source: 'docs/how-to/run-issues.md',
 }
 
 export { RUN_ENTRY_ORACLE }

@@ -1,6 +1,6 @@
 # 引き金つき配送 — 規則を「効く瞬間」に届ける（joshuafolkken/kit#1524）
 
-規則の届け方は 2 つある。**常駐**（`CLAUDE.md` に書き、毎ターン読み込ませる）と、**引き金つき配送**（規則が効く瞬間にフックが本文を突きつける）である。この文書は後者の単一ソースであり、どの規則がどの引き金で配送されるかの列挙表でもある。
+規則の届け方は 2 つある。**常駐**（`CLAUDE.md` に書き、毎ターン読み込ませる）と、**引き金つき配送**（規則が効く瞬間にフックが本文を突きつける）である。この文書は後者の単一ソースであり、配送される規則の一覧でもある。配線・判定の細部と経緯は `docs/maintainers/rule-delivery-rationale.md` にあり、ランの途中で読む必要はない。
 
 ## なぜ配送が要るのか
 
@@ -8,111 +8,112 @@
 
 ## 判定基準 — 引き金を特定できるか
 
-どの規則を配送へ移すか — 引き金を 1 件のツール呼び出しとして名指しできるか、常駐側にトリガの 1 行を残す理由、移設が削除ではないこと — の単一ソースは [`residency.md`](./residency.md) →「第 1 問」であり、ここには写さない。この文書が持つのは、移した規則を届ける機構と列挙表である。移設は削除ではないので、joshuafolkken/kit#1477（読み込む命令文のコスト測定）の答えを待つ必要はない — あちらが門番なのは**削除**の判断である。
+どの規則を配送へ移すか — 引き金を 1 件のツール呼び出しとして名指しできるか、常駐側にトリガの 1 行を残す理由、移設が削除ではないこと — の単一ソースは [`residency.md`](./residency.md) →「第 1 問」であり、ここには写さない。この文書が持つのは、移した規則の一覧である。
 
 ## 機構 — 1 本だけ、新規に作らない
 
-配送はすべて `scripts/josh/hook-decision.ts` の `create_transcript_guard` の上に載る。バッチガード（joshuafolkken/kit#1390）と調査ガード（joshuafolkken/kit#1460）が既に共有している唯一の土台であり、ペイロードのスキーマ、`deny` の封筒、環境変数のスイッチ、`.env` の読み込み、ラン 1 回だけ発火させる記録の 5 つを持つ。**2 本目の配送経路を作るのは `CLAUDE.md` →「No clones」が禁じるクローン**であり、しかも 2 本が「配送したかどうか」で食い違いうる唯一の場所である。
-
-- **列挙表**: `scripts/rules/delivered-rules.ts`。1 規則 = 1 行（`id` ／ 引き金 ／ 配送文）。
-- **入口**: `scripts/hooks/pretool-guard-cli.ts`（ガードの合成は `scripts/hooks/pretool-guard.ts`）＝ `pnpm josh pretool:guard`。3 つの `PreToolUse` ガード（バッチング ／ 調査 ／ 規則）を 1 プロセスにまとめ、`.claude/settings.json` の `PreToolUse` に**単一エントリ**として `Bash|Edit|Read|Write` のマッチャで配線されている。拒否の優先順位はバッチングの理由が先、次に調査、最後に規則であり、各ガードは内部で従来どおり自分の環境変数スイッチを尊重する。
-- **停止スイッチ**: `JOSH_RULE_GUARD`（規則ガードのぶん。既定で有効。`off` / `0` / `false` / `no` で無効）。バッチング・調査の各ガードも同じく自前のスイッチを持つ。
-
-**規則ガードの列挙表に載るのは、効く瞬間がシェル呼び出しである規則に限られる。** Claude Code は 1 ターンのうち 1 件だけを拒否して残りを実行するため、拒否された `Edit` は兄弟の編集だけが適用された状態を残す（joshuafolkken/kit#1390）。単一の `pretool:guard` プロセスは `Bash|Edit|Read|Write` を受け取るが、規則ガードが拒否理由を返すのはシェル呼び出しに限られる。
-
-### Stop フック — 2 つ目の入口、同じ土台（joshuafolkken/kit#2121）
-
-`pretool-guard` が `PreToolUse` の入口であるのと同じ意味で、`stop:guard`（`scripts/hooks/stop-guard.ts` ＝ `pnpm josh stop:guard`）は **`Stop` イベントの入口**である。`.claude/settings.json` の `Stop` に matcher 空の**単一エントリ**として配線され、turn の終わりごとに走る。
-
-**土台は共有し、判定は再利用する。** スイッチ（`JOSH_STOP_GUARD`）と `.env` の読み込みは `hook-decision.ts` のものを、停止通知かどうかは `lane-park.ts` の正規表現を、押さえの有無は `run:hold` の記録読み取りを使う — **2 本目の判定機構は作らない**。起票の有無は `filing-cap.ts` の数え方を、第一者かどうかは `repo-party.ts` の比較を使う。違うのはイベントだけで、`Stop` のペイロードにはツール呼び出しが無く、4 行はいずれも `{"decision":"block","reason":…}` で返す。`Stop` イベントからモデルへ文字を届ける経路はこれ 1 本しかない（joshuafolkken/kit#2247）。
-
-**入口が 2 つでも土台は 1 つ。**「1 本だけ、新規に作らない」が禁じるのは共有部の 2 つ目の写しであって、イベントごとの入口ではない。`stop:guard` の 4 行は下の列挙表に載るが、引き金がシェル呼び出しではなく**ランの停止**なので、`delivered-rules.ts` の `DELIVERED_RULES`（`PreToolUse` 専用）ではなく `stop-rules.ts` に住む。どのエラーでも停止は通す（フェイルオープン）— 4 つのブロック行は自己解消し（通知を送る／押さえを解放する／起票する／引用を直して返信を出し直す）、`stop_hook_active` が無限ループの歯止めになる。
-
-`backlogrun` の通常の親ループと次の Issue の取得は監督プロセスが扱うため、次の Issue を取得させる Stop 判定は撤去した。名前を指定したエピックを判断用の headless セッションに渡す経路では、子レーンの待機がそのセッションに残るため、待機保護を維持する。停滞と取り残しの検出は Stop イベントが起きた時だけ実行し、停止判定とは独立して報告する。
+配送はすべて 1 つの土台に載り、入口はイベントごとに 2 つある。`PreToolUse` の入口が `pnpm josh pretool:guard`（バッチング ／ 調査 ／ 規則の 3 ガードを 1 プロセスで合成）、Stop フックの入口が `pnpm josh stop:guard` である。**2 本目の配送経路を作るのは `CLAUDE.md` →「No clones」が禁じるクローン**である。配線・停止スイッチ・拒否の優先順位: `docs/maintainers/rule-delivery-rationale.md` →「機構」。
 
 ## 配送されている規則
 
-| 規則                                                                                                                                                                   | 引き金                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | 引き金が発火しないターンでは                                                                                                                                                                                                    |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **ターン内バッチング**（`turn-batching.md`）                                                                                                                           | `pnpm josh batch:guard` — 単発呼び出しのターンが 3 つ続いた次の `Bash` / `Edit` / `Read`                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | 往復あたりの呼び出し数が下限を上回っている ＝ 規則は既に守られている                                                                                                                                                            |
-| **調査の委譲しきい値**（`SKILL.md` → §2b）                                                                                                                             | `pnpm josh investigation:guard` — 編集しないファイルの読み取りが 3 件目に達した `Read` / `Bash`                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | 読み取りがしきい値未満 ＝ 委譲する対象がまだ無い                                                                                                                                                                                |
-| **バックログ WIP 上限**（`wip-cap.md`）                                                                                                                                | `pnpm josh rule:guard` — Issue を起票する `Bash`（`pnpm josh issue:file`）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Issue が起票されていない ＝ 上限に触れる行為が無い                                                                                                                                                                              |
-| **直接起票の禁止**（`docs/josh-commands-automation.md` → `josh issue:file`、joshuafolkken/kit#2808）                                                                   | `pnpm josh rule:guard` — `josh issue:file` を通さずに Issue を作成する `Bash`（`gh issue create`、または `…/issues` への `title` 付き POST）。拒否文は `pnpm josh issue:file` の書式を渡す。重複探し・本文の検査と分類ラベル・`## Origin` の確認・`epic:bundle` はこのコマンドが実行するので、それぞれを別の行で見張らない。**毎回発火する**                                                                                                                                                                                                                           | `pnpm josh issue:file` で起票している ＝ 起票の全段がそろっている                                                                                                                                                               |
-| **1 ラン 10 件の起票上限**（`.claude/skills/workflow-commands/SKILL.md` → §2d、`observation-filing.md`）                                                               | `pnpm josh rule:guard` — Issue を起票する `Bash`（`pnpm josh issue:file`）。そのランで**拒否されていない**起票が既に 10 件あるとき、11 件目を拒否する。終了コードが 0 でない `issue:file` 呼び出しは起票に数えない。`is_issue_filing` を再利用し、新しい述語は作らない                                                                                                                                                                                                                                                                                                 | 拒否されていない起票が 10 件未満 ＝ 上限に触れていない。**繰り返す行為を止める行なので毎回発火する**（下の「例外」に従う）                                                                                                      |
-| **Issue コメントの読み取り**（`SKILL.md` → §2g）                                                                                                                       | `pnpm josh rule:guard` — Issue 本文だけを読む `Bash`（`gh issue view <N>`、または `…/issues/<N>` で終わる GET）                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Issue を読んでいない、または最初から `--comments` 付きで読んでいる                                                                                                                                                              |
-| **本文をシェルに載せない**（`shell-body.md`）                                                                                                                          | `pnpm josh rule:guard` — 二重引用符の本文値（`-f body="…"` ／ `-f "body=…"` ／ `--body "…"` ／ `--notify-message "…"`）にバッククォートか `$` を含む `Bash`                                                                                                                                                                                                                                                                                                                                                                                                            | 本文がシェルに評価されない ＝ 規則は既に守られている                                                                                                                                                                            |
-| **@path をリテラル投稿する誤射**（`shell-body.md`、joshuafolkken/kit#2304）                                                                                            | `pnpm josh rule:guard` — 生フィールド（`-f` ／ `--raw-field`）で `body=@<path>` を渡した `Bash`。`@` で始まる値をそのまま送るため `@<path>` がコメントとして投稿される。**毎回発火する**                                                                                                                                                                                                                                                                                                                                                                               | `-F` ／ `--field body=@`（ファイルを読む正しい綴り）・`@` を含まない本文・`pnpm josh issue:comment` ＝ リテラルの `@path` が送出されない                                                                                        |
-| **検証コマンドのパイプ**（`output-bounds.md`）                                                                                                                         | `pnpm josh rule:guard` — 合否を意味する josh のチェック（`gate` ／ `check` ／ `lint*` ／ `cspell*` ／ `test*` ／ `eval` ／ `overrides` ／ `ranges`）がパイプの手前に立った `Bash`                                                                                                                                                                                                                                                                                                                                                                                      | 検証の終了コードが握りつぶされていない ＝ 失敗が失敗として伝わる                                                                                                                                                                |
-| **早すぎる進捗報告**（`.claude/skills/workflow-commands/backlogrun-progress.md` → 「Progress while the run is quiet」）                                                | `pnpm josh rule:guard` — 待つことだけが目的の `Bash`（全区間が `sleep`、または `sleep` に `echo` ／ `:` ／ `date` が並ぶだけ）。既に生きているタイマーがある回、またはその報告が間隔前に着地する回に拒否する                                                                                                                                                                                                                                                                                                                                                           | 待機タイマーを自前で張っていない ＝ 時計は `run:progress` が 1 本だけ持っている                                                                                                                                                 |
-| **run 末尾の空転**（`background-commands.md`）                                                                                                                         | `pnpm josh rule:guard` — commit・push・PR 作成をまとめる段（`pnpm josh git -y` ／ 別名 `josh g`、`--yes` も同じ）を**前景**で出した `Bash`。`run_in_background` が付いていれば引き金に当たらない                                                                                                                                                                                                                                                                                                                                                                       | 背景で発行している ＝ 完了通知が run を再開させ、push とマージのあいだが空かない                                                                                                                                                |
-| **gate 手前の cut**（`.claude/skills/workflow-commands/pre-gate-cut.md`）                                                                                              | `pnpm josh rule:guard` — レーンの作業ツリーに居て、目印 `JOSH_LANE_CHILD` がその Issue を指し、cut 記録がまだ無いまま `pnpm josh gate`（別名 `josh ga` も同じ）を走らせる `Bash`                                                                                                                                                                                                                                                                                                                                                                                       | レーン以外の checkout に居る、目印が無い（レーン内の人）、または既に cut 済み ＝ 規則が守られている状態                                                                                                                         |
-| **実装フェーズの cut**（`.claude/skills/workflow-commands/pre-gate-cut.md` → 「It is a guard, fired at the edit that crosses the threshold」、joshuafolkken/kit#2310） | `pnpm josh rule:guard` — 派遣されたレーンの子（目印 `JOSH_LANE_CHILD` がその Issue を指す）で cut 記録がまだ無く、直近文脈のコスト（`pnpm josh cost --cut` と同一の統計・同一のしきい値 `CONTEXT_CUT_THRESHOLD`、測定不能は `!== UNDER` で安全側に発火）が超過しているときに出した `Edit` ／ `Write`。編集の直前で拒否し `pnpm josh run:cut --impl <N> --handoff <path>` を返す。**しきい値を跨ぐたびに発火する**（`decide`、joshuafolkken/kit#2385）。直後の同じ編集の出し直しは通すので `busy` ／ `failed` でも空回りしない                                          | レーンの子でない（レーン外・目印なし・レーン内の人）、非編集ツール、既に cut 済み、またはコストがしきい値未満 ＝ 打ち切りが要らない状態                                                                                         |
-| **レーンの子の保留**（`.claude/skills/workflow-commands/pre-gate-cut.md`）                                                                                             | `pnpm josh rule:guard` — 派遣されたレーンの子（目印 `JOSH_LANE_CHILD` がその Issue を指す）が、判断待ちの停止通知 `pnpm josh notify --task-type confirmation` を出した `Bash`                                                                                                                                                                                                                                                                                                                                                                                          | レーンの子でない（レーン外・目印なし・レーン内の人）、または停止通知でない ＝ 保留を記録すべき停止が無い                                                                                                                        |
-| **レーンの子の対話質問**（`.claude/skills/workflow-commands/pre-gate-cut.md` → 「The interactive ask is refused one call earlier」）                                   | `pnpm josh rule:guard` — 派遣されたレーンの子（目印 `JOSH_LANE_CHILD` がその Issue を指す）が `AskUserQuestion` を呼んだ呼び出し。停止通知の 1 つ手前で拒否し park 手順を返す。ハーネスは対話質問をターン終了で拒否するので、この 1 つ前が正しい引き金である。**毎回発火する**                                                                                                                                                                                                                                                                                         | レーンの子でない（レーン外・目印なし・レーン内の人）、または対話ツールでない ＝ 握りつぶされる質問が無い                                                                                                                        |
-| **テストの宣言**（`CLAUDE.md` → Code Change Rules）                                                                                                                    | `pnpm josh rule:guard` — commit・push・PR 段（`pnpm josh git -y` ／ 別名 `josh g`）を出した瞬間に `pnpm josh test:declared` が作業ツリーを `required`（テストでも機械的免除パスでもない変更ファイルがある）と読む `Bash`。`run_tail` の commit 段照合を再利用し、新しい配送経路は作らない                                                                                                                                                                                                                                                                              | 差分が `exempt`（`*.md` 等の非ランタイム）または `satisfied`（`*.test.ts` ／ `*.e2e.ts` を含む）＝ テストが要らない、または既に伴っている。免除は人が Step 0 で宣言するため 1 ラン 1 回だけ配送する                             |
-| **force push / ブランチ削除**（`operating-rules.md`、joshuafolkken/kit#2120）                                                                                          | `pnpm josh rule:guard` — `git push` / `git branch` を argv として解析し、force（`--force` ／ `-f` ／ 結合クラスタ `-uf`）・削除（`--delete` ／ `-d` ／ `-D` ／ コロン形 `:branch`）・`git -C` 前置を綴りによらず判定した `Bash`。**毎回発火する**                                                                                                                                                                                                                                                                                                                      | force / 削除でない通常の `git push` / `git branch` ＝ 破壊的操作が無い                                                                                                                                                          |
-| **認可外の作業ツリー変更**（`operating-rules.md`、joshuafolkken/kit#2120）                                                                                             | `pnpm josh rule:guard` — `git checkout -- <path>` ／ `git restore <path>`（worktree）／ 認可外の `git stash`（bare・メッセージ無し push・位置指定 pop 等）を出した `Bash`。**毎回発火する**                                                                                                                                                                                                                                                                                                                                                                            | メッセージ付き `git stash push -m` ・`git stash list` ・`pnpm josh git` ・`pnpm josh stash:pop` ＝ 認可された退避                                                                                                               |
-| **ファイル本文をシェルに載せない**（`file-edits.md`、joshuafolkken/kit#2120）                                                                                          | `pnpm josh rule:guard` — 既存ファイルを対象としたヒアドキュメント書き込み・書き込みを伴う `node -e` ／ インタプリタ heredoc・in-place `perl -0pi -e` を出した `Bash`。既存判定は `stat` 1 回。**毎回発火する**                                                                                                                                                                                                                                                                                                                                                         | 新規ファイル作成・読み取り専用のヒアドキュメント・短い `sed -i` ＝ 本文を丸ごと運んでいない                                                                                                                                     |
-| **停止時の通知**（`CLAUDE.md` →「Mid-workflow stop notification」、joshuafolkken/kit#2121）                                                                            | `pnpm josh stop:guard` — `Stop` フックで、作業ツリーを押さえたまま（`run:hold` 記録あり）その turn に `confirmation` 通知を出さずに止まろうとする。**停止をブロックする**                                                                                                                                                                                                                                                                                                                                                                                              | 押さえを持っていない、`confirmation` 通知が末尾にある、または pre-gate cut を取った回（レーンの子の自動継続）＝ 人待ちの停止ではない（`stop_hook_active` が無限ループの歯止め）                                                 |
-| **hold の解放**（`.claude/skills/workflow-commands/SKILL.md` → §2f、joshuafolkken/kit#2121）                                                                           | `pnpm josh stop:guard` — `Stop` フックで、ツリーが綺麗（`git status --porcelain` が空）なのに `run:hold` 記録が残ったまま止まる。**停止をブロックする**                                                                                                                                                                                                                                                                                                                                                                                                                | ツリーが汚れている（`halfrun` の commit 前停止・`needs-human-review` 停止）、または既に解放済み ＝ 次のランが踏まない                                                                                                           |
-| **Issue 引用の書式**（`prompts/collaboration-workflow/issue-citation.md`、joshuafolkken/kit#2121・joshuafolkken/kit#2247）                                             | `pnpm josh stop:guard` — `Stop` フックで、`last_assistant_message` の地の文に裸の `#N` を含む。**停止をブロックする**（モデルに差し戻し、引用を直して返信を出し直させる）                                                                                                                                                                                                                                                                                                                                                                                              | リンク形式で引用している、コードフェンス／インラインコード／引用行の中、`PR` ／ `pull request` 直後の `#N`、または GitHub 向け成果物（`gh` 引数として渡る）、あるいは `stop_hook_active` が立っている ＝ 差し戻す裸の番号が無い |
-| **起票の申し出**（`.claude/skills/workflow-commands/SKILL.md` → §2i、joshuafolkken/kit#2422）                                                                          | `pnpm josh stop:guard` — `Stop` フックで、`last_assistant_message` の地の文が起票を申し出る（「起票してよければ」等）のに、transcript 末尾に起票（`filing_cap` の数え方）が無い。**停止をブロックする**                                                                                                                                                                                                                                                                                                                                                                | 起票済み、フェンス／引用行の中、第三者の `owner/repo` を名指す（`repo_party.classify`）、owner 不明、または `stop_hook_active` ＝ 保留された Tier A 起票が無い                                                                  |
-| **規則本文を散文に書き足す前の第 0 問・順序の問い**（`residency.md`、joshuafolkken/kit#2272・joshuafolkken/kit#2324）                                                  | `pnpm josh rule:guard` — `CLAUDE.md` ／ `prompts/**/*.md` ／ `.claude/skills/**/*.md` を対象とする `Edit` ／ `Write` で、リンク・URL を除いた正味の追記が閾値以上（規則本文の追記）。誤字・リンク張り替え・削除は当たらない。第 0 問（`oracle:list`）と順序の問い（`run:step`）を突きつける。前提を満たすまで毎回拒否する（下の「例外」）。**#2324 で stand-down** — `oracle:list` と `run:step` の両方を走らせた記録が末尾にあれば通す（リマインダではなく「問いに答えたか」で通す）                                                                                  | 規則ドキュメントを編集していない、追記が閾値未満、または両方の配置判定コマンドを実行済み ＝ 散文の規則が増えていない、または配置の問いに答え済み                                                                                |
-| **オラクル未参照の行為**（`decision-oracle.ts`、joshuafolkken/kit#2324）                                                                                               | `pnpm josh rule:guard` — 発火点を宣言したオラクルが支配する `Bash`（`pkg:scout` ＝ `pnpm add`）を、そのオラクルの `pnpm josh <command>` 無しで出したとき拒否。拒否文は登録簿（判断・コマンド・回答語彙・単一ソース）から組み立て手書きしない。実行するまで毎回拒否し、実行済みで stand-down。発火点を名指しできないオラクルは理由を宣言し**可視化された未強制**として残る（`oracle:list` が発火点／理由を印字）。`release:scope` は理由側で、`pnpm josh followup` のマージ**後**に owe されるリリースを読むためマージを gate せず trail する（joshuafolkken/kit#2334） | 支配下の行為を出していない、またはそのオラクルを実行済み ＝ 規則は既に守られている                                                                                                                                              |
+各項目は**規則**（単一ソース）・**発火点**・**発火しないとき**を持つ。フックが走らないエージェントはこれを自己適用のチェックリストにする（`principles.md`）。頻度を書いていない項目は 1 ラン 1 回だけ配送される — 「毎回発火する」「毎回拒否する」「たびに発火する」「停止をブロックする」（`stop:guard` は止まるたびに判定する）と書いた項目は、条件を満たすかぎり何度でも発火し、「再び発火する」と書いた項目は間隔をおいて再発火する。
 
-**引き金はシェルのコマンド文字列しか見えない。** したがって node の中から REST で Issue を作る経路（`pnpm josh propagate` など）は上の正規表現に掛からない。同じ理由で、本文をファイルで渡す `gh api --input <file>` もタイトルが文字列に現れないため掛からない（`-f` / `-F` / `--field` / `--raw-field` の 4 綴りは覆う）。**これが、規則本文を配送に移したうえで常駐側にトリガ 1 行を残す理由の 1 つである** — 常駐の 1 行は経路によらず効き、配送はそれを効く瞬間に補強する。引き金つきの配送だけにすると、正規表現が知っている綴りだけが規則の適用範囲になる。
+- **ターン内バッチング**（`turn-batching.md`）
+  - 発火点: `pnpm josh batch:guard` — 単発呼び出しのターンが 3 つ続いた次の `Bash` / `Edit` / `Read`。単発が続くかぎり、さらに 3 ターンごとに**再び発火する**（joshuafolkken/kit#2164）
+  - 発火しないとき: 往復あたりの呼び出し数が下限を上回っている ＝ 規則は既に守られている
+- **調査の委譲しきい値**（`delegation.md`）
+  - 発火点: `pnpm josh investigation:guard` — 編集しないファイルの読み取りが 3 件目に達した `Read` / `Bash`。拒否の後も読み取りがもう一度しきい値まで積み上がれば**再び発火する**
+  - 発火しないとき: 読み取りがしきい値未満 ＝ 委譲する対象がまだ無い
+- **バックログ WIP 上限**（`wip-cap.md`）
+  - 発火点: `pnpm josh rule:guard` — Issue を起票する `Bash`（`pnpm josh issue:file`）
+  - 発火しないとき: Issue が起票されていない ＝ 上限に触れる行為が無い
+- **直接起票の禁止**（`docs/josh-commands-automation.md` → `josh issue:file`、joshuafolkken/kit#2808）
+  - 発火点: `pnpm josh rule:guard` — `josh issue:file` を通さずに Issue を作成する `Bash`（`gh issue create`、または `…/issues` への `title` 付き POST）。拒否文は `pnpm josh issue:file` の書式を渡す。**毎回発火する**
+  - 発火しないとき: `pnpm josh issue:file` で起票している ＝ 重複探し・本文の検査・`epic:bundle` までの全段がそろっている
+- **1 ラン 10 件の起票上限**（`.claude/skills/workflow-commands/prerequisite.md`、`observation-filing.md`）
+  - 発火点: `pnpm josh rule:guard` — 拒否されていない起票が既に 10 件あるランの 11 件目の `pnpm josh issue:file`。失敗した呼び出しは数えない。**毎回発火する**
+  - 発火しないとき: 拒否されていない起票が 10 件未満 ＝ 上限に触れていない
+- **Issue コメントの読み取り**（`issue-comments.md`）
+  - 発火点: `pnpm josh rule:guard` — Issue 本文だけを読む `Bash`（`gh issue view <N>`、または `…/issues/<N>` で終わる GET）。コメント込みで読み直すまで毎回拒否する
+  - 発火しないとき: Issue を読んでいない、または最初から `--comments` ／ `--json comments` ／ `…/comments` で読んでいる
+- **本文をシェルに載せない**（`shell-body.md`）
+  - 発火点: `pnpm josh rule:guard` — 二重引用符の本文値（`-f body="…"` ／ `-f "body=…"` ／ `--body "…"` ／ `--notify-message "…"`）にバッククォートか `$` を含む `Bash`
+  - 発火しないとき: 本文がシェルに評価されない ＝ 規則は既に守られている（経緯: `docs/maintainers/rule-delivery-rationale.md` →「本文のシェル評価を同じ機構の 1 行で覆った経緯」）
+- **@path をリテラル投稿する誤射**（`shell-body.md`、joshuafolkken/kit#2304）
+  - 発火点: `pnpm josh rule:guard` — 生フィールド（`-f` ／ `--raw-field`）で `body=@<path>` を渡した `Bash`。**毎回発火する**
+  - 発火しないとき: `-F` ／ `--field body=@`・`@` を含まない本文・`pnpm josh issue:comment` ＝ リテラルの `@path` が送出されない
+- **検証コマンドのパイプ**（`output-bounds.md`）
+  - 発火点: `pnpm josh rule:guard` — 合否を意味する josh のチェック（`gate` ／ `check` ／ `lint*` ／ `cspell*` ／ `test*` ／ `eval` ／ `overrides` ／ `ranges`）がパイプの手前に立った `Bash`
+  - 発火しないとき: 検証の終了コードが握りつぶされていない ＝ 失敗が失敗として伝わる
+- **早すぎる進捗報告**（`.claude/skills/workflow-commands/progress-watcher.md` → 「Progress while the run is quiet」）
+  - 発火点: `pnpm josh rule:guard` — 待つことだけが目的の `Bash`（`sleep` だけ、または `echo` ／ `:` ／ `date` を並べただけ）を、タイマーが生きている回か報告が間隔前に着地する回に出したとき。**毎回発火する**
+  - 発火しないとき: 待機タイマーを自前で張っていない ＝ 時計は `run:progress` が 1 本だけ持っている
+- **run 末尾の空転**（`background-commands.md`）
+  - 発火点: `pnpm josh rule:guard` — `pnpm josh git -y`（別名 `josh g`、`--yes` も同じ）を**前景**で出した `Bash`。**毎回発火する**
+  - 発火しないとき: 背景で発行している ＝ 完了通知が run を再開させ、push とマージのあいだが空かない
+- **gate 手前の cut**（`.claude/skills/workflow-commands/pre-gate-cut.md`）
+  - 発火点: `pnpm josh rule:guard` — レーンの作業ツリーで、目印 `JOSH_LANE_CHILD` がその Issue を指し、cut 記録が無いまま `pnpm josh gate`（別名 `josh ga`）を走らせる `Bash`
+  - 発火しないとき: レーン以外の checkout に居る、目印が無い（レーン内の人）、または既に cut 済み ＝ 規則が守られている状態
+- **実装フェーズの cut**（`.claude/skills/workflow-commands/pre-gate-cut.md` → 「It is a guard, fired at the edit that crosses the threshold」、joshuafolkken/kit#2310）
+  - 発火点: `pnpm josh rule:guard` — 派遣されたレーンの子が cut 前に、直近文脈のコストが `pnpm josh cost --cut` のしきい値を超えた状態で出す `Edit` ／ `Write`。拒否文は `pnpm josh run:cut --impl <N> --handoff <path>` を渡す。しきい値を跨ぐたびに発火する
+  - 発火しないとき: レーンの子でない、非編集ツール、既に cut 済み、またはコストがしきい値未満 ＝ 打ち切りが要らない状態
+- **レーンの子の保留**（`.claude/skills/workflow-commands/pre-gate-cut.md`）
+  - 発火点: `pnpm josh rule:guard` — 派遣されたレーンの子が停止通知 `pnpm josh notify --task-type confirmation` を出した `Bash`
+  - 発火しないとき: レーンの子でない（レーン外・目印なし・レーン内の人）、または停止通知でない ＝ 保留を記録すべき停止が無い
+- **レーンの子の対話質問**（`.claude/skills/workflow-commands/pre-gate-cut.md` → 「The interactive ask is refused one call earlier」）
+  - 発火点: `pnpm josh rule:guard` — 派遣されたレーンの子の `AskUserQuestion`。park 手順を返す。**毎回発火する**
+  - 発火しないとき: レーンの子でない、または対話ツールでない ＝ 握りつぶされる質問が無い
+- **テストの宣言**（`CLAUDE.md` → Code Change Rules）
+  - 発火点: `pnpm josh rule:guard` — `pnpm josh git -y`（別名 `josh g`）を出した瞬間に `pnpm josh test:declared` が `required` と答える `Bash`
+  - 発火しないとき: `exempt`（非ランタイムのみ）または `satisfied`（テストを含む）＝ テストが要らない、または伴っている
+- **force push / ブランチ削除**（`operating-rules.md`、joshuafolkken/kit#2120）
+  - 発火点: `pnpm josh rule:guard` — 綴りによらず force（`--force` ／ `-f` ／ `-uf` 等）・削除（`--delete` ／ `-d` ／ `-D` ／ `:branch`）と判定した `git push` / `git branch` の `Bash`。**毎回発火する**
+  - 発火しないとき: 通常の `git push` / `git branch` ＝ 破壊的操作が無い
+- **認可外の作業ツリー変更**（`operating-rules.md`、joshuafolkken/kit#2120）
+  - 発火点: `pnpm josh rule:guard` — `git checkout -- <path>` ／ `git restore <path>` ／ 強制 `git clean -f` ／ 認可外の `git stash`（bare・メッセージ無し push・位置指定 pop 等）の `Bash`。**毎回発火する**
+  - 発火しないとき: `git stash push -m` ・`git stash list` ・`pnpm josh git` ・`pnpm josh stash:pop` ＝ 認可された退避
+- **index の書き換え**（`operating-rules.md`、joshuafolkken/kit#2983）
+  - 発火点: `pnpm josh rule:guard` — 綴りによらず `git add` ／ `commit` ／ `reset` ／ `rm` ／ `mv` ／ `restore --staged` と判定した `Bash`。**毎回発火する**
+  - 発火しないとき: `pnpm josh git` ＝ 承認済みのコミットフロー
+- **破壊的コマンド**（`operating-rules.md`、joshuafolkken/kit#2983）
+  - 発火点: `pnpm josh rule:guard` — `rm -rf`（綴りによらず）・`gh repo delete` ／ `archive`・`gh pr close`・`gh api -X DELETE` の `Bash`。**毎回発火する**
+  - 発火しないとき: `gh issue close`・Issue ラベルの削除 ＝ ワークフロー自身の手順
+- **PR の直接作成**（`CLAUDE.md` → Git Rules、joshuafolkken/kit#3183）
+  - 発火点: `pnpm josh rule:guard` — `gh pr create`・`repos/<o>/<r>/pulls` への `gh api` 書き込みの `Bash`。`pnpm josh pr` を案内する。**毎回発火する**
+  - 発火しないとき: `pnpm josh pr`・PR の閲覧 ＝ `closes #N` を生成する経路
+- **保護ファイル**（`operating-rules.md`、joshuafolkken/kit#2983）
+  - 発火点: `pnpm josh rule:guard` — `.env` の `Read`、kit 以外のリポジトリでの `.claude/settings.json` の `Edit` ／ `Write`。**毎回発火する**
+  - 発火しないとき: kit 自身とユーザー単位の `~/.claude/settings.json` の編集
+- **ファイル本文をシェルに載せない**（`file-edits.md`、joshuafolkken/kit#2120）
+  - 発火点: `pnpm josh rule:guard` — 既存ファイルへのヒアドキュメント書き込み・書き込みを伴う `node -e` ／ インタプリタ heredoc・`perl -0pi -e` の `Bash`。**毎回発火する**
+  - 発火しないとき: 新規ファイル作成・読み取り専用のヒアドキュメント・短い `sed -i` ＝ 本文を丸ごと運んでいない
+- **停止時の通知**（`CLAUDE.md` →「Mid-workflow stop notification」、joshuafolkken/kit#2121）
+  - 発火点: `pnpm josh stop:guard` — 作業ツリーを押さえたまま、その turn に `confirmation` 通知を出さずに止まる。**停止をブロックする**
+  - 発火しないとき: 押さえが無い、`confirmation` 通知が末尾にある、または pre-gate cut を取った回 ＝ 人待ちの停止ではない
+- **hold の解放**（`.claude/skills/workflow-commands/working-tree-hold.md`、joshuafolkken/kit#2121）
+  - 発火点: `pnpm josh stop:guard` — ツリーが綺麗なのに `run:hold` 記録が残ったまま止まる。**停止をブロックする**
+  - 発火しないとき: ツリーが汚れている（`halfrun` の commit 前停止・`needs-human-review` 停止）、または解放済み ＝ 次のランが踏まない
+- **Issue 引用の書式**（`prompts/collaboration-workflow/issue-citation.md`、joshuafolkken/kit#2121・joshuafolkken/kit#2247）
+  - 発火点: `pnpm josh stop:guard` — 最後の返信の地の文に裸の `#N` を含む。**停止をブロックする**。引用を直して返信を出し直させる
+  - 発火しないとき: リンク形式・コード／引用行の中・`PR` 直後の `#N`・GitHub 向け成果物 ＝ 差し戻す裸の番号が無い
+- **起票の申し出**（`.claude/skills/workflow-commands/observation-filing.md`、joshuafolkken/kit#2422）
+  - 発火点: `pnpm josh stop:guard` — 最後の返信の地の文が起票を申し出る（「起票してよければ」等）のに、起票していない。**停止をブロックする**
+  - 発火しないとき: 起票済み、フェンス／引用行の中、第三者の `owner/repo` を名指す、または owner 不明 ＝ 保留された Tier A 起票が無い
+- **規則本文を散文に書き足す前の第 0 問・順序の問い**（`residency.md`、joshuafolkken/kit#2272・joshuafolkken/kit#2324）
+  - 発火点: `pnpm josh rule:guard` — `CLAUDE.md` ／ `prompts/**/*.md` ／ `.claude/skills/**/*.md` への `Edit` ／ `Write` で、正味の追記が閾値以上のもの。`pnpm josh oracle:list` と `pnpm josh run:step` の両方を走らせるまで毎回拒否する
+  - 発火しないとき: 規則ドキュメントでない、追記が閾値未満（誤字・リンク張り替え・削除）、または両コマンドを実行済み ＝ 配置の問いに答え済み
+- **オラクル未参照の行為**（`decision-oracle.ts`、joshuafolkken/kit#2324）
+  - 発火点: `pnpm josh rule:guard` — 発火点を宣言したオラクルが支配する `Bash`（`pkg:scout` ＝ `pnpm add`）を、そのオラクルの `pnpm josh <command>` 無しで出したとき。実行するまで毎回拒否する
+  - 発火しないとき: 支配下の行為を出していない、またはそのオラクルを実行済み ＝ 規則は既に守られている
 
-**「引き金が発火しないターンでは何も起きない」ことは、欠落ではなく仕様である。** 上の各行はいずれも、発火しない状態が「規則が守られている状態」と一致している。この一致が取れない規則は、引き金を特定できていないということであり、常駐に残す。**誤ったターンで発火するフックは、フックが無いより悪い。**
+**引き金はシェルのコマンド文字列しか見えない**（node 内の REST や `gh api --input <file>` は掛からない）。だから常駐側にトリガ 1 行を残し、配送はそれを効く瞬間に補強する。
 
-### コメント投稿は引き金ではない
-
-WIP 上限の引き金は Issue の**作成**だけを見る。`…/issues/<N>/comments` はコメントであり、起票ではない — コメントは起票より桁違いに多く、そこで拒否するフックは「誤ったターンで発火するフック」そのものになる。`scripts/rules/delivered-rules.test.ts` がこの境界を両方向から固定している。
-
-### Issue コメントの読み取り — 「読め」ではなく「目の前に置く」（joshuafolkken/kit#1319）
-
-**引き金は実装の開始ではなく、本文が届いた 1 件の呼び出しである。** 「実装を始める瞬間」は 1 件のツール呼び出しとして名指しできないが、「Issue の本文がランの目に入る瞬間」は名指しできる — `gh issue view <N>` か、`…/issues/<N>` で終わる GET。この行が判定基準を通るのはそこである。
-
-**拒否文は「コメントも読め」という要求ではなく、読み直しのコマンドそのものを渡す。** 散文の要求は joshuafolkken/kit#1344 が 3 ラン連続で「数値がまったく動かなかった」と実測した形式であり、この行がそれを避けるのは、本文だけの読み取りが**通らない**ことによる。ランの次の一手はコメント込みの読み取りになり、コメントは「読むべきもの」ではなく実際に手元にある。ただし `PreToolUse` の拒否が運べるのは文字列 1 本だけなので、**フックがコメント本文を注入するわけではない** — 1 往復ぶん遅れて、ランが自分で取りに行く。
-
-**この行は `batch:guard` と引き金が重なる唯一の行である。** `time_batch_guard.is_guarded_call` は `gh issue view` を候補として扱う（`gh issue create` は扱わない）。ただしこの行は前提を満たすまで毎回拒否するので（下の「例外」）、`is_first_delivery` の待避分岐を通らず、バッチングの拒否が出るターンでも拒否する。`delivered-rules.test.ts` がこれを固定している。
-
-**判定はコマンド 1 件ごとに、行頭に錨を打って行う。** シェル 1 行は複数のコマンドを運ぶため、`&&` ／ `||` ／ `;` ／ 改行で区切った各区間をそれぞれ判定する（`|` は区切りに使わない — `--jq` の中に現れる方がはるかに多い）。これがないと 2 つの誤りが同時に出る。引用符の中に `gh issue view` を含む書き込み（`gh issue comment <N> -b "…"`）が読み取りと誤認され、逆に `gh issue view <N> && grep -c x` のように無関係な `-c` を含む行が「コメント込み」と誤認されて配送が消える。
-
-**書き込みは読み取りではない。** `gh api` は `-f` ／ `-F` ／ `--field` ／ `--raw-field` ／ `--input` のいずれかが現れた時点で POST になり、`kickoff` はまさに `…/issues/<N>` へ PATCH してタイトルを正規化し空の本文を埋める。メソッドが明示的に `GET` でない、またはフィールド系のフラグを伴う呼び出しは対象外とする — さもないと 1 ラン 1 回の配送を書き込みに使い切り、同じランの本当の本文読み取りは無防備になる。
-
-**`-c` は「コメント込み」と見なさない。** `gh issue view <N> -c` は正しい読み取りだが、`-c` は `wc` ／ `grep` ／ `sort` のものである方が圧倒的に多く、これを行全体で許すとパイプで終わる複合行すべてで規則が黙る。誤って 1 往復ぶん止める側に倒し、`--comments` ／ `--json` の `comments` ／ `…/comments` エンドポイントの 3 綴りだけを「コメント込み」とする。最後の 1 つが要るのは、バッチングが本文とコメントを 1 行にまとめさせるからで、それを拒否すれば規則が求める形そのものを拒否することになる。
-
-**それでもシェル文字列しか見えない。** node の中から REST で本文を読む経路は最初から掛からない。だからこそ手順本体は `SKILL.md` → §2g に置かれており、フックはそれを補強するだけである。
+**「引き金が発火しないターンでは何も起きない」ことは仕様である。** 各項目の発火しない状態は「規則が守られている状態」と一致する。一致が取れない規則は引き金を特定できておらず、常駐に残す。**誤ったターンで発火するフックは、フックが無いより悪い。**
 
 ## 配送は 1 ラン 1 回
 
-配送文は**ラン 1 回につき 1 度**しか出ない（記録は `hook-decision.ts` の stamp）。2 度目も拒否すれば、規則に従った直後の呼び出しを止めてラン自体を詰まらせる。したがって**配送文には「数えたうえで同じ呼び出しをもう一度出せ」と明記する**。これが無いと、拒否された側は次に何をすればよいか分からない。
-
-### 例外 — 繰り返す行為を止める行は毎回発火する（joshuafolkken/kit#1570）
-
-**1 ラン 1 回が正しいのは、拒否がランの「知っていること」を変える行だけである。** コメントを読む、Issue を数える、本文をファイルに書く — いずれも一度届けば、そのランは以後それを知った状態で進む。**一方、止めたい対象そのものが繰り返される行為なら、1 回で終わる配送は「一度断られたあとは自由」を意味し、強制は親の自制に戻る。** その自制が破れたのが #1570 である。
-
-そこで **`decide` を自前で持つ行は 1 ラン 1 回の対象から外れ、条件を満たすかぎり毎回拒否する**。
-
-**`batch:guard` との待避分岐は、そういう行では守る対象が変わる。** 1 ラン 1 回の行では**記録**を守っていた — レースに負ければ、そのランに 1 度しかない配送を無駄打ちするからである。毎回発火する行はその形では消えない。一方で待機タイマーを張る呼び出しは定義上「単発の `Bash`」であり、まさにバッチングガードも候補として扱う形なので、**拒否まで待避させると、10 秒の窓とその中の再発行で規則がまるごと黙る**。したがって**拒否は無条件に行い、待避は「記録してよいか」として行へ渡す** — 他のフックが止めうる呼び出しでしてはならないのは、走らなかったタイマーを生きていると書き残すことだからである。配送文には「これは毎回発火する」と明記する（1 回きりだと読まれると、再発行すれば通ると誤解される）。
-
-### 例外 — 前提を求める行は、前提が満たされるまで毎回拒否する（joshuafolkken/kit#2807）
-
-**`already_satisfied`（前提の行為がトランスクリプト末尾にあるか）を持つ行は、1 ラン 1 回の対象から外れる。** 前提が末尾に現れるまで、毎回拒否する。1 ラン 1 回のままだと、前提を飛ばしたランの再発行がそのまま通る。手順を読み飛ばしたランほどガードを素通りしてしまい、ガードの意味がない。対象は `issue-fold`・`issue-comments`・`rule-body`・`oracle-consulted:*` である。
-
-従うランが詰まることはない。前提の行為を済ませれば、stand-down が先に答えて通すからである。記録を使い切る心配もないので、`batch:guard` との待避もしない。待避すると、10 秒の窓の中の再発行が前提を満たさないまま通ってしまう。配送文には「前提が末尾に現れるまで拒否する」と明記する。
-
-**前提の証拠を読めないときは、拒否を基本とする。** たとえば前提の行為を確かめるための記録が読めないときがこれに当たる。意図して通す例外は、理由をコードのコメントに残す。現在の例外は次のとおりである。
-
-- トランスクリプト自体を読めないとき（`hook-decision.ts`）
-- 初回の起票で、畳み込む相手がないとき（`issue-fold.ts`）
-- 進捗の記録がないとき（`early-heartbeat.ts`）
-- git の読み取りに失敗して、変更なしとして扱うとき（`delivered-rules.ts` の `test-declared` 行）
-
-## 本文のシェル評価は同じ機構の 1 行で覆った（joshuafolkken/kit#1198）
-
-`delivered-rules.ts` の `shell-body` 行は、`-f body=` ／ `--body "` というフラグで引くのではなく、**二重引用符の本文値に `` ` `` か `$` が実際に含まれるとき**だけ発火する。`!`（履歴展開）は引き金に入れない。規則本文と引き金の死角は [`shell-body.md`](./shell-body.md) にある。経緯: `docs/maintainers/rule-delivery-rationale.md` →「本文のシェル評価を同じ機構の 1 行で覆った経緯」。
+配送文は**ラン 1 回につき 1 度**しか出ない — 2 度目も拒否すれば、規則に従った直後の呼び出しを止めてしまう。だから**配送文には「同じ呼び出しをもう一度出せ」と明記する**。例外は 2 つで、繰り返す行為を止める項目は毎回発火し（joshuafolkken/kit#1570）、前提の行為を求める項目は前提が末尾に現れるまで毎回拒否する（joshuafolkken/kit#2807）。これとは別に、バッチングと調査の 2 ガードは同じ呼び出しを二度拒否しないまま、違反が間隔分続けば再び発火する（joshuafolkken/kit#2164）— 1 回きりの注意ではない。先の 2 つの例外の配送文には「同じ呼び出しをもう一度出せ」ではなく、それぞれ「これは毎回発火する」「前提が末尾に現れるまで拒否する」と明記する — 1 回きりと読まれると、再発行すれば通ると誤解される。前提の証拠を読めないときは拒否を基本とする。経緯と意図した通過例外: `docs/maintainers/rule-delivery-rationale.md` →「配送は 1 ラン 1 回」。
 
 ## マーカーテスト
 
-各テストファイルが何を固定するかの一覧: `docs/maintainers/rule-delivery-rationale.md` →「マーカーテスト」。列挙表の行を固定するスイートには `scripts/rules/turn-batching-rule.test.ts` ／ `scripts/rules/shell-body-rule.test.ts` ／ `scripts/rules/piped-verification-rule.test.ts` ／ `scripts/rules/pre-gate-cut.test.ts` ／ `scripts/rules/implementation-cut-rule.test.ts` ／ `scripts/rules/implementation-cut.test.ts` ／ `scripts/rules/lane-park.test.ts` ／ `scripts/rules/lane-interactive-ask.test.ts` ／ `scripts/rules/rule-body-guard.test.ts` がある。
+各項目を固定するスイートの一覧: `docs/maintainers/rule-delivery-rationale.md` →「マーカーテスト」。

@@ -117,6 +117,16 @@ describe('run_merge_steps.do_outage — re-dispatchable, never parked', () => {
 	})
 })
 
+describe('run_merge_steps.is_over_budget — a loop no session owns', () => {
+	it('answers under without measuring when no threshold is given', async () => {
+		const subprocess = vi.spyOn(josh_command, 'josh_run')
+
+		expect(await run_merge_steps.is_over_budget(undefined)).toBe(false)
+		expect(subprocess).not.toHaveBeenCalled()
+		subprocess.mockRestore()
+	})
+})
+
 describe('run_merge_steps — carry owner check (joshuafolkken/kit#2114)', () => {
 	beforeEach(() => {
 		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue('/stub')

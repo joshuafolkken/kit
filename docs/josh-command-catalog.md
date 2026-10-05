@@ -45,6 +45,16 @@ Type-check with tsc (skips a basic project with no TypeScript to check)
 
 ---
 
+### `josh codex:hook-adapter`
+
+> **Audience:** automation · **Side effects:** none
+
+`<pretool|posttool>`
+
+Codex hook: run the pretool or posttool guard on a Codex payload (reads the tool call on stdin)
+
+---
+
 ### `josh cspell:dot` · `josh sd`
 
 > **Audience:** developer · **Side effects:** processes
@@ -989,9 +999,9 @@ Post one comment to an issue from a file, so no shell expands the body
 
 > **Audience:** automation · **Side effects:** network
 
-`<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>]`
+`<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok]`
 
-File an Issue with every filing step: lint, Origin, duplicate scout, labels, then epic:bundle
+File an Issue with every filing step: lint, Origin, WIP cap, duplicate scout, labels, then epic:bundle
 
 ---
 

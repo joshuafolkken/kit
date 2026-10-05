@@ -12,7 +12,7 @@ restating any of it.
 **One `backlogrun` approves every merge of every issue `pnpm josh backlog:next` offers** — the issues
 carrying `auto-ok`, every child of an epic whose root carries it, **and an issue this run filed, once
 it has become such a child**. A filing is placed into an epic by `pnpm josh epic:bundle`, which
-`prompts/review.md` → "Review round cap" and `SKILL.md` → §2i both make **Tier A rather than
+`prompts/review.md` → "Review round cap" and `observation-filing.md` both make **Tier A rather than
 optional**; where that epic's root carries `auto-ok`, the child is offered from the next ask onwards
 without anybody having labelled it.
 
@@ -24,23 +24,26 @@ bounds it instead is "The brake that replaces the promise" below.
 epic"** — what runs is stated by the keyword and its arguments, never inferred from the shape of a
 request.
 
-**Which issues may be opted in stays a person's decision.** `auto-ok` is applied only by a person —
-this file is that rule's single source. **Which ones carry the label, a person; in what order and how
-many at once, the run.** An issue the run files and bundles into an already opted-in epic is offered
-from the next ask onwards, and the brake below bounds that quantity rather than the membership.
+**An issue found by opted-in work is opted in by default** (joshuafolkken/kit#3213) — this file is
+that rule's single source, and `pnpm josh issue:file` computes it (`scripts/issue/issue-auto-ok.ts`),
+printing `auto-ok: applied` or `auto-ok: not applied` with the reason. It applies `auto-ok` while a
+`backlogrun` carry record is live, or when the issue the current branch names carries `auto-ok`,
+and never on a `--repo` filing to another repository. **Pass `--no-auto-ok` only when the new issue needs a person's judgement** — a Tier B toss-up or a
+Tier C action inside it; a choice with a clear recommendation is Tier A and does not qualify.
+Outside those signals `auto-ok` stays a person's to apply. **Which ones carry the label, that rule;
+in what order and how many at once, the run** — the brake below bounds the quantity, not the
+membership.
 
-**The end-of-run retrospective is the one carve-out** (joshuafolkken/kit#2328): when a run drains its
-backlog, the retrospective files the improvements worth carrying into the next run and applies
-`auto-ok` to them. Its filings are counted against every brake in "The brake that replaces the
-promise" below with no exception, and a retrospective that judges nothing worth carrying files
-nothing. Every other filing route is unchanged: `auto-ok` stays a person's to apply.
+The end-of-run retrospective is no longer a separate carve-out: it files
+while the carry record is live, so the same default opts its filings in, counted against every brake
+in "The brake that replaces the promise" below.
 
 A Tier C action inside a child still stops that child, exactly as it does for any batch child.
 
 **A named issue is approved by the keyword and its number, not by `auto-ok`** (joshuafolkken/kit#1984).
-`backlogrun #N1 #N2 …` runs those issues whether or not they carry the label. The pool that follows is
-unchanged: still `auto-ok`, still a person's to opt in. "Named issues run first, in order" below is the
-procedure.
+`backlogrun #N1 #N2 …` runs those issues whether or not they carry the label. The pool that follows
+is unchanged: still `auto-ok`, opted in as "Which ones carry the label" above says. "Named issues
+run first, in order" below is the procedure.
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the authorization boundary is shaped this way"
 
@@ -53,23 +56,23 @@ inside the invocation" below):
 | --- | --- | --- |
 | `--max` | how many issues one invocation may merge — a run's own filing competes for that number rather than extending it | `run:carry --merged` |
 | `--idle`, and the 8-hour whole-run bound | how long one invocation may go on looking for more | the record's `started_at` |
-| **Ten filings per invocation** | how much one invocation may add to the pool at all, on **every** filing route (`SKILL.md` → §2d) | `run:carry --filed` |
+| **Ten filings per invocation** | how much one invocation may add to the pool at all, on **every** filing route (`prerequisite.md`) | `run:carry --filed` |
 | The WIP cap on open issues | how large the pool may become, across invocations | `prompts/collaboration-workflow/wip-cap.md` |
 
 One invocation may add at most ten issues to the pool and merge at most `--max` of them, after which
 the run ends and the next one waits for a person to type the keyword.
 
-**Two filing routes are exempt from the depth test (`SKILL.md` → §2i), and the ten-filings ceiling
+**Two filing routes are exempt from the depth test (`observation-filing.md`), and the ten-filings ceiling
 still covers them:**
 
-- **`route:tier-a` and `route:interrupt` stay exempt.** **Their number is still capped**: §2d's
+- **`route:tier-a` and `route:interrupt` stay exempt.** **Their number is still capped**: `prerequisite.md`'s
   ten-filings ceiling is stated "at every entry point", and `run:carry --filed` counts it across
   session cuts.
 - **A review branch-2 filing stays exempt** — a confirmed defect reaching a runtime path, with a
   written failure scenario.
 
 **This section is the single source of how the `epic:bundle` obligation and this authorization
-boundary meet.** `SKILL.md` → §2i points here rather than restating it.
+boundary meet.** `observation-filing.md` points here rather than restating it.
 
 ## Named issues run first, in order
 
@@ -95,7 +98,7 @@ issues it did not start. `backlog_named.after_failure` is the single source.
 
 - A named issue read back `CLOSED` — merged, or already `already-done` — is finished; continue with the
   next.
-- A **`needs-human-review`** named issue stops the whole run before its commit (`SKILL.md` → §2z),
+- A **`needs-human-review`** named issue stops the whole run before its commit (`needs-human-review.md`),
   exactly as any child does — the named issues after it are not started and neither is the pool.
 - Everything else about running one — the verification gate, the hand-off, the guards — is
   this file's and is not restated here.
@@ -189,11 +192,11 @@ the maximum, the whole-run bound), or the consecutive-failure guard tripped — 
 it clears the record; the reason is the stop verdict's, in the session language. A clean completion
 takes the bare `--end` and stays silent, having its own report; a parked _child_ is pushed by the child
 that parked it (`backlogrun-park.md`). Because `--end` removes the record, a re-run's second `--end`
-finds nothing and never re-sends that confirmation — `backlogrun-progress.md` →
+finds nothing and never re-sends that confirmation — `progress-watcher.md` →
 "Progress while the run is quiet" is the single source of the pull-versus-push split.
 
-**The record widens nothing.** It carries a budget and nothing else: `auto-ok` is still applied only
-by a person. A pool grown across the cut by this run's own bundled filings is "What one invocation
+**The record widens nothing but the default.** It carries a budget, and its being live is what
+opts this run's filings in ("What one invocation approves"); no other label follows from it. A pool grown across the cut by this run's own bundled filings is "What one invocation
 approves", its ceiling counted from the record's `filed`.
 
 **Nothing waits for a person any more — `pnpm josh run:wake` supervises the driver**. After a cut or
@@ -215,7 +218,8 @@ owner prevents a second driver from taking it over. On `none`, `expired` or `unr
 person's**: the supervisor spends the declared budget and never declares another.
 
 **What may be run is untouched.** The driver takes named issues from the invocation and pool issues
-from the existing offer command. The supervisor writes no `auto-ok` label. A judgment session receives
+from the existing offer command. The supervisor writes no label of its own; `auto-ok` arrives only
+through `issue:file`'s default. A judgment session receives
 the original invocation plus the driver's reason and resume state.
 For a named epic, the driver hands off `epic #N` with the original invocation. The judgment session
 follows the named epic procedure and dispatches its children; the epic root is never launched as a
@@ -225,31 +229,9 @@ from the carry record's remaining named list, so the next driver pass can advanc
 also consults the carried maximum and whole-run bound
 before each launch, and a failed named issue skips the remaining named prefix.
 
-**A failure is visible rather than silent.** A judgment wake that never claims the carry record is retried, and
-once the retries are spent the supervisor stops and sends a `warning` Telegram; a carry record that
-expired or cannot be read ends it the same way. `none` — the run having finished — and a person's own
-`--stop` stay silent. Everything the supervisor starts writes to one log file per repository, named by
-`--list` and by every warning, so a silent exit stays diagnosable.
-
-**A person keeps control of it.** `pnpm josh run:wake --list` names the running supervisor and
-`--stop` ends it; the full contract, what it launches and why that is a constant rather than a
-setting are `docs/josh-commands-automation.md` → "`josh run:wake`".
-
-**Every unattended role runs with the provider selected from the invoking CLI and its own profile.**
-Codex sessions use OpenAI; Claude Code sessions use Anthropic. Anthropic uses scheduler
-`claude-opus-5-5`, worker `claude-opus-5-5` and reviewer `claude-opus-5-5`; OpenAI uses `gpt-6.1-sol`,
-with role efforts `medium`/`medium`/`high` (scheduler / worker / reviewer) for both. Role overrides
-resolve before launch; model overrides apply only to Claude Code, effort overrides to either provider,
-and legacy `JOSH_LANE_*` values to the worker only. Invalid configuration, a missing or conflicting
-session marker, or a missing, outdated or unauthenticated CLI refuses without fallback, promotion or
-worker retry. `run:wake --list`, `lane:list`, the review brief and each launch
-log expose the resolved provider, role, model and effort.
-`docs/josh-commands-automation.md` → "`josh lane:dispatch`" and `backlogrun-child.md` → "Each child runs in a
-delegated unit" are the single sources.
-
-**It relays progress from the existing report record.** The driver keeps the same `run:merge` event
-stream and `run:report` finish path; `pnpm josh run:wake --list` relays the latest line from that
-record. Telegram notifications retain their existing generation points (→ "It goes to the session only").
+**A person keeps control of it** — `pnpm josh run:wake --list` names the running supervisor and `--stop`
+ends it. Its failure warnings, log file, progress relay and the provider / model / effort each
+unattended role runs with are `docs/josh-commands-automation.md` → "`josh run:wake`".
 
 **The completion report names how many sessions were woken beside the record's `cuts`** — one wake per
 cut is the invariant, and what counts is a carry record actually claimed, never a process started.
@@ -291,7 +273,7 @@ children are enumerated individually rather than summarized under their root. Re
 stop at a time.**
 
 - **Decide everything decidable from the issue itself.** Read the issue's body **and its comments**
-  (`SKILL.md` → §2g), and where the answer is already there, record it as an Issue comment and
+  (`issue-comments.md`), and where the answer is already there, record it as an Issue comment and
   **remove the label** — `CLAUDE.md` → "Decision autonomy" already makes that Tier A. **Read them all in
   one `pnpm josh issue:read <N> <N> …` call**, not a `gh api` pair per issue.
 - **Never measure in order to decide.** A question needing a benchmark, a profile, or a run of the
@@ -301,8 +283,8 @@ stop at a time.**
   never the body.
 - **Order and isolate the pool in the same pass** (joshuafolkken/kit#2776), from the same
   `issue:read`: an issue that must land first (it builds what another reuses, or both edit one code
-  path) becomes a native `blocked-by`; an issue meeting all three of the `wip-cap.md` → 「実行のしかた」
-  conditions gets `run:solo`, **every other one `run:lane`**. Comment the reason; the offer commands enforce all
+  path) becomes a native `blocked-by`; an issue meeting all three of the `backlogrun-lanes.md` →
+  "Lanes — running more than one child at a time" conditions gets `run:solo`, **every other one `run:lane`**. Comment the reason; the offer commands enforce all
   three, answering `triage` while an issue has neither.
 - **`priority:high` puts an issue first** (joshuafolkken/kit#2928; ranking: `docs/josh-commands-automation.md` →
   `josh backlog:next`). Apply it only on a cited ground — a stated deadline or urgency, or a person's
@@ -313,96 +295,33 @@ stop at a time.**
   run does not wait on it.
 
 **`needs-decision`, `run:solo`, `run:lane` and `priority:high` are the workflow labels a run may
-apply, and none is `auto-ok` or `needs-human-review`.** Those two stay a person's alone (this file, `SKILL.md` → §2z); a
-run parks with `needs-decision` and a person clears it.
+apply by hand, and none is `auto-ok` or `needs-human-review`.** `needs-human-review` stays a
+person's alone (`needs-human-review.md`); `auto-ok` reaches only a run's own filing, through
+`issue:file`'s default ("What one invocation approves"). A run parks with `needs-decision` and a
+person clears it.
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the plan and the decision pass come first"
 
 ## The loop
 
-**The detached `run:wake` supervisor runs `backlog:drive`** after the carry record is handed off.
-Its driver keeps the loop below running without a parent AI turn. A returned judgment branch includes
-the first-line verdict, affected issue and `resume:` flags in the AI prompt; `stop` reports and ends
-inside the driver.
+**The loop is computed, not walked by hand.** The `run:wake` supervisor runs `pnpm josh backlog:drive`,
+whose head is `pnpm josh backlog:offer`: the answer-to-budget mapping, the retry count, the `--exclude`
+feedback and the lane count are its own (`docs/josh-commands-automation.md` → "`josh backlog:offer`"
+and "`josh backlog:drive`"). **An AI session reaches this section only when the driver hands a branch
+back** — the `Driver result:` line names it, and the session acts on it, then hands the loop back with
+`pnpm josh run:carry --cut --owner "$PPID"`:
 
-**The loop's head is one command — `pnpm josh backlog:offer`** (joshuafolkken/kit#2162). It runs
-`backlog:next`, maps its answer to the budget word the table below fixes, runs `backlog:budget`, and
-returns the verdict with the issues to start. It stays both halves' contract source: what an answer
-*means* changes here.
+| Handed back | What the session judges |
+| --- | --- |
+| `triage` | Label each issue stderr names `run:solo` or `run:lane` (with `blocked-by` where one must land first), as "Resolve what the plan can resolve" does; running children continue |
+| `offer` | `backlog:offer` itself could not answer. Report what stderr printed; **never pick an issue by hand** |
+| `launch #N` | A lane failed after it opened. Read the lane's log and park `#N` (`backlogrun-park.md` → "park and continue") |
+| `merge [<token>] #N` | `run:merge` stopped on `environment`, `busy`, `retry` or `over`, or printed nothing: `environment` ends the run, the others re-read the child (`backlogrun-progress.md` → "Running a named epic's children") |
+| `watch` | The backlog drained with nothing in flight; the retrospective is owed (`run:step`) |
+| `window` | The driver's wait window ran out with nothing to judge; hand the loop back as is |
 
-```bash
-offer=$(pnpm josh backlog:offer --started "$started" --active "$active")
-offer=$(pnpm josh backlog:offer --started "$started" --active "$active" --exclude 1630,1631)   # after #1630, #1631 merged
-```
-
-**The first line of standard output is the budget verdict; on `run`, the issue numbers to start
-follow, one per line.** `backlog:offer` forwards `--exclude` and `--repo` to `backlog:next` and
-`--started` / `--active` / `--merged` / `--running` / `--max` / `--idle` to `backlog:budget`, computes
-`--answer` itself, and carries the consecutive-retry count on the last stderr line (`retries: <n>`) and
-in `--json`. **The verdict table is "The two budgets" below; the answer-to-word mapping it applies is
-this section's table.**
-
-**`backlog:next`'s output contract is `docs/josh-commands-automation.md` → "`josh backlog:next`", and four parts
-of it decide how the mapping is written:**
-
-1. **Standard output is one token per line, and everything else is standard error.**
-2. **The tokens are bare issue numbers, scoped to the repository the command runs in.** A runnable
-   child in *another* repository is reported on standard error with its repository and checkout, and
-   is never a token; this repository having no candidate of its own is answered `wait`. **So
-   `backlogrun` takes no `owner/repo#N` token.** Report the other repository's candidates in the run
-   summary and leave them to a session running there (`backlogrun-lanes.md` → "Concurrency").
-3. **The verdict words are `wait`, `stop`, `triage`, `retry`, `error` and `none`** — `none` is
-   `epic:next`'s `complete` under this command's spelling, and there is no `complete` here. **`retry`
-   is the one with no `epic:next` counterpart**: it says GitHub did not answer.
-4. **Exit code 0 covers all six verdicts, and 1 means the listing could not be read** — no answer at
-   all. **`error` cannot be told apart by exit code, so read the token rather than the status.**
-
-**What the answer means is this table's; whether the run may act on it is `pnpm josh backlog:budget`'s**
-(joshuafolkken/kit#1632). The right-hand column ends in the word each answer is handed to that command
-as. Nothing here decides an ending on its own — the two budgets and every termination live in the next
-subsection.
-
-| Answer | What to do | Budget answer |
-| --- | --- | --- |
-| One or more issue numbers | Start each one as a child, up to the free lanes — `backlogrun-lanes.md` → "Lanes" and "Each child runs in a delegated unit", unchanged. Then **ask the command again**, with the merged numbers added to `--exclude` | `candidates` |
-| `wait`, with something of this run's own still in flight | Everything opted in is blocked or already running, so waiting can still change the answer. **Ask the command again on the in-flight wake — `pnpm josh lane:await` or the progress watcher's arrival exit, never a report** — the parent starts no sleep of its own, and the interval is a floor on the re-ask rather than a clock (`backlogrun-progress.md` → "Waiting, and never waiting forever" and "The parent keeps no clock of its own") | `blocked` |
-| `wait` this checkout can never resolve — the only candidates the command reported on standard error are in other repositories, and this run has nothing of its own in flight | Report those candidates with their checkouts. **Waiting cannot resolve them, but a person opting a new issue in here still can**, so the ending is the idle watch's rather than this row's | `exhausted` |
-| `stop` | Nothing can proceed without a person. Report the parked issues and finish | `parked` |
-| `triage` | A candidate lacks `run:solo` / `run:lane` (joshuafolkken/kit#2779). Judge each one stderr names as the pre-start pass does, then **ask again**; running children continue | `untriaged` |
-| `retry`, on fewer than three consecutive asks | GitHub did not answer, so the graph was never read. Sleep the polling interval and **ask the command again** — **this is one of the states with no watcher-delivered wake** (`backlogrun-progress.md` → "The wake exists only while something is in flight"). This is the one answer re-asking is allowed on, and the count is consecutive: any other answer resets it to zero | `blocked` |
-| `retry` for a third consecutive time | The outage is not a hiccup. Report what the command printed on standard error and finish | `unreadable` |
-| `error` | The graph could not be resolved — report what the command printed on standard error and finish. **Never re-ask hoping for a different answer**, and never fall back to picking an issue by hand | `unreadable` |
-| `none` | Nothing opted in is left | `exhausted` |
-| Exit 1, empty standard output | The listing could not be read. Report it and finish — **it is not `none`** | `unreadable` |
-
-**Three consecutive `retry` answers end the run**, and any other answer resets the count to zero, so
-`backlog:budget` is told `blocked` while retries remain and `unreadable` on the third.
-
-**Feed every issue this run has merged back through `--exclude`** — a just-merged issue can still read
-as open on the next ask. The flag takes a comma-separated list and may be repeated; it drops the issue
-from every bucket rather than only from the offer.
-
-**A short offer is not proof the backlog is empty**: the standalone half is capped at the five rows
-`🗒 Next issues` shows, so a sixth opted-in issue appears on the next ask; an epic's children come
-through its own graph, uncapped.
-
-**The epic side is found server-side by the `epic` label**, so an epic without it is invisible and
-tracks nothing — a known limit of the listing (joshuafolkken/kit#1633).
-
-**A child is offered on its own `auto-ok` unless the epic tracking it is opted in**
-(joshuafolkken/kit#1668). An epic that **is** opted in owns its children entirely and sequences them;
-ordering survives the standalone route on the children's own `blocked-by` relations, which `--ordered`
-records.
-
-**An order between two epics holds too** (joshuafolkken/kit#1943). A `blocked-by` relation whose
-blocker sits in another opted-in epic — or is an opted-in standalone issue — makes the child wait on
-time, so one `backlogrun` runs both epics in that order. A blocker outside the opted-in backlog, or one
-inside it that itself waits on a person, makes the child wait on a person instead, and a cycle across
-epics answers `error`. The table is `docs/josh-commands-automation.md` → "`josh epic:next`".
-
-**New work is picked up without restarting anything.** The command re-derives its pool from GitHub
-labels on every ask, so an issue filed and opted in while the run is going is offered on the next
-iteration, once triaged.
+**A candidate only in another repository is never a token** — report it with its checkout and leave it
+to a session running there (`backlogrun-lanes.md` → "Concurrency").
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the loop's contract is shaped this way"
 
@@ -428,13 +347,13 @@ at the first empty backlog. The default's single source is `scripts/backlog/back
 `DEFAULT_IDLE_MINUTES`. **A watch is polled every 5 minutes, not at the loop's 60-second interval** —
 read the interval from the reason `backlog:budget` prints rather than remembering it.
 
-**To become a candidate an issue needs `auto-ok`, which only a person applies** — except an issue this
-run filed and bundled under an already opted-in epic, which is admitted ("What one invocation
-approves") and bounded by the brake there, never the watch. No issue nobody opted in is ever picked up
-during a watch.
+**To become a candidate an issue needs `auto-ok`** — applied by a person, or by `issue:file`'s
+default to an issue this run filed ("What one invocation approves") — or to be a child this run
+filed and bundled under an already opted-in epic. Either is bounded by the brake there, never the
+watch. No issue that neither a person nor that default opted in is ever picked up during a watch.
 
 **`backlog:offer` asks `backlog:budget` for you on every iteration** — it maps `backlog:next`'s answer
-to the word the table above fixes and hands it over, so the loop makes the one call and reads back the
+to the word "The loop" points to and hands it over, so the loop makes the one call and reads back the
 verdict:
 
 ```bash
@@ -445,7 +364,7 @@ offer=$(pnpm josh backlog:offer --started "$started" --active "$active" \
 **`--active` is required of every ask, because the watch is on unless it was turned off** — an
 invocation whose watch is on and that carries no `--active` is **refused** by `backlog:budget`. Only
 `--idle 0` excuses it. **`--running` also decides `wait` and `--retries` decides `retry`** — the two
-context branches the table above carries, applied inside the command from the counts the loop already
+context branches that mapping carries, applied inside the command from the counts the loop already
 tracks.
 
 | Verdict | What the loop does |
@@ -511,12 +430,13 @@ Termination is decided by what the loop is told, never by a judgement that enoug
   rather than per epic: children per run, Issues filed per run, and consecutive child failures. The
   maximum above is a person's declaration of scale and does not replace any of them — whichever binds
   first ends the run.
-- **A `needs-human-review` child stops the whole run** before its commit — `SKILL.md` → §2z, which is
+- **A `needs-human-review` child stops the whole run** before its commit — `needs-human-review.md`, which is
   the single source, and `backlogrun-park.md` → "`needs-human-review` — the one stop that is not a park" for
   what happens to its lane.
 - **The hand-off check** — `pnpm josh cost --cut` at every child's merge, and the lane
   hand-over that follows an `over` — is `backlogrun-progress.md` → "The hand-off", unchanged. It is
-  **not** asked during an idle watch: "The cost check is not asked during a watch" above.
+  **not** asked during an idle watch: "The cost check is not asked during a watch" above, nor by the
+  supervisor's `backlog:drive`, which has no session to cut (joshuafolkken/kit#3156).
 - **Parking is not stopping.** A child that needs a decision, and a delegated unit that stopped
   without reporting, are **parked** and the run continues (`backlogrun-park.md` → "park and
   continue"); only the consecutive-failure guard above can turn repeated parks into a stop.
@@ -529,9 +449,9 @@ All of these are this file's, and are reached here in the same order and for the
 | --- | --- |
 | `git switch main && git pull`, then `pnpm josh latest:scope`, then `pnpm josh lane:prune` — in the primary checkout, before the first lane opens | `backlogrun-lanes.md` → "Once per repository, before the first lane opens" |
 | `josh latest` on `required` only, asked once at the first child and never in a lane | `backlogrun-child.md` → "`josh latest` runs once per session, not once per child" |
-| `pnpm josh run:hold <N>`'s preflight check, before each child that is not in a lane | `backlogrun-child.md` → "Preflight" |
-| `pnpm josh run:progress --wait` in the background, `--mark` at every real report | `backlogrun-progress.md` → "Progress while the run is quiet" |
-| `pnpm josh release:scope` once, after the last issue has merged and the last lane is closed | `followup-reference.md` → "When `pnpm josh release` runs" |
+| `pnpm josh run:hold <N>`'s preflight check, before each child that is not in a lane — act on what it prints | `docs/josh-commands-automation.md` → "`josh run:hold`" |
+| `pnpm josh run:progress --wait` in the background, `--mark` at every real report | `progress-watcher.md` → "Progress while the run is quiet" |
+| `pnpm josh release:scope` once, after the last issue has merged and the last lane is closed | `followup.md` → "When `pnpm josh release` runs" |
 
 **Two more run once per session and are this file's own**:
 `pnpm josh run:carry --begin "<the invocation, single-spaced>" --owner "$PPID"` before the plan and

@@ -2,8 +2,8 @@ import { hook_launch } from '#scripts/init/hook-launch'
 import { describe, expect, it } from 'vitest'
 import { codex_hooks, type HookConfig } from './codex-hooks'
 
-const PRETOOL_GUARD = hook_launch.hook_launch_command('pretool-guard.js', 'pretool:guard')
-const FORMAT_EDITED = hook_launch.hook_launch_command('format-edited.js', 'format:edited')
+const PRETOOL_GUARD = hook_launch.hook_launch_command('pretool-guard')
+const FORMAT_EDITED = hook_launch.hook_launch_command('format-edited')
 const PROMPT_ECHO = "echo 'rule'"
 const TOOL_MATCHER = 'Bash|Edit'
 const PROMPT_TIMEOUT = 10

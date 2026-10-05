@@ -74,7 +74,7 @@ const PROVIDER_PROFILES = { anthropic: DEFAULT_PROFILES, openai: OPENAI_PROFILES
 
 // **Effort as a function of the run phase, not the role alone** (joshuafolkken/kit#2382). For the first
 // merge only the mechanical ship/bookkeeping region is lowered: the pre-gate resume drives the gate,
-// commit, PR and merge, applying fixes the gate has already named — work SKILL.md §2b calls the opposite
+// commit, PR and merge, applying fixes the gate has already named — work delegation.md calls the opposite
 // of judgement. The design-judgment implementation phases keep the role default, as does any role/phase
 // with no entry, and the review's own judgement is the reviewer role's (`high`), untouched by lowering
 // the worker here. The investigation phase — highest output density — is left for a later merge, once

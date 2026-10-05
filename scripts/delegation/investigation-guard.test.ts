@@ -225,7 +225,7 @@ describe('investigation_refusal — every failure allows the call', () => {
 })
 
 describe('investigation_refusal — a delegated unit is never refused', () => {
-	// joshuafolkken/kit#1840: a unit is already where §2b sends the reading, and a read-only one has no
+	// joshuafolkken/kit#1840: a unit is already where `delegation.md` sends the reading, and a read-only one has no
 	// `Agent` tool to dispatch with, so the refusal asked for an action the unit could not take. The
 	// hook still derives the fork path (joshuafolkken/kit#1424); it simply has nothing to record there,
 	// and the parent's own refusal record stays separate.
@@ -266,7 +266,7 @@ describe('investigation_refusal — a delegated unit is never refused', () => {
 describe('investigation_refusal — a file the run has edited is not re-counted', () => {
 	// joshuafolkken/kit#1840: the scenario the Issue measured. The run reaches the threshold on unedited
 	// files, then edits EDITED_FILE; a read of EDITED_FILE afterwards is a read of a file the run edited,
-	// which §2b keeps in the main line, so it is not the `+ 1` that trips the count — whereas a read of a
+	// which `delegation.md` keeps in the main line, so it is not the `+ 1` that trips the count — whereas a read of a
 	// genuinely new file still is, and a read after an edit that *failed* is investigation like any other.
 	it.each([
 		['relative', EDITED_FILE],

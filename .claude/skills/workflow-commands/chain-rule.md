@@ -10,7 +10,8 @@ Review results and successful pushes are never turn boundaries.
    whose prompt names `pnpm josh ship --log <N>` and (Anthropic lane, #2964) the re-detach to run after
    the fix — `pnpm josh ship --detach`, `--review` only if the stopped ship carried it and stopped before
    round 2, which is final (`scripts/run/run-ship-next.ts`); the supervisor skips a recorded round 1.
-   `failed` → step 1.
+   `failed` → step 1. A backgrounded `ship` issued alone is moved to the foreground by the hook
+   rather than refused (#3154).
 1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before the scoped pair and
    the gate** — the pre-gate cut (a no-op outside a lane, joshuafolkken/kit#2177). Then run the final scoped lint/test pair and `pnpm josh run:review`: it starts
    `pnpm josh gate` in the background and prints the `/code-review` brief in one call, so the two overlap
@@ -62,7 +63,7 @@ once here; the measurements that motivated each one live in the linked Issues.
 - **origin/main is merged in before the gate** — `pnpm josh main:merge` merges `origin/<default>` into
   the branch before the gate and the review start, so the gate verifies the tree that will actually
   merge rather than one that never existed (joshuafolkken/kit#1837). It is the last edit, so the scoped
-  pair and the gate run once over it. A conflict here fires `backlogrun-lanes.md` → "Conflicts are not predicted"
+  pair and the gate run once over it. A conflict here fires `backlogrun-recovery.md` → "Conflicts are not predicted"
   early. **This is the one place a conflicted merge's procedure is written** (joshuafolkken/kit#2445):
   `main:merge` refuses before merging when uncommitted changes touch a path the default branch also
   changed, or when the index still holds unresolved or staged paths — commit the work first with

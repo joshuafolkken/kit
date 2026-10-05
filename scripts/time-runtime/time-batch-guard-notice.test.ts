@@ -98,3 +98,54 @@ describe('time_batch_guard.recent_candidates — the write-side fold', () => {
 		expect(time_batch_guard.recent_candidates(transcript(...lone))).not.toContain(EDIT_FOLD_COMMAND)
 	})
 })
+
+// joshuafolkken/kit#3157: the candidates the live density line names for a call that has already run.
+// The call is named after the closed turns behind it, and a call sharing a target with them names nothing.
+const CLOSED_READS_LINES = [
+	target_turn_lines(0, ['a.ts']),
+	target_turn_lines(1, ['b.ts']),
+	target_turn_lines(2, ['c.ts']),
+]
+const CLOSED_READS = transcript(...CLOSED_READS_LINES)
+
+describe('time_batch_guard.pairing_candidates', () => {
+	it('names the closed single-call reads beside the call in hand and folds them all', () => {
+		const tail = time_batch_guard.pairing_candidates(CLOSED_READS, {
+			name: 'Read',
+			input: { file_path: 'd.ts' },
+		})
+
+		expect(tail).toContain('Read b.ts')
+		expect(tail).toContain('Read d.ts')
+		expect(tail).toContain(`${FOLD_COMMAND} a.ts b.ts d.ts`)
+	})
+
+	it('names nothing when the call in hand shares a target with the turns behind it', () => {
+		const call = { name: EDIT_TOOL, input: { file_path: 'a.ts' } }
+
+		expect(time_batch_guard.pairing_candidates(CLOSED_READS, call)).toBe('')
+	})
+
+	it('names nothing when no closed single-call turn stands behind the call', () => {
+		const call = { name: 'Read', input: { file_path: 'd.ts' } }
+
+		expect(time_batch_guard.pairing_candidates('', call)).toBe('')
+	})
+
+	// The shape a `PostToolUse` hook reads: the call in hand's own `tool_use` line is already written,
+	// which closes the turn just before it — the dependency most often missed sits in that turn.
+	it('names nothing when the call in hand edits what the turn just before it read', () => {
+		const tail = transcript(...CLOSED_READS_LINES, open_turn_lines(3, ['c.ts'], EDIT_TOOL))
+		const call = { name: EDIT_TOOL, input: { file_path: 'c.ts' } }
+
+		expect(time_batch_guard.pairing_candidates(tail, call)).toBe('')
+	})
+
+	// A call that is not bundleable names no targets, so a verification run after a stretch of edits
+	// would otherwise be offered beside the edits it reads.
+	it('names nothing when the call in hand is not bundleable', () => {
+		const call = { name: 'Bash', input: { command: 'pnpm install' } }
+
+		expect(time_batch_guard.pairing_candidates(CLOSED_READS, call)).toBe('')
+	})
+})

@@ -1,6 +1,7 @@
 import {
 	AI_DOCS,
 	read_unwrapped,
+	RULE_DELIVERY_RATIONALE,
 	WORKFLOW_PROMPT_DIRECTORY,
 } from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
@@ -19,7 +20,9 @@ import { delivered_rules } from './delivered-rules'
 const TOPIC_FILE = 'shell-body.md'
 const CANONICAL = `${WORKFLOW_PROMPT_DIRECTORY}/${TOPIC_FILE}`
 const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
-const RESIDENCY = `${WORKFLOW_PROMPT_DIRECTORY}/residency.md`
+// The residency list moved here from `residency.md` in joshuafolkken/kit#3177.
+const RESIDENCY = 'docs/maintainers/residency-rationale.md'
+const SHELL_BODY_RATIONALE = 'docs/maintainers/shell-body-rationale.md'
 const SUITE_PATH = 'scripts/rules/shell-body-rule.test.ts'
 // The trigger's own suite, split out of the enumeration's so the reading of a call is read beside the
 // cases it has to keep. The marker list has to name it, or the split loses its coverage claim.
@@ -120,22 +123,31 @@ describe(`${CANONICAL} — carries the damage, the measurement and the safe spel
 			expect(content).toContain(marker)
 		},
 	)
+})
 
-	// **The marker list is a claim about other suites, and nothing was checking it.** The list said
-	// `cli-body.test.ts` pinned the stdin `-` form while no case in it passed `-` at all — a
-	// documentation line that read as coverage and was not. So each suite the list credits is asserted
-	// here by name, and the one claim that had drifted is asserted as text: the suites themselves carry
-	// the cases, and this is what fails when the list and the suites part company again.
+// **The marker list is a claim about other suites, and nothing was checking it.** The list said
+// `cli-body.test.ts` pinned the stdin `-` form while no case in it passed `-` at all — a
+// documentation line that read as coverage and was not. So each suite the list credits is asserted
+// here by name, and the one claim that had drifted is asserted as text: the suites themselves carry
+// the cases, and this is what fails when the list and the suites part company again. The list is
+// writer-facing, so it lives in the rationale rather than the procedure (joshuafolkken/kit#3179).
+describe(`${SHELL_BODY_RATIONALE} — carries the marker list`, () => {
+	const content = read_unwrapped(SHELL_BODY_RATIONALE)
+
 	it.each([TRIGGER_SUITE, 'scripts/josh/cli-body.test.ts', SUITE_PATH, STDIN_CLAIM])(
 		'credits %j in the marker list',
 		(marker) => {
 			expect(content).toContain(marker)
 		},
 	)
+
+	it('leaves the marker list out of the procedure', () => {
+		expect(read_unwrapped(CANONICAL)).not.toContain('### マーカーテスト')
+	})
 })
 
 // The residency list is the second half of the rule: a rule the criterion moved and that is not
-// listed as moved has not been checked against it (`residency.md`).
+// listed as moved has not been checked against it (`residency-rationale.md`).
 describe.each([RESIDENCY])('%s — lists the rule as delivered', (list_path) => {
 	const content = read_unwrapped(list_path)
 
@@ -147,8 +159,12 @@ describe.each([RESIDENCY])('%s — lists the rule as delivered', (list_path) => 
 describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, () => {
 	const content = read_unwrapped(DELIVERY)
 
-	it.each([TOPIC_FILE, GUARD_COMMAND, SUITE_PATH])('states %j', (marker) => {
+	it.each([TOPIC_FILE, GUARD_COMMAND])('states %j', (marker) => {
 		expect(content).toContain(marker)
+	})
+
+	it('leaves the pinning suite to the rationale', () => {
+		expect(read_unwrapped(RULE_DELIVERY_RATIONALE)).toContain(SUITE_PATH)
 	})
 
 	// The condition the whole enumeration turns on: a turn where nothing fires has to be a turn where

@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest'
 // the tool does not.
 
 const REVIEW_PROMPT = 'prompts/review.md'
+const REVIEW_HISTORY = 'docs/maintainers/review-history.md'
 // joshuafolkken/kit#1927 retired the standalone `review:level` command and folded the level into
 // `review:brief --level-only`, so the documents now name that spelling. The rule is unchanged: the
 // level comes from a command, never from a typed judgement.
@@ -123,12 +124,15 @@ describe('documentation is stated as not inert', () => {
 		expect(read_unwrapped(document_path)).toContain('documentation')
 	})
 
-	// The evidence, not just the claim: a reader who disagrees needs to be able to check it.
-	it('the review prompt cites the measurement the rule rests on', () => {
-		const content = read_unwrapped(REVIEW_PROMPT)
+	// The evidence, not just the claim: a reader who disagrees needs to be able to check it. The
+	// measurement moved to the review history, one pointer away (joshuafolkken/kit#3180).
+	it('the review prompt points at the measurement the rule rests on', () => {
+		expect(read_unwrapped(REVIEW_PROMPT)).toContain(REVIEW_HISTORY)
 
-		expect(content).toContain('joshuafolkken/kit#963')
-		expect(content).toContain('ten real defects in each')
+		const history = read_unwrapped(REVIEW_HISTORY)
+
+		expect(history).toContain('joshuafolkken/kit#963')
+		expect(history).toContain('ten real defects in each')
 	})
 })
 
@@ -163,8 +167,14 @@ describe('the review flow routes to the command, never a typed level', () => {
 })
 
 describe('the round cap is untouched', () => {
-	it.each([...AI_DOCS, REVIEW_PROMPT])('%s still caps the rounds at two', (document_path) => {
-		expect(read_unwrapped(document_path)).toContain('two')
+	it('the review prompt still caps the rounds at two', () => {
+		expect(read_unwrapped(REVIEW_PROMPT)).toContain('two')
+	})
+
+	// joshuafolkken/kit#3171: the resident documents point at the cap rather than restating its number
+	// (`rule-numbers.test.ts`), so what they must keep is the pointer.
+	it.each(AI_DOCS)('%s still points at the round cap', (document_path) => {
+		expect(read_unwrapped(document_path)).toContain('"Review round cap"')
 	})
 
 	it('the review prompt still says a confirmed High blocks regardless of round count', () => {

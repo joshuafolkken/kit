@@ -5,24 +5,30 @@ import { repo_party } from '#scripts/discovery/repo-party'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_issue_list, MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
 import { error_text } from '#scripts/lib/error-message'
+import { repository_labels } from '#scripts/repo/repository-labels'
+import { issue_auto_ok } from './issue-auto-ok'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_scout_cli } from './issue-scout-cli'
+import { issue_wip } from './issue-wip'
 
 // `josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>]…
-// [--repo <owner/repo>] [--distinct <N,…>]` — file an Issue with every filing step run in order
-// (joshuafolkken/kit#2808): the third-party refusal, the body lint, the `## Origin` check for another
-// repository, the duplicate scout, the create call carrying every label, and `epic:bundle` after it.
+// [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok]` — file an Issue with every
+// filing step run in order (joshuafolkken/kit#2808): the third-party refusal, the body lint, the
+// `## Origin` check for another repository, the WIP cap count (joshuafolkken/kit#3181), the duplicate
+// scout, the missing workflow labels created (joshuafolkken/kit#3176), the `auto-ok` decision
+// (joshuafolkken/kit#3213), the create call carrying every label, and `epic:bundle` after it.
 // A direct `gh api …/issues` filing is refused by the `direct-filing` delivered rule and pointed here.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE =
-	'Usage: josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>]'
+	'Usage: josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok]'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the filing has no repository to compare against — check `gh auth status`.'
 const THIRD_PARTY_MESSAGE =
@@ -68,6 +74,37 @@ function unacknowledged_message(numbers: ReadonlyArray<number>): string {
 	return `✖ duplicate candidate(s) ${listed} not declared separate — read each (\`issue-fold-existing.md\`); fold into a duplicate, or reissue with \`--distinct ${listed}\` when each is a separate deliverable.`
 }
 
+// The target's open Issues, pull requests excluded by the listing itself; `undefined` when unreadable.
+async function open_count(target: string): Promise<number | undefined> {
+	const outcome = await git_gh_issue_list.issue_list({
+		json_fields: 'number',
+		limit: MAX_SCANNED,
+		repo: target,
+	})
+
+	return outcome.json === undefined ? undefined : issue_wip.count_of(outcome.json)
+}
+
+// The count is printed whatever it answers, and the filing is held only past the cap with no
+// exemption declared. An unreadable count warns and goes on: the cap makes growth visible, and a
+// listing outage is not a reason to stop the run a blocked filing exists for.
+async function is_wip_clear(filing: Filing): Promise<boolean> {
+	const count = await open_count(filing.target)
+
+	if (count === undefined) {
+		console.error(issue_wip.UNREAD_MESSAGE)
+
+		return true
+	}
+
+	const verdict = issue_wip.verdict_of(count, filing.args)
+
+	console.info(issue_wip.count_line(count, filing.target, verdict))
+	if (verdict === issue_wip.HELD) console.error(issue_wip.HELD_MESSAGE)
+
+	return verdict !== issue_wip.HELD
+}
+
 // Set before the scout and left set for `epic:bundle`, so both read the target's backlog.
 function point_listings_at(filing: Filing): void {
 	if (issue_file.is_same_repository(filing.target, filing.current)) return
@@ -94,12 +131,21 @@ async function is_scout_clear(filing: Filing): Promise<boolean> {
 }
 
 // `undefined` when the create call failed. `gh`'s standard error is captured into the thrown error
-// rather than printed, so it is printed here — otherwise the filing fails with no reason given.
+// rather than printed, so it is printed here — otherwise the filing fails with no reason given. A label
+// the create applies is provisioned first, so it never arrives with a generated color.
 async function create(filing: Filing): Promise<string | undefined> {
+	repository_labels.ensure_labels(filing.target)
+	const auto_ok = await issue_auto_ok.resolve(
+		filing.args.is_auto_ok_opted_out,
+		filing.target,
+		filing.current,
+	)
+
+	console.info(issue_auto_ok.line_of(auto_ok))
 	const request = git_gh_issue_write.issue_create_request({
 		title: filing.args.title,
 		body: filing.body,
-		labels: issue_file.labels_of(filing.args, filing.body),
+		labels: issue_file.labels_of(filing.args, filing.body, auto_ok.is_applied),
 		repo: filing.target,
 	})
 
@@ -136,7 +182,7 @@ async function file(filing: Filing): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	if (!(await is_scout_clear(filing))) return FAILURE_EXIT_CODE
+	if (!(await is_wip_clear(filing)) || !(await is_scout_clear(filing))) return FAILURE_EXIT_CODE
 	const url = await create(filing)
 
 	if (url === undefined) return FAILURE_EXIT_CODE

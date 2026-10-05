@@ -57,7 +57,7 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// block in joshuafolkken/kit#2317 when `backlogrun-child.md`'s outage section recorded the
 	// session-resume re-dispatch and the outage-fold window.
 	// Raised in joshuafolkken/kit#2328 when `retrospective.md` joined the point-of-use set and `SKILL.md`
-	// grew by §2j: every entry that reads `SKILL.md` discovers the retrospective document, so its ~5KB
+	// grew by `retrospective.md`: every entry that reads `SKILL.md` discovers the retrospective document, so its ~5KB
 	// and the new section crossed a block for each. The lane child is exempt — it never runs the
 	// retrospective (`run:step` answers `stop` for a child at the stop position), so it skips both.
 	// joshuafolkken/kit#2335 recorded the drain-time firing with the operational detail in
@@ -70,8 +70,8 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// list, so its ~48KB read crossed a block downward and the recorded ceiling drops to the block multiple
 	// the stale-ratchet message named. The other entries still read it, so their rows hold.
 	// joshuafolkken/kit#2345 added the `implementation-unit` delegation row (full fan-out procedure in
-	// `docs/josh-commands-automation.md` → "`josh fanout`"); `SKILL.md` §2b gained only a one-clause mention and a
-	// pointer, folded into the existing enumeration and offset by tightening §2b prose, so every entry
+	// `docs/josh-commands-automation.md` → "`josh fanout`"); `delegation.md` gained only a one-clause mention and a
+	// pointer, folded into the existing enumeration and offset by tightening `delegation.md` prose, so every entry
 	// stayed within its block (kickoff has no block of headroom — its pre-#2294 ceiling is the next
 	// multiple, which the downward ratchet holds shut).
 	// joshuafolkken/kit#2353 wired the watcher-guard note into `backlogrun-progress.md` (read by the three
@@ -92,12 +92,24 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// `backlogrun-*` phase documents it never opens. Each total now counts only what its path reaches.
 	// joshuafolkken/kit#3077 trimmed non-resident rule bodies from `CLAUDE.md`, lowering fullrun, prrun
 	// and backlogrun one block each.
-	{ entry: 'kickoff', bytes: 65_536 },
-	{ entry: 'fullrun', bytes: 126_976 },
-	{ entry: 'halfrun', bytes: 106_496 },
-	{ entry: 'prrun', bytes: 131_072 },
-	{ entry: 'backlogrun', bytes: 212_992 },
-	{ entry: LANE_CHILD, bytes: 77_824 },
+	// Lowered in joshuafolkken/kit#3172: the heartbeat left `backlogrun-progress.md` for its own
+	// `progress-watcher.md`, and `pre-gate-cut.md` became the lane child's alone, so fullrun, halfrun
+	// and prrun stop paying for ~50KB of batch and lane procedure; backlogrun lost the moved prose.
+	// Lowered in joshuafolkken/kit#3174: `SKILL.md` was cut to a manifest (~21KB → ~11KB) and the entry
+	// sequence `fullrun`, `halfrun` and `prrun` shared moved into one `entry-sequence.md`.
+	// Lowered in joshuafolkken/kit#3175: the loop became the driver's hand-backs, the supervisor and
+	// provider prose moved to `docs/josh-commands-automation.md`, and the failure-only sections moved to
+	// `backlogrun-recovery.md`, which the parent's reach still charges whole.
+	// joshuafolkken/kit#3171 cut `CLAUDE.md` to triggers and pointers (~12 KB), lowering every entry.
+	{ entry: 'kickoff', bytes: 45_056 },
+	// Raised in joshuafolkken/kit#3177: #3173, #3181 and #3183 merged in parallel and together tipped
+	// fullrun 12 bytes over its block; none of #3177's documents are in its read set.
+	// Lowered back in joshuafolkken/kit#3180: the history and lint-settled proofs left its read set.
+	{ entry: 'fullrun', bytes: 57_344 },
+	{ entry: 'halfrun', bytes: 57_344 },
+	{ entry: 'prrun', bytes: 61_440 },
+	{ entry: 'backlogrun', bytes: 176_128 },
+	{ entry: LANE_CHILD, bytes: 57_344 },
 ]
 
 function byte_size(root: string, relative_path: string): number {

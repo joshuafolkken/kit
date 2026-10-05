@@ -1,8 +1,8 @@
 # An Issue's comments are part of the Issue
 
-**This is the body of `SKILL.md` §2g, relocated here so the entry read carries the trigger and the
-pointer, not the procedure** (joshuafolkken/kit#2189). `SKILL.md` §2g is the resident stub, and every
-`#N` entry file routes here for the definition. It is read at its point of use — before implementing a
+**This file is the single source, so the entry read carries the trigger and the pointer, not the
+procedure** (joshuafolkken/kit#2189). `SKILL.md` → §2's table keeps the trigger, and every `#N` entry
+file routes here for the definition. It is read at its point of use — before implementing a
 `#N` Issue.
 
 **Every `#N` entry point reads the Issue's comments before it implements** — `fullrun`, `halfrun` and
@@ -73,7 +73,6 @@ holding a lane. **Only a person removes it, by closing the Issue.**
 ```bash
 gh api repos/{owner}/{repo}/labels -f name=already-done -f color=6f42c1 -f description="Verified already merged — a person closes it" --silent 2>/dev/null || true
 gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=already-done'
-gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true
 ```
 
 The procedure, in order:
@@ -81,10 +80,10 @@ The procedure, in order:
 1. **Record the evidence as an Issue comment, before the label.** Name the pull request or commit that
    merged the work and, for each acceptance criterion the Issue states, the file and lines that satisfy
    it. **A claim with no citations is not the finding this exit is for.**
-2. **Apply `already-done` and remove `in-progress`** — the two commands above. Leaving `in-progress`
-   on holds a lane against an Issue nothing will ever run.
+2. **Apply `already-done`** — the two commands above.
 3. **Commit nothing, push nothing, open no pull request.** The tree is clean, so release the hold with
-   `pnpm josh run:release <N>`.
+   `pnpm josh run:release <N>`, which also removes `in-progress` — left on, it holds a lane against an
+   Issue nothing will ever run.
 4. **Then behave as the entry point does for a parked child.** A `fullrun` / `halfrun` a person typed
    sends a `confirmation` Telegram naming the Issue and the merge that already covers it, and stops. An
    `backlogrun` child is park-and-continue (`backlogrun-park.md` → "park and continue").
@@ -98,7 +97,7 @@ citations: a criterion you cannot point at merged code for is a criterion this r
 
 **The fetch is one call however long the thread is; what costs is carrying it afterwards** — which is
 why the call above projects each comment down to its author, its timestamp and its body. Once the
-thread runs longer than the Issue itself it is exactly the pre-implementation reading §2b describes:
+thread runs longer than the Issue itself it is exactly the pre-implementation reading `delegation.md` describes:
 brief a delegated unit to return **the agreements in force plus the comment URLs that carry them**,
 never the comment text.
 

@@ -8,6 +8,7 @@ const problems_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
 const paths_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
 const pr_body_mock = vi.hoisted(() => vi.fn<() => Promise<string | undefined>>())
 const scoped_mock = vi.hoisted(() => vi.fn())
+const classification_mock = vi.hoisted(() => vi.fn<() => Promise<void>>())
 
 vi.mock('#scripts/git/git-preflight', () => ({
 	git_preflight: { problems_of: problems_mock },
@@ -16,6 +17,9 @@ vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: paths_mock },
 }))
 vi.mock('#scripts/gh/git-gh-command', () => ({ git_gh_command: { pr_get_body: pr_body_mock } }))
+vi.mock('#scripts/gh/git-pr', () => ({
+	git_pr: { release_classification: classification_mock },
+}))
 vi.mock('#scripts/git/git-branch', () => ({
 	git_branch: { current: vi.fn().mockResolvedValue('2946-lane') },
 }))
@@ -36,6 +40,7 @@ const READY = { code: OK, out: 'ready' }
 const SCOPED_RED = { code: FAILED, out: 'lint:related red' }
 const DOCS_PATHS = ['docs/josh-commands.md']
 const CLASSIFICATION = 'Choose one release classification before opening the PR'
+const ISSUE = '3154'
 const EVIDENCE_BODY =
 	'## 実機証跡\n\n`pnpm josh ship --log 2946`\n\n```\nstopped at: === preflight ===\n```\n'
 const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-ship-preflight-'))
@@ -56,6 +61,7 @@ beforeEach(() => {
 	paths_mock.mockReset().mockResolvedValue(DOCS_PATHS)
 	pr_body_mock.mockReset().mockResolvedValue(undefined)
 	scoped_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
+	classification_mock.mockReset().mockResolvedValue()
 })
 
 afterAll(() => {
@@ -150,5 +156,37 @@ describe('run_ship_preflight.stage — the scoped pair once the preconditions ho
 		scoped_mock.mockResolvedValue(SCOPED_RED)
 
 		expect(await run_ship_preflight.stage(NO_BODY)).toStrictEqual(SCOPED_RED)
+	})
+})
+
+// joshuafolkken/kit#3154: the classification and evidence refusals are asked before the ship, by
+// `run:prep` and `run:step`, so they are met while the context is still small.
+describe('run_ship_preflight.ahead — the ship refusals asked early', () => {
+	it('returns the classification failure as a problem rather than throwing', async () => {
+		classification_mock.mockRejectedValue(new Error(CLASSIFICATION))
+
+		expect(await run_ship_preflight.ahead(ISSUE)).toStrictEqual([CLASSIFICATION])
+		expect(classification_mock).toHaveBeenCalledWith(ISSUE, '2946-lane')
+	})
+
+	it('asks for the evidence file, not a failed body, for a runtime change with no PR yet', async () => {
+		paths_mock.mockResolvedValue(RUNTIME_PATHS)
+
+		expect(await run_ship_preflight.ahead(ISSUE)).toStrictEqual([
+			run_ship_preflight.EVIDENCE_PENDING,
+		])
+	})
+
+	it('reports the missing evidence of an open PR body that lacks it', async () => {
+		paths_mock.mockResolvedValue(RUNTIME_PATHS)
+		pr_body_mock.mockResolvedValue('## Summary\n')
+
+		expect(await run_ship_preflight.ahead(ISSUE)).toStrictEqual([
+			run_ship_preflight.EVIDENCE_PROBLEM,
+		])
+	})
+
+	it('finds nothing for a docs-only change with a classification', async () => {
+		expect(await run_ship_preflight.ahead(ISSUE)).toStrictEqual([])
 	})
 })

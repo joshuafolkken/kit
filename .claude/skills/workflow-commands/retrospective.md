@@ -1,10 +1,10 @@
-# The end-of-run retrospective — `SKILL.md` §2j's body
+# The end-of-run retrospective
 
-**This is `SKILL.md` → §2j's procedure, and it is read when `run:step` prints the retrospective step —
-not at the entry** (joshuafolkken/kit#2328). §2j keeps the rule itself: run what `run:step` prints once,
+**This is the retrospective's procedure, and it is read when `run:step` prints the retrospective step —
+not at the entry** (joshuafolkken/kit#2328). `SKILL.md` → §2's table keeps the rule itself: run what `run:step` prints once,
 file the improvements worth carrying into the next run, stack the rest, and mark the step done.
 Everything that decides *how* — what the four sections mean, how the top two are chosen rather than
-rationed, the exclusions, and the `auto-ok` carve-out that lets the next run pick them up — is here,
+rationed, the exclusions, and the `auto-ok` default that lets the next run pick them up — is here,
 because none of it binds until a run has actually drained its backlog. A run that never empties its pool
 never reads it; the one that does reads it in full, in the same turn, before it files.
 
@@ -53,7 +53,7 @@ ceiling on what may be recorded. **File nothing when nothing passes** — a run 
 improvement worth carrying files zero Issues, and that is what makes the "file → drain → file again"
 loop converge.
 
-**Exclude what is already filed or already done, through the existing scout** (`SKILL.md` → §2e). File
+**Exclude what is already filed or already done, through the existing scout** (`issue-scout.md`). File
 each with `pnpm josh issue:file`, which runs the scout before creating anything: an **open** candidate
 covering the same work means do not file it, and a `(closed)` candidate covering it means the work is
 already merged. Neither exclusion is a new mechanism. The same call runs `epic:bundle` on each new
@@ -61,10 +61,10 @@ Issue, as after any filing.
 
 ## `auto-ok`, and closing the step
 
-**A retrospective may apply `auto-ok` to what it files** — the one path on which a run labels its own
-input, so the next run picks the improvements up without waiting for a person. **`backlogrun-steps.md` →
-"What one invocation approves" is that carve-out's single source**; it is written there, beside the
-brakes that bound it, rather than restated here. Every brake still counts a retrospective's filings: the
+**What a retrospective files carries `auto-ok`** — it files while the carry record is live, so
+`issue:file`'s default applies the label and the next run picks the improvements up without waiting
+for a person. **`backlogrun-steps.md` → "What one invocation approves" is that default's single
+source**; it is written there, beside the brakes that bound it, rather than restated here. Every brake still counts a retrospective's filings: the
 ten-per-invocation ceiling, the WIP cap, `--max`, the 150,000-token session budget and the 8-hour
 whole-run bound.
 

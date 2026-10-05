@@ -14,7 +14,7 @@ const ROOT = process.cwd()
 // section ("The question"), so it exercises the section-saving measurement — reading that section
 // rather than the whole file it sits in. (joshuafolkken/kit#2189 turned the command files into
 // manifests: `split-assessment.md` left the entry table and became a section-cite of the split
-// decision, and the release-ask pointer at `followup-reference.md` moved into `fullrun-steps.md`,
+// decision, and the release-ask pointer at `followup.md` moved into `fullrun-steps.md`,
 // read on demand rather than at the entry.)
 const SECTION_CITER = 'fullrun'
 const SPLIT_QUESTION_HEADING = 'The question'
@@ -22,6 +22,7 @@ const SPLIT_FILE = 'split-assessment.md'
 const BACKLOGRUN = 'backlogrun.md'
 const CHAIN_RULE = 'chain-rule.md'
 const BACKGROUND_COMMANDS = 'background-commands.md'
+const RECOVERY = 'backlogrun-recovery.md'
 const FOLLOWUP = 'followup.md'
 const CHAIN_HEADING = 'Run the review-to-merge chain'
 const FOLLOWUP_HEADING = 'Run `pnpm josh followup`'
@@ -210,13 +211,28 @@ describe('entry_read_set — chain-rule.md is point-of-use (joshuafolkken/kit#18
 })
 
 describe('entry_read_set — background-commands.md is point-of-use (joshuafolkken/kit#1873)', () => {
-	// §2h's body left SKILL.md for background-commands.md, read before the first backgroundable command
+	// `background-commands.md`'s body left SKILL.md for background-commands.md, read before the first backgroundable command
 	// (the gate). It binds only after the first edit, so it never belonged in the entry read — and
 	// because it was never a table row, the general loop above already keeps it out of every entry; what
 	// this pins is that it is classified point-of-use in the first place.
 	it('classifies background-commands.md as a point-of-use document', () => {
 		expect([...entry_read_set.POINT_OF_USE_FILES]).toContain(BACKGROUND_COMMANDS)
 	})
+})
+
+describe('entry_read_set — backlogrun-recovery.md is point-of-use (joshuafolkken/kit#3175)', () => {
+	// The failure-only sections left the per-child documents for backlogrun-recovery.md, read only when
+	// a unit goes silent or a lane conflicts, so no entry may read it.
+	it('classifies backlogrun-recovery.md as a point-of-use document', () => {
+		expect([...entry_read_set.POINT_OF_USE_FILES]).toContain(RECOVERY)
+	})
+
+	it.each([...IMPLEMENTING])(
+		'keeps backlogrun-recovery.md out of the entry read of %s',
+		(entry) => {
+			expect(entry_read_set.read_set(ROOT, entry).files).not.toContain(RECOVERY)
+		},
+	)
 })
 
 describe('entry_read_set — point-of-use section costs', () => {
@@ -321,13 +337,12 @@ describe('entry_read_set — pre-gate-cut.md is point-of-use (joshuafolkken/kit#
 	})
 
 	// The saving is not a disappearance: the run reads it later, so the cost report accounts for it
-	// under the point-of-use, and the total read counts the ~7k tokens the old figure was short. Only the
-	// entries whose manifest names it reach it (joshuafolkken/kit#3078): `halfrun` stops before the cut
-	// and the `backlogrun` parent never gates.
-	it.each(['fullrun', 'prrun'])('reports pre-gate-cut.md under the %s point-of-use', (entry) => {
+	// under the point-of-use. Only a dispatched lane child resumes or takes the cut
+	// (joshuafolkken/kit#3172), so no ordinary entry is charged for it and the lane child's role is.
+	it.each([...IMPLEMENTING, PLAN_ONLY])('does not charge pre-gate-cut.md to %s', (entry) => {
 		const files = entry_read_set.costed(ROOT, entry).point_of_use.map((one) => one.file)
 
-		expect(files).toContain(PRE_GATE_CUT)
+		expect(files).not.toContain(PRE_GATE_CUT)
 	})
 })
 

@@ -10,6 +10,7 @@ import { run_carry, type CarryRead } from './run-carry'
 import { run_event_scope } from './run-event-scope'
 import { run_event_stream } from './run-event-stream'
 import { run_headless } from './run-headless'
+import { run_prep, type PrepParts } from './run-prep'
 import { run_prep_cli } from './run-prep-cli'
 import { run_retrospective } from './run-retrospective'
 import { run_step, type StepInput } from './run-step'
@@ -85,14 +86,14 @@ function read_run(
 	}
 }
 
-async function gather(issue_number: string): Promise<StepInput> {
-	const reads = await run_prep_cli.gather(issue_number)
-	const parts = run_prep_cli.to_parts(issue_number, reads)
-	const is_lane_child = lane_child_marker.is_child_of(process.cwd())
-	const run_reads = read_run(await run_carry.repository_directory(), issue_number, is_lane_child)
+interface Gathered {
+	input: StepInput
+	ship_problems: ReadonlyArray<string>
+}
 
+function step_input(parts: PrepParts, run_reads: RunReads, is_lane_child: boolean): StepInput {
 	return {
-		issue_number,
+		issue_number: parts.issue_number,
 		state: parts.state?.state,
 		is_human_review: parts.state?.is_human_review ?? false,
 		latest_scope: parts.latest_scope,
@@ -110,6 +111,15 @@ async function gather(issue_number: string): Promise<StepInput> {
 	}
 }
 
+async function gather(issue_number: string): Promise<Gathered> {
+	const reads = await run_prep_cli.gather(issue_number)
+	const parts = run_prep_cli.to_parts(issue_number, reads)
+	const is_lane_child = lane_child_marker.is_child_of(process.cwd())
+	const run_reads = read_run(await run_carry.repository_directory(), issue_number, is_lane_child)
+
+	return { input: step_input(parts, run_reads, is_lane_child), ship_problems: parts.ship_problems }
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const issue_number = run_prep_cli.parse_number(argv)
 
@@ -119,9 +129,12 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	const input = await gather(issue_number)
+	const { input, ship_problems } = await gather(issue_number)
 
 	console.info(run_step.next_action(input).line)
+	// On stderr, so stdout stays the one action line (joshuafolkken/kit#3154): what `josh ship` would
+	// refuse on is said at every step, while it is still cheap to meet.
+	if (ship_problems.length > 0) console.error(run_prep.ship_body(ship_problems))
 
 	// A state that could not be read exits non-zero, exactly as `run:prep` and `run:next` exit on the
 	// same failure, so a position missing its issue state is never read as a confident next step.

@@ -45,11 +45,11 @@ Each step is a terse trigger and a pointer; the procedure is read on demand from
    `backlogrun-steps.md` → "The session cut is inside the invocation".
 3. **What this invocation approves** — `backlogrun-steps.md` → "What one invocation approves": the
    opted-in pool, a run's own filings once bundled, and the brake (`--max`, ten filings, the WIP cap)
-   that bounds the amount. `auto-ok` is a person's alone.
+   that bounds the amount. `auto-ok` reaches a run's own filings only through `issue:file`'s default.
 4. **Report the plan before the first child** — `pnpm josh backlog:plan`, then resolve every
    `needs-decision` issue decidable from its body in one pass. In the same pass, record `blocked-by`
    between issues that must land in order, and apply `run:solo` where all three of the
-   `wip-cap.md` → 「実行のしかた」 conditions hold, `run:lane` elsewhere. `backlogrun-steps.md` → "The plan,
+   `backlogrun-lanes.md` → "Lanes — running more than one child at a time" conditions hold, `run:lane` elsewhere. `backlogrun-steps.md` → "The plan,
    before the first child starts" and its "Resolve what the plan can resolve, before starting".
 5. **Named issues run first, in order** — `backlogrun-steps.md` → "Named issues run first, in order":
    the supervisor's driver dispatches each as a delegated `fullrun`, one at a time, then drains the
@@ -57,7 +57,7 @@ Each step is a terse trigger and a pointer; the procedure is read on demand from
 6. **The loop belongs to the supervisor** — `run:wake` runs `backlog:drive`; the driver uses
    `pnpm josh backlog:offer` as its loop head and returns a branch to an AI session only when it needs
    judgment. `backlogrun-steps.md` → "The loop"
-   fixes the answer-to-word mapping, "The two budgets" the `run` / `watch` / `stop` verdict, "The cost
+   fixes what a handed-back branch asks, "The two budgets" the `run` / `watch` / `stop` verdict, "The cost
    check is not asked during a watch", and "Where the run stops" every termination.
 7. **What runs once per session, not once per issue** — `backlogrun-steps.md` → "What runs once per
    session, not once per issue": the per-repository preflight, `josh latest` on `required`, the
@@ -80,7 +80,8 @@ named step reaches it, exactly as `backlogrun-steps.md` and the shared gate docu
 | --- | --- | --- |
 | `backlogrun-child.md` | dispatching the first child (`pnpm josh delegate epic-child`, `pnpm josh lane:dispatch`) | the shared per-child `fullrun`, a bare non-epic `#N`, the delegated unit and its summary bound, liveness recovery, and the once-per-session setup (audit, `josh latest`, preflight) |
 | `backlogrun-lanes.md` | opening the first lane (`pnpm josh lane:open`) | the per-repository lane ceiling and the lane lifecycle, and how a merge conflict is resolved |
-| `backlogrun-progress.md` | starting the progress watcher (`pnpm josh run:progress --wait`) and the hand-off check at a merge (`pnpm josh cost --cut`) | the heartbeat, the hand-off and the cut/resume, waiting without waiting forever, and the end-of-run summary and propagate |
+| `progress-watcher.md` | starting the progress watcher (`pnpm josh run:progress --wait`) | the heartbeat, shared with every implementing run |
+| `backlogrun-progress.md` | dispatching the first child and the hand-off check at a merge (`pnpm josh cost --cut`) | the hand-off and the cut/resume, waiting without waiting forever, and the end-of-run summary and propagate |
 | `backlogrun-park.md` | a child cannot finish | park-and-continue, the `needs-human-review` stop, a stale `in-progress`, a prerequisite discovered mid-run, and a mid-run split |
 
 ## Guards

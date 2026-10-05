@@ -33,22 +33,13 @@ const UNMATCHED_EVENTS: ReadonlySet<string> = new Set(['UserPromptSubmit'])
 const JSON_INDENT = '\t'
 
 function adapter_command(mode: string): string {
-	return hook_launch.bundle_launch_command(
-		`codex-hook-adapter.js ${mode}`,
-		`pnpm exec tsx scripts/hooks/codex-hook-adapter.ts ${mode}`,
-	)
+	return hook_launch.hook_launch_command(`codex-hook-adapter ${mode}`)
 }
 
 // Each Claude-side guard command the adapter stands in for, keyed by that command verbatim.
 const ADAPTED_COMMANDS: ReadonlyMap<string, string> = new Map([
-	[
-		hook_launch.hook_launch_command('pretool-guard.js', 'pretool:guard'),
-		adapter_command('pretool'),
-	],
-	[
-		hook_launch.hook_launch_command('format-edited.js', 'format:edited'),
-		adapter_command('posttool'),
-	],
+	[hook_launch.hook_launch_command('pretool-guard'), adapter_command('pretool')],
+	[hook_launch.hook_launch_command('format-edited'), adapter_command('posttool')],
 ])
 
 function codex_handler(handler: HookHandler): HookHandler {

@@ -19,19 +19,12 @@ const LANE_CHILD = 'lane-child'
 const FULLRUN = 'fullrun'
 
 // **The `SKILL.md` sections a dispatched lane child never uses**, read at the section level rather
-// than in full. A child is handed one issue to run, so it never files a new one with an `into`
-// target (§2a), never delegates its own pre-implementation reading (§2b), never names a repository or
-// scouts for a duplicate at its entry (§2c, §2e), returns an observation to the parent rather than
-// filing it (§2i), and never edits these documents (§3). Its dispatch is already an explicit workflow
-// invocation, so §0 cannot decide anything for it either. Review delegation remains in chain-rule.md.
+// than in full. A child never edits these documents (§3), and its dispatch is already an explicit
+// workflow invocation, so §0 cannot decide anything for it either. The other rules it never uses — the
+// `into` target, delegation, the repository prefix, the scout, observation filing, the retrospective —
+// are single rows of §2's table since joshuafolkken/kit#3174, so no section of them is left to trim.
 const UNUSED_SKILL_SECTIONS: ReadonlyArray<string> = [
 	'0. The rule that fires before any of them — explicit invocation',
-	'2a. The `into <target>` suffix — where the new Issue lands',
-	'2b. Delegating a step to a cheaper tier',
-	'2c. The `owner/repo#` prefix — which repository the run acts on',
-	'2e. Before filing a new Issue — `pnpm josh issue:scout`',
-	'2i. An observation worth filing is filed without asking',
-	'2j. The end-of-run retrospective — read when `run:step` prints it',
 	'3. What stays resident, and what is read from here',
 ]
 
@@ -49,10 +42,12 @@ const UNUSED_SKILL_SECTIONS: ReadonlyArray<string> = [
 // list — what one invocation approves, the named-issue order, the session-cut record, the loop and the
 // once-per-session tail — none of which a leaf child performs. Every reference to it lives in a
 // document the child never reads (`backlogrun.md`, `backlogrun-progress.md`, `retrospective.md`) or in a
-// `SKILL.md` section the child trims (§0's session-cut note, §2b, §2i, §2j), so the child has no path
+// `SKILL.md` section the child trims (§0's session-cut note), so the child has no path
 // that opens it. It was the child's single largest read — ~16,000 tokens read whole — charged for a
 // document it never reaches, so dropping it is a correction of an over-count, not a loss of any rule the
 // child needs. The parent still reads it in full.
+// **`progress-watcher.md` is the parent's too** (joshuafolkken/kit#3172): a dispatched child is refused
+// a watcher by its `JOSH_LANE_CHILD` mark, so it never opens the watcher's document.
 const SKIPPED_POINT_OF_USE: ReadonlySet<string> = new Set([
 	'backlogrun-child.md',
 	'backlogrun-lanes.md',
@@ -61,13 +56,16 @@ const SKIPPED_POINT_OF_USE: ReadonlySet<string> = new Set([
 	'delegation.md',
 	'issue-scout.md',
 	'latest-gate.md',
+	'progress-watcher.md',
 	'retrospective.md',
 ])
 
 // **A child that parks reads `backlogrun-park.md`** (`SKILL.md` §1, "A lane child that parks"), a
 // document a standalone `fullrun`'s path never names — so the child's reach adds it to its base
-// entry's (joshuafolkken/kit#3078).
-const REACHED_POINT_OF_USE: ReadonlySet<string> = new Set(['backlogrun-park.md'])
+// entry's (joshuafolkken/kit#3078). **`pre-gate-cut.md` is the child's alone** (joshuafolkken/kit#3172):
+// only a lane child resumes or takes the pre-gate cut, so `fullrun.md` stopped naming it and the
+// child's reach carries it instead.
+const REACHED_POINT_OF_USE: ReadonlySet<string> = new Set(['backlogrun-park.md', 'pre-gate-cut.md'])
 
 function costed(root: string): ReadSetCost {
 	return read_set_trim.costed(root, {
