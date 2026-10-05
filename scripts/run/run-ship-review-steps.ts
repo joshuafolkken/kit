@@ -155,7 +155,7 @@ async function record_and_route(
 	if (recorded.code !== SUCCESS_EXIT_CODE) return recorded
 
 	const outcome = outcome_of(verdict)
-	const out = [...verdict.specs, outcome.note].join('\n')
+	const out = [...verdict.report, outcome.note].join('\n')
 
 	return outcome.is_passing ? { code: SUCCESS_EXIT_CODE, out } : failure(out)
 }
