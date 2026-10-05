@@ -85,10 +85,10 @@ describe('cutting a lane child before the gate', () => {
 	})
 })
 
-// joshuafolkken/kit#2312: the pre-gate cut is taken only when the recent-window per-request cost is
+// joshuafolkken/kit#2312: the pre-gate cut is taken only when the current per-request cost is
 // over the shared threshold. Below it a short lane has no accumulation worth a resume's cost, so the
 // gate runs uncut; an unmeasurable session keeps the old unconditional cut as the safety net.
-describe('the pre-gate cut is conditional on the recent-window context', () => {
+describe('the pre-gate cut is conditional on the current context', () => {
 	it('skips the cut and continues to the gate when the context is under the threshold', async () => {
 		session_verdict.mockReturnValue(CONTEXT_UNDER)
 
@@ -122,7 +122,7 @@ describe('the pre-gate cut is conditional on the recent-window context', () => {
 
 	// The condition guards the pre-gate phase alone; the implementation-phase caller gates its own
 	// `--impl` cut on `pnpm josh cost --cut`, so an under-threshold verdict never skips it here.
-	it('still cuts during implementation regardless of the recent-window context', async () => {
+	it('still cuts during implementation regardless of the current context', async () => {
 		session_verdict.mockReturnValue(CONTEXT_UNDER)
 
 		const code = await run_cut_cli.run(['--impl', ...WITH_HANDOFF, ISSUE])

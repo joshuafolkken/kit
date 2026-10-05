@@ -4,6 +4,7 @@ import path from 'node:path'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_format } from '#scripts/cost-runtime/cost-format'
+import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_carry, type RunCarry } from './run-carry'
 import { run_parent_cut_hook, type ParentCutState } from './run-parent-cut-hook'
@@ -30,6 +31,16 @@ function carry(overrides: Partial<RunCarry> = {}): RunCarry {
 
 function state(record: RunCarry | undefined, verdict: CostVerdict): ParentCutState {
 	return { carry: async (): Promise<RunCarry | undefined> => record, verdict: () => verdict }
+}
+
+// A driving parent priced through the real verdict on a per-request billed-input sequence.
+function priced_on(billed: ReadonlyArray<number>): ParentCutState {
+	const measurement = { billed_input_per_request: billed }
+
+	return {
+		carry: async (): Promise<RunCarry> => carry(),
+		verdict: (): CostVerdict => cost_verdict.classify(measurement, CONTEXT_CUT_THRESHOLD),
+	}
 }
 
 // A payload naming a transcript in a fresh directory, so each test starts with no refusal recorded.
@@ -135,6 +146,35 @@ describe('run_parent_cut_hook.parent_cut_reason — the quiet window', () => {
 		await run_parent_cut_hook.parent_cut_reason(payload, INSIDE_QUIET_MS, priced)
 
 		expect(verdict).toHaveBeenCalledTimes(1)
+	})
+})
+
+// joshuafolkken/kit#3224: priced through the real verdict, the parent is refused at the first request
+// past the threshold, not once a ten-request average that trails a growing context catches up.
+describe('run_parent_cut_hook.parent_cut_reason — priced on the newest request', () => {
+	const STEP = 1000
+	const UNDER_STEPS = [3, 2, 1]
+	const before_crossing = UNDER_STEPS.map((steps) => CONTEXT_CUT_THRESHOLD - steps * STEP)
+
+	it('refuses at the request that crosses the threshold while the average is still under', async () => {
+		const growing = [...before_crossing, CONTEXT_CUT_THRESHOLD + 1]
+		const reason = await run_parent_cut_hook.parent_cut_reason(
+			fresh_payload(),
+			NOW_MS,
+			priced_on(growing),
+		)
+
+		expect(reason).toBe(run_parent_cut_hook.PARENT_CUT_REASON)
+	})
+
+	it('lets the parent through while the newest request is under the threshold', async () => {
+		const reason = await run_parent_cut_hook.parent_cut_reason(
+			fresh_payload(),
+			NOW_MS,
+			priced_on(before_crossing),
+		)
+
+		expect(reason).toBeUndefined()
 	})
 })
 

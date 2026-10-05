@@ -1,7 +1,7 @@
 import { run_cut } from '#scripts/run/run-cut'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { context_cut_payback } from './context-cut-payback'
-import { CONTEXT_CUT_THRESHOLD, RECENT_REQUEST_WINDOW } from './context-cut-threshold'
+import { CONTEXT_CUT_THRESHOLD } from './context-cut-threshold'
 import { cost_usage, type UsageRecord, type UsageTotals } from './cost-usage'
 import { cost_verdict, type OverMeasurement } from './cost-verdict'
 
@@ -9,7 +9,6 @@ const OPUS = 'claude-opus-5'
 const FAILURE_EXIT_CODE = 1
 const SHORT_LOW = 100
 const SHORT_HIGH = 300
-const SHORT_MEAN = 200
 const state = { out: [] as Array<string>, err: [] as Array<string> }
 
 function record(input_tokens: number, overrides: Partial<UsageTotals> = {}): UsageRecord {
@@ -28,7 +27,7 @@ function over_of(records: ReadonlyArray<UsageRecord>): OverMeasurement {
 	return { billed_input_per_request: records.map((entry) => cost_usage.billed_input(entry.totals)) }
 }
 
-// A measurement built straight from a per-request billed-input sequence, for the recent-window cases
+// A measurement built straight from a per-request billed-input sequence, for the cases
 // that care about the shape of the sequence rather than how a record maps to it.
 function over_from(billed: ReadonlyArray<number>): OverMeasurement {
 	return { billed_input_per_request: billed }
@@ -58,50 +57,55 @@ function stderr(): string {
 }
 
 describe('cost_verdict.per_request_cost', () => {
-	it('divides billed input by the requests that paid for it', () => {
-		const measurement = over_of([record(100), record(100)])
+	it('answers the billed input of the newest request', () => {
+		const measurement = over_of([record(SHORT_LOW), record(SHORT_HIGH)])
 
-		expect(cost_verdict.per_request_cost(measurement)).toBe(100)
+		expect(cost_verdict.per_request_cost(measurement)).toBe(SHORT_HIGH)
 	})
 
-	// Dividing by no requests would throw or answer Infinity; a session that asked nothing has
-	// nothing to hand off.
+	// A session that asked nothing has nothing to hand off.
 	it('answers zero for a session with no requests', () => {
 		expect(cost_verdict.per_request_cost(over_of([]))).toBe(0)
 	})
 })
 
-// joshuafolkken/kit#2295: the hand-off prices the recent tail, not the whole session, so a long
-// parent whose context has grown hands off on its current cost rather than an average that lags it.
-describe('cost_verdict.per_request_cost recent window', () => {
-	const CHEAP_EARLY = 60_000
-	const EARLY_COUNT = 40
-	const DEAR_LATE = 260_000
-	const UNDER_EACH = 100_000
+// joshuafolkken/kit#3224: the hand-off prices the newest request, so a growing context hands off at
+// the request that crosses the threshold rather than once an average trailing it catches up.
+describe('cost_verdict.classify on the newest request', () => {
+	// The billed input of wake session 03367124's requests 60–69 on 2026-10-05: the newest crossed
+	// 135k at request 65, while the ten-request average stayed under until request 70.
+	const GROWING_CONTEXT = [
+		126_663, 127_928, 132_110, 133_003, 134_270, 135_535, 136_676, 137_953, 138_506, 139_243,
+	]
+	const BEFORE_CROSSING = 5
 
-	// Many cheap early requests, then a tail above the threshold: the whole-session average stays well
-	// under, so the old measurement kept supervising; the recent window prices the tail and hands off.
-	it('prices the recent tail so a late context spike reads over', () => {
-		const early = Array.from({ length: EARLY_COUNT }, () => CHEAP_EARLY)
-		const late = Array.from({ length: RECENT_REQUEST_WINDOW }, () => DEAR_LATE)
+	it('answers over at the first request past the threshold, while an average still trails it', () => {
+		const average = Math.round(
+			GROWING_CONTEXT.reduce((sum, billed) => sum + billed, 0) / GROWING_CONTEXT.length,
+		)
 
-		expect(cost_verdict.classify(over_from([...early, ...late]), CONTEXT_CUT_THRESHOLD)).toBe(
+		expect(average).toBeLessThan(CONTEXT_CUT_THRESHOLD)
+		expect(cost_verdict.classify(over_from(GROWING_CONTEXT), CONTEXT_CUT_THRESHOLD)).toBe(
 			cost_verdict.OVER_VERDICT,
 		)
 	})
 
-	it('stays under when every recent request is below the threshold', () => {
-		const requests = Array.from({ length: EARLY_COUNT }, () => UNDER_EACH)
+	it('stays under at the request just before the crossing', () => {
+		const before = GROWING_CONTEXT.slice(0, BEFORE_CROSSING)
 
-		expect(cost_verdict.classify(over_from(requests), CONTEXT_CUT_THRESHOLD)).toBe(
+		expect(cost_verdict.classify(over_from(before), CONTEXT_CUT_THRESHOLD)).toBe(
 			cost_verdict.UNDER_VERDICT,
 		)
 	})
 
-	// Fewer requests than the window: the average is taken over the requests that exist, never a
-	// division by a padded window.
-	it('averages only the requests present when fewer than the window', () => {
-		expect(cost_verdict.per_request_cost(over_from([SHORT_LOW, SHORT_HIGH]))).toBe(SHORT_MEAN)
+	// A compaction drops the context; the newest request reads the drop at once, where an average
+	// would keep the session over for several more requests.
+	it('answers under once the newest request falls back below the threshold', () => {
+		const compacted = [...GROWING_CONTEXT, SHORT_HIGH]
+
+		expect(cost_verdict.classify(over_from(compacted), CONTEXT_CUT_THRESHOLD)).toBe(
+			cost_verdict.UNDER_VERDICT,
+		)
 	})
 })
 
@@ -123,12 +127,14 @@ describe('cost_verdict.report_over', () => {
 		expect(cost_verdict.report_over(over_of([]), 0)).toBe(FAILURE_EXIT_CODE)
 	})
 
-	// joshuafolkken/kit#2295: the stderr line names how many of the session's requests the average
-	// covers, so a recent-tail average is not mistaken for a whole-session one.
-	it('names the window the average covers', () => {
+	// joshuafolkken/kit#3224: the stderr line names the request priced, so it is not mistaken for an
+	// average over the session.
+	it('names the newest request as the one priced', () => {
 		cost_verdict.report_over(over_from([SHORT_LOW, SHORT_HIGH]), CONTEXT_CUT_THRESHOLD)
 
-		expect(stderr()).toContain('over the last 2 of 2 request(s)')
+		expect(stderr()).toContain(
+			`${String(SHORT_HIGH)} billed input tokens per request, on the newest of 2 request(s)`,
+		)
 	})
 })
 

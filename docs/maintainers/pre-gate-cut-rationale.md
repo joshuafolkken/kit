@@ -90,6 +90,13 @@ joshuafolkken/kit#1933 forbids the child pricing its cut on a statistic the pare
 #2295 keeps one statistic both read. Built for a pathological regime a typical lane never enters, the
 threshold sits below that regime's 208k floor, so a runaway implementation still trips it.
 
+**Then the newest request.** joshuafolkken/kit#3224 found the ten-request average still trailing: wake
+session `03367124` on 2026-10-05 crossed 135k at request 65 and its average at request 70. A session's
+billed input only grows between compactions — units write transcripts of their own — so the average
+smoothed no outlier and only lagged. The statistic is now the newest request's billed input, the
+current context the break-even below is defined on. The rest of that session's climb to 167k came
+after its hand-off, from a person continuing to talk to the handed-off session — not a guard defect.
+
 **The value is derived.** joshuafolkken/kit#2374 set 150,000; joshuafolkken/kit#2406 replaced the
 hand-picked number with the arithmetic behind it. A cut costs one preamble rewrite (`POST_CUT_CONTEXT`,
 ~60,000 tokens) and saves the dropped context's cache read on every later request, so it turns on a

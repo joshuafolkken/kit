@@ -42,7 +42,7 @@ const ENTRY_DIRECTORY = process.cwd()
 const LANE_ROOT = path.join(WORK_DIRECTORY, '.kit-lanes')
 const LANE_DIRECTORY = path.join(LANE_ROOT, ISSUE)
 const WRITTEN_TRANSCRIPTS = new Set<string>()
-// The recent-window context verdicts as `CostVerdict` values (joshuafolkken/kit#2312). The exported
+// The context verdicts as `CostVerdict` values (joshuafolkken/kit#2312). The exported
 // tokens widen to `string` through their namespace objects, so a typed literal is what the state
 // factory's `CostVerdict` field accepts.
 const CONTEXT_OVER: CostVerdict = 'over'
@@ -294,7 +294,7 @@ describe('is_uncut_gate', () => {
 		expect(pre_gate_cut.is_uncut_gate(TAKE_THE_CUT, state_of(LANE_DIRECTORY))).toBe(false)
 	})
 
-	// **joshuafolkken/kit#2312: the cut is conditional on the recent-window context.** Below the shared
+	// **joshuafolkken/kit#2312: the cut is conditional on the current context.** Below the shared
 	// threshold a short lane has no accumulation worth a resume, so the guard stays silent and the gate
 	// runs uncut.
 	it('says nothing about an uncut lane gate whose recent context is under the threshold', () => {
