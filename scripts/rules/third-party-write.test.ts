@@ -12,6 +12,9 @@ const SESSION = 'joshuafolkken'
 const resolve_session = (): string => SESSION
 const THIRD_PARTY_COMMENT = 'gh api repos/sveltejs/svelte/issues/5/comments -f body=x'
 const FIRST_PARTY_FILING = `gh api repos/${SESSION}/kit/issues -f title=x`
+// `gh` expands `{owner}` / `{repo}` to the current repository, so this is a first-party write
+// (joshuafolkken/kit#3188).
+const PLACEHOLDER_LABEL = "gh api repos/{owner}/{repo}/issues/1/labels -f 'labels[]=x'"
 const ROW_ID = 'third-party-write'
 const REASON = delivered_rules.THIRD_PARTY_WRITE_REASON
 
@@ -20,6 +23,10 @@ describe('writes_third_party — computed against an injected session owner', ()
 		['a filing', 'gh api repos/sveltejs/kit/issues -f title=x'],
 		['a comment', 'gh api repos/other/repo/issues/5/comments -f body=x'],
 		['a label delete', 'gh api -X DELETE repos/other/repo/issues/5/labels/x'],
+		[
+			'a write to another owner with the repo placeholder',
+			'gh api repos/other/{repo}/issues -f title=x',
+		],
 	])('refuses %s to a third-party repository', (_name, command) => {
 		expect(third_party_write.writes_third_party(command, resolve_session)).toBe(true)
 	})
@@ -35,6 +42,53 @@ describe('writes_third_party — computed against an injected session owner', ()
 
 	it('is silent when the session owner is unreadable', () => {
 		expect(third_party_write.writes_third_party(THIRD_PARTY_COMMENT, () => undefined)).toBe(false)
+	})
+})
+
+describe('writes_third_party — the owner placeholder, against injected candidate remotes', () => {
+	it.each([
+		['the {owner} placeholder', PLACEHOLDER_LABEL],
+		['the legacy :owner placeholder', 'gh api repos/:owner/:repo/issues/1/labels -f labels[]=x'],
+	])('is silent on %s when every candidate remote is first-party', (_name, command) => {
+		const is_third_party = third_party_write.writes_third_party(command, resolve_session, () => [
+			SESSION,
+		])
+
+		expect(is_third_party).toBe(false)
+	})
+
+	it('refuses the placeholder in a fork checkout whose upstream is another owner', () => {
+		const is_third_party = third_party_write.writes_third_party(
+			PLACEHOLDER_LABEL,
+			resolve_session,
+			() => [SESSION, 'sveltejs'],
+		)
+
+		expect(is_third_party).toBe(true)
+	})
+})
+
+describe('writes_third_party — the owner placeholder it cannot resolve', () => {
+	it('refuses the placeholder when a candidate remote owner is unreadable', () => {
+		const is_third_party = third_party_write.writes_third_party(
+			PLACEHOLDER_LABEL,
+			resolve_session,
+			() => [SESSION, undefined],
+		)
+
+		expect(is_third_party).toBe(true)
+	})
+
+	it.each([
+		['a directory change', `cd ../svelte && ${PLACEHOLDER_LABEL}`],
+		['an exported GH_REPO', `export GH_REPO=sveltejs/svelte && ${PLACEHOLDER_LABEL}`],
+		['an assigned GH_REPO', `GH_REPO=sveltejs/svelte; ${PLACEHOLDER_LABEL}`],
+	])('refuses the placeholder after %s earlier in the line', (_name, command) => {
+		const is_third_party = third_party_write.writes_third_party(command, resolve_session, () => [
+			SESSION,
+		])
+
+		expect(is_third_party).toBe(true)
 	})
 })
 
@@ -71,6 +125,10 @@ describe('third-party-write — delivered through the guard', () => {
 		const command = `gh api repos/${SESSION}/kit/issues/5/comments -f body=x`
 
 		expect(rule_delivery(payload_of('fp-comment', command), NOW_MS)).toBeUndefined()
+	})
+
+	it('is silent on a placeholder label write', () => {
+		expect(rule_delivery(payload_of('fp-placeholder', PLACEHOLDER_LABEL), NOW_MS)).toBeUndefined()
 	})
 
 	it('is refused before wip-cap on a third-party filing', () => {
