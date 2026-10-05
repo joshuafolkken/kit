@@ -29,7 +29,8 @@ import { run_invocation } from './run-invocation'
 //
 // **The waker adds nothing to what may be run.** The argument vector is the constant command plus an
 // invocation rebuilt to say exactly what the record said, and nothing here writes a label: `auto-ok`
-// stays a person's to apply, so a woken session is offered by exactly the rules the first one was. A
+// arrives only through `issue:file`'s default, so a woken session is offered by exactly the rules the
+// first one was. A
 // pool that grew across the seam is `backlogrun-steps.md` → "What one invocation approves", not the
 // waker's doing (joshuafolkken/kit#1675).
 const WAKE_COMMAND = claude_agent_argv.AGENT_COMMAND

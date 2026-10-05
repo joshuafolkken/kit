@@ -653,8 +653,9 @@ pnpm josh issue:file "<title>" --body-file body.md --depth 1 --distinct 2801,279
 - `--route <tier-a|split|interrupt|review-cap>` — the `route:` label naming the filing route. Omit it for a filing with no route.
 - `--label <name>` — an extra label (for example `epic`). Repeatable.
 - `--repo <owner/repo>` — the target repository. Defaults to this repository.
-- `--distinct <N,…>` — the duplicate candidates you read and judged to be different issues.
+- `--distinct <N,…>` — duplicate candidates you read and judged distinct.
 - `--over-cap` — the run is blocked by this filing; the cap lets it through.
+- `--no-auto-ok` — needs a person's judgement (Tier B / C); no `auto-ok`.
 
 **Steps (run in this order):**
 
@@ -664,7 +665,7 @@ pnpm josh issue:file "<title>" --body-file body.md --depth 1 --distinct 2801,279
 4. Count the target's open issues and print `wip: <count> open in <owner/repo> · cap <cap> · <verdict>`: `within` up to the cap; past it `exempt` (route `interrupt` / `split` / `tier-a`, or `--over-cap`), else `held`, which asks the exemption question and refuses; an unreadable count warns.
 5. Run the same duplicate search as [`josh issue:scout`](#josh-issuescout) and print its report. While there are candidates, file nothing until every one is named in `--distinct`. A duplicate is not filed; it is folded into the existing issue by `issue-fold-existing.md`. A filing to another repository points `GH_REPO` at the target, so the duplicate search and the epic decision run there.
 6. Create any missing workflow label (depth / route) with its color and description — the same set as [`josh sync`](josh-commands.md#josh-sync). A label that cannot be created is printed with a warning, and the filing goes on.
-7. File the issue with the depth, the route, the classification label the body declares (`bug` / `enhancement` / `breaking-change`) and any extra labels in one create request, and print its URL.
+7. Print the `auto-ok` decision (applied in a `backlogrun` or when the branch's issue has it). File with all labels in one request; print the URL.
 8. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run. The issue already exists, so the exit code stays 0.
 
 A refusal in steps 1–5 files nothing and exits 1. The per-run filing cap (`filing-cap`) and the `issue:fold` required before a second filing (`issue-fold`) apply to calls of this command. A refused call is not counted.

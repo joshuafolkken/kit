@@ -24,23 +24,26 @@ bounds it instead is "The brake that replaces the promise" below.
 epic"** — what runs is stated by the keyword and its arguments, never inferred from the shape of a
 request.
 
-**Which issues may be opted in stays a person's decision.** `auto-ok` is applied only by a person —
-this file is that rule's single source. **Which ones carry the label, a person; in what order and how
-many at once, the run.** An issue the run files and bundles into an already opted-in epic is offered
-from the next ask onwards, and the brake below bounds that quantity rather than the membership.
+**An issue found by opted-in work is opted in by default** (joshuafolkken/kit#3213) — this file is
+that rule's single source, and `pnpm josh issue:file` computes it (`scripts/issue/issue-auto-ok.ts`),
+printing `auto-ok: applied` or `auto-ok: not applied` with the reason. It applies `auto-ok` while a
+`backlogrun` carry record is live, or when the issue the current branch names carries `auto-ok`,
+and never on a `--repo` filing to another repository. **Pass `--no-auto-ok` only when the new issue needs a person's judgement** — a Tier B toss-up or a
+Tier C action inside it; a choice with a clear recommendation is Tier A and does not qualify.
+Outside those signals `auto-ok` stays a person's to apply. **Which ones carry the label, that rule;
+in what order and how many at once, the run** — the brake below bounds the quantity, not the
+membership.
 
-**The end-of-run retrospective is the one carve-out** (joshuafolkken/kit#2328): when a run drains its
-backlog, the retrospective files the improvements worth carrying into the next run and applies
-`auto-ok` to them. Its filings are counted against every brake in "The brake that replaces the
-promise" below with no exception, and a retrospective that judges nothing worth carrying files
-nothing. Every other filing route is unchanged: `auto-ok` stays a person's to apply.
+The end-of-run retrospective is no longer a separate carve-out: it files
+while the carry record is live, so the same default opts its filings in, counted against every brake
+in "The brake that replaces the promise" below.
 
 A Tier C action inside a child still stops that child, exactly as it does for any batch child.
 
 **A named issue is approved by the keyword and its number, not by `auto-ok`** (joshuafolkken/kit#1984).
-`backlogrun #N1 #N2 …` runs those issues whether or not they carry the label. The pool that follows is
-unchanged: still `auto-ok`, still a person's to opt in. "Named issues run first, in order" below is the
-procedure.
+`backlogrun #N1 #N2 …` runs those issues whether or not they carry the label. The pool that follows
+is unchanged: still `auto-ok`, opted in as "Which ones carry the label" above says. "Named issues
+run first, in order" below is the procedure.
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the authorization boundary is shaped this way"
 
@@ -192,8 +195,8 @@ that parked it (`backlogrun-park.md`). Because `--end` removes the record, a re-
 finds nothing and never re-sends that confirmation — `progress-watcher.md` →
 "Progress while the run is quiet" is the single source of the pull-versus-push split.
 
-**The record widens nothing.** It carries a budget and nothing else: `auto-ok` is still applied only
-by a person. A pool grown across the cut by this run's own bundled filings is "What one invocation
+**The record widens nothing but the default.** It carries a budget, and its being live is what
+opts this run's filings in ("What one invocation approves"); no other label follows from it. A pool grown across the cut by this run's own bundled filings is "What one invocation
 approves", its ceiling counted from the record's `filed`.
 
 **Nothing waits for a person any more — `pnpm josh run:wake` supervises the driver**. After a cut or
@@ -215,7 +218,8 @@ owner prevents a second driver from taking it over. On `none`, `expired` or `unr
 person's**: the supervisor spends the declared budget and never declares another.
 
 **What may be run is untouched.** The driver takes named issues from the invocation and pool issues
-from the existing offer command. The supervisor writes no `auto-ok` label. A judgment session receives
+from the existing offer command. The supervisor writes no label of its own; `auto-ok` arrives only
+through `issue:file`'s default. A judgment session receives
 the original invocation plus the driver's reason and resume state.
 For a named epic, the driver hands off `epic #N` with the original invocation. The judgment session
 follows the named epic procedure and dispatches its children; the epic root is never launched as a
@@ -291,8 +295,10 @@ stop at a time.**
   run does not wait on it.
 
 **`needs-decision`, `run:solo`, `run:lane` and `priority:high` are the workflow labels a run may
-apply, and none is `auto-ok` or `needs-human-review`.** Those two stay a person's alone (this file, `needs-human-review.md`); a
-run parks with `needs-decision` and a person clears it.
+apply by hand, and none is `auto-ok` or `needs-human-review`.** `needs-human-review` stays a
+person's alone (`needs-human-review.md`); `auto-ok` reaches only a run's own filing, through
+`issue:file`'s default ("What one invocation approves"). A run parks with `needs-decision` and a
+person clears it.
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the plan and the decision pass come first"
 
@@ -341,10 +347,10 @@ at the first empty backlog. The default's single source is `scripts/backlog/back
 `DEFAULT_IDLE_MINUTES`. **A watch is polled every 5 minutes, not at the loop's 60-second interval** —
 read the interval from the reason `backlog:budget` prints rather than remembering it.
 
-**To become a candidate an issue needs `auto-ok`, which only a person applies** — except an issue this
-run filed and bundled under an already opted-in epic, which is admitted ("What one invocation
-approves") and bounded by the brake there, never the watch. No issue nobody opted in is ever picked up
-during a watch.
+**To become a candidate an issue needs `auto-ok`** — applied by a person, or by `issue:file`'s
+default to an issue this run filed ("What one invocation approves") — or to be a child this run
+filed and bundled under an already opted-in epic. Either is bounded by the brake there, never the
+watch. No issue that neither a person nor that default opted in is ever picked up during a watch.
 
 **`backlog:offer` asks `backlog:budget` for you on every iteration** — it maps `backlog:next`'s answer
 to the word "The loop" points to and hands it over, so the loop makes the one call and reads back the

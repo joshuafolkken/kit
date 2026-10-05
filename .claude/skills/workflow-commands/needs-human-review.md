@@ -7,8 +7,8 @@ of use — the moment `pnpm josh issue:state <N>` answers `human_review: yes`.
 
 An issue carrying **`needs-human-review`** is degraded to a `halfrun`-shaped stop, whichever entry
 point reached it — `fullrun` or `backlogrun`. It is `auto-ok`'s opposite: that label widens
-unattended execution past an epic's edge, this one withholds its last step, and both may be applied
-**only by a person**. It exists because some work's quality is not something a test can judge — a
+unattended execution past an epic's edge, this one withholds its last step, and this one may be
+applied **only by a person**. It exists because some work's quality is not something a test can judge — a
 **published artifact** whose unit tests say nothing about the writing, or **a choice that was a
 person's to make** such as picking one of several generated candidates.
 
@@ -43,7 +43,7 @@ pnpm josh issue:state <N>                      # state, labels, and human_review
 pnpm josh issue:state <N> --repo <owner/repo>  # a child in another repository
 ```
 
-**Never apply or remove it**, exactly as strongly as `auto-ok`: a mark a run can clear for itself is
+**Never apply or remove it**: a mark a run can clear for itself is
 not a mark. Everything but typing the command on an explicit instruction in the current turn is a
 proposal, written as an Issue comment and left for the person. The label itself is created once per
 repository, by a person:

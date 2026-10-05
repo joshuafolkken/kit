@@ -4,7 +4,12 @@ import { github_issue_url } from '#scripts/gh/github-issue-url'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { issue_backlinks } from './issue-backlinks'
 import { issue_classification } from './issue-classification'
-import { DEPTH_LABEL_ORDER, FILING_ROUTE_LABELS, has_label_name } from './issue-labels'
+import {
+	AUTO_OK_LABEL,
+	DEPTH_LABEL_ORDER,
+	FILING_ROUTE_LABELS,
+	has_label_name,
+} from './issue-labels'
 import { markdown_section } from './markdown-section'
 
 // The decisions behind `josh issue:file` (joshuafolkken/kit#2808), kept apart from the command that
@@ -33,6 +38,8 @@ interface FileArguments {
 	distinct: ReadonlyArray<number>
 	// `--over-cap`: the run is blocked by this filing, so the WIP cap does not hold it (`issue-wip.ts`).
 	is_over_cap: boolean
+	// `--no-auto-ok`: the Issue needs a person's judgement, so `auto-ok` is not applied (`issue-auto-ok.ts`).
+	is_auto_ok_opted_out: boolean
 }
 
 const OPTIONS = {
@@ -43,6 +50,7 @@ const OPTIONS = {
 	repo: { type: 'string' },
 	distinct: { type: 'string', multiple: true },
 	'over-cap': { type: 'boolean' },
+	'no-auto-ok': { type: 'boolean' },
 } as const
 
 // The label a `--depth` / `--route` value names, or `undefined` when it names none — read against the
@@ -111,6 +119,7 @@ function arguments_of(values: ParsedValues, title: string | undefined): FileArgu
 		labels: values.label ?? [],
 		repo: values.repo,
 		is_over_cap: values['over-cap'] === true,
+		is_auto_ok_opted_out: values['no-auto-ok'] === true,
 	}
 }
 
@@ -131,12 +140,16 @@ function is_undeclared_classification(label: string, body: string): boolean {
 
 // Every label the filing carries: the depth, the route when there is one, the classification labels
 // the body declares (`issue_classification.labels_for`, which merges case-insensitively), then any
-// extra `--label`. One request applies them all, so no label is a separate step to forget.
-function labels_of(args: FileArguments, body: string): ReadonlyArray<string> {
+// extra `--label`, then `auto-ok` when the filing opted in (`issue-auto-ok.ts`) and no `--label`
+// already named it. One request applies them all, so no label is a separate step to forget.
+function labels_of(args: FileArguments, body: string, is_auto_ok = false): ReadonlyArray<string> {
 	const extra = args.labels.filter((label) => !is_undeclared_classification(label, body))
 	const declared = [args.depth, ...(args.route === undefined ? [] : [args.route]), ...extra]
+	const labels = issue_classification.labels_for(body, declared)
 
-	return issue_classification.labels_for(body, declared)
+	if (!is_auto_ok || has_label_name(labels, AUTO_OK_LABEL)) return labels
+
+	return [...labels, AUTO_OK_LABEL]
 }
 
 function is_same_repository(target: string, current: string): boolean {

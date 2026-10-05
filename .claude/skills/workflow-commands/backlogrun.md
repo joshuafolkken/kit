@@ -45,7 +45,7 @@ Each step is a terse trigger and a pointer; the procedure is read on demand from
    `backlogrun-steps.md` → "The session cut is inside the invocation".
 3. **What this invocation approves** — `backlogrun-steps.md` → "What one invocation approves": the
    opted-in pool, a run's own filings once bundled, and the brake (`--max`, ten filings, the WIP cap)
-   that bounds the amount. `auto-ok` is a person's alone.
+   that bounds the amount. `auto-ok` reaches a run's own filings only through `issue:file`'s default.
 4. **Report the plan before the first child** — `pnpm josh backlog:plan`, then resolve every
    `needs-decision` issue decidable from its body in one pass. In the same pass, record `blocked-by`
    between issues that must land in order, and apply `run:solo` where all three of the

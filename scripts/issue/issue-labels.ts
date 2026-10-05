@@ -36,11 +36,12 @@ const PRIORITY_HIGH_LABEL = 'priority:high'
 const AUTO_OK_LABEL = 'auto-ok'
 // Degrades one issue's run to a `halfrun`-shaped stop: it is implemented and taken through the
 // verification gate, and then nothing is committed, pushed, opened as a pull request or merged
-// (joshuafolkken/kit#1125). **Only a person applies it**, exactly as strongly as `auto-ok` — a mark a
-// run could clear for itself is not a mark.
+// (joshuafolkken/kit#1125). **Only a person applies it** — a mark a run could clear for itself is not
+// a mark.
 //
-// It is the opposite of `auto-ok` in what it does and its twin in who may apply it: one widens
-// unattended execution past an epic's edge, the other withholds the last step of it. `auto-ok`
+// It is the opposite of `auto-ok` in what it does: one widens unattended execution past an epic's
+// edge, the other withholds the last step of it. Unlike `auto-ok`, which `issue:file` applies by
+// default to work found by opted-in work (joshuafolkken/kit#3213), no run ever applies it. `auto-ok`
 // answers "may this run at all", this one answers "may its result ship without a person looking".
 //
 // **Not `needs-decision`, and the difference is what the two sets below encode.** A parked issue is

@@ -59,7 +59,9 @@ defines, before the create call (joshuafolkken/kit#3176).
 
 - **It is read off the subject, exactly as the table is** — so applying it is not a judgement and not
   a person's to make, which is what separates it from `auto-ok` and `needs-human-review`. Those two
-  decide what a run may do; this one records what an Issue is about and withholds nothing.
+  decide what a run may do (`auto-ok` by `issue:file`'s default for a filing found by opted-in work —
+  `backlogrun-steps.md` → "What one invocation approves"); this one records what an Issue is about
+  and withholds nothing.
 - **Applied at filing, not at completion.**
 - **An Issue carrying more than one counts as the lowest depth present**, the one closest to the
   consumer.

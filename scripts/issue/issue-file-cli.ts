@@ -10,24 +10,25 @@ import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
 import { error_text } from '#scripts/lib/error-message'
 import { repository_labels } from '#scripts/repo/repository-labels'
+import { issue_auto_ok } from './issue-auto-ok'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_scout_cli } from './issue-scout-cli'
 import { issue_wip } from './issue-wip'
 
 // `josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>]…
-// [--repo <owner/repo>] [--distinct <N,…>] [--over-cap]` — file an Issue with every filing step run in
-// order (joshuafolkken/kit#2808): the third-party refusal, the body lint, the `## Origin` check for
-// another repository, the WIP cap count (joshuafolkken/kit#3181), the duplicate scout, the missing
-// workflow labels created (joshuafolkken/kit#3176), the create call carrying every label, and
-// `epic:bundle` after it.
+// [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok]` — file an Issue with every
+// filing step run in order (joshuafolkken/kit#2808): the third-party refusal, the body lint, the
+// `## Origin` check for another repository, the WIP cap count (joshuafolkken/kit#3181), the duplicate
+// scout, the missing workflow labels created (joshuafolkken/kit#3176), the `auto-ok` decision
+// (joshuafolkken/kit#3213), the create call carrying every label, and `epic:bundle` after it.
 // A direct `gh api …/issues` filing is refused by the `direct-filing` delivered rule and pointed here.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE =
-	'Usage: josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--over-cap]'
+	'Usage: josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok]'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the filing has no repository to compare against — check `gh auth status`.'
 const THIRD_PARTY_MESSAGE =
@@ -134,10 +135,17 @@ async function is_scout_clear(filing: Filing): Promise<boolean> {
 // the create applies is provisioned first, so it never arrives with a generated color.
 async function create(filing: Filing): Promise<string | undefined> {
 	repository_labels.ensure_labels(filing.target)
+	const auto_ok = await issue_auto_ok.resolve(
+		filing.args.is_auto_ok_opted_out,
+		filing.target,
+		filing.current,
+	)
+
+	console.info(issue_auto_ok.line_of(auto_ok))
 	const request = git_gh_issue_write.issue_create_request({
 		title: filing.args.title,
 		body: filing.body,
-		labels: issue_file.labels_of(filing.args, filing.body),
+		labels: issue_file.labels_of(filing.args, filing.body, auto_ok.is_applied),
 		repo: filing.target,
 	})
 

@@ -999,7 +999,7 @@ Post one comment to an issue from a file, so no shell expands the body
 
 > **Audience:** automation · **Side effects:** network
 
-`<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap]`
+`<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok]`
 
 File an Issue with every filing step: lint, Origin, WIP cap, duplicate scout, labels, then epic:bundle
 

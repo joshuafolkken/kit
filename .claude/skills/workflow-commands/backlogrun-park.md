@@ -58,7 +58,7 @@ untouched**, for the same reason. **Name the lane directory in the stop report a
 person told to look at a working tree and not told which one has been told nothing. The lanes already in
 flight finish; no new lane is opened.
 
-**Never apply or remove the label** — `auto-ok`'s rule, at `auto-ok`'s strength. Full definition and the
+**Never apply or remove the label** — a person's alone. Full definition and the
 `needs-decision` comparison: `needs-human-review.md`, which is the single source.
 
 ## park and continue
