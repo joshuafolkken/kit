@@ -42,6 +42,22 @@ describe('repo_party.target_owner', () => {
 	})
 })
 
+describe('repo_party.placeholder_owners', () => {
+	it.each([
+		['a bare owner/repo', 'sveltejs/svelte'],
+		['a host prefix', 'github.com/sveltejs/svelte'],
+	])('answers only the GH_REPO owner given as %s', (_name, gh_repo) => {
+		expect(repo_party.placeholder_owners(process.cwd(), { GH_REPO: gh_repo })).toStrictEqual([
+			'sveltejs',
+		])
+	})
+
+	// With no GH_REPO, the candidates are the kit checkout's own remotes — all joshuafolkken's.
+	it('answers every remote owner when GH_REPO is unset', () => {
+		expect(repo_party.placeholder_owners(process.cwd(), {})).toContain('joshuafolkken')
+	})
+})
+
 describe('repo_party.current_owner', () => {
 	// This suite runs in the kit checkout, whose `origin` owner is joshuafolkken — read from the
 	// work tree's own config, so a lane and the primary checkout answer the same.

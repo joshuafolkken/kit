@@ -92,6 +92,25 @@ describe('repo_origin.parse_origin_from_config', () => {
 	})
 })
 
+describe('repo_origin.parse_remote_urls_from_config', () => {
+	it('reads the url of every remote, in config order', () => {
+		const content = [
+			`[remote "origin"]\n\turl = ${SSH_REMOTE}`,
+			'[branch "main"]\n\tremote = origin',
+			`[remote "upstream"]\n\turl = ${HTTPS_REMOTE}`,
+		].join('\n')
+
+		expect(repo_origin.parse_remote_urls_from_config(content)).toStrictEqual([
+			SSH_REMOTE,
+			HTTPS_REMOTE,
+		])
+	})
+
+	it('returns an empty list when the config declares no remote', () => {
+		expect(repo_origin.parse_remote_urls_from_config('[user]\n\tname = x')).toStrictEqual([])
+	})
+})
+
 describe('repo_origin.format_identity', () => {
 	it('joins the identity into the owner/repo key', () => {
 		expect(repo_origin.format_identity(EXPECTED)).toBe(KIT_KEY)

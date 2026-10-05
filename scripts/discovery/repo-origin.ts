@@ -26,6 +26,7 @@ const REPO_PATH_SEGMENTS = 2
 const NOT_FOUND = -1
 const SECTION_PREFIX = '['
 const ORIGIN_SECTION = /^\[remote\s+"origin"\]$/u
+const REMOTE_SECTION = /^\[remote\s+"[^"]+"\]$/u
 const URL_KEY = 'url'
 
 // Whether a URL's hostname is GitHub. Exact, with no alias spelling accepted: an alias is a name
@@ -132,6 +133,30 @@ function parse_origin_from_config(content: string): string | undefined {
 		.find((url) => url !== undefined)
 }
 
+// The config's lines grouped by section, each group led by its header. Lines before the first header
+// belong to no section and are dropped.
+function section_groups(lines: ReadonlyArray<string>): Array<Array<string>> {
+	const groups: Array<Array<string>> = []
+
+	for (const line of lines) {
+		if (is_section_header(line)) groups.push([line])
+		else groups.at(-1)?.push(line)
+	}
+
+	return groups
+}
+
+// The `url` of every `[remote "…"]` section, in config order — the candidates `gh` picks its base
+// repository from when it expands the `{owner}` placeholder (joshuafolkken/kit#3188).
+function parse_remote_urls_from_config(content: string): Array<string> {
+	const lines = content.split('\n').map((line) => line.trim())
+
+	return section_groups(lines)
+		.filter((group) => REMOTE_SECTION.test(group[0] ?? ''))
+		.flatMap((group) => group.map((line) => entry_value(line, URL_KEY)))
+		.filter((url) => url !== undefined)
+}
+
 // The `owner/repo` key a discovery map is keyed by. Lowercased, because GitHub resolves owner and
 // repository names case-insensitively: two remotes spelling the same repository differently are the
 // same repository, and keying by the spelling would put both in the map — where an override, which
@@ -146,6 +171,7 @@ const repo_origin = {
 	is_github_ssh_host,
 	parse_origin_from_config,
 	parse_origin_url,
+	parse_remote_urls_from_config,
 	format_identity,
 }
 

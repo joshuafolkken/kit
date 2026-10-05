@@ -59,20 +59,33 @@ function resolve_git_directory(repository_path: string): string | undefined {
 	}
 }
 
-// The `origin` URL a work tree declares, or nothing when it has no `origin`, no readable config, or
-// is not a work tree at all. Every failure reads as "no remote" so one unreadable sibling cannot
-// fail a command whose contract is to report what it could find.
-function read_origin_url(repository_path: string): string | undefined {
+// The work tree's git config text, or nothing when it is unreadable or not a work tree.
+function read_config(repository_path: string): string | undefined {
 	const git_directory = resolve_git_directory(repository_path)
 	if (git_directory === undefined) return undefined
 
 	try {
-		return repo_origin.parse_origin_from_config(
-			readFileSync(path.join(git_directory, GIT_CONFIG), 'utf8'),
-		)
+		return readFileSync(path.join(git_directory, GIT_CONFIG), 'utf8')
 	} catch {
 		return undefined
 	}
+}
+
+// The `origin` URL a work tree declares, or nothing when it has no `origin`, no readable config, or
+// is not a work tree at all. Every failure reads as "no remote" so one unreadable sibling cannot
+// fail a command whose contract is to report what it could find.
+function read_origin_url(repository_path: string): string | undefined {
+	const config = read_config(repository_path)
+
+	return config === undefined ? undefined : repo_origin.parse_origin_from_config(config)
+}
+
+// The `url` of every remote the work tree declares, with the same "unreadable reads as none" contract
+// as `read_origin_url`.
+function read_remote_urls(repository_path: string): Array<string> {
+	const config = read_config(repository_path)
+
+	return config === undefined ? [] : repo_origin.parse_remote_urls_from_config(config)
 }
 
 // Every immediate child directory of `parent`, in name order. An unreadable parent yields nothing
@@ -158,6 +171,7 @@ const repo_discovery = {
 	OVERRIDE_ENV_KEY,
 	main_worktree,
 	read_origin_url,
+	read_remote_urls,
 	resolve_current_owner,
 	scan_siblings,
 	discover_repositories,

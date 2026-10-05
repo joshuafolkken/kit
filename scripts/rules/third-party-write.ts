@@ -25,24 +25,37 @@ import { shell_segments } from './shell-segments'
 // A third-party write means all three: a `gh api` call, a write, and a repository target whose owner
 // the classification calls third-party. `unknown` (an unreadable session remote, an unparseable path)
 // is not third-party — the rule stays silent rather than refusing a write it cannot prove is external.
-function is_third_party_write_segment(segment: string, session_owner: string | undefined): boolean {
+// The `{owner}` placeholder (joshuafolkken/kit#3188) is judged by every owner `gh` could expand it to:
+// first-party only when all of them are, so a fork checkout whose `upstream` is another owner's still
+// refuses the write `gh` may send there.
+function is_third_party_write_segment(
+	segment: string,
+	session_owner: string | undefined,
+	resolve_placeholder_owners: () => Array<string>,
+): boolean {
 	if (!gh_api.is_gh_api(segment) || !gh_api.is_write(segment)) return false
 
 	const target = gh_api.repo_target(segment)
-
 	if (target === undefined) return false
+	const owners = gh_api.is_owner_placeholder(target.owner)
+		? resolve_placeholder_owners()
+		: [target.owner]
 
-	return repo_party.classify(session_owner, target.owner) === repo_party.THIRD_PARTY
+	return owners.some(
+		(owner) => repo_party.classify(session_owner, owner) === repo_party.THIRD_PARTY,
+	)
 }
 
 // The session owner is read only when a segment is actually a `gh api` write to a repository — so an
-// ordinary shell line, and every read, pays nothing for the local config read. `resolve_owner` is
-// injected so the suite fixes the owner without touching the real remote, the way `file-body.ts`
-// injects `has_file`. Each segment is judged on its own, so a `gh api` write quoted inside another
-// command's argument is read as the write it is not, exactly as every other trigger here reads its own.
+// ordinary shell line, and every read, pays nothing for the local config read. `resolve_owner` and
+// `resolve_placeholder_owners` are injected so the suite fixes the owners without touching the real
+// remotes, the way `file-body.ts` injects `has_file`. Each segment is judged on its own, so a `gh api`
+// write quoted inside another command's argument is read as the write it is not, exactly as every
+// other trigger here reads its own.
 function writes_third_party(
 	command: string,
 	resolve_owner: () => string | undefined = repo_party.current_owner,
+	resolve_placeholder_owners: () => Array<string> = repo_party.placeholder_owners,
 ): boolean {
 	const targets = shell_segments
 		.segments_of(command)
@@ -52,7 +65,9 @@ function writes_third_party(
 
 	const session_owner = resolve_owner()
 
-	return targets.some((segment) => is_third_party_write_segment(segment, session_owner))
+	return targets.some((segment) =>
+		is_third_party_write_segment(segment, session_owner, resolve_placeholder_owners),
+	)
 }
 
 // The instruction in the shape a refusal can carry: what the command does, why it is Tier C, and what
