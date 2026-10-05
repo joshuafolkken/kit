@@ -65,7 +65,7 @@ in `package.json`'s `files` and are written into every consumer project by `josh
 so a defect in one reaches a consumer and is reviewed at `medium` like any other shipped file.
 
 **Documentation is not inert either, and that is deliberate.** `CLAUDE.md`, `prompts/**`, `.claude/**`
-and `docs/**` are all reviewed at `medium`. The "Non-runtime updates" exception in `CLAUDE.md` exempts
+and `docs/**` are all reviewed at `medium`. The "Non-runtime updates" exception in `prompts/testing-guide.md` exempts
 them from _testing_ — which asks whether an automated test could have caught the defect — while this
 asks whether a human reading the diff is the only thing that can. Measured on joshuafolkken/kit#963 and
 #965, both documentation-only by that classification: a `medium` review found ten real defects in each
@@ -97,7 +97,7 @@ third is the review chasing its own tail.
 in its own lane and reviews the resolution — and that round does not count against the cap**
 (joshuafolkken/kit#1623). The cap bounds re-reading _the change under review_; a resolution review reads
 a different subject — not the change, but what merging a moved `main` into it did.
-`.claude/skills/workflow-commands/backlogrun-lanes.md` → "Conflicts are not predicted" is the single source of
+`.claude/skills/workflow-commands/backlogrun-recovery.md` → "Conflicts are not predicted" is the single source of
 the procedure and of the four conditions under which the run steps back instead of resolving.
 `pnpm josh review:attest --check` must answer `ok` before the merge is re-issued, and a confirmed High
 parks the child rather than buying it a further round.

@@ -56,7 +56,8 @@ from the page it explains.
 - [backlogrun-steps-rationale.md](./backlogrun-steps-rationale.md),
   [backlogrun-child-rationale.md](./backlogrun-child-rationale.md),
   [backlogrun-lanes-rationale.md](./backlogrun-lanes-rationale.md),
-  [backlogrun-progress-rationale.md](./backlogrun-progress-rationale.md) — `backlogrun`
+  [backlogrun-progress-rationale.md](./backlogrun-progress-rationale.md),
+  [backlogrun-recovery-rationale.md](./backlogrun-recovery-rationale.md) — `backlogrun`
 - [progress-watcher-rationale.md](./progress-watcher-rationale.md) — the progress watcher every
   implementing run starts
 - [pre-gate-cut-rationale.md](./pre-gate-cut-rationale.md) — the pre-gate session cut

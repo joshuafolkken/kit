@@ -97,12 +97,16 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// and prrun stop paying for ~50KB of batch and lane procedure; backlogrun lost the moved prose.
 	// Lowered in joshuafolkken/kit#3174: `SKILL.md` was cut to a manifest (~21KB → ~11KB) and the entry
 	// sequence `fullrun`, `halfrun` and `prrun` shared moved into one `entry-sequence.md`.
-	{ entry: 'kickoff', bytes: 53_248 },
-	{ entry: 'fullrun', bytes: 69_632 },
-	{ entry: 'halfrun', bytes: 69_632 },
-	{ entry: 'prrun', bytes: 73_728 },
-	{ entry: 'backlogrun', bytes: 196_608 },
-	{ entry: LANE_CHILD, bytes: 73_728 },
+	// Lowered in joshuafolkken/kit#3175: the loop became the driver's hand-backs, the supervisor and
+	// provider prose moved to `docs/josh-commands-automation.md`, and the failure-only sections moved to
+	// `backlogrun-recovery.md`, which the parent's reach still charges whole.
+	// joshuafolkken/kit#3171 cut `CLAUDE.md` to triggers and pointers (~12 KB), lowering every entry.
+	{ entry: 'kickoff', bytes: 45_056 },
+	{ entry: 'fullrun', bytes: 57_344 },
+	{ entry: 'halfrun', bytes: 57_344 },
+	{ entry: 'prrun', bytes: 61_440 },
+	{ entry: 'backlogrun', bytes: 176_128 },
+	{ entry: LANE_CHILD, bytes: 61_440 },
 ]
 
 function byte_size(root: string, relative_path: string): number {

@@ -82,7 +82,9 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
 	// joshuafolkken/kit#2998 split the reference: the developer commands stay, the rest moved out.
-	{ path: 'docs/josh-commands-automation.md', bytes: 155_648 },
+	// joshuafolkken/kit#3175 raised it: the supervisor, provider-table and answer-to-budget prose moved
+	// here out of `backlogrun-steps.md`, so a run reads it only when it asks about those commands.
+	{ path: 'docs/josh-commands-automation.md', bytes: 159_744 },
 	{ path: 'docs/josh-commands.md', bytes: 36_864 },
 	{ path: 'prompts/coding-standards.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 8192 },

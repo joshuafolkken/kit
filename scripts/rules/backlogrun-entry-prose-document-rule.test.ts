@@ -33,7 +33,7 @@ const RELOCATED_BODIES: ReadonlyArray<SingleSourceRule> = [
 		canonical: `${SKILL_DIR}/backlogrun-steps.md`,
 	},
 	{
-		marker: "The loop's head is one command",
+		marker: 'The loop is computed, not walked by hand',
 		canonical: `${SKILL_DIR}/backlogrun-steps.md`,
 	},
 	{

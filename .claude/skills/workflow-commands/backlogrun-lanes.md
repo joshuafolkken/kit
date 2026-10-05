@@ -107,7 +107,7 @@ isolation. So `epic:next` is asked **with** `--lanes`, and everything below runs
 switched".
 
 **Report the throughput gain only with its merge-race cost** — every overlap that becomes a conflict
-costs a resolution, a re-run gate and a review ("Conflicts are not predicted" below). Rationale:
+costs a resolution, a re-run gate and a review (`backlogrun-recovery.md` → "Conflicts are not predicted"). Rationale:
 `docs/maintainers/backlogrun-lanes-rationale.md` → "Why lanes cost as well as buy throughput".
 
 ### Once per repository, before the first lane opens
@@ -209,62 +209,9 @@ lane is cut from.
 
 ### Conflicts are not predicted
 
-**The child merges `origin/main` into its lane before its gate now, so this path is the fallback rather
-than the first line.** Every `fullrun` runs `pnpm josh main:merge` ahead of the gate
-(`chain-rule.md` → "origin/main is merged in before the gate", the single source), so an overlap
-already on `main` is resolved before the gate reads the tree. What this section covers is an overlap
-that lands on `main` *after* it, which `followup` still reports as a conflict.
-
-**Nothing here forecasts which children will overlap.** The overlap surfaces where GitHub already
-reports it: a pull request that conflicts with its base comes back `mergeStateStatus: DIRTY`, which
-`git-pr-checks-eval.ts` reads as a **failure** rather than polling through it — so `pnpm josh followup`
-ends that child with a named conflict in about ten seconds.
-
-**That child does not stop: it resolves the conflict in its own lane.** It is **not** counted against
-the consecutive-failure guard either way.
-
-**The merge direction is `origin/main` into the lane's branch, never a rebase**, and no step below
-rewrites a pushed commit. Rationale: `docs/maintainers/backlogrun-lanes-rationale.md` → "Why a conflict
-is resolved in the lane rather than handed to a person".
-
-1. **Resolve in the lane.** `git fetch origin main`, merge `origin/main` into the lane's branch, resolve
-   in place. Do not close the lane, open another, or switch its branch.
-2. **Re-run the whole gate.** The tree changed, so the green recorded before the conflict is void:
-   `pnpm josh lint:related` and `pnpm josh test:related`, then `pnpm josh gate`.
-3. **Review the resolution, one round.** Brief it with `pnpm josh review:brief` and run `/code-review`
-   over the resolution diff, then require `pnpm josh review:attest --check` to answer `ok`. That round
-   is a different subject and does not spend one of the two the cap allows — `prompts/review.md` →
-   "Review round cap" carries the exception.
-4. **Conclude the merge and push it, with `pnpm josh git -y`** — the only sanctioned way; without it
-   nothing changes on `origin` and condition 3 parks the child for good. **Record the resolution on the
-   Issue in this same step** — a comment naming the conflicting paths — because condition 3 counts
-   resolutions off the Issue comments, not off memory.
-5. **Merge**, by re-running `pnpm josh followup` exactly as before.
-
-**The safeguard is the re-run verification, not who holds the pen** — a conflict the run can resolve is
-not routed to a person.
-
-**The run steps back under these four conditions, and under no others. The list is exhaustive and
-carries no judgement.**
-
-1. **The resolution requires deleting the other side's change.** That decides intended behavior, not
-   text. It goes to the user as a **specification** question — "behavior A or behavior B" — never as a
-   diff.
-2. **Both sides rewrote the same lines** — overlapping, not adjacent. Read off the structure of the
-   conflict hunks, so it needs no interpretation.
-3. **A second conflict on the same child.** One resolution per child; the count is read off the Issue
-   comments step 4 writes, so it survives an interrupt.
-4. **The re-run gate did not come back green, or the resolution review returned a High.** Not only a
-   High: a lint error, a failing test or a spell-check hit that merging a moved `main` introduced is
-   this condition too.
-
-Meeting any of the four, the child is parked — `needs-decision` plus a comment naming which of the four
-it was — and its lane is **kept**, because the pushed branch is the resume path (the table below).
-
-**Leave the tree clean before parking: `git merge --abort` precedes a park under conditions 1, 2 or 4.**
-Conditions 1 and 2 are read mid-merge with conflict markers still in the tree, condition 4 after a merge
-that is resolved but not committed; condition 3 fires before any merge is started, so there is nothing
-to abort.
+**A child whose pull request conflicts with `main` resolves it in its own lane rather than stopping** —
+read `backlogrun-recovery.md` → "Conflicts are not predicted" when `pnpm josh followup` reports the
+conflict.
 
 ### What happens to a lane
 
@@ -273,7 +220,7 @@ to abort.
 | The child **merged** | `pnpm josh lane:close <N>` | `followup` released the hold and the branch is on `main`; nothing in that tree is wanted |
 | The child was **parked before its commit** | `git -C <dir> stash push -u -m "backlogrun: parked #<N>"`, record it on the Issue, then `pnpm josh lane:close <N>` | The stash is a repository-level ref, so it outlives the work tree — and `lane:close` is a **forced** removal that would otherwise take the work. `epic:next` counts a parked child's lane as released, so a lane left open holds a seat the count believes is free |
 | The child was **parked after its commit and push** | **Left open**, its directory and held seat recorded on the Issue | The stash step is a **no-op** (tree clean because committed). What `lane:close` would take is the **local branch**, which is the resume path |
-| The child hit a **merge conflict** | **Left open** — the resolution happens in it | The child resolves in place ("Conflicts are not predicted"). A park under that section's four conditions takes the row above |
+| The child hit a **merge conflict** | **Left open** — the resolution happens in it | The child resolves in place (`backlogrun-recovery.md` → "Conflicts are not predicted"). A park under that section's four conditions takes the row above |
 | The child stopped on **`needs-human-review`** | **Left open and untouched** | The uncommitted work *is* the artifact a person has to look at. Name the lane directory in the stop report and in the Telegram |
 | The child **failed** | Whichever of the two parked rows applies, plus the consecutive-failure count | Same reasoning; only the counter differs. **A merge conflict is not this row** — it takes the row above, and it is not counted |
 | **`lane:open` failed on the install** | `pnpm josh lane:close <N>`, then park the child | A lane exists that no `pnpm josh …` runs in and the next `lane:open` answers `already-open`. Closing frees the seat; parking is right because the cause is one a person fixes. Carry pnpm's reason into the park note |
