@@ -69,10 +69,10 @@ describe('Codex hook wiring', () => {
 	it('runs the Codex adapter and the provider-independent kit hooks', () => {
 		const hooks = read(CODEX_HOOKS)
 
-		expect(hooks).toContain('codex-hook-adapter.js pretool')
-		expect(hooks).toContain('codex-hook-adapter.js posttool')
+		expect(hooks).toContain('run-hook.sh codex-hook-adapter pretool')
+		expect(hooks).toContain('run-hook.sh codex-hook-adapter posttool')
 		expect(hooks).toContain('pnpm josh audit:provision')
-		expect(hooks).toContain('pnpm josh session:lang')
+		expect(hooks).toContain('run-hook.sh session-lang')
 	})
 
 	it('keeps prompt-time rules aligned with the Claude workflow', () => {

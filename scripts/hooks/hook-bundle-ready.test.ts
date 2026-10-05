@@ -2,7 +2,6 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { build_hooks } from '#scripts/build/build-hooks'
-import { hook_launch } from '#scripts/init/hook-launch'
 import { execa } from 'execa'
 import {
 	afterEach,
@@ -20,6 +19,8 @@ const { ensure_bundles, FAILED_NOTICE, REBUILT_NOTICE } = hook_bundle_ready
 
 const BUILD_TIMEOUT_MS = 60_000
 const BUILD_ERROR = 'Transform failed'
+// The gate exactly as `scripts/hooks/run-hook.sh` launches it in kit's own checkout.
+const READY_GATE = 'node --disable-warning=ExperimentalWarning scripts/hooks/hook-bundle-ready.ts'
 
 function create_out_directory(): string {
 	const out_directory = mkdtempSync(path.join(tmpdir(), 'hook-bundle-ready-'))
@@ -87,7 +88,7 @@ describe('the gate as a hook command runs it', () => {
 	it(
 		'passes under plain node without writing to stdout',
 		async () => {
-			const result = await execa('sh', ['-c', hook_launch.BUNDLE_READY_GATE], { reject: false })
+			const result = await execa('sh', ['-c', READY_GATE], { reject: false })
 
 			expect(result.exitCode).toBe(0)
 			expect(result.stdout).toBe('')

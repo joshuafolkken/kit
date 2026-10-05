@@ -45,6 +45,16 @@ Type-check with tsc (skips a basic project with no TypeScript to check)
 
 ---
 
+### `josh codex:hook-adapter`
+
+> **Audience:** automation · **Side effects:** none
+
+`<pretool|posttool>`
+
+Codex hook: run the pretool or posttool guard on a Codex payload (reads the tool call on stdin)
+
+---
+
 ### `josh cspell:dot` · `josh sd`
 
 > **Audience:** developer · **Side effects:** processes
