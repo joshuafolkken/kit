@@ -301,8 +301,8 @@ stop at a time.**
   never the body.
 - **Order and isolate the pool in the same pass** (joshuafolkken/kit#2776), from the same
   `issue:read`: an issue that must land first (it builds what another reuses, or both edit one code
-  path) becomes a native `blocked-by`; an issue meeting all three of the `wip-cap.md` → 「実行のしかた」
-  conditions gets `run:solo`, **every other one `run:lane`**. Comment the reason; the offer commands enforce all
+  path) becomes a native `blocked-by`; an issue meeting all three of the `backlogrun-lanes.md` →
+  "Lanes — running more than one child at a time" conditions gets `run:solo`, **every other one `run:lane`**. Comment the reason; the offer commands enforce all
   three, answering `triage` while an issue has neither.
 - **`priority:high` puts an issue first** (joshuafolkken/kit#2928; ranking: `docs/josh-commands-automation.md` →
   `josh backlog:next`). Apply it only on a cited ground — a stated deadline or urgency, or a person's

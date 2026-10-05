@@ -76,8 +76,11 @@ const REVIEW_MARKERS: ReadonlyArray<string> = [
 // with it, since withholding a split's children is how the cap would otherwise become a route to
 // implementing N deliverables under one Issue's authorization.
 const WIP_MARKERS: ReadonlyArray<string> = [
-	'repos/{owner}/{repo}/issues?state=open&per_page=100',
-	'select(.pull_request == null)',
+	// joshuafolkken/kit#3181 moved the count into `josh issue:file`, so the pointer to the command and
+	// the declaration that lets an exempt filing through are what the topic file owes.
+	'**件数は `pnpm josh issue:file` が起票の前に数える**',
+	'--over-cap',
+	'裁量起票（`--route review-cap` を含む）に `--over-cap` を付けてはならない',
 	'オープン Issue が上限を超えている状態で新しく起票するときは、先に 1 件閉じる',
 	'**判定するのは「起票 1 件」ではなく「起票のひとまとまり」である。**',
 	'正直に閉じられるものが無いなら、起票しない',
@@ -121,25 +124,9 @@ const INTERRUPT_MARKERS: ReadonlyArray<string> = [
 	// unsatisfiable for an interrupt no epic tracks, which is the state it was corrected out of.
 	'**epic の下に無いなら挿入先そのものが無い**',
 	'**epic の外にある割り込みでは、まとまりの後半は 4 の報告そのもの**',
-	// joshuafolkken/kit#1518's added requirement: how an interrupt is *run*. Pinned as the enumeration
-	// rather than as the conclusion, because the conclusion alone ("run it alone if it is serious") is
-	// the judgement the whole rule is written to remove — the same loophole the three tests close.
-	// joshuafolkken/kit#3024 narrowed it to three conditions that must all hold, so each condition and
-	// the AND are pinned: dropping one silently widens solo runs back to anything near the gate.
-	'実行のしかた — `main` で誤答している検証の欠陥は単独で走らせる',
-	'**欠陥である**（`- 種別: 不具合`）',
-	'**kit 自身の検証の欠陥である。**',
-	'**検証ゲート**（lint / 型チェック / スペルチェック / 単体テスト）',
-	'**コードレビュー**',
-	'**push 時のフック**',
-	'**マージ時のチェック**',
-	'**今の `main` で、その Issue と無関係な PR の判定まで誤らせている**（嘘の緑 / 嘘の赤）',
-	'**3 条件すべてに当たれば単独実行、1 つでも外れれば `run:lane`。**',
-	'**「重大だと感じるか」は判定条件ではない**',
-	'**他レーンを止める根拠は 1 つ — 壊れた検証の上でバッチを回すと、全員の結果が信用できないこと。**',
-	// "Landed" is three different points in a lane run — PR opened, review converged, merged — so the
-	// resume point is pinned as the one the section's own premise requires.
-	'バッチを再開するのはそれが `main` へマージされてからとする。**',
+	// How an interrupt is *run* moved to `backlogrun-lanes.md` (joshuafolkken/kit#3181) and is pinned
+	// there by `SOLO_RUN_REACH`; only the pointer stays here.
+	'`.claude/skills/workflow-commands/backlogrun-lanes.md` → "Lanes — running more than one child at a time"',
 	// The blocked-by exemption's enumeration used to be resident and is not any more: `CLAUDE.md` had
 	// 105 bytes of slack under `RESIDENT_CEILING_BYTES`, and the interrupt's three tests had to be
 	// paid for out of it. Moving is only moving if the destination is pinned, so the list is asserted
@@ -202,7 +189,7 @@ const RESIDENT_MARKERS: ReadonlyArray<string> = [
 // pinned by what the refusal says, not by what `CLAUDE.md` holds** — and every sentence below has to
 // survive, because dropping one changes what an agent does at the only moment it will read them.
 const DELIVERED_CAP_MARKERS: ReadonlyArray<string> = [
-	"count the target repository's open Issues",
+	"`pnpm josh issue:file` counts the target repository's open Issues",
 	`With more than ${String(delivered_rules.WIP_CAP)} open, close one first`,
 	'nothing honestly closable means do not file',
 	'one the run is blocked by',
@@ -215,7 +202,9 @@ const DELIVERED_CAP_MARKERS: ReadonlyArray<string> = [
 	'a documented workflow cannot complete',
 	'data is lost or written outside the repository',
 	// A delivery that could not be acted on would wedge the very call it asked for.
-	'Reissue this call once you have counted',
+	'Reissue this call and let the command count',
+	'`--over-cap`',
+	'`--route interrupt`',
 	WIP_TOPIC,
 ]
 
@@ -237,7 +226,7 @@ describe.each(AI_DOCS)('%s — carries the trigger for the resident defaults', (
 	// reading `CLAUDE.md` through a pointer and running no hook — able to file past 30 with nothing
 	// telling it to count. What the relocation takes out is the heading and the procedure.
 	it.each([
-		"**Count the target repository's open Issues before filing; above the WIP cap, close one first.**",
+		"**File through `pnpm josh issue:file` — it counts the target repository's open Issues, never a hand count; above the WIP cap, close one first.**",
 		'and so is an **interrupt** — three tests decide that, never judgement',
 		'a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository',
 		// Without these two the three tests are listed with nothing saying what happens when none is
@@ -266,11 +255,10 @@ describe(`${WORKFLOW_PROMPT} — the WIP cap is reachable from the index`, () =>
 	})
 })
 
-// A rule written only in `wip-cap.md` fires only for a run that opens `wip-cap.md`, and nothing in
-// the batch entry points sent a reader there — `epicrun` fills every free lane from
-// `epic:next --lanes` without ever reading the cap. So the solo-run rule is asserted reachable from
-// `backlogrun-lanes.md`, the point-of-use document read before the first lane opens, which is where
-// children are dispatched (joshuafolkken/kit#1518, split out of `backlogrun.md` by joshuafolkken/kit#2010).
+// The solo-run rule once lived only in `wip-cap.md`, which no batch entry point sent a reader to —
+// `epicrun` filled every free lane from `epic:next --lanes` without ever reading the cap. So its
+// single source is now `backlogrun-lanes.md`, the point-of-use document read before the first lane
+// opens, which is where children are dispatched (joshuafolkken/kit#1518, split out of `backlogrun.md` by joshuafolkken/kit#2010).
 // joshuafolkken/kit#1959 dropped the
 // SKILL.md §2 restatement of both the solo-run rule and the split default, since
 // joshuafolkken/kit#1925 deduplicates §2 into the single sources — the split default stays pinned on
@@ -294,6 +282,23 @@ const SOLO_RUN_REACH: ReadonlyArray<{ doc: string; marker: string }> = [
 			'All three, and the issue carries `run:solo`; any one missing, and it carries `run:lane`',
 	},
 	{ doc: LANES_DOC, marker: 'It runs alone, and the batch resumes only once it has merged.' },
+	// joshuafolkken/kit#3181 made this document the rule's single source, so the reason for stopping
+	// other lanes and the labelling at filing moved with it.
+	{
+		doc: LANES_DOC,
+		marker:
+			"It stops the other lanes for one reason only: a batch run on broken verification leaves nobody's result trustworthy",
+	},
+	{ doc: LANES_DOC, marker: 'carries one of the two from its filing' },
+	{ doc: LANES_DOC, marker: 'never from how serious it looks' },
+	// joshuafolkken/kit#3024 made the solo run need all three conditions, so the first and the third are
+	// pinned beside the second: dropping one silently widens solo runs.
+	{ doc: LANES_DOC, marker: 'is it a defect (not an improvement, refactor, removal or feature)?' },
+	{
+		doc: LANES_DOC,
+		marker:
+			'Does it, on `main` now, make unrelated PRs answer wrongly (a false green or a false red)?',
+	},
 ]
 
 describe('the solo-run rule is reachable from the document that dispatches children', () => {

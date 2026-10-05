@@ -66,10 +66,10 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 	'issue:file': {
 		script: 'scripts/issue/issue-file-cli.ts',
 		description:
-			'File an Issue with every filing step: lint, Origin, duplicate scout, labels, then epic:bundle',
+			'File an Issue with every filing step: lint, Origin, WIP cap, duplicate scout, labels, then epic:bundle',
 		category: 'AI tools',
 		reference: [
-			'<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>]',
+			'<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap]',
 			'automation',
 			['network'],
 		],

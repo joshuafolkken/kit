@@ -84,8 +84,12 @@ it a defect (not an improvement, refactor, removal or feature)? Is it in kit's o
 checks — not a consumer repository's CI or template? Does it, on `main` now, make unrelated PRs
 answer wrongly (a false green or a false red)? All three, and the issue carries `run:solo`; any one
 missing, and it carries `run:lane` and fills a lane like any other child. `backlog:next` and `epic:next --lanes` enforce both (joshuafolkken/kit#2776,
-#2779). The rule is
-`prompts/collaboration-workflow/wip-cap.md` → 「実行のしかた」, its single source.
+#2779), and an issue a run files (an interrupt, a split child, a prerequisite) carries one of the
+two from its filing, because an issue with neither answers `triage` and nothing starts. **It stops
+the other lanes for one reason only: a batch run on broken verification leaves nobody's result
+trustworthy** — that the issue's own verification sits under the defect is the issue's own concern,
+checked by the verification after the fix. This paragraph is the rule's single source; rationale:
+`docs/maintainers/wip-cap-rationale.md` → 「単独実行の理由と由来」.
 
 **A lane's review does not inherit the lane, and `pnpm josh review:brief` is what closes that.**
 `pnpm josh review:brief` prints the lane's absolute root, branch and HEAD, hands over targets written
