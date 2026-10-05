@@ -104,7 +104,8 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	{ entry: 'kickoff', bytes: 45_056 },
 	// Raised in joshuafolkken/kit#3177: #3173, #3181 and #3183 merged in parallel and together tipped
 	// fullrun 12 bytes over its block; none of #3177's documents are in its read set.
-	{ entry: 'fullrun', bytes: 61_440 },
+	// Lowered back in joshuafolkken/kit#3180: the history and lint-settled proofs left its read set.
+	{ entry: 'fullrun', bytes: 57_344 },
 	{ entry: 'halfrun', bytes: 57_344 },
 	{ entry: 'prrun', bytes: 61_440 },
 	{ entry: 'backlogrun', bytes: 176_128 },
