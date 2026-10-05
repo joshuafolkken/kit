@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { document_byte_check } from '#scripts/document/document-byte-check'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
@@ -20,6 +21,12 @@ vi.mock('./lint-parallel', () => ({
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: { read_before: vi.fn(), record_if_green: vi.fn() },
 }))
+// Mocked so the verdict is the mocked lint's alone, never this checkout's real document sizes — an
+// unrelated document over its ceiling mid-work failed the whole-tree fallback case here
+// (joshuafolkken/kit#3208). The ceilings themselves are `document-byte-check.test.ts`.
+vi.mock('#scripts/document/document-byte-check', () => ({
+	document_byte_check: { check_all: vi.fn(), check_files: vi.fn() },
+}))
 
 const mocked_root = vi.mocked(git_command.repository_root)
 const mocked_changed = vi.mocked(changed_paths.read_changed_paths)
@@ -27,6 +34,8 @@ const mocked_scoped = vi.mocked(lint_parallel.run_lint_checks)
 const mocked_whole_tree = vi.mocked(lint_parallel.run_lint_parallel_checks)
 const mocked_record = vi.mocked(scoped_green.record_if_green)
 const mocked_before = vi.mocked(scoped_green.read_before)
+const mocked_byte_all = vi.mocked(document_byte_check.check_all)
+const mocked_byte_files = vi.mocked(document_byte_check.check_files)
 
 // joshuafolkken/kit#1298: the narrowed run is only worth having if the fallbacks reach the whole
 // tree rather than checking nothing, so both branches are asserted by which runner they called.
@@ -62,6 +71,8 @@ beforeEach(() => {
 	mocked_scoped.mockResolvedValue(0)
 	mocked_whole_tree.mockResolvedValue(0)
 	mocked_before.mockResolvedValue(BEFORE_TREE)
+	mocked_byte_all.mockReturnValue(0)
+	mocked_byte_files.mockReturnValue(0)
 })
 
 describe('lint_related.run_related_lint — the green record', () => {
@@ -144,6 +155,43 @@ describe('lint_related.run_related_lint', () => {
 		mocked_scoped.mockResolvedValue(FAILED)
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
+	})
+})
+
+describe('lint_related.run_related_lint — the document byte check', () => {
+	it('checks every budgeted document when lint fell back to the whole tree', async () => {
+		mocked_changed.mockResolvedValue([])
+
+		await lint_related.run_related_lint([])
+
+		expect(mocked_byte_all).toHaveBeenCalledWith(REPOSITORY_ROOT)
+		expect(mocked_byte_files).not.toHaveBeenCalled()
+	})
+
+	it('checks only the narrowed files when lint was narrowed', async () => {
+		await lint_related.run_related_lint([])
+
+		expect(mocked_byte_files.mock.calls[0]?.[0]).toBe(REPOSITORY_ROOT)
+		expect(mocked_byte_files.mock.calls[0]?.[1]).toContain(ABSOLUTE_SOURCE)
+		expect(mocked_byte_all).not.toHaveBeenCalled()
+	})
+
+	it('skips the byte check when lint already failed', async () => {
+		mocked_scoped.mockResolvedValue(FAILED)
+
+		await lint_related.run_related_lint([])
+
+		expect(mocked_byte_files).not.toHaveBeenCalled()
+	})
+
+	it('returns and records a byte-check failure after a green lint', async () => {
+		mocked_byte_files.mockReturnValue(FAILED)
+
+		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
+		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
+			before: BEFORE_TREE,
+			exit_code: FAILED,
+		})
 	})
 })
 
