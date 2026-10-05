@@ -34,8 +34,8 @@ call reports `hold`.
 3. **Ask the session boundary in the same turn as the hold** — `pnpm josh cost --cut`. `under`
    continues; `over` (or unanswerable) stops before the title — `run:entry` sends this and step 1's
    `confirmation` Telegram and runs `run:release` (`stop notified: …`); by hand only for `new`.
-   **Skip it when dispatched by `backlogrun`** (that batch owns the question). `backlogrun-progress.md`
-   → "The hand-off" is the single source of the check and the shared 135,000 threshold.
+   **Skip it when dispatched by `backlogrun`** (that batch owns the question). The verdict and the
+   shared 135,000 threshold are the command's own.
 4. **Gather the mechanical reads — `pnpm josh run:prep <N>`**: `issue:read`'s body/comments
    (`issue-comments.md`), `issue:state`'s state/labels/`human_review`, and `latest:scope`'s dependency
    scope in one report, run beside `run:hold` and `cost --cut` in the same turn. The §2g comment stops,
@@ -52,18 +52,15 @@ call reports `hold`.
 
 - **Start the progress watcher once the hold is claimed** — `pnpm josh run:progress --wait` in the
   background, started once and relayed never, and `pnpm josh run:progress --mark` in the same turn as
-  every real report (`backlogrun-progress.md` → "Progress while the run is quiet"). A `fullrun`
+  every real report (`progress-watcher.md` → "Progress while the run is quiet"). A `fullrun`
   dispatched as a lane child starts none and never reads that document (`pnpm josh read:set
-  lane-child`). **The watcher is a per-session heartbeat; the run's report surface is not it** — the
-  ambient surface is the run's event stream, followed identically before and after a cut, so nothing
-  about the reporter moves when execution hands off (`backlogrun-progress.md` → "The invariant is a
-  tier, not a mechanism").
+  lane-child`).
 - **A lane child asks whether it is a resume first — `pnpm josh run:cut --resume <N>`** (`run:entry` asks it
   before the hold, joshuafolkken/kit#2760); on `resume` it skips the title, plan, hold and implementation and goes to the gate. At the pre-gate
   boundary — immediately after `pnpm josh main:merge`, before the gate — it takes the cut with
-  `pnpm josh run:cut <N>` (the ordered step in `chain-rule.md`), and it records any park on the Issue before the stop notify.
-  `pre-gate-cut.md` → "Resuming — the fresh process's entry check" and `pre-gate-cut.md` → "Taking
-  the cut" are the single sources of the two.
+  `pnpm josh run:cut <N>` (the ordered step in `chain-rule.md`, which names the cut's single source),
+  and it records any park on the Issue before the stop notify. A run that is not a lane child never
+  reads the cut's document (joshuafolkken/kit#3172).
 - **`resume: halfrun`** adopted a stopped `halfrun` (#2796): gate in full; `resume: prrun-*` a stopped
   `prrun` (#3023); `working-tree-hold.md`.
 

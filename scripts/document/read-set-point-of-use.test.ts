@@ -11,6 +11,7 @@ const FOLLOWUP = 'followup.md'
 const CHAIN_RULE = 'chain-rule.md'
 const BACKGROUND_COMMANDS = 'background-commands.md'
 const PRE_GATE_CUT = 'pre-gate-cut.md'
+const BACKLOGRUN_PROGRESS = 'backlogrun-progress.md'
 
 function point_of_use_of(entry: string): Array<string> {
 	return entry_read_set.costed(ROOT, entry).point_of_use.map((one) => one.file)
@@ -39,7 +40,7 @@ describe('entry_read_set.costed — point-of-use totals scoped per entry (#3078)
 		PRE_GATE_CUT,
 		'backlogrun-child.md',
 		'backlogrun-lanes.md',
-		'backlogrun-progress.md',
+		BACKLOGRUN_PROGRESS,
 		'backlogrun-park.md',
 		'backlogrun-steps.md',
 		'retrospective.md',
@@ -50,9 +51,7 @@ describe('entry_read_set.costed — point-of-use totals scoped per entry (#3078)
 	})
 
 	it('fullrun is charged for the gate and merge documents its manifest names', () => {
-		expect(point_of_use_of(FULLRUN)).toEqual(
-			expect.arrayContaining([FOLLOWUP, CHAIN_RULE, PRE_GATE_CUT]),
-		)
+		expect(point_of_use_of(FULLRUN)).toEqual(expect.arrayContaining([FOLLOWUP, CHAIN_RULE]))
 	})
 
 	it('halfrun reaches background-commands.md through its SKILL.md trigger row, not followup.md', () => {
@@ -102,4 +101,27 @@ describe('a role reaches documents its base entry path does not name (#3078)', (
 			expect(files).toContain(file)
 		},
 	)
+})
+
+// The heartbeat left `backlogrun-progress.md` (#3172): a single-issue run reads its ~3 KB of rules
+// without the batch's hand-off, waiting and summary procedure, which is charged to the batch alone.
+describe('single-issue runs read progress-watcher.md, not backlogrun-progress.md (#3172)', () => {
+	const PROGRESS_WATCHER = 'progress-watcher.md'
+	const MAX_FULLRUN_TOTAL_TOKENS = 20_000
+
+	it.each([FULLRUN, 'halfrun', 'prrun'])('charges %s for the watcher alone', (entry) => {
+		expect(point_of_use_of(entry)).toContain(PROGRESS_WATCHER)
+		expect(point_of_use_of(entry)).not.toContain(BACKLOGRUN_PROGRESS)
+	})
+
+	it('still charges the backlogrun parent for backlogrun-progress.md', () => {
+		expect(point_of_use_of('backlogrun')).toContain(BACKLOGRUN_PROGRESS)
+	})
+
+	it('keeps the fullrun total read under 20k tokens', () => {
+		const report = entry_read_set.costed(ROOT, FULLRUN)
+		const parts = [report.scoped, ...report.point_of_use.map((one) => one.cost)]
+
+		expect(entry_read_set.total(parts).tokens).toBeLessThan(MAX_FULLRUN_TOTAL_TOKENS)
+	})
 })

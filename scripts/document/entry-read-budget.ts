@@ -92,12 +92,15 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// `backlogrun-*` phase documents it never opens. Each total now counts only what its path reaches.
 	// joshuafolkken/kit#3077 trimmed non-resident rule bodies from `CLAUDE.md`, lowering fullrun, prrun
 	// and backlogrun one block each.
+	// Lowered in joshuafolkken/kit#3172: the heartbeat left `backlogrun-progress.md` for its own
+	// `progress-watcher.md`, and `pre-gate-cut.md` became the lane child's alone, so fullrun, halfrun
+	// and prrun stop paying for ~50KB of batch and lane procedure; backlogrun lost the moved prose.
 	// joshuafolkken/kit#3171 cut `CLAUDE.md` to triggers and pointers (~12 KB), lowering every entry.
 	{ entry: 'kickoff', bytes: 53_248 },
-	{ entry: 'fullrun', bytes: 114_688 },
-	{ entry: 'halfrun', bytes: 94_208 },
-	{ entry: 'prrun', bytes: 118_784 },
-	{ entry: 'backlogrun', bytes: 200_704 },
+	{ entry: 'fullrun', bytes: 69_632 },
+	{ entry: 'halfrun', bytes: 65_536 },
+	{ entry: 'prrun', bytes: 73_728 },
+	{ entry: 'backlogrun', bytes: 196_608 },
 	{ entry: LANE_CHILD, bytes: 65_536 },
 ]
 
