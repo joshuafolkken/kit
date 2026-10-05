@@ -127,6 +127,17 @@ describe('run_wake_loop.run_loop — deterministic driver', () => {
 		expect(stop).toStrictEqual({ reason: FAILED, note: TRANSPORT_FAILED })
 		expect(scripted.wakes).toStrictEqual([])
 	})
+
+	it('leaves a record released during the driver pause to the next pass', async () => {
+		const expired: CarryRead = { kind: 'expired', carry: carry({ is_handed_off: true }) }
+		const scripted = recorder([HANDED_OFF, expired])
+		const ports = { ...scripted.ports, drive: async () => ({ kind: 'released' as const }) }
+
+		const stop = await run_wake_loop.run_loop(scratch.target, ports, 0)
+
+		expect(stop.reason).toBe('expired')
+		expect(scripted.wakes).toStrictEqual([])
+	})
 })
 
 beforeEach(() => {

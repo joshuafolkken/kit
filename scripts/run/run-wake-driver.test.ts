@@ -189,7 +189,7 @@ test('does not re-drive once the carry record ends during the pause', async () =
 	})
 
 	expect(subprocess).toHaveBeenCalledOnce()
-	expect(result).toMatchObject({ kind: 'judgment' })
+	expect(result).toStrictEqual({ kind: 'released' })
 })
 
 test('does not re-drive a failed driver run', async () => {

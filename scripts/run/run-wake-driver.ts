@@ -114,7 +114,12 @@ function failure_note(result: JoshResult): string {
 	return [cause_of(result.out), details_tail(result.err ?? '')].filter(Boolean).join('\n')
 }
 
-function read_result(result: JoshResult, target: string, invocation: string): DriveResult {
+function read_result(
+	result: JoshResult | undefined,
+	target: string,
+	invocation: string,
+): DriveResult {
+	if (result === undefined) return { kind: 'released' }
 	if (result.code !== SUCCESS) return { kind: 'failed', note: failure_note(result) }
 
 	return driver_result(result.out, run_carry.read_carry(target), invocation, result.err)
@@ -154,19 +159,20 @@ function is_mechanical(result: JoshResult): boolean {
 	)
 }
 
-// A record that expired or was removed during the pause is left to the supervisor's own pass, which
-// ends the run as `expired` or `stopped`; a rerun would only fail on it and report the run as `failed`.
+// A record that expired or was removed during the pause answers `undefined`: its stale verdict must not
+// reach a session, so the supervisor's own next pass re-reads the record and ends the run as `expired`
+// or `stopped`; a rerun would only fail on it and report the run as `failed`.
 async function run_driver(
 	target: string,
 	args: ReadonlyArray<string>,
 	wait: Pause,
 	remaining: number,
-): Promise<JoshResult> {
+): Promise<JoshResult | undefined> {
 	const result = await josh_command.josh_run(args, true)
 	if (remaining === 0 || !is_mechanical(result)) return result
 
 	await wait(RERUN_PAUSE_MS)
-	if (run_carry.read_carry(target).kind !== 'carried') return result
+	if (run_carry.read_carry(target).kind !== 'carried') return undefined
 
 	return await run_driver(target, args, wait, remaining - 1)
 }
@@ -182,9 +188,11 @@ async function drive(target: string, wait: Pause = pause): Promise<DriveResult> 
 		return { kind: 'failed', note: 'The driver could not claim the carry record.' }
 	}
 
-	const result = await run_driver(target, args, wait, RERUN_LIMIT)
-
-	return read_result(result, target, read.carry.invocation)
+	return read_result(
+		await run_driver(target, args, wait, RERUN_LIMIT),
+		target,
+		read.carry.invocation,
+	)
 }
 
 export const run_wake_driver = { RERUN_LIMIT, drive, driver_args, driver_result }

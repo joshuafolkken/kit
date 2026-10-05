@@ -56,8 +56,13 @@ interface LoopPorts {
 	now: () => Date
 }
 
+// `released`: the carry record ended while the driver paused, so there is nothing to hand on and the
+// next pass decides from the record how the run ends.
 type DriveResult =
-	{ kind: 'finished' } | { kind: 'judgment'; material: string } | { kind: 'failed'; note: string }
+	| { kind: 'finished' }
+	| { kind: 'released' }
+	| { kind: 'judgment'; material: string }
+	| { kind: 'failed'; note: string }
 
 interface LoopStop {
 	reason: WakeStopReason
@@ -89,6 +94,7 @@ async function wake_step(wake: RunWake, ports: LoopPorts): Promise<StepOutcome> 
 	const driven = await ports.drive()
 	if (driven.kind === 'finished') return stopped('ended')
 	if (driven.kind === 'failed') return stopped(FAILED_REASON, driven.note)
+	if (driven.kind === 'released') return { kind: 'continue', wake }
 
 	const session_id = ports.new_session_id()
 
