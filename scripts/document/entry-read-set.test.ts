@@ -22,6 +22,7 @@ const SPLIT_FILE = 'split-assessment.md'
 const BACKLOGRUN = 'backlogrun.md'
 const CHAIN_RULE = 'chain-rule.md'
 const BACKGROUND_COMMANDS = 'background-commands.md'
+const RECOVERY = 'backlogrun-recovery.md'
 const FOLLOWUP = 'followup.md'
 const CHAIN_HEADING = 'Run the review-to-merge chain'
 const FOLLOWUP_HEADING = 'Run `pnpm josh followup`'
@@ -217,6 +218,21 @@ describe('entry_read_set — background-commands.md is point-of-use (joshuafolkk
 	it('classifies background-commands.md as a point-of-use document', () => {
 		expect([...entry_read_set.POINT_OF_USE_FILES]).toContain(BACKGROUND_COMMANDS)
 	})
+})
+
+describe('entry_read_set — backlogrun-recovery.md is point-of-use (joshuafolkken/kit#3175)', () => {
+	// The failure-only sections left the per-child documents for backlogrun-recovery.md, read only when
+	// a unit goes silent or a lane conflicts, so no entry may read it.
+	it('classifies backlogrun-recovery.md as a point-of-use document', () => {
+		expect([...entry_read_set.POINT_OF_USE_FILES]).toContain(RECOVERY)
+	})
+
+	it.each([...IMPLEMENTING])(
+		'keeps backlogrun-recovery.md out of the entry read of %s',
+		(entry) => {
+			expect(entry_read_set.read_set(ROOT, entry).files).not.toContain(RECOVERY)
+		},
+	)
 })
 
 describe('entry_read_set — point-of-use section costs', () => {

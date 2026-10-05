@@ -81,7 +81,7 @@ opposite.** **Parked before its commit**, the lane is stashed and closed:
 `pnpm josh lane:close <N>` (`epic:next` counts a parked child's lane as released, and `lane:close`
 removes the work tree by force). **Parked after its commit and push**, the lane is *kept*: nothing to
 stash, and closing would delete the local branch the resume needs. **A lost merge race is not one of
-these rows** — it resolves in its lane ("Conflicts are not predicted" above), and parks only under that
+these rows** — it resolves in its lane (`backlogrun-recovery.md` → "Conflicts are not predicted"), and parks only under that
 section's four conditions, which take the after-commit row. Both rows and the `pnpm josh run:release
 <N>` every parked ending owes are "What happens to a lane" above, the single source.
 

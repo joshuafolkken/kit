@@ -95,11 +95,14 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// Lowered in joshuafolkken/kit#3172: the heartbeat left `backlogrun-progress.md` for its own
 	// `progress-watcher.md`, and `pre-gate-cut.md` became the lane child's alone, so fullrun, halfrun
 	// and prrun stop paying for ~50KB of batch and lane procedure; backlogrun lost the moved prose.
+	// Lowered in joshuafolkken/kit#3175: the loop became the driver's hand-backs, the supervisor and
+	// provider prose moved to `docs/josh-commands-automation.md`, and the failure-only sections moved to
+	// `backlogrun-recovery.md`, which the parent's reach still charges whole.
 	{ entry: 'kickoff', bytes: 65_536 },
 	{ entry: 'fullrun', bytes: 81_920 },
 	{ entry: 'halfrun', bytes: 77_824 },
 	{ entry: 'prrun', bytes: 81_920 },
-	{ entry: 'backlogrun', bytes: 208_896 },
+	{ entry: 'backlogrun', bytes: 200_704 },
 	{ entry: LANE_CHILD, bytes: 77_824 },
 ]
 

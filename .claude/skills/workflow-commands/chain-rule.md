@@ -63,7 +63,7 @@ once here; the measurements that motivated each one live in the linked Issues.
 - **origin/main is merged in before the gate** — `pnpm josh main:merge` merges `origin/<default>` into
   the branch before the gate and the review start, so the gate verifies the tree that will actually
   merge rather than one that never existed (joshuafolkken/kit#1837). It is the last edit, so the scoped
-  pair and the gate run once over it. A conflict here fires `backlogrun-lanes.md` → "Conflicts are not predicted"
+  pair and the gate run once over it. A conflict here fires `backlogrun-recovery.md` → "Conflicts are not predicted"
   early. **This is the one place a conflicted merge's procedure is written** (joshuafolkken/kit#2445):
   `main:merge` refuses before merging when uncommitted changes touch a path the default branch also
   changed, or when the index still holds unresolved or staged paths — commit the work first with

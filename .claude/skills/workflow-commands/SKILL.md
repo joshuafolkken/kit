@@ -53,7 +53,7 @@ an epic) is read on demand only when a split is found (joshuafolkken/kit#2189). 
 lists `backlogrun.md` alone: its parent orchestrates and never implements, so `fullrun.md` and
 `split-assessment.md` are read by a dispatched child in its own delegated unit (`backlogrun-child.md`).
 Every procedure for *running* a `backlogrun` item — lanes (`backlogrun-lanes.md`), park-and-continue,
-the guards — stays `backlogrun.md`'s. The on-demand sections `into-target.md` (an `into` suffix) and `target-repository.md`
+the guards, failure-only recovery (`backlogrun-recovery.md`) — stays `backlogrun.md`'s. The on-demand sections `into-target.md` (an `into` suffix) and `target-repository.md`
 (an `owner/repo#` prefix) are read only when their trigger is typed, and §3's residency procedure lives
 in `prompts/collaboration-workflow/residency.md`, reached only when a rule is placed, moved or retired.
 
