@@ -7,6 +7,7 @@ import {
 	DEPTH_LABELS,
 	EPIC_LABEL,
 	INTERRUPT_ROUTE_LABEL,
+	REPOSITORY_LABELS,
 	TIER_A_ROUTE_LABEL,
 } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
@@ -63,16 +64,15 @@ describe('the depth labels', () => {
 		expect(label.description).toContain('observation-filing.md')
 	})
 
-	// Metadata nothing provisions is metadata a repository never sees: the first filing that applies
-	// the label auto-creates it with a generated color and no description, and the array below would
-	// go on asserting a color nobody had ever set. Prose cannot import this module, so the document's
-	// creation lines are keyed to it here instead.
-	it.each(DEPTH_LABELS)('is provisioned with $name’s own color and description', (label) => {
-		const skill = read_repo_file(WORKFLOW_SKILL)
-
-		expect(skill).toContain(`-f name=${label.name} -f color=${label.color}`)
-		expect(skill).toContain(`-f description="${label.description}"`)
-	})
+	// joshuafolkken/kit#3176: `josh issue:file` provisions the labels itself, so the document carries
+	// no hand creation command that could drift from this array.
+	it.each(DEPTH_LABELS)(
+		'is provisioned by the repository label set, not by a document command',
+		(label) => {
+			expect(REPOSITORY_LABELS).toContainEqual(label)
+			expect(read_repo_file(WORKFLOW_SKILL)).not.toContain(`-f name=${label.name}`)
+		},
+	)
 })
 
 describe('the filing-time rule in observation-filing.md', () => {

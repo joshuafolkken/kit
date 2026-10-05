@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 
 const SKILL_DIR = '.claude/skills/workflow-commands'
 const BACKGROUND = read_repo_file(`${SKILL_DIR}/background-commands.md`)
-const FILING = read_repo_file(`${SKILL_DIR}/observation-filing.md`)
+const LEDGER = read_repo_file(`${SKILL_DIR}/observation-ledger.md`)
 const FOLLOWUP_FOREGROUND = 'Keep `pnpm josh followup` in the foreground'
 const RECORD_RULE = 'Record before the CI wait ends, never after the merge'
 
@@ -32,14 +32,14 @@ describe('background-commands.md — recording beside the CI wait', () => {
 	})
 })
 
-describe('observation-filing.md — the commit path', () => {
+describe('observation-ledger.md — the commit path', () => {
 	it("states that a run's appended lines ride its own commit", () => {
-		expect(FILING).toContain("A run's appended lines ride its own commit")
+		expect(LEDGER).toContain("A run's appended lines ride its own commit")
 	})
 
 	// joshuafolkken/kit#2919: a later append rides the pull request, and a lane's lines ride its own.
 	it('commits a later append onto the pull request and holds nothing in the primary checkout', () => {
-		expect(FILING).toContain("commits a line appended after the run's commit onto the pull request")
-		expect(FILING).toContain('Nothing is held in the primary checkout for later.')
+		expect(LEDGER).toContain("commits a line appended after the run's commit onto the pull request")
+		expect(LEDGER).toContain('Nothing is held in the primary checkout for later.')
 	})
 })

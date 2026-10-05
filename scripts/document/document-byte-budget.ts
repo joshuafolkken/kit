@@ -67,13 +67,14 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/dependency-update/SKILL.md', bytes: 8192 },
 	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 36_864 },
 	{ path: '.claude/skills/verify-ui/SKILL.md', bytes: 8192 },
-	{ path: '.claude/skills/workflow-commands/followup-reference.md', bytes: 16_384 },
 	{ path: '.claude/skills/workflow-commands/fullrun-steps.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/into-target.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/issue-comments.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/issue-fold-existing.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/needs-human-review.md', bytes: 8192 },
-	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 24_576 },
+	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 12_288 },
+	// joshuafolkken/kit#3176 moved the ledger out of `observation-filing.md`, read only when it appends.
+	{ path: '.claude/skills/workflow-commands/observation-ledger.md', bytes: 12_288 },
 	// `pre-gate-cut.md` left this per-document budget in joshuafolkken/kit#2289: it became a point-of-use
 	// document, so its bytes are now held by every entry's total read (`entry-read-budget.ts`) and the
 	// two budgets must not hold it twice — the reachability line moved it from `unreached` to

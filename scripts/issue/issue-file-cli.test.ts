@@ -6,6 +6,7 @@ import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
+import { repository_labels } from '#scripts/repo/repository-labels'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cli } from './issue-file-cli'
@@ -57,6 +58,7 @@ writeFileSync(origin_path, `${VALID_BODY}\n## Origin\n\n${HERE}#2808\n`)
 const scout = vi.spyOn(issue_scout_cli, 'scout')
 const exec_gh_api = vi.spyOn(git_gh_exec, 'exec_gh_api')
 const report_for = vi.spyOn(epic_bundle_cli, 'report_for')
+const ensure_labels = vi.spyOn(repository_labels, 'ensure_labels')
 const issue_list = vi.spyOn(git_gh_issue_list, 'issue_list')
 
 // A listing of `count` open Issues, in the JSON shape `issue_list` answers with.
@@ -87,6 +89,7 @@ beforeEach(() => {
 	scout.mockResolvedValue({ report: 'Duplicates: none', candidates: [] })
 	exec_gh_api.mockResolvedValue(ISSUE_URL)
 	report_for.mockResolvedValue(SUCCESS_EXIT_CODE)
+	ensure_labels.mockReturnValue([])
 	issue_list.mockResolvedValue(listing_of(1))
 })
 
@@ -134,6 +137,18 @@ describe('issue_file_cli.run — a filing that clears every step', () => {
 		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', THERE))).toBe(SUCCESS_EXIT_CODE)
 		expect(process.env['GH_REPO']).toBe(THERE)
 		expect(scout).toHaveBeenCalledWith(expect.anything(), THERE)
+	})
+})
+
+// joshuafolkken/kit#3176: a repository missing the depth labels gets them before the create call, so
+// the create never auto-creates one with a generated color.
+describe('issue_file_cli.run — the labels it applies exist first', () => {
+	it('provisions the missing labels in the target repository before the create call', async () => {
+		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', THERE))).toBe(SUCCESS_EXIT_CODE)
+		expect(ensure_labels).toHaveBeenCalledExactlyOnceWith(THERE)
+		expect(ensure_labels.mock.invocationCallOrder[0]).toBeLessThan(
+			exec_gh_api.mock.invocationCallOrder[0] ?? 0,
+		)
 	})
 })
 
@@ -194,6 +209,7 @@ describe('issue_file_cli.run — a refused filing sends nothing', () => {
 		)
 		expect(console.error).toHaveBeenCalledWith(issue_file_cli.THIRD_PARTY_MESSAGE)
 		expect(exec_gh_api).not.toHaveBeenCalled()
+		expect(ensure_labels).not.toHaveBeenCalled()
 	})
 })
 

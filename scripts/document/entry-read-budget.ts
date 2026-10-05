@@ -106,7 +106,7 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	{ entry: 'halfrun', bytes: 57_344 },
 	{ entry: 'prrun', bytes: 61_440 },
 	{ entry: 'backlogrun', bytes: 176_128 },
-	{ entry: LANE_CHILD, bytes: 61_440 },
+	{ entry: LANE_CHILD, bytes: 57_344 },
 ]
 
 function byte_size(root: string, relative_path: string): number {

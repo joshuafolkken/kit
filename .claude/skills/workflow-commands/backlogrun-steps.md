@@ -445,7 +445,7 @@ All of these are this file's, and are reached here in the same order and for the
 | `josh latest` on `required` only, asked once at the first child and never in a lane | `backlogrun-child.md` → "`josh latest` runs once per session, not once per child" |
 | `pnpm josh run:hold <N>`'s preflight check, before each child that is not in a lane — act on what it prints | `docs/josh-commands-automation.md` → "`josh run:hold`" |
 | `pnpm josh run:progress --wait` in the background, `--mark` at every real report | `progress-watcher.md` → "Progress while the run is quiet" |
-| `pnpm josh release:scope` once, after the last issue has merged and the last lane is closed | `followup-reference.md` → "When `pnpm josh release` runs" |
+| `pnpm josh release:scope` once, after the last issue has merged and the last lane is closed | `followup.md` → "When `pnpm josh release` runs" |
 
 **Two more run once per session and are this file's own**:
 `pnpm josh run:carry --begin "<the invocation, single-spaced>" --owner "$PPID"` before the plan and
