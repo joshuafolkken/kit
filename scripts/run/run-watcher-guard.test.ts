@@ -14,13 +14,14 @@ vi.mock('#scripts/lane/lane-registry', () => ({
 }))
 
 vi.mock('./run-headless', () => ({
-	run_headless: { is_backlog_parent: vi.fn() },
+	run_headless: { is_backlog_parent: vi.fn(), is_headless: vi.fn() },
 }))
 
 const { lane_registry } = await import('#scripts/lane/lane-registry')
 const { run_headless } = await import('./run-headless')
 const lanes_in_flight = vi.mocked(lane_registry.has_lanes_in_flight)
 const backlog_parent = vi.mocked(run_headless.is_backlog_parent)
+const headless = vi.mocked(run_headless.is_headless)
 
 const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-watcher-guard-'))
 const LIFE_TARGET = path.join(TEMPORARY, 'life.json')
@@ -32,6 +33,7 @@ afterAll(() => {
 
 beforeEach(() => {
 	backlog_parent.mockResolvedValue(true)
+	headless.mockReturnValue(false)
 	lanes_in_flight.mockResolvedValue(false)
 })
 
@@ -60,6 +62,16 @@ describe('check — no lanes in-flight', () => {
 describe('check — lanes in-flight for another run', () => {
 	it('returns ok for a session that drives no run, even with the watcher stale', async () => {
 		backlog_parent.mockResolvedValue(false)
+		lanes_in_flight.mockResolvedValue(true)
+
+		const result = await run_watcher_guard.check(LIFE_TARGET)
+
+		expect(result.kind).toBe('ok')
+	})
+
+	// joshuafolkken/kit#3245: the run:wake supervisor's driver watches the lanes, not the woken session.
+	it('returns ok for a session run:wake woke, even with the watcher stale', async () => {
+		headless.mockReturnValue(true)
 		lanes_in_flight.mockResolvedValue(true)
 
 		const result = await run_watcher_guard.check(LIFE_TARGET)

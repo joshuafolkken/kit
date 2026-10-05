@@ -168,6 +168,20 @@ function last_position(events: ReadonlyArray<RunEvent>): number {
 
 // The bounded stream serialized back to JSONL. The newest `EVENT_CAP` are kept and the oldest roll off;
 // each survivor keeps its original `pos`, so the bound never renumbers a position a reader is holding.
+// The stream held to `EVENT_CAP`, dropping the oldest trace events before any position
+// (joshuafolkken/kit#3245). A long run's ship-stage and heartbeat lines once filled 396 of the 500 slots
+// and pushed its cuts off, so the retrospective counted `cut 0` for a run with thirteen; a trace says only
+// that the run was alive, so it is the first to go. Only a stream of positions alone rolls them off.
+function bounded(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEvent> {
+	const excess = events.length - EVENT_CAP
+
+	if (excess <= 0) return events
+
+	const dropped = new Set(events.filter((event) => TRACE_KINDS.has(event.kind)).slice(0, excess))
+
+	return events.filter((event) => !dropped.has(event)).slice(-EVENT_CAP)
+}
+
 function serialize(events: ReadonlyArray<RunEvent>): string {
 	return `${events.map((event) => JSON.stringify(event)).join(LINE_SEPARATOR)}${LINE_SEPARATOR}`
 }
@@ -184,9 +198,9 @@ function append(target: string, kind: string, text: string, at: string): AppendR
 
 	const existing = read_events(target)
 	const position = last_position(existing) + POSITION_INCREMENT
-	const bounded = [...existing, { pos: position, at, kind, text }].slice(-EVENT_CAP)
+	const events = bounded([...existing, { pos: position, at, kind, text }])
 
-	stamp_file.write_text_stamp(target, serialize(bounded))
+	stamp_file.write_text_stamp(target, serialize(events))
 
 	return { appended: true, position }
 }

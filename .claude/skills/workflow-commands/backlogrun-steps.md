@@ -321,6 +321,9 @@ back with `pnpm josh run:carry --cut --owner "$PPID"`:
 | `watch` | The backlog drained with nothing in flight; the retrospective is owed (`run:step`) |
 | `window` | The driver's wait window ran out with nothing to judge; hand the loop back as is |
 
+**`window`, `merge busy` and `merge retry` reach a session only after the supervisor's own re-runs run
+out** (`run-wake-driver.ts`).
+
 **A candidate only in another repository is never a token** — report it with its checkout and leave it
 to a session running there (`backlogrun-lanes.md` → "Concurrency").
 

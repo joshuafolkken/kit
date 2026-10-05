@@ -20,6 +20,7 @@ const BASE: StopContext = {
 	agent_pending: false,
 	handed_off: false,
 	session_lang: 'en',
+	headless_agent: false,
 }
 
 function context(overrides: Partial<StopContext>): StopContext {

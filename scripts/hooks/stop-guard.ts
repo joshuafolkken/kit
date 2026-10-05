@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
+import { agent_headless } from '#scripts/agent/agent-headless'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
@@ -87,6 +88,7 @@ async function build_context(
 		agent_pending: lane_background.pending_agent_ids(tail).length > 0,
 		handed_off: lane_handoff.is_handed_off(process.cwd()),
 		session_lang: session_lang(),
+		headless_agent: agent_headless.is_headless(),
 	}
 }
 
