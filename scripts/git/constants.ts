@@ -12,6 +12,11 @@ const PORCELAIN_FLAG = '--porcelain'
 // The untracked-files mode every porcelain status reading passes (`git-command.ts` carries why it is
 // passed and why it is `all`), shared so another module's own reading cannot drift from it.
 const UNTRACKED_FILES_FLAG = '--untracked-files=all'
+// The git binary a spawn runs in place of the platform's own (joshuafolkken/kit#3234). The spawn path
+// is absolute, so a `git` placed in front on `PATH` never stands in for it: the unit suite's network
+// guard shimmed `git` that way, and `josh ship`'s tests fetched and merged the default branch into the
+// checkout they ran in without the guard ever seeing the call. The guard names its shim here instead.
+const GIT_BINARY_KEY = 'JOSH_GIT_BINARY'
 
 function get_git_command(): string {
 	if (platform() === 'win32') {
@@ -22,6 +27,10 @@ function get_git_command(): string {
 }
 
 function get_git_command_for_spawn(): string {
+	const binary = process.env[GIT_BINARY_KEY]
+
+	if (binary !== undefined && binary !== '') return binary
+
 	if (platform() === 'win32') {
 		return String.raw`C:\Program Files\Git\cmd\git.exe`
 	}
@@ -35,6 +44,7 @@ const git_utilities = {
 }
 
 export {
+	GIT_BINARY_KEY,
 	REQUIRED_STATUS_LENGTH,
 	STAGED_STATUS_INDEX,
 	UNTRACKED_FILE_PREFIX,

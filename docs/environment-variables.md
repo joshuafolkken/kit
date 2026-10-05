@@ -127,3 +127,4 @@ kit sets these for the processes it starts, or writes them into a lane's own `.e
 | `JOSH_UNIT_RUN_MARKED`     | `josh gate`                    | The gate already claimed its place for the unit suite it spawns.      |
 | `JOSH_UNIT_GUARD_LOG`      | the unit suite's network guard | Where the guard logs blocked calls.                                   |
 | `JOSH_TEMP_ROOT`           | the unit suite's network guard | The temporary directory host-wide records go to during a test run.    |
+| `JOSH_GIT_BINARY`          | the unit suite's network guard | The `git` every spawn runs in place of the platform's own binary.     |

@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { GIT_BINARY_KEY } from './constants'
 import { git_fixture_workspace, type FixtureWorkspace } from './git-fixture-workspace'
 import { gone_branch } from './gone-branch'
 
@@ -36,9 +37,13 @@ beforeEach(async () => {
 	await git(opened.workspace, ['init', MAIN_BRANCH, REPOSITORY])
 	await commit_file('base')
 	process.chdir(fixture.repository_root)
+	// The prune fetches only local upstreams, which the unit-suite guard's `git` shim cannot tell from a
+	// real remote — so the spawn runs the real binary (joshuafolkken/kit#3234).
+	vi.stubEnv(GIT_BINARY_KEY, '')
 }, TIMEOUT_MS)
 
 afterEach(async () => {
+	vi.unstubAllEnvs()
 	await git_fixture_workspace.close_workspace(fixture)
 })
 

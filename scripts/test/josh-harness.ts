@@ -1,3 +1,4 @@
+import { GIT_BINARY_KEY } from '#scripts/git/constants'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { poll } from '#scripts/lib/poll'
 import { execa, execaSync } from 'execa'
@@ -20,9 +21,12 @@ const POLL_INTERVAL_MS = 50
 
 // The child must not act on this process's surroundings: git's location variables would point it at
 // another repository, a lane mark would make it a dispatched child, and `PORT_SEED` would decide what
-// a port assertion sees. Blanked here so every scenario starts from the same place.
+// a port assertion sees. Blanked here so every scenario starts from the same place. The guard's `git`
+// binary is blanked too: the environment has no `origin`, so a fetch the real command makes there reaches
+// nothing, and the shim would record it as a network call (joshuafolkken/kit#3234).
 const CHILD_ENVIRONMENT: Record<string, string | undefined> = {
 	...git_location_environment.location_free_environment(),
+	[GIT_BINARY_KEY]: '',
 	JOSH_LANE_CHILD: '',
 	PORT_SEED: undefined,
 }

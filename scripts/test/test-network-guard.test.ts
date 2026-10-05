@@ -1,10 +1,12 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { GIT_BINARY_KEY } from '#scripts/git/constants'
+import { git_spawn } from '#scripts/git/git-spawn'
 import { PLATFORM_TEMP_ROOT, platform_temporary } from '#scripts/josh/platform-temporary'
 import { run_event_stream } from '#scripts/run/run-event-stream'
 import { execaSync } from 'execa'
-import { afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { test_network_guard } from './test-network-guard'
 import { GUARD_LOG_KEY } from './unit-guard-environment'
 
@@ -25,6 +27,7 @@ const ANOTHER_CALL = 'gh api two'
 const VERSION_CALL = 'gh --version'
 const RECORDED_LINE = 'gh api repos/joshuafolkken/kit/issues/1'
 const FETCH_ARGUMENTS = ['fetch', 'origin']
+const GIT_FETCH = 'git fetch'
 // A read that touches nothing outside the checkout, so it must reach the real binary.
 const LOCAL_ARGUMENTS = ['rev-parse', '--is-inside-work-tree']
 const RECORDED_FETCH = 'git fetch origin'
@@ -52,7 +55,12 @@ afterEach(() => {
 
 // `arm` writes to the worker's own environment, and a case that armed a scratch guard must hand the
 // rest of the worker back the real one — a leaked record path sends another test's findings nowhere.
-const ARMED_KEYS: ReadonlyArray<string> = ['PATH', GUARD_LOG_KEY, platform_temporary.TEMP_ROOT_KEY]
+const ARMED_KEYS: ReadonlyArray<string> = [
+	'PATH',
+	GIT_BINARY_KEY,
+	GUARD_LOG_KEY,
+	platform_temporary.TEMP_ROOT_KEY,
+]
 
 function snapshot_environment(): Record<string, string | undefined> {
 	return Object.fromEntries(ARMED_KEYS.map((key) => [key, process.env[key]]))
@@ -260,6 +268,39 @@ describe('test_network_guard.arm — what the workers inherit', () => {
 			expect(existsSync(temporary_root)).toBe(true)
 		} finally {
 			restore_environment(original)
+		}
+	})
+})
+
+// joshuafolkken/kit#3234: every spawn names `/usr/bin/git` outright, so a shim on PATH alone never saw
+// `josh ship`'s tests fetch and merge the default branch into the checkout they ran in.
+describe('test_network_guard — armed for the spawns this run makes', () => {
+	it('names its git shim as the binary every spawn runs', () => {
+		const original = snapshot_environment()
+		const directory = temporary_directory()
+
+		try {
+			test_network_guard.arm(directory, scratch_temporary_root())
+
+			expect(process.env[GIT_BINARY_KEY]).toBe(
+				path.join(directory, test_network_guard.GIT_SHIM_NAME),
+			)
+		} finally {
+			restore_environment(original)
+		}
+	})
+
+	it('records a fetch made through the ordinary spawn path', async () => {
+		const directory = temporary_directory()
+
+		test_network_guard.install_shim_guarding(directory, undefined)
+		vi.stubEnv(GIT_BINARY_KEY, path.join(directory, test_network_guard.GIT_SHIM_NAME))
+
+		try {
+			await expect(git_spawn.read([...FETCH_ARGUMENTS, 'main'])).rejects.toThrow(GIT_FETCH)
+			expect(readFileSync(test_network_guard.log_in(directory), 'utf8')).toContain(GIT_FETCH)
+		} finally {
+			vi.unstubAllEnvs()
 		}
 	})
 })
