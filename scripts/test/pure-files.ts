@@ -137,6 +137,7 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/document/document-section.test.ts',
 	'scripts/document/entry-read-set.test.ts',
 	'scripts/document/fixed-shape-artifacts.test.ts',
+	'scripts/document/issue-citation-budget.test.ts',
 	'scripts/document/kit-only-command-reference.test.ts',
 	'scripts/document/label-reference.test.ts',
 	'scripts/document/lane-child-read-set.test.ts',

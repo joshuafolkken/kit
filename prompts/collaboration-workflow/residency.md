@@ -30,6 +30,7 @@
 
 - **常駐規則は、トリガと導線の 2 つで書く。** **判定は、導線を一度も開かないターンでも常駐の記述だけで正しく振る舞えるかである。**
 - **削ることは移すことであり、削除は理由を示して初めて許される例外である。** 先に導線の先へ移し、マーカーテストも付け替える。引退の 3 条件は `docs/maintainers/residency-rationale.md` → "Trigger and pointer, and the narrow retirement route"。
+- **経緯（Issue 番号・なぜ・計測・却下案）は実行時の文書に書かず `docs/maintainers/<topic>-rationale.md` に置く。** agent が読む文書の Issue 番号引用の件数は `scripts/document/issue-citation-budget.ts` のラチェットが検証ゲートで抑える — 増やせば落ち、減らしたら記録も下げる。経緯は `docs/maintainers/residency-rationale.md` → "The issue-citation ratchet"。
 - 引用は本文があるファイルを直接指す — `docs/maintainers/residency-rationale.md` → "A pointer-only topic file is never cited"。
 - 予算が詰まったら上限ではなく回収で解く。**引き上げは Tier C として扱う** — `RESIDENT_CEILING_BYTES`・`RESIDENT_HEADROOM_BYTES`・`RE_INLINE_GUARD_HEADROOM_BYTES` の緩和は、`docs/maintainers/residency-rationale.md` → "When the ceiling may be raised" の 3 条件を示した上でユーザーの明示指示を得てから行う。
 

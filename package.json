@@ -102,6 +102,7 @@
 		"!scripts/exports/namespace-members.ts",
 		"!scripts/exports/unused-members.ts",
 		"!scripts/document/generate-catalog.ts",
+		"!scripts/document/issue-citation-budget.ts",
 		"!scripts/document/retired-phrases.ts",
 		"!scripts/document/review-agent-type.ts",
 		"!scripts/document/single-source.ts",

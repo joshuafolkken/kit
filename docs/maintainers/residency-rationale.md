@@ -259,6 +259,27 @@ of them leaves whichever limit is actually binding unguarded** — with room und
 floor reached, the floor is what someone will want to loosen, and if that is open the prohibition is
 only a form. Tightening (lowering the ceiling, raising the floor) is outside this prohibition.
 
+## The issue-citation ratchet
+
+The main cause of agent-document growth was issue-number citations and the "why / measured /
+rejected" prose that travels with them, piling up in documents read at run time even where a
+`*-rationale.md` already held the topic. At joshuafolkken/kit#3185 the agent-read set
+(`agent_read_documents()` — `CLAUDE.md`, `prompts/`, the distributed skills and the two command
+references) cited 328 issue numbers. Cutting them alone does not last: nothing stopped the next PR
+adding them back, the same pattern the byte budget answered for size.
+
+**The rule is computable, so a check answers it (question 0).** `scripts/document/issue-citation-budget.ts`
+records each document's count, and its suite fails `pnpm josh gate` on growth and on a reduction left
+unrecorded. `residency.md` carries one line pointing at it, beside the other budget rules.
+
+- **Exact, not block-quantized.** The byte budget quantizes to keep parallel lanes from bumping the
+  same line; here one added citation is precisely the growth to refuse, so there is no headroom to
+  quantize. Two lanes that change the same document's count meet on one line, a conflict resolved by
+  recounting.
+- **Counted as `#` plus three or more digits.** That matches `#3185` and `owner/repo#3185` and skips
+  placeholders (`#N`, `#<N>`) and short ordinals; a five-digit number keeps counting.
+- **The rationale files are outside the set**, so moving history there lowers the count.
+
 ## The reduction freeze and its retraction
 
 **The freeze on reducing resident text was lifted on 2026-09-13** (joshuafolkken/kit#1931 →
