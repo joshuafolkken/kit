@@ -37,6 +37,7 @@ function node(
 		records: [record],
 		baseline_tokens: 100,
 		is_readable: true,
+		took_cut: false,
 	}
 }
 
@@ -61,6 +62,15 @@ describe('cost_run_report.build', () => {
 		expect(JSON.stringify(report)).toContain('"output_tokens":100')
 		expect(JSON.stringify(report)).toContain('"is_readable":true')
 		expect(JSON.stringify(report)).toContain('"is_measured":true')
+	})
+
+	it('carries the per-Issue totals, marked cut when a lane session took the cut', () => {
+		const cut_lane: RunNode = { ...node('L1', 'lane', 1913, 1), took_cut: true }
+		const report = cost_run_report.build(1, 0, [node('p', 'parent', undefined, 0), cut_lane])
+
+		expect(report.issues.map((totals) => totals.issue)).toEqual([1913])
+		expect(report.issues[0]?.took_cut).toBe(true)
+		expect(JSON.stringify(report)).toContain('"issues":[')
 	})
 })
 

@@ -57,6 +57,7 @@ function cost_report(roles: ReadonlyArray<RoleTotals>): RunCostReport {
 		total_elapsed_ms: MINUTES * MS_PER_MINUTE,
 		roles,
 		sessions: [],
+		issues: [],
 	}
 }
 

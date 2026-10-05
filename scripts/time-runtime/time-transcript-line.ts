@@ -79,6 +79,8 @@ const ERROR_TEXT_LIMIT = 256
 // shared constant exists because each guard writes the literal in its own reason, so the one place a
 // refusal is *detected* names it here.
 const REFUSAL_MARKER = '⛔'
+// The label the harness puts in front of a PreToolUse hook's deny reason, naming the hook and the tool.
+const HOOK_ERROR_LABEL = /^PreToolUse:\S+ hook error: /u
 
 interface Block {
 	type: string
@@ -159,8 +161,12 @@ function block_names(
 // before the first `:` — `⛔ pre-gate cut: …` is `pre-gate cut`. A reason with no colon (a headline
 // like `⛔ scoped checks not green on this tree`) is taken whole. Reading the opening rather than
 // searching the body is what stops a result that merely quoted a reason being read as a refusal.
+//
+// **The harness writes the reason behind its own label** — `PreToolUse:Edit hook error: ⛔ …` — so that
+// label is stripped before the opening is read (joshuafolkken/kit#3223). Without it no live refusal
+// carried a guard: the fixtures wrote the bare `⛔` body and passed while every recorded one read `''`.
 function guard_from_refusal(text: string): string {
-	const trimmed = text.trimStart()
+	const trimmed = text.trimStart().replace(HOOK_ERROR_LABEL, '')
 	if (!trimmed.startsWith(REFUSAL_MARKER)) return ''
 
 	const headline = trimmed.slice(REFUSAL_MARKER.length).split('\n', 1)[0]?.trimStart() ?? ''

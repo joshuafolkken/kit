@@ -18,6 +18,7 @@ const REPORT: RunCostReport = {
 	total_elapsed_ms: 0,
 	roles: [],
 	sessions: [],
+	issues: [],
 }
 
 describe('cost_run_report.format_report lead', () => {

@@ -156,8 +156,14 @@ const THRESHOLD_TEXT = `${cost_format.format_tokens(CONTEXT_CUT_THRESHOLD)}-toke
 // the reissue sentence every delivery needs. The verdicts are spelled out rather than pointed at,
 // because `cut` is the only one that ends the turn and a run told merely to "take the cut" would have to
 // read which of the others leave it implementing — the same reason `pre-gate-cut.ts` spells them out.
+// The guard label the refusal opens with, after the `⛔`. `cost-run-cut.ts` reads the refusal back by
+// this constant (joshuafolkken/kit#3223); it lives here, on the published side, because `scripts/cost`
+// is not shipped and this guard runs in every consumer.
+const IMPLEMENTATION_CUT_GUARD = 'implementation-phase cut'
+
 const IMPLEMENTATION_CUT_REASON =
-	'⛔ implementation-phase cut: this checkout is a lane dispatched for this issue, or a run holds it for ' +
+	`⛔ ${IMPLEMENTATION_CUT_GUARD}: this checkout ` +
+	'is a lane dispatched for this issue, or a run holds it for ' +
 	'this issue (joshuafolkken/kit#2760), and its recent-context ' +
 	`cost has crossed the shared ${THRESHOLD_TEXT} threshold mid-implementation, so the thinking accumulated ` +
 	'so far is now re-read on every later request. Take the cut before this edit. ' +
@@ -222,6 +228,7 @@ const ROW = {
 }
 
 const implementation_cut = {
+	IMPLEMENTATION_CUT_GUARD,
 	IMPLEMENTATION_CUT_REASON,
 	REISSUE_WINDOW_MS,
 	ROW,
