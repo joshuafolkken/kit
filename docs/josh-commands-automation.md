@@ -359,7 +359,18 @@ After bumping, update `docs/` to reflect any behavior changes before committing.
 
 ### `josh release`
 
-Release everything main has taken since the version last changed — one command, run by a person. It counts merges on `origin/<default>`'s first-parent line since the last version change, raises the version by that many minors, opens and merges a `release/v<version>` pull request, then polls for the `v<version>` tag.
+Release everything main has taken since the version last changed — one command, run by a person. It counts merges on `origin/<default>`'s first-parent line since the last version change, raises the version by that many minors, opens and merges a `release/v<version>` pull request, then polls for the `v<version>` tag, the npm publish and the GitHub Release. Each stage reached prints one line, with a link where there is one; the completion line prints only when every stage is reached:
+
+```text
+📝 Release PR opened: https://github.com/<owner>/<repo>/pull/<N>
+🔀 Release PR merged: https://github.com/<owner>/<repo>/pull/<N>
+🏷 Tag vX.Y.Z created
+📦 Published to npm: https://www.npmjs.com/package/<name>/v/X.Y.Z
+📰 GitHub Release created: https://github.com/<owner>/<repo>/releases/tag/vX.Y.Z
+🎉 Release vX.Y.Z complete
+```
+
+A package whose `package.json` says `private: true` is not published to npm, so its npm stage is skipped.
 
 ```bash
 pnpm josh release
@@ -372,8 +383,10 @@ pnpm josh release --dry-run   # count and report, write nothing
 
 - `--dry-run` — count and report only; writes nothing, fetches nothing, and creates no work tree.
 - `JOSH_RELEASE_TAG_TIMEOUT_SECONDS` (env) — tag-watch budget, default 30 minutes.
+- `JOSH_RELEASE_NPM_TIMEOUT_SECONDS` (env) — npm-publish watch budget, default 30 minutes.
+- `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS` (env) — GitHub Release watch budget, default 30 minutes.
 
-**Output / exit codes:** exits 0 and writes nothing when the pending count is zero; exits non-zero if `origin/<default>` cannot be read, no version base can be found, the `release/v<version>` branch is already taken (locally or on origin), or the `v<version>` tag never appears.
+**Output / exit codes:** exits 0 and writes nothing when the pending count is zero; exits non-zero if `origin/<default>` cannot be read, no version base can be found, the `release/v<version>` branch is already taken (locally or on origin), or a watched stage — the `v<version>` tag, the npm version, the GitHub Release — never appears, which prints that stage with ❌.
 
 ### `josh release:scope`
 

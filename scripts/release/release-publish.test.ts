@@ -5,6 +5,7 @@ import { git_remote_branch, type RemoteAnswer } from '#scripts/git/git-remote-br
 import { repository_lock } from '#scripts/git/repository-lock'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReleasePlan } from './release-plan'
+import { release_progress } from './release-progress'
 import { release_publish } from './release-publish'
 import { release_tag } from './release-tag'
 import { release_worktree } from './release-worktree'
@@ -59,6 +60,9 @@ function arrange_merge(): void {
 	vi.spyOn(git_pr_checks, 'wait_for_pr_success').mockResolvedValue(PR_SNAPSHOT)
 	vi.spyOn(release_tag, 'wait_for_tag').mockResolvedValue(true)
 	vi.spyOn(release_tag, 'format_result').mockReturnValue('tagged')
+	vi.spyOn(release_progress, 'wait_for_distribution').mockResolvedValue(
+		release_publish.SUCCESS_EXIT_CODE,
+	)
 }
 
 function arrange_publish(): void {
@@ -194,6 +198,42 @@ describe('release_publish.publish around the work tree', () => {
 		await expect(release_publish.publish(PUBLISH_PLAN)).rejects.toThrow('ci failed')
 		expect(release_worktree.remove).toHaveBeenCalledTimes(1)
 		expect(release_worktree.remove).toHaveBeenCalledWith(WORKTREE_DIR, BRANCH)
+	})
+})
+
+describe('release_publish.publish progress', () => {
+	const PR_URL = `https://github.com/joshuafolkken/kit/pull/${String(PR_NUMBER)}`
+
+	it('prints the opened and merged lines with the pull request link before the tag', async () => {
+		arrange_publish()
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		await release_publish.publish(PUBLISH_PLAN)
+
+		expect(info.mock.calls.map((call) => String(call[0]))).toEqual([
+			`📝 Release PR opened: ${PR_URL}`,
+			`🔀 Release PR merged: ${PR_URL}`,
+			'tagged',
+		])
+	})
+
+	it('waits for npm and the GitHub Release once the tag exists, and returns their answer', async () => {
+		arrange_publish()
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		vi.mocked(release_progress.wait_for_distribution).mockResolvedValue(1)
+
+		expect(await release_publish.publish(PUBLISH_PLAN)).toBe(1)
+		expect(release_progress.wait_for_distribution).toHaveBeenCalledWith(PUBLISH_PLAN.next_version)
+	})
+
+	// No tag means nothing downstream ran, so there is nothing to wait for.
+	it('fails without watching the distribution when the tag never appears', async () => {
+		arrange_publish()
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		vi.mocked(release_tag.wait_for_tag).mockResolvedValue(false)
+
+		expect(await release_publish.publish(PUBLISH_PLAN)).not.toBe(release_publish.SUCCESS_EXIT_CODE)
+		expect(release_progress.wait_for_distribution).not.toHaveBeenCalled()
 	})
 })
 

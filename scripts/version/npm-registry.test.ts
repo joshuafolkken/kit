@@ -122,3 +122,29 @@ describe('npm_registry.read_release_times', () => {
 		expect(npm_registry.read_release_times(KIT_PACKAGE)).toBeUndefined()
 	})
 })
+
+describe('npm_registry.has_public_version', () => {
+	const PUBLISHED_TIMES = JSON.stringify({ time: { [LATEST]: PUBLISHED_AT } })
+
+	it('answers whether public npm carries the version', () => {
+		respond_with(fake_result(PUBLISHED_TIMES))
+
+		expect(npm_registry.has_public_version(KIT_PACKAGE, LATEST)).toBe(true)
+		expect(npm_registry.has_public_version(KIT_PACKAGE, '9.9.9')).toBe(false)
+	})
+
+	// `josh release` links npmjs.com, so a scope this checkout installs from GitHub Packages is
+	// still asked of public npm.
+	it('asks public npm even for a scope routed to GitHub Packages', () => {
+		respond_with(fake_result(PUBLISHED_TIMES))
+
+		expect(npm_registry.has_public_version(GITHUB_PACKAGE, LATEST)).toBe(true)
+		expect(packument_requests()).toHaveLength(1)
+	})
+
+	it('answers no when the registry cannot be reached', () => {
+		respond_with(fake_result('', 1))
+
+		expect(npm_registry.has_public_version(KIT_PACKAGE, LATEST)).toBe(false)
+	})
+})
