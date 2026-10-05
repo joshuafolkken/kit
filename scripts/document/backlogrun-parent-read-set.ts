@@ -30,8 +30,13 @@ const SKIPPED_POINT_OF_USE: ReadonlySet<string> = new Set<string>()
 
 // **The parent runs the end-of-run retrospective** (`retrospective.md`) when `run:step` prints it, but its
 // manifest names `retrospective.md` only through `backlogrun-steps.md` — one hop further than the
-// derivation follows — so the parent's reach names it (joshuafolkken/kit#3078).
-const REACHED_POINT_OF_USE: ReadonlySet<string> = new Set(['retrospective.md'])
+// derivation follows — so the parent's reach names it (joshuafolkken/kit#3078). **It polls a
+// delegated unit that went silent** through `backlogrun-recovery.md`, named only from
+// `backlogrun-child.md`, so the reach names that too (joshuafolkken/kit#3175).
+const REACHED_POINT_OF_USE: ReadonlySet<string> = new Set([
+	'retrospective.md',
+	'backlogrun-recovery.md',
+])
 
 function costed(root: string): ReadSetCost {
 	return read_set_trim.costed(root, {

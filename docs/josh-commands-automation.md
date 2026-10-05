@@ -993,7 +993,7 @@ stdout is the verdict word (reason to stderr): `run` (start what was offered), `
 
 ### `josh backlog:offer`
 
-A `backlogrun` loop-head event in one call: `backlog:next`, mapped to the budget word `backlogrun-steps.md` → "The loop" fixes, then `backlog:budget`.
+A `backlogrun` loop-head event in one call: `backlog:next`, mapped to a budget word, then `backlog:budget`. This section is the single source of the mapping: issue numbers → `candidates`; `wait` → `blocked` with children in flight, `exhausted` without; `none` → `exhausted`; `stop` → `parked`; `triage` → `untriaged`; `retry` → `blocked` below three consecutive asks, `unreadable` at the third (any other answer resets the count); `error`, or exit 1 with empty stdout, → `unreadable` — never `none`, and never re-asked.
 
 ```bash
 pnpm josh backlog:offer --started "$started" --active "$active" --running 2 --retries 1
@@ -1260,6 +1260,28 @@ existing backlog offer, lane launch and merge commands. It performs the idle wat
 itself. A judgment handoff includes the driver's verdict, affected issue when present, diagnostic
 output and resume flags. The carry record prevents a restarted supervisor from counting a merge into
 another live owner's run.
+
+**A failure is visible rather than silent.** A judgment wake that never claims the carry record is
+retried, and once the retries are spent the supervisor stops and sends a `warning` Telegram; a carry
+record that expired or cannot be read ends it the same way. `none` — the run having finished — and a
+person's own `--stop` stay silent. Everything the supervisor starts writes to one log file per
+repository, named by `--list` and by every warning. Progress is relayed from the existing report
+record: the driver keeps the `run:merge` event stream and the `run:report` finish path, and `--list`
+prints that record's latest line.
+
+**Every unattended role runs with the provider selected from the invoking CLI and its own profile.**
+Codex sessions use OpenAI; Claude Code sessions use Anthropic.
+
+| Provider  | scheduler                    | worker                       | reviewer                   |
+| --------- | ---------------------------- | ---------------------------- | -------------------------- |
+| Anthropic | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `high` |
+| OpenAI    | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `high`     |
+
+Role overrides resolve before launch; model overrides apply only to Claude Code, effort overrides to
+either provider, and legacy `JOSH_LANE_*` values to the worker only. Invalid configuration, a missing
+or conflicting session marker, or a missing, outdated or unauthenticated CLI refuses without fallback,
+promotion or worker retry. `run:wake --list`, `lane:list`, the review brief and each launch log expose
+the resolved provider, role, model and effort; the worker's launch is "`josh lane:dispatch`".
 
 **Output / exit codes:** stdout is one token; stderr explains. `started`, `running`, `supervising`, `stale`, `stopped`, `ended`, `expired`, `unreadable` exit 0; `none` exits 0 for `--list` / `--stop` and 1 for `--start`; `failed`, `unknown` exit 1. `expired`, `unreadable`, and `failed` each warn.
 

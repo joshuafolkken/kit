@@ -57,7 +57,7 @@ Each step is a terse trigger and a pointer; the procedure is read on demand from
 6. **The loop belongs to the supervisor** — `run:wake` runs `backlog:drive`; the driver uses
    `pnpm josh backlog:offer` as its loop head and returns a branch to an AI session only when it needs
    judgment. `backlogrun-steps.md` → "The loop"
-   fixes the answer-to-word mapping, "The two budgets" the `run` / `watch` / `stop` verdict, "The cost
+   fixes what a handed-back branch asks, "The two budgets" the `run` / `watch` / `stop` verdict, "The cost
    check is not asked during a watch", and "Where the run stops" every termination.
 7. **What runs once per session, not once per issue** — `backlogrun-steps.md` → "What runs once per
    session, not once per issue": the per-repository preflight, `josh latest` on `required`, the
