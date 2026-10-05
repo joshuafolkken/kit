@@ -20,6 +20,11 @@ beside the same statement at the top of `CLAUDE.md` and in `single-source-rules.
 one explanation is the same clone at a smaller scale, so the pointers were cut to the pointer
 sentence and the prohibition on copying rules back (joshuafolkken/kit#2894).
 
+`scripts/document/ai-document-pointers.test.ts` keeps it that way mechanically: it fails when a rule
+body reappears in a pointer, when the pointer sentence disappears, or when `CLAUDE.md` stops saying it
+is the single source. The pointers carry only their tool-specific line; the shared reading for other
+agents lives once, in `principles.md`'s section on agents other than Claude Code.
+
 ## The include line, and what has not been verified
 
 `AGENTS.md` carries no include directive, only the sentence. `GEMINI.md` carries an `@CLAUDE.md`

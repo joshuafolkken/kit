@@ -2,7 +2,7 @@
 
 ## セッション向け出力で Issue はリンク＋セッション言語の短い要約で参照する（joshuafolkken/kit#1758）
 
-セッション向けの出力で Issue を指すとき、番号だけを書くと読み手は何の話か判断できず、番号を内容に解決するために毎回 GitHub を開くことになる。実際、実行中の backlogrun の報告が番号の羅列になり、オーナーから「番号だけ言われても詳細がわからない」という指摘を受けた。配布ドキュメントは Issue / PR の**タイトル**を英語に固定しているが、**セッション向け出力の中で Issue をどう言及するか**は定めていなかったため、番号だけの言及が規則に反しない状態だった。
+番号だけの言及では、読み手は番号を内容に解決するために毎回 GitHub を開くことになる（`docs/maintainers/issue-citation-rationale.md` → "Why the rule exists"）。発火点が `CLAUDE.md` に常駐している理由は `docs/maintainers/issue-citation-rationale.md` → "Why the trigger is resident in CLAUDE.md" にある。
 
 **規則**: セッション向け出力で Issue を指すときは、次の 2 つを必ず添える。
 
@@ -13,11 +13,11 @@
 
 - `[#<N>](https://github.com/<owner>/<repo>/issues/<N>) — <その Issue が何をするものかの短い要約>`
 
-**この引用行は手で組み立てるものではなく、`pnpm josh issue:cite <N> [<N> ...]` が出す。** 番号を並べて渡すと、貼れる引用行を 1 呼び出しでまとめて出す（複数 Issue に 1 回、他リポジトリは `--repo <owner/repo>` あるいは `owner/repo#N` 表記）。正しい形にタイトル取得の往復が要るために裸の `#N` に落ちていたので、安い道と正しい道を同じコマンドにした。要約はその Issue のタイトルをそのまま用いる。詳細は [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md) の `josh issue:cite` を参照。
+**この引用行は手で組み立てるものではなく、`pnpm josh issue:cite <N> [<N> ...]` が出す。** 番号を並べて渡すと、貼れる引用行を 1 呼び出しでまとめて出す（複数 Issue に 1 回、他リポジトリは `--repo <owner/repo>` あるいは `owner/repo#N` 表記。`docs/maintainers/issue-citation-rationale.md` → "Why issue:cite prints the line"）。要約はその Issue のタイトルをそのまま用いる。詳細は [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md) の `josh issue:cite` を参照。
 
 **要約タイトルは全訳ではなく要約でよい。** 何をするものか分かれば足りる。長い訳を作ることが目的ではない。`issue:cite` が出すタイトルを、必要ならセッション言語に言い換えて使う。
 
-**対応前の言及も対象である。** 「これから走らせる」「待機中」「対象外」を並べる場面こそ、読み手が内容を知らないまま番号を読むことになるため、事後の報告だけを対象にすると指摘の半分しか解決しない。
+**対応前の言及も対象である。** 「これから走らせる」「待機中」「対象外」を並べる場面も含む。
 
 ### 適用範囲
 
@@ -27,12 +27,8 @@
 
 ### 英語固定の 3 つとは衝突しない
 
-英語のままにするものは従来どおり 3 つ — Issue / PR のタイトル、コード内コメント・テスト名・コミットメッセージ、スクリプトが出力する固定文字列。この規則が変えるのは、セッション向け出力の地の文における言及の書き方だけである。番号に添えるセッション言語の要約は GitHub 上の**タイトル**ではなく、セッション内の散文の一部なので、タイトルの英語固定とは別物であり矛盾しない。
-
-### なぜ CLAUDE.md に常駐させるか
-
-規則の発火点は「セッション向け出力で Issue 番号を書こうとした瞬間」であり、これはワークフローのスキルを読んでいないターンでも起こる。したがって発火点（引き金）と形式は `CLAUDE.md` の Communication 節に常駐させ、本文（この節）を話題ファイルに置く。常駐側は短く保ち、詳細はここから読む。
+英語のままにするものは従来どおり 3 つ（`overview.md` →「出力の言語（`JOSH_SESSION_LANG`）」）。番号に添えるセッション言語の要約は GitHub 上の**タイトル**ではなく、セッション内の散文の一部なので、タイトルの英語固定とは矛盾しない。
 
 ### 停止時の担保（joshuafolkken/kit#2247）
 
-`Stop` フック `pnpm josh stop:guard` が返信の地の文に裸の `#N` を見つけると**停止をブロックし**、その番号と `pnpm josh issue:cite <N...>` の実行形をモデルへ差し戻す。`{"decision":"block"}` は `Stop` からモデルへ文字を届ける唯一の経路で、`stop_hook_active` がループを断つので誤検出でも空転は 1 ターンで止まる。検出が外す範囲（リンク形式・コード・引用行・PR 参照）は [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md) の `josh stop:guard` を参照。
+`Stop` フック `pnpm josh stop:guard` が返信の地の文に裸の `#N` を見つけると**停止をブロックし**、その番号と `pnpm josh issue:cite <N...>` の実行形を差し戻す。差し戻されたら、その実行形で引用し直す（仕組みは `docs/maintainers/issue-citation-rationale.md` → "How the Stop hook delivers it"）。検出が外す範囲は [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md) の `josh stop:guard` を参照。

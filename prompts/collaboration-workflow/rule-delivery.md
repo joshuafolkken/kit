@@ -70,8 +70,17 @@
   - 発火点: `pnpm josh rule:guard` — 綴りによらず force（`--force` ／ `-f` ／ `-uf` 等）・削除（`--delete` ／ `-d` ／ `-D` ／ `:branch`）と判定した `git push` / `git branch` の `Bash`。**毎回発火する**
   - 発火しないとき: 通常の `git push` / `git branch` ＝ 破壊的操作が無い
 - **認可外の作業ツリー変更**（`operating-rules.md`、joshuafolkken/kit#2120）
-  - 発火点: `pnpm josh rule:guard` — `git checkout -- <path>` ／ `git restore <path>` ／ 認可外の `git stash`（bare・メッセージ無し push・位置指定 pop 等）の `Bash`。**毎回発火する**
+  - 発火点: `pnpm josh rule:guard` — `git checkout -- <path>` ／ `git restore <path>` ／ 強制 `git clean -f` ／ 認可外の `git stash`（bare・メッセージ無し push・位置指定 pop 等）の `Bash`。**毎回発火する**
   - 発火しないとき: `git stash push -m` ・`git stash list` ・`pnpm josh git` ・`pnpm josh stash:pop` ＝ 認可された退避
+- **index の書き換え**（`operating-rules.md`、joshuafolkken/kit#2983）
+  - 発火点: `pnpm josh rule:guard` — 綴りによらず `git add` ／ `commit` ／ `reset` ／ `rm` ／ `mv` ／ `restore --staged` と判定した `Bash`。**毎回発火する**
+  - 発火しないとき: `pnpm josh git` ＝ 承認済みのコミットフロー
+- **破壊的コマンド**（`operating-rules.md`、joshuafolkken/kit#2983）
+  - 発火点: `pnpm josh rule:guard` — `rm -rf`（綴りによらず）・`gh repo delete` ／ `archive`・`gh pr close`・`gh api -X DELETE` の `Bash`。**毎回発火する**
+  - 発火しないとき: `gh issue close`・Issue ラベルの削除 ＝ ワークフロー自身の手順
+- **保護ファイル**（`operating-rules.md`、joshuafolkken/kit#2983）
+  - 発火点: `pnpm josh rule:guard` — `.env` の `Read`、kit 以外のリポジトリでの `.claude/settings.json` の `Edit` ／ `Write`。**毎回発火する**
+  - 発火しないとき: kit 自身とユーザー単位の `~/.claude/settings.json` の編集
 - **ファイル本文をシェルに載せない**（`file-edits.md`、joshuafolkken/kit#2120）
   - 発火点: `pnpm josh rule:guard` — 既存ファイルへのヒアドキュメント書き込み・書き込みを伴う `node -e` ／ インタプリタ heredoc・`perl -0pi -e` の `Bash`。**毎回発火する**
   - 発火しないとき: 新規ファイル作成・読み取り専用のヒアドキュメント・短い `sed -i` ＝ 本文を丸ごと運んでいない
