@@ -119,6 +119,17 @@ describe('backlog_drive.run_pass — collection', () => {
 		expect(result.kind === 'continue' && result.state.in_flight).toStrictEqual([SECOND_CHILD])
 	})
 
+	it('launches the next lane after a merge without handing back to the parent', async () => {
+		const { ports, calls } = harness({
+			finished: [FIRST_CHILD],
+			offers: [offer('run', [OFFERED])],
+		})
+		const result = await backlog_drive.run_pass(state([FIRST_CHILD]), false, ports)
+
+		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer', `launch ${OFFERED}`])
+		expect(result.kind === 'continue' && result.state.in_flight).toStrictEqual([OFFERED])
+	})
+
 	it.each(['over', 'human-review', 'environment', 'busy', 'retry'])(
 		'hands the merge token %s back without offering',
 		async (token) => {
