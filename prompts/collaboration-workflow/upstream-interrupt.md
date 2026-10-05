@@ -22,10 +22,10 @@
 
 ### 第三者リポジトリへの書き込みは Tier C（明示指示が必要）
 
-上の「起票は確認なし」は **first-party の集合**（kit / app-kit / game-kit / jgame）を前提に書かれている。トラッカーが自分たちのもので、重複起票のコストがバックログ 1 行で済むからである。**自分たちが所有しないリポジトリへの書き込みは、これとは別物**として扱う。
+上の「起票は確認なし」は **first-party**（`pnpm josh repo:party` が `first-party` と答えるリポジトリ。判定は下記）を前提に書かれている。トラッカーが自分たちのもので、重複起票のコストがバックログ 1 行で済むからである。**自分たちが所有しないリポジトリへの書き込みは、これとは別物**として扱う。
 
 - **判定は機械的に行い、判断に委ねない**: `pnpm josh repo:party [<owner/repo>]` が `first-party` / `third-party` / `unknown` の 1 語で答える（対象リポジトリの owner がセッションのリポジトリの owner と一致すれば **first-party**、owner を読めなければ **unknown** で third-party 扱いはしない）。**それ以外は全て third-party** で、fork も、単に contribute しているだけの org リポジトリも third-party に入る。この判定は `delivered-rules.ts` の `third-party-write` ルールが同じ計算を使って third-party への `gh api` 書き込みを拒否する（読み取りは素通し）
-- **first-party は従来どおり**: Tier A。確認なしで起票し、双方向バックリンクを書き、停止する。kit / app-kit / game-kit のフローに新しい摩擦は加わらない
+- **first-party は従来どおり**: Tier A。確認なしで起票し、双方向バックリンクを書き、停止する。first-party のフローに新しい摩擦は加わらない
 - **third-party は書き込みの種別を問わず Tier C**: Issue・コメント・PR・Discussion・レビューのいずれも、**その turn におけるユーザーの明示指示**なしに行ってはならない。公開は外向きかつ実質不可逆で、Issue はユーザーの GitHub アカウント名義で公開され、watcher へ通知され、検索に載る。後からクローズしてもそのいずれも取り消せない。加えて、誰も差し出すと約束していないメンテナの時間を消費する
 - **third-party だと判明したときの手順**: (1) **自分たちの側の Issue** に証拠込みで所見を記録する。見出しは `## Upstream candidate` を使い、`## Upstream issues` は使わない（後者は「起票済み」を主張する見出しであるため）。(2) 報告本文の下書きをその Issue 内に用意し、ユーザーが 1 メッセージで承認できる状態にする。(3) 対象プロジェクト名と報告しようとしている内容を書いた `confirmation` Telegram を送って**停止する**
 - **third-party 報告の証拠バー**（下書きを提示する前に満たす）:
@@ -48,4 +48,4 @@
 
 - **即席回避と根本対応は「迷って選ぶもの」ではない**。上流起因と分かった時点で選択肢は根本対応だけであり、「今回は軽いから即席で」という判断はこの手順に存在しない
 - 別パッケージへの新 Issue 作成・stash・Issue コメントは可逆かつ低コストな調査/起票操作なので、Tier C（不可逆・共有状態の操作）ではなく Tier A として確認なしで進める。ただし上流パッケージの **マージ等の共有状態操作** は通常どおりそれぞれのワークフローの明示起動を要する。**「可逆かつ低コスト」という前提が成り立つのは自分たちが所有するリポジトリに対してだけ**で、third-party への起票は外向き・実質不可逆なので Tier C になる（→「第三者リポジトリへの書き込みは Tier C（明示指示が必要）」）
-- このルールは横断ドキュメント（CLAUDE.md「Cross-package problems → file the upstream Issue, then always stop」）のカノニカル参照
+- このルールは横断ドキュメント（CLAUDE.md「Cross-package problems → file the upstream Issue, then stop」）のカノニカル参照
