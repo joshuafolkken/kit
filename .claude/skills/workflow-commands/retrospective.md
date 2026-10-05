@@ -4,7 +4,7 @@
 not at the entry** (joshuafolkken/kit#2328). `SKILL.md` → §2's table keeps the rule itself: run what `run:step` prints once,
 file the improvements worth carrying into the next run, stack the rest, and mark the step done.
 Everything that decides *how* — what the four sections mean, how the top two are chosen rather than
-rationed, the exclusions, and the `auto-ok` carve-out that lets the next run pick them up — is here,
+rationed, the exclusions, and the `auto-ok` default that lets the next run pick them up — is here,
 because none of it binds until a run has actually drained its backlog. A run that never empties its pool
 never reads it; the one that does reads it in full, in the same turn, before it files.
 
@@ -61,10 +61,10 @@ Issue, as after any filing.
 
 ## `auto-ok`, and closing the step
 
-**A retrospective may apply `auto-ok` to what it files** — the one path on which a run labels its own
-input, so the next run picks the improvements up without waiting for a person. **`backlogrun-steps.md` →
-"What one invocation approves" is that carve-out's single source**; it is written there, beside the
-brakes that bound it, rather than restated here. Every brake still counts a retrospective's filings: the
+**What a retrospective files carries `auto-ok`** — it files while the carry record is live, so
+`issue:file`'s default applies the label and the next run picks the improvements up without waiting
+for a person. **`backlogrun-steps.md` → "What one invocation approves" is that default's single
+source**; it is written there, beside the brakes that bound it, rather than restated here. Every brake still counts a retrospective's filings: the
 ten-per-invocation ceiling, the WIP cap, `--max`, the 150,000-token session budget and the 8-hour
 whole-run bound.
 

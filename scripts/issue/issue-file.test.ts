@@ -32,6 +32,7 @@ function args_of(overrides: Partial<FileArguments> = {}): FileArguments {
 		repo: undefined,
 		distinct: [],
 		is_over_cap: false,
+		is_auto_ok_opted_out: false,
 		...overrides,
 	}
 }
@@ -52,6 +53,12 @@ describe('issue_file.parse — the arguments a filing owes', () => {
 
 	it('reads --over-cap', () => {
 		expect(issue_file.parse([...FILED, '--over-cap'])).toStrictEqual(args_of({ is_over_cap: true }))
+	})
+
+	it('reads --no-auto-ok', () => {
+		const parsed = issue_file.parse([...FILED, '--no-auto-ok'])
+
+		expect(parsed).toStrictEqual(args_of({ is_auto_ok_opted_out: true }))
 	})
 
 	it.each([

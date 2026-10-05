@@ -228,7 +228,7 @@ Type one keyword and the agent **starts working through the approved Issues in d
 
 When it hits something that needs a decision, **it sets that aside and moves on instead of stopping.** What needs a human is marked and left for you. Progress and completion arrive as notifications. A cut session resumes where it stopped.
 
-**And the agent can only touch Issues a human has given the approval label (`auto-ok`)** — or Issues under an epic carrying it. The rules forbid the agent from applying that label itself. The one exception is improvement Issues the agent files in the retrospective at the end of a run in kit's own development, and even that is capped by count and budget and off by default. **Deciding what the agent may do stays a human job, to the very end.**
+**And the agent can only touch Issues a human has given the approval label (`auto-ok`)** — or Issues under an epic carrying it. The agent never labels an existing Issue itself. The one exception is the Issues the agent discovers while working on approved ones: those inherit the label by default, unless they need a human's judgement, and even that is capped by count and budget. **Deciding what the agent may do stays a human job, to the very end.**
 
 # The most important part: it ships as a package
 
