@@ -9,7 +9,11 @@ const CHECK = 'exports'
 const FAIL_EXIT_CODE = 1
 // A consumer's namespaces are read from `.svelte` files and routes a TypeScript program over its
 // `tsconfig.json` does not see, so every member they use would read as unused. The check is kit's own.
-const CONSUMER_SKIP_REASON = 'checks only the kit repository itself, not a consumer project'
+//
+// **Not a skip notice** (joshuafolkken/kit#3162). `SKIP_MARKER` means "a check passed without running",
+// and the gate withholds its green record on it — so a consumer, where this notice prints on every
+// run, never got a green record. Out of scope by design is not unverified, so the marker stays out.
+const CONSUMER_NOTICE = `josh ${CHECK}: checks only the kit repository itself — nothing to check in a consumer project.`
 
 function format_member(root: string, member: NamespaceMember): string {
 	return `${path.relative(root, member.file)}:${String(member.line)}  ${member.namespace}.${member.member}`
@@ -26,7 +30,7 @@ function report(root: string, members: ReadonlyArray<NamespaceMember>): string {
 
 async function run_unused_members(root: string): Promise<number> {
 	if (doctor_consumer.is_kit_consumer(root)) {
-		console.info(project_checks.skip_notice(CHECK, CONSUMER_SKIP_REASON))
+		console.info(CONSUMER_NOTICE)
 
 		return 0
 	}
@@ -48,6 +52,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run_unused_members(project_checks.project_root(process.cwd()))
 }
 
-const unused_members_cli = { run_unused_members }
+const unused_members_cli = { run_unused_members, CONSUMER_NOTICE }
 
 export { unused_members_cli }
