@@ -1725,7 +1725,7 @@ pid=$(pnpm josh lane:launch 1749) || exit 1                                     
 pid=$(pnpm josh lane:launch 1749 --stash "backlogrun: josh latest before lanes") || exit 1   # the first lane only
 ```
 
-The child's pid is the one thing on stdout; a refusal is an empty capture beside a non-zero exit, as `lane:dispatch`'s is. A refused `lane:open` (`full` / `already-open` / failed install), a refused pop, or a failed re-install each stop the launch before the child is dispatched.
+The child's pid is the one thing on stdout; a refusal is an empty capture beside a non-zero exit, as `lane:dispatch`'s is. A lane a park kept (dispatched before) is dispatched into, not reopened; a refused `lane:open`, pop or re-install stops it before dispatch.
 
 ### `josh cost`
 

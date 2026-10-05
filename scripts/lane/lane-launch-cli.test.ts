@@ -7,6 +7,12 @@ const josh_run_mock = vi.hoisted(() => vi.fn())
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('execa', () => ({ execa: vi.fn() }))
 
+const find_open_lane_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/lane/lane-registry', () => ({
+	lane_registry: { find_open_lane: find_open_lane_mock },
+}))
+
 const { lane_launch_cli } = await import('./lane-launch-cli')
 
 const mocked_execa = vi.mocked(execa)
@@ -64,6 +70,8 @@ function called(subcommand: string): boolean {
 beforeEach(() => {
 	josh_run_mock.mockReset()
 	mocked_execa.mockReset()
+	find_open_lane_mock.mockReset()
+	find_open_lane_mock.mockResolvedValue(undefined)
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
@@ -158,6 +166,49 @@ describe('lane_launch_cli.launch_lane — the chain an in-process caller shares'
 		expect(await lane_launch_cli.launch_lane({ issue: ISSUE, stash: undefined })).toStrictEqual({
 			kind: 'failed',
 		})
+	})
+})
+
+const KEPT_DIR = '/lanes/kept-17'
+const KEPT = { directory: KEPT_DIR, is_stranded: false, output: '/logs/josh-lane-dispatch-17.log' }
+
+// joshuafolkken/kit#3228: a child parked before its commit keeps its lane, and `lane:open` refuses it.
+describe('lane_launch_cli.launch_lane — a lane a park kept open', () => {
+	it('dispatches into the kept lane without calling lane:open', async () => {
+		find_open_lane_mock.mockResolvedValue(KEPT)
+		stub({ open: { code: FAILED, out: '' }, dispatch: { code: OK, out: PID } })
+
+		expect(await lane_launch_cli.launch_lane({ issue: ISSUE, stash: undefined })).toStrictEqual({
+			kind: 'launched',
+			pid: PID,
+		})
+		expect(called(OPEN)).toBe(false)
+		expect(find_open_lane_mock).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('pops the stash into the kept lane directory when --stash is given', async () => {
+		find_open_lane_mock.mockResolvedValue(KEPT)
+		stub({ open: { code: FAILED, out: '' }, dispatch: { code: OK, out: PID } })
+		stub_install(OK)
+
+		await lane_launch_cli.launch_lane({ issue: ISSUE, stash: STASH[1] })
+
+		expect(josh_run_mock).toHaveBeenCalledWith([POP, STASH[1], '--dir', KEPT_DIR], true)
+	})
+
+	// A failed install leaves a live lane no child was ever dispatched into, so no output is recorded.
+	it.each([
+		['a lane whose install failed', { directory: KEPT_DIR, is_stranded: false, output: undefined }],
+		['a stranded lane', { directory: KEPT_DIR, is_stranded: true, output: undefined }],
+	])('sends %s through lane:open, whose refusal leaves it unopened', async (_name, lane) => {
+		find_open_lane_mock.mockResolvedValue(lane)
+		stub({ open: { code: FAILED, out: '' } })
+
+		expect(await lane_launch_cli.launch_lane({ issue: ISSUE, stash: undefined })).toStrictEqual({
+			kind: 'unopened',
+		})
+		expect(called(OPEN)).toBe(true)
+		expect(called(DISPATCH)).toBe(false)
 	})
 })
 
