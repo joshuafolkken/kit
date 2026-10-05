@@ -189,7 +189,7 @@ the maximum, the whole-run bound), or the consecutive-failure guard tripped — 
 it clears the record; the reason is the stop verdict's, in the session language. A clean completion
 takes the bare `--end` and stays silent, having its own report; a parked _child_ is pushed by the child
 that parked it (`backlogrun-park.md`). Because `--end` removes the record, a re-run's second `--end`
-finds nothing and never re-sends that confirmation — `backlogrun-progress.md` →
+finds nothing and never re-sends that confirmation — `progress-watcher.md` →
 "Progress while the run is quiet" is the single source of the pull-versus-push split.
 
 **The record widens nothing.** It carries a budget and nothing else: `auto-ok` is still applied only
@@ -531,7 +531,7 @@ All of these are this file's, and are reached here in the same order and for the
 | `git switch main && git pull`, then `pnpm josh latest:scope`, then `pnpm josh lane:prune` — in the primary checkout, before the first lane opens | `backlogrun-lanes.md` → "Once per repository, before the first lane opens" |
 | `josh latest` on `required` only, asked once at the first child and never in a lane | `backlogrun-child.md` → "`josh latest` runs once per session, not once per child" |
 | `pnpm josh run:hold <N>`'s preflight check, before each child that is not in a lane | `backlogrun-child.md` → "Preflight" |
-| `pnpm josh run:progress --wait` in the background, `--mark` at every real report | `backlogrun-progress.md` → "Progress while the run is quiet" |
+| `pnpm josh run:progress --wait` in the background, `--mark` at every real report | `progress-watcher.md` → "Progress while the run is quiet" |
 | `pnpm josh release:scope` once, after the last issue has merged and the last lane is closed | `followup-reference.md` → "When `pnpm josh release` runs" |
 
 **Two more run once per session and are this file's own**:

@@ -53,6 +53,8 @@ const UNUSED_SKILL_SECTIONS: ReadonlyArray<string> = [
 // that opens it. It was the child's single largest read — ~16,000 tokens read whole — charged for a
 // document it never reaches, so dropping it is a correction of an over-count, not a loss of any rule the
 // child needs. The parent still reads it in full.
+// **`progress-watcher.md` is the parent's too** (joshuafolkken/kit#3172): a dispatched child is refused
+// a watcher by its `JOSH_LANE_CHILD` mark, so it never opens the watcher's document.
 const SKIPPED_POINT_OF_USE: ReadonlySet<string> = new Set([
 	'backlogrun-child.md',
 	'backlogrun-lanes.md',
@@ -61,13 +63,16 @@ const SKIPPED_POINT_OF_USE: ReadonlySet<string> = new Set([
 	'delegation.md',
 	'issue-scout.md',
 	'latest-gate.md',
+	'progress-watcher.md',
 	'retrospective.md',
 ])
 
 // **A child that parks reads `backlogrun-park.md`** (`SKILL.md` §1, "A lane child that parks"), a
 // document a standalone `fullrun`'s path never names — so the child's reach adds it to its base
-// entry's (joshuafolkken/kit#3078).
-const REACHED_POINT_OF_USE: ReadonlySet<string> = new Set(['backlogrun-park.md'])
+// entry's (joshuafolkken/kit#3078). **`pre-gate-cut.md` is the child's alone** (joshuafolkken/kit#3172):
+// only a lane child resumes or takes the pre-gate cut, so `fullrun.md` stopped naming it and the
+// child's reach carries it instead.
+const REACHED_POINT_OF_USE: ReadonlySet<string> = new Set(['backlogrun-park.md', 'pre-gate-cut.md'])
 
 function costed(root: string): ReadSetCost {
 	return read_set_trim.costed(root, {

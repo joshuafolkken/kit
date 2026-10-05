@@ -21,12 +21,12 @@ that holds its detail.
    a stop that leaves the tree clean removes it in the same turn as `pnpm josh run:release` (`gh api -X
    DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`).
 3. **Ask the session boundary** — `pnpm josh cost --cut` (folded into `run:entry`); `over` stops — `run:entry` notifies and releases
-   (`halfrun new`: by hand). **Skip it when dispatched by a batch.** `backlogrun-progress.md` → "The hand-off" is
-   the single source of the check and the shared 135,000 threshold.
+   (`halfrun new`: by hand). **Skip it when dispatched by a batch.** The verdict and the shared 135,000
+   threshold are the command's own.
 4. **Start the progress watcher once the hold is claimed** — `pnpm josh run:progress --wait` in the
    background, started once — it reports to the event stream itself and nothing is relayed — and
    `--mark` in the same turn as every real report; the stop before commit ends the watcher
-   itself (`backlogrun-progress.md` → "Progress while the run is quiet").
+   itself (`progress-watcher.md` → "Progress while the run is quiet").
 5. **The mechanical reads** — `run:entry` folds `run:prep` (body/comments — `SKILL.md` → §2g;
    `human_review`; `latest:scope`); a `new` entry runs `pnpm josh run:prep <N>` once filed.
 

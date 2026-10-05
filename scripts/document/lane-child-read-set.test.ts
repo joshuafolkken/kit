@@ -6,13 +6,17 @@ import { lane_child_read_set } from './lane-child-read-set'
 // joshuafolkken/kit#2021. The dispatched lane child reads a trimmed `fullrun` set: the point-of-use
 // documents the parent owns are dropped, and the entry-only `SKILL.md` sections are read at the
 // section level. What is pinned here is that the trim is real and derived — the child set is built
-// off `fullrun`'s own figures, so it cannot drift away from them, and the reduction clears the 35KB
-// the issue's acceptance criterion names.
+// off `fullrun`'s own figures, so it cannot drift away from them. The saving is measured against a
+// `fullrun` that also read what the child reaches beyond it (joshuafolkken/kit#3172): `pre-gate-cut.md`
+// left `fullrun`'s path for the child's alone, and `fullrun` stopped being charged for the whole of
+// `backlogrun-progress.md`, so the old 35KB margin over a bare `fullrun` measured that over-count, not
+// the trim. 22KB is what the trim itself saves: the SKILL.md sections, `latest-gate.md`, the two
+// decision documents and `progress-watcher.md`.
 
 const ROOT = process.cwd()
 const FULLRUN = 'fullrun'
 const BYTES_PER_KB = 1024
-const REQUIRED_SAVING_BYTES = 35 * BYTES_PER_KB
+const REQUIRED_SAVING_BYTES = 22 * BYTES_PER_KB
 const MAX_INITIAL_TOKENS = 24_000
 // Raised from 30k when joshuafolkken/kit#2119 added two delivered-rule rows (the scout and the
 // per-run filing cap) to `rule-delivery.md`, which the child reads whole. Raised again to 40k in
@@ -76,10 +80,13 @@ describe('lane_child_read_set.costed — the SKILL.md section trim', () => {
 })
 
 describe('lane_child_read_set.costed — the whole reduction', () => {
-	it('reads at least 35KB less than a fullrun, total for total', () => {
-		const saved =
-			total_read_bytes(entry_read_set.costed(ROOT, FULLRUN)) -
-			total_read_bytes(lane_child_read_set.costed(ROOT))
+	it('reads at least 22KB less than a fullrun that also read what the child reaches', () => {
+		const child = lane_child_read_set.costed(ROOT)
+		const reached = child.point_of_use
+			.filter((one) => lane_child_read_set.REACHED_POINT_OF_USE.has(one.file))
+			.map((one) => one.cost)
+		const base = total_read_bytes(entry_read_set.costed(ROOT, FULLRUN))
+		const saved = base + entry_read_set.total(reached).bytes - total_read_bytes(child)
 
 		expect(saved).toBeGreaterThanOrEqual(REQUIRED_SAVING_BYTES)
 	})
