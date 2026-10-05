@@ -1,6 +1,7 @@
 import { closeSync, fstatSync, openSync, readSync } from 'node:fs'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
+import { time_batch_guard, type GuardedCall } from './time-batch-guard'
 import { time_density } from './time-density'
 import { time_hook_transcript } from './time-hook-transcript'
 
@@ -61,6 +62,7 @@ const payload_schema = z.object({
 	agent_id: z.string().nullish(),
 })
 const notice_schema = z.object({ notified_at_ms: z.number() })
+const call_schema = z.object({ tool_name: z.string().min(1), tool_input: z.unknown() })
 
 function parse_transcript_path(raw_payload: string): string | undefined {
 	const parsed = payload_schema.safeParse(JSON.parse(raw_payload))
@@ -68,6 +70,17 @@ function parse_transcript_path(raw_payload: string): string | undefined {
 	if (!parsed.success || parsed.data.transcript_path === undefined) return undefined
 
 	return time_hook_transcript.transcript_of(parsed.data.transcript_path, parsed.data.agent_id)
+}
+
+// The call that has just run, as the payload names it (joshuafolkken/kit#3157) — what the line checks
+// against the turns behind it, so a call that needed their result is never offered as one that could
+// have shared their turn. A payload without a tool name answers `undefined`, judged on those turns alone.
+function parse_call(raw_payload: string): GuardedCall | undefined {
+	const parsed = call_schema.safeParse(JSON.parse(raw_payload))
+
+	if (!parsed.success) return undefined
+
+	return { name: parsed.data.tool_name, input: parsed.data.tool_input }
 }
 
 // The last `max_bytes` of a file, as text. The leading line is usually cut mid-way, which every
@@ -135,14 +148,19 @@ function notice_for(raw_payload: string, now_ms: number): string | undefined {
 
 	if (transcript_path === undefined) return undefined
 
-	const reading = time_density.read_window(read_tail(transcript_path))
+	const tail = read_tail(transcript_path)
+	const reading = time_density.read_window(tail)
 	const target = notice_path(transcript_path)
 
 	if (!time_density.is_due(reading, now_ms - last_notice_ms(target))) return undefined
 
+	const candidates = time_batch_guard.pairing_candidates(tail, parse_call(raw_payload))
+
+	if (candidates === '') return undefined
+
 	arm_throttle(target, now_ms)
 
-	return time_density.format_notice(reading)
+	return time_density.format_notice(reading, candidates)
 }
 
 // The whole call in one guard: every path above may throw on a file that moved or a payload that is

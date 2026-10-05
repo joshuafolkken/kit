@@ -120,8 +120,9 @@ function is_due(reading: DensityReading, since_last_ms: number): boolean {
 // One line, and it says three things: what the density is, what it is being measured against, and
 // what to do differently. The instruction is last because it is the only part worth acting on, and it
 // names the resident rule rather than restating it — the rule is already in the run's context, and a
-// second wording of it would be a clone that can drift.
-function format_notice(reading: DensityReading): string {
+// second wording of it would be a clone that can drift. `candidates` is the concrete calls that could
+// have shared a turn (joshuafolkken/kit#3157), appended last so the line ends on what to do next.
+function format_notice(reading: DensityReading, candidates = ''): string {
 	const density = time_round_trips.format_density(reading.density)
 	const floor = time_round_trips.format_density(time_round_trips.CALLS_PER_ROUND_TRIP_FLOOR)
 
@@ -130,7 +131,7 @@ function format_notice(reading: DensityReading): string {
 		`under the ${floor} floor, and this turn issued one call. ` +
 		`Independent reads, greps, gh queries and edits go out together; the criterion is whether this ` +
 		`call's input needs another call's result, not what kind of call it is — ` +
-		`prompts/collaboration-workflow/turn-batching.md.`
+		`prompts/collaboration-workflow/turn-batching.md.${candidates}`
 	)
 }
 

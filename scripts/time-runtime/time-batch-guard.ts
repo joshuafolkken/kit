@@ -114,6 +114,10 @@ interface GuardedCall {
 	input: unknown
 }
 
+// What naming a call reads off it — a closed turn's span or the call in hand alike, so the live density
+// line can name the call that has just run beside the turns behind it (joshuafolkken/kit#3157).
+type NamedCall = Pick<Span, 'is_bundleable' | 'is_writing' | 'label' | 'targets'>
+
 // **A write is refusable, and the exclusion that said otherwise is gone** (joshuafolkken/kit#1762).
 // Read over 19 recorded runs, 261 of 1,737 round trips (15.0%) were recoverable by batching and **184
 // of them (70.5%) were writes** — 158 `Edit` alone. The refusal's own text has always said the rule
@@ -410,7 +414,7 @@ function should_notify(text: string, call: GuardedCall, notified_at_ms: number):
 // touched where the label does not already carry it (joshuafolkken/kit#2276). `label` is the tool name
 // for a non-shell call and the command for a shell one, so the target is appended only where it adds
 // something the label has not already said.
-function describe_span(span: Span): string {
+function describe_span(span: NamedCall): string {
 	const target = span.targets[0] ?? ''
 	if (target === '' || span.label.includes(target)) return span.label
 
@@ -428,7 +432,7 @@ const FOLD_MINIMUM = 2
 // `read:files` cannot read — it would emit `Cannot read scripts/` and exit 1, so the paste-ready
 // command must never carry it). The directory test is `has_extension` reused from the target scanner,
 // not a second copy. Deduped, so a run that read one file twice folds it once and names it once.
-function read_targets(sequence: ReadonlyArray<Span>): ReadonlyArray<string> {
+function read_targets(sequence: ReadonlyArray<NamedCall>): ReadonlyArray<string> {
 	const paths = sequence
 		.filter((span) => span.is_bundleable && !span.is_writing)
 		.map((span) => span.targets[0] ?? '')
@@ -445,7 +449,7 @@ function read_targets(sequence: ReadonlyArray<Span>): ReadonlyArray<string> {
 // kit#2202); so the guard now offers *that* command, the one the model can emit in a single turn,
 // rather than another way to say "batch". Below two reads there is nothing to fold, so it is empty and
 // the guidance stands alone.
-function read_fold_directive(sequence: ReadonlyArray<Span>): string {
+function read_fold_directive(sequence: ReadonlyArray<NamedCall>): string {
 	const paths = read_targets(sequence)
 	if (paths.length < FOLD_MINIMUM) return ''
 
@@ -459,7 +463,7 @@ function read_fold_directive(sequence: ReadonlyArray<Span>): string {
 // can emit in a single turn where reissuing the edits as parallel `tool_use` blocks is the shape it
 // resists. Only `Edit` counts: a whole-file `Write` creates content this command cannot content-address,
 // and it earns its own notice already. Below two edits there is nothing to fold.
-function write_targets(sequence: ReadonlyArray<Span>): ReadonlyArray<string> {
+function write_targets(sequence: ReadonlyArray<NamedCall>): ReadonlyArray<string> {
 	const paths = sequence
 		.filter((span) => span.label === EDIT_TOOL)
 		.map((span) => span.targets[0] ?? '')
@@ -468,11 +472,22 @@ function write_targets(sequence: ReadonlyArray<Span>): ReadonlyArray<string> {
 	return [...new Set(paths)]
 }
 
-function write_fold_directive(sequence: ReadonlyArray<Span>): string {
+function write_fold_directive(sequence: ReadonlyArray<NamedCall>): string {
 	const paths = write_targets(sequence)
 	if (paths.length < FOLD_MINIMUM) return ''
 
 	return ` Fold them into one \`pnpm josh edit:files\` call with a plan over: ${paths.join(' ')}.`
+}
+
+// The calls named, and their folds offered — the text both the refusable-call notice and the live
+// density line carry, written once so the two cannot word the same calls differently.
+function name_candidates(calls: ReadonlyArray<NamedCall>): string {
+	if (calls.length === NONE) return ''
+
+	const named = calls.map((call) => describe_span(call)).join(', ')
+	const folds = `${read_fold_directive(calls)}${write_fold_directive(calls)}`
+
+	return ` Just issued one per turn, so at least these could have shared a turn: ${named}.${folds}`
 }
 
 // **The concrete half of the notice** (joshuafolkken/kit#2276): the most recent single-call turns,
@@ -482,16 +497,36 @@ function write_fold_directive(sequence: ReadonlyArray<Span>): string {
 // which is rare enough that the second parse costs less than carrying the spans through the hook's
 // notice contract. An empty sequence names nothing and the notice falls back to its guidance alone.
 function recent_candidates(tail: string): string {
-	const recent = time_bundles
-		.open_sequence(time_spans.parse_timeline(tail).spans)
-		.slice(-NAMED_CANDIDATE_COUNT)
+	return name_candidates(
+		time_bundles.open_sequence(time_spans.parse_timeline(tail).spans).slice(-NAMED_CANDIDATE_COUNT),
+	)
+}
 
-	if (recent.length === NONE) return ''
+// **The candidates for a call that has already run** (joshuafolkken/kit#3157): what the `PostToolUse`
+// density line names. A lane child never sees the notice above — kit#2405 turned it `off` there — so
+// the density line is the one batching signal a lane receives, and until this it named nothing. The
+// call in hand is not in the open sequence (its turn has not closed), so it is named after the turns
+// behind it — and it is checked against them with the same shared-target test the refusal uses, so a
+// call that read what the turn before it wrote is never offered as one that could have gone beside
+// it. A call that is not bundleable names no targets, so the shared-target test cannot see what it
+// needs — `pnpm josh gate` after a run of edits reads every one of them — and it is never offered
+// either, exactly as `is_guarded_call` never refuses one. An empty answer means there is no concrete
+// pair to name, and the caller says nothing at all. A call the payload does not name is judged on the
+// closed turns alone.
+function pairing_candidates(tail: string, call: GuardedCall | undefined): string {
+	const sequence = time_bundles.open_sequence(time_spans.parse_timeline(tail).spans)
 
-	const named = recent.map((span) => describe_span(span)).join(', ')
-	const folds = `${read_fold_directive(recent)}${write_fold_directive(recent)}`
+	if (call === undefined || sequence.length === NONE) {
+		return name_candidates(sequence.slice(-NAMED_CANDIDATE_COUNT))
+	}
 
-	return ` Just issued one per turn, so at least these could have shared a turn: ${named}.${folds}`
+	const facts = time_bundle_call.call_facts(call.name, call.input)
+
+	if (!facts.is_bundleable || depends_on_sequence(sequence, facts)) return ''
+
+	const current = time_spans.to_tool_call(call.name, call.input, time_spans.NO_MESSAGE_ID)
+
+	return name_candidates([...sequence.slice(ONE_TURN - NAMED_CANDIDATE_COUNT), current])
 }
 
 // **This guard's own name for its once-per-run record.** It lives beside the rule rather than in
@@ -519,6 +554,7 @@ const time_batch_guard = {
 	is_guarded_call,
 	is_notice_call,
 	is_read_only_call,
+	pairing_candidates,
 	recent_candidates,
 	should_block,
 	should_notify,
