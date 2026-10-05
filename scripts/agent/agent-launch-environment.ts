@@ -2,6 +2,7 @@ import { existsSync, lstatSync, mkdirSync, readlinkSync, symlinkSync, unlinkSync
 import path from 'node:path'
 import { gh_cli_token } from '#scripts/gh/gh-cli-token'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
+import { agent_headless } from './agent-headless'
 import { agent_role_profile, type AgentProfile } from './agent-role-profile'
 import { codex_home_source } from './codex-home-source'
 
@@ -57,9 +58,12 @@ function build(
 	profile: AgentProfile | undefined,
 	environment: LaunchEnvironment = {},
 ): LaunchEnvironment {
-	if (profile?.provider !== OPENAI_PROVIDER) return environment
+	if (profile === undefined) return environment
 
-	const base = { ...openai_environment(), ...environment }
+	const marked = { ...agent_headless.environment(), ...environment }
+	if (profile.provider !== OPENAI_PROVIDER) return marked
+
+	const base = { ...openai_environment(), ...marked }
 
 	return profile.role === agent_role_profile.REVIEWER
 		? { ...base, CODEX_HOME: reviewer_home(cwd, environment) }

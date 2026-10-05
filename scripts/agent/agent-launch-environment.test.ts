@@ -3,6 +3,7 @@ import path from 'node:path'
 import { gh_cli_token } from '#scripts/gh/gh-cli-token'
 import { PLATFORM_TEMP_ROOT, platform_temporary } from '#scripts/josh/platform-temporary'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { agent_headless } from './agent-headless'
 import { agent_launch_environment } from './agent-launch-environment'
 import { agent_role_profile } from './agent-role-profile'
 
@@ -112,7 +113,7 @@ describe('OpenAI reviewer home switch', () => {
 })
 
 describe('Anthropic detached launch environment', () => {
-	it('leaves explicit child environment unchanged and does not read gh auth', () => {
+	it('keeps explicit child environment and does not read gh auth', () => {
 		const input = { JOSH_LANE_CHILD_ISSUE: MARKER }
 
 		const environment = agent_launch_environment.build(
@@ -121,8 +122,26 @@ describe('Anthropic detached launch environment', () => {
 			input,
 		)
 
-		expect(environment).toBe(input)
+		expect(environment).toStrictEqual({ ...agent_headless.environment(), ...input })
 		expect(get).not.toHaveBeenCalled()
 		expect(existsSync(CWD)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#3245: the stop rules on reply wording stand down only for agents kit launched.
+describe('headless agent mark', () => {
+	it.each([
+		['Anthropic', agent_role_profile.DEFAULT_PROFILES.reviewer],
+		['OpenAI', agent_role_profile.OPENAI_PROFILES.worker],
+	])('marks every %s agent launch as headless', (_provider, profile) => {
+		get.mockReturnValue(undefined)
+
+		expect(agent_headless.is_headless(agent_launch_environment.build(CWD, profile))).toBe(true)
+	})
+
+	it('leaves a launch with no agent profile unmarked', () => {
+		const input = { JOSH_LANE_CHILD_ISSUE: MARKER }
+
+		expect(agent_launch_environment.build(CWD, undefined, input)).toBe(input)
 	})
 })

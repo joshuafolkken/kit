@@ -11,6 +11,7 @@ const INVOCATION = 'backlogrun #2509 --max 5 --only'
 const OUTPUT = 'merge over #2509\nresume: --owner 1 --exclude 2509'
 const LONG_STDERR_REPEAT = 1000
 const EPIC_OUTPUT = 'epic #1\nresume: --owner 1'
+const WINDOW_OUTPUT = 'window\nresume: --owner 1'
 const CUT_COMMAND = 'pnpm josh run:carry --cut --owner "$PPID"'
 const CLAIM_COMMAND = `pnpm josh run:carry --resume "${INVOCATION}" --owner "$PPID"`
 const DEFAULT_NEXT = `first claim the carry record with ${CLAIM_COMMAND}, then act on the result by backlogrun-steps.md → "The loop", then hand the loop back with ${CUT_COMMAND}`
@@ -143,6 +144,61 @@ test.each([
 
 test('builds the claim command the standing refusal also prints', () => {
 	expect(run_carry.claim_command(INVOCATION)).toBe(CLAIM_COMMAND)
+})
+
+async function no_pause(): Promise<void> {
+	await Promise.resolve()
+}
+
+test.each(['window', 'merge busy #2509', 'merge retry #2509'])(
+	're-drives a %j verdict instead of waking a session, then hands on the judgment',
+	async (verdict) => {
+		const subprocess = vi
+			.spyOn(josh_command, 'josh_run')
+			.mockResolvedValueOnce({ code: 0, out: `${verdict}\nresume: --owner 1` })
+			.mockResolvedValueOnce({ code: 0, out: OUTPUT })
+
+		const result = await run_wake_driver.drive(scratch.target, no_pause)
+
+		expect(subprocess).toHaveBeenCalledTimes(2)
+		expect(result).toMatchObject({ kind: 'judgment' })
+		if (result.kind !== 'judgment') return
+		expect(result.material).toMatch(/^Driver result: merge over #2509\n/u)
+	},
+)
+
+test('wakes a session for the mechanical verdict once the re-drive limit is reached', async () => {
+	const subprocess = vi
+		.spyOn(josh_command, 'josh_run')
+		.mockResolvedValue({ code: 0, out: WINDOW_OUTPUT })
+
+	const result = await run_wake_driver.drive(scratch.target, no_pause)
+
+	expect(subprocess).toHaveBeenCalledTimes(run_wake_driver.RERUN_LIMIT + 1)
+	expect(result).toMatchObject({ kind: 'judgment' })
+})
+
+test('does not re-drive once the carry record ends during the pause', async () => {
+	const subprocess = vi
+		.spyOn(josh_command, 'josh_run')
+		.mockResolvedValue({ code: 0, out: WINDOW_OUTPUT })
+
+	const result = await run_wake_driver.drive(scratch.target, async () => {
+		await Promise.resolve()
+		run_carry.end_carry(scratch.target)
+	})
+
+	expect(subprocess).toHaveBeenCalledOnce()
+	expect(result).toStrictEqual({ kind: 'released' })
+})
+
+test('does not re-drive a failed driver run', async () => {
+	const subprocess = vi
+		.spyOn(josh_command, 'josh_run')
+		.mockResolvedValue({ code: 1, out: 'window', err: '' })
+
+	expect(await run_wake_driver.drive(scratch.target, no_pause)).toMatchObject({ kind: 'failed' })
+	expect(subprocess).toHaveBeenCalledOnce()
 })
 
 test('does not take a live owner over on supervisor restart', async () => {

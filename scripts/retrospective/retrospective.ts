@@ -3,7 +3,8 @@ import type { RunCostReport } from '#scripts/cost/cost-run-report'
 import type { RoleTotals } from '#scripts/cost/cost-run-roles'
 import type { CategoryCount } from '#scripts/review/review-finding-ledger'
 import { run_event_scope, type EventScope } from '#scripts/run/run-event-scope'
-import type { RunEvent } from '#scripts/run/run-event-stream'
+import { run_event_stream, type RunEvent } from '#scripts/run/run-event-stream'
+import { run_ship_stop_text } from '#scripts/run/run-ship-stop-text'
 
 // The composition half of `josh retrospective` — the end-of-run retrospective's aggregation
 // (joshuafolkken/kit#2328). A run that drains its backlog has spent time and money that nobody reads;
@@ -105,6 +106,34 @@ function friction_lines(events: ReadonlyArray<RunEvent>, scope: EventScope): Arr
 	return [`Run events: ${counts.join(', ')}`]
 }
 
+function stop_reasons(events: ReadonlyArray<RunEvent>): Array<string> {
+	return events
+		.filter((event) => event.kind === run_event_stream.EVENT_KIND.SHIP_STOP)
+		.map((event) => run_ship_stop_text.reason_of(event.text))
+		.filter((reason) => reason !== undefined)
+}
+
+// Each reason's count, in the order the run first stopped there.
+function tally(reasons: ReadonlyArray<string>): Map<string, number> {
+	const counts = new Map<string, number>()
+
+	for (const reason of reasons) counts.set(reason, (counts.get(reason) ?? 0) + 1)
+
+	return counts
+}
+
+// Where this invocation's `josh ship` supervisors stopped, by stage (joshuafolkken/kit#3245) — the count
+// that otherwise took a hand tally of resume prompts. Scoped exactly as the friction count is.
+function ship_stop_lines(events: ReadonlyArray<RunEvent>, scope: EventScope): Array<string> {
+	const counts = tally(stop_reasons(run_event_scope.scoped_events(events, scope) ?? []))
+
+	if (counts.size === 0) return ['Ship stops: none']
+
+	const body = [...counts].map(([reason, count]) => `${reason} ${String(count)}`)
+
+	return [`Ship stops: ${body.join(', ')}`]
+}
+
 // The four sections in a fixed order, separated by blank lines, closed by the pointer that hands the
 // judgement — which improvements are worth filing — to `retrospective.md`.
 function compose(inputs: RetrospectiveInputs): string {
@@ -116,6 +145,7 @@ function compose(inputs: RetrospectiveInputs): string {
 		...observation_lines(inputs.observations),
 		'',
 		...friction_lines(inputs.events, inputs.scope),
+		...ship_stop_lines(inputs.events, inputs.scope),
 		'',
 		CLOSING,
 	].join('\n')

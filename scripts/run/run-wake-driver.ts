@@ -114,7 +114,12 @@ function failure_note(result: JoshResult): string {
 	return [cause_of(result.out), details_tail(result.err ?? '')].filter(Boolean).join('\n')
 }
 
-function read_result(result: JoshResult, target: string, invocation: string): DriveResult {
+function read_result(
+	result: JoshResult | undefined,
+	target: string,
+	invocation: string,
+): DriveResult {
+	if (result === undefined) return { kind: 'released' }
 	if (result.code !== SUCCESS) return { kind: 'failed', note: failure_note(result) }
 
 	return driver_result(result.out, run_carry.read_carry(target), invocation, result.err)
@@ -128,7 +133,51 @@ function claim_record(target: string, invocation: string): boolean {
 	return run_carry.adopt_carry(target, current.carry, run_carry.owner_of(process.pid)) !== undefined
 }
 
-async function drive(target: string): Promise<DriveResult> {
+// **A verdict with nothing to judge is re-driven here, never handed to a session** (joshuafolkken/kit#3245).
+// A woken session met with `window`, `merge busy` or `merge retry` only cut and handed the loop back, and
+// the supervisor then ran the very same driver again — a model round trip, at a cache write each, that
+// decided nothing. The record is already this process's, so the rerun needs no fresh claim; the limit
+// keeps a driver that never settles from holding the supervisor past its own checks.
+const RERUN_VERDICTS: ReadonlyArray<string> = ['window', 'merge busy', 'merge retry']
+const RERUN_LIMIT = 10
+const RERUN_PAUSE_MS = 60_000
+
+type Pause = (ms: number) => Promise<void>
+
+async function pause(ms: number): Promise<void> {
+	await new Promise((resolve) => {
+		setTimeout(resolve, ms)
+	})
+}
+
+function is_mechanical(result: JoshResult): boolean {
+	const verdict = result.out.split('\n', 1)[FIRST_LINE] ?? ''
+
+	return (
+		result.code === SUCCESS &&
+		RERUN_VERDICTS.some((entry) => verdict === entry || verdict.startsWith(`${entry} `))
+	)
+}
+
+// A record that expired or was removed during the pause answers `undefined`: its stale verdict must not
+// reach a session, so the supervisor's own next pass re-reads the record and ends the run as `expired`
+// or `stopped`; a rerun would only fail on it and report the run as `failed`.
+async function run_driver(
+	target: string,
+	args: ReadonlyArray<string>,
+	wait: Pause,
+	remaining: number,
+): Promise<JoshResult | undefined> {
+	const result = await josh_command.josh_run(args, true)
+	if (remaining === 0 || !is_mechanical(result)) return result
+
+	await wait(RERUN_PAUSE_MS)
+	if (run_carry.read_carry(target).kind !== 'carried') return undefined
+
+	return await run_driver(target, args, wait, remaining - 1)
+}
+
+async function drive(target: string, wait: Pause = pause): Promise<DriveResult> {
 	const read = run_carry.read_carry(target)
 	if (read.kind !== 'carried') return { kind: 'failed', note: 'The carry record changed.' }
 
@@ -139,9 +188,11 @@ async function drive(target: string): Promise<DriveResult> {
 		return { kind: 'failed', note: 'The driver could not claim the carry record.' }
 	}
 
-	const result = await josh_command.josh_run(args, true)
-
-	return read_result(result, target, read.carry.invocation)
+	return read_result(
+		await run_driver(target, args, wait, RERUN_LIMIT),
+		target,
+		read.carry.invocation,
+	)
 }
 
-export const run_wake_driver = { drive, driver_args, driver_result }
+export const run_wake_driver = { RERUN_LIMIT, drive, driver_args, driver_result }

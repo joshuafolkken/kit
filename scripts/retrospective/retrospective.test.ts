@@ -4,6 +4,7 @@ import type { RoleTotals } from '#scripts/cost/cost-run-roles'
 import type { CategoryCount } from '#scripts/review/review-finding-ledger'
 import { run_event_scope, type EventScope } from '#scripts/run/run-event-scope'
 import type { RunEvent } from '#scripts/run/run-event-stream'
+import { run_ship_stop_text } from '#scripts/run/run-ship-stop-text'
 import { describe, expect, it } from 'vitest'
 import { retrospective, type RetrospectiveInputs } from './retrospective'
 
@@ -166,5 +167,28 @@ describe('retrospective.compose — the invocation scope of the friction count',
 		)
 
 		expect(digest).toContain('Run events: park 0, outage 0, cut 0, review-round 0')
+	})
+})
+
+// joshuafolkken/kit#3245: where the run's ship supervisors stopped, by stage, read back from the very
+// text the supervisor writes.
+function ship_stop(reason: string, at: string = RUN_START): RunEvent {
+	return { pos: 1, at, kind: 'ship-stop', text: run_ship_stop_text.format('3245', reason) }
+}
+
+describe('retrospective.compose — ship stops by stage', () => {
+	it('counts this invocation’s ship stops per stage in the order they first occurred', () => {
+		const events = [
+			ship_stop('gate'),
+			ship_stop('review'),
+			ship_stop('gate'),
+			ship_stop('followup', BEFORE_RUN),
+		]
+
+		expect(retrospective.compose(inputs({ events }))).toContain('Ship stops: gate 2, review 1')
+	})
+
+	it('reports no ship stops when the run had none', () => {
+		expect(retrospective.compose(inputs({}))).toContain('Ship stops: none')
 	})
 })

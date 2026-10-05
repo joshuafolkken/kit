@@ -256,6 +256,10 @@ lane needs when its child has to be finished by hand.
 **Restart the progress watcher by name** — `pnpm josh run:progress --wait --output <handed-over paths>`
 in the background, in the same turn as that first `lane:list`. The wired `run:watcher:guard` stops a resume that skips this (joshuafolkken/kit#2353).
 
+**A session woken by the driver's hand-off does neither**: with `Driver
+result:` in its prompt, the `run:wake` driver watches the lanes, so it acts on its branch and cuts as
+its `Next:` line says. The watcher guard and the headless stop rule stand aside for it.
+
 ### A carried-over merge does not stand in front of the next lane
 
 **A carried-over child finishes in its own detached unit, and the resumed parent does not stand in front

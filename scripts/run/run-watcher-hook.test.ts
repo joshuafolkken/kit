@@ -16,7 +16,7 @@ vi.mock('#scripts/lane/lane-registry', () => ({
 }))
 
 vi.mock('./run-headless', () => ({
-	run_headless: { is_backlog_parent: vi.fn() },
+	run_headless: { is_backlog_parent: vi.fn(), is_headless: vi.fn(() => false) },
 }))
 
 vi.mock('./run-progress-read', () => ({

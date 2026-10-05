@@ -204,6 +204,22 @@ describe('run_event_stream.append — the bound', () => {
 
 		expect(run_event_stream.read_last(target)?.pos).toBe(overflow)
 	})
+
+	it('drops the oldest trace events before a position such as a cut', () => {
+		const target = fresh_target()
+
+		run_event_stream.append(target, KIND.CUT, '#3245 cut', AT)
+
+		for (let index = 0; index < run_event_stream.EVENT_CAP; index += 1) {
+			run_event_stream.append(target, KIND.SHIP_STAGE, `stage ${String(index)}`, AT)
+		}
+
+		const events = run_event_stream.read_events(target)
+
+		expect(events).toHaveLength(run_event_stream.EVENT_CAP)
+		expect(events[0]?.kind).toBe(KIND.CUT)
+		expect(events[1]?.text).toBe('stage 1')
+	})
 })
 
 describe('run_event_stream.read_events — a malformed line', () => {

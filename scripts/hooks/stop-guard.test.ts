@@ -1,3 +1,4 @@
+import { agent_headless } from '#scripts/agent/agent-headless'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
@@ -140,6 +141,12 @@ async function decide_in(lang: string, message: string): Promise<Array<string>> 
 describe('write_stop_decision — the session language is wired', () => {
 	beforeEach(() => {
 		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
+		// The suite may itself run inside a kit-launched agent, whose mark would stand the rule aside.
+		vi.stubEnv(agent_headless.KEY, undefined)
+	})
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
 	})
 
 	it('sends back a Japanese reply in an en session, naming en', async () => {

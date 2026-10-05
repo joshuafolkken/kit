@@ -253,7 +253,7 @@ describe('stop_rules.stop_outcome — headless parent', () => {
 		const { reason } = stop_rules.stop_outcome(context({ headless_waiting: true }))
 
 		expect(reason).toBe(stop_rules.HEADLESS_WAIT_REASON)
-		expect(reason).toContain('lane:await')
+		expect(reason).toContain('pnpm josh run:carry --cut --owner "$PPID"')
 	})
 
 	it('is not stood down by the loop-breaker or a pending cut', () => {
@@ -292,14 +292,14 @@ describe('stop_rules.stop_outcome — headless parent', () => {
 	})
 })
 
-describe('stop_rules — the headless heartbeat runs in the background', () => {
-	// joshuafolkken/kit#3102: `--wait` runs until work arrives, so in the foreground it would block the
-	// parent from `lane:await`'s completions — it is a background heartbeat, not a foreground wait.
-	it('names the heartbeat as a background command and does not count it as a foreground wait', () => {
+describe('stop_rules — the headless parent leaves the watching to the supervisor', () => {
+	// joshuafolkken/kit#3245: the run:wake driver watches the lanes, so the woken session no longer
+	// polls them; a heartbeat it starts anyway is still not a foreground wait.
+	it('does not send the parent to the heartbeat and does not count it as a foreground wait', () => {
 		const refusal = stop_rules.HEADLESS_WAIT_REASON
 		const tail = `${refusal} {"command":"pnpm josh run:progress --wait"} ${refusal}`
 
-		expect(refusal).toContain('`pnpm josh run:progress --wait` in the background')
+		expect(refusal).not.toContain('run:progress --wait')
 		expect(stop_rules.count_headless_refusals(tail)).toBe(2)
 	})
 })
