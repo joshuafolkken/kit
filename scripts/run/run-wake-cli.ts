@@ -209,10 +209,16 @@ function log_hint(context: WakeContext): string {
 	return `The output of every session this supervisor started is in ${context.log_target}.`
 }
 
+// The log hint goes ahead of the note: the Telegram length limit cuts the tail, and a long failure note
+// (stdout tail plus stderr tail) would otherwise take the one line that says where to look next.
+function warning_body(stop: LoopStop, body: string, context: WakeContext): string {
+	return [body, log_hint(context), stop.note].filter(Boolean).join('\n')
+}
+
 async function warn_of_stop(stop: LoopStop, body: string, context: WakeContext): Promise<void> {
 	await telegram_notify.warn({
 		issue_title: WARNING_TITLE,
-		body: [body, stop.note, log_hint(context)].filter(Boolean).join('\n'),
+		body: warning_body(stop, body, context),
 		recovery: WARNING_RECOVERY,
 	})
 }
@@ -408,6 +414,7 @@ const run_wake_cli = {
 	USAGE,
 	run,
 	stop_body,
+	warning_body,
 }
 
 if (process.argv[1] === SCRIPT_PATH) await main(process.argv.slice(ARGV_OFFSET))

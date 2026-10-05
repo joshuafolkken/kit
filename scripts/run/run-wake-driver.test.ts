@@ -85,6 +85,31 @@ test('hands on only the tail of a long stderr, after the verdict, resume line an
 	expect(result.material.endsWith('why it stopped')).toBe(true)
 })
 
+test('leads a failed drive note with the driver stdout error line, then the stderr tail', async () => {
+	vi.spyOn(josh_command, 'josh_run').mockResolvedValue({
+		code: 1,
+		out: 'launch #3234\nerror spawn git ENOENT',
+		err: `${'early output\n'.repeat(LONG_STDERR_REPEAT)}[ELIFECYCLE] Command failed`,
+	})
+
+	const result = await run_wake_driver.drive(scratch.target)
+
+	expect(result.kind).toBe('failed')
+	if (result.kind !== 'failed') return
+	expect(result.note).toMatch(/^error spawn git ENOENT\n\.\.\. /u)
+	expect(result.note.endsWith('[ELIFECYCLE] Command failed')).toBe(true)
+	expect(result.note.length).toBeLessThan(agent_role_profile.MAX_VALUE_LENGTH)
+})
+
+test('falls back to the driver stdout when a failed drive printed no error line', async () => {
+	vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 1, out: 'stop', err: '' })
+
+	expect(await run_wake_driver.drive(scratch.target)).toStrictEqual({
+		kind: 'failed',
+		note: 'stop',
+	})
+})
+
 test('refuses an incomplete driver result without waking an agent', () => {
 	expect(run_wake_driver.driver_result('', { kind: 'none' }, INVOCATION)).toMatchObject({
 		kind: 'failed',

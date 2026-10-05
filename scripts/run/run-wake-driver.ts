@@ -8,6 +8,8 @@ const FIRST_LINE = 0
 const RESUME_PREFIX = 'resume: '
 const DETAILS_TAIL_LENGTH = 2048
 const TRUNCATION_MARK = '... '
+// The prefix `backlog-drive-cli.ts` gives the exception it catches.
+const ERROR_PREFIX = 'error '
 
 function driver_args(invocation: string): ReadonlyArray<string> | undefined {
 	const rebuilt = run_invocation.rebuild(invocation)
@@ -98,8 +100,22 @@ function driver_result(
 	return { kind: 'judgment', material: handoff_material(verdict, resume, invocation, details) }
 }
 
+// **The cause is the driver's stdout `error …` line, so it leads the note** (joshuafolkken/kit#3242).
+// `backlog:drive` prints an exception only to stdout, and its stderr is never empty — every command it
+// ran is there — so reading `err ?? out` dropped the one line that said why. The stderr follows as its
+// tail, for the same reason `details_tail` cuts a judgment's details.
+function cause_of(out: string): string {
+	const errors = out.split('\n').filter((line) => line.startsWith(ERROR_PREFIX))
+
+	return errors.length > 0 ? errors.join('\n') : details_tail(out)
+}
+
+function failure_note(result: JoshResult): string {
+	return [cause_of(result.out), details_tail(result.err ?? '')].filter(Boolean).join('\n')
+}
+
 function read_result(result: JoshResult, target: string, invocation: string): DriveResult {
-	if (result.code !== SUCCESS) return { kind: 'failed', note: result.err ?? result.out }
+	if (result.code !== SUCCESS) return { kind: 'failed', note: failure_note(result) }
 
 	return driver_result(result.out, run_carry.read_carry(target), invocation, result.err)
 }
