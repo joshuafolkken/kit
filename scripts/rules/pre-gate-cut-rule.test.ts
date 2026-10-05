@@ -1,4 +1,8 @@
-import { read_unwrapped, WORKFLOW_PROMPT_DIRECTORY } from '#scripts/document/ai-document-fixture'
+import {
+	read_unwrapped,
+	RULE_DELIVERY_RATIONALE,
+	WORKFLOW_PROMPT_DIRECTORY,
+} from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 
@@ -103,8 +107,12 @@ describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, () => {
 	const content = read_unwrapped(DELIVERY)
 
-	it.each([TOPIC_FILE, GUARD_COMMAND, FIRING_SUITE])('states %j', (marker) => {
+	it.each([TOPIC_FILE, GUARD_COMMAND])('states %j', (marker) => {
 		expect(content).toContain(marker)
+	})
+
+	it('leaves the firing suite to the rationale', () => {
+		expect(read_unwrapped(RULE_DELIVERY_RATIONALE)).toContain(FIRING_SUITE)
 	})
 
 	// Every row of that table has to have a non-firing state that means the rule is being kept, or the

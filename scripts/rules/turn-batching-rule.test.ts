@@ -2,6 +2,7 @@ import {
 	AI_DOCS,
 	read_unwrapped,
 	read_unwrapped_rule_surface,
+	RULE_DELIVERY_RATIONALE,
 	WORKFLOW_PROMPT_DIRECTORY,
 } from '#scripts/document/ai-document-fixture'
 import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
@@ -183,8 +184,12 @@ describe.each([RESIDENCY])('%s — lists the rule as delivered', (list_path) => 
 describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, () => {
 	const content = read_unwrapped(DELIVERY)
 
-	it.each([TOPIC_FILE, GUARD_COMMAND, SUITE_PATH])('states %j', (marker) => {
+	it.each([TOPIC_FILE, GUARD_COMMAND])('states %j', (marker) => {
 		expect(content).toContain(marker)
+	})
+
+	it('leaves the pinning suite to the rationale', () => {
+		expect(read_unwrapped(RULE_DELIVERY_RATIONALE)).toContain(SUITE_PATH)
 	})
 })
 

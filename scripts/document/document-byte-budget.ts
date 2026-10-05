@@ -100,7 +100,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/proposal-request.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 28_672 },
 	{ path: 'prompts/collaboration-workflow/residency.md', bytes: 28_672 },
-	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 45_056 },
+	// #3186 moved the hook wiring and history to `docs/maintainers/rule-delivery-rationale.md`.
+	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 16_384 },
 	{ path: 'prompts/collaboration-workflow/shell-body.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/turn-batching.md', bytes: 20_480 },
 	{ path: 'prompts/collaboration-workflow/upstream-interrupt.md', bytes: 12_288 },
