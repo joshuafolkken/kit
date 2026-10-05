@@ -17,7 +17,7 @@ import { run_tail } from './run-tail'
 // pays nothing and only a `pnpm josh git -y` spawns `git status`.
 //
 // **Once per run, because the exemption is a person's judgement a synchronous guard cannot read.** The
-// non-executable-config and cosmetic-asset arms of `CLAUDE.md`'s "Non-runtime updates" exception stay
+// non-executable-config and cosmetic-asset arms of `prompts/testing-guide.md`'s "Non-runtime updates" exception stay
 // `required` by the classifier, and a person declares them in the Step 0 work summary — which no label
 // or transcript tail records. So a row that fired every time would wedge exactly that declared-exempt
 // commit; refusing once and passing the reissue is the same safe direction `issue-comments` takes, and
