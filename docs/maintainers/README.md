@@ -67,6 +67,8 @@ from the page it explains.
   and the push
 - [latest-gate-rationale.md](./latest-gate-rationale.md) — the dependency-update window
 - [split-assessment-rationale.md](./split-assessment-rationale.md) — the split assessment
+- [review-history.md](./review-history.md) — the review policy and rubric
+- [testing-guide-history.md](./testing-guide-history.md) — closing the E2E gate
 - [josh-commands-rationale.md](./josh-commands-rationale.md) — the `josh` commands
 - [josh-commands-automation-rationale.md](./josh-commands-automation-rationale.md) — the automation
   `josh` commands

@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { run_halfrun_resume } from './run-halfrun-resume'
 import { run_hold, type HoldRead, type RunHold } from './run-hold'
+import { run_label } from './run-label'
 import { run_preflight, type PreflightDecision } from './run-preflight'
 import { run_prrun_resume } from './run-prrun-resume'
 import { run_tidy_cli } from './run-tidy-cli'
@@ -267,7 +268,7 @@ function report_unreadable_release(): number {
 // Until then this removed whatever was there, and the `busy` stop message sent a person here to clear
 // a record they had judged stale from outside the run that wrote it — so the guard's own recovery
 // instruction was a way to free a live run's tree, which is the incident it was written after.
-function release(target: string, claimant: string): number {
+function release_record(target: string, claimant: string): number {
 	const read = run_hold.read_hold(target)
 
 	if (read.kind === 'free') return remove_record(target, false)
@@ -277,6 +278,19 @@ function release(target: string, claimant: string): number {
 	if (!run_hold.is_own_hold(read.hold, claimant)) return report_held(read.hold)
 
 	return remove_record(target, true)
+}
+
+// **A numbered run's own release takes its `in-progress` marker back off** (joshuafolkken/kit#3182),
+// whether or not a record was still there — the stop that releases is the run ending its hold on the
+// issue. A refused release (another run's record, an unreadable one) touches no label, and an
+// unnumbered run names no issue to touch.
+async function release(target: string, claimant: string): Promise<number> {
+	const code = release_record(target, claimant)
+	const is_own_end = code === SUCCESS_EXIT_CODE && claimant !== run_hold.UNNUMBERED_ISSUE
+
+	if (is_own_end) await run_label.unmark(claimant)
+
+	return code
 }
 
 // The one path that removes a record without matching it, which is why it says what it removed: a
@@ -335,7 +349,7 @@ async function dispatch(request: HoldRequest, target: string, is_linked: boolean
 
 	if (request.kind === FORCE_RELEASE_KIND) return force_release(target)
 
-	return release(target, request.claimant)
+	return await release(target, request.claimant)
 }
 
 async function answer(request: HoldRequest): Promise<number> {

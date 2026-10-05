@@ -11,6 +11,7 @@ const prrun_adopt_mock = vi.hoisted(() => vi.fn())
 const prrun_token_mock = vi.hoisted(() => vi.fn())
 const read_issue_mock = vi.hoisted(() => vi.fn())
 const confirm_mock = vi.hoisted(() => vi.fn())
+const mark_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/notify/telegram-notify', () => ({ telegram_notify: { confirm: confirm_mock } }))
@@ -24,6 +25,7 @@ vi.mock('./run-prep-cli', () => ({
 	run_prep_cli: { gather: gather_mock, to_parts: to_parts_mock },
 }))
 vi.mock('./run-prep', () => ({ run_prep: { format_report: format_report_mock } }))
+vi.mock('./run-label', () => ({ run_label: { mark: mark_mock } }))
 vi.mock('./run-halfrun-resume', () => ({
 	run_halfrun_resume: { adopt: adopt_mock, is_pending: is_pending_mock },
 }))
@@ -72,6 +74,7 @@ function reset_resume_mocks(): void {
 	prrun_adopt_mock.mockReset().mockResolvedValue(false)
 	prrun_token_mock.mockReset().mockResolvedValue(undefined)
 	read_issue_mock.mockReset().mockResolvedValue(issue_read('OPEN'))
+	mark_mock.mockReset().mockResolvedValue(true)
 }
 
 beforeEach(() => {
@@ -105,6 +108,7 @@ describe('run_entry_cli.run — a held tree in budget folds hold, cost, prep and
 			['cost', '--cut'],
 		])
 		expect(gather_mock).toHaveBeenCalledTimes(1)
+		expect(mark_mock).toHaveBeenCalledExactlyOnceWith(ISSUE)
 		expect(info_lines).toStrictEqual([
 			stage_line('fresh', 'fullrun', 'plan'),
 			`entry #${ISSUE} — hold: hold · cost: under · verdict: implement\n\n${PREP_BODY}`,
@@ -195,6 +199,7 @@ describe('run_entry_cli.run — a stop short-circuits before the reads it would 
 		expect(josh_run_mock).toHaveBeenCalledTimes(2)
 		expect(gather_mock).not.toHaveBeenCalled()
 		expect(info_lines[1]).toContain(`entry #${ISSUE} — hold: busy · cost: skipped · verdict: -`)
+		expect(mark_mock).not.toHaveBeenCalled()
 		expect(confirm_mock).toHaveBeenCalledTimes(1)
 	})
 
@@ -211,6 +216,7 @@ describe('run_entry_cli.run — a stop short-circuits before the reads it would 
 		expect(code).not.toBe(OK)
 		expect(gather_mock).not.toHaveBeenCalled()
 		expect(info_lines[1]).toContain('cost: over · verdict: -')
+		expect(mark_mock).not.toHaveBeenCalled()
 		expect(calls().at(-1)).toStrictEqual(RELEASE_CALL)
 		expect(last_line()).toBe(lane_park.COMMAND_NOTIFY_MARKER)
 	})

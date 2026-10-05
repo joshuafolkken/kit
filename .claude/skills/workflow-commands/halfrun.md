@@ -19,7 +19,7 @@ what is `halfrun`'s own.
 
 ## The step list
 
-`halfrun #<N>`: add `in-progress` → read Issue #N and its comments → **normalize the title** (same as
+`halfrun #<N>`: read Issue #N and its comments → **normalize the title** (same as
 `fullrun`) → post the agreed plan only if the body is blank → `git switch main && git pull`, then `pnpm
 josh latest:scope` and update dependencies only on `required` (`latest-gate.md`; the
 `dependency-update` skill) → implement → run the **full verification gate** (refactor →
@@ -43,7 +43,7 @@ back with fixes, treat each as a new round: implement, re-run `pnpm josh gate`, 
 `halfrun new` or `halfrun new "<title>"`: `kickoff new` + `halfrun #<N>` (no Issue exists yet). Steps
 mirror `fullrun new` (1)–(8): derive an English title (or use the provided one) → create the Issue
 (`pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>`, body per
-`prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `issue-scout.md`) → add `in-progress` → post the agreed plan → stash
+`prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `issue-scout.md`) → add `in-progress` (as `fullrun new` (3)) → post the agreed plan → stash
 any pre-existing changes with `git stash push -m "halfrun new: pre-existing changes" -- ':!docs/maintainers/observations'`
 (the pathspec keeps the observation ledger in the tree for this run's commit; joshuafolkken/kit#2919), popped by
 message with `pnpm josh stash:pop "halfrun new: pre-existing changes"`, never a positional `git stash pop` →

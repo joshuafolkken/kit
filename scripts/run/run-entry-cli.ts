@@ -7,6 +7,7 @@ import { run_entry, type EntryParts } from './run-entry'
 import { run_entry_stop } from './run-entry-stop'
 import { run_halfrun_resume } from './run-halfrun-resume'
 import { run_hold_cli } from './run-hold-cli'
+import { run_label } from './run-label'
 import { run_next } from './run-next'
 import { run_prep } from './run-prep'
 import { run_prep_cli } from './run-prep-cli'
@@ -231,6 +232,15 @@ function is_settled(decision: StageDecision): boolean {
 	return decision.is_reached && decision.state !== run_stage.MERGED
 }
 
+// The tree is held and the budget allows the run, so the issue is marked as running before its reads
+// (joshuafolkken/kit#3182) — the label then shows in the `labels:` line the report below carries.
+async function proceed(issue_number: string, hold: string, cost: string): Promise<number> {
+	await run_label.mark(issue_number)
+	const reads = await gather_reads(issue_number)
+
+	return emit({ issue_number, hold, cost, verdict: reads.verdict, report: reads.report })
+}
+
 async function claim_run({ issue_number, command }: EntryRequest): Promise<number> {
 	const hold = await claim_hold(issue_number, command)
 
@@ -248,9 +258,7 @@ async function claim_run({ issue_number, command }: EntryRequest): Promise<numbe
 		return await stop_run({ parts, command, reason: BUDGET_REASON, should_release: true })
 	}
 
-	const reads = await gather_reads(issue_number)
-
-	return emit({ issue_number, hold, cost, verdict: reads.verdict, report: reads.report })
+	return await proceed(issue_number, hold, cost)
 }
 
 // A carried cut is asked first, before anything is read (`run:cut --resume`); `kickoff` claims and cuts
