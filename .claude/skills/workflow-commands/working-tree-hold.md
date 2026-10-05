@@ -48,13 +48,13 @@ ordinary one.
 and releases `<N>`; a **`new` entry claimed before its Issue existed**, so it releases with the
 **bare** form however many numbers the run has acquired since — so a `fullrun new` that stops on a
 split types `pnpm josh run:release`, not `pnpm josh run:release <N>`. The bare form removes no
-label, so that stop also runs `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress
+label, so every `new` stop that releases — a split, a prerequisite or a third-party target — also runs `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress
 2>/dev/null || true`.
 
 **Releasing is the run's, not a person's memory.** `pnpm josh followup` releases the hold on a merged
 run, and a record abandoned by a crashed session expires after 8 hours. **A stop that leaves the tree
 clean releases it explicitly**: a `fullrun` / `halfrun` that stops on a split, a prerequisite or a
-third-party target ends with `pnpm josh run:release <N>` (bare where that run entered as `new`).
+third-party target ends with `pnpm josh run:release <N>` (bare where that run entered as `new`, followed by the label DELETE above).
 **`halfrun`'s stop before commit keeps the hold**, and so does a `needs-human-review` stop: the
 uncommitted work still in the tree is exactly what a second run would trample, so the release command
 goes in the stop report and the Telegram for the person to type. **`fullrun #<N>` of the same issue
