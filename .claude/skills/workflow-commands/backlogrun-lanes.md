@@ -218,8 +218,8 @@ conflict.
 | When | The lane | Why |
 | --- | --- | --- |
 | The child **merged** | `pnpm josh lane:close <N>` | `followup` released the hold and the branch is on `main`; nothing in that tree is wanted |
-| The child was **parked before its commit** | `git -C <dir> stash push -u -m "backlogrun: parked #<N>"`, record it on the Issue, then `pnpm josh lane:close <N>` | The stash is a repository-level ref, so it outlives the work tree — and `lane:close` is a **forced** removal that would otherwise take the work. `epic:next` counts a parked child's lane as released, so a lane left open holds a seat the count believes is free |
-| The child was **parked after its commit and push** | **Left open**, its directory and held seat recorded on the Issue | The stash step is a **no-op** (tree clean because committed). What `lane:close` would take is the **local branch**, which is the resume path |
+| The child was **parked before its commit** | **Left open**, its uncommitted work in place, its directory and held seat recorded on the Issue | The stash stack is shared by every work tree, so a parallel lane can pop another's entry — the tree itself is the safe place for the work. `lane:close` is a **forced** removal that would take it. `pnpm josh lane:launch <N>` dispatches the released child into the kept lane rather than refusing it as `already-open` — only a lane a child was already dispatched into; a failed-install lane is still refused |
+| The child was **parked after its commit and push** | **Left open**, its directory and held seat recorded on the Issue | The tree is clean because committed. What `lane:close` would take is the **local branch**, which is the resume path |
 | The child hit a **merge conflict** | **Left open** — the resolution happens in it | The child resolves in place (`backlogrun-recovery.md` → "Conflicts are not predicted"). A park under that section's four conditions takes the row above |
 | The child stopped on **`needs-human-review`** | **Left open and untouched** | The uncommitted work *is* the artifact a person has to look at. Name the lane directory in the stop report and in the Telegram |
 | The child **failed** | Whichever of the two parked rows applies, plus the consecutive-failure count | Same reasoning; only the counter differs. **A merge conflict is not this row** — it takes the row above, and it is not counted |
@@ -229,7 +229,7 @@ conflict.
 **A lane closed after a push is reopened by `pnpm josh lane:open <N>`**, which attaches to a local
 `<N>-lane` or creates one from `origin/<N>-lane`, saying on standard error which it reused. **The branch
 still has to have reached the remote for that to hold** — a child parked before its commit has nothing
-on `origin`, which is why that row stashes first and the after-push row does not. Rationale:
+on `origin`, which is why that row keeps its lane open rather than closing it. Rationale:
 `docs/maintainers/backlogrun-lanes-rationale.md` → "Why a committed child's lane is kept".
 
 **Which row a child takes is decided by what `followup` printed, not by reading the situation.** **What

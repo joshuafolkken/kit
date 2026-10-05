@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { josh_command } from '#scripts/josh/josh-run'
+import { lane_registry } from '#scripts/lane/lane-registry'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
@@ -15,6 +16,7 @@ import { execa } from 'execa'
 // and messages are reused rather than cloned — `lane:open`'s cut-session guard and its `full` /
 // `already-open` refusals, `stash:pop`'s message-matched pop, `lane:dispatch`'s in-progress claim and
 // warning. Their explanations stream through to stderr; the child's pid is the one thing on stdout.
+// A lane a park kept is the one `already-open` it steps past — `lane_directory` below.
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
@@ -86,14 +88,30 @@ type LaunchOutcome = { kind: 'launched'; pid: string } | { kind: 'unopened' } | 
 const UNOPENED: LaunchOutcome = { kind: 'unopened' }
 const FAILED: LaunchOutcome = { kind: 'failed' }
 
+// **A lane a park kept open is resumed, not reopened** (joshuafolkken/kit#3228). A child parked before
+// its commit leaves its uncommitted work in its lane, and `lane:open` refuses that lane as
+// `already-open` — so the released child is dispatched into the kept tree instead. **Only a lane a
+// child was already dispatched into counts as kept**: `lane:dispatch` records the child's output in the
+// lane's `.env`, and a lane whose install failed never got that far, so it still goes through
+// `lane:open` and its refusal. So does a stranded lane, whose `.env` is gone with its tree.
+async function lane_directory(issue: string): Promise<string | undefined> {
+	const kept = await lane_registry.find_open_lane(issue)
+
+	if (kept?.output !== undefined) return kept.directory
+
+	const opened = await josh_command.josh_run(['lane:open', issue], should_forward_stderr)
+
+	return opened.code === SUCCESS_EXIT_CODE ? opened.out : undefined
+}
+
 // The launch chain in-process. The CLI prints the pid; `backlog:drive` launches through this same
 // chain (joshuafolkken/kit#2508).
 async function launch_lane(context: LaunchContext): Promise<LaunchOutcome> {
-	const opened = await josh_command.josh_run(['lane:open', context.issue], should_forward_stderr)
+	const directory = await lane_directory(context.issue)
 
-	if (opened.code !== SUCCESS_EXIT_CODE) return UNOPENED
+	if (directory === undefined) return UNOPENED
 
-	if (!(await prepare(context.stash, opened.out))) return FAILED
+	if (!(await prepare(context.stash, directory))) return FAILED
 
 	const dispatched = await josh_command.josh_run(
 		['lane:dispatch', context.issue],
