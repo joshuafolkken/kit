@@ -480,15 +480,20 @@ function busy_message(carry: RunCarry): string {
 	return `A live run holds this budget — ${describe_carry(carry)}, owner pid ${String(carry.owner_pid)} still running. Nothing was established. Wait for that run, or end its record with \`${END_COMMAND}\` once you know it is over.`
 }
 
+// The adoption command, shared by the standing refusal and the judgment wake's hand-off.
+// **`--owner "$PPID"` is part of the command, not an optional extra.** An adoption made without it
+// leaves the record declaring no owner, and from then on every second parent reads it as not provably
+// live and is answered `standing` rather than `busy` — the ownership defense degrading silently
+// through the very message that recommends the command.
+function claim_command(invocation: string): string {
+	return `${RESUME_COMMAND} "${invocation}" ${OWNER_ARGUMENT}`
+}
+
 // The record's owner is gone and no cut handed it off — the crashed run, and the same command
 // retyped over it. Both ways out are named, because which one is right is the reader's to say and
 // not this command's to guess.
-// **`--owner "$PPID"` is part of the command it prints, not an optional extra.** An adoption made
-// without it leaves the record declaring no owner, and from then on every second parent reads it as
-// not provably live and is answered `standing` rather than `busy` — the ownership defense degrading
-// silently through the very message that recommends the command.
 function standing_message(carry: RunCarry): string {
-	return `A run record is standing here that no cut handed off — ${describe_carry(carry)}. Nothing was established. Carry that budget with \`${RESUME_COMMAND} "${carry.invocation}" ${OWNER_ARGUMENT}\`, or discard it with \`${END_COMMAND}\` and begin again.`
+	return `A run record is standing here that no cut handed off — ${describe_carry(carry)}. Nothing was established. Carry that budget with \`${claim_command(carry.invocation)}\`, or discard it with \`${END_COMMAND}\` and begin again.`
 }
 
 // The count refusal reads differently by cause: a record awaiting its successor, or one a successor
@@ -535,6 +540,7 @@ const run_carry = {
 	begin_carry,
 	busy_message,
 	carry_path,
+	claim_command,
 	classify,
 	classify_claim,
 	count_refused_message,

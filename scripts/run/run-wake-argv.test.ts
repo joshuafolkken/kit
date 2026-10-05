@@ -164,6 +164,7 @@ describe('run_wake_session.wake_argv — a judgment handoff', () => {
 		const result = run_wake_driver.driver_result(
 			`epic #2663\n${EPIC_RESUME}`,
 			{ kind: 'none' },
+			NAMED_EPIC,
 			REMAINING_CHILD,
 		)
 
@@ -206,6 +207,7 @@ describe('run_wake_session.wake_argv — handoff material the launch check would
 		const result = run_wake_driver.driver_result(
 			'blocked over #2931\nresume: --owner 2608 --max 5',
 			{ kind: 'none' },
+			NAMED_EPIC,
 			stderr.join('\n'),
 		)
 
