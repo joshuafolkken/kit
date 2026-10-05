@@ -10,6 +10,7 @@
 // composite ends at the failure, and the report names the step that failed so the run reads only it.
 
 const PREFLIGHT_HEADER = '=== preflight ==='
+const PRE_DETACH_HEADER = '=== pre-detach checks ==='
 const REVIEW_HEADER = '=== review ==='
 const GATE_HEADER = '=== gate ==='
 const COMMIT_HEADER = '=== commit/push/PR ==='
@@ -65,6 +66,7 @@ const run_ship = {
 	FOLLOWUP_HEADER,
 	GATE_HEADER,
 	PREFLIGHT_HEADER,
+	PRE_DETACH_HEADER,
 	REPORT_HEADER,
 	REVIEW_HEADER,
 	ROUND_TWO_HEADER,

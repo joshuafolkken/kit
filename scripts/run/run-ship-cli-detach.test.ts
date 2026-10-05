@@ -10,6 +10,7 @@ const repository_mock = vi.hoisted(() => vi.fn())
 const is_lane_child_mock = vi.hoisted(() => vi.fn())
 const mark_result_mock = vi.hoisted(() => vi.fn())
 const preflight_mock = vi.hoisted(() => vi.fn())
+const pre_detach_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('./run-ship-probe', () => ({
@@ -26,6 +27,8 @@ vi.mock('./run-ship-probe', () => ({
 vi.mock('./run-event-stream-emit', () => ({ run_event_stream_emit: { emit: vi.fn() } }))
 // The preflight's own branches are pinned in `run-ship-preflight.test.ts`; here it passes.
 vi.mock('./run-ship-preflight', () => ({ run_ship_preflight: { stage: preflight_mock } }))
+// The pre-detach checks' own branches are pinned in `run-ship-pre-detach.test.ts`; here they pass.
+vi.mock('./run-ship-pre-detach', () => ({ run_ship_pre_detach: { checks: pre_detach_mock } }))
 vi.mock('./run-ship-scoped', async (import_original) => {
 	const actual = await import_original<{ run_ship_scoped: typeof real_scoped }>()
 	const scoped_pair = vi
@@ -84,6 +87,7 @@ beforeEach(() => {
 beforeEach(() => {
 	mark_result_mock.mockReset()
 	preflight_mock.mockReset().mockResolvedValue({ code: OK, out: 'ready' })
+	pre_detach_mock.mockReset().mockResolvedValue({ code: OK, out: 'passed' })
 })
 
 describe('run_ship_cli.run — --detach hands the region to a supervisor', () => {
@@ -162,6 +166,41 @@ describe('run_ship_cli.run — the preflight runs before the hand-off', () => {
 
 		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(FAILED)
 		expect(detach_mock).not.toHaveBeenCalled()
+		expect(pre_detach_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#3222: a type error or a red document test returns to the lane child too.
+describe('run_ship_cli.run — the type check and document tests run before the hand-off', () => {
+	it.each([
+		[
+			'a type error',
+			'scripts/a.test.ts(3,7): error TS4111: Property comes from an index signature',
+		],
+		['a red document test', 'FAIL scripts/document/entry-read-set.test.ts > names every document'],
+	])('does not detach and reports %s', async (_label, output) => {
+		is_lane_child_mock.mockReturnValue(true)
+		pre_detach_mock.mockResolvedValue({ code: FAILED, out: output })
+
+		expect(await run_ship_cli.run([TITLE])).toBe(FAILED)
+		expect(detach_mock).not.toHaveBeenCalled()
+		expect(info_lines.join('\n')).toContain(output)
+		expect(info_lines.join('\n')).toContain('stopped at: === pre-detach checks ===')
+	})
+
+	it('detaches once both pass under an explicit --detach', async () => {
+		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(OK)
+		expect(pre_detach_mock).toHaveBeenCalledOnce()
+		expect(detach_mock).toHaveBeenCalledOnce()
+	})
+
+	it('leaves them to the gate in a supervised ship', async () => {
+		is_lane_child_mock.mockReturnValue(true)
+		is_supervised_mock.mockReturnValue(true)
+
+		await run_ship_cli.run([TITLE])
+
+		expect(pre_detach_mock).not.toHaveBeenCalled()
 	})
 })
 

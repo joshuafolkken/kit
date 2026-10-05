@@ -7,6 +7,7 @@ import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_ship, type ShipSection } from './run-ship'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_next } from './run-ship-next'
+import { run_ship_pre_detach } from './run-ship-pre-detach'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_return } from './run-ship-return'
 import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-ship-stage'
@@ -324,14 +325,26 @@ function should_detach(args: ShipArguments): boolean {
 // joshuafolkken/kit#2966: the preflight is deterministic and fast, so it runs here, in the agent's own
 // turn, before the hand-off — a stop it finds is fixed by the same session instead of relaunching one
 // from the supervisor. Only the slow stages go to the supervisor, which re-asks the preflight itself.
+// joshuafolkken/kit#3222: the type check and the document tests follow it here for the same reason; they
+// are not a stage, so the supervisor's gate runs them again rather than passing over them.
+async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
+	const preflight = await run_stage(run_ship_steps.PREFLIGHT_STEP, args, await open_context(args))
+	if (preflight.code !== SUCCESS_EXIT_CODE) return [preflight]
+
+	const result = await run_ship_pre_detach.checks()
+
+	return [preflight, { header: run_ship.PRE_DETACH_HEADER, body: result.out, code: result.code }]
+}
+
 async function detach_after_preflight(args: ShipArguments): Promise<number> {
-	const section = await run_stage(run_ship_steps.PREFLIGHT_STEP, args, await open_context(args))
+	const sections = await pre_detach_sections(args)
+	const code = run_ship.exit_code(sections)
 
-	if (section.code === SUCCESS_EXIT_CODE) return await detach(args)
+	if (code === SUCCESS_EXIT_CODE) return await detach(args)
 
-	console.info(run_ship.format_report([section]))
+	console.info(run_ship.format_report(sections))
 
-	return run_ship.exit_code([section])
+	return code
 }
 
 async function supervised_repository(): Promise<string | undefined> {
