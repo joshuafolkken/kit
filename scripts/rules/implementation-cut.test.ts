@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
 import type { RunCut } from '#scripts/run/run-cut'
+import { run_cut_handoff } from '#scripts/run/run-cut-handoff'
 import { afterAll, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { implementation_cut, type LaneCostState } from './implementation-cut'
@@ -86,6 +87,18 @@ function run_at(now_ms: number): { transcript: string; now_ms: number } {
 function unread_verdict(): CostVerdict {
 	throw new Error('the cost verdict was read for a call the guard does not own')
 }
+
+// The refusal asks for the handoff in the format the parser reads (joshuafolkken/kit#3195) — the
+// prose-only list was answered with Markdown that `run:cut --impl --handoff` refused.
+describe('the handoff format the refusal asks for', () => {
+	it('states the JSON format the handoff parser reads', () => {
+		expect(implementation_cut.IMPLEMENTATION_CUT_REASON).toContain(run_cut_handoff.HANDOFF_FORMAT)
+	})
+
+	it.each(run_cut_handoff.handoff_schema.keyof().options)('names the schema key %j', (key) => {
+		expect(implementation_cut.IMPLEMENTATION_CUT_REASON).toContain(`"${key}"`)
+	})
+})
 
 describe('takes_the_impl_cut', () => {
 	it.each([[TAKE_THE_IMPL_CUT], [`pnpm josh run:cut --impl=${ISSUE}`]])(

@@ -41,6 +41,22 @@ const UNTOUCHED_LABEL = 'Deliberately untouched'
 const INSTRUCTION_LABEL = 'Instruction (verbatim)'
 const EMPTY_LIST_NOTE = '(none)'
 
+type HandoffKey = keyof Handoff
+
+function describe_key(key: HandoffKey): string {
+	const value = handoff_schema.shape[key] instanceof z.ZodArray ? '["…"]' : '"…"'
+
+	return `"${key}": ${value}`
+}
+
+// The shape a handoff file must have, derived from `handoff_schema` so the refusal that asks for the file
+// and the error that rejects it can never name a key the parser does not read (joshuafolkken/kit#3195).
+// A refusal that listed the four items in prose was answered with Markdown, which `parse_handoff` rejects.
+const HANDOFF_FORMAT = `a JSON object {${handoff_schema
+	.keyof()
+	.options.map((key) => describe_key(key))
+	.join(', ')}}`
+
 function parse_handoff(raw: string): Handoff | undefined {
 	try {
 		const parsed = handoff_schema.safeParse(JSON.parse(raw))
@@ -84,7 +100,10 @@ function load_handoff(handoff_path: string | undefined, max_bytes: number): Hand
 	const handoff = read_handoff_file(handoff_path)
 
 	if (handoff === undefined) {
-		return { kind: 'bad', note: `--handoff ${handoff_path} is not a readable handoff file` }
+		return {
+			kind: 'bad',
+			note: `--handoff ${handoff_path} is not a readable handoff file — write ${HANDOFF_FORMAT}`,
+		}
 	}
 
 	if (!is_within_bound(handoff, max_bytes)) {
@@ -114,6 +133,7 @@ function describe_handoff(handoff: Handoff): string {
 }
 
 const run_cut_handoff = {
+	HANDOFF_FORMAT,
 	describe_handoff,
 	handoff_schema,
 	is_complete_handoff,
