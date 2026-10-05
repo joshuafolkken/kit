@@ -3,6 +3,10 @@ import { timed_fetch } from '#scripts/lib/timed-fetch'
 import { z } from 'zod'
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org'
+// `sendMessage` refuses a text longer than this.
+const TELEGRAM_TEXT_LIMIT = 4096
+const BODY_TRUNCATION_MARK = '\n...'
+const TRAILING_HIGH_SURROGATE = /[\uD800-\uDBFF]$/u
 
 const telegram_environment_schema = z.object({
 	telegram_bot_token: z.string().min(1, { message: 'TELEGRAM_BOT_TOKEN is required' }),
@@ -188,8 +192,29 @@ function build_blocks(input: TelegramSendInput): Array<string> {
 	return blocks
 }
 
-function build_text(input: TelegramSendInput): string {
+function join_blocks(input: TelegramSendInput): string {
 	return build_blocks(input).join('\n\n')
+}
+
+// A cut between the two halves of a surrogate pair leaves a lone surrogate, which is not valid
+// UTF-8 once encoded, so the half is dropped with the rest of the tail.
+function head_of(body: string, kept: number): string {
+	const head = body.slice(0, kept)
+
+	return TRAILING_HIGH_SURROGATE.test(head) ? head.slice(0, -1) : head
+}
+
+// **The body is cut to fit Telegram's length limit, keeping its head** (joshuafolkken/kit#3242). A
+// warning carrying a whole driver stderr ran past 4096 characters and was refused with `400 Bad
+// Request`, so it reached nobody. A caller puts the cause first, so the tail is what is dropped, and the
+// header and the URLs around the body survive.
+function build_text(input: TelegramSendInput): string {
+	const text = join_blocks(input)
+	const overflow = text.length - TELEGRAM_TEXT_LIMIT
+	if (overflow <= 0 || input.body === undefined) return text
+	const kept = Math.max(0, input.body.length - overflow - BODY_TRUNCATION_MARK.length)
+
+	return join_blocks({ ...input, body: `${head_of(input.body, kept)}${BODY_TRUNCATION_MARK}` })
 }
 
 async function post_message(config: TelegramConfig, text: string): Promise<void> {
