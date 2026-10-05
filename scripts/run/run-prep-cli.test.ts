@@ -37,6 +37,10 @@ vi.mock('#scripts/git/stash/git-stash', () => ({
 	git_stash: { has_changes: has_changes_mock },
 }))
 
+const ahead_mock = vi.hoisted(() => vi.fn<(issue_number: string) => Promise<Array<string>>>())
+
+vi.mock('./run-ship-preflight', () => ({ run_ship_preflight: { ahead: ahead_mock } }))
+
 const { run_prep_cli } = await import('./run-prep-cli')
 
 const SUCCESS = 0
@@ -47,6 +51,7 @@ const BLOCK = 'issue: 1978\nThe body\n\ncomment by alice: agreed'
 const OPEN_STATE: IssueState = { state: 'OPEN', labels: ['auto-ok'], is_human_review: false }
 const SKIP_DECISION = { scope: 'skip', reason: 'ran 2 hours ago; window is 12h' }
 const LOCATIONS = 'run:prep\n  scripts/josh/josh-commands-ai.ts:42  run:prep'
+const CLASSIFICATION_PROBLEM = 'Add "- リリース分類: <label>" to the Issue body.'
 const REVIEW_STATE: IssueState = {
 	state: 'OPEN',
 	labels: ['needs-human-review'],
@@ -82,6 +87,7 @@ beforeEach(() => {
 beforeEach(() => {
 	locate_mock.mockReset()
 	locate_mock.mockResolvedValue(LOCATIONS)
+	ahead_mock.mockReset().mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -239,10 +245,37 @@ describe('run_prep.format_report', () => {
 			latest_reason: 'last update 20h ago',
 			has_changes: false,
 			locations: '',
+			ship_problems: [],
 		})
 
 		expect(report.split('\n', 1)[0]).toContain('human_review: yes')
 		expect(report).toContain('latest: required')
+	})
+})
+
+// joshuafolkken/kit#3154: what `josh ship` would refuse on is reported at the entry, not at the ship.
+describe('run_prep_cli.run ship preconditions', () => {
+	it('reports the unmet classification as its own section', async () => {
+		stub_ok()
+		ahead_mock.mockResolvedValue([CLASSIFICATION_PROBLEM])
+
+		await run_prep_cli.run([ISSUE])
+
+		const out = printed()
+
+		expect(out).toContain(run_prep.SHIP_HEADER)
+		expect(out).toContain(run_prep.SHIP_UNMET)
+		expect(out).toContain(CLASSIFICATION_PROBLEM)
+		expect(ahead_mock).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('says the preconditions are met when nothing would be refused', async () => {
+		stub_ok()
+
+		await run_prep_cli.run([ISSUE])
+
+		expect(printed()).toContain(run_prep.SHIP_HEADER)
+		expect(printed()).not.toContain(run_prep.SHIP_UNMET)
 	})
 })
 

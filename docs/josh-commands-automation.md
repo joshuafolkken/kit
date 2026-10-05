@@ -1327,6 +1327,8 @@ pnpm josh run:ending 2118 --output <path> --repo joshuafolkken/app-kit
 
 Bundles the reads a run makes before its first edit into one call.
 
+Its `=== ship preconditions ===` section asks, ahead of the ship, the two refusals `josh ship` would otherwise meet at the run's largest context (joshuafolkken/kit#3154): a missing release classification in the Issue body, and a runtime change whose open PR body has no `## 実機証跡` section. `met` when neither applies; `unmet` lists each, so they are fixed before the gate. The ship and `followup` still refuse on both.
+
 ### `josh run:entry`
 
 Opens a run in one call: `run:hold`, `cost --cut` (skipped in a lane
@@ -1362,6 +1364,8 @@ line for the one Tier-B point it surfaces — a spent whole-run budget. It dispa
 re-decides: a merged child's outcome stays `run:merge`'s, the next issue `backlog:next`'s. `run:next`
 is now its degenerate form — the pre-implementation position mapped to prose over the one shared
 mapping, so there is no second implementation.
+
+When `run:prep`'s ship preconditions are unmet, `run:step` prints that same block on stderr, so stdout stays the one action line (joshuafolkken/kit#3154).
 
 In a **dispatched lane child** (read from the dispatch mark, `lane-child-marker.ts`) a merge or an
 outage position prints `stop` rather than `run:merge <N>`: `run:merge` is the

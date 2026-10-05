@@ -14,6 +14,9 @@ const GATE = 'pnpm josh gate'
 const ROW_ID = 'lane-background'
 const SHIP = 'pnpm josh ship "Title #1" --body-file evidence.md'
 const DETACHED_SHIP = 'pnpm josh ship --detach --review "Title #1"'
+const GATE_AND_SHIP = `${GATE} && ${DETACHED_SHIP}`
+const FOREGROUND_TIMEOUT_MS = 600_000
+const BACKGROUND_TIMEOUT_MS = 1_800_000
 
 function in_lane(): boolean {
 	return true
@@ -109,10 +112,17 @@ describe('lane_background.is_background_long_run', () => {
 })
 
 // joshuafolkken/kit#3027: a child's `ship` detaches only after its preflight passed in the calling
-// process, so a backgrounded one dies with the turn before any supervisor exists.
+// process, so a backgrounded one dies with the turn before any supervisor exists. joshuafolkken/kit#3154:
+// a backgrounded ship alone is rewritten into the foreground rather than refused.
 describe('lane_background.is_background_long_run — ship', () => {
-	it.each([SHIP, DETACHED_SHIP])('refuses a backgrounded ship in a lane child: %s', (command) => {
-		expect(lane_background.is_background_long_run(background_call(command), in_lane)).toBe(true)
+	it.each([SHIP, DETACHED_SHIP])('does not refuse a backgrounded ship alone: %s', (command) => {
+		expect(lane_background.is_background_long_run(background_call(command), in_lane)).toBe(false)
+	})
+
+	it('still refuses a backgrounded ship chained after the gate', () => {
+		const call = background_call(GATE_AND_SHIP)
+
+		expect(lane_background.is_background_long_run(call, in_lane)).toBe(true)
 	})
 
 	it('leaves a foreground ship alone, which returns at the hand-off', () => {
@@ -123,6 +133,41 @@ describe('lane_background.is_background_long_run — ship', () => {
 
 	it('leaves a backgrounded ship alone outside a lane child', () => {
 		expect(lane_background.is_background_long_run(background_call(SHIP), outside_lane)).toBe(false)
+	})
+})
+
+describe('lane_background.foreground_input', () => {
+	it('clears the background flag of a backgrounded ship in a lane child and keeps the command', () => {
+		const input = lane_background.foreground_input(background_call(DETACHED_SHIP), in_lane)
+
+		expect(input).toStrictEqual({
+			command: DETACHED_SHIP,
+			run_in_background: false,
+			timeout: FOREGROUND_TIMEOUT_MS,
+		})
+	})
+
+	it('replaces a background-sized timeout with the foreground cap', () => {
+		const input = { command: SHIP, run_in_background: true, timeout: BACKGROUND_TIMEOUT_MS }
+		const rewritten = lane_background.foreground_input({ name: BASH, input }, in_lane)
+
+		expect(rewritten?.['timeout']).toBe(FOREGROUND_TIMEOUT_MS)
+	})
+
+	it('leaves a backgrounded ship outside a lane child untouched', () => {
+		expect(lane_background.foreground_input(background_call(SHIP), outside_lane)).toBeUndefined()
+	})
+
+	it('does not rewrite a ship chained after the gate', () => {
+		expect(
+			lane_background.foreground_input(background_call(GATE_AND_SHIP), in_lane),
+		).toBeUndefined()
+	})
+
+	it('does not rewrite a foreground ship, nor read the lane mark for it', () => {
+		const call = { name: BASH, input: { command: DETACHED_SHIP } }
+
+		expect(lane_background.foreground_input(call, never)).toBeUndefined()
 	})
 })
 

@@ -30,6 +30,7 @@ function parts(overrides: Partial<PrepParts>): PrepParts {
 		latest_reason: 'window is 12h',
 		has_changes: false,
 		locations: '',
+		ship_problems: [],
 		...overrides,
 	}
 }

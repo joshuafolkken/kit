@@ -1,9 +1,11 @@
 import { duplicate_read_outcome } from '#scripts/delegation/duplicate-read-guard'
 import { investigation_refusal } from '#scripts/delegation/investigation-guard'
-import type { GuardOutcome } from '#scripts/josh/hook-decision'
+import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
+import { lane_background } from '#scripts/rules/lane-background'
 import { run_parent_cut_hook } from '#scripts/run/run-parent-cut-hook'
 import { run_watcher_hook } from '#scripts/run/run-watcher-hook'
+import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { batch_outcome } from './batch-guard'
 import { step_zero_notice } from './step-zero-notice'
 
@@ -108,6 +110,47 @@ async function pretool_outcome_async(raw_payload: string): Promise<GuardOutcome>
 	return with_step_zero_notice(base, raw_payload)
 }
 
-const pretool_guard = { combine_outcomes, pretool_outcome }
+function guarded_call(raw_payload: string): GuardedCall | undefined {
+	try {
+		const payload = hook_decision.parse_hook_payload(raw_payload)
+
+		return payload === undefined
+			? undefined
+			: { name: payload.tool_name, input: payload.tool_input }
+	} catch {
+		return undefined
+	}
+}
+
+// The envelope that replaces the outcome's own when a lane child backgrounded `josh ship` alone
+// (joshuafolkken/kit#3154): the call is run in the foreground instead of being refused. A refusal from
+// any guard still wins, and a notice the outcome carried rides along in the same context.
+function foreground_rewrite(
+	outcome: GuardOutcome,
+	raw_payload: string,
+	is_lane_child?: () => boolean,
+): string | undefined {
+	if (outcome.reason !== undefined) return undefined
+
+	const call = guarded_call(raw_payload)
+	const input =
+		call === undefined ? undefined : lane_background.foreground_input(call, is_lane_child)
+
+	if (input === undefined) return undefined
+
+	const context = [lane_background.FOREGROUND_NOTE, outcome.notice ?? outcome.fault]
+
+	return hook_decision.rewrite_envelope(input, context.filter(Boolean).join('\n\n'))
+}
+
+// The hook's one write: the foreground rewrite where it applies, the outcome's own envelope otherwise.
+function emit(raw_payload: string, outcome: GuardOutcome): void {
+	const rewrite = foreground_rewrite(outcome, raw_payload)
+
+	if (rewrite === undefined) hook_decision.emit_outcome(outcome)
+	else process.stdout.write(`${rewrite}\n`)
+}
+
+const pretool_guard = { combine_outcomes, emit, foreground_rewrite, pretool_outcome }
 
 export { pretool_guard, pretool_outcome, pretool_outcome_async }

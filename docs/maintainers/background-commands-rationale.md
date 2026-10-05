@@ -72,4 +72,7 @@ The pre-gate cut (joshuafolkken/kit#1839) is the one sanctioned turn-end before 
 relaunches a fresh process in the same act, so the run continues rather than stalling. A headless lane
 child kills its background Bash tasks at its turn end (joshuafolkken/kit#2704), and a backgrounded
 `ship` dies before its supervisor exists (joshuafolkken/kit#3027), which is why that child hands the
-region to a foreground `pnpm josh ship --detach`.
+region to a foreground `pnpm josh ship --detach`. Because a foreground `ship` in a child already
+detaches itself after its preflight, the `PreToolUse` hook rewrites a backgrounded `ship` issued alone
+into that foreground call (`updatedInput`) instead of refusing it — the refusal only ever asked for the
+same call again (joshuafolkken/kit#3154).

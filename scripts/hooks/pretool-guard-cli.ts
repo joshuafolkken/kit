@@ -2,7 +2,7 @@
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { hook_decision } from '#scripts/josh/hook-decision'
-import { pretool_outcome_async } from './pretool-guard'
+import { pretool_guard, pretool_outcome_async } from './pretool-guard'
 
 // The `PreToolUse` hook's entry, kept apart from the composition in `pretool-guard.ts`
 // (joshuafolkken/kit#2922). The hook bundles are built with `splitting: true`, which moves a module
@@ -16,6 +16,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 		const raw_payload = await text(process.stdin)
 
 		hook_decision.load_environment_file()
-		hook_decision.emit_outcome(await pretool_outcome_async(raw_payload))
+		pretool_guard.emit(raw_payload, await pretool_outcome_async(raw_payload))
 	}
 }
