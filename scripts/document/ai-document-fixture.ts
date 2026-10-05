@@ -35,6 +35,9 @@ const CANONICAL_DOC = 'CLAUDE.md'
 // fifteen-file edit. Reading is cheap here — this is a test process, not a session.
 const WORKFLOW_PROMPT = 'prompts/collaboration-workflow.md'
 const WORKFLOW_PROMPT_DIRECTORY = 'prompts/collaboration-workflow'
+// The delivery list names each rule; which suite pins a row is maintainer detail and lives here
+// (joshuafolkken/kit#3186), so every row's marker suite asserts its suite path against this file.
+const RULE_DELIVERY_RATIONALE = 'docs/maintainers/rule-delivery-rationale.md'
 const CLAUDE_SETTINGS = '.claude/settings.json'
 const ENV_EXAMPLE = '.env.example'
 const MARKDOWN_EXTENSION = '.md'
@@ -213,6 +216,7 @@ export {
 	read_index,
 	read_repo_file,
 	routing_documents,
+	RULE_DELIVERY_RATIONALE,
 	read_rule_surface,
 	read_unwrapped_rule_surface,
 	POINTER_DOCS,

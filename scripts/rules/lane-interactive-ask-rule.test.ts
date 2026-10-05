@@ -1,4 +1,8 @@
-import { read_unwrapped, WORKFLOW_PROMPT_DIRECTORY } from '#scripts/document/ai-document-fixture'
+import {
+	read_unwrapped,
+	RULE_DELIVERY_RATIONALE,
+	WORKFLOW_PROMPT_DIRECTORY,
+} from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 
@@ -57,8 +61,12 @@ describe(`${TOPIC_FILE} — the single source for the interactive-ask rule`, () 
 describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, () => {
 	const content = read_unwrapped(DELIVERY)
 
-	it.each([FIRING_SUITE, 'AskUserQuestion'])('states %j', (marker) => {
-		expect(content).toContain(marker)
+	it('states the tool it fires on', () => {
+		expect(content).toContain('AskUserQuestion')
+	})
+
+	it('leaves the firing suite to the rationale', () => {
+		expect(read_unwrapped(RULE_DELIVERY_RATIONALE)).toContain(FIRING_SUITE)
 	})
 
 	// The non-firing state that means the rule is kept, or the trigger has not been reached: a checkout
