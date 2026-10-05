@@ -100,12 +100,13 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// Lowered in joshuafolkken/kit#3175: the loop became the driver's hand-backs, the supervisor and
 	// provider prose moved to `docs/josh-commands-automation.md`, and the failure-only sections moved to
 	// `backlogrun-recovery.md`, which the parent's reach still charges whole.
-	{ entry: 'kickoff', bytes: 53_248 },
-	{ entry: 'fullrun', bytes: 69_632 },
-	{ entry: 'halfrun', bytes: 69_632 },
-	{ entry: 'prrun', bytes: 73_728 },
-	{ entry: 'backlogrun', bytes: 188_416 },
-	{ entry: LANE_CHILD, bytes: 73_728 },
+	// joshuafolkken/kit#3171 cut `CLAUDE.md` to triggers and pointers (~12 KB), lowering every entry.
+	{ entry: 'kickoff', bytes: 45_056 },
+	{ entry: 'fullrun', bytes: 57_344 },
+	{ entry: 'halfrun', bytes: 57_344 },
+	{ entry: 'prrun', bytes: 61_440 },
+	{ entry: 'backlogrun', bytes: 176_128 },
+	{ entry: LANE_CHILD, bytes: 57_344 },
 ]
 
 function byte_size(root: string, relative_path: string): number {

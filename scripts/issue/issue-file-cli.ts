@@ -8,6 +8,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
 import { error_text } from '#scripts/lib/error-message'
+import { repository_labels } from '#scripts/repo/repository-labels'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_scout_cli } from './issue-scout-cli'
@@ -15,7 +16,8 @@ import { issue_scout_cli } from './issue-scout-cli'
 // `josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>]…
 // [--repo <owner/repo>] [--distinct <N,…>]` — file an Issue with every filing step run in order
 // (joshuafolkken/kit#2808): the third-party refusal, the body lint, the `## Origin` check for another
-// repository, the duplicate scout, the create call carrying every label, and `epic:bundle` after it.
+// repository, the duplicate scout, the missing workflow labels created (joshuafolkken/kit#3176), the
+// create call carrying every label, and `epic:bundle` after it.
 // A direct `gh api …/issues` filing is refused by the `direct-filing` delivered rule and pointed here.
 
 const SUCCESS_EXIT_CODE = 0
@@ -94,8 +96,10 @@ async function is_scout_clear(filing: Filing): Promise<boolean> {
 }
 
 // `undefined` when the create call failed. `gh`'s standard error is captured into the thrown error
-// rather than printed, so it is printed here — otherwise the filing fails with no reason given.
+// rather than printed, so it is printed here — otherwise the filing fails with no reason given. A label
+// the create applies is provisioned first, so it never arrives with a generated color.
 async function create(filing: Filing): Promise<string | undefined> {
+	repository_labels.ensure_labels(filing.target)
 	const request = git_gh_issue_write.issue_create_request({
 		title: filing.args.title,
 		body: filing.body,

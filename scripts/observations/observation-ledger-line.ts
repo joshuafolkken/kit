@@ -1,4 +1,4 @@
-// The observation ledger's line grammar (`.claude/skills/workflow-commands/observation-filing.md`)
+// The observation ledger's line grammar (`.claude/skills/workflow-commands/observation-ledger.md`)
 // is fixed — `- k:<slug> | d<n> | <YYYY-MM-DD> | <where> | <what>` — but the path was collected in
 // `observation-ledger.ts` without a line ever being parsed, so a malformed append rode a flush
 // through unremarked. This validates a ledger entry line and reports why a broken one is broken

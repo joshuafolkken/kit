@@ -171,9 +171,8 @@ const DEPTH_LABEL_ORDER: ReadonlyArray<string> = [DEPTH_0_LABEL, DEPTH_1_LABEL, 
 // description, so provisioning from here is what gives each one a stable color a reader can scan by.
 // Green, amber and pale blue, so the consumer-facing depth is the one that stands out in a listing.
 //
-// **The provisioning command lives in `observation-filing.md`**, because prose cannot import this module —
-// the same split `FILING_ROUTE_LABELS` above lives with. `scripts/rules/issue-depth-label.test.ts` keys
-// those three command lines to this array, so a color changed here without the document fails.
+// **`josh issue:file` provisions them** through `repository_labels.ensure_labels` before its create
+// call (joshuafolkken/kit#3176), so no document carries a creation command to keep in step.
 const DEPTH_LABELS: ReadonlyArray<{
 	name: string
 	color: string
