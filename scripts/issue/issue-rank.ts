@@ -15,7 +15,7 @@ import {
 //
 // **`run:solo` alone is not a key.** It means "runs alone", not "runs first": tidying that only touches
 // the verification path carries it too, and a low-priority one is not owed a place ahead of the queue.
-// Only a defect on that path is, because `wip-cap.md` holds a batch until it has merged.
+// Only a defect on that path is, because `backlogrun-lanes.md` holds a batch until it has merged.
 
 interface RankRow {
 	labels: ReadonlyArray<string>

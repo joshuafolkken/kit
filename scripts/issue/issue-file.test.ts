@@ -31,6 +31,7 @@ function args_of(overrides: Partial<FileArguments> = {}): FileArguments {
 		labels: [],
 		repo: undefined,
 		distinct: [],
+		is_over_cap: false,
 		...overrides,
 	}
 }
@@ -47,6 +48,10 @@ describe('issue_file.parse — the arguments a filing owes', () => {
 		const expected = { depth: 'depth:0', route: TIER_A, labels: [EPIC], repo: THERE }
 
 		expect(parsed).toStrictEqual(args_of({ ...expected, distinct: [DUPLICATE_A, DUPLICATE_B] }))
+	})
+
+	it('reads --over-cap', () => {
+		expect(issue_file.parse([...FILED, '--over-cap'])).toStrictEqual(args_of({ is_over_cap: true }))
 	})
 
 	it.each([

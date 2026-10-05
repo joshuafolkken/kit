@@ -110,7 +110,7 @@ When `josh bump` changes the version, update `docs/` for any changed behavior be
 ## Collaboration Workflow
 
 - The issue-driven flow: `prompts/collaboration-workflow.md`. **Before writing a rule as prose, place it by `prompts/collaboration-workflow/residency.md`** — computable answers go to `pnpm josh oracle:list`, ordering to `pnpm josh run:step`.
-- **Count the target repository's open Issues before filing; above the WIP cap, close one first.** Nothing honestly closable means do not file. A filing the run is blocked by is exempt, and so is an **interrupt** — three tests decide that, never judgement: a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository; both exemptions proceed, stating the overage. Meeting none of the three, a finding stays discretionary. `pnpm josh rule:guard` states it again at the call that files. `prompts/collaboration-workflow/wip-cap.md`.
+- **File through `pnpm josh issue:file` — it counts the target repository's open Issues, never a hand count; above the WIP cap, close one first.** Nothing honestly closable means do not file. A filing the run is blocked by is exempt, and so is an **interrupt** — three tests decide that, never judgement: a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository; both exemptions proceed, stating the overage. Meeting none of the three, a finding stays discretionary. `pnpm josh rule:guard` states it again at the call that files. `prompts/collaboration-workflow/wip-cap.md`.
 
 ### Shorthand Commands
 
