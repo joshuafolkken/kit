@@ -1,6 +1,7 @@
 import { PORCELAIN_FLAG, UNTRACKED_FILES_FLAG } from './constants'
 import { git_diff_reads } from './git-diff-reads'
 import { create_spawn_error } from './git-execa-error'
+import { git_pre_push_hook } from './git-pre-push-hook'
 import { git_push_transport } from './git-push-transport'
 import { git_spawn } from './git-spawn'
 import { git_spawn_sync } from './git-spawn-sync'
@@ -176,22 +177,33 @@ function is_upstream_not_set_error(error: unknown): boolean {
 	return cause !== undefined && is_exit_code_128(cause)
 }
 
+const NO_VERIFY_FLAG = '--no-verify'
+
 // Both pushes go through `git_push_transport` rather than `git_spawn.with_output`, which is
 // what gives them a timeout and an SSH keepalive the local git commands beside them do not need
 // (joshuafolkken/kit#1251). The thrown error keeps the same `cause.exit_code` shape, so the 128
 // fallback below reads it exactly as it did.
-async function push_with_upstream(branch_name: string): Promise<void> {
-	await git_push_transport.push(['--set-upstream', 'origin', branch_name])
+async function push_with_upstream(
+	branch_name: string,
+	verify_flags: ReadonlyArray<string>,
+): Promise<void> {
+	await git_push_transport.push([...verify_flags, '--set-upstream', 'origin', branch_name])
 }
 
+// **The push budget bounds the transfer alone** (joshuafolkken/kit#3300). The pre-push hook runs once,
+// unbounded, before either push and outside the `try`; both transfers then skip it with `--no-verify`,
+// so neither the timeout retry nor the `--set-upstream` fallback repeats it, and a failed hook is not
+// mistaken for a missing upstream. A git too old to run the hook ahead leaves it to the push, as before.
 async function push(): Promise<void> {
+	const verify_flags = (await git_pre_push_hook.run()) ? [NO_VERIFY_FLAG] : []
+
 	try {
-		await git_push_transport.push([])
+		await git_push_transport.push([...verify_flags])
 	} catch (error) {
 		if (is_upstream_not_set_error(error)) {
 			const current_branch = await branch()
 
-			await push_with_upstream(current_branch)
+			await push_with_upstream(current_branch, verify_flags)
 
 			return
 		}
