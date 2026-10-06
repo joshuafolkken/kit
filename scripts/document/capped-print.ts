@@ -3,6 +3,7 @@ import path from 'node:path'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { review_diff_parts } from '#scripts/review/review-diff-parts'
 import { bash_output_cap_reader } from './bash-output-cap'
+import { capped_print_part } from './capped-print-part'
 
 // Prints a command's output whole when it fits under the Bash output cap, and as part files when it
 // does not (joshuafolkken/kit#3143). Past `BASH_MAX_OUTPUT_LENGTH` Claude Code saves the output and
@@ -17,9 +18,7 @@ import { bash_output_cap_reader } from './bash-output-cap'
 // in one turn, and a shared directory replaced on every call would delete one call's parts while
 // another call's listing still names them.
 
-const DIRECTORY_PREFIX = 'josh-capped-print-'
 const FILE_MODE = 0o600
-const PART_SUFFIX = '.md'
 const LINE_BREAK = '\n'
 // What else shares the Bash result with this output: the launcher line, a script banner, a few
 // stderr lines. Measured at about 80 characters for `pnpm josh doc:section` in kit, so 512 holds the
@@ -27,10 +26,10 @@ const LINE_BREAK = '\n'
 const HEADROOM_CHARS = 512
 
 function write_parts(label: string, text: string, cap: number): Array<string> {
-	const directory = mkdtempSync(path.join(PLATFORM_TEMP_ROOT, DIRECTORY_PREFIX))
+	const directory = mkdtempSync(path.join(PLATFORM_TEMP_ROOT, capped_print_part.DIRECTORY_PREFIX))
 
 	return review_diff_parts.part_texts(label, text, cap).map((part, index) => {
-		const file = path.join(directory, `part-${String(index + 1)}${PART_SUFFIX}`)
+		const file = path.join(directory, capped_print_part.part_name(index))
 
 		writeFileSync(file, part, { flag: 'wx', mode: FILE_MODE })
 

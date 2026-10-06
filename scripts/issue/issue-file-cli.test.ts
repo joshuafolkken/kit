@@ -118,7 +118,13 @@ describe('issue_file_cli.run — a filing that clears every step', () => {
 			labels: ['depth:1', 'route:interrupt', 'bug'],
 			body: VALID_BODY,
 		})
-		expect(report_for).toHaveBeenCalledWith(ISSUE_NUMBER, HERE)
+		expect(report_for).toHaveBeenCalledWith(ISSUE_NUMBER, HERE, issue_file_cli.FRESH_ISSUE_POLL)
+	})
+
+	// joshuafolkken/kit#3332: the open listing trails the create call, so the just-filed Issue is
+	// looked for more than once rather than declared "not an open issue" on the first read.
+	it('asks epic:bundle to wait for the new Issue to reach the open listing', () => {
+		expect(issue_file_cli.FRESH_ISSUE_POLL.attempts).toBeGreaterThan(1)
 	})
 
 	it('files past a candidate declared separate', async () => {

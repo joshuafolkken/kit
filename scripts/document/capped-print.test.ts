@@ -32,8 +32,8 @@ function printed(): string {
 	return prints().join('\n')
 }
 
-function directory_of(listing: string | undefined): string {
-	return path.dirname(capped_print_fixture.part_files(listing ?? '')[0] ?? '')
+function directory_of(listing: string | undefined = ''): string {
+	return path.dirname(capped_print_fixture.part_files(listing)[0] ?? '')
 }
 
 beforeEach(() => {

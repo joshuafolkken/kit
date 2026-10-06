@@ -39,9 +39,9 @@ const MERGED_AT = '2026-09-24T01:23:45Z'
 function listing_row(
 	number: number,
 	head_reference: string,
-	repo?: string,
+	repo = 'joshuafolkken/kit',
 ): Record<string, unknown> {
-	const head = { ref: head_reference, repo: { full_name: repo ?? 'joshuafolkken/kit' } }
+	const head = { ref: head_reference, repo: { full_name: repo } }
 
 	return { number, head }
 }

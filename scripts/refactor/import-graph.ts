@@ -28,7 +28,7 @@ type FileGraph = ReadonlyMap<string, ReadonlySet<string>>
 function specifiers_of(source: string, pattern: RegExp): ReadonlyArray<string> {
 	const matches = [...source.matchAll(pattern)]
 
-	return matches.flatMap((match) => (match[1] === undefined ? [] : [match[1]]))
+	return matches.flatMap((match) => match[1] ?? [])
 }
 
 function parse_imports(source: string): ReadonlyArray<string> {

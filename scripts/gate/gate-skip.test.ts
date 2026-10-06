@@ -65,13 +65,12 @@ const ADVANCED_BASE = 'e5f6a7b8'
 // log is the third of them (joshuafolkken/kit#1227), and left shared a run here would overwrite the
 // live gate's log with the output of checks that never ran. All three are built by
 // `gate_test_fixture.suite_records`, which every gate suite now shares.
-const RECORDS = gate_test_fixture.suite_records('skip')
 const {
 	clear: clear_records,
 	log_path: LOG_PATH,
 	marker_path: MARKER_PATH,
 	stamp_path: STAMP_PATH,
-} = RECORDS
+} = gate_test_fixture.suite_records('skip')
 
 // Which check ran is `verification-gate.test.ts`'s subject; here every one passes and what is counted
 // is how many were started at all. The body matters in one case only — a check that passed with

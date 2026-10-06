@@ -43,6 +43,7 @@ const SHIPPED_UNREACHABLE = new Set([
 	'scripts/build/build-bin.ts',
 	'scripts/build/build-claude-md.ts',
 	'scripts/build/build-codex-hooks.ts',
+	'scripts/build/build-commands.ts',
 	'scripts/agent/codex-hooks.ts',
 	'scripts/build/build-hooks.ts',
 	'scripts/build/build-library.ts',

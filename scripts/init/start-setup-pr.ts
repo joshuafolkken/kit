@@ -22,8 +22,8 @@ const FIRST_SETUP_ISSUE_FILTER = `[.[] | select(.title == "${SETUP_TITLE}") | .n
 
 // Listings are read NUL-separated (`-z`), so a path is never quoted — a name a caller's initialize
 // command wrote need not be ASCII the way kit's own are (#2872).
-function paths_of(output: string | undefined): Array<string> {
-	return (output ?? '').split('\0').filter((listed) => listed.length > 0)
+function paths_of(output: string | undefined = ''): Array<string> {
+	return output.split('\0').filter((listed) => listed.length > 0)
 }
 
 function listing(args: ReadonlyArray<string>, root: string): Array<string> {

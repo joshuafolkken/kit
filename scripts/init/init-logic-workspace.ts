@@ -2,7 +2,7 @@ function extract_yaml_top_level_keys(content: string): Array<string> {
 	return content.split('\n').flatMap((line) => {
 		const key = /^([a-zA-Z][a-zA-Z0-9_-]*):/u.exec(line)?.[1]
 
-		return key ? [key] : []
+		return key ?? []
 	})
 }
 

@@ -13,6 +13,7 @@ const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Print one section of a markdown document, for a `file.md` → "Heading" reference',
 		category: 'AI tools',
 		reference: ['<file> <heading>', 'automation', ['none']],
+		is_bundled: true,
 	},
 	'read:set': {
 		script: 'scripts/document/read-set-cli.ts',

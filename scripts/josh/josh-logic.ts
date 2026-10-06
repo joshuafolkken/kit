@@ -223,14 +223,12 @@ async function run_script_entry(
 	entry: CommandEntry,
 	subcommand_arguments: Array<string>,
 ): Promise<number> {
-	const script_path = path.join(PACKAGE_DIR, entry.script ?? '')
 	const script_arguments = [...(entry.default_script_arguments ?? []), ...subcommand_arguments]
+	const target = josh_in_process.in_process_target(entry, PACKAGE_DIR, import.meta.url)
 
-	if (josh_in_process.can_run_in_process(entry, import.meta.url)) {
-		return await josh_in_process.run_in_process(script_path, script_arguments)
-	}
+	if (target !== undefined) return await josh_in_process.run_in_process(target, script_arguments)
 
-	return spawn_script_entry(entry, script_path, script_arguments)
+	return spawn_script_entry(entry, path.join(PACKAGE_DIR, entry.script ?? ''), script_arguments)
 }
 
 function github_prerequisite_exit(resolved: string, is_consumer: boolean): number | undefined {

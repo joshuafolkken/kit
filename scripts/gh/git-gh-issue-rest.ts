@@ -163,8 +163,8 @@ function empty_blocked_by(): BlockedBy {
 // repository and names a different issue there (joshuafolkken/kit#1126). Undefined when the field is
 // absent or shaped otherwise; the caller then falls back to the repository it is reading in, which is
 // what an unqualified relation has always meant.
-function repo_of_url(repository_url: string | undefined): string | undefined {
-	const match = REPOSITORY_URL.exec(repository_url ?? '')
+function repo_of_url(repository_url: string | undefined = ''): string | undefined {
+	const match = REPOSITORY_URL.exec(repository_url)
 
 	return match?.[REPOSITORY_URL_GROUP]
 }

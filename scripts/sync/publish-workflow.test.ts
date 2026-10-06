@@ -235,7 +235,7 @@ describe('registry dist-tag lookup', () => {
 		(job_name) => {
 			const { steps } = read_workflow().jobs[job_name]
 			const lookups = steps.flatMap((step, index) =>
-				(step.run ?? '').includes('npm view') ? [index] : [],
+				(step.run ?? '').includes('npm view') ? index : [],
 			)
 			const setup = steps.findIndex((step) => step.uses === SETUP_PNPM_ACTION)
 

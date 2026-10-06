@@ -59,7 +59,7 @@ function walk_files(directory: string, relative: string): Array<string> {
 	return readdirSync(path.join(directory, relative), { withFileTypes: true }).flatMap((entry) => {
 		const child = relative === '' ? entry.name : `${relative}/${entry.name}`
 
-		return entry.isDirectory() ? walk_files(directory, child) : [child]
+		return entry.isDirectory() ? walk_files(directory, child) : child
 	})
 }
 

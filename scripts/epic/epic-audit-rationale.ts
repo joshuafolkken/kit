@@ -73,9 +73,10 @@ function order_pairs(
 		const blocked = find_child(children, { repo: epic_repo, number: link.blocked })
 		if (blocker === undefined || blocked === undefined) return []
 
-		return is_open_local(blocker, current_repo) && is_open_local(blocked, current_repo)
-			? [{ blocker, blocked }]
-			: []
+		if (!is_open_local(blocker, current_repo) || !is_open_local(blocked, current_repo)) return []
+
+		// eslint-disable-next-line unicorn/no-unnecessary-array-flat-map -- one return type (sonarjs/function-return-type)
+		return [{ blocker, blocked }]
 	})
 }
 

@@ -114,8 +114,7 @@ function write_timing_start(start: TimingStart, target: string = PROJECT_ROOT): 
 function to_timing(value: unknown): TimingStart | undefined {
 	if (typeof value !== 'object' || value === null) return undefined
 
-	const record = value as Record<string, unknown>
-	const { gate_started_at, review_started_at } = record
+	const { gate_started_at, review_started_at } = value as Record<string, unknown>
 
 	if (typeof gate_started_at !== 'string' || typeof review_started_at !== 'string') return undefined
 

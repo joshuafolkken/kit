@@ -54,8 +54,8 @@ function parse_arguments(argv: ReadonlyArray<string>): ReservedCommand | undefin
 // command becomes an exit code the caller returns rather than a throw — the reservation is released by
 // `with_core_reservation`'s `finally` on either path.
 async function run_command(command: ReadonlyArray<string>): Promise<number> {
-	const [file, ...args] = command
-	const result = await execa(file ?? '', args, { stdio: 'inherit', reject: false })
+	const [file = '', ...args] = command
+	const result = await execa(file, args, { stdio: 'inherit', reject: false })
 
 	return result.exitCode ?? FAIL_EXIT_CODE
 }

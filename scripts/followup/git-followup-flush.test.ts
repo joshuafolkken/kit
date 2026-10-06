@@ -57,10 +57,10 @@ describe('commit_ledger_step — a ledger line appended after the run commit', (
 
 		const [staged] = vi.mocked(git_spawn.read).mock.invocationCallOrder
 		const [committed] = vi.mocked(git_command.commit).mock.invocationCallOrder
-		const [pushed] = vi.mocked(git_command.push).mock.invocationCallOrder
+		const [pushed = 0] = vi.mocked(git_command.push).mock.invocationCallOrder
 
 		expect(staged).toBeLessThan(committed ?? 0)
-		expect(committed).toBeLessThan(pushed ?? 0)
+		expect(committed).toBeLessThan(pushed)
 	})
 })
 
