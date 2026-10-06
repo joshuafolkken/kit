@@ -6,13 +6,23 @@ import { safe_chain_preinstall } from './preinstall-command'
 const PROXY_URL = 'http://127.0.0.1:49681'
 const LEGACY_VALUE = 'pnpm dlx @aikidosec/safe-chain setup-ci'
 const PINNED_VALUE = 'pnpm dlx @aikidosec/safe-chain@1.5.20 setup-ci'
+const EARLIER_CHECK = `node -e "if(!process.env.CI)console.warn('Warning: safe-chain is not scanning this install.')"`
 const CONSUMER_VALUE = 'npx only-allow pnpm'
 const CHECKED_VARIABLES: ReadonlySet<string> = new Set(['CI', 'GLOBAL_AGENT_HTTP_PROXY'])
+// A command that reaches the network to fetch something before running it.
+const NETWORK_FETCH_RE = /\b(?:dlx|npx|curl|wget|exec)\b/u
+const PNPMFILE_URL = new URL('../../.pnpmfile.mjs', import.meta.url).href
 
 interface CheckResult {
 	status: number | null
 	stderr: string
 }
+
+interface PnpmfileModule {
+	is_safe_chain_preinstall: (name: string, command: string) => boolean
+}
+
+const { is_safe_chain_preinstall } = (await import(PNPMFILE_URL)) as PnpmfileModule
 
 function run_check(extra_environment: Record<string, string>): CheckResult {
 	const base_environment = Object.fromEntries(
@@ -63,27 +73,34 @@ describe('local integration check', () => {
 })
 
 describe('SAFE_CHAIN_CMD', () => {
-	it('runs setup-ci and then the local integration check', () => {
+	it('runs only the local integration check', () => {
 		expect(safe_chain_preinstall.SAFE_CHAIN_CMD).toBe(
-			`${LEGACY_VALUE} && ${safe_chain_preinstall.LOCAL_INTEGRATION_CHECK_CMD}`,
+			`node -e "${safe_chain_preinstall.LOCAL_INTEGRATION_CHECK_SOURCE}"`,
 		)
 	})
 
-	it('is what kit itself runs, pinned version aside', () => {
-		expect(read_own_preinstall()).toBe(safe_chain_preinstall.migrate_preinstall(PINNED_VALUE))
+	// joshuafolkken/kit#3269: the install used to fetch and run an unverified safe-chain every time.
+	it('fetches nothing from the network', () => {
+		expect(safe_chain_preinstall.SAFE_CHAIN_CMD).not.toMatch(NETWORK_FETCH_RE)
+	})
+
+	it('is what kit itself runs', () => {
+		expect(read_own_preinstall()).toBe(safe_chain_preinstall.SAFE_CHAIN_CMD)
+	})
+
+	it('is still stripped from a packed manifest by the pnpmfile hook', () => {
+		expect(is_safe_chain_preinstall('preinstall', safe_chain_preinstall.SAFE_CHAIN_CMD)).toBe(true)
 	})
 })
 
 describe('migrate_preinstall', () => {
-	it('appends the check to the legacy value kit wrote', () => {
-		expect(safe_chain_preinstall.migrate_preinstall(LEGACY_VALUE)).toBe(
+	it.each([
+		['the unpinned setup-ci', LEGACY_VALUE],
+		['a pinned setup-ci', PINNED_VALUE],
+		['setup-ci followed by an earlier check', `${PINNED_VALUE} && ${EARLIER_CHECK}`],
+	])('replaces %s with the network-free check', (_label, value) => {
+		expect(safe_chain_preinstall.migrate_preinstall(value)).toBe(
 			safe_chain_preinstall.SAFE_CHAIN_CMD,
-		)
-	})
-
-	it('keeps a pinned version while appending the check', () => {
-		expect(safe_chain_preinstall.migrate_preinstall(PINNED_VALUE)).toBe(
-			`${PINNED_VALUE} && ${safe_chain_preinstall.LOCAL_INTEGRATION_CHECK_CMD}`,
 		)
 	})
 
@@ -93,7 +110,10 @@ describe('migrate_preinstall', () => {
 		expect(safe_chain_preinstall.migrate_preinstall(migrated)).toBe(migrated)
 	})
 
-	it('leaves a consumer-authored value unchanged', () => {
-		expect(safe_chain_preinstall.migrate_preinstall(CONSUMER_VALUE)).toBe(CONSUMER_VALUE)
+	it.each([
+		['a consumer-authored value', CONSUMER_VALUE],
+		['setup-ci chained with a consumer command', `${LEGACY_VALUE} && ${CONSUMER_VALUE}`],
+	])('leaves %s unchanged', (_label, value) => {
+		expect(safe_chain_preinstall.migrate_preinstall(value)).toBe(value)
 	})
 })

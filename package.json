@@ -30,7 +30,7 @@
 		"josh": "dist/josh.js"
 	},
 	"scripts": {
-		"preinstall": "pnpm dlx @aikidosec/safe-chain@1.5.20 setup-ci && node -e \"if(!process.env.CI&&!process.env.GLOBAL_AGENT_HTTP_PROXY)console.warn('Warning: safe-chain is not scanning this install because its shell integration is not active. Install safe-chain (https://github.com/AikidoSec/safe-chain#installation) or run: safe-chain setup - then restart your terminal.')\"",
+		"preinstall": "node -e \"if(!process.env.CI&&!process.env.GLOBAL_AGENT_HTTP_PROXY)console.warn('Warning: safe-chain (@aikidosec/safe-chain) is not scanning this install because its shell integration is not active. Install it with the hash-verified steps at https://github.com/joshuafolkken/kit/blob/main/SECURITY.md#installing-safe-chain - then restart your terminal.')\"",
 		"prepare": "(command -v lefthook >/dev/null 2>&1 && { lefthook install || echo 'lefthook install failed: git hooks are NOT installed. A set core.hooksPath is the usual cause. See https://github.com/joshuafolkken/kit/blob/main/docs/init.md#corehookspath-stops-lefthook-installing-anything' >&2; } || true)",
 		"build": "tsx scripts/build/build-bin.ts && tsx scripts/build/build-hooks.ts && tsx scripts/build/build-version.ts && tsx scripts/build/build-config-merge.ts && tsx scripts/build/build-managed-marker.ts && tsx scripts/build/build-self-sync-guard.ts && tsx scripts/build/build-claude-md.ts && tsx scripts/build/build-codex-hooks.ts",
 		"prepack": "tsx scripts/version/publishable-range-check.ts && pnpm build",

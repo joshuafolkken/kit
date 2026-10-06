@@ -1,38 +1,37 @@
-// `setup-ci` only writes shims and adds them to PATH on a CI runner, so a local `pnpm install` is
-// scanned only when the developer has enabled safe-chain's own shell integration. That integration
-// runs pnpm behind safe-chain's registry proxy and hands `GLOBAL_AGENT_HTTP_PROXY` to it, which a bare
-// pnpm never sets — the one signal a lifecycle script can read (joshuafolkken/kit#2707).
-const SETUP_CI_CMD = 'pnpm dlx @aikidosec/safe-chain setup-ci'
-const LEGACY_PREINSTALL_RE = /^pnpm dlx @aikidosec\/safe-chain(?:@\S+)? setup-ci$/u
+// The `preinstall` kit writes fetches nothing: it only checks that safe-chain is scanning the install
+// and warns when it is not (joshuafolkken/kit#3269). It used to run `pnpm dlx @aikidosec/safe-chain
+// setup-ci`, which downloaded an unverified package on every install and — `setup-ci` acting only on
+// a CI runner, where kit installs with `--ignore-scripts` — protected nothing. safe-chain's shell
+// integration runs pnpm behind its registry proxy and hands `GLOBAL_AGENT_HTTP_PROXY` to it, which a
+// bare pnpm never sets — the one signal a lifecycle script can read (joshuafolkken/kit#2707).
+const INSTALL_GUIDE_ANCHOR = 'installing-safe-chain'
+const INSTALL_GUIDE_URL = `https://github.com/joshuafolkken/kit/blob/main/SECURITY.md#${INSTALL_GUIDE_ANCHOR}`
+// `.pnpmfile.mjs` recognizes the command by the package name, so the hint names it.
 const INTEGRATION_HINT =
-	'Warning: safe-chain is not scanning this install because its shell integration is not active.' +
-	' Install safe-chain (https://github.com/AikidoSec/safe-chain#installation) or run: safe-chain setup' +
+	'Warning: safe-chain (@aikidosec/safe-chain) is not scanning this install because its shell' +
+	` integration is not active. Install it with the hash-verified steps at ${INSTALL_GUIDE_URL}` +
 	' - then restart your terminal.'
 // `preinstall` runs before any dependency is installed, kit included, so the check is plain Node with
 // no imports. It never fails the install and stays silent on CI, where the runner is set up instead.
 // The source avoids double quotes, `$` and backticks so the shell passes it to Node verbatim.
 const LOCAL_INTEGRATION_CHECK_SOURCE = `if(!process.env.CI&&!process.env.GLOBAL_AGENT_HTTP_PROXY)console.warn('${INTEGRATION_HINT}')`
-const LOCAL_INTEGRATION_CHECK_CMD = `node -e "${LOCAL_INTEGRATION_CHECK_SOURCE}"`
+const SAFE_CHAIN_CMD = `node -e "${LOCAL_INTEGRATION_CHECK_SOURCE}"`
+// Every `preinstall` an earlier kit wrote: `setup-ci` alone, pinned or not, or followed by the
+// `node -e` check of any earlier wording.
+const LEGACY_PREINSTALL_RE =
+	/^pnpm dlx @aikidosec\/safe-chain(?:@\S+)? setup-ci(?: && node -e "[^"]*")?$/u
 
-function with_local_check(setup_command: string): string {
-	return `${setup_command} && ${LOCAL_INTEGRATION_CHECK_CMD}`
-}
-
-// Upgrade a `preinstall` kit wrote before the check existed, pinned version included; any other
-// value is the consumer's own and is left exactly as it is.
+// Replace a `preinstall` kit wrote earlier; any other value is the consumer's own and is left exactly
+// as it is.
 function migrate_preinstall(value: string): string {
-	if (!LEGACY_PREINSTALL_RE.test(value)) return value
-
-	return with_local_check(value)
+	return LEGACY_PREINSTALL_RE.test(value) ? SAFE_CHAIN_CMD : value
 }
-
-const SAFE_CHAIN_CMD = with_local_check(SETUP_CI_CMD)
 
 const safe_chain_preinstall = {
 	SAFE_CHAIN_CMD,
-	LOCAL_INTEGRATION_CHECK_CMD,
 	LOCAL_INTEGRATION_CHECK_SOURCE,
 	INTEGRATION_HINT,
+	INSTALL_GUIDE_ANCHOR,
 	migrate_preinstall,
 }
 

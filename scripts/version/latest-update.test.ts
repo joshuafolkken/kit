@@ -17,8 +17,8 @@ vi.mock('node:fs', () => ({
 	mkdtempSync: vi.fn().mockReturnValue(CACHE_DIRECTORY),
 	rmSync: rm_mock,
 }))
-vi.mock('./preinstall-version-update', () => ({
-	preinstall_version_update: { sync: sync_mock },
+vi.mock('./safe-chain-version-update', () => ({
+	safe_chain_version_update: { sync: sync_mock },
 }))
 vi.mock('#scripts/overrides/overrides-files', () => ({
 	overrides_files: {
@@ -138,10 +138,10 @@ describe('latest_update.main — preinstall sync guard', () => {
 		execa_sync_mock.mockReturnValue({ exitCode: 0 })
 	})
 
-	it('calls preinstall sync when update succeeds', () => {
+	it('calls the safe-chain pin sync when update succeeds', () => {
 		latest_update.main()
 
-		expect(sync_mock).toHaveBeenCalled()
+		expect(sync_mock).toHaveBeenCalledOnce()
 	})
 
 	it('skips preinstall sync when update fails', () => {
