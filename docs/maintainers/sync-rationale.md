@@ -91,7 +91,9 @@ name.
 Two failure modes are decided on the safe side. A changed workflow that cannot be read at the head
 fails the step rather than being answered; no output lands on the same side as "managed", but
 visibly. And the narrowing to workflow paths happens inside the `--jq` query rather than through
-`grep`, whose exit status cannot tell "no match" from "could not look".
+`grep`: without `pipefail` a `gh` failure inside the pipeline is masked by grep's status, and the
+old check conflated grep's 1 ("no match") with its 2 ("could not look") — one of which means
+"merge it".
 
 ## Arming and withdrawing auto-merge
 

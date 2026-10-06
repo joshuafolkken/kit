@@ -57,7 +57,7 @@ would have committed a red tree.
 
 **Rejected alternatives:**
 
-- **Rewrite the worked examples in the procedures.** Rejected: **there is no example to rewrite**
+- **Rewrite the worked examples in the procedures.** Rejected: **there is no example to rewrite**.
   Searching every document, prompt and skill found one piped
   verification example — in `docs/josh-commands.md` — and it was the description of this very defect.
   The pipe is not copied from a model; **it is invented fresh every turn**.

@@ -65,6 +65,12 @@ function markdown_in(directory: string): Array<string> {
 		.map((entry) => `${directory}/${entry}`)
 }
 
+function markdown_under(directory: string): Array<string> {
+	return readdirSync(package_file(directory), { encoding: 'utf8', recursive: true })
+		.filter((entry) => entry.endsWith('.md'))
+		.map((entry) => `${directory}/${entry}`)
+}
+
 function user_guides(): Array<string> {
 	return [
 		...USER_GUIDE_PAGES,
@@ -88,7 +94,7 @@ describe('the maintainer documentation', () => {
 		)
 	})
 
-	it.each(markdown_in(MAINTAINERS_DIRECTORY))('%s carries no Japanese prose', (path) => {
+	it.each(markdown_under(MAINTAINERS_DIRECTORY))('%s carries no Japanese prose', (path) => {
 		expect(read_document(path).replaceAll(QUOTED_SPANS, '')).not.toMatch(JAPANESE)
 	})
 

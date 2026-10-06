@@ -7,7 +7,7 @@ changes no rule.
 
 ## Measured cost of whole-file rewrites
 
-Measured on one run:
+Measured on the joshuafolkken/kit#1251 run (joshuafolkken/kit#1260):
 
 | Turn                   | Output tokens | What it was                                                     |
 | ---------------------- | ------------- | --------------------------------------------------------------- |
@@ -19,7 +19,8 @@ At an effective generation rate of about 87 tokens per second, **this one run sp
 
 ## Measured breakdown of command text
 
-The breakdown measured from one run's transcript:
+The breakdown measured from the transcript of the joshuafolkken/kit#1144 run
+(joshuafolkken/kit#1150):
 
 | Kind                  | Share     |
 | --------------------- | --------- |
@@ -41,6 +42,8 @@ The 97,042 tokens of Bash command text over 427 calls broke down as:
 tokens a call, the largest 1,200–1,800. What costs most is not the total but that each one is counted
 twice and stays in the context for the rest of the run.
 
+Re-measuring after the rule took effect is joshuafolkken/kit#1159.
+
 ## Why it is resident
 
 The residency criterion (`residency.md`) comes down to one question:
@@ -55,7 +58,7 @@ Even so, the resident side holds **only the trigger and the pointer**. These thr
 keeps, and they are enough to behave correctly:
 
 1. Make a region-scoped edit with Edit; never write a region back through an interpreter or a heredoc
-2. **Never widen Edit itself to the whole file**
+2. **Never widen Edit itself to the whole file** (joshuafolkken/kit#1260)
 3. The criterion is whether the call carries the text wholesale, not which tool it is (a short
    `sed -i` is allowed)
 
@@ -69,8 +72,14 @@ carries the individual forms.
 
 ## Marker tests
 
-`scripts/document/document-markers.test.ts` pins the following (as written when this list moved out of
-`file-edits.md`; "the procedure" below is `file-edits.md`):
+No suite pins the list below any more. joshuafolkken/kit#1260 added it as
+`scripts/inline-edit-rule.test.ts`, and joshuafolkken/kit#1923 deleted that suite when phrase-pinning
+tests gave way to structural document checks; `scripts/document/document-markers.test.ts`, which
+replaced them, does not cover this rule. What is pinned today is the hook, not the wording:
+`scripts/rules/file-body.test.ts` pins which commands carry a file body and that the refusal names
+`file-edits.md`, and `scripts/rules/shell-body-rule.test.ts` pins that the `CLAUDE.md` file-edit line
+is present. The list is kept as the record of what the deleted suite held ("the procedure" below is
+`file-edits.md`):
 
 - The rule's trigger sentence and its criterion sentence are resident in `CLAUDE.md`
 - The ban on whole-file rewrites ("never widen Edit to the whole file") is resident in `CLAUDE.md`

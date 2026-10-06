@@ -8,7 +8,7 @@ change to this file changes no rule.
 ## Tests that pin the wording
 
 `scripts/backlog/backlog-manufacturing-rule.test.ts` pins what the delivery message `WIP_CAP_REASON`
-(`scripts/rules/delivered-rules.ts`) carries.
+(`scripts/rules/wip-cap.ts`) carries.
 
 `scripts/gh/gh-document-guard.test.ts` pins why `gh issue list` is not used: the only `gh` a
 distributed document may put in an executable block is REST, and `gh issue list` goes through GraphQL,
@@ -32,13 +32,13 @@ heavier harm than the one the cap exists to prevent.
 
 ## Where the interrupt category comes from
 
-A defect that made parallel runs impossible did not block the run that found it at that moment, so
-it fell on the discretionary side and survived **only inside a comment on another Issue**. Had the
-user not happened to read that comment, it would have been lost.
+joshuafolkken/kit#1517 was a defect that made parallel runs impossible, but it did not block the run
+that found it at that moment, so it fell on the discretionary side and survived **only inside a
+comment on another Issue**. Had the user not happened to read that comment, it would have been lost.
 
 Reading an interrupt caused by another package (file upstream and stop) and an interrupt from a
 defect in this repository that does not block the run as the same thing is exactly the path by which
-it was dropped.
+joshuafolkken/kit#1517 was dropped.
 
 ## Why self-reported severity is not a condition
 
@@ -54,14 +54,16 @@ moment it is a condition, that category becomes a loophole too.
 `--before` / `--after` actually write a `blocked-by` relation (`docs/josh-commands-backlog.md` →
 "`josh epic --add`"), so `epic:next` stops offering the child being implemented, as "blocked by the
 interrupt". An addition with no position declares no dependency at all, so what is picked up next is
-the runner's choice, not a declared relation. `--order-before <M>` only moves the task-list line and
-writes neither a dependency nor `blocked-by`, so it is not prohibited — **what is prohibited is
-`--before` / `--after`, which write a dependency, not ordering itself.** `epic:next` offers the
-runnable children in task-list order, so an addition with no position means "offered last"; to have
-the interrupt picked up next, move only its line forward.
+the runner's choice, not a declared relation. `--order-before <M>` (joshuafolkken/kit#1738) only
+moves the task-list line and writes neither a dependency nor `blocked-by`, so it is not prohibited —
+**what is prohibited is `--before` / `--after`, which write a dependency, not ordering itself.**
+`epic:next` offers the runnable children in task-list order (joshuafolkken/kit#1583), so an addition
+with no position means "offered last"; to have the interrupt picked up next, move only its line
+forward.
 
-The remaining routes that write a dependency, such as appending with `--after`, are still open
-defects — the procedure asks for an addition with no position so the run does not route around the
+joshuafolkken/kit#1253 is what stopped an addition with no position from writing a dependency; the
+remaining routes, such as appending with `--after`, are **still open** in joshuafolkken/kit#1080 —
+the procedure asks for an addition with no position so the run does not route around the
 closed side and rebuild here the defect the open side still has.
 
 ## Why a solo run
@@ -74,11 +76,11 @@ The original procedure gave two reasons and called either one alone enough to ru
 1. **A batch run on broken verification leaves nobody's result trustworthy.** Run six lanes in
    parallel and six gates or reviews are void together. Everything is redone after the fix, so running
    solo is not even the slower choice.
-2. **The interrupt's own verification sits under the defect it is fixing.** A test that hit the real
-   network and concurrent suites that shared a temporary directory both carried that self-reference,
-   and both were run solo.
+2. **The interrupt's own verification sits under the defect it is fixing.** joshuafolkken/kit#1515
+   (tests hit the real network) and joshuafolkken/kit#1517 (concurrent suites shared a temporary
+   directory) both carried that self-reference, and both were run solo.
 
-**Only reason 1 justifies stopping the other lanes.** Reason 2 is about how far that Issue's own
+**Only reason 1 justifies stopping the other lanes** (joshuafolkken/kit#3024). Reason 2 is about how far that Issue's own
 verification can be trusted; checking with the verification after the fix is enough, and stopping
 unrelated lanes does not help it. Reason 1 holds only for **a defect in kit's own verification that
 makes today's `main` misjudge unrelated PRs**.
@@ -87,19 +89,21 @@ makes today's `main` misjudge unrelated PRs**.
 verification surface (gate / review / push hook / merge check), and `docs/how-to/run-backlog.md`
 widened it further to "an Issue that changes a verification path". Among Issues closed from
 2026-09-01, 19 were `run:solo` and 76 `run:lane` — about one in five stopped parallel work. Eight of
-the 19 were improvements or tidy-ups, not even `bug`, and the rest included CI / template defects in
-consumer projects, an efficiency problem and a storage-format change. None met reason 1. So the
-verdict became the AND of three conditions: it is a defect, it is a defect in kit's own verification,
-and it makes today's `main` misjudge unrelated PRs. Applied to the past 19, only about four stay solo.
+the 19 were improvements or tidy-ups, not even `bug` (#2966, #2945, #2903, #2888 and others), and the
+rest included CI / template defects in consumer projects (#3013, #2815, #2814, #2765), an efficiency
+problem (#2980) and a storage-format change (#2919). None met reason 1. So the verdict became the AND
+of three conditions: it is a defect, it is a defect in kit's own verification, and it makes today's
+`main` misjudge unrelated PRs. Applied to the past 19, only about #2961 / #2841 / #2770 / #2851 stay
+solo.
 The enforcing code (`scripts/epic/epic-solo.ts` and the like) only reads the label, so it did not
 change.
 
-**The section exists because the verdict wavered.** A defect where a lane child's review read the
-session's checkout rather than the lane's had the same shape as the two above, yet right after filing
-it was treated as a member of a parallel batch and was moved back to solo only when the user pointed
-it out. The same judge gave opposite answers in the same week, which showed that **without an
-enumeration the verdict is not consistent**. And that defect returned a **false green**, not a false
-red — the more dangerous side.
+**The section exists because the verdict wavered.** joshuafolkken/kit#1522 (a lane child's review
+read the session's checkout rather than the lane's) had the same shape as #1515 / #1517, yet right
+after filing it was treated as a member of a parallel batch and was moved back to solo only when the
+user pointed it out. The same judge gave opposite answers in the same week, which showed that
+**without an enumeration the verdict is not consistent**. And #1522 returned a **false green**, not a
+false red — the more dangerous side.
 
 ## Changing the cap itself
 
@@ -124,6 +128,6 @@ production carries on.**
 
 ## Why the three landed in one commit
 
-A cap without stopping the production side stops only execution while production carries on. So the
-split-assessment default, the default for review round 2's leftovers and the 30-Issue WIP cap landed
-together in one commit.
+A cap without stopping the production side stops only execution while production carries on. So joshuafolkken/kit#1469
+landed the split-assessment default, the default for review round 2's leftovers and the 30-Issue WIP
+cap together in one commit.

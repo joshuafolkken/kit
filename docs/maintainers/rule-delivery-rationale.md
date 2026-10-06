@@ -8,30 +8,32 @@ agent follows stays in the procedure, and a change to this file changes no rule.
 
 ## Why delivery is needed
 
-`CLAUDE.md` was packed to within a few tokens of its effective ceiling, while `prompts/` and
+`CLAUDE.md` was packed to within a few tokens of its effective ceiling (6 tokens, about 15–18
+characters, when joshuafolkken/kit#1524 was filed), while `prompts/` and
 `.claude/skills/` hold fifteen times the resident part. **Only one route — residency — is full.**
 
 Delivery is not only cheaper, it is **stronger**:
 
-|                        | Resident prose            | Triggered delivery          |
-| ---------------------- | ------------------------- | --------------------------- |
-| Cost                   | Every turn                | Only at the matching moment |
-| Is it read?            | It can be skimmed past    | **A refusal cannot be**     |
-| Can firing be checked? | No                        | A unit test pins it         |
-| Ceiling on the total   | Capped by the context cap | Effectively none            |
+|                        | Resident prose                  | Triggered delivery          |
+| ---------------------- | ------------------------------- | --------------------------- |
+| Cost                   | Every turn                      | Only at the matching moment |
+| Is it read?            | It can be skimmed past          | **A refusal cannot be**     |
+| Can firing be checked? | No                              | A unit test pins it         |
+| Ceiling on the total   | Capped by the effective ceiling | Effectively none            |
 
-**This is measured, not assumed.** Three consecutive runs showed the batching instruction moving
-nothing, as prose and as a runtime note alike; it moved only once it became a `PreToolUse` hook. The
-investigation guard followed the same path. **A rule can sit resident and never fire**, so what a
-move loses is only prose that was not working.
+**This is measured, not assumed.** joshuafolkken/kit#1344 recorded three consecutive runs in which
+the batching instruction moved nothing, as prose and as a runtime note alike; it moved only once it
+became a `PreToolUse` hook. The investigation guard (joshuafolkken/kit#1460) followed the same path.
+**A rule can sit resident and never fire**, so what a move loses is only prose that was not working.
 
-A move is not a deletion, so it does not wait on a measurement of what reading the instruction
-costs — that measurement gates **deleting** a rule, not moving it.
+A move is not a deletion, so it does not wait on joshuafolkken/kit#1477 (measuring what reading the
+instruction costs) — that measurement gates **deleting** a rule, not moving it.
 
 ## The mechanism
 
 Every delivery rides on `create_transcript_guard` in `scripts/josh/hook-decision.ts`, the one
-foundation the batching guard and the investigation guard already share: the payload schema, the
+foundation the batching guard (joshuafolkken/kit#1390) and the investigation guard
+(joshuafolkken/kit#1460) already share: the payload schema, the
 `deny` envelope, the environment switch, the `.env` read and the record that fires a rule once per
 run. A second delivery route would be the one place two of them could disagree about whether a rule
 was delivered.
@@ -40,7 +42,8 @@ was delivered.
 - **The entry point**: `scripts/hooks/pretool-guard-cli.ts` (the guards are composed in
   `scripts/hooks/pretool-guard.ts`), run as `pnpm josh pretool:guard`. It folds the three
   `PreToolUse` guards — batching, investigation and rule — into one process, wired as a **single
-  entry** in `.claude/settings.json`'s `PreToolUse` with the matcher `Bash|Edit|Read|Write`. A
+  entry** in `.claude/settings.json`'s `PreToolUse` with the matcher
+  `Bash|Edit|Read|Write|AskUserQuestion`. A
   batching refusal wins over an investigation refusal, which wins over a rule refusal, and each guard
   still honors its own environment switch.
 - **The switch**: `JOSH_RULE_GUARD` for the rule guard — on by default, off with `off` / `0` /
@@ -48,12 +51,12 @@ was delivered.
 
 **The rule guard's enumeration holds only rules whose moment is a shell call** (the later `Edit` /
 `Write` and `AskUserQuestion` rows aside). Claude Code refuses one call of a turn and runs the rest,
-so a refused `Edit` leaves the state where only its siblings were applied.
+so a refused `Edit` leaves the state where only its siblings were applied (joshuafolkken/kit#1390).
 
 ### The Stop hook — a second entry point on the same foundation
 
-`stop:guard` (`scripts/hooks/stop-guard.ts`, run as `pnpm josh stop:guard`) is **the entry point for
-the `Stop` event**. It is wired as a **single entry** with an empty matcher under `.claude/settings.json`'s
+`stop:guard` (`scripts/hooks/stop-guard.ts`, run as `pnpm josh stop:guard`, joshuafolkken/kit#2121)
+is **the entry point for the `Stop` event**. It is wired as a **single entry** with an empty matcher under `.claude/settings.json`'s
 `Stop`, and runs at the end of every turn.
 
 **It shares the foundation and reuses the verdicts.** The switch (`JOSH_STOP_GUARD`) and the `.env`
@@ -62,7 +65,7 @@ read come from `hook-decision.ts`; whether a message is a stop notice comes from
 mechanism is built**. Whether anything was filed uses the count in `filing-cap.ts`, and whether a
 repository is first-party uses the comparison in `repo-party.ts`. Only the event differs: a `Stop`
 payload carries no tool call, and all four rows answer with `{"decision":"block","reason":…}`. That
-is the only route by which a `Stop` event can put text in front of the model.
+is the only route by which a `Stop` event can put text in front of the model (joshuafolkken/kit#2247).
 
 **Two entry points, one foundation.** "One route, never a new one" forbids a second copy of the
 shared part, not an entry point per event. The four `stop:guard` rows are triggered by **the run
@@ -90,7 +93,8 @@ The implementation reuse and verdict details taken out of the procedure's list.
 - **The idle run tail** — a call carrying `run_in_background` is not the trigger
 - **The implementation-phase cut** — the cost is measured with the same statistics and the same
   `CONTEXT_CUT_THRESHOLD` as `pnpm josh cost --cut`, and an unmeasurable cost fires on the safe side
-  through `!== UNDER`. It fires every time the threshold is crossed (`decide`), and it lets the
+  through `!== UNDER`. It fires every time the threshold is crossed (`decide`,
+  joshuafolkken/kit#2385), and it lets the
   immediate reissue of the same edit through, so `busy` / `failed` do not spin
 - **The test declaration** — reuses `run_tail_rule`'s commit-stage match rather than a new delivery
   route; the exemption is declared by a person at Step 0, so it is delivered once per run
@@ -102,12 +106,12 @@ The implementation reuse and verdict details taken out of the procedure's list.
 - **The Issue-citation format / the offer to file** — reads `last_assistant_message`; whether
   anything was filed uses `filing_cap`'s count, a third party is judged by `repo_party.classify`, and
   the row stays silent while `stop_hook_active` is set
-- **Appending to a rule body** — stands down once the transcript tail records both `oracle:list` and
+- **Appending to a rule body** — the stand-down came with joshuafolkken/kit#2324: it stands down once the transcript tail records both `oracle:list` and
   `run:step` having run (it passes on "were the questions answered", not on a reminder)
 - **An action that skips its oracle** — the refusal is assembled from the registry (decision,
   command, answer vocabulary, single source), never hand-written. `release:scope` sits on the reason
   side: it reads the release owed **after** `pnpm josh followup` merges, so it trails the merge rather
-  than gating it. An oracle whose firing point cannot be named declares its reason and stays as
+  than gating it (joshuafolkken/kit#2334). An oracle whose firing point cannot be named declares its reason and stays as
   **visible non-enforcement** (`oracle:list` prints the firing point or the reason)
 
 **The four spellings of the trigger.** The filing check covers `-f` / `-F` / `--field` /
@@ -125,13 +129,15 @@ boundary from both sides.
 
 ### Reading Issue comments — put them in front of the run, do not ask it to read them
 
-**The trigger is the one call through which the body arrived, not the start of implementation.**
+This row came from joshuafolkken/kit#1319. **The trigger is the one call through which the body
+arrived, not the start of implementation.**
 "The moment implementation starts" cannot be named as one tool call; "the moment an Issue body
 reaches the run" can — `gh issue view <N>`, or a GET ending in `…/issues/<N>`. That is where this row
 passes the criterion.
 
 **The refusal hands over the re-read command itself, not a request to read the comments too.** A
-prose request is the form measured to move nothing over three consecutive runs; this row avoids it
+prose request is the form joshuafolkken/kit#1344 measured to move nothing over three consecutive
+runs; this row avoids it
 because a body-only read **does not pass**. A `PreToolUse` refusal carries a single string, though,
 so **the hook does not inject the comment text** — the run fetches it itself, one round trip later.
 
@@ -170,7 +176,9 @@ file — once delivered, the run carries on knowing it.
 ### Exception — a row that stops a repeated action fires every time
 
 When the thing to stop is itself a repeated action, a one-time delivery means "free once refused
-once", and enforcement falls back on the parent's restraint — which is what failed. So **a row that
+once", and enforcement falls back on the parent's restraint. That restraint is what failed in
+joshuafolkken/kit#1570: the parent set a fresh waiting timer every time it woke, several ran at
+once, and progress reports landed every few minutes instead of once per interval. So **a row that
 owns its own `decide` is outside once-per-run and refuses every time its condition holds**.
 
 **For such a row, the yield branch shared with `batch:guard` protects something else.** A
@@ -184,7 +192,7 @@ a timer that never ran as alive.
 ### Exception — a row that demands a prerequisite refuses until it is met
 
 **A row with `already_satisfied` (is the prerequisite action at the transcript tail?) is outside
-once-per-run.** Kept once-per-run, a run that skipped the prerequisite would pass on its reissue, and
+once-per-run** (joshuafolkken/kit#2807). Kept once-per-run, a run that skipped the prerequisite would pass on its reissue, and
 the run that skimmed the procedure would be the one that walked past the guard. The rows are
 `issue-fold`, `issue-comments`, `rule-body` and `oracle-consulted:*`. A run that complies is never
 stuck — once the prerequisite is done, the stand-down answers first and lets it through. There is no
@@ -203,7 +211,9 @@ pass is explained in a code comment. The current ones:
 
 A comment body put on the shell runs its backticks as commands. **One more row of this mechanism
 covers it**: no new mechanism was needed, only the `shell-body` row in `delivered-rules.ts` and the
-tests that pin when it fires and when it does not.
+tests that pin when it fires and when it does not. (joshuafolkken/kit#1542, where this was first
+planned, was closed as a duplicate of joshuafolkken/kit#1198, so the work landed under
+joshuafolkken/kit#1198.)
 
 **The trigger is narrower than a flag.** It does not fire on the `-f body=` / `--body "` flag; it fires
 **only when a double-quoted body value actually contains `` ` `` or `$`**. Every example in this
@@ -243,7 +253,7 @@ test file pins:
 - `scripts/rules/shell-body-rule.test.ts` — shell evaluation of a body exists in `shell-body.md` as
   its single source, and the message carries the damage, the safe spelling and the reissue instruction
 - `scripts/rules/raw-field-body.test.ts` — pins the predicate and the message wording for the raw-field
-  `body=@` misfire. `scripts/rules/delivered-rules-bash.test.ts` pins firing on the real delivery route
+  `body=@` misfire (joshuafolkken/kit#2304). `scripts/rules/delivered-rules-bash.test.ts` pins firing on the real delivery route
   (`-f` / `--raw-field body=@`), silence (`-F` / `--field body=@`, a body without `@`,
   `pnpm josh issue:comment`), and that only one row claims a command
 - `scripts/rules/piped-verification-rule.test.ts` — piping a verification command exists in
@@ -257,7 +267,7 @@ test file pins:
 - `scripts/rules/implementation-cut-rule.test.ts` — the implementation-phase cut procedure exists as
   its single source in `.claude/skills/workflow-commands/pre-gate-cut.md` → "It is a guard, fired at
   the edit that crosses the threshold", and the message carries that section, the instruction and the
-  re-arming contract (a resume clears the record and re-arms both guards).
+  re-arming contract (a resume clears the record and re-arms both guards, joshuafolkken/kit#2310).
   `scripts/rules/implementation-cut.test.ts` pins firing and silence (it refuses only an `Edit` /
   `Write` over the threshold by a lane child with the marker that has not cut, and is silent outside
   a lane, without the marker, for a non-edit, after the cut and under the threshold)
@@ -274,13 +284,14 @@ test file pins:
   notice, and is silent outside a lane, without the marker, or when the message is not a stop notice)
 - `scripts/rules/lane-interactive-ask-rule.test.ts` — the lane child's interactive-ask procedure exists
   as its single source in `.claude/skills/workflow-commands/pre-gate-cut.md` → "The interactive ask is
-  refused one call earlier", and the message points at that section.
+  refused one call earlier", and the message points at that section (joshuafolkken/kit#2201).
   `scripts/rules/lane-interactive-ask.test.ts` pins firing and silence (it refuses only a lane child's
   `AskUserQuestion`, and is silent outside a lane, without the marker, or for a non-interactive tool)
   and that it fires every time; `scripts/agent/interactive-ask.test.ts` pins extracting the question
   and the options from the exit record
 - `scripts/rules/lane-switch-main.test.ts` — pins the predicates (`switch_target` /
-  `is_switch_away_from_lane`) that refuse a lane child's `git switch main` before it fails, and the
+  `is_switch_away_from_lane`) that refuse a lane child's `git switch main` (joshuafolkken/kit#2313)
+  before it fails, and the
   message wording. The procedure's single source is `.claude/skills/workflow-commands/backlogrun-lanes.md`
   / `backlogrun-child.md`. The same suite pins firing and silence (it refuses only a lane child
   switching to a branch other than its own lane branch, and is silent for its own branch, a create or
@@ -288,17 +299,17 @@ test file pins:
   claims a command
 - `scripts/rules/git-argv.test.ts` / `scripts/rules/git-force.test.ts` /
   `scripts/rules/worktree-guard.test.ts` / `scripts/rules/file-body.test.ts` — pin the predicates and
-  message wording of the three groups of Bash-string rows. `scripts/rules/delivered-rules-bash.test.ts`
+  message wording of the three groups of Bash-string rows (joshuafolkken/kit#2120). `scripts/rules/delivered-rules-bash.test.ts`
   pins firing and silence on the real delivery route, and that only one row claims a command
 - `scripts/rules/index-guard.test.ts` / `scripts/rules/destructive-command.test.ts` /
   `scripts/rules/protected-files.test.ts` — pin the predicates of the three rows that stop the
-  paraphrases slipping past the deny list's prefix match by parsing arguments and paths.
+  paraphrases slipping past the deny list's prefix match (joshuafolkken/kit#2983) by parsing arguments and paths.
   `permission-guards.ts` folds the three into one and hands them to the enumeration
 - `scripts/rules/direct-pr-create.test.ts` — pins the predicate that stops a direct PR creation which
-  never generates `closes #N` (`gh pr create`, a `gh api` write to pulls). It is delivered as the
+  never generates `closes #N` (`gh pr create`, a `gh api` write to pulls, joshuafolkken/kit#3183). It is delivered as the
   fourth row of `permission-guards.ts`
 - `scripts/rules/rule-body-guard.test.ts` — pins the predicate, the message and the enumeration entry
-  for an `Edit` / `Write` that appends a rule body to prose. This one suite pins firing (an append to
+  for an `Edit` / `Write` that appends a rule body to prose (joshuafolkken/kit#2272). This one suite pins firing (an append to
   a rule document), silence (a typo fix, a link swap, a deletion, a non-rule file, a non-Edit/Write),
   and, on the real delivery route, "refused every time until both commands have run". The same suite
   checks that the message carries question 0 (`oracle:list`) and the ordering question (`run:step`),
