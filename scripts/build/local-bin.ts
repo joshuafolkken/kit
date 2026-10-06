@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
+import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { package_bin_schema } from '#scripts/lib/schemas'
 
 const NODE_MODULES = 'node_modules'
@@ -27,20 +28,9 @@ function resolve_local_bin(project_root: string, bin_name: string): string {
 // in `src/lib` would miss the toolkit its sibling checks resolve fine (joshuafolkken/kit#934).
 // Ascending for the shim itself, rather than for a `package.json` first, is what keeps the two in
 // step: a nested manifest that owns no `node_modules` is not where pnpm would stop either.
-function ancestor_directories(start_directory: string): ReadonlyArray<string> {
-	const directories: Array<string> = []
-	let current = start_directory
-
-	while (!directories.includes(current)) {
-		directories.push(current)
-		current = path.dirname(current)
-	}
-
-	return directories
-}
-
 function find_local_bin_upwards(start_directory: string, bin_name: string): string | undefined {
-	return ancestor_directories(start_directory)
+	return ancestor_directories
+		.list(start_directory)
 		.map((directory) => resolve_local_bin(directory, bin_name))
 		.find((candidate) => existsSync(candidate))
 }

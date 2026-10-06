@@ -2,6 +2,7 @@ import { existsSync, globSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
 import { project_profile } from '#scripts/init/project-profile'
+import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { json_value } from '#scripts/lib/json-value'
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
 import { z } from 'zod'
@@ -43,15 +44,11 @@ const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies']
 const object_schema = z.record(z.string(), z.unknown())
 
 function project_root(directory: string): string {
-	let current = directory
-
-	while (!existsSync(path.join(current, PACKAGE_JSON))) {
-		const parent = path.dirname(current)
-		if (parent === current) return directory
-		current = parent
-	}
-
-	return current
+	return (
+		ancestor_directories.nearest(directory, (candidate) =>
+			existsSync(path.join(candidate, PACKAGE_JSON)),
+		) ?? directory
+	)
 }
 
 function is_ignored(entry: string): boolean {

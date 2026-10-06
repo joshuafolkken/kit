@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_local_bin, resolve_package_bin } from '#scripts/build/local-bin'
+import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { package_version_schema } from '#scripts/lib/schemas'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
 import { execaSync } from 'execa'
@@ -37,15 +38,11 @@ interface TsxRunner {
 // from the bundled dist/josh.js (one level under the root) and from the tsx source at
 // scripts/josh/ (two levels), so this file's depth no longer has to be hard-coded.
 function find_package_directory(start_directory: string): string {
-	let current = start_directory
-
-	while (!existsSync(path.join(current, PACKAGE_JSON))) {
-		const parent = path.dirname(current)
-		if (parent === current) return start_directory
-		current = parent
-	}
-
-	return current
+	return (
+		ancestor_directories.nearest(start_directory, (directory) =>
+			existsSync(path.join(directory, PACKAGE_JSON)),
+		) ?? start_directory
+	)
 }
 
 const PACKAGE_DIR = find_package_directory(path.dirname(fileURLToPath(import.meta.url)))
