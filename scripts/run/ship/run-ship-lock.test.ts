@@ -52,6 +52,13 @@ describe('run_ship_lock.lock_problems', () => {
 		expect(problems[0]).toContain('run `pnpm install` and commit pnpm-lock.yaml')
 	})
 
+	it('asks nothing in a project with no lock file', async () => {
+		expect(await run_ship_lock.lock_problems(WITHOUT_LOCK)).toStrictEqual([])
+		expect(run_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe("run_ship_lock.lock_problems — pnpm's reason", () => {
 	it("carries pnpm's first line without its color codes, so a refusal other than drift is told apart", async () => {
 		run_mock.mockResolvedValue({
 			output: '\n  Error: \u{1B}[31mERR_PNPM_UNSUPPORTED_ENGINE\u{1B}[0m\n\n  details',
@@ -64,14 +71,22 @@ describe('run_ship_lock.lock_problems', () => {
 		])
 	})
 
+	it("carries the line naming pnpm's error code over a workspace's Scope banner", async () => {
+		run_mock.mockResolvedValue({
+			output:
+				'Scope: all 3 workspace projects\n ERR_PNPM_OUTDATED_LOCKFILE  Cannot install with "frozen-lockfile"',
+			exit_code: 1,
+			elapsed_ms: 1,
+		})
+
+		expect(await run_ship_lock.lock_problems(WITH_LOCK)).toStrictEqual([
+			`${run_ship_lock.LOCK_DRIFT} pnpm said: ERR_PNPM_OUTDATED_LOCKFILE  Cannot install with "frozen-lockfile"`,
+		])
+	})
+
 	it('reports the drift alone when pnpm printed nothing', async () => {
 		run_mock.mockResolvedValue({ output: '', exit_code: undefined, elapsed_ms: 1 })
 
 		expect(await run_ship_lock.lock_problems(WITH_LOCK)).toStrictEqual([run_ship_lock.LOCK_DRIFT])
-	})
-
-	it('asks nothing in a project with no lock file', async () => {
-		expect(await run_ship_lock.lock_problems(WITHOUT_LOCK)).toStrictEqual([])
-		expect(run_mock).not.toHaveBeenCalled()
 	})
 })

@@ -85,7 +85,8 @@ const MERGE_STEPS: ReadonlyArray<Step> = [
 ]
 
 // `--review` (joshuafolkken/kit#2427) puts the supervised round-1 review in front of the gate: it
-// launches the gate itself, so the gate stage that follows reuses that tree's green record. It also
+// launches the gate itself, so the gate stage that follows reuses that tree's green record unless the
+// sync stage between them merged the default branch and changed the tree. It also
 // puts the round-2 pass between the commit and the followup (joshuafolkken/kit#2489), so the PR opens
 // between the rounds and round 2 runs beside CI — a no-op when round 1 left no fix delta.
 const REVIEW_STEP: Step = {

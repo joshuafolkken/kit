@@ -14,21 +14,24 @@ import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 //
 // A project with no lock file has nothing to drift, so nothing is asked there.
 //
-// **pnpm's own first line rides along**: the install refuses for reasons other than drift too — an
+// **pnpm's own error line rides along**: the install refuses for reasons other than drift too — an
 // engine mismatch, a timeout on a crowded machine — and there "run `pnpm install`" fixes nothing, so
-// the reader needs pnpm's error code to tell the two apart.
+// the reader needs pnpm's error code to tell the two apart. The line naming an `ERR_PNPM_` code wins
+// over the first line, which in a workspace is pnpm's "Scope: all N workspace projects" banner.
 
 const LOCK_FILE = 'pnpm-lock.yaml'
+const PNPM_ERROR_CODE = 'ERR_PNPM_'
 const LOCK_CHECK_ARGUMENTS = ['install', '--frozen-lockfile', '--lockfile-only', '--ignore-scripts']
 const LOCK_DRIFT = `${LOCK_FILE} does not match its inputs (\`pnpm install --frozen-lockfile\` refuses it), so the pre-push hook's install would rewrite it under the push: run \`pnpm install\` and commit ${LOCK_FILE}.`
 
 function drift_problem(output: string): string {
-	const first_line = stripVTControlCharacters(output)
+	const lines = stripVTControlCharacters(output)
 		.split('\n')
 		.map((line) => line.trim())
-		.find((line) => line !== '')
+		.filter((line) => line !== '')
+	const reason = lines.find((line) => line.includes(PNPM_ERROR_CODE)) ?? lines[0]
 
-	return first_line === undefined ? LOCK_DRIFT : `${LOCK_DRIFT} pnpm said: ${first_line}`
+	return reason === undefined ? LOCK_DRIFT : `${LOCK_DRIFT} pnpm said: ${reason}`
 }
 
 async function lock_problems(directory: string = process.cwd()): Promise<Array<string>> {
