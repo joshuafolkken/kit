@@ -262,14 +262,38 @@ function merged_preinstall(existing: string): string | undefined {
 }
 
 describe('merge_package_scripts preinstall migration', () => {
-	it('adds the local integration check to a preinstall kit wrote earlier', () => {
-		expect(merged_preinstall(LEGACY_SAFE_CHAIN_VALUE)).toContain(
-			`${LEGACY_SAFE_CHAIN_VALUE} && node -e`,
-		)
+	it('replaces a preinstall kit wrote earlier with the network-free check', () => {
+		expect(merged_preinstall(LEGACY_SAFE_CHAIN_VALUE)).toBe(SAFE_CHAIN_SCRIPT_VALUE)
 	})
 
 	it('keeps a consumer-authored preinstall untouched', () => {
 		expect(merged_preinstall(CONSUMER_PREINSTALL_VALUE)).toBe(CONSUMER_PREINSTALL_VALUE)
+	})
+})
+
+describe('upgrade_safe_chain_preinstall', () => {
+	it('replaces only the preinstall kit wrote earlier', () => {
+		const content = JSON.stringify({
+			name: 'consumer',
+			scripts: { preinstall: LEGACY_SAFE_CHAIN_VALUE, josh: JOSH_SCRIPT_VALUE },
+		})
+		const result = parse_jsonc(init_logic.upgrade_safe_chain_preinstall(content))
+
+		expect(result).toEqual({
+			name: 'consumer',
+			scripts: { preinstall: SAFE_CHAIN_SCRIPT_VALUE, josh: JOSH_SCRIPT_VALUE },
+		})
+	})
+
+	it.each([
+		['a consumer-authored preinstall', { scripts: { preinstall: CONSUMER_PREINSTALL_VALUE } }],
+		['the current preinstall', { scripts: { preinstall: SAFE_CHAIN_SCRIPT_VALUE } }],
+		['no preinstall', { scripts: { josh: JOSH_SCRIPT_VALUE } }],
+		['no scripts', { name: 'consumer' }],
+	])('returns the content unchanged for %s', (_label, manifest) => {
+		const content = JSON.stringify(manifest)
+
+		expect(init_logic.upgrade_safe_chain_preinstall(content)).toBe(content)
 	})
 })
 

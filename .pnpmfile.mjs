@@ -2,7 +2,8 @@
 // `josh init` / `josh sync` copy this file into every project that publishes (joshuafolkken/kit#3110)
 // and overwrite it while this first line stays; edit it in kit, not here.
 // Strips the Safe Chain `preinstall` from the packed manifest only (joshuafolkken/kit#2693).
-// kit writes it to run Safe Chain for the repository's own development installs; shipped, it becomes
+// kit writes it to warn the repository's own development installs when Safe Chain is not active
+// (joshuafolkken/kit#3269); shipped, it becomes
 // a build script every consumer's pnpm refuses to run unapproved, and it could not protect them
 // anyway — their install has already started by the time a dependency's `preinstall` runs. The
 // repository's package.json keeps it; `pnpm pack` and `pnpm publish` call this hook on the copy they

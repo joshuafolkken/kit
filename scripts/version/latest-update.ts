@@ -13,7 +13,7 @@ import { overrides_check } from '#scripts/overrides/overrides-logic'
 import { execaSync } from 'execa'
 import { fresh_metadata_cache } from './fresh-metadata-cache'
 import { latest_regression, type VersionRegression } from './latest-regression'
-import { preinstall_version_update } from './preinstall-version-update'
+import { safe_chain_version_update } from './safe-chain-version-update'
 
 const PACKAGE_JSON_PATH = 'package.json'
 const LOCKFILE_PATH = 'pnpm-lock.yaml'
@@ -175,11 +175,11 @@ function main(): void {
 	report_overrides(overrides)
 	report_lockfile_overrides()
 
-	// Skipped after a rollback so the tree really is left exactly as it was found — this sync writes
-	// package.json to advance the pinned safe-chain version, which would contradict the notice that
+	// Skipped after a rollback so the tree really is left exactly as it was found — this sync rewrites
+	// the workflows' pinned safe-chain installer, which would contradict the notice that
 	// nothing changed.
 	if (outcome.status === 0 && !outcome.is_rolled_back) {
-		preinstall_version_update.sync(PACKAGE_JSON_PATH)
+		safe_chain_version_update.sync(PACKAGE_JSON_PATH)
 	}
 }
 
