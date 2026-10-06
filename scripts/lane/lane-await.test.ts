@@ -1,6 +1,6 @@
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { run_liveness } from '#scripts/run/run-liveness'
-import { run_ship_detach } from '#scripts/run/run-ship-detach'
+import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_await, type AwaitState, type CheckConfig } from './lane-await'
 

@@ -1,4 +1,4 @@
-import { run_event_stream, type RunEvent } from '#scripts/run/run-event-stream'
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 
 const ISSUE_IN_EVENT = /#([1-9]\d*)\b/u
 const SETTLED_KINDS: ReadonlySet<string> = new Set([

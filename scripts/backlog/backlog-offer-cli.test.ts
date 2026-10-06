@@ -8,7 +8,7 @@ vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mo
 vi.mock('#scripts/rules/rule-value-cache', () => ({
 	rule_value_cache: { emit: rule_value_emit_mock },
 }))
-vi.mock('#scripts/run/run-event-stream-emit', () => ({
+vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit_once: emit_once_mock },
 }))
 

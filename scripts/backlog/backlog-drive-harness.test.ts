@@ -1,4 +1,4 @@
-import type { RunEvent } from '#scripts/run/run-event-stream'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { expect, it } from 'vitest'
 import { backlog_budget } from './backlog-budget'
 import { backlog_drive, type DriveState, type LoopPorts, type OfferRead } from './backlog-drive'

@@ -2,8 +2,8 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { PullMergeState } from '#scripts/gh/git-gh-pr-read'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_command } from '#scripts/git/git-command'
+import { run_hold, type HoldRead } from '#scripts/run/hold/run-hold'
 import { run_halfrun_resume, type StopMark } from './run-halfrun-resume'
-import { run_hold, type HoldRead } from './run-hold'
 
 // joshuafolkken/kit#3023: a `prrun` stops at a green, mergeable pull request and **keeps** its hold, so
 // a person can look before anything merges. What comes next is one of three, and `run:entry` answers

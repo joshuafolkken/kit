@@ -1,5 +1,5 @@
 import { git_command } from '#scripts/git/git-command'
-import { run_hold } from '#scripts/run/run-hold'
+import { run_hold } from '#scripts/run/hold/run-hold'
 import { lane_await } from './lane-await'
 import type { LaneInfo } from './lane-registry'
 

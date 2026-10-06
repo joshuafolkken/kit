@@ -1,4 +1,4 @@
-import type { RunCarry } from '#scripts/run/run-carry'
+import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 

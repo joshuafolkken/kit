@@ -2,10 +2,10 @@
 import { fileURLToPath } from 'node:url'
 import { git_followup_pending } from '#scripts/followup/git-followup-pending'
 import { release_scope_cli } from '#scripts/release/release-scope-cli'
-import { run_carry } from './run-carry'
-import { run_event_scope, type EventScope } from './run-event-scope'
-import { run_event_stream, type RunEvent } from './run-event-stream'
-import { run_event_stream_emit } from './run-event-stream-emit'
+import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_event_scope, type EventScope } from '#scripts/run/event/run-event-scope'
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_report } from './run-report'
 
 // `josh run:report` — the session-facing report, generated from the run's event stream rather than

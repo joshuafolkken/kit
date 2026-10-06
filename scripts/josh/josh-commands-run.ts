@@ -6,7 +6,7 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 // the generated catalog keeps their order.
 
 // One script answers both `run:hold` and `run:release`; the flag below is what tells them apart.
-const RUN_HOLD_SCRIPT = 'scripts/run/run-hold-cli.ts'
+const RUN_HOLD_SCRIPT = 'scripts/run/hold/run-hold-cli.ts'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const RUN_COMMANDS: Record<string, CommandEntry> = {
@@ -24,19 +24,19 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		default_script_arguments: ['--release'],
 	},
 	'run:tidy': {
-		script: 'scripts/run/run-tidy-cli.ts',
+		script: 'scripts/run/tidy/run-tidy-cli.ts',
 		description: 'Close merged lanes and drop stashes whose issues are all merged',
 		category: 'AI tools',
 		reference: ['', 'automation', ['git', 'network', 'files']],
 	},
 	'run:carry': {
-		script: 'scripts/run/run-carry-cli.ts',
+		script: 'scripts/run/carry/run-carry-cli.ts',
 		description: 'Carry one invocation’s budget across its own session cuts',
 		category: 'AI tools',
 		reference: ['<operation> [arguments...]', 'automation', ['files']],
 	},
 	'run:wake': {
-		script: 'scripts/run/run-wake-cli.ts',
+		script: 'scripts/run/wake/run-wake-cli.ts',
 		// `.env` rather than the ambient environment:
 		// the failure warning needs the Telegram credentials, the same
 		// reasons `notify` and `followup` carry these flags.
@@ -46,7 +46,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['[options]', 'automation', ['processes', 'notifications']],
 	},
 	'run:cut': {
-		script: 'scripts/run/run-cut-cli.ts',
+		script: 'scripts/run/cut/run-cut-cli.ts',
 		description: 'Cut a lane child before the gate and resume a fresh process',
 		category: 'AI tools',
 		reference: ['[--resume] <issue> [--impl] [--handoff <path>]', 'automation', ['files']],
@@ -64,7 +64,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['<issue> --output <path> [--repo <owner/repo>]', 'automation', ['network']],
 	},
 	'run:progress': {
-		script: 'scripts/run/run-progress-cli.ts',
+		script: 'scripts/run/progress/run-progress-cli.ts',
 		description: 'Report an unattended run’s progress once it has gone quiet for an interval',
 		category: 'AI tools',
 		reference: [
@@ -83,7 +83,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 	// read the budget, gather the issue reads and decide the pre-implementation step. `run:hold`,
 	// `cost --cut`, `run:prep` and `run:step` were four round trips re-billing a lane's full context each.
 	'run:entry': {
-		script: 'scripts/run/run-entry-cli.ts',
+		script: 'scripts/run/entry/run-entry-cli.ts',
 		description:
 			'Open a run in one call: claim the tree, read the budget, bundle the reads, decide the pre-implementation step',
 		category: 'AI tools',

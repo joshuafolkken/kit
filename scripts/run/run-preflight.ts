@@ -1,8 +1,8 @@
 import { git_gh_pr_read } from '#scripts/gh/git-gh-pr-read'
 import { git_command } from '#scripts/git/git-command'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { run_hold } from '#scripts/run/hold/run-hold'
 import { z } from 'zod'
-import { run_hold } from './run-hold'
 import { run_issue_number } from './run-issue-number'
 
 // The preflight check — what an interrupted run left in this working tree, and what the rule says to

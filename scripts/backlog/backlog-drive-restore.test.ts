@@ -1,4 +1,4 @@
-import type { RunEvent } from '#scripts/run/run-event-stream'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { expect, it } from 'vitest'
 import { backlog_drive_restore } from './backlog-drive-restore'
 

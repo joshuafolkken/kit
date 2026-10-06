@@ -1,4 +1,9 @@
-import { run_hold, type HoldRead, type RunHold, type StopMarkFields } from './run-hold'
+import {
+	run_hold,
+	type HoldRead,
+	type RunHold,
+	type StopMarkFields,
+} from '#scripts/run/hold/run-hold'
 
 // joshuafolkken/kit#2796: a `halfrun` stops before its commit and **keeps** its hold, because the
 // uncommitted, hand-verified work is exactly what a second run would trample. The person then types

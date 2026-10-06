@@ -176,7 +176,7 @@ describe('backlog_waves.build — the same offer backlog:next makes', () => {
 // joshuafolkken/kit#3221: two issues that restructure the same file are separated in the plan as in
 // the run, so wave 1 still matches backlog:next and the second issue moves to the next wave.
 describe('backlog_waves.build — issues that restructure the same file', () => {
-	const SHARED_PATH = 'scripts/run/run-ship.ts'
+	const SHARED_PATH = 'scripts/run/ship/run-ship.ts'
 	const declared = backlog_restructure.declared_of([
 		{ number: FIRST, body: `Split \`${SHARED_PATH}\` into two modules.` },
 		{ number: SECOND, body: `Move \`${SHARED_PATH}\` under a new directory.` },
