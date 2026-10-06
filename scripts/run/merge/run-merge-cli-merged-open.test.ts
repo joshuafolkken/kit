@@ -23,6 +23,10 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit: vi.fn() },
 }))
 
+vi.mock('#scripts/lane/lane-ledger', () => ({
+	lane_ledger: { record_merge: vi.fn() },
+}))
+
 vi.mock('./run-merge-steps', () => ({
 	run_merge_steps: {
 		CUT_RELAUNCH_CAUSE: 'cut cause',

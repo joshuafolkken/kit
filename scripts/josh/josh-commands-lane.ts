@@ -9,6 +9,10 @@ const LANE_SCRIPT = 'scripts/lane/lane-cli.ts'
 // has to read `.env` to see them — without this the two are documented and unreachable.
 const LANE_ARGUMENTS = { script: LANE_SCRIPT, tsx_arguments: OPTIONAL_ENV_FILE_FLAGS } as const
 const ISSUE_WITH_OPTIONS = '<issue> [options]'
+const MEASURE_ARGUMENTS = {
+	script: 'scripts/lane/lane-measure-cli.ts',
+	tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+} as const
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const LANE_COMMANDS: Record<string, CommandEntry> = {
@@ -68,6 +72,24 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 			'Collapse a backlogrun lane-start event into one call: open the lane, pop and re-install on the first, dispatch the child',
 		category: 'AI tools',
 		reference: ['<issue> [--stash <message>]', 'automation', ['files', 'git', 'processes']],
+	},
+	// The lane-limit measurement (joshuafolkken/kit#3355): `.env` is read so `lane:stats` labels the row
+	// with the `JOSH_LANE_LIMIT` a person set there.
+	'lane:sample': {
+		...MEASURE_ARGUMENTS,
+		description:
+			'Record the machine load (load average, swap, free memory, working lanes) to the lane ledger',
+		category: 'AI tools',
+		reference: ['[--every <seconds>]', 'maintainer', ['files']],
+		default_script_arguments: ['sample'],
+	},
+	'lane:stats': {
+		...MEASURE_ARGUMENTS,
+		description:
+			'Print one table row of lane throughput, gate duration and machine load over a period',
+		category: 'AI tools',
+		reference: ['--period <days> [--limit <lane-limit>]', 'maintainer', ['none']],
+		default_script_arguments: ['stats'],
 	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */

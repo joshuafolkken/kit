@@ -21,6 +21,8 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "lc": "latest:corepack",
     "ln": "lines",
     "lr": "lint:related",
+    "lsm": "lane:sample",
+    "lst": "lane:stats",
     "lu": "latest:update",
     "mm": "main:merge",
     "ms": "main:sync",
@@ -519,6 +521,20 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "files",
         "git",
+      ],
+    ],
+    "lane:sample": [
+      "[--every <seconds>]",
+      "maintainer",
+      [
+        "files",
+      ],
+    ],
+    "lane:stats": [
+      "--period <days> [--limit <lane-limit>]",
+      "maintainer",
+      [
+        "none",
       ],
     ],
     "latest": [

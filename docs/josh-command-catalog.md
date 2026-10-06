@@ -1145,6 +1145,26 @@ Close every lane an interruption left without its work tree
 
 ---
 
+### `josh lane:sample` · `josh lsm`
+
+> **Audience:** maintainer · **Side effects:** files
+
+`[--every <seconds>]`
+
+Record the machine load (load average, swap, free memory, working lanes) to the lane ledger
+
+---
+
+### `josh lane:stats` · `josh lst`
+
+> **Audience:** maintainer · **Side effects:** none
+
+`--period <days> [--limit <lane-limit>]`
+
+Print one table row of lane throughput, gate duration and machine load over a period
+
+---
+
 ### `josh oracle:list`
 
 > **Audience:** automation · **Side effects:** none

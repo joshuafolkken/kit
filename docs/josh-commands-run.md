@@ -509,6 +509,10 @@ pid=$(pnpm josh lane:launch 1749 --stash "backlogrun: josh latest before lanes")
 
 The child's pid is the one thing on stdout; a refusal is an empty capture beside a non-zero exit, as `lane:dispatch`'s is. A lane a park kept (dispatched before) is dispatched into, not reopened; a refused `lane:open`, pop or re-install stops it before dispatch.
 
+#### `josh lane:sample` / `josh lane:stats`
+
+Measure a lane limit: `lane:sample [--every <seconds>]` records the machine load to a per-repository ledger that merges and gates also write to; `lane:stats --period <days> [--limit <n>]` prints a period as one table row. Procedure and columns: [lane-limit-measurement.md](./maintainers/lane-limit-measurement.md).
+
 ## Session and documents
 
 ### `josh cost`
