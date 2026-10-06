@@ -21,7 +21,7 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/overrides/overrides-check.ts',
 		description: 'Check pnpm overrides for drift',
 		category: 'Maintenance',
-		reference: ['[--save]', 'maintainer', ['files']],
+		reference: ['[--save]', 'developer', ['files']],
 	},
 	audit: {
 		script: 'scripts/security/security-audit.ts',
@@ -49,7 +49,7 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		],
 		description: 'Update pnpm, dependencies, and run security audit',
 		category: 'Maintenance',
-		reference: ['', 'maintainer', ['files', 'network', 'processes']],
+		reference: ['', 'developer', ['files', 'network', 'processes']],
 		argument_targets: ['latest:corepack', 'latest:update', 'audit'],
 	},
 	'latest:scope': {
@@ -73,13 +73,13 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/version/latest-corepack.ts',
 		description: 'Update pnpm on the current major while preserving the integrity pin',
 		category: 'Maintenance',
-		reference: ['', 'maintainer', ['files', 'network']],
+		reference: ['', 'developer', ['files', 'network']],
 	},
 	'latest:update': {
 		script: 'scripts/version/latest-update.ts',
 		description: 'Update all dependencies to latest',
 		category: 'Maintenance',
-		reference: ['', 'maintainer', ['files', 'network']],
+		reference: ['', 'developer', ['files', 'network']],
 	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */

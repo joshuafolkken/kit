@@ -504,6 +504,41 @@ pnpm josh audit
 
 The scanner is looked up on `PATH` first, then in the `josh audit:provision` cache (`node_modules/.cache/josh-tools/`). With neither present the audit exits non-zero and prints how to get one — it is never skipped or weakened.
 
+### `josh overrides`
+
+Check that the dependency overrides have not drifted after a dependency update.
+
+```bash
+pnpm josh overrides           # verify overrides unchanged
+pnpm josh overrides --save    # snapshot current merged overrides
+```
+
+Checks effective overrides from `pnpm-workspace.yaml` against a saved snapshot and reports ignored `pnpm.overrides` entries in `package.json` separately. pnpm 11 and 12 do not apply the package field. An empty `pnpm.overrides` is never treated as "no overrides" without reading the workspace.
+
+**Options:**
+
+- `--save` — write the current merged overrides to `.overrides-snapshot.json` (gitignored); later runs compare against it and exit non-zero on any add, removal, or change.
+
+### `josh latest`
+
+Update pnpm with its self-update command, update all dependencies to latest, and run a security audit.
+
+```bash
+pnpm josh latest            # full update (pnpm + update + audit)
+pnpm josh latest:corepack   # update pnpm only
+pnpm josh latest:update     # update dependencies only
+```
+
+`josh latest` never lowers a version: a supply-chain age gate can make the registry report an older release as newest, so `latest:update` rolls the whole tree back rather than writing a silent downgrade. It reports the overrides verdict itself and separately fails the run if `pnpm-lock.yaml` no longer honours an unconditional override. Whether a run has to update at all is [`josh latest:scope`](josh-commands-automation.md#josh-latestscope).
+
+#### `josh latest:corepack`
+
+Updates pnpm and pins `packageManager` to the newest release on the project's **current major** (from `packageManager`, or from `devEngines.packageManager.version` when that is the only pin). The command name is retained for compatibility. With an existing `packageManager` pin, it obtains the release integrity value, runs `pnpm self-update`, then restores the integrity suffix and aligns `devEngines.packageManager.version` byte-for-byte with `packageManager`. Without that pin, it adds a verified pin and checks that the selected pnpm version starts. If the registry cannot answer or that version cannot start, the bump is skipped; existing `devEngines` drift may still be aligned to `packageManager`.
+
+#### `josh latest:update`
+
+Runs `pnpm update --latest`, skipping **held-back** and **overridden** packages (effective overrides read from `pnpm-workspace.yaml`) — `typescript` is currently held at `6.x`. Skipped packages print as `⏭ Skipping held-back / overridden packages: …`. If any direct dependency would move down, it restores `package.json` and `pnpm-lock.yaml` to what it found and exits `0`. Otherwise it also moves the `SAFE_CHAIN_INSTALLER_VERSION` / `SAFE_CHAIN_INSTALLER_SHA256` env to the newest `@aikidosec/safe-chain` release — a registry answer that is not an exact semver version is refused and nothing moves — in every workflow under `.github/workflows` and `templates/workflows` and every local composite action under `.github/actions` that carries the pin — in kit itself, the `.github/actions/setup-pnpm` action every workflow installs through, the distributed `ci.yml` included — the hash is computed from that release's `install-safe-chain.sh`, and a failed download leaves the workflows' pins untouched (the next `josh latest` retries).
+
 ## AI tools
 
 Helpers for AI-assisted development workflows.
