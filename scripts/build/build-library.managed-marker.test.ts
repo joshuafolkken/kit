@@ -2,24 +2,23 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { beforeAll, describe, expect, it } from 'vitest'
-import {
-	build_managed_marker_library,
-	MANAGED_MARKER_DTS_FILE,
-	MANAGED_MARKER_OUTFILE,
-} from './build-managed-marker'
+import { build_library, library_paths } from './build-library'
 
 // The stamp is a public surface, not an internal detail: a package built on kit distributes its own
 // workflows and has to write the same header kit writes, or the auto-merge check that reads it
 // cannot recognize them (joshuafolkken/kit#844). That only works if the module actually ships and
 // loads from a consumer, which is what these assertions hold — the same guarantees the sibling
 // `config-merge` and `version` libraries are held to.
+const LIBRARY = 'managed-marker'
+const { outfile: MANAGED_MARKER_OUTFILE, dts_file: MANAGED_MARKER_DTS_FILE } =
+	library_paths(LIBRARY)
 const BUILD_TIMEOUT = 60_000
 
 beforeAll(async () => {
-	await build_managed_marker_library()
+	await build_library(LIBRARY)
 }, BUILD_TIMEOUT)
 
-describe('build_managed_marker_library — compiled .js', () => {
+describe('build_library managed_marker — compiled .js', () => {
 	it('writes the bundled library to dist/managed-marker/index.js', () => {
 		expect(existsSync(MANAGED_MARKER_OUTFILE)).toBe(true)
 	})
@@ -46,7 +45,7 @@ describe('build_managed_marker_library — compiled .js', () => {
 	})
 })
 
-describe('build_managed_marker_library — bundled .d.ts', () => {
+describe('build_library managed_marker — bundled .d.ts', () => {
 	it('writes a declaration file to dist/managed-marker/index.d.ts', () => {
 		expect(existsSync(MANAGED_MARKER_DTS_FILE)).toBe(true)
 	})

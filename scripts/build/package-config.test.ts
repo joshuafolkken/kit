@@ -215,22 +215,23 @@ describe('package.json scripts', () => {
 })
 
 const RANGE_GUARD_SCRIPT = 'publishable-range-check'
-const BIN_BUILD_SCRIPT = 'build-bin'
+const BUILD_ENTRY = 'tsx scripts/build/build.ts'
 const BUILD_CALL = 'pnpm build'
 
 describe('package.json prepack', () => {
 	const scripts = load_manifest().scripts ?? {}
 	const prepack = scripts['prepack'] ?? ''
 
-	it('builds the compiled bin through the build script', () => {
-		expect(scripts['build']).toContain(BIN_BUILD_SCRIPT)
+	// joshuafolkken/kit#3324: one entry runs every build step, instead of a `tsx` launch per step.
+	it('builds through the single build entry', () => {
+		expect(scripts['build']).toBe(BUILD_ENTRY)
 		expect(prepack).toContain(BUILD_CALL)
 	})
 
 	// joshuafolkken/kit#2885: the build steps are defined once, in `build`; a copied list in
 	// `prepack` drifts the moment only one of the two is edited.
 	it('calls the build script rather than copying its steps', () => {
-		expect(prepack).not.toContain(BIN_BUILD_SCRIPT)
+		expect(prepack).not.toContain(BUILD_ENTRY)
 	})
 
 	it('gates packing on every published dependency range still resolving', () => {
