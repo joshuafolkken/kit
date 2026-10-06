@@ -12,12 +12,13 @@ function artifacts_body(): string {
 	return SYNC_SOURCE.slice(start, end)
 }
 
-// `.aikido`'s Safe Chain age is derived from `.npmrc`, which `sync_config_files` may add the window
-// to; syncing `.aikido` first would copy the pre-sync window until a second run (joshuafolkken/kit#2743).
+// `.aikido`'s Safe Chain age is derived from `pnpm-workspace.yaml`, which `sync_ai_copy_all` may add
+// the window to; syncing `.aikido` first would copy the pre-sync window until a second run
+// (joshuafolkken/kit#2743, #3267).
 describe('sync_project_artifacts ordering', () => {
-	it('syncs the Safe Chain project config after the .npmrc config files', () => {
+	it('syncs the Safe Chain project config after the workspace file', () => {
 		const body = artifacts_body()
-		const config_files_at = body.indexOf('sync_config_files()')
+		const config_files_at = body.indexOf('sync_ai_files.sync_ai_copy_all(')
 		const project_config_at = body.indexOf('project_config.sync_project_config(')
 
 		expect(config_files_at).toBeGreaterThan(-1)

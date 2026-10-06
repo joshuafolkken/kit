@@ -10,9 +10,9 @@ const WORKSPACE =
 	"minimumReleaseAgeExclude:\n  - vite\n  - '@types/node'\n  - tsx\n  - '@joshuafolkken/kit'\n"
 const EXPECTED_EXCLUSIONS = ['vite', '@types/node', 'tsx', '@joshuafolkken/kit']
 const REGISTRY = 'registry.example.com'
-const NPMRC_DAY = 'minimum-release-age=1440\n'
-const NPMRC_PARTIAL_HOUR = 'minimum-release-age=1470\n'
-const NPMRC_OPT_OUT = 'minimum-release-age=0\n'
+const WORKSPACE_DAY = `${WORKSPACE}minimumReleaseAge: 1440\n`
+const WORKSPACE_PARTIAL_HOUR = `${WORKSPACE}minimumReleaseAge: 1470\n`
+const WORKSPACE_OPT_OUT = `${WORKSPACE}minimumReleaseAge: 0\n`
 const DAY_HOURS = 24
 const MINUTES_PER_HOUR = 60
 const WORKSPACE_FILE = 'pnpm-workspace.yaml'
@@ -79,27 +79,27 @@ describe('project_config.merge_project_config', () => {
 })
 
 describe('project_config.merge_project_config — minimum package age', () => {
-	it('converts the .npmrc window from minutes to whole hours', () => {
-		const result = project_config.merge_project_config('', WORKSPACE, NPMRC_DAY)
+	it('converts the workspace window from minutes to whole hours', () => {
+		const result = project_config.merge_project_config('', WORKSPACE_DAY)
 
 		expect(age_hours(result)).toBe(DAY_HOURS)
 	})
 
 	it('floors a partial hour so Safe Chain is never stricter than pnpm', () => {
-		const result = project_config.merge_project_config('', WORKSPACE, NPMRC_PARTIAL_HOUR)
+		const result = project_config.merge_project_config('', WORKSPACE_PARTIAL_HOUR)
 
 		expect(age_hours(result)).toBe(DAY_HOURS)
 	})
 
 	it('writes 0 for an explicit opt-out, replacing an earlier synchronized age', () => {
-		const existing = project_config.merge_project_config('', WORKSPACE, NPMRC_DAY)
-		const result = project_config.merge_project_config(existing, WORKSPACE, NPMRC_OPT_OUT)
+		const existing = project_config.merge_project_config('', WORKSPACE_DAY)
+		const result = project_config.merge_project_config(existing, WORKSPACE_OPT_OUT)
 
 		expect(age_hours(result)).toBe(0)
 	})
 
-	it('writes no age when .npmrc declares no window', () => {
-		const result = project_config.merge_project_config('', WORKSPACE, 'engine-strict=true\n')
+	it('writes no age when the workspace declares no window', () => {
+		const result = project_config.merge_project_config('', WORKSPACE)
 
 		expect(age_hours(result)).toBeUndefined()
 	})
@@ -107,13 +107,12 @@ describe('project_config.merge_project_config — minimum package age', () => {
 	it('replaces a stale age and is stable once synchronized', () => {
 		const existing = project_config.merge_project_config(
 			'',
-			WORKSPACE,
-			'minimum-release-age=2880\n',
+			`${WORKSPACE}minimumReleaseAge: 2880\n`,
 		)
-		const result = project_config.merge_project_config(existing, WORKSPACE, NPMRC_DAY)
+		const result = project_config.merge_project_config(existing, WORKSPACE_DAY)
 
 		expect(age_hours(result)).toBe(DAY_HOURS)
-		expect(project_config.merge_project_config(result, WORKSPACE, NPMRC_DAY)).toBe(result)
+		expect(project_config.merge_project_config(result, WORKSPACE_DAY)).toBe(result)
 	})
 })
 
@@ -152,8 +151,8 @@ describe('kit project configuration', () => {
 		expect(exclusions(aikido)).toEqual(source['minimumReleaseAgeExclude'])
 	})
 
-	it('matches the Safe Chain minimum age to the .npmrc window', () => {
-		const minutes = release_age.parse_minimum_release_age(read_kit_file('.npmrc'))
+	it('matches the Safe Chain minimum age to the workspace window', () => {
+		const minutes = release_age.parse_minimum_release_age(read_kit_file(WORKSPACE_FILE))
 		const aikido = read_kit_file(AIKIDO_FILE)
 
 		expect(minutes).toBeGreaterThan(0)

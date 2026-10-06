@@ -5,8 +5,8 @@ import { latest_corepack } from './latest-corepack'
 import {
 	AGED_PUBLISH,
 	fake_sync_result,
-	NPMRC_AGE_1440,
-	NPMRC_PATH,
+	WORKSPACE_AGE_1440,
+	WORKSPACE_PATH,
 } from './latest-corepack-fixture'
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
@@ -35,7 +35,7 @@ describe('latest_corepack without a packageManager pin', () => {
 
 	it('pins the latest release on the devEngines major', () => {
 		vi.mocked(readFileSync).mockImplementation((file) =>
-			file === NPMRC_PATH ? NPMRC_AGE_1440 : MANIFEST,
+			file === WORKSPACE_PATH ? WORKSPACE_AGE_1440 : MANIFEST,
 		)
 		vi.mocked(execaSync).mockReturnValueOnce(fake_sync_result(0, TIMES))
 		vi.mocked(execaSync).mockReturnValueOnce(fake_sync_result(0, JSON.stringify(INTEGRITY)))

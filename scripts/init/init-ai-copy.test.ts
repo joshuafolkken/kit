@@ -62,6 +62,7 @@ vi.mock('./init-logic', () => ({
 			.mockReturnValue([{ src: 'templates/workflows/ci.yml', dest: WORKFLOW_MAPPING_DEST }]),
 		get_ai_copy_directories: vi.fn().mockReturnValue(['prompts']),
 		merge_workspace_yaml: merge_workspace_mock,
+		carry_npmrc_settings: (template: string) => template,
 	},
 }))
 vi.mock('./init-paths', () => ({

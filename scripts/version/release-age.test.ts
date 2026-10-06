@@ -3,7 +3,7 @@ import { release_age } from './release-age'
 
 const MAJOR = '11'
 const AGE_1440 = 1440
-const NPMRC_WITHOUT_WINDOW = 'engine-strict=true\n'
+const WORKSPACE_WITHOUT_WINDOW = 'engineStrict: true\n'
 const NOW_MS = Date.parse('2026-08-04T12:00:00.000Z')
 const OLD_ENOUGH = '2026-08-01T00:00:00.000Z'
 const TOO_YOUNG = '2026-08-04T11:00:00.000Z'
@@ -17,29 +17,42 @@ function times_of(entries: ReadonlyArray<[string, string]>): Record<string, stri
 }
 
 describe('release_age.parse_minimum_release_age', () => {
-	it('reads the minutes from a minimum-release-age line', () => {
-		expect(release_age.parse_minimum_release_age('minimum-release-age=1440\n')).toBe(AGE_1440)
+	it('reads the minutes from a minimumReleaseAge key', () => {
+		expect(release_age.parse_minimum_release_age('minimumReleaseAge: 1440\n')).toBe(AGE_1440)
 	})
 
-	it('finds the line among other npmrc settings', () => {
-		const npmrc = 'engine-strict=true\nminimum-release-age=1440\nconfirmModulesPurge=false\n'
+	it('finds the key among other workspace settings', () => {
+		const workspace = 'packages:\n  - .\nminimumReleaseAge: 1440\nengineStrict: true\n'
 
-		expect(release_age.parse_minimum_release_age(npmrc)).toBe(AGE_1440)
+		expect(release_age.parse_minimum_release_age(workspace)).toBe(AGE_1440)
 	})
 
 	it('defaults to no quarantine when the setting is absent', () => {
-		expect(release_age.parse_minimum_release_age(NPMRC_WITHOUT_WINDOW)).toBe(0)
+		expect(release_age.parse_minimum_release_age(WORKSPACE_WITHOUT_WINDOW)).toBe(0)
 	})
 
-	it('defaults to no quarantine for a malformed value', () => {
-		expect(release_age.parse_minimum_release_age('minimum-release-age=soon\n')).toBe(0)
+	it('defaults to no quarantine for a non-numeric value', () => {
+		expect(release_age.parse_minimum_release_age('minimumReleaseAge: soon\n')).toBe(0)
+	})
+
+	it('defaults to no quarantine for a non-integer value', () => {
+		expect(release_age.parse_minimum_release_age('minimumReleaseAge: 1.5\n')).toBe(0)
+	})
+
+	it('defaults to no quarantine for a malformed document', () => {
+		expect(release_age.parse_minimum_release_age('minimumReleaseAge: [1440\n')).toBe(0)
+	})
+
+	// pnpm 12 ignores an age line in `.npmrc`, so the reader must not report one as the policy.
+	it('ignores the legacy npmrc spelling', () => {
+		expect(release_age.parse_minimum_release_age('minimum-release-age=1440\n')).toBe(0)
 	})
 })
 
 describe('release_age.parse_declared_minimum_release_age', () => {
 	it('keeps an explicit zero distinct from an undeclared window', () => {
-		expect(release_age.parse_declared_minimum_release_age('minimum-release-age=0\n')).toBe(0)
-		expect(release_age.parse_declared_minimum_release_age(NPMRC_WITHOUT_WINDOW)).toBeUndefined()
+		expect(release_age.parse_declared_minimum_release_age('minimumReleaseAge: 0\n')).toBe(0)
+		expect(release_age.parse_declared_minimum_release_age(WORKSPACE_WITHOUT_WINDOW)).toBeUndefined()
 	})
 })
 

@@ -5,9 +5,9 @@ import { latest_corepack } from './latest-corepack'
 import {
 	AGED_PUBLISH,
 	fake_sync_result,
-	NPMRC_AGE_1440,
 	PACKAGE_JSON_PATH,
 	QUARANTINED_PUBLISH,
+	WORKSPACE_AGE_1440,
 } from './latest-corepack-fixture'
 import { build_package_manager_manifest } from './package-manager-manifest-fixture'
 
@@ -81,7 +81,7 @@ describe('latest_corepack.extract_times_json', () => {
 describe('latest_corepack.query_major_latest_version', () => {
 	it('asks the registry for publish timestamps and selects on the pinned major', () => {
 		mocked_execa_sync.mockReturnValue(fake_sync_result(0, TIMES_JSON_V11_OLD))
-		mocked_read_file_sync.mockReturnValue(NPMRC_AGE_1440)
+		mocked_read_file_sync.mockReturnValue(WORKSPACE_AGE_1440)
 
 		expect(latest_corepack.query_major_latest_version('11')).toBe(REGISTRY_V11)
 		expect(mocked_execa_sync).toHaveBeenCalledWith(
@@ -97,7 +97,7 @@ describe('latest_corepack.query_major_latest_version', () => {
 		expect(latest_corepack.query_major_latest_version('11')).toBeUndefined()
 	})
 
-	it('treats an unreadable .npmrc as no quarantine instead of failing', () => {
+	it('treats an unreadable pnpm-workspace.yaml as no quarantine instead of failing', () => {
 		mocked_execa_sync.mockReturnValue(fake_sync_result(0, TIMES_JSON_V11_OLD))
 		mocked_read_file_sync.mockImplementation(() => {
 			throw new Error('ENOENT')
@@ -219,12 +219,12 @@ function silence_console(): void {
 }
 
 // Arrange a resolved registry answer (11.5.2), then corepack exiting with the given code.
-// Reads arrive in main's order: package.json, then .npmrc (quarantine window), then the
+// Reads arrive in main's order: package.json, then pnpm-workspace.yaml (quarantine window), then the
 // re-read taken by the alignment that closes main() — `on_disk` is what the file holds at
 // that point, the bumped manifest on success and the restored one on a skip.
 function arrange_resolved_registry(update_exit_code: number, on_disk: string): void {
 	mocked_read_file_sync.mockReturnValueOnce(PACKAGE_JSON_WITH_ENGINES)
-	mocked_read_file_sync.mockReturnValueOnce(NPMRC_AGE_1440)
+	mocked_read_file_sync.mockReturnValueOnce(WORKSPACE_AGE_1440)
 	mocked_read_file_sync.mockReturnValueOnce(on_disk)
 	mocked_read_file_sync.mockReturnValueOnce(
 		update_exit_code === 0 ? PACKAGE_JSON_WITH_INTEGRITY : on_disk,
@@ -336,7 +336,7 @@ const PACKAGE_JSON_AHEAD_OF_REGISTRY = build_package_manager_manifest(
 
 describe('latest_corepack.main skip handling', () => {
 	// The kit#766 regression: an age-filtered registry view answers one release below the
-	// pin. The run must be a no-op, not a downgrade. The .npmrc read receives the
+	// pin. The run must be a no-op, not a downgrade. The workspace read receives the
 	// package.json content and parses to no quarantine, which is exactly the point: the
 	// floor holds regardless of what the age filter did.
 	it('skips without invoking pnpm self-update when the registry answers below the pin', () => {
@@ -360,7 +360,7 @@ describe('latest_corepack.main skip handling', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
 		mocked_read_file_sync.mockReturnValueOnce(PACKAGE_JSON_ALIGNED)
-		mocked_read_file_sync.mockReturnValueOnce(NPMRC_AGE_1440)
+		mocked_read_file_sync.mockReturnValueOnce(WORKSPACE_AGE_1440)
 		mocked_read_file_sync.mockReturnValueOnce(PACKAGE_JSON_ALIGNED)
 		mocked_execa_sync.mockReturnValue(fake_sync_result(0, TIMES_JSON_ALL_QUARANTINED))
 
