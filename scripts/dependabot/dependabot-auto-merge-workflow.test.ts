@@ -153,7 +153,7 @@ describe('dependabot-auto-merge.yml gate', () => {
 	// which names whoever triggered the run — see `dependabot-auto-merge-reconcile.test.ts` for why
 	// that distinction is load-bearing (joshuafolkken/kit#838).
 	it('runs only for pull requests Dependabot opened', () => {
-		expect(template_job()?.if).toBe("github.event.pull_request.user.login == 'dependabot[bot]'")
+		expect(template_job()?.if).toBe(dependabot_workflow_fixture.AUTHOR_GATE)
 	})
 
 	// The command `josh doctor` matches to decide whether the repository auto-merge prerequisite

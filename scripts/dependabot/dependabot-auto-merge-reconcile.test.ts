@@ -188,9 +188,9 @@ describe('dependabot-auto-merge.yml reconcile is template-only', () => {
 		expect(find_step(runtime_job(), RECONCILE_STEP_ID)).toBeUndefined()
 	})
 
-	// With nothing to withdraw, kit's copy has no reason to run for anyone else's push, so it keeps
-	// the narrower actor guard on the job itself.
-	it('keeps the actor guard on kit’s own job, which has nothing to reconcile', () => {
-		expect(runtime_job()?.if).toBe(dependabot_workflow_fixture.ACTOR_GATE)
+	// kit's copy gates its job on the author like the template, and keeps the actor guard on the
+	// arming step instead, so a push by anyone else never arms (joshuafolkken/kit#3268).
+	it('gates kit’s own job on the author, which has nothing to reconcile', () => {
+		expect(runtime_job()?.if).toBe(dependabot_workflow_fixture.AUTHOR_GATE)
 	})
 })

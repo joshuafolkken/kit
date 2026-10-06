@@ -1,3 +1,4 @@
+import { ci_yml_fixture } from '#scripts/ci/ci-yml-fixture'
 import { workflow_expression_fixture } from '#scripts/ci/workflow-expression-fixture'
 import { describe, expect, it } from 'vitest'
 import { dependabot_workflow_fixture } from './dependabot-workflow-fixture'
@@ -10,9 +11,12 @@ import { dependabot_workflow_fixture } from './dependabot-workflow-fixture'
 // The workflow, its job and its step ids come from dependabot_workflow_fixture, shared with the
 // guards on the copy consumers receive so the two cannot address different steps.
 const {
-	ACTOR_GATE: DEPENDABOT_ACTOR_GATE,
+	AUTHOR_GATE,
+	TEMPLATE,
+	RUNTIME,
 	METADATA_STEP_ID: METADATA_STEP,
 	DEPENDABOT_LOGIN,
+	MAINTAINER_LOGIN,
 	ECOSYSTEM_OUTPUT,
 	ACTIONS_ECOSYSTEM,
 	NPM_ECOSYSTEM,
@@ -26,17 +30,22 @@ const {
 	merge_condition,
 } = dependabot_workflow_fixture
 const { STEPS_CONTEXT: CONTEXT_ROOT, OUTPUTS_KEY } = workflow_expression_fixture
+const JOB_NAME = 'auto-merge'
 
 // The reference path the expression addresses, assembled from the same pieces the evaluated context
 // is built from so the two cannot drift apart.
 const ECOSYSTEM_REFERENCE = `${CONTEXT_ROOT}.${METADATA_STEP}.${OUTPUTS_KEY}.${ECOSYSTEM_OUTPUT}`
 
-// kit's own gate reads no actor and no upstream-managed decision — that divergence is the point of
-// joshuafolkken/kit#836 — so a run is described here by the metadata outputs alone; the rest of the
-// shared context is inert.
-function is_merge_step_reached(ecosystem: string, update_type: string): boolean {
+// kit's own gate reads no upstream-managed decision — that divergence is the point of
+// joshuafolkken/kit#836 — so a run is described here by who pushed and the metadata outputs alone;
+// the rest of the shared context is inert.
+function is_merge_step_reached(
+	ecosystem: string,
+	update_type: string,
+	actor: string = DEPENDABOT_LOGIN,
+): boolean {
 	const context = build_run_context({
-		actor: DEPENDABOT_LOGIN,
+		actor,
 		managed_output: NO_OUTPUT,
 		ecosystem,
 		update_type,
@@ -51,8 +60,28 @@ describe('dependabot-auto-merge.yml — gate shape (kit#802)', () => {
 	})
 
 	it('runs the job only for Dependabot-authored pull requests', () => {
-		expect(runtime_job()?.if).toContain(DEPENDABOT_ACTOR_GATE)
+		expect(runtime_job()?.if).toBe(AUTHOR_GATE)
 	})
+
+	// The job runs for a maintainer's push to a Dependabot branch too, so arming itself stays
+	// restricted to Dependabot's own events (joshuafolkken/kit#3268).
+	it('never arms on a push by someone other than Dependabot', () => {
+		expect(is_merge_step_reached(ACTIONS_ECOSYSTEM, PATCH_UPDATE, MAINTAINER_LOGIN)).toBe(false)
+	})
+
+	// Write rights belong to the one job that arms, never to the whole workflow (joshuafolkken/kit#3268).
+	it.each([RUNTIME, TEMPLATE])(
+		'grants write rights to the job, not the workflow, in %s',
+		(path) => {
+			const workflow = ci_yml_fixture.load_workflow(path)
+
+			expect(workflow.permissions).toBeUndefined()
+			expect(workflow.jobs[JOB_NAME]?.permissions).toEqual({
+				contents: 'write',
+				'pull-requests': 'write',
+			})
+		},
+	)
 
 	// `dependency-type` reports `direct:production` for github-actions updates and for kit's npm
 	// production dependencies alike, so the ecosystem output is the only signal separating them.

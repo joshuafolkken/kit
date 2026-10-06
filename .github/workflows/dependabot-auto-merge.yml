@@ -11,15 +11,17 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: write
-  pull-requests: write
-
 jobs:
+  # Gated on who opened the pull request rather than on who triggered the run, the same job gate as
+  # the distributed copy; arming stays restricted to Dependabot's own events, on the step below. The
+  # write rights are granted to this job alone (joshuafolkken/kit#3268).
   auto-merge:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: github.actor == 'dependabot[bot]'
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Fetch Dependabot metadata
         id: metadata
@@ -47,7 +49,8 @@ jobs:
       # CI only proves that kit still builds. Major bumps never auto-merge in either ecosystem.
       - name: Enable auto-merge for github-actions patch and minor updates
         if: >-
-          steps.metadata.outputs.package-ecosystem == 'github_actions'
+          github.actor == 'dependabot[bot]'
+          && steps.metadata.outputs.package-ecosystem == 'github_actions'
           && (steps.metadata.outputs.update-type == 'version-update:semver-patch'
           || steps.metadata.outputs.update-type == 'version-update:semver-minor')
         env:

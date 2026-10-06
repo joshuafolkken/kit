@@ -57,7 +57,9 @@ const HEAD_SHA_VARIABLE = 'HEAD_SHA'
 const HEAD_SHA_EXPRESSION = '${{ github.event.pull_request.head.sha }}'
 const DEPENDABOT_LOGIN = 'dependabot[bot]'
 const MAINTAINER_LOGIN = 'joshuafolkken'
-const ACTOR_GATE = `${workflow_expression_fixture.GITHUB_CONTEXT}.actor == '${DEPENDABOT_LOGIN}'`
+// The job gate both copies share: who opened the pull request, which a maintainer's push to the
+// branch does not change (joshuafolkken/kit#838, joshuafolkken/kit#3268).
+const AUTHOR_GATE = `${workflow_expression_fixture.GITHUB_CONTEXT}.event.pull_request.user.login == '${DEPENDABOT_LOGIN}'`
 
 // The metadata outputs the conditions address, and the values Dependabot publishes in them. Spelled
 // out here rather than in each suite so the context a condition is evaluated against and the
@@ -212,7 +214,7 @@ const dependabot_workflow_fixture = {
 	DIAGNOSTIC_VARIABLE,
 	DEPENDABOT_LOGIN,
 	MAINTAINER_LOGIN,
-	ACTOR_GATE,
+	AUTHOR_GATE,
 	NOT_CANCELLED,
 	CONCURRENCY_GROUP,
 	HEAD_MATCH_FLAG,
