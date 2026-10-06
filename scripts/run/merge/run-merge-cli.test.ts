@@ -19,6 +19,7 @@ const is_outage_mock = vi.hoisted(() => vi.fn())
 const has_resumable_cut_mock = vi.hoisted(() => vi.fn())
 const resume_cut_mock = vi.hoisted(() => vi.fn())
 const refused_carry_mock = vi.hoisted(() => vi.fn())
+const close_split_lane_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
@@ -26,13 +27,9 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 
 vi.mock('#scripts/issue/issue-closing-pr')
 
-vi.mock('#scripts/agent/api-outage', () => ({
-	api_outage: { is_outage: is_outage_mock },
-}))
+vi.mock('#scripts/agent/api-outage', () => ({ api_outage: { is_outage: is_outage_mock } }))
 
-vi.mock('#scripts/run/run-ending', () => ({
-	run_ending: { read_exit: read_exit_mock },
-}))
+vi.mock('#scripts/run/run-ending', () => ({ run_ending: { read_exit: read_exit_mock } }))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit: emit_mock },
@@ -41,6 +38,7 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 vi.mock('./run-merge-steps', () => ({
 	run_merge_steps: {
 		ask_next: ask_next_mock,
+		close_split_lane: close_split_lane_mock,
 		do_failed: do_failed_mock,
 		do_merged: do_merged_mock,
 		do_outage: do_outage_mock,
@@ -152,6 +150,7 @@ describe('run_merge_cli.run — a split child', () => {
 		expect(ask_next_mock).toHaveBeenCalledOnce()
 		expect(emit_mock).not.toHaveBeenCalledWith('park', expect.anything())
 		expect(emit_mock).toHaveBeenCalledWith('split', `#${CHILD} split`)
+		expect(close_split_lane_mock).toHaveBeenCalledWith(CHILD)
 	})
 })
 
