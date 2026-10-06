@@ -7,7 +7,7 @@ checkout and writing a new script — kept here so the reference states only eac
 
 Most commands are a TypeScript file under `scripts/`; the rest are a shell line the dispatcher spawns. In kit's own checkout the dispatcher evaluates a script command in its own process rather than starting a second TypeScript runtime for it. Three conditions decide whether a command takes that route:
 
-- **The dispatcher must run from TypeScript source** — kit's own `pnpm josh`. A consumer's `josh` bin is the bundled `dist/josh.js` under plain node, so every consumer keeps the spawning path.
+- **The dispatcher must run from TypeScript source** — kit's own `pnpm josh`. A consumer's `josh` bin is the bundled `dist/josh.js` under plain node, so a consumer keeps the spawning path for every command except one marked `is_bundled`, which it imports pre-built from `dist/commands/` ([runtime-bundling.md](./runtime-bundling.md)).
 - **The command must not need node flags of its own.** `doctor`, `latest:scope`, `followup` and `notify` pass `--env-file`, so they keep a process of their own.
 - **A shell command has no script to import** and is spawned as before.
 

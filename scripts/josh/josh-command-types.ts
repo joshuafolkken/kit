@@ -60,6 +60,9 @@ interface CommandEntry {
 	// listing carries only what a consumer can run (joshuafolkken/kit#1988). The audience in
 	// `reference` separately decides whether the command appears in the default listing.
 	is_kit_only?: boolean
+	// Pre-built to `dist/commands/` so a consumer's `dist/josh.js` imports it in its own process
+	// instead of spawning tsx for it (joshuafolkken/kit#3328, `docs/maintainers/runtime-bundling.md`).
+	is_bundled?: boolean
 }
 
 // The name `josh gate` registers under. It lives here rather than in `verification-gate.ts` so a
