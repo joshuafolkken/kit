@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { package_path } from '#scripts/init/init-paths'
 import { yaml_config_fixture } from '#scripts/lib/yaml-config-fixture'
+import { getFileInfo } from 'prettier'
 import { describe, expect, it } from 'vitest'
 
 interface PackageJson {
@@ -71,6 +72,8 @@ const RUNTIME_DIRS = [
 	'.github',
 ] as const
 
+const PRETTIER_IGNORE = '.prettierignore'
+
 const AI_COPY_ROOT_FILES = [
 	'CLAUDE.md',
 	'AGENTS.md',
@@ -82,7 +85,7 @@ const AI_COPY_ROOT_FILES = [
 	'.gitattributes',
 	'.mcp.json',
 	'.ncurc.json',
-	'.prettierignore',
+	PRETTIER_IGNORE,
 	WORKSPACE_CONFIG,
 	'tsconfig.sonar.json',
 ] as const
@@ -249,5 +252,57 @@ describe('package.json bin', () => {
 
 	it('points josh at the compiled, project-independent bin', () => {
 		expect(manifest.bin?.['josh']).toBe('dist/josh.js')
+	})
+})
+
+const CLAUDE_DIRECTORY = '.claude/'
+
+function prettier_reincluded_claude_paths(): Array<string> {
+	const content = readFileSync(package_path(PRETTIER_IGNORE), 'utf8')
+
+	return content
+		.split('\n')
+		.filter((line) => line.startsWith(`!${CLAUDE_DIRECTORY}`))
+		.map((line) => line.slice(1).replace(/\/$/u, ''))
+}
+
+// joshuafolkken/kit#3325: `.prettierignore` leaves `.claude/` out except for what the package
+// ships, so the distributed skills and settings are format-checked while local runtime state is
+// not. The re-included paths are the `files` entries under `.claude/`; a path added to one list
+// alone is either shipped unchecked or checked without being shipped.
+describe('.prettierignore distributed .claude paths', () => {
+	const shipped = (load_manifest().files ?? []).filter((entry) =>
+		entry.startsWith(CLAUDE_DIRECTORY),
+	)
+
+	it('re-includes exactly the .claude paths the package ships', () => {
+		expect(new Set(prettier_reincluded_claude_paths())).toEqual(new Set(shipped))
+	})
+})
+
+async function is_prettier_ignored(file_path: string): Promise<boolean> {
+	const info = await getFileInfo(package_path(file_path), {
+		ignorePath: package_path(PRETTIER_IGNORE),
+	})
+
+	return info.ignored
+}
+
+// The skills' Markdown stays out because Prettier pads every table column and pushes the skills
+// past their byte budgets; the shipped JSON is checked (joshuafolkken/kit#3325).
+describe('.prettierignore .claude coverage', () => {
+	it.each(['.claude/settings.json', '.claude/.claude-plugin/plugin.json'])(
+		'checks the shipped %s',
+		async (file_path) => {
+			expect(await is_prettier_ignored(file_path)).toBe(false)
+		},
+	)
+
+	it.each([
+		'.claude/skills/workflow-commands/SKILL.md',
+		'.claude/agents/investigator.md',
+		'.claude/tmp/handoff-3261.json',
+	])('leaves %s out', async (file_path) => {
+		expect(await is_prettier_ignored(file_path)).toBe(true)
 	})
 })
