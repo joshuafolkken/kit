@@ -143,7 +143,7 @@ const lane_measure_cli = {
 	run,
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) void main(process.argv.slice(ARGV_OFFSET))
+if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export type { MeasureContext }
 export { lane_measure_cli }
