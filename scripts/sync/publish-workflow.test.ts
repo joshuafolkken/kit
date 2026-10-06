@@ -122,11 +122,11 @@ describe('dual registry publishing', () => {
 		expect(manifest.repository.url).toContain('github.com/joshuafolkken/kit')
 	})
 
-	it('starts independent publish jobs so one failure cannot block the other', () => {
+	it('waits only on the shared pack so one publish failure cannot block the other', () => {
 		const { jobs } = read_workflow()
 
-		expect(jobs['publish-github'].needs).toBeUndefined()
-		expect(jobs['publish-npm'].needs).toBeUndefined()
+		expect(jobs['publish-github'].needs).toBe('pack')
+		expect(jobs['publish-npm'].needs).toBe('pack')
 	})
 
 	it('keeps GitHub Packages publishing with package write permission', () => {
@@ -134,16 +134,15 @@ describe('dual registry publishing', () => {
 		const commands = job.steps.map((step) => step.run ?? '').join('\n')
 
 		expect(job.permissions['packages']).toBe('write')
-		expect(commands).toContain('pnpm publish')
+		expect(commands).toContain('cd "$RUNNER_TEMP" && npm publish kit.tgz')
 		expect(commands).toContain('--registry https://npm.pkg.github.com')
 	})
 
-	it('packs once and publishes publicly from outside the pnpm project', () => {
+	it('publishes the shared tarball publicly from outside the pnpm project', () => {
 		const job = read_workflow().jobs['publish-npm']
 		const commands = job.steps.map((step) => step.run ?? '').join('\n')
 
 		expect(job.permissions['id-token']).toBe('write')
-		expect(commands).toContain('pnpm pack --out "$RUNNER_TEMP/kit.tgz"')
 		expect(commands).toContain('cd "$RUNNER_TEMP" && npm publish kit.tgz --access public')
 		expect(commands).toContain('--registry https://registry.npmjs.org')
 		expect(commands).toContain('--userconfig /dev/null')

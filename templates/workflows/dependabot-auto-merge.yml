@@ -13,10 +13,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: write
-  pull-requests: write
-
 jobs:
   # Gated on who opened the pull request, not on who triggered this run. `github.actor` names the
   # latter, so a push by anyone other than Dependabot — a maintainer rebasing the branch by hand, or
@@ -24,11 +20,15 @@ jobs:
   # `gh pr merge --auto` is state on the pull request, so a run that never happens cannot withdraw an
   # auto-merge an earlier run armed, and the bump merges itself the moment the checks go green
   # (joshuafolkken/kit#838). The author is the stable fact about a Dependabot pull request; arming is
-  # what stays restricted to Dependabot's own events, on the step below.
+  # what stays restricted to Dependabot's own events, on the step below. The write rights are granted
+  # to this job alone (joshuafolkken/kit#3268).
   auto-merge:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: github.event.pull_request.user.login == 'dependabot[bot]'
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       # Whether the pull request touches a workflow some upstream package overwrites. Decided from
       # the changed files because Dependabot's metadata cannot answer it: for the github-actions

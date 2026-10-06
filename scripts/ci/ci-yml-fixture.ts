@@ -27,6 +27,7 @@ interface WorkflowJob {
 	name?: string
 	if?: string
 	outputs?: Record<string, string>
+	permissions?: Record<string, string>
 	needs?: string | ReadonlyArray<string>
 	steps?: ReadonlyArray<WorkflowStep>
 	strategy?: WorkflowStrategy
@@ -49,6 +50,7 @@ interface WorkflowConcurrency {
 interface Workflow {
 	concurrency?: WorkflowConcurrency
 	env?: Record<string, string>
+	permissions?: Record<string, string>
 	jobs: Record<string, WorkflowJob>
 }
 
