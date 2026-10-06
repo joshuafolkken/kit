@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { git_gh_exec, type GhApiRequest } from '#scripts/gh/git-gh-exec'
 import { git_pr } from '#scripts/gh/git-pr'
 import { execaSync } from 'execa'
@@ -39,7 +40,8 @@ function result(stdout = '', exit_code = 0): ReturnType<typeof execaSync> {
 function command_of(call: ReadonlyArray<unknown>): string {
 	const args: ReadonlyArray<unknown> = Array.isArray(call[1]) ? call[1] : []
 
-	return [call[0], ...args].join(' ')
+	// git is spawned through the unit suite's network-guard shim, so its path is read by its name.
+	return [path.basename(String(call[0])), ...args].join(' ')
 }
 
 function git_writes(): Array<string> {

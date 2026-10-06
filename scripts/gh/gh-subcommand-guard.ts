@@ -130,6 +130,8 @@ interface AllowedSpawn {
 	reason: string
 }
 
+const START_EXEC_FILE = 'scripts/init/start-exec.ts'
+
 // The spawns that are not API calls, each with why it cannot be one. Every other `gh` spawn in the
 // repository must start with `api`.
 const ALLOWED_SPAWNS: ReadonlyArray<AllowedSpawn> = [
@@ -150,6 +152,24 @@ const ALLOWED_SPAWNS: ReadonlyArray<AllowedSpawn> = [
 		subcommand: DYNAMIC_SUBCOMMAND,
 		reason:
 			'This file is the REST layer. Its spawns forward the argument list `to_gh_api_args` built, and that builder puts `api` first unconditionally — pinned by `git-gh-exec.test.ts` and `git-gh-exec-sync.test.ts` rather than by reading the call site.',
+	},
+	{
+		file: START_EXEC_FILE,
+		subcommand: '--version',
+		reason:
+			'`josh start` checks the CLI is installed before its first write, so a missing gh leaves the directory untouched. It contacts nothing.',
+	},
+	{
+		file: START_EXEC_FILE,
+		subcommand: 'auth',
+		reason:
+			'`gh auth status` is the question `josh start` asks of the CLI itself — whether the person ran `gh auth login` — before its first write; the hint it answers names that command.',
+	},
+	{
+		file: START_EXEC_FILE,
+		subcommand: 'repo',
+		reason:
+			'`gh repo create --source . --remote origin --push` creates the repository, adds the remote in the protocol the person configured gh with, and pushes, in one step a person runs by hand at their own terminal (joshuafolkken/kit#3262).',
 	},
 ]
 

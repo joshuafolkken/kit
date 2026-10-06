@@ -8,13 +8,13 @@ const START_HINT =
 // reached the branch, so `josh start` has no setup pull request to open (joshuafolkken/kit#2816).
 function is_kit_committed(root: string): boolean {
 	// `./` resolves the path from `root` rather than from the repository's top level.
-	const manifest = start_exec.read_output('git', ['show', 'HEAD:./package.json'], root)
+	const manifest = start_exec.git_read(['show', 'HEAD:./package.json'], root)
 
 	return manifest?.includes(`"${KIT_PACKAGE_NAME}"`) ?? false
 }
 
 function is_git_work_tree(root: string): boolean {
-	return start_exec.succeeds('git', ['rev-parse', '--is-inside-work-tree'], root)
+	return start_exec.git_succeeds(['rev-parse', '--is-inside-work-tree'], root)
 }
 
 // The line `josh init` ends with in a Git repository whose checkout does not hold kit yet: the setup is

@@ -29,7 +29,7 @@ const GH_INSTALL_HINT =
 const GH_AUTH_HINT =
 	'GitHub CLI is not signed in. Run gh auth login, then run josh start again. Nothing was changed.'
 
-const { succeeds, read_output, run, run_local } = start_exec
+const { git_succeeds, git_read, run_local } = start_exec
 
 function read_git_state(root: string, shape: ProjectShape): GitState {
 	const { has_git, has_github } = shape
@@ -46,8 +46,8 @@ function read_git_state(root: string, shape: ProjectShape): GitState {
 	}
 
 	const has_origin = git_spawn_sync.origin_url(root) !== undefined
-	const branch = read_output('git', ['symbolic-ref', '--short', 'HEAD'], root)
-	const has_commits = succeeds('git', ['rev-parse', '--verify', '--quiet', 'HEAD'], root)
+	const branch = git_read(['symbolic-ref', '--short', 'HEAD'], root)
+	const has_commits = git_succeeds(['rev-parse', '--verify', '--quiet', 'HEAD'], root)
 	const has_kit_committed = kit_setup_state.is_kit_committed(root)
 
 	return { has_git, has_github, has_origin, branch, has_commits, has_kit_committed }
@@ -56,8 +56,8 @@ function read_git_state(root: string, shape: ProjectShape): GitState {
 // Every step talks to GitHub, so the CLI is checked before the first write rather than at the step
 // that needs it — a missing `gh` then leaves the directory exactly as it was.
 function github_cli_refusal(root: string): string | undefined {
-	if (!succeeds('gh', ['--version'], root)) return GH_INSTALL_HINT
-	if (!succeeds('gh', ['auth', 'status'], root)) return GH_AUTH_HINT
+	if (!start_exec.is_gh_installed(root)) return GH_INSTALL_HINT
+	if (!start_exec.is_gh_signed_in(root)) return GH_AUTH_HINT
 
 	return undefined
 }
@@ -94,11 +94,7 @@ function commit_all(context: StepContext): void {
 }
 
 function create_github_repository(context: StepContext): void {
-	const name = path.basename(context.root)
-	const visibility = `--${context.visibility}`
-	const source = ['--source', '.', '--remote', 'origin', '--push']
-
-	run('gh', ['repo', 'create', name, visibility, ...source], context.root)
+	start_exec.create_github_repository(path.basename(context.root), context.visibility, context.root)
 }
 
 // The repository was created by the step before, so `gh` resolves the placeholder from the
