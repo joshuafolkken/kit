@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { buffered_process } from '#scripts/lib/buffered-process'
+import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 
 // Filling the lane, which is the other half of opening one (joshuafolkken/kit#1554).
 //
@@ -34,12 +35,6 @@ const MANIFEST_FILE_NAME = 'package.json'
 // The lane opens with no dependencies installed, and that is the reported state rather than a
 // failure — there was nothing to install, so nothing failed.
 const NO_MANIFEST_OUTPUT = `No ${MANIFEST_FILE_NAME} in the lane, so the dependency install was skipped.`
-// The 3.5 s above is a warm store; a first run, or one after a dependency change, goes to the
-// network, so that figure is not the bound to write here. Ten minutes covers that fetch and still
-// ends `lane:open` when a registry never answers, rather than holding a parallel run open with
-// nothing printed. It is well under the fan-out's own half hour because this one blocks a command a
-// person is waiting on, not a check suite.
-const INSTALL_TIMEOUT_MS = 600_000
 
 interface InstallResult {
 	is_installed: boolean
@@ -85,10 +80,4 @@ async function install_dependencies(directory: string): Promise<InstallResult> {
 const lane_install = { install_dependencies }
 
 export type { InstallResult }
-export {
-	lane_install,
-	INSTALL_ARGUMENTS,
-	INSTALL_TIMEOUT_MS,
-	MANIFEST_FILE_NAME,
-	NO_MANIFEST_OUTPUT,
-}
+export { lane_install, INSTALL_ARGUMENTS, MANIFEST_FILE_NAME, NO_MANIFEST_OUTPUT }

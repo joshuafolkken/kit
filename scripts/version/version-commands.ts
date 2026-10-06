@@ -1,3 +1,4 @@
+import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execaSync } from 'execa'
 import { release_age } from './release-age'
 import { release_hold } from './release-hold'
@@ -25,8 +26,6 @@ import { version_targets } from './version-targets'
 const FAILURE_EXIT_CODE = 1
 const ALREADY_UP_TO_DATE = 'Already up to date'
 const NO_QUARANTINE_MINUTES = 0
-// A global install that goes to the network — the same ten minutes `lane-install.ts` gives one.
-const UPGRADE_TIMEOUT_MS = 600_000
 
 // What the local minimum-release-age policy permits for one package. Resolved per package because
 // the newest installable release is a property of that package's own publish history. Returns a hold
@@ -207,7 +206,7 @@ function run_upgrade_step(step: ReadonlyArray<string>): number {
 	const result = execaSync(executable, rest, {
 		stdio: 'inherit',
 		reject: false,
-		timeout: UPGRADE_TIMEOUT_MS,
+		timeout: INSTALL_TIMEOUT_MS,
 	})
 
 	return result.exitCode ?? FAILURE_EXIT_CODE

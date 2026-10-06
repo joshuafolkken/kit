@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
+import { LINT_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import { z } from 'zod'
 
@@ -20,7 +21,6 @@ const PNPM_EXEC = 'exec'
 // `--no-inline-config` so a `/* eslint-disable */` in a file cannot hide a candidate from the scan the
 // way it can from the gate; the scan reports what the rules say, not what a file asked to suppress.
 const FORMAT_FLAGS: ReadonlyArray<string> = ['--format', 'json', '--no-inline-config']
-const PROCESS_TIMEOUT_MS = 180_000
 
 type Priority = 'high' | 'medium' | 'low'
 const HIGH: Priority = 'high'
@@ -216,7 +216,7 @@ async function run_eslint_json(
 			reject: false,
 			stdout: 'pipe',
 			stderr: 'ignore',
-			timeout: PROCESS_TIMEOUT_MS,
+			timeout: LINT_TIMEOUT_MS,
 		})
 
 		return parse_results(result.stdout)

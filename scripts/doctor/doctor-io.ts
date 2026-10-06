@@ -2,11 +2,11 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { read_spawn_stdout } from '#scripts/lib/spawn-exit'
+import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execaSync } from 'execa'
 import { doctor_logic } from './doctor-logic'
 
 const JOSH_BIN = 'josh'
-const GIT_TIMEOUT_MS = 2000
 const NOT_A_REPOSITORY_MESSAGE = 'not a git repository'
 const NPM_VERSION_UPDATES_DISABLED = 'open-pull-requests-limit: 0'
 const DEPENDABOT_CONFIG_PATH = '.github/dependabot.yml'
@@ -72,7 +72,7 @@ function classify_git_failure(exit_code: number | undefined, stderr: string): Gi
 function resolve_git_top_level(): GitTopLevel {
 	// The C locale `toplevel` asks under is what keeps the stderr match below from failing on a
 	// translated message and bringing the spurious warning back.
-	const result = git_spawn_sync.toplevel(GIT_TIMEOUT_MS)
+	const result = git_spawn_sync.toplevel(PROBE_TIMEOUT_MS)
 
 	if (result.exit_code === 0) return classify_top_level(result.stdout.trim())
 
@@ -194,7 +194,6 @@ type GitTopLevel =
 	{ state: 'inside'; top_level: string } | { state: 'outside' } | { state: 'undetermined' }
 
 const doctor_io = {
-	GIT_TIMEOUT_MS,
 	resolve_path_josh,
 	resolve_pnpm_global_josh,
 	has_distributed_dependabot_config,
