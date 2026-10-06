@@ -49,7 +49,7 @@ function paths_matching(command: string, pattern: RegExp): Array<string> {
 	return [...command.matchAll(pattern)].flatMap((match) => {
 		const file_path = match[1]?.trim()
 
-		return file_path === undefined || file_path === '' ? [] : [file_path]
+		return file_path === undefined || file_path === '' ? [] : file_path
 	})
 }
 

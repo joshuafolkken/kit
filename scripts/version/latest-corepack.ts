@@ -179,8 +179,8 @@ function warn_skip(reason: string): void {
 	console.warn(`⚠ Skipped pnpm bump (${reason}); the chain continues.`)
 }
 
-function warn_unresolved(major: string | undefined): void {
-	warn_skip(`no pnpm ${major ?? ''} release resolvable from the registry`)
+function warn_unresolved(major: string | undefined = ''): void {
+	warn_skip(`no pnpm ${major} release resolvable from the registry`)
 }
 
 function run_pnpm_update(target: string): number {

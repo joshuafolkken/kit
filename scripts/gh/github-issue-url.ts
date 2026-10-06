@@ -75,8 +75,8 @@ function build_target(match: RegExpExecArray): ParsedUrl {
 	}
 }
 
-function parse_with(pattern: RegExp, url: string | undefined): ParsedUrl | undefined {
-	const match = pattern.exec(url ?? '')
+function parse_with(pattern: RegExp, url: string | undefined = ''): ParsedUrl | undefined {
+	const match = pattern.exec(url)
 	if (match === null) return undefined
 
 	return build_target(match)

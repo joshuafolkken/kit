@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { NAME_REPLACEMENTS_ALLOW_LIST, unicorn_rules } from './unicorn.js'
 
 const NO_EMPTY_FILE = 'unicorn/no-empty-file'
+const NAME_REPLACEMENTS = 'unicorn/name-replacements'
 
 interface NameReplacementsOptions {
 	allowList: Record<string, boolean>
@@ -40,6 +41,12 @@ describe('unicorn_rules — name-replacements allowList (issue #435)', () => {
 	})
 })
 
+describe('unicorn_rules — documentation comment asterisks (issue #3273)', () => {
+	it('keeps the conventional asterisk-prefixed JSDoc lines', () => {
+		expect(unicorn_rules['unicorn/no-asterisk-prefix-in-documentation-comments']).toBe('off')
+	})
+})
+
 describe('unicorn_rules — filename-case directory checking (regression #528)', () => {
 	it('disables checkDirectories so directory names are never enforced', () => {
 		const rule_value = unicorn_rules['unicorn/filename-case'] as [
@@ -54,28 +61,48 @@ describe('unicorn_rules — filename-case directory checking (regression #528)',
 	})
 })
 
-// The `sv create` scaffold ships `src/lib/index.ts` as a single comment line, so an untouched
-// project must lint clean while a truly empty file is still reported (issue #3069).
-function lint_empty_file_rule(code: string): ReadonlyArray<string> {
+// Lints `code` with one rule exactly as `unicorn_rules` configures it; answers the reported rule ids.
+function lint_with_rule(
+	rule_name: keyof typeof unicorn_rules,
+	code: string,
+): ReadonlyArray<string> {
 	const linter = new Linter({ configType: 'flat' })
 	const config: Linter.Config = {
 		files: ['**/*.ts'],
 		plugins: { unicorn },
-		rules: { [NO_EMPTY_FILE]: unicorn_rules[NO_EMPTY_FILE] as Linter.RuleEntry },
+		rules: { [rule_name]: unicorn_rules[rule_name] as Linter.RuleEntry },
 	}
 
 	return linter.verify(code, [config], 'index.ts').map((message) => String(message.ruleId))
 }
 
+// The `sv create` scaffold ships `src/lib/index.ts` as a single comment line, so an untouched
+// project must lint clean while a truly empty file is still reported (issue #3069).
 describe('unicorn_rules — no-empty-file on a comment-only file (regression #3069)', () => {
 	it('accepts a file that holds only a comment', () => {
 		expect(
-			lint_empty_file_rule('// place files you want to import through the `#lib` alias\n'),
+			lint_with_rule(NO_EMPTY_FILE, '// place files you want to import through the `#lib` alias\n'),
 		).toEqual([])
 	})
 
 	it('still reports a file with no content at all', () => {
-		expect(lint_empty_file_rule('\n')).toEqual([NO_EMPTY_FILE])
+		expect(lint_with_rule(NO_EMPTY_FILE, '\n')).toEqual([NO_EMPTY_FILE])
+	})
+})
+
+// unicorn 77 expands `repo` to `repository`; the allowList matches whole lowercase words only, so
+// the replacement itself is disabled to cover `Repo` inside a PascalCase name too (issue #3273).
+describe('unicorn_rules — name-replacements keeps repo (issue #3273)', () => {
+	it('accepts repo as a word in snake_case and PascalCase names', () => {
+		const code = 'export class RepoIdentity {}\nexport const current_repo = new RepoIdentity()\n'
+
+		expect(lint_with_rule(NAME_REPLACEMENTS, code)).toEqual([])
+	})
+
+	it('still expands an unfamiliar abbreviation', () => {
+		expect(lint_with_rule(NAME_REPLACEMENTS, 'export const req_count = 1\n')).toEqual([
+			NAME_REPLACEMENTS,
+		])
 	})
 })
 

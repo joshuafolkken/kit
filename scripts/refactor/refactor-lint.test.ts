@@ -94,7 +94,7 @@ describe('refactor_lint.parse_results', () => {
 
 	it('returns undefined on unparseable output, distinct from a clean empty array', () => {
 		expect(refactor_lint.parse_results('not json')).toBeUndefined()
-		expect(refactor_lint.parse_results(undefined)).toBeUndefined()
+		expect(refactor_lint.parse_results()).toBeUndefined()
 		expect(refactor_lint.parse_results('[]')).toStrictEqual([])
 	})
 })

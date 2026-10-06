@@ -144,7 +144,7 @@ describe('OpenAI lane supervisor Git access', () => {
 
 		const { args } = launched_request().argv
 		const additions = args.flatMap((argument, index) =>
-			argument === '--add-dir' ? [args[index + 1]] : [],
+			argument === '--add-dir' ? args[index + 1] : [],
 		)
 
 		expect(resolve_common_directory).toHaveBeenCalledWith(lane_directory)

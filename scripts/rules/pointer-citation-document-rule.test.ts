@@ -54,7 +54,7 @@ function pointer_topics(): ReadonlyArray<PointerTopic> {
 	return workflow_prompt_files().flatMap((path) => {
 		const skill = POINTER_DECLARATION.exec(read_repo_file(path))?.[1]
 
-		return skill === undefined ? [] : [{ skill, topic: path }]
+		return skill === undefined ? [] : { skill, topic: path }
 	})
 }
 

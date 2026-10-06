@@ -57,10 +57,10 @@ const DISTRIBUTED_GLOBS: ReadonlyArray<string> = DISTRIBUTED_DIRECTORIES.map(
 	(directory) => `${directory}/**`,
 )
 
-function collect_unknown_words(files: ReadonlyArray<string>, input?: string): Array<string> {
+function collect_unknown_words(files: ReadonlyArray<string>, input = ''): Array<string> {
 	const result = execaSync(resolve_local_bin(REPO_ROOT, CSPELL_BIN), [...CSPELL_FLAGS, ...files], {
 		cwd: REPO_ROOT,
-		input: input ?? '',
+		input,
 		reject: false,
 	})
 

@@ -147,6 +147,7 @@ function splice_declaration(
 		if (index === input.first) return [...input.rendered]
 		if (input.dropped.has(index)) return []
 
+		// eslint-disable-next-line unicorn/no-unnecessary-array-flat-map -- one return type (sonarjs/function-return-type)
 		return [line]
 	})
 }

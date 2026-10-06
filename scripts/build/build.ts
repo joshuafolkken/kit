@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { error_text } from '#scripts/lib/error-message'
 import { OUTFILE as BIN_OUTFILE, build_bin } from './build-bin'
 import { build_claude_md } from './build-claude-md'
+import { build_commands } from './build-commands'
 import { build_hooks, OUT_DIR as HOOKS_OUT_DIR } from './build-hooks'
 import { build_library, PUBLIC_LIBRARIES } from './build-library'
 
@@ -42,6 +43,7 @@ function build_steps(): ReadonlyArray<BuildStep> {
 	return [
 		{ name: 'bin', run: bin_step },
 		{ name: 'hooks', run: hooks_step },
+		{ name: 'commands', run: async () => await build_commands() },
 		...PUBLIC_LIBRARIES.map((name) => ({ name, run: async () => await library_step(name) })),
 		{ name: 'claude-md', run: claude_md_step },
 	]

@@ -29,11 +29,7 @@ const PULL_REQUEST_SEGMENT = '/pull/'
 const epic_issue_schema = z.object({
 	number: z.number(),
 	title: z.string().default(''),
-	body: z
-		.string()
-		.nullable()
-		.default('')
-		.transform((value) => value ?? ''),
+	body: z.union([z.string(), z.null().transform(() => '')]).default(''),
 	state: z.string().default(UNKNOWN_STATE),
 	// The issue endpoint answers for a pull request as readily as for an issue, and nothing in the
 	// other fields separates them — an open PR reports `state: OPEN`, a merged one `MERGED`. The URL

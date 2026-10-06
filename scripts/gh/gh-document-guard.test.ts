@@ -196,7 +196,7 @@ function subcommands_in(text: string): Array<string> {
 	return (text.match(GH_COMMAND_PATTERN) ?? []).flatMap((invocation) => {
 		const subcommand = to_subcommand(invocation)
 
-		return subcommand === undefined ? [] : [subcommand]
+		return subcommand ?? []
 	})
 }
 

@@ -50,6 +50,7 @@ from the page it explains.
 - [wip-cap-rationale.md](./wip-cap-rationale.md) — the open-Issue cap
 - [observation-filing-rationale.md](./observation-filing-rationale.md) — filing observations
 - [observation-ledger-rationale.md](./observation-ledger-rationale.md) — the observation ledger
+- [runtime-bundling.md](./runtime-bundling.md) — running josh commands without tsx
 - [epic-commands-rationale.md](./epic-commands-rationale.md) — the `josh epic:*` commands
 - [backlogrun-steps-rationale.md](./backlogrun-steps-rationale.md),
   [backlogrun-child-rationale.md](./backlogrun-child-rationale.md),

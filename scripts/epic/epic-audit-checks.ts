@@ -301,7 +301,7 @@ function reported_references(
 		.flatMap((reference) => {
 			const state = reported_state(states, reference)
 
-			return state === undefined ? [] : [{ reference, state }]
+			return state === undefined ? [] : { reference, state }
 		})
 }
 

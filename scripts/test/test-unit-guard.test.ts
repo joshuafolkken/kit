@@ -31,11 +31,11 @@ function is_record(value: unknown): value is Record<string, unknown> {
 
 function last_spawn_options(): Record<string, unknown> {
 	const { calls }: { calls: unknown } = mocked_execa.mock
-	if (!Array.isArray(calls)) throw new Error('The execa mock did not record calls')
+	if (!Array.isArray(calls)) throw new TypeError('The execa mock did not record calls')
 
 	const safe_calls = calls.map((call: unknown) => call)
 	const last_call: unknown = safe_calls.at(-1)
-	if (!Array.isArray(last_call)) throw new Error('The execa mock recorded no last call')
+	if (!Array.isArray(last_call)) throw new TypeError('The execa mock recorded no last call')
 
 	const safe_call = last_call.map((entry: unknown) => entry)
 	const options: unknown = safe_call.at(SPAWN_OPTIONS_POSITION)

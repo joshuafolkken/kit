@@ -119,9 +119,9 @@ describe.skipIf(process.platform === 'win32')('a remote git call is bounded', ()
 			expect(Date.now() - started).toBeLessThan(BUDGET_MS + REAP_ALLOWANCE_MS)
 			expect(Date.now() - started).toBeLessThan(HANG_SECONDS * MS_PER_SECOND)
 
-			const [git_pid] = await read_pids(pid_file)
+			const [git_pid = 0] = await read_pids(pid_file)
 
-			expect(is_alive(git_pid ?? 0)).toBe(false)
+			expect(is_alive(git_pid)).toBe(false)
 		},
 		TIMEOUT_MS,
 	)

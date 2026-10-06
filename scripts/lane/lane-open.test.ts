@@ -42,7 +42,7 @@ vi.mock('./lane-registry', () => ({
 		unreadable_lanes: (lanes: ReadonlyArray<LaneInfo>): Array<LaneInfo> =>
 			lanes.filter((lane) => !lane.is_stranded && lane.seat === undefined),
 		used_seats: (lanes: ReadonlyArray<LaneInfo>): Array<number> =>
-			lanes.flatMap((lane) => (lane.seat === undefined ? [] : [lane.seat])),
+			lanes.flatMap((lane) => lane.seat ?? []),
 	},
 }))
 
