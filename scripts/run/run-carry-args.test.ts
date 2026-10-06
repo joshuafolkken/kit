@@ -111,15 +111,16 @@ describe('run_carry_args.to_request counting group', () => {
 		})
 	})
 
-	it('counts merged and filed amounts', () => {
-		expect(request_for(['--merged', MERGED, '--filed', FILED])).toMatchObject({
+	// joshuafolkken/kit#3296: `--merged` names the issue, so the change is the one `run:merge` applies.
+	it('counts a merged issue as one merge naming it, beside a filed amount', () => {
+		expect(request_for(['--merged', ISSUE, '--filed', FILED])).toMatchObject({
 			kind: 'count',
-			change: { merged: Number(MERGED), filed: Number(FILED), cuts: 0 },
+			change: { merged: 1, merged_issue: Number(ISSUE), filed: Number(FILED), cuts: 0 },
 		})
 	})
 
-	it('treats --merged 0 as a count rather than a read', () => {
-		expect(request_for(['--merged', '0'])).toMatchObject({ kind: 'count', change: { merged: 0 } })
+	it('treats --filed 0 as a count rather than a read', () => {
+		expect(request_for(['--filed', '0'])).toMatchObject({ kind: 'count', change: { filed: 0 } })
 	})
 
 	it('records a done issue', () => {
@@ -190,5 +191,14 @@ describe('run_carry_args.to_request usage errors', () => {
 			kind: 'end',
 			stopped: undefined,
 		})
+	})
+})
+
+describe('run_carry_args.to_request --merged', () => {
+	// joshuafolkken/kit#3296: a bare count cannot be matched against `merged_issues`, so it is refused.
+	it('refuses a merged value that is not an issue number', () => {
+		expect(request_for(['--merged', '0'])).toBeUndefined()
+		expect(request_for(['--merged', '012'])).toBeUndefined()
+		expect(request_for(['--merged', UNSAFE_ISSUE])).toBeUndefined()
 	})
 })

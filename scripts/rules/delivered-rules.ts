@@ -16,6 +16,7 @@ import { lane_background } from './lane-background'
 import { lane_carry_conflict } from './lane-carry-conflict'
 import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
+import { lane_split_park } from './lane-split-park'
 import { lane_switch_main } from './lane-switch-main'
 import { oracle_consulted } from './oracle-consulted'
 import { permission_guards } from './permission-guards'
@@ -424,22 +425,14 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// "is this a dispatched lane child" is the dispatch mark against this checkout's own issue, read
 	// synchronously by `lane_child_marker.is_child_of`, and the command match runs first so an ordinary
 	// run pays nothing for it.
+	// Its once-per-run disposition is stated beside the row in `lane-park.ts`.
 	//
-	// **Once per run rather than `decide`, and no `already_satisfied`.** The stop ends the turn, so it
-	// is not the recurring act joshuafolkken/kit#1570 wrote `decide` for. It carries no
-	// `already_satisfied` because the park it asks for is a GitHub label a synchronous guard cannot
-	// read, and the transcript-tail alternative would read a child that merely *read*
-	// `backlogrun-park.md` — whose prose carries the `labels[]=needs-decision` command — as compliant
-	// and fall silent on a real violation. `lane-park.ts` states why one wasted reissue on the compliant
-	// path is the safe direction. `keeps` reads an actual label-application `Bash` command, never the
-	// tail, so it is not fooled the same way; `reaches` stays `is_trigger`, since a compliant run issues
-	// the same confirmation notify and belongs in the denominator.
-	{
-		id: 'lane-park',
-		is_trigger: on_bash_command(lane_park.is_unparked_stop),
-		reason: lane_park.LANE_PARK_REASON,
-		keeps: on_bash_command(lane_park.records_the_park),
-	},
+	// **A split child's park is refused first** (joshuafolkken/kit#3296): a lane child that promoted its
+	// own Issue to an epic this run has nothing to park, so `lane-split-park` refuses the label write
+	// and the confirmation notify onto that epic on every occurrence. It shares the notify with
+	// `lane-park` and is listed first; a run that promoted nothing falls through to `lane-park`.
+	lane_split_park.ROW,
+	lane_park.ROW,
 	// **joshuafolkken/kit#2034's rule, one tool-call earlier** (joshuafolkken/kit#2201). `lane-park`
 	// fires on the `confirmation` notify a routed child reaches; a child that reaches for
 	// `AskUserQuestion` never gets there, because the harness ends its turn at the refused ask. This

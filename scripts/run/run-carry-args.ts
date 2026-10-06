@@ -9,6 +9,7 @@ import { run_issue_number } from './run-issue-number'
 
 const NO_INCREMENT = 0
 const ONE_CUT = 1
+const ONE_MERGE = 1
 // The four request groups below are mutually exclusive, so more than one of them named in a single
 // invocation is a usage error rather than an order to guess.
 const ONE_GROUP = 1
@@ -22,7 +23,7 @@ const MIN_PID = 1
 // cannot advance a budget that is no longer its own. `--end` alone accepts it and ignores it, and a
 // usage line that offered it there would be promising an ownership check nothing performs.
 const USAGE =
-	'Usage: josh run:carry [--json] | --begin <invocation> [--owner <pid>] | --resume <invocation> [--owner <pid>] | (--cut | --merged <count> | --filed <count> | --done <issue> | --retrospective --summary <text>) [--owner <pid>] | --end [--stopped <reason>]'
+	'Usage: josh run:carry [--json] | --begin <invocation> [--owner <pid>] | --resume <invocation> [--owner <pid>] | (--cut | --merged <issue> | --filed <count> | --done <issue> | --retrospective --summary <text>) [--owner <pid>] | --end [--stopped <reason>]'
 
 const OPTIONS = {
 	begin: { type: 'string' },
@@ -89,12 +90,12 @@ function to_count(value: OptionValue): number | undefined {
 	return COUNT_PATTERN.test(text) ? Number(text) : undefined
 }
 
-// **`--done` names an issue, so it is checked as one and not as a count.** The shape is
-// `run-issue-number.ts`'s, which already refuses `0` and a leading zero — the same rule the `run:*`
+// **`--done` and `--merged` name an issue, so each is checked as one and not as a count.** The shape
+// is `run-issue-number.ts`'s, which already refuses `0` and a leading zero — the same rule the `run:*`
 // commands interpolate a number under, imported rather than restated. Absent is an empty object rather
 // than a zero: there is no issue to record, which is a different fact from recording issue zero. A
-// present-but-malformed value invalidates the whole invocation, exactly as a bad `--merged` does.
-function to_done(value: OptionValue): Pick<CarryChange, 'done'> | undefined {
+// present-but-malformed value is `undefined`, which invalidates the whole invocation.
+function to_issue(value: OptionValue): { issue?: number } | undefined {
 	const text = cli_flags.string_of(value)
 
 	if (text === undefined) return {}
@@ -106,7 +107,30 @@ function to_done(value: OptionValue): Pick<CarryChange, 'done'> | undefined {
 	// The pattern is anchored on digits and bounds nothing, so the magnitude check is separate — the
 	// same shape `backlog_budget_cli.to_count` ends with. A number past the safe range would be
 	// recorded as a different number and never match anything in `remaining`.
-	return Number.isSafeInteger(issue) ? { done: issue } : undefined
+	return Number.isSafeInteger(issue) ? { issue } : undefined
+}
+
+function to_done(value: OptionValue): Pick<CarryChange, 'done'> | undefined {
+	const parsed = to_issue(value)
+
+	if (parsed === undefined) return undefined
+
+	return parsed.issue === undefined ? {} : { done: parsed.issue }
+}
+
+// **`--merged` names the issue that merged, never a count** (joshuafolkken/kit#3296). A bare count
+// could not be matched against `merged_issues`, so a parent that counted a merge by hand and the
+// driver's `run:merge` for the same issue added two for one merge. Naming the issue makes the hand
+// count the same change `run:merge` applies — one merge plus its number — so `apply_change`'s
+// duplicate check holds whichever of the two arrives first.
+function to_merged(value: OptionValue): Pick<CarryChange, 'merged' | 'merged_issue'> | undefined {
+	const parsed = to_issue(value)
+
+	if (parsed === undefined) return undefined
+
+	return parsed.issue === undefined
+		? { merged: NO_INCREMENT }
+		: { merged: ONE_MERGE, merged_issue: parsed.issue }
 }
 
 // The two boolean marks in the counting group — `--cut` and `--retrospective` — as the partial the
@@ -119,18 +143,18 @@ function to_marks(values: ParsedValues): Pick<CarryChange, 'cuts' | 'retrospecti
 }
 
 function to_change(values: ParsedValues): CarryChange | undefined {
-	const merged = to_count(values.merged)
+	const merged = to_merged(values.merged)
 	const filed = to_count(values.filed)
 	const done = to_done(values.done)
 
 	if (merged === undefined || filed === undefined || done === undefined) return undefined
 
-	return { merged, filed, ...to_marks(values), ...done }
+	return { ...merged, filed, ...to_marks(values), ...done }
 }
 
-// **A counting flag is what makes a count, never the sum of one.** `--merged 0` is a run reporting
-// that a wave merged nothing, and reading it as a bare read would answer `none` with exit 0 against
-// a record that is not there — the silent zero `docs/josh-commands.md` says exits 1.
+// **A counting flag is what makes a count, never the sum of one.** `--filed 0` is a run reporting
+// that it filed nothing, and reading it as a bare read would answer `none` with exit 0 against a
+// record that is not there — the silent zero `docs/josh-commands.md` says exits 1.
 function has_count(values: ParsedValues): boolean {
 	return (
 		values.cut === true ||
@@ -189,7 +213,7 @@ function is_summary_paired(values: ParsedValues): boolean {
 
 // The counting group, split out so the shape below stays a flat list of exits. The summary rides along
 // only when it is there — guaranteed paired with `--retrospective` by `is_summary_paired` — so a plain
-// `--merged` count never carries one.
+// `--merged` never carries one.
 function to_count_request(values: ParsedValues, owner: CarryOwner): Request | undefined {
 	const change = to_change(values)
 
