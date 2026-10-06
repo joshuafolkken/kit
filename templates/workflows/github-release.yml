@@ -17,6 +17,8 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # `josh release:github` waits up to 60 minutes (120 polls, 30 seconds apart) for the Publish run
+    # and lower tags' releases; the extra 5 minutes cover the setup before it.
     timeout-minutes: 65
     permissions:
       actions: read

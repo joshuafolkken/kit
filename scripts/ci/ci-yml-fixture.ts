@@ -47,9 +47,15 @@ interface WorkflowConcurrency {
 	'cancel-in-progress'?: boolean | string
 }
 
+interface WorkflowTrigger {
+	branches?: ReadonlyArray<string>
+	types?: ReadonlyArray<string>
+}
+
 interface Workflow {
 	concurrency?: WorkflowConcurrency
 	env?: Record<string, string>
+	on?: Record<string, WorkflowTrigger | null>
 	permissions?: Record<string, string>
 	jobs: Record<string, WorkflowJob>
 }
