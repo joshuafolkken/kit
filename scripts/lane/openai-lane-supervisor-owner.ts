@@ -109,9 +109,7 @@ function live_child(state: SupervisorState | undefined): ChildIdentity | undefin
 	if (state?.child_pid === undefined) return undefined
 	const { child_pid, child_process_start } = state
 
-	if (process_identity.is_same_process(child_pid, child_process_start) === false) {
-		return undefined
-	}
+	if (process_identity.is_same_process(child_pid, child_process_start) === false) return undefined
 
 	return {
 		pid: child_pid,

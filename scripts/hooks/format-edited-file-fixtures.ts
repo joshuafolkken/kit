@@ -44,7 +44,7 @@ function eslint_failing_runner(runs: Array<string>): CommandRunner {
 	}
 }
 
-const failing_runner: CommandRunner = async () => {
+async function failing_runner(): ReturnType<CommandRunner> {
 	await Promise.resolve()
 	throw new Error('the formatter failed to start')
 }

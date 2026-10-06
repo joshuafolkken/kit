@@ -14,10 +14,10 @@ import { forget_pr_numbers } from './git-gh-pr-read'
 import {
 	default_fetch_pr_state,
 	MERGE_GATE_EVALUATOR,
-	SHOULD_ALWAYS_READ_REVIEW_DECISION,
+	should_always_read_review_decision,
 } from './git-pr-checks'
 import { evaluate_pr_state, is_review_decision_decisive } from './git-pr-checks-eval'
-import { SHOULD_NEVER_READ_REVIEW_DECISION } from './git-pr-checks-watch'
+import { should_never_read_review_decision } from './git-pr-checks-watch'
 
 // **How many REST requests one poll of the merge gate costs, measured rather than reasoned about.**
 //
@@ -77,7 +77,7 @@ function review_reads(): number {
 // The predicate the poll loop hands the fetcher, taken off the evaluator rather than restated — the
 // fallback is the loop's own default, so the test cannot pass against a predicate nobody wired up.
 const MERGE_GATE_PREDICATE =
-	MERGE_GATE_EVALUATOR.should_read_review_decision ?? SHOULD_ALWAYS_READ_REVIEW_DECISION
+	MERGE_GATE_EVALUATOR.should_read_review_decision ?? should_always_read_review_decision
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -156,9 +156,9 @@ describe('default_fetch_pr_state — requests per poll', () => {
 	it('never reads the review listing for the watch', async () => {
 		arrange({ is_green: true })
 
-		await default_fetch_pr_state(PR_BRANCH, SHOULD_NEVER_READ_REVIEW_DECISION)
+		await default_fetch_pr_state(PR_BRANCH, should_never_read_review_decision)
 		mocked_api.mockClear()
-		await default_fetch_pr_state(PR_BRANCH, SHOULD_NEVER_READ_REVIEW_DECISION)
+		await default_fetch_pr_state(PR_BRANCH, should_never_read_review_decision)
 
 		expect(mocked_api).toHaveBeenCalledTimes(CHECKS_ONLY_REQUESTS)
 		expect(review_reads()).toBe(0)

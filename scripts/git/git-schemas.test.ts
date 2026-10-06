@@ -47,9 +47,7 @@ describe('rollup_item_schema', () => {
 
 		expect(result.success).toBe(true)
 
-		if (!result.success) {
-			return
-		}
+		if (!result.success) return
 
 		// eslint-disable-next-line @typescript-eslint/dot-notation -- bracket notation prevents naming-convention violation on __typename
 		expect(result.data['__typename']).toBe(STATUS_CONTEXT)
@@ -94,9 +92,7 @@ describe('pr_raw_schema', () => {
 
 		expect(result.success).toBe(true)
 
-		if (!result.success) {
-			return
-		}
+		if (!result.success) return
 
 		expect(result.data.mergeStateStatus).toBe('CLEAN')
 		expect(result.data.reviewDecision).toBe('APPROVED')
@@ -108,9 +104,7 @@ describe('pr_raw_schema', () => {
 
 		expect(result.success).toBe(true)
 
-		if (!result.success) {
-			return
-		}
+		if (!result.success) return
 
 		expect(result.data.mergeStateStatus).toBeUndefined()
 		expect(result.data.statusCheckRollup).toBeUndefined()
@@ -132,9 +126,7 @@ describe('pull_comment_schema', () => {
 
 		expect(result.success).toBe(true)
 
-		if (!result.success) {
-			return
-		}
+		if (!result.success) return
 
 		expect(result.data.body).toBe(FIX_THIS)
 		expect(result.data.user?.login).toBe(CODERABBIT_LOGIN)
@@ -194,9 +186,7 @@ describe('pr_info_schema', () => {
 
 		expect(result.success).toBe(true)
 
-		if (!result.success) {
-			return
-		}
+		if (!result.success) return
 
 		expect(result.data.mergeable).toBe(true)
 		expect(result.data.state).toBe('OPEN')

@@ -60,7 +60,10 @@ function record(log_file: string | undefined): void {
 }
 
 function guarded_fetch(real_fetch: Fetch): GuardedFetch {
-	const guarded: GuardedFetch = async function (input, init) {
+	async function guarded(
+		input: Parameters<Fetch>[0],
+		init?: Parameters<Fetch>[1],
+	): Promise<Response> {
 		if (!is_telegram(input)) return await real_fetch(input, init)
 
 		record(process.env[GUARD_LOG_KEY])
@@ -68,9 +71,7 @@ function guarded_fetch(real_fetch: Fetch): GuardedFetch {
 		throw new Error(BLOCKED_MESSAGE)
 	}
 
-	guarded[GUARDED_MARK] = true
-
-	return guarded
+	return Object.assign(guarded, { [GUARDED_MARK]: true as const })
 }
 
 // A plain assignment rather than `vi.stubGlobal`: a test's own `vi.unstubAllGlobals` restores what

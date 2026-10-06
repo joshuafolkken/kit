@@ -5,8 +5,13 @@ import { file_body } from './file-body'
 // the suite controls the one branch `file-edits.md` names — whether the redirect target already exists —
 // without touching the real filesystem.
 
-const is_present = (): boolean => true
-const is_absent = (): boolean => false
+function is_present(): boolean {
+	return true
+}
+
+function is_absent(): boolean {
+	return false
+}
 
 describe('file_body.carries_a_file_body — refuses', () => {
 	it('refuses a heredoc rewrite of an existing file', () => {

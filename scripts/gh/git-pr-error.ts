@@ -8,9 +8,7 @@ function has_error_cause(error: Error): boolean {
 
 function is_pr_already_exists_error(error: unknown): boolean {
 	if (error instanceof Error) {
-		if (is_pr_already_exists_message(error.message)) {
-			return true
-		}
+		if (is_pr_already_exists_message(error.message)) return true
 
 		return has_error_cause(error)
 	}

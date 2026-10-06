@@ -13,7 +13,7 @@ describe('poll.poll_until', () => {
 	it('returns true without waiting when the condition already holds', async () => {
 		const waits: Array<number> = []
 
-		const sleeper = async (duration_ms: number): Promise<void> => {
+		async function sleeper(duration_ms: number): Promise<void> {
 			waits.push(duration_ms)
 			await no_wait()
 		}
@@ -67,7 +67,7 @@ describe('poll.poll_until budget', () => {
 	it('does not wait after the final attempt', async () => {
 		const waits: Array<number> = []
 
-		const sleeper = async (duration_ms: number): Promise<void> => {
+		async function sleeper(duration_ms: number): Promise<void> {
 			waits.push(duration_ms)
 			await no_wait()
 		}

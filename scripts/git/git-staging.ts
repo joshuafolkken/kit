@@ -29,9 +29,7 @@ async function confirm_package_json_staged(should_force = false): Promise<boolea
 async function confirm_package_json_version(should_force = false): Promise<void> {
 	const is_version_updated = await git_status.check_package_json_version()
 
-	if (is_version_updated) {
-		return
-	}
+	if (is_version_updated) return
 
 	if (should_force) {
 		console.info('💡 Skipping package.json version check (force).')

@@ -95,14 +95,17 @@ describe('git_followup_cleanup.run_guarded_steps — the steps after a failure',
 describe('git_followup_cleanup.run_guarded_steps — the order of the tail', () => {
 	it('keeps the steps in the order they were given', async () => {
 		const order: Array<string> = []
-		const push_step = (label: string): CleanupStep => ({
-			label,
-			recovery: undefined,
-			run: async () => {
-				await Promise.resolve()
-				order.push(label)
-			},
-		})
+
+		function push_step(label: string): CleanupStep {
+			return {
+				label,
+				recovery: undefined,
+				run: async () => {
+					await Promise.resolve()
+					order.push(label)
+				},
+			}
+		}
 
 		await git_followup_cleanup.run_guarded_steps(true, [
 			push_step(RUN_REPORT),
