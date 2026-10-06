@@ -1,0 +1,280 @@
+import { cli_flags } from '#scripts/lib/cli-flags'
+import { run_issue_number } from '#scripts/run/run-issue-number'
+import { run_carry, type CarryChange, type CarryClaimRequest, type CarryOwner } from './run-carry'
+
+// The argument half of `josh run:carry`. It sat inside `run-carry-cli.ts` until the ownership answers
+// joshuafolkken/kit#1722 added took that file to 96% of the 300-line limit, and the seam it split on
+// was already there: everything here turns `argv` into one `Request` and reads no record, while
+// everything left there acts on a record and prints. Nothing about the behavior moved with it.
+
+const NO_INCREMENT = 0
+const ONE_CUT = 1
+const ONE_MERGE = 1
+// The four request groups below are mutually exclusive, so more than one of them named in a single
+// invocation is a usage error rather than an order to guess.
+const ONE_GROUP = 1
+const COUNT_PATTERN = /^\d+$/u
+const EMPTY_INVOCATION = ''
+// A pid below this addresses a process group rather than a process, which `process-identity.ts`
+// rejects on the read side. Refused here too, so a record never records an owner nothing can be.
+const MIN_PID = 1
+// `--owner` is read by the two claiming alternatives and by the counting group (joshuafolkken/kit#1935):
+// a count checks the owner so a session whose record was handed off, or taken over by a successor,
+// cannot advance a budget that is no longer its own. `--end` alone accepts it and ignores it, and a
+// usage line that offered it there would be promising an ownership check nothing performs.
+const USAGE =
+	'Usage: josh run:carry [--json] | --begin <invocation> [--owner <pid>] | --resume <invocation> [--owner <pid>] | (--cut | --merged <issue> | --filed <count> | --done <issue> | --retrospective --summary <text>) [--owner <pid>] | --end [--stopped <reason>]'
+
+const OPTIONS = {
+	begin: { type: 'string' },
+	cut: { type: 'boolean' },
+	done: { type: 'string' },
+	end: { type: 'boolean' },
+	filed: { type: 'string' },
+	json: { type: 'boolean' },
+	merged: { type: 'string' },
+	owner: { type: 'string' },
+	// A boolean like `--cut`: it marks the end-of-run retrospective as run rather than counting an
+	// amount (joshuafolkken/kit#2328). It joins the counting group, so it carries `--owner` and is
+	// refused from a session that no longer owns the record, exactly as a merge count is.
+	retrospective: { type: 'boolean' },
+	resume: { type: 'string' },
+	// The retrospective's result carried to the event stream (joshuafolkken/kit#2342). It pairs with
+	// `--retrospective` and only with it: the mark and the result it records are one action, so a mark
+	// with nothing to read and a result no mark records are both usage errors rather than half-done
+	// closes. It is not a record field — `to_change` never carries it — so it rides the count request to
+	// the emit side alone.
+	summary: { type: 'string' },
+	// **`--stopped <reason>` rides on `--end`, so it is a modifier rather than a fifth group.** A run
+	// that halts needing a person ends its record exactly as a clean one does; the reason is what turns
+	// that end into the ⏸️ confirmation the person gets after a session cut (joshuafolkken/kit#2136).
+	// Named without `--end` it is ignored, the way a read ignores every counting flag.
+	stopped: { type: 'string' },
+} as const
+
+type OptionName = keyof typeof OPTIONS
+type ParsedValues = Partial<Record<OptionName, string | boolean>>
+// What `parseArgs` hands back for one option: the flag's own type, or nothing where it was not named.
+type OptionValue = string | boolean | undefined
+
+// The counting request carries the owner so `count` can refuse a write from a session that is no
+// longer the record's owner (joshuafolkken/kit#1935).
+interface CountRequest {
+	kind: 'count'
+	change: CarryChange
+	owner: CarryOwner
+	// The retrospective result to emit, present exactly when `change.retrospective` is set and never
+	// otherwise (joshuafolkken/kit#2342). The CLI reads it to append one event as it applies the mark.
+	summary?: string
+}
+
+type Request =
+	| CountRequest
+	| { kind: 'read' }
+	| { kind: 'claim'; claim: CarryClaimRequest }
+	| { kind: 'end'; stopped: string | undefined }
+
+const READ_REQUEST: Request = { kind: 'read' }
+
+function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
+	return cli_flags.values_of(argv, OPTIONS)
+}
+
+// Absent is zero; present but not a count is `undefined`, which invalidates the whole invocation
+// rather than quietly counting nothing.
+function to_count(value: OptionValue): number | undefined {
+	const text = cli_flags.string_of(value)
+
+	if (text === undefined) return NO_INCREMENT
+
+	return COUNT_PATTERN.test(text) ? Number(text) : undefined
+}
+
+// **`--done` and `--merged` name an issue, so each is checked as one and not as a count.** The shape
+// is `run-issue-number.ts`'s, which already refuses `0` and a leading zero — the same rule the `run:*`
+// commands interpolate a number under, imported rather than restated. Absent is an empty object rather
+// than a zero: there is no issue to record, which is a different fact from recording issue zero. A
+// present-but-malformed value is `undefined`, which invalidates the whole invocation.
+function to_issue(value: OptionValue): { issue?: number } | undefined {
+	const text = cli_flags.string_of(value)
+
+	if (text === undefined) return {}
+
+	if (!run_issue_number.ISSUE_NUMBER_PATTERN.test(text)) return undefined
+
+	const issue = Number(text)
+
+	// The pattern is anchored on digits and bounds nothing, so the magnitude check is separate — the
+	// same shape `backlog_budget_cli.to_count` ends with. A number past the safe range would be
+	// recorded as a different number and never match anything in `remaining`.
+	return Number.isSafeInteger(issue) ? { issue } : undefined
+}
+
+function to_done(value: OptionValue): Pick<CarryChange, 'done'> | undefined {
+	const parsed = to_issue(value)
+
+	if (parsed === undefined) return undefined
+
+	return parsed.issue === undefined ? {} : { done: parsed.issue }
+}
+
+// **`--merged` names the issue that merged, never a count** (joshuafolkken/kit#3296). A bare count
+// could not be matched against `merged_issues`, so a parent that counted a merge by hand and the
+// driver's `run:merge` for the same issue added two for one merge. Naming the issue makes the hand
+// count the same change `run:merge` applies — one merge plus its number — so `apply_change`'s
+// duplicate check holds whichever of the two arrives first.
+function to_merged(value: OptionValue): Pick<CarryChange, 'merged' | 'merged_issue'> | undefined {
+	const parsed = to_issue(value)
+
+	if (parsed === undefined) return undefined
+
+	return parsed.issue === undefined
+		? { merged: NO_INCREMENT }
+		: { merged: ONE_MERGE, merged_issue: parsed.issue }
+}
+
+// The two boolean marks in the counting group — `--cut` and `--retrospective` — as the partial the
+// change spreads. Kept apart from `to_change` so its own decision count stays under the limit.
+function to_marks(values: ParsedValues): Pick<CarryChange, 'cuts' | 'retrospective'> {
+	const cuts = values.cut === true ? ONE_CUT : NO_INCREMENT
+	const retrospective = values.retrospective === true ? { retrospective: true } : {}
+
+	return { cuts, ...retrospective }
+}
+
+function to_change(values: ParsedValues): CarryChange | undefined {
+	const merged = to_merged(values.merged)
+	const filed = to_count(values.filed)
+	const done = to_done(values.done)
+
+	if (merged === undefined || filed === undefined || done === undefined) return undefined
+
+	return { ...merged, filed, ...to_marks(values), ...done }
+}
+
+// **A counting flag is what makes a count, never the sum of one.** `--filed 0` is a run reporting
+// that it filed nothing, and reading it as a bare read would answer `none` with exit 0 against a
+// record that is not there — the silent zero `docs/josh-commands.md` says exits 1.
+function has_count(values: ParsedValues): boolean {
+	return (
+		values.cut === true ||
+		values.retrospective === true ||
+		values.merged !== undefined ||
+		values.filed !== undefined ||
+		values.done !== undefined
+	)
+}
+
+// The four groups are mutually exclusive: `--begin` starts a run, `--resume` adopts one, `--end`
+// finishes one, and the counters change one that is already there. Two groups in one invocation is a
+// usage error, never a guessed order between them.
+function group_count(values: ParsedValues): number {
+	const groups = [
+		values.begin !== undefined,
+		values.resume !== undefined,
+		values.end === true,
+		has_count(values),
+	]
+
+	return groups.filter(Boolean).length
+}
+
+// **`--owner` is what makes liveness answerable at all.** The process that runs this command is a
+// short-lived `tsx`, so its own pid says nothing about whether the run is still going; the caller
+// names the process that is — its own session — and a `backlogrun` passes `--owner "$PPID"`. Absent,
+// the record simply declares no owner and every standing record reads as not provably live, which
+// refuses rather than resumes.
+function to_owner(value: OptionValue): CarryOwner | undefined {
+	const text = cli_flags.string_of(value)
+
+	if (text === undefined) return run_carry.NO_OWNER
+
+	if (!COUNT_PATTERN.test(text)) return undefined
+
+	const pid = Number(text)
+
+	return pid < MIN_PID ? undefined : run_carry.owner_of(pid)
+}
+
+// A non-empty `--summary`, or nothing. An empty string is nothing here, so it reads as absent and the
+// pairing check below refuses it against `--retrospective`.
+function summary_text(values: ParsedValues): string | undefined {
+	const summary = cli_flags.string_of(values.summary)
+
+	return summary === undefined || summary === '' ? undefined : summary
+}
+
+// The mark and its result are one close: `--retrospective` needs a `--summary` to record, and a
+// `--summary` names a result no other flag records (joshuafolkken/kit#2342). Either flag without the
+// other is a usage error, so each must be present exactly when the other is.
+function is_summary_paired(values: ParsedValues): boolean {
+	return (summary_text(values) !== undefined) === (values.retrospective === true)
+}
+
+// The counting group, split out so the shape below stays a flat list of exits. The summary rides along
+// only when it is there — guaranteed paired with `--retrospective` by `is_summary_paired` — so a plain
+// `--merged` never carries one.
+function to_count_request(values: ParsedValues, owner: CarryOwner): Request | undefined {
+	const change = to_change(values)
+
+	if (change === undefined) return undefined
+
+	const summary = summary_text(values)
+
+	return summary === undefined
+		? { kind: 'count', change, owner }
+		: { kind: 'count', change, owner, summary }
+}
+
+// `--begin ""` is a loop whose invocation variable was unset. A record named by nothing is one every
+// other empty `--begin` then reads as its own, which is the cross-run inheritance `classify_claim`
+// exists to refuse — so it is a usage error rather than a record.
+function to_claim_request(
+	invocation: string,
+	owner: CarryOwner,
+	is_adoption: boolean,
+): Request | undefined {
+	if (invocation === EMPTY_INVOCATION) return undefined
+
+	return { kind: 'claim', claim: { invocation, owner, is_adoption } }
+}
+
+function to_other_request(values: ParsedValues, owner: CarryOwner): Request | undefined {
+	if (values.end === true) return { kind: 'end', stopped: cli_flags.string_of(values.stopped) }
+
+	return has_count(values) ? to_count_request(values, owner) : READ_REQUEST
+}
+
+function to_named_request(values: ParsedValues, owner: CarryOwner): Request | undefined {
+	const begun = cli_flags.string_of(values.begin)
+
+	if (begun !== undefined) return to_claim_request(begun, owner, false)
+
+	const adopted = cli_flags.string_of(values.resume)
+
+	if (adopted !== undefined) return to_claim_request(adopted, owner, true)
+
+	return to_other_request(values, owner)
+}
+
+function to_request(values: ParsedValues): Request | undefined {
+	if (group_count(values) > ONE_GROUP) return undefined
+
+	if (!is_summary_paired(values)) return undefined
+
+	const owner = to_owner(values.owner)
+
+	if (owner === undefined) return undefined
+
+	return to_named_request(values, owner)
+}
+
+const run_carry_args = {
+	OPTIONS,
+	USAGE,
+	read_arguments,
+	to_request,
+}
+
+export type { CountRequest, ParsedValues, Request }
+export { run_carry_args }

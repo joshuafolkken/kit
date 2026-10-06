@@ -16,7 +16,7 @@ vi.mock('./lane-dispatch-log', () => ({
 }))
 
 const { lane_relaunch } = await import('./lane-relaunch')
-const { run_ship_detach } = await import('#scripts/run/run-ship-detach')
+const { run_ship_detach } = await import('#scripts/run/ship/run-ship-detach')
 
 const ISSUE = '2428'
 const LANE = { issue: ISSUE, directory: '/lanes/2428', profile: undefined }

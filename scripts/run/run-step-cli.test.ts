@@ -25,7 +25,7 @@ vi.mock('./run-prep-cli', () => ({
 	run_prep_cli: { parse_number: parse_number_mock, gather: gather_mock, to_parts: to_parts_mock },
 }))
 
-vi.mock('./run-carry', () => ({
+vi.mock('#scripts/run/carry/run-carry', () => ({
 	run_carry: {
 		repository_directory: repo_directory_mock,
 		read_carry: read_carry_mock,
@@ -42,7 +42,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: lane_child_mock },
 }))
 
-vi.mock('./run-event-stream', () => ({
+vi.mock('#scripts/run/event/run-event-stream', () => ({
 	run_event_stream: {
 		EVENT_KIND: {
 			PLAN: 'plan',

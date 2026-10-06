@@ -1,8 +1,8 @@
+import type { CarryRead, RunCarry } from '#scripts/run/carry/run-carry'
+import type { RunWake } from '#scripts/run/wake/run-wake'
 import { describe, expect, it, vi } from 'vitest'
-import type { CarryRead, RunCarry } from './run-carry'
 import { run_stranded } from './run-stranded'
 import { run_stranded_detect, type DetectPorts } from './run-stranded-detect'
-import type { RunWake } from './run-wake'
 
 const NONE = 0
 const A_PID = 4242

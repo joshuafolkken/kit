@@ -1,8 +1,8 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { claude_agent_argv, type ClaudeArgv } from '#scripts/agent/claude-agent-argv'
+import { run_wake_session } from '#scripts/run/wake/run-wake-session'
 import { describe, expect, it } from 'vitest'
 import { detached_launch } from './detached-launch'
-import { run_wake_session } from './run-wake-session'
 
 const INVOCATION = 'fullrun #2070'
 const PROFILE = agent_role_profile.DEFAULT_PROFILES.worker

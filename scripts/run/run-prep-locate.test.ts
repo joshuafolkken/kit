@@ -16,7 +16,7 @@ const PREP_PATH = 'scripts/run/run-prep.ts'
 const RUN_PREP_SPAN = '`run:prep`'
 const GREP_OUTPUT = [
 	'scripts/josh/josh-commands-ai.ts:42:\t\'run:prep\': { script: "a:b:c" },',
-	'scripts/run/run-entry-cli.ts:85:\tconst reads = await run_prep_cli.gather(issue_number)',
+	'scripts/run/entry/run-entry-cli.ts:85:\tconst reads = await run_prep_cli.gather(issue_number)',
 ].join('\n')
 
 // `ls-files` answers with the tracked files the target names; every other call is the grep.
@@ -103,7 +103,7 @@ describe('run_prep_locate.locate', () => {
 			[
 				'run:prep',
 				'  scripts/josh/josh-commands-ai.ts:42  \'run:prep\': { script: "a:b:c" },',
-				'  scripts/run/run-entry-cli.ts:85  const reads = await run_prep_cli.gather(issue_number)',
+				'  scripts/run/entry/run-entry-cli.ts:85  const reads = await run_prep_cli.gather(issue_number)',
 			].join('\n'),
 		)
 		expect(grep_calls()[0]).toStrictEqual([expect.arrayContaining(['run:prep'])])
@@ -151,6 +151,8 @@ describe('run_prep_locate.locate on a named file', () => {
 			return GREP_OUTPUT
 		})
 
-		expect(await run_prep_locate.locate(RUN_PREP_SPAN)).toContain('scripts/run/run-entry-cli.ts:85')
+		expect(await run_prep_locate.locate(RUN_PREP_SPAN)).toContain(
+			'scripts/run/entry/run-entry-cli.ts:85',
+		)
 	})
 })

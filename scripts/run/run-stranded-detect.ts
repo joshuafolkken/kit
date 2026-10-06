@@ -1,14 +1,14 @@
 import { telegram_notify } from '#scripts/notify/telegram-notify'
-import { run_carry, type CarryRead, type RunCarry } from './run-carry'
-import { run_event_stream } from './run-event-stream'
-import { run_event_stream_emit } from './run-event-stream-emit'
+import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_wake, type RunWake } from '#scripts/run/wake/run-wake'
 import {
 	run_stranded,
 	type StrandedInput,
 	type StrandedVerdict,
 	type SupervisorLiveness,
 } from './run-stranded'
-import { run_wake, type RunWake } from './run-wake'
 
 // The I/O half of the strand detector (joshuafolkken/kit#2375): it gathers the three facts the pure
 // judge in `run-stranded.ts` weighs, then — on a strand — leaves the marker and sends the one

@@ -2,9 +2,9 @@ import { cost_format } from '#scripts/cost-runtime/cost-format'
 import type { RunCostReport } from '#scripts/cost/cost-run-report'
 import type { RoleTotals } from '#scripts/cost/cost-run-roles'
 import type { CategoryCount } from '#scripts/review/review-finding-ledger'
-import { run_event_scope, type EventScope } from '#scripts/run/run-event-scope'
-import { run_event_stream, type RunEvent } from '#scripts/run/run-event-stream'
-import { run_ship_stop_text } from '#scripts/run/run-ship-stop-text'
+import { run_event_scope, type EventScope } from '#scripts/run/event/run-event-scope'
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_ship_stop_text } from '#scripts/run/ship/run-ship-stop-text'
 
 // The composition half of `josh retrospective` — the end-of-run retrospective's aggregation
 // (joshuafolkken/kit#2328). A run that drains its backlog has spent time and money that nobody reads;

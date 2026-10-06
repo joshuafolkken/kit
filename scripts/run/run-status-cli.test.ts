@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import type { IssueState } from '#scripts/issue/issue-state'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { RunCarry } from './run-carry'
 import { run_status } from './run-status'
 
 const read_state_mock = vi.hoisted(() => vi.fn())
@@ -22,7 +22,7 @@ vi.mock('#scripts/cost-runtime/cost-cli', () => ({
 	cost_cli: { session_verdict: verdict_mock, UNMEASURABLE_VERDICT: 'unmeasurable' },
 }))
 
-vi.mock('./run-carry', () => ({
+vi.mock('#scripts/run/carry/run-carry', () => ({
 	run_carry: {
 		repository_directory: repository_directory_mock,
 		carry_path: carry_path_mock,

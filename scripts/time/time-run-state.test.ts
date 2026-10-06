@@ -1,5 +1,5 @@
-import type { CarryRead, RunCarry } from '#scripts/run/run-carry'
-import type { RunWake } from '#scripts/run/run-wake'
+import type { CarryRead, RunCarry } from '#scripts/run/carry/run-carry'
+import type { RunWake } from '#scripts/run/wake/run-wake'
 import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import { time_run_state, type RunStateInput, type WhiffSession } from './time-run-state'

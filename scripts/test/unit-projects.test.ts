@@ -1,6 +1,6 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
-import { run_ship_detach } from '#scripts/run/run-ship-detach'
+import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { describe, expect, it } from 'vitest'
 import { PURE_FILES } from './pure-files'
 import { unit_projects, type UnitProject } from './unit-projects'

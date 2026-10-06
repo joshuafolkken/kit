@@ -7,7 +7,7 @@ import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { ALREADY_DONE_LABEL, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { issue_state } from '#scripts/issue/issue-state'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
-import { run_hold } from './run-hold'
+import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_issue_number } from './run-issue-number'
 
 // `josh run:liveness <N>` — whether the delegated unit running child `<N>` is still working, or

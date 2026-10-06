@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { run_progress_read } from './run-progress-read'
+import { run_progress_read } from '#scripts/run/progress/run-progress-read'
 import { run_watcher_guard } from './run-watcher-guard'
 
 // `josh run:watcher:guard` — refuses when lane children are in-flight but the progress watcher has not

@@ -14,7 +14,7 @@ vi.mock('#scripts/git/git-command', () => ({
 		default_branch_reference: probes.default_branch_reference,
 	},
 }))
-vi.mock('#scripts/run/run-hold', () => ({ run_hold: { is_tree_dirty: probes.is_tree_dirty } }))
+vi.mock('#scripts/run/hold/run-hold', () => ({ run_hold: { is_tree_dirty: probes.is_tree_dirty } }))
 vi.mock('./lane-await', () => ({
 	lane_await: { is_process_running_default: probes.is_process_running_default },
 }))
