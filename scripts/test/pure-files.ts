@@ -87,7 +87,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/ci/ci-yml-unit-step.test.ts',
 	'scripts/claude/claude-settings.test.ts',
 	'scripts/claude/collaboration-prompt-split.test.ts',
-	'scripts/claude/cursorrules.test.ts',
 	'scripts/claude/plugin-manifest.test.ts',
 	'scripts/claude/verify-ui-skill.test.ts',
 	'scripts/claude/workflow-skills.test.ts',

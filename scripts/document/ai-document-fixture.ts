@@ -20,7 +20,7 @@ const AI_DOCS: ReadonlyArray<string> = ['CLAUDE.md']
 
 // The documents that carry no rules and only point at the one that does. Guarded by
 // `ai-document-pointers.test.ts`, which is what stops a rule being pasted back into them.
-const POINTER_DOCS: ReadonlyArray<string> = ['AGENTS.md', 'GEMINI.md']
+const POINTER_DOCS: ReadonlyArray<string> = ['AGENTS.md', 'GEMINI.md', '.cursorrules']
 
 // The page a person lands on first. It routes nobody's session, but it links into `docs/` and names
 // commands, so the corpus-wide scans have to read it (joshuafolkken/kit#3248).
