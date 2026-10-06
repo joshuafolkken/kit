@@ -63,8 +63,8 @@ flight finish; no new lane is opened.
 
 ## park and continue
 
-When a child hits something this run may not decide — a Tier B toss-up, a Tier C action, an upstream
-defect, a split that needs a person — **park the child and keep going.**
+When a child hits something only a person can decide — → "Only a person's judgement carries
+`needs-decision`" below — **park the child and keep going.**
 
 ```bash
 gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=needs-decision'
@@ -106,6 +106,27 @@ parent that implements the released child inline is the failure the orchestrator
 
 Without removing the label the parked child never runs again — it is the second half of the
 human-in-the-loop cycle, not an optional tidy-up.
+
+## Only a person's judgement carries `needs-decision`
+
+**`needs-decision` means "a person has to choose", and nothing else.** This is the single source of
+when a run may apply it, by hand or through a park. It carries only:
+
+- a design choice nobody has made;
+- a Tier B toss-up, or a Tier C action (`CLAUDE.md` → "Decision autonomy");
+- an upstream defect in another package, whose wait-or-defer is the person's (`upstream-interrupt.md`).
+
+It never carries:
+
+- a choice with a clearly better default — that is Tier A: decide it and record it as an Issue comment;
+- whether to run something already planned and opted in with `auto-ok` — the opt-in is that decision;
+- a defect in the running repository's own run tooling — the run fixes it and resumes
+  (`prompts/collaboration-workflow/upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合").
+
+**When in doubt, it is Tier A**: decide, comment the decision, and continue. A label a person has to
+clear for nothing spends their attention and stalls the child. **A label a mechanical step applied** — a
+failed or abandoned child, a lost merge race's four conditions — is read against this list once its
+reason is known, and removed (Tier A, above) when the reason is not on it.
 
 ## `in-progress` is removed by whoever finds it stale
 

@@ -81,7 +81,10 @@ another live owner's run.
 **A failure is visible rather than silent.** A judgment wake that never claims the carry record is
 retried, and once the retries are spent the supervisor stops and sends a `warning` Telegram; a carry
 record that expired or cannot be read ends it the same way. `none` — the run having finished — and a
-person's own `--stop` stay silent. Everything the supervisor starts writes to one log file per
+person's own `--stop` stay silent. Once the run-tooling defect that stopped it has been fixed, a stop
+with a resume path is restarted by the AI itself with `run:wake --start`, which then confirms the
+driver advances (`prompts/collaboration-workflow/upstream-interrupt.md` →
+"実行中のリポジトリ自身のラン機構の不具合"). Everything the supervisor starts writes to one log file per
 repository, named by `--list` and by every warning. Progress is relayed from the existing report
 record: the driver keeps the `run:merge` event stream and the `run:report` finish path, and `--list`
 prints that record's latest line.
