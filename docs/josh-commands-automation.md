@@ -308,7 +308,7 @@ pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file 
 
 ### `josh observations:flush`
 
-Commit the observation ledger lines no run's own commit carried (`docs/maintainers/observations/`) as a docs-only pull request of its own (no `closes #N`), wait for the required checks, merge it, and return to the default branch. A run needs none — a lane's included: `josh git` stages the run's own `<N>.md` with its commit when its grammar holds, and `pnpm josh followup` commits a line appended after that onto the pull request before it merges. What is left here is a line written on the default branch outside any issue's run, in a date-named `<YYYY-MM-DD>.md`.
+Commit the observation ledger lines no run's own commit carried (`.josh/observations/`) as a pull request of its own (no `closes #N`), wait for the required checks, merge it, and return to the default branch. A run needs none — a lane's included: `josh git` stages the run's own `<N>.md` with its commit when its grammar holds, and `pnpm josh followup` commits a line appended after that onto the pull request before it merges. What is left here is a line written on the default branch outside any issue's run, in a date-named `<YYYY-MM-DD>.md`.
 
 ```bash
 pnpm josh observations:flush
@@ -328,13 +328,13 @@ pnpm josh measure:rerun 2212
 
 **Trust:** a baseline is shell, so it runs only for an `OWNER` / `MEMBER` / `COLLABORATOR` author; any other author, or an unreadable issue, exits 1 before any command runs. A command over its one-minute budget prints `(command failed: …)` and the rest still run.
 
-**Behavior:** when a value has not moved, the premise the rule rested on is recorded as refuted — one line appended to the observation ledger (`docs/maintainers/observations/`, in the file for the issue the checked-out branch leads with, or a date-named file outside any issue's branch), keyed to the command so a second refutation of the same measurement is a same-key repeat the promotion rule counts. It reuses that append-only ledger rather than a second one. A section written in prose (no `` `command` → value `` line) is refused, since a natural-language measurement cannot be re-run. `pnpm josh observations:flush` is the ledger's commit path.
+**Behavior:** when a value has not moved, the premise the rule rested on is recorded as refuted — one line appended to the observation ledger (`.josh/observations/`, in the file for the issue the checked-out branch leads with, or a date-named file outside any issue's branch), keyed to the command so a second refutation of the same measurement is a same-key repeat the promotion rule counts. It reuses that append-only ledger rather than a second one. A section written in prose (no `` `command` → value `` line) is refused, since a natural-language measurement cannot be re-run. `pnpm josh observations:flush` is the ledger's commit path.
 
 Related: [`josh observations:flush`](#josh-observationsflush), [`josh issue:lint`](josh-commands-backlog.md#josh-issuelint).
 
 ### `josh review:record`
 
-Record a `/code-review` round's findings so they survive the run. It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the issue's own file of the observation ledger (`docs/maintainers/observations/<N>.md`, in the work tree the command runs in — a lane's inside a lane) — the same append-only ledger the observation lines use, under a distinct `- rf:` prefix so the `- k:` grammar never treats a finding as its own. It is the one write path for findings.
+Record a `/code-review` round's findings so they survive the run. It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the issue's own file of the observation ledger (`.josh/observations/<N>.md`, in the work tree the command runs in — a lane's inside a lane) — the same append-only ledger the observation lines use, under a distinct `- rf:` prefix so the `- k:` grammar never treats a finding as its own. It is the one write path for findings.
 
 ```bash
 pnpm josh review:record --issue 2325 bug-risks:medium:src/foo.ts:42 tests:low:a.test.ts

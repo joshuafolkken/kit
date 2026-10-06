@@ -1,3 +1,4 @@
+import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { describe, expect, it } from 'vitest'
 import { test_red_logic } from './test-red-logic'
 
@@ -6,7 +7,7 @@ const BEHAVIOR_BODY = '## 背景\n\n- 種別: 振る舞い変更\n'
 const UNIT_TEST = 'scripts/a.test.ts'
 const RUNTIME_FILE = 'scripts/a.ts'
 const E2E_SPEC = 'src/page.e2e.ts'
-const LEDGER_ENTRY = 'docs/maintainers/observations/3208.md'
+const LEDGER_ENTRY = observation_ledger.ledger_file(3208)
 
 describe('test_red_logic.is_bug_fix', () => {
 	it('reads the bug declaration line', () => {
