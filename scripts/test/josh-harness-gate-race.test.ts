@@ -30,9 +30,9 @@ describe('josh harness — the gate and its join race (#2434)', () => {
 			const kit = environment('kit')
 			const marker = file_map_stamp.create(review_stamps.IN_FLIGHT_PREFIX, kit.root).stamp_path()
 			const record = file_map_stamp.create(review_stamps.GATE_PREFIX, kit.root).stamp_path()
-			const gate = josh_harness.start(kit, ['gate', '--force'], GATE_TIMEOUT_MS)
+			const gate = josh_harness.run(kit, ['gate', '--force'], GATE_TIMEOUT_MS)
 			const is_marked = await josh_harness.wait_for(() => existsSync(marker), MARKER_WAIT_MS)
-			const join = await josh_harness.start(kit, ['run:review', '--join'], GATE_TIMEOUT_MS)
+			const join = await josh_harness.run(kit, ['run:review', '--join'], GATE_TIMEOUT_MS)
 			const gate_result = await gate
 
 			// A green gate that withheld its record reads red to every join, race or not — asserted
