@@ -1754,8 +1754,8 @@ pnpm josh doc:section backlogrun.md "The hand-off"
 
 - A bare name resolves inside `.claude/skills/workflow-commands/`; anything that resolves as a path is taken as one.
 - The section prints verbatim with its subsections (a `##` heading carries its `###` children).
-- The heading matches as a prefix, exact match first; two prefix matches is a refusal naming both.
-- Fenced blocks are skipped so a `#`-column comment inside a fence does not end the section early.
+- A heading, else a `**…**` label's item, matches as a prefix, exact first; two matches is a refusal.
+- Fenced blocks are skipped, so a fenced `#` comment does not end a section.
 - **Past the Bash cap the section is written as part files**, each under the cap and together exactly the section, and only their paths are printed — read every part with the Read tool in one turn. `issue:read` and `issue:state` do the same.
 
 **Output / exit codes:** an unresolvable heading exits non-zero and lists the document's own headings.

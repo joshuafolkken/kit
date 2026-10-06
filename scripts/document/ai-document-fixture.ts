@@ -22,6 +22,10 @@ const AI_DOCS: ReadonlyArray<string> = ['CLAUDE.md']
 // `ai-document-pointers.test.ts`, which is what stops a rule being pasted back into them.
 const POINTER_DOCS: ReadonlyArray<string> = ['AGENTS.md', 'GEMINI.md', '.cursorrules']
 
+// The page a person lands on first. It routes nobody's session, but it links into `docs/` and names
+// commands, so the corpus-wide scans have to read it (joshuafolkken/kit#3248).
+const README_DOC = 'README.md'
+
 // The document the pointers name. Written once so the pointer suite and the pointers agree.
 const CANONICAL_DOC = 'CLAUDE.md'
 // The canonical workflow document. joshuafolkken/kit#965 split it into one file per topic under
@@ -131,7 +135,7 @@ function read_index(): string {
 // per-phrase marker suites (joshuafolkken/kit#1923). The pointers are included because a broken link
 // or a stale command name in `AGENTS.md` / `GEMINI.md` is as wrong as one in the rules.
 function all_documents(): ReadonlyArray<string> {
-	return [...routing_documents(), ...POINTER_DOCS]
+	return [...routing_documents(), ...POINTER_DOCS, README_DOC]
 }
 
 // The file exactly as it sits on disk. `read_repo_file` answers the workflow index with the whole

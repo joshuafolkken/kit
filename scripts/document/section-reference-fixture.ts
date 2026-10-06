@@ -7,18 +7,13 @@ import { document_section } from './document-section'
 // corpus-wide link scan and by any suite that has to prove its own pointers land (the workflow
 // glossary), so the two can never disagree on what "resolves" means.
 //
-// An anchor is a markdown heading or a bold label — `- **Cross-package problems → …**`. The
-// documents cite both, so resolving only headings would flag every bold-label reference as broken.
-// The match is a prefix, exactly as `pnpm josh doc:section` matches a heading, so the gloss that
-// follows a title need not be repeated in the reference.
+// **What resolves is what `pnpm josh doc:section` resolves — the same function, not a copy of its
+// rule** (joshuafolkken/kit#3248). This fixture once kept its own anchor set, which accepted bold
+// labels the command could not find, so a green suite promised sections the command then refused.
 
 // A few references cite the reference form itself rather than a real anchor — the doc-section
 // explanation writes a Japanese "section name" placeholder (see EXAMPLE_HEADINGS) as a stand-in.
 const EXAMPLE_HEADINGS: ReadonlySet<string> = new Set(['節名', 'Heading', '見出し'])
-
-// Any bold span is a citable anchor: the documents point at `- **Cross-package problems → …**` at a
-// line start and at a `**…**` emphasis mid-paragraph alike, and a reference resolves to either.
-const BOLD_LABEL_PATTERN = /\*\*([^*]+?)\*\*/gu
 
 function paths_by_base(): Map<string, Array<string>> {
 	const index = new Map<string, Array<string>>()
@@ -46,34 +41,11 @@ function candidate_paths(file: string): Array<string> {
 	return BY_BASE.get(file) ?? []
 }
 
-function anchor_forms(content: string): Array<string> {
-	const titles = document_section.headings(content).map((heading) => heading.title)
-	const labels = [...content.matchAll(BOLD_LABEL_PATTERN)].map((match) => match[1] ?? '')
-
-	return [...titles, ...labels].flatMap((anchor) => document_scan.reference_forms(anchor))
-}
-
-const ANCHORS = new Map<string, Array<string>>()
-
-function anchors_of(path: string): Array<string> {
-	const cached = ANCHORS.get(path)
-
-	if (cached !== undefined) return cached
-
-	const forms = anchor_forms(read_document(path))
-
-	ANCHORS.set(path, forms)
-
-	return forms
-}
-
 function reference_resolves(file: string, heading: string): boolean {
 	if (EXAMPLE_HEADINGS.has(heading)) return true
 
-	const wanted = document_scan.normalize_reference(heading)
-
-	return candidate_paths(file).some((path) =>
-		anchors_of(path).some((anchor) => anchor.startsWith(wanted)),
+	return candidate_paths(file).some(
+		(path) => document_section.section(read_document(path), heading) !== undefined,
 	)
 }
 

@@ -96,7 +96,6 @@
 		"!scripts/test/vitest-include-globs.ts",
 		"!scripts/build/shim-shell.ts",
 		"!scripts/claude/skill-meta.ts",
-		"!scripts/document/document-scan.ts",
 		"!scripts/exports/member-usage.ts",
 		"!scripts/exports/namespace-escape.ts",
 		"!scripts/exports/namespace-members.ts",
