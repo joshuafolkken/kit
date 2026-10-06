@@ -5,7 +5,7 @@ import { member_usage, type MemberUsage } from './member-usage'
 import { namespace_members, type Namespace } from './namespace-members'
 import { unused_members_fixture, type FixtureFile } from './unused-members-fixture'
 
-const { create_project, with_reader, READ_KEPT } = unused_members_fixture
+const { create_project, with_reader, PROGRAM_OPTIONS, READ_KEPT } = unused_members_fixture
 const TAKE = 'declare function take(value: unknown): void\n'
 const TAKE_TWO = 'declare function take(value: unknown, other: unknown): void\n'
 const OUTER = 'const outer = { library }\nexport { outer }\n'
@@ -29,10 +29,7 @@ interface Analysis {
 function analyze(files: ReadonlyArray<FixtureFile>): Analysis {
 	const root = create_project(files)
 	const root_names = files.map(([relative]) => path.join(root, relative))
-	const program = ts.createProgram({
-		rootNames: root_names,
-		options: { strict: true, noEmit: true, types: [] },
-	})
+	const program = ts.createProgram({ rootNames: root_names, options: PROGRAM_OPTIONS })
 	const sources = program.getSourceFiles().filter((source) => !source.isDeclarationFile)
 	const namespaces = sources.flatMap((source) => namespace_members.collect_namespaces(source))
 	const scope = {
