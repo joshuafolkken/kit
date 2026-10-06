@@ -1,6 +1,6 @@
 import { yaml_document } from '#scripts/lib/yaml-document'
 import { overrides_check } from './overrides-logic'
-import { lockfile_importers_schema, type LockfileImporter } from './schemas'
+import { lockfile_importers_schema, type LockfileImporter } from './overrides-schemas'
 
 // The importer sections whose entries pnpm rewrites through `overrides` before resolving.
 const DEPENDENCY_GROUPS = ['dependencies', 'devDependencies', 'optionalDependencies'] as const

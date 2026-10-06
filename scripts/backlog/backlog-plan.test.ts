@@ -8,7 +8,7 @@ import {
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_report } from '#scripts/epic/epic-report'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import type { OpenIssueData } from '#scripts/git/schemas'
+import type { OpenIssueData } from '#scripts/git/git-schemas'
 import {
 	AUTO_OK_LABEL,
 	EPIC_LABEL,

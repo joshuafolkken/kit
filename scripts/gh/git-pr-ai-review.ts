@@ -1,6 +1,6 @@
 // cspell:words coderabbit coderabbitai
+import { ai_review_pull_comment_schema } from '#scripts/git/git-schemas'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
-import { ai_review_pull_comment_schema } from '#scripts/git/schemas'
 import {
 	classify_ai_review_comments,
 	type ClassifiedFinding,

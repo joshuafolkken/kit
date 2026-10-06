@@ -166,7 +166,7 @@ const RUN_TAIL_REASON =
 	'run**, so ' +
 	'reissuing the same call in the foreground will be refused again.'
 
-const run_tail = {
+const run_tail_rule = {
 	RUN_TAIL_REASON,
 	decide,
 	is_backgrounded_push_step,
@@ -175,4 +175,4 @@ const run_tail = {
 	is_push_step_call,
 }
 
-export { run_tail }
+export { run_tail_rule }

@@ -48,7 +48,7 @@
 - **早すぎる進捗報告** — 待機だけの `Bash` は、全区間が `sleep`、または `sleep` に `echo` ／ `:` ／ `date` が並ぶだけのもの
 - **run 末尾の空転** — `run_in_background` が付いていれば引き金に当たらない
 - **実装フェーズの cut** — コストは `pnpm josh cost --cut` と同一の統計・同一のしきい値 `CONTEXT_CUT_THRESHOLD` で測り、測定不能は `!== UNDER` で安全側に発火する。しきい値を跨ぐたびに発火する（`decide`、joshuafolkken/kit#2385）。直後の同じ編集の出し直しを通すので `busy` ／ `failed` でも空回りしない
-- **テストの宣言** — `run_tail` の commit 段照合を再利用し、新しい配送経路は作らない。免除は人が Step 0 で宣言するため 1 ラン 1 回だけ配送する
+- **テストの宣言** — `run_tail_rule` の commit 段照合を再利用し、新しい配送経路は作らない。免除は人が Step 0 で宣言するため 1 ラン 1 回だけ配送する
 - **force push / ブランチ削除** — `git push` / `git branch` を argv として解析し、結合クラスタ（`-uf`）と `git -C` 前置も綴りによらず判定する
 - **ファイル本文をシェルに載せない** — 既存判定は `stat` 1 回
 - **停止時の通知 ／ hold の解放** — 押さえは `run:hold` 記録、綺麗さは `git status --porcelain` が空であることで読む
@@ -95,7 +95,7 @@ WIP 上限の引き金は Issue の**作成**だけを見る。`…/issues/<N>/c
 **前提の証拠を読めないときは、拒否を基本とする。** 意図して通す例外は、理由をコードのコメントに残す。現在の例外は次のとおりである。
 
 - トランスクリプト自体を読めないとき（`hook-decision.ts`）
-- 初回の起票で、畳み込む相手がないとき（`issue-fold.ts`）
+- 初回の起票で、畳み込む相手がないとき（`issue-fold-rule.ts`）
 - 進捗の記録がないとき（`early-heartbeat.ts`）
 - git の読み取りに失敗して、変更なしとして扱うとき（`delivered-rules.ts` の `test-declared` 行）
 

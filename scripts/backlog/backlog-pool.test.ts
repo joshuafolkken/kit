@@ -1,6 +1,6 @@
 import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixture'
 import type { EpicChild } from '#scripts/epic/epic-graph'
-import type { OpenIssueData } from '#scripts/git/schemas'
+import type { OpenIssueData } from '#scripts/git/git-schemas'
 import {
 	ALREADY_DONE_LABEL,
 	AUTO_OK_LABEL,

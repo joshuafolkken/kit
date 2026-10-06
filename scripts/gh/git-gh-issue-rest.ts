@@ -1,8 +1,8 @@
+import { blocking_issue_schema } from '#scripts/git/git-schemas'
 import {
 	parse_json_array_or_undefined,
 	parse_json_object_safe,
 } from '#scripts/git/parse-json-array'
-import { blocking_issue_schema } from '#scripts/git/schemas'
 import type { IssueReference } from '#scripts/issue/issue-reference'
 import { z } from 'zod'
 import { MERGED_STATE, to_gh_state } from './git-gh-rest-state'

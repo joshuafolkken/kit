@@ -140,7 +140,7 @@ const BODY_FLAG = new RegExp(
 	'u',
 )
 
-// **A flag is only a flag outside the quotes**, the same reading `run-tail.ts` takes of a pull-request
+// **A flag is only a flag outside the quotes**, the same reading `run-tail-rule.ts` takes of a pull-request
 // title. This repository's own refusal text names `--body-file <path>`, so a `grep` or an `echo`
 // quoting it would otherwise be scored as a run that passed a body by path. The quoted spellings of
 // the same thing are not lost by blanking: `--field "body=@<path>"` is a whole-value file reference,

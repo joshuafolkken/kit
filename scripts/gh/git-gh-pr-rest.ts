@@ -1,8 +1,8 @@
+import { rest_comment_schema } from '#scripts/git/git-schemas'
 import {
 	parse_json_array_or_undefined,
 	parse_json_object_safe,
 } from '#scripts/git/parse-json-array'
-import { rest_comment_schema } from '#scripts/git/schemas'
 import { z } from 'zod'
 import { MERGED_STATE, to_gh_state } from './git-gh-rest-state'
 

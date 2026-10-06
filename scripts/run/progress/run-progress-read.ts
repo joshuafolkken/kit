@@ -1,7 +1,7 @@
 import { loadavg } from 'node:os'
 import { epic_busy } from '#scripts/epic/epic-busy'
 import { git_command } from '#scripts/git/git-command'
-import type { OpenIssueData } from '#scripts/git/schemas'
+import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_report } from '#scripts/lane/lane-report'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'

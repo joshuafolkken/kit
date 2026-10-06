@@ -15,7 +15,7 @@ import { shell_segments } from './shell-segments'
 //
 // **It fires on every occurrence, not once per run.** A force push is destructive every time it is
 // issued, so refused-once-and-free-after would put the second one back on the run's self-restraint —
-// the disposition `run-tail.ts` and `filing-cap.ts` take for the same reason.
+// the disposition `run-tail-rule.ts` and `filing-cap.ts` take for the same reason.
 
 // A force push. The long forms all open with `--force` (`--force`, `--force-with-lease[=ref]`,
 // `--force-if-includes`); `-f` and any cluster carrying `f` are the short forms; a bare `--delete` and

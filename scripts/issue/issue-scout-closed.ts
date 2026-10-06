@@ -1,7 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { issue_label_schema } from '#scripts/git/git-schemas'
 import { PAGE_CEILING_CAUSE } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
-import { issue_label_schema } from '#scripts/git/schemas'
 import { z } from 'zod'
 import { EPIC_LABEL, has_any_label } from './issue-labels'
 import type { ScoutIssue } from './issue-scout'

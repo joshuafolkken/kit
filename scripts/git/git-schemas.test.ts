@@ -6,7 +6,7 @@ import {
 	pr_raw_schema,
 	pull_comment_schema,
 	rollup_item_schema,
-} from './schemas'
+} from './git-schemas'
 
 const PACKAGE_NAME = '@joshuafolkken/kit'
 const STATUS_CONTEXT = 'StatusContext'
