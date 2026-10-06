@@ -684,7 +684,7 @@ JOSH_EVAL_MODEL=opus pnpm josh eval     # a different model (default: sonnet)
 JOSH_EVAL_CONCURRENCY=2 pnpm josh eval  # fewer sessions at a time (default: 5)
 ```
 
-Each scenario replays a situation against a real Claude session in a throwaway sandbox carrying the documents and skills kit distributes, then judges it on the tool calls the run made — never on what it said. The `n/m` line is a number you can compare before and after a document change. Needs the `claude` CLI on `PATH`; it is deliberately not part of CI. See [docs/eval.md](./eval.md) for the scenario format.
+Each scenario replays a situation against a real Claude session in a throwaway sandbox carrying the documents and skills kit distributes, then judges it on the tool calls the run made — never on what it said. The `n/m` line is a number you can compare before and after a document change. Needs the `claude` CLI on `PATH`; it is deliberately not part of CI. See [docs/maintainers/eval.md](./maintainers/eval.md) for the scenario format.
 
 **Options:**
 

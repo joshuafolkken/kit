@@ -301,7 +301,7 @@ describe('obsolete migration notes', () => {
 
 describe('publishing guidance', () => {
 	it('documents direct publishing and a public-registry verification', () => {
-		const content = readFileSync('docs/publishing.md', 'utf8')
+		const content = readFileSync('docs/maintainers/publishing.md', 'utf8')
 
 		expect(content).toContain('direct `npm publish`')
 		expect(content).toContain('two-factor authentication')
