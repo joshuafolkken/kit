@@ -12,12 +12,13 @@ import { section_reference_resolution } from './section-reference-fixture'
 const DOCUMENTS = all_documents()
 const { broken_section_references, exists } = section_reference_resolution
 
-// A relative link is resolved against the containing file's directory, then against the repository
-// root — a document at the top level writes `docs/x.md`, one in a sub-directory writes `../x.md`.
+// A relative link is resolved against the containing file's directory only, because that is how
+// GitHub renders it — a repository-root fallback would pass a link that breaks on the page
+// (joshuafolkken/kit#3248).
 function link_resolves(from: string, target: string): boolean {
-	const resolved = node_path.normalize(node_path.join(node_path.dirname(from), target))
+	const joined = node_path.join(node_path.dirname(from), target)
 
-	return exists(resolved) || exists(target)
+	return exists(node_path.normalize(joined))
 }
 
 function broken_links(from: string, text: string): Array<string> {
@@ -67,5 +68,21 @@ describe('every cross-document reference resolves', () => {
 		expect(broken_links('CLAUDE.md', 'see [x](does-not-exist.md)')).toStrictEqual([
 			'does-not-exist.md',
 		])
+	})
+})
+
+describe('the scan answers as GitHub and `doc:section` do', () => {
+	it('flags a link that resolves only from the repository root', () => {
+		expect(broken_links('docs/how-to.md', 'see [x](docs/cli.md)')).toStrictEqual(['docs/cli.md'])
+	})
+
+	it('scans README.md with the rest of the corpus', () => {
+		expect(DOCUMENTS).toContain('README.md')
+	})
+
+	// The symptom joshuafolkken/kit#3248 was filed on: a bold-label reference the scan accepted and
+	// `pnpm josh doc:section CLAUDE.md "Output language"` refused. Both now answer from one function.
+	it('resolves a bold-label reference the way the command does', () => {
+		expect(broken_section_references('`CLAUDE.md` → "Output language"')).toStrictEqual([])
 	})
 })

@@ -94,7 +94,7 @@ child over" in `backlogrun-lanes.md` carries the command.
 JSONL. `JOSH_WORKER_MODEL` overrides Claude Code only; `JOSH_WORKER_EFFORT` covers both providers,
 and legacy `JOSH_LANE_*` applies only here. Bad markers, missing CLI/auth and failure
 refuse or park without fallback or retry.
-`docs/josh-commands-automation.md` → "`josh lane:dispatch`" is the single source.
+`docs/josh-commands-run.md` → "`josh lane:dispatch`" is the single source.
 
 **The parent reads GitHub, never the summary.** That is `epic-child`'s verifier: a unit that reports
 a child finished without its PR merged leaves that child open, and `pnpm josh issue:state <N>` says so
@@ -118,7 +118,7 @@ summary is bounded the way it is".
    parent files what survives — `observation-filing.md`, the single source. **What the parent does with the
    rest is append it, not drop it**: an observation that cannot cite the depth-0 work it blocked
    becomes one line in the observation ledger, and a second line under the same key files it. **A
-   child appends only to its own issue's file, `docs/maintainers/observations/<N>.md`, in its own
+   child appends only to its own issue's file, `.josh/observations/<N>.md`, in its own
    lane** (joshuafolkken/kit#2919) — it merges with the child's pull request, and a sibling lane's
    file is never one it touches.
 4. **Decisions taken and why**, where the decision was not already logged as an Issue comment.
@@ -190,7 +190,9 @@ and a child that skips it implements on a stale main. Only the dependency update
 lanes it changes hands**: no lane can switch to the default branch, so the parent runs it in the primary
 checkout **before each `lane:open`**. **And in a lane `josh latest` is not even asked** — `latest:scope`
 skips and `latest:guard` refuses. The stash that carries the lock file into the first lane is in
-`backlogrun-lanes.md` → "Once per repository, before the first lane opens".
+`backlogrun-lanes.md` → "Once per repository, before the first lane opens": the parent runs the update
+and pushes the stash in the primary checkout before `backlog:drive` starts, and the driver passes it
+to the first lane it launches.
 
 This is the same rule `latest-gate.md` is the single source of.
 
@@ -204,6 +206,6 @@ session".
 `pnpm josh run:hold <N>`, the first call of the child's `fullrun`, checks for an interrupted run's
 leftovers before it claims the tree, and prints the step for each answer (`reclaim` / `resume` /
 `park`) on stderr — follow it, and report a reclaim or resume with its stash reference. The answers are
-`docs/josh-commands-automation.md` → "`josh run:hold`"; rationale:
+`docs/josh-commands-run.md` → "`josh run:hold`"; rationale:
 `docs/maintainers/backlogrun-child-rationale.md` → "Why the preflight is part of the claim".
 

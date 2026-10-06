@@ -65,7 +65,7 @@ it is".
 
 `pnpm josh epic:next <E> --repo <owner/repo> --lanes` answers with **one issue number per line**, up to
 the number of free lanes, and each of those children runs in a **lane** of its own: a linked git work
-tree with its own branch, its own `.env` and its own dev and preview ports (`docs/josh-commands-automation.md` →
+tree with its own branch, its own `.env` and its own dev and preview ports (`docs/josh-commands-run.md` →
 "`josh lane:open` / `josh lane:close` / `josh lane:list` / `josh lane:prune`"). **Implementation, the
 verification gate and the review run in parallel; the merges stay serial** — each one lands on the
 `main` the next is then measured against.
@@ -89,7 +89,7 @@ two from its filing, because an issue with neither answers `triage` and nothing 
 the other lanes for one reason only: a batch run on broken verification leaves nobody's result
 trustworthy** — that the issue's own verification sits under the defect is the issue's own concern,
 checked by the verification after the fix. This paragraph is the rule's single source; rationale:
-`docs/maintainers/wip-cap-rationale.md` → 「単独実行の理由と由来」.
+`docs/maintainers/wip-cap-rationale.md` → "Why a solo run".
 
 **A lane's review does not inherit the lane, and `pnpm josh review:brief` is what closes that.**
 `pnpm josh review:brief` prints the lane's absolute root, branch and HEAD, hands over targets written
@@ -135,6 +135,10 @@ Record it on that first child's Issue — the comment is what gets it popped if 
 **The first lane's `pnpm josh lane:launch "$n" --stash "backlogrun: josh latest before lanes"` pops it
 by message, after `lane:open`'s own install** — never a positional `git -C "$dir" stash pop`: the stash
 is a repository-wide stack every lane shares, so a positional pop would take whichever lane last pushed.
+**Under the supervisor's `backlog:drive` the driver passes it, never you**:
+each launch asks whether a stash under that message is on the stack and, if one is, hands it to
+`lane:launch --stash` — the pop consumes it, so the first lane takes it and every later one launches
+without. The push above stays the parent's, before the driver starts.
 
 ### Opening one lane and dispatching its child
 

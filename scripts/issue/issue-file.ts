@@ -1,5 +1,6 @@
 import type { parseArgs } from 'node:util'
 import { epic_issue } from '#scripts/epic/epic-issue'
+import { epic_triage } from '#scripts/epic/epic-triage'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { issue_backlinks } from './issue-backlinks'
@@ -9,6 +10,8 @@ import {
 	DEPTH_LABEL_ORDER,
 	FILING_ROUTE_LABELS,
 	has_label_name,
+	RUN_LANE_LABEL,
+	RUN_SOLO_LABEL,
 } from './issue-labels'
 import { markdown_section } from './markdown-section'
 
@@ -152,6 +155,19 @@ function labels_of(args: FileArguments, body: string, is_auto_ok = false): Reado
 	return [...labels, AUTO_OK_LABEL]
 }
 
+// Why an `auto-ok` filing with neither `run:lane` nor `run:solo` is refused, or `undefined` when it is
+// not (joshuafolkken/kit#3313). The offer paths withhold every candidate while one opted-in Issue is
+// untriaged, so a run's own filing without the judgement stopped every lane. No default is applied:
+// `run:solo` is the answer that keeps a verification defect from running beside others, and only a
+// reading of the Issue gives it (`backlogrun-lanes.md`).
+function triage_problem(labels: ReadonlyArray<string>): string | undefined {
+	const is_owed = has_label_name(labels, AUTO_OK_LABEL) && !epic_triage.has_triage_label(labels)
+
+	if (!is_owed) return undefined
+
+	return `an \`${AUTO_OK_LABEL}\` filing needs \`--label ${RUN_LANE_LABEL}\` or \`--label ${RUN_SOLO_LABEL}\` — \`${RUN_SOLO_LABEL}\` only for a defect in kit's own verification that makes unrelated PRs answer wrongly on main now (\`backlogrun-lanes.md\`), else \`${RUN_LANE_LABEL}\``
+}
+
 function is_same_repository(target: string, current: string): boolean {
 	return target.toLowerCase() === current.toLowerCase()
 }
@@ -202,7 +218,14 @@ function unacknowledged(
 	return candidates.filter((candidate) => !distinct.includes(candidate))
 }
 
-const issue_file = { parse, labels_of, origin_problem, unacknowledged, is_same_repository }
+const issue_file = {
+	parse,
+	labels_of,
+	origin_problem,
+	triage_problem,
+	unacknowledged,
+	is_same_repository,
+}
 
 export type { FileArguments }
 export { issue_file }

@@ -6,6 +6,7 @@ import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_owner_schema } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { z } from 'zod'
 
 // A machine-wide weighted core budget with admission control (joshuafolkken/kit#2351).
@@ -45,6 +46,26 @@ const POLL_INTERVAL_MS = 50
 const WAIT_CAP_MS = 120_000
 // The head of the ledger is always admitted, so the smallest budget worth planning against is one core.
 const MIN_BUDGET = 1
+
+// **The cores each heavy tool occupies, declared once for both places that reserve them**
+// (joshuafolkken/kit#3345). `gate-plan.ts`'s checks and the `josh` commands that run the same tools
+// directly read these, so a direct `josh lint` claims what the gate's lint claims. The lint, type check
+// and spell check numbers are `gate-plan.ts`'s measured table, floored. The whole-tree eslint scan
+// behind `josh lines` and `josh refactor:scan` runs in one process: measured cold on the 11-core
+// machine on 2026-10-06, 113s of CPU over 98s of wall, so it gets one core.
+const CORE_WEIGHTS = {
+	lint: 2,
+	type_check: 1,
+	spell_check: 1,
+	eslint_scan: 1,
+} as const
+
+// **The environment mark that says a parent already holds this process's cores**
+// (joshuafolkken/kit#3345). `josh gate` reserves per check and then spawns `pnpm josh lint`. Without
+// the mark, that child's own dispatch would claim a second place for the cores its parent already
+// holds. Every holder sets it, and every child inherits it through the environment and claims nothing.
+const HELD_KEY = 'JOSH_CORE_RESERVED'
+const HELD_VALUE = '1'
 
 const reservation_schema = process_owner_schema.extend({
 	weight: z.number(),
@@ -133,7 +154,7 @@ function live_reservations(directory: string = PLATFORM_TEMP_ROOT): Array<LiveRe
 	return marker_files(directory).flatMap((name) => {
 		const reservation = live_reservation(path.join(directory, name))
 
-		return reservation === undefined ? [] : [{ key: name, reservation }]
+		return reservation === undefined ? [] : { key: name, reservation }
 	})
 }
 
@@ -272,14 +293,61 @@ async function with_core_reservation<T>(
 	}
 }
 
+function is_held(): boolean {
+	return process.env[HELD_KEY] === HELD_VALUE
+}
+
+// A function of its own so the restoring write does not sit after an `await`, where
+// `require-atomic-updates` reads any write to `process` as a possible race — the reason `josh.ts`
+// gives `record_exit_code`.
+function set_held_mark(value: string): void {
+	process.env[HELD_KEY] = value
+}
+
+// Marks this process, and every child it spawns, as running inside a held reservation. The previous
+// value comes back afterwards, so a nested holder never clears the mark its outer holder set.
+async function with_held_mark<T>(run: () => Promise<T>): Promise<T> {
+	const previous = process.env[HELD_KEY] ?? ''
+
+	set_held_mark(HELD_VALUE)
+
+	try {
+		return await run()
+	} finally {
+		set_held_mark(previous)
+	}
+}
+
+// **A command's reservation: the gate's claim, unless a parent already holds the cores**
+// (joshuafolkken/kit#3345). `josh-logic.ts` calls this around every command that declares a weight.
+// Each command then only declares its weight, and no command carries a copy of the claim, run and
+// release steps. A solo run is admitted on the first read, so a run with room on the machine starts
+// with no wait. A command inside a unit suite claims nothing either, for the reason `reserved-run.ts`
+// gives: the suite's own reservation already covers it, and a place claimed there would wait on it.
+async function with_command_reservation<T>(
+	weight: number,
+	run: () => Promise<T>,
+	options: ReserveOptions = {},
+): Promise<T> {
+	if (is_held() || unit_worker_share.is_nested_run()) return await run()
+
+	return await with_core_reservation(weight, async () => await with_held_mark(run), options)
+}
+
 const core_budget = {
+	CORE_WEIGHTS,
+	HELD_KEY,
+	HELD_VALUE,
 	RESERVED_PREFIX,
 	admitted_keys,
 	admitted_load,
+	is_held,
 	live_reservations,
 	release,
 	reserve,
+	with_command_reservation,
 	with_core_reservation,
+	with_held_mark,
 }
 
 export type { LiveReservation, Reservation, ReserveOptions }

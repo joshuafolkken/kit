@@ -1,4 +1,4 @@
-import { package_with_deps_schema } from '#scripts/overrides/schemas'
+import { package_with_deps_schema } from '#scripts/overrides/overrides-schemas'
 import semver from 'semver'
 
 // kit ships a `preinstall` hook that installs @aikidosec/safe-chain, whose minimum-age policy hides

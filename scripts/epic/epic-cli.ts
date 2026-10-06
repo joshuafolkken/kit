@@ -1,6 +1,6 @@
 import { cli_body } from '#scripts/josh/cli-body'
 import type { InsertKind, InsertPosition } from './epic-chains'
-import { epic_cli_argv, ISSUE_NUMBER_PATTERN } from './epic-cli-argv'
+import { epic_cli_argv, ISSUE_NUMBER_PATTERN, type EpicArgv, type FormFlags } from './epic-cli-argv'
 import { epic_cli_remove } from './epic-cli-remove'
 import { epic_parse, type ExternalChild } from './epic-parse'
 
@@ -27,25 +27,22 @@ const ORDER_AFTER_FLAG = '--order-after'
 // from a file, or from stdin as `-`. The text is a judgement, so the caller writes it; what the command
 // contributes is placing it in the epic's `## Decisions` and on each child (joshuafolkken/kit#1350).
 const DECISION_FLAG = '--decision-file'
-// Which flags consume the argument after them — per parser, for the reason `epic-cli-argv.ts` gives.
-const VALUE_FLAGS: ReadonlySet<string> = new Set([RATIONALE_FLAG, ORIGIN_FLAG])
-const ADD_VALUE_FLAGS: ReadonlySet<string> = new Set([
-	BEFORE_FLAG,
-	AFTER_FLAG,
-	ORDER_BEFORE_FLAG,
-	ORDER_AFTER_FLAG,
-	DECISION_FLAG,
-])
-const ADD_KNOWN_FLAGS: ReadonlySet<string> = new Set([
-	ADD_FLAG,
-	BEFORE_FLAG,
-	AFTER_FLAG,
-	ORDER_BEFORE_FLAG,
-	ORDER_AFTER_FLAG,
-	DECISION_FLAG,
-])
+// Which flags each form knows, and which of them consume the argument after them — per form, for the
+// reason `epic-cli-argv.ts` gives.
+const CREATE_FORM: FormFlags = {
+	switches: [ORDERED_FLAG],
+	value_flags: [RATIONALE_FLAG, ORIGIN_FLAG],
+}
+const PROMOTE_FORM: FormFlags = { ...CREATE_FORM, switches: [PROMOTE_FLAG, ORDERED_FLAG] }
+const RECONCILE_FORM: FormFlags = { switches: [RECONCILE_FLAG] }
+const CHECK_FORM: FormFlags = { switches: [] }
+const ADD_FORM: FormFlags = {
+	switches: [ADD_FLAG],
+	value_flags: [BEFORE_FLAG, AFTER_FLAG, ORDER_BEFORE_FLAG, ORDER_AFTER_FLAG, DECISION_FLAG],
+}
 
-const { count_flag, is_value_unusable, read_flag_value } = epic_cli_argv
+const { count_flag, is_switch_set, is_value_unusable, positionals_of, read_flag_value, read_form } =
+	epic_cli_argv
 
 interface CreateArguments {
 	title: string
@@ -65,13 +62,6 @@ interface PromoteArguments {
 	origin?: string | undefined
 }
 
-function to_positional_arguments(
-	argv: ReadonlyArray<string>,
-	value_flags: ReadonlySet<string> = VALUE_FLAGS,
-): Array<string> {
-	return epic_cli_argv.to_positional_arguments(argv, value_flags)
-}
-
 // Deduplicated because a repeated number would render a duplicate task-list row, and with
 // `--ordered` would ask GitHub to make an issue block itself.
 function to_child_numbers(raw_children: ReadonlyArray<string>): Array<number> {
@@ -83,22 +73,33 @@ function to_child_numbers(raw_children: ReadonlyArray<string>): Array<number> {
 	return [...new Set(numbers)]
 }
 
-// The title comes first so the children can stay a bare list of numbers, which is how they are
-// written down when the split is made.
-function parse_create_arguments(argv: ReadonlyArray<string>): CreateArguments | undefined {
-	const [title, ...raw_children] = to_positional_arguments(argv)
+// The flags a creation and a promotion share, read the same way for both.
+function read_batch_flags(
+	parsed: EpicArgv,
+): Pick<CreateArguments, 'is_ordered' | 'rationale_path' | 'origin'> {
+	return {
+		is_ordered: is_switch_set(parsed, ORDERED_FLAG),
+		rationale_path: read_flag_value(parsed, RATIONALE_FLAG),
+		origin: read_flag_value(parsed, ORIGIN_FLAG),
+	}
+}
+
+function to_create_arguments(parsed: EpicArgv): CreateArguments | undefined {
+	const [title, ...raw_children] = parsed.positionals
 	if (title === undefined || title.length === 0) return undefined
 
 	const children = to_child_numbers(raw_children)
 	if (children.length === 0) return undefined
 
-	return {
-		title,
-		children,
-		is_ordered: argv.includes(ORDERED_FLAG),
-		rationale_path: read_flag_value(argv, RATIONALE_FLAG),
-		origin: read_flag_value(argv, ORIGIN_FLAG),
-	}
+	return { title, children, ...read_batch_flags(parsed) }
+}
+
+// The title comes first so the children can stay a bare list of numbers, which is how they are
+// written down when the split is made.
+function parse_create_arguments(argv: ReadonlyArray<string>): CreateArguments | undefined {
+	const parsed = read_form(argv, CREATE_FORM)
+
+	return parsed === undefined ? undefined : to_create_arguments(parsed)
 }
 
 // Whether the invocation is a promotion rather than a creation.
@@ -118,7 +119,7 @@ interface ReconcileArguments {
 // The epic to reconcile. The number after `--reconcile` is the only subject; there are no children
 // and no position — the repair reads what the epic already records rather than being told an order.
 function parse_reconcile_arguments(argv: ReadonlyArray<string>): ReconcileArguments | undefined {
-	const [raw_epic] = to_positional_arguments(argv)
+	const [raw_epic] = positionals_of(argv, RECONCILE_FORM)
 	if (raw_epic === undefined || !ISSUE_NUMBER_PATTERN.test(raw_epic)) return undefined
 
 	return { epic_number: Number(raw_epic) }
@@ -127,20 +128,20 @@ function parse_reconcile_arguments(argv: ReadonlyArray<string>): ReconcileArgume
 // The promoted issue and its children. The number after `--promote` is the epic; everything else
 // positional is a child. Refused when the epic would also be listed as its own child, which would
 // have it block itself under `--ordered`.
-function parse_promote_arguments(argv: ReadonlyArray<string>): PromoteArguments | undefined {
-	const [raw_epic, ...raw_children] = to_positional_arguments(argv)
+function to_promote_arguments(parsed: EpicArgv): PromoteArguments | undefined {
+	const [raw_epic, ...raw_children] = parsed.positionals
 	if (raw_epic === undefined || !ISSUE_NUMBER_PATTERN.test(raw_epic)) return undefined
 	const epic_number = Number(raw_epic)
 	const children = to_child_numbers(raw_children).filter((child) => child !== epic_number)
 	if (children.length === 0) return undefined
 
-	return {
-		epic_number,
-		children,
-		is_ordered: argv.includes(ORDERED_FLAG),
-		rationale_path: read_flag_value(argv, RATIONALE_FLAG),
-		origin: read_flag_value(argv, ORIGIN_FLAG),
-	}
+	return { epic_number, children, ...read_batch_flags(parsed) }
+}
+
+function parse_promote_arguments(argv: ReadonlyArray<string>): PromoteArguments | undefined {
+	const parsed = read_form(argv, PROMOTE_FORM)
+
+	return parsed === undefined ? undefined : to_promote_arguments(parsed)
 }
 
 // `--add <E> <N...> [--before <M> | --after <M> | --order-before <M> | --order-after <M>]`: the epic
@@ -195,36 +196,33 @@ const POSITION_FLAGS: ReadonlyArray<PositionFlag> = [
 // of each direction, or a dependency-writing flag beside an order-only one. `read_flag_value` would
 // answer with the first, which is a silent choice rather than a refusal — and here the silent choice
 // would decide whether a `blocked-by` is written at all.
-function is_position_ambiguous(argv: ReadonlyArray<string>): boolean {
-	return POSITION_FLAGS.reduce((total, entry) => total + count_flag(argv, entry.flag), 0) > 1
+function count_position_flags(parsed: EpicArgv): number {
+	return POSITION_FLAGS.reduce((total, entry) => total + count_flag(parsed, entry.flag), 0)
 }
 
 interface PositionTarget extends PositionFlag {
 	raw: string
 }
 
-function to_position_target(
-	argv: ReadonlyArray<string>,
-	entry: PositionFlag,
-): PositionTarget | undefined {
-	const raw = read_flag_value(argv, entry.flag)
+function to_position_target(parsed: EpicArgv, entry: PositionFlag): PositionTarget | undefined {
+	const raw = read_flag_value(parsed, entry.flag)
 
 	return raw === undefined ? undefined : { ...entry, raw }
 }
 
-function read_position_target(argv: ReadonlyArray<string>): PositionTarget | undefined {
-	if (is_position_ambiguous(argv)) return undefined
+function read_position_target(parsed: EpicArgv): PositionTarget | undefined {
+	if (count_position_flags(parsed) > 1) return undefined
 
-	return POSITION_FLAGS.map((entry) => to_position_target(argv, entry)).find(
+	return POSITION_FLAGS.map((entry) => to_position_target(parsed, entry)).find(
 		(found) => found !== undefined,
 	)
 }
 
 // A target that is not an issue number is refused for the same reason two flags are: guessing would
 // insert somewhere.
-function parse_position(argv: ReadonlyArray<string>): PositionOutcome {
-	const has_flag = POSITION_FLAGS.some((entry) => argv.includes(entry.flag))
-	const target = read_position_target(argv)
+function parse_position(parsed: EpicArgv): PositionOutcome {
+	const has_flag = count_position_flags(parsed) > 0
+	const target = read_position_target(parsed)
 	if (target === undefined) return has_flag ? REFUSED_POSITION : NO_POSITION
 	if (!ISSUE_NUMBER_PATTERN.test(target.raw)) return REFUSED_POSITION
 
@@ -233,10 +231,6 @@ function parse_position(argv: ReadonlyArray<string>): PositionOutcome {
 		is_order_only: target.is_order_only,
 		is_refused: false,
 	}
-}
-
-function has_unknown_flag(argv: ReadonlyArray<string>): boolean {
-	return epic_cli_argv.has_unknown_flag(argv, ADD_KNOWN_FLAGS)
 }
 
 // Whether *this* is why the insertion could not be read, so the refusal can say so. Without it the
@@ -248,9 +242,9 @@ function is_decision_path_unusable(argv: ReadonlyArray<string>): boolean {
 }
 
 function read_add_subject(
-	argv: ReadonlyArray<string>,
+	parsed: EpicArgv,
 ): { epic_number: number; children: Array<number> } | undefined {
-	const [raw_epic, ...raw_children] = to_positional_arguments(argv, ADD_VALUE_FLAGS)
+	const [raw_epic, ...raw_children] = parsed.positionals
 	if (raw_epic === undefined || !ISSUE_NUMBER_PATTERN.test(raw_epic)) return undefined
 	const epic_number = Number(raw_epic)
 	const children = to_child_numbers(raw_children).filter((child) => child !== epic_number)
@@ -258,19 +252,26 @@ function read_add_subject(
 	return children.length === 0 ? undefined : { epic_number, children }
 }
 
-function parse_add_arguments(argv: ReadonlyArray<string>): AddArguments | undefined {
-	if (has_unknown_flag(argv) || is_decision_path_unusable(argv)) return undefined
-	const subject = read_add_subject(argv)
+function to_add_arguments(parsed: EpicArgv): AddArguments | undefined {
+	const subject = read_add_subject(parsed)
 	if (subject === undefined) return undefined
-	const outcome = parse_position(argv)
+	const outcome = parse_position(parsed)
 	if (outcome.is_refused) return undefined
 
 	return {
 		...subject,
 		position: outcome.position,
 		is_order_only: outcome.is_order_only,
-		decision_path: read_flag_value(argv, DECISION_FLAG),
+		decision_path: read_flag_value(parsed, DECISION_FLAG),
 	}
+}
+
+// An unknown flag is refused by the strict read: a mistyped positioning flag would otherwise leave its
+// value positional, so it becomes a child and the edit lands somewhere else (joshuafolkken/kit#890).
+function parse_add_arguments(argv: ReadonlyArray<string>): AddArguments | undefined {
+	const parsed = is_decision_path_unusable(argv) ? undefined : read_form(argv, ADD_FORM)
+
+	return parsed === undefined ? undefined : to_add_arguments(parsed)
 }
 
 // The one refusal `--add` has to explain rather than merely report. `into owner/repo#N` is a legal
@@ -288,7 +289,7 @@ interface CrossRepoAddTarget {
 // problem, and
 // a suggestion built from it would drop or mangle what the person typed.
 function find_cross_repo_add_target(argv: ReadonlyArray<string>): CrossRepoAddTarget | undefined {
-	const [raw_epic] = to_positional_arguments(argv, ADD_VALUE_FLAGS)
+	const [raw_epic] = positionals_of(argv, ADD_FORM)
 	if (raw_epic === undefined) return undefined
 	const epic = epic_parse.parse_external_reference(raw_epic)
 	if (epic === undefined) return undefined
@@ -351,7 +352,7 @@ function format_cross_repo_refusal(found: CrossRepoAddTarget): string {
 }
 
 function parse_check_argument(argv: ReadonlyArray<string>): number | undefined {
-	const [raw] = to_positional_arguments(argv)
+	const [raw] = positionals_of(argv, CHECK_FORM)
 	if (raw === undefined || !ISSUE_NUMBER_PATTERN.test(raw)) return undefined
 
 	return Number(raw)

@@ -1,5 +1,5 @@
 import { git_command } from '#scripts/git/git-command'
-import { run_carry, type RunCarry } from '#scripts/run/run-carry'
+import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_state_cli } from './issue-state-cli'

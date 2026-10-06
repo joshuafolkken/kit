@@ -5,7 +5,7 @@ import { epic_index } from '#scripts/epic/epic-index'
 import { epic_issue } from '#scripts/epic/epic-issue'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_outside_blocker } from '#scripts/epic/epic-outside-blocker'
-import type { OpenIssueData } from '#scripts/git/schemas'
+import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
 import {
 	ALREADY_DONE_LABEL,
@@ -37,6 +37,9 @@ const DECISION_LABELS: ReadonlySet<string> = new Set([NEEDS_DECISION_LABEL, ALRE
 // `tracked` is the narrowed set `epic_index.withheld_children` builds, not every child an epic
 // tracks (joshuafolkken/kit#1668) — the narrowing itself is defined there, once, for this half and
 // `auto-ok:next` alike.
+// Child number to every open epic whose task list names it — `epic_index.build_tracking_index`.
+type TrackingIndex = ReadonlyMap<number, ReadonlyArray<number>>
+
 // The part of the context that decides which rows the standalone half considers at all.
 type ConsideredContext = Pick<StandaloneContext, 'tracked' | 'exclude' | 'repo'>
 
@@ -69,24 +72,64 @@ function needs_person(issue: OpenIssueData, context: StandaloneContext): boolean
 	)
 }
 
+// Each open epic's key, read off the tracking index — child number to the epics listing it.
+function epic_keys_of(tracking: TrackingIndex, repo: string): ReadonlySet<string> {
+	return new Set([...tracking.values()].flat().map((number) => epic_graph.key_of({ repo, number })))
+}
+
+// The set with every epic that tracks a member added, nested epics included (joshuafolkken/kit#3289).
+// An epic is a container rather than work, so it is never run itself — but it closes once its children
+// do, so a row blocked by it waits on time exactly when one of those children is in this run.
+function with_tracking_epics(
+	running: ReadonlySet<string>,
+	tracking: TrackingIndex,
+	repo: string,
+): ReadonlySet<string> {
+	const tracking_epics = [...tracking]
+		.filter(([child]) => running.has(epic_graph.key_of({ repo, number: child })))
+		.flatMap(([, epics]) => epics.map((number) => epic_graph.key_of({ repo, number })))
+	const grown = new Set([...running, ...tracking_epics])
+
+	return grown.size === running.size ? running : with_tracking_epics(grown, tracking, repo)
+}
+
+// The epics re-derived from the members alone, so an epic whose last running child was just taken out
+// leaves with it rather than lingering from an earlier pass.
+function rooted(
+	running: ReadonlySet<string>,
+	tracking: TrackingIndex,
+	repo: string,
+): ReadonlySet<string> {
+	const epics = epic_keys_of(tracking, repo)
+	const members = new Set([...running].filter((key) => !epics.has(key)))
+
+	return with_tracking_epics(members, tracking, repo)
+}
+
+function is_stuck(issue: OpenIssueData, running: ReadonlySet<string>, repo: string): boolean {
+	return has_any_label(issue.labels, DECISION_LABELS) || waits_outside(issue, running, repo)
+}
+
 // The running set with every standalone row a person has to resolve taken out, repeated until a pass
 // removes nothing — a row waiting on such a row waits on that person too, however long the chain.
 function settle_standalone(
 	running: ReadonlySet<string>,
 	issues: ReadonlyArray<OpenIssueData>,
 	repo: string,
+	tracking: TrackingIndex,
 ): ReadonlySet<string> {
 	const settled = new Set(running)
 
-	// An epic row is never in the set, so deleting its key changes nothing and it needs no filter.
+	// An epic row is never a standalone row, so deleting its key here never happens; `rooted` decides it.
 	for (const issue of issues) {
-		const is_stuck =
-			has_any_label(issue.labels, DECISION_LABELS) || waits_outside(issue, running, repo)
-
-		if (is_stuck) settled.delete(epic_graph.key_of({ repo, number: issue.number }))
+		if (is_stuck(issue, running, repo)) {
+			settled.delete(epic_graph.key_of({ repo, number: issue.number }))
+		}
 	}
 
-	return settled.size === running.size ? running : settle_standalone(settled, issues, repo)
+	const next = rooted(settled, tracking, repo)
+
+	return next.size === running.size ? next : settle_standalone(next, issues, repo, tracking)
 }
 
 // An opted-in row as the graph's node type. Both halves of the pool are then the same shape, so one
@@ -182,18 +225,21 @@ function classify_standalone(
 // (joshuafolkken/kit#1943). A child is opted in through its epic's `auto-ok` even where it carries none
 // of its own, which is why the set is built from the graphs that were read rather than from labels. A
 // standalone row a person has to resolve is left out, so a row waiting on it waits for that person too;
-// an epic child in the same state is taken out by `epic_next_views.settle_views`.
+// an epic child in the same state is taken out by `epic_next_views.settle_views`. An open epic with a
+// child in the set is in it too, so a row blocked by that epic waits rather than needs a person. A
+// closed child is left out: it runs nothing, and kept in the set it would hold its epic there.
 function running_set(
 	graphs: ReadonlyArray<ReadonlyArray<EpicChild>>,
 	issues: ReadonlyArray<OpenIssueData>,
 	repo: string,
+	tracking: TrackingIndex,
 ): ReadonlySet<string> {
 	const running = epic_outside_blocker.running_keys([
-		...graphs.flat(),
+		...graphs.flat().filter((child) => child.state === 'OPEN'),
 		...to_children(standalone_rows(issues), repo),
 	])
 
-	return settle_standalone(running, issues, repo)
+	return settle_standalone(rooted(running, tracking, repo), issues, repo, tracking)
 }
 
 // A cycle no single epic can see, because its links cross from one graph into another. Each epic's own
@@ -336,4 +382,4 @@ const backlog_pool = {
 }
 
 export { backlog_pool }
-export type { ConsideredContext, StandaloneContext }
+export type { ConsideredContext, StandaloneContext, TrackingIndex }

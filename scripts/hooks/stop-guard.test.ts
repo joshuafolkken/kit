@@ -1,3 +1,4 @@
+import { agent_headless } from '#scripts/agent/agent-headless'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
@@ -7,10 +8,10 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { lane_background } from '#scripts/rules/lane-background'
 import { stop_rules } from '#scripts/rules/stop-rules'
-import { run_carry, type CarryRead } from '#scripts/run/run-carry'
-import { run_cut } from '#scripts/run/run-cut'
+import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
+import { run_cut } from '#scripts/run/cut/run-cut'
+import { run_hold, type HoldRead } from '#scripts/run/hold/run-hold'
 import { run_headless } from '#scripts/run/run-headless'
-import { run_hold, type HoldRead } from '#scripts/run/run-hold'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
@@ -140,6 +141,12 @@ async function decide_in(lang: string, message: string): Promise<Array<string>> 
 describe('write_stop_decision — the session language is wired', () => {
 	beforeEach(() => {
 		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
+		// The suite may itself run inside a kit-launched agent, whose mark would stand the rule aside.
+		vi.stubEnv(agent_headless.KEY, undefined)
+	})
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
 	})
 
 	it('sends back a Japanese reply in an en session, naming en', async () => {

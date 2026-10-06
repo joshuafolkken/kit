@@ -8,8 +8,8 @@ import {
 } from './ai-document-fixture'
 import { document_section } from './document-section'
 
-// The rules live in one document; `AGENTS.md` and `GEMINI.md` point at it
-// (joshuafolkken/kit#963). Every other marker suite now reads `CLAUDE.md` alone, so nothing else
+// The rules live in one document; `AGENTS.md`, `GEMINI.md` and `.cursorrules` point at it
+// (joshuafolkken/kit#963, joshuafolkken/kit#3249). Every other marker suite now reads `CLAUDE.md` alone, so nothing else
 // would notice a rule being pasted back into a pointer — or a pointer quietly losing the sentence
 // that sends an agent to the rules. This suite is what notices.
 
@@ -48,7 +48,7 @@ const OFF_TABLE_HOOK_MARKERS: ReadonlyArray<string> = [
 const JOSH_COMMAND = 'pnpm josh '
 
 // The sentences every pointer is required to carry, pinned by the suite below. Identical text there
-// is the pointer contract, not a clone; any other sentence the two pointers share is.
+// is the pointer contract, not a clone; any other sentence two pointers share is.
 const CONTRACT_PHRASES: ReadonlyArray<string> = [
 	'All rules for this repository live in',
 	READ_IN_FULL,
@@ -69,11 +69,14 @@ function is_contract(sentence: string): boolean {
 	return CONTRACT_PHRASES.some((phrase) => sentence.includes(phrase))
 }
 
+// Every pair of pointers, not the first against the rest: a sentence pasted into two of three
+// pointers must fail here whichever two they are.
 function shared_sentences(): ReadonlyArray<string> {
-	const [first = '', ...others] = POINTER_DOCS
-	const other_sentences = new Set(others.flatMap((document_path) => sentences_of(document_path)))
+	const sentences = POINTER_DOCS.flatMap((document_path) => [
+		...new Set(sentences_of(document_path)),
+	])
 
-	return sentences_of(first).filter((sentence) => other_sentences.has(sentence))
+	return [...new Set(sentences.filter((sentence, index) => sentences.indexOf(sentence) !== index))]
 }
 
 describe('the rules have exactly one home', () => {
@@ -166,7 +169,7 @@ describe('the canonical document explains the arrangement', () => {
 		for (const marker of RULE_BODY_MARKERS) expect(unwrapped).toContain(marker)
 	})
 
-	it('names both pointer documents so the arrangement is discoverable', () => {
+	it('names every pointer document so the arrangement is discoverable', () => {
 		for (const pointer of POINTER_DOCS) expect(content).toContain(pointer)
 	})
 

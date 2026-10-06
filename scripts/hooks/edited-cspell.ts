@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { HOOK_PROCESS_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 
 // The spell half of the edit hook (joshuafolkken/kit#2296). joshuafolkken/kit#2275 gave the hook a way
@@ -47,9 +48,6 @@ const CSPELL_ARGS: ReadonlyArray<string> = [
 	'--no-summary',
 ]
 const PNPM = 'pnpm'
-// A spell check that hangs would hold the edit's turn open; the bound is generous because reaching it
-// means something is already wrong, exactly as the formatter spawns in `format-edited-file.ts`.
-const PROCESS_TIMEOUT_MS = 15_000
 
 const HEADER =
 	'The edit hook found words cspell does not know; fix them or add them to `cspell.config.yaml` now rather than at the gate:'
@@ -79,7 +77,7 @@ async function run_cspell(file_path: string, project_root: string): Promise<stri
 		cwd: project_root,
 		stdout: 'pipe',
 		stderr: 'ignore',
-		timeout: PROCESS_TIMEOUT_MS,
+		timeout: HOOK_PROCESS_TIMEOUT_MS,
 	})
 
 	return result.stdout

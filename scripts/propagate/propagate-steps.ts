@@ -4,7 +4,8 @@ import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { OTHER_CHANGE_LABEL } from '#scripts/issue/issue-labels'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { error_text } from '#scripts/lib/error-message'
-import { build_upgrade_shell_command } from '#scripts/version/upgrade-shell-command'
+import { SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { build_upgrade_command } from '#scripts/version/upgrade-shell-command'
 import { create_version_command_config } from '#scripts/version/version-command-config'
 import { execaSync } from 'execa'
 import { propagate_git } from './propagate-git'
@@ -20,9 +21,6 @@ import type { PropagateTarget } from './propagate-targets'
 // and the sequencing stays testable (joshuafolkken/kit#863).
 
 const SUCCESS_EXIT_CODE = 0
-// Long enough for a consumer's full unit suite and a `pnpm add`, short enough that a hung step ends
-// the run instead of holding the whole propagation open.
-const STEP_TIMEOUT_MS = 1_800_000
 // The consumer-side gate. `josh gate` is the same command the AI documents require of a person
 // (joshuafolkken/kit#914) — running the four checks concurrently and reporting every failure in one
 // pass — so the chain is not repeated here. It resolves in the consumer's directory, which by this
@@ -54,11 +52,15 @@ function sync_command(bin_name: string): ReadonlyArray<string> {
 // which would defeat the exact-version wait: a release published while the run was in flight would
 // be the one every consumer received. `josh adopt` names `latest` deliberately, because it is pulling
 // whatever is newest inward rather than carrying one known release outward. Built through kit's own
-// upgrade-command builder either way, so the lockfile repair it chains stays single-sourced.
-function upgrade_command(package_name: string, version: string): ReadonlyArray<string> {
+// upgrade-command builder either way, so the lockfile repair it chains stays single-sourced — and
+// its steps are argument vectors, so the version never passes through a shell.
+function upgrade_command(
+	package_name: string,
+	version: string,
+): ReadonlyArray<ReadonlyArray<string>> {
 	const config = create_version_command_config({ package_name })
 
-	return ['sh', '-c', build_upgrade_shell_command(version, true, config)]
+	return build_upgrade_command(version, true, config).steps
 }
 
 const PROPAGATE_ORIGIN =
@@ -149,8 +151,8 @@ const NO_COMMAND = 'no command defined'
 // tail would throw on its first `replaceAll`, and nothing between here and the report catches it:
 // the throw escapes the whole run, so every consumer after this one goes unattempted and the
 // end-of-run block is never printed — "one consumer's failure never stops another", lost to a crash.
-function captured(text: string | undefined): string {
-	return text ?? ''
+function captured(text: string | undefined = ''): string {
+	return text
 }
 
 function step_result(step: string, exit_code: number | undefined): StepResult {
@@ -172,7 +174,7 @@ function spawn_step(
 		cwd: target.path,
 		reject: false,
 		stdio: 'inherit',
-		timeout: STEP_TIMEOUT_MS,
+		timeout: SUITE_TIMEOUT_MS,
 	})
 
 	return step_result(step, spawned.exitCode)
@@ -207,7 +209,7 @@ function spawn_captured(
 		stdin: 'inherit',
 		stdout: ['inherit', 'pipe'],
 		stderr: ['inherit', 'pipe'],
-		timeout: STEP_TIMEOUT_MS,
+		timeout: SUITE_TIMEOUT_MS,
 	})
 
 	return {
@@ -383,11 +385,14 @@ function run_each(
 	return { step, is_ok: true }
 }
 
+// One entry per step, so `run_each` stops a toolkit's lockfile repair after its failed install.
 function upgrade_commands(plan: ReleasePlan): ReadonlyArray<ToolkitCommand> {
-	return plan.releases.map((release) => ({
-		package_name: release.package_name,
-		command: upgrade_command(release.package_name, release.version),
-	}))
+	return plan.releases.flatMap((release) =>
+		upgrade_command(release.package_name, release.version).map((command) => ({
+			package_name: release.package_name,
+			command,
+		})),
+	)
 }
 
 function sync_commands(plan: ReleasePlan): ReadonlyArray<ToolkitCommand> {

@@ -69,11 +69,7 @@ than `josh latest`.
 
 ## 4. When the bump breaks something — fix forward
 
-Adopt the newest versions by default and resolve breakage **forward**: fix consumer code where a new
-rule or error is legitimate, and add or scope rule overrides at the correct layer (the shared kit /
-app-kit config), not as an ad-hoc consumer disable. When the breakage originates in a first-party
-package, file an issue there rather than only working around it in the consumer.
-
-Pinning back is a **last resort**, only when fixing forward is genuinely blocked. Record why, and
-open a tracking issue to return to latest. Fix-forward never authorizes a silent edit to a protected
-pin: the approval gates in sections 1–3 still apply.
+The procedure — latest-first, fix forward at the correct layer, pin back only as a last resort with a
+tracking issue — has its single source in
+`prompts/collaboration-workflow/principles.md` → "latest-first". Fix-forward never authorizes a silent edit to a protected pin: the
+approval gates in sections 1–3 still apply.

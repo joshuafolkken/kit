@@ -1,19 +1,19 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { init_logic } from '#scripts/init/init-logic'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { sync_configs } from './sync-configs'
 
 const UNCHANGED_LABEL = 'unchanged'
+const SYNCED_LABEL = 'synced'
 const HOME_NPMRC = '~/.npmrc'
-const NPMRC_UP_TO_DATE = init_logic.generate_npmrc()
-const PURGE_LINE = 'confirmModulesPurge=false'
+const REGISTRY_LINE = '@joshuafolkken:registry=https://npm.pkg.github.com\n'
+const LEGACY_LINES = 'engine-strict=true\nminimum-release-age=1440\nconfirmModulesPurge=false\n'
 // The kit does not distribute this line, but a consumer may keep it: with `npmrcAuthFile`
 // pointing at the project .npmrc, pnpm expands it and it is the only credential the deploy
 // build has. Sync removed it until #759, which took down a working Cloudflare deploy.
 const AUTH_LINE = '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n'
-const NPMRC_WITH_AUTH_LINE = `${NPMRC_UP_TO_DATE}${AUTH_LINE}`
+const NPMRC_WITH_AUTH_LINE = `${REGISTRY_LINE}${AUTH_LINE}`
 
 const ctx = { work_directory: '', destination: '' }
 
@@ -40,20 +40,21 @@ describe('sync_configs.sync_npmrc', () => {
 		expect(existsSync(ctx.destination)).toBe(false)
 	})
 
-	it('logs unchanged when all required lines present', () => {
-		writeFileSync(ctx.destination, NPMRC_UP_TO_DATE)
+	it('logs unchanged when no legacy line is present', () => {
+		writeFileSync(ctx.destination, REGISTRY_LINE)
 		const info_spy = spy_console_info()
 
 		sync_configs.sync_npmrc(ctx.destination)
 		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining(UNCHANGED_LABEL))
 	})
 
-	it('appends missing lines when outdated', () => {
-		writeFileSync(ctx.destination, 'engine-strict=true\n')
-		spy_console_info()
+	it('strips the legacy settings lines pnpm 12 ignores', () => {
+		writeFileSync(ctx.destination, `${LEGACY_LINES}${REGISTRY_LINE}`)
+		const info_spy = spy_console_info()
 
 		sync_configs.sync_npmrc(ctx.destination)
-		expect(readFileSync(ctx.destination, 'utf8')).toContain(PURGE_LINE)
+		expect(readFileSync(ctx.destination, 'utf8')).toBe(REGISTRY_LINE)
+		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining(SYNCED_LABEL))
 	})
 })
 
@@ -82,14 +83,11 @@ describe('sync_configs.sync_npmrc — consumer auth line', () => {
 		expect(info_spy).not.toHaveBeenCalledWith(expect.stringContaining(HOME_NPMRC))
 	})
 
-	it('keeps the auth line while appending the missing required lines', () => {
-		writeFileSync(ctx.destination, AUTH_LINE)
+	it('keeps the auth line while stripping the legacy lines', () => {
+		writeFileSync(ctx.destination, `${LEGACY_LINES}${AUTH_LINE}`)
 		spy_console_info()
 
 		sync_configs.sync_npmrc(ctx.destination)
-		const result = readFileSync(ctx.destination, 'utf8')
-
-		expect(result).toContain(AUTH_LINE)
-		expect(result).toContain(PURGE_LINE)
+		expect(readFileSync(ctx.destination, 'utf8')).toBe(AUTH_LINE)
 	})
 })

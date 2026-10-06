@@ -41,4 +41,4 @@ pnpm josh issue:file "<title>" --body-file <complete-draft.md> --depth <n> --dis
 - **The split path files each child through the same command.** The epic is created with
   `pnpm josh epic` over children that were scanned.
 
-Full behavior: `docs/josh-commands-automation.md` → "`josh issue:file`" and "`josh issue:scout`".
+Full behavior: `docs/josh-commands-backlog.md` → "`josh issue:file`" and "`josh issue:scout`".

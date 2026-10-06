@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { shell_upgrade_command } from './upgrade-shell-command'
 import {
 	version_check_logic,
 	type UpstreamReport,
@@ -44,8 +45,8 @@ function stale_effective_report(
 	return report
 }
 
-function up_to_date_snapshot(latest: string): VersionSnapshot {
-	return { global_version: latest, project_version: latest, latest }
+function up_to_date_snapshot(): VersionSnapshot {
+	return { global_version: MAIN_LATEST, project_version: MAIN_LATEST, latest: MAIN_LATEST }
 }
 
 describe('version_check_logic.build_effective_upgrade_commands no-op guard', () => {
@@ -58,26 +59,26 @@ describe('version_check_logic.build_effective_upgrade_commands no-op guard', () 
 	it('keeps the command when the consumer did not declare it pin-only', () => {
 		const report = stale_effective_report(PINNED_COMMAND)
 
-		expect(version_check_logic.build_effective_upgrade_commands(report)).toStrictEqual([
-			PINNED_COMMAND,
-		])
+		expect(
+			version_check_logic.build_effective_upgrade_commands(report).map(({ text }) => text),
+		).toStrictEqual([PINNED_COMMAND])
 	})
 
 	it('keeps a fresh-resolve command whose pin is already installed', () => {
 		const report = stale_effective_report(FRESH_RESOLVE_COMMAND)
 
-		expect(version_check_logic.build_effective_upgrade_commands(report)).toStrictEqual([
-			FRESH_RESOLVE_COMMAND,
-		])
+		expect(
+			version_check_logic.build_effective_upgrade_commands(report).map(({ text }) => text),
+		).toStrictEqual([FRESH_RESOLVE_COMMAND])
 	})
 
 	it('keeps the command when the pinned version is still ahead of the installed one', () => {
 		const installed = new Map([[MAIN_PACKAGE, MAIN_STALE]])
 		const report = stale_effective_report(PINNED_COMMAND, installed)
 
-		expect(version_check_logic.build_effective_upgrade_commands(report)).toStrictEqual([
-			PINNED_COMMAND,
-		])
+		expect(
+			version_check_logic.build_effective_upgrade_commands(report).map(({ text }) => text),
+		).toStrictEqual([PINNED_COMMAND])
 	})
 })
 
@@ -102,7 +103,7 @@ describe('version_check_logic.build_effective_upgrade_notes', () => {
 describe('version_check_logic.format_dual_version_output with a dead global command', () => {
 	it('replaces the Run hint with the explanation in the rendered report', () => {
 		const result = version_check_logic.format_dual_version_output(
-			up_to_date_snapshot(MAIN_LATEST),
+			up_to_date_snapshot(),
 			MAIN_CONFIG,
 			{},
 			[stale_effective_report(PINNED_COMMAND, PRIMARY_AT_LATEST)],
@@ -116,9 +117,10 @@ describe('version_check_logic.format_dual_version_output with a dead global comm
 
 describe('version_check_logic.unique_upgrade_commands', () => {
 	it('drops repeated commands while preserving first-seen order', () => {
-		const result = version_check_logic.unique_upgrade_commands(['a', 'b', 'a', 'c', 'b'])
+		const commands = ['a', 'b', 'a', 'c', 'b'].map((text) => shell_upgrade_command(text))
+		const result = version_check_logic.unique_upgrade_commands(commands)
 
-		expect(result).toStrictEqual(['a', 'b', 'c'])
+		expect(result.map(({ text }) => text)).toStrictEqual(['a', 'b', 'c'])
 	})
 })
 
@@ -129,7 +131,7 @@ describe('version_check_logic.format_dual_version_output hint de-duplication', (
 			config: SECOND_UPSTREAM_CONFIG,
 		}
 		const result = version_check_logic.format_dual_version_output(
-			up_to_date_snapshot(MAIN_LATEST),
+			up_to_date_snapshot(),
 			MAIN_CONFIG,
 			{},
 			[stale_effective_report(PINNED_COMMAND), second],

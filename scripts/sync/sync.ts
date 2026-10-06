@@ -192,12 +192,23 @@ function sync_prepare_lefthook_warning(destination_path: string): void {
 	)
 }
 
+// The `preinstall` earlier kits wrote fetched safe-chain on every install (joshuafolkken/kit#3269);
+// `josh init` replaces it, and this covers everyone already initialized.
+function sync_safe_chain_preinstall(destination_path: string): void {
+	sync_package_json_with(
+		destination_path,
+		(existing) => init_logic.upgrade_safe_chain_preinstall(existing),
+		'  ✔ synced    preinstall safe-chain check',
+	)
+}
+
 // Every migration an already-initialized consumer needs applied to its own manifest, run as one
 // group so the next one is added here rather than at the call site.
 function sync_package_json_migrations(destination_path: string): void {
 	sync_package_manager_version(destination_path)
 	sync_secretlint_development_deps(destination_path)
 	sync_prepare_lefthook_warning(destination_path)
+	sync_safe_chain_preinstall(destination_path)
 }
 
 // Two distributed artifacts each depend on a repository setting kit cannot write, and both reports
@@ -230,8 +241,8 @@ function sync_project_artifacts(is_force: boolean): void {
 
 	sync_sonar_with_template(name_with_owner, is_force)
 	sync_config_files()
-	// After `sync_config_files`, which may add the `.npmrc` window `.aikido`'s age is derived from
-	// (joshuafolkken/kit#2743).
+	// After `sync_ai_copy_all`, which may add the `pnpm-workspace.yaml` window `.aikido`'s age is
+	// derived from (joshuafolkken/kit#2743, #3267).
 	project_config.sync_project_config(PROJECT_ROOT)
 	sync_package_json_migrations(path.join(PROJECT_ROOT, PACKAGE_JSON))
 	report_repository_settings(name_with_owner)
@@ -277,6 +288,8 @@ const sync = {
 	sync_package_manager_version,
 	sync_secretlint_development_deps,
 	sync_prepare_lefthook_warning,
+	sync_safe_chain_preinstall,
+	sync_package_json_migrations,
 	migrate_prettierrc: did_migrate_prettierrc,
 }
 

@@ -1,7 +1,7 @@
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { run_progress_read } from '#scripts/run/progress/run-progress-read'
 import { z } from 'zod'
-import { run_progress_read } from './run-progress-read'
 import { run_watcher_guard } from './run-watcher-guard'
 
 // The `PreToolUse` adapter that turns `run_watcher_guard`'s verdict into a deny reason, so the guard

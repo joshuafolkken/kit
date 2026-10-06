@@ -1,72 +1,133 @@
-# オープン Issue の WIP 上限（30 件） — rationale
+# The open-Issue WIP cap (30) — rationale
 
-これは `prompts/collaboration-workflow/wip-cap.md` の背後にある保守者向けの根拠である — 手順の境界・免除・数字を正当化する測定、経緯、論証をここに置く。ラン中に読まれることはない。エージェントが従う引き金・コマンド・判定・境界はすべて手順ドキュメントに残っており、このファイルを変えても規則は何も変わらない。
+This is maintainer-only rationale behind `prompts/collaboration-workflow/wip-cap.md` — the
+measurements and arguments that justify the procedure's boundaries, exemptions and numbers. No run
+reads it. Every trigger, command, verdict and boundary an agent follows stays in the procedure, and a
+change to this file changes no rule.
 
-## 文言を固定しているテスト
+## Tests that pin the wording
 
-配送文 `WIP_CAP_REASON`（`scripts/rules/delivered-rules.ts`）の中身は `scripts/backlog/backlog-manufacturing-rule.test.ts` が固定している。
+`scripts/backlog/backlog-manufacturing-rule.test.ts` pins what the delivery message `WIP_CAP_REASON`
+(`scripts/rules/wip-cap.ts`) carries.
 
-`gh issue list` を使わない理由（配布ドキュメントの実行可能ブロックに置ける `gh` は REST のものだけで、`gh issue list` は GraphQL 経由のためクラウドセッションで 403 になる）は `scripts/gh/gh-document-guard.test.ts` が固定している。
+`scripts/gh/gh-document-guard.test.ts` pins why `gh issue list` is not used: the only `gh` a
+distributed document may put in an executable block is REST, and `gh issue list` goes through GraphQL,
+which answers 403 in a cloud session.
 
-## なぜ上限が要るのか — 測定
+## Why a cap is needed — the measurement
 
-2026-09-06 までの 7 日間で起票 257 件・クローズ 163 件、**1 日あたり +13.4 件**。直近 14 日は 14 日すべてで起票がクローズを上回った。一方 `fullrun` は PR 作成からマージまで中央値およそ 10 分で、**処理速度は問題ではなかった**。到着側が処理側を上回り続けていたのであり、オープン件数に上限が無いため、その増加は誰にも見えないまま蓄積した。
+In the 7 days up to 2026-09-06, 257 Issues were filed and 163 closed — **+13.4 a day**. Over the
+latest 14 days, filings outran closures on every single day. Meanwhile `fullrun` took a median of
+about 10 minutes from PR creation to merge, so **throughput was not the problem**. Arrivals kept
+outrunning processing, and with no cap on the open count the growth piled up where nobody saw it.
 
-## 実行が詰まる起票を止めない理由
+## Why a filing a run is blocked by is not stopped
 
-上限を理由に止めれば、製造を減らす規則が実行を止めることになり、Issue が言うとおり「今より悪い状態」になる。
+Stopping it because of the cap would let a rule meant to reduce production stop execution, leaving
+things "worse than now".
 
-分割の子についても同じである。起票を止めて 1 Issue のまま実装へ進むのは、「子と epic を起票して **STOP**」という停止規則を破って 1 Issue 分の承認を N 件分に広げることであり、上限が防ぐはずだったものより重い。
+The same holds for a split's children. Stopping their filing and carrying on as one Issue breaks the
+stop rule "file the children and the epic, then **STOP**", widening one Issue's approval to N — a
+heavier harm than the one the cap exists to prevent.
 
-## 割り込み区分の由来 — joshuafolkken/kit#1517
+## Where the interrupt category comes from
 
-joshuafolkken/kit#1517 は並列実行を成立させない欠陥だったが、発見した実行単位のランをその瞬間ブロックしてはいなかったため裁量側に落ち、**別 Issue のコメント本文の中にだけ**残った。利用者が偶然そのコメントを読まなければ失われていた。
+joshuafolkken/kit#1517 was a defect that made parallel runs impossible, but it did not block the run
+that found it at that moment, so it fell on the discretionary side and survived **only inside a
+comment on another Issue**. Had the user not happened to read that comment, it would have been lost.
 
-別パッケージ起因の割り込み（上流へ起票して停止する側）と、このリポジトリの欠陥でランをブロックしていない割り込みとを同じものとして読んだことが、joshuafolkken/kit#1517 を落とした経路そのものである。
+Reading an interrupt caused by another package (file upstream and stop) and an interrupt from a
+defect in this repository that does not block the run as the same thing is exactly the path by which
+joshuafolkken/kit#1517 was dropped.
 
-## 深刻さの自己申告を条件にしない理由
+## Why self-reported severity is not a condition
 
-「重大だと思う」を条件に加えた瞬間、割り込みは誰でも通れる抜け道になり、上限そのものが無意味になる。3 条件は、当たるか当たらないかを **他人が同じ答えに到達できる**形で書いてあり、そこが唯一の役割である。
+The moment "I think it is serious" becomes a condition, the interrupt is a loophole anyone can walk
+through, and the cap means nothing. The three conditions are written so that **someone else reaches
+the same answer** about whether they hold, and that is their only job.
 
-単独実行の判定（`backlogrun-lanes.md`）も同じ理由で、深刻さの自己申告を条件に加えた瞬間、この区分も抜け道になる。
+The solo-run verdict (`backlogrun-lanes.md`) excludes self-reported severity for the same reason: the
+moment it is a condition, that category becomes a loophole too.
 
-## 位置を指定しない追加の経緯
+## Why an addition names no position
 
-`--before` / `--after` は `blocked-by` 関係を実際に書き込む（`docs/josh-commands-automation.md` →「`josh epic --add`」）ので、`epic:next` が実装中の子を「割り込みにブロックされている」として出さなくなる。位置を指定しない追加は依存を一切宣言しないので、次に取り上げるのは実行側の選択であって、宣言された関係ではない。`--order-before <M>`（joshuafolkken/kit#1738）はタスクリストの行だけを動かし、依存宣言も `blocked-by` も書かないので禁止に当たらない — **禁止しているのは依存を書き込む `--before` / `--after` であって、順序そのものではない。** `epic:next` は runnable な子をタスクリスト順に提示する（joshuafolkken/kit#1583）ため、位置を指定しない追加は「末尾に提示される」を意味し、割り込みを次に取り上げてほしいときは行だけを前に出す。
+`--before` / `--after` actually write a `blocked-by` relation (`docs/josh-commands-backlog.md` →
+"`josh epic --add`"), so `epic:next` stops offering the child being implemented, as "blocked by the
+interrupt". An addition with no position declares no dependency at all, so what is picked up next is
+the runner's choice, not a declared relation. `--order-before <M>` (joshuafolkken/kit#1738) only
+moves the task-list line and writes neither a dependency nor `blocked-by`, so it is not prohibited —
+**what is prohibited is `--before` / `--after`, which write a dependency, not ordering itself.**
+`epic:next` offers the runnable children in task-list order (joshuafolkken/kit#1583), so an addition
+with no position means "offered last"; to have the interrupt picked up next, move only its line
+forward.
 
-位置無し追加が依存を作らなくなったのは joshuafolkken/kit#1253 であり、`--after` の継ぎ足しなど残りの経路は joshuafolkken/kit#1080 で**まだ開いている** — 塞がった側を自分から迂回して、開いている側と同じ欠陥をここで作り直さないため、手順は位置を指定しない追加を求めている。
+joshuafolkken/kit#1253 is what stopped an addition with no position from writing a dependency; the
+remaining routes, such as appending with `--after`, are **still open** in joshuafolkken/kit#1080 —
+the procedure asks for an addition with no position so the run does not route around the
+closed side and rebuild here the defect the open side still has.
 
-## 単独実行の理由と由来
+## Why a solo run
 
-「着地」をマージとするのは、壊れた検証の上でバッチを回せないというのがこの節の前提なので、**修正が効き始めるのはマージの瞬間**だからである。
+"Landed" means merged because this section rests on not running a batch over broken verification, so
+**the fix takes effect at the moment of the merge**.
 
-当初の手順は次の 2 つの理由を挙げ、「どちらか一方だけでも単独実行の根拠として十分」としていた。
+The original procedure gave two reasons and called either one alone enough to run solo:
 
-1. **壊れた検証の上でバッチを回すと、全員の結果が信用できない。** 6 レーンを並列で走らせれば、6 件分のゲートまたはレビューがまとめて無意味になる。直したあとに全部やり直すことになるので、単独実行は遅い選択ですらない。
-2. **割り込み自身の検証が、その割り込みが直そうとしている欠陥の影響下にある。** joshuafolkken/kit#1515（テストが実ネットワークを叩いていた）と joshuafolkken/kit#1517（同時実行のスイートが一時ディレクトリを共有していた）はどちらもこの自己言及の罠を抱えており、両者とも単独実行で扱った。
+1. **A batch run on broken verification leaves nobody's result trustworthy.** Run six lanes in
+   parallel and six gates or reviews are void together. Everything is redone after the fix, so running
+   solo is not even the slower choice.
+2. **The interrupt's own verification sits under the defect it is fixing.** joshuafolkken/kit#1515
+   (tests hit the real network) and joshuafolkken/kit#1517 (concurrent suites shared a temporary
+   directory) both carried that self-reference, and both were run solo.
 
-**他レーンを止める根拠は理由 1 だけである**（joshuafolkken/kit#3024）。理由 2 はその Issue 自身の検証をどう信用するかの問題で、修正後の検証で確かめれば足り、無関係なレーンを止めても解決しない。理由 1 が成り立つのは、**kit 自身の検証が今の `main` で無関係な PR の判定まで誤らせている欠陥**だけである。
+**Only reason 1 justifies stopping the other lanes** (joshuafolkken/kit#3024). Reason 2 is about how far that Issue's own
+verification can be trusted; checking with the verification after the fix is enough, and stopping
+unrelated lanes does not help it. Reason 1 holds only for **a defect in kit's own verification that
+makes today's `main` misjudge unrelated PRs**.
 
-**条件を狭めた経緯。** 以前の判定は「影響先（ゲート / レビュー / push フック / マージチェック）に当たるか」だけで、`docs/how-to/run-backlog.md` ではさらに「検証経路を変更する Issue」にまで広がっていた。2026-09-01 以降に閉じた Issue では `run:solo` が 19 件、`run:lane` が 76 件で、約 5 件に 1 件が並列を止めていた。`run:solo` のうち 8 件は `bug` ですらない改善・整理（#2966, #2945, #2903, #2888 など）で、ほかにも配布先向け CI / テンプレートの不具合（#3013, #2815, #2814, #2765）、効率の問題（#2980）、保存形式の変更（#2919）が含まれていた。どれも理由 1 には当たらない。そこで判定を「欠陥である」「kit 自身の検証の欠陥である」「今の `main` で無関係な PR の判定まで誤らせている」の 3 条件の AND にした。過去 19 件に当てはめると、単独実行に残るのは #2961 / #2841 / #2770 / #2851 程度になる。強制側のコード（`scripts/epic/epic-solo.ts` など）はラベルを読むだけなので変えていない。
+**Why the condition was narrowed.** The earlier verdict asked only whether the issue touched a
+verification surface (gate / review / push hook / merge check), and `docs/how-to/run-backlog.md`
+widened it further to "an Issue that changes a verification path". Among Issues closed from
+2026-09-01, 19 were `run:solo` and 76 `run:lane` — about one in five stopped parallel work. Eight of
+the 19 were improvements or tidy-ups, not even `bug` (#2966, #2945, #2903, #2888 and others), and the
+rest included CI / template defects in consumer projects (#3013, #2815, #2814, #2765), an efficiency
+problem (#2980) and a storage-format change (#2919). None met reason 1. So the verdict became the AND
+of three conditions: it is a defect, it is a defect in kit's own verification, and it makes today's
+`main` misjudge unrelated PRs. Applied to the past 19, only about #2961 / #2841 / #2770 / #2851 stay
+solo.
+The enforcing code (`scripts/epic/epic-solo.ts` and the like) only reads the label, so it did not
+change.
 
-**判定が揺れた実例がこの節の由来である。** joshuafolkken/kit#1522（レーンで走る子のレビューが、レーンではなくセッションのチェックアウトを読む）は #1515 / #1517 と同じ形なのに、起票直後は並列バッチの一員として扱われ、利用者の指摘で単独に戻された。同じ判断者が同じ週に逆の答えを出しており、**列挙が無ければ一貫しない**ことがそこで示された。しかも #1522 は嘘の赤ではなく**嘘の緑**を返す側で、より危険である。
+**The section exists because the verdict wavered.** joshuafolkken/kit#1522 (a lane child's review
+read the session's checkout rather than the lane's) had the same shape as #1515 / #1517, yet right
+after filing it was treated as a member of a parallel batch and was moved back to solo only when the
+user pointed it out. The same judge gave opposite answers in the same week, which showed that
+**without an enumeration the verdict is not consistent**. And #1522 returned a **false green**, not a
+false red — the more dangerous side.
 
-## 上限そのものを変えるとき
+## Changing the cap itself
 
-**上限の数字は Tier C ではない** — 引き上げも引き下げも、測定を添えて提案してよい。ただし**変更は必ず `WIP_CAP` と `wip-cap.md`「規則」節の 1 行を同じコミットで動かす**。片方だけ動かすと一致を固定するテストが落ちる。
+**The number is not Tier C** — raising or lowering it may be proposed with a measurement. But **a
+change always moves `WIP_CAP` and the one line in `wip-cap.md`'s rule section in the same commit**;
+moving one alone fails the test that pins them equal.
 
-**引き上げる条件は「窮屈だから」ではない。** オープン件数が 7 日移動平均で減り続けていて、なお上限が起票を止めているとき — つまり装置が目的を果たし終えたときだけである。
+**"It feels tight" is not a reason to raise it.** Raise it only when the open count keeps falling on
+a 7-day moving average and the cap is still stopping filings — that is, when the device has done its
+job.
 
-## 3 つは一緒に動く
+## The three move together
 
-上限は単独では効かない。**製造側を止めないまま上限だけ入れると、製造は続いたまま実行だけが止まる。**
+The cap does not work alone. **A cap without stopping the production side stops only execution while
+production carries on.**
 
-| 製造元                    | 変更                                           | 単一ソース                                                              |
-| ------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------- |
-| 分割判定                  | 既定を「分割しない」に。目安は単一ソースにある | `.claude/skills/workflow-commands/split-assessment.md` → "The question" |
-| レビュー round 2 の残指摘 | 既定を branch 3（PR に 1 行残して落とす）に    | `prompts/review.md` → "Three-way disposition after the cap"             |
-| オープン件数              | WIP 上限                                       | `prompts/collaboration-workflow/wip-cap.md`                             |
+| Producer                   | Change                                                              | Single source                                                           |
+| -------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| The split assessment       | Default to "do not split"; the guideline lives in the single source | `.claude/skills/workflow-commands/split-assessment.md` → "The question" |
+| Review round 2's leftovers | Default to branch 3 (one line in the PR, then drop)                 | `prompts/review.md` → "Three-way disposition after the cap"             |
+| The open count             | The WIP cap                                                         | `prompts/collaboration-workflow/wip-cap.md`                             |
 
-## 3 つを 1 コミットで着地させた経緯
+## Why the three landed in one commit
 
-製造側を止めないまま上限だけ入れると、製造は続いたまま実行だけが止まる。だから joshuafolkken/kit#1469 は分割判定の既定・レビュー round 2 の残指摘の既定・30 件の WIP 上限の 3 つを 1 コミットで着地させた。
+A cap without stopping the production side stops only execution while production carries on. So joshuafolkken/kit#1469
+landed the split-assessment default, the default for review round 2's leftovers and the 30-Issue WIP
+cap together in one commit.

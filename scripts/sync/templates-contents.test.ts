@@ -3,7 +3,7 @@ import { package_path } from '#scripts/init/init-paths'
 import { describe, expect, it } from 'vitest'
 
 // Files removed because no distribution code path reads them:
-// - templates/.npmrc: .npmrc is generated from NPMRC_LINES, never copied from this file.
+// - templates/.npmrc: kit no longer distributes a .npmrc; sync only strips legacy lines from one.
 // - templates/workflows/deploy-vps.yml: sync only patches an existing consumer file;
 //   the template body is never read or copied.
 const DEAD_TEMPLATE_FILES: ReadonlyArray<string> = [

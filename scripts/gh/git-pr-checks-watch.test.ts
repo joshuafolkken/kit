@@ -22,7 +22,7 @@ import {
 	is_awaited_check,
 	NO_CHECKS_MESSAGE,
 	PR_CHECKS_WATCH_TIMEOUT_MS,
-	SHOULD_NEVER_READ_REVIEW_DECISION,
+	should_never_read_review_decision,
 } from './git-pr-checks-watch'
 
 // `gh pr checks --watch` streamed, and REST cannot stream (joshuafolkken/kit#1028). What the two
@@ -53,7 +53,7 @@ const fetch_review = vi.mocked(git_gh_pr_snapshot.pr_get_review_decision)
 const PR_NUMBER = 972
 
 // The three-request read the watch makes, with no review listing behind it — the point of
-// `SHOULD_NEVER_READ_REVIEW_DECISION` (joshuafolkken/kit#1043).
+// `should_never_read_review_decision` (joshuafolkken/kit#1043).
 function stub_rollup(rollup: ReadonlyArray<Record<string, unknown>>): void {
 	fetch_checks.mockResolvedValue({
 		pr_number: PR_NUMBER,
@@ -239,9 +239,9 @@ describe('pr_checks_watch — what it asks the poll loop for', () => {
 	// The verdict never reads `review_decision`, so the fetcher must not spend a request on it.
 	it('tells the fetcher never to read the review listing', () => {
 		expect(CHECKS_SETTLED_EVALUATOR.should_read_review_decision).toBe(
-			SHOULD_NEVER_READ_REVIEW_DECISION,
+			should_never_read_review_decision,
 		)
-		expect(SHOULD_NEVER_READ_REVIEW_DECISION(EMPTY_SNAPSHOT)).toBe(false)
+		expect(should_never_read_review_decision()).toBe(false)
 	})
 
 	// No new loop is written here — that is the whole point of the conversion.

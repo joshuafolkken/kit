@@ -1,6 +1,8 @@
 import { json_value } from '#scripts/lib/json-value'
+import { FETCH_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { migrate_logic } from '#scripts/registry-migration/migrate-logic'
 import { execaSync } from 'execa'
+import semver from 'semver'
 import { z } from 'zod'
 import { release_age } from './release-age'
 
@@ -12,7 +14,6 @@ const PUBLIC_REGISTRY = 'https://registry.npmjs.org'
 // The abbreviated packument carries `dist-tags` without every version's full manifest.
 const ABBREVIATED_ACCEPT = 'application/vnd.npm.install-v1+json'
 const FULL_ACCEPT = 'application/json'
-const REQUEST_TIMEOUT_MS = 10_000
 const SCOPE_SEPARATOR = '/'
 const ENCODED_SCOPE_SEPARATOR = '%2f'
 const SCOPE_PATTERN = /^@[^/]+(?=\/)/u
@@ -29,7 +30,10 @@ const FETCH_SCRIPT = [
 	'process.stdout.write(await response.text())',
 ].join('\n')
 
-const latest_schema = z.looseObject({ 'dist-tags': z.looseObject({ latest: z.string() }) })
+// A registry-supplied version is used only when it is exactly a semver version — it ends up inside an
+// install command, so `1.0.0;curl…|sh` or any other text is refused at the source, not downstream.
+const version_schema = z.string().refine((value) => semver.valid(value) === value)
+const latest_schema = z.looseObject({ 'dist-tags': z.looseObject({ latest: version_schema }) })
 const times_schema = z.looseObject({ time: release_age.release_times_schema })
 
 // The packument URL for a package name; a scoped name keeps its `@` and encodes the separator, the
@@ -42,7 +46,7 @@ function read_packument(package_name: string, accept: string): unknown {
 	const result = execaSync(
 		process.execPath,
 		['--input-type=module', '-e', FETCH_SCRIPT, packument_url(package_name), accept],
-		{ reject: false, timeout: REQUEST_TIMEOUT_MS },
+		{ reject: false, timeout: FETCH_TIMEOUT_MS },
 	)
 	if (result.exitCode !== 0) return undefined
 
@@ -59,7 +63,7 @@ function is_github_scope(scope: string): boolean {
 	if (is_cached_github !== undefined) return is_cached_github
 	const result = execaSync('pnpm', ['config', 'get', `${scope}${SCOPE_REGISTRY_SUFFIX}`], {
 		reject: false,
-		timeout: REQUEST_TIMEOUT_MS,
+		timeout: FETCH_TIMEOUT_MS,
 	})
 	const is_github = result.exitCode === 0 && migrate_logic.is_github_tarball(result.stdout.trim())
 
@@ -102,6 +106,17 @@ function has_public_version(package_name: string, version: string): boolean {
 	return parsed.success && parsed.data.time[version] !== undefined
 }
 
-const npm_registry = { has_public_version, packument_url, read_latest, read_release_times }
+// The version itself, or nothing when it is not exactly a semver version.
+function valid_version(value: string): string | undefined {
+	return version_schema.safeParse(value).success ? value : undefined
+}
+
+const npm_registry = {
+	has_public_version,
+	packument_url,
+	read_latest,
+	read_release_times,
+	valid_version,
+}
 
 export { npm_registry }

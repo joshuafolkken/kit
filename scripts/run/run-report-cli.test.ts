@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { run_event_stream } from './run-event-stream'
 import { run_report } from './run-report'
 
 // joshuafolkken/kit#2249: `josh run:report`. The stream target and the pending-merge count are both
@@ -16,7 +16,7 @@ const read_pending_mock = vi.hoisted(() => vi.fn())
 const repository_directory_mock = vi.hoisted(() => vi.fn())
 const read_carry_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('./run-event-stream-emit', () => ({
+vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { stream_target: stream_target_mock },
 }))
 
@@ -26,7 +26,7 @@ vi.mock('#scripts/followup/git-followup-pending', () => ({
 
 // joshuafolkken/kit#2393: the CLI reads the invocation's start time off the run record, so the record is
 // mocked alongside the stream — what this pins is the wiring, that the scope reaches the generator at all.
-vi.mock('./run-carry', () => ({
+vi.mock('#scripts/run/carry/run-carry', () => ({
 	run_carry: {
 		carry_path: (directory: string) => directory,
 		read_carry: read_carry_mock,

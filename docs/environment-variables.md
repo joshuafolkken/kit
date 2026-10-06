@@ -38,7 +38,7 @@ A missing `.env` file is not itself an error: both commands also read the two va
 | ------------------------- | -------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PORT_SEED`               | No       | `0` (dev 5173, preview 4173)                      | Several kit projects run on one machine: an integer `0`–`99` that moves this project's dev and preview ports by `seed × 10` ([`josh port`](./josh-commands.md#josh-port)).                                                 |
 | `JOSH_LANE_ROOT`          | No       | `.<repository-name>-lanes`, beside the repository | Where `josh lane:open` puts a lane's work tree.                                                                                                                                                                            |
-| `JOSH_LANE_LIMIT`         | No       | `6`                                               | How many lanes one repository runs at once ([`josh epic:next`](./josh-commands-automation.md#josh-epicnext)); set `2` on a small container.                                                                                |
+| `JOSH_LANE_LIMIT`         | No       | `6`                                               | How many lanes one repository runs at once ([`josh epic:next`](./josh-commands-backlog.md#josh-epicnext)); set `2` on a small container.                                                                                   |
 | `PLAYWRIGHT_REUSE_SERVER` | No       | off                                               | `1` / `true` / `yes` / `on` lets the E2E run reuse this project's own server already on the port instead of booting one ([troubleshooting](./troubleshooting.md#local-e2e-aborts-with-httplocalhost5173-is-already-used)). |
 
 ### Unattended agents
@@ -58,13 +58,14 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 
 ### Runs
 
-| Variable                         | Required | Default                                                       | Used when                                                                                                                                                       |
-| -------------------------------- | -------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `JOSH_PROGRESS_INTERVAL_MINUTES` | No       | `josh.progress_interval_minutes` in `package.json`, else `20` | How long a run goes quiet before `josh run:progress` prints a line ([`josh run:progress`](./josh-commands-automation.md#josh-runprogress)).                     |
-| `JOSH_PROGRESS`                  | No       | on                                                            | `0` turns the progress lines off.                                                                                                                               |
-| `JOSH_RETROSPECTIVE`             | No       | off                                                           | `on` / `1` / `true` / `yes` runs the end-of-run retrospective when a backlog drains ([`josh retrospective`](./josh-commands-automation.md#josh-retrospective)). |
-| `JOSH_REPO_PATHS`                | No       | sibling repositories are found automatically                  | A repository that is not a sibling, or is checked out twice: `owner/repo=/absolute/path`, comma-separated ([`josh doctor`](./josh-commands.md#josh-doctor)).    |
-| `JOSH_DEBUG`                     | No       | off                                                           | Any non-blank value writes the error a run, lane, git or GitHub state check swallowed to stderr as `josh debug: <where>: <message>`; verdicts are unchanged.    |
+| Variable                         | Required | Default                                                       | Used when                                                                                                                                                    |
+| -------------------------------- | -------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `JOSH_PROGRESS_INTERVAL_MINUTES` | No       | `josh.progress_interval_minutes` in `package.json`, else `20` | How long a run goes quiet before `josh run:progress` prints a line ([`josh run:progress`](./josh-commands-run.md#josh-runprogress)).                         |
+| `JOSH_PROGRESS`                  | No       | on                                                            | `0` turns the progress lines off.                                                                                                                            |
+| `JOSH_RETROSPECTIVE`             | No       | off                                                           | `on` / `1` / `true` / `yes` runs the end-of-run retrospective when a backlog drains ([`josh retrospective`](./josh-commands-run.md#josh-retrospective)).     |
+| `JOSH_REPO_PATHS`                | No       | sibling repositories are found automatically                  | A repository that is not a sibling, or is checked out twice: `owner/repo=/absolute/path`, comma-separated ([`josh doctor`](./josh-commands.md#josh-doctor)). |
+| `JOSH_DEBUG`                     | No       | off                                                           | Any non-blank value writes the error a run, lane, git or GitHub state check swallowed to stderr as `josh debug: <where>: <message>`; verdicts are unchanged. |
+| `JOSH_CORE_RESERVED`             | No       | unset                                                         | Set by josh, never by hand: `1` marks a child whose parent already holds its share of the machine-wide core budget, so it does not reserve a second time.    |
 
 ### Merge, release and dependency updates
 
@@ -95,7 +96,7 @@ Each guard is on by default; `off`, `0`, `false` or `no` turns that one guard of
 | `JOSH_DUPLICATE_READ_GUARD` | No       | on      | [`josh duplicate-read:guard`](./josh-commands-automation.md#josh-duplicate-readguard) — reading the same file twice.      |
 | `JOSH_RULE_GUARD`           | No       | on      | [`josh rule:guard`](./josh-commands-automation.md#josh-ruleguard) — a rule delivered at the call that breaks it.          |
 | `JOSH_STOP_GUARD`           | No       | on      | [`josh stop:guard`](./josh-commands-automation.md#josh-stopguard) — what a turn must do before it ends.                   |
-| `JOSH_WATCHER_GUARD`        | No       | on      | [`josh run:watcher:guard`](./josh-commands-automation.md#josh-runwatcherguard) — a run whose progress watcher stopped.    |
+| `JOSH_WATCHER_GUARD`        | No       | on      | [`josh run:watcher:guard`](./josh-commands-run.md#josh-runwatcherguard) — a run whose progress watcher stopped.           |
 | `JOSH_PARENT_CUT_GUARD`     | No       | on      | A `backlogrun` parent over its session budget.                                                                            |
 | `JOSH_SCOPED_GREEN`         | No       | on      | `josh gate` refusing a tree its scoped checks were never green on ([`josh gate`](./josh-commands.md#josh-gate)).          |
 
@@ -103,7 +104,7 @@ Each guard is on by default; `off`, `0`, `false` or `no` turns that one guard of
 
 | Variable                | Required | Default  | Used when                                                                                     |
 | ----------------------- | -------- | -------- | --------------------------------------------------------------------------------------------- |
-| `JOSH_EVAL_MODEL`       | No       | `sonnet` | The model `josh eval` runs against ([`josh eval`](./josh-commands-automation.md#josh-eval)).  |
+| `JOSH_EVAL_MODEL`       | No       | `sonnet` | The model `josh eval` runs against ([`josh eval`](./josh-commands-run.md#josh-eval)).         |
 | `JOSH_EVAL_CONCURRENCY` | No       | `5`      | How many `josh eval` sessions run at once; a value that is not a positive integer is refused. |
 
 ## Variables kit sets itself
@@ -120,6 +121,7 @@ kit sets these for the processes it starts, or writes them into a lane's own `.e
 | `JOSH_LANE_AGENT_MODEL`    | a `backlogrun` dispatch        | The model the lane's child was launched with.                         |
 | `JOSH_LANE_AGENT_EFFORT`   | a `backlogrun` dispatch        | The effort the lane's child was launched with.                        |
 | `JOSH_AGENT_PROVIDER`      | a detached launcher            | The provider handed to a process that is not itself an agent session. |
+| `JOSH_AGENT_HEADLESS`      | every kit agent launch         | This agent session was launched by kit, so no person reads its reply. |
 | `JOSH_RUN_HEADLESS`        | the run supervisor             | This session was launched headless by the supervisor.                 |
 | `JOSH_SHIP_SUPERVISED`     | `josh ship --detach`           | This `josh ship` runs under the detached supervisor.                  |
 | `JOSH_SHIP_LAUNCH_ID`      | `josh ship --detach`           | The supervisor launch this `josh ship` belongs to.                    |

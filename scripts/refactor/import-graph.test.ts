@@ -5,6 +5,8 @@ const ROOT = '/repo'
 const FILE_A = '/repo/scripts/a.ts'
 const FILE_B = '/repo/scripts/b.ts'
 const FILE_C = '/repo/scripts/lib/c.ts'
+// One hop longer than `MAX_STAGES` reaches, so a capped walk and an uncapped one tell apart.
+const LONG_CHAIN = ['/repo/0.ts', '/repo/1.ts', '/repo/2.ts', '/repo/3.ts', '/repo/4.ts']
 
 function graph(entries: ReadonlyArray<readonly [string, ReadonlyArray<string>]>): FileGraph {
 	return new Map(entries.map(([file, targets]) => [file, new Set(targets)]))
@@ -71,10 +73,36 @@ describe('import_graph.expand', () => {
 	})
 
 	it('stops at MAX_STAGES hops', () => {
-		const chain = ['/repo/0.ts', '/repo/1.ts', '/repo/2.ts', '/repo/3.ts', '/repo/4.ts']
-		const forward = chain_graph(chain)
-		const expanded = import_graph.expand([chain[0] ?? ''], forward, import_graph.invert(forward))
+		const forward = chain_graph(LONG_CHAIN)
+		const expanded = import_graph.expand(
+			[LONG_CHAIN[0] ?? ''],
+			forward,
+			import_graph.invert(forward),
+		)
 
 		expect(expanded.size).toBe(import_graph.MAX_STAGES + 1)
+	})
+})
+
+describe('import_graph.reachable', () => {
+	it('follows import edges forward past the stage cap', () => {
+		const reached = import_graph.reachable(LONG_CHAIN[0] ?? '', chain_graph(LONG_CHAIN))
+
+		expect(reached).toStrictEqual(new Set(LONG_CHAIN))
+	})
+
+	it('never follows importer edges backward', () => {
+		const forward = graph([[FILE_A, [FILE_C]]])
+
+		expect(import_graph.reachable(FILE_C, forward)).toStrictEqual(new Set([FILE_C]))
+	})
+
+	it('terminates on an import cycle', () => {
+		const forward = graph([
+			[FILE_A, [FILE_B]],
+			[FILE_B, [FILE_A]],
+		])
+
+		expect(import_graph.reachable(FILE_A, forward)).toStrictEqual(new Set([FILE_A, FILE_B]))
 	})
 })

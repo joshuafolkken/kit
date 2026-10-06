@@ -7,6 +7,13 @@ import { dts } from 'rollup-plugin-dts'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const SCRIPTS_IMPORT_PREFIX = '#scripts/'
+// Every public library `pnpm build` bundles — each one a `./<name>` export in package.json.
+const PUBLIC_LIBRARIES: ReadonlyArray<string> = [
+	'version',
+	'config-merge',
+	'managed-marker',
+	'self-sync-guard',
+]
 
 interface LibraryPaths {
 	entry_point: string
@@ -73,11 +80,13 @@ async function build_library_dts(entry_point: string, dts_file: string): Promise
 async function build_library(name: string): Promise<LibraryPaths> {
 	const paths = library_paths(name)
 
-	await build_library_js(paths.entry_point, paths.outfile)
-	await build_library_dts(paths.entry_point, paths.dts_file)
+	await Promise.all([
+		build_library_js(paths.entry_point, paths.outfile),
+		build_library_dts(paths.entry_point, paths.dts_file),
+	])
 
 	return paths
 }
 
 export type { LibraryPaths }
-export { build_library, library_paths }
+export { build_library, library_paths, PUBLIC_LIBRARIES }

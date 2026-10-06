@@ -5,6 +5,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { epic_classify } from './epic-classify'
 import { epic_cross_repo } from './epic-cross-repo'
@@ -31,12 +32,10 @@ import { epic_report, type EpicNextResult } from './epic-report'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const REPO_FLAG = '--repo'
-// Asking for every free lane is opt-in, so the answer stays one token for a caller that has not been
-// changed. `--repo` alone still prints exactly one number — what joshuafolkken/kit#1491 changed for
-// it is *when* that number appears, not how many arrive (joshuafolkken/kit#1491).
-const LANES_FLAG = '--lanes'
-const FLAG_PREFIX = '--'
+// Asking for every free lane (`--lanes`) is opt-in, so the answer stays one token for a caller that
+// has not been changed. `--repo` alone still prints exactly one number — what joshuafolkken/kit#1491
+// changed for it is *when* that number appears, not how many arrive (joshuafolkken/kit#1491).
+const OPTIONS = { repo: { type: 'string' }, lanes: { type: 'boolean' } } as const
 const USAGE =
 	'Usage: josh epic:next <epic-number|owner/repo#number>... [--repo <owner/repo>] [--lanes]'
 // A repository that could not be read is refused rather than stood in for. Since
@@ -66,30 +65,6 @@ interface NextOptions {
 	usage?: string
 }
 
-// A value that is itself a flag is no value at all. `--repo --lanes` used to narrow to a repository
-// literally named `--lanes` and report `No runnable child in --lanes` with exit 0; refused here, it
-// reaches the usage line instead — the caller meant a repository and named none.
-function parse_repo(rest: ReadonlyArray<string>): string | undefined {
-	const flag_index = rest.indexOf(REPO_FLAG)
-	const value = flag_index === -1 ? undefined : rest[flag_index + 1]
-
-	return value?.startsWith(FLAG_PREFIX) === true ? undefined : value
-}
-
-// The leading arguments are epic references and everything from the first flag on is options. Split
-// on the flag rather than taking a fixed count, so `epic:next 858 909 --repo X` reads two epics and
-// `epic:next 858 --repo X` still reads one (joshuafolkken/kit#1493).
-function split_at_flag(argv: ReadonlyArray<string>): {
-	head: ReadonlyArray<string>
-	rest: ReadonlyArray<string>
-} {
-	const flag_at = argv.findIndex((entry) => entry.startsWith(FLAG_PREFIX))
-
-	return flag_at === -1
-		? { head: argv, rest: [] }
-		: { head: argv.slice(0, flag_at), rest: argv.slice(flag_at) }
-}
-
 // Every leading entry, or nothing. One entry that does not parse fails the whole read rather than
 // being dropped: a mistyped second epic would otherwise run the first one alone and report nothing
 // at all about the one that was missed — an unattended run silently doing half of what was asked.
@@ -106,21 +81,34 @@ function parse_references(head: ReadonlyArray<string>): ReadonlyArray<EpicRefere
 	return references.length === 0 ? undefined : references
 }
 
-// `--lanes` without `--repo` is refused rather than ignored: the lane count is a property of one
-// repository, so the aggregate listing has nothing to apply it to, and a flag that silently does
-// nothing is a caller believing it asked for something.
-function parse_options(argv: ReadonlyArray<string>): NextOptions {
-	const { head, rest } = split_at_flag(argv)
-	const references = parse_references(head)
-	if (references === undefined) return { usage: USAGE }
-	const repo = parse_repo(rest)
-	const is_all_lanes = rest.includes(LANES_FLAG)
+function with_repo(
+	references: ReadonlyArray<EpicReference>,
+	values: { repo?: string; lanes?: boolean },
+): NextOptions {
+	const { repo, lanes: is_all_lanes = false } = values
 
-	if (repo === undefined) {
-		return is_all_lanes || rest.includes(REPO_FLAG) ? { usage: USAGE } : { references }
-	}
+	if (repo === undefined) return is_all_lanes ? { usage: USAGE } : { references }
 
 	return { references, repo, is_all_lanes }
+}
+
+// The positional arguments are epic references and the flags are options, so `epic:next 858 909 --repo
+// X` reads two epics and `epic:next 858 --repo X` still reads one (joshuafolkken/kit#1493). The read is
+// strict: an unknown flag reaches the usage line rather than being ignored, and a value that is itself
+// a flag is no value at all — `--repo --lanes` used to narrow to a repository literally named
+// `--lanes` and report `No runnable child in --lanes` with exit 0.
+//
+// `--lanes` without `--repo` is refused rather than ignored: the lane count is a property of one
+// repository, so the aggregate listing has nothing to apply it to, and a flag that silently does
+// nothing is a caller believing it asked for something. An empty name (`--repo=` from an unset
+// variable) is no repository either: narrowed to it, the answer is `No runnable child in .` and exit 0.
+function parse_options(argv: ReadonlyArray<string>): NextOptions {
+	const parsed = cli_flags.arguments_of(argv, OPTIONS)
+	if (parsed === undefined) return { usage: USAGE }
+	const references = parse_references(parsed.positionals)
+	if (references === undefined || parsed.values.repo === '') return { usage: USAGE }
+
+	return with_repo(references, parsed.values)
 }
 
 // The answer for one epic, from an already-fetched snapshot. Split from the fetch so the whole
@@ -446,7 +434,6 @@ const epic_next = {
 	is_order_declared,
 	repo_verdict,
 	UNCHECKED_EXCLUSION,
-	split_at_flag,
 	parse_options,
 	refuse_reads,
 	views_of,

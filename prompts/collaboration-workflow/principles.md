@@ -2,7 +2,7 @@
 
 **このファイルは、`CLAUDE.md` の Communication 節が指す 7 つの原則の単一ソースである。** 各節は `CLAUDE.md` から `prompts/collaboration-workflow/principles.md` → "見出し" の形で引かれ、`pnpm josh doc:section` で解決する。経緯と適用例は各節が指す [`docs/maintainers/principles-rationale.md`](../../docs/maintainers/principles-rationale.md) の節にあり、実行中には読まない。
 
-## クローン禁止・単一ソース化（パッケージ境界を越えても）
+## no-clones — クローン禁止・単一ソース化
 
 既存の非自明なロジックを「ソースを変えずに済ませる」ために**コピー・移植・再実装することは既定で禁止**する。すでにどこか（別ファイル・別モジュール・別**パッケージ＝上流依存を含む**）に存在するロジックを複製しようとした瞬間が、**単一ソース化**（全消費者が import する共有モジュール／export／パッケージ）のシグナルである。コピーではなく単一ソース化する。
 
@@ -13,7 +13,7 @@
 
 **計測は `pnpm josh clone:scan`。** 同一リポジトリ内および `JOSH_REPO_PATHS` の他リポジトリを跨いだ複製を検出し、**件数**と各複製の `file:line`（`[same-file|cross-file|cross-repo]` 分類つき、複製なしは `clean`）を印字する。`pnpm josh oracle:list` に載る決定オラクルでもある（導入の経緯は `docs/maintainers/principles-rationale.md` → "Why clone:scan exists"）。
 
-## 設計はエレガント・シンプルを第一目標にする
+## elegant-design — 設計はエレガント・シンプルを第一目標にする
 
 新しい仕組み（フック・ガード・ルール・抽象化）を足す前に、**原因側を直せばその仕組みが要らなくならないか**を先に問う。要らなくなるなら、足さない。症状を叱る仕組みを重ねるのではなく、症状を生んでいる材料を断つ。
 
@@ -22,17 +22,19 @@
 
 **書かれたコードの可読性**（意図が伝わる命名、過度な抽象化を避ける、など）は `prompts/coding-standards.md` の担当で、こちらは**設計時にどの仕組みを足すか・どこへ置くかを決める**規則。両者は別レイヤーなので、片方の本文をもう片方へ写さず、互いを指すだけにする。
 
-## 相談と実行を区別する（議論中にファイルを編集しない）
+## consult-vs-execute — 相談と実行を区別する
 
 ユーザーが「どう進めるべきか」「何をすべきか」「なぜそうなったか」を尋ねたり、目標・願望を述べたりした（「どうすべき？」「how should we…」「なぜ」「理由を知りたい」「〜したい」「〜の方が良い？」）ときは、**分析と推奨のみ**で応答する。ファイル編集・Issue 作成・その他の具体的アクションは取らない。
 
-- 具体的アクションを取ってよいのは、明示的な命令（「do it」「書き換えて」「作成して」「implement」）またはワークフローキーワード（`kickoff` / `halfrun` / `fullrun` / `backlogrun`）があるときだけ
-- 曖昧なときは propose-and-wait を既定とする（「これを実行してよいか？」と尋ねる）
+- 具体的アクションを取ってよいのは、明示的な命令（「do it」「書き換えて」「作成して」「implement」）またはワークフローキーワード（`kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun`）があるときだけ
+- 発言が相談か実行の指示か判別できないときは、相談として扱う — 分析と推奨を返し、実行の指示を待つ。実行が指示されたあとの判断点で確認するかどうかは、この規則ではなく `CLAUDE.md` → "Decision autonomy" の Tier で決まる
 - **目標の表明は「計画の依頼」であって「実行の承認」ではない**
 
-## 最新優先・fix-forward（pin-back は最終手段）
+## latest-first — 最新優先・fix-forward（pin-back は最終手段）
 
 依存パッケージ・ツールチェーンは**既定で最新版を採用する**。バンプが lint クラッシュ・新規有効化ルール・型エラーなどの破壊を引き起こしても、古いバージョンへ留まる／戻すことを既定の「安全策」にしてはならない。破壊は**前向きに（fix-forward）速やかに**解消する。
+
+この節が単一ソースで、`dependency-update` skill → "4. When the bump breaks something — fix forward" はここを指す。
 
 1. **最新優先（latest-first）**: 依存・ツールチェーンは新しいバージョンを既定で採用する。適応の手間を避けるためだけに古いバージョンに留まったり戻したりしない
 2. **破壊は fix-forward**: バンプで lint クラッシュ・新規ルール・型エラー等が出たら、前向きに解消する:
@@ -43,7 +45,7 @@
 4. **既存の保護を尊重する**: fix-forward は保護された pin を黙って書き換える許可ではない。overrides と `devEngines` の承認ゲートの単一ソースは `CLAUDE.md` → "Dependency overrides" と `dependency-update` skill である
 5. **タイムリーに**: バンプ起因の破壊は、可能な限り同じ作業セッション内で速やかに対処し、pin の裏に先送りしない
 
-## 恒久ルールは MEMORY ではなくプロンプト／ドキュメントに書く
+## durable-rules — 恒久ルールは MEMORY ではなくプロンプト／ドキュメントに書く
 
 今後のセッションでも守るべき恒久的な振る舞いのルールに気付いたときは、**kit が配布するプロンプト／ドキュメント**（`CLAUDE.md` / `prompts/*`）への変更として記述する。プロジェクト単位の自動 MEMORY（例: `~/.claude/projects/<repo-slug>/memory/`）への保存で済ませてはならない。
 
@@ -57,18 +59,18 @@
 3. 消費者リポジトリで気付いた場合は、ローカル編集ではなく kit 側へ Issue／PR として上流化する
 4. 既に MEMORY にあるルールが実は共有すべきものだと分かったときは、プロンプト／ドキュメントへ移し、MEMORY 側の重複エントリは削除する
 
-## 配布ドキュメント・設定の変更は kit に上流化する
+## upstream-to-kit — 配布ドキュメント・設定の変更は kit に上流化する
 
 `CLAUDE.md` および kit が配布する他のドキュメント／設定は、kit から単一ソースで配布される。
 
 - **消費者リポジトリ（app-kit / game-kit）ではこれらをローカル編集しない**: `josh sync` が編集を上書きするうえ、変更は本来上流（kit）に属する。ドキュメント／設定を編集する前に、それが配布物かどうかを確認し、配布物なら kit 側に変更を提案（Issue／PR）する
 - **kit リポジトリ自身ではあなたが配布元**なので、ここでは編集してよい。編集先は `CLAUDE.md` 1 本である（次節）
 
-## エージェント規則の単一ソースは `CLAUDE.md`（`AGENTS.md` / `GEMINI.md` は導線）
+## エージェント規則の単一ソースは `CLAUDE.md`（`AGENTS.md` / `GEMINI.md` / `.cursorrules` は導線）
 
-**規則の本体は `CLAUDE.md` にしか無い。** `AGENTS.md` と `GEMINI.md` は「規則は `CLAUDE.md` にある。作業前に全文を読むこと」と「規則を書き戻さない」だけを書いた短い導線文書であり、規則を 1 行も持たない。
+**規則の本体は `CLAUDE.md` にしか無い。** `AGENTS.md`・`GEMINI.md`・`.cursorrules` は「規則は `CLAUDE.md` にある。作業前に全文を読むこと」と「規則を書き戻さない」だけを書いた短い導線文書であり、規則を 1 行も持たない（`.cursorrules` は Svelte MCP の使い方の案内だけを足す）。
 
-- **規則の追加・仕様変更・文言修正・節の追加は `CLAUDE.md` に 1 回だけ書く。** 他の 2 本には触れない
+- **規則の追加・仕様変更・文言修正・節の追加は `CLAUDE.md` に 1 回だけ書く。** 導線文書には触れない
 - **導線文書に規則を書き戻さない。** そこに書かれた規則は、次の改訂で更新し忘れる 4 つ目の置き場になる
 - 経緯と機械的な検査は `docs/maintainers/principles-rationale.md` → "Why AGENTS and GEMINI are pointers"、`@CLAUDE.md` 行と他ツールでの未検証は `docs/maintainers/principles-rationale.md` → "The include line, and what has not been verified"
 
@@ -78,5 +80,5 @@
 
 - **フック**: フックが走らない、または出力が見えないツールでは、フックが届ける規則を自分で適用する。その一覧は手書きせず、[`rule-delivery.md`](./rule-delivery.md) →「配送されている規則」の一覧を正とする — 一覧の各項目が、そのツールでは自分で守る規則である。一覧の外でフックが担う 3 つも同じく自分で行う — 最初の実行時コード編集の前に Step 0 の作業サマリを提示する、編集ごとの整形フックに頼らず編集後に `pnpm josh lint:related` と `pnpm josh cspell:dot` を走らせる、`JOSH_SESSION_LANG` は注入を待たずに `.env` から解決する。フックの全体は `.claude/settings.json` の `hooks` が正である
 - **Skill・`/verify-ui`・`/code-review`**: `CLAUDE.md` が skill のロードやサブエージェントでの実行を指示する箇所では、その skill の `SKILL.md` を読み、自分のセッションで従う
-- **`.claude/settings.json` の deny list** は効かない。それが裏付ける規則 — 指示なしのコミット・マージ・ステージングその他の共有状態変更をしない — はそのまま拘束する
+- **`.claude/settings.json` の deny list** は効かない。それが裏付ける `CLAUDE.md` → "Git Rules" はそのまま拘束する
 - **`AskUserQuestion`** は、ユーザーに平文で尋ねることを指す

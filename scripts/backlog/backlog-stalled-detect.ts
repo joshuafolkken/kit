@@ -1,6 +1,6 @@
 import { telegram_notify } from '#scripts/notify/telegram-notify'
-import { run_event_stream, type RunEvent } from '#scripts/run/run-event-stream'
-import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { backlog_ready, type ReadyPorts } from './backlog-ready'
 import { backlog_stalled, type StallReading, type StallVerdict } from './backlog-stalled'
 

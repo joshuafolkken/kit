@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import { capped_print_part } from '#scripts/document/capped-print-part'
 import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_bundle_call } from '#scripts/time-runtime/time-bundle-call'
@@ -212,7 +213,8 @@ function is_session_artifact(target: string): boolean {
 
 	return (
 		segments.some((_segment, index) => has_state_root(segments, index)) ||
-		is_harness_output(segments)
+		is_harness_output(segments) ||
+		capped_print_part.is_part_file(absolute)
 	)
 }
 

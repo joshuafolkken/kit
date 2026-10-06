@@ -72,9 +72,9 @@ describe('version_check_logic.build_upstream_upgrade_commands', () => {
 		])
 
 		expect(result).toHaveLength(1)
-		expect(result[0]).toContain(`${ADD_LOCAL} ${UPSTREAM_PACKAGE}@${UPSTREAM_LATEST}`)
+		expect(result[0]?.text).toContain(`${ADD_LOCAL} ${UPSTREAM_PACKAGE}@${UPSTREAM_LATEST}`)
 		// The repair always runs kit's single fix-gh-packages.ts, not the upstream's own copy.
-		expect(result[0]).toContain(`node_modules/${KIT_PACKAGE}/scripts/gh/fix-gh-packages.ts`)
+		expect(result[0]?.text).toContain(`node_modules/${KIT_PACKAGE}/scripts/gh/fix-gh-packages.ts`)
 	})
 
 	it('never builds a global command for upstreams', () => {
@@ -82,7 +82,7 @@ describe('version_check_logic.build_upstream_upgrade_commands', () => {
 			upstream_report(UPSTREAM_STALE),
 		])
 
-		expect(result[0]).not.toContain(ADD_GLOBAL)
+		expect(result[0]?.text).not.toContain(ADD_GLOBAL)
 	})
 
 	it('skips up-to-date and not-installed upstreams', () => {
@@ -135,7 +135,7 @@ describe('version_check_logic.build_upstream_upgrade_commands effective/global',
 			report_with_effective(UPSTREAM_LATEST, EFFECTIVE_STALE),
 		])
 
-		expect(result).toStrictEqual([GLOBAL_UPGRADE_COMMAND])
+		expect(result.map(({ text }) => text)).toStrictEqual([GLOBAL_UPGRADE_COMMAND])
 	})
 
 	it('omits the global command when the effective install is up to date', () => {
@@ -159,8 +159,8 @@ describe('version_check_logic.build_upstream_upgrade_commands effective/global',
 			report_with_effective(UPSTREAM_STALE, EFFECTIVE_STALE),
 		])
 
-		expect(result[0]).toBe(GLOBAL_UPGRADE_COMMAND)
-		expect(result[1]).toContain(`${ADD_LOCAL} ${UPSTREAM_PACKAGE}@${UPSTREAM_LATEST}`)
+		expect(result[0]?.text).toBe(GLOBAL_UPGRADE_COMMAND)
+		expect(result[1]?.text).toContain(`${ADD_LOCAL} ${UPSTREAM_PACKAGE}@${UPSTREAM_LATEST}`)
 	})
 })
 

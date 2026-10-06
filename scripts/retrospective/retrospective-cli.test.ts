@@ -16,7 +16,7 @@ const LINE =
 const OTHER_LINE =
 	'- k:another-lane-line | d1 | 2026-09-24 | pnpm josh run:tail | A second lane appended this one'
 
-vi.mock('#scripts/run/run-carry', () => ({
+vi.mock('#scripts/run/carry/run-carry', () => ({
 	run_carry: { repository_directory: vi.fn().mockResolvedValue(undefined) },
 }))
 vi.mock('#scripts/cost/cost-run-tree', () => ({ cost_run_tree: { load: vi.fn(() => undefined) } }))

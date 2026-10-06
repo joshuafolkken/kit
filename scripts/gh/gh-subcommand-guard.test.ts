@@ -26,6 +26,7 @@ const GIT_CONSTANT = 'FIXTURE_GIT_BINARY'
 const SCRIPTS_DIRECTORY = 'scripts'
 const EPIC_ENTRY_FILE = 'scripts/epic/epic.ts'
 const GH_EXEC_FILE = 'scripts/gh/git-gh-exec.ts'
+const START_EXEC_FILE = 'scripts/init/start-exec.ts'
 // What a REST request's spawn reports as: `api` written inline, or an argument list built elsewhere.
 const REST_SUBCOMMANDS: ReadonlySet<string> = new Set([
 	gh_subcommand_guard.API_SUBCOMMAND,
@@ -119,6 +120,18 @@ describe('gh subcommand guard — what the scan reaches', () => {
 
 			expect(found.length).toBeGreaterThan(0)
 			expect(found.map((spawn) => spawn.file)).toContain(GH_EXEC_FILE)
+		},
+		SCAN_TIMEOUT_MS,
+	)
+
+	// joshuafolkken/kit#3262: `josh start` once spawned gh through a `command` parameter, which the
+	// scan cannot resolve, so its `gh repo create` passed unseen.
+	it(
+		"sees josh start's gh spawns by their subcommand",
+		() => {
+			const start = repository.spawns.filter((spawn) => spawn.file === START_EXEC_FILE)
+
+			expect(start.map((spawn) => spawn.subcommand)).toStrictEqual(['--version', 'auth', 'repo'])
 		},
 		SCAN_TIMEOUT_MS,
 	)

@@ -103,6 +103,20 @@ describe('issue_file.labels_of — every label in one create call', () => {
 	})
 })
 
+describe('issue_file.triage_problem — the run label an auto-ok filing owes', () => {
+	it('refuses auto-ok with neither run:lane nor run:solo', () => {
+		expect(issue_file.triage_problem(['depth:1', 'auto-ok'])).toContain('--label run:lane')
+	})
+
+	it.each([['run:lane'], ['run:solo'], ['Run:Lane']])('accepts auto-ok with %s', (label) => {
+		expect(issue_file.triage_problem(['depth:1', 'auto-ok', label])).toBeUndefined()
+	})
+
+	it('leaves a filing without auto-ok as it was', () => {
+		expect(issue_file.triage_problem(['depth:1', 'bug'])).toBeUndefined()
+	})
+})
+
 describe('issue_file.origin_problem — the backlink a cross-repository filing owes', () => {
 	it('asks nothing of a filing into this repository', () => {
 		expect(issue_file.origin_problem('', HERE, HERE)).toBeUndefined()

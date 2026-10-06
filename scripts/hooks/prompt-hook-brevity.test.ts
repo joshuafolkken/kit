@@ -47,7 +47,7 @@ const STEP_ZERO_DIRECTIVES: ReadonlyArray<string> = [
 	'no file paths, function or type names, or CLI option flags',
 	'Details',
 	'never wrapped in a code fence',
-	'fullrun/halfrun/backlogrun',
+	'fullrun/halfrun/prrun/backlogrun',
 	'never a confirmation stop',
 	'Cause / Fix / Result',
 	'Tests are required for ALL changes',

@@ -105,12 +105,20 @@ afterEach(async () => {
 })
 
 describe('test_red.run', () => {
+	// joshuafolkken/kit#3047: the changed tests are copied into the tree together, nested ones
+	// included. One run answers both, so the whole-output fixture carries the nested copy as well.
 	it(
-		'is red when the regression test checks the whole output the user saw',
+		'is red when the regression test checks the whole output the user saw, nested copies included',
 		async () => {
 			await build_fix_branch(WHOLE_OUTPUT_TEST)
+			await mkdir(path.join(process.cwd(), NESTED_DIRECTORY))
+			await write(NESTED_TEST_FILE, WHOLE_OUTPUT_TEST.replace('./report.js', '../report.js'))
 
-			expect(await test_red.run()).toEqual({ verdict: 'red', files: [TEST_FILE] })
+			const { verdict, files } = await test_red.run()
+
+			expect(verdict).toBe('red')
+			expect(files).toHaveLength(2)
+			expect(files).toEqual(expect.arrayContaining([TEST_FILE, NESTED_TEST_FILE]))
 		},
 		RUN_TIMEOUT,
 	)
@@ -135,24 +143,6 @@ describe('test_red.run', () => {
 
 			expect(verdict).toBe('green')
 			expect(await snapshot()).toBe(before)
-		},
-		RUN_TIMEOUT,
-	)
-})
-
-// joshuafolkken/kit#3047: the changed tests are copied into the tree together, nested ones included.
-describe('test_red.run with several changed tests', () => {
-	it(
-		'copies every changed test, a nested one included, and runs them all',
-		async () => {
-			await build_fix_branch(WHOLE_OUTPUT_TEST)
-			await mkdir(path.join(process.cwd(), NESTED_DIRECTORY))
-			await write(NESTED_TEST_FILE, WHOLE_OUTPUT_TEST.replace('./report.js', '../report.js'))
-
-			const result = await test_red.run()
-
-			expect(result.verdict).toBe('red')
-			expect(result.files).toEqual(expect.arrayContaining([TEST_FILE, NESTED_TEST_FILE]))
 		},
 		RUN_TIMEOUT,
 	)

@@ -1,5 +1,11 @@
-# Claude Code
-.claude/
+# Claude Code — local runtime state stays out; the distributed parts are formatted like any source
+.claude/*
+!.claude/settings.json
+!.claude/skills/
+!.claude/agents/
+!.claude/.claude-plugin/
+# Prettier pads every Markdown table column, which grows the skills past their byte budgets (joshuafolkken/kit#3325)
+.claude/**/*.md
 
 # Package Managers
 package-lock.json

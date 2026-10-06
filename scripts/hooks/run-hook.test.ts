@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import {
 	chmodSync,
 	copyFileSync,
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -20,24 +21,29 @@ const REPOSITORY_ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const LAUNCHER = 'scripts/hooks/run-hook.sh'
 const INSTALLED_PACKAGE = 'node_modules/@joshuafolkken/kit'
 const REFUSED = 2
-const FAILED = 1
 const REAL_HOOK_TIMEOUT_MS = 60_000
 const BUNDLE_RAN = 'bundle first second cleared'
+const GATE_RAN = 'gate demo-hook demo:hook first second cleared'
+const NODE_LOG = 'node-launches.log'
 
-// The stub gate exits with STUB_GATE; the stub bundle reports its arguments and whether the git
-// location reached it, then exits with STUB_EXIT.
-const GATE_STUB = 'process.exit(Number(process.env.STUB_GATE ?? 0))\n'
-const BUNDLE_STUB = [
-	"const git_dir = process.env.GIT_DIR ?? 'cleared'",
-	"process.stdout.write(`bundle ${process.argv.slice(2).join(' ')} ${git_dir}`)",
-	'process.exit(Number(process.env.STUB_EXIT ?? 0))',
-].join('\n')
+// Each stub reports its name, its arguments and whether the git location reached it, then exits with
+// STUB_EXIT. In kit's checkout the gate is the whole launch: it runs the bundle or the fallback itself.
+function stub_script(name: string): string {
+	return [
+		"const git_dir = process.env.GIT_DIR ?? 'cleared'",
+		`process.stdout.write(\`${name} \${process.argv.slice(2).join(' ')} \${git_dir}\`)`,
+		'process.exit(Number(process.env.STUB_EXIT ?? 0))',
+	].join('\n')
+}
+
+const GATE_STUB = stub_script('gate')
+const BUNDLE_STUB = stub_script('bundle')
 const DISPATCHER_STUB = "process.stdout.write(`dispatcher ${process.argv.slice(2).join(' ')}`)\n"
-const PNPM_STUB = '#!/bin/sh\necho "pnpm $*"\n'
 
 interface LaunchResult {
 	status: number | null
 	stdout: string
+	node_launches: number
 }
 
 const workspace = { root: '' }
@@ -61,25 +67,44 @@ function create_package(package_root: string, has_bundles = true): void {
 	if (has_bundles) write_file(path.join(package_root, 'dist/hooks/demo-hook.js'), BUNDLE_STUB)
 }
 
-function stub_pnpm(): string {
+// A `node` first on PATH that logs each launch and runs the real one, so a test can count launches.
+function counting_node_path(): string {
 	const bin_directory = path.join(workspace.root, 'bin')
+	const log_path = path.join(workspace.root, NODE_LOG)
 
-	write_file('bin/pnpm', PNPM_STUB)
-	chmodSync(path.join(bin_directory, 'pnpm'), 0o755)
+	write_file(
+		'bin/node',
+		`#!/bin/sh\necho launch >> "${log_path}"\nexec "${process.execPath}" "$@"\n`,
+	)
+	chmodSync(path.join(bin_directory, 'node'), 0o755)
 
-	return bin_directory
+	return `${bin_directory}${path.delimiter}${process.env['PATH'] ?? ''}`
+}
+
+function count_node_launches(): number {
+	const log_path = path.join(workspace.root, NODE_LOG)
+	if (!existsSync(log_path)) return 0
+
+	return readFileSync(log_path, 'utf8').trim().split('\n').length
+}
+
+function run_launcher(
+	command: ReadonlyArray<string>,
+	cwd: string,
+	overrides: NodeJS.ProcessEnv,
+): LaunchResult {
+	const base_environment = hook_command_bootstrap.fresh_git_environment()
+	const { status, stdout } = spawnSync('sh', command, {
+		cwd,
+		encoding: 'utf8',
+		env: { ...base_environment, PATH: counting_node_path(), ...overrides },
+	})
+
+	return { status, stdout, node_launches: count_node_launches() }
 }
 
 function launch(launcher: string, overrides: NodeJS.ProcessEnv = {}): LaunchResult {
-	const base_environment = hook_command_bootstrap.fresh_git_environment()
-	const search_path = `${stub_pnpm()}${path.delimiter}${process.env['PATH'] ?? ''}`
-	const { status, stdout } = spawnSync('sh', [launcher, 'demo-hook', 'first', 'second'], {
-		cwd: workspace.root,
-		encoding: 'utf8',
-		env: { ...base_environment, PATH: search_path, ...overrides },
-	})
-
-	return { status, stdout }
+	return run_launcher([launcher, 'demo-hook', 'first', 'second'], workspace.root, overrides)
 }
 
 function initialize_repository(git_arguments: ReadonlyArray<string>): void {
@@ -103,22 +128,16 @@ describe('run-hook.sh in kit checkout', () => {
 		create_package('.')
 	})
 
-	it('runs the bundle with the hook arguments when the gate passes', () => {
+	it('hands the hook, its josh command and its arguments to the gate in one node launch', () => {
 		const result = launch(LAUNCHER)
 
-		expect(result).toEqual({ status: 0, stdout: BUNDLE_RAN })
+		expect(result).toEqual({ status: 0, stdout: GATE_RAN, node_launches: 1 })
 	})
 
-	it('falls back to the josh command when the gate fails', () => {
-		const result = launch(LAUNCHER, { STUB_GATE: String(FAILED) })
-
-		expect(result).toEqual({ status: 0, stdout: 'pnpm josh demo:hook first second\n' })
-	})
-
-	it('passes a refusal through without running the fallback', () => {
+	it('passes a refusal through without launching anything else', () => {
 		const result = launch(LAUNCHER, { STUB_EXIT: String(REFUSED) })
 
-		expect(result).toEqual({ status: REFUSED, stdout: BUNDLE_RAN })
+		expect(result).toEqual({ status: REFUSED, stdout: GATE_RAN, node_launches: 1 })
 	})
 })
 
@@ -128,7 +147,7 @@ describe('run-hook.sh in installed package', () => {
 	it('runs the bundle without consulting the gate', () => {
 		create_package(INSTALLED_PACKAGE)
 
-		const result = launch(installed_launcher, { STUB_GATE: String(FAILED) })
+		const result = launch(installed_launcher)
 
 		expect(result.stdout).toBe(BUNDLE_RAN)
 	})
@@ -146,7 +165,7 @@ describe('run-hook.sh in installed package', () => {
 
 		const result = launch(installed_launcher, { STUB_EXIT: String(REFUSED) })
 
-		expect(result).toEqual({ status: REFUSED, stdout: BUNDLE_RAN })
+		expect(result).toEqual({ status: REFUSED, stdout: BUNDLE_RAN, node_launches: 1 })
 	})
 })
 
@@ -160,7 +179,7 @@ describe('run-hook.sh git location variables', () => {
 
 		const result = launch(LAUNCHER, { GIT_DIR: '/elsewhere' })
 
-		expect(result.stdout).toBe(BUNDLE_RAN)
+		expect(result.stdout).toBe(GATE_RAN)
 	})
 
 	it('keeps them when the git metadata lives outside the work tree', () => {
@@ -170,7 +189,7 @@ describe('run-hook.sh git location variables', () => {
 
 		const result = launch(LAUNCHER, { GIT_DIR: metadata_root, GIT_WORK_TREE: workspace.root })
 
-		expect(result.stdout).toBe(`bundle first second ${metadata_root}`)
+		expect(result.stdout).toBe(`gate demo-hook demo:hook first second ${metadata_root}`)
 	})
 
 	it('lists the same names as GIT_LOCATION_VARIABLES', () => {
@@ -183,15 +202,14 @@ describe('run-hook.sh git location variables', () => {
 
 describe('run-hook.sh with a real hook', () => {
 	it(
-		'launches session-lang from the repository root',
+		'launches session-lang from the repository root with one node launch',
 		() => {
-			const { stdout } = spawnSync('sh', [LAUNCHER, 'session-lang'], {
-				cwd: REPOSITORY_ROOT,
-				encoding: 'utf8',
-				env: { ...hook_command_bootstrap.fresh_git_environment(), JOSH_SESSION_LANG: 'en' },
+			const result = run_launcher([LAUNCHER, 'session-lang'], REPOSITORY_ROOT, {
+				JOSH_SESSION_LANG: 'en',
 			})
 
-			expect(stdout).toContain('JOSH_SESSION_LANG): en')
+			expect(result.stdout).toContain('JOSH_SESSION_LANG): en')
+			expect(result.node_launches).toBe(1)
 		},
 		REAL_HOOK_TIMEOUT_MS,
 	)

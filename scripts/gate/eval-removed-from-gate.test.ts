@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 // joshuafolkken/kit#1922: `josh eval` became a manual command and the automated rule-compliance
 // measurement left the completion gate and every workflow procedure. The distributed documents the
 // acceptance criterion names — `CLAUDE.md`, `prompts/**`, `.claude/skills/**` — must carry no step
-// that tells a run to query eval, and the manual command must still be documented in `docs/eval.md`.
+// that tells a run to query eval, and the manual command must still be documented in `docs/maintainers/eval.md`.
 
 const ROOT = process.cwd()
 const RESIDENT_DOC = 'CLAUDE.md'
@@ -36,7 +36,9 @@ describe('the eval query step is gone from the distributed documents', () => {
 })
 
 describe('the manual josh eval command survives', () => {
-	it('docs/eval.md still documents running the suite by hand', () => {
-		expect(readFileSync(path.join(ROOT, 'docs/eval.md'), 'utf8')).toContain('pnpm josh eval')
+	it('docs/maintainers/eval.md still documents running the suite by hand', () => {
+		expect(readFileSync(path.join(ROOT, 'docs/maintainers/eval.md'), 'utf8')).toContain(
+			'pnpm josh eval',
+		)
 	})
 })

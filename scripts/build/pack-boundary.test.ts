@@ -9,7 +9,7 @@ import { import_closure, SCRIPTS_DIR } from './import-closure-fixture'
 // The pack boundary (joshuafolkken/kit#1997): the published npm package and the `kit` plugin must
 // carry what a consumer runs — every distributed command's entry script and its static import
 // closure — and none of what only measures kit's own development: the report modules under `time/`
-// and `cost/`, the `eval` suite and `docs/eval.md`. The list is read from an
+// and `cost/`, the `eval` suite and `docs/maintainers/eval.md`. The list is read from an
 // actual `pnpm pack --dry-run`, so an exclusion pattern that stops matching is caught here rather
 // than shipping. `--config.ignore-scripts=true` skips the prepack build and its network range check;
 // neither changes which files the `files` field selects.
@@ -25,7 +25,7 @@ const EXCLUDED_PREFIXES = [
 	'scripts/dogfood/',
 	'evals/',
 ]
-const EXCLUDED_FILES = new Set(['docs/eval.md'])
+const EXCLUDED_FILES = new Set(['docs/maintainers/eval.md'])
 
 // Runtime entries a consumer reaches by file path rather than by a static import
 // (joshuafolkken/kit#2899): `init` writes `fix-gh-packages.ts` into the consumer's `prepare`, and the lane
@@ -43,14 +43,12 @@ const SHIPPED_UNREACHABLE = new Set([
 	'scripts/build/build-bin.ts',
 	'scripts/build/build-claude-md.ts',
 	'scripts/build/build-codex-hooks.ts',
+	'scripts/build/build-commands.ts',
 	'scripts/agent/codex-hooks.ts',
-	'scripts/build/build-config-merge.ts',
 	'scripts/build/build-hooks.ts',
 	'scripts/build/build-library.ts',
 	'scripts/build/hook-bundle-stamp.ts',
-	'scripts/build/build-managed-marker.ts',
-	'scripts/build/build-self-sync-guard.ts',
-	'scripts/build/build-version.ts',
+	'scripts/build/build.ts',
 	'scripts/managed-marker/index.ts',
 	'scripts/self-sync-guard/index.ts',
 	'scripts/version/index.ts',

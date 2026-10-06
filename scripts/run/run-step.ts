@@ -1,7 +1,7 @@
 import { git_stash } from '#scripts/git/stash/git-stash'
+import type { CarryRead } from '#scripts/run/carry/run-carry'
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
-import type { CarryRead } from './run-carry'
-import { run_event_stream } from './run-event-stream'
 import { run_retrospective } from './run-retrospective'
 
 // `josh run:step <N>` — the run's next single action, computed from three mechanical inputs and nothing

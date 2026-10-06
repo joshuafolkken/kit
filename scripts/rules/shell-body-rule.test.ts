@@ -28,7 +28,7 @@ const SUITE_PATH = 'scripts/rules/shell-body-rule.test.ts'
 // cases it has to keep. The marker list has to name it, or the split loses its coverage claim.
 const TRIGGER_SUITE = 'scripts/rules/shell-body-trigger.test.ts'
 // The one line in that list that had drifted from the suite it credits.
-const STDIN_CLAIM = '`-` が標準入力を読むこと'
+const STDIN_CLAIM = '`-` reads stdin'
 // Named once: the enumeration, the residency list and this suite have to agree on the command.
 const GUARD_COMMAND = 'pnpm josh rule:guard'
 // The single safe spelling the rule steers every caller toward — asserted in the delivered text and

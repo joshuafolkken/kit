@@ -29,7 +29,8 @@ function sync_with_merge(
 	console.info(`  ✔ synced    ${destination_name}`)
 }
 
-// Append-only, and deliberately so: a `_authToken` line in the consumer's file is left alone.
+// Removes only the exact settings lines earlier kit releases wrote, which pnpm 12 ignores in
+// `.npmrc` (joshuafolkken/kit#3267); every other line, a `_authToken` line included, is left alone.
 // Sync used to remove the env-var form, which broke every project that had opted its project
 // .npmrc in via `npmrcAuthFile` — there the line is the live credential, and the opt-in itself
 // can live in a deploy platform's dashboard where sync cannot see it (joshuafolkken/kit#759).

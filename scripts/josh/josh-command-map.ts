@@ -78,6 +78,8 @@ const ALIASES: Record<string, string> = {
 	rvf: 'review:findings',
 	ruv: 'rule:value',
 	ev: 'eval',
+	lsm: 'lane:sample',
+	lst: 'lane:stats',
 }
 
 // The canonical name of a `josh` subcommand: an alias expands, and anything else passes through

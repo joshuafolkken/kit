@@ -60,6 +60,17 @@ interface CommandEntry {
 	// listing carries only what a consumer can run (joshuafolkken/kit#1988). The audience in
 	// `reference` separately decides whether the command appears in the default listing.
 	is_kit_only?: boolean
+	// Pre-built to `dist/commands/` so a consumer's `dist/josh.js` imports it in its own process
+	// instead of spawning tsx for it (joshuafolkken/kit#3328, `docs/maintainers/runtime-bundling.md`).
+	is_bundled?: boolean
+	// The cores the command reserves from the machine-wide budget before it starts its heavy tools
+	// (joshuafolkken/kit#3345). `josh-logic.ts` claims them at the one dispatch point every command
+	// passes through, so the command only declares the number. A function means the weight is read
+	// when the command starts: the unit suite's share depends on what else is running at that moment.
+	// **The edit hook declares none, on purpose.** It formats one file per edit and finishes in well
+	// under a second, so a wait for room on the machine would stall every edit for the length of
+	// another lane's check.
+	core_weight?: number | (() => number)
 }
 
 // The name `josh gate` registers under. It lives here rather than in `verification-gate.ts` so a

@@ -7,29 +7,29 @@ import { direct_filing } from './direct-filing'
 import { early_heartbeat } from './early-heartbeat'
 import { file_body } from './file-body'
 import { filing_cap } from './filing-cap'
-import { gh_api } from './gh-api'
 import { git_force } from './git-force'
 import { implementation_cut } from './implementation-cut'
-import { issue_fold } from './issue-fold'
+import { issue_comments } from './issue-comments'
+import { issue_fold_rule } from './issue-fold-rule'
 import { josh_git_bare } from './josh-git-bare'
 import { lane_background } from './lane-background'
 import { lane_carry_conflict } from './lane-carry-conflict'
 import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
+import { lane_split_park } from './lane-split-park'
 import { lane_switch_main } from './lane-switch-main'
 import { oracle_consulted } from './oracle-consulted'
 import { permission_guards } from './permission-guards'
 import { piped_verification } from './piped-verification'
 import { poll_loop } from './poll-loop'
 import { pre_gate_cut } from './pre-gate-cut'
-import { prior_comment_read } from './prior-comment-read'
 import { raw_field_body } from './raw-field-body'
 import { rule_body_guard } from './rule-body-guard'
-import { run_tail } from './run-tail'
+import { run_tail_rule } from './run-tail-rule'
 import { shell_body_trigger } from './shell-body-trigger'
-import { shell_segments } from './shell-segments'
 import { test_declared_commit } from './test-declared-commit'
 import { third_party_write } from './third-party-write'
+import { wip_cap } from './wip-cap'
 import { worktree_guard } from './worktree-guard'
 
 // The enumeration of rules delivered at the moment they bind, rather than carried resident in
@@ -140,148 +140,11 @@ const STAMP_PREFIX = 'josh-rule-guard-'
 // function of it. `on_bash_command` went with it because those modules build their own rows.
 const { is_issue_filing, on_bash_command } = bash_triggers
 
-// The whole of the WIP cap, in the shape a refusal can carry: the count, the refusal, the two
-// exemptions and the three tests that decide the second one. The three tests are spelled out rather
-// than named, because a delivery that said only "an interrupt is exempt" would hand the deciding back
-// to judgement at exactly the moment nothing else is open to read (joshuafolkken/kit#1518).
-// `WIP_CAP` is the number's single source; `wip-cap.md` states it once and a test pins the two equal.
-const WIP_CAP = 30
-const WIP_CAP_REASON =
-	`⛔ backlog WIP cap: \`pnpm josh issue:file\` counts the target repository's open Issues before filing. With more than ${String(WIP_CAP)} ` +
-	'open, close one first; nothing honestly closable means do not file — the command holds such a filing. ' +
-	'Two filings are exempt and proceed while stating the overage — one the run is blocked by (`--over-cap`, ' +
-	'or the `tier-a` / `split` route), and an interrupt (`--route interrupt`), decided by three tests rather ' +
-	'than judgement: a verification answers wrongly, a documented workflow cannot complete, or data is lost ' +
-	'or written outside the repository. Meeting none of the three, the finding is discretionary and waits. ' +
-	'Both procedures are in `prompts/collaboration-workflow/wip-cap.md`. Reissue this call and let the ' +
-	'command count — it fires once per run and cannot repeat on the call in hand.'
-
-// **A shell line carries several commands, and the subcommand has to be the one being invoked.**
-// Each segment is judged on its own, anchored at its start, so `gh issue comment <N> -b "… gh issue
-// view <N> …"` is read as the write it is rather than as the read it quotes. The cut itself is
-// `shell-segments.ts`, shared with the triggers that need the same one.
-// Global flags may precede the subcommand (`gh --repo o/r issue view 1`), so they are skipped —
-// the same optional-flag prefix `gh-api.ts` skips in front of `api`, shared from there.
-const ISSUE_VIEW_COMMAND = new RegExp(String.raw`^gh\s+${gh_api.GH_FLAGS}issue\s+view\s`, 'u')
-// `…/issues/<N>` — **one** Issue's body. The number has to end the path, so the listing
-// (`…/issues`) and every sub-resource under it (`…/issues/1319/comments`) are left alone.
-const ISSUE_BODY_PATH = /repos\/[^\s'"]*\/issues\/\d+(?=$|["'\s])/u
-// **A write to that path is not a read of it**, which is why the body read below asks `gh_api.is_read`:
-// `gh api` sends POST as soon as any field flag appears, and `kickoff` PATCHes `…/issues/<N>` to
-// normalize a title and to fill a blank body — so without the read check the delivery would be spent
-// refusing a write, and the genuine body read later in the same run would never be guarded.
-// A segment that fetches comments: the flag, a `comments` field in a `--json` projection, or the
-// comments endpoint. The short `-c` is deliberately absent — it belongs to `wc`, `grep` and `sort`
-// far more often than to `gh`, and reading it as "comments included" silenced the rule on any line
-// that ended in a pipe. A run that types it pays one round trip instead.
-const FETCHES_COMMENTS = /--comments\b|--json\s[\w,]*\bcomments\b|\/comments\b/u
-const ISSUES_PATH = /repos\/[^\s'"]*\/issues\//u
-
-// A field projection — `--jq` for `gh api`, `--json` for `gh issue view` — whose value never names the
-// body. `gh api …/issues/<N> --jq '{state, labels}'` fetches the Issue only to read its state or its
-// labels, which is a state check and not the body read this rule guards (joshuafolkken/kit#1905); a
-// `--jq '.body'` still names the body and stays a body read. The value is taken quoted or bare, so the
-// comma list `--json state,labels` and the expression `'{state, labels}'` are read the same way.
-const FIELD_PROJECTION = /(?:--jq|--json)[= ]\s*('[^']*'|"[^"]*"|\S+)/u
-const NAMES_THE_BODY = /\bbody\b/u
-
-function projects_away_body(segment: string): boolean {
-	const projection = FIELD_PROJECTION.exec(segment)
-
-	return projection !== null && !NAMES_THE_BODY.test(projection[1] ?? '')
-}
-
-function is_body_read_segment(segment: string): boolean {
-	if (projects_away_body(segment)) return false
-
-	if (ISSUE_VIEW_COMMAND.test(segment)) return true
-
-	return gh_api.is_gh_api(segment) && ISSUE_BODY_PATH.test(segment) && gh_api.is_read(segment)
-}
-
-// **An Issue's comments, not just any comments.** Batching pushes a run to fetch the body and the
-// comments on one line, so the allowance has to reach across segments — but `gh pr view 42 --json
-// comments` says nothing about whether *this* Issue was read whole, so the segment doing the
-// fetching has to be an Issue read itself.
-function fetches_issue_comments(segment: string): boolean {
-	if (!FETCHES_COMMENTS.test(segment)) return false
-
-	return (
-		ISSUE_VIEW_COMMAND.test(segment) || (gh_api.is_gh_api(segment) && ISSUES_PATH.test(segment))
-	)
-}
-
-// **The trigger is the body read, not the start of implementation.** The moment an Issue's body
-// reaches a run is the moment the rule binds, and it is one shell call — the test
-// `prompts/collaboration-workflow/rule-delivery.md` sets for leaving residency.
-function is_body_only_issue_read(command: string): boolean {
-	const segments = shell_segments.segments_of(command)
-
-	if (segments.some((segment) => fetches_issue_comments(segment))) return false
-
-	return segments.some((segment) => is_body_read_segment(segment))
-}
-
-// **The refusal hands over the command that fixes it**, because reading is not the same as
-// obeying: a sentence saying "also read the comments" is prose of exactly the kind
-// joshuafolkken/kit#1344 measured as moving nothing, while a refused body read leaves the run
-// holding the reissue that makes the comments *present*. The conflict rule ships with it — a
-// delivery that said only "read them" would hand back the deciding at the moment nothing else is
-// open to read, the mistake joshuafolkken/kit#1518 corrected for the WIP cap.
-const ISSUE_COMMENTS_REASON =
-	"⛔ an Issue's comments are part of the Issue: read them before implementing, not only the body. " +
-	'A decision recorded after the body was written lives only in a comment — a corrected diagnosis ' +
-	'(joshuafolkken/kit#1537), a changed default and an added acceptance criterion ' +
-	'(joshuafolkken/kit#1520), a scope handed to another Issue (joshuafolkken/kit#1304) — and ' +
-	'nothing in the body says it was superseded, so a body-only reader builds the wrong thing and ' +
-	'sees no contradiction. Reissue this read with the comments included: ' +
-	"`gh api repos/{owner}/{repo}/issues/<N>/comments --jq '.[] | {user: .user.login, created_at, " +
-	"body}'` beside the body read, or `gh issue view <N> --comments` where GraphQL is reachable. " +
-	'Then the later text is the agreement in force — a comment supersedes the body it contradicts — ' +
-	"except for two answers that are not the run's to make: work a comment reassigns to another " +
-	'Issue is out of scope and is not implemented, and a comment saying the Issue no longer has a ' +
-	'reason to exist stops the run with a `confirmation` Telegram. The procedure is ' +
-	'`.claude/skills/workflow-commands/issue-comments.md`. ' +
-	'Every body-only read is refused until the comments are read.'
-
 // The reading of the call itself — which spellings carry a body inline, and what the shell does to
 // the value — is `shell-body-trigger.ts`, beside its own cases, as is the refusal text. A row states
 // its trigger and its text; a model of zsh quoting is more than a row.
 const { SHELL_BODY_REASON, carries_a_body, is_shell_evaluated_body, keeps_body_safe } =
 	shell_body_trigger
-
-// **Keeping the WIP cap is counting the open Issues**, which is the one act the rule asks for before
-// a filing.
-//
-// **It has to be Issues, open, and a listing — all three, in one segment.** A pattern that took any
-// of them alone scored `gh pr list --state open` and `epic:bundle`'s candidate search as the count,
-// and those inflate exactly the ratio the retirement decision reads. `gh issue list` alone is not
-// enough either: the cap is about *open* Issues, and a listing that does not say so is some other
-// question. Segment-wise like the comments predicate, so a spelling quoted inside a filing's body
-// is not read as the count that filing skipped.
-const ISSUE_LISTING = /^gh\s+(?:-{1,2}[\w-]+(?:[= ]\S+)?\s+)*issue\s+list\b/u
-const ISSUES_QUERY = /repos\/[^\s'"]*\/issues\?[^\s'"]*state=open/u
-const OPEN_STATE = /--state[= ]open|state=open/u
-// **A label filter makes it a different question.** `gh issue list --label epic --state open` and
-// `…/issues?labels=epic&state=open` ask which epics are open, which is what `epic:bundle` and the
-// Issue template do; counting either as the WIP count would credit the cap as kept by a run that
-// never counted the backlog. The residual the pattern cannot separate is named in
-// `docs/josh-commands.md`: the inventory command in the `diag` skill is byte-identical to a hand count
-// of the backlog, so no pattern can tell those two apart.
-const LABEL_FILTER = /--label\b|[?&]labels=/u
-
-function counts_open_issues(command: string): boolean {
-	return shell_segments.segments_of(command).some((segment) => {
-		if (LABEL_FILTER.test(segment)) return false
-
-		return (ISSUE_LISTING.test(segment) && OPEN_STATE.test(segment)) || ISSUES_QUERY.test(segment)
-	})
-}
-
-// **Keeping the comments rule is fetching them**, in any of the spellings the refusal hands back.
-function reads_issue_comments(command: string): boolean {
-	return shell_segments.segments_of(command).some((segment) => fetches_issue_comments(segment))
-}
 
 // **The occasion the pre-gate cut governs, in the one shape that separates a cut run's two halves**
 // (joshuafolkken/kit#1867). Asking about the cut is what a lane child does whatever it goes on to do;
@@ -302,12 +165,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// `epic:bundle` itself. It claims the direct call only, so the rows below — which trigger on the
 	// `issue:file` call — never overlap it.
 	direct_filing.ROW,
-	{
-		id: 'wip-cap',
-		is_trigger: on_bash_command(is_issue_filing),
-		reason: WIP_CAP_REASON,
-		keeps: on_bash_command(counts_open_issues),
-	},
+	wip_cap.ROW,
 	// **Two more rows share the filing trigger** (joshuafolkken/kit#2119, joshuafolkken/kit#2213), listed
 	// after `wip-cap` so the backlog count still speaks first: `filing-cap` refuses every filing past
 	// the per-run ceiling, and `issue-fold` refuses a *second* filing the run has not folded. Each is a
@@ -315,14 +173,8 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// delivery is still correct one reissue later — so an unfolded, over-cap second filing is delivered
 	// `wip-cap`, then `filing-cap`, then `issue-fold` across its reissues.
 	filing_cap.ROW,
-	issue_fold.ROW,
-	{
-		id: 'issue-comments',
-		is_trigger: on_bash_command(is_body_only_issue_read),
-		reason: ISSUE_COMMENTS_REASON,
-		already_satisfied: prior_comment_read.already_read_for_call,
-		keeps: on_bash_command(reads_issue_comments),
-	},
+	issue_fold_rule.ROW,
+	issue_comments.ROW,
 	{
 		id: 'shell-body',
 		is_trigger: on_bash_command(is_shell_evaluated_body),
@@ -377,11 +229,11 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// second inside one `fullrun` when round 2 fixes a finding in place.
 	{
 		id: 'run-tail',
-		is_trigger: run_tail.is_foreground_push_step,
-		reason: run_tail.RUN_TAIL_REASON,
-		decide: run_tail.decide,
-		keeps: run_tail.is_backgrounded_push_step,
-		reaches: run_tail.is_push_step_call,
+		is_trigger: run_tail_rule.is_foreground_push_step,
+		reason: run_tail_rule.RUN_TAIL_REASON,
+		decide: run_tail_rule.decide,
+		keeps: run_tail_rule.is_backgrounded_push_step,
+		reaches: run_tail_rule.is_push_step_call,
 	},
 	// **The one row whose trigger consults the world beside the command**, because "is this a lane that
 	// has not cut" is not readable from the call: it is the working directory's own name and the cut
@@ -424,22 +276,14 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// "is this a dispatched lane child" is the dispatch mark against this checkout's own issue, read
 	// synchronously by `lane_child_marker.is_child_of`, and the command match runs first so an ordinary
 	// run pays nothing for it.
+	// Its once-per-run disposition is stated beside the row in `lane-park.ts`.
 	//
-	// **Once per run rather than `decide`, and no `already_satisfied`.** The stop ends the turn, so it
-	// is not the recurring act joshuafolkken/kit#1570 wrote `decide` for. It carries no
-	// `already_satisfied` because the park it asks for is a GitHub label a synchronous guard cannot
-	// read, and the transcript-tail alternative would read a child that merely *read*
-	// `backlogrun-park.md` — whose prose carries the `labels[]=needs-decision` command — as compliant
-	// and fall silent on a real violation. `lane-park.ts` states why one wasted reissue on the compliant
-	// path is the safe direction. `keeps` reads an actual label-application `Bash` command, never the
-	// tail, so it is not fooled the same way; `reaches` stays `is_trigger`, since a compliant run issues
-	// the same confirmation notify and belongs in the denominator.
-	{
-		id: 'lane-park',
-		is_trigger: on_bash_command(lane_park.is_unparked_stop),
-		reason: lane_park.LANE_PARK_REASON,
-		keeps: on_bash_command(lane_park.records_the_park),
-	},
+	// **A split child's park is refused first** (joshuafolkken/kit#3296): a lane child that promoted its
+	// own Issue to an epic this run has nothing to park, so `lane-split-park` refuses the label write
+	// and the confirmation notify onto that epic on every occurrence. It shares the notify with
+	// `lane-park` and is listed first; a run that promoted nothing falls through to `lane-park`.
+	lane_split_park.ROW,
+	lane_park.ROW,
 	// **joshuafolkken/kit#2034's rule, one tool-call earlier** (joshuafolkken/kit#2201). `lane-park`
 	// fires on the `confirmation` notify a routed child reaches; a child that reaches for
 	// `AskUserQuestion` never gets there, because the harness ends its turn at the refused ask. This
@@ -782,8 +626,8 @@ const delivered_rules = {
 	DIRECT_FILING_REASON: direct_filing.DIRECT_FILING_REASON,
 	FILING_CAP_REASON: filing_cap.FILING_CAP_REASON,
 	GIT_FORCE_REASON: git_force.GIT_FORCE_REASON,
-	ISSUE_COMMENTS_REASON,
-	ISSUE_FOLD_REASON: issue_fold.ISSUE_FOLD_REASON,
+	ISSUE_COMMENTS_REASON: issue_comments.ISSUE_COMMENTS_REASON,
+	ISSUE_FOLD_REASON: issue_fold_rule.ISSUE_FOLD_REASON,
 	LANE_INTERACTIVE_ASK_REASON: lane_interactive_ask.LANE_INTERACTIVE_ASK_REASON,
 	LANE_PARK_REASON: lane_park.LANE_PARK_REASON,
 	MEASURED_RULES,
@@ -791,16 +635,16 @@ const delivered_rules = {
 	POLL_LOOP_REASON: poll_loop.POLL_LOOP_REASON,
 	PRE_GATE_CUT_REASON: pre_gate_cut.PRE_GATE_CUT_REASON,
 	RAW_FIELD_BODY_REASON: raw_field_body.RAW_FIELD_BODY_REASON,
-	RUN_TAIL_REASON: run_tail.RUN_TAIL_REASON,
+	RUN_TAIL_REASON: run_tail_rule.RUN_TAIL_REASON,
 	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,
 	THIRD_PARTY_WRITE_REASON: third_party_write.THIRD_PARTY_WRITE_REASON,
-	WIP_CAP,
-	WIP_CAP_REASON,
+	WIP_CAP: wip_cap.WIP_CAP,
+	WIP_CAP_REASON: wip_cap.WIP_CAP_REASON,
 	WORKTREE_MUTATION_REASON: worktree_guard.WORKTREE_MUTATION_REASON,
 	delivery,
 	delivery_path,
-	is_body_only_issue_read,
+	is_body_only_issue_read: issue_comments.is_body_only_issue_read,
 	is_enabled,
 	is_issue_filing,
 }

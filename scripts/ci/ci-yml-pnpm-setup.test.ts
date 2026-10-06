@@ -3,7 +3,9 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { package_path } from '#scripts/init/init-paths'
+import semver from 'semver'
 import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
 
 const ACTION = 'pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024'
@@ -11,7 +13,13 @@ const VERSION_INPUT = '${{ steps.pnpm-version.outputs.version }}'
 const RESOLVER_ID = 'pnpm-version'
 const E2E_JOB = 'e2e'
 const STATIC_CHECKS_JOB = 'static-checks'
-const NODE_26_JOB = 'node-26-pnpm'
+const NODE_COMPAT_JOB = 'node-compat'
+const NEWEST_NODE_MAJOR = 26
+const ENGINES_SCHEMA = z.looseObject({ engines: z.looseObject({ node: z.string() }) })
+const UTF8 = 'utf8'
+const PACKAGE_JSON = 'package.json'
+const NODE_COMPAT_RUNTIME = 'node@${{ matrix.node }}'
+const NODE_VERSION_STEP = 'Verify Node.js version'
 const PUBLISH_YML = '.github/workflows/publish.yml'
 const RUNTIME_WORKFLOWS_DIR = '.github/workflows'
 const PUBLISH_JOBS = ['publish-github', 'publish-npm', 'create-release']
@@ -22,12 +30,22 @@ const ACTION_STEPS = ci_yml_fixture.load_action(ci_yml_fixture.SETUP_PNPM_ACTION
 // The jobs that prepare pnpm, all through the composite action: kit's own workflows, and the
 // distributed template, which calls the action `josh sync` writes beside it (joshuafolkken/kit#3095).
 const ACTION_CALLERS = [
-	{ path: ci_yml_fixture.RUNTIME_CI_YML, jobs: [STATIC_CHECKS_JOB, 'unit', E2E_JOB, NODE_26_JOB] },
+	{
+		path: ci_yml_fixture.RUNTIME_CI_YML,
+		jobs: [STATIC_CHECKS_JOB, 'unit', E2E_JOB, NODE_COMPAT_JOB],
+	},
 	{ path: PUBLISH_YML, jobs: PUBLISH_JOBS },
 	{ path: '.github/workflows/pr-classification.yml', jobs: ['classification'] },
 	{ path: ci_yml_fixture.TEMPLATE_CI_YML, jobs: ['checks', E2E_JOB] },
 ]
 type Steps = ReadonlyArray<WorkflowStep>
+
+function engines_node_floor(): string | undefined {
+	const raw = readFileSync(package_path(PACKAGE_JSON), UTF8)
+	const manifest = ENGINES_SCHEMA.parse(JSON.parse(raw))
+
+	return semver.minVersion(manifest.engines.node)?.version
+}
 
 function required_steps(workflow_path: string, job_name: string): Steps {
 	const steps = ci_yml_fixture.find_job(workflow_path, job_name)?.steps
@@ -48,7 +66,7 @@ function run_resolver(steps: Steps, manifest: unknown): string {
 	const script = steps.find((step) => step.id === RESOLVER_ID)?.run ?? ''
 
 	try {
-		writeFileSync(path.join(directory, 'package.json'), JSON.stringify(manifest))
+		writeFileSync(path.join(directory, PACKAGE_JSON), JSON.stringify(manifest))
 		const result = spawnSync('bash', ['-e', '-c', script], {
 			cwd: directory,
 			encoding: 'utf8',
@@ -175,23 +193,43 @@ it('uses the latest pnpm when no version is declared', () => {
 	expect(run_resolver(ACTION_STEPS, { name: 'consumer' })).toBe('version=latest\n')
 })
 
-describe('Node 26 smoke job', () => {
-	it('installs pnpm and runs it with Node 26', () => {
-		const steps = required_steps(ci_yml_fixture.RUNTIME_CI_YML, NODE_26_JOB)
+describe('Node compatibility job', () => {
+	it('runs on the exact engines floor and the newest supported Node', () => {
+		const strategy = ci_yml_fixture.find_job(
+			ci_yml_fixture.RUNTIME_CI_YML,
+			NODE_COMPAT_JOB,
+		)?.strategy
+
+		expect(strategy).toMatchObject({
+			'fail-fast': false,
+			matrix: { node: [engines_node_floor(), NEWEST_NODE_MAJOR] },
+		})
+	})
+
+	it('installs on the matrix runtime through the composite action', () => {
 		const setup = ACTION_STEPS.find((step) => step.uses === ACTION)
 
-		expect(action_call(ci_yml_fixture.RUNTIME_CI_YML, NODE_26_JOB)?.with).toEqual({
-			runtime: 'node@26',
-			install: 'false',
+		expect(action_call(ci_yml_fixture.RUNTIME_CI_YML, NODE_COMPAT_JOB)?.with).toEqual({
+			runtime: NODE_COMPAT_RUNTIME,
 		})
 		expect(setup?.with?.['runtime']).toBe('${{ inputs.runtime }}')
-		expect(steps.at(-1)?.run).toContain('pnpm --version')
+	})
+
+	it('checks the runtime, builds, then starts the bundled CLI', () => {
+		const steps = required_steps(ci_yml_fixture.RUNTIME_CI_YML, NODE_COMPAT_JOB)
+		const runs = steps.map((step) => step.run).filter((run) => run !== undefined)
+
+		expect(runs.slice(1)).toEqual(['pnpm build', 'node dist/josh.js help'])
+		const version_step = steps.find((step) => step.name === NODE_VERSION_STEP)
+
+		expect(version_step?.env).toEqual({ NODE_VERSION: '${{ matrix.node }}' })
+		expect(version_step?.run).toContain('tee /dev/stderr | grep -qE "^v${NODE_VERSION}(\\.|$)"')
 	})
 })
 
 describe('pnpm update documentation', () => {
 	it('describes self-update without a Corepack installation instruction', () => {
-		const commands = readFileSync(package_path('docs/josh-commands-automation.md'), 'utf8')
+		const commands = readFileSync(package_path('docs/josh-commands.md'), 'utf8')
 		const troubleshooting = readFileSync(package_path('docs/troubleshooting.md'), 'utf8')
 
 		expect(commands).toContain('pnpm self-update')

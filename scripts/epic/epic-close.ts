@@ -1,10 +1,10 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { epic_child_schema, epic_issue_schema, type EpicChildData } from '#scripts/git/git-schemas'
 import { cutoff_cause, cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import {
 	parse_json_array_or_undefined,
 	parse_json_object_safe,
 } from '#scripts/git/parse-json-array'
-import { epic_child_schema, epic_issue_schema, type EpicChildData } from '#scripts/git/schemas'
 import { EPIC_LABEL } from '#scripts/issue/issue-labels'
 import { error_text } from '#scripts/lib/error-message'
 import { epic_close_comment } from './epic-close-comment'

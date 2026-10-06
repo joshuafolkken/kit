@@ -50,7 +50,7 @@ run in lanes".
    lane — and in the same turn start `pnpm josh lane:await <N...> --owner "$PPID"` in the background** (joshuafolkken/kit#2113).
    `lane:await` watches local process presence and exits when any named child confirms-complete. **The
    re-confirm delay and poll interval are the command's, not the agent's** — pass only the issue
-   numbers and `--owner` (why: `docs/josh-commands-automation.md` → `josh lane:await`). Without that wake (Codex), hand off instead — "A parent without a completion callback".
+   numbers and `--owner` (why: `docs/josh-commands-run.md` → `josh lane:await`). Without that wake (Codex), hand off instead — "A parent without a completion callback".
 
    **A `lane:await` wake is a confirmed-gone process, so classify the ending at once — do not wait out
    the silent-unit window** (joshuafolkken/kit#2277). On a `lane:await` wake go straight to `pnpm josh run:merge <N> --output <path>` — the composite reads the child's **exit
@@ -94,7 +94,8 @@ run in lanes".
    **not** parked and **not** counted against the consecutive-failure guard, and stays re-dispatchable
    (joshuafolkken/kit#2240); a **failed** child (OPEN, neither label, not an outage) has its stale
    `in-progress` dropped, is parked with `needs-decision`, and is counted against the consecutive-failure
-   guard.
+   guard. The label stays only once its reason passes `backlogrun-park.md` → "Only a person's judgement
+   carries `needs-decision`".
 
    **Beyond the offer `epic:next` prints** (`run` becomes numbers; `wait` / `stop` / `complete` /
    `error` pass through), the composite adds six verdict tokens: `over` — the merge crossed the budget,
@@ -255,6 +256,10 @@ lane needs when its child has to be finished by hand.
 
 **Restart the progress watcher by name** — `pnpm josh run:progress --wait --output <handed-over paths>`
 in the background, in the same turn as that first `lane:list`. The wired `run:watcher:guard` stops a resume that skips this (joshuafolkken/kit#2353).
+
+**A session woken by the driver's hand-off does neither**: with `Driver
+result:` in its prompt, the `run:wake` driver watches the lanes, so it acts on its branch and cuts as
+its `Next:` line says. The watcher guard and the headless stop rule stand aside for it.
 
 ### A carried-over merge does not stand in front of the next lane
 

@@ -1,6 +1,6 @@
 import { lane_registry } from '#scripts/lane/lane-registry'
+import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
 import { run_headless } from './run-headless'
-import { run_progress_clock } from './run-progress-clock'
 
 // A watcher that stopped while children are still in-flight leaves the run's event stream without a
 // heartbeat and the parent without the wake an arrival would deliver. This guard detects that state so
@@ -37,9 +37,11 @@ const OK_RESULT: GuardResult = { kind: 'ok' }
 // **Only the run that opened the lanes owes them a watcher** (joshuafolkken/kit#2965). The lane listing
 // is machine-wide, so a session with no run of its own — an investigation, a `fullrun` beside a batch —
 // used to be refused for another run's lanes. The session that drives the live `backlogrun` carry
-// record is the one that dispatched them; every other session passes.
+// record is the one that dispatched them; every other session passes. A session `run:wake` woke owes
+// none either (joshuafolkken/kit#3245): the supervisor's driver watches the lanes, and the woken session
+// only acts on the branch it was handed and cuts.
 async function owes_watcher(): Promise<boolean> {
-	if (!(await run_headless.is_backlog_parent())) return false
+	if (run_headless.is_headless() || !(await run_headless.is_backlog_parent())) return false
 
 	return await lane_registry.has_lanes_in_flight()
 }

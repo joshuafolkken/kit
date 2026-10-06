@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { session_language_cli } from './session-language-cli'
 
-const { ENV_KEY, DEFAULT_SESSION_LANG, SCOPE_NOTE, resolve_session_lang, format_line } =
-	session_language_cli
+const { ENV_KEY, DEFAULT_SESSION_LANG, resolve_session_lang, format_line } = session_language_cli
 
 const DEFAULT_RESULT = { lang: DEFAULT_SESSION_LANG, is_default: true }
 
@@ -39,20 +38,13 @@ describe('resolve_session_lang', () => {
 })
 
 describe('format_line', () => {
-	it('states the language and scope note without a default marker when set', () => {
-		const line = format_line({ lang: 'en', is_default: false })
-
-		expect(line).toContain(`${ENV_KEY}): en —`)
-		expect(line).toContain(SCOPE_NOTE)
-		expect(line).not.toContain('default')
+	it('states only the language, with no default marker, when set', () => {
+		expect(format_line({ lang: 'en', is_default: false })).toBe(`Session language (${ENV_KEY}): en`)
 	})
 
-	it('marks the ja default and names the English opt-in when unset', () => {
-		const line = format_line({ lang: DEFAULT_SESSION_LANG, is_default: true })
-
-		expect(line).toContain(
-			`${ENV_KEY}): ${DEFAULT_SESSION_LANG} (default; set ${ENV_KEY}=en for English)`,
+	it('marks the ja default and names the English opt-in, with no scope note, when unset', () => {
+		expect(format_line({ lang: DEFAULT_SESSION_LANG, is_default: true })).toBe(
+			`Session language (${ENV_KEY}): ${DEFAULT_SESSION_LANG} (default; set ${ENV_KEY}=en for English)`,
 		)
-		expect(line).toContain(SCOPE_NOTE)
 	})
 })

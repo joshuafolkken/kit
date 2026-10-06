@@ -1,4 +1,4 @@
-import { epic_cli_argv, ISSUE_NUMBER_PATTERN } from './epic-cli-argv'
+import { epic_cli_argv, ISSUE_NUMBER_PATTERN, type EpicArgv, type FormFlags } from './epic-cli-argv'
 
 // `josh epic --remove <E> <M> <N> …`'s argument rules (joshuafolkken/kit#1712).
 //
@@ -10,8 +10,7 @@ const REMOVE_FLAG = '--remove'
 const DECISION_FLAG = '--decision-file'
 // `--remove` takes no positioning flag: there is nothing for a removal to be relative to, and the
 // path itself says which orders go.
-const REMOVE_VALUE_FLAGS: ReadonlySet<string> = new Set([DECISION_FLAG])
-const REMOVE_KNOWN_FLAGS: ReadonlySet<string> = new Set([REMOVE_FLAG, DECISION_FLAG])
+const REMOVE_FORM: FormFlags = { switches: [REMOVE_FLAG], value_flags: [DECISION_FLAG] }
 // The shortest path that names an order at all: `<M> <N>`.
 const MINIMUM_PATH_LENGTH = 2
 
@@ -36,30 +35,23 @@ function to_path_numbers(raw_path: ReadonlyArray<string>): Array<number> | undef
 	return raw_path.length < MINIMUM_PATH_LENGTH ? undefined : raw_path.map(Number)
 }
 
-// A flag that makes the whole invocation unreadable, whatever the positional arguments say.
-function has_flag_refusal(argv: ReadonlyArray<string>): boolean {
-	return (
-		epic_cli_argv.has_unknown_flag(argv, REMOVE_KNOWN_FLAGS) ||
-		epic_cli_argv.is_value_unusable(argv, DECISION_FLAG)
-	)
-}
-
-function read_subject(
-	argv: ReadonlyArray<string>,
-): { epic_number: number; path: Array<number> } | undefined {
-	const [raw_epic, ...raw_path] = epic_cli_argv.to_positional_arguments(argv, REMOVE_VALUE_FLAGS)
+function read_subject(parsed: EpicArgv): { epic_number: number; path: Array<number> } | undefined {
+	const [raw_epic, ...raw_path] = parsed.positionals
 	if (raw_epic === undefined || !ISSUE_NUMBER_PATTERN.test(raw_epic)) return undefined
 	const path = to_path_numbers(raw_path)
 
 	return path === undefined ? undefined : { epic_number: Number(raw_epic), path }
 }
 
+// An unknown flag, or a `--decision-file` a shell ate, makes the whole invocation unreadable whatever
+// the positional arguments say.
 function parse_remove_arguments(argv: ReadonlyArray<string>): RemoveArguments | undefined {
-	if (has_flag_refusal(argv)) return undefined
-	const subject = read_subject(argv)
-	if (subject === undefined) return undefined
+	if (epic_cli_argv.is_value_unusable(argv, DECISION_FLAG)) return undefined
+	const parsed = epic_cli_argv.read_form(argv, REMOVE_FORM)
+	const subject = parsed === undefined ? undefined : read_subject(parsed)
+	if (parsed === undefined || subject === undefined) return undefined
 
-	return { ...subject, decision_path: epic_cli_argv.read_flag_value(argv, DECISION_FLAG) }
+	return { ...subject, decision_path: epic_cli_argv.read_flag_value(parsed, DECISION_FLAG) }
 }
 
 const epic_cli_remove = {

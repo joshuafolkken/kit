@@ -8,7 +8,7 @@ import {
 import { create_version_command_config } from './version-command-config'
 
 // The release-age window binds *unpinned* resolution only. Measured on pnpm 11.22.0 with
-// `minimum-release-age=1440` against a release published 3.5 h earlier:
+// `minimumReleaseAge: 1440` against a release published 3.5 h earlier:
 //
 //   pnpm add pkg@1.80.0  ->  1.80.0   (pnpm records a `minimumReleaseAgeExclude` entry)
 //   pnpm add pkg         ->  1.78.0
@@ -125,7 +125,9 @@ describe('release-age hold degrades to the previous report', () => {
 describe('the upgrade hint is never suppressed by a hold', () => {
 	it('prints the hint for a held upstream install', () => {
 		expect(
-			version_check_logic.build_effective_upgrade_commands(upstream_report(INSTALLABLE, HOLD)),
+			version_check_logic
+				.build_effective_upgrade_commands(upstream_report(INSTALLABLE, HOLD))
+				.map(({ text }) => text),
 		).toStrictEqual([UPGRADE_COMMAND])
 	})
 

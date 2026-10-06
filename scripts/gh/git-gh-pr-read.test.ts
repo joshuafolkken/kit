@@ -166,10 +166,6 @@ describe.each([
 	it('reports pr_get_body as undefined', async () => {
 		await expect(git_gh_pr_read.pr_get_body(PR_BRANCH)).resolves.toBeUndefined()
 	})
-
-	it('reports pr_view as the empty string its readers check the length of', async () => {
-		await expect(git_gh_pr_read.pr_view(PR_BRANCH)).resolves.toBe('')
-	})
 })
 
 // **`pr_exists` is the one reader that does not fold**, because `git-pr.ts` acts on `false` by
@@ -254,10 +250,10 @@ describe('the reads keyed by the resolved number', () => {
 		)
 	})
 
-	it('reports pr_view as the empty string when the detail read fails', async () => {
+	it('throws from pr_view when the detail read fails', async () => {
 		stub({ [pr_lookup_path()]: rest_pull_page([{}]) })
 
-		await expect(git_gh_pr_read.pr_view(PR_BRANCH)).resolves.toBe('')
+		await expect(git_gh_pr_read.pr_view(PR_BRANCH)).rejects.toThrow(UNREADABLE_PULL_REQUEST_MESSAGE)
 	})
 })
 

@@ -5,10 +5,10 @@ import { latest_corepack } from './latest-corepack'
 import {
 	AGED_PUBLISH,
 	fake_sync_result,
-	NPMRC_AGE_1440,
-	NPMRC_PATH,
 	PACKAGE_JSON_PATH,
 	QUARANTINED_PUBLISH,
+	WORKSPACE_AGE_1440,
+	WORKSPACE_PATH,
 } from './latest-corepack-fixture'
 import { build_package_manager_manifest } from './package-manager-manifest-fixture'
 
@@ -34,11 +34,11 @@ const PACKAGE_JSON_REPAIRED = build_package_manager_manifest(`pnpm@${PINNED_PIN}
 const REPAIR_CALL = [PACKAGE_JSON_PATH, PACKAGE_JSON_REPAIRED]
 
 // main reads package.json twice (once up front, once inside the alignment) with the
-// `.npmrc` quarantine window in between; no bump happens in any case below, so the
+// `pnpm-workspace.yaml` quarantine window in between; no bump happens in any case below, so the
 // manifest content stays the same across both reads.
 function arrange_reads(package_json_content: string): void {
 	mocked_read_file_sync.mockImplementation((path: unknown) =>
-		path === NPMRC_PATH ? NPMRC_AGE_1440 : package_json_content,
+		path === WORKSPACE_PATH ? WORKSPACE_AGE_1440 : package_json_content,
 	)
 }
 

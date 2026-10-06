@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { run_carry } from '#scripts/run/run-carry'
+import { run_carry } from '#scripts/run/carry/run-carry'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { backlog_drive_owner } from './backlog-drive-owner'
 

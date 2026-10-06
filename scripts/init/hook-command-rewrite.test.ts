@@ -219,14 +219,14 @@ describe('the distributed settings.json a consumer receives', () => {
 		}
 	})
 
-	it('invokes every josh subcommand through the node bundle', () => {
-		const josh_hooks = consumer_hook_commands().filter((command) => command.includes('josh.js'))
+	// The session-start provisioner was the last hook calling the josh dispatcher directly; it moved to
+	// the shared launcher (joshuafolkken/kit#3256), so every kit hook now pays only a bundle start.
+	it('runs no hook through the josh dispatcher', () => {
+		const josh_hooks = consumer_hook_commands().filter((command) =>
+			command.includes(CONSUMER_JOSH_COMMAND),
+		)
 
-		expect(josh_hooks.length).toBeGreaterThan(0)
-
-		for (const command of josh_hooks) {
-			expect(command).toContain(`${CONSUMER_JOSH_COMMAND} `)
-		}
+		expect(josh_hooks).toEqual([])
 	})
 
 	it('starts every installed hook command from the project root', () => {

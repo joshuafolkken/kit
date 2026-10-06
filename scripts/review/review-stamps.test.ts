@@ -101,7 +101,10 @@ describe('review_stamps — the three records are kept apart', () => {
 
 describe('the record round trip', () => {
 	const directory = use_temporary_directory('josh-gate-stamp-test-')
-	const target = (): string => path.join(directory(), STAMP_FILE)
+
+	function target(): string {
+		return path.join(directory(), STAMP_FILE)
+	}
 
 	it('reads back the tree it wrote, with a timestamp', () => {
 		const files = { [FILE_A]: DIGEST }
@@ -166,7 +169,10 @@ describe('the record round trip — the completion field', () => {
 
 describe('verification_gate.record_green_gate — withholds the record rather than lying', () => {
 	const directory = use_temporary_directory('josh-gate-withhold-')
-	const target = (): string => path.join(directory(), STAMP_FILE)
+
+	function target(): string {
+		return path.join(directory(), STAMP_FILE)
+	}
 
 	// The gate keeps a skip visible on the console for exactly this reason: a run that executed zero
 	// unit tests is not a run whose unit tests passed, and the brief would tell a review agent not to
@@ -202,7 +208,10 @@ const MARKER_FILES = { [FILE_A]: DIGEST }
 
 describe('verification_gate — the in-flight marker lasts exactly as long as the checks', () => {
 	const directory = use_temporary_directory('josh-gate-inflight-')
-	const target = (): string => path.join(directory(), STAMP_FILE)
+
+	function target(): string {
+		return path.join(directory(), STAMP_FILE)
+	}
 
 	it('records the tree the checks are reading', () => {
 		verification_gate.mark_gate_running(MARKER_FILES, target())
@@ -264,7 +273,11 @@ describe('verification_gate — marking and clearing never reach the verdict', (
 // going to produce, which is the one state this record must never describe.
 describe('verification_gate.with_gate_marker — clears on every exit', () => {
 	const directory = use_temporary_directory('josh-gate-finally-')
-	const target = (): string => path.join(directory(), STAMP_FILE)
+
+	function target(): string {
+		return path.join(directory(), STAMP_FILE)
+	}
+
 	const files = { [FILE_A]: DIGEST }
 
 	it('holds the marker while the work runs, and not after', async () => {

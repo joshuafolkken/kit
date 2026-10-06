@@ -72,9 +72,7 @@ function workflow_job_names(content: string): Array<string> {
 	const parsed = workflow_schema.safeParse(parse_yaml_safe(content))
 	if (!parsed.success) return []
 
-	return Object.values(parsed.data.jobs).flatMap((job) =>
-		job.name === undefined ? [] : [job.name],
-	)
+	return Object.values(parsed.data.jobs).flatMap((job) => job.name ?? [])
 }
 
 // The checks this repository should require: only those a workflow it has actually reports. A file

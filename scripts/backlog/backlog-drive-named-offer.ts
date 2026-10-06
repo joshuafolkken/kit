@@ -1,8 +1,8 @@
 import { EPIC_LABEL, has_label_name, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
-import type { RunCarry } from '#scripts/run/run-carry'
-import type { MergeResult } from '#scripts/run/run-merge-cli'
+import type { RunCarry } from '#scripts/run/carry/run-carry'
+import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { backlog_budget } from './backlog-budget'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_named } from './backlog-drive-named'
@@ -58,9 +58,7 @@ function settled_outcome(state: IssueState): MergeResult['outcome'] | undefined 
 async function classify(issue: string, named: OfferRead, owner: string): Promise<OfferRead> {
 	const result = await issue_state_cli.read_issue(issue)
 
-	if (result.kind !== 'state') {
-		return { verdict: 'issue-state', issues: [], retries: NO_RETRIES }
-	}
+	if (result.kind !== 'state') return { verdict: 'issue-state', issues: [], retries: NO_RETRIES }
 
 	const outcome = settled_outcome(result.state)
 

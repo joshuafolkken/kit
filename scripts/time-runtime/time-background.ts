@@ -49,7 +49,11 @@ const NO_FINISH = 0
 
 // The launch's own result body, which is the only place the harness writes the id it assigns. Read
 // as a derived fact and the body discarded, exactly as `has_failure_line` and `followup_stages` are.
-const LAUNCH_PATTERN = /running in background with ID:\s*([\w-]+)/iu
+// **A foreground call that outran its timeout is a launch too** (joshuafolkken/kit#3304): the harness
+// moves it to the background and says so as `moved to the background (ID: <id>)`. Missing that spelling
+// let the #3273 lane child end its turn on a running task the stop hook never saw.
+const LAUNCH_PATTERN =
+	/(?:running in background with ID:|moved to the background \(ID:)\s*([\w-]+)/iu
 // A backgrounded subagent's launch result, which names its id on an `agentId:` line of its own.
 const AGENT_LAUNCH_PATTERN = /^Async agent launched[\s\S]*?\bagentId:\s*([\w-]+)/u
 // The notice the harness writes when a task it took into the background ends

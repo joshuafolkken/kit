@@ -68,7 +68,7 @@
 
 ### 変更対象はまとめて読んでから編集する（joshuafolkken/kit#2202）
 
-**「変更とテスト」が変更対象ファイルを列挙した直後、それらを 1 回の `pnpm josh read:files <path> [<path> ...]` で読み、続く独立した編集は 1 回の `pnpm josh edit:files -` で送る**（形式は `docs/josh-commands-automation.md` →「`josh edit:files`」）。**個別の `Edit` に戻すのは**、前の編集結果に依存する編集（`dependent` で拒否される）、編集が 1 件だけのとき、ファイル全体を書くとき（`Write`）の 3 つ。根拠は [`turn-batching.md`](turn-batching.md) →「実装中の独立編集に効く合成コマンド」。
+**「変更とテスト」が変更対象ファイルを列挙した直後、それらを 1 回の `pnpm josh read:files <path> [<path> ...]` で読み、続く独立した編集は 1 回の `pnpm josh edit:files -` で送る**（形式は `docs/josh-commands-run.md` →「`josh edit:files`」）。**個別の `Edit` に戻すのは**、前の編集結果に依存する編集（`dependent` で拒否される）、編集が 1 件だけのとき、ファイル全体を書くとき（`Write`）の 3 つ。根拠は [`turn-batching.md`](turn-batching.md) →「実装中の独立編集に効く合成コマンド」。
 
 ### 完了報告（セッション向け）
 

@@ -42,7 +42,7 @@ PY
 
 **レビュー指摘の修正がこの規則の主戦場である。** 「この行の条件が逆」「この定数を切り出す」といった局所的な指摘ほど、部分編集は小さくなる。一方で全文書き直しのコストはファイルの大きさで決まり、指摘の小ささでは下がらない。**指摘が局所的であるほど、全文書き直しとの差は開く。**
 
-実測では 1 ランで約 2 分 45 秒が、すでに存在する行を打ち直すことに使われていた（joshuafolkken/kit#1260）。内訳は `docs/maintainers/file-edits-rationale.md` → "全文書き直しの実測"。
+実測では 1 ランで約 2 分 45 秒が、すでに存在する行を打ち直すことに使われていた（joshuafolkken/kit#1260）。内訳は `docs/maintainers/file-edits-rationale.md` → "Measured cost of whole-file rewrites"。
 
 ### `sed -i` を使う前に満たす 4 条件
 
@@ -67,12 +67,12 @@ PY
 
 ### なぜコストが二重になるか
 
-インタプリタで書き戻す形は、編集後の本文が**コマンド本文とファイルの両方**に載る。さらに悪いのは持続性である。**コマンド本文は、書いた時点以降のすべてのリクエストで読み直される。** ランの序盤に書いた編集スクリプトほど、そのランの残り全リクエストぶん課金され続ける。ファイル側は次に読んだときだけ載るのに対し、コマンド側は消えない。実測の内訳は `docs/maintainers/file-edits-rationale.md` → "コマンド本文の実測内訳"。
+インタプリタで書き戻す形は、編集後の本文が**コマンド本文とファイルの両方**に載る。さらに悪いのは持続性である。**コマンド本文は、書いた時点以降のすべてのリクエストで読み直される。** ランの序盤に書いた編集スクリプトほど、そのランの残り全リクエストぶん課金され続ける。ファイル側は次に読んだときだけ載るのに対し、コマンド側は消えない。実測の内訳は `docs/maintainers/file-edits-rationale.md` → "Measured breakdown of command text"。
 
 ### なぜ resident に置くか
 
-根拠は `docs/maintainers/file-edits-rationale.md` → "なぜ resident に置くか"。
+根拠は `docs/maintainers/file-edits-rationale.md` → "Why it is resident"。
 
 ### マーカーテスト
 
-固定している内容は `docs/maintainers/file-edits-rationale.md` → "マーカーテスト"。
+固定している内容は `docs/maintainers/file-edits-rationale.md` → "Marker tests"。

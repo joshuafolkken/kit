@@ -71,7 +71,7 @@ function sync_workspace_yaml(
 	destination_path: string,
 	is_force = false,
 ): boolean {
-	const template = readFileSync(template_path, 'utf8')
+	const template = init_ai_copy.read_workspace_template(template_path, destination_path)
 	const existing = is_force ? '' : file_reader.read_file_or_empty(destination_path)
 	const merged = init_logic.merge_workspace_yaml(existing, template)
 

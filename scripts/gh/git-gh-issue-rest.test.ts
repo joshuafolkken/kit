@@ -3,7 +3,7 @@ import {
 	blocking_issue_schema,
 	epic_child_schema,
 	epic_subject_schema,
-} from '#scripts/git/schemas'
+} from '#scripts/git/git-schemas'
 import { describe, expect, it } from 'vitest'
 import { git_gh_issue_rest } from './git-gh-issue-rest'
 import {
@@ -297,7 +297,7 @@ describe('repo_of_url', () => {
 	})
 
 	it('answers nothing for an absent field, so the caller falls back to its own repository', () => {
-		expect(git_gh_issue_rest.repo_of_url(undefined)).toBeUndefined()
+		expect(git_gh_issue_rest.repo_of_url()).toBeUndefined()
 	})
 
 	it('answers nothing for a url that is not a repository', () => {

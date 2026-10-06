@@ -56,13 +56,12 @@ const CHAIN_RULE = '.claude/skills/workflow-commands/chain-rule.md'
 const BEFORE_FIX: Record<string, string> = { [GATE_SOURCE]: 'digest-one' }
 const AFTER_FIX: Record<string, string> = { [GATE_SOURCE]: 'digest-two' }
 
-const RECORDS = gate_test_fixture.suite_records('child-bump-removed')
 const {
 	clear: clear_records,
 	log_path: LOG_PATH,
 	marker_path: MARKER_PATH,
 	stamp_path: STAMP_PATH,
-} = RECORDS
+} = gate_test_fixture.suite_records('child-bump-removed')
 
 beforeEach(() => {
 	vi.clearAllMocks()

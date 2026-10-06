@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
+import { agent_headless } from '#scripts/agent/agent-headless'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
@@ -13,11 +14,11 @@ import { lane_background } from '#scripts/rules/lane-background'
 import { lane_park } from '#scripts/rules/lane-park'
 import { last_prompt } from '#scripts/rules/last-prompt'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
-import { run_carry } from '#scripts/run/run-carry'
-import { run_cut } from '#scripts/run/run-cut'
+import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_cut } from '#scripts/run/cut/run-cut'
+import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
 import { run_headless } from '#scripts/run/run-headless'
-import { run_hold } from '#scripts/run/run-hold'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
@@ -87,6 +88,7 @@ async function build_context(
 		agent_pending: lane_background.pending_agent_ids(tail).length > 0,
 		handed_off: lane_handoff.is_handed_off(process.cwd()),
 		session_lang: session_lang(),
+		headless_agent: agent_headless.is_headless(),
 	}
 }
 

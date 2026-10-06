@@ -10,8 +10,20 @@ const MANIFEST = JSON.parse(readFileSync(new URL('../package.json', import.meta.
 	peerDependenciesMeta: Record<string, { optional?: boolean }>
 }
 
+// The exported config names every plugin by package, so a plugin given as an object or a URL is a
+// regression in the config itself rather than something the peer checks below could skip.
+function plugin_packages(): Array<string> {
+	return (config.plugins ?? []).map((plugin) => {
+		if (typeof plugin !== 'string') {
+			throw new TypeError('Expected every Prettier plugin to be a package name')
+		}
+
+		return plugin
+	})
+}
+
 // Every package the exported config loads by name, plus Prettier itself.
-const LOADED_PACKAGES = ['prettier', ...config.plugins]
+const LOADED_PACKAGES = ['prettier', ...plugin_packages()]
 
 // prettier-plugin-svelte v4 removed these options; keeping them triggers
 // "Ignored unknown option { ... }" warnings on every .svelte file.
@@ -23,7 +35,7 @@ const REQUIRED_SVELTE_OPTIONS = ['svelteIndentScriptAndStyle', 'svelteSortOrder'
 function find_svelte_override(): Options {
 	const override = config.overrides?.find((entry) => entry.files === '*.svelte')
 
-	if (!override) throw new Error('Expected a *.svelte override in the Prettier config')
+	if (!override?.options) throw new Error('Expected a *.svelte override in the Prettier config')
 
 	return override.options
 }
@@ -40,7 +52,7 @@ describe('shared Prettier config — *.svelte override', () => {
 	it('keeps the svelte options still supported in v4', () => {
 		const options = find_svelte_override() as Record<string, unknown>
 
-		expect(options.parser).toBe('svelte')
+		expect(options['parser']).toBe('svelte')
 
 		for (const required of REQUIRED_SVELTE_OPTIONS) {
 			expect(options).toHaveProperty(required)

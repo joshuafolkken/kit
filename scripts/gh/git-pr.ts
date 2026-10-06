@@ -1,6 +1,6 @@
 import { pr_classification, type ReleaseClassification } from '#scripts/ci/pr-classification'
 import type { IssueInfo } from '#scripts/git/git-issue'
-import { pr_info_schema } from '#scripts/git/schemas'
+import { pr_info_schema } from '#scripts/git/git-schemas'
 import { animation_helpers, type AnimationOptions } from '#scripts/lib/animation-helpers'
 import { git_gh_command } from './git-gh-command'
 import { git_pr_error } from './git-pr-error'
@@ -98,18 +98,14 @@ function parse_pr_state(pr_info_json: string): string | undefined {
 	}
 }
 
-async function get_pr_state_safe(branch_name: string): Promise<string | undefined> {
-	try {
-		const pr_info_json = await git_gh_command.pr_view(branch_name)
+// A read that failed throws rather than answering `undefined`: "no state" is read as "not merged",
+// which would write onto a pull request that already merged (joshuafolkken/kit#3263).
+async function get_pr_state(branch_name: string): Promise<string | undefined> {
+	const pr_info_json = await git_gh_command.pr_view(branch_name)
 
-		if (pr_info_json.length === 0) {
-			return undefined
-		}
+	if (pr_info_json.length === 0) return undefined
 
-		return parse_pr_state(pr_info_json)
-	} catch {
-		return undefined
-	}
+	return parse_pr_state(pr_info_json)
 }
 
 function is_pr_state_merged(pr_state: string | undefined): boolean {
@@ -137,7 +133,7 @@ async function handle_existing_pr(
 	branch_name: string,
 	options: { label: ReleaseClassification; should_replace_body: boolean },
 ): Promise<void> {
-	const pr_state_result = await get_pr_state_safe(branch_name)
+	const pr_state_result = await get_pr_state(branch_name)
 
 	if (is_pr_state_merged(pr_state_result)) {
 		git_pr_messages.display_merged_pr_message()
@@ -181,7 +177,7 @@ function build_body(issue_info: IssueInfo, extra_body?: string): string {
 
 async function existing_pr_label(branch_name: string): Promise<ReleaseClassification | undefined> {
 	if (!(await git_gh_command.pr_exists(branch_name))) return undefined
-	if (is_pr_state_merged(await get_pr_state_safe(branch_name))) return undefined
+	if (is_pr_state_merged(await get_pr_state(branch_name))) return undefined
 
 	return await git_gh_command.pr_get_classification(branch_name)
 }

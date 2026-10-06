@@ -83,6 +83,9 @@ interface StopContext {
 	handed_off: boolean
 	// The resolved `JOSH_SESSION_LANG` — `session_language.resolve_session_lang` (joshuafolkken/kit#2470).
 	session_lang: string
+	// This session is an agent kit launched under `claude -p` — `agent_headless.is_headless`
+	// (joshuafolkken/kit#3245). No person reads its reply, so the rules on how a reply is written stand down.
+	headless_agent: boolean
 }
 
 interface StopOutcome {
@@ -170,12 +173,10 @@ const HEADLESS_WAIT_CALLS = ['"command":"pnpm josh lane:await']
 const HEADLESS_WAIT_BODY =
 	' this is a `claude -p` `backlogrun` parent (`JOSH_RUN_HEADLESS`) with lanes still ' +
 	'in flight, and ending this turn ends the process — its background waits are killed with it and the ' +
-	'lanes are left without a parent. Wait in the foreground instead: run `pnpm josh lane:await <N...>` ' +
-	'for the in-flight lanes as a foreground command within the tool timeout (with ' +
-	'`pnpm josh run:progress --wait` in the background for the heartbeat, which streams its reports ' +
-	'itself and lives while this turn does), act on what it reports, and continue the loop. End the turn only ' +
-	'after `pnpm josh run:carry --cut` or `--end` (`backlogrun-progress.md` → "The parent keeps no clock ' +
-	'of its own").'
+	"lanes are left without a parent. Do not watch them yourself: the `run:wake` supervisor's driver " +
+	'watches the lanes and wakes a session only for a branch that needs judging. Hand the loop back with ' +
+	'`pnpm josh run:carry --cut --owner "$PPID"` (or `--end` when the run is over), then end the turn ' +
+	'(`backlogrun-progress.md` → "Picking the lanes up in the fresh session").'
 
 const HEADLESS_WAIT_REASON = `${HEADLESS_WAIT_MARKER}${HEADLESS_WAIT_BODY}`
 
@@ -263,13 +264,23 @@ function citation_reason(context: StopContext): string | undefined {
 	return build_citation_reason(references)
 }
 
+// The two rules on how a reply is written. **A headless agent's reply has no reader**
+// (joshuafolkken/kit#3245): its text lands in a stream-json log, so correcting its citations or its
+// language costs a turn and reaches nobody. The artifacts a person does read — a Telegram, an Issue, a
+// pull request — are held to the same rules by their own guards, not here.
+function wording_reason(context: StopContext): string | undefined {
+	if (context.headless_agent) return undefined
+
+	return citation_reason(context) ?? language_reason(context)
+}
+
 // The three rules that read the reply itself, filing offer first and the language last. A drifted reply
 // refused for another reason is not rewritten, but the drift still ends: `block_envelope` appends the
 // session-language note to every refusal, so the turn it continues is written in the session language.
 function reply_reason(context: StopContext): string | undefined {
 	if (needs_filing(context)) return FILING_OFFER_REASON
 
-	return citation_reason(context) ?? language_reason(context)
+	return wording_reason(context)
 }
 
 // The headless wait holds past the loop-breaker until the spin bound is reached.

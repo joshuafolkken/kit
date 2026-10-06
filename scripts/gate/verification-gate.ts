@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
+import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { buffered_process, FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
 import { review_stamps } from '#scripts/review/review-stamps'
@@ -166,7 +167,7 @@ interface BudgetContext {
 function default_budget(): BudgetContext {
 	return {
 		available_cores: availableParallelism(),
-		is_reserved: !unit_worker_share.is_nested_run(),
+		is_reserved: !unit_worker_share.is_nested_run() && !core_budget.is_held(),
 	}
 }
 
@@ -222,10 +223,17 @@ async function run_gate_steps(
 ): Promise<ReadonlyArray<GateStepResult>> {
 	const reserved = await build_reserved_steps(process.cwd(), plan, budget.available_cores)
 
-	return await bounded_pool.bounded_map(
-		reserved,
-		plan.concurrency,
-		async (entry) => await run_reserved_step(entry, budget),
+	// **The checks run under the held mark, so a check's own dispatch claims nothing**
+	// (joshuafolkken/kit#3345). Each check is a `pnpm josh <target>` child, and a target that declares
+	// a weight would otherwise claim a second place for the cores reserved for it here. A nested gate
+	// sets the mark too, since its checks are covered by the outer gate's reservation.
+	return await core_budget.with_held_mark(
+		async () =>
+			await bounded_pool.bounded_map(
+				reserved,
+				plan.concurrency,
+				async (entry) => await run_reserved_step(entry, budget),
+			),
 	)
 }
 
@@ -299,6 +307,9 @@ interface GateOptions {
 	// The scoped records' paths, overridable so a test can plant a green pair rather than depend on the
 	// surrounding checkout's — the reason `scoped-green.ts` takes a `source` per stamp.
 	scoped_sources?: ScopedSources
+	// The lane ledger a finished gate's duration is appended to (joshuafolkken/kit#3355). Only the CLI
+	// entry resolves it, so a suite driving the gate never writes a measurement of checks that never ran.
+	ledger_path?: string | undefined
 }
 
 // **The gate refuses to start when the scoped pair has not been green on this tree**
@@ -339,14 +350,20 @@ async function settle_gate(
 	tree: GateTree,
 	options: GateOptions & { started_at: number },
 ): Promise<number> {
+	const elapsed_ms = performance.now() - options.started_at
 	const failed_labels = gate_report.report_gate_steps(results, {
 		is_verbose: options.is_verbose ?? false,
 		log_path: options.log_path,
-		elapsed_ms: performance.now() - options.started_at,
+		elapsed_ms,
 		step_count: String(plan.checks.length),
 	})
+	const is_passed = failed_labels.length === 0
 
-	if (failed_labels.length > 0) return FAIL_EXIT_CODE
+	if (options.ledger_path !== undefined) {
+		await lane_ledger.record_gate(options.ledger_path, elapsed_ms, is_passed)
+	}
+
+	if (!is_passed) return FAIL_EXIT_CODE
 
 	await record_whole_gate(plan, results, tree, options)
 
@@ -474,7 +491,9 @@ async function run_gate_command(
 // summary, written last, is the first thing lost. Setting the code lets the writes drain and the
 // process end on its own, which it can, since every child has already exited by here.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	process.exitCode = await run_gate_command(process.argv.slice(FIRST_ARGUMENT_INDEX))
+	process.exitCode = await run_gate_command(process.argv.slice(FIRST_ARGUMENT_INDEX), {
+		ledger_path: await lane_ledger.target(),
+	})
 }
 
 const verification_gate = {

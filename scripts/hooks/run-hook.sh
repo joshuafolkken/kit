@@ -12,9 +12,10 @@
 #   runs through josh, whose command is the name with its first `-` turned into `:`
 #   (`pretool-guard` → `pretool:guard`).
 # - In kit's own checkout the gate is `hook-bundle-ready.ts`, which rebuilds stale bundles
-#   (joshuafolkken/kit#2984). In an installed package it is a presence check: the published bundles
-#   cannot be stale against a source the consumer never edits, and Node strips no types under
-#   `node_modules`.
+#   (joshuafolkken/kit#2984) and then runs the bundle — or the josh fallback — itself, so a hook call
+#   starts node once (joshuafolkken/kit#3327). In an installed package it is a presence check: the
+#   published bundles cannot be stale against a source the consumer never edits, and Node strips no
+#   types under `node_modules`.
 # - An `if`/`else`, never `&&`/`||`: a guard's refusal is a non-zero exit, and a chain would read it as
 #   a missing bundle and run the hook twice.
 
@@ -36,6 +37,6 @@ case $0 in
 	if [ -d "$package_dir/dist/hooks" ]; then node "$bundle" "$@"; else node "$package_dir/dist/josh.js" "$josh_command" "$@"; fi
 	;;
 *)
-	if node --disable-warning=ExperimentalWarning "$hooks_dir/hook-bundle-ready.ts"; then node "$bundle" "$@"; else pnpm josh "$josh_command" "$@"; fi
+	node --disable-warning=ExperimentalWarning "$hooks_dir/hook-bundle-ready.ts" "$hook_name" "$josh_command" "$@"
 	;;
 esac

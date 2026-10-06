@@ -27,6 +27,7 @@ interface WorkflowJob {
 	name?: string
 	if?: string
 	outputs?: Record<string, string>
+	permissions?: Record<string, string>
 	needs?: string | ReadonlyArray<string>
 	steps?: ReadonlyArray<WorkflowStep>
 	strategy?: WorkflowStrategy
@@ -46,9 +47,16 @@ interface WorkflowConcurrency {
 	'cancel-in-progress'?: boolean | string
 }
 
+interface WorkflowTrigger {
+	branches?: ReadonlyArray<string>
+	types?: ReadonlyArray<string>
+}
+
 interface Workflow {
 	concurrency?: WorkflowConcurrency
 	env?: Record<string, string>
+	on?: Record<string, WorkflowTrigger | null>
+	permissions?: Record<string, string>
 	jobs: Record<string, WorkflowJob>
 }
 

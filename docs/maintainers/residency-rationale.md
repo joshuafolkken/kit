@@ -187,10 +187,9 @@ Examples that answer "no" and keep their body on the skill side:
 single-sourced into a skill and the topic file shrinks to a pointer, a citation of that topic **points
 at the skill file directly** — from `CLAUDE.md`, `docs/` and other topic files alike; the pointer
 topic is never named as "the canonical reference" (joshuafolkken/kit#1178). The heading this convention
-was argued under in `residency.md` was 「指し先になった話題ファイルは引用しない」.
+was argued under in `residency.md` was "指し先になった話題ファイルは引用しない".
 
-The decision is one question, never left to the writer: **which file holds the topic's body?** (in
-the original wording, 「その話題の本文はどのファイルにあるか」). While the body is still in the topic
+The decision is one question, never left to the writer: **which file holds the topic's body?** While the body is still in the topic
 file, cite the topic file; once it is in a skill, cite the skill. Mid-rollout (joshuafolkken/kit#1176)
 topics in both states coexist, so the answer has to come from where the body is, not from the file's
 role.
@@ -208,7 +207,7 @@ documents' citations. The exception is the skill that is the single source itsel
 pointer is a reverse reference and causes no double read.
 
 `scripts/rules/pointer-citation-document-rule.test.ts` pins this. **A shrunken topic file that survives
-until deletion opens with the declaration 「この規則の単一ソースは …」** — the check finds the pointer
+until deletion opens with the declaration `この規則の単一ソースは …`** — the check finds the pointer
 by that declaration, confirms the skill it names exists, and confirms no other document cites the
 topic file. The declaration is the entry point, so a topic newly shrunk during a rollout falls under
 the rule automatically.

@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { lane_child_invocation } from './lane-child-invocation'
 
 // Ending a lane child that did not end itself (joshuafolkken/kit#2421).
@@ -24,9 +25,6 @@ const CHILDREN_OF_FLAG = '-P'
 const PS_COMMAND = '/bin/ps'
 const PARENT_FORMAT = ['-o', 'ppid=', '-p']
 const TERMINATE_SIGNAL = 'SIGTERM'
-// A probe that hung would hang the close it runs inside; failing answers "no process", which leaves
-// the lane exactly as it was before this module existed.
-const PROBE_TIMEOUT_MS = 2000
 // `0` addresses the caller's own process group and `1` is init — neither is ever a lane child.
 const LOWEST_CHILD_PID = 2
 

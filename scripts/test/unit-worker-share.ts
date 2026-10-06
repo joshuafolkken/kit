@@ -227,6 +227,7 @@ async function with_run_marker<T>(run: () => Promise<T>): Promise<T> {
 const unit_worker_share = {
 	MIN_WORKERS,
 	NESTED_KEY,
+	NESTED_VALUE,
 	RUN_PREFIX,
 	SOLO_RUNS,
 	current_share,

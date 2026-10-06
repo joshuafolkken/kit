@@ -1,6 +1,6 @@
 ## 常駐ドキュメントと skill の分担（何を常駐に残すか）
 
-**規則をどこに書くか、常駐にどこまで残すかの判定は、このファイルが単一ソースである**（joshuafolkken/kit#2891）。**読むのは規則を置く・移す・引退させるターンだけ**である。`CLAUDE.md` は毎ターン全文が読み込まれ、上限は `scripts/document/resident-budget.ts` の `RESIDENT_CEILING_BYTES`（残りは `pnpm josh bytes CLAUDE.md`）。**置き場所は書き手の重要度判断ではなく、下の 4 つの問いを順に当てて決める。** 経緯・一覧・作例は `docs/maintainers/residency-rationale.md` にある。
+**規則をどこに書くか、常駐にどこまで残すかの判定は、このファイルが単一ソースである**（joshuafolkken/kit#2891）。`CLAUDE.md` はすべてのエージェント規則の入口で、`AGENTS.md` / `GEMINI.md` / `.cursorrules` はそこへの導線である。規則のトリガは `CLAUDE.md` に **1 度だけ**、手順と数値は導線の先に **1 度だけ**書く。`CLAUDE.md` の経緯は `docs/maintainers/claude-md-history.md` にある。**規則を散文で書く前に**、下の問いで置き場所を決める — 計算できる答えは `pnpm josh oracle:list` のコマンドへ、順序は `pnpm josh run:step` へ。**読むのは規則を置く・移す・引退させるターンだけ**である。`CLAUDE.md` は毎ターン全文が読み込まれ、上限は `scripts/document/resident-budget.ts` の `RESIDENT_CEILING_BYTES`（残りは `pnpm josh bytes CLAUDE.md`）。**置き場所は書き手の重要度判断ではなく、下の 4 つの問いを順に当てて決める。** 経緯・一覧・作例は `docs/maintainers/residency-rationale.md` にある。
 
 ### 第 0 問（先に問う）
 

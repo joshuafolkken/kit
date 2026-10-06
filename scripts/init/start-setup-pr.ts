@@ -22,12 +22,12 @@ const FIRST_SETUP_ISSUE_FILTER = `[.[] | select(.title == "${SETUP_TITLE}") | .n
 
 // Listings are read NUL-separated (`-z`), so a path is never quoted — a name a caller's initialize
 // command wrote need not be ASCII the way kit's own are (#2872).
-function paths_of(output: string | undefined): Array<string> {
-	return (output ?? '').split('\0').filter((listed) => listed.length > 0)
+function paths_of(output: string | undefined = ''): Array<string> {
+	return output.split('\0').filter((listed) => listed.length > 0)
 }
 
 function listing(args: ReadonlyArray<string>, root: string): Array<string> {
-	return paths_of(start_exec.read_output('git', [...args, '-z'], root))
+	return paths_of(start_exec.git_read([...args, '-z'], root))
 }
 
 function setup_issue(issue_number: string): IssueInfo {
@@ -103,13 +103,13 @@ function switch_to(branch: string, current: string | undefined, root: string): v
 
 	const reference = `refs/heads/${branch}`
 
-	if (start_exec.succeeds('git', ['rev-parse', '--verify', '--quiet', reference], root)) {
+	if (start_exec.git_succeeds(['rev-parse', '--verify', '--quiet', reference], root)) {
 		throw new Error(
 			`The setup branch ${branch} already exists. Run git switch ${branch}, then josh start again.`,
 		)
 	}
 
-	start_exec.run('git', ['switch', '--create', branch], root)
+	start_exec.git_run(['switch', '--create', branch], root)
 }
 
 // The paths are named on the commit as well as on the add, so anything the user had staged before
@@ -117,8 +117,8 @@ function switch_to(branch: string, current: string | undefined, root: string): v
 function commit_kit_paths(paths: ReadonlyArray<string>, issue: IssueInfo, root: string): void {
 	if (paths.length === 0) return
 
-	start_exec.run('git', ['add', '--', ...paths], root)
-	start_exec.run('git', ['commit', '--message', issue.commit_message, '--', ...paths], root)
+	start_exec.git_run(['add', '--', ...paths], root)
+	start_exec.git_run(['commit', '--message', issue.commit_message, '--', ...paths], root)
 }
 
 // A caller's initialize command writes files kit cannot name, so with a `baseline` — what was already
@@ -143,7 +143,7 @@ function setup_paths(
 // Issue → branch → only the setup's files committed → push → pull request. The merge is left to a
 // person: it is the one step that changes main.
 async function open(root: string, baseline?: ReadonlyArray<string>): Promise<void> {
-	const current = start_exec.read_output('git', ['symbolic-ref', '--short', 'HEAD'], root)
+	const current = start_exec.git_read(['symbolic-ref', '--short', 'HEAD'], root)
 	const paths = setup_paths(root, baseline, current)
 
 	if (paths.length === 0) {
@@ -156,7 +156,7 @@ async function open(root: string, baseline?: ReadonlyArray<string>): Promise<voi
 
 	switch_to(issue.branch_name, current, root)
 	commit_kit_paths(paths, issue, root)
-	start_exec.run('git', ['push', '--set-upstream', 'origin', issue.branch_name], root)
+	start_exec.git_run(['push', '--set-upstream', 'origin', issue.branch_name], root)
 	await git_pr.create_with_issue_info(issue)
 }
 

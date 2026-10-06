@@ -71,6 +71,13 @@ const STDOUT_GUARD: ReadonlyArray<string> = ['./scripts/test/test-stdout-guard.t
 // Telegram send and recording which test tried (joshuafolkken/kit#2494).
 const TELEGRAM_GUARD: ReadonlyArray<string> = ['./scripts/test/test-telegram-guard.ts']
 
+// The guards every run of the suite arms, whichever config starts it: the network guard once in the
+// main process, the stdout and Telegram guards in every worker. Named here so `vitest.config.ts` and
+// `vitest.harness.config.ts` read one definition — the harness once ran with none of them
+// (joshuafolkken/kit#3253).
+const NETWORK_GUARD: ReadonlyArray<string> = ['./scripts/test/test-network-guard.ts']
+const WORKER_GUARDS: ReadonlyArray<string> = [...STDOUT_GUARD, ...TELEGRAM_GUARD]
+
 interface UnitProjectTest {
 	name: string
 	env: Record<string, string>
@@ -104,7 +111,7 @@ function unit_project(spec: UnitProjectSpec): UnitProject {
 			isolate: spec.isolate,
 			testTimeout: TEST_TIMEOUT_MS,
 			globalSetup: [...(spec.globalSetup ?? [])],
-			setupFiles: [...STDOUT_GUARD, ...TELEGRAM_GUARD],
+			setupFiles: [...WORKER_GUARDS],
 		},
 	}
 }
@@ -128,11 +135,13 @@ const unit_projects = {
 	ENV,
 	ISOLATED_PROJECT,
 	MAIN_EXCLUDE,
+	NETWORK_GUARD,
 	PURE_PROJECT,
 	STATE_GUARD,
 	STDOUT_GUARD,
 	TELEGRAM_GUARD,
 	UNIT_PROJECTS,
+	WORKER_GUARDS,
 }
 
 export type { UnitProject, UnitProjectTest }

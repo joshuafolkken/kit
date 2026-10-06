@@ -16,12 +16,10 @@ import { test_declared_logic, type Verdict } from '#scripts/test/test-declared-l
 
 const EVIDENCE_HEADING = '## 実機証跡'
 
-function verdict_for(paths: ReadonlyArray<string>, body: string | undefined): Verdict {
+function verdict_for(paths: ReadonlyArray<string>, body: string | undefined = ''): Verdict {
 	if (test_declared_logic.runtime_files(paths).length === 0) return 'exempt'
 
-	return reproduction_measure.has_command_output(body ?? '', EVIDENCE_HEADING)
-		? 'satisfied'
-		: 'required'
+	return reproduction_measure.has_command_output(body, EVIDENCE_HEADING) ? 'satisfied' : 'required'
 }
 
 // The diff is this checkout's, so it answers for the named branch only when that is the one checked

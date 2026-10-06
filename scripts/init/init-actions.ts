@@ -217,11 +217,6 @@ function build_file_actions(shape?: ProjectShape): ReadonlyArray<FileAction> {
 
 	return [
 		...(shape?.has_git === false ? [] : [build_gitignore_action()]),
-		build_action(
-			'.npmrc',
-			() => init_logic.generate_npmrc(),
-			(existing) => init_logic.merge_npmrc(existing),
-		),
 		build_eslint_action(),
 		build_action(
 			PRETTIER_CONFIG_JS,

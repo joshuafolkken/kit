@@ -2,6 +2,7 @@ import { repo_map_logic } from '#scripts/discovery/repo-map-logic'
 import { repo_origin } from '#scripts/discovery/repo-origin'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { GH_API_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { propagate_publish } from '#scripts/propagate/propagate-publish'
 import { derive_versions_endpoint } from '#scripts/version/version-command-config'
 import { load } from 'js-yaml'
@@ -69,7 +70,6 @@ function is_published(repo: string, version: string): boolean {
 	return propagate_publish.is_version_published(versions, version)
 }
 
-const GH_TIMEOUT_MS = 20_000
 // The manifest arrives base64-encoded in the API's `content` field; `jq` decodes and reads it.
 const VERSION_JQ = '.content | @base64d | fromjson | {version, private, workspaces} | tojson'
 const PNPM_WORKSPACE_FILE = 'pnpm-workspace.yaml'
@@ -145,7 +145,7 @@ function pnpm_workspace_path(repo: string): string {
 
 // A read that failed for any reason other than a missing file leaves the layout unknown.
 function classify_workspace_failure(repo: string): WorkspaceCheck {
-	const status = git_gh_exec.exec_gh_api_status_sync(pnpm_workspace_path(repo), GH_TIMEOUT_MS)
+	const status = git_gh_exec.exec_gh_api_status_sync(pnpm_workspace_path(repo), GH_API_TIMEOUT_MS)
 
 	return status === NOT_FOUND_STATUS ? 'single' : 'unreadable'
 }
@@ -154,7 +154,7 @@ function read_pnpm_workspace(repo: string): WorkspaceCheck {
 	const stdout = git_gh_exec.read_gh_api_sync({
 		path: pnpm_workspace_path(repo),
 		jq_filter: WORKSPACE_JQ,
-		timeout_ms: GH_TIMEOUT_MS,
+		timeout_ms: GH_API_TIMEOUT_MS,
 	})
 	if (stdout === undefined) return classify_workspace_failure(repo)
 
@@ -229,7 +229,7 @@ function to_manifest(repo: string, stdout: string): ManifestAnswer {
 // here is trustworthy in a way a registry 404 is not: the repository's issues are already being read,
 // so access is established and what is missing is the file.
 function classify_manifest_failure(repo: string): ManifestAnswer {
-	const status = git_gh_exec.exec_gh_api_status_sync(manifest_path(repo), GH_TIMEOUT_MS)
+	const status = git_gh_exec.exec_gh_api_status_sync(manifest_path(repo), GH_API_TIMEOUT_MS)
 
 	return { kind: status === NOT_FOUND_STATUS ? 'absent' : 'unreadable' }
 }
@@ -238,7 +238,7 @@ function fetch_manifest(repo: string): ManifestAnswer {
 	const stdout = git_gh_exec.read_gh_api_sync({
 		path: manifest_path(repo),
 		jq_filter: VERSION_JQ,
-		timeout_ms: GH_TIMEOUT_MS,
+		timeout_ms: GH_API_TIMEOUT_MS,
 	})
 
 	return stdout === undefined ? classify_manifest_failure(repo) : to_manifest(repo, stdout)

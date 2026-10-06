@@ -1,6 +1,6 @@
 import { git_gh_issue_rest } from '#scripts/gh/git-gh-issue-rest'
+import { blocked_by_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
-import { blocked_by_schema } from '#scripts/git/schemas'
 import { z } from 'zod'
 import type { IssueReference } from './epic-reference'
 
@@ -29,11 +29,7 @@ const PULL_REQUEST_SEGMENT = '/pull/'
 const epic_issue_schema = z.object({
 	number: z.number(),
 	title: z.string().default(''),
-	body: z
-		.string()
-		.nullable()
-		.default('')
-		.transform((value) => value ?? ''),
+	body: z.union([z.string(), z.null().transform(() => '')]).default(''),
 	state: z.string().default(UNKNOWN_STATE),
 	// The issue endpoint answers for a pull request as readily as for an issue, and nothing in the
 	// other fields separates them — an open PR reports `state: OPEN`, a merged one `MERGED`. The URL

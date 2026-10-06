@@ -82,11 +82,12 @@ guard, and go back to step 1.
      session**: `lane:dispatch` reads the `session_id` off the exit record and relaunches with
      `--resume`; with no session id it falls back to a fresh `fullrun`, and the report says which path
      it took. **Outages inside a two-minute window count once** toward the streak. The re-dispatch is
-     bounded by `CONSECUTIVE_OUTAGE_LIMIT` in `scripts/run/run-merge.ts`: *distinct* outages trip the
+     bounded by `CONSECUTIVE_OUTAGE_LIMIT` in `scripts/run/merge/run-merge.ts`: *distinct* outages trip the
      separate outage guard, at which point the command prints `environment` and the run stops. It never
      re-dispatches into a dead API forever.
    - **abandoned** — counted against the consecutive-failure guard and parked with `needs-decision`,
-     exactly as a failed child. Never retried silently.
+     exactly as a failed child — the label then answers to `backlogrun-park.md` → "Only a person's
+     judgement carries `needs-decision`". Never retried silently.
 3. **Read the token it printed and take that branch** — a next child number to run (the re-dispatched
    outage child among them), `environment` / `stop` to end the run, or `busy` / `retry` to re-read —
    the same tokens the merge event reads (`backlogrun-progress.md` → "Running a named epic's children").
@@ -146,7 +147,7 @@ carries no judgement.**
    this condition too.
 
 Meeting any of the four, the child is parked — `needs-decision` plus a comment naming which of the four
-it was — and its lane is **kept**, because the pushed branch is the resume path
+it was, read against `backlogrun-park.md` → "Only a person's judgement carries `needs-decision`" — and its lane is **kept**, because the pushed branch is the resume path
 (`backlogrun-lanes.md` → "What happens to a lane").
 
 **Leave the tree clean before parking: `git merge --abort` precedes a park under conditions 1, 2 or 4.**

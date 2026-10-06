@@ -20,7 +20,7 @@ import { git_ssh_keepalive } from './git-ssh-keepalive'
 // spawns git itself. The timeout it carries is shared here by `read_remote` / `with_output_remote`. Those two files are the spawn sites of the ordinary command
 // modules — the claim stops there. A synchronous caller goes through `git-spawn-sync.ts`, the same
 // binary resolution with a result instead of an exception (joshuafolkken/kit#3065). Other parts of
-// this package spawn git for their own purposes (`scripts/run/run-progress-clock.ts`,
+// this package spawn git for their own purposes (`scripts/run/progress/run-progress-clock.ts`,
 // `scripts/git/git-fixture-workspace.ts`), and an audit of how the git binary is resolved has to read
 // those too.
 

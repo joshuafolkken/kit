@@ -1,4 +1,4 @@
-import type { RunCarry } from '#scripts/run/run-carry'
+import type { RunCarry } from '#scripts/run/carry/run-carry'
 import type { DriveState } from './backlog-drive'
 
 const LIST_SEPARATOR = ','

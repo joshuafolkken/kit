@@ -3,6 +3,7 @@ import path from 'node:path'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { json_value } from '#scripts/lib/json-value'
 import { file_reader } from '#scripts/lib/read-file'
+import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { z } from 'zod'
 
@@ -20,7 +21,6 @@ const PLUGIN_ID = 'kit@kit'
 // full document, so this pointer is also what tells a consumer repository apart from kit itself.
 const CLAUDE_MD_POINTER = `@${NODE_MODULES}/${KIT_PACKAGE_NAME}/dist/${CLAUDE_MD}`
 const SECRETLINT_BIN = path.join(NODE_MODULES, '.bin', 'secretlint')
-const GIT_TIMEOUT_MS = 2000
 
 const manifest_schema = z.object({
 	name: z.string().optional(),
@@ -77,7 +77,7 @@ function is_plugin_declared(root: string): boolean {
 // from installing kit's git hooks — the failure is silent but for one stderr line.
 function configured_hooks_path(root: string): string | undefined {
 	const value = git_spawn_sync.read(['-C', root, 'config', '--get', 'core.hooksPath'], {
-		timeout: GIT_TIMEOUT_MS,
+		timeout: PROBE_TIMEOUT_MS,
 	})
 
 	return value === '' ? undefined : value

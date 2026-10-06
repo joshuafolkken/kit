@@ -1,4 +1,4 @@
-import type { CommandEntry } from './josh-command-types'
+import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
 // The `backlog:*` command registry, split out of `josh-commands-ai.ts` so that file stays under its
 // 300-code-line limit, exactly as `LANE_COMMANDS` and `SPLIT_COMMANDS` were for the same reason
@@ -41,6 +41,9 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'backlog:stalled': {
 		script: 'scripts/backlog/backlog-stalled-cli.ts',
+		// A stall sends one Telegram warning (joshuafolkken/kit#3357). The `Stop` hook calls the detector
+		// directly, so this flag costs only the manual command its in-process dispatch.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
 			'Report whether ready backlog work is sitting undispatched with a free lane and no recent dispatch',
 		category: 'AI tools',

@@ -1,8 +1,8 @@
+import { blocking_issue_schema } from '#scripts/git/git-schemas'
 import {
 	parse_json_array_or_undefined,
 	parse_json_object_safe,
 } from '#scripts/git/parse-json-array'
-import { blocking_issue_schema } from '#scripts/git/schemas'
 import type { IssueReference } from '#scripts/issue/issue-reference'
 import { z } from 'zod'
 import { MERGED_STATE, to_gh_state } from './git-gh-rest-state'
@@ -163,8 +163,8 @@ function empty_blocked_by(): BlockedBy {
 // repository and names a different issue there (joshuafolkken/kit#1126). Undefined when the field is
 // absent or shaped otherwise; the caller then falls back to the repository it is reading in, which is
 // what an unqualified relation has always meant.
-function repo_of_url(repository_url: string | undefined): string | undefined {
-	const match = REPOSITORY_URL.exec(repository_url ?? '')
+function repo_of_url(repository_url: string | undefined = ''): string | undefined {
+	const match = REPOSITORY_URL.exec(repository_url)
 
 	return match?.[REPOSITORY_URL_GROUP]
 }

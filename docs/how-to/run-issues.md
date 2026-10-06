@@ -24,7 +24,7 @@ This table is the single description of the keywords; the README and the [tutori
 
 ## Going up the ladder a stage at a time
 
-`kickoff` → `halfrun` → `prrun` → `fullrun` is a ladder: the keyword you type decides only how far the run goes, and where it starts is read off the Issue, so nothing already done is redone. A keyword whose stopping point the Issue has already reached reports that and stops.
+`kickoff` → `halfrun` → `prrun` → `fullrun` is a ladder: the keyword you type decides only how far the run goes, and where it starts is read off the Issue, so nothing already done is redone. A keyword whose stopping point the Issue has already reached reports that and stops. What each state means is in [Run states](../labels-and-run-states.md#run-states).
 
 | Issue state       | `kickoff`                 | `halfrun`                            | `prrun`                         | `fullrun`                 |
 | ----------------- | ------------------------- | ------------------------------------ | ------------------------------- | ------------------------- |
@@ -34,7 +34,7 @@ This table is the single description of the keywords; the README and the [tutori
 | `prrun-stopped`   | reached — report and stop | reached — report and stop            | reached — report and stop       | followup → merged         |
 | `merged`          | reached — report and stop | reached — report and stop            | reached — report and stop       | reached — report and stop |
 
-Each stop's notification lists the keywords further up, nearest first. How each state is read is in [`josh run:entry`](../josh-commands-automation.md#josh-runentry).
+Each stop's notification lists the keywords further up, nearest first. How each state is read is in [`josh run:entry`](../josh-commands-run.md#josh-runentry).
 
 ## Check it worked
 
@@ -42,6 +42,6 @@ Each stop's notification lists the keywords further up, nearest first. How each 
 
 ## Common failures
 
-- A run stops on an Issue labelled `needs-human-review`: that is intended — see [the label](../josh-commands-automation.md#needs-human-review--the-opposite-label).
-- A run exits early because the work is already merged: see [`already-done`](../josh-commands-automation.md#already-done--the-exit-for-work-that-is-already-merged).
+- A run stops on an Issue labelled `needs-human-review`: that is intended — see [the label](../labels-and-run-states.md#needs-human-review--the-opposite-label).
+- A run exits early because the work is already merged: see [`already-done`](../labels-and-run-states.md#already-done--the-exit-for-work-that-is-already-merged).
 - The gate or CI fails: [Fix a failing gate or CI](./fix-gate-and-ci.md).

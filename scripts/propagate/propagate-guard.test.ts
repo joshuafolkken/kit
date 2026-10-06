@@ -166,6 +166,14 @@ describe('propagate.parse_options — --target', () => {
 		expect(options.usage).toContain(MISSING_NAME)
 	})
 
+	// joshuafolkken/kit#3261: the read goes through `cli_flags`, so the inline spelling is accepted.
+	it('reads an inline --target=<repo>', () => {
+		const options = propagate.parse_options(['--dry-run', `${propagate.TARGET_FLAG}=app-kit`])
+
+		expect(options.usage).toBeUndefined()
+		expect(options.target).toBe('app-kit')
+	})
+
 	it('refuses a second --target rather than letting one name win silently', () => {
 		const flag = propagate.TARGET_FLAG
 		const options = propagate.parse_options([flag, 'app-kit', flag, 'game-kit'])

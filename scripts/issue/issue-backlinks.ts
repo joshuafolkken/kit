@@ -33,11 +33,11 @@ function has_heading(body: string, heading: string): boolean {
 	return markdown_section.has_line(body, heading)
 }
 
-// The lines under `heading`, up to the next `##` heading; `undefined` when the heading is absent.
-function section_lines(body: string, heading: string): ReadonlyArray<string> | undefined {
-	if (!has_heading(body, heading)) return undefined
+// The lines under the upstream heading, up to the next `##` heading; `undefined` when it is absent.
+function upstream_section_lines(body: string): ReadonlyArray<string> | undefined {
+	if (!has_heading(body, UPSTREAM_ISSUES_HEADING)) return undefined
 
-	return markdown_section.section_lines(body, heading)
+	return markdown_section.section_lines(body, UPSTREAM_ISSUES_HEADING)
 }
 
 // A heading that looks like the upstream one but is not exactly it (`## Upstream`, `## Upstreams`,
@@ -59,8 +59,8 @@ function tokens_of(section: ReadonlyArray<string>): ReadonlyArray<string> {
 		.filter((token) => token.length > 0)
 }
 
-function has_two_segments(path: string | undefined): boolean {
-	const segments = (path ?? '').split(PATH_SEPARATOR)
+function has_two_segments(path: string | undefined = ''): boolean {
+	const segments = path.split(PATH_SEPARATOR)
 
 	return segments.length === PATH_SEGMENT_COUNT && segments.every((segment) => segment.length > 0)
 }
@@ -115,7 +115,7 @@ function classify_backlinks(
 ): BacklinkVerdict {
 	if (has_wrong_upstream_heading(origin_body)) return WRONG_HEADING
 
-	const section = section_lines(origin_body, UPSTREAM_ISSUES_HEADING)
+	const section = upstream_section_lines(origin_body)
 
 	return section === undefined
 		? verdict_without_section(origin_body)
@@ -125,7 +125,7 @@ function classify_backlinks(
 // The `owner/repo#N` references the upstream section lists, so the CLI knows which upstream bodies to
 // fetch and check for `## Origin`.
 function upstream_references(origin_body: string): ReadonlyArray<string> {
-	const section = section_lines(origin_body, UPSTREAM_ISSUES_HEADING)
+	const section = upstream_section_lines(origin_body)
 	if (section === undefined) return []
 
 	return tokens_of(section).filter((token) => is_qualified_reference(token))
@@ -138,7 +138,7 @@ function upstream_references(origin_body: string): ReadonlyArray<string> {
 function needs_upstreams(origin_body: string): boolean {
 	if (has_wrong_upstream_heading(origin_body)) return false
 
-	const section = section_lines(origin_body, UPSTREAM_ISSUES_HEADING)
+	const section = upstream_section_lines(origin_body)
 	if (section === undefined) return false
 
 	return !is_malformed_upstream_section(section)

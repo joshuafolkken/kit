@@ -9,6 +9,7 @@ import { git_gh_issue_list, MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
 import { error_text } from '#scripts/lib/error-message'
+import type { PollOptions } from '#scripts/lib/poll'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_file, type FileArguments } from './issue-file'
@@ -19,9 +20,10 @@ import { issue_wip } from './issue-wip'
 // `josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>]…
 // [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok]` — file an Issue with every
 // filing step run in order (joshuafolkken/kit#2808): the third-party refusal, the body lint, the
-// `## Origin` check for another repository, the WIP cap count (joshuafolkken/kit#3181), the duplicate
-// scout, the missing workflow labels created (joshuafolkken/kit#3176), the `auto-ok` decision
-// (joshuafolkken/kit#3213), the create call carrying every label, and `epic:bundle` after it.
+// `## Origin` check for another repository, the `auto-ok` decision (joshuafolkken/kit#3213) with the
+// run label it owes (joshuafolkken/kit#3313), the WIP cap count (joshuafolkken/kit#3181), the duplicate
+// scout, the missing workflow labels created (joshuafolkken/kit#3176), the create call carrying every
+// label, and `epic:bundle` after it.
 // A direct `gh api …/issues` filing is refused by the `direct-filing` delivered rule and pointed here.
 
 const SUCCESS_EXIT_CODE = 0
@@ -36,6 +38,9 @@ const THIRD_PARTY_MESSAGE =
 // `GH_REPO` is the variable `gh` reads `{owner}/{repo}` from, so setting it points every listing the
 // scout and `epic:bundle` make at the target repository rather than at this checkout.
 const GH_REPO_VARIABLE = 'GH_REPO'
+// The open listing `epic:bundle` reads trails the create call, so the issue just filed is looked for
+// again for up to ten seconds before the placement is given up (joshuafolkken/kit#3332).
+const FRESH_ISSUE_POLL: PollOptions = { attempts: 6, interval_ms: 2000 }
 
 interface Filing {
 	args: FileArguments
@@ -130,11 +135,9 @@ async function is_scout_clear(filing: Filing): Promise<boolean> {
 	return open.length === 0
 }
 
-// `undefined` when the create call failed. `gh`'s standard error is captured into the thrown error
-// rather than printed, so it is printed here — otherwise the filing fails with no reason given. A label
-// the create applies is provisioned first, so it never arrives with a generated color.
-async function create(filing: Filing): Promise<string | undefined> {
-	repository_labels.ensure_labels(filing.target)
+// Every label the create call carries, or `undefined` when an `auto-ok` filing names neither run label
+// (joshuafolkken/kit#3313). Decided before the WIP count and the scout, so a refusal costs no listing.
+async function labels_of(filing: Filing): Promise<ReadonlyArray<string> | undefined> {
 	const auto_ok = await issue_auto_ok.resolve(
 		filing.args.is_auto_ok_opted_out,
 		filing.target,
@@ -142,10 +145,24 @@ async function create(filing: Filing): Promise<string | undefined> {
 	)
 
 	console.info(issue_auto_ok.line_of(auto_ok))
+	const labels = issue_file.labels_of(filing.args, filing.body, auto_ok.is_applied)
+	const problem = issue_file.triage_problem(labels)
+
+	if (problem === undefined) return labels
+	console.error(`✖ ${problem}`)
+
+	return undefined
+}
+
+// `undefined` when the create call failed. `gh`'s standard error is captured into the thrown error
+// rather than printed, so it is printed here — otherwise the filing fails with no reason given. A label
+// the create applies is provisioned first, so it never arrives with a generated color.
+async function create(filing: Filing, labels: ReadonlyArray<string>): Promise<string | undefined> {
+	repository_labels.ensure_labels(filing.target)
 	const request = git_gh_issue_write.issue_create_request({
 		title: filing.args.title,
 		body: filing.body,
-		labels: issue_file.labels_of(filing.args, filing.body, auto_ok.is_applied),
+		labels,
 		repo: filing.target,
 	})
 
@@ -165,7 +182,7 @@ async function create(filing: Filing): Promise<string | undefined> {
 async function place(url: string, target: string): Promise<void> {
 	const issue_number = Number(github_issue_url.parse(url)?.issue_number)
 	const exit_code = Number.isSafeInteger(issue_number)
-		? await epic_bundle_cli.report_for(issue_number, target)
+		? await epic_bundle_cli.report_for(issue_number, target, FRESH_ISSUE_POLL)
 		: FAILURE_EXIT_CODE
 
 	if (exit_code !== SUCCESS_EXIT_CODE) {
@@ -173,23 +190,33 @@ async function place(url: string, target: string): Promise<void> {
 	}
 }
 
-async function file(filing: Filing): Promise<number> {
+function is_admitted(filing: Filing): boolean {
 	const refusals = refusals_of(filing)
 
-	if (refusals.length > 0) {
-		console.error(refusals.join('\n'))
+	if (refusals.length === 0) return true
+	console.error(refusals.join('\n'))
 
-		return FAILURE_EXIT_CODE
-	}
+	return false
+}
 
-	if (!(await is_wip_clear(filing)) || !(await is_scout_clear(filing))) return FAILURE_EXIT_CODE
-	const url = await create(filing)
+async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<number> {
+	const url = await create(filing, labels)
 
 	if (url === undefined) return FAILURE_EXIT_CODE
 	console.info(url)
 	await place(url, filing.target)
 
 	return SUCCESS_EXIT_CODE
+}
+
+async function file(filing: Filing): Promise<number> {
+	if (!is_admitted(filing)) return FAILURE_EXIT_CODE
+	const labels = await labels_of(filing)
+
+	if (labels === undefined) return FAILURE_EXIT_CODE
+	if (!(await is_wip_clear(filing)) || !(await is_scout_clear(filing))) return FAILURE_EXIT_CODE
+
+	return await send(filing, labels)
 }
 
 async function filing_of(args: FileArguments): Promise<Filing | string> {
@@ -228,7 +255,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const issue_file_cli = { THIRD_PARTY_MESSAGE, run }
+const issue_file_cli = { FRESH_ISSUE_POLL, THIRD_PARTY_MESSAGE, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

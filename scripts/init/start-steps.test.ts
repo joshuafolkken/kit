@@ -47,7 +47,8 @@ function commands(): Array<string> {
 	return mocked_execa.mock.calls.map((call) => {
 		const args: ReadonlyArray<unknown> = Array.isArray(call[1]) ? call[1] : []
 
-		return [call[0], ...args].join(' ')
+		// git is spawned through the unit suite's network-guard shim, so its path is read by its name.
+		return [path.basename(String(call[0])), ...args].join(' ')
 	})
 }
 

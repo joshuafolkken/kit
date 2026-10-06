@@ -9,7 +9,11 @@ import { third_party_write } from './third-party-write'
 // the kit checkout, whose owner is joshuafolkken.
 
 const SESSION = 'joshuafolkken'
-const resolve_session = (): string => SESSION
+
+function resolve_session(): string {
+	return SESSION
+}
+
 const THIRD_PARTY_COMMENT = 'gh api repos/sveltejs/svelte/issues/5/comments -f body=x'
 const FIRST_PARTY_FILING = `gh api repos/${SESSION}/kit/issues -f title=x`
 // `gh` expands `{owner}` / `{repo}` to the current repository, so this is a first-party write

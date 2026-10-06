@@ -227,6 +227,23 @@ describe('git_pr.create — returns as soon as the pull request is open', () => 
 	})
 })
 
+// joshuafolkken/kit#3263: an unreadable state used to answer "not merged", so a rate limit wrote the
+// new body onto a pull request that had already merged.
+describe('git_pr.create — a pull request whose state cannot be read', () => {
+	it('stops without writing when the PR state read fails', async () => {
+		const failure = new Error('gh api could not read the pull requests for branch')
+
+		vi.mocked(git_gh_command.pr_exists).mockResolvedValue(true)
+		vi.mocked(git_gh_command.pr_view).mockRejectedValue(failure)
+
+		await expect(
+			git_pr.create(PR_TITLE, PR_BODY, BRANCH, { label: BUGFIX, should_replace_body: true }),
+		).rejects.toBe(failure)
+		expect(vi.mocked(git_gh_command.pr_update_body)).not.toHaveBeenCalled()
+		expect(vi.mocked(git_gh_command.pr_create)).not.toHaveBeenCalled()
+	})
+})
+
 // The five-second sleep that is gone was also what let the `?head=…` listing catch up, and that
 // listing is eventually consistent — so where the reported URL comes from is now load-bearing
 // (joshuafolkken/kit#1232).

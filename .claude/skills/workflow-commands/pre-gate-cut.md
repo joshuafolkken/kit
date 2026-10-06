@@ -190,12 +190,17 @@ the push is never a turn boundary (`chain-rule.md`).
 ## A lane child records its park before it stops
 
 **The trigger**: a dispatched lane child about to stop for a decision (a Tier B toss-up, a Tier C
-action, an upstream defect, a split) parks its own Issue first — `backlogrun-park.md` → "park and
+action, an upstream defect) parks its own Issue first — `backlogrun-park.md` → "park and
 continue" — so the parent's `pnpm josh run:liveness` reads it `settled` (joshuafolkken/kit#2034),
 after #2012 and #2011. A `needs-human-review` or `already-done` stop already carries its label.
 `pnpm josh rule:guard` refuses `pnpm josh notify --task-type confirmation` from a marked child until
 then — **It fires once per run.**, and a person's own `fullrun` is never refused
 (`scripts/rules/lane-park.ts`).
+
+**A split is not a park**: the parent reads an open Issue carrying `epic` as
+a split, so a child that promoted its Issue stops without `needs-decision` — `backlogrun-park.md` →
+"Splitting a child mid-run". `pnpm josh rule:guard` refuses a `needs-decision` write onto the epic
+the child promoted this run, on every occurrence (`scripts/rules/lane-split-park.ts`).
 
 ### The interactive ask is refused one call earlier
 

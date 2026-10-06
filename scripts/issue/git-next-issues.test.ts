@@ -1,5 +1,5 @@
 import { listing_of, listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
-import type { OpenIssueData } from '#scripts/git/schemas'
+import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { describe, expect, it, vi } from 'vitest'
 import { git_next_issues } from './git-next-issues'
 

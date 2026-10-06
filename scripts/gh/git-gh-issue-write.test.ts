@@ -318,7 +318,6 @@ describe('issue_add_label', () => {
 		expect(await git_gh_issue_write.issue_add_label(ISSUE_NUMBER, LABEL_NAME)).toBe(false)
 	})
 })
-
 // joshuafolkken/kit#1794: the marker a run writes before it implements has to come back off when the
 // run's pull request merges, and the name travels in the path rather than in a body.
 describe('issue_remove_label', () => {

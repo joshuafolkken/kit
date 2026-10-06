@@ -23,6 +23,7 @@ import { init_file_action } from './init-file-action'
 import { init_install } from './init-install'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
+import { kit_development_versions } from './kit-development-versions'
 import { kit_setup_state } from './kit-setup-state'
 import { project_profile, type ProjectProfile, type ProjectShape } from './project-profile'
 
@@ -81,21 +82,10 @@ function tool_dependency_names(has_git: boolean): ReadonlyArray<string> {
 
 // Versions mirror kit's own devDependencies, so the consumer runs the toolchain kit is verified with.
 function get_toolchain_development_dependencies(has_git: boolean): Record<string, string> {
-	const manifest = z
-		.object({
-			peerDependencies: z.record(z.string(), z.string()),
-			devDependencies: z.record(z.string(), z.string()),
-		})
-		.parse(init_actions.read_package_json(PACKAGE_JSON))
-	const names = [...Object.keys(manifest.peerDependencies), ...tool_dependency_names(has_git)]
-	const entries = names.map((name): [string, string] => {
-		const version = manifest.devDependencies[name]
-		if (version === undefined) throw new Error(`Missing development version for ${name}`)
-
-		return [name, version]
-	})
-
-	return Object.fromEntries(entries)
+	return kit_development_versions.versions_of([
+		...kit_development_versions.peer_names(),
+		...tool_dependency_names(has_git),
+	])
 }
 
 function apply_dependency_merges(content: string, has_git = true): string {

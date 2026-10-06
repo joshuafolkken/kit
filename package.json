@@ -1,5 +1,5 @@
 {
-	"version": "1.1178.0",
+	"version": "1.1229.0",
 	"name": "@joshuafolkken/kit",
 	"description": "Development toolkit for AI-assisted projects: formatting, AI assistant rules and a Git/GitHub Issue workflow for any repository, plus lint, type check, tests and hooks for Node projects",
 	"keywords": [
@@ -21,7 +21,7 @@
 	},
 	"packageManager": "pnpm@12.6.0+sha512.3ef68f951cb111ac204b4a5a16f0b2ddf0da56a96e0413e81d855d9f0b55ef926714709028e1cd00c405c2c5fb7b9e8ec4dc46777c805d0373c2f2ff00fd20ec",
 	"engines": {
-		"node": ">=22.19.0"
+		"node": "^22.19.0 || ^24.0.0 || >=26.0.0"
 	},
 	"josh": {
 		"progress_interval_minutes": 15
@@ -30,9 +30,9 @@
 		"josh": "dist/josh.js"
 	},
 	"scripts": {
-		"preinstall": "pnpm dlx @aikidosec/safe-chain@1.5.20 setup-ci && node -e \"if(!process.env.CI&&!process.env.GLOBAL_AGENT_HTTP_PROXY)console.warn('Warning: safe-chain is not scanning this install because its shell integration is not active. Install safe-chain (https://github.com/AikidoSec/safe-chain#installation) or run: safe-chain setup - then restart your terminal.')\"",
+		"preinstall": "node -e \"if(!process.env.CI&&!process.env.GLOBAL_AGENT_HTTP_PROXY)console.warn('Warning: safe-chain (@aikidosec/safe-chain) is not scanning this install because its shell integration is not active. Install it with the hash-verified steps at https://github.com/joshuafolkken/kit/blob/main/SECURITY.md#installing-safe-chain - then restart your terminal.')\"",
 		"prepare": "(command -v lefthook >/dev/null 2>&1 && { lefthook install || echo 'lefthook install failed: git hooks are NOT installed. A set core.hooksPath is the usual cause. See https://github.com/joshuafolkken/kit/blob/main/docs/init.md#corehookspath-stops-lefthook-installing-anything' >&2; } || true)",
-		"build": "tsx scripts/build/build-bin.ts && tsx scripts/build/build-hooks.ts && tsx scripts/build/build-version.ts && tsx scripts/build/build-config-merge.ts && tsx scripts/build/build-managed-marker.ts && tsx scripts/build/build-self-sync-guard.ts && tsx scripts/build/build-claude-md.ts && tsx scripts/build/build-codex-hooks.ts",
+		"build": "tsx scripts/build/build.ts",
 		"prepack": "tsx scripts/version/publishable-range-check.ts && pnpm build",
 		"josh": "tsx scripts/josh/josh.ts"
 	},
@@ -93,10 +93,10 @@
 		"!scripts/test/test-telegram-guard.ts",
 		"!scripts/test/unit-guard-environment.ts",
 		"!scripts/test/unit-projects.ts",
+		"!scripts/test/untested-sources.ts",
 		"!scripts/test/vitest-include-globs.ts",
 		"!scripts/build/shim-shell.ts",
 		"!scripts/claude/skill-meta.ts",
-		"!scripts/document/document-scan.ts",
 		"!scripts/exports/member-usage.ts",
 		"!scripts/exports/namespace-escape.ts",
 		"!scripts/exports/namespace-members.ts",
@@ -109,6 +109,7 @@
 		"!scripts/hooks/hook-bundle-ready.ts",
 		"!scripts/hooks/prompt-hooks.ts",
 		"!scripts/josh/josh-script-reader.ts",
+		"!scripts/package/engine-range.ts",
 		"!scripts/package/production-dependency-graph.ts",
 		"!scripts/rules/delivered-rules-harness.ts",
 		"!scripts/rules/top-level-scripts-guard.ts"
@@ -182,7 +183,7 @@
 		"eslint-plugin-import-x": "^4.17.1",
 		"eslint-plugin-promise": "^7.3.0",
 		"eslint-plugin-sonarjs": "^4.2.1",
-		"eslint-plugin-unicorn": "^76.0.0",
+		"eslint-plugin-unicorn": "^77.0.0",
 		"globals": "^17.12.0",
 		"prettier": "^3.9.9",
 		"prettier-plugin-svelte": "^4.1.1",
@@ -264,7 +265,7 @@
 		"eslint-plugin-import-x": "^4.17.1",
 		"eslint-plugin-promise": "^7.3.0",
 		"eslint-plugin-sonarjs": "^4.2.2",
-		"eslint-plugin-unicorn": "^76.0.0",
+		"eslint-plugin-unicorn": "^77.0.0",
 		"eslint_d": "^15.0.3",
 		"globals": "^17.13.0",
 		"lefthook": "^2.1.16",

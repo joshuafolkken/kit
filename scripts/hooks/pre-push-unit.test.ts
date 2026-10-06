@@ -259,6 +259,54 @@ describe('a record that cannot speak for this tree', () => {
 	})
 })
 
+// joshuafolkken/kit#3307: a push that fell back to the whole suite said nothing about why, so a moved
+// merge base, a dirty tree and a mismatched record could not be told apart from the log.
+describe('a fall back to the whole suite names its reason in one line', () => {
+	const MISS_LEAD = 'the green gate record does not cover this push: '
+
+	it('names the moved merge base', async () => {
+		record_green(CHANGED_TREE, ADVANCED_BASE)
+
+		const [, text] = await run_hook()
+
+		expect(text).toContain(
+			`${MISS_LEAD}the merge base moved since the green gate (${ADVANCED_BASE} → ${BASE}).`,
+		)
+	})
+
+	it('names the paths that leave the working tree dirty', async () => {
+		record_green(CHANGED_TREE, BASE)
+		repository.status = ' M pnpm-lock.yaml'
+
+		const [, text] = await run_hook()
+
+		expect(text).toContain(`${MISS_LEAD}the working tree differs from HEAD ( M pnpm-lock.yaml).`)
+	})
+
+	it('names a missing record', async () => {
+		const [, text] = await run_hook()
+
+		expect(text).toContain(`${MISS_LEAD}no green gate record matches the changed files.`)
+	})
+
+	it('names an unreadable status', async () => {
+		record_green(CHANGED_TREE, BASE)
+		repository.unreadable = 'status'
+
+		const [, text] = await run_hook()
+
+		expect(text).toContain(`${MISS_LEAD}git status could not be read.`)
+	})
+
+	it('prints no reason when the record is reused', async () => {
+		record_green(CHANGED_TREE, BASE)
+
+		const [, text] = await run_hook()
+
+		expect(text).not.toContain(MISS_LEAD)
+	})
+})
+
 // The hook's line names this command, so a command that is not registered is a push that fails on
 // every repository the config reaches.
 describe(`josh ${COMMAND_NAME} is registered`, () => {

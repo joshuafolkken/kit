@@ -4,7 +4,7 @@ The `josh init` path for the `basic` [profile](../init.md#project-profiles) — 
 
 ## 1. Install the prerequisites
 
-kit needs **Node.js 22.19.0 or later** and **pnpm 12 or later**. [Install the prerequisites](./prerequisites.md) checks what you have and installs what is missing; its gh CLI step is only for the optional GitHub Issue workflow.
+kit needs the Node.js and pnpm versions [Install the prerequisites](./prerequisites.md) lists. That page checks what you have and installs what is missing; its gh CLI step is only for the optional GitHub Issue workflow.
 
 ## 2. Install kit and initialize
 
@@ -33,7 +33,7 @@ It then runs `pnpm install` and `josh format` for you, so the tools it listed ar
 
 It adds no ESLint, cspell, Playwright, Git hooks, GitHub workflows or external-service settings, and it creates no Git repository. Existing VS Code settings, such as a `[python]` section, are kept. See [init.md](../init.md#project-profiles) for how the profile is chosen.
 
-**The `preinstall` script does not scan the `pnpm install` on your machine.** It runs [safe-chain](https://github.com/AikidoSec/safe-chain)'s `setup-ci`, which only acts on a CI runner. To have local installs scanned for malware, install safe-chain as its [README](https://github.com/AikidoSec/safe-chain#installation) describes (or run `safe-chain setup` if it is already installed), then restart your terminal; until then `preinstall` prints a warning with these steps and never blocks the install. Details: [init.md → Package scripts](../init.md#package-scripts).
+**The `preinstall` script does not scan the `pnpm install` on your machine.** It fetches nothing; it only checks whether [safe-chain](https://github.com/AikidoSec/safe-chain) is scanning the install. To have local installs scanned for malware, install safe-chain with the hash-verified steps in kit's [SECURITY.md](https://github.com/joshuafolkken/kit/blob/main/SECURITY.md#installing-safe-chain), then restart your terminal; until then `preinstall` prints a warning pointing there and never blocks the install. Details: [init.md → Package scripts](../init.md#package-scripts).
 
 ## 3. Verify
 

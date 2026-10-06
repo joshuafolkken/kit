@@ -3,7 +3,7 @@ import {
 	package_pnpm_schema,
 	package_with_deps_schema,
 	workspace_overrides_schema,
-} from './schemas'
+} from './overrides-schemas'
 
 interface AddedEntry {
 	key: string

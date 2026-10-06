@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { OBSERVATION_LEDGER_DIRECTORY } from '#scripts/observations/observation-ledger'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { agent_role_profile, type AgentProfile } from './agent-role-profile'
 import { codex_agent_argv } from './codex-agent-argv'
@@ -14,6 +15,8 @@ const LANE = '/lanes/2071'
 const FIXTURE = path.join(process.cwd(), 'node_modules', '.cache', 'codex-argv-test')
 const PRIMARY = path.join(FIXTURE, 'primary')
 const GIT_COMMON_DIRECTORY = path.join(FIXTURE, 'kit with spaces', '.git')
+// The writable root is the ledger's parent, outside `docs/` since joshuafolkken/kit#3341.
+const LEDGER_PARENT = path.dirname(OBSERVATION_LEDGER_DIRECTORY)
 
 const resolve_common_directory = vi.spyOn(git_common_directory, 'resolve')
 
@@ -99,20 +102,20 @@ describe('Codex lane runtime state', () => {
 
 		const argv = codex_agent_argv.build(INVOCATION, openai_worker(), LANE)
 		const additions = argv.args.flatMap((argument, index) =>
-			argument === '--add-dir' ? [argv.args[index + 1]] : [],
+			argument === '--add-dir' ? argv.args[index + 1] : [],
 		)
 
 		expect(resolve_common_directory).toHaveBeenCalledWith(LANE)
 		expect(additions).toStrictEqual([
 			GIT_COMMON_DIRECTORY,
-			path.join(path.dirname(GIT_COMMON_DIRECTORY), 'docs'),
+			path.join(path.dirname(GIT_COMMON_DIRECTORY), LEDGER_PARENT),
 		])
 	})
 })
 
 describe('Codex lane ledger scope', () => {
 	it('creates a missing primary ledger directory before granting worker access', () => {
-		const documents = path.join(PRIMARY, 'docs')
+		const documents = path.join(PRIMARY, LEDGER_PARENT)
 
 		mkdirSync(PRIMARY, { recursive: true })
 		resolve_common_directory.mockReturnValue(path.join(PRIMARY, '.git'))
@@ -123,13 +126,13 @@ describe('Codex lane ledger scope', () => {
 	})
 
 	it('adds only the primary ledger directory for a lane worker', () => {
-		const documents = path.join(PRIMARY, 'docs')
+		const documents = path.join(PRIMARY, LEDGER_PARENT)
 
 		mkdirSync(documents, { recursive: true })
 		resolve_common_directory.mockReturnValue(path.join(PRIMARY, '.git'))
 		const argv = codex_agent_argv.build(INVOCATION, openai_worker(), LANE)
 		const additions = argv.args.flatMap((argument, index) =>
-			argument === '--add-dir' ? [argv.args[index + 1]] : [],
+			argument === '--add-dir' ? argv.args[index + 1] : [],
 		)
 
 		expect(additions).toStrictEqual([path.join(PRIMARY, '.git'), documents])
@@ -137,7 +140,7 @@ describe('Codex lane ledger scope', () => {
 	})
 
 	it('does not expose the primary ledger directory to a reviewer', () => {
-		mkdirSync(path.join(PRIMARY, 'docs'), { recursive: true })
+		mkdirSync(path.join(PRIMARY, LEDGER_PARENT), { recursive: true })
 		resolve_common_directory.mockReturnValue(path.join(PRIMARY, '.git'))
 		const argv = codex_agent_argv.build(
 			INVOCATION,
@@ -145,6 +148,6 @@ describe('Codex lane ledger scope', () => {
 			LANE,
 		)
 
-		expect(argv.args).not.toContain(path.join(PRIMARY, 'docs'))
+		expect(argv.args).not.toContain(path.join(PRIMARY, LEDGER_PARENT))
 	})
 })

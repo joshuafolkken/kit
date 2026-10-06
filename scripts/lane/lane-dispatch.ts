@@ -1,12 +1,13 @@
 import { agent_argv, type AgentArgv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import type { LabelWrite } from '#scripts/gh/git-gh-issue-write'
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { detached_launch } from '#scripts/run/detached-launch'
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ending } from '#scripts/run/run-ending'
-import { run_event_stream } from '#scripts/run/run-event-stream'
-import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
 import { run_issue_number } from '#scripts/run/run-issue-number'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
@@ -79,7 +80,7 @@ type DispatchOutcome =
 	// that marks a child as holding its lane — the lane count, the offer filter, `run:progress` and the
 	// stale check all read it — so a child that ran without it would be counted as an empty lane and
 	// handed to a second session. Refusing the launch keeps "dispatched" and "counted as busy" one state.
-	| { kind: typeof LABEL_UNSET_KIND }
+	| { kind: typeof LABEL_UNSET_KIND; reason: string }
 
 type LogOutcome = { kind: 'ready'; path: string } | { kind: 'unrecordable'; reason: string }
 
@@ -305,9 +306,10 @@ function prepared(lane: LaneInfo): Prepared {
 // to its (idempotent) apply. `issue_add_label` creates the label if the repository lacks it — a
 // `POST /issues/{N}/labels` provisions a missing label with a generated color (measured on
 // joshuafolkken/kit#1026, `git-gh-issue-write.ts`) — so no separate `label_ensure` is needed here, and
-// its `false` is a real refusal to launch rather than a note.
-async function mark_in_progress(issue: string): Promise<boolean> {
-	return await git_gh_command.issue_add_label(issue, IN_PROGRESS_LABEL)
+// its unapplied answer is a real refusal to launch rather than a note — confirmed by a read-back, so
+// a write that landed but answered with an error still launches (joshuafolkken/kit#3312).
+async function mark_in_progress(issue: string): Promise<LabelWrite> {
+	return await git_gh_command.issue_apply_label(issue, IN_PROGRESS_LABEL)
 }
 
 // The dispatch owns both halves of the marker: it applied it, so a launch that never started takes it
@@ -324,8 +326,12 @@ async function unmark_in_progress(issue: string): Promise<void> {
 
 // A started child is recorded on the run's stream, which is where the stall detector ages the last
 // dispatch from (joshuafolkken/kit#2464) — unrecorded, every stall read "hours since the last dispatch"
-// minutes after a launch. A failed start records nothing: no child is running.
+// minutes after a launch. A failed start records nothing: no child is running. The marker is claimed
+// first, so a refused one starts nothing.
 async function finish_dispatch(issue: string, request: StartRequest): Promise<DispatchOutcome> {
+	const mark = await mark_in_progress(issue)
+
+	if (!mark.is_applied) return { kind: LABEL_UNSET_KIND, reason: mark.reason }
 	const outcome = await started(request)
 
 	const is_failed = outcome.kind === 'failed'
@@ -352,8 +358,6 @@ async function dispatch_child(issue: string): Promise<DispatchOutcome> {
 	const log = await resolved_log(lane, built.profile)
 
 	if (log.kind !== 'ready') return log
-
-	if (!(await mark_in_progress(issue))) return { kind: LABEL_UNSET_KIND }
 
 	return await finish_dispatch(issue, { lane, log_path: log.path, ...built })
 }
@@ -410,7 +414,7 @@ function describe(outcome: DispatchOutcome, issue: string): string {
 	if (outcome.kind === 'unrecordable') return outcome.reason
 
 	if (outcome.kind === LABEL_UNSET_KIND) {
-		return `The child for #${issue} was not started: the \`${IN_PROGRESS_LABEL}\` label could not be applied, so the lane would be counted as empty. Nothing was launched.`
+		return `The child for #${issue} was not started: the \`${IN_PROGRESS_LABEL}\` label could not be applied (${outcome.reason}), so the lane would be counted as empty. Nothing was launched.`
 	}
 
 	if (outcome.kind === 'failed') {

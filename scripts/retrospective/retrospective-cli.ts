@@ -5,9 +5,9 @@ import { cost_run_tree } from '#scripts/cost/cost-run-tree'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { observation_ledger_line } from '#scripts/observations/observation-ledger-line'
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
-import { run_carry } from '#scripts/run/run-carry'
-import { run_event_scope, type EventScope } from '#scripts/run/run-event-scope'
-import { run_event_stream, type RunEvent } from '#scripts/run/run-event-stream'
+import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_event_scope, type EventScope } from '#scripts/run/event/run-event-scope'
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { retrospective, type RetrospectiveInputs } from './retrospective'
 
 // `josh retrospective` — the end-of-run retrospective (joshuafolkken/kit#2328). It is the aggregation

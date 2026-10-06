@@ -54,7 +54,7 @@ function pointer_topics(): ReadonlyArray<PointerTopic> {
 	return workflow_prompt_files().flatMap((path) => {
 		const skill = POINTER_DECLARATION.exec(read_repo_file(path))?.[1]
 
-		return skill === undefined ? [] : [{ skill, topic: path }]
+		return skill === undefined ? [] : { skill, topic: path }
 	})
 }
 
@@ -164,7 +164,7 @@ describe('the decision is written where the next conversion will read it', () =>
 		const content = read_unwrapped(RESIDENCY_RATIONALE)
 
 		expect(content).toContain('指し先になった話題ファイルは引用しない')
-		expect(content).toContain('その話題の本文はどのファイルにあるか')
+		expect(content).toContain("which file holds the topic's body?")
 		expect(content).toContain(POINTER_MARKER)
 	})
 

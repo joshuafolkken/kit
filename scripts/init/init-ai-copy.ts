@@ -104,8 +104,16 @@ function did_skip_copy_if_absent(
 
 // The merged file is written back, and reported as `updated`, only when the merge changed it — a
 // second `josh init` over an already-merged file reports `unchanged` (joshuafolkken/kit#2873).
+// The workspace template with the project's own `.npmrc` values carried over: once the file holds a
+// key, the merge keeps it, so this is the one chance to move the value (joshuafolkken/kit#3267).
+function read_workspace_template(source_path: string, destination_path: string): string {
+	const npmrc = file_reader.read_file_or_empty(path.join(path.dirname(destination_path), '.npmrc'))
+
+	return init_logic.carry_npmrc_settings(readFileSync(source_path, 'utf8'), npmrc)
+}
+
 function merge_existing_workspace_yaml(source_path: string, destination_path: string): void {
-	const template = readFileSync(source_path, 'utf8')
+	const template = read_workspace_template(source_path, destination_path)
 	const existing = readFileSync(destination_path, 'utf8')
 	const merged = init_logic.merge_workspace_yaml(existing, template)
 
@@ -126,7 +134,9 @@ function did_skip_workspace_yaml_copy(source_path: string, destination_path: str
 		return false
 	}
 
-	copy_ai_file(source_path, destination_path)
+	const template = read_workspace_template(source_path, destination_path)
+
+	writeFileSync(destination_path, transform_copied_content(destination_path, template))
 	console.info(`  ✔ created   ${WORKSPACE_YAML}`)
 
 	return false
@@ -385,6 +395,7 @@ const init_ai_copy = {
 	ai_file_source,
 	ai_file_mappings,
 	ensure_basic_claude_md,
+	read_workspace_template,
 }
 
 export { init_ai_copy, CLAUDE_MD_FILENAME }

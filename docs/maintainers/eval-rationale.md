@@ -1,6 +1,6 @@
 # josh eval — rationale and history
 
-History behind [eval.md](../eval.md), kept here so the user-facing page states only the rules a run
+History behind [eval.md](./eval.md), kept here so the user-facing page states only the rules a run
 follows today.
 
 ## Why the suite exists

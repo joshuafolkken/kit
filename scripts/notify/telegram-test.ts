@@ -6,13 +6,19 @@ import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { github_issue_url, type IssueUrlTarget } from '#scripts/gh/github-issue-url'
 import { git_error } from '#scripts/git/git-error'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { telegram_notify } from './telegram-notify'
 import { telegram_test_logic, type CliValues, type ResolvedContext } from './telegram-test-logic'
 
 const REPO_NAME_SEPARATOR = '/'
+const ARGV_OFFSET = 2
+
+// The free-text values a caller writes, often opening with a Markdown `-` bullet.
+const FREE_TEXT_FLAGS = ['--body', '--issue-title']
 
 function parse_cli_arguments(): CliValues {
 	const { values } = parseArgs({
+		args: [...cli_flags.attach_values(process.argv.slice(ARGV_OFFSET), FREE_TEXT_FLAGS)],
 		options: {
 			'task-type': { type: 'string' },
 			'repo-name': { type: 'string' },

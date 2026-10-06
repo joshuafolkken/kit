@@ -218,6 +218,29 @@ describe('gate_plan.check_weight — the cores a check reserves from the budget'
 	})
 })
 
+// joshuafolkken/kit#3345: a lone direct `josh test:unit` claimed every core, so FIFO admission held it
+// until the ledger emptied and every later claim from other lanes queued behind it.
+describe('gate_plan.direct_unit_weight — the cores a direct unit run reserves', () => {
+	it.each([MEASURED_CORES, MID_SIZED_CORES])(
+		'weighs a lone run on %i cores as the gate weighs its own unit step',
+		(cores) => {
+			const plan = gate_plan.resolve_gate_plan(cores)
+
+			expect(gate_plan.direct_unit_weight(cores, 0)).toBe(
+				gate_plan.check_weight(unit_check(), plan, cores),
+			)
+		},
+	)
+
+	it('never claims the whole machine', () => {
+		expect(gate_plan.direct_unit_weight(MEASURED_CORES, 0)).toBeLessThan(MEASURED_CORES)
+	})
+
+	it('claims at least one core on a runner the static checks fill', () => {
+		expect(gate_plan.direct_unit_weight(CI_CORES, 0)).toBe(1)
+	})
+})
+
 describe('gate_plan.format_gate_plan', () => {
 	it('names the width, the cap and the core count', () => {
 		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)

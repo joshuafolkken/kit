@@ -1,4 +1,5 @@
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
+import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 
 // joshuafolkken/kit#934: `josh gate`'s type-check step used to be `tsc --noEmit` for every project.
@@ -28,8 +29,6 @@ const TOOLKIT_BINS: ReadonlyArray<string> = ['josh-app', 'josh-game']
 // a bracketed warning printed first would otherwise be read as the command list.
 const USAGE_COMMANDS_PATTERN = /Usage:[^<>\n]*<([^<>\n]+)>/u
 const COMMAND_SEPARATOR = '|'
-// A toolkit that prints its usage answers in milliseconds; anything slower is hung.
-const USAGE_TIMEOUT_MS = 30_000
 
 function parse_usage_commands(output: string): ReadonlyArray<string> {
 	const group = USAGE_COMMANDS_PATTERN.exec(output)?.[1]
@@ -46,7 +45,7 @@ async function read_toolkit_commands(bin_path: string): Promise<ReadonlyArray<st
 		const result = await execa(bin_path, [], {
 			all: true,
 			reject: false,
-			timeout: USAGE_TIMEOUT_MS,
+			timeout: COMMAND_TIMEOUT_MS,
 		})
 
 		return parse_usage_commands(result.all)

@@ -281,26 +281,6 @@ describe('get_ai_copy_directories', () => {
 	})
 })
 
-describe('get_npmrc_lines', () => {
-	it('omits the GitHub Packages registry mapping for new projects', () => {
-		expect(init_logic.get_npmrc_lines()).not.toContain(
-			'@joshuafolkken:registry=https://npm.pkg.github.com',
-		)
-	})
-
-	it('omits the auth token line, which pnpm ignores unless npmrcAuthFile opts the file in', () => {
-		expect(init_logic.get_npmrc_lines().join('\n')).not.toContain('_authToken')
-	})
-
-	it('includes confirmModulesPurge=false', () => {
-		expect(init_logic.get_npmrc_lines()).toContain('confirmModulesPurge=false')
-	})
-
-	it('includes lockfile-include-tarball-url=true so pnpm >=11.5 frozen installs avoid 401', () => {
-		expect(init_logic.get_npmrc_lines()).toContain('lockfile-include-tarball-url=true')
-	})
-})
-
 describe('gitignore template content', () => {
 	const GITIGNORE_TEMPLATE_PATH = path.join(PACKAGE_ROOT, 'templates', 'gitignore')
 	const GITIGNORE_CONTENT = readFileSync(GITIGNORE_TEMPLATE_PATH, 'utf8')
@@ -315,85 +295,5 @@ describe('gitignore template content', () => {
 
 	it('does not contain bare stats.html', () => {
 		expect(GITIGNORE_CONTENT).not.toContain('\nstats.html\n')
-	})
-})
-
-const OTHER_LINE = 'other=value'
-
-describe('merge_npmrc', () => {
-	const LINES = init_logic.get_npmrc_lines()
-	const ALL_LINES = LINES.join('\n')
-
-	it('adds all lines to empty content', () => {
-		expect(init_logic.merge_npmrc('')).toBe(`${ALL_LINES}\n`)
-	})
-
-	it('appends missing lines to existing content', () => {
-		const result = init_logic.merge_npmrc(`${OTHER_LINE}\n`)
-
-		expect(result).toBe(`${OTHER_LINE}\n${ALL_LINES}\n`)
-	})
-
-	it('adds newline before appending when content lacks trailing newline', () => {
-		const result = init_logic.merge_npmrc(OTHER_LINE)
-
-		expect(result).toBe(`${OTHER_LINE}\n${ALL_LINES}\n`)
-	})
-
-	it('returns content unchanged when all lines already present', () => {
-		const content = `${ALL_LINES}\n`
-
-		expect(init_logic.merge_npmrc(content)).toBe(content)
-	})
-
-	it('adds only missing lines when some are already present', () => {
-		const partial = `${LINES.slice(0, 1).join('')}\n`
-		const result = init_logic.merge_npmrc(partial)
-
-		for (const line of LINES) expect(result).toContain(line)
-	})
-})
-
-const PLACEHOLDER_AUTH_LINE = '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}'
-const LITERAL_AUTH_LINE = '//npm.pkg.github.com/:_authToken=ghp_literal123'
-
-// Regression guard for #759: the env-var placeholder form is the live credential wherever
-// `npmrcAuthFile` declares the project .npmrc trusted, and that opt-in can live in a deploy
-// platform's dashboard, invisible here. Merging must never delete it.
-describe('merge_npmrc — existing auth lines survive', () => {
-	const LINES = init_logic.get_npmrc_lines()
-	const ALL_LINES = LINES.join('\n')
-
-	it('keeps the env-var auth line npmrcAuthFile makes live', () => {
-		const existing = `${ALL_LINES}\n${PLACEHOLDER_AUTH_LINE}\n`
-
-		expect(init_logic.merge_npmrc(existing)).toBe(existing)
-	})
-
-	it('keeps the env-var auth line while appending the missing required lines', () => {
-		const result = init_logic.merge_npmrc(`${PLACEHOLDER_AUTH_LINE}\n${OTHER_LINE}\n`)
-
-		expect(result).toContain(PLACEHOLDER_AUTH_LINE)
-		expect(result).toContain(OTHER_LINE)
-		for (const line of LINES) expect(result).toContain(line)
-	})
-
-	it('keeps a literal token line, which pnpm honors unconditionally', () => {
-		const existing = `${ALL_LINES}\n${LITERAL_AUTH_LINE}\n`
-
-		expect(init_logic.merge_npmrc(existing)).toBe(existing)
-	})
-
-	it('keeps the auth line when the content lacks a trailing newline', () => {
-		const result = init_logic.merge_npmrc(`${OTHER_LINE}\n${PLACEHOLDER_AUTH_LINE}`)
-
-		expect(result).toContain(PLACEHOLDER_AUTH_LINE)
-		expect(result).toContain(OTHER_LINE)
-	})
-
-	it('is idempotent — a second merge changes nothing', () => {
-		const once = init_logic.merge_npmrc(`${PLACEHOLDER_AUTH_LINE}\n`)
-
-		expect(init_logic.merge_npmrc(once)).toBe(once)
 	})
 })

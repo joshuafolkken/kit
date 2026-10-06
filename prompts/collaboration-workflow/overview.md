@@ -26,7 +26,7 @@
   2. **コード内コメント、テストタイトル（`describe` / `it` / `expect`）、コミットメッセージ**。
   3. **スクリプトが出力する固定文字列**: Telegram のヘッダーラベル（`Planning` / `Completion` など）、`Issue:` / `PR:` の URL ラベル、`--notify-message` 省略時の既定メッセージ。
 
-`JOSH_SESSION_LANG` は **開発者個人の設定**であり、`.env`（gitignore 済み・非コミット）に置く。**解決値は毎ターン、`UserPromptSubmit` フック（`pnpm josh session:lang`）がコンテキストへ差し込む。** フック出力を表示しないハーネス（Codex / Gemini / Cursor）は `.env` を読んで解決する。各既定の理由は `docs/maintainers/overview-rationale.md` → "Why the session language defaults the way it does" にある。
+`JOSH_SESSION_LANG` は **開発者個人の設定**であり、`.env`（gitignore 済み・非コミット）に置く。**解決値は毎ターン、`UserPromptSubmit` フック（`scripts/hooks/run-hook.sh session-lang`）がコンテキストへ差し込む。** Codex も `.codex/hooks.json` で同じフックを実行する。フックが走らないハーネス（Gemini / Cursor）は `.env` を読んで解決する。各既定の理由は `docs/maintainers/overview-rationale.md` → "Why the session language defaults the way it does" にある。
 
 ### 配布ドキュメントの層ごとの言語（joshuafolkken/kit#2997）
 
@@ -38,4 +38,4 @@
 | `prompts/` のトピックファイル（次の行の 3 文書を除く）                                  | 日本語 |
 | `prompts/review.md`、`prompts/review-rubric.md`、`prompts/sonar-hotspot-handling.md`    | 英語   |
 
-英語の層から日本語のトピックファイルの節を指すポインターは、その**見出しを原文のまま**引く（例: `principles.md` → 「クローン禁止」）。見出しは `pnpm josh doc:section` が節を引くキーであり、訳すと解決しなくなるため、これは言語の混在ではない。
+英語の層から日本語のトピックファイルの節を指すポインターは、見出しの先頭に置いた**英語 ID** を引く（例: 見出し `## no-clones — クローン禁止・…` を `principles.md` → "no-clones" で指す）。`pnpm josh doc:section` は見出しの前方一致で節を引くので、ID だけで解決し、`JOSH_SESSION_LANG=en` の利用者や日本語を読まないエージェントにも参照先が読める。ID の無い日本語見出しは原文のまま引く。

@@ -136,6 +136,14 @@ describe('create_base_config — tests block (issue #867)', () => {
 	})
 })
 
+describe('create_base_config — tests block (issue #3273)', () => {
+	it('disables no-unnecessary-parameters so fixture helpers keep their varying axis', () => {
+		const rules = rules_of(find_tests_block(build_config()))
+
+		expect(rules['unicorn/no-unnecessary-parameters']).toBe('off')
+	})
+})
+
 const EXPLICIT_RETURN_TYPE_RULE = '@typescript-eslint/explicit-function-return-type'
 const EXPLICIT_BOUNDARY_RULE = '@typescript-eslint/explicit-module-boundary-types'
 

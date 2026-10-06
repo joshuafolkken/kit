@@ -1,6 +1,6 @@
 # @joshuafolkken/kit — Overview
 
-For anyone deciding whether kit fits their project: what it sets up for each profile, and how it works. `@joshuafolkken/kit` sets up a repository for AI-assisted development: AI assistant rules, formatting and Git settings for any project, plus the full lint, type-check, test and hook toolchain for Node projects. It is framework-agnostic; the SvelteKit-specific layer lives in the separate [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) package.
+For anyone deciding whether kit fits their project: what it sets up for each profile, and how it works. kit gives Claude Code or Codex your project's rules and checks. With the workflow, the agent takes each change from Issue to merged PR. That workflow is optional: what kit sets up underneath is AI assistant rules, formatting and Git settings for any project, plus the full lint, type-check, test and hook toolchain for Node projects. It is framework-agnostic; the SvelteKit-specific layer lives in the separate [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) package.
 
 ## What it provides
 
@@ -46,11 +46,15 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 - [why.md](./why.md) — why kit exists: the pains it solves
 - [tutorial.md](./tutorial.md) — your first change with an agent, from Issue to merge
 - [how-to.md](./how-to.md) — guides by task
+- [glossary.md](./glossary.md) — the workflow's words: gate, lane, epic, profile, `auto-ok`
+- [labels-and-run-states.md](./labels-and-run-states.md) — the Issue labels and the run states the workflow reads
 
 **Commands and configuration**
 
 - [josh-commands.md](./josh-commands.md) — the `josh` commands you type by hand ([catalog](./josh-command-catalog.md) of every command)
 - [josh-commands-automation.md](./josh-commands-automation.md) — the commands hooks, workflow runs and lanes call
+- [josh-commands-run.md](./josh-commands-run.md) — the run, lane and session commands a workflow run calls
+- [josh-commands-backlog.md](./josh-commands-backlog.md) — the issue, epic, backlog and review commands a workflow run calls
 - [environment-variables.md](./environment-variables.md) — every environment variable kit reads
 - [init.md](./init.md) — what `josh init` creates
 - [sync.md](./sync.md) — what `josh sync` updates
@@ -67,5 +71,3 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 
 - [maintainers/README.md](./maintainers/README.md) — where every maintainer page starts
 - [maintainers/release.md](./maintainers/release.md) — releasing a new version
-- [publishing.md](./publishing.md) — the publish jobs and the public npm setup
-- [eval.md](./eval.md) — measuring rule adherence

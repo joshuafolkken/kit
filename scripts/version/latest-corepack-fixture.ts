@@ -8,8 +8,8 @@ import type { execaSync } from 'execa'
 type ExecaSyncResult = ReturnType<typeof execaSync>
 
 const PACKAGE_JSON_PATH = 'package.json'
-const NPMRC_PATH = '.npmrc'
-const NPMRC_AGE_1440 = 'minimum-release-age=1440\n'
+const WORKSPACE_PATH = 'pnpm-workspace.yaml'
+const WORKSPACE_AGE_1440 = 'minimumReleaseAge: 1440\n'
 // Published long enough ago to clear any quarantine window / far enough in the future to
 // stay inside every window — the two ends the age filter is exercised against.
 const AGED_PUBLISH = '2020-01-01T00:00:00.000Z'
@@ -27,8 +27,8 @@ function fake_sync_result(exit_code: number | undefined, stdout = ''): ExecaSync
 export {
 	AGED_PUBLISH,
 	fake_sync_result,
-	NPMRC_AGE_1440,
-	NPMRC_PATH,
+	WORKSPACE_AGE_1440,
+	WORKSPACE_PATH,
 	PACKAGE_JSON_PATH,
 	QUARANTINED_PUBLISH,
 }

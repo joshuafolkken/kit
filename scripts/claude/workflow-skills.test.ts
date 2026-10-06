@@ -9,14 +9,8 @@ import {
 import { resident_budget } from '#scripts/document/resident-budget'
 import { init_logic } from '#scripts/init/init-logic'
 import { describe, expect, it } from 'vitest'
-import {
-	has_frontmatter,
-	package_file,
-	read_skill_file,
-	skill_description,
-	skill_frontmatter,
-	SKILL_ROOT,
-} from './skill-fixture'
+import { package_file, read_skill_file, SKILL_ROOT } from './skill-fixture'
+import { skill_meta } from './skill-meta'
 
 // joshuafolkken/kit#854: the three AI documents are read in full on every turn, and roughly half of
 // each was procedure for a workflow most turns never enter. Those sections now live in skills the
@@ -121,15 +115,15 @@ describe.each(distributed_skill_directories())('%s — distribution', (skill_dir
 	})
 
 	it('opens with YAML frontmatter Claude Code can read', () => {
-		expect(has_frontmatter(content)).toBe(true)
+		expect(skill_meta.has_frontmatter(content)).toBe(true)
 	})
 
 	it('declares a name matching its directory', () => {
-		expect(skill_frontmatter(content)).toContain(`name: ${basename_of(skill_directory)}`)
+		expect(skill_meta.frontmatter_of(content)).toContain(`name: ${basename_of(skill_directory)}`)
 	})
 
 	it('declares a description that says when to read it', () => {
-		expect(skill_description(content).length).toBeGreaterThan(MINIMUM_DESCRIPTION_LENGTH)
+		expect(skill_meta.description_of(content).length).toBeGreaterThan(MINIMUM_DESCRIPTION_LENGTH)
 	})
 })
 
@@ -390,9 +384,11 @@ describe.each(AI_DOCS)('%s — keeps what cannot move', (document_path) => {
 		OVERRIDES_END_HEADING,
 		'Please run \\`<command>\\` to start this task.',
 		'pnpm josh notify --task-type confirmation',
-		'`parseArgs` rejects it',
 		'**NEVER** remove or modify entries in **either** location without explicit user approval.',
-		'**NEVER** modify the `devEngines` field in `package.json` without explicit user confirmation.',
+		'**NEVER** modify the `devEngines` field in `package.json` without explicit user confirmation',
+		// joshuafolkken/kit#3249: the one sanctioned change is named where the prohibition is, so a
+		// turn that never loads the skill does not revert a correct `josh latest` bump.
+		'except the `josh latest` lockstep pnpm bump, kept per the `dependency-update` skill',
 		// The three `epic:*` rules the criterion's list names. They fire the moment an issue is filed
 		// or a decision is written, on turns where no `epic:*` command was run.
 		"Recording a decision removes that child's `needs-decision` label",
@@ -412,17 +408,8 @@ describe.each(AI_DOCS)('%s — keeps what cannot move', (document_path) => {
 		},
 	)
 
-	// The criterion itself is what keeps the next rule from landing resident by default. It is stated
-	// in full in the skill; what the documents carry is the question.
-	// Both halves are pinned: the question, and the set it resolves to. A criterion whose worked
-	// examples drift from what this suite asserts resident is what let the rule be applied two ways
-	// at once (joshuafolkken/kit#951).
-	it.each([
-		'**What stays here is decided by one question: must the rule fire on a turn where no skill was loaded?**',
-		'Explicit invocation, the mid-workflow stop notification, the `overrides` / `devEngines` prohibitions, the UI-verification gate and the three `epic:*` rules below all do',
-	])('states the test for what may stay resident: %j', (marker) => {
-		expect(content).toContain(marker)
-	})
+	// The residency criterion itself is not restated here: it lives in `residency.md` (question 2) and
+	// is read only when a rule is placed (joshuafolkken/kit#3256). The markers above pin its outcome.
 })
 
 // joshuafolkken/kit#964: the residency criterion decides *whether* a rule stays; this is the guard

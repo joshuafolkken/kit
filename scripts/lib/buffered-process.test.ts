@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { SUITE_TIMEOUT_MS } from './timeouts'
 
 vi.mock('execa', () => ({
 	execa: vi.fn(),
 }))
 
-const { buffered_process, PROCESS_TIMEOUT_MS } = await import('./buffered-process')
+const { buffered_process } = await import('./buffered-process')
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 
@@ -65,7 +66,7 @@ describe('run_buffered_process', () => {
 
 		expect(spawn_options[0]?.all).toBe(true)
 		expect(spawn_options[0]?.reject).toBe(false)
-		expect(spawn_options[0]?.timeout).toBe(PROCESS_TIMEOUT_MS)
+		expect(spawn_options[0]?.timeout).toBe(SUITE_TIMEOUT_MS)
 	})
 
 	// joshuafolkken/kit#1554: `lane:open` runs its install in the work tree it just created, so a

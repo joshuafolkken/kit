@@ -115,7 +115,7 @@ const ENGLISH_DOCUMENTS: ReadonlyArray<string> = [CANONICAL_DOC]
 
 function rule_entry(rules: RuleSet, name: string): ReadonlyArray<unknown> {
 	const entry = rules[name]
-	if (!Array.isArray(entry)) throw new Error(`${name} is not configured as [severity, options]`)
+	if (!Array.isArray(entry)) throw new TypeError(`${name} is not configured as [severity, options]`)
 
 	return entry as ReadonlyArray<unknown>
 }

@@ -1,68 +1,94 @@
-# ファイル編集はコマンド本文に本文を載せない — rationale
+# File edits do not carry the file's text in a command — rationale
 
-これは `prompts/collaboration-workflow/file-edits.md` の背後にある保守者向けの根拠である — 実測値、経緯、
-そして手順の境界を正当化する議論を置く。ラン中に読まれることはない。エージェントが従うトリガ・行動・判定・
-上限はすべて手順文書に残っており、このファイルを変えても規則は何も変わらない。
+This is maintainer-only rationale behind `prompts/collaboration-workflow/file-edits.md` — the
+measurements and the arguments that justify the procedure's boundaries. No run reads it. Every
+trigger, action, verdict and limit an agent follows stays in the procedure, and a change to this file
+changes no rule.
 
-## 全文書き直しの実測
+## Measured cost of whole-file rewrites
 
-joshuafolkken/kit#1251 のランで実測した値（joshuafolkken/kit#1260）:
+Measured on the joshuafolkken/kit#1251 run (joshuafolkken/kit#1260):
 
-| ターン             | 出力トークン | 内容                                                     |
-| ------------------ | ------------ | -------------------------------------------------------- |
-| レビュー指摘の修正 | 11,104       | 2 ファイルの全文書き直し。そのランの単一ターンとして最大 |
-| 同じランの別ターン | 3,282        | 全文書き直し                                             |
+| Turn                   | Output tokens | What it was                                                     |
+| ---------------------- | ------------- | --------------------------------------------------------------- |
+| Fixing review findings | 11,104        | Whole-file rewrites of two files; the run's largest single turn |
+| Another turn, same run | 3,282         | A whole-file rewrite                                            |
 
-実効生成速度は約 87 トークン/秒なので、**この 1 ランで約 2 分 45 秒が、すでに存在する行を打ち直すことに使われている。**
+At an effective generation rate of about 87 tokens per second, **this one run spent about 2 minutes
+45 seconds retyping lines that already existed.**
 
-## コマンド本文の実測内訳
+## Measured breakdown of command text
 
-joshuafolkken/kit#1144 のランのトランスクリプトで実測した内訳（joshuafolkken/kit#1150）:
+The breakdown measured from the transcript of the joshuafolkken/kit#1144 run
+(joshuafolkken/kit#1150):
 
-| 種別                    | 割合      |
-| ----------------------- | --------- |
-| tool_result             | 37.7%     |
-| **Bash のコマンド本文** | **30.2%** |
-| thinking                | 24.9%     |
-| text                    | 4.7%      |
+| Kind                  | Share     |
+| --------------------- | --------- |
+| tool_result           | 37.7%     |
+| **Bash command text** | **30.2%** |
+| thinking              | 24.9%     |
+| text                  | 4.7%      |
 
-Bash コマンド本文 97,042 tok・427 呼び出しの内訳:
+The 97,042 tokens of Bash command text over 427 calls broke down as:
 
-| 種別                                  | 呼び出し数 | トークン   | 割合      |
-| ------------------------------------- | ---------- | ---------- | --------- |
-| `python3 - <<'PY'` 形式のファイル編集 | 145        | **79,317** | **81.7%** |
-| git / gh / pnpm                       | 140        | 12,716     | 13.1%     |
-| 読み取り・検索                        | 110        | 3,215      | 3.3%      |
-| その他                                | 32         | 1,794      | 1.8%      |
+| Kind                             | Calls | Tokens     | Share     |
+| -------------------------------- | ----- | ---------- | --------- |
+| File edits as `python3 - <<'PY'` | 145   | **79,317** | **81.7%** |
+| git / gh / pnpm                  | 140   | 12,716     | 13.1%     |
+| Reads and searches               | 110   | 3,215      | 3.3%      |
+| Other                            | 32    | 1,794      | 1.8%      |
 
-**編集スクリプトだけでセッション全体のコンテキストの約 2 割を占めていた。** 1 回あたり平均 547 tok、上位は 1,200〜1,800 tok。総量そのものより、二重計上と持続が効いている。
+**The edit scripts alone took about a fifth of the whole session's context.** They averaged 547
+tokens a call, the largest 1,200–1,800. What costs most is not the total but that each one is counted
+twice and stays in the context for the rest of the run.
 
-適用後の再計測は joshuafolkken/kit#1159 が担当する。
+Re-measuring after the rule took effect is joshuafolkken/kit#1159.
 
-## なぜ resident に置くか
+## Why it is resident
 
-residency 基準（`residency.md`）は 1 問で決まる。
+The residency criterion (`residency.md`) comes down to one question:
 
-> **その規則は、skill がロードされていないターンでも効く必要があるか。**
+> **Must the rule fire on a turn where no skill was loaded?**
 
-答えは yes である。ファイル編集はワークフローのキーワードが打たれていないターンでも起き、**編集の直前にロードされる skill は存在しない。** skill 側に本体を置いた場合、この規則は一度も発火しない — 規則を書いたのに削除したのと同じ振る舞いになる。
+Yes. File edits happen on turns where no workflow keyword was typed, and **no skill is loaded just
+before an edit.** With the body in a skill, the rule would never fire — the same behavior as writing
+the rule and then deleting it.
 
-そのうえで、常駐側に置くのは**トリガと導線だけ**である。常駐側に残すのは次の 3 点で、それだけで正しく振る舞える。
+Even so, the resident side holds **only the trigger and the pointer**. These three points are what it
+keeps, and they are enough to behave correctly:
 
-1. 領域を指定する編集は Edit で行い、インタプリタや heredoc で領域を書き戻さない
-2. **Edit 自体を全文へ広げない**（joshuafolkken/kit#1260）
-3. 判断基準は「本文を丸ごと運ぶか」であってツール名ではない（短い `sed -i` は許される）
+1. Make a region-scoped edit with Edit; never write a region back through an interpreter or a heredoc
+2. **Never widen Edit itself to the whole file** (joshuafolkken/kit#1260)
+3. The criterion is whether the call carries the text wholesale, not which tool it is (a short
+   `sed -i` is allowed)
 
-実測値・可否表・二重計上の説明・全文書き直しが許される 3 条件、そして**インタプリタの具体形**（`python3 - <<'PY'` / `node -e` / `cat > file <<'EOF'`）は `file-edits.md` にあり、常駐側からは落としている。これらは「読まなくても正しく振る舞えるが、読めばより納得できる」種類の記述だからである。**具体形を指し先へ移したのは削除ではなく移動である** — 禁止の区分は常駐側の「インタプリタや heredoc」が担い、個々の形は `file-edits.md` の可否表が担う。
+The measurements, the allowed/refused table, the double-counting explanation, the three conditions
+under which a whole-file rewrite is allowed, and **the concrete interpreter forms**
+(`python3 - <<'PY'` / `node -e` / `cat > file <<'EOF'`) live in `file-edits.md` and are left out of
+the resident side: they are the kind of text an agent behaves correctly without, and is more
+convinced with. **Moving the concrete forms to the pointer target is a move, not a deletion** — the
+resident "an interpreter or a heredoc" carries the prohibited category, and `file-edits.md`'s table
+carries the individual forms.
 
-## マーカーテスト
+## Marker tests
 
-`scripts/document/document-markers.test.ts` が次を固定する（`file-edits.md` から移した時点の記述。以下の「このファイル」は `file-edits.md` を指す）。
+No suite pins the list below any more. joshuafolkken/kit#1260 added it as
+`scripts/inline-edit-rule.test.ts`, and joshuafolkken/kit#1923 deleted that suite when phrase-pinning
+tests gave way to structural document checks; `scripts/document/document-markers.test.ts`, which
+replaced them, does not cover this rule. What is pinned today is the hook, not the wording:
+`scripts/rules/file-body.test.ts` pins which commands carry a file body and that the refusal names
+`file-edits.md`, and `scripts/rules/shell-body-rule.test.ts` pins that the `CLAUDE.md` file-edit line
+is present. The list is kept as the record of what the deleted suite held ("the procedure" below is
+`file-edits.md`):
 
-- `CLAUDE.md` に規則のトリガ文と判断基準の一文が resident で存在すること
-- `CLAUDE.md` に全文書き直しの禁止（「Edit を全文へ広げない」）が resident で存在すること
-- 常駐側がこのファイルを導線として指していること
-- このファイルが判断基準・可否表・`sed -i` の 4 条件・全文書き直しの 3 条件を持っていること
-- インタプリタの具体形 3 つ（`python3 - <<'PY'` / `node -e` / `cat > file <<'EOF'`）が常駐側にも residency 一覧にも残っておらず、このファイルにあること
-- 実測値（79,317 / 81.7% / 30.2% / 11,104 / 3,282）が常駐側にも residency 一覧にも貼り戻されていないこと
-- residency の一覧（`.claude/skills/workflow-commands/SKILL.md` と `prompts/collaboration-workflow/residency.md`）にこの規則が載っていること
+- The rule's trigger sentence and its criterion sentence are resident in `CLAUDE.md`
+- The ban on whole-file rewrites ("never widen Edit to the whole file") is resident in `CLAUDE.md`
+- The resident side points at the procedure
+- The procedure holds the criterion, the allowed/refused table, the four `sed -i` conditions and the
+  three conditions for a whole-file rewrite
+- The three concrete interpreter forms (`python3 - <<'PY'` / `node -e` / `cat > file <<'EOF'`) are on
+  neither the resident side nor the residency list, and are in the procedure
+- The measurements (79,317 / 81.7% / 30.2% / 11,104 / 3,282) have not been pasted back onto the
+  resident side or the residency list
+- The residency lists (`.claude/skills/workflow-commands/SKILL.md` and
+  `prompts/collaboration-workflow/residency.md`) name this rule

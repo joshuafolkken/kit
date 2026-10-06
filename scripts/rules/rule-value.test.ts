@@ -225,6 +225,7 @@ const UNMEASURABLE_ROWS: ReadonlyArray<string> = [
 	'raw-field-body',
 	'test-declared',
 	'lane-background',
+	'lane-split-park',
 	'lane-interactive-ask',
 	'lane-carry-conflict',
 	'lane-switch-main',
@@ -268,7 +269,9 @@ describe('rule_value.measure — rules nothing can score', () => {
 	// `third-party-write` declares none for the same reason (joshuafolkken/kit#2122) — not writing to
 	// another owner's tracker is the absence of a call, not a call; and `lane-interactive-ask` declares
 	// none for the same reason (joshuafolkken/kit#2201) — not asking a person is the absence of a call,
-	// and the compliance a routed child does make is the park `lane-park` already scores. **`rule-body`
+	// and the compliance a routed child does make is the park `lane-park` already scores; `lane-split-park`
+	// declares none for the same reason (joshuafolkken/kit#3296) — not parking a promoted epic is the
+	// absence of a call. **`rule-body`
 	// left this list in joshuafolkken/kit#2324**: the placement-verdict stand-down made keeping the rule
 	// a *recorded* act — running `pnpm josh oracle:list` and `pnpm josh run:step` — so a call now reveals
 	// the compliance the #2272 doctrine said none could, and the row declares a `keeps`. The module's

@@ -1,8 +1,8 @@
 import { git_gh_pr_read } from '#scripts/gh/git-gh-pr-read'
 import { git_command } from '#scripts/git/git-command'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { run_hold } from '#scripts/run/hold/run-hold'
 import { z } from 'zod'
-import { run_hold } from './run-hold'
 import { run_issue_number } from './run-issue-number'
 
 // The preflight check — what an interrupted run left in this working tree, and what the rule says to
@@ -230,11 +230,11 @@ async function read_tree_state(): Promise<TreeState> {
 // could not complete (joshuafolkken/kit#1048). That throw reaches the CLI as `unknown`; without it a
 // rate-limited or logged-out `gh` turns a **merged** pull request into `resume`, and the run commits
 // on top of work somebody already landed — the exact hazard `park` exists for.
-// **The second half of the same guard.** `pr_exists` refuses to read an unreadable lookup as an
-// absence, but `pr_view` still folds any failure of its own into `''` — and the two are separate
-// round trips, so a rate limit or a 5xx arriving between them would put a **merged** pull request
-// back through `NO_PR` and out as `resume`. An empty answer for a branch `pr_exists` has just
-// confirmed is therefore a failed read by construction, and it throws rather than answering.
+// **The second half of the same guard.** `pr_view` throws on a read it could not complete
+// (joshuafolkken/kit#3263), but the two are separate round trips, so a lookup that answers empty
+// between them would still put a **merged** pull request back through `NO_PR` and out as `resume`.
+// An empty answer for a branch `pr_exists` has just confirmed is therefore a failed read by
+// construction, and it throws rather than answering.
 async function read_pr_state(branch_name: string): Promise<PrState> {
 	if (!(await git_gh_pr_read.pr_exists(branch_name))) return NO_PR
 

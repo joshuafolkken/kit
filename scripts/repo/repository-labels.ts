@@ -52,9 +52,9 @@ function label_names(labels: ReadonlyArray<LabelDefinition>): ReadonlyArray<stri
 
 // An unreadable listing is not an empty one: nothing is created, and every label is reported as
 // unconfirmed rather than as missing. An unresolved repository (no GitHub remote) is the same case.
-function unreadable(repo: string | undefined): ReadonlyArray<string> {
+function unreadable(repo: string | undefined = 'this repository'): ReadonlyArray<string> {
 	const names = label_names(REPOSITORY_LABELS)
-	const target = repo ?? 'this repository'
+	const target = repo
 
 	console.warn(
 		`  ⚠ could not read the labels of ${target}; make sure these exist: ${names.join(', ')}`,

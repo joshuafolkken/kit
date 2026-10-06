@@ -23,19 +23,11 @@ function require_endpoint(versions_endpoint: string | undefined, package_name: s
 	)
 }
 
-// Fetch the latest published version: public npm's `latest` dist-tag first, which needs no
-// credentials (joshuafolkken/kit#2882), then the GitHub Packages versions endpoint for a package
-// public npm does not answer for. The endpoint is supplied per package (e.g.
-// `/users/joshuafolkken/packages/npm/kit/versions?per_page=1`) so the same fetcher serves kit, jgame,
-// and app-kit. Guards an undefined/empty endpoint and wraps `gh api` failures with an actionable
-// message instead of a raw ExecaSyncError stack. The detail is the shared layer's failure text: gh's
-// own stderr (e.g. "gh: Not Found (HTTP 404)") when it wrote one, execa's message otherwise, followed
-// by any JSON error body gh wrote to stdout.
-function fetch_latest_version(versions_endpoint: string | undefined, package_name: string): string {
-	const endpoint = require_endpoint(versions_endpoint, package_name)
-	const public_latest = npm_registry.read_latest(package_name)
-	if (public_latest !== undefined) return public_latest
-
+// The newest version name on the GitHub Packages versions endpoint. Wraps `gh api` failures with an
+// actionable message instead of a raw ExecaSyncError stack. The detail is the shared layer's failure
+// text: gh's own stderr (e.g. "gh: Not Found (HTTP 404)") when it wrote one, execa's message
+// otherwise, followed by any JSON error body gh wrote to stdout.
+function read_github_name(endpoint: string, package_name: string): string {
 	try {
 		return git_gh_exec.exec_gh_api_sync({ path: endpoint, jq_filter: '.[0].name' }).trim()
 	} catch (error) {
@@ -48,6 +40,29 @@ function fetch_latest_version(versions_endpoint: string | undefined, package_nam
 			},
 		)
 	}
+}
+
+// Refused at the source, as public npm's answer is: the value goes into an install command, so
+// anything but a semver version is never passed on (joshuafolkken/kit#3266).
+function read_github_latest(endpoint: string, package_name: string): string {
+	const name = read_github_name(endpoint, package_name)
+	const version = npm_registry.valid_version(name)
+	if (version !== undefined) return version
+
+	throw new Error(
+		`Refused latest version for ${package_name} via ${endpoint}: ${JSON.stringify(name)} is not a semver version`,
+	)
+}
+
+// Fetch the latest published version: public npm's `latest` dist-tag first, which needs no
+// credentials (joshuafolkken/kit#2882), then the GitHub Packages versions endpoint for a package
+// public npm does not answer for. The endpoint is supplied per package (e.g.
+// `/users/joshuafolkken/packages/npm/kit/versions?per_page=1`) so the same fetcher serves kit, jgame,
+// and app-kit. Guards an undefined/empty endpoint before either source is asked.
+function fetch_latest_version(versions_endpoint: string | undefined, package_name: string): string {
+	const endpoint = require_endpoint(versions_endpoint, package_name)
+
+	return npm_registry.read_latest(package_name) ?? read_github_latest(endpoint, package_name)
 }
 
 // Rewrite the endpoint's page size. The endpoint is consumer-overridable, so `per_page` is set

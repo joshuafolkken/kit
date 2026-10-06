@@ -1,4 +1,4 @@
-import { package_name_schema } from '#scripts/git/schemas'
+import { package_name_schema } from '#scripts/git/git-schemas'
 import { poll } from '#scripts/lib/poll'
 import { git_gh_pr_auto_merge } from './git-gh-pr-auto-merge'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
@@ -87,7 +87,9 @@ type ReviewDecisionPredicate = (snapshot: PrStateSnapshot) => boolean
 
 // The conservative answer, and the one every evaluator that does not say gets: read it every poll,
 // which is what all of them did before the predicate existed.
-const SHOULD_ALWAYS_READ_REVIEW_DECISION: ReviewDecisionPredicate = () => true
+function should_always_read_review_decision(): boolean {
+	return true
+}
 
 type PrStateFetcher = (
 	branch_name: string,
@@ -199,7 +201,7 @@ async function read_pr_state(
 	try {
 		const snapshot = await input.options.fetcher(
 			input.options.branch_name,
-			evaluator.should_read_review_decision ?? SHOULD_ALWAYS_READ_REVIEW_DECISION,
+			evaluator.should_read_review_decision ?? should_always_read_review_decision,
 		)
 
 		return { kind: 'read', snapshot }
@@ -297,7 +299,7 @@ async function wait_for_pr_success(options: WaitForPrSuccessOptions): Promise<Pr
 // (joshuafolkken/kit#1043).
 async function default_fetch_pr_state(
 	branch_name: string,
-	should_read_review_decision: ReviewDecisionPredicate = SHOULD_ALWAYS_READ_REVIEW_DECISION,
+	should_read_review_decision: ReviewDecisionPredicate = should_always_read_review_decision,
 ): Promise<PrStateSnapshot> {
 	const checks = await git_gh_pr_snapshot.pr_get_checks_snapshot(branch_name)
 	const snapshot = parse_pr_state_snapshot(checks.snapshot_json)
@@ -385,7 +387,7 @@ export {
 	is_pr_checks_timeout,
 	default_fetch_pr_state,
 	MERGE_GATE_EVALUATOR,
-	SHOULD_ALWAYS_READ_REVIEW_DECISION,
+	should_always_read_review_decision,
 }
 export type { MergeProgress, PrStateFetcher, PrStateEvaluator, ReviewDecisionPredicate }
 export {

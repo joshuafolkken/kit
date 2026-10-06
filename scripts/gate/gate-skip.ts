@@ -60,18 +60,42 @@ const FORCE_FLAG = '--force'
 //
 // A `base` that could not be read is `undefined`, and an older record carries none: both compare
 // unequal to anything, so the gate runs its checks. No base means no reuse, never reuse without one.
+//
+// **A refusal carries its reason** (joshuafolkken/kit#3307): a pre-push hook that fell back to the
+// whole unit suite said nothing about why, so a merge base moved by ship's main sync and a lock file
+// rewritten by the hook's own install each cost minutes before anyone could tell them apart.
+type GateReuse = { stamp: FileMapStamp } | { miss: string }
+
+function base_moved(recorded: string | undefined, base: string): string {
+	return `the merge base moved since the green gate (${recorded ?? 'none'} → ${base})`
+}
+
+function gate_reuse(
+	tree: Record<string, string>,
+	base: string | undefined,
+	source?: string,
+): GateReuse {
+	if (base === undefined) return { miss: 'the merge base could not be read' }
+	if (Object.keys(tree).length === 0) return { miss: 'no file differs from the merge base' }
+
+	const stamp = review_brief.matching_stamp(review_stamps.gate_stamp.read(source), tree)
+
+	if (stamp === undefined) return { miss: 'no green gate record matches the changed files' }
+	if (stamp.base !== base) return { miss: base_moved(stamp.base, base) }
+
+	return { stamp }
+}
+
+function stamp_of(reuse: GateReuse): FileMapStamp | undefined {
+	return 'stamp' in reuse ? reuse.stamp : undefined
+}
+
 function reusable_green_gate(
 	tree: Record<string, string>,
 	base: string | undefined,
 	source?: string,
 ): FileMapStamp | undefined {
-	if (base === undefined || Object.keys(tree).length === 0) return undefined
-
-	const stamp = review_brief.matching_stamp(review_stamps.gate_stamp.read(source), tree)
-
-	if (stamp?.base !== base) return undefined
-
-	return stamp
+	return stamp_of(gate_reuse(tree, base, source))
 }
 
 // **The sentence claims the result, and never merely the omission.** "verification skipped" on its
@@ -116,8 +140,15 @@ function format_skip(taken_at: string): string {
 	})
 }
 
-const gate_skip = { FORCE_FLAG, format_reuse_notice, format_skip, reusable_green_gate }
+const gate_skip = {
+	FORCE_FLAG,
+	format_reuse_notice,
+	format_skip,
+	gate_reuse,
+	reusable_green_gate,
+	stamp_of,
+}
 
-export type { ReuseNotice }
+export type { GateReuse, ReuseNotice }
 
 export { gate_skip }

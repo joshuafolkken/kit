@@ -109,7 +109,7 @@ function broken_cross_page_anchors(path: string, text: string): ReadonlyArray<st
 	return links.flatMap(([, file = '', anchor = '']) => {
 		const target = node_path.join(node_path.dirname(path), file)
 
-		return page_anchors(target).has(anchor) ? [] : [`${path} → ${target}#${anchor}`]
+		return page_anchors(target).has(anchor) ? [] : `${path} → ${target}#${anchor}`
 	})
 }
 

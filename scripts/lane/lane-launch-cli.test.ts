@@ -13,6 +13,10 @@ vi.mock('#scripts/lane/lane-registry', () => ({
 	lane_registry: { find_open_lane: find_open_lane_mock },
 }))
 
+const is_vacant_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/lane/lane-vacant', () => ({ lane_vacant: { is_vacant: is_vacant_mock } }))
+
 const { lane_launch_cli } = await import('./lane-launch-cli')
 
 const mocked_execa = vi.mocked(execa)
@@ -72,6 +76,8 @@ beforeEach(() => {
 	mocked_execa.mockReset()
 	find_open_lane_mock.mockReset()
 	find_open_lane_mock.mockResolvedValue(undefined)
+	is_vacant_mock.mockReset()
+	is_vacant_mock.mockResolvedValue(false)
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
@@ -209,6 +215,39 @@ describe('lane_launch_cli.launch_lane — a lane a park kept open', () => {
 		})
 		expect(called(OPEN)).toBe(true)
 		expect(called(DISPATCH)).toBe(false)
+	})
+})
+
+const CLOSE = 'lane:close'
+const LEFTOVER = { issue: ISSUE, directory: KEPT_DIR, is_stranded: false, output: undefined }
+
+// joshuafolkken/kit#3289: a run cut between `lane:open` and `lane:dispatch` leaves an empty lane.
+describe('lane_launch_cli.launch_lane — a leftover lane no child was dispatched into', () => {
+	it('closes a vacant lane and opens it afresh, so the launch succeeds', async () => {
+		find_open_lane_mock.mockResolvedValue(LEFTOVER)
+		is_vacant_mock.mockResolvedValue(true)
+		stub({ open: { code: OK, out: DIR }, dispatch: { code: OK, out: PID } })
+
+		expect(await lane_launch_cli.launch_lane({ issue: ISSUE, stash: undefined })).toStrictEqual({
+			kind: 'launched',
+			pid: PID,
+		})
+		expect(josh_run_mock.mock.calls.map((call) => (call[0] as Array<string>)[0])).toStrictEqual([
+			CLOSE,
+			OPEN,
+			DISPATCH,
+		])
+	})
+
+	it('leaves a lane with work or a live process to the lane:open refusal', async () => {
+		find_open_lane_mock.mockResolvedValue(LEFTOVER)
+		stub({ open: { code: FAILED, out: '' } })
+
+		expect(await lane_launch_cli.launch_lane({ issue: ISSUE, stash: undefined })).toStrictEqual({
+			kind: 'unopened',
+		})
+		expect(is_vacant_mock).toHaveBeenCalledWith(LEFTOVER)
+		expect(called(CLOSE)).toBe(false)
 	})
 })
 

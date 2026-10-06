@@ -108,7 +108,7 @@ than restated — and beside it the one thing this one deliberately refuses: whe
 already been filed, from a title comparison (joshuafolkken/kit#1252). **Both run**, and neither
 replaces the other: `pnpm josh issue:file` runs the scout before it creates the issue, and
 `epic:bundle` afterwards, from the real number and the relations recorded against it.
-Full behavior: `docs/josh-commands-automation.md` → "`josh issue:file`".
+Full behavior: `docs/josh-commands-backlog.md` → "`josh issue:file`".
 
 **When the relation carries an order, record it** in `blocked-by` and in the epic's `Dependencies` —
 on an addition as much as on a new epic. Without it the batch survives and the reason for it does

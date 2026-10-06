@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises'
-import { run_ship_detach } from '#scripts/run/run-ship-detach'
-import { run_ship_probe } from '#scripts/run/run-ship-probe'
+import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
+import { run_ship_probe } from '#scripts/run/ship/run-ship-probe'
 
 const POLL_MS = 250
 type ShipEnding = 'none' | 'success' | 'failed' | 'abnormal'

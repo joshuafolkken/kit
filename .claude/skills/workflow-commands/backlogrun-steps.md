@@ -143,7 +143,7 @@ be answered and every standing record is refused rather than resumed. A live PID
 the sandbox cannot read is held as `busy`.
 
 **Ask it before the plan, in the same turn as the first `git switch main && git pull`.** The contract
-is `docs/josh-commands-automation.md` → "`josh run:carry`"; what this loop does with each answer is here:
+is `docs/josh-commands-run.md` → "`josh run:carry`"; what this loop does with each answer is here:
 
 | It answers   | What the run does                                                                                                                                                                                                          |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -151,7 +151,7 @@ is `docs/josh-commands-automation.md` → "`josh run:carry`"; what this loop doe
 | `resumed`    | **This session is continuing a run that was cut** — a `--cut` handed the record off, or a `--resume` adopted it. Read the record with `--json` and take the budget figures from it, never from this session's own zero. Report the plan again — the pool has moved — and skip nothing else |
 | `busy`       | The record's **owner process is still running and no cut handed it off**: another parent is spending this budget right now. **Stop; do not open a lane.** (A record a `--cut` _did_ hand off answers `resumed` here even with its owner still alive.) Nothing here is yours to end — either that run finishes and ends its own record, or a person decides it is over |
 | `over`       | This session is over the context-cut threshold, so it claims nothing (joshuafolkken/kit#2760). **End the conversation**; retype the invocation in a fresh session |
-| `standing`   | A record is here that **no cut or supervisor handed off** — an unwatched crash, and the same command retyped over it. **Stop; do not open a lane**, and do not guess: the choice is the person's. Report the two commands the answer names — `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` to carry that budget on, or `pnpm josh run:carry --end` and begin again to discard it. Pass `--owner` to the resume as to the begin |
+| `standing`   | A record is here that **no cut or supervisor handed off** — an unwatched crash, and the same command retyped over it. **Stop; do not open a lane**: the choice is the person's. Report the two commands the answer names — `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` to carry that budget on, or `pnpm josh run:carry --end` and begin again to discard it. A crash from a run-tooling defect this run has since fixed is the one you resume yourself (`upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合") |
 | `mismatch`   | A record is here for a **different** invocation — a run that never reached `--end`. **Stop; do not open a lane**, and never resume into it. End it deliberately, with `pnpm josh run:carry --end`, once you know that run is over |
 | `expired`    | The 8-hour whole-run bound is spent. **Where a `--cut` handed the record off it is this run's own bound**, so this is the verdict on standard output and the run ends: report it and stop, and clear the record with `pnpm josh run:carry --end` once it is genuinely over. Where nothing handed it off it is printed on standard error ahead of a `began` instead — a person typing the keyword again over a spent record is starting a new run, and the record is replaced. A `--resume` over a spent record answers `expired` and adopts nothing |
 | `unreadable` | Report what it printed and **stop before opening a lane**                                                             |
@@ -161,9 +161,11 @@ is `docs/josh-commands-automation.md` → "`josh run:carry`"; what this loop doe
 child and nothing about the invocation's budget. **`--begin` claims the record exclusively and names
 the owning process, so a second parent is answered `busy`.**
 
-**Count into the record rather than into your head** — `--merged 1 --owner "$PPID"` at every child's
+**Count into the record rather than into your head** — `--merged <N> --owner "$PPID"` at every child's
 merge, `--filed 1 --owner "$PPID"` at every Issue this run files, and `--cut --owner "$PPID"`
-immediately before the cut. Every counter is an increment. **`--owner "$PPID"` is not optional on a
+immediately before the cut. `--merged` names the merged issue, never a count
+(`scripts/run/carry/run-carry-args.ts`): `run:merge` records the same issue, so a merge counted on both paths counts
+once. Every other counter is an increment. **`--owner "$PPID"` is not optional on a
 count**: a count that does not name the record's owning process is refused.
 
 **`--cut` hands the record off, and so does `run:wake` for a dead owner** (joshuafolkken/kit#2437): the
@@ -217,6 +219,9 @@ owner prevents a second driver from taking it over. On `none`, `expired` or `unr
 8-hour whole-run bound therefore still comes from the carry record. **A new authorization is still a
 person's**: the supervisor spends the declared budget and never declares another.
 
+**A supervisor stopped by a run-tooling defect is restarted by the AI once the fix lands** —
+`upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合".
+
 **What may be run is untouched.** The driver takes named issues from the invocation and pool issues
 from the existing offer command. The supervisor writes no label of its own; `auto-ok` arrives only
 through `issue:file`'s default. A judgment session receives
@@ -231,7 +236,7 @@ before each launch, and a failed named issue skips the remaining named prefix.
 
 **A person keeps control of it** — `pnpm josh run:wake --list` names the running supervisor and `--stop`
 ends it. Its failure warnings, log file, progress relay and the provider / model / effort each
-unattended role runs with are `docs/josh-commands-automation.md` → "`josh run:wake`".
+unattended role runs with are `docs/josh-commands-run.md` → "`josh run:wake`".
 
 **The completion report names how many sessions were woken beside the record's `cuts`** — one wake per
 cut is the invariant, and what counts is a carry record actually claimed, never a process started.
@@ -278,15 +283,15 @@ stop at a time.**
   one `pnpm josh issue:read <N> <N> …` call**, not a `gh api` pair per issue.
 - **Never measure in order to decide.** A question needing a benchmark, a profile, or a run of the
   thing itself is not settled here: it stays labelled and the plan says so.
-- **Label what you find.** An issue needing a person's judgement gets `needs-decision`, applied as
-  `backlogrun-park.md` → "park and continue" does. **The next plan classifies it by the label alone**,
+- **Label what you find.** An issue needing a person's judgement — `backlogrun-park.md` → "Only a
+  person's judgement carries `needs-decision`" — gets the label, applied as "park and continue" does. **The next plan classifies it by the label alone**,
   never the body.
 - **Order and isolate the pool in the same pass** (joshuafolkken/kit#2776), from the same
   `issue:read`: an issue that must land first (it builds what another reuses, or both edit one code
   path) becomes a native `blocked-by`; an issue meeting all three of the `backlogrun-lanes.md` →
   "Lanes — running more than one child at a time" conditions gets `run:solo`, **every other one `run:lane`**. Comment the reason; the offer commands enforce all
   three, answering `triage` while an issue has neither.
-- **`priority:high` puts an issue first** (joshuafolkken/kit#2928; ranking: `docs/josh-commands-automation.md` →
+- **`priority:high` puts an issue first** (joshuafolkken/kit#2928; ranking: `docs/josh-commands-backlog.md` →
   `josh backlog:next`). Apply it only on a cited ground — a stated deadline or urgency, or a person's
   written policy — commenting the ground; **never remove it**.
 - **Report the order those labels produce — `pnpm josh backlog:plan --waves`** (joshuafolkken/kit#2778),
@@ -297,8 +302,8 @@ stop at a time.**
 **`needs-decision`, `run:solo`, `run:lane` and `priority:high` are the workflow labels a run may
 apply by hand, and none is `auto-ok` or `needs-human-review`.** `needs-human-review` stays a
 person's alone (`needs-human-review.md`); `auto-ok` reaches only a run's own filing, through
-`issue:file`'s default ("What one invocation approves"). A run parks with `needs-decision` and a
-person clears it.
+`issue:file`'s default ("What one invocation approves"). A run parks with `needs-decision` only on
+`backlogrun-park.md` → "Only a person's judgement carries `needs-decision`", and a person clears it.
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the plan and the decision pass come first"
 
@@ -306,7 +311,7 @@ Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the plan an
 
 **The loop is computed, not walked by hand.** The `run:wake` supervisor runs `pnpm josh backlog:drive`,
 whose head is `pnpm josh backlog:offer`: the answer-to-budget mapping, the retry count, the `--exclude`
-feedback and the lane count are its own (`docs/josh-commands-automation.md` → "`josh backlog:offer`"
+feedback and the lane count are its own (`docs/josh-commands-backlog.md` → "`josh backlog:offer`"
 and "`josh backlog:drive`"). **An AI session reaches this section only when the driver hands a branch
 back** — the `Driver result:` line names it, and its `Next:` line is the order: claim the record with
 `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"`, act on the branch, then hand the loop
@@ -320,6 +325,9 @@ back with `pnpm josh run:carry --cut --owner "$PPID"`:
 | `merge [<token>] #N` | `run:merge` stopped on `environment`, `busy`, `retry` or `over`, or printed nothing: `environment` ends the run, the others re-read the child (`backlogrun-progress.md` → "Running a named epic's children") |
 | `watch` | The backlog drained with nothing in flight; the retrospective is owed (`run:step`) |
 | `window` | The driver's wait window ran out with nothing to judge; hand the loop back as is |
+
+**`window`, `merge busy` and `merge retry` reach a session only after the supervisor's own re-runs run
+out** (`run-wake-driver.ts`).
 
 **A candidate only in another repository is never a token** — report it with its checkout and leave it
 to a session running there (`backlogrun-lanes.md` → "Concurrency").
@@ -386,7 +394,7 @@ again at its full budget. Both are ISO-8601 timestamps (`date -u +%FT%TZ`), and 
 `--active` is refused. `--merged` is what has merged and `--running` what is still in a lane; **both
 count against the maximum**. **No ending abandons a lane**: whatever would have ended the run answers
 `watch` while `--running` is above zero, so the lanes drain and their merges reach the report. The full
-contract is `docs/josh-commands-automation.md` → "`josh backlog:budget`".
+contract is `docs/josh-commands-backlog.md` → "`josh backlog:budget`".
 
 **The completion report names three things the budgets make meaningful**: how many issues this run
 took, how many of them were picked up during an idle watch, and the termination reason — quoted from
@@ -450,7 +458,7 @@ All of these are this file's, and are reached here in the same order and for the
 | --- | --- |
 | `git switch main && git pull`, then `pnpm josh latest:scope`, then `pnpm josh lane:prune` — in the primary checkout, before the first lane opens | `backlogrun-lanes.md` → "Once per repository, before the first lane opens" |
 | `josh latest` on `required` only, asked once at the first child and never in a lane | `backlogrun-child.md` → "`josh latest` runs once per session, not once per child" |
-| `pnpm josh run:hold <N>`'s preflight check, before each child that is not in a lane — act on what it prints | `docs/josh-commands-automation.md` → "`josh run:hold`" |
+| `pnpm josh run:hold <N>`'s preflight check, before each child that is not in a lane — act on what it prints | `docs/josh-commands-run.md` → "`josh run:hold`" |
 | `pnpm josh run:progress --wait` in the background, `--mark` at every real report | `progress-watcher.md` → "Progress while the run is quiet" |
 | `pnpm josh release:scope` once, after the last issue has merged and the last lane is closed | `followup.md` → "When `pnpm josh release` runs" |
 

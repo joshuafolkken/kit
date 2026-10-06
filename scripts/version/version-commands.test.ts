@@ -1,5 +1,6 @@
 import { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { build_upgrade_command, shell_upgrade_command } from './upgrade-shell-command'
 import { create_version_command_config } from './version-command-config'
 import { version_commands } from './version-commands'
 import { fetch_latest_version } from './version-remote'
@@ -44,28 +45,56 @@ beforeEach(() => {
 	vi.clearAllMocks()
 })
 
+const SPAWN_OPTIONS = {
+	stdio: 'inherit',
+	reject: false,
+	timeout: expect.any(Number) as number,
+}
+
 describe('version_commands.run_upgrade_command', () => {
-	it('runs the command through sh -c and returns its exit code', () => {
+	it('runs the consumer command through sh -c and returns its exit code', () => {
 		const upgrade_command = 'npm i -g pkg'
 
 		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
 
-		expect(version_commands.run_upgrade_command(upgrade_command)).toBe(0)
-		expect(mocked_execa_sync).toHaveBeenCalledWith('sh', ['-c', upgrade_command], {
-			stdio: 'inherit',
-			reject: false,
-			timeout: expect.any(Number) as number,
-		})
+		expect(version_commands.run_upgrade_command(shell_upgrade_command(upgrade_command))).toBe(0)
+		expect(mocked_execa_sync).toHaveBeenCalledWith('sh', ['-c', upgrade_command], SPAWN_OPTIONS)
+	})
+
+	it('runs a kit-built command as argument vectors, never through a shell', () => {
+		const command = build_upgrade_command('1.0.0', true, config_with({}))
+
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
+		version_commands.run_upgrade_command(command)
+
+		expect(mocked_execa_sync).toHaveBeenNthCalledWith(
+			1,
+			'pnpm',
+			['add', '-D', `${KIT_PACKAGE}@1.0.0`],
+			SPAWN_OPTIONS,
+		)
+		expect(mocked_execa_sync.mock.calls.map(([file]) => file)).not.toContain('sh')
+	})
+
+	it('stops at the first failing step, as the && in its text says', () => {
+		const command = build_upgrade_command('1.0.0', true, config_with({}))
+
+		mocked_execa_sync.mockReturnValue(fake_sync_result(2))
+
+		expect(version_commands.run_upgrade_command(command)).toBe(2)
+		expect(mocked_execa_sync).toHaveBeenCalledTimes(1)
 	})
 
 	it('falls back to the failure code when exitCode is undefined', () => {
 		mocked_execa_sync.mockReturnValue(fake_sync_result(undefined))
 
-		expect(version_commands.run_upgrade_command('cmd')).toBe(1)
+		expect(version_commands.run_upgrade_command(shell_upgrade_command('cmd'))).toBe(1)
 	})
 })
 
 describe('version_commands.run_all_upgrade_commands', () => {
+	const commands = [shell_upgrade_command('a'), shell_upgrade_command('b')]
+
 	it('returns 0 and runs no command for an empty list', () => {
 		expect(version_commands.run_all_upgrade_commands([])).toBe(0)
 		expect(mocked_execa_sync).not.toHaveBeenCalled()
@@ -74,7 +103,7 @@ describe('version_commands.run_all_upgrade_commands', () => {
 	it('runs every command and returns 0 when all succeed', () => {
 		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
 
-		expect(version_commands.run_all_upgrade_commands(['a', 'b'])).toBe(0)
+		expect(version_commands.run_all_upgrade_commands(commands)).toBe(0)
 		expect(mocked_execa_sync).toHaveBeenCalledTimes(2)
 	})
 
@@ -85,7 +114,7 @@ describe('version_commands.run_all_upgrade_commands', () => {
 			.mockReturnValueOnce(fake_sync_result(3))
 			.mockReturnValueOnce(fake_sync_result(0))
 
-		expect(version_commands.run_all_upgrade_commands(['a', 'b'])).toBe(3)
+		expect(version_commands.run_all_upgrade_commands(commands)).toBe(3)
 		expect(mocked_execa_sync).toHaveBeenCalledTimes(2)
 		expect(error_spy).toHaveBeenCalledWith(
 			expect.stringContaining('successful steps remain applied'),
@@ -136,7 +165,7 @@ describe('version_commands.run_upgrade for a package with no upstreams', () => {
 		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
 		expect(version_commands.run_upgrade(config_with({}))).toBe(0)
-		expect(mocked_execa_sync).toHaveBeenCalledTimes(2)
+		expect(mocked_execa_sync).toHaveBeenCalledTimes(3)
 		expect(info_spy).not.toHaveBeenCalled()
 		info_spy.mockRestore()
 	})

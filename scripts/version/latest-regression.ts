@@ -1,4 +1,4 @@
-import { package_with_deps_schema } from '#scripts/overrides/schemas'
+import { package_with_deps_schema } from '#scripts/overrides/overrides-schemas'
 import semver from 'semver'
 
 // `pnpm update --latest` sets each range to whatever the registry reports as newest. When a

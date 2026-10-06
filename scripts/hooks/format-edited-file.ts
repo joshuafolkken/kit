@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_local_bin, resolve_package_bin } from '#scripts/build/local-bin'
 import { ESLINT_EDIT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
+import { HOOK_PROCESS_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { execa } from 'execa'
 import { z } from 'zod'
@@ -87,15 +88,6 @@ const DAEMON_RESTART = 'restart'
 // `eslint.config.*` entry, and the rule modules under `eslint/` that it imports.
 const ESLINT_CONFIG_DIR = 'eslint'
 const ESLINT_CONFIG_ENTRY = /^eslint\.config\.[cm]?[jt]s$/u
-// A formatter that hangs would hold the edit's turn open, so each spawn is bounded. The bound has
-// to be read against the *worst-case run* rather than one spawn: an edit to a config input plans
-// eslint, prettier and `eslint_d restart`, and the first and last each have a second route behind
-// the daemon — five spawns. The hook entry in `.claude/settings.json` declares 90 seconds, so the
-// per-spawn bound must leave five of them under it, or the harness kill lands first and lands at a
-// moment this file did not choose — possibly inside `prettier --write`, which rewrites in place and
-// can leave the file truncated. 15s × 5 = 75s. It is still two orders of magnitude beyond the 0.84s
-// a warm run takes, so reaching it means something is already wrong.
-const PROCESS_TIMEOUT_MS = 15_000
 
 // The problems eslint could not auto-fix are handed to the model verbatim from eslint's own stdout —
 // its default formatter already prints the file, the `line:col`, and the rule name the issue asks
@@ -315,7 +307,7 @@ async function spawn_invocation(
 		env: { ESLINT_D_MISS: 'fail' },
 		stdout: 'pipe',
 		stderr: 'ignore',
-		timeout: PROCESS_TIMEOUT_MS,
+		timeout: HOOK_PROCESS_TIMEOUT_MS,
 	})
 
 	return { exit_code: result.exitCode ?? 1, stdout: result.stdout }
@@ -469,7 +461,7 @@ function report_no_payload(): void {
 // have (joshuafolkken/kit#2314). The rewrite, lint and spell blocks are composed together first, then
 // joined to the density line — one envelope, since a `PostToolUse` hook's stdout carries only one
 // (joshuafolkken/kit#2296). A hook killed at its 15s timeout is the one case this loses the density
-// line to — a run already gone pathologically wrong, per PROCESS_TIMEOUT_MS.
+// line to — a run already gone pathologically wrong, per HOOK_PROCESS_TIMEOUT_MS.
 async function run_hook(payload: string): Promise<void> {
 	const notice = time_density_hook.density_notice(payload)
 	const file_path = parse_edited_path(payload)
@@ -500,6 +492,5 @@ export {
 	select_invocation,
 	ESLINT_DAEMON,
 	MAX_DIAGNOSTIC_CHARS,
-	PROCESS_TIMEOUT_MS,
 }
 export type { CommandRunner, FormatCommand }

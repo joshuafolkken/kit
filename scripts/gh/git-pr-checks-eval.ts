@@ -191,9 +191,7 @@ function evaluate_pr_state(snapshot: PrStateSnapshot): PrEvaluation {
 
 	if (failure !== undefined) return failure
 
-	if (is_mergeable_state(snapshot) && is_every_required_passing(statuses)) {
-		return 'success'
-	}
+	if (is_mergeable_state(snapshot) && is_every_required_passing(statuses)) return 'success'
 
 	return 'pending'
 }

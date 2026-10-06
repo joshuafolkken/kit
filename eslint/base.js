@@ -13,6 +13,7 @@ import ts from 'typescript-eslint'
 import { checkout_rooted_parser } from './checkout-rooted-parser.js'
 import { config_fingerprint } from './config-fingerprint.js'
 import { code_quality_rules } from './rules/code-quality.js'
+import { early_return_one_liner_rule } from './rules/early-return-one-liner.js'
 import { formatting_rules } from './rules/formatting.js'
 import { import_rules } from './rules/import.js'
 import { namespace_object_export_rule } from './rules/namespace-object-export.js'
@@ -40,6 +41,14 @@ const FILE_PATTERNS = {
 	// file that was failing anyway.
 	tests: ['**/*.test.ts', '**/*.e2e.ts'],
 	eslint_rules: ['eslint/**/*.ts', 'eslint/rules/**/*.js'],
+	// joshuafolkken/kit#3294: the SvelteKit convention files, whose named exports — route handlers,
+	// `load`, `handle`, `match` — are typed through a const annotation (`export const GET:
+	// RequestHandler = …`). That idiom is the one place `func-style` allows an arrow const.
+	sveltekit_typed_exports: [
+		'**/src/routes/**/+*.{ts,js}',
+		'**/src/hooks{.server,.client,}.{ts,js}',
+		'**/src/params/**/*.{ts,js}',
+	],
 }
 
 // One test-filename ban block. Both bans differ only in their glob and their message, so the shape
@@ -128,12 +137,18 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			// way the test-filename bans are.
 			plugins: {
 				'@stylistic': stylistic,
-				local: { rules: { 'namespace-object-export': namespace_object_export_rule } },
+				local: {
+					rules: {
+						'namespace-object-export': namespace_object_export_rule,
+						'early-return-one-liner': early_return_one_liner_rule,
+					},
+				},
 			},
 			languageOptions: { globals: { ...globals.browser, ...globals.node } },
 			rules: {
 				'no-undef': 'off',
 				'local/namespace-object-export': 'error',
+				'local/early-return-one-liner': 'error',
 				...naming_convention_rules,
 				...typescript_rules,
 				...code_quality_rules,
@@ -145,6 +160,10 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			},
 		},
 		{ files: FILE_PATTERNS.d_ts, rules: { 'import/no-default-export': 'off' } },
+		{
+			files: FILE_PATTERNS.sveltekit_typed_exports,
+			rules: { 'func-style': ['error', 'declaration', { allowTypeAnnotation: true }] },
+		},
 		{
 			files: FILE_PATTERNS.typescript,
 			ignores: ['**/*.svelte.ts'],
@@ -178,6 +197,9 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 				'no-console': ['error', { allow: ['warn', 'error', 'info'] }],
 				// vi mock/stub patterns require explicit undefined (mockResolvedValue/stubGlobal)
 				'unicorn/no-useless-undefined': 'off',
+				// A fixture helper's parameter names the axis a test varies, even while every current
+				// call passes the same value; inlining it hides that axis until the next case re-adds it.
+				'unicorn/no-unnecessary-parameters': 'off',
 				// describe-scoped `let` assigned in beforeEach is the standard vitest fixture shape;
 				// the declaration cannot be initialized where it is declared.
 				'init-declarations': 'off',

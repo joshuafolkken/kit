@@ -2,6 +2,8 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The macOS `sysctl` key the lane-limit measurement reads swap from (#3355).
+  - swapusage
   # A run trying kit's distribution on a throwaway project of its own (#3142).
   - dogfood
   # The workflow command that stops at a green, mergeable pull request (#3023).
@@ -225,7 +227,7 @@ words:
   - refusable
   - runnability
   # The outcome `josh lane:dispatch` answers with when a lane's log path could not be recorded
-  # (joshuafolkken/kit#1749), and the anchor of `docs/josh-commands-automation.md` → "`josh run:wake`", which a
+  # (joshuafolkken/kit#1749), and the anchor of `docs/josh-commands-run.md` → "`josh run:wake`", which a
   # document-rule test quotes verbatim.
   - unrecordable
   - runwake

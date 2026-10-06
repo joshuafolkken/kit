@@ -1,4 +1,5 @@
 import { read_spawn_stderr, read_spawn_stdout } from '#scripts/lib/spawn-exit'
+import { GIT_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execaSync } from 'execa'
 import { git_utilities } from './constants'
 
@@ -7,7 +8,6 @@ import { git_utilities } from './constants'
 // non-zero exit is returned as a result, and every call is bounded: a git that never answers is an
 // unknown the caller already handles, never a hang.
 
-const GIT_TIMEOUT_MS = 10_000
 const SUCCESS_EXIT_CODE = 0
 // git translates its messages, so a caller matching stderr would fail under any non-English locale.
 const C_LOCALE: Record<string, string> = { LC_ALL: 'C', LANGUAGE: 'C' }
@@ -16,6 +16,8 @@ interface GitSyncOptions {
 	cwd?: string
 	timeout?: number
 	env?: Record<string, string | undefined>
+	// A step a person watches (`josh start`) shows git's own progress and hook output as it runs.
+	stdio?: 'inherit'
 }
 
 interface GitSyncResult {

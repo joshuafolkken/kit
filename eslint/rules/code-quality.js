@@ -11,6 +11,9 @@ export const code_quality_rules = {
 	'prefer-const': 'error',
 	// アロー関数を優先（名前付き関数式はスタックトレース可読性のため許可）
 	'prefer-arrow-callback': ['error', { allowNamedFunctions: true }],
+	// 関数は function 宣言で書く（joshuafolkken/kit#3294）。SvelteKit の型付き const export は
+	// eslint/base.js が該当ファイルだけ allowTypeAnnotation で許可する
+	'func-style': ['error', 'declaration'],
 	// テンプレートリテラルを優先
 	'prefer-template': 'error',
 	// 等価演算子は厳密等価を使用

@@ -1,3 +1,5 @@
+import { core_budget } from '#scripts/gate/core-budget'
+import { gate_plan } from '#scripts/gate/gate-plan'
 import { GATE_COMMAND, type CommandEntry } from './josh-command-types'
 
 const FILE_ARGUMENTS = '[files...]'
@@ -25,18 +27,21 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Check code with prettier and eslint (skips a tool a basic project lacks)',
 		category: 'Development',
 		reference: ['', 'developer', ['processes']],
+		core_weight: core_budget.CORE_WEIGHTS.lint,
 	},
 	'lint:related': {
 		script: 'scripts/lint/lint-related.ts',
 		description: 'Check only the changed files with prettier and eslint (whole tree on fallback)',
 		category: 'Development',
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],
+		core_weight: core_budget.CORE_WEIGHTS.lint,
 	},
 	lines: {
 		script: 'scripts/lines/lines-command.ts',
 		description: "Print a file's code lines against the max-lines limit and the headroom left",
 		category: 'Development',
 		reference: [REQUIRED_FILE_ARGUMENTS, 'developer', ['none']],
+		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
 	},
 	'refactor:scan': {
 		script: 'scripts/refactor/refactor-scan-cli.ts',
@@ -44,6 +49,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'List refactoring candidates in the changed scope by category and answer clear/candidates',
 		category: 'Development',
 		reference: ['', 'automation', ['processes']],
+		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
 	},
 	bytes: {
 		script: 'scripts/lines/bytes-command.ts',
@@ -130,6 +136,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Run spell check including dotfiles',
 		category: 'Development',
 		reference: ['', 'developer', ['processes']],
+		core_weight: core_budget.CORE_WEIGHTS.spell_check,
 	},
 	behavior: {
 		script: 'scripts/behavior/behavior-cli.ts',
@@ -151,12 +158,14 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'Run unit tests with Vitest (skips when Vitest is absent; fails when it has no tests)',
 		category: 'Development',
 		reference: [FILTER_ARGUMENTS, 'developer', ['processes']],
+		core_weight: gate_plan.direct_unit_weight,
 	},
 	'test:related': {
 		script: 'scripts/test/test-related.ts',
 		description: 'Run only the unit tests related to the changed files (full suite on fallback)',
 		category: 'Development',
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],
+		core_weight: gate_plan.direct_unit_weight,
 	},
 	'test:declared': {
 		script: 'scripts/test/test-declared.ts',
@@ -203,6 +212,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Type-check with tsc (skips a basic project with no TypeScript to check)',
 		category: 'Development',
 		reference: ['[arguments...]', 'developer', ['processes']],
+		core_weight: core_budget.CORE_WEIGHTS.type_check,
 	},
 	port: {
 		script: 'scripts/ports/port-command.ts',

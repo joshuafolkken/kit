@@ -24,7 +24,11 @@ const A_LATER_CALL_MS = NOW_MS + 60_000
 const CLAUDE_PATH = '/repo/CLAUDE.md'
 const SCRIPT_PATH = '/repo/scripts/foo.ts'
 const NEW_PROMPT_PATH = '/repo/prompts/new-rule.md'
-const EMPTY = (): string => ''
+
+function empty_output(): string {
+	return ''
+}
+
 const RULE_DELIVERY = 'prompts/collaboration-workflow/rule-delivery.md'
 const RESIDENCY = 'prompts/collaboration-workflow/residency.md'
 const FIRING_SUITE = 'scripts/rules/rule-body-guard.test.ts'
@@ -154,7 +158,7 @@ describe('writes_rule_prose — Write reads the existing file for its old text',
 	it('fires on a Write that creates a new rule document', () => {
 		const call = { name: WRITE, input: { file_path: NEW_PROMPT_PATH, content: RULE_SENTENCE } }
 
-		expect(rule_body_guard.writes_rule_prose(call, EMPTY)).toBe(true)
+		expect(rule_body_guard.writes_rule_prose(call, empty_output)).toBe(true)
 	})
 
 	// A rewrite that adds little over the existing text is not an append.

@@ -43,12 +43,12 @@ function checkout_refusal(root: string, kit_root: string): string | undefined {
 }
 
 function history_refusal(root: string): string | undefined {
-	const top_level = start_exec.read_output('git', ['rev-parse', '--show-toplevel'], root)
+	const top_level = start_exec.git_read(['rev-parse', '--show-toplevel'], root)
 
 	if (top_level === undefined) return undefined
 	if (realpathSync(top_level) !== root) return 'the directory is inside another git repository'
 
-	const has_commits = start_exec.succeeds('git', ['rev-parse', '--verify', '--quiet', 'HEAD'], root)
+	const has_commits = start_exec.git_succeeds(['rev-parse', '--verify', '--quiet', 'HEAD'], root)
 
 	return has_commits ? 'the repository already has commits' : undefined
 }

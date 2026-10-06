@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { git_utilities } from '#scripts/git/constants'
+import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { doctor_io } from './doctor-io'
@@ -137,7 +138,7 @@ describe('resolve_git_top_level — when git cannot answer', () => {
 			['rev-parse', '--show-toplevel'],
 			{
 				reject: false,
-				timeout: doctor_io.GIT_TIMEOUT_MS,
+				timeout: PROBE_TIMEOUT_MS,
 				// Pinned so the stderr match below is not defeated by a translated git message.
 				env: { LC_ALL: 'C', LANGUAGE: 'C' },
 				extendEnv: true,

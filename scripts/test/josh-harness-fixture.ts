@@ -2,9 +2,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
-import { run_carry } from '#scripts/run/run-carry'
-import { execaSync } from 'execa'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { run_carry } from '#scripts/run/carry/run-carry'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { josh_harness, type EnvironmentKind, type JoshEnvironment } from './josh-harness'
 
 // The harness suites are split by the environments they open (joshuafolkken/kit#3083): each file
@@ -26,6 +25,19 @@ const ROUND_ISSUE = 101
 type FixtureKind = Exclude<EnvironmentKind, 'packed'>
 type EnvironmentLookup = (kind: FixtureKind) => JoshEnvironment
 
+// After each test, kills every process tree the test left running (joshuafolkken/kit#3309). A test
+// vitest timed out is still awaiting its child, so the leftovers are named in the failure — the
+// command and how long it ran — rather than writing on into a workspace about to be removed.
+function stop_leftovers_after_each(): void {
+	afterEach(() => {
+		const leftovers = josh_harness.stop_all()
+
+		if (leftovers.length > 0) {
+			throw new Error(`harness subprocesses were still running:\n${leftovers.join('\n')}`)
+		}
+	})
+}
+
 // Opens one environment per kind before the file's tests and removes them all after. The map is the
 // calling file's own, so a worker that runs several files without isolation never shares one.
 function open_environments(kinds: ReadonlyArray<FixtureKind>): EnvironmentLookup {
@@ -36,7 +48,10 @@ function open_environments(kinds: ReadonlyArray<FixtureKind>): EnvironmentLookup
 		for (const kind of kinds) environments.set(kind, await josh_harness.open_environment(kind))
 	}, SETUP_TIMEOUT_MS)
 
+	stop_leftovers_after_each()
+
 	afterAll(() => {
+		josh_harness.stop_all()
 		for (const opened of environments.values()) josh_harness.close_environment(opened)
 	})
 
@@ -68,20 +83,21 @@ function ledger_text(directory: string, issue: number): string {
 	return readFileSync(ledger_at(directory, issue), 'utf8')
 }
 
-function carry_target(opened: JoshEnvironment): string {
-	const git_directory = execaSync('git', ['rev-parse', '--git-common-dir'], {
+async function carry_target(opened: JoshEnvironment): Promise<string> {
+	const { stdout } = await josh_harness.run_command('git', ['rev-parse', '--git-common-dir'], {
 		cwd: opened.root,
 		env: git_location_environment.location_free_environment(),
-	}).stdout
+		timeout_ms: josh_harness.DEFAULT_TIMEOUT_MS,
+	})
 
-	return run_carry.carry_path(path.resolve(opened.root, git_directory))
+	return run_carry.carry_path(path.resolve(opened.root, stdout))
 }
 
-function run_only_driver(opened: JoshEnvironment): void {
-	const target = carry_target(opened)
+async function run_only_driver(opened: JoshEnvironment): Promise<void> {
+	const target = await carry_target(opened)
 
 	run_carry.begin_carry(target, 'backlogrun --only', run_carry.owner_of(process.pid))
-	const result = josh_harness.run(opened, [
+	const result = await josh_harness.run(opened, [
 		'backlog:drive',
 		'--owner',
 		String(process.pid),
@@ -93,26 +109,28 @@ function run_only_driver(opened: JoshEnvironment): void {
 	expect(run_carry.read_carry(target).kind).toBe('none')
 }
 
-function record_round(opened: JoshEnvironment): void {
+async function record_round(opened: JoshEnvironment): Promise<void> {
 	const issue = String(ROUND_ISSUE)
 
-	expect(josh_harness.run(opened, [RECORD, '--issue', issue]).exit_code).toBe(0)
-	expect(josh_harness.run(opened, [RECORD, '--check', '--issue', issue]).exit_code).toBe(0)
+	const recorded = await josh_harness.run(opened, [RECORD, '--issue', issue])
+	const checked = await josh_harness.run(opened, [RECORD, '--check', '--issue', issue])
+
+	expect([recorded.exit_code, checked.exit_code]).toStrictEqual([0, 0])
 	expect(ledger_text(opened.root, ROUND_ISSUE)).toContain(`#${issue}`)
 }
 
 // The gate runs its checks as `pnpm josh <check>` in the environment; a `josh` that resolved to a
 // global install passed locally and was missing in CI. A decoy `josh` first on PATH that always
 // fails stands in for both, so only the environment's own script can answer.
-function run_own_script(opened: JoshEnvironment): void {
+async function run_own_script(opened: JoshEnvironment): Promise<void> {
 	const decoy_path = decoy_bin(opened.workspace)
-	const result = execaSync('pnpm', ['josh', 'help'], {
+	const result = await josh_harness.run_command('pnpm', ['josh', 'help'], {
 		cwd: opened.root,
 		env: { PATH: `${decoy_path}${path.delimiter}${process.env['PATH'] ?? ''}` },
-		reject: false,
+		timeout_ms: josh_harness.DEFAULT_TIMEOUT_MS,
 	})
 
-	expect(result.exitCode, result.stderr).toBe(0)
+	expect(result.exit_code, result.stderr).toBe(0)
 }
 
 // The scenarios every state-writing environment has to pass, registered once per kind by the file
@@ -121,22 +139,22 @@ function describe_environment(kind: FixtureKind, environment: EnvironmentLookup)
 	describe(`josh harness — the ${kind} environment`, () => {
 		it(
 			'finishes a supervised only-mode backlog through the real driver',
-			() => {
-				run_only_driver(environment(kind))
+			async () => {
+				await run_only_driver(environment(kind))
 			},
 			SCENARIO_TIMEOUT_MS,
 		)
 		it(
 			'records a review round and finds it again',
-			() => {
-				record_round(environment(kind))
+			async () => {
+				await record_round(environment(kind))
 			},
 			SCENARIO_TIMEOUT_MS,
 		)
 		it(
 			'runs `pnpm josh` through its own script, not a `josh` on PATH',
-			() => {
-				run_own_script(environment(kind))
+			async () => {
+				await run_own_script(environment(kind))
 			},
 			SCENARIO_TIMEOUT_MS,
 		)
@@ -153,6 +171,7 @@ const josh_harness_fixture = {
 	ledger_at,
 	ledger_text,
 	open_environments,
+	stop_leftovers_after_each,
 }
 
 export type { EnvironmentLookup, FixtureKind }

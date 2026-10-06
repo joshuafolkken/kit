@@ -1,7 +1,8 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { josh_command } from '#scripts/josh/josh-run'
-import { lane_registry } from '#scripts/lane/lane-registry'
+import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_vacant } from '#scripts/lane/lane-vacant'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
@@ -88,16 +89,29 @@ type LaunchOutcome = { kind: 'launched'; pid: string } | { kind: 'unopened' } | 
 const UNOPENED: LaunchOutcome = { kind: 'unopened' }
 const FAILED: LaunchOutcome = { kind: 'failed' }
 
+async function close_if_vacant(lane: LaneInfo | undefined): Promise<void> {
+	if (lane === undefined || !(await lane_vacant.is_vacant(lane))) return
+
+	await josh_command.josh_run(['lane:close', lane.issue], should_forward_stderr)
+}
+
 // **A lane a park kept open is resumed, not reopened** (joshuafolkken/kit#3228). A child parked before
 // its commit leaves its uncommitted work in its lane, and `lane:open` refuses that lane as
 // `already-open` — so the released child is dispatched into the kept tree instead. **Only a lane a
 // child was already dispatched into counts as kept**: `lane:dispatch` records the child's output in the
 // lane's `.env`, and a lane whose install failed never got that far, so it still goes through
 // `lane:open` and its refusal. So does a stranded lane, whose `.env` is gone with its tree.
+//
+// **A lane no child was dispatched into and that holds nothing is closed and opened afresh**
+// (joshuafolkken/kit#3289) — a run cut between the open and the dispatch leaves one. It is reopened
+// rather than reused because nothing recorded whether its install finished. A lane with work or a live
+// process in it still meets `lane:open`'s refusal.
 async function lane_directory(issue: string): Promise<string | undefined> {
 	const kept = await lane_registry.find_open_lane(issue)
 
 	if (kept?.output !== undefined) return kept.directory
+
+	await close_if_vacant(kept)
 
 	const opened = await josh_command.josh_run(['lane:open', issue], should_forward_stderr)
 

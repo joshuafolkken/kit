@@ -2,7 +2,7 @@ function extract_yaml_top_level_keys(content: string): Array<string> {
 	return content.split('\n').flatMap((line) => {
 		const key = /^([a-zA-Z][a-zA-Z0-9_-]*):/u.exec(line)?.[1]
 
-		return key ? [key] : []
+		return key ?? []
 	})
 }
 
@@ -125,6 +125,45 @@ function add_missing_build_entries(existing: string, template: string): string {
 	return existing.replace(block, () => [block, ...missing].join('\n'))
 }
 
+interface MovedNpmrcSetting {
+	npmrc_key: string
+	workspace_key: string
+	value_pattern: RegExp
+}
+
+// `.npmrc` settings pnpm 12 reads only from `pnpm-workspace.yaml`, with the value shape each takes.
+// A project's own value (a longer age window, `engine-strict=false`) replaces the template's, so the
+// move neither loosens nor tightens what the project chose (joshuafolkken/kit#3267).
+const MOVED_NPMRC_SETTINGS: ReadonlyArray<MovedNpmrcSetting> = [
+	{ npmrc_key: 'minimum-release-age', workspace_key: 'minimumReleaseAge', value_pattern: /^\d+$/u },
+	{ npmrc_key: 'engine-strict', workspace_key: 'engineStrict', value_pattern: /^(?:true|false)$/u },
+]
+
+// The last assignment wins, as it does when npm reads the file.
+function npmrc_value(npmrc: string, key: string): string | undefined {
+	const pattern = new RegExp(String.raw`^[ \t]*${key}[ \t]*=[ \t]*(\S+)[ \t]*$`, 'gmu')
+
+	return [...npmrc.matchAll(pattern)].at(-1)?.[1]
+}
+
+function carry_npmrc_setting(template: string, npmrc: string, setting: MovedNpmrcSetting): string {
+	const value = npmrc_value(npmrc, setting.npmrc_key)
+	if (value === undefined || !setting.value_pattern.test(value)) return template
+	const line_pattern = new RegExp(`^${setting.workspace_key}:.*$`, 'mu')
+
+	return template.replace(line_pattern, () => `${setting.workspace_key}: ${value}`)
+}
+
+function carry_npmrc_settings(template: string, npmrc: string): string {
+	let result = template
+
+	for (const setting of MOVED_NPMRC_SETTINGS) {
+		result = carry_npmrc_setting(result, npmrc, setting)
+	}
+
+	return result
+}
+
 function merge_workspace_yaml(existing: string, template: string): string {
 	if (!existing.trim()) return template
 	const normalized = existing.endsWith('\n') ? existing : `${existing}\n`
@@ -138,6 +177,6 @@ function merge_workspace_yaml(existing: string, template: string): string {
 	return append_user_blocks(cleaned, new_keys, template)
 }
 
-const init_logic_workspace = { merge_workspace_yaml, template_build_values }
+const init_logic_workspace = { carry_npmrc_settings, merge_workspace_yaml, template_build_values }
 
 export { init_logic_workspace }

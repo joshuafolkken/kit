@@ -24,24 +24,4 @@ function read_skill_file(skill_directory: string, filename: string = SKILL_ENTRY
 	return readFileSync(package_file(`${skill_directory}/${filename}`), 'utf8')
 }
 
-function has_frontmatter(content: string): boolean {
-	return skill_meta.has_frontmatter(content)
-}
-
-function skill_frontmatter(content: string): string {
-	return skill_meta.frontmatter_of(content)
-}
-
-function skill_description(content: string): string {
-	return skill_meta.description_of(content)
-}
-
-export {
-	has_frontmatter,
-	package_file,
-	read_skill_file,
-	skill_description,
-	SKILL_ENTRY_FILE,
-	SKILL_ROOT,
-	skill_frontmatter,
-}
+export { package_file, read_skill_file, SKILL_ENTRY_FILE, SKILL_ROOT }

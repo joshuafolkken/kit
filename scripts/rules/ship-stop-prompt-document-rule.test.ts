@@ -1,5 +1,5 @@
 import { read_repo_file } from '#scripts/document/ai-document-fixture'
-import { run_ship_next } from '#scripts/run/run-ship-next'
+import { run_ship_next } from '#scripts/run/ship/run-ship-next'
 import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#2964. The ship-stop prompt carries the command that resumes a stopped stage, written
