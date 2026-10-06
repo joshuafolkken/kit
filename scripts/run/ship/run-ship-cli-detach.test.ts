@@ -1,7 +1,8 @@
+import type { josh_command } from '#scripts/josh/josh-run'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 
-const josh_run_mock = vi.hoisted(() => vi.fn())
+const josh_run_mock = vi.hoisted(() => vi.fn<typeof josh_command.josh_run>())
 const detach_mock = vi.hoisted(() => vi.fn())
 const read_log_mock = vi.hoisted(() => vi.fn())
 const is_supervised_mock = vi.hoisted(() => vi.fn())
@@ -38,7 +39,15 @@ vi.mock('./run-ship-scoped', async (import_original) => {
 		.fn<typeof real_scoped.scoped_pair>()
 		.mockResolvedValue({ code: 0, out: '' })
 
-	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_pair } }
+	// The real `scoped_gate` calls its own module's pair, so it is rebuilt around the mocked one.
+	async function scoped_gate(): ReturnType<typeof real_scoped.scoped_gate> {
+		return await actual.run_ship_scoped.run_phases([
+			scoped_pair,
+			async () => await josh_run_mock(['gate'], true),
+		])
+	}
+
+	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_gate, scoped_pair } }
 })
 vi.mock('./run-ship-detach', () => ({
 	run_ship_detach: {

@@ -48,21 +48,19 @@ const PREFLIGHT_STEP: Step = {
 // with no green record (joshuafolkken/kit#2946). The commit step carries the `--skip-*` flags a resumed
 // ship needs, so an existing commit or push is never made twice.
 const COMMIT_STEPS: ReadonlyArray<Step> = [
-	{
-		stage: STAGE.GATE,
-		header: run_ship.GATE_HEADER,
-		run: async () =>
-			await run_ship_scoped.run_phases([
-				run_ship_scoped.scoped_pair,
-				async () => await josh(['gate']),
-			]),
-	},
-	// joshuafolkken/kit#3221: the default branch merged again right before the commit, so the pull
-	// request opens on a branch that is current; a clean merge goes on without waking anyone.
+	// joshuafolkken/kit#3221: the default branch merged again before the commit, so the pull request
+	// opens on a branch that is current; a clean merge goes on without waking anyone. It runs before the
+	// gate (joshuafolkken/kit#3307): a merge after it moved the merge base the gate's record pins, so the
+	// pre-push hook could never reuse that record and re-ran the whole unit suite on every merged ship.
 	{
 		stage: STAGE.SYNC,
 		header: run_ship.SYNC_HEADER,
 		run: async () => await run_ship_sync.sync_stage(),
+	},
+	{
+		stage: STAGE.GATE,
+		header: run_ship.GATE_HEADER,
+		run: async () => await run_ship_scoped.scoped_gate(),
 	},
 	{
 		stage: STAGE.COMMIT,

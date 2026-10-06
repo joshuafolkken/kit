@@ -26,6 +26,7 @@ const MAX_MERGE_RETRIES = 2
 const CONFLICT_NOTE = 'merging the default branch left unmerged paths:'
 const DEFERRED_PREFIX = 'merge deferred to the followup: '
 const CURRENT_SUFFIX = ' brings nothing in'
+const MERGED_PREFIX = 'merged '
 
 // A stage's result, plus the paths a stopped merge left unmerged — carried to the stop prompt.
 interface StepResult extends JoshResult {
@@ -52,21 +53,24 @@ function conflict_result(files: ReadonlyArray<string>, lead: string): StepResult
 	return { code: FAILURE_EXIT_CODE, out, conflicts: files }
 }
 
+function sync_note(outcome: Exclude<MergeOutcome, { kind: 'conflict' }>): string {
+	if (outcome.kind === 'refused') return `${DEFERRED_PREFIX}${outcome.message}`
+
+	return outcome.kind === 'current'
+		? `${outcome.branch}${CURRENT_SUFFIX}`
+		: `${MERGED_PREFIX}${outcome.branch}`
+}
+
 // A refusal does not stop the commit: the guard refuses only uncommitted work the default branch also
 // touches, and once that work is committed the followup merges again on a clean tree. A merge that changed
-// the tree meets the scoped pair again, so the commit never carries an unchecked merge.
+// the tree is checked by the gate stage that follows (joshuafolkken/kit#3307), so the commit never carries
+// an unchecked merge and the gate's record names the merge base the push carries.
 async function sync_stage(): Promise<StepResult> {
 	const outcome = await merge_outcome()
 
 	if (outcome.kind === 'conflict') return conflict_result(outcome.files, '')
-	if (outcome.kind === 'merged') return await run_ship_scoped.scoped_pair()
 
-	const out =
-		outcome.kind === 'current'
-			? `${outcome.branch}${CURRENT_SUFFIX}`
-			: `${DEFERRED_PREFIX}${outcome.message}`
-
-	return { code: SUCCESS_EXIT_CODE, out }
+	return { code: SUCCESS_EXIT_CODE, out: sync_note(outcome) }
 }
 
 // Any read that fails answers "not conflicting": the followup failure then stands as it was.
@@ -80,6 +84,18 @@ async function is_conflicting(): Promise<boolean> {
 	}
 }
 
+// The merged tree is gated before it is pushed (joshuafolkken/kit#3307): the push then carries the tree
+// the gate's record describes, so the pre-push hook reuses it rather than re-running the unit suite.
+async function push_merged(title: string): Promise<StepResult | undefined> {
+	const gate = await run_ship_scoped.scoped_gate()
+
+	if (gate.code !== SUCCESS_EXIT_CODE) return gate
+
+	const push = await josh(['git', '-y', '--skip-commit', '--skip-pr', title])
+
+	return push.code === SUCCESS_EXIT_CODE ? undefined : push
+}
+
 // The result to stop on, or `undefined` once a clean merge is pushed and the followup can wait again.
 async function merge_again(title: string, failed: JoshResult): Promise<StepResult | undefined> {
 	if (!(await is_conflicting())) return failed
@@ -89,9 +105,7 @@ async function merge_again(title: string, failed: JoshResult): Promise<StepResul
 	if (outcome.kind === 'conflict') return conflict_result(outcome.files, failed.out)
 	if (outcome.kind !== 'merged') return failed
 
-	const push = await josh(['git', '-y', '--skip-commit', '--skip-pr', title])
-
-	return push.code === SUCCESS_EXIT_CODE ? undefined : push
+	return await push_merged(title)
 }
 
 async function followup_stage(

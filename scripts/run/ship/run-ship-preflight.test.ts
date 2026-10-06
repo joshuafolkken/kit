@@ -9,6 +9,7 @@ const paths_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
 const pr_body_mock = vi.hoisted(() => vi.fn<() => Promise<string | undefined>>())
 const scoped_mock = vi.hoisted(() => vi.fn())
 const classification_mock = vi.hoisted(() => vi.fn<() => Promise<void>>())
+const lock_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
 
 vi.mock('#scripts/git/git-preflight', () => ({
 	git_preflight: { problems_of: problems_mock },
@@ -24,6 +25,7 @@ vi.mock('#scripts/git/git-branch', () => ({
 	git_branch: { current: vi.fn().mockResolvedValue('2946-lane') },
 }))
 vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_pair: scoped_mock } }))
+vi.mock('./run-ship-lock', () => ({ run_ship_lock: { lock_problems: lock_mock } }))
 
 const { run_ship_preflight } = await import('./run-ship-preflight')
 
@@ -62,6 +64,20 @@ beforeEach(() => {
 	pr_body_mock.mockReset().mockResolvedValue(undefined)
 	scoped_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	classification_mock.mockReset().mockResolvedValue()
+	lock_mock.mockReset().mockResolvedValue([])
+})
+
+// joshuafolkken/kit#3307: a drifted lock stops the ship before the gate, with its reason.
+describe('run_ship_preflight.stage — the lock file', () => {
+	it('stops before the scoped pair on a drifted lock, naming it', async () => {
+		lock_mock.mockResolvedValue(['pnpm-lock.yaml does not match its inputs'])
+
+		const result = await run_ship_preflight.stage(NO_BODY)
+
+		expect(result.code).toBe(FAILED)
+		expect(result.out).toContain('  - pnpm-lock.yaml does not match its inputs')
+		expect(scoped_mock).not.toHaveBeenCalled()
+	})
 })
 
 afterAll(() => {

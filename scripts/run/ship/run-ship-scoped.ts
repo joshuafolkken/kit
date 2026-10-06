@@ -39,7 +39,16 @@ async function scoped_pair(): Promise<JoshResult> {
 	)
 }
 
-const run_ship_scoped = { run_phases, scoped_pair }
+// The scoped pair and then `josh gate` — the gate stage, and the followup's gate over a merged tree
+// before its push (joshuafolkken/kit#3307), so both leave the record the pre-push hook reuses.
+async function scoped_gate(): Promise<JoshResult> {
+	return await run_phases([
+		scoped_pair,
+		async () => await josh_command.josh_run(['gate'], should_forward_stderr),
+	])
+}
+
+const run_ship_scoped = { run_phases, scoped_gate, scoped_pair }
 
 export type { Phase }
 export { run_ship_scoped }

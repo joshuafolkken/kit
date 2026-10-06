@@ -13,7 +13,7 @@ vi.mock('#scripts/gh/git-gh-pr-read', () => ({
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: { branch: vi.fn().mockResolvedValue('3221-lane') },
 }))
-vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_pair: scoped_mock } }))
+vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_gate: scoped_mock } }))
 
 const { run_ship_sync } = await import('./run-ship-sync')
 
@@ -36,6 +36,7 @@ const DIRTY = {
 }
 const FOLLOWUP_FAILED = { code: FAILED, out: 'PR checks failed: merge conflict' }
 const SCOPED_GREEN = { code: OK, out: 'scoped green' }
+const GATE_RED = { code: FAILED, out: 'gate red' }
 const PUSH_REJECTED = { code: FAILED, out: 'push rejected' }
 const PUSH = ['git', '-y', '--skip-commit', '--skip-pr', TITLE]
 const FOLLOWUP = ['followup', TITLE, ...NOTIFY]
@@ -60,11 +61,14 @@ describe('run_ship_sync.sync_stage — the merge before the commit', () => {
 		expect(scoped_mock).not.toHaveBeenCalled()
 	})
 
-	it('meets the scoped pair again after a clean merge, and goes on without stopping', async () => {
+	// joshuafolkken/kit#3307: the gate stage after the sync checks the merged tree, so its record pins
+	// the merge base the push carries.
+	it('leaves the merged tree to the gate stage that follows, and goes on without stopping', async () => {
 		merge_mock.mockResolvedValue(MERGED)
 
-		expect(await run_ship_sync.sync_stage()).toStrictEqual(SCOPED_GREEN)
-		expect(scoped_mock).toHaveBeenCalledOnce()
+		expect(await run_ship_sync.sync_stage()).toStrictEqual({ code: OK, out: 'merged main' })
+		expect(scoped_mock).not.toHaveBeenCalled()
+		expect(josh_run_mock).not.toHaveBeenCalled()
 	})
 
 	it('stops on a conflict, naming the unmerged paths', async () => {
@@ -96,12 +100,25 @@ describe('run_ship_sync.followup_stage — a pull request that turned conflictin
 		expect(merge_mock).not.toHaveBeenCalled()
 	})
 
-	it('merges again on DIRTY, pushes the clean merge and waits again', async () => {
+	it('merges again on DIRTY, gates and pushes the clean merge and waits again', async () => {
 		josh_run_mock.mockResolvedValueOnce(FOLLOWUP_FAILED)
 		merge_mock.mockResolvedValue(MERGED)
 
 		expect(await run_ship_sync.followup_stage(TITLE, NOTIFY)).toMatchObject({ code: OK })
 		expect(commands()).toStrictEqual([FOLLOWUP, PUSH, FOLLOWUP])
+		expect(scoped_mock).toHaveBeenCalledOnce()
+		expect(scoped_mock.mock.invocationCallOrder[0]).toBeLessThan(
+			josh_run_mock.mock.invocationCallOrder[1] ?? 0,
+		)
+	})
+
+	it('stops before the push when the gate over the merged tree is red', async () => {
+		josh_run_mock.mockResolvedValueOnce(FOLLOWUP_FAILED)
+		merge_mock.mockResolvedValue(MERGED)
+		scoped_mock.mockResolvedValue(GATE_RED)
+
+		expect(await run_ship_sync.followup_stage(TITLE, NOTIFY)).toStrictEqual(GATE_RED)
+		expect(commands()).toStrictEqual([FOLLOWUP])
 	})
 
 	it('stops as a conflict only when the merge leaves unmerged paths', async () => {

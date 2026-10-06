@@ -49,3 +49,21 @@ describe('run_ship_scoped.scoped_pair', () => {
 		expect(commands()).toStrictEqual([LINT])
 	})
 })
+
+describe('run_ship_scoped.scoped_gate', () => {
+	it('runs the missing scoped checks and then josh gate, forwarding stderr', async () => {
+		missing_mock.mockReturnValue([LINT])
+
+		expect(await run_ship_scoped.scoped_gate()).toStrictEqual({ code: OK, out: '' })
+		expect(commands()).toStrictEqual([LINT, 'gate'])
+		expect(josh_run_mock).toHaveBeenLastCalledWith(['gate'], true)
+	})
+
+	it('stops before josh gate when the scoped pair fails', async () => {
+		missing_mock.mockReturnValue([LINT])
+		josh_run_mock.mockResolvedValueOnce({ code: FAILED, out: 'lint red' })
+
+		expect(await run_ship_scoped.scoped_gate()).toStrictEqual({ code: FAILED, out: 'lint red' })
+		expect(commands()).toStrictEqual([LINT])
+	})
+})

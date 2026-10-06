@@ -7,6 +7,7 @@ import { git_preflight } from '#scripts/git/git-preflight'
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { error_text } from '#scripts/lib/error-message'
 import { live_evidence } from '#scripts/review/live-evidence'
+import { run_ship_lock } from './run-ship-lock'
 import { run_ship_scoped } from './run-ship-scoped'
 
 // `josh ship`'s first stage (joshuafolkken/kit#2946). A detached ship used to meet the pull request's
@@ -71,13 +72,16 @@ async function caught(problems: Promise<Array<string>>): Promise<Array<string>> 
 	}
 }
 
+// The lock file is asked here too (joshuafolkken/kit#3307), so a drift stops the ship before the gate
+// rather than being rewritten by the pre-push hook's install under the push.
 async function asked_problems(request: PreflightRequest): Promise<Array<string>> {
-	const [preflight, evidence] = await Promise.all([
+	const [preflight, evidence, lock] = await Promise.all([
 		caught(git_preflight.problems_of({ cli_input: request.title, will_open_pr: true })),
 		caught(evidence_problems(request.body_path)),
+		caught(run_ship_lock.lock_problems()),
 	])
 
-	return [...preflight, ...evidence]
+	return [...preflight, ...evidence, ...lock]
 }
 
 async function stage(request: PreflightRequest): Promise<JoshResult> {
