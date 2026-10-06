@@ -9,6 +9,7 @@ import { lane_close } from '#scripts/lane/lane-close'
 import { lane_reap } from '#scripts/lane/lane-reap'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
+import { poll } from '#scripts/lib/poll'
 import {
 	run_carry,
 	type CarryChange,
@@ -43,6 +44,7 @@ const LANE_CLOSE_OCCASION = 'lane close'
 const GIT_ENTRY = '.git'
 const MERGE_CLOSER = 'pnpm josh run:merge'
 const SINGLE_READ = { attempts: 1, interval_ms: 0 }
+const SYNC_RETRY = { attempts: 3, interval_ms: 5000 }
 // What the driver judged when it parks a child, stated on the issue (joshuafolkken/kit#2769).
 const FAILED_CAUSE = 'the child’s session ended with its issue still open and unfinished.'
 const CUT_RELAUNCH_CAUSE =
@@ -130,10 +132,27 @@ async function refused_carry(ctx: MergeContext): Promise<RunCarry | undefined> {
 	return record.carry
 }
 
+// **A failed `main:sync` is retried before it ends the run** (joshuafolkken/kit#3323): one failure
+// right after a merge — measured while several lanes merged at once — stopped the whole drive, and a
+// hand-run `main:sync` minutes later succeeded. **The error carries the step's stderr, not its
+// stdout**: `main:sync` reports git's refusal on stderr, while stdout carries the wrapper's guard
+// statistics, which is all the old message showed.
 async function sync_main(): Promise<void> {
-	const result = await josh(['main:sync'])
+	// `poll_until` answers only whether it succeeded, so the last attempt's stderr is kept here.
+	let error_output = ''
 
-	if (result.code !== 0) throw new Error(`main:sync failed: ${result.out}`)
+	const is_synced = await poll.poll_until(
+		async () => {
+			const result = await josh(['main:sync'])
+
+			error_output = result.err ?? ''
+
+			return result.code === 0
+		},
+		{ ...SYNC_RETRY, sleeper: poll.sleep },
+	)
+
+	if (!is_synced) throw new Error(`main:sync failed: ${error_output}`)
 }
 
 async function close_lane(child: string): Promise<void> {

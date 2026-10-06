@@ -7,6 +7,7 @@ import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
+import { poll } from '#scripts/lib/poll'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_cut } from '#scripts/run/cut/run-cut'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
@@ -256,22 +257,50 @@ describe('run_merge_steps.do_merged — primary checkout sync', () => {
 			LANE_CLOSE_COMMAND,
 		])
 	})
+})
 
-	it('leaves the lane open when primary checkout sync fails', async () => {
-		const spies = stub_lane_close()
+// A failed `main:sync` as the subprocess returns it: git's refusal on stderr, the wrapper's guard
+// statistics on stdout (joshuafolkken/kit#3323). The driver tries it three times before giving up.
+const SYNC_FAILURE = {
+	code: 1,
+	out: 'batching reached 2030 calls',
+	err: 'fatal: cannot lock ref',
+}
+const SYNC_ATTEMPTS = 3
+
+describe('run_merge_steps.do_merged — a failed primary checkout sync (joshuafolkken/kit#3323)', () => {
+	let spies: LaneCloseSpies
+
+	beforeEach(() => {
+		spies = stub_lane_close()
+		vi.spyOn(poll, 'sleep').mockResolvedValue()
+		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(false)
+	})
+
+	it('retries a transient sync failure and carries on with the merged lane', async () => {
 		const apply = stub_active_carry()
 
-		spies.josh_run.mockResolvedValueOnce({ code: 1, out: 'pull failed' })
+		spies.josh_run.mockResolvedValueOnce(SYNC_FAILURE)
+		await run_merge_steps.do_merged(CONTEXT)
+
+		expect(spies.josh_run.mock.calls.map(([args]) => args[0])).toEqual([
+			'main:sync',
+			'main:sync',
+			LANE_CLOSE_COMMAND,
+		])
+		expect(apply).toHaveBeenCalledTimes(1)
+	})
+
+	it('leaves the lane open with git’s own error, not stdout, once every attempt fails', async () => {
+		const apply = stub_active_carry()
+
+		spies.josh_run.mockResolvedValue(SYNC_FAILURE)
 		await expect(run_merge_steps.do_merged(CONTEXT)).rejects.toThrow(
-			'main:sync failed: pull failed',
+			/^main:sync failed: fatal: cannot lock ref$/u,
 		)
+		expect(spies.josh_run).toHaveBeenCalledTimes(SYNC_ATTEMPTS)
 		expect(apply).not.toHaveBeenCalled()
 		expect(did_close(spies)).toBe(false)
-
-		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(false)
-		await run_merge_steps.do_merged(CONTEXT)
-		expect(apply).toHaveBeenCalledTimes(1)
-		expect(did_close(spies)).toBe(true)
 	})
 })
 
