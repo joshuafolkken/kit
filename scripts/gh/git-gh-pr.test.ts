@@ -256,6 +256,20 @@ describe('pr_update_body', () => {
 		expect(request_to(PR_PATH).method).toBe('PATCH')
 		expect(parsed_body(PR_PATH)).toStrictEqual({ body: BODY })
 	})
+
+	// joshuafolkken/kit#3263: the detail read is remembered for the command, so a body read before
+	// the write would otherwise keep answering the old body after it.
+	it('reads the pull request again after writing its body', async () => {
+		await git_gh_pr.pr_get_body(PR_BRANCH)
+		await git_gh_pr.pr_update_body(PR_BRANCH, BODY)
+		await git_gh_pr.pr_get_body(PR_BRANCH)
+
+		const detail_reads = requests().filter(
+			(request) => request.path === PR_PATH && request.method === undefined,
+		)
+
+		expect(detail_reads).toHaveLength(2)
+	})
 })
 
 describe('pr_merge', () => {

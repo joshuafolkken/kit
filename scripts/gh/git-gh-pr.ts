@@ -152,10 +152,12 @@ async function pr_comment(branch_name: string, body: string): Promise<string> {
 
 // Replaces the body of the branch's open pull request. `git -y` opens a pull request once, so a
 // body supplied on a later run — the live-execution evidence `followup` gates the merge on
-// (joshuafolkken/kit#2446) — reaches an already-open one only through this write.
+// (joshuafolkken/kit#2446) — reaches an already-open one only through this write. The remembered
+// detail read holds the old body, so it is cleared first (joshuafolkken/kit#3263).
 async function pr_update_body(branch_name: string, body: string): Promise<void> {
 	const pr_number = await require_pr_number(branch_name)
 
+	forget_pr_numbers()
 	await git_gh_exec.exec_gh_api({
 		path: git_gh_api_path.pull_api_path(String(pr_number)),
 		method: PATCH_METHOD,
@@ -163,7 +165,9 @@ async function pr_update_body(branch_name: string, body: string): Promise<void> 
 	})
 }
 
+// A merge moves the remembered detail read's state, so it is cleared first (joshuafolkken/kit#3263).
 async function put_merge(pr_number: number): Promise<void> {
+	forget_pr_numbers()
 	await git_gh_exec.exec_gh_api({
 		path: git_gh_api_path.pull_merge_api_path(String(pr_number)),
 		method: PUT_METHOD,
