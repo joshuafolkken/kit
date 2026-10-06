@@ -94,7 +94,7 @@ child over" in `backlogrun-lanes.md` carries the command.
 JSONL. `JOSH_WORKER_MODEL` overrides Claude Code only; `JOSH_WORKER_EFFORT` covers both providers,
 and legacy `JOSH_LANE_*` applies only here. Bad markers, missing CLI/auth and failure
 refuse or park without fallback or retry.
-`docs/josh-commands-automation.md` → "`josh lane:dispatch`" is the single source.
+`docs/josh-commands-run.md` → "`josh lane:dispatch`" is the single source.
 
 **The parent reads GitHub, never the summary.** That is `epic-child`'s verifier: a unit that reports
 a child finished without its PR merged leaves that child open, and `pnpm josh issue:state <N>` says so
@@ -206,6 +206,6 @@ session".
 `pnpm josh run:hold <N>`, the first call of the child's `fullrun`, checks for an interrupted run's
 leftovers before it claims the tree, and prints the step for each answer (`reclaim` / `resume` /
 `park`) on stderr — follow it, and report a reclaim or resume with its stash reference. The answers are
-`docs/josh-commands-automation.md` → "`josh run:hold`"; rationale:
+`docs/josh-commands-run.md` → "`josh run:hold`"; rationale:
 `docs/maintainers/backlogrun-child-rationale.md` → "Why the preflight is part of the claim".
 

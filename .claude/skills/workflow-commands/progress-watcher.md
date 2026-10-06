@@ -33,7 +33,7 @@ flight and the watcher's life record has gone stale — once per run, so the res
 
 **`--mark` at every real report.** Whenever the run reports something of its own, run
 `pnpm josh run:progress --mark` in the same turn to restart the silence clock. The clock is silence,
-never a timer (`docs/josh-commands-automation.md` → "`josh run:progress`").
+never a timer (`docs/josh-commands-run.md` → "`josh run:progress`").
 
 **Do not keep a progress clock of your own** — the hook refuses the arm rather than asking
 (`scripts/rules/early-heartbeat.ts` → `decide`), though a single correctly-spaced arm is allowed.

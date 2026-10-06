@@ -36,7 +36,7 @@
 
 ## 実装中の独立編集に効く合成コマンド（joshuafolkken/kit#2202）
 
-レーン子ではガードが `off` なので、`Read` → `Edit` の交互の並びは誰にも止められない。**Step 0 が対象ファイルを列挙した時点で、`pnpm josh read:files <path> …` で読み取りを 1 回に畳み、続く別ファイルへの編集を 1 ターンに載せる**（`report-format.md` が導く）。書き込みは `pnpm josh edit:files` で畳む（joshuafolkken/kit#2366） — プランを 1 呼び出しで適用し、`old` が 1 箇所に一致しなければ拒否する。形式は `docs/josh-commands-automation.md` →「`josh read:files`」と「`josh edit:files`」、経緯は `docs/maintainers/turn-batching-rationale.md` → "The composite commands"。
+レーン子ではガードが `off` なので、`Read` → `Edit` の交互の並びは誰にも止められない。**Step 0 が対象ファイルを列挙した時点で、`pnpm josh read:files <path> …` で読み取りを 1 回に畳み、続く別ファイルへの編集を 1 ターンに載せる**（`report-format.md` が導く）。書き込みは `pnpm josh edit:files` で畳む（joshuafolkken/kit#2366） — プランを 1 呼び出しで適用し、`old` が 1 箇所に一致しなければ拒否する。形式は `docs/josh-commands-run.md` →「`josh read:files`」と「`josh edit:files`」、経緯は `docs/maintainers/turn-batching-rationale.md` → "The composite commands"。
 
 ## ガード発火時にも合成コマンドを手渡す（joshuafolkken/kit#2311）
 

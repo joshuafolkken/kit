@@ -72,6 +72,8 @@ from the page it explains.
 - [josh-commands-rationale.md](./josh-commands-rationale.md) — the `josh` commands
 - [josh-commands-automation-rationale.md](./josh-commands-automation-rationale.md) — the automation
   `josh` commands
+- [josh-commands-run-rationale.md](./josh-commands-run-rationale.md) — the run, lane and session
+  `josh` commands
 - [init-rationale.md](./init-rationale.md) — `josh init`
 - [sync-rationale.md](./sync-rationale.md) — `josh sync`
 - [environment-variables-rationale.md](./environment-variables-rationale.md) — the notification
