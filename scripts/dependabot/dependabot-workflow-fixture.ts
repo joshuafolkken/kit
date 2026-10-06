@@ -204,6 +204,7 @@ function merge_condition(target: WorkflowJob | undefined): string {
 const dependabot_workflow_fixture = {
 	TEMPLATE,
 	RUNTIME,
+	JOB,
 	MERGE_COMMAND,
 	METADATA_STEP_ID,
 	MANAGED_STEP_ID,

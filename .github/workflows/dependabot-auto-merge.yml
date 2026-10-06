@@ -23,8 +23,12 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      # The author gate also runs the job on a maintainer's push to a Dependabot branch, where this
+      # action fails because the first commit is no longer Dependabot's. Contained as in the
+      # distributed copy: the outputs stay empty, so the arming step below is simply not reached.
       - name: Fetch Dependabot metadata
         id: metadata
+        continue-on-error: true
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'

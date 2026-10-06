@@ -14,6 +14,7 @@ const {
 	AUTHOR_GATE,
 	TEMPLATE,
 	RUNTIME,
+	JOB: JOB_NAME,
 	METADATA_STEP_ID: METADATA_STEP,
 	DEPENDABOT_LOGIN,
 	MAINTAINER_LOGIN,
@@ -26,11 +27,11 @@ const {
 	NO_OUTPUT,
 	build_run_context,
 	runtime_job,
+	find_step,
 	merge_step,
 	merge_condition,
 } = dependabot_workflow_fixture
 const { STEPS_CONTEXT: CONTEXT_ROOT, OUTPUTS_KEY } = workflow_expression_fixture
-const JOB_NAME = 'auto-merge'
 
 // The reference path the expression addresses, assembled from the same pieces the evaluated context
 // is built from so the two cannot drift apart.
@@ -82,6 +83,14 @@ describe('dependabot-auto-merge.yml — gate shape (kit#802)', () => {
 			})
 		},
 	)
+
+	// The author gate runs the job on a maintainer's push too, where the metadata action fails; left
+	// unhandled, that failure would end the job red and block the pull request (joshuafolkken/kit#3268).
+	it.each([RUNTIME, TEMPLATE])('contains the metadata action’s failure in %s', (path) => {
+		const job = ci_yml_fixture.find_job(path, JOB_NAME)
+
+		expect(find_step(job, METADATA_STEP)?.['continue-on-error']).toBe(true)
+	})
 
 	// `dependency-type` reports `direct:production` for github-actions updates and for kit's npm
 	// production dependencies alike, so the ecosystem output is the only signal separating them.
