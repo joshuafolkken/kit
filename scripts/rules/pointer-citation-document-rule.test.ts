@@ -164,7 +164,7 @@ describe('the decision is written where the next conversion will read it', () =>
 		const content = read_unwrapped(RESIDENCY_RATIONALE)
 
 		expect(content).toContain('指し先になった話題ファイルは引用しない')
-		expect(content).toContain('その話題の本文はどのファイルにあるか')
+		expect(content).toContain("which file holds the topic's body?")
 		expect(content).toContain(POINTER_MARKER)
 	})
 

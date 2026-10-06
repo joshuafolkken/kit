@@ -60,7 +60,7 @@ with the reason for the split recorded nowhere.
 **The follow-up filing route.** The review cap (`prompts/review.md` → "Review round cap") is the
 workflow's busiest filing route, yet its procedure long stopped at "file it and reference the current
 issue", with nothing leading to the bundling. joshuafolkken/kit#943 was cut from a second review round,
-named `親: joshuafolkken/kit#891` in its body, and joined no epic; #891 closed three minutes later. On
+named its parent `joshuafolkken/kit#891` in its body, and joined no epic; #891 closed three minutes later. On
 the same route joshuafolkken/kit#911 ran the command, `epic:bundle` named the epic, and the issue was
 added. **The only difference was whether the command was typed** (joshuafolkken/kit#946). The second
 layer of #943's miss — a filing after the parent closed answering `Nothing to bundle.` forever, because

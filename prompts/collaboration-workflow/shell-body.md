@@ -10,7 +10,7 @@
 gh api repos/{owner}/{repo}/issues/1535/comments -f body="… `pnpm josh ms` は …"
 ```
 
-zsh は `pnpm josh ms` を実行し、その標準出力を本文に埋め込む。`pnpm josh followup --notify-message "…"` の本文も同じ根で壊れる。事故の経緯は `docs/maintainers/shell-body-rationale.md` →「事故の経緯 — 二つの被害、一つの原因」。
+zsh は `pnpm josh ms` を実行し、その標準出力を本文に埋め込む。`pnpm josh followup --notify-message "…"` の本文も同じ根で壊れる。事故の経緯は `docs/maintainers/shell-body-rationale.md` → "The incidents — two kinds of damage, one cause"。
 
 - **通知経路**: 置換結果が本文に混ざる。壊れ方が静かで、`followup` は正常終了する
 - **`gh` 経路**: 置換された結果が捨てられるのではなく、**コマンドとして実行される**
@@ -26,7 +26,7 @@ zsh は `pnpm josh ms` を実行し、その標準出力を本文に埋め込む
 | `!`             | 発火しない（履歴展開は非対話では無効）               |
 | `\$` / `` \` `` | 発火しない（直前のバックスラッシュがリテラル化する） |
 
-`!` は引き金に入れていない。理由は `docs/maintainers/shell-body-rationale.md` →「`!` を引き金に入れない理由」。
+`!` は引き金に入れていない。理由は `docs/maintainers/shell-body-rationale.md` → "Why `!` is not a trigger"。
 
 ### 安全な書き方
 
@@ -39,7 +39,7 @@ pnpm josh followup "<title> #<N>" --notify-message-file <path>
 pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file <path>
 ```
 
-**PR コメントも同じ経路である** — REST では pull request のコメントは issue のコメントであり、`pnpm josh issue:comment <N> --body-file <path>` がそのまま使える。`gh issue comment` / `gh pr comment` は使わない（GraphQL 経由。理由は `docs/maintainers/shell-body-rationale.md` →「`gh` サブコマンドを実行可能ブロックに書かない理由」）。
+**PR コメントも同じ経路である** — REST では pull request のコメントは issue のコメントであり、`pnpm josh issue:comment <N> --body-file <path>` がそのまま使える。`gh issue comment` / `gh pr comment` は使わない（GraphQL 経由。理由は `docs/maintainers/shell-body-rationale.md` → "Why no `gh` subcommand is written in an executable block"）。
 
 ### コメント投稿は `pnpm josh issue:comment` の 1 綴りだけ（joshuafolkken/kit#2304）
 
@@ -48,17 +48,17 @@ pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file <path>
 - `gh api ... -F body=@<path>` ／ `--field body=@<path>` — `@` で始まる値を**ファイルとして読む**。正しい
 - `gh api ... -f body=@<path>` ／ `--raw-field body=@<path>` — 値を**そのまま送る**。`@<path>` というリテラル文字列がコメントとして投稿される
 
-`-f` と `-F` は 1 文字違いで、どちらでも `gh` は終了コード 0 でコメント URL を返す。**壊れたことが分かるのは後で人が Issue を見たときだけ**である（`docs/maintainers/shell-body-rationale.md` →「`-f body=@` で失われたコメント」）。
+`-f` と `-F` は 1 文字違いで、どちらでも `gh` は終了コード 0 でコメント URL を返す。**壊れたことが分かるのは後で人が Issue を見たときだけ**である（`docs/maintainers/shell-body-rationale.md` → "The comments lost to `-f body=@`"）。
 
 だから **Issue／PR コメントの投稿は `pnpm josh issue:comment <N> --body-file <path>` ただ 1 綴りに寄せる** — 間違ったフラグを選ぶ余地が無く、本文は `cli-body.ts` を通ってパスで渡るためシェルも評価しない。`-f body=@…` の綴りは実行前に `pnpm josh rule:guard` が拒否する（列挙表の `raw-field-body` 行、`scripts/rules/raw-field-body.ts`）。上の Issue body 書き換え（`-X PATCH ... --field body=@<path>`）は `-F` 側で安全なので綴りを変えない。
 
-`--body-file` / `--notify-message-file` はいずれも `-` で標準入力を読む（`gh issue create --body-file -` と同じ約束）。読み取りは `scripts/josh/cli-body.ts` の 1 本だけで、`josh notify` / `josh followup` / `epic --rationale-file` / `epic --decision-file` の 4 つがそれを共有する。**`--body` と `--body-file` の同時指定は拒否する**（`docs/maintainers/shell-body-rationale.md` →「`--body` と `--body-file` の同時指定を拒否する理由」）。
+`--body-file` / `--notify-message-file` はいずれも `-` で標準入力を読む（`gh issue create --body-file -` と同じ約束）。読み取りは `scripts/josh/cli-body.ts` の 1 本だけで、`josh notify` / `josh followup` / `epic --rationale-file` / `epic --decision-file` の 4 つがそれを共有する。**`--body` と `--body-file` の同時指定は拒否する**（`docs/maintainers/shell-body-rationale.md` → "Why `--body` and `--body-file` together are refused"）。
 
 **`$'…'` も安全である。** ANSI-C クォートの中ではコマンド置換も変数展開も起きない。`CLAUDE.md` が Telegram の本文に `--body=$'…'` を指定しているのはそのためであり、この規則はそれを置き換えるものではない。ただし本文が長くなるほどファイルの方が扱いやすい。
 
 ### 引き金つき配送
 
-`pnpm josh rule:guard` が、二重引用符の本文値にバッククォートか `$` が実際に含まれる `Bash` 呼び出しを拒否して本文を突きつける。拒否されたら本文をファイルに移して出し直す。配線は `docs/maintainers/shell-body-rationale.md` →「引き金つき配送にした理由」、引き金の設計は `docs/maintainers/shell-body-rationale.md` →「引き金をフラグでなく本文で引く理由」、固定しているテストは `docs/maintainers/shell-body-rationale.md` →「マーカーテスト」にある。
+`pnpm josh rule:guard` が、二重引用符の本文値にバッククォートか `$` が実際に含まれる `Bash` 呼び出しを拒否して本文を突きつける。拒否されたら本文をファイルに移して出し直す。配線は `docs/maintainers/shell-body-rationale.md` → "Why it is a triggered delivery"、引き金の設計は `docs/maintainers/shell-body-rationale.md` → "Why the trigger reads the body, not the flag"、固定しているテストは `docs/maintainers/shell-body-rationale.md` → "Marker tests"にある。
 
 ### 引き金が見えないもの
 

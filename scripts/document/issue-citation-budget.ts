@@ -73,7 +73,7 @@ const ISSUE_CITATION_BUDGET: ReadonlyArray<CitationBudget> = [
 	{ path: 'prompts/collaboration-workflow/shell-body.md', citations: 2 },
 	{ path: 'prompts/collaboration-workflow/turn-batching.md', citations: 6 },
 	{ path: 'prompts/collaboration-workflow/upstream-interrupt.md', citations: 1 },
-	{ path: 'prompts/collaboration-workflow/wip-cap.md', citations: 3 },
+	{ path: 'prompts/collaboration-workflow/wip-cap.md', citations: 2 },
 	{ path: 'prompts/refactoring.md', citations: 1 },
 	{ path: 'prompts/review-rubric.md', citations: 1 },
 	{ path: 'prompts/sonar-hotspot-handling.md', citations: 2 },

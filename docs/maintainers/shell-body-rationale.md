@@ -1,43 +1,78 @@
-# 本文をシェルの二重引用符に載せない — rationale
+# Never put a body in shell double quotes — rationale
 
-これは `prompts/collaboration-workflow/shell-body.md` の背後にある、メンテナー専用の根拠である。手順の境界・引き金・死角を正当化する事故の経緯、実測の経緯、議論をここに置く。実行中に読まれることは無い — エージェントが従う引き金・コマンド・判定・境界はすべて手順文書に残っており、このファイルを変えても規則は何も変わらない。
+This is maintainer-only rationale behind `prompts/collaboration-workflow/shell-body.md` — the
+incidents, measurements and arguments that justify the procedure's boundaries, trigger and blind
+spots. No run reads it. Every trigger, command, verdict and boundary an agent follows stays in the
+procedure, and a change to this file changes no rule.
 
-## 事故の経緯 — 二つの被害、一つの原因
+## The incidents — two kinds of damage, one cause
 
-2026-09-07 深夜の joshuafolkken/kit#1535 の実行では、手順文書「何が起きるのか」の呼び出し（本文にバッククォート語 `pnpm josh ms` を含む `gh api ... -f body="…"`）で、**レーンの work tree が `main` に切り替わり、実行が止まった**。復旧は手動である。
+In one run, the procedure's "What happens" call (a `gh api ... -f body="…"` whose body held the
+backticked word `pnpm josh ms`) **switched the lane's work tree to `main` and stopped the run**.
+Recovery was manual.
 
-同じ根がもう 1 つの口にもある。`pnpm josh followup --notify-message "…"` に渡した本文のバッククォート語（`` `owner/repo#` ``）が空文字に置換され、Telegram 通知の 1 行目から語が丸ごと消えた（joshuafolkken/kit#1176 の子 #1182）。**被害の重さが違うだけで、原因は同一である。**
+The same root reaches a second mouth. A backticked word (`` `owner/repo#` ``) in a body passed to
+`pnpm josh followup --notify-message "…"` was replaced by an empty string, and the word vanished from
+the first line of the Telegram notice. **Only the severity differs; the cause is the same.**
 
-## `!` を引き金に入れない理由
+## Why `!` is not a trigger
 
-joshuafolkken/kit#1198 のコメントは `!` も発火すると書いていたが、**この環境では発火しない**（非対話 zsh で実測）。引き金にも入れていない — 「!」を含む本文は日常的であり、そこで拒否するフックは[「誤ったターンで発火するフック」](../../prompts/collaboration-workflow/rule-delivery.md)そのものになる。
+An Issue comment said `!` fires too, but **it does not fire in this environment** (measured in
+non-interactive zsh). It is not a trigger either — bodies containing "!" are everyday, and a hook
+that refused on them would be exactly
+["a hook that fires on the wrong turn"](../../prompts/collaboration-workflow/rule-delivery.md).
 
-## `gh` サブコマンドを実行可能ブロックに書かない理由
+## Why no `gh` subcommand is written in an executable block
 
-`gh issue comment` / `gh pr comment` にも `--body-file` はあるが、本リポジトリの配布ドキュメントは GraphQL 経由の `gh` サブコマンドを実行可能ブロックに書かない — クラウドセッションでは 403 になる（`scripts/gh/gh-document-guard.test.ts`）。
+`gh issue comment` / `gh pr comment` have `--body-file` too, but this repository's distributed
+documents do not put GraphQL-backed `gh` subcommands in executable blocks — they answer 403 in a cloud
+session (`scripts/gh/gh-document-guard.test.ts`).
 
-## `-f body=@` で失われたコメント
+## The comments lost to `-f body=@`
 
-`-f` と `-F` は 1 文字違いで、どちらでも `gh` は終了コード 0 を返す。joshuafolkken/kit#2304 では park コメント 2 件がこれで失われ、壊れたことは後で人が Issue を見るまで分からなかった。これが、コメント投稿を `pnpm josh issue:comment` の 1 綴りに寄せた理由である。
+`-f` and `-F` differ by one character, and `gh` exits 0 for either. Two park comments were lost this
+way, and nobody knew they were broken until a person later looked at the Issue. That is why posting a
+comment was narrowed to the single spelling `pnpm josh issue:comment`.
 
-## `--body` と `--body-file` の同時指定を拒否する理由
+## Why `--body` and `--body-file` together are refused
 
-優先順位を決めると、ファイルを渡したつもりの呼び出しが、避けようとしていたインライン文字列をそのまま送ってしまう。だから同時指定はどちらかを優先せず拒否する。
+Choosing a precedence would let a call meant to pass a file send the very inline string it was
+avoiding. So passing both is refused rather than resolved in favor of either.
 
-## 引き金つき配送にした理由
+## Why it is a triggered delivery
 
-**規則を書くだけでは守られないことは、本リポジトリで繰り返し計測されている**（[`rule-delivery.md`](../../prompts/collaboration-workflow/rule-delivery.md)）。したがってこの規則は joshuafolkken/kit#1524 の機構に 1 行として載っており、`pnpm josh rule:guard` が該当する `Bash` 呼び出しを拒否して本文を突きつける。列挙表の行は `scripts/rules/delivered-rules.ts` の `shell-body` であり、その行が読む引き金 — どの綴りが本文をインラインで運ぶか、シェルがその値に何をするか — は `scripts/rules/shell-body-trigger.ts` にある。
+**That writing a rule down is not enough to have it followed has been measured repeatedly in this
+repository** ([`rule-delivery.md`](../../prompts/collaboration-workflow/rule-delivery.md)). So this rule
+rides as one row of that mechanism, and `pnpm josh rule:guard` refuses the matching `Bash` call and
+puts the rule in front of the run. The enumeration's row is `shell-body` in
+`scripts/rules/delivered-rules.ts`, and the trigger it reads — which spellings carry a body inline and
+what the shell does to that value — is in `scripts/rules/shell-body-trigger.ts`.
 
-引き金が見えない綴りがあるため、`CLAUDE.md` の常駐 1 行は消していない。配送は Claude Code にしか届かず（Codex / Gemini / Cursor はフックを走らせない）、正規表現が知っている綴りだけが規則の適用範囲になってはならない。
+Some spellings are invisible to the trigger, so the resident line in `CLAUDE.md` stays. Delivery
+reaches Claude Code alone (Codex / Gemini / Cursor run no hooks), and the rule must not shrink to the
+spellings the pattern knows.
 
-## 引き金をフラグでなく本文で引く理由
+## Why the trigger reads the body, not the flag
 
-本リポジトリのプロンプトにある作例はいずれもプレースホルダ（`-f body="<plan>"`）を渡しており、これは無害である。フラグで引くと、規則が既に守られているそれらのターンでも拒否することになる。実際にバッククォートか `$` を含む本文が二重引用符に載った瞬間だけが、テキストが実行される呼び出しである。
+Every example in this repository's prompts passes a placeholder (`-f body="<plan>"`), which is
+harmless. A flag trigger would refuse on those turns too, where the rule is already followed. Only the
+moment a body that actually holds a backtick or `$` lands in double quotes is a call whose text gets
+executed.
 
-## マーカーテスト
+## Marker tests
 
-- `scripts/josh/cli-body.test.ts` — バッククォート・`$` を含む本文がファイル経由で無改変に通ること、`-` が標準入力を読むこと、通常ファイル以外の読める経路（`/dev/stdin`・プロセス置換）を開けること、インラインとファイルの同時指定を拒否すること
-- `scripts/rules/shell-body-trigger.test.ts` — 危険な綴りで発火し、プレースホルダ・`@file` 形式・エスケープ済み `\$` では無言であること。`body=` のどちら側に引用符があっても発火すること、`$( … )` で包んでもバッククォートは免除されないこと、`$( … )` の中の引用符で捕捉が切れないことを、いずれも発火・非発火の対で固定する
-- `scripts/rules/raw-field-body.test.ts` — `-f` ／ `--raw-field body=@` の綴りで発火し、`-F` ／ `--field body=@`・`@` を含まない本文・`labels[]=`・`pnpm josh issue:comment` では無言であること
-- `scripts/rules/delivered-rules.test.ts` — 上の引き金が列挙表の行に配線されており、非 `Bash` ツールでは無言であること
-- `scripts/rules/shell-body-rule.test.ts` — 常駐 1 行が手順文書を指しており、配送文が被害・安全な綴り・再発行の指示を運ぶこと。**この一覧そのものも固定する** — 一覧が「あるスイートが何を固定しているか」を書きながら、そのケースが存在しないという食い違いが実際に起きた（`-` の標準入力）。一覧は joshuafolkken/kit#3179 で手順文書からここへ移った
+- `scripts/josh/cli-body.test.ts` — a body holding backticks or `$` passes through a file unchanged,
+  `-` reads stdin, readable non-regular paths (`/dev/stdin`, process substitution) open, and passing
+  inline and file together is refused
+- `scripts/rules/shell-body-trigger.test.ts` — it fires on the dangerous spellings and is silent on a
+  placeholder, the `@file` form and an escaped `\$`. Firing and non-firing pairs pin that it fires
+  whichever side of `body=` the quote sits on, that wrapping in `$( … )` does not exempt a backtick,
+  and that a quote inside `$( … )` does not cut the capture short
+- `scripts/rules/raw-field-body.test.ts` — it fires on the `-f` / `--raw-field body=@` spellings and
+  is silent on `-F` / `--field body=@`, a body without `@`, `labels[]=` and `pnpm josh issue:comment`
+- `scripts/rules/delivered-rules.test.ts` — the triggers above are wired to the enumeration's row, and
+  it is silent for non-`Bash` tools
+- `scripts/rules/shell-body-rule.test.ts` — the resident line points at the procedure, and the message
+  carries the damage, the safe spelling and the reissue instruction. **It pins this list too** — the
+  list once credited a suite with a case it did not have (stdin `-`), a line that read as coverage and
+  was not

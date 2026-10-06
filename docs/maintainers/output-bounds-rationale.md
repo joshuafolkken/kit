@@ -52,18 +52,17 @@ prints only `✔ this tree is already green …` — two lines, never truncated,
 
 **The incident.** It happened during joshuafolkken/kit#1546: the second gate printed
 `✗ verification gate failed` while the pipeline returned 0. The failure was real (a Prettier format
-and one marker test), and **it was caught because the child that ran it read the output** (in the
-procedure's original wording, 「実行した子が出力を読んでいたから気づいた」). Reading the exit code alone
+and one marker test), and **it was caught because the child that ran it read the output**. Reading the exit code alone
 would have committed a red tree.
 
 **Rejected alternatives:**
 
 - **Rewrite the worked examples in the procedures.** Rejected: **there is no example to rewrite**
-  (「書き換える例が存在しない」). Searching every document, prompt and skill found one piped
+  Searching every document, prompt and skill found one piped
   verification example — in `docs/josh-commands.md` — and it was the description of this very defect.
   The pipe is not copied from a model; **it is invented fresh every turn**.
 - **Write it as a calling convention** ("never pipe the gate", "prefix `set -o pipefail`"). Rejected:
-  **the same idea was already rejected** (「同じ案が既に却下されている」).
+  **the same idea was already rejected**.
   `scripts/time-runtime/time-reported-failure.ts` turned it down because "a convention is either kept or
   not, and what the chart must capture is what was actually done, not what should have been", and
   placed a detector instead. joshuafolkken/kit#1344 and joshuafolkken/kit#1460 also measured prose that
@@ -72,7 +71,7 @@ would have committed a red tree.
 **Triggered delivery was adopted** (`rule-delivery.md`): `pnpm josh rule:guard` refuses, on the spot, a
 `Bash` call where a pass/fail josh check stands before a pipe. **A refusal cannot be skimmed past.**
 
-**The detector stays** (「検出器は残る」). `scripts/time-runtime/time-reported-failure.ts` reads the gate's
+**The detector stays**. `scripts/time-runtime/time-reported-failure.ts` reads the gate's
 own `✗ verification gate failed:` line on top of `is_error`. A hook reaches Claude Code alone — not a
 session with the stop switch set, not another harness — so the detector covers the outside and is **the
 only path that can measure afterwards whether the rule was kept**. Delivery and detection are not
@@ -81,7 +80,7 @@ alternatives: the first prevents, the second counts.
 **The boundary is deliberate.** Narrowing a listing with `| head` is the right way to read one, and a
 hook refusing it would fire on the commonest shape in the transcript. **Widening a rule makes it
 ignored, and an ignored rule is worse than none** — a hook that fires on the wrong turn is worse than
-no hook (`rule-delivery.md` → 「配送されている規則」). The hook also stays silent on two shapes: a pipeline prefixed with
+no hook (`rule-delivery.md` → "配送されている規則"). The hook also stays silent on two shapes: a pipeline prefixed with
 `set -o pipefail` carries the check's status, and a command string inside quotes (an Issue body such
 as `--body "cd x && pnpm josh gate | tail"`) is text, not a call. **Both keep a compliant call from being
 refused** — delivery is once per run, so spending it on a compliant call would let a genuinely

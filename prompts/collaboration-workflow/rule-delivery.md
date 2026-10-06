@@ -4,7 +4,7 @@
 
 ## なぜ配送が要るのか
 
-常駐の経路は実効上限で詰まっており、配送は該当する瞬間だけのコストで届き、拒否は読み飛ばせず、発火を単体テストで固定できる。経緯: `docs/maintainers/rule-delivery-rationale.md` →「なぜ配送が要るのか」。
+常駐の経路は実効上限で詰まっており、配送は該当する瞬間だけのコストで届き、拒否は読み飛ばせず、発火を単体テストで固定できる。経緯: `docs/maintainers/rule-delivery-rationale.md` → "Why delivery is needed"。
 
 ## 判定基準 — 引き金を特定できるか
 
@@ -12,7 +12,7 @@
 
 ## 機構 — 1 本だけ、新規に作らない
 
-配送はすべて 1 つの土台に載り、入口はイベントごとに 2 つある。`PreToolUse` の入口が `pnpm josh pretool:guard`（バッチング ／ 調査 ／ 規則の 3 ガードを 1 プロセスで合成）、Stop フックの入口が `pnpm josh stop:guard` である。**2 本目の配送経路を作るのは `CLAUDE.md` →「No clones」が禁じるクローン**である。配線・停止スイッチ・拒否の優先順位: `docs/maintainers/rule-delivery-rationale.md` →「機構」。
+配送はすべて 1 つの土台に載り、入口はイベントごとに 2 つある。`PreToolUse` の入口が `pnpm josh pretool:guard`（バッチング ／ 調査 ／ 規則の 3 ガードを 1 プロセスで合成）、Stop フックの入口が `pnpm josh stop:guard` である。**2 本目の配送経路を作るのは `CLAUDE.md` →「No clones」が禁じるクローン**である。配線・停止スイッチ・拒否の優先順位: `docs/maintainers/rule-delivery-rationale.md` → "The mechanism"。
 
 ## 配送されている規則
 
@@ -38,7 +38,7 @@
   - 発火しないとき: Issue を読んでいない、または最初から `--comments` ／ `--json comments` ／ `…/comments` で読んでいる
 - **本文をシェルに載せない**（`shell-body.md`）
   - 発火点: `pnpm josh rule:guard` — 二重引用符の本文値（`-f body="…"` ／ `-f "body=…"` ／ `--body "…"` ／ `--notify-message "…"`）にバッククォートか `$` を含む `Bash`
-  - 発火しないとき: 本文がシェルに評価されない ＝ 規則は既に守られている（経緯: `docs/maintainers/rule-delivery-rationale.md` →「本文のシェル評価を同じ機構の 1 行で覆った経緯」）
+  - 発火しないとき: 本文がシェルに評価されない ＝ 規則は既に守られている（経緯: `docs/maintainers/rule-delivery-rationale.md` → "Shell evaluation of a body is one more row of the same mechanism"）
 - **@path をリテラル投稿する誤射**（`shell-body.md`、joshuafolkken/kit#2304）
   - 発火点: `pnpm josh rule:guard` — 生フィールド（`-f` ／ `--raw-field`）で `body=@<path>` を渡した `Bash`。**毎回発火する**
   - 発火しないとき: `-F` ／ `--field body=@`・`@` を含まない本文・`pnpm josh issue:comment` ＝ リテラルの `@path` が送出されない
@@ -112,8 +112,8 @@
 
 ## 配送は 1 ラン 1 回
 
-配送文は**ラン 1 回につき 1 度**しか出ない — 2 度目も拒否すれば、規則に従った直後の呼び出しを止めてしまう。だから**配送文には「同じ呼び出しをもう一度出せ」と明記する**。例外は 2 つで、繰り返す行為を止める項目は毎回発火し（joshuafolkken/kit#1570）、前提の行為を求める項目は前提が末尾に現れるまで毎回拒否する（joshuafolkken/kit#2807）。これとは別に、バッチングと調査の 2 ガードは同じ呼び出しを二度拒否しないまま、違反が間隔分続けば再び発火する（joshuafolkken/kit#2164）— 1 回きりの注意ではない。先の 2 つの例外の配送文には「同じ呼び出しをもう一度出せ」ではなく、それぞれ「これは毎回発火する」「前提が末尾に現れるまで拒否する」と明記する — 1 回きりと読まれると、再発行すれば通ると誤解される。前提の証拠を読めないときは拒否を基本とする。経緯と意図した通過例外: `docs/maintainers/rule-delivery-rationale.md` →「配送は 1 ラン 1 回」。
+配送文は**ラン 1 回につき 1 度**しか出ない — 2 度目も拒否すれば、規則に従った直後の呼び出しを止めてしまう。だから**配送文には「同じ呼び出しをもう一度出せ」と明記する**。例外は 2 つで、繰り返す行為を止める項目は毎回発火し（joshuafolkken/kit#1570）、前提の行為を求める項目は前提が末尾に現れるまで毎回拒否する（joshuafolkken/kit#2807）。これとは別に、バッチングと調査の 2 ガードは同じ呼び出しを二度拒否しないまま、違反が間隔分続けば再び発火する（joshuafolkken/kit#2164）— 1 回きりの注意ではない。先の 2 つの例外の配送文には「同じ呼び出しをもう一度出せ」ではなく、それぞれ「これは毎回発火する」「前提が末尾に現れるまで拒否する」と明記する — 1 回きりと読まれると、再発行すれば通ると誤解される。前提の証拠を読めないときは拒否を基本とする。経緯と意図した通過例外: `docs/maintainers/rule-delivery-rationale.md` → "One delivery per run"。
 
 ## マーカーテスト
 
-各項目を固定するスイートの一覧: `docs/maintainers/rule-delivery-rationale.md` →「マーカーテスト」。
+各項目を固定するスイートの一覧: `docs/maintainers/rule-delivery-rationale.md` → "Marker tests"。
