@@ -24,10 +24,10 @@ const BACKLOGRUN_MD = '.claude/skills/workflow-commands/backlogrun.md'
 // a reader is routed to, in the same `file.md → \`josh <command>\`` form the `epic:reconcile` and
 // `lane:list` entries already use. joshuafolkken/kit#2254.
 const RUN_MERGE_REFERENCE = 'docs/josh-commands-run.md → `josh run:merge`'
-const EPIC_NEXT_REFERENCE = 'docs/josh-commands-automation.md → `josh epic:next`'
-const BACKLOG_BUDGET_REFERENCE = 'docs/josh-commands-automation.md → `josh backlog:budget`'
+const EPIC_NEXT_REFERENCE = 'docs/josh-commands-backlog.md → `josh epic:next`'
+const BACKLOG_BUDGET_REFERENCE = 'docs/josh-commands-backlog.md → `josh backlog:budget`'
 const RUN_LIVENESS_REFERENCE = 'docs/josh-commands-run.md → `josh run:liveness`'
-const AUTO_OK_NEXT_REFERENCE = 'docs/josh-commands-automation.md → `josh auto-ok:next`'
+const AUTO_OK_NEXT_REFERENCE = 'docs/josh-commands-backlog.md → `josh auto-ok:next`'
 
 // Command used by two separate oracle entries (run:cut:resume and run:cut:gate).
 const RUN_CUT_CMD = 'run:cut'
@@ -312,7 +312,7 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 			"Whether an epic's declaration matches its recorded relations, and the repair when it does not",
 		args: '--reconcile <E>',
 		vocabulary: [RECONCILED, NOTHING_TO_RECONCILE],
-		single_source: 'docs/josh-commands-automation.md → `josh epic --reconcile`',
+		single_source: 'docs/josh-commands-backlog.md → `josh epic --reconcile`',
 	},
 	{
 		name: 'lane:list',

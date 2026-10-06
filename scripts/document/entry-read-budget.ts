@@ -70,7 +70,7 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// list, so its ~48KB read crossed a block downward and the recorded ceiling drops to the block multiple
 	// the stale-ratchet message named. The other entries still read it, so their rows hold.
 	// joshuafolkken/kit#2345 added the `implementation-unit` delegation row (full fan-out procedure in
-	// `docs/josh-commands-automation.md` → "`josh fanout`"); `delegation.md` gained only a one-clause mention and a
+	// `docs/josh-commands-backlog.md` → "`josh fanout`"); `delegation.md` gained only a one-clause mention and a
 	// pointer, folded into the existing enumeration and offset by tightening `delegation.md` prose, so every entry
 	// stayed within its block (kickoff has no block of headroom — its pre-#2294 ceiling is the next
 	// multiple, which the downward ratchet holds shut).
