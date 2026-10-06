@@ -25,6 +25,9 @@ const SINGLE_MATCH = 1
 // Any bold span is a citable anchor: the documents point at `- **Cross-package problems → …**` at a
 // line start and at a `**…**` emphasis mid-paragraph alike.
 const BOLD_LABEL_PATTERN = /\*\*([^*]+?)\*\*/gu
+const BOLD_DELIMITER = '**'
+// A one-line inline code span: a double-backtick span (which may quote a backtick) or a single one.
+const CODE_SPAN_PATTERN = /``[^\n]*?``|`[^`\n]*`/gu
 // A label ranks below every heading, so a heading section never ends at one.
 const LABEL_LEVEL = 7
 // A list item opens with `-`, `*` or a number, after any indentation.
@@ -121,13 +124,23 @@ function unfenced_text(markdown: string): string {
 	return lines.map((line, index) => (fenced[index] === true ? '' : line)).join('\n')
 }
 
+// An inline code span gets the same treatment one level down: `prompts/**` mid-paragraph would take a
+// delimiter just as a fenced glob does. Its `*` become spaces, so every offset still indexes the
+// unmasked text — which is where the title is read from, keeping a label that quotes code intact.
+function code_masked(text: string): string {
+	return text.replaceAll(CODE_SPAN_PATTERN, (span) => span.replaceAll('*', ' '))
+}
+
 function labels(markdown: string): Array<Heading> {
 	const text = unfenced_text(markdown)
 	const starts = line_starts(text)
 
-	return [...text.matchAll(BOLD_LABEL_PATTERN)].map((match) => ({
+	return [...code_masked(text).matchAll(BOLD_LABEL_PATTERN)].map((match) => ({
 		level: LABEL_LEVEL,
-		title: match[1] ?? '',
+		title: text.slice(
+			match.index + BOLD_DELIMITER.length,
+			match.index + match[0].length - BOLD_DELIMITER.length,
+		),
 		line: line_of(starts, match.index),
 	}))
 }

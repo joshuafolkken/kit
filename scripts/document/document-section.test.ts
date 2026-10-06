@@ -77,6 +77,19 @@ describe('document_section.section — bold-label anchors', () => {
 		expect(document_section.section(markdown.join('\n'), 'Real label')?.text).toBe(REAL_LABEL_ITEM)
 	})
 
+	it('keeps a `**` inside an inline code span from shifting the labels after it', () => {
+		const later = '**Later label** body'
+		const markdown = ['**Glob note.** See `prompts/**` and', '', later]
+
+		expect(document_section.section(markdown.join('\n'), 'Later label')?.text).toBe(later)
+	})
+
+	it('keeps inline code that a label quotes in its title', () => {
+		const markdown = '- **Run `pnpm josh gate` first** body'
+
+		expect(document_section.section(markdown, 'Run `pnpm josh gate` first')?.text).toBe(markdown)
+	})
+
 	it('suggests only headings when a heading prefix is ambiguous', () => {
 		const markdown = ['## Lane one', '## Lane two', '- **Lane label** x'].join('\n')
 
