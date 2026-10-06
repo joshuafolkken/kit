@@ -7,7 +7,7 @@ import {
 	time_transcript_line,
 	type Block as TranscriptBlock,
 } from '#scripts/time-runtime/time-transcript-line'
-import { run_tail } from './run-tail'
+import { run_tail_rule } from './run-tail-rule'
 
 // A dispatched lane child is stopped from backgrounding a long-running josh command (joshuafolkken/kit#2704).
 //
@@ -85,7 +85,7 @@ function is_backgrounded_ship(call: GuardedCall): boolean {
 // detached route on its first refusal rather than two contradictory ones. A backgrounded `ship` alone is
 // not refused: `foreground_input` turns it into the foreground call the refusal used to ask for.
 function is_candidate(call: GuardedCall): boolean {
-	if (run_tail.is_push_step_call(call)) return true
+	if (run_tail_rule.is_push_step_call(call)) return true
 
 	const command = backgrounded_bash_command(call)
 

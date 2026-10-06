@@ -8,7 +8,7 @@ import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
-import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_liveness } from '#scripts/run/run-liveness'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_child_invocation } from './lane-child-invocation'
@@ -34,13 +34,14 @@ const ALIVE_PROCESS = '--process alive'
 const INJECTION = '1749; rm -rf /'
 const LAUNCH_FAILURE = 'spawn claude ENOENT'
 const LOG_REFUSED = 'the session log at /x could not be opened'
+const LABEL_REFUSED = 'gh: API rate limit exceeded (HTTP 403)'
 const PID = 4242
 const WORKER_PROFILE = agent_role_profile.DEFAULT_PROFILES.worker
 
 const launch = vi.spyOn(detached_launch, 'launch')
 const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
 const record_output = vi.spyOn(lane_output, 'record_output')
-const add_label = vi.spyOn(git_gh_command, 'issue_add_label')
+const apply_label = vi.spyOn(git_gh_command, 'issue_apply_label')
 const remove_label = vi.spyOn(git_gh_command, 'issue_remove_label')
 const check_diagnostics = vi.spyOn(agent_diagnostics, 'check')
 const active_supervisor = vi.spyOn(openai_lane_supervisor, 'active')
@@ -92,7 +93,7 @@ beforeEach(() => {
 		lane: lane(DERIVED_LOG),
 		output: DERIVED_LOG,
 	})
-	add_label.mockResolvedValue(true)
+	apply_label.mockResolvedValue({ is_applied: true })
 	remove_label.mockResolvedValue(undefined)
 	mock_supervisor()
 })
@@ -334,14 +335,14 @@ describe('lane_dispatch.dispatch_child — the in-progress marker the parent cla
 	it('applies in-progress before it starts the child', async () => {
 		await lane_dispatch.dispatch_child(ISSUE)
 
-		expect(add_label).toHaveBeenCalledWith(ISSUE, IN_PROGRESS_LABEL)
-		expect(add_label.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+		expect(apply_label).toHaveBeenCalledWith(ISSUE, IN_PROGRESS_LABEL)
+		expect(apply_label.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
 			launch.mock.invocationCallOrder[0] ?? 0,
 		)
 	})
 
 	it('starts nothing when the marker could not be applied', async () => {
-		add_label.mockResolvedValue(false)
+		apply_label.mockResolvedValue({ is_applied: false, reason: LABEL_REFUSED })
 
 		const outcome = await lane_dispatch.dispatch_child(ISSUE)
 
@@ -349,13 +350,15 @@ describe('lane_dispatch.dispatch_child — the in-progress marker the parent cla
 		expect(launch).not.toHaveBeenCalled()
 	})
 
-	it('warns rather than leaving an unapplied marker silent', async () => {
-		add_label.mockResolvedValue(false)
+	// joshuafolkken/kit#3312: the refusal names why, so a wrong verdict can be followed to its cause.
+	it('warns with the reason rather than leaving an unapplied marker silent', async () => {
+		apply_label.mockResolvedValue({ is_applied: false, reason: LABEL_REFUSED })
 
 		const outcome = await lane_dispatch.dispatch_child(ISSUE)
 
 		expect(lane_dispatch.is_worth_warning(outcome)).toBe(true)
 		expect(lane_dispatch.describe(outcome, ISSUE)).toContain(IN_PROGRESS_LABEL)
+		expect(lane_dispatch.describe(outcome, ISSUE)).toContain(LABEL_REFUSED)
 	})
 
 	it('takes the marker back off when the launch fails, leaving none on an idle issue', async () => {

@@ -1,5 +1,5 @@
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
-import { run_event_stream } from './run-event-stream'
 import { run_step, type StepInput } from './run-step'
 
 const KIND = run_event_stream.EVENT_KIND

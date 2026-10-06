@@ -12,9 +12,9 @@ josh_harness_fixture.describe_environment('lane', environment)
 describe('josh harness — scenarios from past defects', () => {
 	it(
 		'records a lane review round in the lane, not the primary checkout (#2919)',
-		() => {
+		async () => {
 			const lane = environment('lane')
-			const result = josh_harness.run(lane, [RECORD, '--issue', '2919'])
+			const result = await josh_harness.run(lane, [RECORD, '--issue', '2919'])
 
 			expect(result.exit_code).toBe(0)
 			expect(result.stdout).toContain(ledger_at(lane.root, 2919))

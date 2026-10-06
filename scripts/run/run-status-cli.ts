@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { cli_flags } from '#scripts/lib/cli-flags'
-import { run_carry, type CarryRead } from './run-carry'
+import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { run_status, type StatusParts } from './run-status'
 
 // `josh run:status <N>` — one call for the read-only status a run glances at (joshuafolkken/kit#2165):

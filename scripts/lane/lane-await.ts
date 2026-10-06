@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
+import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { run_liveness } from '#scripts/run/run-liveness'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_handoff } from './lane-handoff'
@@ -66,7 +67,10 @@ interface RunConfig extends CheckConfig {
 
 function is_process_running_default(issue: string): boolean {
 	const pattern = lane_child_invocation.process_pattern(issue)
-	const result = spawnSync('pgrep', ['-f', pattern], { encoding: 'utf8' })
+	const result = spawnSync('pgrep', ['-f', pattern], {
+		encoding: 'utf8',
+		timeout: PROBE_TIMEOUT_MS,
+	})
 
 	if (result.status === PROCESS_FOUND) return true
 

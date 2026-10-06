@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { parseArgs } from 'node:util'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const repo_get_name_with_owner_mock = vi.hoisted(() => vi.fn())
 const issue_get_title_mock = vi.hoisted(() => vi.fn())
@@ -69,6 +70,31 @@ describe('telegram_test.run_cli — a send that reached nobody', () => {
 		await telegram_test.run_cli()
 
 		expect(error_handle_mock).not.toHaveBeenCalled()
+	})
+})
+
+// A notification body is usually a Markdown list, so a split `--body -x` has to reach `parseArgs`
+// joined to its flag; handed over as two tokens, `parseArgs` refuses it as ambiguous.
+describe('telegram_test.run_cli — a dash-led free-text value', () => {
+	const original_argv = process.argv
+
+	beforeEach(() => {
+		process.argv = ['node', 'telegram-test.ts', '--body', '- item', '--issue-title', '-t', '--json']
+	})
+
+	afterEach(() => {
+		process.argv = original_argv
+	})
+
+	it('hands parseArgs the body and the title joined to their flags', async () => {
+		repo_get_name_with_owner_mock.mockResolvedValue(REPO_NAME_WITH_OWNER)
+		telegram_send_mock.mockResolvedValue(undefined)
+
+		await telegram_test.run_cli()
+
+		expect(vi.mocked(parseArgs)).toHaveBeenLastCalledWith(
+			expect.objectContaining({ args: ['--body=- item', '--issue-title=-t', '--json'] }),
+		)
 	})
 })
 

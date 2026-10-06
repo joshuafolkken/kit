@@ -34,7 +34,7 @@
 - **共有状態に影響する操作（このセクションの対象＝Tier C）は迷ったら確認する。** 確認のコストは低いが、意図しない操作の巻き戻しは高コスト
 - ただしこの「迷ったら確認」は Tier C に限る。**可逆な実装・設計判断（Tier A）は別ルール**（下記「意思決定の自律ポリシー」）に従う
 
-### git index を勝手に変更しない（自律 staging の禁止）
+### no-self-staging — git index を勝手に変更しない（自律 staging の禁止）
 
 規則そのもの — index はユーザーのスナップショットであり、自分の判断でステージ・コミットしない — は `CLAUDE.md` → "Git Rules" に常駐している。ここに書くのは、その規則を実行するときの細則である。index には履歴がなく、上書きされた直前のステージ状態は復元できない（経緯は `docs/maintainers/operating-rules-rationale.md` → "Why the index is the user's"）。
 
@@ -49,17 +49,25 @@
 - 上記以外で staging が必要だと考えたときは、**実行せずに先に確認する**
 - **レーンの中で競合を解決したあとの「解決済み」の記録は、ケース 2 に含まれる（Tier A）。** レーンは run 専用の作業ツリーで、守るべき利用者の staging はない。利用者に `git add` の許可を求めず、`pnpm josh git -y` で記録する。手順は `.claude/skills/workflow-commands/chain-rule.md` →「origin/main is merged in before the gate」の 1 か所にだけ書く（joshuafolkken/kit#2445）
 - 同じ理由で、`git reset` / `git checkout -- <path>` / `git restore <path>` など index や作業ツリーを破壊的に書き換える操作も、自分の判断で実行しない
-- **`git stash` は例外的に、明文化されたフローの中でのみ自動実行してよい**: `fullrun new` / `halfrun new` の手順 5（作業ツリーに変更がある状態で `josh latest` を回す前の退避）、`backlogrun` のラン開始時の `josh latest`、「別パッケージ起因の問題は割り込み Issue で対応する」、および `backlogrun` が epic の子を始める前の preflight（`pnpm josh run:hold <N>` が `reclaim` と答えたときの回収 — joshuafolkken/kit#926, joshuafolkken/kit#1965）。**この 5 番目だけが復元を伴わない。前の 4 つはいずれも直後に `pnpm josh stash:pop "<メッセージ>"` で復元することが手順に含まれている**（stash はリポジトリ単位の 1 本のスタックを全 work tree が共有するため、位置指定や引数なしの `git stash pop` は別のレーンが最後に積んだ stash を取り込む — メッセージで対象を特定する。joshuafolkken/kit#2050）。 回収するのは異常終了したランの置き土産であって、いま実行中のランの作業ではないから、pop して戻す先がない。**代わりに stash を子の Issue にコメントで記録する** — 前提 Issue で中断するときの stash（`prerequisite.md`）と同じく、**その記録だけが後で pop させられる唯一の手がかり**であり、記録し忘れた stash は誰にも拾われない。これら以外の場面で退避したくなったときは、実行せずに先に確認する
+- **`git stash` は例外的に、次の明文化されたフローの中でのみ自動実行してよい**:
+  1. `fullrun new` / `halfrun new` の手順 5（作業ツリーに変更がある状態で `josh latest` を回す前の退避）
+  2. `backlogrun` のラン開始時の `josh latest`
+  3. 「別パッケージ起因の問題は割り込み Issue で対応する」
+  4. `backlogrun` が epic の子を始める前の preflight（`pnpm josh run:hold <N>` が `reclaim` と答えたときの回収 — joshuafolkken/kit#926, joshuafolkken/kit#1965）
+
+  **4 番目だけが復元を伴わない。1〜3 はいずれも直後に `pnpm josh stash:pop "<メッセージ>"` で復元することが手順に含まれている**（stash はリポジトリ単位の 1 本のスタックを全 work tree が共有するため、位置指定や引数なしの `git stash pop` は別のレーンが最後に積んだ stash を取り込む — メッセージで対象を特定する。joshuafolkken/kit#2050）。 回収するのは異常終了したランの置き土産であって、いま実行中のランの作業ではないから、pop して戻す先がない。**代わりに stash を子の Issue にコメントで記録する** — 前提 Issue で中断するときの stash（`prerequisite.md`）と同じく、**その記録だけが後で pop させられる唯一の手がかり**であり、記録し忘れた stash は誰にも拾われない。これら以外の場面で退避したくなったときは、実行せずに先に確認する
+
 - **staging・index の書き換え・`git commit` の直接実行は deny されており、deny には「そのターンでユーザーが明示指示した」という例外がない。** だから上記ケース 1 は AI 側では実行できず、ユーザー自身の端末で実行してもらう。ユーザーが明示的にコミットを指示した場合も、承認済みのコミットは `pnpm josh git` を通す（理由は `docs/maintainers/operating-rules-rationale.md` → "Why the index is the user's"）
 - index を守る deny と `pnpm josh rule:guard`（`worktree-mutation`・`index-mutation`・`destructive-command`・`protected-file` 行）も事故防止の実装である — 上記「指示されていない行動は取らない」→「deny と配送ガードは実装であって規則ではない」
 
-### 意思決定の自律ポリシー（確認停止を減らす）
+### decision-autonomy — 意思決定の自律ポリシー（確認停止を減らす）
 
-3 層の定義（Tier A / B / C）、起票した Issue の epic 所属と自己修正が Tier A であること、自動判断の記録先は `CLAUDE.md` → "Decision autonomy (minimize confirmation stops)" に常駐している。ここに書くのは、その境界の細則である。
+3 層の定義（Tier A / B / C）、起票した Issue の epic 所属と自己修正が Tier A であること、自動判断の記録先は `CLAUDE.md` → "Decision autonomy" に常駐している。ここに書くのは、その境界の細則である。
 
 - **A と B の判定基準**: 確認するのは「差が僅差 **かつ** 後戻りしにくい／アーキテクチャに長く影響する」ときだけ。「迷っている」だけでは停止理由にならない — 明確に優位な選択肢は多少の不確実性が残っても自動で選び、僅差でも安価に巻き戻せる選択は自動で決めて記録して進む
 - **起票した Issue の所属先は、候補が複数の epic に散っていても Tier B ではない**（joshuafolkken/kit#1339）。`epic --add` 1 回で移せるので推奨する 1 つを選び、採用・却下・理由・決定日を Issue と epic の両方に記録して進む。止まるのは 2 つの epic が本当に甲乙つけがたいときだけである
 - **自己修正**は設計判断ではなく後始末である — 自分が公開した成果物の事実誤り（誤った帰属を含む）の訂正と、同じセッションで自分が特定した自分の作業の抜けの穴埋め（例: 欠けていると自分で指摘した相互リンクの追加）。どちらも可逆で、望ましい結果が 1 つしかなく、問題を迂回せず既に行った作業を修復するだけなので、回避策のリスクはない
-- **「相談と実行を区別する」との境界**: ここでの Tier A は **すでに承認され実行された作業を完了・修復する**ことに限られる。目標の表明（「〜したい」）や進め方への問い（「どうすべき？」）に対して勝手に動いてよい、という意味ではない（→ `principles.md` → "相談と実行を区別する"）
+- **「相談と実行を区別する」との境界**: ここでの Tier A は **すでに承認され実行された作業を完了・修復する**ことに限られる。目標の表明（「〜したい」）や進め方への問い（「どうすべき？」）に対して勝手に動いてよい、という意味ではない（→ `principles.md` → "consult-vs-execute"）
 - **Tier C との境界**: 自分のコメントの訂正は Tier A。マージ・ブランチ削除・force push・スコープ外の変更は、**その問題を招いたのが自分自身であっても** Tier C のまま。確認を外しても監査証跡は外さない
+- **major のバージョン bump は Tier C**: `pnpm josh bump major` は自分の判断で実行せず、提案もしない。破壊的な変更に見えても既定は minor / patch で、major はユーザーがそのターンで明示したときだけ（0.x の major は 1.0.0 になり、戻せない公開を伴う）
 - **自動判断の記録の書き方**: Issue 駆動ワークフロー内では `pnpm josh issue:comment <N> --body-file <path>` で、採用案・不採用の代替案・なぜ採用案が明確に優位かを記載する

@@ -1,4 +1,4 @@
-import { run_carry } from '#scripts/run/run-carry'
+import { run_carry } from '#scripts/run/carry/run-carry'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CloseKind } from './lane-close'
 import type { LaneInfo } from './lane-registry'

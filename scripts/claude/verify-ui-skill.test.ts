@@ -1,7 +1,8 @@
 import { AI_DOCS, read_repo_file } from '#scripts/document/ai-document-fixture'
 import { init_logic } from '#scripts/init/init-logic'
 import { describe, expect, it } from 'vitest'
-import { has_frontmatter, read_skill_file, skill_frontmatter } from './skill-fixture'
+import { read_skill_file } from './skill-fixture'
+import { skill_meta } from './skill-meta'
 
 // #853: the completion gate named a `/verify` skill that this package did not ship, so the UI
 // verification step pointed at nothing. The skill is distributed under `verify-ui` rather than
@@ -22,11 +23,11 @@ describe(`${SKILL_PATH} — distribution`, () => {
 	})
 
 	it('opens with YAML frontmatter Claude Code can read', () => {
-		expect(has_frontmatter(read_skill())).toBe(true)
+		expect(skill_meta.has_frontmatter(read_skill())).toBe(true)
 	})
 
 	it.each(['name: verify-ui', 'description:'])('declares %s', (field) => {
-		expect(skill_frontmatter(read_skill())).toContain(field)
+		expect(skill_meta.frontmatter_of(read_skill())).toContain(field)
 	})
 })
 

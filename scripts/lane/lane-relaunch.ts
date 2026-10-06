@@ -1,6 +1,6 @@
 import { agent_argv } from '#scripts/agent/agent-argv'
 import { detached_launch, type LaunchResult } from '#scripts/run/detached-launch'
-import { run_ship_detach } from '#scripts/run/run-ship-detach'
+import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch_log } from './lane-dispatch-log'

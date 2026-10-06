@@ -1,4 +1,4 @@
-import { run_event_stream } from './run-event-stream'
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_step, type StepInput } from './run-step'
 
 // The golden-transcript input for the run driver (joshuafolkken/kit#2250). #2248 lifted the run's step

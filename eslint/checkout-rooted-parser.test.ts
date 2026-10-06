@@ -1,10 +1,10 @@
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ESLint, type Linter } from 'eslint'
 import ts from 'typescript-eslint'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { create_base_config } from './base.js'
 import { checkout_rooted_parser } from './checkout-rooted-parser.js'
 import { config_fingerprint } from './config-fingerprint.js'
@@ -17,7 +17,7 @@ const LINT_PROBE_TIMEOUT_MS = 60_000
 vi.setConfig({ testTimeout: LINT_PROBE_TIMEOUT_MS })
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
-const GITIGNORE_PATH = new URL('../.gitignore', import.meta.url)
+const GITIGNORE = '.gitignore'
 // A second checkout location. Nothing exists there, which is the point of the cache-hit probe: a run
 // that re-linted under it could not load the project and would report a fatal parse error.
 const OTHER_CHECKOUT = path.join(tmpdir(), 'kit-other-checkout', 'kit')
@@ -25,13 +25,34 @@ const PROBE_FILE = 'eslint/checkout-rooted-parser.test.ts'
 const SOURCE = 'const x = 1\n'
 const HASH_OF_CONFIG = /"hashOfConfig":"(?<hash>[^"]+)"/u
 
-function options_for(root: string, extra: Array<Linter.Config> = []): ESLint.Options {
-	const config = [
-		...create_base_config({ gitignore_path: GITIGNORE_PATH, tsconfig_root_dir: root }),
-		...extra,
-	]
+// The cache probe lints for real, and `parserOptions.project` would make that a typed lint over this
+// repository's whole program. A checkout holding one file under a one-file `tsconfig.json` asks the
+// same question — does the hash of the config move with the checkout path — at a fraction of the cost.
+const PROBE_TSCONFIG = {
+	compilerOptions: { lib: ['es2022'], types: [], strict: true, noEmit: true },
+	include: [PROBE_FILE],
+}
 
-	return { cwd: REPO_ROOT, overrideConfigFile: true, overrideConfig: config }
+function create_probe_checkout(): string {
+	const checkout = mkdtempSync(path.join(tmpdir(), 'kit-probe-checkout-'))
+
+	mkdirSync(path.join(checkout, path.dirname(PROBE_FILE)))
+	writeFileSync(path.join(checkout, PROBE_FILE), SOURCE)
+	writeFileSync(path.join(checkout, 'tsconfig.json'), JSON.stringify(PROBE_TSCONFIG))
+	writeFileSync(path.join(checkout, GITIGNORE), 'node_modules\n')
+
+	return checkout
+}
+
+function options_for(
+	root: string,
+	extra: Array<Linter.Config> = [],
+	checkout = REPO_ROOT,
+): ESLint.Options {
+	const gitignore_path = pathToFileURL(path.join(checkout, GITIGNORE))
+	const config = [...create_base_config({ gitignore_path, tsconfig_root_dir: root }), ...extra]
+
+	return { cwd: checkout, overrideConfigFile: true, overrideConfig: config }
 }
 
 async function resolved_config(
@@ -49,8 +70,13 @@ async function serialized_config(root: string, extra: Array<Linter.Config> = [])
 	return JSON.stringify(await resolved_config(root, extra))
 }
 
-async function cached_hash(root: string, cache_location: string): Promise<string | undefined> {
-	const cached = new ESLint({ ...options_for(root), cache: true, cacheLocation: cache_location })
+async function cached_hash(
+	root: string,
+	checkout: string,
+	cache_location: string,
+): Promise<string | undefined> {
+	const options = options_for(root, [], checkout)
+	const cached = new ESLint({ ...options, cache: true, cacheLocation: cache_location })
 	const [result] = await cached.lintFiles([PROBE_FILE])
 
 	expect(result?.messages.filter((message) => message.fatal === true)).toStrictEqual([])
@@ -92,8 +118,14 @@ describe('create_base_config — the serialized config across checkouts', () => 
 	it('hits a cache warmed in one checkout from another without re-linting', async () => {
 		const cache_directory = mkdtempSync(path.join(tmpdir(), 'kit-lane-cache-'))
 		const cache_location = path.join(cache_directory, '.eslintcache')
-		const warmed = await cached_hash(REPO_ROOT, cache_location)
-		const reused = await cached_hash(OTHER_CHECKOUT, cache_location)
+		const checkout = create_probe_checkout()
+
+		onTestFinished(() => {
+			rmSync(cache_directory, { recursive: true, force: true })
+			rmSync(checkout, { recursive: true, force: true })
+		})
+		const warmed = await cached_hash(checkout, checkout, cache_location)
+		const reused = await cached_hash(OTHER_CHECKOUT, checkout, cache_location)
 
 		expect(warmed).toBeDefined()
 		expect(reused).toBe(warmed)

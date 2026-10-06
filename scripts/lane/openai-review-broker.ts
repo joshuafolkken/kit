@@ -8,7 +8,7 @@ import { git_common_directory } from '#scripts/git/git-common-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
 import { detached_launch } from '#scripts/run/detached-launch'
-import { run_ship_review } from '#scripts/run/run-ship-review'
+import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { z } from 'zod'
 import type { LaneInfo } from './lane-registry'
 

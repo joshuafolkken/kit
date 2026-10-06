@@ -5,10 +5,10 @@ import { issue_read_cli, type BlockRead } from '#scripts/issue/issue-read-cli'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
+import { run_ship_preflight } from '#scripts/run/ship/run-ship-preflight'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
 import { run_prep, type PrepParts } from './run-prep'
 import { run_prep_locate } from './run-prep-locate'
-import { run_ship_preflight } from './run-ship-preflight'
 
 // `josh run:prep <N>` — one call for the reads a `fullrun` makes before its first edit
 // (joshuafolkken/kit#1978): the issue body and comments (`issue:read`), the state, labels and

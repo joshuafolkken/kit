@@ -49,7 +49,7 @@ interface HookBundle {
 	out: string
 }
 
-// The three settings.json hooks, the Codex input adapter, and the three guards `pretool-guard`
+// The settings.json hooks (the session-start audit provisioner among them), the Codex input adapter, and the three guards `pretool-guard`
 // composes: `batch-guard`, `investigation-guard` and `duplicate-read-guard` each self-invoke, so they
 // must be their own entries to keep their `import.meta.url` out of `pretool-guard`'s file.
 // `delivered-rules` (the fourth guard) has no self-invoke, so it stays inlined.
@@ -59,6 +59,7 @@ const HOOK_BUNDLES: ReadonlyArray<HookBundle> = [
 	{ source: 'scripts/hooks/stop-guard.ts', out: 'stop-guard' },
 	{ source: 'scripts/hooks/format-edited-cli.ts', out: 'format-edited' },
 	{ source: 'scripts/josh/session-language-cli.ts', out: 'session-lang' },
+	{ source: 'scripts/security/security-audit-provision.ts', out: 'audit-provision' },
 	{ source: 'scripts/hooks/batch-guard.ts', out: 'batch-guard' },
 	{ source: 'scripts/delegation/investigation-guard.ts', out: 'investigation-guard' },
 	{ source: 'scripts/delegation/duplicate-read-guard.ts', out: 'duplicate-read-guard' },

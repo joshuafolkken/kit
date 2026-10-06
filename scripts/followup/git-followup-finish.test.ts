@@ -40,7 +40,7 @@ vi.mock('#scripts/review/review-attest', () => ({
 	review_attest: { clear_here: attest_clear_mock },
 }))
 
-vi.mock('#scripts/run/run-hold', () => ({
+vi.mock('#scripts/run/hold/run-hold', () => ({
 	run_hold: {
 		hold_path: (directory: string) => `${directory}/hold.json`,
 		release_hold: release_hold_mock,
@@ -48,7 +48,7 @@ vi.mock('#scripts/run/run-hold', () => ({
 	},
 }))
 
-vi.mock('#scripts/run/run-progress-clock', () => ({
+vi.mock('#scripts/run/progress/run-progress-clock', () => ({
 	run_progress_clock: {
 		life_target_of: (directory: string) => `${directory}/life.json`,
 		end_life: end_life_mock,

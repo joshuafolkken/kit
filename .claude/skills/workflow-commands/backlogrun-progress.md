@@ -94,7 +94,8 @@ run in lanes".
    **not** parked and **not** counted against the consecutive-failure guard, and stays re-dispatchable
    (joshuafolkken/kit#2240); a **failed** child (OPEN, neither label, not an outage) has its stale
    `in-progress` dropped, is parked with `needs-decision`, and is counted against the consecutive-failure
-   guard.
+   guard. The label stays only once its reason passes `backlogrun-park.md` → "Only a person's judgement
+   carries `needs-decision`".
 
    **Beyond the offer `epic:next` prints** (`run` becomes numbers; `wait` / `stop` / `complete` /
    `error` pass through), the composite adds six verdict tokens: `over` — the merge crossed the budget,

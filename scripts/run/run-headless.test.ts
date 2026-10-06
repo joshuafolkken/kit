@@ -1,5 +1,5 @@
+import type { CarryRead, RunCarry } from '#scripts/run/carry/run-carry'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CarryRead, RunCarry } from './run-carry'
 
 // joshuafolkken/kit#2437. Under `claude -p` a turn-end is the process's end, so a headless parent with
 // lanes in flight must keep waiting; everything else — an attached session, a lane child, a parent
@@ -9,7 +9,7 @@ vi.mock('#scripts/lane/lane-registry', () => ({
 	lane_registry: { has_lanes_in_flight: vi.fn() },
 }))
 
-vi.mock('./run-carry', () => ({
+vi.mock('#scripts/run/carry/run-carry', () => ({
 	run_carry: {
 		repository_directory: vi.fn(),
 		carry_path: vi.fn(() => '/carry.json'),
@@ -18,7 +18,7 @@ vi.mock('./run-carry', () => ({
 }))
 
 const { lane_registry } = await import('#scripts/lane/lane-registry')
-const { run_carry } = await import('./run-carry')
+const { run_carry } = await import('#scripts/run/carry/run-carry')
 const { run_headless } = await import('./run-headless')
 
 const lanes_in_flight = vi.mocked(lane_registry.has_lanes_in_flight)

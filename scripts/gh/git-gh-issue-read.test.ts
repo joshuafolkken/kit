@@ -1,5 +1,5 @@
+import { epic_child_schema, type EpicChildData } from '#scripts/git/git-schemas'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
-import { epic_child_schema, type EpicChildData } from '#scripts/git/schemas'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 import { gh_failure } from './git-gh-failure'

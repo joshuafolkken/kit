@@ -1,4 +1,4 @@
-import { run_carry, type RunCarry } from '#scripts/run/run-carry'
+import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 
 function owns_record(carry: RunCarry, owner: string): boolean {
 	const current = run_carry.owner_of(Number(owner))

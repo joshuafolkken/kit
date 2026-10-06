@@ -32,8 +32,8 @@ vi.mock('node:fs', () => ({
 	mkdtempSync: vi.fn().mockReturnValue('cache-directory-fixture'),
 	rmSync: vi.fn(),
 }))
-vi.mock('./preinstall-version-update', () => ({
-	preinstall_version_update: { sync: sync_mock },
+vi.mock('./safe-chain-version-update', () => ({
+	safe_chain_version_update: { sync: sync_mock },
 }))
 vi.mock('#scripts/overrides/overrides-files', () => ({
 	overrides_files: {

@@ -29,7 +29,7 @@ The `files` field of `package.json` decides what the published `@joshuafolkken/k
 - `.codex/` — the same hooks for Codex (`hooks.json`) and its project settings (`config.toml`).
 - `.github/` — GitHub Actions workflows (CI, tagging, pull request classification, Dependabot auto-merge, SonarQube and production), composite actions, `dependabot.yml`, the pull request template and the release-notes config. `josh sync` overwrites the distributed workflows; their action references are pinned to commit SHAs. kit's own `publish.yml` ships in the package but is never copied into a project.
 - `lefthook/` — Git hook presets: lint before commit, checks before push.
-- The `preinstall` script `josh init` adds to `package.json` runs `pnpm dlx @aikidosec/safe-chain setup-ci` on every install, then a `node -e` check that only prints a warning, and only outside CI. The `prepare` script it adds runs `lefthook install` when Lefthook is present, then, when tsx is present, kit's `fix-gh-packages` script: only when the project `.npmrc` routes a scope to GitHub Packages, it reads a GitHub token (`NODE_AUTH_TOKEN`, a token in the project `.npmrc`, or `gh auth token`), queries GitHub Packages and rewrites tarball URLs in `pnpm-lock.yaml`.
+- The `preinstall` script `josh init` adds to `package.json` is a `node -e` check that fetches nothing and only prints a warning — outside CI, when safe-chain is not scanning the install (see [Installing safe-chain](#installing-safe-chain)). The `prepare` script it adds runs `lefthook install` when Lefthook is present, then, when tsx is present, kit's `fix-gh-packages` script: only when the project `.npmrc` routes a scope to GitHub Packages, it reads a GitHub token (`NODE_AUTH_TOKEN`, a token in the project `.npmrc`, or `gh auth token`), queries GitHub Packages and rewrites tarball URLs in `pnpm-lock.yaml`.
 - `.pnpmfile.mjs` — a pnpm `beforePacking` hook that removes that safe-chain `preinstall` from the manifest `pnpm pack` and `pnpm publish` write, and changes nothing else. `josh init` and `josh sync` copy it only into a project whose `package.json` is not `private: true`, and never over a pnpmfile of the project's own.
 
 **Agent instructions and skills**
@@ -46,6 +46,20 @@ The `files` field of `package.json` decides what the published `@joshuafolkken/k
 - `templates/` — the templates `josh init` and `josh sync` write from.
 - `.vscode/`, `.gitattributes`, `.ncurc.json`, `.prettierignore`, `pnpm-workspace.yaml` — editor, Git and package-manager settings.
 - `CODE_OF_CONDUCT.md`, `SECURITY.md` — community files.
+
+## Installing safe-chain
+
+[safe-chain](https://github.com/AikidoSec/safe-chain) scans a local `pnpm install` for malware once its shell integration is active. The `preinstall` script only warns when it is not; it never installs safe-chain itself. Install it from a release whose installer hash you have checked — the same release and SHA-256 kit's CI uses, pinned as `SAFE_CHAIN_INSTALLER_VERSION` and `SAFE_CHAIN_INSTALLER_SHA256` in [`.github/actions/setup-pnpm/action.yml`](https://github.com/joshuafolkken/kit/blob/main/.github/actions/setup-pnpm/action.yml):
+
+```sh
+version=<SAFE_CHAIN_INSTALLER_VERSION>
+sha256=<SAFE_CHAIN_INSTALLER_SHA256>
+curl --proto '=https' -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$version/install-safe-chain.sh" -o install-safe-chain.sh
+echo "$sha256  install-safe-chain.sh" | shasum -a 256 -c -
+sh install-safe-chain.sh
+```
+
+Stop if `shasum` does not print `install-safe-chain.sh: OK`. Then restart your terminal; if the warning still appears, run `safe-chain setup` and restart it again.
 
 ## Secrets
 

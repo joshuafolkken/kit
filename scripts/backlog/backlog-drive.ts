@@ -17,7 +17,7 @@
 // without a process, a network or a clock.
 
 import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
-import type { MergeResult } from '#scripts/run/run-merge-cli'
+import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 
 const RUN_VERDICT = 'run'
 const STOP_VERDICT = 'stop'

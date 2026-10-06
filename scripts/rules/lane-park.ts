@@ -1,6 +1,7 @@
 import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
+import { bash_triggers } from './bash-triggers'
 import { shell_segments } from './shell-segments'
 
 // A dispatched lane child records its park before it stops, delivered at the call it binds on
@@ -124,9 +125,26 @@ const LANE_PARK_REASON =
 	'procedure is `.claude/skills/workflow-commands/pre-gate-cut.md` → "A lane child records its park ' +
 	'before it stops", and the park itself is `backlogrun-park.md` → "park and continue".'
 
+// The row itself, so `delivered-rules.ts` spreads one entry. **Once per run rather than `decide`, and
+// no `already_satisfied`.** The stop ends the turn, so it is not the recurring act joshuafolkken/kit#1570
+// wrote `decide` for. It carries no `already_satisfied` because the park it asks for is a GitHub label a
+// synchronous guard cannot read, and the transcript-tail alternative would read a child that merely
+// *read* `backlogrun-park.md` — whose prose carries the `labels[]=needs-decision` command — as
+// compliant and fall silent on a real violation (the header above). `keeps` reads an actual
+// label-application `Bash` command, never the tail, so it is not fooled the same way; `reaches` stays
+// `is_trigger`, since a compliant run issues the same confirmation notify and belongs in the
+// denominator.
+const ROW = {
+	id: 'lane-park',
+	is_trigger: bash_triggers.on_bash_command(is_unparked_stop),
+	reason: LANE_PARK_REASON,
+	keeps: bash_triggers.on_bash_command(records_the_park),
+}
+
 const lane_park = {
 	COMMAND_NOTIFY_MARKER,
 	LANE_PARK_REASON,
+	ROW,
 	is_confirmation_notify,
 	is_parking_child,
 	is_unparked_stop,

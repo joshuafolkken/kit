@@ -51,7 +51,7 @@ pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind pa
 **Options:**
 
 - `--owner <pid>` — the long-lived process spending the budget (`$PPID` under a loop); required by counts and `--begin` / `--resume`. A live PID stays `busy` if probes fail.
-- `--done <issue>` shrinks a named-issue run's `remaining` list; `--merged` / `--filed` / `--cut` are increments, never totals.
+- `--done <issue>` shrinks a named-issue run's `remaining` list; `--merged <issue>` names the merged issue and counts it once against `merged_issues`, so a merge `run:merge` already recorded is not counted twice; `--filed` / `--cut` are increments, never totals.
 - `--retrospective` marks the end-of-run retrospective run, once per invocation, and requires `--summary <text>` — the same close writes that result as one `retrospective` event on the run's event stream (best-effort), so a run that filed zero improvements reads apart from one whose retrospective never ran. Either flag without the other is refused.
 - `--stopped <reason>` rides on `--end`: the run ended by _stopping_ rather than finishing, so one ⏸️ confirmation is pushed with the reason as the record is cleared, reaching the person after a cut a headless parent's report would not. A bare `--end` (a clean finish) stays silent, and because `--end` removes the record a second `--end --stopped` never sends twice. Named without `--end` it is ignored.
 - `--end` over a live record flushes pending ledger lines once; a failed flush goes to stderr and the record is still cleared.
@@ -81,7 +81,10 @@ another live owner's run.
 **A failure is visible rather than silent.** A judgment wake that never claims the carry record is
 retried, and once the retries are spent the supervisor stops and sends a `warning` Telegram; a carry
 record that expired or cannot be read ends it the same way. `none` — the run having finished — and a
-person's own `--stop` stay silent. Everything the supervisor starts writes to one log file per
+person's own `--stop` stay silent. Once the run-tooling defect that stopped it has been fixed, a stop
+with a resume path is restarted by the AI itself with `run:wake --start`, which then confirms the
+driver advances (`prompts/collaboration-workflow/upstream-interrupt.md` →
+"実行中のリポジトリ自身のラン機構の不具合"). Everything the supervisor starts writes to one log file per
 repository, named by `--list` and by every warning. Progress is relayed from the existing report
 record: the driver keeps the `run:merge` event stream and the `run:report` finish path, and `--list`
 prints that record's latest line.

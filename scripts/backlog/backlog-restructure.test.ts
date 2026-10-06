@@ -14,7 +14,7 @@ const FIRST = 3301
 const SECOND = 3302
 const THIRD = 3303
 const RUNNING = 3304
-const MOVED = 'scripts/run/run-ship.ts'
+const MOVED = 'scripts/run/ship/run-ship.ts'
 const IDLE: BusyRead = { kind: 'idle' }
 
 function child(number: number): EpicChild {

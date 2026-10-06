@@ -89,9 +89,16 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// joshuafolkken/kit#3175 raised it: the supervisor, provider-table and answer-to-budget prose moved
 	// here out of `backlogrun-steps.md`, so a run reads it only when it asks about those commands.
 	// joshuafolkken/kit#3277 moved the run, lane and session commands to `docs/josh-commands-run.md`.
-	{ path: 'docs/josh-commands-automation.md', bytes: 106_496 },
+	// joshuafolkken/kit#3280 moved the issue, epic, backlog and review commands to
+	// `docs/josh-commands-backlog.md`.
+	// joshuafolkken/kit#3278 moved `josh latest` and `josh overrides` — commands a person types — from
+	// the automation page to `docs/josh-commands.md`, which grew one block and the automation page shrank one.
+	{ path: 'docs/josh-commands-automation.md', bytes: 49_152 },
 	{ path: 'docs/josh-commands-run.md', bytes: 57_344 },
-	{ path: 'docs/josh-commands.md', bytes: 36_864 },
+	{ path: 'docs/josh-commands-backlog.md', bytes: 57_344 },
+	{ path: 'docs/josh-commands.md', bytes: 40_960 },
+	// joshuafolkken/kit#3279 moved the label sections here out of `docs/josh-commands-backlog.md`.
+	{ path: 'docs/labels-and-run-states.md', bytes: 8192 },
 	{ path: 'prompts/coding-standards.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 12_288 },

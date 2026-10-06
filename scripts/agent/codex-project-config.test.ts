@@ -71,7 +71,7 @@ describe('Codex hook wiring', () => {
 
 		expect(hooks).toContain('run-hook.sh codex-hook-adapter pretool')
 		expect(hooks).toContain('run-hook.sh codex-hook-adapter posttool')
-		expect(hooks).toContain('pnpm josh audit:provision')
+		expect(hooks).toContain('run-hook.sh audit-provision')
 		expect(hooks).toContain('run-hook.sh session-lang')
 	})
 

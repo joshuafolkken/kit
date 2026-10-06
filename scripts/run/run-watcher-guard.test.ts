@@ -1,8 +1,8 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { run_progress_clock } from './run-progress-clock'
 import { run_watcher_guard } from './run-watcher-guard'
 
 // joshuafolkken/kit#2113. The guard detects "in-flight lanes, stale watcher" and refuses — the

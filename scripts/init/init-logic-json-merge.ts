@@ -3,6 +3,7 @@ import { json_format } from '#scripts/config-merge/json-format'
 import { parse_jsonc } from '#scripts/config-merge/parse-jsonc'
 import { patch_json_key } from '#scripts/config-merge/patch-json-key'
 import { json_object_schema, string_array_schema, string_record_schema } from '#scripts/lib/schemas'
+import { safe_chain_preinstall } from '#scripts/safe-chain/preinstall-command'
 import { apply_jf_migrations, remove_retired_scripts } from './init-logic-migrate'
 import { PACKAGE_JSON_KEY_ORDER } from './init-logic-package-key-order'
 import { kit_base_preset } from './kit-base-preset'
@@ -216,6 +217,23 @@ function merge_package_scripts(content: string, scripts: Record<string, string>)
 	return serialize_package_json({ ...parsed, scripts: { ...prepend, ...migrated, ...append } })
 }
 
+// Replace only a safe-chain `preinstall` an earlier kit wrote, for a consumer that never re-runs
+// `josh init`; every other key and script is kept (joshuafolkken/kit#3269).
+function upgrade_safe_chain_preinstall(content: string): string {
+	const parsed = parse_jsonc(content)
+	const raw = parsed['scripts']
+	if (raw === undefined) return content
+
+	const scripts = string_record_schema.parse(raw)
+	const current = scripts['preinstall']
+	if (current === undefined) return content
+
+	const migrated = safe_chain_preinstall.migrate_preinstall(current)
+	if (migrated === current) return content
+
+	return serialize_package_json({ ...parsed, scripts: { ...scripts, preinstall: migrated } })
+}
+
 function merge_development_dependencies(
 	content: string,
 	additions: Record<string, string>,
@@ -327,6 +345,7 @@ const init_logic_json_merge = {
 	merge_json_array_field,
 	merge_json_object,
 	merge_package_scripts,
+	upgrade_safe_chain_preinstall,
 	merge_package_script_suffix,
 	replace_in_package_script,
 	remove_script_with_marker,

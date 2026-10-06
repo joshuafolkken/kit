@@ -1,6 +1,6 @@
 import { git_gh_issue_rest } from '#scripts/gh/git-gh-issue-rest'
+import { blocked_by_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
-import { blocked_by_schema } from '#scripts/git/schemas'
 import { z } from 'zod'
 import type { IssueReference } from './epic-reference'
 

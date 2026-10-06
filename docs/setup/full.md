@@ -2,7 +2,7 @@
 
 The detailed version of the [Quick start](../../README.md#quick-start) for the `full` [profile](../init.md#project-profiles): a JavaScript / TypeScript project with npm dependencies. For an `index.html` site, or a Python, Rust or other non-Node project, see [Set up the basic profile](./basic.md).
 
-kit needs **Node.js 22.19.0 or later** and **pnpm 12 or later**, and `josh start` needs the gh CLI ([install the prerequisites](./prerequisites.md), then return here). The package is independent of the [global `josh` CLI](../cli.md) — most projects want both, but the package alone is enough to consume configs.
+kit needs **Node.js 22.19.0 or later in the 22 line, any 24 release, or 26 and later (Node 25 is not supported)** and **pnpm 12 or later**, and `josh start` needs the gh CLI ([install the prerequisites](./prerequisites.md), then return here). The package is independent of the [global `josh` CLI](../cli.md) — most projects want both, but the package alone is enough to consume configs.
 
 ## 1. Choose `josh init` or `josh start`
 

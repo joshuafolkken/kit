@@ -4,7 +4,7 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { review_brief } from './review-brief'
 import { review_round2 } from './review-round2'
 import { review_tree } from './review-tree'
@@ -25,6 +25,10 @@ import { review_tree } from './review-tree'
 // and adds `branch-only.ts`; the default branch then lands the *same* edit to `shared.ts` plus one
 // file of its own, and the run merges it — which is what a resume does. After the merge the branch's
 // real diff is `branch-only.ts` alone, while round 1's snapshot still names `shared.ts`.
+//
+// **One branch per group, not one per case.** No case changes what the next one reads: the moved-base
+// group merges once and every case reads the same two rounds, and the unmoved group's working-tree
+// edits are put back after each case. Building the branch per case only repeated the same git calls.
 
 const TIMEOUT_MS = 30_000
 const WORKSPACE_PREFIX = 'review-round2-target-scope-'
@@ -41,6 +45,8 @@ const BRANCH_ONLY = 'branch-only.ts'
 // change. It is the `carried` half of the reconciliation.
 const SETTLED = 'settled.ts'
 const FOREIGN = 'foreign.ts'
+const SHARED_ON_BRANCH = 'new'
+const BRANCH_ONLY_ON_BRANCH = 'branch'
 const TAKEN_AT = '2026-09-07T00:00:00.000Z'
 const { git, MAIN_BRANCH } = git_fixture_workspace
 
@@ -55,6 +61,13 @@ interface Reading {
 	base: string
 	tree: Record<string, string>
 }
+
+interface RoundTwo {
+	round_one: FileMapStamp
+	round_two: Reading
+}
+
+const moved: { rounds?: RoundTwo } = {}
 
 function write_file(name: string, content: string): void {
 	writeFileSync(path.join(fixture.root, name), `${content}\n`)
@@ -86,8 +99,8 @@ async function build_branch(): Promise<void> {
 	await commit_all('base')
 	await declare_origin()
 	await git(fixture.root, ['switch', '-c', FEATURE])
-	write_file(SHARED, 'new')
-	write_file(BRANCH_ONLY, 'branch')
+	write_file(SHARED, SHARED_ON_BRANCH)
+	write_file(BRANCH_ONLY, BRANCH_ONLY_ON_BRANCH)
 	write_file(SETTLED, 'settled')
 	await commit_all('implementation')
 }
@@ -97,7 +110,7 @@ async function build_branch(): Promise<void> {
 // branch's diff while round 1's record still names it.
 async function advance_default_branch_and_merge(): Promise<void> {
 	await git(fixture.root, ['switch', MAIN])
-	write_file(SHARED, 'new')
+	write_file(SHARED, SHARED_ON_BRANCH)
 	write_file(FOREIGN, 'changed')
 	await commit_all('upstream')
 	await git(fixture.root, [UPDATE_REF, ORIGIN_MAIN_REF, MAIN_HEAD_REF])
@@ -118,7 +131,7 @@ function snapshot_of(reading: Reading): FileMapStamp {
 	return { taken_at: TAKEN_AT, files: reading.tree, base: reading.base }
 }
 
-async function reach_round_two(): Promise<{ round_one: FileMapStamp; round_two: Reading }> {
+async function reach_round_two(): Promise<RoundTwo> {
 	const round_one = snapshot_of(await read_round())
 
 	await advance_default_branch_and_merge()
@@ -126,106 +139,118 @@ async function reach_round_two(): Promise<{ round_one: FileMapStamp; round_two: 
 	return { round_one, round_two: await read_round() }
 }
 
-beforeEach(async () => {
+async function open_branch(): Promise<void> {
 	Object.assign(fixture, git_fixture_workspace.open_workspace(WORKSPACE_PREFIX))
 	fixture.root = path.join(fixture.workspace, PRIMARY)
 	await build_branch()
 	process.chdir(fixture.root)
-}, TIMEOUT_MS)
+}
 
-afterEach(async () => {
+async function close_branch(): Promise<void> {
 	await git_fixture_workspace.close_workspace(fixture)
-}, TIMEOUT_MS)
+}
 
-describe('the round-2 target against the branch it is meant to cover', () => {
-	// The reproduction itself, asserted on the raw comparison the brief used to hand over verbatim.
-	// Both directions are visible in this one value: `shared.ts` is in it and is not in the branch's
-	// diff, and `branch-only.ts` is in the branch's diff and is not in it.
-	it(
-		'reproduces both directions in the bare digest comparison',
-		async () => {
-			const { round_one, round_two } = await reach_round_two()
+function moved_rounds(): RoundTwo {
+	if (moved.rounds === undefined) throw new Error('the moved-base rounds were never read')
 
-			expect(Object.keys(round_two.tree)).toStrictEqual([BRANCH_ONLY, SETTLED])
-			expect(file_map_stamp.changed_since(round_one, round_two.tree)).toStrictEqual([SHARED])
-		},
-		TIMEOUT_MS,
-	)
-})
+	return moved.rounds
+}
+
+// Registered inside a `describe`: the branch merged once, both rounds read, shared by its cases.
+function share_moved_branch(): void {
+	beforeAll(async () => {
+		await open_branch()
+		moved.rounds = await reach_round_two()
+	}, TIMEOUT_MS)
+
+	afterAll(close_branch, TIMEOUT_MS)
+}
+
+// Registered inside a `describe`: the unmerged branch, its working-tree edits undone after each case.
+function share_unmoved_branch(): void {
+	beforeAll(open_branch, TIMEOUT_MS)
+
+	afterEach(() => {
+		write_file(SHARED, SHARED_ON_BRANCH)
+		write_file(BRANCH_ONLY, BRANCH_ONLY_ON_BRANCH)
+	})
+
+	afterAll(close_branch, TIMEOUT_MS)
+}
 
 // The merge is what moves the change base, and a moved base is what makes round 1's record describe a
 // different set of paths from the one round 2 reads.
 describe('a round-2 target after a merge moved the change base', () => {
-	it(
-		'keeps a file the branch does not change out of the target',
-		async () => {
-			const { round_one, round_two } = await reach_round_two()
+	share_moved_branch()
 
-			const scope = review_brief.round_two_scope(round_one, round_two.tree, round_two.base)
+	// The reproduction itself, asserted on the raw comparison the brief used to hand over verbatim.
+	// Both directions are visible in this one value: `shared.ts` is in it and is not in the branch's
+	// diff, and `branch-only.ts` is in the branch's diff and is not in it.
+	it('reproduces both directions in the bare digest comparison', () => {
+		const { round_one, round_two } = moved_rounds()
 
-			expect(scope.target).not.toContain(SHARED)
-			expect(scope.target).not.toContain(FOREIGN)
-		},
-		TIMEOUT_MS,
-	)
+		expect(Object.keys(round_two.tree)).toStrictEqual([BRANCH_ONLY, SETTLED])
+		expect(file_map_stamp.changed_since(round_one, round_two.tree)).toStrictEqual([SHARED])
+	})
 
-	it(
-		'covers every file the branch does change',
-		async () => {
-			const { round_one, round_two } = await reach_round_two()
+	it('keeps a file the branch does not change out of the target', () => {
+		const { round_one, round_two } = moved_rounds()
 
-			const scope = review_brief.round_two_scope(round_one, round_two.tree, round_two.base)
+		const scope = review_brief.round_two_scope(round_one, round_two.tree, round_two.base)
 
-			expect(scope.target).toContain(BRANCH_ONLY)
-		},
-		TIMEOUT_MS,
-	)
+		expect(scope.target).not.toContain(SHARED)
+		expect(scope.target).not.toContain(FOREIGN)
+	})
+
+	it('covers every file the branch does change', () => {
+		const { round_one, round_two } = moved_rounds()
+
+		const scope = review_brief.round_two_scope(round_one, round_two.tree, round_two.base)
+
+		expect(scope.target).toContain(BRANCH_ONLY)
+	})
 })
 
 // The composed text is what the forked agent actually receives, so the properties above are asserted
 // there too: naming a file the branch never touched is the symptom the Issue was filed on.
 describe('the brief a moved change base composes', () => {
-	it(
-		'names no file outside the change in the printed brief',
-		async () => {
-			const { round_one, round_two } = await reach_round_two()
+	share_moved_branch()
 
-			const block = review_brief.round_two_block(
-				round_one,
-				round_two.tree,
-				fixture.root,
-				round_two.base,
-			)
+	it('names no file outside the change in the printed brief', () => {
+		const { round_one, round_two } = moved_rounds()
 
-			expect(block).not.toContain(SHARED)
-			expect(block).toContain(review_brief.BASE_MOVED_PREFIX)
-		},
-		TIMEOUT_MS,
-	)
+		const block = review_brief.round_two_block(
+			round_one,
+			round_two.tree,
+			fixture.root,
+			round_two.base,
+		)
+
+		expect(block).not.toContain(SHARED)
+		expect(block).toContain(review_brief.BASE_MOVED_PREFIX)
+	})
 
 	// A skip is worse than a mistargeted read, so the same moved base has to make the round due.
-	it(
-		'requires the second round rather than reading the delta as round 1 fixes',
-		async () => {
-			const { round_one, round_two } = await reach_round_two()
+	it('requires the second round rather than reading the delta as round 1 fixes', () => {
+		const { round_one, round_two } = moved_rounds()
 
-			const decision = review_round2.decide({
-				base: round_two.base,
-				is_round_one_closed: true,
-				snapshot: round_one,
-				tree: round_two.tree,
-			})
+		const decision = review_round2.decide({
+			base: round_two.base,
+			is_round_one_closed: true,
+			snapshot: round_one,
+			tree: round_two.tree,
+		})
 
-			expect(decision.verdict).toBe(review_round2.REQUIRED_VERDICT)
-			expect(decision.reason).toContain(review_round2.BASE_MOVED_REASON)
-		},
-		TIMEOUT_MS,
-	)
+		expect(decision.verdict).toBe(review_round2.REQUIRED_VERDICT)
+		expect(decision.reason).toContain(review_round2.BASE_MOVED_REASON)
+	})
 })
 
 // The base is the whole guard, so the run that does not move it must still get the narrow round —
 // widening every round 2 would be the cheapest way to pass this suite and would undo #1219.
 describe('a round-2 target when the change base did not move', () => {
+	share_unmoved_branch()
+
 	it(
 		'still names the fix delta when the base did not move',
 		async () => {
@@ -264,6 +289,8 @@ describe('a round-2 target when the change base did not move', () => {
 })
 
 describe('the reconciliation the brief prints beside a narrow target', () => {
+	share_unmoved_branch()
+
 	// An empty target is not always "nothing changed": a fix that reverts a file to its base content
 	// takes that path out of the change, so the comparison still offers it while nothing is left to
 	// read. Saying "nothing changed since round 1" there would contradict the list printed under it.
@@ -290,6 +317,8 @@ describe('the reconciliation the brief prints beside a narrow target', () => {
 })
 
 describe('the two lists the brief prints beside a narrow target', () => {
+	share_unmoved_branch()
+
 	it(
 		'prints both disagreements rather than passing them over',
 		async () => {

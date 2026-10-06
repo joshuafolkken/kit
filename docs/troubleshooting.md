@@ -27,7 +27,7 @@ which josh   # should now print a path
 
 ## Wrong Node or pnpm version
 
-kit needs **pnpm 12 or later** and **Node ≥ 22.19** (see `engines`). A `full` project that ran `josh init` pins pnpm exactly in `packageManager` and `devEngines.packageManager.version`; use that version there. Check:
+kit needs **pnpm 12 or later** and **Node 22.19+ in the 22 line, 24 or 26+** (see `engines`; Node 25 fails the install). A `full` project that ran `josh init` pins pnpm exactly in `packageManager` and `devEngines.packageManager.version`; use that version there. Check:
 
 ```bash
 node -v

@@ -1,14 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const UPSTREAM_NOT_SET_EXIT_CODE = 128
-
 const execa_mock = vi.hoisted(() => {
-	const UPSTREAM_NOT_SET = 128
 	const state = {
 		should_fail: false as boolean,
 		stdout: '',
-		fail_plain_push: false as boolean,
-		plain_push_exit_code: UPSTREAM_NOT_SET,
 		// What the last call actually passed, for the assertions that care about the arguments rather
 		// than the output.
 		last_arguments: [] as Array<string>,
@@ -22,14 +17,6 @@ const execa_mock = vi.hoisted(() => {
 	): Promise<{ stdout: string }> {
 		state.last_arguments = [...arguments_]
 		state.last_options = options
-
-		const is_bare_push = arguments_[0] === 'push' && !arguments_.includes('--set-upstream')
-
-		if (is_bare_push && state.fail_plain_push) {
-			throw Object.assign(new Error('bare push rejected'), {
-				exitCode: state.plain_push_exit_code,
-			})
-		}
 
 		if (state.should_fail) throw new Error('Command failed')
 
@@ -51,8 +38,6 @@ const PROPAGATES_ERRORS_TEST = 'propagates errors instead of returning empty str
 beforeEach(() => {
 	execa_mock.state.should_fail = false
 	execa_mock.state.stdout = ''
-	execa_mock.state.fail_plain_push = false
-	execa_mock.state.plain_push_exit_code = UPSTREAM_NOT_SET_EXIT_CODE
 	execa_mock.state.last_arguments = []
 	execa_mock.state.last_options = undefined
 })
@@ -199,59 +184,6 @@ describe('git_command.get_default_branch', () => {
 		const result = await git_command.get_default_branch()
 
 		expect(result).toBe('main')
-	})
-})
-
-describe('git_command.push', () => {
-	it('falls back to --set-upstream when push fails with exit code 128', async () => {
-		execa_mock.state.fail_plain_push = true
-		execa_mock.state.stdout = 'feature-branch'
-
-		const { git_command } = await import('./git-command')
-
-		await expect(git_command.push()).resolves.toBeUndefined()
-	})
-
-	it('rethrows the wrapped error when the bare push fails with a non-128 exit code', async () => {
-		const NON_UPSTREAM_EXIT_CODE = 1
-
-		execa_mock.state.fail_plain_push = true
-		execa_mock.state.plain_push_exit_code = NON_UPSTREAM_EXIT_CODE
-
-		const { git_command } = await import('./git-command')
-
-		await expect(git_command.push()).rejects.toThrow('exited with code 1')
-	})
-})
-
-describe('git_command.is_upstream_not_set_error', () => {
-	const RETURNS_FALSE = 'returns false'
-	const PUSH_FAILED = 'push failed'
-
-	it('returns true for an Error with cause.exit_code of 128', async () => {
-		const { git_command } = await import('./git-command')
-		const error = new Error(PUSH_FAILED, { cause: { exit_code: '128' } })
-
-		expect(git_command.is_upstream_not_set_error(error)).toBe(true)
-	})
-
-	it(`${RETURNS_FALSE} when cause.exit_code is not 128`, async () => {
-		const { git_command } = await import('./git-command')
-		const error = new Error(PUSH_FAILED, { cause: { exit_code: '1' } })
-
-		expect(git_command.is_upstream_not_set_error(error)).toBe(false)
-	})
-
-	it(`${RETURNS_FALSE} for a plain Error without cause`, async () => {
-		const { git_command } = await import('./git-command')
-
-		expect(git_command.is_upstream_not_set_error(new Error('fail'))).toBe(false)
-	})
-
-	it(`${RETURNS_FALSE} for a non-Error value`, async () => {
-		const { git_command } = await import('./git-command')
-
-		expect(git_command.is_upstream_not_set_error('not an error')).toBe(false)
 	})
 })
 

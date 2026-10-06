@@ -46,12 +46,15 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 - [why.md](./why.md) — why kit exists: the pains it solves
 - [tutorial.md](./tutorial.md) — your first change with an agent, from Issue to merge
 - [how-to.md](./how-to.md) — guides by task
+- [glossary.md](./glossary.md) — the workflow's words: gate, lane, epic, profile, `auto-ok`
+- [labels-and-run-states.md](./labels-and-run-states.md) — the Issue labels and the run states the workflow reads
 
 **Commands and configuration**
 
 - [josh-commands.md](./josh-commands.md) — the `josh` commands you type by hand ([catalog](./josh-command-catalog.md) of every command)
 - [josh-commands-automation.md](./josh-commands-automation.md) — the commands hooks, workflow runs and lanes call
 - [josh-commands-run.md](./josh-commands-run.md) — the run, lane and session commands a workflow run calls
+- [josh-commands-backlog.md](./josh-commands-backlog.md) — the issue, epic, backlog and review commands a workflow run calls
 - [environment-variables.md](./environment-variables.md) — every environment variable kit reads
 - [init.md](./init.md) — what `josh init` creates
 - [sync.md](./sync.md) — what `josh sync` updates

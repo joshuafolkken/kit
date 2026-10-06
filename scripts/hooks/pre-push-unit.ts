@@ -1,9 +1,8 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { gate_skip } from '#scripts/gate/gate-skip'
+import { gate_skip, type GateReuse } from '#scripts/gate/gate-skip'
 import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { hook_gate_reuse } from '#scripts/gate/hook-gate-reuse'
-import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
 
 // The pre-push hook's unit run, which no longer re-runs a suite a green gate already covers
@@ -42,6 +41,15 @@ const FORCE_ENV = 'JOSH_PRE_PUSH_FORCE'
 // `gate-tree.ts` rather than read a second way here — plus the one this hook adds.
 interface PushTree extends GateTree {
 	is_clean: boolean
+	// What a dirty tree reports as the reason the record was not reused (joshuafolkken/kit#3307) — the
+	// paths name a lock file a hook's own `pnpm install` rewrote, the case that went unexplained.
+	carry_miss: string
+}
+
+function carry_miss(lines: ReadonlyArray<string> | undefined): string {
+	if (lines === undefined) return 'git status could not be read'
+
+	return `the working tree differs from HEAD (${lines.join('; ')})`
 }
 
 // `git status --porcelain` prints one line per difference from HEAD, untracked files included — so an
@@ -57,7 +65,11 @@ async function read_push_tree(): Promise<PushTree> {
 		hook_gate_reuse.read_status_lines(),
 	])
 
-	return { ...tree, is_clean: hook_gate_reuse.is_worktree_clean(lines) }
+	return {
+		...tree,
+		is_clean: hook_gate_reuse.is_worktree_clean(lines),
+		carry_miss: carry_miss(lines),
+	}
 }
 
 // `--force` is the gate's own flag, reused rather than respelled: it and `JOSH_PRE_PUSH_FORCE` are
@@ -74,14 +86,15 @@ function forwarded_arguments(extra_arguments: ReadonlyArray<string>): ReadonlyAr
 // **Any argument at all refuses the reuse**, not only `--force`. Everything else is forwarded to
 // vitest, and a caller who narrowed the run to one spec asked for that run rather than for a
 // recorded result about a whole tree. The hook's own line passes none, so this costs it nothing.
-function reusable_green_push(
+function push_reuse(
 	tree: PushTree,
 	extra_arguments: ReadonlyArray<string>,
 	source?: string,
-): FileMapStamp | undefined {
-	return hook_gate_reuse.reusable_green_hook({
+): GateReuse {
+	return hook_gate_reuse.hook_reuse({
 		tree,
 		is_tree_carried: tree.is_clean,
+		carry_miss: tree.carry_miss,
 		extra_arguments,
 		force_env: FORCE_ENV,
 		source,
@@ -107,20 +120,29 @@ function format_skip(taken_at: string): string {
 // other commands already have. **A project that has vitest and no test file at all fails the push
 // instead** (joshuafolkken/kit#1224): the guard treats that half as a broken state rather than a
 // young project, and the hook returns what the guard returns.
+// **A fall back to the whole suite says why, in one line** (joshuafolkken/kit#3307): under a crowded
+// machine the suite costs minutes, and a silent miss left a moved merge base, a dirty tree and a
+// mismatched record indistinguishable from one another.
+function format_miss(reason: string): string {
+	return `↻ running the whole unit suite — the green gate record does not cover this push: ${reason}.`
+}
+
 async function run_pre_push_unit(
 	extra_arguments: ReadonlyArray<string> = [],
 	source?: string,
 ): Promise<number> {
-	const reusable = reusable_green_push(await read_push_tree(), extra_arguments, source)
+	const reuse = push_reuse(await read_push_tree(), extra_arguments, source)
 
-	if (reusable === undefined) {
+	if ('miss' in reuse) {
+		process.stdout.write(`${format_miss(reuse.miss)}\n`)
+
 		return await test_unit_guard.run_guarded_unit(
 			process.cwd(),
 			forwarded_arguments(extra_arguments),
 		)
 	}
 
-	process.stdout.write(`${format_skip(reusable.taken_at)}\n`)
+	process.stdout.write(`${format_skip(reuse.stamp.taken_at)}\n`)
 
 	return 0
 }

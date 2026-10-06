@@ -38,11 +38,18 @@ const SECRETS: ReadonlyArray<string> = [
 	'GH_TOKEN',
 	'NODE_AUTH_TOKEN',
 ]
-// The install command SECURITY.md names is the one `josh init` writes, minus the trailing warning check.
-const PREINSTALL_SETUP_COMMAND = safe_chain_preinstall.SAFE_CHAIN_CMD.replace(
-	` && ${safe_chain_preinstall.LOCAL_INTEGRATION_CHECK_CMD}`,
-	'',
-)
+const HEADING_LINE = /^#{2,} (.+)$/gmu
+const INSTALLER_PIN_KEYS: ReadonlyArray<string> = [
+	'SAFE_CHAIN_INSTALLER_VERSION',
+	'SAFE_CHAIN_INSTALLER_SHA256',
+]
+
+// GitHub's anchor for a plain-text heading: lower case, spaces as hyphens.
+function heading_anchors(text: string): Array<string> {
+	return [...text.matchAll(HEADING_LINE)].map((match) =>
+		(match[1] ?? '').toLowerCase().replaceAll(' ', '-'),
+	)
+}
 
 interface Manifest {
 	files: Array<string>
@@ -113,8 +120,15 @@ describe('the security policy', () => {
 		expect(read_document(SECURITY)).toContain(secret)
 	})
 
-	it('names the preinstall command josh init writes', () => {
-		expect(read_document(SECURITY)).toContain(`\`${PREINSTALL_SETUP_COMMAND}\``)
+	// joshuafolkken/kit#3269: the preinstall warning links here instead of installing safe-chain.
+	it('holds the install section the preinstall warning links to', () => {
+		expect(heading_anchors(read_document(SECURITY))).toContain(
+			safe_chain_preinstall.INSTALL_GUIDE_ANCHOR,
+		)
+	})
+
+	it.each(INSTALLER_PIN_KEYS)('verifies the installer against the pinned %s', (key) => {
+		expect(read_document(SECURITY)).toContain(`\`${key}\``)
 	})
 
 	it('is reachable from the README beside the release notes', () => {

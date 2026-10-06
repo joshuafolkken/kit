@@ -70,7 +70,7 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// list, so its ~48KB read crossed a block downward and the recorded ceiling drops to the block multiple
 	// the stale-ratchet message named. The other entries still read it, so their rows hold.
 	// joshuafolkken/kit#2345 added the `implementation-unit` delegation row (full fan-out procedure in
-	// `docs/josh-commands-automation.md` → "`josh fanout`"); `delegation.md` gained only a one-clause mention and a
+	// `docs/josh-commands-backlog.md` → "`josh fanout`"); `delegation.md` gained only a one-clause mention and a
 	// pointer, folded into the existing enumeration and offset by tightening `delegation.md` prose, so every entry
 	// stayed within its block (kickoff has no block of headroom — its pre-#2294 ceiling is the next
 	// multiple, which the downward ratchet holds shut).
@@ -101,12 +101,14 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// provider prose moved to `docs/josh-commands-automation.md`, and the failure-only sections moved to
 	// `backlogrun-recovery.md`, which the parent's reach still charges whole.
 	// joshuafolkken/kit#3171 cut `CLAUDE.md` to triggers and pointers (~12 KB), lowering every entry.
-	{ entry: 'kickoff', bytes: 45_056 },
+	// joshuafolkken/kit#3256 moved `CLAUDE.md`'s residency prose to `residency.md`, lowering kickoff and
+	// halfrun one block each.
+	{ entry: 'kickoff', bytes: 40_960 },
 	// Raised in joshuafolkken/kit#3177: #3173, #3181 and #3183 merged in parallel and together tipped
 	// fullrun 12 bytes over its block; none of #3177's documents are in its read set.
 	// Lowered back in joshuafolkken/kit#3180: the history and lint-settled proofs left its read set.
 	{ entry: 'fullrun', bytes: 57_344 },
-	{ entry: 'halfrun', bytes: 57_344 },
+	{ entry: 'halfrun', bytes: 53_248 },
 	{ entry: 'prrun', bytes: 61_440 },
 	{ entry: 'backlogrun', bytes: 176_128 },
 	{ entry: LANE_CHILD, bytes: 57_344 },

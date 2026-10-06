@@ -1,5 +1,5 @@
 import { setTimeout as sleep } from 'node:timers/promises'
-import type { OpenIssueData } from '#scripts/git/schemas'
+import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { has_any_label, IN_PROGRESS_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { lane_await } from '#scripts/lane/lane-await'
 import { lane_registry } from '#scripts/lane/lane-registry'

@@ -12,32 +12,39 @@
 [![CI](https://github.com/joshuafolkken/kit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/joshuafolkken/kit/actions/workflows/ci.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=joshuafolkken_kit&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=joshuafolkken_kit)
 
-**Tell your AI agent the change. It files the GitHub Issue and takes it to a merged PR — the same way in every project.**
+**AI assistant setup, plus an optional GitHub workflow.**
 
-kit gives Claude Code or Codex (or Gemini, Cursor) your project's rules, checks and an Issue-driven workflow.
+kit gives Claude Code or Codex your project's rules and checks. With the workflow, the agent takes each change from Issue to merged PR.
+
+**Only want the AI assistant, without the GitHub workflow?** Set it up here: [Node projects](./docs/setup/full.md#2-install-and-initialize-with-josh-init) · [Other projects](./docs/setup/basic.md)
 
 ## Sound familiar?
 
 Each pain links to how it is solved — or read [the whole story](./docs/why.md).
 
+kit solves these in every project — and so do [app-kit] and [game-kit], which build on it:
+
+- [Done doesn't mean done](./docs/why.md#done-doesnt-mean-done)
+- [Quality slips with every change](./docs/why.md#quality-slips-with-every-change)
+- [I keep repeating the same instructions](./docs/why.md#i-keep-repeating-the-same-instructions)
+- [The agent does things I never asked for](./docs/why.md#the-agent-does-things-i-never-asked-for)
+- [Reviewing every change is a chore](./docs/why.md#reviewing-every-change-is-a-chore)
+- [Some changes need a human eye](./docs/why.md#some-changes-need-a-human-eye)
+- [I spend all day talking to the agent](./docs/why.md#i-spend-all-day-talking-to-the-agent)
+- [Big requests come back sloppy](./docs/why.md#big-requests-come-back-sloppy)
+- [I want many Issues solved at once](./docs/why.md#i-want-many-issues-solved-at-once)
+- [AI costs keep climbing](./docs/why.md#ai-costs-keep-climbing)
+- [Writing Issues is a chore](./docs/why.md#writing-issues-is-a-chore)
+- [Wiring AI up to GitHub is a chore](./docs/why.md#wiring-ai-up-to-github-is-a-chore)
+- [I can't tell if the agent is stuck or done](./docs/why.md#i-cant-tell-if-the-agent-is-stuck-or-done)
+- [One task overwrote another's work](./docs/why.md#one-task-overwrote-anothers-work)
+- [A session cut off and I lost track](./docs/why.md#a-session-cut-off-and-i-lost-track)
+- [The backlog fills with duplicate Issues](./docs/why.md#the-backlog-fills-with-duplicate-issues)
+
+The app and game kits add:
+
 | Your pain                                                                                                                  | kit | [app-kit] | [game-kit] |
 | -------------------------------------------------------------------------------------------------------------------------- | :-: | :-------: | :--------: |
-| [Done doesn't mean done](./docs/why.md#done-doesnt-mean-done)                                                              | ✅  |    ✅     |     ✅     |
-| [Quality slips with every change](./docs/why.md#quality-slips-with-every-change)                                           | ✅  |    ✅     |     ✅     |
-| [I keep repeating the same instructions](./docs/why.md#i-keep-repeating-the-same-instructions)                             | ✅  |    ✅     |     ✅     |
-| [The agent does things I never asked for](./docs/why.md#the-agent-does-things-i-never-asked-for)                           | ✅  |    ✅     |     ✅     |
-| [Reviewing every change is a chore](./docs/why.md#reviewing-every-change-is-a-chore)                                       | ✅  |    ✅     |     ✅     |
-| [Some changes need a human eye](./docs/why.md#some-changes-need-a-human-eye)                                               | ✅  |    ✅     |     ✅     |
-| [I spend all day talking to the agent](./docs/why.md#i-spend-all-day-talking-to-the-agent)                                 | ✅  |    ✅     |     ✅     |
-| [Big requests come back sloppy](./docs/why.md#big-requests-come-back-sloppy)                                               | ✅  |    ✅     |     ✅     |
-| [I want many Issues solved at once](./docs/why.md#i-want-many-issues-solved-at-once)                                       | ✅  |    ✅     |     ✅     |
-| [AI costs keep climbing](./docs/why.md#ai-costs-keep-climbing)                                                             | ✅  |    ✅     |     ✅     |
-| [Writing Issues is a chore](./docs/why.md#writing-issues-is-a-chore)                                                       | ✅  |    ✅     |     ✅     |
-| [Wiring AI up to GitHub is a chore](./docs/why.md#wiring-ai-up-to-github-is-a-chore)                                       | ✅  |    ✅     |     ✅     |
-| [I can't tell if the agent is stuck or done](./docs/why.md#i-cant-tell-if-the-agent-is-stuck-or-done)                      | ✅  |    ✅     |     ✅     |
-| [One task overwrote another's work](./docs/why.md#one-task-overwrote-anothers-work)                                        | ✅  |    ✅     |     ✅     |
-| [A session cut off and I lost track](./docs/why.md#a-session-cut-off-and-i-lost-track)                                     | ✅  |    ✅     |     ✅     |
-| [The backlog fills with duplicate Issues](./docs/why.md#the-backlog-fills-with-duplicate-issues)                           | ✅  |    ✅     |     ✅     |
 | [Setting up SvelteKit on Cloudflare takes a day](https://github.com/joshuafolkken/app-kit/blob/main/docs/setup/install.md) |  —  |    ✅     |     ✅     |
 | [I'm not sure the app is secure](https://github.com/joshuafolkken/app-kit/blob/main/docs/security-headers.md)              |  —  |    ✅     |     ✅     |
 | [Nobody looked at the screen](https://github.com/joshuafolkken/app-kit/blob/main/docs/shot.md)                             |  —  |    ✅     |     ✅     |
@@ -80,7 +87,7 @@ Add the two Telegram credentials to `.env` so a run that needs you can reach you
 
 Then open your agent and follow the [tutorial](./docs/tutorial.md).
 
-No Issue workflow? [Node projects](./docs/setup/full.md#2-install-and-initialize-with-josh-init) · [Other projects](./docs/setup/basic.md)
+AI assistant only, no GitHub workflow? [Node projects](./docs/setup/full.md#2-install-and-initialize-with-josh-init) · [Other projects](./docs/setup/basic.md)
 
 ## Docs
 

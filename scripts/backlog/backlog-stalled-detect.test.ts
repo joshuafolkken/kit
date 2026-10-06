@@ -1,4 +1,4 @@
-import { run_event_stream, type RunEvent } from '#scripts/run/run-event-stream'
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it, vi } from 'vitest'
 import { backlog_stalled } from './backlog-stalled'
 import { backlog_stalled_detect, type DetectPorts } from './backlog-stalled-detect'

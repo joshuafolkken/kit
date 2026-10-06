@@ -1,4 +1,4 @@
-import { run_cut } from '#scripts/run/run-cut'
+import { run_cut } from '#scripts/run/cut/run-cut'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { context_cut_payback } from './context-cut-payback'
 import { CONTEXT_CUT_THRESHOLD } from './context-cut-threshold'

@@ -35,7 +35,7 @@ const PATH = 'scripts/gate/hook-gate-reuse.ts'
 // The call a `josh` target makes when it declines a check on the strength of the record. It names
 // the suite for that function below, and the drift guard at the end of this file greps the command
 // registry's scripts for it — one spelling, so the two cannot come to mean different things.
-const REUSE_CALL = 'hook_gate_reuse.reusable_green_hook'
+const REUSE_CALL = 'hook_gate_reuse.hook_reuse'
 const STAGED_ONLY = `M  ${PATH}`
 const RENAMED = `R  old.ts -> ${PATH}`
 const UNSTAGED = ` M ${PATH}`
@@ -47,16 +47,18 @@ const BASE = 'a1b2c3d4'
 const TREE: GateTree = { files: { [PATH]: 'digest-one' }, base: BASE }
 const NO_ARGUMENTS: ReadonlyArray<string> = []
 const AN_ARGUMENT: ReadonlyArray<string> = ['--project=unit']
+const CARRY_MISS = 'the operation carries another tree'
 
 const { stamp_path, clear } = gate_test_fixture.suite_records('hook-gate-reuse')
 
 function reusable(
 	extra_arguments: ReadonlyArray<string> = NO_ARGUMENTS,
 	is_tree_carried = true,
-): ReturnType<typeof hook_gate_reuse.reusable_green_hook> {
-	return hook_gate_reuse.reusable_green_hook({
+): ReturnType<typeof hook_gate_reuse.hook_reuse> {
+	return hook_gate_reuse.hook_reuse({
 		tree: TREE,
 		is_tree_carried,
+		carry_miss: CARRY_MISS,
 		extra_arguments,
 		force_env: FORCE_ENV,
 		source: stamp_path,
@@ -158,21 +160,30 @@ describe(REUSE_CALL, () => {
 	})
 
 	it('reuses a record covering a tree the git operation carries', () => {
-		expect(reusable()).toBeDefined()
+		expect(reusable()).toHaveProperty('stamp')
 	})
 
-	it('refuses when the git operation carries something else', () => {
-		expect(reusable(NO_ARGUMENTS, false)).toBeUndefined()
+	// joshuafolkken/kit#3307: each refusal names its own reason, so a hook can say why it ran in full.
+	it('refuses with the hook reason when the git operation carries something else', () => {
+		expect(reusable(NO_ARGUMENTS, false)).toStrictEqual({ miss: CARRY_MISS })
 	})
 
 	it('refuses when any argument at all was passed', () => {
-		expect(reusable(AN_ARGUMENT)).toBeUndefined()
+		expect(reusable(AN_ARGUMENT)).toStrictEqual({ miss: 'arguments were passed to the hook' })
 	})
 
-	it('refuses when the escape hatch is set', () => {
+	it('refuses when the escape hatch is set, naming the variable', () => {
 		vi.stubEnv(FORCE_ENV, '1')
 
-		expect(reusable()).toBeUndefined()
+		expect(reusable()).toStrictEqual({ miss: `${FORCE_ENV} is set` })
+	})
+
+	it('refuses with the gate reason when the merge base moved under the record', () => {
+		review_stamps.gate_stamp.write(TREE.files, stamp_path, 'e5f6a7b8')
+
+		expect(reusable()).toStrictEqual({
+			miss: `the merge base moved since the green gate (e5f6a7b8 → ${BASE})`,
+		})
 	})
 })
 
@@ -191,7 +202,7 @@ describe(REUSE_CALL, () => {
 // unrelated helper would be swept in and asserted to skip a check it still runs.
 //
 // **And the test is the call, not the import.** A target reuses the record when it asks
-// `reusable_green_hook` for one; importing the module proves nothing about that. `REUSE_CALL` is
+// `hook_reuse` for one; importing the module proves nothing about that. `REUSE_CALL` is
 // declared beside `PATH` at the top, because the suite for that function names itself with it.
 function calls_the_reuse(script: string | undefined): boolean {
 	if (script === undefined) return false

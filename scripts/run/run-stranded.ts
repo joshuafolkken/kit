@@ -1,6 +1,6 @@
 import { process_identity } from '#scripts/josh/process-identity'
-import { run_carry, type CarryRead, type RunCarry } from './run-carry'
-import type { RunWake } from './run-wake'
+import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
+import type { RunWake } from '#scripts/run/wake/run-wake'
 
 // The mechanical judge of a *stranded* run (joshuafolkken/kit#2375). On 2026-09-22 a `backlogrun`'s
 // cost hand-off left the record carried and handed off, the session that cut it died, no successor ever

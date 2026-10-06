@@ -7,7 +7,7 @@ import { main_merge_guard } from './main-merge-guard'
 
 const CHANGED_FILE = 'scripts/a.ts'
 const OLD_NAME = 'old.ts'
-const CONFLICTED = 'UU scripts/run/run-event-stream.ts\n M scripts/other.ts'
+const CONFLICTED = 'UU scripts/run/event/run-event-stream.ts\n M scripts/other.ts'
 const DIRTY = ` M ${CHANGED_FILE}\n?? scripts/new.ts`
 const COMMIT_COMMAND = 'pnpm josh git -y'
 const UNTOUCHED_FILE = 'elsewhere.ts'
@@ -58,7 +58,7 @@ describe('main_merge_guard.refusal', () => {
 	it('refuses unresolved paths and routes them through the commit flow', () => {
 		const refusal = main_merge_guard.refusal(CONFLICTED, [], 'main')
 
-		expect(refusal).toContain('scripts/run/run-event-stream.ts')
+		expect(refusal).toContain('scripts/run/event/run-event-stream.ts')
 		expect(refusal).toContain(COMMIT_COMMAND)
 	})
 

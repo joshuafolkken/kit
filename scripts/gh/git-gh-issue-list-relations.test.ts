@@ -1,5 +1,5 @@
+import { open_issue_schema } from '#scripts/git/git-schemas'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
-import { open_issue_schema } from '#scripts/git/schemas'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_issue_list } from './git-gh-issue-list'

@@ -3,7 +3,7 @@ import {
 	blocking_issue_schema,
 	epic_child_schema,
 	epic_subject_schema,
-} from '#scripts/git/schemas'
+} from '#scripts/git/git-schemas'
 import { describe, expect, it } from 'vitest'
 import { git_gh_issue_rest } from './git-gh-issue-rest'
 import {

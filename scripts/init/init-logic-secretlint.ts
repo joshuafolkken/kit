@@ -1,4 +1,5 @@
 import { init_logic_json_merge } from './init-logic-json-merge'
+import { kit_development_versions } from './kit-development-versions'
 
 const SECRETLINT_CONFIG_FILENAME = '.secretlintrc.json'
 const SECRETLINT_RULE_PRESET = '@secretlint/secretlint-rule-preset-recommend'
@@ -6,12 +7,8 @@ const SECRETLINT_RULE_PRESET = '@secretlint/secretlint-rule-preset-recommend'
 // secretlint resolves both its CLI and every rule package from the project it runs in, not
 // transitively through the kit — the same constraint that forces the prettier plugins into
 // consumer devDependencies (as kit peers, see init.ts). Omitting either
-// entry makes the pre-commit hook fail with "Cannot find module". Versions mirror the kit's
-// own devDependencies.
-const SECRETLINT_DEV_DEPS: Record<string, string> = {
-	secretlint: '^13.0.2',
-	[SECRETLINT_RULE_PRESET]: '^13.0.2',
-}
+// entry makes the pre-commit hook fail with "Cannot find module". The versions are kit's own.
+const SECRETLINT_PACKAGES = ['secretlint', SECRETLINT_RULE_PRESET]
 
 function generate_secretlint_config(): string {
 	const config = { rules: [{ id: SECRETLINT_RULE_PRESET }] }
@@ -24,7 +21,10 @@ function get_secretlint_config_filename(): string {
 }
 
 function merge_secretlint_development_deps(content: string): string {
-	return init_logic_json_merge.merge_development_dependencies(content, SECRETLINT_DEV_DEPS)
+	return init_logic_json_merge.merge_development_dependencies(
+		content,
+		kit_development_versions.versions_of(SECRETLINT_PACKAGES),
+	)
 }
 
 const init_logic_secretlint = {

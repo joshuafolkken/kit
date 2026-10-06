@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { package_file } from '#scripts/claude/skill-fixture'
 import { describe, expect, it } from 'vitest'
 import { init_logic_secretlint } from './init-logic-secretlint'
 
@@ -67,6 +69,14 @@ describe('init_logic_secretlint.merge_secretlint_development_deps', () => {
 		const content = `{"devDependencies":{"${SECRETLINT_KEY}":"^13.0.2","${PRESET_ID}":"^13.0.2"}}`
 
 		expect(init_logic_secretlint.merge_secretlint_development_deps(content)).toBe(content)
+	})
+
+	it("adds the versions kit's own devDependencies carry", () => {
+		const kit = JSON.parse(readFileSync(package_file('package.json'), 'utf8')) as PackageJson
+		const deps = parse_merged_deps('{}')
+
+		expect(deps[SECRETLINT_KEY]).toBe(kit.devDependencies[SECRETLINT_KEY])
+		expect(deps[PRESET_ID]).toBe(kit.devDependencies[PRESET_ID])
 	})
 
 	it('keeps unrelated devDependencies intact', () => {

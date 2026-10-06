@@ -1,5 +1,5 @@
+import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { describe, expect, it } from 'vitest'
-import { run_carry, type CarryRead } from './run-carry'
 import { run_stop_notify } from './run-stop-notify'
 
 // joshuafolkken/kit#2136. The decision is pinned without a Telegram: what `run:carry --end` sends is

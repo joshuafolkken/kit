@@ -14,20 +14,20 @@
 
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { cost_tokens } from '#scripts/cost-runtime/cost-tokens'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { bash_output_cap_reader } from './bash-output-cap'
-import { document_section, type Section } from './document-section'
+import { document_section } from './document-section'
+import { read_set_cost, type Cost } from './read-set-cost'
 import { read_set_point_of_use } from './read-set-point-of-use'
 
 const { POINT_OF_USE_FILES, POINT_OF_USE_BY_ENTRY, is_point_of_use, point_of_use_files } =
 	read_set_point_of_use
+const { cost_of, scoped_file_cost, total } = read_set_cost
 
 const SKILL_DIRECTORY = path.join('.claude', 'skills', 'workflow-commands')
 const SKILL_FILE = 'SKILL.md'
 const TABLE_SECTION = '1. Which file to read'
 const NOTHING = 0
-const ONE_LINE = 1
 
 // The point-of-use classification — which documents an entry names but reads only at a later step —
 // is its own concern, split into `read-set-point-of-use.ts` in joshuafolkken/kit#2289. This file
@@ -52,11 +52,6 @@ const WHITESPACE_RUN = /\s+/gu
 interface SectionReference {
 	file: string
 	heading: string
-}
-
-interface Cost {
-	bytes: number
-	tokens: number
 }
 
 interface SectionCost extends SectionReference {
@@ -297,21 +292,6 @@ function read_set(root: string, entry: string): ReadSet {
 	return { entry, files, sections: sections_for(root, entry, files) }
 }
 
-function cost_of(text: string): Cost {
-	return { bytes: Buffer.byteLength(text, 'utf8'), tokens: cost_tokens.estimate(text) }
-}
-
-function total(costs: ReadonlyArray<Cost>): Cost {
-	const running = { bytes: NOTHING, tokens: NOTHING }
-
-	for (const cost of costs) {
-		running.bytes += cost.bytes
-		running.tokens += cost.tokens
-	}
-
-	return running
-}
-
 function section_cost(root: string, reference: SectionReference): SectionCost {
 	const found = document_section.section(read_document(root, reference.file), reference.heading)
 
@@ -334,74 +314,13 @@ function headings_for(sections: ReadonlyArray<SectionReference>, file: string): 
 	return sections.filter((reference) => reference.file === file).map((one) => one.heading)
 }
 
-function add_range(charged: Set<number>, found: Section): void {
-	for (let index = found.first_line; index <= found.last_line; index += ONE_LINE) charged.add(index)
-}
-
-// `undefined` the moment one heading does not resolve, because that reference is charged at its whole
-// file and there is then nothing to union.
-function charged_lines(markdown: string, headings: ReadonlyArray<string>): Set<number> | undefined {
-	const charged = new Set<number>()
-
-	for (const heading of headings) {
-		const found = document_section.section(markdown, heading)
-
-		if (found === undefined) return undefined
-
-		add_range(charged, found)
-	}
-
-	return charged
-}
-
-// **The union's charged lines are split into contiguous runs, and each run is costed on its own
-// natural text.** Joining non-adjacent lines with `\n` into one string fabricates a token boundary at
-// every gap the union skipped, so the estimate could drift a token *above* the per-reference sum even
-// with no real overlap — a false negative saving the measurement must never print
-// (joshuafolkken/kit#1934). A run is a maximal stretch of consecutive charged lines, which is exactly
-// the contiguous text a reader of that section actually reads, so summing the runs both mirrors the
-// real read and keeps `scoped` at or below the per-reference sum by construction.
-function extend_or_start(runs: Array<Array<number>>, index: number): void {
-	const current = runs.at(-1)
-
-	if (current?.at(-1) === index - ONE_LINE) current.push(index)
-	else runs.push([index])
-}
-
-function contiguous_runs(charged: ReadonlySet<number>): Array<Array<number>> {
-	const runs: Array<Array<number>> = []
-	const ascending = [...charged].toSorted((left, right) => left - right)
-
-	for (const index of ascending) extend_or_start(runs, index)
-
-	return runs
-}
-
-function run_text(lines: ReadonlyArray<string>, run: ReadonlyArray<number>): string {
-	return run.map((index) => lines[index] ?? '').join('\n')
-}
-
-// **Charged per file over the union of the lines its references cover, never per reference.**
-// Summing the references instead double-counts the two ways one file can be cited twice — two
-// unresolved headings each charged at the whole file, and a `##` section cited beside one of its own
-// `###` children, which `section()` already returns inside the parent. Either one could push the
-// scoped figure above the whole one and print a *negative* saving, which is the single direction this
-// measurement must not be able to move (joshuafolkken/kit#1776 review round 1).
-function file_scoped_cost(root: string, file: string, headings: ReadonlyArray<string>): Cost {
-	const markdown = read_document(root, file)
-	const charged = charged_lines(markdown, headings)
-
-	if (charged === undefined) return cost_of(markdown)
-
-	const lines = markdown.split('\n')
-
-	return total(contiguous_runs(charged).map((run) => cost_of(run_text(lines, run))))
-}
-
+// The per-file union that keeps `scoped` at or below `whole` lives in `read-set-cost.ts`.
 function scoped_cost(root: string, sections: ReadonlyArray<SectionReference>): Cost {
 	const files = unique(sections.map((reference) => reference.file))
 
-	return total(files.map((file) => file_scoped_cost(root, file, headings_for(sections, file))))
+	return total(
+		files.map((file) => scoped_file_cost(read_document(root, file), headings_for(sections, file))),
+	)
 }
 
 function file_costs(root: string, names: ReadonlyArray<string>): Array<FileCost> {
@@ -491,5 +410,7 @@ const entry_read_set = {
 	total,
 }
 
-export type { Cost, FileCost, ReadSet, ReadSetCost, SectionCost, SectionReference }
+export type { FileCost, ReadSet, ReadSetCost, SectionCost, SectionReference }
 export { entry_read_set }
+
+export { type Cost } from './read-set-cost'

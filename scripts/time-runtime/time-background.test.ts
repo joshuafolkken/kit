@@ -16,6 +16,7 @@ const { MINUTE_MS, span, GATE_COMMAND, PR_COMMAND } = time_phase_fixture
 const GATE_ID = 'b3sods4bd'
 const OTHER_ID = 'second-run'
 const LAUNCH_BODY = `Command running in background with ID: ${GATE_ID}. Output is being written to: /tmp/tasks/${GATE_ID}.output`
+const MOVED_BODY = `Command did not complete within its 600s timeout and was moved to the background (ID: ${GATE_ID}). Output is being written to: /tmp/tasks/${GATE_ID}.output`
 const JOIN_COMMAND = `tail -25 /private/tmp/claude-501/proj/session/tasks/${GATE_ID}.output`
 const FINISH_NOTICE = `<task-notification>\n<task-id>${GATE_ID}</task-id>\n<tool-use-id>toolu_01W</tool-use-id>\n<status>completed</status>\n</task-notification>`
 
@@ -69,6 +70,11 @@ const POLLED: ReadonlyArray<Span> = [
 describe('time_background.launch_id', () => {
 	it('reads the id the harness assigned out of the launch result', () => {
 		expect(time_background.launch_id(LAUNCH_BODY)).toBe(GATE_ID)
+	})
+
+	// joshuafolkken/kit#3304: a foreground call that outran its timeout is moved to the background.
+	it('reads the id out of a call moved to the background at its timeout', () => {
+		expect(time_background.launch_id(MOVED_BODY)).toBe(GATE_ID)
 	})
 
 	// Every other tool result in a transcript goes through the same reader, so a body that says nothing

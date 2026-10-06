@@ -1,7 +1,7 @@
 import { release_scope_cli } from '#scripts/release/release-scope-cli'
+import { run_event_scope, type EventScope } from '#scripts/run/event/run-event-scope'
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
-import { run_event_scope, type EventScope } from './run-event-scope'
-import { run_event_stream, type RunEvent } from './run-event-stream'
 import { run_report } from './run-report'
 
 // joshuafolkken/kit#2249: the report generated from the run's event stream. The generator is pure — it

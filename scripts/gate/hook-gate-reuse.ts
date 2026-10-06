@@ -1,7 +1,6 @@
 import { git_command } from '#scripts/git/git-command'
-import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
-import { gate_skip } from './gate-skip'
+import { gate_skip, type GateReuse } from './gate-skip'
 import type { GateTree } from './gate-tree'
 
 // What the two git hooks share when they decline to re-run a check `pnpm josh gate` already passed on
@@ -94,6 +93,8 @@ interface HookReuse {
 	// The hook-specific narrowing: whether what this git operation carries is the tree the record
 	// describes. `is_worktree_clean` for a push, `is_index_matching_worktree` for a commit.
 	is_tree_carried: boolean
+	// The reason a refusal on that narrowing reports, in the hook's own words (joshuafolkken/kit#3307).
+	carry_miss: string
 	extra_arguments: ReadonlyArray<string>
 	force_env: string
 	// The record to read, so a test can plant one without overwriting the record a live run relies on.
@@ -102,27 +103,28 @@ interface HookReuse {
 	source?: string | undefined
 }
 
-// The stamp rather than a boolean, for the same reason `gate_skip.reusable_green_gate` hands one back:
-// the caller prints `taken_at`, and a record that does not describe this tree has no timestamp worth
-// printing.
+// The stamp rather than a boolean, for the same reason `gate_skip.gate_reuse` hands one back: the
+// caller prints `taken_at`, and a record that does not describe this tree has no timestamp worth
+// printing. A refusal carries its reason instead (joshuafolkken/kit#3307).
 //
 // **Any argument at all refuses the reuse**, not only the force flag. A caller who narrowed the run
 // asked for that run rather than for a recorded result about a whole tree, and a hook's own line passes
 // none, so this costs it nothing.
-function reusable_green_hook(input: HookReuse): FileMapStamp | undefined {
-	if (input.extra_arguments.length > 0 || is_force_requested(input.force_env)) return undefined
-	if (!input.is_tree_carried) return undefined
+function hook_reuse(input: HookReuse): GateReuse {
+	if (input.extra_arguments.length > 0) return { miss: 'arguments were passed to the hook' }
+	if (is_force_requested(input.force_env)) return { miss: `${input.force_env} is set` }
+	if (!input.is_tree_carried) return { miss: input.carry_miss }
 
-	return gate_skip.reusable_green_gate(input.tree.files, input.tree.base, input.source)
+	return gate_skip.gate_reuse(input.tree.files, input.tree.base, input.source)
 }
 
 const hook_gate_reuse = {
 	GATE_REUSING_TARGETS,
+	hook_reuse,
 	is_force_requested,
 	is_index_matching_worktree,
 	is_worktree_clean,
 	read_status_lines,
-	reusable_green_hook,
 }
 
 export type { HookReuse }

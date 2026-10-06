@@ -13,7 +13,7 @@ export default defineConfig({
 		// worker of either project forks, so both inherit it. The pure project adds the state guard of
 		// its own, since isolate:false is the only run a leaked branch or dirty tree can reach a sibling
 		// in.
-		globalSetup: ['./scripts/test/test-network-guard.ts'],
+		globalSetup: [...unit_projects.NETWORK_GUARD],
 		coverage: {
 			provider: 'v8',
 		},

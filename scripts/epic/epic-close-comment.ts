@@ -1,6 +1,6 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { rest_comment_schema, type RestCommentData } from '#scripts/git/git-schemas'
 import { read_json_listing } from '#scripts/git/parse-json-array'
-import { rest_comment_schema, type RestCommentData } from '#scripts/git/schemas'
 import { epic_parse, type ExternalChild } from './epic-parse'
 
 // The comment the epic auto-close announces itself with, and how a run recognizes the one a previous

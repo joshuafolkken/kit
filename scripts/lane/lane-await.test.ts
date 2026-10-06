@@ -1,8 +1,16 @@
+import { spawnSync } from 'node:child_process'
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { run_liveness } from '#scripts/run/run-liveness'
-import { run_ship_detach } from '#scripts/run/run-ship-detach'
+import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_await, type AwaitState, type CheckConfig } from './lane-await'
+
+vi.mock('node:child_process', async (original) => {
+	const actual = await original<{ spawnSync: typeof spawnSync }>()
+
+	return { ...actual, spawnSync: vi.fn(actual.spawnSync) }
+})
 
 // joshuafolkken/kit#2113. The re-confirm guard is the invariant being tested: a process that
 // briefly disappears (the pre-gate boundary handoff) must not be declared done, while one that
@@ -34,6 +42,21 @@ function config(is_running: () => boolean): CheckConfig {
 		never_appeared_timeout_ms: Number.MAX_SAFE_INTEGER,
 	}
 }
+
+describe('is_process_running_default', () => {
+	it('bounds the pgrep probe with the probe timeout', () => {
+		const mocked = vi.mocked(spawnSync)
+
+		mocked.mockClear()
+		lane_await.is_process_running_default(ISSUE)
+
+		expect(mocked).toHaveBeenCalledWith(
+			'pgrep',
+			expect.any(Array),
+			expect.objectContaining({ timeout: PROBE_TIMEOUT_MS }),
+		)
+	})
+})
 
 describe('check_issue -- running / disappearance states', () => {
 	it('counts the detached ship as running after its child command disappears', () => {

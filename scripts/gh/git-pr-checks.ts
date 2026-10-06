@@ -1,4 +1,4 @@
-import { package_name_schema } from '#scripts/git/schemas'
+import { package_name_schema } from '#scripts/git/git-schemas'
 import { poll } from '#scripts/lib/poll'
 import { git_gh_pr_auto_merge } from './git-gh-pr-auto-merge'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'

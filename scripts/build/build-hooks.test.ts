@@ -214,8 +214,12 @@ describe('Codex adapter bundle', () => {
 		async () => {
 			const source_file = path.join(format_directory, 'source.json')
 			const bundle_file = path.join(format_directory, 'bundle.json')
-			const source = await format_with_entrypoint(source_file, TSX_BIN, CODEX_ADAPTER_SOURCE)
-			const bundle = await format_with_entrypoint(bundle_file, 'node', CODEX_ADAPTER_BUNDLE)
+			// Concurrent: each side formats its own file, and the posttool path never reads the Step 0
+			// stamp the sequential pretool parity runs have to clear between them.
+			const [source, bundle] = await Promise.all([
+				format_with_entrypoint(source_file, TSX_BIN, CODEX_ADAPTER_SOURCE),
+				format_with_entrypoint(bundle_file, 'node', CODEX_ADAPTER_BUNDLE),
+			])
 
 			expect(bundle.result).toEqual(source.result)
 			expect(bundle.content).toBe(source.content)

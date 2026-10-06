@@ -1,6 +1,6 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { parse_json_array_safe } from '#scripts/git/parse-json-array'
-import { open_issue_schema, type OpenIssueData } from '#scripts/git/schemas'
 import { has_any_label, NOT_DIRECTLY_RUNNABLE_LABELS } from './issue-labels'
 import { issue_rank, type DependencyRow } from './issue-rank'
 

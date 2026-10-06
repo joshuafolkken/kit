@@ -24,6 +24,11 @@ review scan and the merge and runs only the post-merge tail; a completion report
 is not posted or notified twice, so re-running is safe. Keep the default Issue target. Ignore a
 finding only after verifying it is inapplicable; rate-limit text is not a finding.
 
+**A red rate-limited CodeRabbit check is cleared by a retrigger, not a bypass.** Wait out the window
+the rate-limit comment states, post `@coderabbitai review` on the pull request, and rerun `followup`.
+Bypassing the check is Tier C — only on explicit user instruction, and only when the stated window is
+impractically long or the retrigger is rate-limited again.
+
 A pre-merge failure stops the run; an unverifiable AI finding or CI failure needing input receives a
 `confirmation` Telegram. Post-merge cleanup failures are named and do not undo the merge; run the
 named recovery without rerunning it. Because notification precedes merge, the printed result is

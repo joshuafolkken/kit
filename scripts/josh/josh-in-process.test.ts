@@ -108,7 +108,6 @@ const UNCONDITIONAL_SCRIPTS: ReadonlyArray<string> = [
 	'scripts/epic/epic-check.ts',
 	'scripts/epic/epic.ts',
 	'scripts/git/git-workflow.ts',
-	'scripts/eval/eval-run.ts',
 	'scripts/version/version-check.ts',
 ]
 const GUARDED_SCRIPTS = IN_PROCESS_SCRIPTS.filter(

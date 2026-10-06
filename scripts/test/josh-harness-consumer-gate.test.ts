@@ -1,7 +1,8 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { run_carry } from '#scripts/run/run-carry'
-import { run_review_steps } from '#scripts/run/run-review-steps'
+import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_review_steps } from '#scripts/run/review/run-review-steps'
+import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { describe, expect, it, vi } from 'vitest'
 import { josh_harness, type JoshEnvironment } from './josh-harness'
 import { josh_harness_fixture } from './josh-harness-fixture'
@@ -12,13 +13,21 @@ const GATE_PASSED = 'verification gate passed'
 
 const environment = josh_harness_fixture.open_environments(['kit', 'consumer'])
 
-function prepare_consumer_gate(consumer: JoshEnvironment, kit: JoshEnvironment): void {
+async function prepare_consumer_gate(
+	consumer: JoshEnvironment,
+	kit: JoshEnvironment,
+): Promise<void> {
 	writeFileSync(path.join(consumer.root, 'change.md'), '# Change\n', 'utf8')
 	writeFileSync(path.join(kit.root, 'change.md'), '# Change\n', 'utf8')
-	expect(josh_harness.run(consumer, ['lint:related']).exit_code).toBe(0)
-	expect(josh_harness.run(consumer, ['test:related']).exit_code).toBe(0)
+	const linted = await josh_harness.run(consumer, ['lint:related'])
+	const tested = await josh_harness.run(consumer, ['test:related'])
+
+	expect([linted.exit_code, tested.exit_code]).toStrictEqual([0, 0])
 }
 
+// The detached gate leads a process group of its own, so the harness tracks it: a test that times out
+// has it stopped rather than left writing into a workspace about to be removed (joshuafolkken/kit#3309).
+// The nested mark is the one the harness gives its own children, so this gate reserves no cores either.
 function launch_gate_from_hook(
 	kit: JoshEnvironment,
 	consumer: JoshEnvironment,
@@ -26,26 +35,41 @@ function launch_gate_from_hook(
 	try {
 		vi.stubEnv('GIT_DIR', path.join(kit.root, '.git'))
 		vi.stubEnv('GIT_WORK_TREE', kit.root)
+		vi.stubEnv(unit_worker_share.NESTED_KEY, unit_worker_share.NESTED_VALUE)
+		const launched = run_review_steps.launch_gate(consumer.root)
 
-		return run_review_steps.launch_gate(consumer.root)
+		if (launched.kind === 'launched') josh_harness.track(launched.pid, 'detached josh gate')
+
+		return launched
 	} finally {
 		vi.unstubAllEnvs()
 	}
 }
 
-it('targets the fixture repository even when a push hook supplies GIT_DIR', () => {
+it('targets the fixture repository even when a push hook supplies GIT_DIR', async () => {
 	const kit = environment('kit')
 	const consumer = environment('consumer')
-	const previous = process.env['GIT_DIR']
 
 	try {
-		process.env['GIT_DIR'] = path.join(kit.root, '.git')
-		expect(carry_target(consumer)).toBe(run_carry.carry_path(path.join(consumer.root, '.git')))
+		vi.stubEnv('GIT_DIR', path.join(kit.root, '.git'))
+		await expect(carry_target(consumer)).resolves.toBe(
+			run_carry.carry_path(path.join(consumer.root, '.git')),
+		)
 	} finally {
-		if (previous === undefined) Reflect.deleteProperty(process.env, 'GIT_DIR')
-		else process.env['GIT_DIR'] = previous
+		vi.unstubAllEnvs()
 	}
 })
+
+// The gate's process group, not its log, says it has finished: the log says passed a moment before the
+// gate exits, and what it wrote in that moment landed in a workspace already removed — so the scenario
+// waits until the whole group has gone, and reads the log once nothing can still append to it.
+async function has_exited(
+	launched: ReturnType<typeof run_review_steps.launch_gate>,
+): Promise<boolean> {
+	if (launched.kind !== 'launched') return false
+
+	return await josh_harness.wait_for(() => !josh_harness.is_running(launched.pid), GATE_TIMEOUT_MS)
+}
 
 describe('josh harness — detached consumer gate (#2573)', () => {
 	it(
@@ -55,22 +79,14 @@ describe('josh harness — detached consumer gate (#2573)', () => {
 			const kit = environment('kit')
 
 			expect(existsSync(path.join(consumer.root, 'scripts', 'josh', 'josh.ts'))).toBe(false)
-			prepare_consumer_gate(consumer, kit)
+			await prepare_consumer_gate(consumer, kit)
 			const launched = launch_gate_from_hook(kit, consumer)
-
-			const log_path = run_review_steps.gate_log_path(consumer.root)
-			const is_finished = await josh_harness.wait_for(
-				() =>
-					existsSync(log_path) &&
-					/verification gate passed|verification gate failed|ELIFECYCLE/u.test(
-						readFileSync(log_path, 'utf8'),
-					),
-				GATE_TIMEOUT_MS,
-			)
+			const is_finished = await has_exited(launched)
+			const log = readFileSync(run_review_steps.gate_log_path(consumer.root), 'utf8')
 
 			expect(launched.kind).toBe('launched')
-			expect(is_finished, readFileSync(log_path, 'utf8')).toBe(true)
-			expect(readFileSync(log_path, 'utf8')).toContain(GATE_PASSED)
+			expect(is_finished, log).toBe(true)
+			expect(log).toContain(GATE_PASSED)
 		},
 		GATE_TIMEOUT_MS,
 	)

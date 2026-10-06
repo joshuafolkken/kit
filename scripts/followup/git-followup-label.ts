@@ -1,6 +1,6 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { issue_label_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
-import { issue_label_schema } from '#scripts/git/schemas'
 import { IN_PROGRESS_LABEL, label_name_of } from '#scripts/issue/issue-labels'
 import { z } from 'zod'
 
@@ -19,7 +19,7 @@ import { z } from 'zod'
 // No procedure covered the ordinary ending: merged, closed, and still marked as running.
 
 // The `number,labels,body` read answers labels as objects, and this is the one field of it this
-// step needs. The element shape is `schemas.ts`'s rather than a second spelling of it; the wrapper
+// step needs. The element shape is `git-schemas.ts`'s rather than a second spelling of it; the wrapper
 // is local because a read's *field list* is what multiplies helpers when it is shared
 // (`git-gh-issue-read.ts`).
 const labels_read_schema = z.object({ labels: z.array(issue_label_schema).optional() })
