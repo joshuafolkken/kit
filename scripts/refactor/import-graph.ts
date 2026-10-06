@@ -157,6 +157,22 @@ function expand(
 	return included
 }
 
+// Every file `entry` reaches through its own imports, `entry` included, with no stage cap — the whole
+// transitive closure a running script loads, not the §4.3 neighborhood `expand` bounds.
+function reachable(entry: string, forward: FileGraph): ReadonlySet<string> {
+	const included = new Set<string>([entry])
+	const pending = [entry]
+
+	for (let file = pending.pop(); file !== undefined; file = pending.pop()) {
+		const fresh = [...(forward.get(file) ?? [])].filter((target) => !included.has(target))
+
+		for (const target of fresh) included.add(target)
+		pending.push(...fresh)
+	}
+
+	return included
+}
+
 // The whole §4.3 walk: build the graph over the universe, then expand the seed within it.
 function expand_scope(
 	seed: ReadonlyArray<string>,
@@ -174,6 +190,7 @@ const import_graph = {
 	expand_scope,
 	invert,
 	parse_imports,
+	reachable,
 	resolve_spec,
 	MAX_STAGES,
 }
