@@ -65,6 +65,7 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 | `JOSH_RETROSPECTIVE`             | No       | off                                                           | `on` / `1` / `true` / `yes` runs the end-of-run retrospective when a backlog drains ([`josh retrospective`](./josh-commands-run.md#josh-retrospective)).     |
 | `JOSH_REPO_PATHS`                | No       | sibling repositories are found automatically                  | A repository that is not a sibling, or is checked out twice: `owner/repo=/absolute/path`, comma-separated ([`josh doctor`](./josh-commands.md#josh-doctor)). |
 | `JOSH_DEBUG`                     | No       | off                                                           | Any non-blank value writes the error a run, lane, git or GitHub state check swallowed to stderr as `josh debug: <where>: <message>`; verdicts are unchanged. |
+| `JOSH_CORE_RESERVED`             | No       | unset                                                         | Set by josh, never by hand: `1` marks a child whose parent already holds its share of the machine-wide core budget, so it does not reserve a second time.    |
 
 ### Merge, release and dependency updates
 

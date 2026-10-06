@@ -1,6 +1,7 @@
 import { availableParallelism } from 'node:os'
 import { josh_verdict } from '#scripts/josh/josh-verdict'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
+import { core_budget } from './core-budget'
 
 // How many of the gate's checks run at once, and how wide the one elastic check may fan out —
 // both derived from the machine rather than fixed at four (joshuafolkken/kit#1258).
@@ -61,15 +62,30 @@ const WARNING_CHECKER_LABELS: ReadonlyArray<string> = [LINT_LABEL, TYPE_CHECK_LA
 // check rather than one appended after the unit suite is what keeps the plan's shape intact: the
 // `--no-unit` set stays "the whole gate minus the unit suite", and a CI runner — which has no recorded
 // transcripts — runs it as a trivial green rather than skipping it.
+//
+// **The three reserving weights are `core_budget.CORE_WEIGHTS`** (joshuafolkken/kit#3345), the same
+// numbers the `josh lint`, `josh check` and `josh cspell:dot` commands claim when run directly.
+//
+// **The two zero weights were measured again for joshuafolkken/kit#3345, and they stay zero.** These are
+// warm runs on the 11-core machine on 2026-10-06. `behavior` took 0.6s of wall for 0.7s of CPU, which
+// is node starting up. `exports:unused` took 5.5s of wall for 9.0s of CPU, about 1.6 cores. Floored,
+// that would be one core, but a reservation lasts the whole gate's plan, not the check's five seconds.
+// It would lower `RESERVED_CORES` from 4 to 5 and cut the solo unit cap from 7 workers to 6 for the
+// full length of the unit suite, to cover a burst that ends before lint does. Nothing has measured
+// that trade, so the measured shape stays.
 const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
-	{ label: LINT_LABEL, target: 'lint', reserved_cores: 2 },
-	{ label: TYPE_CHECK_LABEL, target: 'check', reserved_cores: 1 },
-	{ label: 'cspell', target: 'cspell:dot', reserved_cores: 1 },
+	{ label: LINT_LABEL, target: 'lint', reserved_cores: core_budget.CORE_WEIGHTS.lint },
+	{
+		label: TYPE_CHECK_LABEL,
+		target: 'check',
+		reserved_cores: core_budget.CORE_WEIGHTS.type_check,
+	},
+	{ label: 'cspell', target: 'cspell:dot', reserved_cores: core_budget.CORE_WEIGHTS.spell_check },
 	{ label: BEHAVIOR_LABEL, target: BEHAVIOR_LABEL, reserved_cores: 0 },
 	// **The unused-member check reserves no core** (joshuafolkken/kit#2987): it builds one TypeScript
-	// program and walks it single-threaded for about 5s — over well before lint and the type check, so
-	// a reservation would only take a place from the four-core CI runner's fan-out and a worker from
-	// the unit suite for the whole gate.
+	// program and walks it for about 5s, and it is over well before lint and the type check. A
+	// reservation would only take a place from the four-core CI runner's fan-out and a worker from the
+	// unit suite for the whole gate.
 	{ label: 'exports', target: 'exports:unused', reserved_cores: 0 },
 ]
 
@@ -242,6 +258,11 @@ function resolve_unit_worker_cap(
 	return available_cores - RESERVED_CORES
 }
 
+// The unit suite's weight when nothing caps its pool: the cores left once the static checks have theirs.
+function solo_unit_weight(available_cores: number): number {
+	return Math.max(0, available_cores - RESERVED_CORES)
+}
+
 // The cores a check reserves from the machine-wide budget while it runs (joshuafolkken/kit#2351). The
 // static checks declare their measured reservation; the unit suite declares the pool it will open,
 // which `unit_worker_cap` has already sized against the runs in flight. **This is the same table, read
@@ -256,7 +277,25 @@ function resolve_unit_worker_cap(
 function check_weight(check: GateCheck, plan: GatePlan, available_cores: number): number {
 	if (check.label !== UNIT_LABEL) return check.reserved_cores
 
-	return plan.unit_worker_cap ?? Math.max(0, available_cores - RESERVED_CORES)
+	return plan.unit_worker_cap ?? solo_unit_weight(available_cores)
+}
+
+// The cores a unit run started directly reserves (joshuafolkken/kit#3345): the share it will pass to
+// vitest while other runs are live, and otherwise the gate's own solo unit weight. **Not the whole
+// machine**, though a lone vitest sizes its own pool: FIFO admission lets a claim of every core in only
+// once the ledger is empty, so a one-file `josh test:related` would wait out every other lane's gate
+// and hold every later claim behind it. One weight for the suite however it is started. **Floored at one
+// worker**: on a machine the static checks fill, a four-core CI runner among them, the gate's solo
+// weight is zero because its siblings hold every core — a direct run has no siblings, and vitest still
+// occupies a core.
+function direct_unit_weight(
+	available_cores: number = availableParallelism(),
+	live_runs: number = unit_worker_share.live_run_count(),
+): number {
+	const weight =
+		unit_worker_share.current_share(available_cores, live_runs) ?? solo_unit_weight(available_cores)
+
+	return Math.max(unit_worker_share.MIN_WORKERS, weight)
 }
 
 // `availableParallelism()` rather than `cpus().length`: it reports what this process may actually
@@ -345,6 +384,7 @@ const gate_plan = {
 	UNIT_LABEL,
 	WARNING_CHECKER_LABELS,
 	check_weight,
+	direct_unit_weight,
 	format_gate_plan,
 	format_machine,
 	has_unit_check,

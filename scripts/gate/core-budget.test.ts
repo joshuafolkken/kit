@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
+import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_budget, type LiveReservation } from './core-budget'
 
@@ -226,4 +227,66 @@ describe('core_budget.reserve — waiting on the machine-wide budget', () => {
 	it('admits a solo reservation without waiting', reserve_admits_solo_without_waiting)
 	it('is admitted once a blocking place is freed', reserve_admits_once_freed)
 	it('admits at the wait cap when the budget never clears', reserve_admits_at_wait_cap)
+})
+
+// joshuafolkken/kit#3345: a heavy command run outside the gate claims its place through
+// `with_command_reservation`, and a command whose parent already holds its cores claims none. The
+// held mark is cleared per case, because this suite itself runs under a `josh test:unit` that holds one.
+interface CommandRun {
+	places: number
+	mark: string | undefined
+}
+
+async function run_command_reservation(directory: string): Promise<CommandRun> {
+	const sleep = vi.fn(async () => {
+		throw new Error('a command with room on the machine must not wait')
+	})
+
+	return await core_budget.with_command_reservation(
+		core_budget.CORE_WEIGHTS.lint,
+		async () => ({ places: marker_count(directory), mark: process.env[core_budget.HELD_KEY] }),
+		{ directory, budget: MEASURED_CORES, sleep },
+	)
+}
+
+describe('core_budget.with_command_reservation — a command run outside the gate', () => {
+	beforeEach(() => {
+		vi.stubEnv(core_budget.HELD_KEY, '')
+		vi.stubEnv(unit_worker_share.NESTED_KEY, '')
+	})
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('claims one place and marks its children while it runs', async () => {
+		await with_probe(async (directory) => {
+			const run = await run_command_reservation(directory)
+
+			expect(run).toEqual({ places: 1, mark: core_budget.HELD_VALUE })
+			expect(marker_count(directory)).toBe(0)
+			expect(core_budget.is_held()).toBe(false)
+		})
+	})
+
+	it('claims nothing under a parent that already holds its cores', async () => {
+		vi.stubEnv(core_budget.HELD_KEY, core_budget.HELD_VALUE)
+
+		await with_probe(async (directory) => {
+			const run = await run_command_reservation(directory)
+
+			expect(run.places).toBe(0)
+			expect(core_budget.is_held()).toBe(true)
+		})
+	})
+
+	it('claims nothing inside a unit suite', async () => {
+		vi.stubEnv(unit_worker_share.NESTED_KEY, unit_worker_share.NESTED_VALUE)
+
+		await with_probe(async (directory) => {
+			const run = await run_command_reservation(directory)
+
+			expect(run.places).toBe(0)
+		})
+	})
 })

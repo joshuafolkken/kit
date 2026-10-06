@@ -8,7 +8,10 @@ vi.mock('node:fs', () => ({
 	readFileSync: vi.fn().mockReturnValue('{"version":"0.0.0"}'),
 }))
 
-const { josh_logic, SPAWN_ERROR_EXIT_CODE, USAGE_ERROR_EXIT_CODE } = await import('./josh-logic')
+const { COMMAND_MAP, josh_logic, SPAWN_ERROR_EXIT_CODE, USAGE_ERROR_EXIT_CODE } =
+	await import('./josh-logic')
+const { core_budget } = await import('#scripts/gate/core-budget')
+const { gate_plan } = await import('#scripts/gate/gate-plan')
 
 const SPAWN_ERROR_MESSAGE = 'ENOENT: no such file or directory'
 const SCRIPT_ARGS = ['scripts/josh/josh.ts']
@@ -111,6 +114,67 @@ describe('josh_logic.run_command — composite commands reject extra arguments',
 	it('applies the refusal to the aliased form as well', async () => {
 		await expect(josh_logic.run_command('t', [WORKERS_FLAG])).resolves.toBe(USAGE_ERROR_EXIT_CODE)
 		expect(execa_sync_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#3345: the heavy commands an agent calls directly used to start their tools outside
+// the machine-wide core budget. Each one now declares a weight, and the dispatch every command passes
+// through reserves it.
+const WEIGHTED_COMMANDS: ReadonlyArray<string> = [
+	'lines',
+	'refactor:scan',
+	'lint',
+	'lint:related',
+	'check',
+	'cspell:dot',
+	'test:unit',
+	'test:related',
+]
+
+function declared_weight(command: string): number | undefined {
+	const weight = COMMAND_MAP[command]?.core_weight
+
+	return typeof weight === 'function' ? weight() : weight
+}
+
+describe('josh_logic.run_command — the core budget a command reserves', () => {
+	beforeEach(() => {
+		execa_sync_mock.mockClear()
+		execa_sync_mock.mockReturnValue(SPAWN_SUCCESS)
+	})
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it.each(WEIGHTED_COMMANDS)('reserves the weight %s declares before it runs', async (command) => {
+		const reservation = vi
+			.spyOn(core_budget, 'with_command_reservation')
+			.mockResolvedValue(SPAWN_SUCCESS.exitCode)
+
+		await expect(josh_logic.run_command(command, [])).resolves.toBe(SPAWN_SUCCESS.exitCode)
+		// The reserved weight is read off the call: a unit run's weight follows the live runs on the
+		// machine, so a second read could differ from the one the dispatch made.
+		const [weight] = reservation.mock.calls[0] ?? []
+
+		expect(reservation).toHaveBeenCalledOnce()
+		expect(weight).toBeGreaterThanOrEqual(1)
+	})
+
+	it('reserves nothing for a command that declares no weight', async () => {
+		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
+
+		await expect(josh_logic.run_command(TEST_CMD, [])).resolves.toBe(SPAWN_SUCCESS.exitCode)
+		expect(reservation).not.toHaveBeenCalled()
+	})
+
+	// One table of weights: a direct `josh lint` claims exactly what the gate's lint check claims.
+	it('declares the same weight the gate reserves for the same command', () => {
+		const reserving = gate_plan.GATE_CHECKS.filter((check) => check.reserved_cores > 0)
+
+		for (const check of reserving) {
+			expect(declared_weight(check.target)).toBe(check.reserved_cores)
+		}
 	})
 })
 
