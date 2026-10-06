@@ -16,6 +16,8 @@ interface GitSyncOptions {
 	cwd?: string
 	timeout?: number
 	env?: Record<string, string | undefined>
+	// A step a person watches (`josh start`) shows git's own progress and hook output as it runs.
+	stdio?: 'inherit'
 }
 
 interface GitSyncResult {

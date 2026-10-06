@@ -26,13 +26,13 @@ function resolve_spawn_exit(executable: string, result: SpawnResult): number {
 // covers for `exitCode`. Reading it through a signature that admits the real shape keeps the guard
 // honest: a plain `result.stdout ?? ''` is reported as an unnecessary condition against the lying
 // type, and dereferencing it unguarded crashes the caller.
-function read_spawn_stdout(result: { stdout?: string }): string {
+function read_spawn_stdout(result: { stdout?: string | undefined }): string {
 	return result.stdout ?? ''
 }
 
 // Same declared-vs-actual gap as `read_spawn_stdout`, for the stream that carries git's and gh's
 // failure messages.
-function read_spawn_stderr(result: { stderr?: string }): string {
+function read_spawn_stderr(result: { stderr?: string | undefined }): string {
 	return result.stderr ?? ''
 }
 
