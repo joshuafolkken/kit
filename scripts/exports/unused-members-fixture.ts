@@ -1,14 +1,19 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type ts from 'typescript'
 
 // One file of a fixture project: its project-relative path and the source written there.
 type FixtureFile = readonly [relative: string, source: string]
 
 const TMP_PREFIX = 'unused-members-'
+// One ES lib rather than TypeScript's default set: the default pulls in DOM, about 83 lib files to
+// parse and bind for every Program a case builds, and no fixture reads any of it.
+const LIB = 'es2022'
 const TSCONFIG = {
 	compilerOptions: {
 		target: 'ES2022',
+		lib: [LIB],
 		module: 'ESNext',
 		moduleResolution: 'Bundler',
 		strict: true,
@@ -52,7 +57,15 @@ function with_reader(reader: string, relative = 'reader.ts'): Array<FixtureFile>
 	return [LIBRARY_FILE, [relative, `${IMPORT_LIBRARY}${reader}`]]
 }
 
-const unused_members_fixture = { create_project, with_reader, LIBRARY, READ_KEPT }
+// The same options for a suite that builds its Program directly rather than from `tsconfig.json`.
+const PROGRAM_OPTIONS: ts.CompilerOptions = {
+	strict: true,
+	noEmit: true,
+	types: [],
+	lib: [`lib.${LIB}.d.ts`],
+}
+
+const unused_members_fixture = { create_project, with_reader, LIBRARY, PROGRAM_OPTIONS, READ_KEPT }
 
 export type { FixtureFile }
 export { unused_members_fixture }
