@@ -151,7 +151,7 @@ is `docs/josh-commands-run.md` → "`josh run:carry`"; what this loop does with 
 | `resumed`    | **This session is continuing a run that was cut** — a `--cut` handed the record off, or a `--resume` adopted it. Read the record with `--json` and take the budget figures from it, never from this session's own zero. Report the plan again — the pool has moved — and skip nothing else |
 | `busy`       | The record's **owner process is still running and no cut handed it off**: another parent is spending this budget right now. **Stop; do not open a lane.** (A record a `--cut` _did_ hand off answers `resumed` here even with its owner still alive.) Nothing here is yours to end — either that run finishes and ends its own record, or a person decides it is over |
 | `over`       | This session is over the context-cut threshold, so it claims nothing (joshuafolkken/kit#2760). **End the conversation**; retype the invocation in a fresh session |
-| `standing`   | A record is here that **no cut or supervisor handed off** — an unwatched crash, and the same command retyped over it. **Stop; do not open a lane**, and do not guess: the choice is the person's. Report the two commands the answer names — `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` to carry that budget on, or `pnpm josh run:carry --end` and begin again to discard it. Pass `--owner` to the resume as to the begin |
+| `standing`   | A record is here that **no cut or supervisor handed off** — an unwatched crash, and the same command retyped over it. **Stop; do not open a lane**: the choice is the person's. Report the two commands the answer names — `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` to carry that budget on, or `pnpm josh run:carry --end` and begin again to discard it. A crash from a run-tooling defect this run has since fixed is the one you resume yourself (`upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合") |
 | `mismatch`   | A record is here for a **different** invocation — a run that never reached `--end`. **Stop; do not open a lane**, and never resume into it. End it deliberately, with `pnpm josh run:carry --end`, once you know that run is over |
 | `expired`    | The 8-hour whole-run bound is spent. **Where a `--cut` handed the record off it is this run's own bound**, so this is the verdict on standard output and the run ends: report it and stop, and clear the record with `pnpm josh run:carry --end` once it is genuinely over. Where nothing handed it off it is printed on standard error ahead of a `began` instead — a person typing the keyword again over a spent record is starting a new run, and the record is replaced. A `--resume` over a spent record answers `expired` and adopts nothing |
 | `unreadable` | Report what it printed and **stop before opening a lane**                                                             |
@@ -219,6 +219,9 @@ owner prevents a second driver from taking it over. On `none`, `expired` or `unr
 8-hour whole-run bound therefore still comes from the carry record. **A new authorization is still a
 person's**: the supervisor spends the declared budget and never declares another.
 
+**A supervisor stopped by a run-tooling defect is restarted by the AI once the fix lands** —
+`upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合".
+
 **What may be run is untouched.** The driver takes named issues from the invocation and pool issues
 from the existing offer command. The supervisor writes no label of its own; `auto-ok` arrives only
 through `issue:file`'s default. A judgment session receives
@@ -280,8 +283,8 @@ stop at a time.**
   one `pnpm josh issue:read <N> <N> …` call**, not a `gh api` pair per issue.
 - **Never measure in order to decide.** A question needing a benchmark, a profile, or a run of the
   thing itself is not settled here: it stays labelled and the plan says so.
-- **Label what you find.** An issue needing a person's judgement gets `needs-decision`, applied as
-  `backlogrun-park.md` → "park and continue" does. **The next plan classifies it by the label alone**,
+- **Label what you find.** An issue needing a person's judgement — `backlogrun-park.md` → "Only a
+  person's judgement carries `needs-decision`" — gets the label, applied as "park and continue" does. **The next plan classifies it by the label alone**,
   never the body.
 - **Order and isolate the pool in the same pass** (joshuafolkken/kit#2776), from the same
   `issue:read`: an issue that must land first (it builds what another reuses, or both edit one code
@@ -299,8 +302,8 @@ stop at a time.**
 **`needs-decision`, `run:solo`, `run:lane` and `priority:high` are the workflow labels a run may
 apply by hand, and none is `auto-ok` or `needs-human-review`.** `needs-human-review` stays a
 person's alone (`needs-human-review.md`); `auto-ok` reaches only a run's own filing, through
-`issue:file`'s default ("What one invocation approves"). A run parks with `needs-decision` and a
-person clears it.
+`issue:file`'s default ("What one invocation approves"). A run parks with `needs-decision` only on
+`backlogrun-park.md` → "Only a person's judgement carries `needs-decision`", and a person clears it.
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the plan and the decision pass come first"
 
