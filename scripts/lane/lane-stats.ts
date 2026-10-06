@@ -7,9 +7,14 @@ import type { GateEntry, LedgerEntry, LoadEntry } from './lane-ledger'
 // **A column with no samples prints `—`, never `0`.** A period nobody ran the sampler through has no
 // load, which is not a load of zero; a zero would be read as an idle machine.
 //
-// **Throughput is per active hour** — the gaps between consecutive merges and gates no longer than an
-// hour — rather than per calendar hour, so the nights between runs in a several-day period do not
-// dilute the rate. A first-to-last span would still contain every interior night.
+// **Throughput is per active hour** — the time load samples saw a lane child working — rather than per
+// calendar hour, so the nights between runs in a several-day period do not dilute the rate. The gaps
+// between work entries cannot stand in for it: at a low limit the gap from one merge to the next child's
+// first gate is a whole implementation, which a gap cap drops, inflating exactly the low limits' rate.
+// Only a period no sample saw working falls back to the gaps of up to an hour between merges and gates.
+//
+// **The means take working samples only** for the same reason: the sampler runs through the nights,
+// and their idle samples would read four busy lanes as about one. Peaks and minima take every sample.
 
 const MS_PER_MINUTE = 60_000
 const MS_PER_HOUR = 3_600_000
@@ -96,21 +101,49 @@ function lowest(values: ReadonlyArray<number>): number | undefined {
 	return values.length === 0 ? undefined : Math.min(...values)
 }
 
-// The hours work was under way: the gaps between consecutive work entries (merges and gates) that are
-// no longer than `ACTIVE_GAP_MS`. Load samples are left out because the sampler runs through the
-// nights; `undefined` when no such gap leaves any active time.
-function active_hours(entries: ReadonlyArray<LedgerEntry>): number | undefined {
+type WorkingEntry = LoadEntry & { lanes: number }
+
+function is_working(sample: LoadEntry): sample is WorkingEntry {
+	return (sample.lanes ?? 0) > 0
+}
+
+function sum_hours(gaps: ReadonlyArray<number>): number | undefined {
+	const active = gaps.filter((gap) => gap <= ACTIVE_GAP_MS).reduce((sum, gap) => sum + gap, 0)
+
+	return active > 0 ? active / MS_PER_HOUR : undefined
+}
+
+// The fallback for a period no sampler saw working: the gaps between consecutive work entries (merges
+// and gates) no longer than `ACTIVE_GAP_MS`.
+function gap_hours(entries: ReadonlyArray<LedgerEntry>): number | undefined {
 	const instants = entries
 		.filter((entry) => !is_load(entry))
 		.map((entry) => Date.parse(entry.at))
 		.toSorted((left, right) => left - right)
-	const active = instants
-		.slice(1)
-		.map((instant, index) => instant - (instants[index] ?? instant))
-		.filter((gap) => gap <= ACTIVE_GAP_MS)
-		.reduce((sum, gap) => sum + gap, 0)
 
-	return active > 0 ? active / MS_PER_HOUR : undefined
+	return sum_hours(
+		instants.slice(1).map((instant, index) => instant - (instants[index] ?? instant)),
+	)
+}
+
+// The time from each working sample to the next sample. The cap still applies, so a sampler stopped
+// mid-run does not count its silence as work.
+function sampled_hours(samples: ReadonlyArray<LoadEntry>): number | undefined {
+	const sorted = samples.toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at))
+	const gaps = sorted
+		.slice(1)
+		.map((next, index) => ({ sample: sorted[index] ?? next, next }))
+		.filter(({ sample }) => is_working(sample))
+		.map(({ sample, next }) => Date.parse(next.at) - Date.parse(sample.at))
+
+	return sum_hours(gaps)
+}
+
+// The hours work was under way; `undefined` when nothing leaves any active time.
+function active_hours(entries: ReadonlyArray<LedgerEntry>): number | undefined {
+	const samples = entries.filter(is_load)
+
+	return samples.some((sample) => is_working(sample)) ? sampled_hours(samples) : gap_hours(entries)
 }
 
 function gigabytes(megabytes: number | undefined): number | undefined {
@@ -124,10 +157,13 @@ function cell(value: number | undefined): string {
 function throughput_cells(entries: ReadonlyArray<LedgerEntry>): Array<string> {
 	const merges = entries.filter((entry) => entry.kind === 'merge').length
 	const hours = active_hours(entries)
-	const lanes = entries.filter(is_load).map((entry) => entry.lanes)
+	const lanes = entries
+		.filter(is_load)
+		.filter(is_working)
+		.map((entry) => entry.lanes)
 	const per_hour = hours === undefined ? undefined : merges / hours
 
-	return [String(merges), cell(per_hour), cell(mean(lanes.filter(is_number)))]
+	return [String(merges), cell(per_hour), cell(mean(lanes))]
 }
 
 function gate_cells(entries: ReadonlyArray<LedgerEntry>): Array<string> {
@@ -137,17 +173,19 @@ function gate_cells(entries: ReadonlyArray<LedgerEntry>): Array<string> {
 }
 
 function load_cells(samples: ReadonlyArray<LoadEntry>): Array<string> {
-	const loads = samples.map((sample) => sample.load)
+	const working = samples.filter(is_working)
 	const swap = samples.map((sample) => sample.swap_mb).filter(is_number)
+	const working_swap = working.map((sample) => sample.swap_mb).filter(is_number)
 	const free = samples.map((sample) => sample.free_mb)
+	const working_free = working.map((sample) => sample.free_mb)
 
 	return [
-		cell(peak(loads)),
-		cell(mean(loads)),
+		cell(peak(samples.map((sample) => sample.load))),
+		cell(mean(working.map((sample) => sample.load))),
 		cell(gigabytes(peak(swap))),
-		cell(gigabytes(mean(swap))),
+		cell(gigabytes(mean(working_swap))),
 		cell(gigabytes(lowest(free))),
-		cell(gigabytes(mean(free))),
+		cell(gigabytes(mean(working_free))),
 		String(samples.length),
 	]
 }

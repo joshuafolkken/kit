@@ -15,6 +15,10 @@ const PER_HOUR = 'merges / hour'
 const GATE_MEDIAN = 'gate median (min)'
 const LOAD_PEAK = 'load peak'
 const LOAD_SAMPLES = 'load samples'
+const LOAD_MEAN = 'load mean'
+const EFFECTIVE_LANES = 'effective lanes'
+const FREE_MIN = 'free memory min (GB)'
+const FREE_MEAN = 'free memory mean (GB)'
 
 function hours_before_now(hours: number): string {
 	return new Date(NOW - hours * MS_PER_MINUTE * 60).toISOString()
@@ -51,15 +55,41 @@ const LOADS: ReadonlyArray<LedgerEntry> = [
 	{ kind: 'load', at: hours_before_now(1), load: 8, free_mb: 1024, lanes: 4 },
 ]
 
+const HALF_HOUR = 0.5
+
+// Load samples every half hour from `from` hours before now down to `to`, all with `lanes` working.
+function samples_between(from: number, to: number, lanes: number): Array<LedgerEntry> {
+	const count = Math.round((from - to) / HALF_HOUR) + 1
+
+	return Array.from({ length: count }, (_, index) => ({
+		kind: 'load',
+		at: hours_before_now(from - index * HALF_HOUR),
+		load: 1,
+		free_mb: 1024,
+		lanes,
+	}))
+}
+
 describe('lane_stats.row active hours', () => {
-	it('leaves a long silence between runs out of the active hours, even with load samples in it', () => {
+	it('leaves a long silence between runs out of the active hours, even with idle samples bridging it', () => {
 		const morning: ReadonlyArray<LedgerEntry> = [
 			{ kind: 'merge', at: hours_before_now(23), issue: MERGE_ISSUE },
 			{ kind: 'merge', at: hours_before_now(22), issue: MERGE_ISSUE },
 		]
-		const night: LedgerEntry = { kind: 'load', at: hours_before_now(12), load: 1, free_mb: 1024 }
+		const night = samples_between(21.5, 1.5, 0)
 
-		expect(cell_of([...morning, night, ...MERGES.slice(1)], PER_HOUR)).toBe('2.0')
+		expect(cell_of([...morning, ...night, ...MERGES.slice(1)], PER_HOUR)).toBe('2.0')
+	})
+
+	it('counts the time samples saw a lane working, however long the gap between merges', () => {
+		const merges: ReadonlyArray<LedgerEntry> = [
+			{ kind: 'merge', at: hours_before_now(2.5), issue: MERGE_ISSUE },
+			{ kind: 'merge', at: hours_before_now(0), issue: MERGE_ISSUE },
+		]
+		const idle = samples_between(6, 3.5, 0)
+		const working = samples_between(3, 0, 1)
+
+		expect(cell_of([...merges, ...idle, ...working], PER_HOUR)).toBe('0.7')
 	})
 })
 
@@ -89,12 +119,12 @@ describe('lane_stats.row', () => {
 	})
 
 	it('reduces load samples to load, swap, free memory and lane figures', () => {
-		expect(cell_of(LOADS, 'effective lanes')).toBe('3.0')
+		expect(cell_of(LOADS, EFFECTIVE_LANES)).toBe('3.0')
 		expect(cell_of(LOADS, LOAD_PEAK)).toBe('8.0')
-		expect(cell_of(LOADS, 'load mean')).toBe('6.0')
+		expect(cell_of(LOADS, LOAD_MEAN)).toBe('6.0')
 		expect(cell_of(LOADS, 'swap peak (GB)')).toBe('1.0')
-		expect(cell_of(LOADS, 'free memory min (GB)')).toBe('1.0')
-		expect(cell_of(LOADS, 'free memory mean (GB)')).toBe('1.5')
+		expect(cell_of(LOADS, FREE_MIN)).toBe('1.0')
+		expect(cell_of(LOADS, FREE_MEAN)).toBe('1.5')
 		expect(cell_of(LOADS, LOAD_SAMPLES)).toBe('2')
 	})
 
@@ -102,6 +132,26 @@ describe('lane_stats.row', () => {
 		expect(cell_of(MERGES, LOAD_PEAK)).toBe(lane_stats.MISSING)
 		expect(cell_of(MERGES, GATE_MEDIAN)).toBe(lane_stats.MISSING)
 		expect(cell_of(MERGES, LOAD_SAMPLES)).toBe('0')
+	})
+})
+
+describe('lane_stats.row working samples', () => {
+	it('averages only the samples that saw a lane working, while peaks and minima take every sample', () => {
+		const idle: LedgerEntry = {
+			kind: 'load',
+			at: hours_before_now(1),
+			load: 9,
+			free_mb: 512,
+			lanes: 0,
+		}
+		const entries = [...LOADS, idle]
+
+		expect(cell_of(entries, EFFECTIVE_LANES)).toBe('3.0')
+		expect(cell_of(entries, LOAD_MEAN)).toBe('6.0')
+		expect(cell_of(entries, FREE_MEAN)).toBe('1.5')
+		expect(cell_of(entries, LOAD_PEAK)).toBe('9.0')
+		expect(cell_of(entries, FREE_MIN)).toBe('0.5')
+		expect(cell_of(entries, LOAD_SAMPLES)).toBe('3')
 	})
 })
 
