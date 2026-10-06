@@ -17,7 +17,7 @@ const ESLINT_TEST_FILES = ['eslint/*.test.ts']
 const TEMPLATE_FILES = ['templates/**/*.ts']
 
 export default [
-	{ ignores: ['templates/**', 'prettier/**'] },
+	{ ignores: ['templates/**'] },
 	...create_base_config({
 		gitignore_path: new URL('./.gitignore', import.meta.url),
 		tsconfig_root_dir: fileURLToPath(new URL('.', import.meta.url)),

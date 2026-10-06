@@ -12,7 +12,7 @@
 		"env/**/*.ts",
 		"eslint/**/*.ts",
 		"ports/**/*.ts",
-		"prettier/**/*.d.ts",
+		"prettier/**/*.ts",
 		"scripts/**/*.ts",
 		"templates/**/*.ts"
 	]
