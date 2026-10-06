@@ -108,6 +108,7 @@ describe('backlog_pool.classify_standalone — the rows a person has to resolve'
 const EPIC_CHILD = 20
 const OTHER_EPIC_CHILD = 30
 const THIRD_CHILD = 40
+const NO_TRACKING = new Map<number, ReadonlyArray<number>>()
 
 function epic_child(number: number, blockers: ReadonlyArray<number> = []): EpicChild {
 	return {
@@ -132,6 +133,7 @@ describe('backlog_pool.running_set', () => {
 			[[epic_child(EPIC_CHILD)]],
 			[opted_in(ROW_NUMBER, [])],
 			READING_REPO,
+			NO_TRACKING,
 		)
 
 		expect(running).toEqual(
@@ -144,6 +146,7 @@ describe('backlog_pool.running_set', () => {
 			[],
 			[opted_in(ROW_NUMBER, [NEEDS_DECISION_LABEL])],
 			READING_REPO,
+			NO_TRACKING,
 		)
 
 		expect(running.size).toBe(0)
@@ -228,8 +231,75 @@ describe('backlog_pool.settle_standalone', () => {
 		const behind = auto_ok_fixture.blocked_issue(THIRD_CHILD, CREATED_EARLIER, [
 			{ number: ROW_NUMBER, state: 'OPEN' },
 		])
-		const running = backlog_pool.running_set([], [outside_blocked, behind], READING_REPO)
+		const running = backlog_pool.running_set(
+			[],
+			[outside_blocked, behind],
+			READING_REPO,
+			NO_TRACKING,
+		)
 
 		expect(running.size).toBe(0)
+	})
+})
+
+// joshuafolkken/kit#3289: an epic is never run itself, but it closes once its children do.
+const NESTED_EPIC = 8
+const OUTSIDE_CHILD = 50
+
+function epic_blocked_class(
+	graphs: ReadonlyArray<ReadonlyArray<EpicChild>>,
+	rows: ReadonlyArray<OpenIssueData>,
+	tracking: ReadonlyMap<number, ReadonlyArray<number>>,
+): { time: Array<number>; human: Array<number> } {
+	const running = backlog_pool.running_set(graphs, rows, READING_REPO, tracking)
+	const result = backlog_pool.classify_standalone([blocked_row('OPEN')], {
+		...STANDALONE_CONTEXT,
+		running,
+	})
+
+	return {
+		time: result.time.map((child) => child.number),
+		human: result.human.map((child) => child.number),
+	}
+}
+
+describe('backlog_pool.running_set — a row blocked by an epic root', () => {
+	it('waits on time when a child of the blocking epic is in the run', () => {
+		const tracking = new Map([[EPIC_CHILD, [BLOCKER_NUMBER]]])
+
+		expect(epic_blocked_class([[epic_child(EPIC_CHILD)]], [], tracking)).toEqual({
+			time: [ROW_NUMBER],
+			human: [],
+		})
+	})
+
+	it('waits on time behind a nested epic whose child is in the run', () => {
+		const tracking = new Map([
+			[EPIC_CHILD, [NESTED_EPIC]],
+			[NESTED_EPIC, [BLOCKER_NUMBER]],
+		])
+
+		expect(epic_blocked_class([[epic_child(EPIC_CHILD)]], [], tracking).time).toEqual([ROW_NUMBER])
+	})
+
+	it('still needs a person when none of the blocking epic children is in the run', () => {
+		const tracking = new Map([[OUTSIDE_CHILD, [BLOCKER_NUMBER]]])
+
+		expect(epic_blocked_class([[epic_child(EPIC_CHILD)]], [], tracking).human).toEqual([ROW_NUMBER])
+	})
+
+	it('still needs a person when the only child of the blocking epic is already closed', () => {
+		const tracking = new Map([[EPIC_CHILD, [BLOCKER_NUMBER]]])
+		const closed = { ...epic_child(EPIC_CHILD), state: 'CLOSED' as const }
+
+		expect(epic_blocked_class([[closed]], [], tracking).human).toEqual([ROW_NUMBER])
+	})
+
+	// The epic leaves the set with its last running child, rather than lingering from the first pass.
+	it('needs a person once the only running child of the epic is itself parked', () => {
+		const tracking = new Map([[THIRD_CHILD, [BLOCKER_NUMBER]]])
+		const parked = opted_in(THIRD_CHILD, [NEEDS_DECISION_LABEL])
+
+		expect(epic_blocked_class([], [parked], tracking).human).toEqual([ROW_NUMBER])
 	})
 })
