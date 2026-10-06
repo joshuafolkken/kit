@@ -25,12 +25,12 @@
 
 ### 指示されていない行動は取らない
 
-PR マージ・ブランチ削除・force push・共有ブランチへの push・外部通知の追加送信・リポジトリ設定の変更など、**共有状態に影響する操作はその場でユーザーに明示指示されたものだけ実行する**。
+規則そのもの — 共有状態に影響する操作はその場で明示指示されたものだけ実行し、マージを認可するのはどのコマンドの起動か — は `CLAUDE.md` → "Git Rules" に常駐している。ここに書くのは、その規則を実行するときの細則である。対象には共有ブランチへの push・外部通知の追加送信・リポジトリ設定の変更も含まれる。
 
-- `fullrun` と `backlogrun` の auto-merge は、それぞれの指示自体に含まれるため許可される（本文は [`followup.md`](../../.claude/skills/workflow-commands/followup.md)、`backlogrun` の子への継承は [`backlogrun-child.md`](../../.claude/skills/workflow-commands/backlogrun-child.md)）。`prrun` はマージを認可しない。それ以外の状況で勝手にマージしてはならない
+- auto-merge の本文は [`followup.md`](../../.claude/skills/workflow-commands/followup.md)、`backlogrun` の子への継承は [`backlogrun-child.md`](../../.claude/skills/workflow-commands/backlogrun-child.md)
 - `kickoff` / `pnpm josh followup` 単独実行は文書化されたスコープで終了する。PR が OPEN のまま完了したら状態を報告して停止する
 - 「チェックが全部 green だから次のステップに進む」は承認ではない
-- **deny と配送ガードは実装であって規則ではない。** `gh pr merge`・force push・ブランチ削除の直接実行は `.claude/settings.json` の `permissions.deny` と `pnpm josh rule:guard` が拒否する（一覧は各ファイルと [`rule-delivery.md`](./rule-delivery.md) →「配送されている規則」）が、それらが取りこぼす綴りを禁じているのは本節の規則のほうである。`fullrun` の auto-merge は `pnpm josh followup` の内部から gh を起動するため影響を受けない
+- **deny と配送ガードは実装であって規則ではない。** `gh pr merge`・force push・ブランチ削除の直接実行は `.claude/settings.json` の `permissions.deny` と `pnpm josh rule:guard` が拒否する（一覧は各ファイルと [`rule-delivery.md`](./rule-delivery.md) →「配送されている規則」）が、それらは規則より狭い — 取りこぼす綴りを禁じ、ツールが通したことを許可と読ませないのは `CLAUDE.md` → "Git Rules" である。`fullrun` の auto-merge は `pnpm josh followup` の内部から gh を起動するため影響を受けない
 - **共有状態に影響する操作（このセクションの対象＝Tier C）は迷ったら確認する。** 確認のコストは低いが、意図しない操作の巻き戻しは高コスト
 - ただしこの「迷ったら確認」は Tier C に限る。**可逆な実装・設計判断（Tier A）は別ルール**（下記「意思決定の自律ポリシー」）に従う
 
@@ -51,7 +51,7 @@ PR マージ・ブランチ削除・force push・共有ブランチへの push�
 - 同じ理由で、`git reset` / `git checkout -- <path>` / `git restore <path>` など index や作業ツリーを破壊的に書き換える操作も、自分の判断で実行しない
 - **`git stash` は例外的に、明文化されたフローの中でのみ自動実行してよい**: `fullrun new` / `halfrun new` の手順 5（作業ツリーに変更がある状態で `josh latest` を回す前の退避）、`backlogrun` のラン開始時の `josh latest`、「別パッケージ起因の問題は割り込み Issue で対応する」、および `backlogrun` が epic の子を始める前の preflight（`pnpm josh run:hold <N>` が `reclaim` と答えたときの回収 — joshuafolkken/kit#926, joshuafolkken/kit#1965）。**この 5 番目だけが復元を伴わない。前の 4 つはいずれも直後に `pnpm josh stash:pop "<メッセージ>"` で復元することが手順に含まれている**（stash はリポジトリ単位の 1 本のスタックを全 work tree が共有するため、位置指定や引数なしの `git stash pop` は別のレーンが最後に積んだ stash を取り込む — メッセージで対象を特定する。joshuafolkken/kit#2050）。 回収するのは異常終了したランの置き土産であって、いま実行中のランの作業ではないから、pop して戻す先がない。**代わりに stash を子の Issue にコメントで記録する** — 前提 Issue で中断するときの stash（`prerequisite.md`）と同じく、**その記録だけが後で pop させられる唯一の手がかり**であり、記録し忘れた stash は誰にも拾われない。これら以外の場面で退避したくなったときは、実行せずに先に確認する
 - **staging・index の書き換え・`git commit` の直接実行は deny されており、deny には「そのターンでユーザーが明示指示した」という例外がない。** だから上記ケース 1 は AI 側では実行できず、ユーザー自身の端末で実行してもらう。ユーザーが明示的にコミットを指示した場合も、承認済みのコミットは `pnpm josh git` を通す（理由は `docs/maintainers/operating-rules-rationale.md` → "Why the index is the user's"）
-- **ツールが通したことを許可と読み替えてはならない。** deny と `pnpm josh rule:guard`（`worktree-mutation`・`index-mutation`・`destructive-command`・`protected-file` 行）は事故防止の実装で、規則より狭い。何をしてよいかを決めるのはこのルールである
+- index を守る deny と `pnpm josh rule:guard`（`worktree-mutation`・`index-mutation`・`destructive-command`・`protected-file` 行）も事故防止の実装である — 上記「指示されていない行動は取らない」→「deny と配送ガードは実装であって規則ではない」
 
 ### 意思決定の自律ポリシー（確認停止を減らす）
 

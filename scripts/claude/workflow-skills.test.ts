@@ -392,7 +392,10 @@ describe.each(AI_DOCS)('%s — keeps what cannot move', (document_path) => {
 		'pnpm josh notify --task-type confirmation',
 		'`parseArgs` rejects it',
 		'**NEVER** remove or modify entries in **either** location without explicit user approval.',
-		'**NEVER** modify the `devEngines` field in `package.json` without explicit user confirmation.',
+		'**NEVER** modify the `devEngines` field in `package.json` without explicit user confirmation',
+		// joshuafolkken/kit#3249: the one sanctioned change is named where the prohibition is, so a
+		// turn that never loads the skill does not revert a correct `josh latest` bump.
+		'except the `josh latest` lockstep pnpm bump, kept per the `dependency-update` skill',
 		// The three `epic:*` rules the criterion's list names. They fire the moment an issue is filed
 		// or a decision is written, on turns where no `epic:*` command was run.
 		"Recording a decision removes that child's `needs-decision` label",

@@ -1,6 +1,6 @@
 {
 	"name": "kit",
-	"description": "joshuafolkken/kit distributed skills: the Issue-driven workflow commands (kickoff/fullrun/halfrun/backlogrun), the epic:* commands, the post-dependency-update verification, the UI-verification gate.",
+	"description": "joshuafolkken/kit distributed skills: the Issue-driven workflow commands (kickoff/fullrun/halfrun/prrun/backlogrun), the epic:* commands, the post-dependency-update verification, the UI-verification gate.",
 	"author": {
 		"name": "joshuafolkken",
 		"url": "https://github.com/joshuafolkken"

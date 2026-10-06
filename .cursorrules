@@ -1,45 +1,10 @@
-You are able to use the Svelte MCP server, where you have access to comprehensive Svelte 5 and SvelteKit documentation. Here's how to use the available tools effectively:
+# Agent Instructions
 
-## Available MCP Tools:
+> **All rules for this repository live in [`CLAUDE.md`](./CLAUDE.md). Read it in full before doing
+> any work here, and follow every rule in it.** This file exists only to point at it.
 
-### 1. list-sections
+**No hooks are configured for Cursor** — apply every hook-delivered rule yourself, per `prompts/collaboration-workflow/principles.md` → "Claude Code 以外のエージェントでの読み替え". Do not copy rules back into this file.
 
-Use this FIRST to discover all available documentation sections. Returns a structured list with titles, use_cases, and paths.
-When asked about Svelte or SvelteKit topics, ALWAYS use this tool at the start of the chat to find relevant sections.
+## Svelte MCP
 
-### 2. get-documentation
-
-Retrieves full documentation content for specific sections. Accepts single or multiple sections.
-After calling the list-sections tool, you MUST analyze the returned documentation sections (especially the use_cases field) and then use the get-documentation tool to fetch ALL documentation sections that are relevant for the user's task.
-
-### 3. svelte-autofixer
-
-Analyzes Svelte code and returns issues and suggestions.
-You MUST use this tool whenever writing Svelte code before sending it to the user. Keep calling it until no issues or suggestions are returned.
-
-### 4. playground-link
-
-Generates a Svelte Playground link with the provided code.
-After completing the code, ask the user if they want a playground link. Only call this tool after user confirmation and NEVER if code was written to files in their project.
-
-## Code Change Rules
-
-Whenever modifying, adding, or deleting any code:
-
-1. **Verify the gate**: Run `pnpm josh gate` — lint, type check, spell check and unit tests, run concurrently, with every failing check reported in one pass. Re-run one on its own by copying the command from its output header while fixing — `pnpm josh lint`, `pnpm josh check`, `pnpm josh cspell:dot`, `pnpm josh test:unit` for a project with no application toolkit.
-2. **Verify IDE Feedback**: ALWAYS run the **ReadLints** tool on every modified file (and any file that might be affected) before finishing. Fix all reported errors and warnings. IDE/ReadLints can report issues that terminal `pnpm josh lint` does not (e.g. type resolution for generated or gitignored paths).
-3. **Fix Issues**: If any check fails (terminal or IDE feedback, or ReadLints), fix all reported issues immediately.
-4. **Repeat**: Repeat the checks until **all** pass and **ReadLints shows no errors** for the modified files.
-5. **Completion**: Only finish the task or response after ALL checks pass and ReadLints reports **zero errors** on modified files (warnings only are acceptable only when documented as a known exception, e.g. unused eslint-disable for Paraglide).
-6. **Full test gate (code or E2E-impacting work):** `pnpm josh gate` already covers the spell check and the unit tests; E2E is closed on top of it, and **never by asking the user to run it**. With a pull request open, the CI E2E job is the authority and `pnpm josh followup` refuses to merge while any check is non-passing. With no pull request, run **`pnpm josh test:e2e`** yourself and read what it prints — it exits 0 without running when Playwright or the `*.e2e.{ts,js}` files are absent, and that printed skip is the answer for a project with no E2E suite. **Do not** claim completion using only `pnpm josh test:unit --run` when E2E applies, and **do not** fall back to **`pnpm build`** or **`CI=true`** to get past a Playwright run that will not finish — report that it did not run instead. Run it with `CI` unset so Playwright uses **DEV** (`pnpm run dev`, on the port `playwright.config.ts` resolves from `PORT_SEED`), matching the VS Code Test extension. Details: **Completion gate** in `CLAUDE.md` and `prompts/testing-guide.md` → "Closing the E2E gate without a human run".
-
-**Constraint**: Never state "it should pass" without actually having run the commands and confirmed the output. Do not end a task while **errors** exist. Before completing, you MUST run **ReadLints** on every modified file and fix every **error** (not just rely on terminal check/lint). If verification commands fail (e.g., system error), you MUST rely on ReadLints to ensure correctness. If **`pnpm josh test:e2e`** cannot complete in your environment, say so in the completion report and name the E2E result as missing — with a pull request open the CI E2E job is that result, and with no pull request there is none, so the gate is **not** closed. Never switch to build/CI flags to make it finish, and never hand the run to the user instead.
-
-## Refactoring Rules
-
-- **Prompt Reference**: When performing any refactoring, ALWAYS read and follow the instructions in `prompts/refactoring.md` before starting.
-
-## Git Rules
-
-- **No Commits**: DO NOT commit changes unless explicitly requested by the user.
-- **Workflow Awareness**: Use `pnpm josh git` when the user asks for git operations.
+For Svelte 5 / SvelteKit work, use the Svelte MCP server: call `list-sections` first, then `get-documentation` for every section whose use_cases match the task, and run `svelte-autofixer` on any Svelte code you write until it reports nothing. Offer `playground-link` only when asked, and never for code written to project files.
