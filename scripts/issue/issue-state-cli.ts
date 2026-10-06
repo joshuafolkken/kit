@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { issue_report_failures, type ReadFailureKind } from './issue-report-failures'
 import { issue_state, type IssueState } from './issue-state'
 
@@ -28,9 +29,6 @@ import { issue_state, type IssueState } from './issue-state'
 
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const REPO_FLAG = '--repo'
-const FLAG_PREFIX = '-'
-const INLINE_REPO_FLAG = `${REPO_FLAG}=`
 const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = 'Usage: josh issue:state <issue-number> [<issue-number> ...] [--repo <owner/repo>]'
 // A blank line between the blocks of a multi-number report, so a person sees where one issue ends
@@ -60,85 +58,43 @@ interface IssueReport {
 	result: StateRead
 }
 
-// `absent` and "given but with nothing usable after it" are different answers. Falling back to the
-// session's repository on the second would print a confident state for a *different* issue of the
-// same number, which is the exact misread the `--repo` argument exists to prevent.
-//
-// A named flag carries the argv positions it actually occupied, never the token text it matched
-// (joshuafolkken/kit#1355). Removing tokens by value removes every token that happens to look like
-// one of them — a second `--repo`, a repeated `owner/repo` — and a token removed is a token nobody
-// is told about, which is the whole failure this file refuses elsewhere.
-type RepoFlag =
-	| { kind: 'absent' }
-	| { kind: 'named'; repo: string; consumed: ReadonlyArray<number> }
-	| { kind: 'incomplete' }
+// The read goes through `cli_flags`, both spellings gh itself accepts included (`--repo owner/repo`,
+// `--repo=owner/repo`), and is strict (joshuafolkken/kit#3261). An unrecognized flag refuses the
+// call: `--rep=owner/repo` used to be discarded for starting with a dash, so the call fell back to
+// the session's repository and printed a confident state for a *different* repository's issue of
+// that number (joshuafolkken/kit#1355).
+const OPTIONS = { repo: { type: 'string', multiple: true } } as const
 
-// Both spellings gh itself accepts. `--repo=owner/repo` falling through to the separate-word branch
-// would read as no repository at all, which is the fall back to the session's repository above.
-function read_inline_repo(argv: ReadonlyArray<string>): RepoFlag | undefined {
-	const inline = argv.find((argument) => argument.startsWith(INLINE_REPO_FLAG))
+// `absent` and "given but with nothing usable" are different answers. Falling back to the session's
+// repository on the second — an empty value, or `--repo` given twice — would print a confident state
+// for a *different* issue of the same number, which is the exact misread `--repo` exists to prevent.
+function read_repo(given: ReadonlyArray<string> | undefined): { repo?: string } | undefined {
+	if (given === undefined) return {}
+	const [repo, ...rest] = given
 
-	if (inline === undefined) return undefined
-
-	const repo = inline.slice(INLINE_REPO_FLAG.length)
-
-	if (repo.length === 0) return { kind: 'incomplete' }
-
-	return { kind: 'named', repo, consumed: [argv.indexOf(inline)] }
+	return repo !== undefined && rest.length === 0 && repo.length > 0 ? { repo } : undefined
 }
 
-function read_separate_repo(argv: ReadonlyArray<string>): RepoFlag {
-	const index = argv.indexOf(REPO_FLAG)
-
-	if (index === -1) return { kind: 'absent' }
-
-	const value_index = index + 1
-	const repo = argv[value_index]
-
-	if (repo === undefined || repo.startsWith(FLAG_PREFIX)) return { kind: 'incomplete' }
-
-	return { kind: 'named', repo, consumed: [index, value_index] }
-}
-
-function read_repo_flag(argv: ReadonlyArray<string>): RepoFlag {
-	return read_inline_repo(argv) ?? read_separate_repo(argv)
-}
-
-// The argv positions the repository flag occupied, and nothing else. Everything outside this set was
-// offered as an issue number, whatever it looks like — so a flag nobody recognizes reaches the check
-// below and refuses the call instead of vanishing from it (joshuafolkken/kit#1355).
-function consumed_indices(repo_flag: RepoFlag): ReadonlySet<number> {
-	return new Set(repo_flag.kind === 'named' ? repo_flag.consumed : [])
+// A token that is not a number refuses the whole invocation rather than being dropped. Dropping it
+// answers fewer numbers than were asked for and still exits zero — and with one number left, the
+// surviving block prints in the single-number shape, so nothing in the output says a number went
+// unanswered. `#1262` copied out of a `diag` table is exactly that token.
+function is_issue_numbers(positionals: ReadonlyArray<string>): boolean {
+	return (
+		positionals.length > 0 && positionals.every((argument) => ISSUE_NUMBER_PATTERN.test(argument))
+	)
 }
 
 function parse_request(argv: ReadonlyArray<string>): StateRequest | undefined {
-	const repo_flag = read_repo_flag(argv)
+	const parsed = cli_flags.arguments_of(argv, OPTIONS)
+	if (parsed === undefined) return undefined
+	const repo = read_repo(parsed.values.repo)
 
-	if (repo_flag.kind === 'incomplete') return undefined
-
-	// The repository is read first, flag word and value together, so neither is ever mistaken for an
-	// issue number — and nothing else is removed here. Every remaining token is one the caller offered
-	// as an issue number, whatever it looks like.
-	const consumed = consumed_indices(repo_flag)
-	const rest = argv.filter((_argument, index) => !consumed.has(index))
-	const numbers = rest.filter((argument) => ISSUE_NUMBER_PATTERN.test(argument))
-
-	// A token that is not a number refuses the whole invocation rather than being dropped. Dropping
-	// it answers fewer numbers than were asked for and still exits zero — and with one number left,
-	// the surviving block prints in the single-number shape, so nothing in the output says a number
-	// went unanswered. `#1262` copied out of a `diag` table is exactly that token.
-	//
-	// An unrecognized flag reaches this same check rather than a lenient one of its own
-	// (joshuafolkken/kit#1355). `--rep=owner/repo` used to be discarded for starting with a dash, so
-	// the call fell back to the session's repository and printed a confident state for a *different*
-	// repository's issue of that number — the misread `incomplete` already exists to prevent.
-	if (numbers.length === 0 || numbers.length !== rest.length) return undefined
+	if (repo === undefined || !is_issue_numbers(parsed.positionals)) return undefined
 
 	// In the order they were typed, with a repeat dropped: repeating a number would spend a second
 	// read on an answer already in hand, and print a second block a caller counting rows counts twice.
-	const issue_numbers = [...new Set(numbers)]
-
-	return repo_flag.kind === 'named' ? { issue_numbers, repo: repo_flag.repo } : { issue_numbers }
+	return { issue_numbers: [...new Set(parsed.positionals)], ...repo }
 }
 
 // One number's read, reduced to what the report needs and nothing printed yet. Separating the two

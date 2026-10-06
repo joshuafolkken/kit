@@ -61,6 +61,53 @@ function string_of(value: unknown): string | undefined {
 	return typeof value === 'string' ? value : undefined
 }
 
-const cli_flags = { refuse_unknown_flags, parse_or_undefined, values_of, arguments_of, string_of }
+const LONG_FLAG_PREFIX = '--'
+const SHORT_FLAG_PREFIX = '-'
+
+// The key `parseArgs` files a `--long-flag` under.
+function option_name(flag: string): string {
+	return flag.slice(LONG_FLAG_PREFIX.length)
+}
+
+// `parseArgs`'s own rule for a value it calls ambiguous: a dash and more. A lone `-` is a value — the
+// stdin spelling `--body-file -` and `--decision-file -` rely on.
+function is_unusable_value(value: string | boolean): boolean {
+	if (typeof value === 'boolean' || value.length === 0) return true
+
+	return value !== SHORT_FLAG_PREFIX && value.startsWith(SHORT_FLAG_PREFIX)
+}
+
+// Every value one value-taking flag was given, `true` standing for one given none. Read leniently, so an
+// unknown flag elsewhere on the line does not hide the answer: a strict read only answers `undefined`
+// for the whole line, and this is what lets a command name the one flag that went wrong.
+function given_values(argv: ReadonlyArray<string>, flag: string): ReadonlyArray<string | boolean> {
+	const name = option_name(flag)
+	const given = parse_or_undefined({
+		args: [...argv],
+		options: { [name]: { type: 'string', multiple: true } },
+		strict: false,
+		allowPositionals: true,
+	})?.values[name]
+
+	return Array.isArray(given) ? given : []
+}
+
+// Whether a value-taking flag was given without a usable value — last on the line, followed by
+// another flag, or empty — so a command can say which value a shell ate rather than print its
+// generic usage.
+function is_value_unusable(argv: ReadonlyArray<string>, flag: string): boolean {
+	return given_values(argv, flag).some((value) => is_unusable_value(value))
+}
+
+const cli_flags = {
+	refuse_unknown_flags,
+	parse_or_undefined,
+	values_of,
+	arguments_of,
+	string_of,
+	option_name,
+	given_values,
+	is_value_unusable,
+}
 
 export { cli_flags }

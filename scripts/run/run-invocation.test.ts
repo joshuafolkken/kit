@@ -20,6 +20,7 @@ const QUALIFIED = `${BARE_BACKLOG} kit#1749`
 const NAMED_ONLY = `${BARE_BACKLOG} #1762 #1749 --only`
 const ONLY_WITH_BUDGET = `${BARE_BACKLOG} #1762 --only --max 5`
 const REFUSES = 'refuses %s'
+const MAX_FIVE = `${BARE_BACKLOG} --max 5`
 
 describe('a backlogrun invocation with only a budget', () => {
 	it('rebuilds its budget flags to the text they were given', () => {
@@ -40,7 +41,22 @@ describe('a backlogrun invocation with only a budget', () => {
 	// the wake then refuses the record, because the woken session would hand a prompt the record does
 	// not match straight back to `run:carry --begin`.
 	it('normalizes a value rather than carrying the text it was written with', () => {
-		expect(run_invocation.rebuild('backlogrun --max 05')).toBe('backlogrun --max 5')
+		expect(run_invocation.rebuild('backlogrun --max 05')).toBe(MAX_FIVE)
+	})
+
+	// joshuafolkken/kit#3261: the read goes through `cli_flags`, so the inline spelling is read too —
+	// and rebuilt in the one canonical spelling, from constants.
+	it('rebuilds an inline --max=<n> as the separate spelling', () => {
+		expect(run_invocation.rebuild('backlogrun --max=5')).toBe(MAX_FIVE)
+	})
+
+	it.each([
+		'backlogrun --',
+		'backlogrun #1749 -- --max 5',
+		'backlogrun --only=yes',
+		'backlogrun --max',
+	])(REFUSES, (invocation) => {
+		expect(run_invocation.rebuild(invocation)).toBeUndefined()
 	})
 
 	it('has no named list to report', () => {

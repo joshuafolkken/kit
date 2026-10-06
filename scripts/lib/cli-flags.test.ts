@@ -88,3 +88,30 @@ describe('cli_flags.refuse_unknown_flags', () => {
 		)
 	})
 })
+
+describe('cli_flags.option_name', () => {
+	it('drops the long-flag prefix', () => {
+		expect(cli_flags.option_name('--decision-file')).toBe('decision-file')
+	})
+})
+
+describe('cli_flags.is_value_unusable', () => {
+	it.each([
+		['the flag is absent', [ISSUE]],
+		['the value follows the flag', [REPO_FLAG, REPO]],
+		['the value is inline', [`${REPO_FLAG}=${REPO}`]],
+		['the value is the stdin dash', [REPO_FLAG, '-']],
+		['an unknown flag sits elsewhere', ['--nope', REPO_FLAG, REPO]],
+	])('answers false when %s', (_label, argv) => {
+		expect(cli_flags.is_value_unusable(argv, REPO_FLAG)).toBe(false)
+	})
+
+	it.each([
+		['the flag is last', [ISSUE, REPO_FLAG]],
+		['another flag follows it', [REPO_FLAG, '--json']],
+		['the inline value is empty', [`${REPO_FLAG}=`]],
+		['one of two values is missing', [REPO_FLAG, REPO, REPO_FLAG]],
+	])('answers true when %s', (_label, argv) => {
+		expect(cli_flags.is_value_unusable(argv, REPO_FLAG)).toBe(true)
+	})
+})

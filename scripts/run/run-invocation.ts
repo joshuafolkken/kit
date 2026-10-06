@@ -1,4 +1,5 @@
 import { backlog_budget_cli } from '#scripts/backlog/backlog-budget-cli'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_issue_number } from './run-issue-number'
 
 // The grammar of an invocation that can be carried across a session cut, and the only place it is
@@ -39,16 +40,32 @@ const KNOWN_FLAGS: ReadonlyArray<string> = ['--max', '--idle']
 // pool" (joshuafolkken/kit#1984). It is carried across a cut like any other part of the invocation, so
 // a resumed session that reads it back does not silently start draining the backlog the person excluded.
 const ONLY_FLAG = '--only'
+// The read itself is `cli_flags`'s (joshuafolkken/kit#3261): strict, so an unknown flag, a flag with
+// no value, `--only=<x>` and a value that is itself a flag are all refused before this file looks.
+const OPTIONS = {
+	max: { type: 'string' },
+	idle: { type: 'string' },
+	only: { type: 'boolean' },
+} as const
 const ISSUE_PREFIX = '#'
 const TOKEN_SEPARATOR = ' '
 const FIRST_TOKEN = 0
 const FIRST_ARGUMENT_INDEX = 1
-const VALUE_OFFSET = 1
-const FLAG_PAIR_LENGTH = 2
-// `--only` advances the scan by one token, having no value where a `--max` / `--idle` pair advances two.
-const ONLY_STEP = 1
 const EMPTY_LENGTH = 0
 const NOT_FOUND = -1
+
+// One token of `parseArgs`'s `tokens` answer, as far as this file reads it: a positional's text, or an
+// option's name and the value it was given (`--max 5` and `--max=5` alike).
+interface ArgumentToken {
+	kind: string
+	name?: string
+	value?: string | undefined
+}
+
+interface Invocation {
+	issues: ReadonlyArray<number>
+	flags: ReadonlyArray<string>
+}
 
 // A space is the only separator that can survive `detached-launch.ts`'s `is_safe_value`, which has
 // already refused every control character — so the split needs no pattern, and this file is left with
@@ -60,57 +77,33 @@ function tokens_of(invocation: string): ReadonlyArray<string> {
 
 // **The integer check is `backlog:budget`'s own, imported rather than restated.** It is the command
 // this invocation is going to be handed to, so a second copy of the rule here would be free to drift
-// from the one that actually reads the number.
-function flag_token(token: string, raw: string | undefined): string | undefined {
-	const flag = KNOWN_FLAGS.find((known) => known === token)
-	const value = backlog_budget_cli.to_count(raw)
+// from the one that actually reads the number. `--only` carries no value and renders to its own
+// constant for the same taint reason every other token does — the constant severs the record's string
+// from the rebuilt one.
+function render_option(token: ArgumentToken): string | undefined {
+	if (token.name === cli_flags.option_name(ONLY_FLAG)) return ONLY_FLAG
+	const flag = KNOWN_FLAGS.find((known) => cli_flags.option_name(known) === token.name)
+	const value = backlog_budget_cli.to_count(token.value)
 
 	if (flag === undefined || value === undefined) return undefined
 
 	return `${flag} ${String(value)}`
 }
 
-// One rendered flag and how far it advanced the scan: two tokens for a valued flag, one for `--only`.
-// The advance is returned rather than assumed, so `flag_tokens` handles a valueless flag mixed in with
-// the pairs without knowing which kind it read.
-interface FlagRead {
-	part: string
-	advance: number
-}
-
-// **`--only` is read before the valued flags**, because it is the one token that carries no value: read
-// as a valued flag it would swallow whatever follows it as its argument. It renders to its own constant
-// for the same taint reason every other token does — the constant severs the record's string from the
-// rebuilt one.
-function read_flag(tokens: ReadonlyArray<string>, index: number): FlagRead | undefined {
-	const token = tokens[index] ?? ''
-
-	if (token === ONLY_FLAG) return { part: ONLY_FLAG, advance: ONLY_STEP }
-
-	const part = flag_token(token, tokens[index + VALUE_OFFSET])
-
-	return part === undefined ? undefined : { part, advance: FLAG_PAIR_LENGTH }
-}
-
 // **An unknown flag is refused, never dropped.** Dropping one would wake a session running to a budget
 // the person did not declare the first time `backlogrun` grows a flag this list has not caught up with
 // — which is the failure that is hardest to notice, because the session runs and looks fine. A stray
-// `#N` after the flags lands here too, as a token that matches no known flag, and is refused: the
-// named list is the invocation's leading block, never interleaved with the budget.
-function flag_tokens(
-	tokens: ReadonlyArray<string>,
-	start: number,
-): ReadonlyArray<string> | undefined {
+// `#N` after the flags lands here too, as a token that is no option, and is refused: the named list is
+// the invocation's leading block, never interleaved with the budget. So is a `--` terminator.
+function rendered_options(tokens: ReadonlyArray<ArgumentToken>): ReadonlyArray<string> | undefined {
 	const rendered: Array<string> = []
-	let index = start
 
-	while (index < tokens.length) {
-		const read = read_flag(tokens, index)
+	for (const token of tokens) {
+		const part = render_option(token)
 
-		if (read === undefined) return undefined
+		if (part === undefined) return undefined
 
-		rendered.push(read.part)
-		index += read.advance
+		rendered.push(part)
 	}
 
 	return rendered
@@ -135,25 +128,15 @@ function issue_of(token: string): number | undefined {
 	return Number.isSafeInteger(issue) ? issue : undefined
 }
 
-// The named issues are the leading block of `#N` tokens, in the order they were typed. The scan stops
-// at the first token that is not an issue reference — that is where the budget flags begin — and a
-// `#`-prefixed token that does not validate refuses the whole invocation rather than being read as the
-// start of the flags. An empty block is a valid answer here (a bare `backlogrun` or a budget-only one);
-// `issue_numbers` is where "no named issues" becomes `undefined`.
-// The contiguous leading block of `#`-prefixed tokens — everything up to the first token that is not
-// an issue reference, which is where the budget flags begin.
-function take_leading_prefixed(args: ReadonlyArray<string>): ReadonlyArray<string> {
-	const stop = args.findIndex((token) => !token.startsWith(ISSUE_PREFIX))
-
-	return args.slice(FIRST_TOKEN, stop === NOT_FOUND ? args.length : stop)
-}
-
-function leading_issues(tokens: ReadonlyArray<string>): ReadonlyArray<number> | undefined {
+// The named issues are the leading block of positionals, in the order they were typed, and each must be
+// a `#N` that validates — anything else refuses the whole invocation rather than being dropped. An
+// empty block is a valid answer here (a bare `backlogrun` or a budget-only one); `issue_numbers` is
+// where "no named issues" becomes `undefined`.
+function issues_of(tokens: ReadonlyArray<ArgumentToken>): ReadonlyArray<number> | undefined {
 	const issues: Array<number> = []
-	const prefixed = take_leading_prefixed(tokens.slice(FIRST_ARGUMENT_INDEX))
 
-	for (const token of prefixed) {
-		const issue = issue_of(token)
+	for (const token of tokens) {
+		const issue = issue_of(token.value ?? '')
 
 		if (issue === undefined) return undefined
 
@@ -161,6 +144,35 @@ function leading_issues(tokens: ReadonlyArray<string>): ReadonlyArray<number> | 
 	}
 
 	return issues
+}
+
+// The arguments after the command word, as `parseArgs` tokens, or `undefined` for another command or
+// an argument list the strict read refuses.
+function argument_tokens(invocation: string): ReadonlyArray<ArgumentToken> | undefined {
+	const tokens = tokens_of(invocation)
+
+	if (tokens[FIRST_TOKEN] !== BACKLOG_COMMAND) return undefined
+
+	return cli_flags.parse_or_undefined({
+		args: tokens.slice(FIRST_ARGUMENT_INDEX),
+		options: OPTIONS,
+		allowPositionals: true,
+		tokens: true,
+	})?.tokens
+}
+
+// The named list is everything before the first option, and the budget flags everything from it on.
+function parse(invocation: string): Invocation | undefined {
+	const tokens = argument_tokens(invocation)
+	if (tokens === undefined) return undefined
+	const stop = tokens.findIndex((token) => token.kind !== 'positional')
+	const split_at = stop === NOT_FOUND ? tokens.length : stop
+	const issues = issues_of(tokens.slice(FIRST_TOKEN, split_at))
+	const flags = rendered_options(tokens.slice(split_at))
+
+	if (issues === undefined || flags === undefined) return undefined
+
+	return { issues, flags }
 }
 
 function issue_token(issue: number): string {
@@ -174,26 +186,17 @@ function joined(command: string, rendered: ReadonlyArray<string>): string {
 // The named list rebuilds first and the budget flags after it, so the canonical text is
 // `backlogrun #1 #2 --max 5` whatever spacing the record held. Both halves are composed from this
 // file's own constants and validated integers, so no token of the record survives into the result.
-function rebuilt_backlog(tokens: ReadonlyArray<string>): string | undefined {
-	const issues = leading_issues(tokens)
-
-	if (issues === undefined) return undefined
-
-	const flags = flag_tokens(tokens, FIRST_ARGUMENT_INDEX + issues.length)
-
-	if (flags === undefined) return undefined
-
-	return joined(BACKLOG_COMMAND, [...issues.map((issue) => issue_token(issue)), ...flags])
-}
-
 // The command word is compared against this file's own constant and the **constant** is what the
 // rebuilt text is composed from, so no token of the record survives into the result.
 function rebuild(invocation: string): string | undefined {
-	const tokens = tokens_of(invocation)
+	const parsed = parse(invocation)
 
-	if (tokens[FIRST_TOKEN] !== BACKLOG_COMMAND) return undefined
+	if (parsed === undefined) return undefined
 
-	return rebuilt_backlog(tokens)
+	return joined(BACKLOG_COMMAND, [
+		...parsed.issues.map((issue) => issue_token(issue)),
+		...parsed.flags,
+	])
 }
 
 // The issues a `backlogrun` invocation named, in the order it named them. An invocation with no named
@@ -202,11 +205,7 @@ function rebuild(invocation: string): string | undefined {
 // caller that could not tell them apart would report a finished sequential run as one that never had a
 // list. A malformed leading `#N` answers `undefined` too, because there is then no list to trust.
 function issue_numbers(invocation: string): ReadonlyArray<number> | undefined {
-	const tokens = tokens_of(invocation)
-
-	if (tokens[FIRST_TOKEN] !== BACKLOG_COMMAND) return undefined
-
-	const issues = leading_issues(tokens)
+	const issues = parse(invocation)?.issues
 
 	if (issues === undefined || issues.length === EMPTY_LENGTH) return undefined
 
@@ -214,15 +213,11 @@ function issue_numbers(invocation: string): ReadonlyArray<number> | undefined {
 }
 
 // Whether the invocation carries `--only`, so a resumed session runs the named list and stops rather
-// than draining the pool. It reads the token from the same grammar `rebuild` composes from, so the two
+// than draining the pool. It reads the flag from the same parse `rebuild` composes from, so the two
 // cannot disagree on what `--only` looks like. A non-`backlogrun` invocation carries none, which is
 // `false`.
 function has_only(invocation: string): boolean {
-	const tokens = tokens_of(invocation)
-
-	if (tokens[FIRST_TOKEN] !== BACKLOG_COMMAND) return false
-
-	return tokens.slice(FIRST_ARGUMENT_INDEX).includes(ONLY_FLAG)
+	return parse(invocation)?.flags.includes(ONLY_FLAG) === true
 }
 
 // **Three entries, because three things call in.** The command word, the flag list and the token
