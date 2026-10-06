@@ -51,7 +51,7 @@ pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind pa
 **Options:**
 
 - `--owner <pid>` — the long-lived process spending the budget (`$PPID` under a loop); required by counts and `--begin` / `--resume`. A live PID stays `busy` if probes fail.
-- `--done <issue>` shrinks a named-issue run's `remaining` list; `--merged` / `--filed` / `--cut` are increments, never totals.
+- `--done <issue>` shrinks a named-issue run's `remaining` list; `--merged <issue>` names the merged issue and counts it once against `merged_issues`, so a merge `run:merge` already recorded is not counted twice; `--filed` / `--cut` are increments, never totals.
 - `--retrospective` marks the end-of-run retrospective run, once per invocation, and requires `--summary <text>` — the same close writes that result as one `retrospective` event on the run's event stream (best-effort), so a run that filed zero improvements reads apart from one whose retrospective never ran. Either flag without the other is refused.
 - `--stopped <reason>` rides on `--end`: the run ended by _stopping_ rather than finishing, so one ⏸️ confirmation is pushed with the reason as the record is cleared, reaching the person after a cut a headless parent's report would not. A bare `--end` (a clean finish) stays silent, and because `--end` removes the record a second `--end --stopped` never sends twice. Named without `--end` it is ignored.
 - `--end` over a live record flushes pending ledger lines once; a failed flush goes to stderr and the record is still cleared.

@@ -194,12 +194,13 @@ describe('adopting a standing record', () => {
 	it('carries the budget the crashed run had spent', async () => {
 		await run_carry_cli.run(['--begin', INVOCATION])
 		await run_carry_cli.run(['--merged', '2', '--filed', '1'])
+		await run_carry_cli.run(['--merged', '3'])
 		out.length = 0
 
 		expect(await run_carry_cli.run(['--resume', INVOCATION])).toBe(0)
 		expect(out).toStrictEqual([run_carry_cli.RESUMED_VERDICT])
 		expect(run_carry.read_carry(target())).toMatchObject({
-			carry: { merged: 2, filed: 1 },
+			carry: { merged: 2, filed: 1, merged_issues: [2, 3] },
 		})
 	})
 
@@ -250,7 +251,7 @@ describe('counting into a carried run', () => {
 	// A wave that merged nothing still reports a count, and the record it counts into is either there
 	// or it is not — reading the zero as a bare read would answer `none` with exit 0.
 	it('treats a zero increment as a count, so a missing record still exits non-zero', async () => {
-		expect(await run_carry_cli.run(['--merged', '0'])).toBe(1)
+		expect(await run_carry_cli.run(['--filed', '0'])).toBe(1)
 		expect(out).toStrictEqual([run_carry_cli.NONE_VERDICT])
 	})
 
