@@ -6,6 +6,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execaSync } from 'execa'
 import {
 	publishable_range,
@@ -15,7 +16,6 @@ import {
 } from './publishable-range'
 
 const PACKAGE_JSON_PATH = 'package.json'
-const VIEW_TIMEOUT_MS = 30_000
 const FAILURE_EXIT_CODE = 1
 
 // A registry query rather than a direct fetch: safe-chain installs shims ahead of the package
@@ -29,7 +29,7 @@ const FAILURE_EXIT_CODE = 1
 function probe_range(name: string, range: string): ProbeResult {
 	const result = execaSync('pnpm', ['view', `${name}@${range}`, 'version'], {
 		reject: false,
-		timeout: VIEW_TIMEOUT_MS,
+		timeout: COMMAND_TIMEOUT_MS,
 	})
 
 	return { exit_code: result.exitCode ?? FAILURE_EXIT_CODE, stdout: result.stdout }

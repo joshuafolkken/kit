@@ -3,6 +3,7 @@ import { statSync } from 'node:fs'
 import path from 'node:path'
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { LINT_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import { z } from 'zod'
 import { effective_limit, type LineRuleOptions } from './effective-limit'
@@ -95,9 +96,6 @@ const RULE_FLAG = '--rule'
 const CACHE_PREFIX = 'josh-lines-eslint-cache-'
 const CACHE_LOCATION_FLAG = '--cache-location'
 const CACHE_KEY_LENGTH = 8
-// Bounded so a hung child ends the call rather than holding it open. A cold type-aware lint of a few
-// files is seconds; this is two orders of magnitude beyond that.
-const PROCESS_TIMEOUT_MS = 180_000
 
 // Only the two fields this reads. `ruleId` is nullable on a parse error or an ignore warning, and
 // both of those are answers — "no count for this path" — rather than failures.
@@ -200,7 +198,7 @@ async function run_probe(group: ProbeGroup, project_root: string): Promise<strin
 			reject: false,
 			stdout: 'pipe',
 			stderr: 'ignore',
-			timeout: PROCESS_TIMEOUT_MS,
+			timeout: LINT_TIMEOUT_MS,
 		})
 
 		return result.stdout

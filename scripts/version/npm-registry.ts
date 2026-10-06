@@ -1,4 +1,5 @@
 import { json_value } from '#scripts/lib/json-value'
+import { FETCH_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { migrate_logic } from '#scripts/registry-migration/migrate-logic'
 import { execaSync } from 'execa'
 import semver from 'semver'
@@ -13,7 +14,6 @@ const PUBLIC_REGISTRY = 'https://registry.npmjs.org'
 // The abbreviated packument carries `dist-tags` without every version's full manifest.
 const ABBREVIATED_ACCEPT = 'application/vnd.npm.install-v1+json'
 const FULL_ACCEPT = 'application/json'
-const REQUEST_TIMEOUT_MS = 10_000
 const SCOPE_SEPARATOR = '/'
 const ENCODED_SCOPE_SEPARATOR = '%2f'
 const SCOPE_PATTERN = /^@[^/]+(?=\/)/u
@@ -46,7 +46,7 @@ function read_packument(package_name: string, accept: string): unknown {
 	const result = execaSync(
 		process.execPath,
 		['--input-type=module', '-e', FETCH_SCRIPT, packument_url(package_name), accept],
-		{ reject: false, timeout: REQUEST_TIMEOUT_MS },
+		{ reject: false, timeout: FETCH_TIMEOUT_MS },
 	)
 	if (result.exitCode !== 0) return undefined
 
@@ -63,7 +63,7 @@ function is_github_scope(scope: string): boolean {
 	if (is_cached_github !== undefined) return is_cached_github
 	const result = execaSync('pnpm', ['config', 'get', `${scope}${SCOPE_REGISTRY_SUFFIX}`], {
 		reject: false,
-		timeout: REQUEST_TIMEOUT_MS,
+		timeout: FETCH_TIMEOUT_MS,
 	})
 	const is_github = result.exitCode === 0 && migrate_logic.is_github_tarball(result.stdout.trim())
 

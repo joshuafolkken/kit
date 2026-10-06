@@ -3,6 +3,7 @@ import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { ls_remote_branch_arguments } from '#scripts/git/git-ls-remote'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
+import { GIT_TIMEOUT_MS } from '#scripts/lib/timeouts'
 
 // The git probes propagation needs before it writes anything into a working tree.
 //
@@ -11,7 +12,6 @@ import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 // its remote would propagate the *previous* release, which is already published and would report
 // success (joshuafolkken/kit#863).
 
-const GIT_TIMEOUT_MS = 10_000
 // The probes that talk to the remote get their own budget. Ten seconds is generous for a local
 // `rev-parse` and tight for an ssh handshake, and a probe that times out answers "no" — which for
 // the two below would report a push that never reached origin as a push nobody attempted.

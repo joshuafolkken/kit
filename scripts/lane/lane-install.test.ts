@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
+import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
 	INSTALL_ARGUMENTS,
-	INSTALL_TIMEOUT_MS,
 	lane_install,
 	MANIFEST_FILE_NAME,
 	NO_MANIFEST_OUTPUT,

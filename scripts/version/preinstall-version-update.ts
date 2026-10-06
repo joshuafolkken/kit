@@ -1,10 +1,10 @@
 import { readFileSync, writeFileSync } from 'node:fs'
+import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { ci_installer_pin } from '#scripts/safe-chain/ci-installer-pin'
 import { execaSync } from 'execa'
 
 const SAFE_CHAIN_PKG = '@aikidosec/safe-chain'
 const VERSION_RE = /@aikidosec\/safe-chain@([^\s"']+)/u
-const NPM_TIMEOUT_MS = 30_000
 
 interface PreinstallInfo {
 	content: string
@@ -18,7 +18,7 @@ function extract_pinned_version(preinstall: string): string | undefined {
 function fetch_latest_version(): string | undefined {
 	const result = execaSync('npm', ['view', SAFE_CHAIN_PKG, 'version'], {
 		reject: false,
-		timeout: NPM_TIMEOUT_MS,
+		timeout: COMMAND_TIMEOUT_MS,
 	})
 	if (result.exitCode !== 0 || !result.stdout) return undefined
 

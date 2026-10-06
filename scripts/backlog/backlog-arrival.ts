@@ -1,5 +1,6 @@
 import { epic_triage } from '#scripts/epic/epic-triage'
 import type { JoshResult } from '#scripts/josh/josh-run'
+import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { run_headless } from '#scripts/run/run-headless'
 import { backlog_next } from './backlog-next'
 import { backlog_ready, type ReadyPorts, type ReadyReading } from './backlog-ready'
@@ -26,14 +27,13 @@ import { backlog_stalled } from './backlog-stalled'
 //
 // **Every read is bounded.** The probe is awaited inside the watcher's tick loop, so a `gh` call that
 // hangs would otherwise freeze the loop — its `--hours` bound, its liveness ping and the exit that is
-// the parent's wake. A read past `READ_TIMEOUT_MS` is killed and counts as a failed read.
+// the parent's wake. A read past `COMMAND_TIMEOUT_MS` is killed and counts as a failed read.
 //
 // **And strict.** `backlog:next` exits 0 on a `retry` (a transport failure) or an `error` verdict, which
 // the lenient pick-up read takes as an empty pool — here that empty baseline is the whole-pool wake the
 // paragraph above rules out, so either verdict, like a non-zero exit, is a read that did not answer.
 
 const PROBE_INTERVAL_MS = 60_000
-const READ_TIMEOUT_MS = 30_000
 const SUCCESS_EXIT_CODE = 0
 const NO_FREE = 0
 const NONE = 0
@@ -61,7 +61,7 @@ function answered_issues(result: JoshResult | undefined): ReadonlyArray<string> 
 }
 
 async function bounded_ready_issues(): Promise<ReadonlyArray<string>> {
-	return answered_issues(await backlog_ready.read_backlog_next(READ_TIMEOUT_MS))
+	return answered_issues(await backlog_ready.read_backlog_next(COMMAND_TIMEOUT_MS))
 }
 
 const ARRIVAL_PORTS: ReadyPorts = {

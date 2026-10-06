@@ -4,6 +4,7 @@ import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { OTHER_CHANGE_LABEL } from '#scripts/issue/issue-labels'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { error_text } from '#scripts/lib/error-message'
+import { SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { build_upgrade_command } from '#scripts/version/upgrade-shell-command'
 import { create_version_command_config } from '#scripts/version/version-command-config'
 import { execaSync } from 'execa'
@@ -20,9 +21,6 @@ import type { PropagateTarget } from './propagate-targets'
 // and the sequencing stays testable (joshuafolkken/kit#863).
 
 const SUCCESS_EXIT_CODE = 0
-// Long enough for a consumer's full unit suite and a `pnpm add`, short enough that a hung step ends
-// the run instead of holding the whole propagation open.
-const STEP_TIMEOUT_MS = 1_800_000
 // The consumer-side gate. `josh gate` is the same command the AI documents require of a person
 // (joshuafolkken/kit#914) — running the four checks concurrently and reporting every failure in one
 // pass — so the chain is not repeated here. It resolves in the consumer's directory, which by this
@@ -176,7 +174,7 @@ function spawn_step(
 		cwd: target.path,
 		reject: false,
 		stdio: 'inherit',
-		timeout: STEP_TIMEOUT_MS,
+		timeout: SUITE_TIMEOUT_MS,
 	})
 
 	return step_result(step, spawned.exitCode)
@@ -211,7 +209,7 @@ function spawn_captured(
 		stdin: 'inherit',
 		stdout: ['inherit', 'pipe'],
 		stderr: ['inherit', 'pipe'],
-		timeout: STEP_TIMEOUT_MS,
+		timeout: SUITE_TIMEOUT_MS,
 	})
 
 	return {

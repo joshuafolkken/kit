@@ -190,7 +190,9 @@ and a child that skips it implements on a stale main. Only the dependency update
 lanes it changes hands**: no lane can switch to the default branch, so the parent runs it in the primary
 checkout **before each `lane:open`**. **And in a lane `josh latest` is not even asked** — `latest:scope`
 skips and `latest:guard` refuses. The stash that carries the lock file into the first lane is in
-`backlogrun-lanes.md` → "Once per repository, before the first lane opens".
+`backlogrun-lanes.md` → "Once per repository, before the first lane opens": the parent runs the update
+and pushes the stash in the primary checkout before `backlog:drive` starts, and the driver passes it
+to the first lane it launches.
 
 This is the same rule `latest-gate.md` is the single source of.
 
