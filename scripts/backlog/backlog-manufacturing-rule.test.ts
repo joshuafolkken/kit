@@ -115,7 +115,7 @@ const INTERRUPT_MARKERS: ReadonlyArray<string> = [
 	'**偽の依存関係**',
 	'**割り込みは上限の例外であって、明示起動規則の例外ではない。**',
 	// The `--add` without a position, and the ban on `--before` / `--after`. `--before <M>` really does write
-	// a `blocked-by` (docs/josh-commands-automation.md → `josh epic --add`), so prescribing it and forbidding a
+	// a `blocked-by` (docs/josh-commands-backlog.md → `josh epic --add`), so prescribing it and forbidding a
 	// false dependency in the same breath is unsatisfiable — and the relation it writes is exactly
 	// what makes `epic:next` withhold the child the interrupt does not block.
 	'**`--before` / `--after` を使ってはならない。**',

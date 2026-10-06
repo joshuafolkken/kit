@@ -74,6 +74,8 @@ from the page it explains.
   `josh` commands
 - [josh-commands-run-rationale.md](./josh-commands-run-rationale.md) — the run, lane and session
   `josh` commands
+- [josh-commands-backlog-rationale.md](./josh-commands-backlog-rationale.md) — the issue, epic,
+  backlog and review `josh` commands
 - [init-rationale.md](./init-rationale.md) — `josh init`
 - [sync-rationale.md](./sync-rationale.md) — `josh sync`
 - [environment-variables-rationale.md](./environment-variables-rationale.md) — the notification

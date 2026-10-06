@@ -5,6 +5,7 @@ The commands you type by hand — the `developer` audience. Look a command up he
 See also:
 
 - [Automation command reference](josh-commands-automation.md) — the commands hooks, workflow runs, lanes and maintainers call.
+- [Issue, epic, backlog and review command reference](josh-commands-backlog.md) — the commands a workflow run calls to file issues, track epics, plan a backlog and brief a review.
 - [Command Catalog](josh-command-catalog.md) — auto-generated index of every command (name, aliases, synopsis, audience, side effects).
 
 `josh` is available as `pnpm josh` (or `pnpm exec josh`) after running `josh init`. Run `pnpm josh help` to print a grouped summary in the terminal. How the dispatcher runs a command in kit's own checkout, and the shape a new script keeps: `docs/maintainers/josh-commands-rationale.md` → "How a command runs".

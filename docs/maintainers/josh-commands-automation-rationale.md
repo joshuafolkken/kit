@@ -2,12 +2,9 @@
 
 History behind [josh-commands-automation.md](../josh-commands-automation.md), kept here so the
 reference states only each command's contract — what it does, its arguments, output, exit codes and side effects.
-The run, lane and session commands' history is in [josh-commands-run-rationale.md](josh-commands-run-rationale.md).
-
-## `josh delegate` no longer counts investigation reads
-
-The investigation threshold's counting first lived beside the `josh delegate` enumeration; it moved
-into `josh investigation:guard`, which is why a delegation resets the counter rather than spending it.
+The run, lane and session commands' history is in [josh-commands-run-rationale.md](josh-commands-run-rationale.md);
+the issue, epic, backlog and review commands' history is in
+[josh-commands-backlog-rationale.md](josh-commands-backlog-rationale.md).
 
 ## The batching guard is off in a lane child
 
@@ -50,18 +47,4 @@ the behavior.
 | `josh measure:rerun`        | #2178, #3064                                                     |
 | `josh review:record`        | #2325, #2343, #2419, #2919                                       |
 | `josh reserved-run`         | #2351                                                            |
-| `josh issue:comment`        | #2304                                                            |
-| `josh pkg:scout`            | #2216                                                            |
-| `josh issue:lint`           | #2123, #2212, #2353                                              |
-| `josh defect:rate`          | #2449, #2455                                                     |
-| `josh report:lint`          | #2123                                                            |
-| `josh stash:pop`            | #2050                                                            |
-| `josh epic:next`            | #2779                                                            |
-| `josh auto-ok:next`         | #2928                                                            |
-| `josh backlog:next`         | #2244, #2449, #2455, #2776, #2779, #2928                         |
-| `josh backlog:plan`         | #2778                                                            |
-| `josh backlog:stalled`      | #2359                                                            |
-| `josh backlog:offer`        | #2335                                                            |
-| `josh backlog:drive`        | #2499, #2508, #2881                                              |
-| `josh oracle:list`          | #2324, #2334, #2808                                              |
 | `josh repo:party`           | #2122                                                            |

@@ -5,7 +5,7 @@ import { backlog_next } from './backlog-next'
 // answered — its stdout tokens and its exit code — into the one word `backlog:budget` is then asked
 // with, plus the issue numbers to start and the consecutive-retry count carried to the next ask.
 //
-// **The mapping is `docs/josh-commands-automation.md` → "`josh backlog:offer`", held here so it cannot
+// **The mapping is `docs/josh-commands-backlog.md` → "`josh backlog:offer`", held here so it cannot
 // drift.** It fixes which `backlog:next` answer becomes which `backlog:budget` word, and it carries two
 // context branches an agent once applied by hand every iteration: `wait` is `blocked` while this run
 // has children in flight and `exhausted` when it has none, and `retry` is `blocked` until the third
