@@ -46,7 +46,7 @@ beforeEach(() => {
 		lane: { ...LANE, output: LOG_PATH },
 		output: LOG_PATH,
 	})
-	vi.spyOn(git_gh_command, 'issue_add_label').mockResolvedValue(true)
+	vi.spyOn(git_gh_command, 'issue_apply_label').mockResolvedValue({ is_applied: true })
 	vi.spyOn(git_gh_command, 'issue_remove_label').mockResolvedValue(undefined)
 	emit.mockResolvedValue(undefined)
 })
