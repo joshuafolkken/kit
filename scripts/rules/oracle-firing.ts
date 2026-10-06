@@ -133,7 +133,7 @@ function firing_oracles(): ReadonlyArray<{
 	return decision_oracle.DECISION_ORACLES.flatMap((oracle) => {
 		const firing_point = FIRING.get(oracle.name)
 
-		return firing_point === undefined ? [] : [{ oracle, firing_point }]
+		return firing_point === undefined ? [] : { oracle, firing_point }
 	})
 }
 

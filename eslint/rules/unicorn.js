@@ -20,6 +20,14 @@ export const NAME_REPLACEMENTS_ALLOW_LIST = {
 	repository: true, // unicorn 68 は repository→repo を勧めるが、明確さを優先し完全名を維持する
 }
 
+// unicorn 77 は逆に repo→repository を要求する（joshuafolkken/kit#3273）。repo は GitHub の
+// owner/repo・gh repo・josh repo:party と同じ定着した語で、展開しても明確さは増えない。
+// allowList は大文字小文字を区別した単語一致なので RepoIdentity の `Repo` を拾えない。
+// 置き換えそのものを外すと repo / Repo のどちらも対象外になる。
+export const NAME_REPLACEMENTS_DISABLED = {
+	repo: false,
+}
+
 // unicorn 68→69 のベースライン方針（Issue #610 / Problem 3）:
 // `unicorn.configs.recommended` で 65→68 にかけて新たに有効化されたルール
 // （prefer-url-href / consistent-class-member-order / prefer-number-coercion /
@@ -40,7 +48,10 @@ export const unicorn_rules = {
 	'unicorn/no-array-reduce': 'error',
 	// abbreviation を禁止（明確な命名を強制、idiomatic な短縮名は許可）
 	// unicorn 68 で prevent-abbreviations から name-replacements にリネーム
-	'unicorn/name-replacements': ['error', { allowList: NAME_REPLACEMENTS_ALLOW_LIST }],
+	'unicorn/name-replacements': [
+		'error',
+		{ allowList: NAME_REPLACEMENTS_ALLOW_LIST, replacements: NAME_REPLACEMENTS_DISABLED },
+	],
 	// より良いエラーメッセージ
 	'unicorn/error-message': 'error',
 	// ファイル名のケース統一（unicorn 65 で既定 true になった checkDirectories を無効化し、
@@ -189,4 +200,8 @@ export const unicorn_rules = {
 	// 差分ノイズだけを生む。無効化ではなく 'single-line' 側で一貫性を強制する
 	// （内容が複数行のコメントはこのルールの対象外なので、長い解説コメントは影響を受けない）。
 	'unicorn/single-line-block-comment-style': ['error', 'single-line'],
+	// unicorn 77 で新設。JSDoc の各行から ` * ` を外させるが、行頭の `*` は JSDoc の標準形で、
+	// エディタは `/**` の中で改行するたびに自動で挿入する。有効のままだと新しい doc コメントの
+	// たびにエディタと衝突し、可読性の利得なく差分ノイズだけを生むため無効化する（joshuafolkken/kit#3273）。
+	'unicorn/no-asterisk-prefix-in-documentation-comments': 'off',
 }

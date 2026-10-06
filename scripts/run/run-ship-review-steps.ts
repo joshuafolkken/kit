@@ -59,8 +59,8 @@ function failure(out: string): JoshResult {
 	return { code: FAILURE_EXIT_CODE, out }
 }
 
-function paths(root: string = PROJECT_ROOT): { brief: string; findings: string; log: string } {
-	return openai_review_broker.review_paths(root)
+function paths(): { brief: string; findings: string; log: string } {
+	return openai_review_broker.review_paths(PROJECT_ROOT)
 }
 
 async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {

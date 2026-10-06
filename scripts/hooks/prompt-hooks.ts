@@ -26,9 +26,7 @@ function user_prompt_hook_commands(settings_text: string): Array<string> {
 	const matchers = parsed.success ? (parsed.data.hooks?.UserPromptSubmit ?? []) : []
 
 	return matchers.flatMap((matcher) =>
-		(matcher.hooks ?? []).flatMap((hook) =>
-			typeof hook.command === 'string' ? [hook.command] : [],
-		),
+		(matcher.hooks ?? []).flatMap((hook) => (typeof hook.command === 'string' ? hook.command : [])),
 	)
 }
 

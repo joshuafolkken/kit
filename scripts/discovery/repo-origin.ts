@@ -111,12 +111,12 @@ function origin_section_lines(lines: ReadonlyArray<string>): Array<string> {
 	return end === NOT_FOUND ? rest : rest.slice(0, end)
 }
 
-// The value of a `key = value` entry, or nothing when the line declares a different key. Split on
+// The value of a `url = value` entry, or nothing when the line declares a different key. Split on
 // the first separator rather than matched, for the reason `parse_scp_like` is split by hand.
-function entry_value(line: string, key: string): string | undefined {
+function url_value(line: string): string | undefined {
 	const separator = line.indexOf('=')
 	if (separator === NOT_FOUND) return undefined
-	if (line.slice(0, separator).trim() !== key) return undefined
+	if (line.slice(0, separator).trim() !== URL_KEY) return undefined
 
 	return line.slice(separator + 1).trim()
 }
@@ -129,7 +129,7 @@ function parse_origin_from_config(content: string): string | undefined {
 	const lines = content.split('\n').map((line) => line.trim())
 
 	return origin_section_lines(lines)
-		.map((line) => entry_value(line, URL_KEY))
+		.map((line) => url_value(line))
 		.find((url) => url !== undefined)
 }
 
@@ -153,7 +153,7 @@ function parse_remote_urls_from_config(content: string): Array<string> {
 
 	return section_groups(lines)
 		.filter((group) => REMOTE_SECTION.test(group[0] ?? ''))
-		.flatMap((group) => group.map((line) => entry_value(line, URL_KEY)))
+		.flatMap((group) => group.map((line) => url_value(line)))
 		.filter((url) => url !== undefined)
 }
 

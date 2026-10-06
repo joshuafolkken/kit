@@ -35,8 +35,8 @@ const REQUIRED_RULE = {
 const RULESET = JSON.stringify({ id: RULESET_ID, rules: [{ type: 'deletion' }, REQUIRED_RULE] })
 
 function job_names(relative_path: string): Array<string> {
-	return Object.values(ci_yml_fixture.load_workflow(relative_path).jobs).flatMap((job) =>
-		job.name === undefined ? [] : [job.name],
+	return Object.values(ci_yml_fixture.load_workflow(relative_path).jobs).flatMap(
+		(job) => job.name ?? [],
 	)
 }
 

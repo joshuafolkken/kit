@@ -16,7 +16,7 @@ const NAME_SCHEMA = z.object({ name: z.string() })
 
 function created_names(): ReadonlyArray<string> {
 	return mocked_api.mock.calls.flatMap(([request]) =>
-		request.body === undefined ? [] : [NAME_SCHEMA.parse(JSON.parse(request.body)).name],
+		request.body === undefined ? [] : NAME_SCHEMA.parse(JSON.parse(request.body)).name,
 	)
 }
 

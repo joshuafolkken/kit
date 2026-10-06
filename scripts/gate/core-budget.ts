@@ -133,7 +133,7 @@ function live_reservations(directory: string = PLATFORM_TEMP_ROOT): Array<LiveRe
 	return marker_files(directory).flatMap((name) => {
 		const reservation = live_reservation(path.join(directory, name))
 
-		return reservation === undefined ? [] : [{ key: name, reservation }]
+		return reservation === undefined ? [] : { key: name, reservation }
 	})
 }
 

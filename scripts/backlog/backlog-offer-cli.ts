@@ -74,8 +74,8 @@ function to_count(raw: string | undefined): number | undefined {
 
 // A count flag that was given but unreadable makes the invocation unreadable rather than defaulted —
 // the contract `backlog:budget` follows for its own counts.
-function count_of(raw: string | undefined, fallback: number): number | undefined {
-	return raw === undefined ? fallback : to_count(raw)
+function count_of(raw: string | undefined): number | undefined {
+	return raw === undefined ? DEFAULT_COUNT : to_count(raw)
 }
 
 interface OfferCounts {
@@ -86,8 +86,8 @@ interface OfferCounts {
 // The two counts the mapping needs: `--running` decides `wait`, `--retries` decides `retry`. Either
 // given but unreadable refuses the whole invocation.
 function counts_of(values: ParsedValues): OfferCounts | undefined {
-	const running = count_of(cli_flags.string_of(values.running), DEFAULT_COUNT)
-	const retries = count_of(cli_flags.string_of(values.retries), DEFAULT_COUNT)
+	const running = count_of(cli_flags.string_of(values.running))
+	const retries = count_of(cli_flags.string_of(values.retries))
 
 	if (running === undefined || retries === undefined) return undefined
 
