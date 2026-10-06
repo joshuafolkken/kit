@@ -17,13 +17,13 @@ pnpm josh delegate --list   # the enumeration, and what was rejected and why
 **how a wrong result is caught** cheaply in the parent tier, not merely by being unlikely to fail.
 `pnpm josh delegate --list` names both delegatable and rejected steps; a rejected step either has no
 verifier or lets a wrong result propagate too far. The command distinguishes `kept deliberately`
-from `kept by default`. `docs/josh-commands-automation.md` → "`josh delegate`" carries the full enumeration.
+from `kept by default`. `docs/josh-commands-backlog.md` → "`josh delegate`" carries the full enumeration.
 
 **The mechanism is not the unit.** `pnpm josh delegate` covers a run step, a file-disjoint Step 0
 implementation unit (`pnpm josh fanout`), and `epic-child` — an epic's child and a named issue of a
 `backlogrun` alike. Do not add a second batch-child mechanism. Read `backlogrun-child.md` → "Each child
 runs in a delegated unit" at child dispatch; `backlogrun-steps.md` → "Named issues run first, in order"
-applies to named issues. `docs/josh-commands-automation.md` → "`josh fanout`" carries file-disjoint dispatch.
+applies to named issues. `docs/josh-commands-backlog.md` → "`josh fanout`" carries file-disjoint dispatch.
 
 **`followup-filing` delegates the late review-finding filing chain** with the parent's finding text;
 the parent verifies the new Issue using `pnpm josh issue:state <new>`. For `epic-child`, the parent

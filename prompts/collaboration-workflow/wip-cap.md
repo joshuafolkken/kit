@@ -10,7 +10,7 @@
 
 **オープン Issue が上限を超えている状態で新しく起票するときは、先に 1 件閉じる。**
 
-**件数は `pnpm josh issue:file` が起票の前に数える**（joshuafolkken/kit#3181）。手で数えることも、見積もりや記憶で済ませることもない。数え方・印字・保留の詳細は `docs/josh-commands-automation.md` → "`josh issue:file`" にある。
+**件数は `pnpm josh issue:file` が起票の前に数える**（joshuafolkken/kit#3181）。手で数えることも、見積もりや記憶で済ませることもない。数え方・印字・保留の詳細は `docs/josh-commands-backlog.md` → "`josh issue:file`" にある。
 
 - **上限は 30。** これを超える 1 件を作る前に 1 件閉じる。エージェントが読む文書（`CLAUDE.md`・`prompts/`・配布 skill）がこの数字を書くのはこの行だけで、一次情報は `scripts/rules/wip-cap.ts` の `WIP_CAP` である（一致はテストが固定する）。
 - コマンドは起票先（`--repo` を付ければそのリポジトリ）のオープン Issue を epic も含めて数え、`wip:` 行に件数・上限・判定を印字する。上限を超えて免除が宣言されていなければ**何も送らずに保留し、免除の問いを印字する**。
@@ -64,7 +64,7 @@
 
 #### 該当したときの手順
 
-1. **上限に関係なく起票する。** 1 件閉じることを条件にしない。起票は `pnpm josh issue:file` で行う。本文の検査、本文が宣言する分類ラベルの付与、重複探し、`epic:bundle` はこのコマンドが実行する（`docs/josh-commands-automation.md` → `josh issue:file`）。
+1. **上限に関係なく起票する。** 1 件閉じることを条件にしない。起票は `pnpm josh issue:file` で行う。本文の検査、本文が宣言する分類ラベルの付与、重複探し、`epic:bundle` はこのコマンドが実行する（`docs/josh-commands-backlog.md` → `josh issue:file`）。
 
    ```bash
    pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --route interrupt

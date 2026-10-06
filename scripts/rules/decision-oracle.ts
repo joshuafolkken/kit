@@ -200,7 +200,7 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 			"Whether an epic's declaration matches its recorded relations, and the repair when it does not",
 		args: '--reconcile <E>',
 		vocabulary: [RECONCILED, NOTHING_TO_RECONCILE],
-		single_source: 'docs/josh-commands-automation.md → `josh epic --reconcile`',
+		single_source: 'docs/josh-commands-backlog.md → `josh epic --reconcile`',
 	},
 	{
 		name: 'lane:list',

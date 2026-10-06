@@ -166,7 +166,7 @@ command prints a ⚠️ line naming that child rather than reporting a reorderin
 `owner/repo#number` and kept by the epic named earlier; withheld there, it stays withheld, because a
 `blocked-by` relation belongs to the issue rather than to the epic listing it. **One unusable graph
 refuses the whole answer**, and **one reference that does not parse fails the read** rather than
-being dropped. `docs/josh-commands-automation.md` → "`josh epic:next`" carries the worked form.
+being dropped. `docs/josh-commands-backlog.md` → "`josh epic:next`" carries the worked form.
 
 **An `in-progress` issue occupies a lane rather than the whole repository.** The occupancy is counted
 from that repository's own `in-progress` listing — never from anything the session remembers, since
@@ -209,7 +209,7 @@ inherits; open and tracked by none, the child waits on a person and the
 blocker is named on standard error; a state the relation did not carry reads as waiting. **So an order
 between two epics is recorded with a native `blocked-by` relation and honoured by naming both epics**
 — `epic:next 1936 1931`, or `backlog:next`, whose set is the whole opted-in backlog. The table is
-`docs/josh-commands-automation.md` → "`josh epic:next`".
+`docs/josh-commands-backlog.md` → "`josh epic:next`".
 
 Two things stop the command rather than being worked around: a **circular dependency**, and a
 **disagreement between the epic body and the `blocked-by` relations** (an epic written before `josh`

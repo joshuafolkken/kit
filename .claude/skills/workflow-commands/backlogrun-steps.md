@@ -286,7 +286,7 @@ stop at a time.**
   path) becomes a native `blocked-by`; an issue meeting all three of the `backlogrun-lanes.md` →
   "Lanes — running more than one child at a time" conditions gets `run:solo`, **every other one `run:lane`**. Comment the reason; the offer commands enforce all
   three, answering `triage` while an issue has neither.
-- **`priority:high` puts an issue first** (joshuafolkken/kit#2928; ranking: `docs/josh-commands-automation.md` →
+- **`priority:high` puts an issue first** (joshuafolkken/kit#2928; ranking: `docs/josh-commands-backlog.md` →
   `josh backlog:next`). Apply it only on a cited ground — a stated deadline or urgency, or a person's
   written policy — commenting the ground; **never remove it**.
 - **Report the order those labels produce — `pnpm josh backlog:plan --waves`** (joshuafolkken/kit#2778),
@@ -306,7 +306,7 @@ Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the plan an
 
 **The loop is computed, not walked by hand.** The `run:wake` supervisor runs `pnpm josh backlog:drive`,
 whose head is `pnpm josh backlog:offer`: the answer-to-budget mapping, the retry count, the `--exclude`
-feedback and the lane count are its own (`docs/josh-commands-automation.md` → "`josh backlog:offer`"
+feedback and the lane count are its own (`docs/josh-commands-backlog.md` → "`josh backlog:offer`"
 and "`josh backlog:drive`"). **An AI session reaches this section only when the driver hands a branch
 back** — the `Driver result:` line names it, and its `Next:` line is the order: claim the record with
 `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"`, act on the branch, then hand the loop
@@ -389,7 +389,7 @@ again at its full budget. Both are ISO-8601 timestamps (`date -u +%FT%TZ`), and 
 `--active` is refused. `--merged` is what has merged and `--running` what is still in a lane; **both
 count against the maximum**. **No ending abandons a lane**: whatever would have ended the run answers
 `watch` while `--running` is above zero, so the lanes drain and their merges reach the report. The full
-contract is `docs/josh-commands-automation.md` → "`josh backlog:budget`".
+contract is `docs/josh-commands-backlog.md` → "`josh backlog:budget`".
 
 **The completion report names three things the budgets make meaningful**: how many issues this run
 took, how many of them were picked up during an idle watch, and the termination reason — quoted from
