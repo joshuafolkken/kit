@@ -5,6 +5,7 @@ import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-thresho
 import { issue_closing_pr } from '#scripts/issue/issue-closing-pr'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
+import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
@@ -234,6 +235,7 @@ async function on_merged(ctx: MergeContext): Promise<MergeVerdict> {
 	if (refused !== undefined) return report_count_refused(refused)
 
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.MERGE, `#${ctx.child} merged`)
+	await lane_ledger.record_merge(Number(ctx.child))
 
 	if (await run_merge_steps.is_over_budget(ctx.over)) return emit(OVER_TOKEN, SUCCESS_EXIT_CODE)
 

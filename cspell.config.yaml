@@ -2,6 +2,8 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The macOS `sysctl` key the lane-limit measurement reads swap from (#3355).
+  - swapusage
   # A run trying kit's distribution on a throwaway project of its own (#3142).
   - dogfood
   # The workflow command that stops at a green, mergeable pull request (#3023).

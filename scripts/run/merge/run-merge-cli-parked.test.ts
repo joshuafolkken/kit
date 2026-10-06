@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const read_issue_mock = vi.hoisted(() => vi.fn())
 const remove_in_progress_mock = vi.hoisted(() => vi.fn())
+const record_merge_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
@@ -16,6 +17,10 @@ vi.mock('#scripts/issue/issue-closing-pr', () => ({
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit: vi.fn() },
+}))
+
+vi.mock('#scripts/lane/lane-ledger', () => ({
+	lane_ledger: { record_merge: record_merge_mock },
 }))
 
 vi.mock('./run-merge-steps', () => ({
@@ -34,6 +39,9 @@ vi.mock('./run-merge-steps', () => ({
 const { run_merge_cli } = await import('./run-merge-cli')
 
 const CHILD = '2987'
+const IN_PROGRESS = 'in-progress'
+const NEEDS_DECISION = 'needs-decision'
+const CLOSED_STATE = { kind: 'state', state: { state: 'CLOSED', labels: [] } }
 
 function context(): NonNullable<ReturnType<typeof run_merge_cli.parse>> {
 	const ctx = run_merge_cli.parse([CHILD])
@@ -50,13 +58,14 @@ function open_with(labels: ReadonlyArray<string>): unknown {
 beforeEach(() => {
 	read_issue_mock.mockReset()
 	remove_in_progress_mock.mockReset().mockResolvedValue(undefined)
+	record_merge_mock.mockReset().mockResolvedValue(undefined)
 })
 
 describe('run_merge_cli.merge_child — in-progress on a settled child', () => {
-	it.each(['needs-decision', 'already-done'])(
+	it.each([NEEDS_DECISION, 'already-done'])(
 		'drops in-progress from a child parked with %s',
 		async (label) => {
-			read_issue_mock.mockResolvedValue(open_with(['in-progress', label]))
+			read_issue_mock.mockResolvedValue(open_with([IN_PROGRESS, label]))
 
 			const result = await run_merge_cli.merge_child(context())
 
@@ -66,11 +75,28 @@ describe('run_merge_cli.merge_child — in-progress on a settled child', () => {
 	)
 
 	it('leaves the label of a merged child to the merge step', async () => {
-		read_issue_mock.mockResolvedValue({ kind: 'state', state: { state: 'CLOSED', labels: [] } })
+		read_issue_mock.mockResolvedValue(CLOSED_STATE)
 
 		const result = await run_merge_cli.merge_child(context())
 
 		expect(result.outcome).toBe('merged')
 		expect(remove_in_progress_mock).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#3355: the lane-limit measurement counts merges from the ledger.
+	it('records a merged child in the lane ledger', async () => {
+		read_issue_mock.mockResolvedValue(CLOSED_STATE)
+
+		await run_merge_cli.merge_child(context())
+
+		expect(record_merge_mock).toHaveBeenCalledWith(Number(CHILD))
+	})
+
+	it('records nothing for a parked child', async () => {
+		read_issue_mock.mockResolvedValue(open_with([IN_PROGRESS, NEEDS_DECISION]))
+
+		await run_merge_cli.merge_child(context())
+
+		expect(record_merge_mock).not.toHaveBeenCalled()
 	})
 })
