@@ -10,7 +10,9 @@
 // clone `CLAUDE.md` prohibits, and the two copies would disagree the first time one of them learned
 // to accept another format.
 function parse_instant(raw: string | null | undefined): number | undefined {
-	const parsed = Date.parse(raw ?? '')
+	if (raw === null || raw === undefined) return undefined
+
+	const parsed = Date.parse(raw)
 
 	return Number.isNaN(parsed) ? undefined : parsed
 }

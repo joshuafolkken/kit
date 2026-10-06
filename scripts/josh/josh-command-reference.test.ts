@@ -110,7 +110,10 @@ describe('command reference — the synopsis matches the script it describes', (
 			const flags = usage_flags(read_script(script), name)
 			const missing = flags.filter((flag) => !listed.has(flag) && !UNIVERSAL_FLAGS.has(flag))
 
-			return missing.length === 0 ? [] : [`${name} (${script}): ${missing.join(' ')}`]
+			if (missing.length === 0) return []
+
+			// eslint-disable-next-line unicorn/no-unnecessary-array-flat-map -- one return type (sonarjs/function-return-type)
+			return [`${name} (${script}): ${missing.join(' ')}`]
 		})
 
 		expect(omissions, 'synopses that omit flags their usage line names').toEqual([])

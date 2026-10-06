@@ -66,8 +66,8 @@ function is_posted_since(comment: IssueComment, merged_at: string): boolean {
 	return Date.parse(comment.created_at) >= Date.parse(merged_at)
 }
 
-function parse_comments(comments_json: string | undefined): Array<IssueComment> {
-	const parsed = COMMENTS_SCHEMA.safeParse(json_value.parse_or_undefined(comments_json ?? ''))
+function parse_comments(comments_json: string | undefined = ''): Array<IssueComment> {
+	const parsed = COMMENTS_SCHEMA.safeParse(json_value.parse_or_undefined(comments_json))
 
 	return parsed.success ? parsed.data : []
 }

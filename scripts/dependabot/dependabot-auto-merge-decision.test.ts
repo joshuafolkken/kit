@@ -50,7 +50,7 @@ function may_arm(run: WorkflowRun): boolean {
 // very clause that broke it.
 function swept_values(): ReadonlyArray<string> {
 	const declared = `${decision_expression(template_job())} ${entitlement_expression(template_job())}`
-	const literals = Array.from(declared.matchAll(/'([^']*)'/gu), ([, value]) => value ?? '')
+	const literals = Array.from(declared.matchAll(/'([^']*)'/gu), ([, value = '']) => value)
 
 	return [...new Set([...literals, MAINTAINER_LOGIN, MANAGED, MAJOR_UPDATE, NO_OUTPUT])]
 }

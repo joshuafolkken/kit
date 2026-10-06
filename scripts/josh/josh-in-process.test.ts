@@ -203,8 +203,8 @@ function resolve_import(specifier: string, from_file: string): string | undefine
 function resolve_matches(source: string, pattern: RegExp, file: string): Array<string> {
 	const resolved: Array<string> = []
 
-	for (const [, specifier] of source.matchAll(pattern)) {
-		const target = resolve_import(specifier ?? '', file)
+	for (const [, specifier = ''] of source.matchAll(pattern)) {
+		const target = resolve_import(specifier, file)
 
 		if (target !== undefined && existsSync(target)) resolved.push(target)
 	}

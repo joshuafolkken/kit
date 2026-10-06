@@ -99,7 +99,7 @@ describe('Codex lane runtime state', () => {
 
 		const argv = codex_agent_argv.build(INVOCATION, openai_worker(), LANE)
 		const additions = argv.args.flatMap((argument, index) =>
-			argument === '--add-dir' ? [argv.args[index + 1]] : [],
+			argument === '--add-dir' ? argv.args[index + 1] : [],
 		)
 
 		expect(resolve_common_directory).toHaveBeenCalledWith(LANE)
@@ -129,7 +129,7 @@ describe('Codex lane ledger scope', () => {
 		resolve_common_directory.mockReturnValue(path.join(PRIMARY, '.git'))
 		const argv = codex_agent_argv.build(INVOCATION, openai_worker(), LANE)
 		const additions = argv.args.flatMap((argument, index) =>
-			argument === '--add-dir' ? [argv.args[index + 1]] : [],
+			argument === '--add-dir' ? argv.args[index + 1] : [],
 		)
 
 		expect(additions).toStrictEqual([path.join(PRIMARY, '.git'), documents])

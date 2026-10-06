@@ -34,16 +34,16 @@ function slug_of(first_field: string): string {
 
 // The `?? ''` lives in these small helpers rather than in `field_reason`, so that function stays a
 // single lookup with no branching of its own.
-function is_present(field: string | undefined): boolean {
-	return (field ?? '').trim().length > 0
+function is_present(field: string | undefined = ''): boolean {
+	return field.trim().length > 0
 }
 
-function matches(pattern: RegExp, field: string | undefined): boolean {
-	return pattern.test(field ?? '')
+function matches(pattern: RegExp, field: string | undefined = ''): boolean {
+	return pattern.test(field)
 }
 
-function slug_ok(key_field: string | undefined): boolean {
-	return SLUG_PATTERN.test(slug_of(key_field ?? ''))
+function slug_ok(key_field: string | undefined = ''): boolean {
+	return SLUG_PATTERN.test(slug_of(key_field))
 }
 
 // Each field's check paired with the reason it fails, so `field_reason` is a single lookup for the

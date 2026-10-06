@@ -178,6 +178,9 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 				'no-console': ['error', { allow: ['warn', 'error', 'info'] }],
 				// vi mock/stub patterns require explicit undefined (mockResolvedValue/stubGlobal)
 				'unicorn/no-useless-undefined': 'off',
+				// A fixture helper's parameter names the axis a test varies, even while every current
+				// call passes the same value; inlining it hides that axis until the next case re-adds it.
+				'unicorn/no-unnecessary-parameters': 'off',
 				// describe-scoped `let` assigned in beforeEach is the standard vitest fixture shape;
 				// the declaration cannot be initialized where it is declared.
 				'init-declarations': 'off',

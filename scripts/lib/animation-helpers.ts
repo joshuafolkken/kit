@@ -6,8 +6,8 @@ interface AnimationOptions<T> {
 	result_formatter?: (result: T) => string
 }
 
-function get_error_message(error_message: string | undefined): string {
-	return error_message ?? 'Operation failed'
+function get_error_message(error_message: string | undefined = 'Operation failed'): string {
+	return error_message
 }
 
 function get_display_result<T>(result: T, formatter?: (result: T) => string): string {

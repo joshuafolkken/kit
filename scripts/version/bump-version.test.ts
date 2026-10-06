@@ -87,7 +87,7 @@ describe('bump_version — JSON-safe write', () => {
 
 		const [, written_content] = vi.mocked(write_file_sync).mock.calls[0] ?? []
 
-		if (typeof written_content !== 'string') throw new Error('Expected string content')
+		if (typeof written_content !== 'string') throw new TypeError('Expected string content')
 
 		expect(JSON.parse(written_content)).toMatchObject({ version: '1.2.4' })
 	})

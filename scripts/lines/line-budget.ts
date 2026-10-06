@@ -237,9 +237,9 @@ function count_or_zero(
 
 // Keyed by the absolute path eslint reports, so the caller's spelling of a path does not have to
 // match it. A path eslint refused is simply absent, and the caller reports that rather than a number.
-function counts_in(raw_output: string | undefined): ReadonlyMap<string, number> {
+function counts_in(raw_output: string | undefined = 'null'): ReadonlyMap<string, number> {
 	const counts = new Map<string, number>()
-	const parsed = results_schema.safeParse(JSON.parse(raw_output ?? 'null'))
+	const parsed = results_schema.safeParse(JSON.parse(raw_output))
 
 	if (!parsed.success) return counts
 

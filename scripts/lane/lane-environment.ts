@@ -185,9 +185,13 @@ function replace_assignment(
 	key: string,
 ): Array<string> {
 	return lines.flatMap((entry, index) => {
+		// One return type across the branches (sonarjs/function-return-type) keeps the array wrappers.
+		// eslint-disable-next-line unicorn/no-unnecessary-array-flat-map -- see above
 		if (index === keep) return [assignment]
+		if (is_key_line(entry, key)) return []
 
-		return is_key_line(entry, key) ? [] : [entry]
+		// eslint-disable-next-line unicorn/no-unnecessary-array-flat-map -- see above
+		return [entry]
 	})
 }
 

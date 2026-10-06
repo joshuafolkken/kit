@@ -187,10 +187,10 @@ function solo_offer(
 	read: BusyRead,
 	request: LaneRequest,
 ): LaneOffer {
-	const { offered, notice } = epic_solo.select(answer.children, read, request.repo)
+	const { offered, notice = '' } = epic_solo.select(answer.children, read, request.repo)
 
 	if (offered.length === NO_LANES && answer.children.length > NO_LANES) {
-		return { children: [], verdict: WAIT_VERDICT, notice: notice ?? '' }
+		return { children: [], verdict: WAIT_VERDICT, notice }
 	}
 
 	return { ...answer, children: offered, notice: offered_notice(offered, read, request) }

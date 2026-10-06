@@ -156,9 +156,9 @@ describe('git_staging.check_and_confirm_staging — the observation ledger rides
 		await git_staging.check_and_confirm_staging(true)
 
 		const [prepared_at] = vi.mocked(observation_ledger_prepare.prepare).mock.invocationCallOrder
-		const [status_read_at] = vi.mocked(git_command.status).mock.invocationCallOrder
+		const [status_read_at = 0] = vi.mocked(git_command.status).mock.invocationCallOrder
 
-		expect(prepared_at).toBeLessThan(status_read_at ?? 0)
+		expect(prepared_at).toBeLessThan(status_read_at)
 	})
 })
 
