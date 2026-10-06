@@ -396,7 +396,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/test/test-red-commit.test.ts',
 	'scripts/test/test-red-logic.test.ts',
 	'scripts/test/test-related-scope.test.ts',
-	'scripts/test/test-state-guard.test.ts',
 	'scripts/test/test-stdout-guard.test.ts',
 	'scripts/test/test-type-logic.test.ts',
 	'scripts/time-runtime/time-agent-bundles.test.ts',

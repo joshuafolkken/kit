@@ -1,5 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { execFileSync } from 'node:child_process'
+import { GIT_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { describe, expect, it, vi } from 'vitest'
 import { test_state_guard, type StateSnapshot } from './test-state-guard'
+
+vi.mock('node:child_process', async (original) => {
+	const actual = await original<{ execFileSync: typeof execFileSync }>()
+
+	return { ...actual, execFileSync: vi.fn(actual.execFileSync) }
+})
 
 const EMPTY_GIT_ENV: Record<string, string | undefined> = Object.fromEntries(
 	test_state_guard.GIT_ENV_KEYS.map((key: string): [string, undefined] => [key, undefined]),
@@ -12,6 +20,26 @@ function make_snapshot(
 ): StateSnapshot {
 	return { branch, status, git_env: git_environment }
 }
+
+describe('test_state_guard.capture_state', () => {
+	it('launches git with array args and a timeout', () => {
+		const mocked = vi.mocked(execFileSync)
+
+		mocked.mockClear()
+		test_state_guard.capture_state()
+
+		expect(mocked).toHaveBeenCalledWith(
+			'git',
+			['rev-parse', '--abbrev-ref', 'HEAD'],
+			expect.objectContaining({ timeout: GIT_TIMEOUT_MS }),
+		)
+		expect(mocked).toHaveBeenCalledWith(
+			'git',
+			['status', '--porcelain'],
+			expect.objectContaining({ timeout: GIT_TIMEOUT_MS }),
+		)
+	})
+})
 
 describe('test_state_guard.format_violations', () => {
 	it('returns undefined when state is unchanged', () => {
