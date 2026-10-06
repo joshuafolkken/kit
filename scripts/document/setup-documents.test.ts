@@ -72,7 +72,7 @@ describe('the setup guides', () => {
 })
 
 describe('the entry pages agree', () => {
-	it('opens the overview with the README positioning', () => {
+	it('states the README positioning in the overview', () => {
 		expect(read_unwrapped(README)).toContain(README_POSITIONING)
 		expect(read_unwrapped(OVERVIEW)).toContain(README_POSITIONING)
 	})

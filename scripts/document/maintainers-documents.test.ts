@@ -16,7 +16,12 @@ const HOW_TO_INDEX = 'docs/how-to.md'
 const TROUBLESHOOTING = 'docs/troubleshooting.md'
 const ENTRY_DOCUMENTS: ReadonlyArray<string> = [README, OVERVIEW, HOW_TO_INDEX]
 const USER_DOCS_DIRECTORY = 'docs'
-const MAINTAINER_AUDIENCE = 'For kit maintainers'
+// Maintainer pages announce their audience with either phrase: the index-level pages say "For kit
+// maintainers", the rationale pages say "maintainer-only".
+const MAINTAINER_AUDIENCE_MARKERS: ReadonlyArray<string> = [
+	'For kit maintainers',
+	'maintainer-only',
+]
 const USER_GUIDE_PAGES: ReadonlyArray<string> = [
 	OVERVIEW,
 	'docs/tutorial.md',
@@ -91,7 +96,11 @@ describe('the maintainer documentation', () => {
 		const pages = markdown_in(USER_DOCS_DIRECTORY)
 
 		expect(
-			pages.filter((path) => read_unwrapped(path).includes(MAINTAINER_AUDIENCE)),
+			pages.filter((path) => {
+				const text = read_unwrapped(path)
+
+				return MAINTAINER_AUDIENCE_MARKERS.some((marker) => text.includes(marker))
+			}),
 		).toStrictEqual([])
 	})
 
