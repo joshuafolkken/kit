@@ -48,6 +48,7 @@ const OPTIONS = {
 	only: { type: 'boolean' },
 } as const
 const ISSUE_PREFIX = '#'
+const FLAG_PREFIX = '-'
 const TOKEN_SEPARATOR = ' '
 const FIRST_TOKEN = 0
 const FIRST_ARGUMENT_INDEX = 1
@@ -204,8 +205,13 @@ function rebuild(invocation: string): string | undefined {
 // "this invocation named no issues" and "this run has no issues left" are different facts, and a
 // caller that could not tell them apart would report a finished sequential run as one that never had a
 // list. A malformed leading `#N` answers `undefined` too, because there is then no list to trust.
+// Only the leading block is read, so a flag this grammar does not carry — `backlog:plan`'s `--exclude`
+// — after it does not hide the named issues.
 function issue_numbers(invocation: string): ReadonlyArray<number> | undefined {
-	const issues = parse(invocation)?.issues
+	const tokens = tokens_of(invocation)
+	const stop = tokens.findIndex((token) => token.startsWith(FLAG_PREFIX))
+	const leading = stop === NOT_FOUND ? tokens : tokens.slice(FIRST_TOKEN, stop)
+	const issues = parse(leading.join(TOKEN_SEPARATOR))?.issues
 
 	if (issues === undefined || issues.length === EMPTY_LENGTH) return undefined
 

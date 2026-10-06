@@ -74,6 +74,12 @@ describe('a backlogrun invocation with a named issue list', () => {
 		expect(run_invocation.issue_numbers(NAMED)).toStrictEqual([1762, 1749, 1759])
 	})
 
+	// `backlog:plan` hands its whole argv in, so a flag the run grammar does not carry must not hide
+	// the leading named block.
+	it('reports the named issues ahead of a flag the run grammar does not carry', () => {
+		expect(run_invocation.issue_numbers(`${NAMED} --exclude 7`)).toStrictEqual([1762, 1749, 1759])
+	})
+
 	// The named block leads and the budget follows it — the one canonical order, so a resumed session
 	// hands back exactly what the record holds.
 	it('carries a named list and a budget together, named first', () => {

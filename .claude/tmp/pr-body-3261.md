@@ -60,9 +60,25 @@ exit=1
 ```
 
 ```
+$ pnpm josh backlog:plan '#3261' --exclude 7
+...
+Named issues — run in order first, one at a time, then the backlog:
+    [#3261](https://github.com/joshuafolkken/kit/issues/3261) — Route hand-written argv parsers through cli_flags
+exit=0
+```
+
+```
 $ pnpm josh test:related
  Test Files  191 passed (191)
-      Tests  3686 passed (3686)
+      Tests  3689 passed (3689)
 ```
+
+## レビュー指摘の扱い（round 2）
+
+- Medium `run-invocation.ts`: `backlog:plan '#5' '#6' --exclude 7` が usage で止まる回帰を修正した。名前付きの番号は先頭ブロックだけを読むように戻し、回帰テストを追加済み。
+- Low `epic:next --repo a --repo b`: 最後の値が採られる。旧実装も単一値で、実害は対象リポジトリの取り違えに限られるため今回は見送り。
+- Low `propagate --target -`: `-` という名前のリポジトリとして扱われ、その後の解決で失敗する。書き込みには至らないため見送り。
+- Low `issue:comment --body "- item"`: ダッシュで始まる本文は `--body=<text>` で渡す（上記の挙動変更に記載済み、`parseArgs` の仕様どおり）。
+- Low `.claude/tmp/` のスクラッチファイル: ship が PR 本文の受け渡しに使うためコミットに含まれている。マージ前の扱いは ship 側の手順に委ねる。
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
