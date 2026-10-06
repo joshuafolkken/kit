@@ -5,7 +5,6 @@ import { hook_decision } from '#scripts/josh/hook-decision'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
 import { lane_registry } from '#scripts/lane/lane-registry'
-import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 import { run_carry, type RunCarry } from '#scripts/run/run-carry'
 import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
@@ -18,6 +17,7 @@ import {
 	type LoopPorts,
 	type OfferRead,
 } from './backlog-drive'
+import { backlog_drive_args, type DriveContext } from './backlog-drive-args'
 import { backlog_drive_finish } from './backlog-drive-finish'
 import { backlog_drive_launch } from './backlog-drive-launch'
 import { backlog_drive_named } from './backlog-drive-named'
@@ -44,114 +44,7 @@ const FAILURE_EXIT_CODE = 1
 const should_forward_stderr = true
 const POLL_MS = 5000
 const OFFER_MS = 60_000
-const MS_PER_MINUTE = 60_000
 const FIRST_LINE = 0
-const LIST_SEPARATOR = ','
-const COUNT_PATTERN = /^\d+$/u
-const ISSUE_PATTERN = /^[1-9]\d*$/u
-const USAGE =
-	'Usage: josh backlog:drive --owner <pid> [--active <ISO-8601>] [--max <n>] [--idle <minutes>] [--only] [--exclude <n>[,<n>...]] [--await <n>[,<n>...]] [--window <minutes>] [--stopped <n>]'
-
-const OPTIONS = {
-	active: { type: 'string' },
-	await: { type: 'string' },
-	exclude: { type: 'string' },
-	idle: { type: 'string' },
-	max: { type: 'string' },
-	only: { type: 'boolean' },
-	owner: { type: 'string' },
-	stopped: { type: 'string' },
-	window: { type: 'string' },
-} as const
-
-interface DriveContext {
-	owner: string
-	active: string | undefined
-	// Flags forwarded to `backlog:offer` unchanged — the declared budgets.
-	forwarded: ReadonlyArray<string>
-	exclude: ReadonlyArray<string>
-	awaited: ReadonlyArray<string>
-	window_ms: number | undefined
-	window: string | undefined
-	is_only: boolean
-	// The child whose merge answered `stop` before the hand-back: the resumed run starts already stopping.
-	stopped: string | undefined
-}
-
-type Values = Partial<Record<Exclude<keyof typeof OPTIONS, 'only'>, string>> & { only?: boolean }
-
-function read_values(argv: ReadonlyArray<string>): Values | undefined {
-	return cli_flags.parse_or_undefined({ args: [...argv], options: OPTIONS, strict: true })?.values
-}
-
-// A comma list of issue numbers; one entry that is not an issue number refuses the whole list.
-function to_issues(raw: string | undefined): ReadonlyArray<string> | undefined {
-	if (raw === undefined) return []
-
-	const issues = raw.split(LIST_SEPARATOR)
-
-	return issues.some((issue) => !ISSUE_PATTERN.test(issue)) ? undefined : issues
-}
-
-function forwarded_of(values: Values): ReadonlyArray<string> | undefined {
-	const pairs = (['max', 'idle'] as const).filter((name) => values[name] !== undefined)
-
-	if (pairs.some((name) => !COUNT_PATTERN.test(values[name] ?? ''))) return undefined
-
-	return pairs.flatMap((name) => [`--${name}`, values[name] ?? ''])
-}
-
-// An absent window is no bound; a present one must be a count, which `is_valid_window` checks first.
-function window_of(raw: string | undefined): number | undefined {
-	return raw === undefined ? undefined : Number(raw) * MS_PER_MINUTE
-}
-
-function is_valid_window(raw: string | undefined): boolean {
-	return raw === undefined || COUNT_PATTERN.test(raw)
-}
-
-function is_valid_single(values: Values): boolean {
-	const is_valid_stopped = values.stopped === undefined || ISSUE_PATTERN.test(values.stopped)
-
-	return is_valid_stopped && is_valid_window(values.window)
-}
-
-function owner_of(values: Values | undefined): string | undefined {
-	const owner = values?.owner
-
-	return owner !== undefined && COUNT_PATTERN.test(owner) ? owner : undefined
-}
-
-function to_context(values: Values, owner: string): DriveContext | undefined {
-	if (!is_valid_single(values)) return undefined
-
-	const forwarded = forwarded_of(values)
-	const exclude = to_issues(values.exclude)
-	const awaited = to_issues(values.await)
-
-	if (forwarded === undefined || exclude === undefined || awaited === undefined) return undefined
-
-	const window_ms = window_of(values.window)
-
-	return {
-		owner,
-		active: values.active,
-		forwarded,
-		exclude,
-		awaited,
-		window_ms,
-		window: values.window,
-		is_only: values.only === true,
-		stopped: values.stopped,
-	}
-}
-
-function parse(argv: ReadonlyArray<string>): DriveContext | undefined {
-	const values = read_values(argv)
-	const owner = owner_of(values)
-
-	return values === undefined || owner === undefined ? undefined : to_context(values, owner)
-}
 
 // The `--json` object `backlog:offer` prints, keyed under its `JSON_KEY`.
 const offer_read_schema = z.object({
@@ -270,17 +163,6 @@ async function open_lanes(): Promise<ReadonlyArray<string>> {
 	return lanes.filter((lane) => !lane.is_stranded).map((lane) => lane.issue)
 }
 
-function resume_line(state: DriveState, context: DriveContext): string {
-	const exclude = [...new Set([...context.exclude, ...state.exclude])]
-	const flags = ['--owner', context.owner, '--active', state.active, ...context.forwarded]
-
-	if (exclude.length > 0) flags.push('--exclude', exclude.join(LIST_SEPARATOR))
-	if (context.window !== undefined) flags.push('--window', context.window)
-	if (state.stopped_by !== undefined) flags.push('--stopped', state.stopped_by)
-
-	return `resume: ${flags.join(' ')}`
-}
-
 function end_line(end: DriveEnd): string {
 	const token = end.token === undefined || end.token === end.reason ? [] : [end.token]
 	const issue = end.issue === undefined ? [] : [`#${end.issue}`]
@@ -337,7 +219,7 @@ async function drive(context: DriveContext): Promise<number> {
 	const end = await backlog_drive.run_loop(last.state, config, ports_of(context, seeded, last))
 
 	console.info(end_line(end))
-	console.info(resume_line(last.state, context))
+	console.info(backlog_drive_args.resume_line(last.state, context))
 
 	return SUCCESS_EXIT_CODE
 }
@@ -353,10 +235,10 @@ async function run_safe(context: DriveContext): Promise<number> {
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const context = parse(argv)
+	const context = backlog_drive_args.parse(argv)
 
 	if (context === undefined) {
-		console.error(USAGE)
+		console.error(backlog_drive_args.USAGE)
 
 		return FAILURE_EXIT_CODE
 	}
@@ -376,8 +258,8 @@ const backlog_drive_cli = {
 	merge,
 	merge_token,
 	offer_argv: backlog_drive_offer_argv.offer_argv,
-	parse,
-	resume_line,
+	parse: backlog_drive_args.parse,
+	resume_line: backlog_drive_args.resume_line,
 	to_offer,
 }
 
