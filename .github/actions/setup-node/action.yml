@@ -5,7 +5,7 @@ description: >
 
 # The one place the Node.js version of kit's workflows is written (joshuafolkken/kit#3084). Every
 # job used to call actions/setup-node with its own `node-version` literal, so a version move had to
-# find all of them. A job that needs a different runtime says so explicitly — `node-26-pnpm` in
+# find all of them. A job that needs a different runtime says so explicitly — `node-compat` in
 # `ci.yml` passes its own runtime to `.github/actions/setup-pnpm` instead of calling this.
 #
 # Distributed: `josh sync` writes this file into a consumer beside the workflows that call it, the
