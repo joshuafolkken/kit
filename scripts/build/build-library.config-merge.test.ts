@@ -2,19 +2,17 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { beforeAll, describe, expect, it } from 'vitest'
-import {
-	build_config_merge_library,
-	CONFIG_MERGE_DTS_FILE,
-	CONFIG_MERGE_OUTFILE,
-} from './build-config-merge'
+import { build_library, library_paths } from './build-library'
 
+const LIBRARY = 'config-merge'
+const { outfile: CONFIG_MERGE_OUTFILE, dts_file: CONFIG_MERGE_DTS_FILE } = library_paths(LIBRARY)
 const BUILD_TIMEOUT = 60_000
 
 beforeAll(async () => {
-	await build_config_merge_library()
+	await build_library(LIBRARY)
 }, BUILD_TIMEOUT)
 
-describe('build_config_merge_library — compiled .js', () => {
+describe('build_library config_merge — compiled .js', () => {
 	it('writes the bundled library to dist/config-merge/index.js', () => {
 		expect(existsSync(CONFIG_MERGE_OUTFILE)).toBe(true)
 	})
@@ -41,7 +39,7 @@ describe('build_config_merge_library — compiled .js', () => {
 	})
 })
 
-describe('build_config_merge_library — bundled .d.ts', () => {
+describe('build_library config_merge — bundled .d.ts', () => {
 	it('writes a declaration file to dist/config-merge/index.d.ts', () => {
 		expect(existsSync(CONFIG_MERGE_DTS_FILE)).toBe(true)
 	})

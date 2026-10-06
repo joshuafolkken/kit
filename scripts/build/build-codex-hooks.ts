@@ -10,7 +10,9 @@ const CODEX_HOOKS = path.join(REPO_ROOT, '.codex', 'hooks.json')
 
 // Regenerate `.codex/hooks.json` from `.claude/settings.json` (joshuafolkken/kit#2997). The output is
 // committed rather than gitignored: Codex reads it straight from a fresh clone of kit, before any
-// build has run, and `josh init` / `josh sync` copy it to consumers from the package.
+// build has run, and `josh init` / `josh sync` copy it to consumers from the package. It is run by
+// hand, never from `pnpm build`, so a build never rewrites a committed file (joshuafolkken/kit#3324):
+// `codex-project-config.test.ts` fails the gate when the committed copy has drifted.
 function build_codex_hooks(): string {
 	writeFileSync(CODEX_HOOKS, codex_hooks.codex_hooks_text(readFileSync(CLAUDE_SETTINGS, 'utf8')))
 

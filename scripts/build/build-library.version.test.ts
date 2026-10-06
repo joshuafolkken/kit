@@ -2,15 +2,17 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { build_version_library, VERSION_DTS_FILE, VERSION_OUTFILE } from './build-version'
+import { build_library, library_paths } from './build-library'
 
+const LIBRARY = 'version'
+const { outfile: VERSION_OUTFILE, dts_file: VERSION_DTS_FILE } = library_paths(LIBRARY)
 const BUILD_TIMEOUT = 60_000
 
 beforeAll(async () => {
-	await build_version_library()
+	await build_library(LIBRARY)
 }, BUILD_TIMEOUT)
 
-describe('build_version_library — compiled .js', () => {
+describe('build_library version — compiled .js', () => {
 	it('writes the bundled library to dist/version/index.js', () => {
 		expect(existsSync(VERSION_OUTFILE)).toBe(true)
 	})
@@ -39,7 +41,7 @@ describe('build_version_library — compiled .js', () => {
 	})
 })
 
-describe('build_version_library — bundled .d.ts', () => {
+describe('build_library version — bundled .d.ts', () => {
 	it('writes a declaration file to dist/version/index.d.ts', () => {
 		expect(existsSync(VERSION_DTS_FILE)).toBe(true)
 	})
