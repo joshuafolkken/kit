@@ -10,13 +10,13 @@ import { CATALOG_FILE, generate_catalog } from './generate-catalog'
 // renamed or mistyped command fails here rather than at run time (joshuafolkken/kit#1923).
 
 // `josh <x>` forms a document writes that are legitimately not COMMAND_MAP sub-commands: the
-// workflow keywords a person types (`epicrun`, …), the built-in `help`, and `review`, which
+// workflow keywords a person types (`prrun`, …), the built-in `help`, and `review`, which
 // `chain-rule.md` names only to record a CLI wrapper that was investigated and rejected.
 const KNOWN_EXTRA_COMMANDS: ReadonlyArray<string> = [
 	'kickoff',
 	'fullrun',
 	'halfrun',
-	'epicrun',
+	'prrun',
 	'backlogrun',
 	'help',
 	'review',
@@ -49,6 +49,11 @@ describe('every josh command a document names exists', () => {
 	// An alias retired with joshuafolkken/kit#2906 is no longer a command a document may name.
 	it('flags a retired automation alias', () => {
 		expect(unknown_commands('then `josh rh`')).toStrictEqual(['rh'])
+	})
+
+	// `epicrun` was retired in favour of `backlogrun #E --only`; `prrun` is a current keyword.
+	it('flags the retired epicrun keyword and accepts prrun', () => {
+		expect(unknown_commands('`josh epicrun` or `josh prrun`')).toStrictEqual(['epicrun'])
 	})
 })
 

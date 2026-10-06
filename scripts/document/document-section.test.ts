@@ -35,6 +35,55 @@ const NESTED = [`## ${HAND_OFF_HEADING}`, 'a', '', '### Inner', 'b', '', '## Nex
 
 const AMBIGUOUS = [`## ${LANES} are one thing`, 'a', '', `## ${LANES} are another`, 'b'].join('\n')
 
+const OUTPUT_LANGUAGE = 'Output language'
+const REAL_LABEL_ITEM = '- **Real label** body'
+const HEADING_BODY = 'heading body'
+
+// The shape CLAUDE.md cites as `CLAUDE.md` → "Output language" (joshuafolkken/kit#3248).
+const LABELLED = [
+	'## Communication',
+	'',
+	'- **Fix root causes, not symptoms.** Surface the root cause.',
+	`- **${OUTPUT_LANGUAGE} follows the session setting** (default \`ja\`) for prose.`,
+	'  - a nested note that belongs to it',
+	'- **Cite an Issue with a link.** Next sibling.',
+	'',
+	'```bash',
+	'echo "**Fenced label** is quoted code"',
+	'```',
+	'',
+	'## Output',
+	HEADING_BODY,
+].join('\n')
+
+describe('document_section.section — bold-label anchors', () => {
+	it('resolves a reference to a bold label as the list item it opens', () => {
+		const found = document_section.section(LABELLED, OUTPUT_LANGUAGE)
+
+		expect(found?.text).toBe(LABELLED.split('\n').slice(3, 5).join('\n'))
+	})
+
+	it('prefers a heading to a label that shares its prefix', () => {
+		expect(document_section.section(LABELLED, 'Output')?.text).toContain(HEADING_BODY)
+	})
+
+	it('finds no label inside a fenced block', () => {
+		expect(document_section.section(LABELLED, 'Fenced label')).toBeUndefined()
+	})
+
+	it('keeps an unpaired `**` inside a fence from swallowing the labels after it', () => {
+		const markdown = ['```bash', 'ls docs/**', '```', '', REAL_LABEL_ITEM, '- **Other** x']
+
+		expect(document_section.section(markdown.join('\n'), 'Real label')?.text).toBe(REAL_LABEL_ITEM)
+	})
+
+	it('suggests only headings when a heading prefix is ambiguous', () => {
+		const markdown = ['## Lane one', '## Lane two', '- **Lane label** x'].join('\n')
+
+		expect(document_section.candidates(markdown, 'Lane')).toStrictEqual(['Lane one', 'Lane two'])
+	})
+})
+
 describe('document_section.section — what it returns', () => {
 	it('keeps a fenced `#` line inside the section it sits in', () => {
 		const found = document_section.section(FENCED, TOP)
