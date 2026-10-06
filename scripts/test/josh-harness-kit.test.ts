@@ -14,8 +14,8 @@ describe('josh harness — the same command launched twice at once', () => {
 		async () => {
 			const kit = environment('kit')
 			const results = await Promise.all([
-				josh_harness.start(kit, [RECORD, '--issue', '201']),
-				josh_harness.start(kit, [RECORD, '--issue', '202']),
+				josh_harness.run(kit, [RECORD, '--issue', '201']),
+				josh_harness.run(kit, [RECORD, '--issue', '202']),
 			])
 
 			expect(results.map((result) => result.exit_code)).toStrictEqual([0, 0])

@@ -1,4 +1,5 @@
 import { josh_harness, type JoshEnvironment } from '#scripts/test/josh-harness'
+import { josh_harness_fixture } from '#scripts/test/josh-harness-fixture'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 // Smoke test: pack the real tarball, install in a temp consumer project, and run the published
@@ -24,21 +25,23 @@ beforeAll(async () => {
 	fixture.consumer = await josh_harness.open_packed_consumer()
 }, SETUP_TIMEOUT_MS)
 
+josh_harness_fixture.stop_leftovers_after_each()
+
 afterAll(() => {
 	if (fixture.consumer !== undefined) josh_harness.close_environment(fixture.consumer)
 })
 
 describe('packed-package consumer smoke', () => {
-	it('josh help exits 0 and reports the version', () => {
-		const result = josh_harness.run(consumer(), ['help'], CMD_TIMEOUT_MS)
+	it('josh help exits 0 and reports the version', async () => {
+		const result = await josh_harness.run(consumer(), ['help'], CMD_TIMEOUT_MS)
 
 		expect(result.is_timed_out, CMD_TIMEOUT_MSG).toBe(false)
 		expect(result.exit_code).toBe(0)
 		expect(result.stdout).toContain('josh v')
 	})
 
-	it.each(['init', 'sync'])('josh %s starts without a module resolution error', (command) => {
-		const result = josh_harness.run(consumer(), [command], CMD_TIMEOUT_MS)
+	it.each(['init', 'sync'])('josh %s starts without a module resolution error', async (command) => {
+		const result = await josh_harness.run(consumer(), [command], CMD_TIMEOUT_MS)
 
 		expect(result.is_timed_out, CMD_TIMEOUT_MSG).toBe(false)
 		expect(result.stderr).not.toContain(CANNOT_FIND_MODULE)
