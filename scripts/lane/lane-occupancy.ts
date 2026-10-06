@@ -82,7 +82,10 @@ function without_label_line(issue: number): string {
 
 function labelled_lines(labelled: ReadonlyArray<LabelledIssue>): Array<string> {
 	return labelled.flatMap((entry) => {
+		// One return type across the branches (sonarjs/function-return-type) keeps the array wrappers.
+		// eslint-disable-next-line unicorn/no-unnecessary-array-flat-map -- see above
 		if (entry.liveness === 'stopped') return [stopped_line(entry.issue)]
+		// eslint-disable-next-line unicorn/no-unnecessary-array-flat-map -- see above
 		if (entry.liveness === 'unknown') return [unknown_line(entry.issue)]
 
 		return []

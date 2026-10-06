@@ -156,6 +156,9 @@ jobs:
   create-release:
     needs: [publish-github, publish-npm, update-production]
     runs-on: ubuntu-latest
+    # `josh release:github` waits up to 60 minutes (120 polls, 30 seconds apart) for lower tags'
+    # releases, which can sit queued behind `package-publish`; the extra 5 minutes cover the setup
+    # before it. Lower this only together with that wait budget.
     timeout-minutes: 65
     permissions:
       actions: read

@@ -34,22 +34,41 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-describe('josh_in_process.can_run_in_process', () => {
-	it('accepts a script command when the dispatcher itself was loaded as TypeScript', () => {
-		expect(josh_in_process.can_run_in_process(SCRIPT_ENTRY, TYPESCRIPT_DISPATCHER_URL)).toBe(true)
+function target_of(entry: CommandEntry, dispatcher_url: string): string | undefined {
+	return josh_in_process.in_process_target(entry, PACKAGE_DIR, dispatcher_url)
+}
+
+describe('josh_in_process.in_process_target', () => {
+	it('imports the source script when the dispatcher itself was loaded as TypeScript', () => {
+		expect(target_of(SCRIPT_ENTRY, TYPESCRIPT_DISPATCHER_URL)).toBe(
+			path.join(PACKAGE_DIR, SCRIPT_ENTRY.script ?? ''),
+		)
 	})
 
-	// A consumer runs the bundle under plain node, which cannot evaluate `scripts/*.ts` at all, so
-	// that install has to keep spawning tsx exactly as it did.
-	it('refuses a script command when the dispatcher is the bundled dist/josh.js', () => {
-		expect(josh_in_process.can_run_in_process(SCRIPT_ENTRY, BUNDLED_DISPATCHER_URL)).toBe(false)
+	// A consumer runs the bundle under plain node, which cannot evaluate `scripts/*.ts` at all, so a
+	// command that is not pre-built has to keep spawning tsx exactly as it did.
+	it('spawns a command that is not pre-built when the dispatcher is the bundled dist/josh.js', () => {
+		expect(target_of(SCRIPT_ENTRY, BUNDLED_DISPATCHER_URL)).toBeUndefined()
+	})
+
+	it('imports the pre-built bundle of an is_bundled command under the bundled dist/josh.js', () => {
+		const entry: CommandEntry = { ...SCRIPT_ENTRY, is_bundled: true }
+
+		expect(target_of(entry, BUNDLED_DISPATCHER_URL)).toBe(
+			path.join(PACKAGE_DIR, 'dist', 'commands', 'lint-related.js'),
+		)
 	})
 
 	// `--env-file` is a node flag that has to be in force before the script's first line runs.
-	it('refuses a command carrying tsx_arguments', () => {
-		const entry: CommandEntry = { ...SCRIPT_ENTRY, tsx_arguments: ['--env-file=.env'] }
+	it('refuses a command carrying tsx_arguments, even when it is marked is_bundled', () => {
+		const entry: CommandEntry = {
+			...SCRIPT_ENTRY,
+			is_bundled: true,
+			tsx_arguments: ['--env-file=.env'],
+		}
 
-		expect(josh_in_process.can_run_in_process(entry, TYPESCRIPT_DISPATCHER_URL)).toBe(false)
+		expect(target_of(entry, TYPESCRIPT_DISPATCHER_URL)).toBeUndefined()
+		expect(target_of(entry, BUNDLED_DISPATCHER_URL)).toBeUndefined()
 	})
 
 	it('refuses a shell command, which has no script to import', () => {
@@ -60,7 +79,7 @@ describe('josh_in_process.can_run_in_process', () => {
 			reference: ['', 'developer', ['processes']],
 		}
 
-		expect(josh_in_process.can_run_in_process(entry, TYPESCRIPT_DISPATCHER_URL)).toBe(false)
+		expect(target_of(entry, TYPESCRIPT_DISPATCHER_URL)).toBeUndefined()
 	})
 })
 
@@ -88,7 +107,7 @@ describe('josh_in_process.run_in_process', () => {
 })
 
 const IN_PROCESS_SCRIPTS: ReadonlyArray<string> = Object.values(COMMAND_MAP)
-	.filter((entry) => josh_in_process.can_run_in_process(entry, TYPESCRIPT_DISPATCHER_URL))
+	.filter((entry) => target_of(entry, TYPESCRIPT_DISPATCHER_URL) !== undefined)
 	.map((entry) => entry.script ?? '')
 
 // The dispatcher sets `process.argv[1]` to the script's own path, so a script whose main guard is
@@ -108,7 +127,6 @@ const UNCONDITIONAL_SCRIPTS: ReadonlyArray<string> = [
 	'scripts/epic/epic-check.ts',
 	'scripts/epic/epic.ts',
 	'scripts/git/git-workflow.ts',
-	'scripts/eval/eval-run.ts',
 	'scripts/version/version-check.ts',
 ]
 const GUARDED_SCRIPTS = IN_PROCESS_SCRIPTS.filter(
@@ -185,8 +203,8 @@ function resolve_import(specifier: string, from_file: string): string | undefine
 function resolve_matches(source: string, pattern: RegExp, file: string): Array<string> {
 	const resolved: Array<string> = []
 
-	for (const [, specifier] of source.matchAll(pattern)) {
-		const target = resolve_import(specifier ?? '', file)
+	for (const [, specifier = ''] of source.matchAll(pattern)) {
+		const target = resolve_import(specifier, file)
 
 		if (target !== undefined && existsSync(target)) resolved.push(target)
 	}

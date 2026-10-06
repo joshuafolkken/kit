@@ -35,10 +35,10 @@ const JOB_INDENT = ' '.repeat(JOB_INDENT_WIDTH)
 const NESTED_INDENT = ' '.repeat(JOB_INDENT_WIDTH + 1)
 const NOT_FOUND = -1
 
-const WORKFLOWS: ReadonlyArray<string> = [
-	ci_yml_fixture.TEMPLATE_CI_YML,
-	ci_yml_fixture.RUNTIME_CI_YML,
-]
+// Only the distributed template: kit is not a SvelteKit app, so its own e2e job carries no Better
+// Auth pin and no `.svelte-kit` cache (joshuafolkken/kit#3326) — guarded at the end of this file.
+const WORKFLOWS: ReadonlyArray<string> = [ci_yml_fixture.TEMPLATE_CI_YML]
+const SVELTE_KIT_DIRECTORY = '.svelte-kit'
 
 // The `e2e` job's own lines. Scoping to the job is what keeps a workflow-wide `BETTER_AUTH_URL` —
 // exactly the value this comment says not to inherit — from being the line the guard reads.
@@ -114,10 +114,24 @@ describe('ci.yml e2e BETTER_AUTH_URL rationale', () => {
 })
 
 // The reword is comment-only: Better Auth rejects the origin unless this names the preview server
-// the suite actually talks to, so the value has to survive every edit to the rationale — in kit's
-// own workflow as well as in the copy consumers receive.
+// the suite actually talks to, so the value has to survive every edit to the rationale in the copy
+// consumers receive.
 describe('ci.yml e2e BETTER_AUTH_URL value', () => {
 	it.each(WORKFLOWS)('%s overrides the production URL with the unseeded preview URL', (path) => {
 		expect(e2e_auth_url(path)).toBe(PREVIEW_URL)
+	})
+})
+
+describe('kit e2e job without SvelteKit settings', () => {
+	it('sets no BETTER_AUTH_URL', () => {
+		expect(e2e_auth_url(ci_yml_fixture.RUNTIME_CI_YML)).toBeUndefined()
+	})
+
+	it('caches no .svelte-kit build output', () => {
+		const steps = ci_yml_fixture.find_job(ci_yml_fixture.RUNTIME_CI_YML, E2E_JOB)?.steps ?? []
+		const cached_paths = steps.map((step) => String(step.with?.['path'] ?? ''))
+
+		expect(steps.length).toBeGreaterThan(0)
+		expect(cached_paths.some((cached) => cached.includes(SVELTE_KIT_DIRECTORY))).toBe(false)
 	})
 })

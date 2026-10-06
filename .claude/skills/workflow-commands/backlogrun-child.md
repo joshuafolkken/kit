@@ -118,7 +118,7 @@ summary is bounded the way it is".
    parent files what survives — `observation-filing.md`, the single source. **What the parent does with the
    rest is append it, not drop it**: an observation that cannot cite the depth-0 work it blocked
    becomes one line in the observation ledger, and a second line under the same key files it. **A
-   child appends only to its own issue's file, `docs/maintainers/observations/<N>.md`, in its own
+   child appends only to its own issue's file, `.josh/observations/<N>.md`, in its own
    lane** (joshuafolkken/kit#2919) — it merges with the child's pull request, and a sibling lane's
    file is never one it touches.
 4. **Decisions taken and why**, where the decision was not already logged as an Issue comment.

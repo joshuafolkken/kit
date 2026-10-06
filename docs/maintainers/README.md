@@ -19,13 +19,13 @@ is the way it is, and the issues it came from, live in the matching `*-rationale
 ## Release and publish
 
 - [release.md](./release.md) — releasing a new version
-- [publishing.md](../publishing.md) — the publish jobs and the one-time public npm setup
+- [publishing.md](./publishing.md) — the publish jobs and the one-time public npm setup
 - [release-classification-audit.md](./release-classification-audit.md) — the audit behind the first
   GitHub Release's change classification
 
 ## Measure the distributed rules
 
-- [eval.md](../eval.md) — `josh eval`, measuring whether a document change changed what an agent does
+- [eval.md](./eval.md) — `josh eval`, measuring whether a document change changed what an agent does
 - [eval-rationale.md](./eval-rationale.md) — why the suite is built the way it is
 - [guide-verification.md](./guide-verification.md) — how the step-by-step user guides were verified
 - [backlogrun-worker-evaluation.md](./backlogrun-worker-evaluation.md) — evaluating the `backlogrun`
@@ -54,6 +54,7 @@ from the page it explains.
 - [wip-cap-rationale.md](./wip-cap-rationale.md) — the open-Issue cap
 - [observation-filing-rationale.md](./observation-filing-rationale.md) — filing observations
 - [observation-ledger-rationale.md](./observation-ledger-rationale.md) — the observation ledger
+- [runtime-bundling.md](./runtime-bundling.md) — running josh commands without tsx
 - [epic-commands-rationale.md](./epic-commands-rationale.md) — the `josh epic:*` commands
 - [backlogrun-steps-rationale.md](./backlogrun-steps-rationale.md),
   [backlogrun-child-rationale.md](./backlogrun-child-rationale.md),
@@ -90,5 +91,6 @@ so a split is a publish boundary, not a topic one.
 
 ## The observation ledger
 
-[observations/](./observations/) holds one file per Issue: the review findings and observations a run
-recorded. `josh` commands write it.
+[`.josh/observations/`](../../.josh/observations/) holds one file per Issue: the review findings and
+observations a run recorded. `josh` commands write it. It sits outside `docs/` because its files are
+data lines, not documents (joshuafolkken/kit#3341).

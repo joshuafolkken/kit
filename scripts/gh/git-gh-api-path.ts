@@ -14,8 +14,8 @@ const FULL_PAGE_QUERY = '?per_page=100'
 // `gh api` expands `{owner}` and `{repo}` from the current repository, so the unqualified form needs
 // no extra lookup to name a path. An explicit `repo` names another repository — the form a
 // cross-repository reference takes.
-function repo_api_path(repo?: string): string {
-	return `repos/${repo ?? '{owner}/{repo}'}`
+function repo_api_path(repo = '{owner}/{repo}'): string {
+	return `repos/${repo}`
 }
 
 // The issue collection — what a listing pages through and what a creation posts to. One segment,

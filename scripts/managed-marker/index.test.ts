@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { PUBLIC_LIBRARIES } from '#scripts/build/build-library'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { managed_marker_logic } from './index'
@@ -16,7 +17,8 @@ const PACKAGE_ROOT = path.resolve(SELF_DIR, '..', '..')
 const EXPORT_KEY = './managed-marker'
 const EXPORT_TYPES = './dist/managed-marker/index.d.ts'
 const EXPORT_DEFAULT = './dist/managed-marker/index.js'
-const BUILD_STEP = 'tsx scripts/build/build-managed-marker.ts'
+const BUILD_ENTRY = 'tsx scripts/build/build.ts'
+const LIBRARY_NAME = 'managed-marker'
 const PREPACK_BUILD_CALL = 'pnpm build'
 
 function read_manifest(): z.infer<typeof exports_schema> {
@@ -48,7 +50,8 @@ describe('package.json managed-marker export', () => {
 	it('builds the library in the build script that prepack calls', () => {
 		const { scripts } = read_manifest()
 
-		expect(scripts['build']).toContain(BUILD_STEP)
+		expect(scripts['build']).toContain(BUILD_ENTRY)
+		expect(PUBLIC_LIBRARIES).toContain(LIBRARY_NAME)
 		expect(scripts['prepack']).toContain(PREPACK_BUILD_CALL)
 	})
 })

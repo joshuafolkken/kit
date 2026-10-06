@@ -1,6 +1,6 @@
 # @joshuafolkken/kit — Overview
 
-For anyone deciding whether kit fits their project: what it sets up for each profile, and how it works. `@joshuafolkken/kit` sets up a repository for AI-assisted development: AI assistant rules, formatting and Git settings for any project, plus the full lint, type-check, test and hook toolchain for Node projects. It is framework-agnostic; the SvelteKit-specific layer lives in the separate [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) package.
+For anyone deciding whether kit fits their project: what it sets up for each profile, and how it works. kit gives Claude Code or Codex your project's rules and checks. With the workflow, the agent takes each change from Issue to merged PR. That workflow is optional: what kit sets up underneath is AI assistant rules, formatting and Git settings for any project, plus the full lint, type-check, test and hook toolchain for Node projects. It is framework-agnostic; the SvelteKit-specific layer lives in the separate [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) package.
 
 ## What it provides
 
@@ -71,5 +71,3 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 
 - [maintainers/README.md](./maintainers/README.md) — where every maintainer page starts
 - [maintainers/release.md](./maintainers/release.md) — releasing a new version
-- [publishing.md](./publishing.md) — the publish jobs and the public npm setup
-- [eval.md](./eval.md) — measuring rule adherence

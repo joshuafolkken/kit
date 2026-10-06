@@ -1,6 +1,7 @@
 import { lstatSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { OBSERVATION_LEDGER_DIRECTORY } from '#scripts/observations/observation-ledger'
 import { agent_role_profile, type AgentProfile } from './agent-role-profile'
 
 const AGENT_COMMAND = 'codex'
@@ -13,7 +14,7 @@ const SQLITE_CACHE_PATH = ['node_modules', '.cache', 'josh', 'openai']
 const EPHEMERAL_FLAG = '--ephemeral'
 const ADD_DIRECTORY_FLAG = '--add-dir'
 const GIT_DIRECTORY = '.git'
-const LEDGER_DIRECTORY = 'docs'
+const LEDGER_DIRECTORY = path.dirname(OBSERVATION_LEDGER_DIRECTORY)
 
 interface CodexArgv {
 	command: string

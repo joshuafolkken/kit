@@ -6,6 +6,7 @@ import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { OBSERVATION_LEDGER_DIRECTORY } from '#scripts/observations/observation-ledger'
 import { run_cut } from '#scripts/run/cut/run-cut'
 import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
 import { afterAll, beforeEach, describe, expect, it, test, vi } from 'vitest'
@@ -144,13 +145,13 @@ describe('OpenAI lane supervisor Git access', () => {
 
 		const { args } = launched_request().argv
 		const additions = args.flatMap((argument, index) =>
-			argument === '--add-dir' ? [args[index + 1]] : [],
+			argument === '--add-dir' ? args[index + 1] : [],
 		)
 
 		expect(resolve_common_directory).toHaveBeenCalledWith(lane_directory)
 		expect(additions).toStrictEqual([
 			common_directory,
-			path.join(path.dirname(common_directory), 'docs'),
+			path.join(path.dirname(common_directory), path.dirname(OBSERVATION_LEDGER_DIRECTORY)),
 		])
 	})
 })

@@ -4,23 +4,22 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { beforeAll, describe, expect, it } from 'vitest'
-import {
-	build_self_sync_guard_library,
-	SELF_SYNC_GUARD_DTS_FILE,
-	SELF_SYNC_GUARD_OUTFILE,
-} from './build-self-sync-guard'
+import { build_library, library_paths } from './build-library'
 
 // The guard is a public surface, not an internal detail: app-kit and game-kit run the same kind of
 // copy and have to refuse a sync aimed at their own repository the same way kit does
 // (joshuafolkken/kit#868). That only works if the module actually ships and loads from a consumer,
 // which is what these assertions hold — the same guarantees the sibling `managed-marker`,
 // `config-merge` and `version` libraries are held to.
+const LIBRARY = 'self-sync-guard'
+const { outfile: SELF_SYNC_GUARD_OUTFILE, dts_file: SELF_SYNC_GUARD_DTS_FILE } =
+	library_paths(LIBRARY)
 const BUILD_TIMEOUT = 60_000
 const DOWNSTREAM_NAME = '@example/downstream'
 const MANIFEST = 'package.json'
 
 beforeAll(async () => {
-	await build_self_sync_guard_library()
+	await build_library(LIBRARY)
 }, BUILD_TIMEOUT)
 
 function manifest_directory(name: string): string {
@@ -31,7 +30,7 @@ function manifest_directory(name: string): string {
 	return directory
 }
 
-describe('build_self_sync_guard_library — compiled .js', () => {
+describe('build_library self_sync_guard — compiled .js', () => {
 	it('writes the bundled library to dist/self-sync-guard/index.js', () => {
 		expect(existsSync(SELF_SYNC_GUARD_OUTFILE)).toBe(true)
 	})
@@ -58,7 +57,7 @@ describe('build_self_sync_guard_library — compiled .js', () => {
 	})
 })
 
-describe('build_self_sync_guard_library — bundled .d.ts', () => {
+describe('build_library self_sync_guard — bundled .d.ts', () => {
 	it('writes a declaration file to dist/self-sync-guard/index.d.ts', () => {
 		expect(existsSync(SELF_SYNC_GUARD_DTS_FILE)).toBe(true)
 	})

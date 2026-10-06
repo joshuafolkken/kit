@@ -26,7 +26,7 @@ function body_with(section_lines: ReadonlyArray<string>): string {
 
 describe('live_evidence.verdict_for', () => {
 	it('exempts a change with no runtime path, whatever the body says', () => {
-		expect(live_evidence.verdict_for(DOCS_PATHS, undefined)).toBe('exempt')
+		expect(live_evidence.verdict_for(DOCS_PATHS)).toBe('exempt')
 	})
 
 	it('requires evidence when a runtime path changed and the body has no section', () => {
@@ -34,7 +34,7 @@ describe('live_evidence.verdict_for', () => {
 	})
 
 	it('requires evidence when the body is empty', () => {
-		expect(live_evidence.verdict_for(RUNTIME_PATHS, undefined)).toBe('required')
+		expect(live_evidence.verdict_for(RUNTIME_PATHS)).toBe('required')
 	})
 
 	it('refuses a section written in prose', () => {

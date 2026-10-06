@@ -34,8 +34,8 @@ async function read_upstream(reference: string): Promise<UpstreamEntry | undefin
 	const match = REF_PATTERN.exec(reference)
 	if (match === null) return undefined
 
-	const [, repo, number] = match
-	const body = await read_body(number ?? '', repo)
+	const [, repo, number = ''] = match
+	const body = await read_body(number, repo)
 
 	return body === undefined ? undefined : { ref: reference, body }
 }

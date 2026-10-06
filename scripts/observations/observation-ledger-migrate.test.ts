@@ -12,6 +12,7 @@ import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
 	LEGACY_LEDGER_FILE,
+	LEGACY_OBSERVATION_LEDGER_DIRECTORY,
 	LEGACY_OBSERVATION_LEDGER_PATHS,
 	OBSERVATION_LEDGER_DIRECTORY,
 } from './observation-ledger'
@@ -70,7 +71,9 @@ describe('observation_ledger_migrate.migrate — the old ledger', () => {
 		observation_ledger_migrate.migrate(root)
 
 		expect(read(root, OBSERVATION_LEDGER_PATH)).toBe(`${NEW_LINE}\n${OLD_LINE}\n`)
-		expect(readdirSync(path.join(root, 'docs'))).toEqual(['maintainers'])
+		const legacy_parent = path.join(root, path.dirname(LEGACY_OBSERVATION_LEDGER_PATH))
+
+		expect(readdirSync(legacy_parent)).toEqual([])
 	})
 
 	it('copies the lines once when asked twice, since the first call claimed the file', () => {
@@ -117,6 +120,55 @@ describe('observation_ledger_migrate.migrate — an old ledger restored after th
 		observation_ledger_migrate.migrate(root)
 
 		expect(read(root, OBSERVATION_LEDGER_PATH)).toBe(`${OLD_LINE}\n${NEW_LINE}\n${STRANDED_LINE}\n`)
+	})
+})
+
+// joshuafolkken/kit#3341: the directory moved out of `docs/`, and a run on the old code, a stash cut
+// before the move and a consumer's existing ledger still write to the old one.
+describe('observation_ledger_migrate.migrate — the old ledger directory', () => {
+	const OLD_ISSUE_FILE = `${LEGACY_OBSERVATION_LEDGER_DIRECTORY}/2872.md`
+	const NEW_ISSUE_FILE = `${OBSERVATION_LEDGER_DIRECTORY}/2872.md`
+
+	it('moves each file to the same name in the new directory and removes the emptied old one', () => {
+		const root = fresh_root()
+
+		write(root, OLD_ISSUE_FILE, `${OLD_LINE}\n`)
+		write(root, `${LEGACY_OBSERVATION_LEDGER_DIRECTORY}/2026-10-03.md`, `${NEW_LINE}\n`)
+
+		expect(observation_ledger_migrate.migrate(root)).toBe(true)
+		expect(read(root, NEW_ISSUE_FILE)).toBe(`${OLD_LINE}\n`)
+		expect(read(root, `${OBSERVATION_LEDGER_DIRECTORY}/2026-10-03.md`)).toBe(`${NEW_LINE}\n`)
+		expect(existsSync(path.join(root, LEGACY_OBSERVATION_LEDGER_DIRECTORY))).toBe(false)
+	})
+
+	it('appends only the lines the new file does not already hold', () => {
+		const root = fresh_root()
+
+		write(root, NEW_ISSUE_FILE, `${OLD_LINE}\n`)
+		write(root, OLD_ISSUE_FILE, `${OLD_LINE}\n${NEW_LINE}\n`)
+
+		observation_ledger_migrate.migrate(root)
+
+		expect(read(root, NEW_ISSUE_FILE)).toBe(`${OLD_LINE}\n${NEW_LINE}\n`)
+	})
+
+	it('absorbs a claim a killed process left in the old directory', () => {
+		const root = fresh_root()
+
+		write(root, `${OLD_ISSUE_FILE}.${String(DEAD_PID)}.migrating`, `${STRANDED_LINE}\n`)
+
+		expect(observation_ledger_migrate.migrate(root)).toBe(true)
+		expect(read(root, NEW_ISSUE_FILE)).toBe(`${STRANDED_LINE}\n`)
+	})
+
+	it('leaves a file in the old directory that is not the ledger, and the directory with it', () => {
+		const root = fresh_root()
+		const unrelated = `${LEGACY_OBSERVATION_LEDGER_DIRECTORY}/notes.txt`
+
+		write(root, unrelated, 'kept')
+
+		expect(observation_ledger_migrate.migrate(root)).toBe(false)
+		expect(read(root, unrelated)).toBe('kept')
 	})
 })
 

@@ -27,14 +27,14 @@ which josh   # should now print a path
 
 ## Wrong Node or pnpm version
 
-kit needs **pnpm 12 or later** and **Node 22.19+ in the 22 line, 24 or 26+** (see `engines`; Node 25 fails the install). A `full` project that ran `josh init` pins pnpm exactly in `packageManager` and `devEngines.packageManager.version`; use that version there. Check:
+kit needs the Node.js and pnpm versions [Install the prerequisites](./setup/prerequisites.md) lists. A `full` project that ran `josh init` pins pnpm exactly in `packageManager` and `devEngines.packageManager.version`; use that version there. Check:
 
 ```bash
 node -v
 pnpm -v
 ```
 
-If pnpm is older than 12 or differs from the project's pin, install the current standalone pnpm release using the [official installer](https://pnpm.io/installation/), then check `pnpm -v` again. A Corepack-managed pnpm cannot run `pnpm self-update`; switch to the standalone installation before updating the project pin.
+If pnpm is older than that or differs from the project's pin, install the current standalone pnpm release using the [official installer](https://pnpm.io/installation/), then check `pnpm -v` again. A Corepack-managed pnpm cannot run `pnpm self-update`; switch to the standalone installation before updating the project pin.
 
 ## `josh sync` reports config drift
 
@@ -115,7 +115,7 @@ The builder is not a GitHub Actions runner: it has no `~/.npmrc` and no kit CI a
 
 ## `[WARN] Ignored project-level auth setting "//npm.pkg.github.com/:_authToken"`
 
-Since pnpm 11.6, environment variables are not expanded in registry credentials read from a project `.npmrc` **unless `npmrcAuthFile` declares that file trusted**, because the file is committed and could leak the token to an attacker-controlled registry. The warning means the opt-in is absent, so the line contributes no auth — whatever currently works is coming from somewhere else — and it repeats on every pnpm command.
+pnpm ignores a credential line in a project `.npmrc` unless `npmrcAuthFile` declares that file trusted — why is in [§2 of authentication.md](./authentication.md#2-put-the-credential-in-npmrc). The warning means the opt-in is absent, so the line contributes no auth — whatever currently works is coming from somewhere else — and it repeats on every pnpm command.
 
 - Want the line to do nothing? Delete it from the project `.npmrc` and keep the credential in a source pnpm expands by default — see §2 of [authentication.md](./authentication.md). `josh sync` neither adds nor removes it, so the deletion sticks.
 - Want the line to be the credential (typically on a deploy builder with no user-level npmrc)? Set `npmrcAuthFile` to that file — see [§4(d) of authentication.md](./authentication.md#4-build-platforms-with-no-user-level-npmrc). The warning disappears and the token is expanded.

@@ -9,6 +9,7 @@ import { git_gh_issue_list, MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
 import { error_text } from '#scripts/lib/error-message'
+import type { PollOptions } from '#scripts/lib/poll'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_file, type FileArguments } from './issue-file'
@@ -37,6 +38,9 @@ const THIRD_PARTY_MESSAGE =
 // `GH_REPO` is the variable `gh` reads `{owner}/{repo}` from, so setting it points every listing the
 // scout and `epic:bundle` make at the target repository rather than at this checkout.
 const GH_REPO_VARIABLE = 'GH_REPO'
+// The open listing `epic:bundle` reads trails the create call, so the issue just filed is looked for
+// again for up to ten seconds before the placement is given up (joshuafolkken/kit#3332).
+const FRESH_ISSUE_POLL: PollOptions = { attempts: 6, interval_ms: 2000 }
 
 interface Filing {
 	args: FileArguments
@@ -178,7 +182,7 @@ async function create(filing: Filing, labels: ReadonlyArray<string>): Promise<st
 async function place(url: string, target: string): Promise<void> {
 	const issue_number = Number(github_issue_url.parse(url)?.issue_number)
 	const exit_code = Number.isSafeInteger(issue_number)
-		? await epic_bundle_cli.report_for(issue_number, target)
+		? await epic_bundle_cli.report_for(issue_number, target, FRESH_ISSUE_POLL)
 		: FAILURE_EXIT_CODE
 
 	if (exit_code !== SUCCESS_EXIT_CODE) {
@@ -251,7 +255,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const issue_file_cli = { THIRD_PARTY_MESSAGE, run }
+const issue_file_cli = { FRESH_ISSUE_POLL, THIRD_PARTY_MESSAGE, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
