@@ -24,8 +24,7 @@ const SKIP_PUBLISH_FLAG = '--skip-publish-wait'
 const DRY_RUN_FLAG = '--dry-run'
 const TARGET_FLAG = '--target'
 const KNOWN_FLAGS: ReadonlyArray<string> = [SKIP_PUBLISH_FLAG, DRY_RUN_FLAG]
-// Shown in the usage line only. `--target` carries a value, so it is taken out of argv before the
-// flag-only refusal runs, and this entry never has to match an argument.
+// Shown in the usage line only: `--target` carries a value, so it is spelled with a placeholder.
 const TARGET_USAGE = `${TARGET_FLAG} <repo>`
 const DRY_RUN_REASON = 'would be propagated'
 const UNTOUCHED_NOTE = 'No consumer was touched.'
@@ -40,41 +39,51 @@ interface RunOptions {
 	usage?: string
 }
 
-interface TargetArgument {
-	rest: Array<string>
-	target?: string
-	usage?: string
+// `--target` is read as a list so a second one is seen and refused rather than letting one of the two
+// names win silently.
+const OPTIONS = {
+	'skip-publish-wait': { type: 'boolean' },
+	'dry-run': { type: 'boolean' },
+	target: { type: 'string', multiple: true },
+} as const
+const USAGE = `Usage: josh propagate [${[...KNOWN_FLAGS, TARGET_USAGE].join('] [')}]`
+const TARGET_MISSING = `${TARGET_FLAG} needs a repository name, e.g. ${TARGET_FLAG} app-kit`
+
+type ParsedValues = NonNullable<ReturnType<typeof cli_flags.values_of<typeof OPTIONS>>>
+
+function refused(usage: string): RunOptions {
+	return { is_dry_run: false, is_publish_wait_skipped: false, usage }
 }
 
-// Take `--target <repo>` out of argv. A second `--target` stays in `rest`, where the flag-only
-// refusal rejects it rather than letting one of the two names win silently.
-function split_target(argv: ReadonlyArray<string>): TargetArgument {
-	const index = argv.indexOf(TARGET_FLAG)
-	if (index === -1) return { rest: [...argv] }
-	const target = argv[index + 1]
-	const rest = argv.filter((_, position) => position !== index && position !== index + 1)
+function to_options(values: ParsedValues): RunOptions {
+	const [target] = values.target ?? []
 
-	if (target === undefined || target.startsWith('-')) {
-		return { rest, usage: `${TARGET_FLAG} needs a repository name, e.g. ${TARGET_FLAG} app-kit` }
+	return {
+		is_dry_run: values['dry-run'] ?? false,
+		is_publish_wait_skipped: values['skip-publish-wait'] ?? false,
+		...(target !== undefined && { target }),
 	}
-
-	return { rest, target }
 }
 
 // Reject anything not on the list rather than ignoring it. `--dryrun` silently falling through to
-// the real write path is the mistake this refusal exists to prevent.
-function parse_options(argv: ReadonlyArray<string>): RunOptions {
-	const { rest, target, usage: target_usage } = split_target(argv)
-	const options: RunOptions = {
-		is_dry_run: rest.includes(DRY_RUN_FLAG),
-		is_publish_wait_skipped: rest.includes(SKIP_PUBLISH_FLAG),
-		...(target !== undefined && { target }),
-	}
-	const usage =
-		target_usage ??
-		cli_flags.refuse_unknown_flags(rest, [...KNOWN_FLAGS, TARGET_USAGE], 'propagate')
+// the real write path is the mistake this refusal exists to prevent. A `--target` with no usable name
+// after it — last on the line, or followed by `--dry-run` — is named on its own, so the caller learns
+// which value is missing rather than reading the generic usage.
+function read_values(argv: ReadonlyArray<string>): ParsedValues | undefined {
+	const values = cli_flags.values_of(argv, OPTIONS)
 
-	return usage === undefined ? options : { ...options, usage }
+	return (values?.target?.length ?? 0) > 1 ? undefined : values
+}
+
+function parse_options(argv: ReadonlyArray<string>): RunOptions {
+	if (cli_flags.is_value_unusable(argv, TARGET_FLAG)) return refused(TARGET_MISSING)
+	const values = read_values(argv)
+
+	if (values === undefined) {
+		return refused(`Unknown argument(s) or a repeated ${TARGET_FLAG}: ${argv.join(' ')}\n${USAGE}`)
+	}
+
+	return to_options(values)
 }
 
 // Propagation runs from the supplier's own repository, and only there — kit's, or a toolkit's built

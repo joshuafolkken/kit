@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { cli_body } from '#scripts/josh/cli-body'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 
 // `josh issue:comment <N> --body <text> | --body-file <path>` — post one comment to an issue (a PR
@@ -28,25 +29,30 @@ interface CommentRequest {
 	body: string
 }
 
-// The value after a flag word, or `undefined` when the flag is absent. `cli_body.resolve` owns the
-// both-flags-at-once refusal and the file read, so this stays the one narrow job of finding the token.
-function flag_value(argv: ReadonlyArray<string>, flag: string): string | undefined {
-	const index = argv.indexOf(flag)
+// The read is strict (joshuafolkken/kit#3261): an unknown flag refuses the call rather than being
+// ignored. `cli_body.resolve` owns the both-flags-at-once refusal and the file read.
+const OPTIONS = { body: { type: 'string' }, 'body-file': { type: 'string' } } as const
 
-	return index === -1 ? undefined : argv[index + 1]
+// The number is the one positional, and it must be a real issue number: a missing, malformed or
+// second one refuses the whole call rather than posting to some other issue.
+function single_issue_number(positionals: ReadonlyArray<string>): string | undefined {
+	const [issue_number, ...rest] = positionals
+	const is_single = rest.length === 0 && issue_number !== undefined
+
+	return is_single && ISSUE_NUMBER_PATTERN.test(issue_number) ? issue_number : undefined
 }
 
-// The number is the first argument, and it must be a real issue number: a missing or malformed one
-// refuses the whole call rather than posting to some other issue. `resolve` may throw when both body
-// flags are given, which `run` reports — the message names the two flags a caller must pick between.
+// `resolve` may throw when both body flags are given, which `run` reports — the message names the two
+// flags a caller must pick between.
 function parse_request(argv: ReadonlyArray<string>): CommentRequest | undefined {
-	const [issue_number] = argv
-
-	if (issue_number === undefined || !ISSUE_NUMBER_PATTERN.test(issue_number)) return undefined
+	const parsed = cli_flags.arguments_of(argv, OPTIONS)
+	if (parsed === undefined) return undefined
+	const issue_number = single_issue_number(parsed.positionals)
+	if (issue_number === undefined) return undefined
 
 	const body = cli_body.resolve({
-		inline: flag_value(argv, BODY_FLAG),
-		file_path: flag_value(argv, BODY_FILE_FLAG),
+		inline: parsed.values.body,
+		file_path: parsed.values['body-file'],
 		inline_flag: BODY_FLAG,
 		file_flag: BODY_FILE_FLAG,
 	})

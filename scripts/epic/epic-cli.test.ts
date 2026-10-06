@@ -269,16 +269,34 @@ describe('epic_cli.parse_add_arguments — what it refuses', () => {
 })
 
 describe('epic_cli — the positioning flags stay scoped to --add', () => {
-	it('does not swallow a creation child after an unknown --after flag', () => {
+	// Refused rather than read without the flag: a creation is as strict as an insertion, so neither a
+	// swallowed child nor a silently ignored flag can come out of it (joshuafolkken/kit#3261).
+	it('refuses a creation with an --after flag it does not know', () => {
 		const parsed = epic_cli.parse_create_arguments([TITLE, '101', '102', '--after', '103'])
 
-		expect(parsed?.children).toStrictEqual([101, 102, 103])
+		expect(parsed).toBeUndefined()
 	})
 
-	it('does not swallow a promotion child after an unknown --before flag', () => {
+	it('refuses a promotion with a --before flag it does not know', () => {
 		const parsed = epic_cli.parse_promote_arguments(['--promote', '893', '101', '--before', '102'])
 
-		expect(parsed?.children).toStrictEqual([101, 102])
+		expect(parsed).toBeUndefined()
+	})
+
+	it('refuses a truncated --ordered rather than creating an unordered epic', () => {
+		expect(epic_cli.parse_create_arguments([TITLE, '101', '102', '--order'])).toBeUndefined()
+	})
+
+	it('refuses a repeated --rationale-file rather than reading one of the two', () => {
+		const argv = [TITLE, '101', RATIONALE_FILE_FLAG, 'a.md', RATIONALE_FILE_FLAG, 'b.md']
+
+		expect(epic_cli.parse_create_arguments(argv)).toBeUndefined()
+	})
+
+	it('reads an inline --origin value', () => {
+		const parsed = epic_cli.parse_create_arguments([TITLE, '101', `${ORIGIN_FLAG_NAME}=#42`])
+
+		expect(parsed?.origin).toBe('#42')
 	})
 
 	it('refuses a repeated --before, rather than silently taking the first', () => {

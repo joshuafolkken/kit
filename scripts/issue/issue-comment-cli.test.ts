@@ -58,6 +58,13 @@ describe('issue_comment_cli.run — posts one comment and prints its URL', () =>
 		expect(printed).toContain(COMMENT_URL)
 	})
 
+	it('posts an inline --body=<text>, the one spelling for a body that starts with a dash', async () => {
+		const code = await issue_comment_cli.run(['5', '--body=- item'])
+
+		expect(code).toBe(0)
+		expect(issue_comment).toHaveBeenCalledWith('5', '- item')
+	})
+
 	it('reads the body from --body-file, so no shell evaluates it', async () => {
 		const code = await issue_comment_cli.run(['5', BODY_FILE_FLAG, BODY_FILE])
 
@@ -85,6 +92,15 @@ describe('issue_comment_cli.run — refuses a call it cannot post', () => {
 
 	it('refuses a call with no body at all', async () => {
 		const code = await issue_comment_cli.run(['5'])
+
+		expect(code).toBe(1)
+		expect(issue_comment).not.toHaveBeenCalled()
+		expect(errors).toContain(issue_comment_cli.USAGE)
+	})
+
+	// joshuafolkken/kit#3261: a misspelled flag used to be skipped, posting with whatever else was given.
+	it('refuses an unknown flag', async () => {
+		const code = await issue_comment_cli.run(['5', '--body', 'note', '--bdy-file', BODY_FILE])
 
 		expect(code).toBe(1)
 		expect(issue_comment).not.toHaveBeenCalled()

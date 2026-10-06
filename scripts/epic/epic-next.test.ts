@@ -155,6 +155,10 @@ describe('epic_next.parse_options — refusals', () => {
 		expect(epic_next.parse_options(['858', '--repo']).usage).toContain('Usage:')
 	})
 
+	it.each([['--repo='], ['--repo', '']])('refuses an empty repository name (%s)', (...flag) => {
+		expect(epic_next.parse_options(['858', ...flag]).usage).toContain('Usage:')
+	})
+
 	it('refuses a missing epic number', () => {
 		expect(epic_next.parse_options([]).usage).toContain('Usage:')
 	})
@@ -196,16 +200,21 @@ describe('epic_next.parse_options — several epics', () => {
 	})
 })
 
-describe('epic_next.split_at_flag', () => {
-	it('puts everything before the first flag in the head', () => {
-		expect(epic_next.split_at_flag(['858', '909', '--lanes'])).toEqual({
-			head: ['858', '909'],
-			rest: ['--lanes'],
-		})
+// joshuafolkken/kit#3261: the read goes through `cli_flags`, so it is strict about flags and reads
+// positionals wherever they stand.
+describe('epic_next.parse_options — strict read', () => {
+	it('refuses an unknown flag rather than ignoring it', () => {
+		expect(epic_next.parse_options(['858', '--repo', REPO, '--lane']).usage).toContain('Usage:')
 	})
 
-	it('takes the whole argument list as the head when there is no flag', () => {
-		expect(epic_next.split_at_flag(['858'])).toEqual({ head: ['858'], rest: [] })
+	it('reads a reference named after a flag', () => {
+		const options = epic_next.parse_options(['858', '--repo', REPO, '909'])
+
+		expect(options.references?.map((entry) => entry.number)).toEqual([858, 909])
+	})
+
+	it('reads an inline --repo value', () => {
+		expect(epic_next.parse_options(['858', `--repo=${REPO}`]).repo).toBe(REPO)
 	})
 })
 
