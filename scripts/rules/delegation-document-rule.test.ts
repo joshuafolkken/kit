@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest'
 
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const DELEGATION_DOC = '.claude/skills/workflow-commands/delegation.md'
-const COMMAND_DOC = 'docs/josh-commands-automation.md'
+const COMMAND_DOC = 'docs/josh-commands-backlog.md'
 // The skill routes readers to the on-demand procedure; `docs/` is the command reference and carries
 // the enumeration a person reads. All three must route the decision to the command.
 const RULE_DOCS: ReadonlyArray<string> = [DELEGATION_DOC, COMMAND_DOC]

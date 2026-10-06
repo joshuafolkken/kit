@@ -14,7 +14,7 @@ const DIRECT_FILING_REASON =
 	'lint and its classification labels, the depth and `route:` labels, the `## Origin` check when filing ' +
 	'into another repository, and `epic:bundle` after the create — so none of them is a step to remember. ' +
 	'When the scout prints candidates it holds the filing: read each, then reissue with `--distinct <N,…>` ' +
-	'for the ones that are separate deliverables. Reference: `docs/josh-commands-automation.md` → "`josh issue:file`". ' +
+	'for the ones that are separate deliverables. Reference: `docs/josh-commands-backlog.md` → "`josh issue:file`". ' +
 	'**This rule fires on every occurrence, not once per run.**'
 
 function is_any_filing(command: string): boolean {

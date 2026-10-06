@@ -42,6 +42,6 @@ Each stop's notification lists the keywords further up, nearest first. How each 
 
 ## Common failures
 
-- A run stops on an Issue labelled `needs-human-review`: that is intended — see [the label](../josh-commands-automation.md#needs-human-review--the-opposite-label).
-- A run exits early because the work is already merged: see [`already-done`](../josh-commands-automation.md#already-done--the-exit-for-work-that-is-already-merged).
+- A run stops on an Issue labelled `needs-human-review`: that is intended — see [the label](../josh-commands-backlog.md#needs-human-review--the-opposite-label).
+- A run exits early because the work is already merged: see [`already-done`](../josh-commands-backlog.md#already-done--the-exit-for-work-that-is-already-merged).
 - The gate or CI fails: [Fix a failing gate or CI](./fix-gate-and-ci.md).
