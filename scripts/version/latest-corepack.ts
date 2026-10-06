@@ -38,6 +38,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { json_value } from '#scripts/lib/json-value'
+import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execaSync } from 'execa'
 import semver from 'semver'
 import { z } from 'zod'
@@ -50,7 +51,6 @@ const PINNED_VERSION_RE = /"packageManager"\s*:\s*"pnpm@([^"+]+)/u
 const TARGET_PREFIX = 'pnpm@'
 const FAILURE_EXIT_CODE = 1
 const NPMRC_PATH = '.npmrc'
-const VIEW_TIMEOUT_MS = 30_000
 const SHA512_BYTES = 64
 const INTEGRITY_RE = /^sha512-([A-Za-z0-9+/]+={0,2})$/u
 const PACKAGE_MANAGER_VALUE_RE = /("packageManager"\s*:\s*")pnpm@[^"]+(")/u
@@ -121,7 +121,7 @@ function extract_times_json(stdout: string): Record<string, string> | undefined 
 function query_release_times(): Record<string, string> | undefined {
 	const result = execaSync('pnpm', ['view', 'pnpm', 'time', '--json'], {
 		reject: false,
-		timeout: VIEW_TIMEOUT_MS,
+		timeout: COMMAND_TIMEOUT_MS,
 	})
 	if ((result.exitCode ?? FAILURE_EXIT_CODE) !== 0) return undefined
 
@@ -156,7 +156,7 @@ function parse_latest_version(stdout: string): string | undefined {
 function query_latest_version(): string | undefined {
 	const result = execaSync('pnpm', ['view', 'pnpm', 'version', '--json'], {
 		reject: false,
-		timeout: VIEW_TIMEOUT_MS,
+		timeout: COMMAND_TIMEOUT_MS,
 	})
 	if ((result.exitCode ?? FAILURE_EXIT_CODE) !== 0) return undefined
 
@@ -247,7 +247,7 @@ function extract_encoded_integrity(stdout: string): string | undefined {
 function query_integrity(target: string): string | undefined {
 	const result = execaSync('pnpm', ['view', target, 'dist.integrity', '--json'], {
 		reject: false,
-		timeout: VIEW_TIMEOUT_MS,
+		timeout: COMMAND_TIMEOUT_MS,
 	})
 	if ((result.exitCode ?? FAILURE_EXIT_CODE) !== 0) return undefined
 

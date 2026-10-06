@@ -1,4 +1,5 @@
 import { execa } from 'execa'
+import { SUITE_TIMEOUT_MS } from './timeouts'
 
 // One definition of "run a check, keep its output, never throw".
 //
@@ -12,11 +13,6 @@ import { execa } from 'execa'
 const PNPM = 'pnpm'
 const FORCE_COLOR = '1'
 const FAIL_EXIT_CODE = 1
-// Long enough for a cold unit suite on a large consumer, short enough that a check which never
-// exits ends the run instead of holding it open with nothing printed — the same hazard
-// `propagate-steps.ts` bounds with its own step timeout. Because output is buffered until the
-// child finishes, a hung child shows nothing at all until this fires.
-const PROCESS_TIMEOUT_MS = 1_800_000
 
 interface BufferedProcessResult {
 	output: string
@@ -60,7 +56,7 @@ async function run_buffered_process(
 		all: true,
 		reject: false,
 		...(options.cwd !== undefined && { cwd: options.cwd }),
-		timeout: options.timeout_ms ?? PROCESS_TIMEOUT_MS,
+		timeout: options.timeout_ms ?? SUITE_TIMEOUT_MS,
 	})
 
 	return {
@@ -79,4 +75,4 @@ function is_process_failed(result: Pick<BufferedProcessResult, 'exit_code'>): bo
 const buffered_process = { is_process_failed, run_buffered_process }
 
 export type { BufferedProcessResult }
-export { buffered_process, FAIL_EXIT_CODE, PROCESS_TIMEOUT_MS }
+export { buffered_process, FAIL_EXIT_CODE }

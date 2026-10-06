@@ -1,5 +1,6 @@
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { poll } from '#scripts/lib/poll'
+import { GH_API_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { with_page_size } from '#scripts/version/version-remote'
 
 // Waiting for a specific version of this package to actually exist in the registry.
@@ -14,7 +15,6 @@ const VERSIONS_PAGE_SIZE = 100
 const NAMES_JQ = '[.[] | .name]'
 const DEFAULT_TIMEOUT_MS = 600_000
 const DEFAULT_INTERVAL_MS = 15_000
-const GH_TIMEOUT_MS = 20_000
 // How many probes in a row may fail before the registry is called unreadable. One failure is a rate
 // limit, a 5xx or a DNS hiccup — ending a ten-minute wait seconds in, on the first of those, is the
 // opposite of waiting. Only a registry that fails this many times running is a broken one.
@@ -60,7 +60,7 @@ function fetch_published_versions(versions_endpoint: string): Array<string> | un
 	const stdout = git_gh_exec.read_gh_api_sync({
 		path: endpoint,
 		jq_filter: NAMES_JQ,
-		timeout_ms: GH_TIMEOUT_MS,
+		timeout_ms: GH_API_TIMEOUT_MS,
 	})
 	if (stdout === undefined) return undefined
 

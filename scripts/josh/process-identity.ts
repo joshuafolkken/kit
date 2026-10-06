@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync, rmSync } from 'node:fs'
 import { createServer, type Server } from 'node:net'
 import path from 'node:path'
+import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { PLATFORM_TEMP_ROOT } from './platform-temporary'
 
 // Whether the process a record names is still the one that wrote it (joshuafolkken/kit#1245).
@@ -48,9 +49,6 @@ const PID_FLAG = '-p'
 // runs in** — nothing is inherited, so the token depends on the process being asked about and on
 // nothing whatever about who is asking.
 const PROBE_ENVIRONMENT = { TZ: 'UTC', LC_ALL: 'C' }
-// A probe that hung would hang `josh review:brief`, `josh bench` and the unit suite's worker share
-// alike. Failing is harmless here: it answers "cannot tell", which every caller already handles.
-const PROBE_TIMEOUT_MS = 2000
 // `process.kill(pid, 0)` runs every permission check and delivers nothing, so it is the standard
 // liveness probe: it throws `ESRCH` where the process is gone.
 const LIVENESS_SIGNAL = 0
