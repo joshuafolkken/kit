@@ -1,8 +1,18 @@
-import { appendFileSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
+import {
+	appendFileSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	renameSync,
+	rmdirSync,
+	rmSync,
+} from 'node:fs'
 import path from 'node:path'
 import { file_reader } from '#scripts/lib/read-file'
 import {
+	LEDGER_FILE_EXTENSION,
 	LEGACY_LEDGER_FILE,
+	LEGACY_OBSERVATION_LEDGER_DIRECTORY,
 	LEGACY_OBSERVATION_LEDGER_PATHS,
 	MIGRATION_CLAIM_SUFFIX,
 	OBSERVATION_LEDGER_DIRECTORY,
@@ -136,14 +146,55 @@ function migrate_one(legacy: string, target: string): boolean {
 	return true
 }
 
+// The ledger file a name in the old directory belongs to — a claim `<name>.md.<pid>.migrating` left by
+// a killed process included, whose `<name>.md` may already be gone.
+function source_name(name: string): string | undefined {
+	const end = name.indexOf(LEDGER_FILE_EXTENSION)
+
+	return end === -1 ? undefined : name.slice(0, end + LEDGER_FILE_EXTENSION.length)
+}
+
+function legacy_directory_names(directory: string): ReadonlyArray<string> {
+	try {
+		const names = readdirSync(directory).map((name) => source_name(name))
+
+		return [...new Set(names.filter((name) => name !== undefined))]
+	} catch {
+		return []
+	}
+}
+
+// **The old directory moves file by file into the same names** (joshuafolkken/kit#3341), so an
+// issue's lines stay in that issue's file; the emptied directory is removed when nothing else is left.
+function migrate_directory(root: string): boolean {
+	const legacy_directory = path.join(root, LEGACY_OBSERVATION_LEDGER_DIRECTORY)
+	const did_move = legacy_directory_names(legacy_directory)
+		.map((name) =>
+			migrate_one(
+				path.join(legacy_directory, name),
+				path.join(root, OBSERVATION_LEDGER_DIRECTORY, name),
+			),
+		)
+		.some(Boolean)
+
+	try {
+		rmdirSync(legacy_directory)
+	} catch {
+		// Absent, or still holding something that is not the ledger's — left where it is.
+	}
+
+	return did_move
+}
+
 // Returns whether anything was moved. `root` is the checkout the ledger lives in. Every old path is
 // tried — `map` before `some`, so one that moved does not leave the next one where it was.
 function migrate(root: string): boolean {
 	const target = path.join(root, OBSERVATION_LEDGER_DIRECTORY, LEGACY_LEDGER_FILE)
-
-	return LEGACY_OBSERVATION_LEDGER_PATHS.map((legacy) =>
+	const moved_files = LEGACY_OBSERVATION_LEDGER_PATHS.map((legacy) =>
 		migrate_one(path.join(root, legacy), target),
-	).some(Boolean)
+	)
+
+	return [...moved_files, migrate_directory(root)].some(Boolean)
 }
 
 const observation_ledger_migrate = { migrate }

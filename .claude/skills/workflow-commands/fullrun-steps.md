@@ -55,7 +55,7 @@ that covers the same work stops the run rather than filing a second Issue (`issu
 `gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=in-progress'`. (4) Post the agreed plan
 in the session language: fill the body if blank,
 otherwise add a comment. (5) If the working tree already has staged or modified files,
-`git stash push -m "fullrun new: pre-existing changes" -- ':!docs/maintainers/observations'` first
+`git stash push -m "fullrun new: pre-existing changes" -- ':!.josh/observations'` first
 (joshuafolkken/kit#2919). (6) `git switch main && git pull`. (7)
 `pnpm josh latest:scope`; on `required` run `josh latest` and load the `dependency-update` skill; on
 `skip` neither runs (`latest-gate.md` is the single source). If you stashed in (5),

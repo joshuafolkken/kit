@@ -4,14 +4,24 @@
 // tree, and `observations-flush.ts` commits what no run carried — so a literal in each would be three
 // answers to one question, and a rename reaching only some of them would silently split them.
 //
-// **It sits under `docs/maintainers/`, apart from the reader-facing documents** (joshuafolkken/kit#2724).
+// **It sits outside `docs/`** (joshuafolkken/kit#3341): its files are machine-written data lines, not
+// documents a person reads, and at about forty new files a day they were most of `docs/`.
 //
 // **It is a directory of one file per issue, not one file** (joshuafolkken/kit#2919). One file every
 // run appended to made two lanes' pull requests conflict at its tail, so lanes parked their lines in
 // the primary checkout for a batch-end flush — and another run's stash took them from there, and the
 // flush never saw them. A run now appends to `<issue>.md` in its own work tree and merges it with its
 // own pull request: parallel lanes write different files, so nothing conflicts and nothing waits.
-const OBSERVATION_LEDGER_DIRECTORY = 'docs/maintainers/observations'
+const OBSERVATION_LEDGER_DIRECTORY = '.josh/observations'
+
+// Where the directory lived until joshuafolkken/kit#3341, a migration source for the same reasons as
+// the single-file ledgers below: each `<name>.md` in it moves to the same name in the directory.
+const LEGACY_OBSERVATION_LEDGER_DIRECTORY = 'docs/maintainers/observations'
+
+const LEDGER_DIRECTORIES: ReadonlyArray<string> = [
+	OBSERVATION_LEDGER_DIRECTORY,
+	LEGACY_OBSERVATION_LEDGER_DIRECTORY,
+]
 
 const LEDGER_FILE_EXTENSION = '.md'
 
@@ -51,18 +61,25 @@ function is_ledger_file_name(name: string): boolean {
 // (`observation-ledger-migrate.ts`): `docs/observations.md.<pid>.migrating`.
 const MIGRATION_CLAIM_SUFFIX = '.migrating'
 
+function is_legacy_directory_file(file_path: string): boolean {
+	return file_path.startsWith(`${LEGACY_OBSERVATION_LEDGER_DIRECTORY}/`)
+}
+
 // A claim left by a process killed mid-migration holds ledger lines, so it is the ledger too: never
 // staged by an ordinary commit, and absorbed by the next migration.
 function is_migration_claim(file_path: string): boolean {
-	return LEGACY_OBSERVATION_LEDGER_PATHS.some(
-		(legacy) => file_path.startsWith(`${legacy}.`) && file_path.endsWith(MIGRATION_CLAIM_SUFFIX),
+	if (!file_path.endsWith(MIGRATION_CLAIM_SUFFIX)) return false
+
+	return (
+		is_legacy_directory_file(file_path) ||
+		LEGACY_OBSERVATION_LEDGER_PATHS.some((legacy) => file_path.startsWith(`${legacy}.`))
 	)
 }
 
-// Porcelain status collapses an untracked directory to `docs/maintainers/observations/`, so the
-// directory itself, trailing slash and all, is the ledger as much as any file inside it.
+// Porcelain status collapses an untracked directory to `.josh/observations/`, so the directory
+// itself, trailing slash and all, is the ledger as much as any file inside it — the old directory too.
 function is_in_directory(file_path: string): boolean {
-	return file_path.startsWith(`${OBSERVATION_LEDGER_DIRECTORY}/`)
+	return LEDGER_DIRECTORIES.some((directory) => file_path.startsWith(`${directory}/`))
 }
 
 function is_ledger_path(file_path: string): boolean {
@@ -107,8 +124,10 @@ const observation_ledger = {
 }
 
 export {
+	LEDGER_DIRECTORIES,
 	LEDGER_FILE_EXTENSION,
 	LEGACY_LEDGER_FILE,
+	LEGACY_OBSERVATION_LEDGER_DIRECTORY,
 	LEGACY_OBSERVATION_LEDGER_PATHS,
 	MIGRATION_CLAIM_SUFFIX,
 	OBSERVATION_LEDGER_DIRECTORY,
