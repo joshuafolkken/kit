@@ -19,9 +19,10 @@ import { issue_wip } from './issue-wip'
 // `josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>]…
 // [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok]` — file an Issue with every
 // filing step run in order (joshuafolkken/kit#2808): the third-party refusal, the body lint, the
-// `## Origin` check for another repository, the WIP cap count (joshuafolkken/kit#3181), the duplicate
-// scout, the missing workflow labels created (joshuafolkken/kit#3176), the `auto-ok` decision
-// (joshuafolkken/kit#3213), the create call carrying every label, and `epic:bundle` after it.
+// `## Origin` check for another repository, the `auto-ok` decision (joshuafolkken/kit#3213) with the
+// run label it owes (joshuafolkken/kit#3313), the WIP cap count (joshuafolkken/kit#3181), the duplicate
+// scout, the missing workflow labels created (joshuafolkken/kit#3176), the create call carrying every
+// label, and `epic:bundle` after it.
 // A direct `gh api …/issues` filing is refused by the `direct-filing` delivered rule and pointed here.
 
 const SUCCESS_EXIT_CODE = 0
@@ -130,11 +131,9 @@ async function is_scout_clear(filing: Filing): Promise<boolean> {
 	return open.length === 0
 }
 
-// `undefined` when the create call failed. `gh`'s standard error is captured into the thrown error
-// rather than printed, so it is printed here — otherwise the filing fails with no reason given. A label
-// the create applies is provisioned first, so it never arrives with a generated color.
-async function create(filing: Filing): Promise<string | undefined> {
-	repository_labels.ensure_labels(filing.target)
+// Every label the create call carries, or `undefined` when an `auto-ok` filing names neither run label
+// (joshuafolkken/kit#3313). Decided before the WIP count and the scout, so a refusal costs no listing.
+async function labels_of(filing: Filing): Promise<ReadonlyArray<string> | undefined> {
 	const auto_ok = await issue_auto_ok.resolve(
 		filing.args.is_auto_ok_opted_out,
 		filing.target,
@@ -142,10 +141,24 @@ async function create(filing: Filing): Promise<string | undefined> {
 	)
 
 	console.info(issue_auto_ok.line_of(auto_ok))
+	const labels = issue_file.labels_of(filing.args, filing.body, auto_ok.is_applied)
+	const problem = issue_file.triage_problem(labels)
+
+	if (problem === undefined) return labels
+	console.error(`✖ ${problem}`)
+
+	return undefined
+}
+
+// `undefined` when the create call failed. `gh`'s standard error is captured into the thrown error
+// rather than printed, so it is printed here — otherwise the filing fails with no reason given. A label
+// the create applies is provisioned first, so it never arrives with a generated color.
+async function create(filing: Filing, labels: ReadonlyArray<string>): Promise<string | undefined> {
+	repository_labels.ensure_labels(filing.target)
 	const request = git_gh_issue_write.issue_create_request({
 		title: filing.args.title,
 		body: filing.body,
-		labels: issue_file.labels_of(filing.args, filing.body, auto_ok.is_applied),
+		labels,
 		repo: filing.target,
 	})
 
@@ -173,23 +186,33 @@ async function place(url: string, target: string): Promise<void> {
 	}
 }
 
-async function file(filing: Filing): Promise<number> {
+function is_admitted(filing: Filing): boolean {
 	const refusals = refusals_of(filing)
 
-	if (refusals.length > 0) {
-		console.error(refusals.join('\n'))
+	if (refusals.length === 0) return true
+	console.error(refusals.join('\n'))
 
-		return FAILURE_EXIT_CODE
-	}
+	return false
+}
 
-	if (!(await is_wip_clear(filing)) || !(await is_scout_clear(filing))) return FAILURE_EXIT_CODE
-	const url = await create(filing)
+async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<number> {
+	const url = await create(filing, labels)
 
 	if (url === undefined) return FAILURE_EXIT_CODE
 	console.info(url)
 	await place(url, filing.target)
 
 	return SUCCESS_EXIT_CODE
+}
+
+async function file(filing: Filing): Promise<number> {
+	if (!is_admitted(filing)) return FAILURE_EXIT_CODE
+	const labels = await labels_of(filing)
+
+	if (labels === undefined) return FAILURE_EXIT_CODE
+	if (!(await is_wip_clear(filing)) || !(await is_scout_clear(filing))) return FAILURE_EXIT_CODE
+
+	return await send(filing, labels)
 }
 
 async function filing_of(args: FileArguments): Promise<Filing | string> {

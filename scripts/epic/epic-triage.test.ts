@@ -28,6 +28,13 @@ describe('epic_triage.is_triaged', () => {
 	})
 })
 
+describe('epic_triage.has_triage_label', () => {
+	it('reads a bare label list the way is_triaged reads a child', () => {
+		expect(epic_triage.has_triage_label(['auto-ok', 'Run:Solo'])).toBe(true)
+		expect(epic_triage.has_triage_label(['auto-ok'])).toBe(false)
+	})
+})
+
 describe('epic_triage.untriaged', () => {
 	it('keeps only the children nobody has judged, in their order', () => {
 		const children = [child(FIRST), child(SECOND, [RUN_LANE_LABEL]), child(THIRD)]

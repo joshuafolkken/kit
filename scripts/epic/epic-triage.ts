@@ -20,10 +20,14 @@ type TriageVerdict = 'triage'
 
 const TRIAGE_VERDICT: TriageVerdict = 'triage'
 
-function is_triaged(child: EpicChild): boolean {
-	const { labels } = child
-
+// Read off a bare label list too, so `josh issue:file` refuses an untriaged `auto-ok` filing by the
+// same answer the offer paths withhold it by (joshuafolkken/kit#3313).
+function has_triage_label(labels: ReadonlyArray<string>): boolean {
 	return has_label_name(labels, RUN_SOLO_LABEL) || has_label_name(labels, RUN_LANE_LABEL)
+}
+
+function is_triaged(child: EpicChild): boolean {
+	return has_triage_label(child.labels)
 }
 
 // The candidates nobody has judged, in the order they were given.
@@ -41,7 +45,7 @@ function message(children: ReadonlyArray<EpicChild>, repo: string): string {
 	)
 }
 
-const epic_triage = { TRIAGE_VERDICT, is_triaged, message, untriaged }
+const epic_triage = { TRIAGE_VERDICT, has_triage_label, is_triaged, message, untriaged }
 
 export type { TriageVerdict }
 export { epic_triage }

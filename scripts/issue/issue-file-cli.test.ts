@@ -172,11 +172,42 @@ describe('issue_file_cli.run — the auto-ok decision', () => {
 	it('adds auto-ok to the create call when the filing opted in', async () => {
 		stub_carried()
 
-		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(SUCCESS_EXIT_CODE)
-		expect(create_body()).toMatchObject({ labels: ['depth:1', 'bug', 'auto-ok'] })
+		expect(await issue_file_cli.run(argv_of(valid_path, '--label', 'run:lane'))).toBe(
+			SUCCESS_EXIT_CODE,
+		)
+		expect(create_body()).toMatchObject({ labels: ['depth:1', 'run:lane', 'bug', 'auto-ok'] })
 		expect(vi.mocked(console.info).mock.calls.join('\n')).toContain('auto-ok: applied — ')
 	})
+})
 
+// joshuafolkken/kit#3313: an untriaged opted-in Issue withholds every lane's candidate.
+describe('issue_file_cli.run — the run label an auto-ok filing owes', () => {
+	it('refuses an auto-ok filing with no run label, before the count, the scout or the create', async () => {
+		stub_carried()
+
+		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('--label run:solo')
+		expect(issue_list).not.toHaveBeenCalled()
+		expect(scout).not.toHaveBeenCalled()
+		expect(exec_gh_api).not.toHaveBeenCalled()
+	})
+
+	it('files an auto-ok filing judged run:solo', async () => {
+		stub_carried()
+
+		expect(await issue_file_cli.run(argv_of(valid_path, '--label', 'run:solo'))).toBe(
+			SUCCESS_EXIT_CODE,
+		)
+		expect(create_body()).toMatchObject({ labels: ['depth:1', 'run:solo', 'bug', 'auto-ok'] })
+	})
+
+	it('files without a run label when auto-ok is not applied, as before', async () => {
+		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(SUCCESS_EXIT_CODE)
+		expect(create_body()).toMatchObject({ labels: ['depth:1', 'bug'] })
+	})
+})
+
+describe('issue_file_cli.run — the auto-ok opt-out and the repositories it reads', () => {
 	it('leaves auto-ok off with --no-auto-ok, printing why', async () => {
 		stub_carried()
 
@@ -194,10 +225,10 @@ describe('issue_file_cli.run — the auto-ok decision', () => {
 	it('does not repeat an auto-ok already named with --label', async () => {
 		stub_carried()
 
-		expect(await issue_file_cli.run(argv_of(valid_path, '--label', 'auto-ok'))).toBe(
-			SUCCESS_EXIT_CODE,
-		)
-		expect(create_body()).toMatchObject({ labels: ['depth:1', 'auto-ok', 'bug'] })
+		expect(
+			await issue_file_cli.run(argv_of(valid_path, '--label', 'auto-ok', '--label', 'run:lane')),
+		).toBe(SUCCESS_EXIT_CODE)
+		expect(create_body()).toMatchObject({ labels: ['depth:1', 'auto-ok', 'run:lane', 'bug'] })
 	})
 })
 
