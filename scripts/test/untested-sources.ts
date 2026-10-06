@@ -59,7 +59,6 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/epic/epic-bundle-gaps.ts',
 	'scripts/epic/epic-check.ts',
 	'scripts/epic/epic-cli-argv.ts',
-	'scripts/epic/epic-issue.ts',
 	'scripts/epic/epic-rank.ts',
 	'scripts/epic/epic-read.ts',
 	'scripts/epic/epic-shape.ts',
