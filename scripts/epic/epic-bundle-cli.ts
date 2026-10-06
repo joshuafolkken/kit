@@ -4,6 +4,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
+import type { PollOptions } from '#scripts/lib/poll'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { z } from 'zod'
 import {
@@ -14,6 +15,7 @@ import {
 } from './epic-bundle'
 import { epic_bundle_evidence } from './epic-bundle-evidence'
 import { epic_bundle_gaps } from './epic-bundle-gaps'
+import { epic_bundle_poll } from './epic-bundle-poll'
 import { epic_bundle_referenced, type ReferencedContext } from './epic-bundle-referenced'
 import { epic_index, epic_schema, type FetchedEpics } from './epic-index'
 import { epic_issue } from './epic-issue'
@@ -393,9 +395,18 @@ async function report_widened(
 	return report_decision(subject, widened, repo)
 }
 
-// The recommendation for one issue, from the open backlog around it.
-async function report_for(issue_number: number, repo: string): Promise<number> {
-	const backlog = await read_backlog(repo)
+// The recommendation for one issue, from the open backlog around it. `options` is the poll a caller
+// holding a just-filed issue passes, since the listing trails the create call (`epic-bundle-poll.ts`).
+async function report_for(
+	issue_number: number,
+	repo: string,
+	options?: PollOptions,
+): Promise<number> {
+	const backlog = await epic_bundle_poll.read_until_listed(
+		async () => await read_backlog(repo),
+		issue_number,
+		options,
+	)
 
 	if (!backlog.is_readable) {
 		console.error(unreadable_backlog_message(backlog))
