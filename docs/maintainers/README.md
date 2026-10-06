@@ -7,8 +7,10 @@ reached from this page — the user documentation starts at [overview.md](../ove
 
 Every page here is written in English, one language per document. A rationale explaining a
 Japanese-language prompt file (`prompts/collaboration-workflow/*.md`, `.claude/skills/**`) quotes that
-file's headings and rule text verbatim so the pointer still resolves; the explanation around the quote
-is English. A page that still carries Japanese prose is brought to English when it is next edited. The
+file's headings and rule text verbatim, in double quotes or a code span, so the pointer still
+resolves; the explanation around the quote is English, and `maintainers-documents.test.ts` fails a
+page with Japanese anywhere else. A one-off audit or evaluation is not kept here once it has done its
+job — its conclusion lands in the rule or rationale it informed. The
 user documentation (`docs/`, `docs/how-to/`, `docs/setup/`) follows the same rule, keeping Japanese
 only where it names a literal a command matches (an issue-body heading such as `## 背景`, a prompt
 heading a pointer cites).
@@ -20,18 +22,12 @@ is the way it is, and the issues it came from, live in the matching `*-rationale
 
 - [release.md](./release.md) — releasing a new version
 - [publishing.md](./publishing.md) — the publish jobs and the one-time public npm setup
-- [release-classification-audit.md](./release-classification-audit.md) — the audit behind the first
-  GitHub Release's change classification
 
 ## Measure the distributed rules
 
 - [eval.md](./eval.md) — `josh eval`, measuring whether a document change changed what an agent does
 - [eval-rationale.md](./eval-rationale.md) — why the suite is built the way it is
 - [guide-verification.md](./guide-verification.md) — how the step-by-step user guides were verified
-- [backlogrun-worker-evaluation.md](./backlogrun-worker-evaluation.md) — evaluating the `backlogrun`
-  worker profile
-- [implementation-step-evaluation.md](./implementation-step-evaluation.md) — the deterministic
-  operation sequences found across implementation lanes
 
 ## Why the rules and commands are the way they are
 

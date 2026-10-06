@@ -1,132 +1,325 @@
-# 引き金つき配送 — 経緯と根拠
+# Triggered delivery — rationale
 
-この文書は [`prompts/collaboration-workflow/rule-delivery.md`](../../prompts/collaboration-workflow/rule-delivery.md) の裏にある、メンテナー専用の経緯と根拠である。手順の境界と機構を正当化する計測・経緯・論拠と、各マーカーテストが何を固定しているかの一覧を置く。ランの途中で読まれることはない — エージェントが従う引き金・行為・判定・境界はすべて手順文書に残っており、このファイルを変えても規則は何も変わらない。
+This is maintainer-only rationale behind
+[`prompts/collaboration-workflow/rule-delivery.md`](../../prompts/collaboration-workflow/rule-delivery.md):
+the measurements and arguments that justify the procedure's boundaries and mechanism, and the list
+of what each marker test pins. No run reads it — every trigger, action, verdict and boundary an
+agent follows stays in the procedure, and a change to this file changes no rule.
 
-## なぜ配送が要るのか
+## Why delivery is needed
 
-`CLAUDE.md` は実効上限まで残り数トークンまで詰まっていた（joshuafolkken/kit#1524 起票時点で 6 トークン ≒ 15〜18 文字）。一方で `prompts/` と `.claude/skills/` は常駐部の 15 倍を抱えており、**詰まっているのは常駐という 1 本の経路だけ**である。
+`CLAUDE.md` was packed to within a few tokens of its effective ceiling (6 tokens, about 15–18
+characters, when joshuafolkken/kit#1524 was filed), while `prompts/` and
+`.claude/skills/` hold fifteen times the resident part. **Only one route — residency — is full.**
 
-そして配送は安いだけでなく**強い**。
+Delivery is not only cheaper, it is **stronger**:
 
-|            | 常駐の散文       | 引き金つき配送           |
-| ---------- | ---------------- | ------------------------ |
-| コスト     | 毎ターン         | 該当する瞬間だけ         |
-| 読まれるか | 読み飛ばされうる | **拒否は読み飛ばせない** |
-| 発火の検証 | できない         | 単体テストで固定できる   |
-| 総量の上限 | 実効上限で頭打ち | 実質なし                 |
+|                        | Resident prose                  | Triggered delivery          |
+| ---------------------- | ------------------------------- | --------------------------- |
+| Cost                   | Every turn                      | Only at the matching moment |
+| Is it read?            | It can be skimmed past          | **A refusal cannot be**     |
+| Can firing be checked? | No                              | A unit test pins it         |
+| Ceiling on the total   | Capped by the effective ceiling | Effectively none            |
 
-**これは推測ではなく計測済みである。** joshuafolkken/kit#1344 はバッチングの指示について、散文でも実行時の注意書きでも数値がまったく動かなかったランを 3 回連続で記録した。`PreToolUse` フックにして初めて動いた。調査ガード（joshuafolkken/kit#1460）も同じ経緯である。**常駐していながら一度も発火していなかった規則が実在した**ということであり、移設で失われるものは「効いていなかった散文」だけである。
+**This is measured, not assumed.** joshuafolkken/kit#1344 recorded three consecutive runs in which
+the batching instruction moved nothing, as prose and as a runtime note alike; it moved only once it
+became a `PreToolUse` hook. The investigation guard (joshuafolkken/kit#1460) followed the same path.
+**A rule can sit resident and never fire**, so what a move loses is only prose that was not working.
 
-移設は削除ではないので、joshuafolkken/kit#1477（読み込む命令文のコスト測定）の答えを待つ必要はない — あちらが門番なのは**削除**の判断である。
+A move is not a deletion, so it does not wait on joshuafolkken/kit#1477 (measuring what reading the
+instruction costs) — that measurement gates **deleting** a rule, not moving it.
 
-## 機構
+## The mechanism
 
-配送はすべて `scripts/josh/hook-decision.ts` の `create_transcript_guard` の上に載る。バッチガード（joshuafolkken/kit#1390）と調査ガード（joshuafolkken/kit#1460）が既に共有している唯一の土台であり、ペイロードのスキーマ、`deny` の封筒、環境変数のスイッチ、`.env` の読み込み、ラン 1 回だけ発火させる記録の 5 つを持つ。2 本目の配送経路は、2 本が「配送したかどうか」で食い違いうる唯一の場所でもある。
+Every delivery rides on `create_transcript_guard` in `scripts/josh/hook-decision.ts`, the one
+foundation the batching guard (joshuafolkken/kit#1390) and the investigation guard
+(joshuafolkken/kit#1460) already share: the payload schema, the
+`deny` envelope, the environment switch, the `.env` read and the record that fires a rule once per
+run. A second delivery route would be the one place two of them could disagree about whether a rule
+was delivered.
 
-- **列挙表**: `scripts/rules/delivered-rules.ts`。1 規則 = 1 行（`id` ／ 引き金 ／ 配送文）。
-- **入口**: `scripts/hooks/pretool-guard-cli.ts`（ガードの合成は `scripts/hooks/pretool-guard.ts`）＝ `pnpm josh pretool:guard`。3 つの `PreToolUse` ガード（バッチング ／ 調査 ／ 規則）を 1 プロセスにまとめ、`.claude/settings.json` の `PreToolUse` に**単一エントリ**として `Bash|Edit|Read|Write` のマッチャで配線されている。拒否の優先順位はバッチングの理由が先、次に調査、最後に規則であり、各ガードは内部で従来どおり自分の環境変数スイッチを尊重する。
-- **停止スイッチ**: `JOSH_RULE_GUARD`（規則ガードのぶん。既定で有効。`off` / `0` / `false` / `no` で無効）。バッチング・調査の各ガードも同じく自前のスイッチを持つ。
+- **The enumeration**: `scripts/rules/delivered-rules.ts` — one rule per row (`id`, trigger, message).
+- **The entry point**: `scripts/hooks/pretool-guard-cli.ts` (the guards are composed in
+  `scripts/hooks/pretool-guard.ts`), run as `pnpm josh pretool:guard`. It folds the three
+  `PreToolUse` guards — batching, investigation and rule — into one process, wired as a **single
+  entry** in `.claude/settings.json`'s `PreToolUse` with the matcher
+  `Bash|Edit|Read|Write|AskUserQuestion`. A
+  batching refusal wins over an investigation refusal, which wins over a rule refusal, and each guard
+  still honors its own environment switch.
+- **The switch**: `JOSH_RULE_GUARD` for the rule guard — on by default, off with `off` / `0` /
+  `false` / `no`. The batching and investigation guards each have their own.
 
-**規則ガードの列挙表に載るのは、効く瞬間がシェル呼び出しである規則に限られる**（後から加わった `Edit` ／ `Write` と `AskUserQuestion` の行を除く）。Claude Code は 1 ターンのうち 1 件だけを拒否して残りを実行するため、拒否された `Edit` は兄弟の編集だけが適用された状態を残す（joshuafolkken/kit#1390）。
+**The rule guard's enumeration holds only rules whose moment is a shell call** (the later `Edit` /
+`Write` and `AskUserQuestion` rows aside). Claude Code refuses one call of a turn and runs the rest,
+so a refused `Edit` leaves the state where only its siblings were applied (joshuafolkken/kit#1390).
 
-### Stop フック — 2 つ目の入口、同じ土台（joshuafolkken/kit#2121）
+### The Stop hook — a second entry point on the same foundation
 
-`stop:guard`（`scripts/hooks/stop-guard.ts` ＝ `pnpm josh stop:guard`）は **`Stop` イベントの入口**である。`.claude/settings.json` の `Stop` に matcher 空の**単一エントリ**として配線され、turn の終わりごとに走る。
+`stop:guard` (`scripts/hooks/stop-guard.ts`, run as `pnpm josh stop:guard`, joshuafolkken/kit#2121)
+is **the entry point for the `Stop` event**. It is wired as a **single entry** with an empty matcher under `.claude/settings.json`'s
+`Stop`, and runs at the end of every turn.
 
-**土台は共有し、判定は再利用する。** スイッチ（`JOSH_STOP_GUARD`）と `.env` の読み込みは `hook-decision.ts` のものを、停止通知かどうかは `lane-park.ts` の正規表現を、押さえの有無は `run:hold` の記録読み取りを使う — **2 本目の判定機構は作らない**。起票の有無は `filing-cap.ts` の数え方を、第一者かどうかは `repo-party.ts` の比較を使う。違うのはイベントだけで、`Stop` のペイロードにはツール呼び出しが無く、4 行はいずれも `{"decision":"block","reason":…}` で返す。`Stop` イベントからモデルへ文字を届ける経路はこれ 1 本しかない（joshuafolkken/kit#2247）。
+**It shares the foundation and reuses the verdicts.** The switch (`JOSH_STOP_GUARD`) and the `.env`
+read come from `hook-decision.ts`; whether a message is a stop notice comes from the pattern in
+`lane-park.ts`; whether a hold is in place comes from the `run:hold` record — **no second verdict
+mechanism is built**. Whether anything was filed uses the count in `filing-cap.ts`, and whether a
+repository is first-party uses the comparison in `repo-party.ts`. Only the event differs: a `Stop`
+payload carries no tool call, and all four rows answer with `{"decision":"block","reason":…}`. That
+is the only route by which a `Stop` event can put text in front of the model (joshuafolkken/kit#2247).
 
-**入口が 2 つでも土台は 1 つ。**「1 本だけ、新規に作らない」が禁じるのは共有部の 2 つ目の写しであって、イベントごとの入口ではない。`stop:guard` の 4 行は引き金がシェル呼び出しではなく**ランの停止**なので、`delivered-rules.ts` の `DELIVERED_RULES`（`PreToolUse` 専用）ではなく `stop-rules.ts` に住む。どのエラーでも停止は通す（フェイルオープン）— 4 つのブロック行は自己解消し（通知を送る／押さえを解放する／起票する／引用を直して返信を出し直す）、`stop_hook_active` が無限ループの歯止めになる。
+**Two entry points, one foundation.** "One route, never a new one" forbids a second copy of the
+shared part, not an entry point per event. The four `stop:guard` rows are triggered by **the run
+stopping**, not by a shell call, so they live in `stop-rules.ts` rather than in `DELIVERED_RULES` in
+`delivered-rules.ts`, which is `PreToolUse`-only. Every error lets the stop through (fail-open): each
+of the four blocking rows resolves itself (send the notice, release the hold, file the Issue, fix the
+citation and reissue the reply), and `stop_hook_active` stops an endless loop.
 
-`backlogrun` の通常の親ループと次の Issue の取得は監督プロセスが扱うため、次の Issue を取得させる Stop 判定は撤去した。名前を指定したエピックを判断用の headless セッションに渡す経路では、子レーンの待機がそのセッションに残るため、待機保護を維持する。停滞と取り残しの検出は Stop イベントが起きた時だけ実行し、停止判定とは独立して報告する。
+`backlogrun`'s ordinary parent loop and the fetch of the next Issue are handled by the supervisor
+process, so the Stop verdict that made a run fetch the next Issue was removed. On the route that hands
+a named epic to a headless session for decisions, the wait for child lanes stays in that session, so
+the wait protection stays. Stall and stranded-run detection runs only when a Stop event fires, and is
+reported independently of the stop verdict.
 
-### 行ごとの配線の細部
+### Per-row wiring details
 
-手順文書の一覧から外した、実装上の再利用と判定の細部である。
+The implementation reuse and verdict details taken out of the procedure's list.
 
-- **直接起票の禁止** — 重複探し・本文の検査と分類ラベル・`## Origin` の確認・`epic:bundle` は `issue:file` が実行するので、それぞれを別の行で見張らない
-- **1 ラン 10 件の起票上限** — `is_issue_filing` を再利用し、新しい述語は作らない。終了コードが 0 でない `issue:file` は起票に数えない
-- **早すぎる進捗報告** — 待機だけの `Bash` は、全区間が `sleep`、または `sleep` に `echo` ／ `:` ／ `date` が並ぶだけのもの
-- **run 末尾の空転** — `run_in_background` が付いていれば引き金に当たらない
-- **実装フェーズの cut** — コストは `pnpm josh cost --cut` と同一の統計・同一のしきい値 `CONTEXT_CUT_THRESHOLD` で測り、測定不能は `!== UNDER` で安全側に発火する。しきい値を跨ぐたびに発火する（`decide`、joshuafolkken/kit#2385）。直後の同じ編集の出し直しを通すので `busy` ／ `failed` でも空回りしない
-- **テストの宣言** — `run_tail_rule` の commit 段照合を再利用し、新しい配送経路は作らない。免除は人が Step 0 で宣言するため 1 ラン 1 回だけ配送する
-- **force push / ブランチ削除** — `git push` / `git branch` を argv として解析し、結合クラスタ（`-uf`）と `git -C` 前置も綴りによらず判定する
-- **ファイル本文をシェルに載せない** — 既存判定は `stat` 1 回
-- **停止時の通知 ／ hold の解放** — 押さえは `run:hold` 記録、綺麗さは `git status --porcelain` が空であることで読む
-- **Issue 引用の書式 ／ 起票の申し出** — 対象は `last_assistant_message`。起票の有無は `filing_cap` の数え方、第三者かどうかは `repo_party.classify` で判定し、`stop_hook_active` が立っていれば黙る
-- **規則本文の追記** — #2324 で stand-down を入れた。`oracle:list` と `run:step` の両方を走らせた記録が末尾にあれば通す（リマインダではなく「問いに答えたか」で通す）
-- **オラクル未参照の行為** — 拒否文は登録簿（判断・コマンド・回答語彙・単一ソース）から組み立て、手書きしない。`release:scope` は理由側で、`pnpm josh followup` のマージ**後**に owe されるリリースを読むためマージを gate せず trail する（joshuafolkken/kit#2334）。発火点を名指せないオラクルは理由を宣言し、**可視化された未強制**として残る（`oracle:list` が発火点／理由を印字）
+- **The direct-filing refusal** — `issue:file` runs the duplicate search, the body check and type
+  label, the `## Origin` check and `epic:bundle`, so none of them is watched by a row of its own
+- **The 10-filings-per-run cap** — reuses `is_issue_filing` rather than a new predicate; an
+  `issue:file` that exits non-zero is not counted as a filing
+- **The early progress report** — a waiting-only `Bash` is one that is `sleep` throughout, or `sleep`
+  beside nothing but `echo` / `:` / `date`
+- **The idle run tail** — a call carrying `run_in_background` is not the trigger
+- **The implementation-phase cut** — the cost is measured with the same statistics and the same
+  `CONTEXT_CUT_THRESHOLD` as `pnpm josh cost --cut`, and an unmeasurable cost fires on the safe side
+  through `!== UNDER`. It fires every time the threshold is crossed (`decide`,
+  joshuafolkken/kit#2385), and it lets the
+  immediate reissue of the same edit through, so `busy` / `failed` do not spin
+- **The test declaration** — reuses `run_tail_rule`'s commit-stage match rather than a new delivery
+  route; the exemption is declared by a person at Step 0, so it is delivered once per run
+- **Force push / branch deletion** — `git push` / `git branch` are parsed as argv, so grouped short
+  flags (`-uf`) and a `git -C` prefix are judged the same whatever the spelling
+- **No file body on the shell** — the existence check is one `stat`
+- **The stop notice / releasing the hold** — the hold is read off the `run:hold` record, and a clean
+  tree as an empty `git status --porcelain`
+- **The Issue-citation format / the offer to file** — reads `last_assistant_message`; whether
+  anything was filed uses `filing_cap`'s count, a third party is judged by `repo_party.classify`, and
+  the row stays silent while `stop_hook_active` is set
+- **Appending to a rule body** — the stand-down came with joshuafolkken/kit#2324: it stands down once the transcript tail records both `oracle:list` and
+  `run:step` having run (it passes on "were the questions answered", not on a reminder)
+- **An action that skips its oracle** — the refusal is assembled from the registry (decision,
+  command, answer vocabulary, single source), never hand-written. `release:scope` sits on the reason
+  side: it reads the release owed **after** `pnpm josh followup` merges, so it trails the merge rather
+  than gating it (joshuafolkken/kit#2334). An oracle whose firing point cannot be named declares its reason and stays as
+  **visible non-enforcement** (`oracle:list` prints the firing point or the reason)
 
-**引き金の 4 綴り。** 起票の判定は `-f` / `-F` / `--field` / `--raw-field` の 4 綴りを覆う。本文をファイルで渡す `gh api --input <file>` はタイトルが文字列に現れないため掛からず、node の中から REST で起票する経路（`pnpm josh propagate` など）も同じである。引き金つきの配送だけにすると、正規表現が知っている綴りだけが規則の適用範囲になる — 常駐の 1 行を残す理由である。
+**The four spellings of the trigger.** The filing check covers `-f` / `-F` / `--field` /
+`--raw-field`. `gh api --input <file>`, which passes the body as a file, never shows the title in the
+string and is not caught; nor is a filing made over REST from inside node (`pnpm josh propagate` and
+the like). Delivered alone, the rule would reach only the spellings the pattern knows — which is why
+the one resident line stays.
 
-### コメント投稿は引き金ではない
+### Posting a comment is not a trigger
 
-WIP 上限の引き金は Issue の**作成**だけを見る。`…/issues/<N>/comments` はコメントであり、起票ではない — コメントは起票より桁違いに多く、そこで拒否するフックは「誤ったターンで発火するフック」そのものになる。`scripts/rules/delivered-rules.test.ts` がこの境界を両方向から固定している。
+The WIP cap's trigger looks only at **creating** an Issue. `…/issues/<N>/comments` is a comment, not a
+filing — comments outnumber filings by an order of magnitude, and a hook that refused there would be
+exactly "a hook that fires on the wrong turn". `scripts/rules/delivered-rules.test.ts` pins that
+boundary from both sides.
 
-### Issue コメントの読み取り — 「読め」ではなく「目の前に置く」（joshuafolkken/kit#1319）
+### Reading Issue comments — put them in front of the run, do not ask it to read them
 
-**引き金は実装の開始ではなく、本文が届いた 1 件の呼び出しである。** 「実装を始める瞬間」は 1 件のツール呼び出しとして名指しできないが、「Issue の本文がランの目に入る瞬間」は名指しできる — `gh issue view <N>` か、`…/issues/<N>` で終わる GET。この行が判定基準を通るのはそこである。
+This row came from joshuafolkken/kit#1319. **The trigger is the one call through which the body
+arrived, not the start of implementation.**
+"The moment implementation starts" cannot be named as one tool call; "the moment an Issue body
+reaches the run" can — `gh issue view <N>`, or a GET ending in `…/issues/<N>`. That is where this row
+passes the criterion.
 
-**拒否文は「コメントも読め」という要求ではなく、読み直しのコマンドそのものを渡す。** 散文の要求は joshuafolkken/kit#1344 が 3 ラン連続で「数値がまったく動かなかった」と実測した形式であり、この行がそれを避けるのは、本文だけの読み取りが**通らない**ことによる。ただし `PreToolUse` の拒否が運べるのは文字列 1 本だけなので、**フックがコメント本文を注入するわけではない** — 1 往復ぶん遅れて、ランが自分で取りに行く。
+**The refusal hands over the re-read command itself, not a request to read the comments too.** A
+prose request is the form joshuafolkken/kit#1344 measured to move nothing over three consecutive
+runs; this row avoids it
+because a body-only read **does not pass**. A `PreToolUse` refusal carries a single string, though,
+so **the hook does not inject the comment text** — the run fetches it itself, one round trip later.
 
-**この行は `batch:guard` と引き金が重なる唯一の行である。** `time_batch_guard.is_guarded_call` は `gh issue view` を候補として扱う（`gh issue create` は扱わない）。ただしこの行は前提を満たすまで毎回拒否するので、`is_first_delivery` の待避分岐を通らず、バッチングの拒否が出るターンでも拒否する。`delivered-rules.test.ts` がこれを固定している。
+**This is the only row whose trigger overlaps `batch:guard`'s.** `time_batch_guard.is_guarded_call`
+treats `gh issue view` as a candidate (`gh issue create` it does not). But this row refuses every time
+until its prerequisite is met, so it skips the `is_first_delivery` yield branch and refuses even on a
+turn that also draws a batching refusal. `delivered-rules.test.ts` pins this.
 
-**判定はコマンド 1 件ごとに、行頭に錨を打って行う。** シェル 1 行は複数のコマンドを運ぶため、`&&` ／ `||` ／ `;` ／ 改行で区切った各区間をそれぞれ判定する（`|` は区切りに使わない — `--jq` の中に現れる方がはるかに多い）。これがないと、引用符の中に `gh issue view` を含む書き込み（`gh issue comment <N> -b "…"`）が読み取りと誤認され、逆に `gh issue view <N> && grep -c x` のように無関係な `-c` を含む行が「コメント込み」と誤認されて配送が消える。
+**The check runs per command, anchored at the start.** One shell line carries several commands, so
+each segment split on `&&` / `||` / `;` / a newline is judged separately (`|` is not a separator — it
+appears far more often inside `--jq`). Without that, a write quoting `gh issue view` inside its body
+(`gh issue comment <N> -b "…"`) would read as a read, and a line such as
+`gh issue view <N> && grep -c x` would read as "with comments" off an unrelated `-c`, and the delivery
+would vanish.
 
-**書き込みは読み取りではない。** `gh api` は `-f` ／ `-F` ／ `--field` ／ `--raw-field` ／ `--input` のいずれかが現れた時点で POST になり、`kickoff` はまさに `…/issues/<N>` へ PATCH してタイトルを正規化し空の本文を埋める。メソッドが明示的に `GET` でない、またはフィールド系のフラグを伴う呼び出しは対象外とする。
+**A write is not a read.** `gh api` becomes a POST as soon as `-f` / `-F` / `--field` / `--raw-field`
+/ `--input` appears, and `kickoff` PATCHes `…/issues/<N>` to normalize the title and fill an empty
+body. A call whose method is not explicitly `GET`, or that carries a field flag, is out of scope.
 
-**`-c` は「コメント込み」と見なさない。** `gh issue view <N> -c` は正しい読み取りだが、`-c` は `wc` ／ `grep` ／ `sort` のものである方が圧倒的に多く、これを行全体で許すとパイプで終わる複合行すべてで規則が黙る。誤って 1 往復ぶん止める側に倒し、`--comments` ／ `--json` の `comments` ／ `…/comments` エンドポイントの 3 綴りだけを「コメント込み」とする。最後の 1 つが要るのは、バッチングが本文とコメントを 1 行にまとめさせるからである。
+**`-c` does not count as "with comments".** `gh issue view <N> -c` is a correct read, but `-c` belongs
+to `wc` / `grep` / `sort` far more often, and accepting it anywhere on the line would silence the rule
+on every compound line ending in a pipe. The row errs toward costing one round trip, and only three
+spellings count as "with comments": `--comments`, `comments` in `--json`, and the `…/comments`
+endpoint. The last is needed because batching folds the body and the comments into one line.
 
-**それでもシェル文字列しか見えない。** node の中から REST で本文を読む経路は最初から掛からない。だからこそ手順本体は `issue-comments.md` に置かれており、フックはそれを補強するだけである。
+**It still sees only the shell string.** A route that reads the body over REST from inside node is
+never caught. That is why the procedure itself lives in `issue-comments.md`, and the hook only
+reinforces it.
 
-## 配送は 1 ラン 1 回
+## One delivery per run
 
-記録は `hook-decision.ts` の stamp が持つ。**1 ラン 1 回が正しいのは、拒否がランの「知っていること」を変える行だけである。** コメントを読む、Issue を数える、本文をファイルに書く — いずれも一度届けば、そのランは以後それを知った状態で進む。
+The record is the stamp `hook-decision.ts` keeps. **Once per run is right only for a row whose
+refusal changes what the run knows.** Reading the comments, counting Issues, writing a body to a
+file — once delivered, the run carries on knowing it.
 
-### 例外 — 繰り返す行為を止める行は毎回発火する（joshuafolkken/kit#1570）
+### Exception — a row that stops a repeated action fires every time
 
-止めたい対象そのものが繰り返される行為なら、1 回で終わる配送は「一度断られたあとは自由」を意味し、強制は親の自制に戻る。その自制が破れたのが #1570 である。そこで **`decide` を自前で持つ行は 1 ラン 1 回の対象から外れ、条件を満たすかぎり毎回拒否する**。
+When the thing to stop is itself a repeated action, a one-time delivery means "free once refused
+once", and enforcement falls back on the parent's restraint. That restraint is what failed in
+joshuafolkken/kit#1570: the parent set a fresh waiting timer every time it woke, several ran at
+once, and progress reports landed every few minutes instead of once per interval. So **a row that
+owns its own `decide` is outside once-per-run and refuses every time its condition holds**.
 
-**`batch:guard` との待避分岐は、そういう行では守る対象が変わる。** 1 ラン 1 回の行では**記録**を守っていた — レースに負ければ、そのランに 1 度しかない配送を無駄打ちするからである。一方で待機タイマーを張る呼び出しは定義上「単発の `Bash`」であり、バッチングガードも候補として扱う形なので、**拒否まで待避させると、10 秒の窓とその中の再発行で規則がまるごと黙る**。したがって**拒否は無条件に行い、待避は「記録してよいか」として行へ渡す** — 他のフックが止めうる呼び出しでしてはならないのは、走らなかったタイマーを生きていると書き残すことだからである。
+**For such a row, the yield branch shared with `batch:guard` protects something else.** A
+once-per-run row protected its **record** — losing the race would waste the run's only delivery. A
+call that sets a waiting timer is by definition a single `Bash`, a shape the batching guard also
+treats as a candidate, so **yielding the refusal as well would let a reissue inside the 10-second
+window silence the rule entirely**. The refusal is therefore unconditional, and the yield is passed to
+the row as "may this be recorded" — what must not happen on a call another hook can stop is recording
+a timer that never ran as alive.
 
-### 例外 — 前提を求める行は、前提が満たされるまで毎回拒否する（joshuafolkken/kit#2807）
+### Exception — a row that demands a prerequisite refuses until it is met
 
-**`already_satisfied`（前提の行為がトランスクリプト末尾にあるか）を持つ行は、1 ラン 1 回の対象から外れる。** 1 ラン 1 回のままだと、前提を飛ばしたランの再発行がそのまま通り、手順を読み飛ばしたランほどガードを素通りする。対象は `issue-fold`・`issue-comments`・`rule-body`・`oracle-consulted:*` である。従うランが詰まることはない — 前提の行為を済ませれば stand-down が先に答えて通す。記録を使い切る心配もないので、`batch:guard` との待避もしない（待避すると、10 秒の窓の中の再発行が前提を満たさないまま通る）。
+**A row with `already_satisfied` (is the prerequisite action at the transcript tail?) is outside
+once-per-run** (joshuafolkken/kit#2807). Kept once-per-run, a run that skipped the prerequisite would pass on its reissue, and
+the run that skimmed the procedure would be the one that walked past the guard. The rows are
+`issue-fold`, `issue-comments`, `rule-body` and `oracle-consulted:*`. A run that complies is never
+stuck — once the prerequisite is done, the stand-down answers first and lets it through. There is no
+record to use up either, so it does not yield to `batch:guard` (yielding would let a reissue inside
+the 10-second window through without the prerequisite).
 
-**前提の証拠を読めないときは、拒否を基本とする。** 意図して通す例外は、理由をコードのコメントに残す。現在の例外は次のとおりである。
+**When the evidence of the prerequisite cannot be read, the default is to refuse.** A deliberate
+pass is explained in a code comment. The current ones:
 
-- トランスクリプト自体を読めないとき（`hook-decision.ts`）
-- 初回の起票で、畳み込む相手がないとき（`issue-fold-rule.ts`）
-- 進捗の記録がないとき（`early-heartbeat.ts`）
-- git の読み取りに失敗して、変更なしとして扱うとき（`delivered-rules.ts` の `test-declared` 行）
+- The transcript itself cannot be read (`hook-decision.ts`)
+- A first filing, with nothing to fold into (`issue-fold-rule.ts`)
+- No progress record (`early-heartbeat.ts`)
+- A failed git read treated as no change (the `test-declared` row in `delivered-rules.ts`)
 
-## 本文のシェル評価を同じ機構の 1 行で覆った経緯
+## Shell evaluation of a body is one more row of the same mechanism
 
-コメント本文をシェルに載せるとバッククォートがコマンドとして実行される問題は、**この機構の追加 1 行で覆った**。起票時の見込みどおり新しい機構は要らず、`delivered-rules.ts` の `shell-body` 行と、その発火・非発火を固定するテストで足りている（実装先として書いていた joshuafolkken/kit#1542 は #1198 の重複として閉じられたため、実装は #1198 側で行った）。
+A comment body put on the shell runs its backticks as commands. **One more row of this mechanism
+covers it**: no new mechanism was needed, only the `shell-body` row in `delivered-rules.ts` and the
+tests that pin when it fires and when it does not. (joshuafolkken/kit#1542, where this was first
+planned, was closed as a duplicate of joshuafolkken/kit#1198, so the work landed under
+joshuafolkken/kit#1198.)
 
-**引き金は当初の見込みより狭い。** `-f body=` ／ `--body "` というフラグで引くのではなく、**二重引用符の本文値に `` ` `` か `$` が実際に含まれるとき**だけ発火する。本リポジトリのプロンプトにある作例はいずれもプレースホルダ（`-f body="<plan>"`）を渡しており無害なので、フラグで引くと**規則が既に守られているターンで拒否する**ことになり、手順文書の「誤ったターンで発火するフックはフックが無いより悪い」に反する。`!`（履歴展開）も引き金に入れていない — 非対話 zsh では発火しないことを実測した。規則本文と引き金の死角は [`shell-body.md`](../../prompts/collaboration-workflow/shell-body.md) にある。
+**The trigger is narrower than a flag.** It does not fire on the `-f body=` / `--body "` flag; it fires
+**only when a double-quoted body value actually contains `` ` `` or `$`**. Every example in this
+repository's prompts passes a placeholder (`-f body="<plan>"`), which is harmless, so a flag trigger
+would **refuse on turns that already follow the rule** — against the procedure's "a hook that fires on
+the wrong turn is worse than no hook". `!` (history expansion) is not a trigger either — it was
+measured not to fire in non-interactive zsh. The rule body and the trigger's blind spots are in
+[`shell-body.md`](../../prompts/collaboration-workflow/shell-body.md).
 
-## マーカーテスト
+## Marker tests
 
-配送一覧の項目を固定するスイートには `scripts/rules/turn-batching-rule.test.ts` ／ `scripts/rules/shell-body-rule.test.ts` ／ `scripts/rules/piped-verification-rule.test.ts` ／ `scripts/rules/pre-gate-cut.test.ts` ／ `scripts/rules/implementation-cut-rule.test.ts` ／ `scripts/rules/implementation-cut.test.ts` ／ `scripts/rules/lane-park.test.ts` ／ `scripts/rules/lane-interactive-ask.test.ts` ／ `scripts/rules/rule-body-guard.test.ts` がある。各テストファイルが何を固定するか:
+The suites pinning the delivery list's items are `scripts/rules/turn-batching-rule.test.ts`,
+`scripts/rules/shell-body-rule.test.ts`, `scripts/rules/piped-verification-rule.test.ts`,
+`scripts/rules/pre-gate-cut.test.ts`, `scripts/rules/implementation-cut-rule.test.ts`,
+`scripts/rules/implementation-cut.test.ts`, `scripts/rules/lane-park.test.ts`,
+`scripts/rules/lane-interactive-ask.test.ts` and `scripts/rules/rule-body-guard.test.ts`. What each
+test file pins:
 
-- `scripts/rules/delivered-rules.test.ts` — 各エントリが引き金で**実際に発火**し、それ以外では無言であること。散文が効かなかったのがこの機構の出発点であり、**発火しない移設は移設ではない**
-- `scripts/claude/claude-settings-hooks.test.ts` — `rule:guard` が `PreToolUse` に `Bash` だけを名指しして配線され、タイムアウトを宣言し、実在する josh サブコマンドを指すこと
-- `scripts/backlog/backlog-manufacturing-rule.test.ts` — WIP 上限が `wip-cap.md` に単一ソースとして存在し、配送文が数え方・拒否・2 つの免除・免除を決める 3 条件を運ぶこと
-- `scripts/rules/turn-batching-rule.test.ts` — バッチングの配送文が判断基準を運び、参照先が `CLAUDE.md` ではなくこのディレクトリの `turn-batching.md` であること
-- `scripts/document/document-markers.test.ts` — 早すぎる進捗報告の手順が `.claude/skills/workflow-commands/backlogrun.md` の該当節に単一ソースとして存在し、この文書が行と 1 ラン 1 回の例外を書いていること。発火・非発火と「毎回発火する」ことは `scripts/rules/early-heartbeat.test.ts` が固定する
-- `scripts/rules/issue-comments-rule.test.ts` — コメント読み取りの手順が `issue-comments.md` に単一ソースとして存在し、3 つの `#N` 入口がそれを**再掲せずに指す**こと（矛盾時の規則を 3 箇所に写せばクローンになる）。フックが届かないセッションでも規則が残ることを、この対で担保する
-- `scripts/rules/shell-body-rule.test.ts` — 本文のシェル評価が `shell-body.md` に単一ソースとして存在し、配送文が被害・安全な綴り・再発行の指示を運ぶこと
-- `scripts/rules/raw-field-body.test.ts` — 生フィールドの `body=@` 誤射（joshuafolkken/kit#2304）の述語と配送文の文言を固定する。実際の配送経路での発火（`-f` ／ `--raw-field body=@`）・無言（`-F` ／ `--field body=@`・`@` を含まない本文・`pnpm josh issue:comment`）と「1 コマンドを 1 行だけが主張する」ことは `scripts/rules/delivered-rules-bash.test.ts` が固定する
-- `scripts/rules/piped-verification-rule.test.ts` — 検証コマンドのパイプが `output-bounds.md` に単一ソースとして存在し、配送文が仕組み・逃げ道・境界の 3 つを運び、読み取り専用の一覧を巻き込んでいないこと
-- `scripts/rules/pre-gate-cut-rule.test.ts` — gate 手前の cut の手順が `.claude/skills/workflow-commands/pre-gate-cut.md` に単一ソースとして存在し、この文書と `docs/josh-commands.md` の双方が引き金を書いていること。発火・非発火（レーンかつ目印ありかつ未 cut でのみ拒否し、目印の無い人・レーン外・cut 済みでは無言）は `scripts/rules/pre-gate-cut.test.ts` が固定する
-- `scripts/rules/implementation-cut-rule.test.ts` — 実装フェーズの cut の手順が `.claude/skills/workflow-commands/pre-gate-cut.md` →「It is a guard, fired at the edit that crosses the threshold」に単一ソースとして存在し、配送文がその節・命令・再武装の契約（再開で記録を消して両ガードを再武装させること、joshuafolkken/kit#2310）を運ぶこと。発火・非発火（レーンの子かつ目印ありかつ未 cut かつしきい値超過の `Edit` ／ `Write` でのみ拒否し、レーン外・目印なし・非編集・cut 済み・しきい値未満では無言）は `scripts/rules/implementation-cut.test.ts` が固定する
-- `scripts/rules/delivered-rules-filing.test.ts` — 直接起票（`gh issue create`、`…/issues` への `title` 付き POST）が毎回拒否されて `pnpm josh issue:file` を案内され、`issue:file` の呼び出し自体は拒否されないこと。起票上限と畳み込みの行が `issue:file` の呼び出しで発火し、失敗した `issue:file` 呼び出しを起票に数えないことも同じスイートが固定する
-- `scripts/rules/filing-cap.test.ts` — 起票回数の計数（拒否された起票を数に入れないこと）を固定する。発火・非発火（10 件目まで無言・11 件目で拒否・毎回発火する）は `scripts/rules/delivered-rules.test.ts` が固定する
-- `scripts/rules/lane-park-rule.test.ts` — レーンの子の保留の手順が `.claude/skills/workflow-commands/pre-gate-cut.md` に単一ソースとして存在し、配送文がその節を指すこと。発火・非発火（レーンの子かつ停止通知でのみ拒否し、レーン外・目印なし・停止通知でないときは無言）は `scripts/rules/lane-park.test.ts` が固定する
-- `scripts/rules/lane-interactive-ask-rule.test.ts` — レーンの子の対話質問の手順が `.claude/skills/workflow-commands/pre-gate-cut.md` → 「The interactive ask is refused one call earlier」に単一ソースとして存在し、配送文がその節を指すこと（joshuafolkken/kit#2201）。発火・非発火（レーンの子の `AskUserQuestion` でのみ拒否し、レーン外・目印なし・対話ツールでないときは無言）と毎回発火は `scripts/rules/lane-interactive-ask.test.ts` が、終了記録からの質問・選択肢の取り出しは `scripts/agent/interactive-ask.test.ts` が固定する
-- `scripts/rules/lane-switch-main.test.ts` — レーンの子の `git switch main`（joshuafolkken/kit#2313）を、失敗する前に拒否する述語（`switch_target` ／ `is_switch_away_from_lane`）と配送文の文言を固定する。手順の単一ソースは `.claude/skills/workflow-commands/backlogrun-lanes.md` ／ `backlogrun-child.md`。発火・非発火（レーンの子が自分のレーンブランチ以外へ切り替えるときのみ拒否し、自ブランチ・作成/デタッチ・レーン外・主チェックアウトでは無言）と毎回発火、「1 コマンドを 1 行だけが主張する」ことは同スイートが固定する
-- `scripts/rules/git-argv.test.ts` ／ `scripts/rules/git-force.test.ts` ／ `scripts/rules/worktree-guard.test.ts` ／ `scripts/rules/file-body.test.ts` — Bash 文字列の 3 群（joshuafolkken/kit#2120）の述語と配送文の文言を固定する。実際の配送経路での発火・無言と「1 コマンドを 1 行だけが主張する」ことは `scripts/rules/delivered-rules-bash.test.ts` が固定する
-- `scripts/rules/index-guard.test.ts` ／ `scripts/rules/destructive-command.test.ts` ／ `scripts/rules/protected-files.test.ts` — deny の先頭一致をすり抜ける言い換え（joshuafolkken/kit#2983）を引数・パスの解析で止める 3 行の述語を固定する。`permission-guards.ts` がこの 3 行を 1 つにまとめて配送表へ渡す
-- `scripts/rules/direct-pr-create.test.ts` — `closes #N` を生成しない PR の直接作成（`gh pr create`・pulls への `gh api` 書き込み、joshuafolkken/kit#3183）を止める述語を固定する。`permission-guards.ts` の 4 行目として配送される
-- `scripts/rules/rule-body-guard.test.ts` — 規則本文を散文に書き足す `Edit` ／ `Write`（joshuafolkken/kit#2272）の述語・配送文・列挙表掲載を固定する。発火（規則ドキュメントへの追記）と無言（誤字・リンク張り替え・削除・非規則ファイル・非 Edit/Write）、および実際の配送経路での「2 つのコマンドを実行するまで毎回拒否」はこの 1 スイートが固定する。配送文が第 0 問（`oracle:list`）と順序の問い（`run:step`）を運び、単一ソースが `residency.md` であることも同じスイートが押さえる
-- `scripts/rules/stop-rules-rule.test.ts` — 停止時 4 規則の単一ソース（`CLAUDE.md` の停止通知・`working-tree-hold.md`・`observation-filing.md`・`issue-citation.md`）と `rule-delivery.md` の列挙表掲載を固定する。発火・無言（押さえ×未通知でブロック／綺麗×押さえでブロック／汚れ・通知済みで無言／`stop_hook_active` で無言／起票の申し出×未起票でブロック・起票済み／第三者リポジトリ／owner 不明で無言／裸 `#N` でブロック・リンク形式やコードフェンス／インラインコード／引用行／PR 参照の中で無言）は `scripts/rules/stop-rules.test.ts`・`scripts/rules/filing-offer.test.ts`・`scripts/rules/issue-citation.test.ts` が、`Stop` フックの配線は `scripts/claude/claude-settings-hooks.test.ts` が固定する
+- `scripts/rules/delivered-rules.test.ts` — each entry **actually fires** on its trigger and is silent
+  otherwise. Prose that did not work is where this mechanism started, so **a move that does not fire
+  is not a move**
+- `scripts/claude/claude-settings-hooks.test.ts` — `rule:guard` is wired under `PreToolUse` naming
+  `Bash` alone, declares a timeout and points at a josh subcommand that exists
+- `scripts/backlog/backlog-manufacturing-rule.test.ts` — the WIP cap exists in `wip-cap.md` as its
+  single source, and the message carries the count, the refusal, the two exemptions and the three
+  conditions that decide an exemption
+- `scripts/rules/turn-batching-rule.test.ts` — the batching message carries the criterion, and points
+  at `turn-batching.md` in this directory rather than at `CLAUDE.md`
+- `scripts/document/document-markers.test.ts` — the early-progress-report procedure exists as its
+  single source in its section of `.claude/skills/workflow-commands/backlogrun.md`, and this document
+  states the row and its once-per-run exception. `scripts/rules/early-heartbeat.test.ts` pins when it
+  fires, when it does not, and that it fires every time
+- `scripts/rules/issue-comments-rule.test.ts` — the comment-reading procedure exists in
+  `issue-comments.md` as its single source, and the three `#N` entries **point at it without
+  restating it** (copying the conflict rule into three places would be a clone). The pair keeps the
+  rule alive in a session the hook does not reach
+- `scripts/rules/shell-body-rule.test.ts` — shell evaluation of a body exists in `shell-body.md` as
+  its single source, and the message carries the damage, the safe spelling and the reissue instruction
+- `scripts/rules/raw-field-body.test.ts` — pins the predicate and the message wording for the raw-field
+  `body=@` misfire (joshuafolkken/kit#2304). `scripts/rules/delivered-rules-bash.test.ts` pins firing on the real delivery route
+  (`-f` / `--raw-field body=@`), silence (`-F` / `--field body=@`, a body without `@`,
+  `pnpm josh issue:comment`), and that only one row claims a command
+- `scripts/rules/piped-verification-rule.test.ts` — piping a verification command exists in
+  `output-bounds.md` as its single source, the message carries the mechanism, the way out and the
+  boundary, and read-only listings are left alone
+- `scripts/rules/pre-gate-cut-rule.test.ts` — the pre-gate cut procedure exists as its single source
+  in `.claude/skills/workflow-commands/pre-gate-cut.md`, and both this document and
+  `docs/josh-commands.md` state the trigger. `scripts/rules/pre-gate-cut.test.ts` pins firing and
+  silence (it refuses only for a lane with the marker that has not cut, and is silent for a person
+  without the marker, outside a lane, or after the cut)
+- `scripts/rules/implementation-cut-rule.test.ts` — the implementation-phase cut procedure exists as
+  its single source in `.claude/skills/workflow-commands/pre-gate-cut.md` → "It is a guard, fired at
+  the edit that crosses the threshold", and the message carries that section, the instruction and the
+  re-arming contract (a resume clears the record and re-arms both guards, joshuafolkken/kit#2310).
+  `scripts/rules/implementation-cut.test.ts` pins firing and silence (it refuses only an `Edit` /
+  `Write` over the threshold by a lane child with the marker that has not cut, and is silent outside
+  a lane, without the marker, for a non-edit, after the cut and under the threshold)
+- `scripts/rules/delivered-rules-filing.test.ts` — a direct filing (`gh issue create`, a POST with a
+  `title` to `…/issues`) is refused every time and pointed to `pnpm josh issue:file`, and the
+  `issue:file` call itself is not refused. The same suite pins that the cap and fold rows fire on an
+  `issue:file` call, and that a failed `issue:file` call is not counted as a filing
+- `scripts/rules/filing-cap.test.ts` — pins the filing count (a refused filing is not counted).
+  `scripts/rules/delivered-rules.test.ts` pins firing and silence (silent through the tenth, refused at
+  the eleventh, every time)
+- `scripts/rules/lane-park-rule.test.ts` — the lane child's park procedure exists as its single source
+  in `.claude/skills/workflow-commands/pre-gate-cut.md`, and the message points at that section.
+  `scripts/rules/lane-park.test.ts` pins firing and silence (it refuses only a lane child's stop
+  notice, and is silent outside a lane, without the marker, or when the message is not a stop notice)
+- `scripts/rules/lane-interactive-ask-rule.test.ts` — the lane child's interactive-ask procedure exists
+  as its single source in `.claude/skills/workflow-commands/pre-gate-cut.md` → "The interactive ask is
+  refused one call earlier", and the message points at that section (joshuafolkken/kit#2201).
+  `scripts/rules/lane-interactive-ask.test.ts` pins firing and silence (it refuses only a lane child's
+  `AskUserQuestion`, and is silent outside a lane, without the marker, or for a non-interactive tool)
+  and that it fires every time; `scripts/agent/interactive-ask.test.ts` pins extracting the question
+  and the options from the exit record
+- `scripts/rules/lane-switch-main.test.ts` — pins the predicates (`switch_target` /
+  `is_switch_away_from_lane`) that refuse a lane child's `git switch main` (joshuafolkken/kit#2313)
+  before it fails, and the
+  message wording. The procedure's single source is `.claude/skills/workflow-commands/backlogrun-lanes.md`
+  / `backlogrun-child.md`. The same suite pins firing and silence (it refuses only a lane child
+  switching to a branch other than its own lane branch, and is silent for its own branch, a create or
+  detach, outside a lane, and in the main checkout), that it fires every time, and that only one row
+  claims a command
+- `scripts/rules/git-argv.test.ts` / `scripts/rules/git-force.test.ts` /
+  `scripts/rules/worktree-guard.test.ts` / `scripts/rules/file-body.test.ts` — pin the predicates and
+  message wording of the three groups of Bash-string rows (joshuafolkken/kit#2120). `scripts/rules/delivered-rules-bash.test.ts`
+  pins firing and silence on the real delivery route, and that only one row claims a command
+- `scripts/rules/index-guard.test.ts` / `scripts/rules/destructive-command.test.ts` /
+  `scripts/rules/protected-files.test.ts` — pin the predicates of the three rows that stop the
+  paraphrases slipping past the deny list's prefix match (joshuafolkken/kit#2983) by parsing arguments and paths.
+  `permission-guards.ts` folds the three into one and hands them to the enumeration
+- `scripts/rules/direct-pr-create.test.ts` — pins the predicate that stops a direct PR creation which
+  never generates `closes #N` (`gh pr create`, a `gh api` write to pulls, joshuafolkken/kit#3183). It is delivered as the
+  fourth row of `permission-guards.ts`
+- `scripts/rules/rule-body-guard.test.ts` — pins the predicate, the message and the enumeration entry
+  for an `Edit` / `Write` that appends a rule body to prose (joshuafolkken/kit#2272). This one suite pins firing (an append to
+  a rule document), silence (a typo fix, a link swap, a deletion, a non-rule file, a non-Edit/Write),
+  and, on the real delivery route, "refused every time until both commands have run". The same suite
+  checks that the message carries question 0 (`oracle:list`) and the ordering question (`run:step`),
+  and that the single source is `residency.md`
+- `scripts/rules/stop-rules-rule.test.ts` — pins the single sources of the four stop rules (the stop
+  notification in `CLAUDE.md`, `working-tree-hold.md`, `observation-filing.md`, `issue-citation.md`)
+  and their entry in `rule-delivery.md`'s enumeration. `scripts/rules/stop-rules.test.ts`,
+  `scripts/rules/filing-offer.test.ts` and `scripts/rules/issue-citation.test.ts` pin firing and
+  silence (hold × no notice blocks; clean × hold blocks; dirty or notified is silent;
+  `stop_hook_active` is silent; an offer to file × nothing filed blocks, while filed, a third-party
+  repository or an unknown owner is silent; a bare `#N` blocks, while one in link form, a code fence,
+  inline code, a quoted line or a PR reference is silent), and
+  `scripts/claude/claude-settings-hooks.test.ts` pins the `Stop` hook's wiring

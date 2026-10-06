@@ -34,8 +34,8 @@ const PIPEFAIL = '`set -o pipefail`'
 // The anecdote and the rejected alternatives are the quotable half — the first thing that would be
 // pasted back into an always-loaded document, and the reason to check that it was not.
 const REASONING: ReadonlyArray<string> = [
-	'実行した子が出力を読んでいたから気づいた',
-	'書き換える例が存在しない',
+	'it was caught because the child that ran it read the output',
+	'**it is invented fresh every turn**',
 ]
 
 // Every sentence here changes what the reader does next. Drop the mechanism and the refusal reads as
@@ -105,7 +105,7 @@ describe(`${CANONICAL} — the single source for the rule and its rejected alter
 })
 
 // The reasoning belongs at the pointer, and the resident surface is the likeliest place it would be
-// pasted back into. The rationale quotes the original Japanese wording, so the markers stay verbatim.
+// pasted back into.
 describe.each(AI_DOCS)('%s — leaves the reasoning at the pointer', (document_path) => {
 	it.each(REASONING)('does not carry %j', (marker) => {
 		expect(read_unwrapped_rule_surface(document_path)).not.toContain(marker)

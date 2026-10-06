@@ -49,6 +49,10 @@ const INSTALLER_PIN_KEYS: ReadonlyArray<string> = [
 	'SAFE_CHAIN_INSTALLER_VERSION',
 	'SAFE_CHAIN_INSTALLER_SHA256',
 ]
+// A verbatim quote of a Japanese prompt heading or literal sits in a code span, a fence or double
+// quotes (`docs/maintainers/README.md` → "Language"); everything else is English.
+const QUOTED_SPANS = /```[\s\S]*?```|`[^`\n]*`|"[^"\n]*"/gu
+const JAPANESE = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u
 
 // GitHub's anchor for a plain-text heading: lower case, spaces as hyphens.
 function heading_anchors(text: string): Array<string> {
@@ -67,6 +71,12 @@ function markdown_in(directory: string): Array<string> {
 		.map((entry) => `${directory}/${entry}`)
 }
 
+function markdown_under(directory: string): Array<string> {
+	return readdirSync(package_file(directory), { encoding: 'utf8', recursive: true })
+		.filter((entry) => entry.endsWith('.md'))
+		.map((entry) => `${directory}/${entry}`)
+}
+
 function user_guides(): Array<string> {
 	return [
 		...USER_GUIDE_PAGES,
@@ -79,6 +89,19 @@ function published_entries(): Array<string> {
 
 	return manifest.files.filter((entry) => !entry.startsWith('!'))
 }
+
+describe('the maintainer documentation language', () => {
+	it.each(markdown_under(MAINTAINERS_DIRECTORY))('%s carries no Japanese prose', (path) => {
+		expect(read_document(path).replaceAll(QUOTED_SPANS, '')).not.toMatch(JAPANESE)
+	})
+
+	it('reads a quoted Japanese heading as a quote, not as prose', () => {
+		const quoted = 'See `wip-cap.md` → "規則" and `## 背景`.'
+
+		expect(quoted.replaceAll(QUOTED_SPANS, '')).not.toMatch(JAPANESE)
+		expect('The 規則 section.'.replaceAll(QUOTED_SPANS, '')).toMatch(JAPANESE)
+	})
+})
 
 describe('the maintainer documentation', () => {
 	it('indexes every maintainer page', () => {

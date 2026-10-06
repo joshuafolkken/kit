@@ -481,8 +481,7 @@ profile it recorded at dispatch: a cut, resume or wake of a lane created before 
 its recorded model (a model the floor table does not name is not version-checked), and only a newly
 dispatched lane takes the new default. `JOSH_{ROLE}_MODEL` overrides reach new Claude Code launches
 only; they never rewrite a recorded lane. Legacy
-`JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`. See the [worker
-evaluation procedure](./maintainers/backlogrun-worker-evaluation.md).
+`JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`.
 
 **Output / exit codes:** prints the child's pid on stdout. Every refusal exits non-zero and sends a `warning` — including one because the `in-progress` label could not be applied (no log path, since nothing started). A child that started but whose log could not be opened warns and exits zero (`dispatched`).
 
