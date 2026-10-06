@@ -146,6 +146,19 @@ function report(result: EpicNextResult, context: PoolContext): number {
 	return SUCCESS_EXIT_CODE
 }
 
+// The settled set the views were classified against, so a standalone row and an epic child weigh the
+// same blocker the same way.
+function running_of(
+	views: ReadonlyArray<EpicView>,
+	graphs: ReadonlyArray<ReadonlyArray<EpicChild>>,
+	context: PoolContext,
+): ReadonlySet<string> {
+	return (
+		views[0]?.running ??
+		backlog_pool.running_set(graphs, context.opted_in.issues, context.repo, context.tracking.index)
+	)
+}
+
 // The two halves as one result. The epic half is already classified by `epic:next`; the standalone
 // half is classified here; the verdict is decided from the merge, so a backlog with a runnable epic
 // child and nothing else says `run` exactly as one with a runnable standalone issue does.
@@ -161,10 +174,7 @@ function combine(views: ReadonlyArray<EpicView>, context: PoolContext): EpicNext
 		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
 		exclude: context.exclude,
 		repo: context.repo,
-		// The settled set the views were classified against, so a standalone row and an epic child weigh
-		// the same blocker the same way.
-		running:
-			views[0]?.running ?? backlog_pool.running_set(graphs, context.opted_in.issues, context.repo),
+		running: running_of(views, graphs, context),
 	})
 
 	// The same checkout map `epic:next` hands `build_result`. Without it every bundle heading reads
@@ -194,6 +204,7 @@ function settled_views(
 		views[0]?.running ?? running,
 		context.opted_in.issues,
 		context.repo,
+		context.tracking.index,
 	)
 
 	return settled.size === running.size ? views : settled_views(reads, settled, context)
@@ -212,7 +223,7 @@ function views_from(reads: ReadonlyArray<EpicRead>, context: PoolContext): Reado
 
 	return settled_views(
 		reads,
-		backlog_pool.running_set(graphs, context.opted_in.issues, context.repo),
+		backlog_pool.running_set(graphs, context.opted_in.issues, context.repo, context.tracking.index),
 		context,
 	)
 }
