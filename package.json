@@ -93,6 +93,7 @@
 		"!scripts/test/test-telegram-guard.ts",
 		"!scripts/test/unit-guard-environment.ts",
 		"!scripts/test/unit-projects.ts",
+		"!scripts/test/untested-sources.ts",
 		"!scripts/test/vitest-include-globs.ts",
 		"!scripts/build/shim-shell.ts",
 		"!scripts/claude/skill-meta.ts",

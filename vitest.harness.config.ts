@@ -14,5 +14,7 @@ export default defineConfig({
 		env: unit_projects.ENV,
 		testTimeout: TEST_TIMEOUT_MS,
 		include: [...unit_projects.MAIN_EXCLUDE],
+		globalSetup: [...unit_projects.NETWORK_GUARD],
+		setupFiles: [...unit_projects.WORKER_GUARDS],
 	},
 })

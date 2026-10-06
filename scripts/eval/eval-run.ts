@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { poll } from '#scripts/lib/poll'
@@ -196,6 +197,12 @@ async function main(): Promise<boolean> {
 	return await run_recorded(chosen, choice.limit)
 }
 
-const is_all_held = await main()
+async function run(): Promise<void> {
+	if (!(await main())) process.exitCode = FAILURE_EXIT_CODE
+}
 
-if (!is_all_held) process.exitCode = FAILURE_EXIT_CODE
+const eval_run = { main, selected, unknown_scenarios }
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) await run()
+
+export { eval_run }
