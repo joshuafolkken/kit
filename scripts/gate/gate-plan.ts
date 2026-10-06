@@ -1,6 +1,7 @@
 import { availableParallelism } from 'node:os'
 import { josh_verdict } from '#scripts/josh/josh-verdict'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
+import { core_budget } from './core-budget'
 
 // How many of the gate's checks run at once, and how wide the one elastic check may fan out —
 // both derived from the machine rather than fixed at four (joshuafolkken/kit#1258).
@@ -61,15 +62,30 @@ const WARNING_CHECKER_LABELS: ReadonlyArray<string> = [LINT_LABEL, TYPE_CHECK_LA
 // check rather than one appended after the unit suite is what keeps the plan's shape intact: the
 // `--no-unit` set stays "the whole gate minus the unit suite", and a CI runner — which has no recorded
 // transcripts — runs it as a trivial green rather than skipping it.
+//
+// **The three reserving weights are `core_budget.CORE_WEIGHTS`** (joshuafolkken/kit#3345), the same
+// numbers the `josh lint`, `josh check` and `josh cspell:dot` commands claim when run directly.
+//
+// **The two zero weights were measured again for joshuafolkken/kit#3345, and they stay zero.** These are
+// warm runs on the 11-core machine on 2026-10-06. `behavior` took 0.6s of wall for 0.7s of CPU, which
+// is node starting up. `exports:unused` took 5.5s of wall for 9.0s of CPU, about 1.6 cores. Floored,
+// that would be one core, but a reservation lasts the whole gate's plan, not the check's five seconds.
+// It would lower `RESERVED_CORES` from 4 to 5 and cut the solo unit cap from 7 workers to 6 for the
+// full length of the unit suite, to cover a burst that ends before lint does. Nothing has measured
+// that trade, so the measured shape stays.
 const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
-	{ label: LINT_LABEL, target: 'lint', reserved_cores: 2 },
-	{ label: TYPE_CHECK_LABEL, target: 'check', reserved_cores: 1 },
-	{ label: 'cspell', target: 'cspell:dot', reserved_cores: 1 },
+	{ label: LINT_LABEL, target: 'lint', reserved_cores: core_budget.CORE_WEIGHTS.lint },
+	{
+		label: TYPE_CHECK_LABEL,
+		target: 'check',
+		reserved_cores: core_budget.CORE_WEIGHTS.type_check,
+	},
+	{ label: 'cspell', target: 'cspell:dot', reserved_cores: core_budget.CORE_WEIGHTS.spell_check },
 	{ label: BEHAVIOR_LABEL, target: BEHAVIOR_LABEL, reserved_cores: 0 },
 	// **The unused-member check reserves no core** (joshuafolkken/kit#2987): it builds one TypeScript
-	// program and walks it single-threaded for about 5s — over well before lint and the type check, so
-	// a reservation would only take a place from the four-core CI runner's fan-out and a worker from
-	// the unit suite for the whole gate.
+	// program and walks it for about 5s, and it is over well before lint and the type check. A
+	// reservation would only take a place from the four-core CI runner's fan-out and a worker from the
+	// unit suite for the whole gate.
 	{ label: 'exports', target: 'exports:unused', reserved_cores: 0 },
 ]
 

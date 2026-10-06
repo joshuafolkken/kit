@@ -166,7 +166,7 @@ interface BudgetContext {
 function default_budget(): BudgetContext {
 	return {
 		available_cores: availableParallelism(),
-		is_reserved: !unit_worker_share.is_nested_run(),
+		is_reserved: !unit_worker_share.is_nested_run() && !core_budget.is_held(),
 	}
 }
 
@@ -222,10 +222,17 @@ async function run_gate_steps(
 ): Promise<ReadonlyArray<GateStepResult>> {
 	const reserved = await build_reserved_steps(process.cwd(), plan, budget.available_cores)
 
-	return await bounded_pool.bounded_map(
-		reserved,
-		plan.concurrency,
-		async (entry) => await run_reserved_step(entry, budget),
+	// **The checks run under the held mark, so a check's own dispatch claims nothing**
+	// (joshuafolkken/kit#3345). Each check is a `pnpm josh <target>` child, and a target that declares
+	// a weight would otherwise claim a second place for the cores reserved for it here. A nested gate
+	// sets the mark too, since its checks are covered by the outer gate's reservation.
+	return await core_budget.with_held_mark(
+		async () =>
+			await bounded_pool.bounded_map(
+				reserved,
+				plan.concurrency,
+				async (entry) => await run_reserved_step(entry, budget),
+			),
 	)
 }
 

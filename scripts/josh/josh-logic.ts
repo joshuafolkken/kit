@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_local_bin, resolve_package_bin } from '#scripts/build/local-bin'
+import { core_budget } from '#scripts/gate/core-budget'
 import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { package_version_schema } from '#scripts/lib/schemas'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
@@ -269,13 +270,35 @@ function pre_dispatch_exit(
 	return USAGE_ERROR_EXIT_CODE
 }
 
-async function dispatch_entry(
+async function run_entry(
 	entry: CommandEntry,
 	subcommand_arguments: Array<string>,
 ): Promise<number> {
 	if (entry.shell) return run_shell_command(entry.shell, subcommand_arguments)
 
 	return await run_script_entry(entry, subcommand_arguments)
+}
+
+function command_weight(entry: CommandEntry): number | undefined {
+	return typeof entry.core_weight === 'function' ? entry.core_weight() : entry.core_weight
+}
+
+// **Every command passes through here, so this is where a declared weight is reserved**
+// (joshuafolkken/kit#3345). A heavy command run directly, outside `josh gate`, used to start its tools
+// without claiming a place. A command under a parent that already holds its cores claims nothing:
+// `core_budget.with_command_reservation` reads the mark that parent set.
+async function dispatch_entry(
+	entry: CommandEntry,
+	subcommand_arguments: Array<string>,
+): Promise<number> {
+	const weight = command_weight(entry)
+
+	if (weight === undefined) return await run_entry(entry, subcommand_arguments)
+
+	return await core_budget.with_command_reservation(
+		weight,
+		async () => await run_entry(entry, subcommand_arguments),
+	)
 }
 
 async function run_command(
