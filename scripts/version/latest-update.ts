@@ -179,7 +179,7 @@ function main(): void {
 	// the workflows' pinned safe-chain installer, which would contradict the notice that
 	// nothing changed.
 	if (outcome.status === 0 && !outcome.is_rolled_back) {
-		safe_chain_version_update.sync(PACKAGE_JSON_PATH)
+		safe_chain_version_update.sync()
 	}
 }
 

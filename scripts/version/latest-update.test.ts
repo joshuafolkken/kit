@@ -138,10 +138,10 @@ describe('latest_update.main — preinstall sync guard', () => {
 		execa_sync_mock.mockReturnValue({ exitCode: 0 })
 	})
 
-	it('calls the safe-chain pin sync with the manifest when update succeeds', () => {
+	it('calls the safe-chain pin sync when update succeeds', () => {
 		latest_update.main()
 
-		expect(sync_mock).toHaveBeenCalledWith('package.json')
+		expect(sync_mock).toHaveBeenCalledOnce()
 	})
 
 	it('skips preinstall sync when update fails', () => {
