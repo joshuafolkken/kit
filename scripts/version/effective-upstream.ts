@@ -1,13 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
+import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { json_value } from '#scripts/lib/json-value'
 import { package_named_version_schema } from '#scripts/lib/schemas'
 
 const PACKAGE_JSON = 'package.json'
-// Node module paths never nest anywhere near this deep; the bound only guards against an unexpected
-// filesystem cycle so the walk-up cannot loop forever.
-const MAX_WALK_DEPTH = 64
 
 // Options for `resolve_effective_upstream_version`. `resolve_marker` is a subpath specifier used for
 // `createRequire().resolve()` when the package root itself is not directly resolvable — e.g. kit does
@@ -31,26 +29,10 @@ function read_matching_version(manifest_path: string, package_name: string): str
 	return parsed.data.version
 }
 
-// The directory itself and each of its ancestors up to the filesystem root, nearest-first. Bounded
-// by MAX_WALK_DEPTH so an unexpected filesystem cycle cannot produce an unbounded list.
-function ancestor_directories(start_directory: string): Array<string> {
-	const directories: Array<string> = []
-	let current = start_directory
-
-	for (let depth = 0; depth < MAX_WALK_DEPTH; depth += 1) {
-		directories.push(current)
-		const parent = path.dirname(current)
-		if (parent === current) break
-		current = parent
-	}
-
-	return directories
-}
-
 // Walk up from a resolved file's directory to the package root, returning the version of the first
 // ancestor package.json whose `name` matches the target — or undefined when no matching root exists.
 function walk_up_for_version(start_directory: string, package_name: string): string | undefined {
-	for (const directory of ancestor_directories(start_directory)) {
+	for (const directory of ancestor_directories.list(start_directory)) {
 		const version = read_matching_version(path.join(directory, PACKAGE_JSON), package_name)
 		if (version !== undefined) return version
 	}

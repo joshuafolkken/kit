@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { z } from 'zod'
 import { run_progress } from './run-progress'
 
@@ -28,28 +29,12 @@ import { run_progress } from './run-progress'
 
 const PACKAGE_FILE = 'package.json'
 
-// Deep enough to cross a workspace package and its root, and bounded so a path that never reaches a
-// root — a broken mount, a mocked `dirname` — cannot spin.
-const MAX_DEPTH = 10
-
 // Unknown keys are stripped rather than rejected: this reads a whole `package.json`, and every other
 // field in it is none of this module's business. A present-but-unusable interval fails the parse and
 // falls through, which is the same answer an unusable environment variable already gets.
 const package_schema = z.object({
 	josh: z.object({ progress_interval_minutes: z.number().positive() }).optional(),
 })
-
-function ancestors_of(start: string): ReadonlyArray<string> {
-	const directories: Array<string> = []
-	let current = path.resolve(start)
-
-	while (directories.length < MAX_DEPTH && !directories.includes(current)) {
-		directories.push(current)
-		current = path.dirname(current)
-	}
-
-	return directories
-}
 
 function read_declared_minutes(directory: string): number | undefined {
 	try {
@@ -63,7 +48,7 @@ function read_declared_minutes(directory: string): number | undefined {
 }
 
 function read_package_minutes(start: string): number | undefined {
-	for (const directory of ancestors_of(start)) {
+	for (const directory of ancestor_directories.list(start)) {
 		const minutes = read_declared_minutes(directory)
 
 		if (minutes !== undefined) return minutes
