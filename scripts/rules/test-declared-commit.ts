@@ -1,9 +1,9 @@
 import { test_declared_changed } from '#scripts/test/test-declared-changed'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
-import { run_tail } from './run-tail'
+import { run_tail_rule } from './run-tail-rule'
 
 // The trigger and the delivered text behind the `test-declared` row of `delivered-rules.ts`
-// (joshuafolkken/kit#2118). It lives beside `run-tail.ts` and the other per-rule modules rather than
+// (joshuafolkken/kit#2118). It lives beside `run-tail-rule.ts` and the other per-rule modules rather than
 // inline in the enumeration, so the enumeration stays a list of rows.
 //
 // **A commit whose code change carries no test, refused at the commit stage `run-tail` already
@@ -11,7 +11,7 @@ import { run_tail } from './run-tail'
 // the input is mechanical — the changed paths, the test-file spelling, the exempt-path enumeration —
 // so it is a delivered rule rather than resident prose.
 //
-// **No new delivery path.** The command half is `run_tail.is_push_step_call`, reused verbatim, and the
+// **No new delivery path.** The command half is `run_tail_rule.is_push_step_call`, reused verbatim, and the
 // only thing added is the world-read: the working-tree verdict `pnpm josh test:declared` prints. Like
 // `pre-gate-cut`, the command test comes first and the git read second, so an ordinary `Bash` call
 // pays nothing and only a `pnpm josh git -y` spawns `git status`.
@@ -23,7 +23,7 @@ import { run_tail } from './run-tail'
 // commit; refusing once and passing the reissue is the same safe direction `issue-comments` takes, and
 // a compliant reissue that adds a test flips the verdict to `satisfied` and stops matching anyway.
 function is_untested_commit(call: GuardedCall): boolean {
-	if (!run_tail.is_push_step_call(call)) return false
+	if (!run_tail_rule.is_push_step_call(call)) return false
 
 	return test_declared_changed.current_verdict() === 'required'
 }

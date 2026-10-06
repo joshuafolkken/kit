@@ -6,7 +6,7 @@ import {
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import type { OpenIssueData } from '#scripts/git/schemas'
+import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { AUTO_OK_LABEL, BUG_LABEL, EPIC_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'

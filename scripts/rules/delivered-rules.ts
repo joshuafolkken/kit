@@ -10,7 +10,7 @@ import { filing_cap } from './filing-cap'
 import { git_force } from './git-force'
 import { implementation_cut } from './implementation-cut'
 import { issue_comments } from './issue-comments'
-import { issue_fold } from './issue-fold'
+import { issue_fold_rule } from './issue-fold-rule'
 import { josh_git_bare } from './josh-git-bare'
 import { lane_background } from './lane-background'
 import { lane_carry_conflict } from './lane-carry-conflict'
@@ -25,7 +25,7 @@ import { poll_loop } from './poll-loop'
 import { pre_gate_cut } from './pre-gate-cut'
 import { raw_field_body } from './raw-field-body'
 import { rule_body_guard } from './rule-body-guard'
-import { run_tail } from './run-tail'
+import { run_tail_rule } from './run-tail-rule'
 import { shell_body_trigger } from './shell-body-trigger'
 import { test_declared_commit } from './test-declared-commit'
 import { third_party_write } from './third-party-write'
@@ -173,7 +173,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// delivery is still correct one reissue later — so an unfolded, over-cap second filing is delivered
 	// `wip-cap`, then `filing-cap`, then `issue-fold` across its reissues.
 	filing_cap.ROW,
-	issue_fold.ROW,
+	issue_fold_rule.ROW,
 	issue_comments.ROW,
 	{
 		id: 'shell-body',
@@ -229,11 +229,11 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// second inside one `fullrun` when round 2 fixes a finding in place.
 	{
 		id: 'run-tail',
-		is_trigger: run_tail.is_foreground_push_step,
-		reason: run_tail.RUN_TAIL_REASON,
-		decide: run_tail.decide,
-		keeps: run_tail.is_backgrounded_push_step,
-		reaches: run_tail.is_push_step_call,
+		is_trigger: run_tail_rule.is_foreground_push_step,
+		reason: run_tail_rule.RUN_TAIL_REASON,
+		decide: run_tail_rule.decide,
+		keeps: run_tail_rule.is_backgrounded_push_step,
+		reaches: run_tail_rule.is_push_step_call,
 	},
 	// **The one row whose trigger consults the world beside the command**, because "is this a lane that
 	// has not cut" is not readable from the call: it is the working directory's own name and the cut
@@ -627,7 +627,7 @@ const delivered_rules = {
 	FILING_CAP_REASON: filing_cap.FILING_CAP_REASON,
 	GIT_FORCE_REASON: git_force.GIT_FORCE_REASON,
 	ISSUE_COMMENTS_REASON: issue_comments.ISSUE_COMMENTS_REASON,
-	ISSUE_FOLD_REASON: issue_fold.ISSUE_FOLD_REASON,
+	ISSUE_FOLD_REASON: issue_fold_rule.ISSUE_FOLD_REASON,
 	LANE_INTERACTIVE_ASK_REASON: lane_interactive_ask.LANE_INTERACTIVE_ASK_REASON,
 	LANE_PARK_REASON: lane_park.LANE_PARK_REASON,
 	MEASURED_RULES,
@@ -635,7 +635,7 @@ const delivered_rules = {
 	POLL_LOOP_REASON: poll_loop.POLL_LOOP_REASON,
 	PRE_GATE_CUT_REASON: pre_gate_cut.PRE_GATE_CUT_REASON,
 	RAW_FIELD_BODY_REASON: raw_field_body.RAW_FIELD_BODY_REASON,
-	RUN_TAIL_REASON: run_tail.RUN_TAIL_REASON,
+	RUN_TAIL_REASON: run_tail_rule.RUN_TAIL_REASON,
 	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,
 	THIRD_PARTY_WRITE_REASON: third_party_write.THIRD_PARTY_WRITE_REASON,

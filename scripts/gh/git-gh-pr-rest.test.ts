@@ -1,4 +1,4 @@
-import { ai_review_pull_comment_schema, pr_info_schema } from '#scripts/git/schemas'
+import { ai_review_pull_comment_schema, pr_info_schema } from '#scripts/git/git-schemas'
 import { describe, expect, it } from 'vitest'
 import { git_gh_pr_rest } from './git-gh-pr-rest'
 

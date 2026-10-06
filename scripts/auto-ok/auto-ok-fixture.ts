@@ -1,4 +1,4 @@
-import type { OpenIssueData } from '#scripts/git/schemas'
+import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { AUTO_OK_LABEL, EPIC_LABEL } from '#scripts/issue/issue-labels'
 
 // Fixtures shared by the `auto-ok:next` suites. Split out when the pickup gained its dependency

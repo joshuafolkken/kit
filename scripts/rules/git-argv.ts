@@ -11,7 +11,7 @@
 // :branch`), because none of those put the literal the glob keys on where the glob looks. Parsing the
 // arguments is what makes the judgement independent of the spelling.
 
-// The wrapper words that may stand in front of `git`, the same ones `run-tail.ts` skips in front of
+// The wrapper words that may stand in front of `git`, the same ones `run-tail-rule.ts` skips in front of
 // `josh`: environment assignments, the package-manager launchers, `sudo`, `env`, and an opening
 // subshell parenthesis. Left in, `sudo git push --force`, `env git commit` and `(git push -f)` are
 // silently not a git command (joshuafolkken/kit#2983).

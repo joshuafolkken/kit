@@ -1,6 +1,6 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { read_json_listing } from '#scripts/git/parse-json-array'
-import { open_issue_schema, type OpenIssueData } from '#scripts/git/schemas'
 import {
 	ALREADY_DONE_LABEL,
 	has_any_label,

@@ -1,4 +1,4 @@
-import { pr_raw_schema, type RollupItemData } from '#scripts/git/schemas'
+import { pr_raw_schema, type RollupItemData } from '#scripts/git/git-schemas'
 import { json_value } from '#scripts/lib/json-value'
 
 const CHECK_STATUS_PASS = 'pass'

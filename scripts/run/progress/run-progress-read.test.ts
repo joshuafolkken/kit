@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import type { OpenIssueData } from '#scripts/git/schemas'
+import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#1520. The readings behind the progress line: the silence record, and the three

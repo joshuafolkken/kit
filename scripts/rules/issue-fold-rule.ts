@@ -67,6 +67,6 @@ const ROW = {
 	keeps: bash_triggers.on_bash_command(runs_the_fold),
 }
 
-const issue_fold = { ISSUE_FOLD_REASON, ROW, already_folded, runs_the_fold }
+const issue_fold_rule = { ISSUE_FOLD_REASON, ROW, already_folded, runs_the_fold }
 
-export { issue_fold }
+export { issue_fold_rule }

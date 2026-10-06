@@ -9,14 +9,8 @@ import {
 import { resident_budget } from '#scripts/document/resident-budget'
 import { init_logic } from '#scripts/init/init-logic'
 import { describe, expect, it } from 'vitest'
-import {
-	has_frontmatter,
-	package_file,
-	read_skill_file,
-	skill_description,
-	skill_frontmatter,
-	SKILL_ROOT,
-} from './skill-fixture'
+import { package_file, read_skill_file, SKILL_ROOT } from './skill-fixture'
+import { skill_meta } from './skill-meta'
 
 // joshuafolkken/kit#854: the three AI documents are read in full on every turn, and roughly half of
 // each was procedure for a workflow most turns never enter. Those sections now live in skills the
@@ -121,15 +115,15 @@ describe.each(distributed_skill_directories())('%s — distribution', (skill_dir
 	})
 
 	it('opens with YAML frontmatter Claude Code can read', () => {
-		expect(has_frontmatter(content)).toBe(true)
+		expect(skill_meta.has_frontmatter(content)).toBe(true)
 	})
 
 	it('declares a name matching its directory', () => {
-		expect(skill_frontmatter(content)).toContain(`name: ${basename_of(skill_directory)}`)
+		expect(skill_meta.frontmatter_of(content)).toContain(`name: ${basename_of(skill_directory)}`)
 	})
 
 	it('declares a description that says when to read it', () => {
-		expect(skill_description(content).length).toBeGreaterThan(MINIMUM_DESCRIPTION_LENGTH)
+		expect(skill_meta.description_of(content).length).toBeGreaterThan(MINIMUM_DESCRIPTION_LENGTH)
 	})
 })
 

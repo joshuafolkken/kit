@@ -1,6 +1,6 @@
 import { pr_classification, type ReleaseClassification } from '#scripts/ci/pr-classification'
 import type { IssueInfo } from '#scripts/git/git-issue'
-import { pr_info_schema } from '#scripts/git/schemas'
+import { pr_info_schema } from '#scripts/git/git-schemas'
 import { animation_helpers, type AnimationOptions } from '#scripts/lib/animation-helpers'
 import { git_gh_command } from './git-gh-command'
 import { git_pr_error } from './git-pr-error'

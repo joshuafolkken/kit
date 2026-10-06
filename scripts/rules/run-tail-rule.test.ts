@@ -6,7 +6,7 @@ import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
-import { run_tail } from './run-tail'
+import { run_tail_rule } from './run-tail-rule'
 import { test_declared_commit } from './test-declared-commit'
 
 // joshuafolkken/kit#1510: the trigger has to fire on the foreground push step and on nothing else.
@@ -103,7 +103,7 @@ describe('is_push_step', () => {
 		// itself such a title, and would have exempted itself from it.
 		['pnpm josh git -y "Exclude --skip-push from the run-tail trigger #1510"'],
 	])('matches %j', (command) => {
-		expect(run_tail.is_push_step(command)).toBe(true)
+		expect(run_tail_rule.is_push_step(command)).toBe(true)
 	})
 
 	it.each([
@@ -120,33 +120,33 @@ describe('is_push_step', () => {
 		['pnpm josh git "a title with -y in it"'],
 		[''],
 	])('leaves %j alone', (command) => {
-		expect(run_tail.is_push_step(command)).toBe(false)
+		expect(run_tail_rule.is_push_step(command)).toBe(false)
 	})
 })
 
 describe('is_foreground_push_step', () => {
 	it('fires on the push step issued in the foreground', () => {
-		expect(run_tail.is_foreground_push_step(call_of(FOREGROUND_PUSH))).toBe(true)
+		expect(run_tail_rule.is_foreground_push_step(call_of(FOREGROUND_PUSH))).toBe(true)
 	})
 
 	// The exemption is the whole point: a run that already backgrounds it pays nothing.
 	it('leaves the same command alone once it is backgrounded', () => {
-		expect(run_tail.is_foreground_push_step(call_of(FOREGROUND_PUSH, true))).toBe(false)
+		expect(run_tail_rule.is_foreground_push_step(call_of(FOREGROUND_PUSH, true))).toBe(false)
 	})
 
 	it('fires when the field is present and false', () => {
-		expect(run_tail.is_foreground_push_step(call_of(FOREGROUND_PUSH, false))).toBe(true)
+		expect(run_tail_rule.is_foreground_push_step(call_of(FOREGROUND_PUSH, false))).toBe(true)
 	})
 
 	// Refusing a write tool would leave a turn half applied, so no tool but `Bash` is a candidate.
 	it('says nothing about a write tool whose input looks like the push step', () => {
 		const call = { name: 'Edit', input: { command: FOREGROUND_PUSH } }
 
-		expect(run_tail.is_foreground_push_step(call)).toBe(false)
+		expect(run_tail_rule.is_foreground_push_step(call)).toBe(false)
 	})
 
 	it('says nothing when the input carries no command', () => {
-		expect(run_tail.is_foreground_push_step({ name: BASH, input: undefined })).toBe(false)
+		expect(run_tail_rule.is_foreground_push_step({ name: BASH, input: undefined })).toBe(false)
 	})
 })
 
@@ -158,20 +158,20 @@ describe('is_push_step_call and is_backgrounded_push_step', () => {
 	const BACKGROUND_FIELDS: ReadonlyArray<boolean | undefined> = [undefined, true, false]
 
 	it.each(BACKGROUND_FIELDS)('reaches the rule whatever run_in_background says (%j)', (field) => {
-		expect(run_tail.is_push_step_call(call_of(FOREGROUND_PUSH, field))).toBe(true)
+		expect(run_tail_rule.is_push_step_call(call_of(FOREGROUND_PUSH, field))).toBe(true)
 	})
 
 	it('leaves a call that is not the push step out of the denominator', () => {
 		const write = { name: 'Edit', input: { command: FOREGROUND_PUSH } }
 
-		expect(run_tail.is_push_step_call(call_of(NOT_THE_PUSH_STEP))).toBe(false)
-		expect(run_tail.is_push_step_call(write)).toBe(false)
+		expect(run_tail_rule.is_push_step_call(call_of(NOT_THE_PUSH_STEP))).toBe(false)
+		expect(run_tail_rule.is_push_step_call(write)).toBe(false)
 	})
 
 	it('credits the push step only once it is issued detached', () => {
-		expect(run_tail.is_backgrounded_push_step(call_of(FOREGROUND_PUSH, true))).toBe(true)
-		expect(run_tail.is_backgrounded_push_step(call_of(FOREGROUND_PUSH))).toBe(false)
-		expect(run_tail.is_backgrounded_push_step(call_of(SKIPPED_PUSH, true))).toBe(false)
+		expect(run_tail_rule.is_backgrounded_push_step(call_of(FOREGROUND_PUSH, true))).toBe(true)
+		expect(run_tail_rule.is_backgrounded_push_step(call_of(FOREGROUND_PUSH))).toBe(false)
+		expect(run_tail_rule.is_backgrounded_push_step(call_of(SKIPPED_PUSH, true))).toBe(false)
 	})
 })
 
@@ -268,13 +268,13 @@ describe('RUN_TAIL_REASON', () => {
 		['joshuafolkken/kit#1462'],
 		['read the merge result stay after'],
 	])('carries %j', (marker) => {
-		expect(run_tail.RUN_TAIL_REASON).toContain(marker)
+		expect(run_tail_rule.RUN_TAIL_REASON).toContain(marker)
 	})
 
 	// The retracted premise, kept as a negative assertion rather than deleted quietly: an agent told
 	// there is nothing to overlap after the merge leaves the whole tail where joshuafolkken/kit#1462
 	// measured it (joshuafolkken/kit#1510 wrote it, joshuafolkken/kit#1462 disproved it).
 	it.each([['nothing follows it'], ['nothing to overlap']])('no longer claims %j', (retracted) => {
-		expect(run_tail.RUN_TAIL_REASON).not.toContain(retracted)
+		expect(run_tail_rule.RUN_TAIL_REASON).not.toContain(retracted)
 	})
 })

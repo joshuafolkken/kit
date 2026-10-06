@@ -1,5 +1,5 @@
+import { pull_comment_schema } from '#scripts/git/git-schemas'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
-import { pull_comment_schema } from '#scripts/git/schemas'
 import { git_gh_command } from './git-gh-command'
 import { has_ignore_reason } from './git-pr-ai-review'
 

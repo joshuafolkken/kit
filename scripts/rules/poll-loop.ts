@@ -17,7 +17,7 @@ import { bash_triggers } from './bash-triggers'
 // way the command's *exit* is not what ends the wait, and each pass spends a full-context round trip.
 // A command backgrounded with `run_in_background` re-invokes the run when it exits — the completion
 // notification is what ends the wait on the task itself, which is the mechanism this row hands back,
-// the same reading joshuafolkken/kit#1510 took for the foreground push (`run-tail.ts`).
+// the same reading joshuafolkken/kit#1510 took for the foreground push (`run-tail-rule.ts`).
 //
 // **It fires on every occurrence**, for the reason `git-force.ts` does: a poll loop wastes the same
 // round trips each time it is armed, so refused-once-and-free-after would put every loop but the first
