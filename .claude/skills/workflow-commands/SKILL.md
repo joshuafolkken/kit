@@ -11,10 +11,8 @@ never a procedure** (joshuafolkken/kit#3174): each rule is stated once, in the f
 
 ## 0. The rule that fires before any of them — explicit invocation
 
-**Never start a `kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun` workflow (including their
-`#N` and `new` variants) unless the user has typed the keyword in the current turn's prompt.** Its
-single source is `CLAUDE.md` → "Explicit invocation required (MANDATORY)", resident because it holds
-when this skill is not loaded. **A session cut inside a declared budget is not a new invocation — for `backlogrun`
+Its single source is `CLAUDE.md` → "Explicit invocation required (MANDATORY)", resident because it
+holds when this skill is not loaded. **A session cut inside a declared budget is not a new invocation — for `backlogrun`
 alone**: `backlogrun-steps.md` → "The session cut is inside the invocation".
 
 ## 1. Which file to read

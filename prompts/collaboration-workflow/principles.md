@@ -26,13 +26,15 @@
 
 ユーザーが「どう進めるべきか」「何をすべきか」「なぜそうなったか」を尋ねたり、目標・願望を述べたりした（「どうすべき？」「how should we…」「なぜ」「理由を知りたい」「〜したい」「〜の方が良い？」）ときは、**分析と推奨のみ**で応答する。ファイル編集・Issue 作成・その他の具体的アクションは取らない。
 
-- 具体的アクションを取ってよいのは、明示的な命令（「do it」「書き換えて」「作成して」「implement」）またはワークフローキーワード（`kickoff` / `halfrun` / `fullrun` / `backlogrun`）があるときだけ
-- 曖昧なときは propose-and-wait を既定とする（「これを実行してよいか？」と尋ねる）
+- 具体的アクションを取ってよいのは、明示的な命令（「do it」「書き換えて」「作成して」「implement」）またはワークフローキーワード（`kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun`）があるときだけ
+- 発言が相談か実行の指示か判別できないときは、相談として扱う — 分析と推奨を返し、実行の指示を待つ。実行が指示されたあとの判断点で確認するかどうかは、この規則ではなく `CLAUDE.md` → "Decision autonomy" の Tier で決まる
 - **目標の表明は「計画の依頼」であって「実行の承認」ではない**
 
 ## 最新優先・fix-forward（pin-back は最終手段）
 
 依存パッケージ・ツールチェーンは**既定で最新版を採用する**。バンプが lint クラッシュ・新規有効化ルール・型エラーなどの破壊を引き起こしても、古いバージョンへ留まる／戻すことを既定の「安全策」にしてはならない。破壊は**前向きに（fix-forward）速やかに**解消する。
+
+この節が単一ソースで、`dependency-update` skill → "4. When the bump breaks something — fix forward" はここを指す。
 
 1. **最新優先（latest-first）**: 依存・ツールチェーンは新しいバージョンを既定で採用する。適応の手間を避けるためだけに古いバージョンに留まったり戻したりしない
 2. **破壊は fix-forward**: バンプで lint クラッシュ・新規ルール・型エラー等が出たら、前向きに解消する:
@@ -64,11 +66,11 @@
 - **消費者リポジトリ（app-kit / game-kit）ではこれらをローカル編集しない**: `josh sync` が編集を上書きするうえ、変更は本来上流（kit）に属する。ドキュメント／設定を編集する前に、それが配布物かどうかを確認し、配布物なら kit 側に変更を提案（Issue／PR）する
 - **kit リポジトリ自身ではあなたが配布元**なので、ここでは編集してよい。編集先は `CLAUDE.md` 1 本である（次節）
 
-## エージェント規則の単一ソースは `CLAUDE.md`（`AGENTS.md` / `GEMINI.md` は導線）
+## エージェント規則の単一ソースは `CLAUDE.md`（`AGENTS.md` / `GEMINI.md` / `.cursorrules` は導線）
 
-**規則の本体は `CLAUDE.md` にしか無い。** `AGENTS.md` と `GEMINI.md` は「規則は `CLAUDE.md` にある。作業前に全文を読むこと」と「規則を書き戻さない」だけを書いた短い導線文書であり、規則を 1 行も持たない。
+**規則の本体は `CLAUDE.md` にしか無い。** `AGENTS.md`・`GEMINI.md`・`.cursorrules` は「規則は `CLAUDE.md` にある。作業前に全文を読むこと」と「規則を書き戻さない」だけを書いた短い導線文書であり、規則を 1 行も持たない（`.cursorrules` は Svelte MCP の使い方の案内だけを足す）。
 
-- **規則の追加・仕様変更・文言修正・節の追加は `CLAUDE.md` に 1 回だけ書く。** 他の 2 本には触れない
+- **規則の追加・仕様変更・文言修正・節の追加は `CLAUDE.md` に 1 回だけ書く。** 導線文書には触れない
 - **導線文書に規則を書き戻さない。** そこに書かれた規則は、次の改訂で更新し忘れる 4 つ目の置き場になる
 - 経緯と機械的な検査は `docs/maintainers/principles-rationale.md` → "Why AGENTS and GEMINI are pointers"、`@CLAUDE.md` 行と他ツールでの未検証は `docs/maintainers/principles-rationale.md` → "The include line, and what has not been verified"
 
@@ -78,5 +80,5 @@
 
 - **フック**: フックが走らない、または出力が見えないツールでは、フックが届ける規則を自分で適用する。その一覧は手書きせず、[`rule-delivery.md`](./rule-delivery.md) →「配送されている規則」の一覧を正とする — 一覧の各項目が、そのツールでは自分で守る規則である。一覧の外でフックが担う 3 つも同じく自分で行う — 最初の実行時コード編集の前に Step 0 の作業サマリを提示する、編集ごとの整形フックに頼らず編集後に `pnpm josh lint:related` と `pnpm josh cspell:dot` を走らせる、`JOSH_SESSION_LANG` は注入を待たずに `.env` から解決する。フックの全体は `.claude/settings.json` の `hooks` が正である
 - **Skill・`/verify-ui`・`/code-review`**: `CLAUDE.md` が skill のロードやサブエージェントでの実行を指示する箇所では、その skill の `SKILL.md` を読み、自分のセッションで従う
-- **`.claude/settings.json` の deny list** は効かない。それが裏付ける規則 — 指示なしのコミット・マージ・ステージングその他の共有状態変更をしない — はそのまま拘束する
+- **`.claude/settings.json` の deny list** は効かない。それが裏付ける `CLAUDE.md` → "Git Rules" はそのまま拘束する
 - **`AskUserQuestion`** は、ユーザーに平文で尋ねることを指す

@@ -20,7 +20,7 @@ const AI_DOCS: ReadonlyArray<string> = ['CLAUDE.md']
 
 // The documents that carry no rules and only point at the one that does. Guarded by
 // `ai-document-pointers.test.ts`, which is what stops a rule being pasted back into them.
-const POINTER_DOCS: ReadonlyArray<string> = ['AGENTS.md', 'GEMINI.md']
+const POINTER_DOCS: ReadonlyArray<string> = ['AGENTS.md', 'GEMINI.md', '.cursorrules']
 
 // The document the pointers name. Written once so the pointer suite and the pointers agree.
 const CANONICAL_DOC = 'CLAUDE.md'

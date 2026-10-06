@@ -1,6 +1,6 @@
 # Claude Code Instructions
 
-> **This file is the entry point for every agent rule.** `AGENTS.md` and `GEMINI.md` are pointers to it. A rule's trigger is written **once**, here; its procedure and numbers **once**, at its pointer (the single source). History and rationale: `docs/maintainers/claude-md-history.md`.
+> **This file is the entry point for every agent rule.** `AGENTS.md`, `GEMINI.md` and `.cursorrules` are pointers to it. A rule's trigger is written **once**, here; its procedure and numbers **once**, at its pointer (the single source). History and rationale: `docs/maintainers/claude-md-history.md`.
 
 ## Project
 
@@ -69,7 +69,7 @@ Svelte `PascalCase.svelte(.ts)` · TypeScript `kebab-case.ts` · tests `*.test.t
 
 - Effective overrides live in `pnpm-workspace.yaml`; check both files.
 - **NEVER** remove or modify entries in **either** location without explicit user approval.
-- **NEVER** modify the `devEngines` field in `package.json` without explicit user confirmation.
+- **NEVER** modify the `devEngines` field in `package.json` without explicit user confirmation — except the `josh latest` lockstep pnpm bump, kept per the `dependency-update` skill.
 - After any dependency-update command, load the `dependency-update` skill before reporting anything about the pins.
 
 ## Package-First Development
@@ -78,7 +78,7 @@ Before building a feature, check for a well-maintained package — measure with 
 
 ## Code Change Rules
 
-0. **Work summary + test declaration** — before writing any implementation code, once per Issue (required in fullrun/halfrun/backlogrun; `kickoff` exempt), never wrapped in a code fence, never a confirmation stop. `prompts/collaboration-workflow/report-format.md`; `pnpm josh report:lint`.
+0. **Work summary + test declaration** — before writing any implementation code, once per Issue (required in fullrun/halfrun/prrun/backlogrun; `kickoff` exempt), never wrapped in a code fence, never a confirmation stop. `prompts/collaboration-workflow/report-format.md`; `pnpm josh report:lint`.
    - **Overview** — **Now / Change / Check**, one sentence each in the session language that a non-programmer can follow; name the concrete subject in each line — subject-less prose is not acceptable. Use no file paths, function or type names, or CLI option flags — only internal identifiers are banned.
    - **Details** — every change with its test: `<what changes> — Test: <Unit|E2E> — <file path> — <what it verifies>`. Completion reports lead with **Cause / Fix / Result**.
    - **Tests are required for ALL changes** — zero tests without explicit approval is a violation. Exceptions (non-runtime and basic-profile manual checks): `prompts/testing-guide.md`. `pnpm josh test:declared` answers from the changed paths; a runtime change with no test is refused at `pnpm josh git -y` on `required`.
