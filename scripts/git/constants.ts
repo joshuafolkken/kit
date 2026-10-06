@@ -19,9 +19,7 @@ const UNTRACKED_FILES_FLAG = '--untracked-files=all'
 const GIT_BINARY_KEY = 'JOSH_GIT_BINARY'
 
 function get_git_command(): string {
-	if (platform() === 'win32') {
-		return String.raw`"C:\Program Files\Git\cmd\git.exe"`
-	}
+	if (platform() === 'win32') return String.raw`"C:\Program Files\Git\cmd\git.exe"`
 
 	return GIT_COMMAND_UNIX
 }
@@ -31,9 +29,7 @@ function get_git_command_for_spawn(): string {
 
 	if (binary !== undefined && binary !== '') return binary
 
-	if (platform() === 'win32') {
-		return String.raw`C:\Program Files\Git\cmd\git.exe`
-	}
+	if (platform() === 'win32') return String.raw`C:\Program Files\Git\cmd\git.exe`
 
 	return GIT_COMMAND_UNIX
 }

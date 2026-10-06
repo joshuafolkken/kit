@@ -40,7 +40,7 @@ Log auto-decisions: an Issue comment in an Issue workflow, else a one-line "Auto
 
 ## Critical Conventions (non-standard — always apply)
 
-Most are lint-enforced; `function` syntax and the early-return one-liner are not. Craft guidance: `prompts/coding-standards.md`.
+Most are lint-enforced. Craft guidance: `prompts/coding-standards.md`.
 
 ### Naming
 

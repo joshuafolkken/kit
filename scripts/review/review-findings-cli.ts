@@ -19,9 +19,7 @@ function zero_line(zero_rounds: number): string {
 }
 
 function format_report(counts: ReadonlyArray<CategoryCount>, zero_rounds: number): string {
-	if (counts.length === 0) {
-		return zero_rounds === 0 ? NO_FINDINGS : zero_line(zero_rounds)
-	}
+	if (counts.length === 0) return zero_rounds === 0 ? NO_FINDINGS : zero_line(zero_rounds)
 
 	const body = counts.map((entry) => count_line(entry)).join('\n')
 

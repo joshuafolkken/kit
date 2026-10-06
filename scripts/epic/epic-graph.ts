@@ -121,7 +121,7 @@ function find_stuck_children(children: ReadonlyArray<EpicChild>): Array<string> 
 	const index = index_children(children)
 	const remaining = new Set(children.map((child) => key_of(child)))
 
-	const peel = (): number => {
+	function peel(): number {
 		const ready = [...remaining].filter((node) => !has_remaining_blocker(index, node, remaining))
 
 		for (const node of ready) remaining.delete(node)

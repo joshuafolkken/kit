@@ -184,7 +184,7 @@ describe('wait_for_any -- exits when a child confirms-complete', () => {
 	it('returns the issue that confirmed-completed', async () => {
 		let calls = 0
 
-		const is_running = (): boolean => {
+		function is_running(): boolean {
 			calls += 1
 
 			return calls === 1
@@ -207,7 +207,7 @@ describe('wait_for_any -- pre-gate boundary does not trigger early return', () =
 		let tick = 0
 
 		// Appears -> briefly gone -> resumes -> finally done
-		const is_running = (): boolean => {
+		function is_running(): boolean {
 			tick += 1
 			if (tick === 1) return true
 			if (tick <= 3) return false
@@ -232,7 +232,7 @@ describe('wait_for_any -- first to complete wins', () => {
 		const running_state: Record<string, boolean> = { [ISSUE]: true, [OTHER]: true }
 		let ticks = 0
 
-		const is_running = (issue: string): boolean => {
+		function is_running(issue: string): boolean {
 			ticks += 1
 			if (issue === ISSUE && ticks > 3) return false
 

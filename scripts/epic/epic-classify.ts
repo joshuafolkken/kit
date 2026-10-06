@@ -217,7 +217,7 @@ function is_ready(node: string, context: ClassifyContext): boolean {
 function fill_memo(children: ReadonlyArray<EpicChild>, context: ClassifyContext): void {
 	const pending = new Set(children.map((child) => epic_graph.key_of(child)))
 
-	const peel = (): number => {
+	function peel(): number {
 		const ready = [...pending].filter((node) => is_ready(node, context))
 
 		for (const node of ready) {

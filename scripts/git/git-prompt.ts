@@ -62,9 +62,7 @@ function create_prompt(): Interface | undefined {
 }
 
 function handle_prompt_fallback<T>(fallback_value?: T): T {
-	if (fallback_value !== undefined) {
-		return fallback_value
-	}
+	if (fallback_value !== undefined) return fallback_value
 
 	throw new Error('TTY not available')
 }
@@ -72,9 +70,7 @@ function handle_prompt_fallback<T>(fallback_value?: T): T {
 async function with_prompt<T>(callback: PromptCallback<T>, fallback_value?: T): Promise<T> {
 	const prompt = create_prompt()
 
-	if (prompt === undefined) {
-		return handle_prompt_fallback(fallback_value)
-	}
+	if (prompt === undefined) return handle_prompt_fallback(fallback_value)
 
 	try {
 		// eslint-disable-next-line promise/prefer-await-to-callbacks

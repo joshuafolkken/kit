@@ -322,7 +322,7 @@ describe('epic_classify.classify_children — the cross-repository resolver', ()
 	it("asks the resolver with the blocker's own repository", () => {
 		const seen: Array<string> = []
 
-		const resolve = (blocker: EpicChild, blocked: EpicChild): DependencyVerdict => {
+		function resolve(blocker: EpicChild, blocked: EpicChild): DependencyVerdict {
 			seen.push(`${blocker.repo}->${blocked.repo}`)
 
 			return 'resolved'

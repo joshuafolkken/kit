@@ -212,8 +212,7 @@ allowed.
 
 ### 4. Project conventions (`CLAUDE.md`)
 
-**Do not re-check what lint enforces — the gate has already run; lint does not catch `function`
-syntax over an arrow const (outside named route handlers), the early-return one-liner, duplication
+**Do not re-check what lint enforces — the gate has already run; lint does not catch duplication
 that is not identical, a name whose shape passes but whose meaning misleads, grouping and file layout,
 Svelte semantics, or test placement beyond the `*.spec.*` / top-level `tests/` bans, so check those.**
 A lint gap the change opens — a disabled rule, an ignored path, an added `eslint-disable`, a block

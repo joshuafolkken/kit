@@ -76,8 +76,9 @@ describe('process_identity — reading a start time', () => {
 	})
 
 	it('keeps live, dead, and reused pids distinct when ps is unavailable', () => {
-		const read = (pid: number): string | undefined =>
-			process_identity.read_start(pid, sandbox_probes(SANDBOX_START))
+		function read(pid: number): string | undefined {
+			return process_identity.read_start(pid, sandbox_probes(SANDBOX_START))
+		}
 
 		expect(process_identity.is_same_process(process.pid, SANDBOX_START, read)).toBe(true)
 		expect(process_identity.is_same_process(process.pid, FOREIGN_START, read)).toBe(false)

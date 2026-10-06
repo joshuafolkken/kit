@@ -80,13 +80,14 @@ rule that enforces it:
 - **Identical functions and repeated string literals** — `eslint/rules/sonarjs.js`.
 - **The quality limits** — `eslint/rules/code-quality.js` and `eslint/rules/sonarjs.js`, stated once
   in `CLAUDE.md` and pinned against the rule objects by `eslint/quality-limits-document.test.ts`.
+- **`function` syntax rather than an arrow const** — `func-style: declaration` in
+  `eslint/rules/code-quality.js`; `eslint/base.js` allows the typed-const idiom only in the SvelteKit
+  route, hook and param-matcher files (joshuafolkken/kit#3294).
+- **The early-return one-liner** — `local/early-return-one-liner` (`eslint/rules/early-return-one-liner.js`),
+  for a lone `return` whose one-liner fits the print width (joshuafolkken/kit#3294).
 
 What lint cannot see, and why each is the reader's:
 
-- **`function` syntax rather than an arrow const** — there is no `func-style` and no arrow selector
-  anywhere in `eslint/`, and the named-export selector exempts `ArrowFunctionExpression`.
-- **The early-return one-liner** — `curly` is `['error', 'multi-line']`, which never requires the
-  one-liner form.
 - **Duplication that is not identical** — `sonarjs/no-identical-functions` sees only functions that
   match.
 - **A name that satisfies the convention and says the wrong thing** — `naming-convention` checks the

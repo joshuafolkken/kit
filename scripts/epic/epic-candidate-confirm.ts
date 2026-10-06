@@ -70,11 +70,12 @@ function is_same_blockers(
 	left: ReadonlyArray<IssueReference>,
 	right: ReadonlyArray<IssueReference>,
 ): boolean {
-	const sorted = (blockers: ReadonlyArray<IssueReference>): string =>
-		blockers
+	function sorted(blockers: ReadonlyArray<IssueReference>): string {
+		return blockers
 			.map((blocker) => epic_graph.key_of(blocker))
 			.toSorted((first, second) => first.localeCompare(second))
 			.join(',')
+	}
 
 	return sorted(left) === sorted(right)
 }
