@@ -8,7 +8,6 @@ import { z } from 'zod'
 
 const WORKSPACE_FILE = 'pnpm-workspace.yaml'
 const PROJECT_CONFIG_FILE = '.aikido'
-const NPMRC_FILE = '.npmrc'
 const EXCLUSIONS_FIELD = 'minimumPackageAgeExclusions'
 const AGE_FIELD = 'minimumPackageAgeHours'
 const MINUTES_PER_HOUR = 60
@@ -78,18 +77,22 @@ function replace_safe_chain_block(existing: string, safe_chain: Record<string, u
 }
 
 // Safe Chain enforces its own minimum package age (48 hours by default), so CI refused lockfiles pnpm
-// had resolved under `.npmrc`'s shorter window (kit #2743). `.npmrc` is the source: its minutes are
-// floored to whole hours so Safe Chain is never stricter than pnpm, and an undeclared window writes
-// nothing; an explicit `0` opt-out is written as 0 so an earlier synchronized age cannot outlive it.
-function package_age_hours(npmrc: string): number | undefined {
-	const minutes = release_age.parse_declared_minimum_release_age(npmrc)
+// had resolved under pnpm's shorter window (kit #2743). The workspace's `minimumReleaseAge` is the
+// source: its minutes are floored to whole hours so Safe Chain is never stricter than pnpm, and an
+// undeclared window writes nothing; an explicit `0` opt-out is written as 0 so an earlier
+// synchronized age cannot outlive it.
+function package_age_hours(workspace: string): number | undefined {
+	const minutes = release_age.parse_declared_minimum_release_age(workspace)
 	if (minutes === undefined) return undefined
 
 	return Math.floor(minutes / MINUTES_PER_HOUR)
 }
 
-function merge_age(safe_chain: Record<string, unknown>, npmrc: string): Record<string, unknown> {
-	const hours = package_age_hours(npmrc)
+function merge_age(
+	safe_chain: Record<string, unknown>,
+	workspace: string,
+): Record<string, unknown> {
+	const hours = package_age_hours(workspace)
 	if (hours === undefined) return safe_chain
 
 	return { ...safe_chain, [AGE_FIELD]: hours }
@@ -107,22 +110,24 @@ function merge_exclusions(
 function has_nothing_to_write(
 	existing: string,
 	exclusions: ReadonlyArray<string>,
-	npmrc: string,
+	workspace: string,
 ): boolean {
-	return existing.length === 0 && exclusions.length === 0 && package_age_hours(npmrc) === undefined
+	return (
+		existing.length === 0 && exclusions.length === 0 && package_age_hours(workspace) === undefined
+	)
 }
 
 function read_exclusions(workspace: string): ReadonlyArray<string> {
 	return workspace_schema.parse(yaml_document.parse_yaml(workspace)).minimumReleaseAgeExclude ?? []
 }
 
-function merge_project_config(existing: string, workspace: string, npmrc = ''): string {
+function merge_project_config(existing: string, workspace: string): string {
 	const exclusions = read_exclusions(workspace)
 	const aikido = yaml_document.parse_yaml(existing)
 	const safe_chain = read_mapping(aikido['safe-chain'], 'safe-chain')
-	const merged = merge_age(merge_exclusions(safe_chain, exclusions), npmrc)
+	const merged = merge_age(merge_exclusions(safe_chain, exclusions), workspace)
 	if (JSON.stringify(merged) === JSON.stringify(safe_chain)) return existing
-	if (has_nothing_to_write(existing, exclusions, npmrc)) return existing
+	if (has_nothing_to_write(existing, exclusions, workspace)) return existing
 
 	return replace_safe_chain_block(existing, merged)
 }
@@ -133,8 +138,7 @@ function sync_project_config(root: string): boolean {
 	const config_path = path.join(root, PROJECT_CONFIG_FILE)
 	const existing = file_reader.read_file_or_empty(config_path)
 	const workspace = readFileSync(workspace_path, 'utf8')
-	const npmrc = file_reader.read_file_or_empty(path.join(root, NPMRC_FILE))
-	const merged = merge_project_config(existing, workspace, npmrc)
+	const merged = merge_project_config(existing, workspace)
 	if (merged === existing) return false
 	writeFileSync(config_path, merged)
 

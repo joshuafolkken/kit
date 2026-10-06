@@ -11,12 +11,12 @@
  * major equals the `packageManager` pin keeps both invariants: never below the adopted
  * major, and advancing while that major is the current one.
  *
- * The `minimum-release-age` quarantine is applied natively from `.npmrc` (kit#768).
- * safe-chain filters the registry only when the process tree was launched through one of
- * its wrapped shell commands, so `josh latest` and `pnpm josh latest` used to resolve
+ * The `minimumReleaseAge` quarantine is applied natively from `pnpm-workspace.yaml` (kit#768,
+ * #3267). safe-chain filters the registry only when the process tree was launched through one
+ * of its wrapped shell commands, so `josh latest` and `pnpm josh latest` used to resolve
  * different answers and the pin oscillated. Reading the window from the repo-managed
- * `.npmrc` and filtering by publish timestamp makes the resolution identical in every
- * invocation context; right after a pnpm release the answer is simply the previous
+ * `pnpm-workspace.yaml` and filtering by publish timestamp makes the resolution identical in
+ * every invocation context; right after a pnpm release the answer is simply the previous
  * release, exactly as the filtered view behaved.
  *
  * The resolved version is floored at the current `packageManager` pin: a filtered registry
@@ -50,7 +50,7 @@ const PACKAGE_MANAGER_RE = /"packageManager"\s*:\s*"pnpm@(\d+)(?:[^\d]|$)/u
 const PINNED_VERSION_RE = /"packageManager"\s*:\s*"pnpm@([^"+]+)/u
 const TARGET_PREFIX = 'pnpm@'
 const FAILURE_EXIT_CODE = 1
-const NPMRC_PATH = '.npmrc'
+const WORKSPACE_PATH = 'pnpm-workspace.yaml'
 const SHA512_BYTES = 64
 const INTEGRITY_RE = /^sha512-([A-Za-z0-9+/]+={0,2})$/u
 const PACKAGE_MANAGER_VALUE_RE = /("packageManager"\s*:\s*")pnpm@[^"]+(")/u
@@ -134,14 +134,14 @@ function query_major_latest_version(major: string): string | undefined {
 	const times = query_release_times()
 	if (times === undefined) return undefined
 
-	// The project's own `.npmrc`, deliberately not the upward walk the version check uses: `josh
-	// latest` reads `package.json` and writes the pnpm pin relative to the working directory, so it
-	// has no subdirectory case — and honouring a user-level policy here could freeze pnpm bumps in a
-	// project that declares none (joshuafolkken/kit#808).
+	// The project's own `pnpm-workspace.yaml`, deliberately not the upward walk the version check
+	// uses: `josh latest` reads `package.json` and writes the pnpm pin relative to the working
+	// directory, so it has no subdirectory case — and honouring an ancestor's policy here could freeze
+	// pnpm bumps in a project that declares none (joshuafolkken/kit#808).
 	return release_age.select_aged_version(
 		times,
 		major,
-		release_age.read_minimum_release_age(NPMRC_PATH),
+		release_age.read_minimum_release_age(WORKSPACE_PATH),
 		Date.now(),
 	)
 }

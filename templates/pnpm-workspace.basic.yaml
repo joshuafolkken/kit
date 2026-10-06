@@ -4,3 +4,7 @@
 allowBuilds:
   esbuild: true
   unrs-resolver: true
+
+# pnpm 12 reads these settings from this file only; the same lines in .npmrc are ignored (kit #3267).
+minimumReleaseAge: 1440
+engineStrict: true

@@ -230,8 +230,8 @@ function sync_project_artifacts(is_force: boolean): void {
 
 	sync_sonar_with_template(name_with_owner, is_force)
 	sync_config_files()
-	// After `sync_config_files`, which may add the `.npmrc` window `.aikido`'s age is derived from
-	// (joshuafolkken/kit#2743).
+	// After `sync_ai_copy_all`, which may add the `pnpm-workspace.yaml` window `.aikido`'s age is
+	// derived from (joshuafolkken/kit#2743, #3267).
 	project_config.sync_project_config(PROJECT_ROOT)
 	sync_package_json_migrations(path.join(PROJECT_ROOT, PACKAGE_JSON))
 	report_repository_settings(name_with_owner)

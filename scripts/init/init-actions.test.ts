@@ -13,7 +13,6 @@ vi.mock('./session-language-environment', () => ({
 }))
 
 const GITIGNORE = '.gitignore'
-const NPMRC = '.npmrc'
 const ESLINT = 'eslint.config.js'
 const PRETTIER = 'prettier.config.js'
 const BASIC_PRETTIER = 'prettier.config.mjs'
@@ -36,14 +35,7 @@ const COMMON_TAIL_DESTINATIONS = [
 	ENV_FILE,
 ]
 
-const VANILLA_DESTINATIONS = [
-	GITIGNORE,
-	NPMRC,
-	ESLINT,
-	PRETTIER,
-	PLAYWRIGHT,
-	...COMMON_TAIL_DESTINATIONS,
-]
+const VANILLA_DESTINATIONS = [GITIGNORE, ESLINT, PRETTIER, PLAYWRIGHT, ...COMMON_TAIL_DESTINATIONS]
 
 describe('init_actions.build_file_actions', () => {
 	it('returns the expected ordered destination list', () => {

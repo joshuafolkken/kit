@@ -14,16 +14,15 @@ const DEV_ENGINES_VALUE = {
 	packageManager: { name: 'pnpm', version: '>=12.1.0', onFail: 'error' },
 }
 
-// New projects resolve kit from public npm. Existing registry and auth lines remain untouched
-// by merge_npmrc so consumers of other GitHub Packages can migrate separately.
-const NPMRC_LINES: ReadonlyArray<string> = [
+// The settings lines earlier kit releases wrote into a project `.npmrc`. pnpm 12 reads only registry
+// and auth settings from `.npmrc`, so all four are inert there: the age window and engine check now
+// live in `pnpm-workspace.yaml`, and `confirmModulesPurge` no longer exists (joshuafolkken/kit#3267).
+const LEGACY_NPMRC_LINES: ReadonlySet<string> = new Set([
 	'engine-strict=true',
 	'minimum-release-age=1440',
 	'confirmModulesPurge=false',
-	// Pin full GitHub Packages tarball URLs in the lockfile so pnpm >=11.5 frozen-lockfile
-	// installs hit the correct authenticated download path (avoids ERR_PNPM_FETCH_401 on CI).
 	'lockfile-include-tarball-url=true',
-]
+])
 
 const CSPELL_IMPORT = '@joshuafolkken/kit/cspell'
 
@@ -254,10 +253,6 @@ function generate_cspell_config(): string {
 	return `version: "0.2"\nimport:\n  - "${CSPELL_IMPORT}"\nwords: []\nignorePaths: []\n`
 }
 
-function generate_npmrc(): string {
-	return `${NPMRC_LINES.join('\n')}\n`
-}
-
 // Append `missing` lines to `existing`, inserting a separating newline when the base is
 // non-empty and lacks a trailing one. Returns `existing` untouched when nothing is missing.
 function append_missing_lines(existing: string, missing: ReadonlyArray<string>): string {
@@ -267,18 +262,19 @@ function append_missing_lines(existing: string, missing: ReadonlyArray<string>):
 	return `${prefix}${missing.join('\n')}\n`
 }
 
-// Insert-only: every existing line survives verbatim, including a `_authToken` line the consumer
-// added themselves. Kit removed the env-var form until #759, on the premise that pnpm always
-// ignores it in a project .npmrc — true only while `npmrcAuthFile` is unset. A consumer that
-// declares the project file its trusted auth file (Cloudflare Workers Builds via
-// `PNPM_CONFIG_NPMRC_AUTH_FILE`, for instance) gets the credential expanded, and that setting can
-// live in a deploy platform's dashboard — so no reading of the repository tells an inert line
-// apart from a live one. Deleting it took down a working production deploy; leaving it costs at
-// most the warning pnpm already prints. See docs/authentication.md §4(d).
+// Removes only an exact kit-written legacy line; every other line survives verbatim, including a
+// `_authToken` line the consumer added themselves and a setting carrying a value of their own. Kit
+// removed the env-var auth form until #759, on the premise that pnpm always ignores it in a project
+// .npmrc — true only while `npmrcAuthFile` is unset. A consumer that declares the project file its
+// trusted auth file (Cloudflare Workers Builds via `PNPM_CONFIG_NPMRC_AUTH_FILE`, for instance) gets
+// the credential expanded, and that setting can live in a deploy platform's dashboard — so no
+// reading of the repository tells an inert auth line apart from a live one. Deleting it took down a
+// working production deploy. See docs/authentication.md §4(d).
 function merge_npmrc(content: string): string {
-	const missing = NPMRC_LINES.filter((line) => !content.includes(line))
+	const lines = content.split('\n')
+	const kept = lines.filter((line) => !LEGACY_NPMRC_LINES.has(line.trim()))
 
-	return append_missing_lines(content, missing)
+	return kept.length === lines.length ? content : kept.join('\n')
 }
 
 // A gitignore line worth appending during a union merge: real ignore patterns only.
@@ -347,10 +343,6 @@ function strip_kit_only_vscode_settings_content(raw: string): string {
 	// file the consumer's own `prettier --check` rejects — the same defect as kit#797, which was
 	// about the opposite direction on `package.json`.
 	return json_format.format_json(stripped)
-}
-
-function get_npmrc_lines(): ReadonlyArray<string> {
-	return NPMRC_LINES
 }
 
 function get_development_engines_value(): typeof DEV_ENGINES_VALUE {
@@ -436,7 +428,6 @@ const init_logic = {
 	get_tsconfig_exclude_entries,
 	generate_lefthook_config,
 	generate_cspell_config,
-	generate_npmrc,
 	merge_npmrc,
 	merge_gitignore,
 	get_tsconfig_extends_entry,
@@ -450,7 +441,6 @@ const init_logic = {
 	SAFE_CHAIN_CMD,
 	GUARDED_LEFTHOOK_CMD,
 	upgrade_prepare_lefthook_warning,
-	get_npmrc_lines,
 	get_development_engines_value,
 	get_ai_copy_files,
 	get_ai_copy_file_mappings,
