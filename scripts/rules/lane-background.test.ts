@@ -40,14 +40,17 @@ function background_call(command: string): { name: string; input: Record<string,
 	return { name: BASH, input: { command, run_in_background: true } }
 }
 
-function launch_line(id: string): string {
-	const result = {
-		type: 'tool_result',
-		tool_use_id: 'toolu_1',
-		content: `Command running in background with ID: ${id}`,
-	}
+function launch_line(id: string, content = `Command running in background with ID: ${id}`): string {
+	const result = { type: 'tool_result', tool_use_id: 'toolu_1', content }
 
 	return JSON.stringify({ type: 'user', timestamp: TIMESTAMP, message: { content: [result] } })
+}
+
+// The result the harness writes when a foreground call outruns its timeout (joshuafolkken/kit#3304).
+function moved_line(id: string): string {
+	const content = `Command did not complete within its 600s timeout and was moved to the background (ID: ${id}).`
+
+	return launch_line(id, content)
 }
 
 // The launch result the harness writes for a subagent taken into the background (joshuafolkken/kit#2774),
@@ -213,6 +216,18 @@ describe('lane_background.pending_background_ids', () => {
 
 	it(DROPS_FINISHED_AGENT, () => {
 		const tail = [agent_launch_line(AGENT_ID), finish_line(AGENT_ID)].join('\n')
+
+		expect(lane_background.pending_background_ids(tail)).toStrictEqual([])
+	})
+
+	// joshuafolkken/kit#3304: the #3273 child's foreground call outran its timeout, was moved to the
+	// background, and the stop hook let the child end its turn on it.
+	it('reports a foreground call moved to the background at its timeout', () => {
+		expect(lane_background.pending_background_ids(moved_line(TASK_ID))).toStrictEqual([TASK_ID])
+	})
+
+	it('drops a moved call whose finish notice is on the tail', () => {
+		const tail = [moved_line(TASK_ID), finish_line(TASK_ID)].join('\n')
 
 		expect(lane_background.pending_background_ids(tail)).toStrictEqual([])
 	})
