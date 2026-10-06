@@ -19,13 +19,13 @@ is the way it is, and the issues it came from, live in the matching `*-rationale
 ## Release and publish
 
 - [release.md](./release.md) — releasing a new version
-- [publishing.md](../publishing.md) — the publish jobs and the one-time public npm setup
+- [publishing.md](./publishing.md) — the publish jobs and the one-time public npm setup
 - [release-classification-audit.md](./release-classification-audit.md) — the audit behind the first
   GitHub Release's change classification
 
 ## Measure the distributed rules
 
-- [eval.md](../eval.md) — `josh eval`, measuring whether a document change changed what an agent does
+- [eval.md](./eval.md) — `josh eval`, measuring whether a document change changed what an agent does
 - [eval-rationale.md](./eval-rationale.md) — why the suite is built the way it is
 - [guide-verification.md](./guide-verification.md) — how the step-by-step user guides were verified
 - [backlogrun-worker-evaluation.md](./backlogrun-worker-evaluation.md) — evaluating the `backlogrun`

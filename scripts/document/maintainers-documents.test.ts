@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { package_file } from '#scripts/claude/skill-fixture'
 import { safe_chain_preinstall } from '#scripts/safe-chain/preinstall-command'
 import { describe, expect, it } from 'vitest'
-import { linked_paths, read_document } from './ai-document-fixture'
+import { linked_paths, read_document, read_unwrapped } from './ai-document-fixture'
 
 // Maintainer content sits apart from the user documentation (joshuafolkken/kit#2993): one index
 // reaches every maintainer page, the user lists reach that index instead of the pages, and the
@@ -15,7 +15,8 @@ const OVERVIEW = 'docs/overview.md'
 const HOW_TO_INDEX = 'docs/how-to.md'
 const TROUBLESHOOTING = 'docs/troubleshooting.md'
 const ENTRY_DOCUMENTS: ReadonlyArray<string> = [README, OVERVIEW, HOW_TO_INDEX]
-const MAINTAINER_TOP_LEVEL_PAGES: ReadonlyArray<string> = ['docs/publishing.md', 'docs/eval.md']
+const USER_DOCS_DIRECTORY = 'docs'
+const MAINTAINER_AUDIENCE = 'For kit maintainers'
 const USER_GUIDE_PAGES: ReadonlyArray<string> = [
 	OVERVIEW,
 	'docs/tutorial.md',
@@ -77,11 +78,21 @@ function published_entries(): Array<string> {
 describe('the maintainer documentation', () => {
 	it('indexes every maintainer page', () => {
 		const linked = new Set(linked_paths(MAINTAINERS_INDEX))
-		const pages = [...markdown_in(MAINTAINERS_DIRECTORY), ...MAINTAINER_TOP_LEVEL_PAGES]
+		const pages = markdown_in(MAINTAINERS_DIRECTORY)
 
 		expect(pages.filter((path) => path !== MAINTAINERS_INDEX && !linked.has(path))).toStrictEqual(
 			[],
 		)
+	})
+
+	// joshuafolkken/kit#3343: a page addressed to maintainers lives under the maintainers directory,
+	// so the user documentation root holds none.
+	it('keeps every maintainer-only page out of the user documentation root', () => {
+		const pages = markdown_in(USER_DOCS_DIRECTORY)
+
+		expect(
+			pages.filter((path) => read_unwrapped(path).includes(MAINTAINER_AUDIENCE)),
+		).toStrictEqual([])
 	})
 
 	it.each(ENTRY_DOCUMENTS)('%s links to the maintainer index', (path) => {

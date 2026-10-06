@@ -33,14 +33,15 @@ function read(relative_path: string): string {
 // A workflow procedure file first; a canonical topic file when the rationale explains one that holds
 // its own body (`residency-rationale.md`, joshuafolkken/kit#2891); a whole skill's `SKILL.md` when the
 // rationale is named after a skill (`epic-commands-rationale.md`, joshuafolkken/kit#2892); a
-// consumer-facing page under `docs/` when it is named after none of them (`sync-rationale.md`,
-// joshuafolkken/kit#2896).
+// maintainer page beside it (`eval-rationale.md`, joshuafolkken/kit#3343); a consumer-facing page
+// under `docs/` when it is named after none of them (`sync-rationale.md`, joshuafolkken/kit#2896).
 function procedure_of(rationale: string): string {
 	const name = path.basename(rationale).replace(RATIONALE_SUFFIX, '')
 	const candidates = [
 		path.join(entry_read_set.SKILL_DIRECTORY, `${name}.md`),
 		path.join(TOPIC_DIRECTORY, `${name}.md`),
 		path.join(SKILL_ROOT, name, SKILL_FILE),
+		path.join(RATIONALE_DIRECTORY, `${name}.md`),
 	]
 
 	return (
@@ -122,6 +123,12 @@ describe('a rationale document maps to the procedure it explains', () => {
 	it('maps a rationale named after a canonical topic file to that topic', () => {
 		expect(procedure_of('docs/maintainers/residency-rationale.md')).toBe(
 			path.join(TOPIC_DIRECTORY, 'residency.md'),
+		)
+	})
+
+	it('maps a rationale named after a maintainer page to that page beside it', () => {
+		expect(procedure_of('docs/maintainers/eval-rationale.md')).toBe(
+			path.join(RATIONALE_DIRECTORY, 'eval.md'),
 		)
 	})
 

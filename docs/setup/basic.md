@@ -4,7 +4,7 @@ The `josh init` path for the `basic` [profile](../init.md#project-profiles) — 
 
 ## 1. Install the prerequisites
 
-kit needs **Node.js 22.19.0 or later in the 22 line, any 24 release, or 26 and later (Node 25 is not supported)** and **pnpm 12 or later**. [Install the prerequisites](./prerequisites.md) checks what you have and installs what is missing; its gh CLI step is only for the optional GitHub Issue workflow.
+kit needs the Node.js and pnpm versions [Install the prerequisites](./prerequisites.md) lists. That page checks what you have and installs what is missing; its gh CLI step is only for the optional GitHub Issue workflow.
 
 ## 2. Install kit and initialize
 

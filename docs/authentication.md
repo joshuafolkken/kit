@@ -109,7 +109,7 @@ Unlike (b) and (c), this needs no build step of your own, so it also works on a 
 
 > **Which of (a)–(d) should I use?** (a) whenever the platform allows arbitrary variable names — it is the least setup. (d) when it does not, since a dashboard that rejects `npm_config_//…` still accepts `PNPM_CONFIG_NPMRC_AUTH_FILE`. (b) and (c) only where you control a step that runs before dependency installation.
 
-> **Why is the plain project `.npmrc` not enough without (d)?** Since pnpm 11.6 the line is ignored there by default (§2). Verified on pnpm 11.20.0: with the user config isolated and `npmrcAuthFile` unset, that line yields `Ignored project-level auth setting` and a `401`, while the same line in a user-level npmrc resolves. Setting `npmrcAuthFile` to the project file is what flips it — that is the whole of (d).
+> **Why is the plain project `.npmrc` not enough without (d)?** The line is ignored there by default ([§2](#2-put-the-credential-in-npmrc)). Verified on pnpm 11.20.0: with the user config isolated and `npmrcAuthFile` unset, that line yields `Ignored project-level auth setting` and a `401`, while the same line in a user-level npmrc resolves. Setting `npmrcAuthFile` to the project file is what flips it — that is the whole of (d).
 
 ## Next
 

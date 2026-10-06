@@ -7,7 +7,7 @@ project: `CLAUDE.md` (the rules), `AGENTS.md` / `GEMINI.md` (pointers to it), `p
 `.claude/skills/`. `pnpm josh eval` measures whether editing them changed what an agent does. It
 replays a handful of representative situations against a real agent and judges each one on **what the
 agent did**, never on what it said. Why it exists, and how each rule below was reached, is in
-[eval-rationale.md](./maintainers/eval-rationale.md) — `docs/maintainers/eval-rationale.md` → "Why the
+[eval-rationale.md](./eval-rationale.md) — `docs/maintainers/eval-rationale.md` → "Why the
 suite exists".
 
 ## Running it
