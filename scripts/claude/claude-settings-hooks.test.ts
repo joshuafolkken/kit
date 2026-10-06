@@ -75,8 +75,9 @@ const FORMAT_TOOLS = ['Edit', 'Write']
 const PRETOOL_GUARD_TOOLS = ['Bash', 'Edit', 'Read', 'Write', 'AskUserQuestion']
 // The audit provisioner (joshuafolkken/kit#1563). `SessionStart` is the one event that fires before
 // any work is attempted, which is what makes the pre-push audit's missing binary a solved problem
-// rather than a push that dies after the unit suite has already run.
-const PROVISION_HOOK_COMMAND = 'pnpm josh audit:provision'
+// rather than a push that dies after the unit suite has already run. It goes through the shared
+// launcher like every other hook (joshuafolkken/kit#3256), so a bundle runs it instead of `pnpm josh`.
+const PROVISION_HOOK_COMMAND = hook_launch.hook_launch_command('audit-provision')
 // Derived from the download's own bound for the reason the formatter's is: a harness kill lands
 // mid-write, and the staging file this script renames from is the only thing that makes that
 // survivable. Raising the download budget has to raise the declared timeout with it.
@@ -208,15 +209,16 @@ function describe_tool_hook(title: string, wiring: ToolHookWiring): void {
 }
 
 // `SessionStart` carries no tool matcher, so the two assertions above have nothing to check here.
-// What replaces them is the matcher's emptiness: Claude Code reads a `SessionStart` matcher as the
-// *reason* the session began — `startup`, `resume`, `clear`, `compact` — and naming one of them would
-// leave the other three starting a session whose audit tooling was never provisioned.
+// What replaces them is the start reason: Claude Code reads a `SessionStart` matcher as the *reason*
+// the session began — `startup`, `resume`, `clear`, `compact`. Provisioning is per machine, not per
+// conversation, so a fresh start is enough; matching every reason re-ran the check on each resume and
+// compaction (joshuafolkken/kit#3256).
 function describe_session_hook(title: string, wiring: HookWiring): void {
 	describe(title, () => {
 		describe_shared_hook_properties(wiring)
 
-		it('matches every session start rather than one start reason', () => {
-			expect(matchers_of(wiring).map((entry) => entry.matcher)).toEqual([''])
+		it('matches only a fresh session start', () => {
+			expect(matchers_of(wiring).map((entry) => entry.matcher)).toEqual(['startup'])
 		})
 	})
 }

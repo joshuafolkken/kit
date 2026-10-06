@@ -20,24 +20,29 @@ kit gives Claude Code or Codex (or Gemini, Cursor) your project's rules, checks 
 
 Each pain links to how it is solved — or read [the whole story](./docs/why.md).
 
+kit solves these in every project — and so do [app-kit] and [game-kit], which build on it:
+
+- [Done doesn't mean done](./docs/why.md#done-doesnt-mean-done)
+- [Quality slips with every change](./docs/why.md#quality-slips-with-every-change)
+- [I keep repeating the same instructions](./docs/why.md#i-keep-repeating-the-same-instructions)
+- [The agent does things I never asked for](./docs/why.md#the-agent-does-things-i-never-asked-for)
+- [Reviewing every change is a chore](./docs/why.md#reviewing-every-change-is-a-chore)
+- [Some changes need a human eye](./docs/why.md#some-changes-need-a-human-eye)
+- [I spend all day talking to the agent](./docs/why.md#i-spend-all-day-talking-to-the-agent)
+- [Big requests come back sloppy](./docs/why.md#big-requests-come-back-sloppy)
+- [I want many Issues solved at once](./docs/why.md#i-want-many-issues-solved-at-once)
+- [AI costs keep climbing](./docs/why.md#ai-costs-keep-climbing)
+- [Writing Issues is a chore](./docs/why.md#writing-issues-is-a-chore)
+- [Wiring AI up to GitHub is a chore](./docs/why.md#wiring-ai-up-to-github-is-a-chore)
+- [I can't tell if the agent is stuck or done](./docs/why.md#i-cant-tell-if-the-agent-is-stuck-or-done)
+- [One task overwrote another's work](./docs/why.md#one-task-overwrote-anothers-work)
+- [A session cut off and I lost track](./docs/why.md#a-session-cut-off-and-i-lost-track)
+- [The backlog fills with duplicate Issues](./docs/why.md#the-backlog-fills-with-duplicate-issues)
+
+The app and game kits add:
+
 | Your pain                                                                                                                  | kit | [app-kit] | [game-kit] |
 | -------------------------------------------------------------------------------------------------------------------------- | :-: | :-------: | :--------: |
-| [Done doesn't mean done](./docs/why.md#done-doesnt-mean-done)                                                              | ✅  |    ✅     |     ✅     |
-| [Quality slips with every change](./docs/why.md#quality-slips-with-every-change)                                           | ✅  |    ✅     |     ✅     |
-| [I keep repeating the same instructions](./docs/why.md#i-keep-repeating-the-same-instructions)                             | ✅  |    ✅     |     ✅     |
-| [The agent does things I never asked for](./docs/why.md#the-agent-does-things-i-never-asked-for)                           | ✅  |    ✅     |     ✅     |
-| [Reviewing every change is a chore](./docs/why.md#reviewing-every-change-is-a-chore)                                       | ✅  |    ✅     |     ✅     |
-| [Some changes need a human eye](./docs/why.md#some-changes-need-a-human-eye)                                               | ✅  |    ✅     |     ✅     |
-| [I spend all day talking to the agent](./docs/why.md#i-spend-all-day-talking-to-the-agent)                                 | ✅  |    ✅     |     ✅     |
-| [Big requests come back sloppy](./docs/why.md#big-requests-come-back-sloppy)                                               | ✅  |    ✅     |     ✅     |
-| [I want many Issues solved at once](./docs/why.md#i-want-many-issues-solved-at-once)                                       | ✅  |    ✅     |     ✅     |
-| [AI costs keep climbing](./docs/why.md#ai-costs-keep-climbing)                                                             | ✅  |    ✅     |     ✅     |
-| [Writing Issues is a chore](./docs/why.md#writing-issues-is-a-chore)                                                       | ✅  |    ✅     |     ✅     |
-| [Wiring AI up to GitHub is a chore](./docs/why.md#wiring-ai-up-to-github-is-a-chore)                                       | ✅  |    ✅     |     ✅     |
-| [I can't tell if the agent is stuck or done](./docs/why.md#i-cant-tell-if-the-agent-is-stuck-or-done)                      | ✅  |    ✅     |     ✅     |
-| [One task overwrote another's work](./docs/why.md#one-task-overwrote-anothers-work)                                        | ✅  |    ✅     |     ✅     |
-| [A session cut off and I lost track](./docs/why.md#a-session-cut-off-and-i-lost-track)                                     | ✅  |    ✅     |     ✅     |
-| [The backlog fills with duplicate Issues](./docs/why.md#the-backlog-fills-with-duplicate-issues)                           | ✅  |    ✅     |     ✅     |
 | [Setting up SvelteKit on Cloudflare takes a day](https://github.com/joshuafolkken/app-kit/blob/main/docs/setup/install.md) |  —  |    ✅     |     ✅     |
 | [I'm not sure the app is secure](https://github.com/joshuafolkken/app-kit/blob/main/docs/security-headers.md)              |  —  |    ✅     |     ✅     |
 | [Nobody looked at the screen](https://github.com/joshuafolkken/app-kit/blob/main/docs/shot.md)                             |  —  |    ✅     |     ✅     |

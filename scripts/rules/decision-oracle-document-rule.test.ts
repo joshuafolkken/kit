@@ -32,9 +32,11 @@ describe('residency.md carries question 0 as the single source', () => {
 	})
 })
 
-describe('CLAUDE.md carries the question 0 pointer', () => {
-	it('names oracle:list so agents know where to look', () => {
-		expect(read_repo_file(CLAUDE)).toContain(ORACLE_COMMAND)
+// joshuafolkken/kit#3256 moved question 0 out of residency: it matters only on the turn a rule is
+// placed, where the rule-prose hook delivers it. CLAUDE.md keeps the pointer to the criterion.
+describe('CLAUDE.md points at the residency criterion', () => {
+	it('names residency.md, which carries oracle:list', () => {
+		expect(read_repo_file(CLAUDE)).toContain(RESIDENCY)
 	})
 })
 

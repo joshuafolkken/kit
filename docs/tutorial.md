@@ -74,6 +74,7 @@ Not part of the loop above. After upgrading `@joshuafolkken/kit`, run `pnpm josh
 ## Where next
 
 - One guide per task: [how-to.md](./how-to.md).
+- A word on this page you did not recognize: [glossary.md](./glossary.md).
 - A run stopped and you want to continue or clean up: [Recover a stopped run](./how-to/recover-a-run.md).
 - A run fails on the gate or CI: [Fix a failing gate or CI](./how-to/fix-gate-and-ci.md).
 - Every command: [josh-commands.md](./josh-commands.md).

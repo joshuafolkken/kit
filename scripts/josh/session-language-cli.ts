@@ -20,16 +20,16 @@ import { session_language, type Resolution } from './session-language'
 
 const { DEFAULT_SESSION_LANG, ENV_KEY, resolve_session_lang } = session_language
 const ENGLISH_OPT_IN_LANG = 'en'
-const SCOPE_NOTE =
-	'write session dialogue, AskUserQuestion labels/descriptions and artifact prose (Issue bodies, comments, Telegram) in this language. English stays only for Issue/PR titles, code comments/test titles/commit messages, and script-fixed strings.'
 
 // The file load happens in `main`, on the command path only; the resolver reads the environment.
+// The line carries the value alone: what the language covers is `CLAUDE.md` → "Output language",
+// already in context every turn, so repeating it here only spent context on each prompt.
 function format_line(resolution: Resolution): string {
 	const suffix = resolution.is_default
 		? ` (default; set ${ENV_KEY}=${ENGLISH_OPT_IN_LANG} for English)`
 		: ''
 
-	return `Session language (${ENV_KEY}): ${resolution.lang}${suffix} — ${SCOPE_NOTE}`
+	return `Session language (${ENV_KEY}): ${resolution.lang}${suffix}`
 }
 
 function main(): void {
@@ -42,7 +42,6 @@ const session_language_cli = {
 	ENV_KEY,
 	format_line,
 	resolve_session_lang,
-	SCOPE_NOTE,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()

@@ -71,5 +71,5 @@ than `josh latest`.
 
 The procedure — latest-first, fix forward at the correct layer, pin back only as a last resort with a
 tracking issue — has its single source in
-`prompts/collaboration-workflow/principles.md` → "最新優先・fix-forward（pin-back は最終手段）". Fix-forward never authorizes a silent edit to a protected pin: the
+`prompts/collaboration-workflow/principles.md` → "latest-first". Fix-forward never authorizes a silent edit to a protected pin: the
 approval gates in sections 1–3 still apply.

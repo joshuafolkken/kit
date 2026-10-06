@@ -218,7 +218,7 @@ You let the agent file what it notices along the way, and **three Issues say the
 
 And **when more than 30 Issues are open, nothing new is filed until one is closed.** If nothing can honestly be closed, the filing is dropped. The only exceptions are a filing the work itself needs, and an interrupt such as a verification giving a wrong answer or data being lost.
 
-# What happens when it all fits together
+## What happens when it all fits together
 
 Everything so far is about "fewer accidents". Stack enough of it, though, and **something changes in kind.**
 
@@ -230,7 +230,7 @@ When it hits something that needs a decision, **it sets that aside and moves on 
 
 **And the agent can only touch Issues a human has given the approval label (`auto-ok`)** — or Issues under an epic carrying it. The agent never labels an existing Issue itself. The one exception is the Issues the agent discovers while working on approved ones: those inherit the label by default, unless they need a human's judgement, and even that is capped by count and budget. **Deciding what the agent may do stays a human job, to the very end.**
 
-# The most important part: it ships as a package
+## The most important part: it ships as a package
 
 If you read this far thinking "I built something like this in my own repository", you're not alone — so did I. **The problem is that it only lives in that one repository.** The moment you have two or three projects, the system you grew becomes copies and degraded copies.
 
@@ -238,9 +238,9 @@ kit **ships it as a package.**
 
 Add it as a devDependency and initialize, and the rules, the verification scripts and the deny rules for dangerous operations all reach that project. The procedure skills arrive as a Claude Code plugin, with nothing to install. Update kit and the sync command brings the project along. **The same keyword works the same way in every project.** (Everything above reaches a `full`-profile project; a `basic` project gets only short rules and minimal formatting and Git settings.)
 
-For scale: there are 145 `josh` commands, and **101 of them are meant to be run by the agent, not by a person.** That is what it means to be built with the agent as the primary user, rather than having AI support bolted on later.
+For scale: there are 152 `josh` commands, and **106 of them are meant to be run by the agent, not by a person.** That is what it means to be built with the agent as the primary user, rather than having AI support bolted on later.
 
-# What to know up front
+## What to know up front
 
 - **It assumes you work from GitHub Issues.** It doesn't fit a style of development that never writes one.
 - **It needs the `gh` CLI.** GitHub operations go through `gh api`.

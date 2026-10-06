@@ -46,6 +46,7 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 - [why.md](./why.md) — why kit exists: the pains it solves
 - [tutorial.md](./tutorial.md) — your first change with an agent, from Issue to merge
 - [how-to.md](./how-to.md) — guides by task
+- [glossary.md](./glossary.md) — the workflow's words: gate, lane, epic, profile, `auto-ok`
 
 **Commands and configuration**
 

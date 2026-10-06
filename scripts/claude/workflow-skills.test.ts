@@ -390,7 +390,6 @@ describe.each(AI_DOCS)('%s — keeps what cannot move', (document_path) => {
 		OVERRIDES_END_HEADING,
 		'Please run \\`<command>\\` to start this task.',
 		'pnpm josh notify --task-type confirmation',
-		'`parseArgs` rejects it',
 		'**NEVER** remove or modify entries in **either** location without explicit user approval.',
 		'**NEVER** modify the `devEngines` field in `package.json` without explicit user confirmation',
 		// joshuafolkken/kit#3249: the one sanctioned change is named where the prohibition is, so a
@@ -415,17 +414,8 @@ describe.each(AI_DOCS)('%s — keeps what cannot move', (document_path) => {
 		},
 	)
 
-	// The criterion itself is what keeps the next rule from landing resident by default. It is stated
-	// in full in the skill; what the documents carry is the question.
-	// Both halves are pinned: the question, and the set it resolves to. A criterion whose worked
-	// examples drift from what this suite asserts resident is what let the rule be applied two ways
-	// at once (joshuafolkken/kit#951).
-	it.each([
-		'**What stays here is decided by one question: must the rule fire on a turn where no skill was loaded?**',
-		'Explicit invocation, the mid-workflow stop notification, the `overrides` / `devEngines` prohibitions, the UI-verification gate and the three `epic:*` rules below all do',
-	])('states the test for what may stay resident: %j', (marker) => {
-		expect(content).toContain(marker)
-	})
+	// The residency criterion itself is not restated here: it lives in `residency.md` (question 2) and
+	// is read only when a rule is placed (joshuafolkken/kit#3256). The markers above pin its outcome.
 })
 
 // joshuafolkken/kit#964: the residency criterion decides *whether* a rule stays; this is the guard

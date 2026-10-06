@@ -95,6 +95,31 @@ describe('cli_flags.option_name', () => {
 	})
 })
 
+describe('cli_flags.attach_values', () => {
+	const BODY_FLAG = '--body'
+
+	it('joins a dash-led value to its flag so parseArgs reads it as the value', () => {
+		const argv = cli_flags.attach_values([BODY_FLAG, '-x', '--json'], [BODY_FLAG])
+		const values = cli_flags.values_of(argv, {
+			body: { type: 'string' },
+			json: { type: 'boolean' },
+		})
+
+		expect({ ...values }).toStrictEqual({ body: '-x', json: true })
+	})
+
+	it('leaves flags it was not given unjoined', () => {
+		expect(cli_flags.attach_values([REPO_FLAG, '-x'], [BODY_FLAG])).toStrictEqual([REPO_FLAG, '-x'])
+	})
+
+	it('leaves a trailing flag with no value as it is', () => {
+		expect(cli_flags.attach_values([ISSUE, BODY_FLAG], [BODY_FLAG])).toStrictEqual([
+			ISSUE,
+			BODY_FLAG,
+		])
+	})
+})
+
 describe('cli_flags.is_value_unusable', () => {
 	it.each([
 		['the flag is absent', [ISSUE]],
