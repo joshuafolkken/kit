@@ -523,7 +523,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "latest": [
       "",
-      "maintainer",
+      "developer",
       [
         "files",
         "network",
@@ -532,7 +532,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "latest:corepack": [
       "",
-      "maintainer",
+      "developer",
       [
         "files",
         "network",
@@ -554,7 +554,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "latest:update": [
       "",
-      "maintainer",
+      "developer",
       [
         "files",
         "network",
@@ -630,7 +630,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "overrides": [
       "[--save]",
-      "maintainer",
+      "developer",
       [
         "files",
       ],

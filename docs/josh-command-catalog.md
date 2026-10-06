@@ -577,7 +577,7 @@ Diagnose PATH shadowing of the global josh and show the discovered repository ma
 
 ### `josh latest` · `josh u`
 
-> **Audience:** maintainer · **Side effects:** files, network, processes
+> **Audience:** developer · **Side effects:** files, network, processes
 
 _No arguments._
 
@@ -587,7 +587,7 @@ Update pnpm, dependencies, and run security audit
 
 ### `josh latest:corepack` · `josh lc`
 
-> **Audience:** maintainer · **Side effects:** files, network
+> **Audience:** developer · **Side effects:** files, network
 
 _No arguments._
 
@@ -617,7 +617,7 @@ Say whether this run has to update dependencies, from when josh latest last fini
 
 ### `josh latest:update` · `josh lu`
 
-> **Audience:** maintainer · **Side effects:** files, network
+> **Audience:** developer · **Side effects:** files, network
 
 _No arguments._
 
@@ -627,7 +627,7 @@ Update all dependencies to latest
 
 ### `josh overrides` · `josh ov`
 
-> **Audience:** maintainer · **Side effects:** files
+> **Audience:** developer · **Side effects:** files
 
 `[--save]`
 
