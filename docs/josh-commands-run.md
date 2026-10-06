@@ -80,7 +80,9 @@ another live owner's run.
 
 **A failure is visible rather than silent.** A judgment wake that never claims the carry record is
 retried, and once the retries are spent the supervisor stops and sends a `warning` Telegram; a carry
-record that expired or cannot be read ends it the same way. `none` — the run having finished — and a
+record that expired or cannot be read ends it the same way. A `failed` stop while the carry record is
+still resumable restarts the supervisor in place after one interval, up to three times; only the
+failure past that bound sends the warning, its note counting the restarts. `none` — the run having finished — and a
 person's own `--stop` stay silent. Once the run-tooling defect that stopped it has been fixed, a stop
 with a resume path is restarted by the AI itself with `run:wake --start`, which then confirms the
 driver advances (`prompts/collaboration-workflow/upstream-interrupt.md` →

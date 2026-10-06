@@ -19,9 +19,8 @@ jobs:
           ref: ${{ github.event.client_payload.sha }}
           fetch-depth: 2
 
-      - name: Setup Node.js
-        uses: ./.github/actions/setup-node
-
+      # No Node.js setup: this job installs nothing and reads package.json with jq, which the runner
+      # image ships, so a Node.js version step would only add time (joshuafolkken/kit#3326).
       - name: Check if package.json changed
         id: pkg_changed
         run: |
@@ -37,7 +36,7 @@ jobs:
         id: current_version
         if: steps.pkg_changed.outputs.changed == 'true'
         run: |
-          VERSION=$(node -p "require('./package.json').version")
+          VERSION=$(jq -r '.version' package.json)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $VERSION"
 

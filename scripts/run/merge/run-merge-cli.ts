@@ -316,7 +316,10 @@ async function on_parked(ctx: MergeContext): Promise<MergeVerdict> {
 	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
 }
 
+// A split child: nothing is counted, and its lane is closed when it holds nothing, so the promoted
+// epic does not keep a seat the next child needs (joshuafolkken/kit#3334).
 async function on_skipped(ctx: MergeContext): Promise<MergeVerdict> {
+	await run_merge_steps.close_split_lane(ctx.child)
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.SPLIT, `#${ctx.child} split`)
 
 	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)

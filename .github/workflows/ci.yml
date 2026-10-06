@@ -32,19 +32,41 @@ env:
 # pnpm version resolution, the store cache, the safe-chain installer pin and the install
 # (joshuafolkken/kit#2982).
 jobs:
-  node-26-pnpm:
-    name: Node 26 pnpm
+  # Every other job runs on the Node.js version `.github/actions/setup-node` names, while `engines`
+  # and the esbuild target accept Node 22 and a consumer may already be on 26. This job builds the
+  # package and starts the bundled CLI on both ends of that range, so a syntax or API the oldest
+  # supported Node lacks fails here instead of in a consumer (joshuafolkken/kit#3326). The runtime
+  # comes from pnpm's `runtime` input, not setup-node, so the one Node.js version stays written once.
+  # The oldest entry is the exact `engines` floor, not a bare major that resolves to the newest 22.x;
+  # `scripts/ci/ci-yml-pnpm-setup.test.ts` holds it equal to the floor `package.json` declares.
+  node-compat:
+    name: Node ${{ matrix.node }} build
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.19.0', 26]
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup-pnpm
+
+      - name: Setup pnpm and install dependencies
+        uses: ./.github/actions/setup-pnpm
         with:
-          runtime: node@26
-          install: 'false'
-      - run: node --version && pnpm --version
+          runtime: node@${{ matrix.node }}
+
+      - name: Verify Node.js version
+        env:
+          NODE_VERSION: ${{ matrix.node }}
+        run: node --version | tee /dev/stderr | grep -qE "^v${NODE_VERSION}(\.|$)" && pnpm --version
+
+      - name: Build package
+        run: pnpm build
+
+      - name: Run CLI smoke
+        run: node dist/josh.js help
 
   playwright-image:
     name: Resolve Playwright image
@@ -519,19 +541,9 @@ jobs:
       packages: read
     container: ${{ fromJSON(needs.playwright-image.outputs.container) }}
     timeout-minutes: 10
-    # Better Auth rejects any origin its BETTER_AUTH_URL does not name, so this job pins the value
-    # to the preview server the suite talks to rather than letting a production value reach it.
-    # It has to be the port that server listens on. 4173 is correct because `PORT_SEED` — the
-    # personal offset `playwright.config.ts` resolves the preview port from — is not committed (it
-    # lives in a gitignored `.env`) and is not set anywhere in this workflow, so the port resolves
-    # to its base on every CI run. That is the invariant, not a constant in `playwright.config.ts`:
-    # the port there is seed-derived. The one setting that would move the port and leave this URL
-    # behind is an `env` entry for the seed in this file, at workflow or job level. A repository or
-    # organization variable would not: it reaches a step only through an explicit `vars.PORT_SEED`
-    # expression, and nothing here writes one. For a seeded CI job, derive this URL from
-    # `josh port preview` in the same job instead.
-    env:
-      BETTER_AUTH_URL: http://localhost:4173
+    # kit is not a SvelteKit app, so this job carries neither the `.svelte-kit` build cache nor the
+    # Better Auth `BETTER_AUTH_URL` pin; both belong to the consumer's copy in
+    # `templates/workflows/ci.yml`, which keeps them (joshuafolkken/kit#3326).
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -540,17 +552,6 @@ jobs:
         uses: ./.github/actions/setup-node
         with:
           registry-url: 'https://npm.pkg.github.com'
-
-      - name: Setup build cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        id: build-cache
-        with:
-          path: |
-            .svelte-kit
-          key: ${{ runner.os }}-build-cache-e2e-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('svelte.config.js', 'vite.config.ts', 'tsconfig.json', 'src/lib/server/auth.ts') }}
-          restore-keys: |
-            ${{ runner.os }}-build-cache-e2e-${{ hashFiles('pnpm-lock.yaml') }}-
-            ${{ runner.os }}-build-cache-e2e-
 
       - name: Setup pnpm and install dependencies
         uses: ./.github/actions/setup-pnpm
