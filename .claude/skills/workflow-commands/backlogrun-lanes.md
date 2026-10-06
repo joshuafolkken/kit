@@ -135,6 +135,10 @@ Record it on that first child's Issue — the comment is what gets it popped if 
 **The first lane's `pnpm josh lane:launch "$n" --stash "backlogrun: josh latest before lanes"` pops it
 by message, after `lane:open`'s own install** — never a positional `git -C "$dir" stash pop`: the stash
 is a repository-wide stack every lane shares, so a positional pop would take whichever lane last pushed.
+**Under the supervisor's `backlog:drive` the driver passes it, never you**:
+each launch asks whether a stash under that message is on the stack and, if one is, hands it to
+`lane:launch --stash` — the pop consumes it, so the first lane takes it and every later one launches
+without. The push above stays the parent's, before the driver starts.
 
 ### Opening one lane and dispatching its child
 
