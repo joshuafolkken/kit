@@ -12,9 +12,11 @@
 [![CI](https://github.com/joshuafolkken/kit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/joshuafolkken/kit/actions/workflows/ci.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=joshuafolkken_kit&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=joshuafolkken_kit)
 
-**Tell your AI agent the change. It files the GitHub Issue and takes it to a merged PR — the same way in every project.**
+**AI assistant setup, plus an optional GitHub workflow.**
 
-kit gives Claude Code or Codex (or Gemini, Cursor) your project's rules, checks and an Issue-driven workflow.
+kit gives Claude Code or Codex your project's rules and checks. With the workflow, the agent takes each change from Issue to merged PR.
+
+**Only want the AI assistant, without the GitHub workflow?** Set it up here: [Node projects](./docs/setup/full.md#2-install-and-initialize-with-josh-init) · [Other projects](./docs/setup/basic.md)
 
 ## Sound familiar?
 
@@ -85,7 +87,7 @@ Add the two Telegram credentials to `.env` so a run that needs you can reach you
 
 Then open your agent and follow the [tutorial](./docs/tutorial.md).
 
-No Issue workflow? [Node projects](./docs/setup/full.md#2-install-and-initialize-with-josh-init) · [Other projects](./docs/setup/basic.md)
+AI assistant only, no GitHub workflow? [Node projects](./docs/setup/full.md#2-install-and-initialize-with-josh-init) · [Other projects](./docs/setup/basic.md)
 
 ## Docs
 
