@@ -1,5 +1,5 @@
 import { core_budget } from '#scripts/gate/core-budget'
-import { unit_worker_share } from '#scripts/test/unit-worker-share'
+import { gate_plan } from '#scripts/gate/gate-plan'
 import { GATE_COMMAND, type CommandEntry } from './josh-command-types'
 
 const FILE_ARGUMENTS = '[files...]'
@@ -158,14 +158,14 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'Run unit tests with Vitest (skips when Vitest is absent; fails when it has no tests)',
 		category: 'Development',
 		reference: [FILTER_ARGUMENTS, 'developer', ['processes']],
-		core_weight: unit_worker_share.planned_workers,
+		core_weight: gate_plan.direct_unit_weight,
 	},
 	'test:related': {
 		script: 'scripts/test/test-related.ts',
 		description: 'Run only the unit tests related to the changed files (full suite on fallback)',
 		category: 'Development',
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],
-		core_weight: unit_worker_share.planned_workers,
+		core_weight: gate_plan.direct_unit_weight,
 	},
 	'test:declared': {
 		script: 'scripts/test/test-declared.ts',

@@ -258,6 +258,11 @@ function resolve_unit_worker_cap(
 	return available_cores - RESERVED_CORES
 }
 
+// The unit suite's weight when nothing caps its pool: the cores left once the static checks have theirs.
+function solo_unit_weight(available_cores: number): number {
+	return Math.max(0, available_cores - RESERVED_CORES)
+}
+
 // The cores a check reserves from the machine-wide budget while it runs (joshuafolkken/kit#2351). The
 // static checks declare their measured reservation; the unit suite declares the pool it will open,
 // which `unit_worker_cap` has already sized against the runs in flight. **This is the same table, read
@@ -272,7 +277,21 @@ function resolve_unit_worker_cap(
 function check_weight(check: GateCheck, plan: GatePlan, available_cores: number): number {
 	if (check.label !== UNIT_LABEL) return check.reserved_cores
 
-	return plan.unit_worker_cap ?? Math.max(0, available_cores - RESERVED_CORES)
+	return plan.unit_worker_cap ?? solo_unit_weight(available_cores)
+}
+
+// The cores a unit run started directly reserves (joshuafolkken/kit#3345): the share it will pass to
+// vitest while other runs are live, and otherwise the gate's own solo unit weight. **Not the whole
+// machine**, though a lone vitest sizes its own pool: FIFO admission lets a claim of every core in only
+// once the ledger is empty, so a one-file `josh test:related` would wait out every other lane's gate
+// and hold every later claim behind it. One weight for the suite however it is started.
+function direct_unit_weight(
+	available_cores: number = availableParallelism(),
+	live_runs: number = unit_worker_share.live_run_count(),
+): number {
+	return (
+		unit_worker_share.current_share(available_cores, live_runs) ?? solo_unit_weight(available_cores)
+	)
 }
 
 // `availableParallelism()` rather than `cpus().length`: it reports what this process may actually
@@ -361,6 +380,7 @@ const gate_plan = {
 	UNIT_LABEL,
 	WARNING_CHECKER_LABELS,
 	check_weight,
+	direct_unit_weight,
 	format_gate_plan,
 	format_machine,
 	has_unit_check,

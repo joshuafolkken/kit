@@ -170,12 +170,6 @@ function current_share(
 	return resolve_unit_workers(available_cores, live_runs + own_run)
 }
 
-// The cores a unit run reserves when it is started directly (joshuafolkken/kit#3345): the share it
-// will pass to vitest, or the whole machine when it runs alone and vitest sizes its own pool.
-function planned_workers(available_cores: number = availableParallelism()): number {
-	return current_share(available_cores) ?? available_cores
-}
-
 function is_worker_flag(argument: string): boolean {
 	return WORKER_FLAGS.some((flag) => argument === flag || argument.startsWith(`${flag}=`))
 }
@@ -240,7 +234,6 @@ const unit_worker_share = {
 	is_nested_run,
 	live_run_count,
 	marker_path,
-	planned_workers,
 	read_marker,
 	resolve_unit_workers,
 	with_run_marker,
