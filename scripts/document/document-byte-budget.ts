@@ -97,6 +97,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'docs/josh-commands-run.md', bytes: 57_344 },
 	{ path: 'docs/josh-commands-backlog.md', bytes: 57_344 },
 	{ path: 'docs/josh-commands.md', bytes: 40_960 },
+	// joshuafolkken/kit#3279 moved the label sections here out of `docs/josh-commands-backlog.md`.
+	{ path: 'docs/labels-and-run-states.md', bytes: 8192 },
 	{ path: 'prompts/coding-standards.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 12_288 },

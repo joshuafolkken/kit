@@ -47,6 +47,7 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 - [tutorial.md](./tutorial.md) — your first change with an agent, from Issue to merge
 - [how-to.md](./how-to.md) — guides by task
 - [glossary.md](./glossary.md) — the workflow's words: gate, lane, epic, profile, `auto-ok`
+- [labels-and-run-states.md](./labels-and-run-states.md) — the Issue labels and the run states the workflow reads
 
 **Commands and configuration**
 

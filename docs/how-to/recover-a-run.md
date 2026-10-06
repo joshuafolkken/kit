@@ -11,7 +11,7 @@ A workflow run stopped — on purpose, as `halfrun` does, or because a session e
 3. If a new run answers `busy`, another run holds the tree ([`josh run:hold`](../josh-commands-run.md#josh-runhold--josh-runrelease)). Finish or stash that work; release a hold another run left behind, once you know that run has ended, with `josh run:release --force` (a plain `josh run:release` removes only your own run's hold). A hold over a clean tree expires after 8 hours.
 4. Restore stashed work by its message with [`josh stash:pop`](../josh-commands-backlog.md#josh-stashpop), never a bare `git stash pop`.
 5. For a `backlogrun` whose session was cut, [`josh run:carry`](../josh-commands-run.md#josh-runcarry) says whether it can resume; [`josh run:stranded`](../josh-commands-run.md#josh-runstranded) says whether a run is stuck with no session driving it.
-6. Remove a stale `in-progress` label only once the tree is clean — a dirty tree means the hold is real.
+6. Remove a stale `in-progress` label only once the tree is clean — a dirty tree means the hold is real. What each label and run state means is in [Labels and run states](../labels-and-run-states.md).
 
 ## Check it worked
 
