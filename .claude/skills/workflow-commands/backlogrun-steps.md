@@ -164,7 +164,7 @@ the owning process, so a second parent is answered `busy`.**
 **Count into the record rather than into your head** — `--merged <N> --owner "$PPID"` at every child's
 merge, `--filed 1 --owner "$PPID"` at every Issue this run files, and `--cut --owner "$PPID"`
 immediately before the cut. `--merged` names the merged issue, never a count
-(`scripts/run/run-carry-args.ts`): `run:merge` records the same issue, so a merge counted on both paths counts
+(`scripts/run/carry/run-carry-args.ts`): `run:merge` records the same issue, so a merge counted on both paths counts
 once. Every other counter is an increment. **`--owner "$PPID"` is not optional on a
 count**: a count that does not name the record's owning process is refused.
 

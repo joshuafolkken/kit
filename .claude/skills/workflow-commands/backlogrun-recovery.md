@@ -82,7 +82,7 @@ guard, and go back to step 1.
      session**: `lane:dispatch` reads the `session_id` off the exit record and relaunches with
      `--resume`; with no session id it falls back to a fresh `fullrun`, and the report says which path
      it took. **Outages inside a two-minute window count once** toward the streak. The re-dispatch is
-     bounded by `CONSECUTIVE_OUTAGE_LIMIT` in `scripts/run/run-merge.ts`: *distinct* outages trip the
+     bounded by `CONSECUTIVE_OUTAGE_LIMIT` in `scripts/run/merge/run-merge.ts`: *distinct* outages trip the
      separate outage guard, at which point the command prints `environment` and the run stops. It never
      re-dispatches into a dead API forever.
    - **abandoned** — counted against the consecutive-failure guard and parked with `needs-decision`,

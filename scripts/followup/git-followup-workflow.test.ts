@@ -115,7 +115,7 @@ const worktree_directory_mock = vi.hoisted(() =>
 	vi.fn<() => Promise<string | undefined>>().mockResolvedValue(WORKTREE_DIRECTORY),
 )
 
-vi.mock('#scripts/run/run-hold', () => ({
+vi.mock('#scripts/run/hold/run-hold', () => ({
 	run_hold: {
 		hold_path: (directory: string) => `${directory}/hold.json`,
 		release_hold: release_hold_mock,

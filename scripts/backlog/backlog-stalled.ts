@@ -1,5 +1,5 @@
 import { epic_triage } from '#scripts/epic/epic-triage'
-import { run_event_stream, type RunEvent } from '#scripts/run/run-event-stream'
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 
 // When ready backlog work sits undispatched while lanes are free, nobody notices until a person asks
 // (joshuafolkken/kit#2359). This is the mechanical judge of that state: three facts read, never

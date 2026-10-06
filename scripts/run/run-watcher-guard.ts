@@ -1,6 +1,6 @@
 import { lane_registry } from '#scripts/lane/lane-registry'
+import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
 import { run_headless } from './run-headless'
-import { run_progress_clock } from './run-progress-clock'
 
 // A watcher that stopped while children are still in-flight leaves the run's event stream without a
 // heartbeat and the parent without the wake an arrival would deliver. This guard detects that state so

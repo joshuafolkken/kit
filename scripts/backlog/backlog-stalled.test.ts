@@ -1,4 +1,4 @@
-import { run_event_stream, type RunEvent } from '#scripts/run/run-event-stream'
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import { backlog_stalled, type StallReading } from './backlog-stalled'
 

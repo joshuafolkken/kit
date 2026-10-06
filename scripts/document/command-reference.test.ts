@@ -63,8 +63,9 @@ describe('every josh command a document names exists', () => {
 // (`` `josh run:hold` / `josh run:release` ``) covers each command it names.
 // The reference is two pages — the commands a person types, and the ones automation calls
 // (joshuafolkken/kit#2998) — and together they cover the map.
-function documented_commands(): Set<string> {
-	const headings = COMMAND_REFERENCE_DOCS.map((path) => read_document(path))
+function documented_commands(paths: ReadonlyArray<string> = COMMAND_REFERENCE_DOCS): Set<string> {
+	const headings = paths
+		.map((path) => read_document(path))
 		.join('\n')
 		.split('\n')
 		.filter((line) => /^#{2,4} /u.test(line))
@@ -92,6 +93,48 @@ describe('the command reference covers exactly the command map', () => {
 
 		expect(unknown).toStrictEqual([])
 	})
+})
+
+// A command's audience decides its page: the commands a person types (`developer`) are documented on
+// the developer reference and nowhere else, and every other command stays off it — so the audience
+// the catalog prints and the page a reader is sent to cannot disagree (joshuafolkken/kit#3278).
+const DEVELOPER_REFERENCE = 'docs/josh-commands.md'
+
+function developer_commands(): Array<string> {
+	return Object.entries(COMMAND_MAP)
+		.filter(([, entry]) => entry.reference[1] === 'developer')
+		.map(([name]) => name)
+}
+
+describe('the audience decides the reference page', () => {
+	it('documents every developer command on the developer reference', () => {
+		const documented = documented_commands([DEVELOPER_REFERENCE])
+
+		expect(developer_commands().filter((name) => !documented.has(name))).toStrictEqual([])
+	})
+
+	it('documents no other command on the developer reference', () => {
+		const developer = new Set(developer_commands())
+		const misplaced = [...documented_commands([DEVELOPER_REFERENCE])].filter(
+			(name) => Object.hasOwn(COMMAND_MAP, name) && !developer.has(name),
+		)
+
+		expect(misplaced).toStrictEqual([])
+	})
+
+	it('documents no developer command on an automation page', () => {
+		const others = COMMAND_REFERENCE_DOCS.filter((path) => path !== DEVELOPER_REFERENCE)
+		const documented = documented_commands(others)
+
+		expect(developer_commands().filter((name) => documented.has(name))).toStrictEqual([])
+	})
+
+	it.each(['latest', 'latest:corepack', 'latest:update', 'overrides'])(
+		'treats %s as a command a person types',
+		(name) => {
+			expect(developer_commands()).toContain(name)
+		},
+	)
 })
 
 describe('the command catalog is up to date', () => {

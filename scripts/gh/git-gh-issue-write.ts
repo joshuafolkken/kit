@@ -29,6 +29,7 @@ const DELETE_METHOD = 'DELETE'
 // object, so the same value is unwrapped out of it rather than the shape being changed.
 const HTML_URL_FILTER = '.html_url'
 const ID_FILTER = '.id'
+const LABEL_NAMES_FILTER = '.[].name'
 
 const LABELS_SEGMENT = '/labels'
 const COMMENTS_SEGMENT = '/comments'
@@ -182,17 +183,60 @@ async function issue_create_with_label(input: {
 	)
 }
 
+// The outcome of applying one label, with the swallowed failure's gist kept for a caller that has to
+// say why it refused (joshuafolkken/kit#3312).
+type LabelWrite = { is_applied: true } | { is_applied: false; reason: string }
+
+// The issue's label names, read back after a failed write. A read that itself fails answers
+// `undefined`, which the caller treats as "not applied" — the write's own error is the reason then.
+async function read_label_names(issue_number: string): Promise<Array<string> | undefined> {
+	try {
+		const raw = await git_gh_exec.exec_gh_api({
+			path: `${git_gh_api_path.issue_api_path(issue_number)}${LABELS_SEGMENT}`,
+			should_paginate: true,
+			jq_filter: LABEL_NAMES_FILTER,
+		})
+
+		return raw.split('\n').map((name) => name.trim())
+	} catch (error) {
+		error_text.trace_swallowed('git_gh_issue_write.read_label_names', error)
+
+		return undefined
+	}
+}
+
+// **A failed answer is not a failed write.** The POST is idempotent, and a timeout, a non-zero exit
+// after the write or a secondary rate limit can each throw after the label landed — which refused a
+// lane dispatch whose label was in fact applied (joshuafolkken/kit#3312). So a throw is confirmed by
+// reading the labels back, and only a label that is really absent answers `is_applied: false`.
+async function issue_apply_label(issue_number: string, label: string): Promise<LabelWrite> {
+	const labels_path = `${git_gh_api_path.issue_api_path(issue_number)}${LABELS_SEGMENT}`
+
+	try {
+		await git_gh_exec.exec_gh_api({ path: labels_path, body: JSON.stringify({ labels: [label] }) })
+
+		return { is_applied: true }
+	} catch (error) {
+		const names = await read_label_names(issue_number)
+
+		if (names?.includes(label) === true) return { is_applied: true }
+		error_text.trace_swallowed('git_gh_issue_write.issue_apply_label', error)
+
+		// The first line is the gist: gh follows it with the response body, which a one-line refusal
+		// does not need.
+		const [gist = ''] = error_text.message_of(error).split('\n', 1)
+
+		return { is_applied: false, reason: gist }
+	}
+}
+
 // Applied after the body edit so a failure leaves an issue with the epic sections and no label,
 // which `epic:check` reports — rather than a labelled issue with nothing to track. The caller checks
 // the return: the label is what the auto-close filters on (joshuafolkken/kit#865).
 async function issue_add_label(issue_number: string, label: string): Promise<boolean> {
-	return await did_write_succeed(
-		async () =>
-			await git_gh_exec.exec_gh_api({
-				path: `${git_gh_api_path.issue_api_path(issue_number)}${LABELS_SEGMENT}`,
-				body: JSON.stringify({ labels: [label] }),
-			}),
-	)
+	const write = await issue_apply_label(issue_number, label)
+
+	return write.is_applied
 }
 
 // The counterpart to the addition above, for a run taking its own marker back off
@@ -279,6 +323,7 @@ const git_gh_issue_write = {
 	label_ensure,
 	issue_create_request,
 	issue_create_with_label,
+	issue_apply_label,
 	issue_add_label,
 	issue_remove_label,
 	issue_add_blocked_by,
@@ -286,3 +331,4 @@ const git_gh_issue_write = {
 }
 
 export { git_gh_issue_write }
+export type { LabelWrite }

@@ -1,6 +1,6 @@
 import { run_issue_number } from '#scripts/run/run-issue-number'
-import { run_ship_next, type ShipResume } from '#scripts/run/run-ship-next'
-import type { Stage } from '#scripts/run/run-ship-stage'
+import { run_ship_next, type ShipResume } from '#scripts/run/ship/run-ship-next'
+import type { Stage } from '#scripts/run/ship/run-ship-stage'
 
 interface ShipStop extends ShipResume {
 	stage: Stage

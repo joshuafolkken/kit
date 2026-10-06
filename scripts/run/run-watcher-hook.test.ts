@@ -1,8 +1,8 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { run_progress_clock } from './run-progress-clock'
 import { run_watcher_guard } from './run-watcher-guard'
 import { run_watcher_hook } from './run-watcher-hook'
 
@@ -19,13 +19,13 @@ vi.mock('./run-headless', () => ({
 	run_headless: { is_backlog_parent: vi.fn(), is_headless: vi.fn(() => false) },
 }))
 
-vi.mock('./run-progress-read', () => ({
+vi.mock('#scripts/run/progress/run-progress-read', () => ({
 	run_progress_read: { live_target: vi.fn() },
 }))
 
 const { lane_registry } = await import('#scripts/lane/lane-registry')
 const { run_headless } = await import('./run-headless')
-const { run_progress_read } = await import('./run-progress-read')
+const { run_progress_read } = await import('#scripts/run/progress/run-progress-read')
 const lanes_in_flight = vi.mocked(lane_registry.has_lanes_in_flight)
 const live_target = vi.mocked(run_progress_read.live_target)
 

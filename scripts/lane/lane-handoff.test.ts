@@ -1,5 +1,5 @@
 import { git_common_directory } from '#scripts/git/git-common-directory'
-import { run_ship_detach } from '#scripts/run/run-ship-detach'
+import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_handoff } from './lane-handoff'

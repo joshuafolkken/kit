@@ -39,7 +39,9 @@ vi.mock('#scripts/git/stash/git-stash', () => ({
 
 const ahead_mock = vi.hoisted(() => vi.fn<(issue_number: string) => Promise<Array<string>>>())
 
-vi.mock('./run-ship-preflight', () => ({ run_ship_preflight: { ahead: ahead_mock } }))
+vi.mock('#scripts/run/ship/run-ship-preflight', () => ({
+	run_ship_preflight: { ahead: ahead_mock },
+}))
 
 const { run_prep_cli } = await import('./run-prep-cli')
 

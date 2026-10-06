@@ -1,6 +1,6 @@
 import { release_scope_cli, type Decision } from '#scripts/release/release-scope-cli'
-import { run_event_scope, type EventScope } from './run-event-scope'
-import { run_event_stream, type RunEvent } from './run-event-stream'
+import { run_event_scope, type EventScope } from '#scripts/run/event/run-event-scope'
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 
 // The session-facing report generated *from* the run's event stream, rather than composed by hand each
 // time (joshuafolkken/kit#2249). #2205 gave the run a typed, ordered stream of what happened — a plan, a

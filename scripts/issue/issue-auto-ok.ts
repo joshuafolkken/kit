@@ -1,6 +1,6 @@
 import { git_branch } from '#scripts/git/git-branch'
 import { git_command } from '#scripts/git/git-command'
-import { run_carry } from '#scripts/run/run-carry'
+import { run_carry } from '#scripts/run/carry/run-carry'
 import { issue_file } from './issue-file'
 import { AUTO_OK_LABEL, has_label_name } from './issue-labels'
 import { issue_state_cli } from './issue-state-cli'

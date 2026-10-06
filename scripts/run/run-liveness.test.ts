@@ -4,8 +4,8 @@ import path from 'node:path'
 import type { AgentEventState } from '#scripts/agent/agent-event'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
+import { run_hold } from '#scripts/run/hold/run-hold'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { run_hold } from './run-hold'
 import {
 	ALIVE_VERDICT,
 	MS_PER_MINUTE,

@@ -1,5 +1,5 @@
 import { git_common_directory } from '#scripts/git/git-common-directory'
-import { run_ship_detach } from '#scripts/run/run-ship-detach'
+import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { lane_child_marker, type MarkerSource } from './lane-child-marker'
 
 // Whether a lane has handed its post-implementation region to the detached ship (joshuafolkken/kit#2962).

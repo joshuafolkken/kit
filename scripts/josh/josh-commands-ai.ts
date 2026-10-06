@@ -143,14 +143,14 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['[<owner/repo>]', 'automation', ['none']],
 	},
 	'run:merge': {
-		script: 'scripts/run/run-merge-cli.ts',
+		script: 'scripts/run/merge/run-merge-cli.ts',
 		description:
 			'Collapse a backlogrun merge event into one call: confirm the child, do the post-merge steps, offer the next child',
 		category: 'AI tools',
 		reference: [ISSUE_WITH_OPTIONS, 'automation', ['git', 'network']],
 	},
 	'run:review': {
-		script: 'scripts/run/run-review-cli.ts',
+		script: 'scripts/run/review/run-review-cli.ts',
 		description:
 			'Start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict)',
 		category: 'AI tools',
@@ -171,7 +171,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	// (`run:tail`) were four round trips re-billing the run's full context each. It stops at the first
 	// failed step and names it, so the run reads only the step to fix.
 	ship: {
-		script: 'scripts/run/run-ship-cli.ts',
+		script: 'scripts/run/ship/run-ship-cli.ts',
 		description:
 			'Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step',
 		category: 'AI tools',
@@ -182,7 +182,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		],
 	},
 	'run:event': {
-		script: 'scripts/run/run-event-cli.ts',
+		script: 'scripts/run/event/run-event-cli.ts',
 		description:
 			'Append to, read or watch the run’s append-only event stream (--append <kind> <text> | --from|--follow <n> | --watch [<n>] | --last)',
 		category: 'AI tools',
