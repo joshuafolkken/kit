@@ -89,8 +89,23 @@ interface PullMergeState {
 type PullNumberRead =
 	{ kind: 'read'; pr_number: number } | { kind: 'missing' } | { kind: 'unreadable'; cause: unknown }
 
+// The branch-keyed detail read, in the same three answers. `missing` and `unreadable` are the
+// resolution's own; `unreadable` also covers a resolved number whose detail read failed, which every
+// branch-keyed reader used to fold into "no pull request" (joshuafolkken/kit#3263).
+type PullRead = Exclude<PullNumberRead, { kind: 'read' }> | { kind: 'read'; pull: RestPull }
+
 // The lookups still in flight, keyed the same way the resolved numbers are.
 const pending_pr_number_by_branch = new Map<string, Promise<PullNumberRead>>()
+
+// The detail reads, keyed by number and remembered for the life of the command
+// (joshuafolkken/kit#3263). `josh followup` asks `pr_get_body` and `pr_get_url` in one tick — the
+// same `GET /pulls/{N}` each time. The promise is stored, so readers in one tick share the request as
+// well as its answer; a read that fails is dropped and re-tried, the rule the number memo holds.
+// **Every write to a pull request clears it** through `forget_pr_numbers`, and the two state readers
+// never read it: `pr_get_merge_state` answers where the pull request stands *now*, which `josh ship`
+// asks again after every merge it pushes, and `pr_view` decides whether `josh git -y` writes onto the
+// pull request — after a commit and a push its preflight read would otherwise outlast.
+const pull_by_number = new Map<number, Promise<RestPull>>()
 
 async function fetch_pr_number_read(branch_name: string): Promise<PullNumberRead> {
 	try {
@@ -130,10 +145,11 @@ async function start_pr_number_read(branch_name: string): Promise<PullNumberRead
 	}
 }
 
-// Defined after the map it clears, so the two memos are declared before anything reaches them.
+// Defined after the maps it clears, so the memos are declared before anything reaches them.
 function forget_pr_numbers(): void {
 	pr_number_by_branch.clear()
 	pending_pr_number_by_branch.clear()
+	pull_by_number.clear()
 }
 
 async function read_pr_number(branch_name: string): Promise<PullNumberRead> {
@@ -144,9 +160,9 @@ async function read_pr_number(branch_name: string): Promise<PullNumberRead> {
 }
 
 // `undefined` covers both "this branch has no pull request" and "the lookup failed", which is the
-// distinction `gh pr view` never made either — every *read* here folds them together on purpose:
-// `pr_view` answers the empty string either way, the comment readers `undefined`. The two callers
-// that act on the absence rather than displaying it — `require_pr_number` and `pr_exists` — opt out.
+// distinction `gh pr view` never made either — the *display* reads here fold them together on
+// purpose: the comment readers answer `undefined` either way. The callers that act on the absence
+// rather than displaying it — `require_pr_number`, `pr_exists` and `pr_view` — opt out.
 async function resolve_pr_number(branch_name: string): Promise<number | undefined> {
 	const read = await read_pr_number(branch_name)
 
@@ -186,17 +202,41 @@ async function read_pull(pr_number: number): Promise<RestPull> {
 	return git_gh_pr_rest.parse_rest_pull(json)
 }
 
-// One pull request named by its branch: the resolution, then the detail read that carries
-// `mergeable` and `mergeable_state`, which the lookup listing does not.
-async function read_pull_of_branch(branch_name: string): Promise<RestPull | undefined> {
-	const pr_number = await resolve_pr_number(branch_name)
-	if (pr_number === undefined) return undefined
+// The identity check keeps a failure from evicting a read that `forget_pr_numbers` already replaced.
+async function read_remembered_pull(pr_number: number): Promise<RestPull> {
+	const pending = pull_by_number.get(pr_number) ?? read_pull(pr_number)
+
+	pull_by_number.set(pr_number, pending)
 
 	try {
-		return await read_pull(pr_number)
-	} catch {
-		return undefined
+		return await pending
+	} catch (error) {
+		if (pull_by_number.get(pr_number) === pending) pull_by_number.delete(pr_number)
+		throw error
 	}
+}
+
+// One pull request named by its branch: the resolution, then the detail read that carries
+// `mergeable` and `mergeable_state`, which the lookup listing does not.
+async function read_pull_of_branch(
+	branch_name: string,
+	read: (pr_number: number) => Promise<RestPull> = read_remembered_pull,
+): Promise<PullRead> {
+	const number_read = await read_pr_number(branch_name)
+	if (number_read.kind !== 'read') return number_read
+
+	try {
+		return { kind: 'read', pull: await read(number_read.pr_number) }
+	} catch (error) {
+		return { kind: 'unreadable', cause: error }
+	}
+}
+
+// The display readers' fold: "no pull request" and "nothing could be read" are one empty answer.
+async function read_pull_or_undefined(branch_name: string): Promise<RestPull | undefined> {
+	const read = await read_pull_of_branch(branch_name)
+
+	return read.kind === 'read' ? read.pull : undefined
 }
 
 // **`false` means the branch has no pull request, and nothing else.** This is the second half of
@@ -218,7 +258,7 @@ async function pr_get_number(branch_name: string): Promise<number | undefined> {
 }
 
 async function pr_get_url(branch_name: string): Promise<string | undefined> {
-	const pull = await read_pull_of_branch(branch_name)
+	const pull = await read_pull_or_undefined(branch_name)
 	if (pull?.html_url === undefined) return undefined
 
 	return git_gh_helpers.parse_pr_state_string(pull.html_url)
@@ -229,9 +269,11 @@ async function pr_get_url(branch_name: string): Promise<string | undefined> {
 // made on GitHub moves without touching the local branch. `undefined` covers both "no pull request"
 // and "nothing could be read": `followup` then takes its ordinary path, whose merge step settles a
 // pull request that did merge after all (`pr_merge`), so an unread answer costs a wait, not a wrong tail.
+// Read past the detail memo: `josh ship` asks it again after each merge it pushes (joshuafolkken/kit#3263).
 async function pr_get_merge_state(branch_name: string): Promise<PullMergeState | undefined> {
-	const pull = await read_pull_of_branch(branch_name)
-	if (pull === undefined) return undefined
+	const read = await read_pull_of_branch(branch_name, read_pull)
+	if (read.kind !== 'read') return undefined
+	const { pull } = read
 
 	return {
 		is_merged: git_gh_pr_rest.is_merged(pull),
@@ -244,19 +286,22 @@ async function pr_get_merge_state(branch_name: string): Promise<PullMergeState |
 // REST answers JSON null for a pull request with no body where `gh --json body` answered an empty
 // string, and both used to arrive here as the empty answer this folds to `undefined`.
 async function pr_get_body(branch_name: string): Promise<string | undefined> {
-	const pull = await read_pull_of_branch(branch_name)
+	const pull = await read_pull_or_undefined(branch_name)
 	const body = pull?.body
 
 	return typeof body === 'string' && body.length > 0 ? body : undefined
 }
 
-// The empty string means "there is nothing to read" — a branch with no pull request, or a read that
-// failed. `git-pr.ts` checks the length before parsing.
+// The empty string means "this branch has no pull request", and nothing else. A read that failed
+// throws, carrying gh's reason as the `cause`: `git-pr.ts` decides from this state whether the
+// branch's pull request merged, and a rate limit answered as "no state" sent a merged pull request
+// down the open one's path (joshuafolkken/kit#3263). Read past the detail memo, like the merge state.
 async function pr_view(branch_name: string): Promise<string> {
-	const pull = await read_pull_of_branch(branch_name)
-	if (pull === undefined) return ''
+	const read = await read_pull_of_branch(branch_name, read_pull)
+	if (read.kind === 'unreadable') throw to_unreadable_error(branch_name, read.cause)
+	if (read.kind === 'missing') return ''
 
-	return JSON.stringify(git_gh_pr_rest.to_pr_info(pull))
+	return JSON.stringify(git_gh_pr_rest.to_pr_info(read.pull))
 }
 
 // `undefined` when the listing could not be read — a failed request, or a PR whose number could not
