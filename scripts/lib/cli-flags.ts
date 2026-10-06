@@ -99,7 +99,30 @@ function is_value_unusable(argv: ReadonlyArray<string>, flag: string): boolean {
 	return given_values(argv, flag).some((value) => is_unusable_value(value))
 }
 
+function attach_one(attached: Array<string>, argument: string, flags: ReadonlyArray<string>): void {
+	const previous = attached.at(-1)
+
+	if (previous !== undefined && flags.includes(previous)) {
+		attached[attached.length - 1] = `${previous}=${argument}`
+	} else attached.push(argument)
+}
+
+// Joins each listed free-text flag to the token after it (`--body -x` → `--body=-x`), so a value that
+// opens with a dash — a Markdown bullet — reaches the command instead of being refused by `parseArgs` as
+// ambiguous. Only the listed flags are joined: anywhere else a dash-led token is still the next flag.
+function attach_values(
+	argv: ReadonlyArray<string>,
+	flags: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+	const attached: Array<string> = []
+
+	for (const argument of argv) attach_one(attached, argument, flags)
+
+	return attached
+}
+
 const cli_flags = {
+	attach_values,
 	refuse_unknown_flags,
 	parse_or_undefined,
 	values_of,

@@ -46,11 +46,11 @@
 	"hooks": {
 		"SessionStart": [
 			{
-				"matcher": "",
+				"matcher": "startup",
 				"hooks": [
 					{
 						"type": "command",
-						"command": "pnpm josh audit:provision",
+						"command": "project_root=\"$(env -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_COMMON_DIR -u GIT_DIR -u GIT_INDEX_FILE -u GIT_NAMESPACE -u GIT_OBJECT_DIRECTORY -u GIT_WORK_TREE git rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel)\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh audit-provision",
 						"timeout": 180
 					}
 				]

@@ -44,6 +44,34 @@ describe('protected_files.is_protected_file_call — .env', () => {
 	)
 })
 
+describe('protected_files.is_protected_file_call — .env through Bash', () => {
+	it.each([
+		'cat .env',
+		'head -n 3 /work/app/.env',
+		'grep TOKEN ".env"',
+		'source .env && pnpm dev',
+		'. ./.env',
+		'git status; sed -n 1p .env',
+		'wc -l < .env',
+	])('refuses %j', (command) => {
+		const call = { name: 'Bash', input: { command } }
+
+		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(true)
+	})
+
+	it.each([
+		'cat .env.example',
+		'grep KEY .env.local',
+		'git add .env.example',
+		'git commit -m "Ignore .env"',
+		'ls -a',
+	])('is silent on %j', (command) => {
+		const call = { name: 'Bash', input: { command } }
+
+		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(false)
+	})
+})
+
 describe('protected_files.is_protected_file_call — .claude/settings.json', () => {
 	it.each(['Edit', 'Write'])('refuses a consumer %s', (name) => {
 		const call = { name, input: { file_path: SETTINGS_PATH } }

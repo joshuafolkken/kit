@@ -237,17 +237,18 @@ describe.each(AI_DOCS)('%s — carries the trigger for the resident defaults', (
 	// **The cap keeps its trigger resident and loses its section.** A hook reaches this harness
 	// alone, so removing the line outright would leave a Codex, Gemini or Cursor session — each
 	// reading `CLAUDE.md` through a pointer and running no hook — able to file past 30 with nothing
-	// telling it to count. What the relocation takes out is the heading and the procedure.
+	// telling it to count. What the relocation takes out is the heading and the procedure; the
+	// explanation of why the count and the tests exist went with it (joshuafolkken/kit#3256).
 	it.each([
-		"**File through `pnpm josh issue:file` — it counts the target repository's open Issues, never a hand count; above the WIP cap, close one first.**",
-		'and so is an **interrupt** — three tests decide that, never judgement',
+		'**File through `pnpm josh issue:file`, never a hand count; above the WIP cap, close one first.**',
+		'Exempt: a filing the run is blocked by, and an **interrupt**',
 		'a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository',
 		// Without these two the three tests are listed with nothing saying what happens when none is
 		// met, and no instruction to state the overage — for the agent that runs no hook, which is
 		// the whole audience the resident line exists for.
-		'Meeting none of the three, a finding stays discretionary',
-		'both exemptions proceed, stating the overage',
-		'`pnpm josh rule:guard` states it again at the call that files',
+		'anything else stays discretionary',
+		'both proceed, stating the overage',
+		'`pnpm josh rule:guard` states the rest at the call that files',
 		WIP_TOPIC,
 	])('keeps the trigger %j resident', (marker) => {
 		expect(content).toContain(marker)

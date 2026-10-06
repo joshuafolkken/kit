@@ -52,7 +52,7 @@ function is_index_mutation(command: string): boolean {
 const INDEX_MUTATION_REASON =
 	'⛔ git index mutation: `git add` / `stage` / `commit` / `reset` / `rm` / `mv` and `git restore ' +
 	"--staged` overwrite the user's staged snapshot, which `CLAUDE.md` → Git Rules forbids on your own " +
-	'judgement (`prompts/collaboration-workflow/operating-rules.md` → "git index を勝手に変更しない"). The ' +
+	'judgement (`prompts/collaboration-workflow/operating-rules.md` → "no-self-staging"). The ' +
 	'`.claude/settings.json` deny list matches prefix globs, so it misses `git -C . commit`, `git -c ' +
 	'k=v commit` and `env git commit`; this row reads the argv instead, so the spelling does not matter. ' +
 	'A commit goes through `pnpm josh git -y`; any other staging needs explicit current-turn user ' +
