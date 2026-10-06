@@ -9,6 +9,7 @@ import { lane_close } from '#scripts/lane/lane-close'
 import { lane_reap } from '#scripts/lane/lane-reap'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
+import { lane_vacant } from '#scripts/lane/lane-vacant'
 import { poll } from '#scripts/lib/poll'
 import {
 	run_carry,
@@ -196,6 +197,28 @@ async function preserve_uncommitted(child: string): Promise<boolean> {
 	}
 }
 
+function kept_lane_comment(directory: string): string {
+	return `The split left this issue's lane open: it still holds a commit, an uncommitted change or a live process — ${directory}`
+}
+
+// A child promoted to an epic by a split leaves its lane holding a seat (joshuafolkken/kit#3334): the
+// epic root is never dispatched again, so nothing else would ever close it. The lane is closed only
+// when it holds nothing — no commit, no change, no live process (`lane_vacant`); any other lane is
+// kept, and why is stated on the issue.
+async function close_split_lane(child: string): Promise<void> {
+	const lane = await lane_registry.find_open_lane(child)
+
+	if (lane === undefined) return
+
+	if (await lane_vacant.is_vacant(lane)) {
+		await close_lane(child)
+
+		return
+	}
+
+	await git_gh_issue_write.issue_try_comment(child, kept_lane_comment(lane.directory))
+}
+
 // The progress comment is a human-readable mirror of the carry record, so it is best-effort and only
 // where a named epic has a body to carry it — a pure backlog run keeps the record alone.
 async function post_counters(ctx: MergeContext, carry: RunCarry | undefined): Promise<void> {
@@ -380,6 +403,7 @@ async function ask_next(ctx: MergeContext): Promise<string> {
 const run_merge_steps = {
 	CUT_RELAUNCH_CAUSE,
 	ask_next,
+	close_split_lane,
 	do_failed,
 	do_merged,
 	do_outage,
