@@ -1,4 +1,5 @@
 import { realpathSync } from 'node:fs'
+import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { CommandEntry } from './josh-command-types'
 
@@ -8,26 +9,44 @@ import type { CommandEntry } from './josh-command-types'
 // (joshuafolkken/kit#1342). The script is ordinary TypeScript and a TypeScript loader is already
 // installed by the time this file runs, so the dispatcher evaluates the script itself instead.
 const TYPESCRIPT_EXTENSION = '.ts'
+const JAVASCRIPT_EXTENSION = '.js'
+const BUNDLED_COMMAND_DIRECTORY = path.join('dist', 'commands')
 const FAILURE_EXIT_CODE = 1
 
 // The dispatcher may only load a `.ts` script in its own process when it was itself loaded as
 // TypeScript — which is exactly the condition under which a loader capable of it is present. A
-// consumer runs the bundled `dist/josh.js` under plain node, whose `import.meta.url` ends in `.js`,
-// so that install keeps the spawning path unchanged rather than failing on a module node cannot
-// load at all.
+// consumer runs the bundled `dist/josh.js` under plain node, whose `import.meta.url` ends in `.js`.
 function is_typescript_dispatcher(dispatcher_url: string): boolean {
 	return dispatcher_url.endsWith(TYPESCRIPT_EXTENSION)
 }
 
+// A command marked `is_bundled` is pre-built to `dist/commands/<script basename>.js` by
+// `scripts/build/build-commands.ts` (joshuafolkken/kit#3328). The path is derived here, in a module
+// the dispatcher bundle already carries, so the build and the dispatcher cannot name two locations.
+function bundled_script_path(package_directory: string, script: string): string {
+	const name = `${path.basename(script, TYPESCRIPT_EXTENSION)}${JAVASCRIPT_EXTENSION}`
+
+	return path.join(package_directory, BUNDLED_COMMAND_DIRECTORY, name)
+}
+
+// The file this dispatcher imports in its own process, or `undefined` to spawn tsx instead.
 // `tsx_arguments` are node flags the script needs *before* its own code runs — today every one of
 // them a form of `--env-file`, which has no in-process equivalent that reproduces node's own
 // parsing and precedence. Those commands (`doctor`, `latest:scope`, `followup`, `notify`) keep a
 // process of their own; each runs at most a few times per run, so none of them is where the cost
-// this saves accumulates.
-function can_run_in_process(entry: CommandEntry, dispatcher_url: string): boolean {
-	if (entry.script === undefined || entry.tsx_arguments !== undefined) return false
+// this saves accumulates. Under plain node, which cannot load a `.ts` script at all, only a
+// pre-built command runs in-process; every other one keeps spawning tsx.
+function in_process_target(
+	entry: CommandEntry,
+	package_directory: string,
+	dispatcher_url: string,
+): string | undefined {
+	if (entry.script === undefined || entry.tsx_arguments !== undefined) return undefined
+	if (is_typescript_dispatcher(dispatcher_url)) return path.join(package_directory, entry.script)
 
-	return is_typescript_dispatcher(dispatcher_url)
+	return entry.is_bundled === true
+		? bundled_script_path(package_directory, entry.script)
+		: undefined
 }
 
 // `process.exitCode` is typed `number | string | undefined`. Only the numeric form is an exit code
@@ -75,6 +94,6 @@ async function run_in_process(
 	return read_exit_code()
 }
 
-const josh_in_process = { can_run_in_process, run_in_process }
+const josh_in_process = { bundled_script_path, in_process_target, run_in_process }
 
-export { FAILURE_EXIT_CODE, josh_in_process }
+export { BUNDLED_COMMAND_DIRECTORY, FAILURE_EXIT_CODE, josh_in_process }

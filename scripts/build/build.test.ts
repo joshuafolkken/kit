@@ -8,7 +8,13 @@ function step_names(): Array<string> {
 
 describe('build_steps', () => {
 	it('runs the bin, the hook bundles, every public library and the distributed CLAUDE.md', () => {
-		expect(step_names()).toStrictEqual(['bin', 'hooks', ...PUBLIC_LIBRARIES, 'claude-md'])
+		expect(step_names()).toStrictEqual([
+			'bin',
+			'hooks',
+			'commands',
+			...PUBLIC_LIBRARIES,
+			'claude-md',
+		])
 	})
 
 	it('names each step once, so no output is written by two concurrent steps', () => {
