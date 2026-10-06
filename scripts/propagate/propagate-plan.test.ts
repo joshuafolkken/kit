@@ -147,9 +147,9 @@ describe('propagate_plan.build_plan', () => {
 	it('upgrades every carried package to its pinned version', () => {
 		const commands = propagate_steps.upgrade_commands(plan_of(make_app_kit(), APP_KIT_VERSION))
 
-		expect(commands.map(({ package_name }) => package_name)).toEqual([KIT, APP_KIT])
-		expect(commands[0]?.command.join(' ')).toContain(`${KIT}@${KIT_INSTALLED}`)
-		expect(commands[1]?.command.join(' ')).toContain(`${APP_KIT}@${APP_KIT_VERSION}`)
+		expect(commands.map(({ package_name }) => package_name)).toEqual([KIT, KIT, APP_KIT, APP_KIT])
+		expect(commands[0]?.command).toContain(`${KIT}@${KIT_INSTALLED}`)
+		expect(commands[2]?.command).toContain(`${APP_KIT}@${APP_KIT_VERSION}`)
 	})
 })
 

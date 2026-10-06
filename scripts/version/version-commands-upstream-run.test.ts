@@ -75,15 +75,10 @@ describe('version_commands.run_upgrade with upstreams', () => {
 		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
 
 		expect(version_commands.run_upgrade(CHAINED_CONFIG)).toBe(0)
-		expect(mocked_execa_sync).toHaveBeenCalledTimes(1)
-		expect(mocked_execa_sync).toHaveBeenCalledWith(
-			'sh',
-			[
-				'-c',
-				`${UPSTREAM_UPGRADE_COMMAND} && node_modules/.bin/tsx node_modules/${UPSTREAM_PACKAGE}/scripts/gh/fix-gh-packages.ts`,
-			],
-			expect.objectContaining({ stdio: 'inherit', reject: false }),
-		)
+		expect(mocked_execa_sync.mock.calls.map(([file, argv]) => [file, argv])).toStrictEqual([
+			['pnpm', UPSTREAM_UPGRADE_COMMAND.split(' ').slice(1)],
+			['node_modules/.bin/tsx', [`node_modules/${UPSTREAM_PACKAGE}/scripts/gh/fix-gh-packages.ts`]],
+		])
 	})
 
 	it('reports already up to date when the upstream chain is current', () => {
@@ -169,7 +164,7 @@ describe('version_commands.run_upgrade outcome for a suppressed global command',
 		// The project dependency is stale, so an upgrade does run — but the effective global command
 		// was suppressed as a no-op and must not be reported as having failed to change anything.
 		expect(version_commands.run_upgrade(CHAINED_CONFIG_WITH_PINNED_COMMAND)).toBe(0)
-		expect(mocked_execa_sync).toHaveBeenCalledTimes(1)
+		expect(mocked_execa_sync).toHaveBeenCalledTimes(2)
 		expect(info_spy).not.toHaveBeenCalled()
 		info_spy.mockRestore()
 	})

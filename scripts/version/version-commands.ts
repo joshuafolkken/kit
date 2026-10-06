@@ -3,6 +3,7 @@ import { release_age } from './release-age'
 import { release_hold } from './release-hold'
 import { running_binary } from './running-binary'
 import type { InstalledVersions } from './upgrade-command-guard'
+import type { UpgradeCommand } from './upgrade-shell-command'
 import {
 	version_check_logic,
 	type ReleaseHold,
@@ -197,12 +198,13 @@ function run_check(config: VersionCommandConfig): void {
 	)
 }
 
-// Through `sh -c` because an upgrade command is the user's own configured string — `pnpm add -g …`,
-// or a chain with `&&` — so it is inside the trust boundary and needs a shell to mean what it says.
-// The bound keeps a registry that never answers from holding `josh version` open forever; a timed-out
-// run has no exit code, so it falls through to the failure code like any other failed step.
-function run_upgrade_command(command: string): number {
-	const result = execaSync('sh', ['-c', command], {
+// One step as an argument vector — no shell unless the step itself is the consumer's `sh -c`
+// (`shell_upgrade_command`). The bound keeps a registry that never answers from holding `josh
+// version` open forever; a timed-out run has no exit code, so it falls through to the failure code
+// like any other failed step.
+function run_upgrade_step(step: ReadonlyArray<string>): number {
+	const [executable = '', ...rest] = step
+	const result = execaSync(executable, rest, {
 		stdio: 'inherit',
 		reject: false,
 		timeout: UPGRADE_TIMEOUT_MS,
@@ -211,9 +213,20 @@ function run_upgrade_command(command: string): number {
 	return result.exitCode ?? FAILURE_EXIT_CODE
 }
 
+// Run one command's steps in order, stopping at the first failure — what the `&&` in its printed
+// text says.
+function run_upgrade_command(command: UpgradeCommand): number {
+	for (const step of command.steps) {
+		const code = run_upgrade_step(step)
+		if (code !== 0) return code
+	}
+
+	return 0
+}
+
 // Run every upgrade command in order, returning the last non-zero exit code (or 0 when all
 // succeed) so a failure on either target is surfaced without aborting the remaining upgrades.
-function run_all_upgrade_commands(commands: ReadonlyArray<string>): number {
+function run_all_upgrade_commands(commands: ReadonlyArray<UpgradeCommand>): number {
 	let exit_code = 0
 	const failed_commands: Array<string> = []
 
@@ -221,7 +234,7 @@ function run_all_upgrade_commands(commands: ReadonlyArray<string>): number {
 		const code = run_upgrade_command(command)
 		if (code === 0) continue
 		exit_code = code
-		failed_commands.push(command)
+		failed_commands.push(command.text)
 	}
 
 	if (failed_commands.length > 0) {

