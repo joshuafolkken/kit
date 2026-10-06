@@ -284,14 +284,18 @@ function check_weight(check: GateCheck, plan: GatePlan, available_cores: number)
 // vitest while other runs are live, and otherwise the gate's own solo unit weight. **Not the whole
 // machine**, though a lone vitest sizes its own pool: FIFO admission lets a claim of every core in only
 // once the ledger is empty, so a one-file `josh test:related` would wait out every other lane's gate
-// and hold every later claim behind it. One weight for the suite however it is started.
+// and hold every later claim behind it. One weight for the suite however it is started. **Floored at one
+// worker**: on a machine the static checks fill, a four-core CI runner among them, the gate's solo
+// weight is zero because its siblings hold every core — a direct run has no siblings, and vitest still
+// occupies a core.
 function direct_unit_weight(
 	available_cores: number = availableParallelism(),
 	live_runs: number = unit_worker_share.live_run_count(),
 ): number {
-	return (
+	const weight =
 		unit_worker_share.current_share(available_cores, live_runs) ?? solo_unit_weight(available_cores)
-	)
+
+	return Math.max(unit_worker_share.MIN_WORKERS, weight)
 }
 
 // `availableParallelism()` rather than `cpus().length`: it reports what this process may actually

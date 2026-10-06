@@ -235,6 +235,10 @@ describe('gate_plan.direct_unit_weight — the cores a direct unit run reserves'
 	it('never claims the whole machine', () => {
 		expect(gate_plan.direct_unit_weight(MEASURED_CORES, 0)).toBeLessThan(MEASURED_CORES)
 	})
+
+	it('claims at least one core on a runner the static checks fill', () => {
+		expect(gate_plan.direct_unit_weight(CI_CORES, 0)).toBe(1)
+	})
 })
 
 describe('gate_plan.format_gate_plan', () => {
