@@ -30,7 +30,7 @@ const { STAGE } = run_ship_stage
 
 const josh_spy = vi.spyOn(josh_command, 'josh_run')
 const preflight_spy = vi.spyOn(run_ship_preflight, 'stage')
-const scoped_spy = vi.spyOn(run_ship_scoped, 'scoped_pair')
+const scoped_gate_spy = vi.spyOn(run_ship_scoped, 'scoped_gate')
 const review_spy = vi.spyOn(run_ship_review_steps, 'review_stage')
 const round_two_spy = vi.spyOn(run_ship_review_steps, 'round_two_stage')
 const sync_spy = vi.spyOn(run_ship_sync, 'sync_stage')
@@ -39,7 +39,7 @@ const followup_spy = vi.spyOn(run_ship_sync, 'followup_stage')
 beforeEach(() => {
 	josh_spy.mockReset().mockResolvedValue(OK)
 	preflight_spy.mockReset().mockResolvedValue(OK)
-	scoped_spy.mockReset().mockResolvedValue(OK)
+	scoped_gate_spy.mockReset().mockResolvedValue(OK)
 	review_spy.mockReset().mockResolvedValue(OK)
 	round_two_spy.mockReset().mockResolvedValue(OK)
 })
@@ -58,8 +58,8 @@ describe('run_ship_steps.steps — the order a change ships in', () => {
 	it('runs preflight, gate, commit, followup and report without --review', () => {
 		expect(run_ship_steps.steps(ARGS).map((step) => [step.stage, step.header])).toStrictEqual([
 			[STAGE.PREFLIGHT, run_ship.PREFLIGHT_HEADER],
-			[STAGE.GATE, run_ship.GATE_HEADER],
 			[STAGE.SYNC, run_ship.SYNC_HEADER],
+			[STAGE.GATE, run_ship.GATE_HEADER],
 			[STAGE.COMMIT, run_ship.COMMIT_HEADER],
 			[STAGE.FOLLOWUP, run_ship.FOLLOWUP_HEADER],
 			[STAGE.REPORT, run_ship.REPORT_HEADER],
@@ -72,8 +72,8 @@ describe('run_ship_steps.steps — the order a change ships in', () => {
 		expect(stages).toStrictEqual([
 			STAGE.PREFLIGHT,
 			STAGE.REVIEW,
-			STAGE.GATE,
 			STAGE.SYNC,
+			STAGE.GATE,
 			STAGE.COMMIT,
 			STAGE.ROUND_TWO,
 			STAGE.FOLLOWUP,
@@ -102,17 +102,11 @@ describe('run_ship_steps — preflight and review stages delegate', () => {
 })
 
 describe('run_ship_steps — the gate stage', () => {
-	it('runs the scoped pair and then josh gate, forwarding stderr', async () => {
-		expect(await step_for(STAGE.GATE).run(ARGS, FRESH)).toBe(OK)
-		expect(scoped_spy).toHaveBeenCalledOnce()
-		expect(josh_spy).toHaveBeenCalledWith(['gate'], true)
-	})
-
-	it('stops before josh gate when the scoped pair fails', async () => {
-		scoped_spy.mockResolvedValue(FAILED)
+	it('delegates to the scoped gate and returns its result', async () => {
+		scoped_gate_spy.mockResolvedValue(FAILED)
 
 		expect(await step_for(STAGE.GATE).run(ARGS, FRESH)).toBe(FAILED)
-		expect(josh_spy).not.toHaveBeenCalled()
+		expect(scoped_gate_spy).toHaveBeenCalledOnce()
 	})
 })
 
@@ -144,7 +138,7 @@ describe('run_ship_steps — the commit, followup and report stages', () => {
 		])
 	})
 
-	// joshuafolkken/kit#3221: the merge of the default branch between the gate and the commit.
+	// joshuafolkken/kit#3221: the merge of the default branch before the commit.
 	it('sync and followup delegate to the sync module', async () => {
 		sync_spy.mockResolvedValue(OK)
 		followup_spy.mockResolvedValue(OK)

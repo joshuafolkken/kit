@@ -96,13 +96,16 @@ async function reusable_green_commit(
 	source?: string,
 	start_directory: string = process.cwd(),
 ): Promise<FileMapStamp | undefined> {
-	const reusable = hook_gate_reuse.reusable_green_hook({
+	const reuse = hook_gate_reuse.hook_reuse({
 		tree,
 		is_tree_carried: tree.is_index_matching_worktree,
+		carry_miss: 'the index differs from the working tree',
 		extra_arguments,
 		force_env: FORCE_ENV,
 		source,
 	})
+
+	const reusable = gate_skip.stamp_of(reuse)
 
 	if (reusable === undefined) return undefined
 

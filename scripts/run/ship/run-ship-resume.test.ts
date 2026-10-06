@@ -2,11 +2,12 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type { josh_command } from '#scripts/josh/josh-run'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 import type { ShipState } from './run-ship-stage'
 
-const josh_run_mock = vi.hoisted(() => vi.fn())
+const josh_run_mock = vi.hoisted(() => vi.fn<typeof josh_command.josh_run>())
 const probe = vi.hoisted(() => ({ read_state: vi.fn(), record_target: vi.fn() }))
 const emit_mock = vi.hoisted(() => vi.fn())
 
@@ -25,7 +26,15 @@ vi.mock('./run-ship-scoped', async (import_original) => {
 		.fn<typeof real_scoped.scoped_pair>()
 		.mockResolvedValue({ code: 0, out: '' })
 
-	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_pair } }
+	// The real `scoped_gate` calls its own module's pair, so it is rebuilt around the mocked one.
+	async function scoped_gate(): ReturnType<typeof real_scoped.scoped_gate> {
+		return await actual.run_ship_scoped.run_phases([
+			scoped_pair,
+			async () => await josh_run_mock(['gate'], true),
+		])
+	}
+
+	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_gate, scoped_pair } }
 })
 // The sync stage's merge of the default branch is pinned in `run-ship-sync.test.ts`; here it is
 // current, so no test ever merges into the checkout it runs in.
@@ -61,7 +70,7 @@ const MERGED: ShipState = { ...SHIPPED, is_merged: true }
 const current = { target: '' }
 
 function commands(): ReadonlyArray<string> {
-	return josh_run_mock.mock.calls.map((call) => (call[0] as ReadonlyArray<string>).join(' '))
+	return josh_run_mock.mock.calls.map((call) => call[0].join(' '))
 }
 
 function events(): ReadonlyArray<string> {
@@ -118,8 +127,8 @@ describe('josh ship — a restart with a record', () => {
 		expect(await run_ship_cli.run([TITLE])).toBe(FAILED)
 		expect([...run_ship_stage.read_done(current.target)]).toStrictEqual([
 			'preflight',
-			'gate',
 			'sync',
+			'gate',
 		])
 	})
 })
@@ -164,8 +173,8 @@ describe('josh ship — the stage trace on the event stream', () => {
 
 		expect(events()).toStrictEqual([
 			'ship-stage #2426 preflight skipped',
-			'ship-stage #2426 gate skipped',
 			'ship-stage #2426 sync skipped',
+			'ship-stage #2426 gate skipped',
 			'ship-stage #2426 commit skipped',
 			'ship-stage #2426 followup skipped',
 			'ship-stage #2426 report start',
@@ -181,6 +190,8 @@ describe('josh ship — the stage trace on the event stream', () => {
 		expect(events()).toStrictEqual([
 			'ship-stage #2426 preflight start',
 			'ship-stage #2426 preflight done',
+			'ship-stage #2426 sync start',
+			'ship-stage #2426 sync done',
 			'ship-stage #2426 gate start',
 			'ship-stage #2426 gate failed',
 		])

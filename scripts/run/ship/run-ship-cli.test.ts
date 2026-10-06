@@ -1,7 +1,8 @@
+import type { josh_command } from '#scripts/josh/josh-run'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 
-const josh_run_mock = vi.hoisted(() => vi.fn())
+const josh_run_mock = vi.hoisted(() => vi.fn<typeof josh_command.josh_run>())
 const review_mock = vi.hoisted(() => vi.fn())
 const round_two_mock = vi.hoisted(() => vi.fn())
 const repository_mock = vi.hoisted(() => vi.fn())
@@ -32,7 +33,15 @@ vi.mock('./run-ship-preflight', () => ({ run_ship_preflight: { stage: preflight_
 vi.mock('./run-ship-scoped', async (import_original) => {
 	const actual = await import_original<{ run_ship_scoped: typeof real_scoped }>()
 
-	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_pair: scoped_mock } }
+	// The real `scoped_gate` calls its own module's pair, so it is rebuilt around the mocked one.
+	async function scoped_gate(): ReturnType<typeof real_scoped.scoped_gate> {
+		return await actual.run_ship_scoped.run_phases([
+			scoped_mock,
+			async () => await josh_run_mock(['gate'], true),
+		])
+	}
+
+	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_gate, scoped_pair: scoped_mock } }
 })
 // The sync stage's merge of the default branch is pinned in `run-ship-sync.test.ts`; here it is
 // current, so no test ever merges into the checkout it runs in.
@@ -65,11 +74,12 @@ const FOLLOWUP = ['followup', TITLE]
 const REPORT = ['run:tail', NUMBER]
 const BODY_FILE_FLAG = '--body-file'
 const PREFLIGHT_SECTION = '=== preflight ===\nready\n\n'
+const SYNC_SECTION = '=== sync origin/main ===\nmain brings nothing in\n\n'
 
 const info_lines: Array<string> = []
 
 function argv_calls(): ReadonlyArray<ReadonlyArray<string>> {
-	return josh_run_mock.mock.calls.map((call) => call[0] as ReadonlyArray<string>)
+	return josh_run_mock.mock.calls.map((call) => call[0])
 }
 
 beforeEach(() => {
@@ -164,7 +174,7 @@ describe('run_ship_cli.run — folds the four ship steps into one call', () => {
 		await run_ship_cli.run([TITLE])
 
 		expect(info_lines[0]).toBe(
-			`${PREFLIGHT_SECTION}=== gate ===\ngreen\n\n=== sync origin/main ===\nmain brings nothing in\n\n=== commit/push/PR ===\npushed\n\n=== followup ===\nmerged\n\n=== report ===\nshipped`,
+			`${PREFLIGHT_SECTION}${SYNC_SECTION}=== gate ===\ngreen\n\n=== commit/push/PR ===\npushed\n\n=== followup ===\nmerged\n\n=== report ===\nshipped`,
 		)
 	})
 })
@@ -264,7 +274,7 @@ describe('run_ship_cli.run — a failed step stops the ship', () => {
 		await run_ship_cli.run([TITLE])
 
 		expect(info_lines[0]).toBe(
-			`${PREFLIGHT_SECTION}=== gate ===\nlint red\n\nstopped at: === gate ===`,
+			`${PREFLIGHT_SECTION}${SYNC_SECTION}=== gate ===\nlint red\n\nstopped at: === gate ===`,
 		)
 	})
 
@@ -290,7 +300,7 @@ describe('run_ship_cli.run — --review owns the round-1 review (joshuafolkken/k
 		expect(review_mock).toHaveBeenCalledWith(NUMBER)
 		expect(argv_calls()).toStrictEqual([GATE, COMMIT, FOLLOWUP, REPORT])
 		expect(info_lines[0]).toMatch(
-			/^=== preflight ===\nready\n\n=== review ===\nreview clean\n\n=== gate ===/u,
+			/^=== preflight ===\nready\n\n=== review ===\nreview clean\n\n=== sync origin\/main ===\nmain brings nothing in\n\n=== gate ===/u,
 		)
 	})
 
