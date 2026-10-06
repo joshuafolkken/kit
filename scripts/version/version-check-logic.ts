@@ -1,6 +1,12 @@
 import { release_hold } from './release-hold'
 import { is_no_op_upgrade_command, type InstalledVersions } from './upgrade-command-guard'
-import { build_upgrade_shell_command, format_update_command } from './upgrade-shell-command'
+import {
+	build_upgrade_command,
+	build_upgrade_shell_command,
+	format_update_command,
+	shell_upgrade_command,
+	type UpgradeCommand,
+} from './upgrade-shell-command'
 import type { PackageVersionConfig } from './version-command-config'
 
 const NOT_INSTALLED = 'not installed'
@@ -161,11 +167,11 @@ function resolve_effective_upgrade_hint(report: UpstreamReport): EffectiveUpgrad
 // The consumer-supplied global upgrade command for a stale effective upstream, or nothing. Skipped
 // when the consumer did not opt in, the effective install is up to date / unresolved, or the command
 // provably cannot change the effective version it was meant to fix (see the note line instead).
-function build_effective_upgrade_commands(report: UpstreamReport): Array<string> {
+function build_effective_upgrade_commands(report: UpstreamReport): Array<UpgradeCommand> {
 	const hint = resolve_effective_upgrade_hint(report)
 	if (hint === undefined || hint.is_no_op) return []
 
-	return [hint.command]
+	return [shell_upgrade_command(hint.command)]
 }
 
 // The explanation that replaces a suppressed `Run:` hint, so a stale effective install is never left
@@ -202,8 +208,9 @@ function format_upstream_lines(report: UpstreamReport): Array<string> {
 // Drop repeated commands while preserving first-seen order. A consumer with several upstreams can
 // return the same chain-pinning global command from each of them (game-kit returns one command for
 // both app-kit and kit), which would otherwise print an identical `Run:` line once per upstream.
-function unique_upgrade_commands(commands: ReadonlyArray<string>): Array<string> {
-	return [...new Set(commands)]
+// Keyed on the printed text, which the steps are derived from or carried verbatim inside.
+function unique_upgrade_commands(commands: ReadonlyArray<UpgradeCommand>): Array<UpgradeCommand> {
+	return [...new Map(commands.map((command) => [command.text, command])).values()]
 }
 
 // The outcome line for an effective install the upgrade command left exactly where it was.
@@ -235,37 +242,39 @@ function format_effective_outcome(report: UpstreamReport, after: string | undefi
 
 // The project-scope upgrade command when the upstream's project dependency is installed and stale.
 // Always local (with lockfile repair), since the project path is the only scope kit resolves.
-function build_project_upgrade_commands(report: UpstreamReport): Array<string> {
+function build_project_upgrade_commands(report: UpstreamReport): Array<UpgradeCommand> {
 	if (!is_target_stale(report.project_version, report.latest)) return []
 
-	return [build_upgrade_shell_command(report.latest, true, report.config)]
+	return [build_upgrade_command(report.latest, true, report.config)]
 }
 
 // Build the upgrade commands for every upstream: the consumer's global command for a stale effective
 // install first, then the project-scope command, mirroring the main report's global-before-project
 // order. Upstreams without either stale target contribute nothing.
-function build_upstream_upgrade_commands(reports: ReadonlyArray<UpstreamReport>): Array<string> {
+function build_upstream_upgrade_commands(
+	reports: ReadonlyArray<UpstreamReport>,
+): Array<UpgradeCommand> {
 	return reports.flatMap((report) => [
 		...build_effective_upgrade_commands(report),
 		...build_project_upgrade_commands(report),
 	])
 }
 
-// Build the shell upgrade commands for whichever of the two targets are installed and stale.
+// Build the upgrade commands for whichever of the two targets are installed and stale.
 // Order: global first, then project (mirrors the display order).
 function build_dual_upgrade_commands(
 	snapshot: VersionSnapshot,
 	config: PackageVersionConfig,
-): Array<string> {
+): Array<UpgradeCommand> {
 	const { global_version, project_version, latest } = snapshot
-	const commands: Array<string> = []
+	const commands: Array<UpgradeCommand> = []
 
 	if (is_target_stale(global_version, latest)) {
-		commands.push(build_upgrade_shell_command(latest, false, config))
+		commands.push(build_upgrade_command(latest, false, config))
 	}
 
 	if (is_target_stale(project_version, latest)) {
-		commands.push(build_upgrade_shell_command(latest, true, config))
+		commands.push(build_upgrade_command(latest, true, config))
 	}
 
 	return commands
@@ -298,7 +307,7 @@ function format_dual_version_output(
 	const hints = unique_upgrade_commands([
 		...build_dual_upgrade_commands(snapshot, config),
 		...build_upstream_upgrade_commands(upstreams),
-	]).map((command) => `Run: ${command}`)
+	]).map((command) => `Run: ${command.text}`)
 	if (hints.length > 0) lines.push('', ...hints)
 	if (extras.warning !== undefined) lines.push('', extras.warning)
 

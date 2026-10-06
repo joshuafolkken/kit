@@ -125,7 +125,9 @@ describe('release-age hold degrades to the previous report', () => {
 describe('the upgrade hint is never suppressed by a hold', () => {
 	it('prints the hint for a held upstream install', () => {
 		expect(
-			version_check_logic.build_effective_upgrade_commands(upstream_report(INSTALLABLE, HOLD)),
+			version_check_logic
+				.build_effective_upgrade_commands(upstream_report(INSTALLABLE, HOLD))
+				.map(({ text }) => text),
 		).toStrictEqual([UPGRADE_COMMAND])
 	})
 

@@ -278,9 +278,9 @@ describe('version_check_logic.build_dual_upgrade_commands', () => {
 		)
 
 		expect(result).toHaveLength(2)
-		expect(result[0]).toContain(ADD_GLOBAL)
-		expect(result[1]).toContain(ADD_LOCAL)
-		expect(result[1]).toContain(FIX_GH_PACKAGES_MARKER)
+		expect(result[0]?.text).toContain(ADD_GLOBAL)
+		expect(result[1]?.text).toContain(ADD_LOCAL)
+		expect(result[1]?.text).toContain(FIX_GH_PACKAGES_MARKER)
 	})
 
 	it('returns an empty list when both targets are up to date', () => {
@@ -299,6 +299,6 @@ describe('version_check_logic.build_dual_upgrade_commands', () => {
 		)
 
 		expect(result).toHaveLength(1)
-		expect(result[0]).toContain(ADD_LOCAL)
+		expect(result[0]?.text).toContain(ADD_LOCAL)
 	})
 })

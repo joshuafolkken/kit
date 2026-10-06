@@ -225,21 +225,34 @@ describe('propagate_steps.STEP_COMMANDS', () => {
 // The exact version is the whole point of the publish wait: `josh version:upgrade` installs the
 // registry's latest, so a release published while the run was in flight would be the one every
 // consumer received instead.
+function upgrade_text(): string {
+	return propagate_steps
+		.upgrade_command(KIT, VERSION)
+		.map((step) => step.join(' '))
+		.join(' && ')
+}
+
 describe('propagate_steps.upgrade_command', () => {
 	it('pins the exact version that was waited for', () => {
-		expect(propagate_steps.upgrade_command(KIT, VERSION).join(' ')).toContain(`${KIT}@${VERSION}`)
+		expect(upgrade_text()).toContain(`${KIT}@${VERSION}`)
 	})
 
 	it('never asks for latest', () => {
-		expect(propagate_steps.upgrade_command(KIT, VERSION).join(' ')).not.toContain('latest')
+		expect(upgrade_text()).not.toContain('latest')
 	})
 
 	it('installs into the consumer own dev dependencies', () => {
-		expect(propagate_steps.upgrade_command(KIT, VERSION).join(' ')).toContain('pnpm add -D')
+		expect(upgrade_text()).toContain('pnpm add -D')
 	})
 
 	it('repairs the lockfile the way kit own upgrade does', () => {
-		expect(propagate_steps.upgrade_command(KIT, VERSION).join(' ')).toContain('fix-gh-packages')
+		expect(upgrade_text()).toContain('fix-gh-packages')
+	})
+
+	it('runs every step as an argument vector, never through sh -c', () => {
+		const executables = propagate_steps.upgrade_command(KIT, VERSION).map(([file]) => file)
+
+		expect(executables).toStrictEqual(['pnpm', 'node_modules/.bin/tsx'])
 	})
 })
 
@@ -291,12 +304,12 @@ const PLAN = {
 }
 
 describe('propagate_steps — a plan repeats the upgrade and the sync per release', () => {
-	it('upgrades once per toolkit', () => {
-		const commands = propagate_steps.upgrade_commands(PLAN).map((one) => one.command.join(' '))
+	it('upgrades once per toolkit, its install before its lockfile repair', () => {
+		const commands = propagate_steps.upgrade_commands(PLAN)
 
-		expect(commands).toHaveLength(2)
-		expect(commands[0]).toContain(`${KIT}@${LATEST}`)
-		expect(commands[1]).toContain(`${APP_KIT}@${LATEST}`)
+		expect(commands.map((one) => one.package_name)).toStrictEqual([KIT, KIT, APP_KIT, APP_KIT])
+		expect(commands[0]?.command).toContain(`${KIT}@${LATEST}`)
+		expect(commands[2]?.command).toContain(`${APP_KIT}@${LATEST}`)
 	})
 
 	it('syncs once per toolkit, through each toolkit own CLI', () => {
