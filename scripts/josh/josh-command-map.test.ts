@@ -193,6 +193,12 @@ describe('COMMAND_MAP — tsx_arguments', () => {
 		expect(entry?.tsx_arguments).toContain(OPTIONAL_ENV_FILE_FLAG)
 	})
 
+	// joshuafolkken/kit#3357: `--stopped` sends the stop confirmation, the only interrupt a stopped run
+	// raises, so it needs the same credentials `notify` reads.
+	it('run:carry command reads .env only when it exists', () => {
+		expect(get_command('run:carry')?.tsx_arguments).toContain(OPTIONAL_ENV_FILE_FLAG)
+	})
+
 	// #820 put a `--env-file-if-exists=.env` flag here so `josh port` and `playwright.config.ts`
 	// would read one file. #826 replaced it: the flag resolved `.env` against the working directory,
 	// while the config resolves it at the project root, so the two disagreed again from a

@@ -31,6 +31,9 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'run:carry': {
 		script: 'scripts/run/carry/run-carry-cli.ts',
+		// `--stopped` sends the stop confirmation, so the Telegram credentials come from `.env` as for
+		// `run:wake` below (joshuafolkken/kit#3357).
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description: 'Carry one invocation’s budget across its own session cuts',
 		category: 'AI tools',
 		reference: ['<operation> [arguments...]', 'automation', ['files']],
@@ -84,6 +87,8 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 	// `cost --cut`, `run:prep` and `run:step` were four round trips re-billing a lane's full context each.
 	'run:entry': {
 		script: 'scripts/run/entry/run-entry-cli.ts',
+		// A `busy` hold or an `over` budget sends the stop confirmation (joshuafolkken/kit#3357).
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
 			'Open a run in one call: claim the tree, read the budget, bundle the reads, decide the pre-implementation step',
 		category: 'AI tools',
