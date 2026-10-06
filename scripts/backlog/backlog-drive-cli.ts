@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
-import { lane_launch_cli, type LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
@@ -20,6 +19,7 @@ import {
 	type OfferRead,
 } from './backlog-drive'
 import { backlog_drive_finish } from './backlog-drive-finish'
+import { backlog_drive_launch } from './backlog-drive-launch'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 import { backlog_drive_offer_argv } from './backlog-drive-offer-argv'
@@ -235,14 +235,6 @@ async function merge(issue: string, owner: string): Promise<MergeResult> {
 	return result
 }
 
-async function launch(issue: string, owner: string): Promise<LaunchOutcome['kind']> {
-	await backlog_drive_owner.assert_current(owner)
-
-	const outcome = await lane_launch_cli.launch_lane({ issue, stash: undefined })
-
-	return outcome.kind
-}
-
 // `lane:await`'s re-confirmed check, one state per child. A child already gone when the loop starts —
 // a restart after it ended — is read as having appeared, so it is collected after the re-confirm window
 // rather than waited on until the never-appeared timeout. One that never appeared is collected too:
@@ -306,7 +298,7 @@ function ports_of(
 		is_finished: finished_checker(seeded),
 		merge: async (issue) => await merge(issue, context.owner),
 		offer: async (state) => await read_offer(state, context),
-		launch: async (issue) => await launch(issue, context.owner),
+		launch: async (issue) => await backlog_drive_launch.launch(issue, context.owner),
 		free_lanes: backlog_ready.drive_free_lane_count,
 		now: () => new Date(),
 		sleep: async (milliseconds) => {
