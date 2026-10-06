@@ -1,4 +1,5 @@
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
+import { GIT_TIMEOUT_MS } from '#scripts/lib/timeouts'
 
 // Environment variables that git reads from the environment. A test that sets these affects every
 // subsequent git command in the same worker when isolation is disabled.
@@ -16,9 +17,13 @@ interface StateSnapshot {
 	git_env: Record<string, string | undefined>
 }
 
-function run_git(args: string): string {
+function run_git(args: ReadonlyArray<string>): string {
 	try {
-		return execSync(`git ${args}`, { encoding: 'utf8', stdio: 'pipe' }).trim()
+		return execFileSync('git', args, {
+			encoding: 'utf8',
+			stdio: 'pipe',
+			timeout: GIT_TIMEOUT_MS,
+		}).trim()
 	} catch {
 		return '(error)'
 	}
@@ -30,8 +35,8 @@ function capture_git_environment(): Record<string, string | undefined> {
 
 function capture_state(): StateSnapshot {
 	return {
-		branch: run_git('rev-parse --abbrev-ref HEAD'),
-		status: run_git('status --porcelain'),
+		branch: run_git(['rev-parse', '--abbrev-ref', 'HEAD']),
+		status: run_git(['status', '--porcelain']),
 		git_env: capture_git_environment(),
 	}
 }
@@ -76,6 +81,7 @@ function setup(): () => void {
 
 const test_state_guard = {
 	GIT_ENV_KEYS,
+	capture_state,
 	env_diff: environment_diff,
 	format_violations,
 }
