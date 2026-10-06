@@ -93,7 +93,7 @@ describe('git_command.add_tracked — the pathspec git actually receives', () =>
 
 		await git_command.add_tracked([])
 
-		expect(await staged_paths()).toEqual([OTHER_FILE, OBSERVATION_LEDGER_PATH])
+		expect(await staged_paths()).toEqual([OBSERVATION_LEDGER_PATH, OTHER_FILE])
 	})
 
 	// `:/` is anchored to the repository root rather than to the process's working directory, which is

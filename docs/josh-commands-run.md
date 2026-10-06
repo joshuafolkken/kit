@@ -28,7 +28,7 @@ pnpm josh run:tidy
 ```
 
 - **Lanes:** closes a lane whose issue was closed by a merge, whose work tree has no uncommitted change, whose branch has no commit that no remote reaches, and that no live run holds — then releases its run record.
-- **Stashes:** drops an entry when every issue its message names (`#N`, a leading `N: `, or an `On N-lane:` branch) was closed by a merge. An entry that touches the observation ledger has its ledger lines appended first to the running work tree's own ledger file, less those any file of `docs/maintainers/observations/` already holds.
+- **Stashes:** drops an entry when every issue its message names (`#N`, a leading `N: `, or an `On N-lane:` branch) was closed by a merge. An entry that touches the observation ledger has its ledger lines appended first to the running work tree's own ledger file, less those any file of `.josh/observations/` already holds.
 - **Left alone:** an issue closed as not planned or without a merged pull request, an open issue, a stash naming no issue, a lane with changes or unpushed commits.
 
 "Closed by a merge" is read from the issue's REST timeline: its latest closed/reopened event is `closed` as completed (not `not_planned` or `duplicate`) and a merged pull request cross-references it.
@@ -683,7 +683,7 @@ JOSH_EVAL_MODEL=opus pnpm josh eval     # a different model (default: sonnet)
 JOSH_EVAL_CONCURRENCY=2 pnpm josh eval  # fewer sessions at a time (default: 5)
 ```
 
-Each scenario replays a situation against a real Claude session in a throwaway sandbox carrying the documents and skills kit distributes, then judges it on the tool calls the run made — never on what it said. The `n/m` line is a number you can compare before and after a document change. Needs the `claude` CLI on `PATH`; it is deliberately not part of CI. See [docs/eval.md](./eval.md) for the scenario format.
+Each scenario replays a situation against a real Claude session in a throwaway sandbox carrying the documents and skills kit distributes, then judges it on the tool calls the run made — never on what it said. The `n/m` line is a number you can compare before and after a document change. Needs the `claude` CLI on `PATH`; it is deliberately not part of CI. See [docs/maintainers/eval.md](./maintainers/eval.md) for the scenario format.
 
 **Options:**
 

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { package_file } from '#scripts/claude/skill-fixture'
 import { safe_chain_preinstall } from '#scripts/safe-chain/preinstall-command'
 import { describe, expect, it } from 'vitest'
-import { linked_paths, read_document } from './ai-document-fixture'
+import { linked_paths, read_document, read_unwrapped } from './ai-document-fixture'
 
 // Maintainer content sits apart from the user documentation (joshuafolkken/kit#2993): one index
 // reaches every maintainer page, the user lists reach that index instead of the pages, and the
@@ -15,7 +15,13 @@ const OVERVIEW = 'docs/overview.md'
 const HOW_TO_INDEX = 'docs/how-to.md'
 const TROUBLESHOOTING = 'docs/troubleshooting.md'
 const ENTRY_DOCUMENTS: ReadonlyArray<string> = [README, OVERVIEW, HOW_TO_INDEX]
-const MAINTAINER_TOP_LEVEL_PAGES: ReadonlyArray<string> = ['docs/publishing.md', 'docs/eval.md']
+const USER_DOCS_DIRECTORY = 'docs'
+// Maintainer pages announce their audience with either phrase: the index-level pages say "For kit
+// maintainers", the rationale pages say "maintainer-only".
+const MAINTAINER_AUDIENCE_MARKERS: ReadonlyArray<string> = [
+	'For kit maintainers',
+	'maintainer-only',
+]
 const USER_GUIDE_PAGES: ReadonlyArray<string> = [
 	OVERVIEW,
 	'docs/tutorial.md',
@@ -84,16 +90,7 @@ function published_entries(): Array<string> {
 	return manifest.files.filter((entry) => !entry.startsWith('!'))
 }
 
-describe('the maintainer documentation', () => {
-	it('indexes every maintainer page', () => {
-		const linked = new Set(linked_paths(MAINTAINERS_INDEX))
-		const pages = [...markdown_in(MAINTAINERS_DIRECTORY), ...MAINTAINER_TOP_LEVEL_PAGES]
-
-		expect(pages.filter((path) => path !== MAINTAINERS_INDEX && !linked.has(path))).toStrictEqual(
-			[],
-		)
-	})
-
+describe('the maintainer documentation language', () => {
 	it.each(markdown_under(MAINTAINERS_DIRECTORY))('%s carries no Japanese prose', (path) => {
 		expect(read_document(path).replaceAll(QUOTED_SPANS, '')).not.toMatch(JAPANESE)
 	})
@@ -103,6 +100,31 @@ describe('the maintainer documentation', () => {
 
 		expect(quoted.replaceAll(QUOTED_SPANS, '')).not.toMatch(JAPANESE)
 		expect('The 規則 section.'.replaceAll(QUOTED_SPANS, '')).toMatch(JAPANESE)
+	})
+})
+
+describe('the maintainer documentation', () => {
+	it('indexes every maintainer page', () => {
+		const linked = new Set(linked_paths(MAINTAINERS_INDEX))
+		const pages = markdown_in(MAINTAINERS_DIRECTORY)
+
+		expect(pages.filter((path) => path !== MAINTAINERS_INDEX && !linked.has(path))).toStrictEqual(
+			[],
+		)
+	})
+
+	// joshuafolkken/kit#3343: a page addressed to maintainers lives under the maintainers directory,
+	// so the user documentation root holds none.
+	it('keeps every maintainer-only page out of the user documentation root', () => {
+		const pages = markdown_in(USER_DOCS_DIRECTORY)
+
+		expect(
+			pages.filter((path) => {
+				const text = read_unwrapped(path)
+
+				return MAINTAINER_AUDIENCE_MARKERS.some((marker) => text.includes(marker))
+			}),
+		).toStrictEqual([])
 	})
 
 	it.each(ENTRY_DOCUMENTS)('%s links to the maintainer index', (path) => {

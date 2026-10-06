@@ -18,7 +18,7 @@ describe('eval_trigger.is_measured', () => {
 		},
 	)
 
-	it.each([CODE, 'docs/eval.md', MANIFEST, 'evals/scenarios/consult-not-execute.json'])(
+	it.each([CODE, 'docs/maintainers/eval.md', MANIFEST, 'evals/scenarios/consult-not-execute.json'])(
 		'does not treat %s as measured',
 		(path) => {
 			expect(eval_trigger.is_measured(path)).toBe(false)

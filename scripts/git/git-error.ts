@@ -12,21 +12,15 @@ function get_stderr_from_error(cause: Error): string | undefined {
 function get_error_message_from_cause(cause: Error): string | undefined {
 	const message = cause.message.trim()
 
-	if (message.length > 0) {
-		return message
-	}
+	if (message.length > 0) return message
 
 	return get_stderr_from_error(cause)
 }
 
 function get_cause_message(cause: unknown): string | undefined {
-	if (cause instanceof Error) {
-		return get_error_message_from_cause(cause)
-	}
+	if (cause instanceof Error) return get_error_message_from_cause(cause)
 
-	if (typeof cause === 'string') {
-		return cause.trim()
-	}
+	if (typeof cause === 'string') return cause.trim()
 
 	return undefined
 }
@@ -34,9 +28,7 @@ function get_cause_message(cause: unknown): string | undefined {
 function display_error_details(cause: unknown): void {
 	const cause_message = get_cause_message(cause)
 
-	if (cause_message === undefined || cause_message.length === 0) {
-		return
-	}
+	if (cause_message === undefined || cause_message.length === 0) return
 
 	console.error('')
 	console.error('💡 Details:', cause_message)

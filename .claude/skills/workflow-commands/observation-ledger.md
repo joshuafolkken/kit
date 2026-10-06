@@ -11,7 +11,7 @@ second-sighting promotion.
 (joshuafolkken/kit#1728). Rationale: `docs/maintainers/observation-ledger-rationale.md` → "Why the
 ledger exists".
 
-- **The destination is the `docs/maintainers/observations/` directory in the repository the
+- **The destination is the `.josh/observations/` directory in the repository the
   observation is about** — the same repository the Issue would have been filed into — **one file per
   issue** (joshuafolkken/kit#2919): append to `<N>.md` for the issue the run is executing (the number
   its branch leads with, a lane's included), or to `<YYYY-MM-DD>.md` for a line written on the
@@ -70,7 +70,7 @@ wherever an exit status is being watched. **A missing directory is still a first
 complains on standard error and the count is zero; the append below creates the directory.
 
 ```bash
-cat <that repository's checkout>/docs/maintainers/observations/*.md | grep -c '^- k:<slug> |' || true
+cat <that repository's checkout>/.josh/observations/*.md | grep -c '^- k:<slug> |' || true
 ```
 
 Free-text comparison is what the key exists to replace, so two lines that read alike under different
@@ -87,7 +87,7 @@ could not.
 `docs/maintainers/observation-ledger-rationale.md` → "Why the ledger has a commit path".
 
 - **A run's appended lines ride its own commit** (joshuafolkken/kit#2763). `pnpm josh git` stages
-  `docs/maintainers/observations/` with the run's other changes, in the one staging step every entry
+  `.josh/observations/` with the run's other changes, in the one staging step every entry
   point goes through (`scripts/git/git-staging.ts`), so the lines are reviewed and merged with the
   pull request of the run that recorded them, and the run's CI is the only wait they cost.
   **Record before the commit, not after the merge:** a finding recorded with `pnpm josh review:record`

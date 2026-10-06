@@ -98,16 +98,16 @@ describe('Codex post-tool adaptation', () => {
 	it('runs the canonical formatter plan for every patched file', async () => {
 		const formatted: Array<string> = []
 
-		const runner: CommandRunner = async (command) => {
+		async function runner(command: Parameters<CommandRunner>[0]): ReturnType<CommandRunner> {
 			formatted.push(command.command_arguments.at(-1) ?? '')
 
 			return { exit_code: 0, stdout: '' }
 		}
 
-		const formatter = async (
+		async function formatter(
 			raw_payload: string,
 			project_root: string,
-		): Promise<string | undefined> => {
+		): Promise<string | undefined> {
 			return await format_edited_file(raw_payload, runner, project_root)
 		}
 
@@ -134,7 +134,7 @@ describe('Codex post-tool formatting budget', () => {
 		const finished: Array<string> = []
 		const releases: Array<() => void> = []
 
-		const formatter = async (raw_payload: string): Promise<string | undefined> => {
+		async function formatter(raw_payload: string): Promise<string | undefined> {
 			started.push(parse_edited_path(raw_payload) ?? '')
 			await new Promise<void>((resolve) => {
 				releases.push(resolve)

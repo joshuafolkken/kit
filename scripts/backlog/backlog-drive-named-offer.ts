@@ -58,9 +58,7 @@ function settled_outcome(state: IssueState): MergeResult['outcome'] | undefined 
 async function classify(issue: string, named: OfferRead, owner: string): Promise<OfferRead> {
 	const result = await issue_state_cli.read_issue(issue)
 
-	if (result.kind !== 'state') {
-		return { verdict: 'issue-state', issues: [], retries: NO_RETRIES }
-	}
+	if (result.kind !== 'state') return { verdict: 'issue-state', issues: [], retries: NO_RETRIES }
 
 	const outcome = settled_outcome(result.state)
 

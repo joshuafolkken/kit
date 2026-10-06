@@ -249,9 +249,7 @@ async function request(directory: string, issue: string, round: ReviewRound): Pr
 	if (target === undefined) return false
 	const response = read_record(target, response_schema)
 
-	if (response === undefined || !is_live_response(response, response.session)) {
-		return false
-	}
+	if (response === undefined || !is_live_response(response, response.session)) return false
 
 	const nonce = randomUUID()
 	const body: ReviewRequest = { session: response.session, nonce, round }

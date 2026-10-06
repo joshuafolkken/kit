@@ -303,9 +303,7 @@ function blocked_count(
 	request: CountRequest,
 	is_json: boolean,
 ): number | undefined {
-	if (run_carry.is_count_refused(carry, request.owner)) {
-		return report_count_refused(carry, is_json)
-	}
+	if (run_carry.is_count_refused(carry, request.owner)) return report_count_refused(carry, is_json)
 
 	if (is_cut_count(request) && run_carry.is_at_cut_cap(carry)) {
 		return report_cut_capped(carry, is_json)

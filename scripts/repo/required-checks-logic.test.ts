@@ -122,8 +122,9 @@ describe('expected_checks', () => {
 
 	// A same-named file is not kit's: a project's own ci.yml must not be told to require `Checks`.
 	it('expects only the checks a same-named workflow actually reports', () => {
-		const read_own_ci = (workflow: string): string | undefined =>
-			workflow === CI_WORKFLOW ? workflow_text(['build', CHECKS]) : undefined
+		function read_own_ci(workflow: string): string | undefined {
+			return workflow === CI_WORKFLOW ? workflow_text(['build', CHECKS]) : undefined
+		}
 
 		expect(required_checks_logic.expected_checks(read_own_ci)).toEqual([CHECKS])
 	})

@@ -74,8 +74,12 @@ describe('lane_child_read_set.costed — the SKILL.md section trim', () => {
 
 	it('charges the child less for SKILL.md than a full fullrun read', () => {
 		const base = entry_read_set.costed(ROOT, FULLRUN)
-		const skill_of = (report: ReturnType<typeof entry_read_set.costed>): number =>
-			report.files.find((one) => one.file === entry_read_set.SKILL_FILE)?.cost.bytes ?? NOTHING
+
+		function skill_of(report: ReturnType<typeof entry_read_set.costed>): number {
+			const skill_row = report.files.find((one) => one.file === entry_read_set.SKILL_FILE)
+
+			return skill_row?.cost.bytes ?? NOTHING
+		}
 
 		expect(skill_of(lane_child_read_set.costed(ROOT))).toBeLessThan(skill_of(base))
 	})

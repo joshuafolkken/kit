@@ -1,7 +1,7 @@
 import {
+	LEDGER_DIRECTORIES,
 	LEGACY_OBSERVATION_LEDGER_PATHS,
 	observation_ledger,
-	OBSERVATION_LEDGER_DIRECTORY,
 } from '#scripts/observations/observation-ledger'
 import { observation_ledger_prepare } from '#scripts/observations/observation-ledger-prepare'
 import { git_command } from './git-command'
@@ -29,9 +29,7 @@ async function confirm_package_json_staged(should_force = false): Promise<boolea
 async function confirm_package_json_version(should_force = false): Promise<void> {
 	const is_version_updated = await git_status.check_package_json_version()
 
-	if (is_version_updated) {
-		return
-	}
+	if (is_version_updated) return
 
 	if (should_force) {
 		console.info('💡 Skipping package.json version check (force).')
@@ -83,7 +81,7 @@ async function stage_untracked_files(files: ReadonlyArray<string>): Promise<void
 // own lines** (joshuafolkken/kit#2919): its writers append to its own tree's issue file, so this is
 // the step that takes them to the default branch.
 const LEDGER_PATHSPECS: ReadonlyArray<string> = [
-	OBSERVATION_LEDGER_DIRECTORY,
+	...LEDGER_DIRECTORIES,
 	...LEGACY_OBSERVATION_LEDGER_PATHS,
 ]
 
@@ -108,7 +106,7 @@ function is_stageable(file_path: string, excluded: ReadonlyArray<string>): boole
 // step dies on git's empty index with `Failed to commit changes` — a message naming nothing that
 // caused it. This line is what turns that into a diagnosis.
 //
-// **The paths are parsed rather than matched as substrings**: `docs/maintainers/observations-old/x.md`
+// **The paths are parsed rather than matched as substrings**: `.josh/observations-old/x.md`
 // contains the ledger's path, and a hint naming a file the exclusion never touched is a hint that
 // teaches the reader to ignore it.
 function report_excluded_paths(status_output: string, excluded: ReadonlyArray<string>): void {

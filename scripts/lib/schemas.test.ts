@@ -126,9 +126,7 @@ describe('with_scripts_schema', () => {
 
 		expect(result.success).toBe(true)
 
-		if (!result.success) {
-			return
-		}
+		if (!result.success) return
 
 		expect(result.data.scripts).toStrictEqual({ build: 'tsc', test: 'vitest' })
 		expect(result.data).toMatchObject({ name: PKG_NAME })
@@ -148,9 +146,7 @@ describe('with_development_deps_schema', () => {
 
 		expect(result.success).toBe(true)
 
-		if (!result.success) {
-			return
-		}
+		if (!result.success) return
 
 		expect(result.data.devDependencies).toStrictEqual({ vitest: VITEST_VERSION })
 		expect(result.data).toMatchObject({ name: PKG_NAME })

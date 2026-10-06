@@ -223,7 +223,7 @@ The ESLint preset likewise resolves ESLint and its plugins from the consumer pro
 
 ### Available `pnpm josh` subcommands
 
-The `josh` script runs every subcommand in [josh-commands.md](./josh-commands.md), the single source for what each one runs — for example [`josh lint`](./josh-commands.md#josh-lint), [`josh check`](./josh-commands.md#josh-check) and [`josh main:sync`](./josh-commands.md#josh-mainsync). The package scripts kit retired are listed in [init-rationale.md](./maintainers/init-rationale.md#retired-package-scripts) — `docs/maintainers/init-rationale.md` → "Retired package scripts".
+The `josh` script runs every subcommand indexed in the [Command Catalog](./josh-command-catalog.md). The ones you type by hand are described in [josh-commands.md](./josh-commands.md) — for example [`josh lint`](./josh-commands.md#josh-lint), [`josh check`](./josh-commands.md#josh-check) and [`josh main:sync`](./josh-commands.md#josh-mainsync). The package scripts kit retired are listed in [init-rationale.md](./maintainers/init-rationale.md#retired-package-scripts) — `docs/maintainers/init-rationale.md` → "Retired package scripts".
 
 ## AI files
 

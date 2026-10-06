@@ -52,8 +52,9 @@ describe('read_set_trim.costed — an unused SKILL.md section', () => {
 	})
 
 	it('leaves every other row unchanged', () => {
-		const others = (one: typeof report): typeof report.files =>
-			one.files.filter((file) => file.file !== entry_read_set.SKILL_FILE)
+		function others(one: typeof report): typeof report.files {
+			return one.files.filter((file) => file.file !== entry_read_set.SKILL_FILE)
+		}
 
 		expect(others(report)).toEqual(others(base))
 	})

@@ -1,4 +1,5 @@
 import {
+	LEGACY_OBSERVATION_LEDGER_DIRECTORY,
 	LEGACY_OBSERVATION_LEDGER_PATHS,
 	MIGRATION_CLAIM_SUFFIX,
 	observation_ledger,
@@ -177,6 +178,7 @@ describe('git_staging.check_and_confirm_staging — a ledger that breaks the gra
 
 		expect(git_command.add_tracked).toHaveBeenCalledWith([
 			OBSERVATION_LEDGER_DIRECTORY,
+			LEGACY_OBSERVATION_LEDGER_DIRECTORY,
 			...LEGACY_OBSERVATION_LEDGER_PATHS,
 		])
 	})
