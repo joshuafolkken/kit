@@ -65,7 +65,7 @@ it is".
 
 `pnpm josh epic:next <E> --repo <owner/repo> --lanes` answers with **one issue number per line**, up to
 the number of free lanes, and each of those children runs in a **lane** of its own: a linked git work
-tree with its own branch, its own `.env` and its own dev and preview ports (`docs/josh-commands-automation.md` →
+tree with its own branch, its own `.env` and its own dev and preview ports (`docs/josh-commands-run.md` →
 "`josh lane:open` / `josh lane:close` / `josh lane:list` / `josh lane:prune`"). **Implementation, the
 verification gate and the review run in parallel; the merges stay serial** — each one lands on the
 `main` the next is then measured against.

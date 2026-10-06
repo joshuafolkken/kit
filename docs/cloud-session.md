@@ -160,5 +160,5 @@ Lanes work in a cloud container: `pnpm josh lane:open` creates the linked work t
 ## Related
 
 - [`josh audit` / `josh audit:provision`](./josh-commands.md#josh-audit)
-- [`josh run:liveness`](./josh-commands-automation.md#josh-runliveness)
+- [`josh run:liveness`](./josh-commands-run.md#josh-runliveness)
 - [Environment variables — notification behavior](./environment-variables.md#notification-behavior)

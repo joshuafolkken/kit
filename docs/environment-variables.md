@@ -58,13 +58,13 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 
 ### Runs
 
-| Variable                         | Required | Default                                                       | Used when                                                                                                                                                       |
-| -------------------------------- | -------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `JOSH_PROGRESS_INTERVAL_MINUTES` | No       | `josh.progress_interval_minutes` in `package.json`, else `20` | How long a run goes quiet before `josh run:progress` prints a line ([`josh run:progress`](./josh-commands-automation.md#josh-runprogress)).                     |
-| `JOSH_PROGRESS`                  | No       | on                                                            | `0` turns the progress lines off.                                                                                                                               |
-| `JOSH_RETROSPECTIVE`             | No       | off                                                           | `on` / `1` / `true` / `yes` runs the end-of-run retrospective when a backlog drains ([`josh retrospective`](./josh-commands-automation.md#josh-retrospective)). |
-| `JOSH_REPO_PATHS`                | No       | sibling repositories are found automatically                  | A repository that is not a sibling, or is checked out twice: `owner/repo=/absolute/path`, comma-separated ([`josh doctor`](./josh-commands.md#josh-doctor)).    |
-| `JOSH_DEBUG`                     | No       | off                                                           | Any non-blank value writes the error a run, lane, git or GitHub state check swallowed to stderr as `josh debug: <where>: <message>`; verdicts are unchanged.    |
+| Variable                         | Required | Default                                                       | Used when                                                                                                                                                    |
+| -------------------------------- | -------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `JOSH_PROGRESS_INTERVAL_MINUTES` | No       | `josh.progress_interval_minutes` in `package.json`, else `20` | How long a run goes quiet before `josh run:progress` prints a line ([`josh run:progress`](./josh-commands-run.md#josh-runprogress)).                         |
+| `JOSH_PROGRESS`                  | No       | on                                                            | `0` turns the progress lines off.                                                                                                                            |
+| `JOSH_RETROSPECTIVE`             | No       | off                                                           | `on` / `1` / `true` / `yes` runs the end-of-run retrospective when a backlog drains ([`josh retrospective`](./josh-commands-run.md#josh-retrospective)).     |
+| `JOSH_REPO_PATHS`                | No       | sibling repositories are found automatically                  | A repository that is not a sibling, or is checked out twice: `owner/repo=/absolute/path`, comma-separated ([`josh doctor`](./josh-commands.md#josh-doctor)). |
+| `JOSH_DEBUG`                     | No       | off                                                           | Any non-blank value writes the error a run, lane, git or GitHub state check swallowed to stderr as `josh debug: <where>: <message>`; verdicts are unchanged. |
 
 ### Merge, release and dependency updates
 
@@ -95,7 +95,7 @@ Each guard is on by default; `off`, `0`, `false` or `no` turns that one guard of
 | `JOSH_DUPLICATE_READ_GUARD` | No       | on      | [`josh duplicate-read:guard`](./josh-commands-automation.md#josh-duplicate-readguard) — reading the same file twice.      |
 | `JOSH_RULE_GUARD`           | No       | on      | [`josh rule:guard`](./josh-commands-automation.md#josh-ruleguard) — a rule delivered at the call that breaks it.          |
 | `JOSH_STOP_GUARD`           | No       | on      | [`josh stop:guard`](./josh-commands-automation.md#josh-stopguard) — what a turn must do before it ends.                   |
-| `JOSH_WATCHER_GUARD`        | No       | on      | [`josh run:watcher:guard`](./josh-commands-automation.md#josh-runwatcherguard) — a run whose progress watcher stopped.    |
+| `JOSH_WATCHER_GUARD`        | No       | on      | [`josh run:watcher:guard`](./josh-commands-run.md#josh-runwatcherguard) — a run whose progress watcher stopped.           |
 | `JOSH_PARENT_CUT_GUARD`     | No       | on      | A `backlogrun` parent over its session budget.                                                                            |
 | `JOSH_SCOPED_GREEN`         | No       | on      | `josh gate` refusing a tree its scoped checks were never green on ([`josh gate`](./josh-commands.md#josh-gate)).          |
 
@@ -103,7 +103,7 @@ Each guard is on by default; `off`, `0`, `false` or `no` turns that one guard of
 
 | Variable                | Required | Default  | Used when                                                                                     |
 | ----------------------- | -------- | -------- | --------------------------------------------------------------------------------------------- |
-| `JOSH_EVAL_MODEL`       | No       | `sonnet` | The model `josh eval` runs against ([`josh eval`](./josh-commands-automation.md#josh-eval)).  |
+| `JOSH_EVAL_MODEL`       | No       | `sonnet` | The model `josh eval` runs against ([`josh eval`](./josh-commands-run.md#josh-eval)).         |
 | `JOSH_EVAL_CONCURRENCY` | No       | `5`      | How many `josh eval` sessions run at once; a value that is not a positive integer is refused. |
 
 ## Variables kit sets itself

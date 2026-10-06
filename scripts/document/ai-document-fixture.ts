@@ -47,12 +47,13 @@ const ENV_EXAMPLE = '.env.example'
 const MARKDOWN_EXTENSION = '.md'
 const PROMPT_ROOT = 'prompts'
 const DOCS_ROOT = 'docs'
-// The only files under `docs/` an agent is routed to read — the two command references; the rest of
+// The only files under `docs/` an agent is routed to read — the three command references; the rest of
 // `docs/` is reference a human browses, so the byte budget (`document/document-byte-budget.ts`)
 // covers these alone.
 const COMMAND_REFERENCE_DOCS: ReadonlyArray<string> = [
 	'docs/josh-commands.md',
 	'docs/josh-commands-automation.md',
+	'docs/josh-commands-run.md',
 ]
 
 // Every markdown file under one root, recursively, as repository-relative paths. Deliberately not
@@ -87,7 +88,7 @@ function routing_documents(): ReadonlyArray<string> {
 }
 
 // Every document an agent reads in full during a session — the rule document, every distributed
-// skill, every workflow prompt, and the two routed `docs/` command references. `document/document-byte-budget.ts`
+// skill, every workflow prompt, and the three routed `docs/` command references. `document/document-byte-budget.ts`
 // walks this set to assert none has grown past its recorded ceiling and that the budget names
 // exactly these files. Composed from the same roots as `routing_documents`, minus the rest of
 // `docs/`, so the two cannot drift on the directories they share.

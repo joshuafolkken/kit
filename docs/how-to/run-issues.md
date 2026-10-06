@@ -34,7 +34,7 @@ This table is the single description of the keywords; the README and the [tutori
 | `prrun-stopped`   | reached — report and stop | reached — report and stop            | reached — report and stop       | followup → merged         |
 | `merged`          | reached — report and stop | reached — report and stop            | reached — report and stop       | reached — report and stop |
 
-Each stop's notification lists the keywords further up, nearest first. How each state is read is in [`josh run:entry`](../josh-commands-automation.md#josh-runentry).
+Each stop's notification lists the keywords further up, nearest first. How each state is read is in [`josh run:entry`](../josh-commands-run.md#josh-runentry).
 
 ## Check it worked
 

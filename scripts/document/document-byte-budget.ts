@@ -88,7 +88,9 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// joshuafolkken/kit#2998 split the reference: the developer commands stay, the rest moved out.
 	// joshuafolkken/kit#3175 raised it: the supervisor, provider-table and answer-to-budget prose moved
 	// here out of `backlogrun-steps.md`, so a run reads it only when it asks about those commands.
-	{ path: 'docs/josh-commands-automation.md', bytes: 159_744 },
+	// joshuafolkken/kit#3277 moved the run, lane and session commands to `docs/josh-commands-run.md`.
+	{ path: 'docs/josh-commands-automation.md', bytes: 106_496 },
+	{ path: 'docs/josh-commands-run.md', bytes: 57_344 },
 	{ path: 'docs/josh-commands.md', bytes: 36_864 },
 	{ path: 'prompts/coding-standards.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 8192 },

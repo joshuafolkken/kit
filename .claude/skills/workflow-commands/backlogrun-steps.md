@@ -143,7 +143,7 @@ be answered and every standing record is refused rather than resumed. A live PID
 the sandbox cannot read is held as `busy`.
 
 **Ask it before the plan, in the same turn as the first `git switch main && git pull`.** The contract
-is `docs/josh-commands-automation.md` → "`josh run:carry`"; what this loop does with each answer is here:
+is `docs/josh-commands-run.md` → "`josh run:carry`"; what this loop does with each answer is here:
 
 | It answers   | What the run does                                                                                                                                                                                                          |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -231,7 +231,7 @@ before each launch, and a failed named issue skips the remaining named prefix.
 
 **A person keeps control of it** — `pnpm josh run:wake --list` names the running supervisor and `--stop`
 ends it. Its failure warnings, log file, progress relay and the provider / model / effort each
-unattended role runs with are `docs/josh-commands-automation.md` → "`josh run:wake`".
+unattended role runs with are `docs/josh-commands-run.md` → "`josh run:wake`".
 
 **The completion report names how many sessions were woken beside the record's `cuts`** — one wake per
 cut is the invariant, and what counts is a carry record actually claimed, never a process started.
@@ -453,7 +453,7 @@ All of these are this file's, and are reached here in the same order and for the
 | --- | --- |
 | `git switch main && git pull`, then `pnpm josh latest:scope`, then `pnpm josh lane:prune` — in the primary checkout, before the first lane opens | `backlogrun-lanes.md` → "Once per repository, before the first lane opens" |
 | `josh latest` on `required` only, asked once at the first child and never in a lane | `backlogrun-child.md` → "`josh latest` runs once per session, not once per child" |
-| `pnpm josh run:hold <N>`'s preflight check, before each child that is not in a lane — act on what it prints | `docs/josh-commands-automation.md` → "`josh run:hold`" |
+| `pnpm josh run:hold <N>`'s preflight check, before each child that is not in a lane — act on what it prints | `docs/josh-commands-run.md` → "`josh run:hold`" |
 | `pnpm josh run:progress --wait` in the background, `--mark` at every real report | `progress-watcher.md` → "Progress while the run is quiet" |
 | `pnpm josh release:scope` once, after the last issue has merged and the last lane is closed | `followup.md` → "When `pnpm josh release` runs" |
 

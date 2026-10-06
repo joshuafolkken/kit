@@ -30,7 +30,7 @@ const CONTEXT_CUT_DOCS = [
 	'.claude/skills/workflow-commands/backlogrun-progress.md',
 	'.claude/skills/workflow-commands/entry-sequence.md',
 	'.claude/skills/workflow-commands/pre-gate-cut.md',
-	'docs/josh-commands-automation.md',
+	'docs/josh-commands-run.md',
 ]
 
 describe.each(CONTEXT_CUT_DOCS)('%s states the context-cut threshold', (path) => {
