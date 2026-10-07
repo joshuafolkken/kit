@@ -2,9 +2,13 @@ import { parseArgs, type ParseArgsConfig, type ParseArgsOptionsConfig } from 'no
 
 // Argument reading for the commands under `scripts/`.
 
+const HELP_FLAGS: ReadonlySet<string> = new Set(['--help', '-h'])
+
 // The usage line `refuse_unknown_flags` ends with, for a command that prints it on its own help
 // request (`josh release --help`, joshuafolkken/kit#3384).
 function usage_line(known_flags: ReadonlyArray<string>, command: string): string {
+	if (known_flags.length === 0) return `Usage: josh ${command}`
+
 	return `Usage: josh ${command} [${known_flags.join('] [')}]`
 }
 
@@ -21,6 +25,29 @@ function refuse_unknown_flags(
 	if (unknown.length === 0) return undefined
 
 	return `Unknown argument(s): ${unknown.join(' ')}\n${usage_line(known_flags, command)}`
+}
+
+// The argument gate of a command that publishes (`josh release`, `josh release:github`,
+// joshuafolkken/kit#3384, joshuafolkken/kit#3385): a help request prints the usage and exits 0, an
+// unknown argument is refused with exit 1, both before any side effect. `undefined` means the
+// arguments are all known and the command may run.
+function answer_help_or_unknown(
+	argv: ReadonlyArray<string>,
+	known_flags: ReadonlyArray<string>,
+	command: string,
+): number | undefined {
+	if (argv.some((argument) => HELP_FLAGS.has(argument))) {
+		console.info(usage_line(known_flags, command))
+
+		return 0
+	}
+
+	const refusal = refuse_unknown_flags(argv, known_flags, command)
+	if (refusal === undefined) return undefined
+
+	console.error(refusal)
+
+	return 1
 }
 
 // `parseArgs`, answering `undefined` where it would throw — an unknown flag, a missing option value,
@@ -130,6 +157,7 @@ const cli_flags = {
 	attach_values,
 	usage_line,
 	refuse_unknown_flags,
+	answer_help_or_unknown,
 	parse_or_undefined,
 	values_of,
 	arguments_of,

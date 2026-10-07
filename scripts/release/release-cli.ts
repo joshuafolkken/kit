@@ -20,7 +20,6 @@ import { release_publish } from './release-publish'
 
 const DRY_RUN_FLAG = '--dry-run'
 const KNOWN_FLAGS: ReadonlyArray<string> = [DRY_RUN_FLAG]
-const HELP_FLAGS: ReadonlySet<string> = new Set(['--help', '-h'])
 const COMMAND_NAME = 'release'
 const ARGUMENT_START = 2
 const SUCCESS_EXIT_CODE = 0
@@ -81,21 +80,12 @@ function is_dry_run_requested(argv: ReadonlyArray<string>): boolean {
 // so a `--help` it did not read once started a real release; a help request now prints the usage, and
 // anything else unknown is refused, both before the first fetch.
 async function run_argv(argv: ReadonlyArray<string>): Promise<number> {
-	const given = argv.slice(ARGUMENT_START)
-
-	if (given.some((argument) => HELP_FLAGS.has(argument))) {
-		console.info(cli_flags.usage_line(KNOWN_FLAGS, COMMAND_NAME))
-
-		return SUCCESS_EXIT_CODE
-	}
-
-	const refusal = cli_flags.refuse_unknown_flags(given, KNOWN_FLAGS, COMMAND_NAME)
-
-	if (refusal !== undefined) {
-		console.error(refusal)
-
-		return FAILURE_EXIT_CODE
-	}
+	const answer = cli_flags.answer_help_or_unknown(
+		argv.slice(ARGUMENT_START),
+		KNOWN_FLAGS,
+		COMMAND_NAME,
+	)
+	if (answer !== undefined) return answer
 
 	return await run(is_dry_run_requested(argv))
 }
