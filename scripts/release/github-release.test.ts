@@ -86,6 +86,7 @@ it('publishes reversed tags in version order using the prior release for notes',
 	const later_request = vi
 		.fn()
 		.mockResolvedValueOnce(missing_response())
+		.mockResolvedValueOnce(response(200, { workflow_runs: [] }))
 		.mockResolvedValueOnce(missing_response())
 		.mockResolvedValueOnce(response(200, { workflow_runs: [] }))
 		.mockResolvedValueOnce(response(200, { tag_name: TAG }))
@@ -106,13 +107,12 @@ it('publishes reversed tags in version order using the prior release for notes',
 		}),
 	).toBe(`published v1.889.0 from ${TAG}`)
 	expect(earlier_request.mock.calls[2]?.[1]).toHaveProperty('body', note_request(TAG, PREVIOUS_TAG))
-	expect(later_request.mock.calls[4]?.[1]).toHaveProperty('body', note_request('v1.889.0', TAG))
+	expect(later_request.mock.calls[5]?.[1]).toHaveProperty('body', note_request('v1.889.0', TAG))
 })
 
 it('skips a lower tag whose package publication failed', async () => {
 	const request = vi
 		.fn()
-		.mockResolvedValueOnce(missing_response())
 		.mockResolvedValueOnce(missing_response())
 		.mockResolvedValueOnce(
 			response(200, { workflow_runs: [{ id: 42, display_title: `Publish ${TAG}` }] }),
@@ -122,6 +122,7 @@ it('skips a lower tag whose package publication failed', async () => {
 				jobs: [{ name: PUBLISH_NPM, status: 'completed', conclusion: 'failure' }],
 			}),
 		)
+		.mockResolvedValueOnce(missing_response())
 		.mockResolvedValueOnce(response(200, { tag_name: PREVIOUS_TAG }))
 		.mockResolvedValueOnce(response(200, { name: 'v1.889.0', body: 'Changes' }))
 		.mockResolvedValueOnce(response(201, { tag_name: 'v1.889.0' }))
@@ -136,6 +137,7 @@ it('waits for the nearest lower tag when several newer tags exist', async () => 
 	const request = vi
 		.fn()
 		.mockResolvedValueOnce(missing_response())
+		.mockResolvedValueOnce(response(200, { workflow_runs: [] }))
 		.mockResolvedValueOnce(response(200, { tag_name: 'v1.889.0' }))
 		.mockResolvedValueOnce(response(200, { name: 'v1.890.0', body: 'Changes' }))
 		.mockResolvedValueOnce(response(201, { tag_name: 'v1.890.0' }))
@@ -146,15 +148,15 @@ it('waits for the nearest lower tag when several newer tags exist', async () => 
 			tags: [TAG, 'v1.889.0', 'v1.890.0'],
 		}),
 	).toBe('published v1.890.0 from v1.889.0')
-	expect(request.mock.calls[1]?.[0]).toMatch(/\/tags\/v1\.889\.0$/u)
+	expect(request.mock.calls[2]?.[0]).toMatch(/\/tags\/v1\.889\.0$/u)
 })
 
 it('does not publish the later tag when waiting for the earlier release fails', async () => {
 	const request = vi
 		.fn()
 		.mockResolvedValueOnce(missing_response())
-		.mockResolvedValueOnce(missing_response())
 		.mockResolvedValueOnce(response(200, { workflow_runs: [] }))
+		.mockResolvedValueOnce(missing_response())
 	const wait = vi.fn().mockRejectedValue(new Error(CONNECTION_ERROR))
 
 	await expect(

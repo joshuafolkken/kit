@@ -125,9 +125,9 @@ function failed_lower_tag(job_name: string, conclusion = 'failure'): ReleaseRequ
 	return release_request(
 		missing_response(),
 		response(200, { tag_name: RELEASED_TAG }),
-		missing_response(),
 		response(200, { workflow_runs: [{ id: 7, display_title: `Publish ${LOWER_TAG}` }] }),
 		response(200, { jobs: [{ name: job_name, status: 'completed', conclusion }] }),
+		missing_response(),
 		response(200, NOTES),
 		response(201, { tag_name: TAG }),
 	)
@@ -140,8 +140,8 @@ describe('publication jobs that are waited on', () => {
 		expect(await github_release.publish(request, TOKEN, TAG, SETTINGS)).toBe(
 			`published ${TAG} from ${RELEASED_TAG}`,
 		)
-		expect(request.mock.calls[3]?.[0]).toBe(`${API}/actions/workflows/42/runs?per_page=100`)
-		expect(request.mock.calls[4]?.[0]).toBe(`${API}/actions/runs/7/jobs?per_page=100`)
+		expect(request.mock.calls[2]?.[0]).toBe(`${API}/actions/workflows/42/runs?per_page=100`)
+		expect(request.mock.calls[3]?.[0]).toBe(`${API}/actions/runs/7/jobs?per_page=100`)
 	})
 
 	it('ignores a failed job outside the named ones', async () => {

@@ -7,6 +7,9 @@ name: GitHub Release
 # started by the GITHUB_TOKEN never fires one (joshuafolkken/kit#3138). kit's own release is the
 # `create-release` job of its publish.yml, which runs the same `josh release:github`, so this file is
 # distributed but never runs in kit.
+# The title names the tag, so a later tag's release can tell this run is still at work on it.
+run-name: GitHub Release ${{ github.event.client_payload.tag }}
+
 on:
   repository_dispatch:
     types: [new-tag-created]
@@ -67,3 +70,4 @@ jobs:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_WORKFLOW: ${{ steps.release.outputs.workflow }}
           RELEASE_AWAIT_PUBLISH: ${{ steps.release.outputs.await }}
+          RELEASE_RUN_WORKFLOW: github-release.yml
