@@ -1,10 +1,10 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { issue_citation } from '#scripts/rules/issue-citation'
-import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
+import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_liveness } from '#scripts/run/run-liveness'
-import { run_wake, type RunWake } from './run-wake'
+import { run_wake, type RunWake, type WakeDecision, type WakeDecisionInput } from './run-wake'
 
 // The `--list` presentation of a wake record (joshuafolkken/kit#2407 split it out of `run-wake-cli.ts`,
 // which had reached its line limit). What the command *does* stays in the CLI; how a supervisor's
@@ -13,6 +13,7 @@ import { run_wake, type RunWake } from './run-wake'
 const UNKNOWN_CUTS = 'an unreadable number of'
 const REPO_LOOKUP_TIMEOUT_MS = 10_000
 const STOP_COMMAND = 'pnpm josh run:wake --stop'
+const UNREADABLE_TIME = 'an unreadable time'
 
 // The three paths every verb needs: the carry record it reads, its own record, and the work tree a
 // woken session runs in. The work tree is the common git directory's parent, which is the *primary*
@@ -49,6 +50,55 @@ function outstanding_line(wake: RunWake): string | undefined {
 	return `${String(wake.attempts)} launch(es) outstanding for the current cut, none claimed yet`
 }
 
+// **Why the supervisor is not launching, and until when** (joshuafolkken/kit#3363). A supervisor that
+// waits writes nothing to its log, so before this `--list` showed a stalled run and a waiting one
+// alike. The state is `run_wake.decide`'s own answer rather than a second reading of the record: an
+// `idle_since` mark is the last pass having found no work, so it is fed back in as `has_work: false`.
+function wait_input(wake: RunWake, read: CarryRead, now: Date): WakeDecisionInput {
+	return {
+		read,
+		woke_at: wake.woke_at,
+		attempts: wake.attempts ?? 0,
+		is_owner_live: read.kind === 'carried' && run_carry.is_owner_live(read.carry, now),
+		has_work: wake.idle_since === undefined ? undefined : false,
+		idle_since: wake.idle_since,
+		now,
+	}
+}
+
+function deadline(marked_at: string | undefined, limit_ms: number): string {
+	const marked = Date.parse(marked_at ?? '')
+
+	return Number.isNaN(marked) ? UNREADABLE_TIME : new Date(marked + limit_ms).toISOString()
+}
+
+// A live owner that is this supervisor is its own driver at work; any other is a session spending the
+// budget, which has no deadline of its own short of the carry record's whole-run expiry.
+function owner_wait(wake: RunWake, carry: RunCarry): string {
+	if (carry.owner_pid === wake.pid) {
+		return 'waiting: the driver holds the carry record and is running'
+	}
+
+	const expiry = deadline(carry.started_at, run_carry.CARRY_MAX_AGE_MS)
+
+	return `waiting: process ${String(carry.owner_pid)} holds the carry record; the driver starts at its next cut or once it exits, and the record expires at ${expiry}`
+}
+
+const WAIT_LINES: Partial<Record<WakeDecision['kind'], (wake: RunWake) => string>> = {
+	pending: (wake) =>
+		`waiting: the woken session has until ${deadline(wake.woke_at, run_wake.WAKE_GRACE_MS)} to claim the carry record`,
+	idle: (wake) =>
+		`waiting: no runnable work; the driver starts anyway at ${deadline(wake.idle_since, run_wake.IDLE_CEILING_MS)}`,
+}
+
+function wait_line(wake: RunWake, read: CarryRead, now: Date): string | undefined {
+	const { kind } = run_wake.decide(wait_input(wake, read, now))
+
+	if (kind === 'wait' && read.kind === 'carried') return owner_wait(wake, read.carry)
+
+	return WAIT_LINES[kind]?.(wake)
+}
+
 // The run's stream, read here because a headless parent's progress reaches its own transcript alone —
 // after a cut, `--list` is the person's one window onto it (joshuafolkken/kit#1910). Two lines: the
 // newest event (the degenerate last-event read of the stream the watch pane follows, so `--list` and
@@ -73,16 +123,17 @@ function stream_lines(context: WakeContext): Array<string> {
 // **The outstanding line beside it is what makes a shortfall readable**: the count is observed at a
 // poll, so it lags a claim by up to one interval, and launches still outstanding are what say whether
 // a missing wake is one not yet seen or one that never arrived.
-function describe_wake(wake: RunWake, context: WakeContext): string {
+function describe_wake(wake: RunWake, context: WakeContext, now: Date = new Date()): string {
 	const live = run_wake.is_supervisor_live(wake) ? 'running' : 'not running'
-	const cuts = carry_cuts(run_carry.read_carry(context.carry_target))
+	const read = run_carry.read_carry(context.carry_target)
 
 	return [
 		`invocation: ${wake.invocation}`,
 		`profile: ${wake.profile === undefined ? 'unrecorded' : agent_role_profile.describe(wake.profile)}`,
 		`supervisor: process ${String(wake.pid)} (${live}), watching since ${wake.started_at}`,
-		`woke ${String(wake.woke)} session(s) across ${cuts} cut(s)`,
+		`woke ${String(wake.woke)} session(s) across ${carry_cuts(read)} cut(s)`,
 		outstanding_line(wake),
+		wait_line(wake, read, now),
 		run_liveness.describe_agent_state(context.log_target),
 		`output: ${context.log_target}`,
 		// How progress is seen without asking after the cut: the run's stream, followed from here

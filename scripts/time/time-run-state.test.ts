@@ -11,7 +11,7 @@ const IDLE_ACTIVITY_MS = 0
 const RECENT_ACTIVITY_MS = NOW_MS
 const MERGE_COMMAND = 'josh followup'
 const STARTED_AT = '2026-09-13T10:00:00.000Z'
-const HELD_AT = '2026-09-13T10:08:00.000Z'
+const WOKE_AT = '2026-09-13T10:08:00.000Z'
 const WHIFF_1 = '2026-09-13T10:18:00.000Z'
 const WHIFF_2 = '2026-09-13T10:28:00.000Z'
 const WHIFF_3 = '2026-09-13T10:38:00.000Z'
@@ -119,10 +119,10 @@ describe('time_run_state.classify measurement', () => {
 			started_at: STARTED_AT,
 			pid: 1,
 			woke: 1,
-			held_at: HELD_AT,
+			woke_at: WOKE_AT,
 		}
 
-		expect(time_run_state.classify(input({ wake })).last_cut_at).toBe(HELD_AT)
+		expect(time_run_state.classify(input({ wake })).last_cut_at).toBe(WOKE_AT)
 	})
 })
 

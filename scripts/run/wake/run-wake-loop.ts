@@ -35,9 +35,8 @@ interface LoopPorts {
 	// The carry record, re-read every pass rather than cached: it is written by the parent loop of a
 	// different session, which is the whole point of reading it here.
 	read_carry: () => CarryRead
-	// Whether the process named on the carry record is still running. The cutting session writes
-	// `--cut` and then exits, so the two moments are not the same one and the supervisor has to wait
-	// out the second — `run-wake.ts` → `WakeDecisionInput.is_owner_live`.
+	// Whether the process named on the carry record is still running, which tells a session at work
+	// from a crashed one — `run-wake.ts` → `WakeDecisionInput.is_owner_live`.
 	is_owner_live: (read: CarryRead) => boolean
 	// A compatibility probe for the wake decision. Production lets the resident driver inspect work,
 	// including an empty idle watch, without starting an AI session.
@@ -110,16 +109,10 @@ async function wake_step(wake: RunWake, ports: LoopPorts): Promise<StepOutcome> 
 // A `wait` means the woken session has claimed the carry record, so the wake mark is cleared and the
 // next cut starts the grace window afresh — **and it is the only pass on which `woke` may grow**
 // (joshuafolkken/kit#1746), because arriving here is the supervisor observing that a record it was
-// waiting on has been taken over. A `hold` starts the ceiling on a wait without launching
-// anything — the bounded wait on a predecessor that has cut but not yet exited, which ends the moment
-// that predecessor does. A `pending` keeps what is there, because the window it is measured from is
-// still open.
+// waiting on has been taken over. A `pending` keeps what is there, because the window it is measured
+// from is still open.
 function continue_step(wake: RunWake, decision: WakeDecision, ports: LoopPorts): StepOutcome {
 	if (decision.kind === 'wait') return { kind: 'continue', wake: run_wake.count_claim(wake) }
-
-	if (decision.kind === 'hold') {
-		return { kind: 'continue', wake: run_wake.mark_wait(wake, ports.now()) }
-	}
 
 	if (decision.kind === 'idle') {
 		return { kind: 'continue', wake: run_wake.mark_idle(wake, ports.now()) }
@@ -146,7 +139,6 @@ function decision_input(wake: RunWake, ports: LoopPorts): WakeDecisionInput {
 		woke_at: wake.woke_at,
 		attempts: wake.attempts ?? NO_ATTEMPTS,
 		is_owner_live: ports.is_owner_live(read),
-		held_at: wake.held_at,
 		has_work: undefined,
 		idle_since: wake.idle_since,
 		now: ports.now(),
@@ -155,7 +147,7 @@ function decision_input(wake: RunWake, ports: LoopPorts): WakeDecisionInput {
 
 // **Work is asked about only where the answer could change the decision** (joshuafolkken/kit#2417):
 // on a pass the record alone would launch from. Every other pass — the in-flight wait, the pending
-// grace window, the hold — decides from the record as before and costs no backlog read.
+// grace window — decides from the record as before and costs no backlog read.
 async function decide_pass(wake: RunWake, ports: LoopPorts): Promise<WakeDecision> {
 	const input = decision_input(wake, ports)
 	const decision = run_wake.decide(input)

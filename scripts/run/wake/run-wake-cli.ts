@@ -74,9 +74,8 @@ const WARNING_RECOVERY = `Check the wake command, then restart with \`pnpm josh 
 //
 // **`expired` and `unreadable` were silent until joshuafolkken/kit#1746, and that was the defect
 // rather than the design.** Both end the supervisor while a carry record is still sitting there handed
-// off, so the run is left asleep with nothing anywhere saying so — `run-wake.ts` →
-// `is_predecessor_exiting` names the `expired` one as a silent overnight failure in as many words, and
-// then only the `failed` reason was wired to the notification.
+// off, so the run is left asleep with nothing anywhere saying so — a silent overnight failure, while
+// only the `failed` reason was wired to the notification.
 // **Every reason is listed, and the silent two are listed as `undefined`.** A partial map would let a
 // sixth stop reason compile straight past this and reach nobody, which is the defect class this
 // section exists to close.
