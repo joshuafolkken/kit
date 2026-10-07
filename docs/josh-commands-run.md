@@ -201,7 +201,8 @@ Prints the run's next single action, computed from the event stream (`run:event`
 (`run:carry`) and the issue state (`run:prep`) — never the conversation
 . It lifts `run:next`'s fold from an _event_ to a whole _run_, printing one
 line: a runnable command for a phase that has one (`followup` after a PR opens, `run:merge <N>` after a
-merge, `backlog:next` after a park, `run:cut --resume <N>` after a cut, `run:carry --cut` after a
+merge, `backlog:next` after a park, `run:cut --resume <N>` after a cut — until a `resume-impl` answer
+appends `resume`, which reads as `implement` again — `run:carry --cut` after a
 Codex parent's dispatch below the cut cap), a fixed verdict otherwise
 (`implement`, `human-review`, `update-deps`, `already-done`, `wait`, `stop`, `unknown`), or a `decide:`
 line for the one Tier-B point it surfaces — a spent whole-run budget. It dispatches rather than
@@ -360,7 +361,7 @@ and after a cut, the stream the run's, the position the caller's.
 `--watch` loops that pass, printing `HH:MM · <label> · <text>` in the session language.
 
 `<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `outage`, `cut`,
-`stop`, `pr-opened`, `review-round`); a kind outside it is refused. `run:merge` appends `merge`, `park`
+`resume`, `stop`, `pr-opened`, `review-round`); a kind outside it is refused. `run:merge` appends `merge`, `park`
 and `outage`; other steps call `--append`. The stream is bounded, so an unattended run cannot grow it
 without limit.
 
@@ -420,7 +421,7 @@ pnpm josh lane:prune
 
 **Options:**
 
-- `lane:close --all` — close every lane; `lane:prune` — close lanes left registered without a work tree.
+- `lane:close --all` — close every lane; `lane:prune` — close lanes left registered without a work tree, then remove unregistered lanes-root leftovers git can fully restore (the rest are kept with a reason).
 
 **Settings:**
 

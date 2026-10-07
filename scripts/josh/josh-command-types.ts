@@ -71,6 +71,9 @@ interface CommandEntry {
 	// under a second, so a wait for room on the machine would stall every edit for the length of
 	// another lane's check.
 	core_weight?: number | (() => number)
+	// The memory the command's tools hold, claimed with its cores (joshuafolkken/kit#3371); read like
+	// `core_weight`, and none declared is none waited for.
+	memory_mb?: number | (() => number)
 }
 
 // The name `josh gate` registers under. It lives here rather than in `verification-gate.ts` so a

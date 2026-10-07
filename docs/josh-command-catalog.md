@@ -581,7 +581,7 @@ Diagnose PATH shadowing of the global josh and show the discovered repository ma
 
 _No arguments._
 
-Update pnpm, dependencies, and run security audit
+Update dependencies, run security audit, then update pnpm
 
 ---
 
@@ -999,7 +999,7 @@ Post one comment to an issue from a file, so no shell expands the body
 
 > **Audience:** automation · **Side effects:** network
 
-`<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok]`
+`<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]`
 
 File an Issue with every filing step: lint, Origin, WIP cap, duplicate scout, labels, then epic:bundle
 
@@ -1042,6 +1042,16 @@ Check an issue body file for the template's required headings
 `<issue...>`
 
 Print each issue's title, body and every comment on it, in one call
+
+---
+
+### `josh issue:release`
+
+> **Audience:** automation · **Side effects:** network
+
+`<issue>`
+
+Link an Issue to the repository's open release Issue as its blocker, filing one when none is open
 
 ---
 
@@ -1141,7 +1151,7 @@ Record, or read back, where the unit running a lane’s child writes
 
 _No arguments._
 
-Close every lane an interruption left without its work tree
+Close every lane an interruption left without its work tree, then sweep unregistered leftovers under the lanes root
 
 ---
 

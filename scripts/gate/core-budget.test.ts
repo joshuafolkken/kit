@@ -1,10 +1,12 @@
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
+import { stamp_file } from '#scripts/josh/stamp-file'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { core_admission } from './core-admission'
 import { core_budget, type LiveReservation } from './core-budget'
 
 // joshuafolkken/kit#2351: the gate's CPU budget was decided once at start, so overlapping gates each
@@ -126,6 +128,16 @@ describe('core_budget.live_reservations — who counts as holding a place', () =
 
 		expect(existsSync(path.join(directory, DEAD_MARKER))).toBe(false)
 	})
+
+	it('does not count the temporary copy of a marker being replaced', () => {
+		write_marker(directory, `${ALIVE_MARKER}.1.in-flight`, {
+			...process_identity.own_fields(),
+			weight: 2,
+			claimed_at: 1,
+		})
+
+		expect(core_budget.live_reservations(directory)).toHaveLength(0)
+	})
 })
 
 // The weight one gate's unit step reserves solo, and the whole budget a blocking place holds.
@@ -133,6 +145,12 @@ const SOLO_UNIT_WEIGHT = 7
 // The wait cap the reservation is admitted at once the clock passes it, small so the injected clock
 // reaches it in one sleep.
 const TEST_WAIT_CAP_MS = 10
+
+// A machine reading that says nothing, so a ledger with more than one place budgets by the core count
+// exactly as before joshuafolkken/kit#3371 rather than by whatever the test machine is running.
+async function unread_machine(): Promise<{ busy_cores: undefined; available_mb: undefined }> {
+	return { busy_cores: undefined, available_mb: undefined }
+}
 
 function marker_count(directory: string): number {
 	return readdirSync(directory).filter((name) => name.startsWith(core_budget.RESERVED_PREFIX))
@@ -190,14 +208,16 @@ async function reserve_admits_once_freed(): Promise<void> {
 			rmSync(path.join(directory, ALIVE_MARKER), { force: true })
 		})
 
-		await core_budget.reserve(SOLO_UNIT_WEIGHT, {
+		const handle = await core_budget.reserve(SOLO_UNIT_WEIGHT, {
 			directory,
 			budget: MEASURED_CORES,
+			read_machine: unread_machine,
 			now: () => 1,
 			sleep,
 		})
 
 		expect(sleep).toHaveBeenCalledTimes(1)
+		expect(core_budget.describe_overflow(handle.admission)).toBeUndefined()
 	})
 }
 
@@ -206,20 +226,28 @@ async function reserve_admits_once_freed(): Promise<void> {
 async function reserve_admits_at_wait_cap(): Promise<void> {
 	await with_probe(async (directory) => {
 		write_blocking_marker(directory)
-		const clock = { value: 0 }
+		// Claimed after the blocking place, so the filename tiebreak can never make this claim the head.
+		const clock = { value: 1 }
 		const sleep = vi.fn(async () => {
 			clock.value += TEST_WAIT_CAP_MS
 		})
 
-		await core_budget.reserve(SOLO_UNIT_WEIGHT, {
+		const handle = await core_budget.reserve(SOLO_UNIT_WEIGHT, {
 			directory,
 			budget: MEASURED_CORES,
+			read_machine: unread_machine,
 			wait_cap_ms: TEST_WAIT_CAP_MS,
 			now: () => clock.value,
 			sleep,
 		})
 
 		expect(marker_count(directory)).toBe(2)
+		expect(handle.admission.overflow).toEqual({
+			waited_ms: TEST_WAIT_CAP_MS,
+			ledger: { cores: MEASURED_CORES + SOLO_UNIT_WEIGHT, memory_mb: 0 },
+			budget: { cores: MEASURED_CORES, memory_mb: Infinity },
+		})
+		expect(core_budget.describe_overflow(handle.admission)).toContain('past the core budget')
 	})
 }
 
@@ -227,6 +255,86 @@ describe('core_budget.reserve — waiting on the machine-wide budget', () => {
 	it('admits a solo reservation without waiting', reserve_admits_solo_without_waiting)
 	it('is admitted once a blocking place is freed', reserve_admits_once_freed)
 	it('admits at the wait cap when the budget never clears', reserve_admits_at_wait_cap)
+})
+
+// joshuafolkken/kit#3371: the ledger counted cores only, so three lanes' type checks and whole-tree
+// eslint runs started together and swapped. A claim now also waits while its tool's memory is not free.
+const TOOL_MEMORY_MB = 2400
+const LOW_AVAILABLE_MB = 500
+
+function marker_payload(directory: string, name: string): unknown {
+	return JSON.parse(readFileSync(path.join(directory, name), 'utf8'))
+}
+
+// The admitted place holds the tool's memory and only a little more is free, so the second claim's
+// memory does not fit until the injected sleep frees the place.
+async function reserve_waits_on_memory(): Promise<void> {
+	await with_probe(async (directory) => {
+		write_marker(directory, ALIVE_MARKER, {
+			...process_identity.own_fields(),
+			weight: 1,
+			claimed_at: 0,
+			memory_mb: TOOL_MEMORY_MB,
+			admitted_at: -core_admission.RAMP_UP_MS,
+		})
+		const sleep = vi.fn(async () => {
+			rmSync(path.join(directory, ALIVE_MARKER), { force: true })
+		})
+
+		await core_budget.reserve(1, {
+			directory,
+			budget: MEASURED_CORES,
+			memory_mb: TOOL_MEMORY_MB,
+			read_machine: async () => ({ busy_cores: 0, available_mb: LOW_AVAILABLE_MB }),
+			now: () => 1,
+			sleep,
+		})
+
+		expect(sleep).toHaveBeenCalledTimes(1)
+	})
+}
+
+describe('core_budget memory admission', () => {
+	it('stops the FIFO walk at the first claim that does not fit in free memory', () => {
+		const entries = [reservation(1, 0, 'a'), reservation(1, 1, 'b')].map((entry) => ({
+			...entry,
+			reservation: { ...entry.reservation, memory_mb: TOOL_MEMORY_MB },
+		}))
+
+		expect(core_budget.admitted_keys(entries, MEASURED_CORES, TOOL_MEMORY_MB)).toEqual(
+			new Set(['a']),
+		)
+	})
+
+	it('waits while free memory is below what the claim holds', reserve_waits_on_memory)
+
+	// Other lanes poll the marker while it is rewritten, so an unlink-then-create would open a gap in
+	// which the ledger lacks this place.
+	it('rewrites its marker as admitted by an atomic replace', async () => {
+		const replace = vi.spyOn(stamp_file, 'replace_stamp')
+
+		await with_probe(async (directory) => {
+			const handle = await core_budget.reserve(1, { directory, now: () => 1 })
+
+			expect(replace).toHaveBeenLastCalledWith(
+				handle.target,
+				expect.objectContaining({ admitted_at: 1 }),
+			)
+		})
+		replace.mockRestore()
+	})
+
+	it('records when its marker was admitted once it runs', async () => {
+		await with_probe(async (directory) => {
+			const options = { directory, memory_mb: TOOL_MEMORY_MB, now: () => 1 }
+			const handle = await core_budget.reserve(1, options)
+
+			expect(marker_payload(directory, path.basename(handle.target))).toMatchObject({
+				admitted_at: 1,
+				memory_mb: TOOL_MEMORY_MB,
+			})
+		})
+	})
 })
 
 // joshuafolkken/kit#3345: a heavy command run outside the gate claims its place through

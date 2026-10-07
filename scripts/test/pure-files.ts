@@ -219,7 +219,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/init/init-logic.tsconfig.test.ts',
 	'scripts/init/init-logic.vscode-settings.test.ts',
 	'scripts/init/init-logic.yaml.test.ts',
-	'scripts/init/init-package-manager-align.test.ts',
 	'scripts/init/init-paths.test.ts',
 	'scripts/init/kit-base-preset.test.ts',
 	'scripts/issue/baseline-measure.test.ts',

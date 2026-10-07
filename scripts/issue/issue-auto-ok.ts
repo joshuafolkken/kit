@@ -2,7 +2,7 @@ import { git_branch } from '#scripts/git/git-branch'
 import { git_command } from '#scripts/git/git-command'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { issue_file } from './issue-file'
-import { AUTO_OK_LABEL, has_label_name } from './issue-labels'
+import { AUTO_OK_LABEL, has_label_name, RELEASE_LABEL } from './issue-labels'
 import { issue_state_cli } from './issue-state-cli'
 
 // Whether `josh issue:file` applies `auto-ok` to the Issue it files (joshuafolkken/kit#3213). Work
@@ -12,9 +12,13 @@ import { issue_state_cli } from './issue-state-cli'
 // default. `--no-auto-ok` is the one exception, declared for an Issue that needs a person's judgement
 // (a Tier B toss-up or a Tier C action). A filing to another repository is never opted in: that
 // repository's own `backlogrun` would implement and merge it though nobody opted that repository in.
+// A `release` Issue is never opted in either (joshuafolkken/kit#3360): a release is Tier C, so only a
+// person applies `auto-ok` to it, whatever the carry record or the branch's Issue says.
 
 interface AutoOkSignals {
 	is_opted_out: boolean
+	// The filing carries the `release` label.
+	is_release: boolean
 	is_carried: boolean
 	// The labels of the Issue the current branch names; `undefined` when the branch names none or the
 	// Issue could not be read.
@@ -31,6 +35,10 @@ const CROSS_REPOSITORY: AutoOkDecision = {
 	is_applied: false,
 	reason: 'the Issue is filed to another repository',
 }
+const RELEASE: AutoOkDecision = {
+	is_applied: false,
+	reason: `a ${RELEASE_LABEL} Issue is opted in by a person only`,
+}
 const CARRIED: AutoOkDecision = { is_applied: true, reason: 'a backlogrun carry record is live' }
 const BRANCH_OPTED_IN: AutoOkDecision = {
 	is_applied: true,
@@ -41,9 +49,22 @@ const NOT_OPTED_IN: AutoOkDecision = {
 	reason: 'no backlogrun carry record is live and the branch names no auto-ok Issue',
 }
 
-// The opt-out wins over every signal, then the carry record, then the branch's Issue.
-function decide(signals: AutoOkSignals): AutoOkDecision {
+type Withholding = Pick<AutoOkSignals, 'is_opted_out' | 'is_release'>
+
+// The two signals that withhold `auto-ok` before any other is read, or `undefined` when neither holds.
+function withheld(signals: Withholding): AutoOkDecision | undefined {
 	if (signals.is_opted_out) return OPTED_OUT
+	if (signals.is_release) return RELEASE
+
+	return undefined
+}
+
+// The opt-out and the `release` label win over every signal, then the carry record, then the branch's
+// Issue.
+function decide(signals: AutoOkSignals): AutoOkDecision {
+	const decision = withheld(signals)
+
+	if (decision !== undefined) return decision
 	if (signals.is_carried) return CARRIED
 	if (has_label_name(signals.branch_labels ?? [], AUTO_OK_LABEL)) return BRANCH_OPTED_IN
 
@@ -76,17 +97,21 @@ async function branch_labels(current: string): Promise<ReadonlyArray<string> | u
 }
 
 // Each read is skipped once an earlier signal has already decided the answer; a cross-repository
-// filing is refused before any signal is read.
+// filing is refused before any signal is read. `labels` are the ones the filing declares.
 async function resolve(
 	is_opted_out: boolean,
 	target: string,
 	current: string,
+	labels: ReadonlyArray<string> = [],
 ): Promise<AutoOkDecision> {
-	if (is_opted_out) return OPTED_OUT
+	const withholding = { is_opted_out, is_release: has_label_name(labels, RELEASE_LABEL) }
+	const decision = withheld(withholding)
+
+	if (decision !== undefined) return decision
 	if (!issue_file.is_same_repository(target, current)) return CROSS_REPOSITORY
 	if (await is_carried()) return CARRIED
 
-	return decide({ is_opted_out, is_carried: false, branch_labels: await branch_labels(current) })
+	return decide({ ...withholding, is_carried: false, branch_labels: await branch_labels(current) })
 }
 
 const issue_auto_ok = { decide, line_of, resolve }

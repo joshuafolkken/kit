@@ -25,6 +25,7 @@ import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
 import { kit_development_versions } from './kit-development-versions'
 import { kit_setup_state } from './kit-setup-state'
+import { package_manager_pin } from './package-manager-pin'
 import { project_profile, type ProjectProfile, type ProjectShape } from './project-profile'
 
 const PACKAGE_JSON = 'package.json'
@@ -52,7 +53,10 @@ function resolve_kit_package_manager(manifest: unknown): string | undefined {
 }
 
 function get_kit_package_manager(): string | undefined {
-	return resolve_kit_package_manager(init_actions.read_package_json(PACKAGE_JSON))
+	return package_manager_pin.choose(
+		resolve_kit_package_manager(init_actions.read_package_json(PACKAGE_JSON)),
+		process.env['npm_config_user_agent'],
+	)
 }
 
 function get_kit_development_engines(): Record<string, unknown> {

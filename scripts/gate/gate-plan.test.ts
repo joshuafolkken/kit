@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { core_budget } from './core-budget'
 import { gate_plan, type GateCheck } from './gate-plan'
 
 function unit_check(): GateCheck {
@@ -215,6 +216,33 @@ describe('gate_plan.check_weight — the cores a check reserves from the budget'
 		expect(gate_plan.check_weight(unit_check(), plan, MID_SIZED_CORES)).toBe(
 			MID_SIZED_CORES - gate_plan.RESERVED_CORES,
 		)
+	})
+})
+
+function static_memory(label: string): number | undefined {
+	const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
+	const check = plan.checks.find((entry) => entry.label === label)
+
+	return check === undefined ? undefined : gate_plan.check_memory(check, plan, MEASURED_CORES)
+}
+
+// joshuafolkken/kit#3371: a check declares the memory its tool holds beside its cores.
+describe('gate_plan.check_memory — the memory a check holds', () => {
+	it('holds one worker of memory per core the unit suite reserves', () => {
+		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
+		const weight = gate_plan.check_weight(unit_check(), plan, MEASURED_CORES)
+
+		expect(gate_plan.check_memory(unit_check(), plan, MEASURED_CORES)).toBe(
+			weight * core_budget.MEMORY_MB.unit_worker,
+		)
+	})
+
+	it('holds the measured memory of each heavy static check', () => {
+		expect([static_memory('lint'), static_memory('check'), static_memory('cspell')]).toEqual([
+			core_budget.MEMORY_MB.lint,
+			core_budget.MEMORY_MB.type_check,
+			core_budget.MEMORY_MB.spell_check,
+		])
 	})
 })
 

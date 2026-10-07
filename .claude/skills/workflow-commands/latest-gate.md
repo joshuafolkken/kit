@@ -1,6 +1,6 @@
 # The dependency update — when `josh latest` runs
 
-`josh latest` updates corepack, every dependency, the published ranges and `pnpm audit`, in that
+`josh latest` updates every dependency, the published ranges, `pnpm audit` and pnpm, in that
 order and over the network. Until joshuafolkken/kit#1215 every entry point put it at the head of
 every run and called it **mandatory, never skip** — so a standalone `fullrun` paid 60–120 seconds
 for it before touching the issue, and a batch that ran ten children paid it ten times unless the

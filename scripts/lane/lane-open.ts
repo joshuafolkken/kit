@@ -37,14 +37,13 @@ type OpenOutcome =
 
 const FULL_OUTCOME: OpenOutcome = { kind: 'full' }
 
-// The seat a lane will take is claimed by exclusively creating its lock directory here, under the
-// lanes root and clear of the lanes themselves (which are numbered, never dot-prefixed). The claim
+// The seat a lane will take is claimed by exclusively creating its lock directory under
+// `lane_paths.SEAT_LOCK_DIR`, in the lanes root and clear of the lanes themselves (which are numbered, never dot-prefixed). The claim
 // is what closes the gap between reading the free seats and writing the lane's `.env`: two
 // `lane:open` runs that both saw seat 1 free cannot both create the same lock, so the loser steps to
 // the next free seat (joshuafolkken/kit#1494). The lock is released once the lane's `.env` is on
 // disk and the seat is discoverable — or on any failure — so only a hard crash mid-open can strand
 // one, which removing the lanes-root `.seat-locks` directory clears.
-const SEAT_LOCK_DIR = '.seat-locks'
 const SEAT_LOCK_PREFIX = 'seat-'
 
 // A root with no `.env` is the normal state of a fresh clone and of CI, and it means seed 0 — the
@@ -79,7 +78,7 @@ function build_lane(
 }
 
 function seat_lock_path(root: string, seat: number): string {
-	return path.join(root, SEAT_LOCK_DIR, `${SEAT_LOCK_PREFIX}${String(seat)}`)
+	return path.join(root, lane_paths.SEAT_LOCK_DIR, `${SEAT_LOCK_PREFIX}${String(seat)}`)
 }
 
 // Release the seat lock — idempotent (`force`), so calling it after the `.env` write and again in the
@@ -93,7 +92,7 @@ function release_seat_lock(lock: string): void {
 // being created. A missing directory is none held — the normal state when no open is running.
 function open_in_flight_count(root: string): number {
 	try {
-		return readdirSync(path.join(root, SEAT_LOCK_DIR)).filter((entry) =>
+		return readdirSync(path.join(root, lane_paths.SEAT_LOCK_DIR)).filter((entry) =>
 			entry.startsWith(SEAT_LOCK_PREFIX),
 		).length
 	} catch {
@@ -279,6 +278,7 @@ async function open_lane(issue: string): Promise<OpenOutcome> {
 }
 
 const lane_open = {
+	open_in_flight_count,
 	open_lane,
 }
 

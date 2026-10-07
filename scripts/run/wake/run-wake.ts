@@ -126,14 +126,6 @@ interface RunWake {
 	// session that is merely slow is still doing the run's work, and a supervisor that killed what it
 	// could not account for would destroy exactly the work it exists to keep going.
 	woke_pid?: number | undefined
-	// When the wait on a still-running predecessor began. **It is its own field rather than a second
-	// use of `woke_at`, and that is the whole of the bound working as described.** Marked on `woke_at`,
-	// the first pass of a wait was the last one that could see the predecessor exit — every later pass
-	// read the mark as an outstanding wake and answered `pending` — so a predecessor that ended two
-	// seconds after the hold still cost the full grace window on a supervisor whose point is not to
-	// stall. Kept apart, the predecessor's liveness is read on every pass and the mark only bounds how
-	// long the wait may last.
-	held_at?: string | undefined
 	// The transcript ids of every session this supervisor forced with `--session-id`
 	// (joshuafolkken/kit#2407). `josh time --run` attributes a whiff only to a session in this list, so
 	// an unrelated read-only session that moved while the supervisor was alive is no longer counted
@@ -164,7 +156,6 @@ type WakeDecision =
 	| { kind: 'idle' }
 	| { kind: 'wait' }
 	| { kind: 'pending' }
-	| { kind: 'hold' }
 	| { kind: 'failed' }
 	| { kind: 'stop'; reason: WakeStopReason }
 
@@ -172,16 +163,16 @@ interface WakeDecisionInput {
 	read: CarryRead
 	woke_at: string | undefined
 	attempts: number
-	// Whether the process named on the carry record is still running. **A cut is the run's last write,
-	// not the moment its process is gone** — so a supervisor that woke the instant it saw the hand-off
-	// could have the new session answered `busy`, because `run-carry.ts` → `classify_claim` tests
-	// `is_foreign_live_owner` before it tests the hand-off. Answered `busy`, the woken session stops
-	// without claiming anything, and the supervisor would eventually call its own wake a failure and end
-	// the run. So the predecessor is waited out first.
+	// Whether the process named on the carry record is still running — read only for a record no cut
+	// handed off, where it tells a session at work from a crashed one (`decide_not_handed_off`).
+	//
+	// **A handed-off record is launched from whether its cutting process lives or not**
+	// (joshuafolkken/kit#3363). The supervisor used to wait that process out, for up to the grace
+	// window, because `run-carry.ts` → `classify_claim` once tested liveness before the hand-off and
+	// would have answered the successor `busy`. joshuafolkken/kit#1935 put the hand-off first, so the
+	// wait guarded nothing — and an interactive session outlives its own cut, so every cut paid the
+	// whole ten minutes before the driver started.
 	is_owner_live: boolean
-	// When the wait on that predecessor began, so the wait can be bounded without spending the mark
-	// that measures a launch.
-	held_at: string | undefined
 	// **Whether a woken session would find anything to do** (joshuafolkken/kit#2417). Before this the
 	// decision read the carry record alone, so a session was launched whether or not the backlog held a
 	// runnable issue or a lane was free — and a session that found nothing ended without touching
@@ -198,7 +189,6 @@ const WAKE_DECISION: WakeDecision = { kind: 'wake' }
 const IDLE_DECISION: WakeDecision = { kind: 'idle' }
 const WAIT_DECISION: WakeDecision = { kind: 'wait' }
 const PENDING_DECISION: WakeDecision = { kind: 'pending' }
-const HOLD_DECISION: WakeDecision = { kind: 'hold' }
 const FAILED_DECISION: WakeDecision = { kind: 'failed' }
 
 // The three carry reads that are not `carried`, each mapped to why the supervisor stops. `none` is the
@@ -220,7 +210,6 @@ const run_wake_schema = process_owner_schema.extend({
 	// reads as "no attempt has been made yet" and would restart the retry count on every pass.
 	attempts: z.number().optional(),
 	woke_pid: z.number().optional(),
-	held_at: z.string().optional(),
 	spawned: z.array(z.string()).optional(),
 	idle_since: z.string().optional(),
 	profile: agent_role_profile.PROFILE_SCHEMA.optional(),
@@ -279,32 +268,10 @@ function decide_not_handed_off(input: WakeDecisionInput): WakeDecision {
 	return decide_launch(input)
 }
 
-// Only before the first launch for this cut. Once a wake is out, the record's owner is whatever the
-// woken session declares, and waiting on it again would stall the grace window indefinitely.
-//
-// **The wait is bounded, and the bound is not decoration.** The owner is the agent process of the
-// session that cut, and an interactive one often outlives its own cut — waited on without a bound, the
-// supervisor would pend every interval for the record's whole life, wake nothing, and end on `expired`,
-// which sends no warning. That is a silent overnight failure, which is worse than the `busy` race this
-// wait exists to avoid: a `busy` merely costs one attempt, and attempts are retried. So the wait is
-// marked when it starts and expires into an ordinary wake through the same grace window everything
-// else uses.
-//
-// **And the wait ends the moment the predecessor does, because its liveness is read on every pass.**
-// The bound is the ceiling on the wait, never its length: a predecessor that exits two seconds after
-// the hold is waited two seconds. That is what `held_at` is a separate field for — marked on `woke_at`,
-// this test could not fire a second time, so every wait cost the whole ceiling.
-function is_predecessor_exiting(input: WakeDecisionInput): boolean {
-	if (input.woke_at !== undefined || !input.is_owner_live) return false
-
-	return input.held_at === undefined || !is_overdue(input.held_at, input.now)
-}
-
-// The whole policy, in four lines. Nothing else in this module decides whether to wake.
+// The whole policy, in three lines. Nothing else in this module decides whether to wake.
 function decide(input: WakeDecisionInput): WakeDecision {
 	if (input.read.kind !== 'carried') return { kind: 'stop', reason: STOP_REASONS[input.read.kind] }
 	if (input.read.carry.is_handed_off !== true) return decide_not_handed_off(input)
-	if (is_predecessor_exiting(input)) return HOLD_DECISION
 
 	return decide_launch(input)
 }
@@ -367,10 +334,9 @@ function is_supervisor_live(wake: RunWake): boolean {
 // inside the grace window would otherwise see no wake mark, launch a second session for the *same*
 // cut, count it as another cut served, and leave two sessions racing for one record. The invocation
 // has to match — a different one is a different run, and its state is not this one's.
-// **`woke_pid` and `held_at` come across too.** Without the first, a restart inside the grace window
-// that then spends its retries reports "the last one was none" in the warning — the one fact the
-// warning exists to hand the person, dropped exactly where it is needed. Without the second, a restart
-// restarts the bounded wait, which is the ceiling sliding by another road.
+// **`woke_pid` comes across too.** Without it, a restart inside the grace window that then spends its
+// retries reports "the last one was none" in the warning — the one fact the warning exists to hand the
+// person, dropped exactly where it is needed.
 function carried_state(existing: RunWake | undefined, invocation: string): Partial<RunWake> {
 	if (existing?.invocation !== invocation) return { woke: NO_WAKES }
 
@@ -379,7 +345,6 @@ function carried_state(existing: RunWake | undefined, invocation: string): Parti
 		woke_at: existing.woke_at,
 		attempts: existing.attempts,
 		woke_pid: existing.woke_pid,
-		held_at: existing.held_at,
 		// **`spawned` carries across too, or a restart mid-run would lose the ids of every session it
 		// already started** (joshuafolkken/kit#2407) — and `josh time --run`, reading the record after
 		// the restart, would under-count the whiffs and read the loss as a saving.
@@ -447,24 +412,12 @@ function count_wake(wake: RunWake, now: Date, pid: number, session_id: string): 
 		spawned,
 		woke_at,
 		woke_pid: pid,
-		held_at: undefined,
 		idle_since: undefined,
 	}
 }
 
-// Starts the clock on a wait without launching anything. `attempts` is deliberately untouched, so the
-// bounded wait costs no retry: what it buys is that the wait expires into an ordinary wake instead of
-// running until the carry record does.
-//
-// **Marked once, so the ceiling does not slide.** A mark rewritten on every pass would measure from the
-// latest pass rather than from the start of the wait, and a predecessor that never exits would then be
-// waited on for ever — the unbounded wait this bound exists to prevent, arrived at by another road.
-function mark_wait(wake: RunWake, now: Date): RunWake {
-	return wake.held_at === undefined ? { ...wake, held_at: now.toISOString() } : wake
-}
-
-// Starts the idle stretch a deferred launch is bounded by (joshuafolkken/kit#2417). Marked once, for
-// the reason `mark_wait` is: rewritten each pass, the ceiling would slide and never be reached.
+// Starts the idle stretch a deferred launch is bounded by (joshuafolkken/kit#2417). Marked once:
+// rewritten each pass, the ceiling would slide and never be reached.
 function mark_idle(wake: RunWake, now: Date): RunWake {
 	return wake.idle_since === undefined ? { ...wake, idle_since: now.toISOString() } : wake
 }
@@ -489,7 +442,6 @@ function count_claim(wake: RunWake): RunWake {
 		woke,
 		woke_at: undefined,
 		attempts: undefined,
-		held_at: undefined,
 		idle_since: undefined,
 	}
 }
@@ -589,7 +541,6 @@ const run_wake = {
 	fresh_wake,
 	is_supervisor_live,
 	mark_idle,
-	mark_wait,
 	parse_wake,
 	read_own_wake,
 	read_wake,

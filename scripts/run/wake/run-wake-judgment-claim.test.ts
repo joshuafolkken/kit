@@ -57,7 +57,6 @@ function supervisor_decision(): string {
 		woke_at: new Date().toISOString(),
 		attempts: 1,
 		is_owner_live,
-		held_at: undefined,
 		now: new Date(),
 	}).kind
 }

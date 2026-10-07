@@ -279,8 +279,8 @@ async function run_entry(
 	return await run_script_entry(entry, subcommand_arguments)
 }
 
-function command_weight(entry: CommandEntry): number | undefined {
-	return typeof entry.core_weight === 'function' ? entry.core_weight() : entry.core_weight
+function declared(value: number | (() => number) | undefined): number | undefined {
+	return typeof value === 'function' ? value() : value
 }
 
 // **Every command passes through here, so this is where a declared weight is reserved**
@@ -291,13 +291,14 @@ async function dispatch_entry(
 	entry: CommandEntry,
 	subcommand_arguments: Array<string>,
 ): Promise<number> {
-	const weight = command_weight(entry)
+	const weight = declared(entry.core_weight)
 
 	if (weight === undefined) return await run_entry(entry, subcommand_arguments)
 
 	return await core_budget.with_command_reservation(
 		weight,
 		async () => await run_entry(entry, subcommand_arguments),
+		{ memory_mb: declared(entry.memory_mb) },
 	)
 }
 

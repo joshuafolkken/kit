@@ -27,6 +27,23 @@ describe('format_failure_actions', () => {
 	})
 })
 
+// joshuafolkken/kit#3371: a check the wait cap admitted past the budget is said in the summary.
+describe('format_budget_notes', () => {
+	it('names each check that started past the budget', () => {
+		const note = 'started past the core budget after 120s'
+		const block = gate_report.format_budget_notes([
+			{ ...result_of('check', 'josh check', PASS), budget_note: note },
+			result_of('unit', 'josh test:unit', PASS),
+		])
+
+		expect(block).toBe(`  ⚠ check — ${note}\n`)
+	})
+
+	it('is empty when every check fitted', () => {
+		expect(gate_report.format_budget_notes([result_of('cspell', 'josh cspell', PASS)])).toBe('')
+	})
+})
+
 describe('is_gate_step_failed', () => {
 	it('reads the exit code of the step', () => {
 		expect(gate_report.is_gate_step_failed(result_of('lint', 'josh lint', FAIL))).toBe(true)

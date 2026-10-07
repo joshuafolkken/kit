@@ -48,6 +48,7 @@ describe('issue_auto_ok.decide', () => {
 	it('applies auto-ok while a backlogrun carry record is live', () => {
 		const decision = issue_auto_ok.decide({
 			is_opted_out: false,
+			is_release: false,
 			is_carried: true,
 			branch_labels: undefined,
 		})
@@ -58,6 +59,7 @@ describe('issue_auto_ok.decide', () => {
 	it('applies auto-ok when the branch Issue carries it, in any casing', () => {
 		const decision = issue_auto_ok.decide({
 			is_opted_out: false,
+			is_release: false,
 			is_carried: false,
 			branch_labels: ['enhancement', 'Auto-OK'],
 		})
@@ -68,22 +70,55 @@ describe('issue_auto_ok.decide', () => {
 	it('does not apply auto-ok when neither signal holds', () => {
 		const decision = issue_auto_ok.decide({
 			is_opted_out: false,
+			is_release: false,
 			is_carried: false,
 			branch_labels: ['enhancement'],
 		})
 
 		expect(decision.is_applied).toBe(false)
 	})
+})
 
+describe('issue_auto_ok.decide — opted out', () => {
 	it('does not apply auto-ok when opted out, even with both signals', () => {
 		const decision = issue_auto_ok.decide({
 			is_opted_out: true,
+			is_release: false,
 			is_carried: true,
 			branch_labels: ['auto-ok'],
 		})
 
 		expect(decision.is_applied).toBe(false)
 		expect(issue_auto_ok.line_of(decision)).toBe('auto-ok: not applied — --no-auto-ok declared')
+	})
+})
+
+// joshuafolkken/kit#3360: a release is Tier C, so a `release` Issue is opted in by a person only.
+describe('issue_auto_ok.decide — a release Issue', () => {
+	it.each([
+		{ is_carried: true, branch_labels: undefined },
+		{ is_carried: false, branch_labels: ['auto-ok'] },
+	])('does not apply auto-ok (carried: $is_carried)', (signals) => {
+		const decision = issue_auto_ok.decide({ is_opted_out: false, is_release: true, ...signals })
+
+		expect(decision.is_applied).toBe(false)
+		expect(issue_auto_ok.line_of(decision)).toBe(
+			'auto-ok: not applied — a release Issue is opted in by a person only',
+		)
+	})
+})
+
+describe('issue_auto_ok.resolve — a release Issue', () => {
+	it.each([
+		{ branch: 'main', is_carried: true },
+		{ branch: '3213-lane', is_carried: false },
+	])('does not apply auto-ok, reading nothing, on $branch', async ({ branch, is_carried }) => {
+		stub_reads(branch, is_carried, ['auto-ok'])
+		const decision = await issue_auto_ok.resolve(false, CURRENT, CURRENT, ['Release'])
+
+		expect(decision.is_applied).toBe(false)
+		expect(run_carry.read_carry).not.toHaveBeenCalled()
+		expect(issue_state_cli.read_issue).not.toHaveBeenCalled()
 	})
 })
 

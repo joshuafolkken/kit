@@ -33,6 +33,7 @@ function args_of(overrides: Partial<FileArguments> = {}): FileArguments {
 		distinct: [],
 		is_over_cap: false,
 		is_auto_ok_opted_out: false,
+		is_release: false,
 		...overrides,
 	}
 }
@@ -59,6 +60,10 @@ describe('issue_file.parse — the arguments a filing owes', () => {
 		const parsed = issue_file.parse([...FILED, '--no-auto-ok'])
 
 		expect(parsed).toStrictEqual(args_of({ is_auto_ok_opted_out: true }))
+	})
+
+	it('reads --release', () => {
+		expect(issue_file.parse([...FILED, '--release'])).toStrictEqual(args_of({ is_release: true }))
 	})
 
 	it.each([

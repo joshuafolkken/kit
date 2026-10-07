@@ -67,14 +67,15 @@ describe('MAINTENANCE_COMMANDS latest', () => {
 		expect(cmd.shell?.join(' ') ?? '').toContain(LATEST_COREPACK_COMMAND)
 	})
 
-	// The lane refusal has to run before corepack, the first step that mutates package.json
-	// (joshuafolkken/kit#2135) — otherwise a lane's corepack bump lands before the guard is reached.
-	it('fronts the chain with the lane guard, ahead of corepack', () => {
+	// The lane refusal has to run before the first step that mutates package.json
+	// (joshuafolkken/kit#2135) — otherwise a lane's update lands before the guard is reached.
+	it('fronts the chain with the lane guard, ahead of every mutating step', () => {
 		if (!cmd) throw new Error(LATEST_NOT_DEFINED)
 
 		const shell = cmd.shell?.join(' ') ?? ''
 
 		expect(shell).toContain(LATEST_GUARD_COMMAND)
+		expect(shell.indexOf(LATEST_GUARD_COMMAND)).toBeLessThan(shell.indexOf(LATEST_UPDATE_COMMAND))
 		expect(shell.indexOf(LATEST_GUARD_COMMAND)).toBeLessThan(shell.indexOf(LATEST_COREPACK_COMMAND))
 	})
 

@@ -1,6 +1,7 @@
 import { setTimeout } from 'node:timers/promises'
 import semver from 'semver'
 import { z } from 'zod'
+import { github_release_runs, type PollState, type RunSource } from './github-release-runs'
 
 const API_ROOT = 'https://api.github.com/repos'
 const LATEST_PATH = '/releases/latest'
@@ -8,42 +9,26 @@ const REPOSITORY_PATTERN = /^[\w.-]+\/[\w.-]+$/u
 const TAG_PATTERN = /^v\d+\.\d+\.\d+(?:[.-][0-9A-Za-z.-]+)?$/u
 const REQUEST_TIMEOUT_MS = 30_000
 const NOT_FOUND_STATUS = 404
-// A job skipped by its `if:` (or neutral) belongs to a run that succeeded; counting it would skip a
-// lower tag whose release is still on its way.
-const FAILED_CONCLUSIONS = new Set(['failure', 'cancelled', 'timed_out', 'startup_failure'])
 const POLL_INTERVAL_MS = 30_000
 const MAX_WAIT_ATTEMPTS = 120
 const RELEASE_SCHEMA = z.object({ tag_name: z.string().min(1) })
 const NOTES_SCHEMA = z.object({ name: z.string().min(1), body: z.string().min(1) })
-const RUN_SCHEMA = z.object({
-	id: z.number(),
-	display_title: z.string(),
-	status: z.string().optional(),
-	conclusion: z.string().nullable().optional(),
-})
-const JOB_SCHEMA = z.object({
-	name: z.string(),
-	status: z.string(),
-	conclusion: z.string().nullable(),
-})
-const RUNS_SCHEMA = z.object({ workflow_runs: z.array(RUN_SCHEMA) })
-const JOBS_SCHEMA = z.object({ jobs: z.array(JOB_SCHEMA) })
-
 type ReleaseRequest = (url: string, init: RequestInit) => Promise<Response>
 type Wait = () => Promise<void>
-type PollState = 'ready' | 'failed' | 'pending'
 
 // What differs between repositories. `start_tag` is the last tag that predates automatic releases;
 // without it the latest existing release is the floor. `workflow` names the publish workflow whose
 // failed run lets a lower tag be skipped, and `jobs` the jobs in it that count (empty: every job).
 // `await_publish` holds the tag's own release until its run in that workflow has succeeded, for a
-// release started beside the publication rather than from inside it.
+// release started beside the publication rather than from inside it. `release_run_workflow` names
+// the workflow whose run creates a tag's release, so a lower tag left without one can be told lost.
 interface ReleaseSettings {
 	repository: string
 	start_tag?: string | undefined
 	workflow?: string | undefined
 	jobs?: ReadonlyArray<string> | undefined
 	await_publish?: boolean | undefined
+	release_run_workflow?: string | undefined
 }
 
 interface PublishOptions extends ReleaseSettings {
@@ -51,12 +36,10 @@ interface PublishOptions extends ReleaseSettings {
 	wait?: Wait
 }
 
-interface Client {
+interface Client extends Omit<RunSource, 'read'> {
 	request: ReleaseRequest
 	token: string
 	url: string
-	workflow: string | undefined
-	jobs: ReadonlyArray<string>
 }
 
 // `fallback` answers when no tag sits between the floor and the target; without one the floor itself
@@ -139,59 +122,21 @@ function predecessor(
 		.toSorted((left, right) => semver.compare(right, left))[0]
 }
 
-function is_failed_job(job: z.infer<typeof JOB_SCHEMA>, names: ReadonlyArray<string>): boolean {
-	if (job.status !== 'completed' || !FAILED_CONCLUSIONS.has(job.conclusion ?? '')) return false
-	if (names.length === 0) return true
-
-	return names.some((name) => job.name === name || job.name.startsWith(`${name} /`))
-}
-
-async function publish_run(
-	client: Client,
-	workflow_name: string,
-	tag: string,
-): Promise<z.infer<typeof RUN_SCHEMA> | undefined> {
-	const workflow = encodeURIComponent(workflow_name)
-	const runs_response = await api_get(client, `/actions/workflows/${workflow}/runs?per_page=100`)
-	const runs = RUNS_SCHEMA.parse(await read_response(runs_response)).workflow_runs
-
-	return runs.find((item) => item.display_title === `Publish ${tag}`)
-}
-
-async function failed_publication(client: Client, tag: string): Promise<boolean> {
-	if (client.workflow === undefined) return false
-
-	const run = await publish_run(client, client.workflow, tag)
-	if (!run) return false
-
-	const jobs_response = await api_get(client, `/actions/runs/${String(run.id)}/jobs?per_page=100`)
-	const { jobs } = JOBS_SCHEMA.parse(await read_response(jobs_response))
-
-	return jobs.some((job) => is_failed_job(job, client.jobs))
+function run_source(client: Client): RunSource {
+	return { ...client, read: async (path) => await read_response(await api_get(client, path)) }
 }
 
 async function default_wait(): Promise<void> {
 	await setTimeout(POLL_INTERVAL_MS)
 }
 
+// The lost state is read before the release: a run completes only after creating the release, so a
+// run that completes between the two reads still shows its release to the second one.
 async function release_state(client: Client, tag: string): Promise<PollState> {
+	const is_lost = await github_release_runs.is_release_lost(run_source(client), tag)
 	if (await existing_release(client, tag)) return 'ready'
-	if (await failed_publication(client, tag)) return 'failed'
 
-	return 'pending'
-}
-
-// A run not listed yet is pending too: the announcement that starts this release also starts the
-// publication, so the release can ask before GitHub has queued that run.
-async function publication_state(
-	client: Client,
-	workflow: string,
-	tag: string,
-): Promise<PollState> {
-	const run = await publish_run(client, workflow, tag)
-	if (run?.status !== 'completed') return 'pending'
-
-	return run.conclusion === 'success' ? 'ready' : 'failed'
+	return is_lost ? 'failed' : 'pending'
 }
 
 async function poll(
@@ -225,7 +170,7 @@ async function wait_for_publication(client: Client, tag: string, budget: Budget)
 	if (workflow === undefined) throw new Error('Waiting for the publication needs RELEASE_WORKFLOW')
 
 	return await poll(
-		async () => await publication_state(client, workflow, tag),
+		async () => await github_release_runs.publication_state(run_source(client), workflow, tag),
 		budget,
 		`Publish ${tag}`,
 	)
@@ -325,6 +270,7 @@ function create_client(request: ReleaseRequest, token: string, settings: Release
 		url: `${API_ROOT}/${settings.repository}`,
 		workflow: settings.workflow,
 		jobs: settings.jobs ?? [],
+		release_run_workflow: settings.release_run_workflow,
 	}
 }
 

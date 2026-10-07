@@ -46,8 +46,10 @@ const carry_spy = vi.spyOn(run_carry, 'read_carry')
 const event_spy = vi.spyOn(run_event_stream, 'read_last')
 const agent_spy = vi.spyOn(run_liveness, 'describe_agent_state')
 const repo_spy = vi.spyOn(gh_spawn, 'get_repo_name_with_owner_within')
+const owner_spy = vi.spyOn(run_carry, 'is_owner_live')
 
 beforeEach(() => {
+	owner_spy.mockReset().mockReturnValue(false)
 	live_spy.mockReset().mockReturnValue(true)
 	carry_spy.mockReset().mockReturnValue({ kind: 'carried', carry: CARRY })
 	event_spy.mockReset().mockReturnValue(undefined)
@@ -134,6 +136,65 @@ describe('run_wake_describe.describe_wake — the optional lines', () => {
 			'watch: `pnpm josh run:event --watch 7` in a pane of its own (recover with `tail -F /stub/events.jsonl`)',
 		])
 		expect(event_spy).toHaveBeenCalledWith(CONTEXT.event_target)
+	})
+})
+
+// joshuafolkken/kit#3363: a waiting supervisor writes nothing to its log, so `--list` is where the
+// reason and the time the wait ends have to be read.
+const NOW = new Date('2026-10-03T02:00:00.000Z')
+const HANDED_OFF = { ...CARRY, is_handed_off: true }
+
+function wait_line(wake: RunWake): string | undefined {
+	return run_wake_describe
+		.describe_wake(wake, CONTEXT, NOW)
+		.split('\n')
+		.find((line) => line.startsWith('waiting: '))
+}
+
+function at(offset_ms: number): string {
+	return new Date(NOW.getTime() + offset_ms).toISOString()
+}
+
+describe('run_wake_describe.describe_wake — the wait line on a handed-off record', () => {
+	it('prints no wait line when the next pass would start the driver', () => {
+		carry_spy.mockReturnValue({ kind: 'carried', carry: HANDED_OFF })
+
+		expect(wait_line(WAKE)).toBeUndefined()
+	})
+
+	it('names the deadline a woken session has to claim the record by', () => {
+		carry_spy.mockReturnValue({ kind: 'carried', carry: HANDED_OFF })
+
+		expect(wait_line({ ...WAKE, woke_at: NOW.toISOString(), attempts: 1 })).toBe(
+			`waiting: the woken session has until ${at(run_wake.WAKE_GRACE_MS)} to claim the carry record`,
+		)
+	})
+
+	it('names the time an idle stretch starts the driver anyway', () => {
+		carry_spy.mockReturnValue({ kind: 'carried', carry: HANDED_OFF })
+
+		expect(wait_line({ ...WAKE, idle_since: NOW.toISOString() })).toBe(
+			`waiting: no runnable work; the driver starts anyway at ${at(run_wake.IDLE_CEILING_MS)}`,
+		)
+	})
+})
+
+describe('run_wake_describe.describe_wake — the wait line on a live owner', () => {
+	it('names the live session that holds the record and the record expiry', () => {
+		owner_spy.mockReturnValue(true)
+		carry_spy.mockReturnValue({ kind: 'carried', carry: { ...CARRY, owner_pid: 999 } })
+		const expiry = new Date(Date.parse(CARRY.started_at) + run_carry.CARRY_MAX_AGE_MS).toISOString()
+
+		expect(wait_line(WAKE)).toBe(
+			`waiting: process 999 holds the carry record; the driver starts at its next cut or once it exits, and the record expires at ${expiry}`,
+		)
+	})
+
+	it('says the driver is at work when the supervisor itself holds the record', () => {
+		owner_spy.mockReturnValue(true)
+		carry_spy.mockReturnValue({ kind: 'carried', carry: { ...CARRY, owner_pid: WAKE.pid } })
+
+		expect(wait_line(WAKE)).toBe('waiting: the driver holds the carry record and is running')
 	})
 })
 

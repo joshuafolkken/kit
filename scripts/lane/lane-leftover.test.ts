@@ -5,7 +5,7 @@ import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#2857: a lane directory git no longer registers is removed only when removing it
-// loses nothing. `git_spawn` is mocked so the tree listing is the fixture's; the files themselves are
+// loses nothing. `git_spawn` is mocked so the object listing is the fixture's; the files themselves are
 // real, and the object ids are checked against `git hash-object` so the fixture cannot drift from git.
 
 vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
@@ -22,8 +22,8 @@ const SKILLS_TARGET = '../.claude/skills'
 const SKILL_PATH = '.claude/skills/review/SKILL.md'
 const SKILL_CONTENT = '# review\n'
 const POINTER_CONTENT = 'gitdir: /nowhere/.git/worktrees/2842\n'
-const SYMLINK_MODE = '120000'
-const FILE_MODE = '100644'
+const COMMIT_ID = 'c'.repeat(40)
+const TREE_ID = 'e'.repeat(40)
 
 const NOTES_PATH = 'notes.md'
 const NOTES_CONTENT = 'work in progress\n'
@@ -48,20 +48,23 @@ function write_leftover(): void {
 	symlinkSync(SKILLS_TARGET, path.join(cases.directory, SKILLS_PATH))
 }
 
-// The listing `git ls-tree -r -z --full-tree HEAD` would print for a repository holding the leftover.
-function tree_listing(): string {
+// The listing `git rev-list --objects --all` would print for a repository holding the leftover: a
+// commit, a tree and the two blobs, each with the path it was reached by.
+function object_listing(): string {
 	const config_id = lane_leftover.blob_id(path.join(cases.directory, CONFIG_PATH))
 	const skills_id = lane_leftover.blob_id(path.join(cases.directory, SKILLS_PATH))
 
 	return [
-		`${FILE_MODE} blob ${config_id}\t${CONFIG_PATH}`,
-		`${SYMLINK_MODE} blob ${skills_id}\t${SKILLS_PATH}`,
+		COMMIT_ID,
+		`${TREE_ID} `,
+		`${config_id} ${CONFIG_PATH}`,
+		`${skills_id} ${SKILLS_PATH}`,
 		'',
-	].join('\0')
+	].join('\n')
 }
 
-function tracked(): Map<string, string> {
-	return lane_leftover.parse_tree(tree_listing())
+function tracked(): Set<string> {
+	return lane_leftover.parse_objects(object_listing())
 }
 
 beforeEach(() => {
@@ -115,7 +118,39 @@ describe('lane_leftover.foreign_paths', () => {
 	it('treats a .git directory as a repository of its own', () => {
 		mkdirSync(path.join(cases.directory, '.git'))
 
-		expect(lane_leftover.foreign_paths(cases.directory, new Map())).toStrictEqual(['.git'])
+		expect(lane_leftover.foreign_paths(cases.directory, new Set())).toStrictEqual(['.git'])
+	})
+})
+
+// joshuafolkken/kit#3370: a leftover is a checkout of whatever commit its lane was on, so content
+// from any commit is restorable, and what the install, the build and the gate write is regenerated.
+describe('lane_leftover.foreign_paths on an older checkout', () => {
+	it('finds nothing foreign in content the history holds under another path', () => {
+		write_file(NOTES_PATH, CONFIG_CONTENT)
+		const objects = new Set([lane_leftover.blob_id(path.join(cases.directory, NOTES_PATH))])
+
+		expect(lane_leftover.foreign_paths(cases.directory, objects)).toStrictEqual([])
+	})
+
+	it('neither walks nor names the regenerated top-level entries', () => {
+		for (const regenerated of [
+			'node_modules/pkg/index.js',
+			'dist/hooks/x.js',
+			'.env',
+			'.eslintcache',
+		]) {
+			write_file(regenerated, NOTES_CONTENT)
+		}
+
+		expect(lane_leftover.foreign_paths(cases.directory, new Set())).toStrictEqual([])
+	})
+
+	it('still names a regenerated name below the top level', () => {
+		const nested = 'scripts/.env'
+
+		write_file(nested, NOTES_CONTENT)
+
+		expect(lane_leftover.foreign_paths(cases.directory, new Set())).toStrictEqual([nested])
 	})
 })
 
@@ -135,9 +170,9 @@ describe('lane_leftover.foreign_paths on a live or linked tree', () => {
 	it('does not walk into a symbolic link to a directory the repository also holds', () => {
 		write_leftover()
 		write_file(SKILL_PATH, SKILL_CONTENT)
-		const listing = new Map([
+		const listing = new Set([
 			...tracked(),
-			[SKILL_PATH, lane_leftover.blob_id(path.join(cases.directory, SKILL_PATH))],
+			lane_leftover.blob_id(path.join(cases.directory, SKILL_PATH)),
 		])
 
 		expect(lane_leftover.foreign_paths(cases.directory, listing)).toStrictEqual([])
@@ -153,16 +188,17 @@ describe('lane_leftover.reclaim', () => {
 
 	it('removes a leftover that holds only repository files', async () => {
 		write_leftover()
-		vi.mocked(git_spawn.read).mockResolvedValue(tree_listing())
+		vi.mocked(git_spawn.read).mockResolvedValue(object_listing())
 
 		await lane_leftover.reclaim(cases.directory)
 
 		expect(existsSync(cases.directory)).toBe(false)
+		expect(git_spawn.read).toHaveBeenCalledWith(['rev-list', '--objects', '--all'])
 	})
 
 	it('keeps a leftover holding other files and names them in the refusal', async () => {
 		write_leftover()
-		vi.mocked(git_spawn.read).mockResolvedValue(tree_listing())
+		vi.mocked(git_spawn.read).mockResolvedValue(object_listing())
 		write_file(NOTES_PATH, NOTES_CONTENT)
 
 		await expect(lane_leftover.reclaim(cases.directory)).rejects.toThrow(/notes\.md/u)

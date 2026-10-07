@@ -16,6 +16,7 @@ import { lane_output, type ReadOutcome, type RecordOutcome } from './lane-output
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_report } from './lane-report'
 import { lane_seed_policy } from './lane-seed'
+import { lane_stray } from './lane-stray'
 
 // `josh lane:open` / `lane:close` / `lane:list` / `lane:prune` — the lane's whole lifecycle
 // (joshuafolkken/kit#1490).
@@ -268,7 +269,14 @@ async function list_command(rest: ReadonlyArray<string>): Promise<number> {
 async function prune_command(rest: ReadonlyArray<string>): Promise<number> {
 	if (rest.length > 0) return report_usage()
 
-	return report_sweep(await lane_close.prune_lanes())
+	const code = report_sweep(await lane_close.prune_lanes())
+
+	// After the closes, so a lane whose close left its directory behind is swept in the same run. A
+	// kept stray is reported, never a failure: it waits on a person, and a non-zero exit would stop
+	// every `backlogrun` preparation until one came (joshuafolkken/kit#3370).
+	await lane_stray.sweep_and_report()
+
+	return code
 }
 
 // The recorded path goes to standard output on both arms, so

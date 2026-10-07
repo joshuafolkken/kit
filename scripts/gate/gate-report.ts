@@ -25,6 +25,8 @@ interface GateStepResult extends BufferedProcessResult {
 	// What was actually run. The type check's command is resolved per project, so a failure on the
 	// `check` step is only reproducible if the header names the command rather than the label.
 	command: string
+	// Set when the check started past the machine-wide budget at the wait cap (joshuafolkken/kit#3371).
+	budget_note?: string | undefined
 }
 
 function is_gate_step_failed(result: GateStepResult): boolean {
@@ -141,25 +143,42 @@ function format_failure_actions(failed: ReadonlyArray<GateStepResult>): string {
 	return `${GATE_COMMAND} — next:\n${lines.join('\n')}\n`
 }
 
+// **A check that started past the core budget is said in the summary, not only in the log**
+// (joshuafolkken/kit#3371). The wait cap admits a check that waited two minutes whatever the budget says,
+// so a gate that ran over-subscribed would otherwise look exactly like one that fitted. The icon is
+// local rather than in `status-icons.ts` because nothing reads this line back.
+const WARN_ICON = '⚠'
+
+function format_budget_notes(results: ReadonlyArray<GateStepResult>): string {
+	const lines = results.flatMap((result) =>
+		result.budget_note === undefined
+			? []
+			: `  ${WARN_ICON} ${result.label} — ${result.budget_note}`,
+	)
+
+	return lines.length === 0 ? '' : `${lines.join('\n')}\n`
+}
+
 // The total is wall-clock for the whole command, not the sum of the four — they run concurrently,
 // so a sum would report about three times what the caller waited.
 //
 // The failure actions and the log path are printed with the summary and immediately **above** the
 // verdict line, which stays last for the reason `josh-verdict.ts` gives (joshuafolkken/kit#1227).
 function print_gate_summary(
-	failed: ReadonlyArray<GateStepResult>,
-	elapsed_ms: number,
-	step_count: string,
+	results: ReadonlyArray<GateStepResult>,
+	report: GateReport,
 	log_path?: string,
 ): void {
-	const total = format_seconds(elapsed_ms)
+	const failed = results.filter((result) => is_gate_step_failed(result))
+	const total = format_seconds(report.elapsed_ms)
 	const verdict =
 		failed.length === 0
-			? josh_verdict.format_gate_passed(step_count, total)
+			? josh_verdict.format_gate_passed(report.step_count, total)
 			: josh_verdict.format_gate_failed(failed.map((result) => result.label).join(', '), total)
+	const notes = format_budget_notes(results)
 
 	process.stdout.write(
-		`\n${format_failure_actions(failed)}${gate_log.format_log_notice(log_path)}${verdict}\n`,
+		`\n${notes}${format_failure_actions(failed)}${gate_log.format_log_notice(log_path)}${verdict}\n`,
 	)
 }
 
@@ -183,15 +202,15 @@ function report_gate_steps(
 		header: gate_step_header(result),
 		output: result.output,
 	}))
-	const failed = results.filter((result) => is_gate_step_failed(result))
 	const written_log = gate_log.write_gate_log(entries, report.log_path)
 
-	print_gate_summary(failed, report.elapsed_ms, report.step_count, written_log)
+	print_gate_summary(results, report, written_log)
 
-	return failed.map((result) => result.label)
+	return results.filter((result) => is_gate_step_failed(result)).map((result) => result.label)
 }
 
 const gate_report = {
+	format_budget_notes,
 	format_failure_actions,
 	has_checker_warning,
 	is_gate_step_failed,

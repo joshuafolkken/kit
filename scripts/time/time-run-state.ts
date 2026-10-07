@@ -147,12 +147,10 @@ function status_of(input: StatusInput): RunStatus {
 }
 
 // The wake record's own timing stands in for a per-cut timestamp the carry record does not keep:
-// `held_at` is when a successor's bounded wait began, i.e. just after a cut; `woke_at` is the last
-// unserved wake attempt. Neither, and the last cut is reported as unrecorded rather than guessed.
+// `woke_at` is the last unserved wake attempt. Without it, the last cut is reported as unrecorded
+// rather than guessed.
 function last_cut_of(wake: RunWake | undefined): string | undefined {
-	if (wake === undefined) return undefined
-
-	return wake.held_at ?? wake.woke_at
+	return wake?.woke_at
 }
 
 function idle_of(now_ms: number, last_activity_ms: number | undefined): number | undefined {

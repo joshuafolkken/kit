@@ -107,7 +107,7 @@ describe('release tag checkout', () => {
 	)
 
 	it('looks up publish runs of every trigger so pre-migration runs stay visible', () => {
-		const source = readFileSync('scripts/release/github-release.ts', 'utf8')
+		const source = readFileSync('scripts/release/github-release-runs.ts', 'utf8')
 
 		expect(source).toContain('/runs?per_page=')
 		expect(source).not.toContain('event=')

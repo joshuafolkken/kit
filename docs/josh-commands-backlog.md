@@ -33,6 +33,20 @@ pnpm josh issue:state 42 43 --repo joshuafolkken/app-kit   # a child in another 
 
 State is `OPEN` / `CLOSED` / `MERGED`. `human_review:` answers whether the issue carries `needs-human-review`, matched case-insensitively. Output past the Bash cap is written as part files under it, as `issue:read` does. A number that resolves to nothing prints `does not resolve`; a failed read prints `could not read`; non-zero exit if any went unanswered.
 
+### `josh issue:release`
+
+Make an existing issue a blocker of its repository's release issue — the one-issue form of `josh issue:file --release`, for an issue a consumer can use only once it is published.
+
+```bash
+pnpm josh issue:release 3360
+```
+
+1. List the repository's open issues labelled `release`. An unreadable listing files nothing and exits 1, so the blockers are never split across two release issues.
+2. When none is open, file `Release <owner/repo> (next version)` with the `release` label. It never gets `auto-ok` on its own — `issue:file` refuses `auto-ok` for the `release` label on every path — so the release stays a person's call; a person may still add `auto-ok`.
+3. Record the issue as a `blocked_by` blocker of the release issue and print `release: #<R> (open|filed) is blocked by #<N>`. A failed link exits 1.
+
+---
+
 ### `josh issue:scout`
 
 Before an issue is filed, answer the two questions every filing asks: has this already been filed, and which epic does it belong to. [`josh issue:file`](#josh-issuefile) runs this scan as a filing step and holds the filing until every candidate is named in `--distinct`.
@@ -70,6 +84,7 @@ pnpm josh issue:file "<title>" --body-file body.md --depth 1 --distinct 2801,279
 - `--distinct <N,…>` — duplicate candidates you read and judged distinct.
 - `--over-cap` — the run is blocked by this filing; the cap lets it through.
 - `--no-auto-ok` — needs a person's judgement (Tier B / C); no `auto-ok`.
+- `--release` — a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 9).
 
 **Steps (run in this order):**
 
@@ -81,7 +96,8 @@ pnpm josh issue:file "<title>" --body-file body.md --depth 1 --distinct 2801,279
 6. Run the same duplicate search as [`josh issue:scout`](#josh-issuescout) and print its report. While there are candidates, file nothing until every one is named in `--distinct`. A duplicate is not filed; it is folded into the existing issue by `issue-fold-existing.md`. A filing to another repository points `GH_REPO` at the target, so the duplicate search and the epic decision run there.
 7. Create any missing workflow label (depth / route) with its color and description — the same set as [`josh sync`](josh-commands.md#josh-sync). A label that cannot be created is printed with a warning, and the filing goes on.
 8. File with all labels in one request; print the URL.
-9. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run. The issue already exists, so the exit code stays 0.
+9. With `--release`, link the filed issue to the target's release issue, as [`josh issue:release`](#josh-issuerelease) does. A link that does not complete prints `⚠` with that command to re-run, prefixed with `GH_REPO=<target>` so a `--repo` filing is linked in the target rather than the current repository.
+10. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run. The issue already exists, so the exit code stays 0.
 
 A refusal in steps 1–6 files nothing and exits 1. The per-run filing cap (`filing-cap`) and the `issue:fold` required before a second filing (`issue-fold`) apply to calls of this command. A refused call is not counted.
 
