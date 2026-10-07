@@ -521,10 +521,10 @@ Checks effective overrides from `pnpm-workspace.yaml` against a saved snapshot a
 
 ### `josh latest`
 
-Update pnpm with its self-update command, update all dependencies to latest, and run a security audit.
+Update all dependencies to latest, run a security audit, then update pnpm with its self-update command. The pnpm bump runs last, right before the run is recorded, so a failed bump still lets the dependency update and the audit finish but leaves the run unrecorded and exits non-zero.
 
 ```bash
-pnpm josh latest            # full update (pnpm + update + audit)
+pnpm josh latest            # full update (update + audit + pnpm)
 pnpm josh latest:corepack   # update pnpm only
 pnpm josh latest:update     # update dependencies only
 ```
@@ -533,7 +533,7 @@ pnpm josh latest:update     # update dependencies only
 
 #### `josh latest:corepack`
 
-Updates pnpm and pins `packageManager` to the newest release on the project's **current major** (from `packageManager`, or from `devEngines.packageManager.version` when that is the only pin). The command name is retained for compatibility. With an existing `packageManager` pin, it obtains the release integrity value, runs `pnpm self-update`, then restores the integrity suffix and aligns `devEngines.packageManager.version` byte-for-byte with `packageManager`. Without that pin, it adds a verified pin and checks that the selected pnpm version starts. If the registry cannot answer or that version cannot start, the bump is skipped; existing `devEngines` drift may still be aligned to `packageManager`.
+Updates pnpm and pins `packageManager` to the newest release on the project's **current major** (from `packageManager`, or from `devEngines.packageManager.version` when that is the only pin). The command name is retained for compatibility. With an existing `packageManager` pin, it obtains the release integrity value, runs `pnpm self-update`, then restores the integrity suffix and aligns `devEngines.packageManager.version` byte-for-byte with `packageManager`. Without that pin, it adds a verified pin and checks that the selected pnpm version starts. A registry answer that is not newer than the pin, or no release on the major aged past the quarantine window yet, is a skip and exits `0`. Any failure — a registry that does not answer, no integrity value, `pnpm self-update` exiting non-zero, an unexpected pin after it, or a selected version that cannot start — restores `package.json`, prints the cause and exits `1`. When pnpm runs through the Corepack shim, which pnpm 11 and later refuse to self-update under (`ERR_PNPM_CANT_SELF_UPDATE_IN_COREPACK`), the message also names the remedy: `corepack disable pnpm` and a standalone pnpm. Either way, existing `devEngines` drift is still aligned to `packageManager`.
 
 #### `josh latest:update`
 

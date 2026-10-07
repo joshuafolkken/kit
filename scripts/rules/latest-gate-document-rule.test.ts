@@ -86,9 +86,12 @@ describe('the josh latest chain records the run it just made', () => {
 	})
 
 	// `&&` rather than `;`: a chain that recorded a run whose audit failed would tell the next run the
-	// dependencies are current on the strength of a step that did not finish.
+	// dependencies are current on the strength of a step that did not finish. The pnpm bump sits
+	// between them, so a failed bump leaves the run unrecorded too (#3361).
 	it('records only after every earlier step succeeded', () => {
-		expect(latest_command).toContain(`pnpm josh audit && ${RECORD_STEP}`)
+		expect(latest_command).toContain(
+			`pnpm josh audit && pnpm josh latest:corepack && ${RECORD_STEP}`,
+		)
 	})
 
 	it('registers the command that reads it', () => {

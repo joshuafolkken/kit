@@ -581,7 +581,7 @@ Diagnose PATH shadowing of the global josh and show the discovered repository ma
 
 _No arguments._
 
-Update pnpm, dependencies, and run security audit
+Update dependencies, run security audit, then update pnpm
 
 ---
 

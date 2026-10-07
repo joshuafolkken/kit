@@ -78,23 +78,17 @@ describe('latest_corepack.extract_times_json', () => {
 	})
 })
 
-describe('latest_corepack.query_major_latest_version', () => {
+describe('latest_corepack.resolve_corepack_target on a pinned major', () => {
 	it('asks the registry for publish timestamps and selects on the pinned major', () => {
 		mocked_execa_sync.mockReturnValue(fake_sync_result(0, TIMES_JSON_V11_OLD))
 		mocked_read_file_sync.mockReturnValue(WORKSPACE_AGE_1440)
 
-		expect(latest_corepack.query_major_latest_version('11')).toBe(REGISTRY_V11)
+		expect(latest_corepack.resolve_corepack_target('11')).toBe(`pnpm@${REGISTRY_V11}`)
 		expect(mocked_execa_sync).toHaveBeenCalledWith(
 			'pnpm',
 			['view', 'pnpm', 'time', '--json'],
 			expect.objectContaining({ reject: false }),
 		)
-	})
-
-	it('returns undefined when the registry query exits non-zero', () => {
-		mocked_execa_sync.mockReturnValue(fake_sync_result(1, ''))
-
-		expect(latest_corepack.query_major_latest_version('11')).toBeUndefined()
 	})
 
 	it('treats an unreadable pnpm-workspace.yaml as no quarantine instead of failing', () => {
@@ -103,7 +97,7 @@ describe('latest_corepack.query_major_latest_version', () => {
 			throw new Error('ENOENT')
 		})
 
-		expect(latest_corepack.query_major_latest_version('11')).toBe(REGISTRY_V11)
+		expect(latest_corepack.resolve_corepack_target('11')).toBe(`pnpm@${REGISTRY_V11}`)
 	})
 })
 
@@ -203,7 +197,6 @@ const RESTORE_CALL = [PACKAGE_JSON_PATH, PACKAGE_JSON_WITH_ENGINES]
 // 11.5.2 aged past any window; 11.6.0 published in the far future stays quarantined, so the
 // selection exercises the native age filter on the main path too.
 const VIEW_STDOUT = `{"11.5.2":"${AGED_PUBLISH}","11.6.0":"${QUARANTINED_PUBLISH}"}\n`
-const TIMES_JSON_ALL_QUARANTINED = `{"11.5.2":"${QUARANTINED_PUBLISH}"}`
 
 interface SyncSpy {
 	mock: { invocationCallOrder: Array<number> }
@@ -216,6 +209,7 @@ function invocation_order(spy: SyncSpy, call_index: number): number {
 function silence_console(): void {
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 }
 
 // Arrange a resolved registry answer (11.5.2), then corepack exiting with the given code.
@@ -298,7 +292,7 @@ describe('latest_corepack.main', () => {
 		vi.restoreAllMocks()
 	})
 
-	it('restores the original package.json when pnpm skips the bump', () => {
+	it('restores the original package.json when pnpm self-update fails', () => {
 		silence_console()
 		arrange_resolved_registry(1, PACKAGE_JSON_WITH_ENGINES)
 
@@ -345,42 +339,7 @@ describe('latest_corepack.main skip handling', () => {
 		mocked_read_file_sync.mockReturnValue(PACKAGE_JSON_AHEAD_OF_REGISTRY)
 		mocked_execa_sync.mockReturnValue(fake_sync_result(0, TIMES_JSON_V11_OLD))
 
-		latest_corepack.main()
-
-		expect(mocked_execa_sync).toHaveBeenCalledTimes(1)
-		expect(mocked_write_file_sync).not.toHaveBeenCalled()
-		expect(warn).toHaveBeenCalledOnce()
-
-		warn.mockRestore()
-	})
-
-	// The kit#768 acceptance case: every release on the major is still inside the quarantine
-	// window, so nothing qualifies and the bump is skipped with package.json untouched.
-	it('skips without touching package.json when every release is still quarantined', () => {
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-
-		mocked_read_file_sync.mockReturnValueOnce(PACKAGE_JSON_ALIGNED)
-		mocked_read_file_sync.mockReturnValueOnce(WORKSPACE_AGE_1440)
-		mocked_read_file_sync.mockReturnValueOnce(PACKAGE_JSON_ALIGNED)
-		mocked_execa_sync.mockReturnValue(fake_sync_result(0, TIMES_JSON_ALL_QUARANTINED))
-
-		latest_corepack.main()
-
-		expect(mocked_execa_sync).toHaveBeenCalledTimes(1)
-		expect(mocked_write_file_sync).not.toHaveBeenCalled()
-		expect(warn).toHaveBeenCalledOnce()
-
-		warn.mockRestore()
-	})
-
-	it('skips without touching package.json when the registry cannot answer', () => {
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-
-		mocked_read_file_sync.mockReturnValue(PACKAGE_JSON_ALIGNED)
-		mocked_execa_sync.mockReturnValue(fake_sync_result(1, ''))
-
-		latest_corepack.main()
-
+		expect(latest_corepack.main()).toBe(0)
 		expect(mocked_execa_sync).toHaveBeenCalledTimes(1)
 		expect(mocked_write_file_sync).not.toHaveBeenCalled()
 		expect(warn).toHaveBeenCalledOnce()
@@ -389,22 +348,5 @@ describe('latest_corepack.main skip handling', () => {
 	})
 })
 
-describe('latest_corepack.did_warn_skip', () => {
-	it('warns and reports a skip when pnpm exits non-zero', () => {
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-
-		expect(latest_corepack.did_warn_skip(1)).toBe(true)
-		expect(warn).toHaveBeenCalledOnce()
-
-		warn.mockRestore()
-	})
-
-	it('stays silent and reports no skip when pnpm succeeds', () => {
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-
-		expect(latest_corepack.did_warn_skip(0)).toBe(false)
-		expect(warn).not.toHaveBeenCalled()
-
-		warn.mockRestore()
-	})
-})
+// The failure paths that exit non-zero instead of skipping (#3361) live in
+// latest-corepack-failure.test.ts.
