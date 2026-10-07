@@ -177,6 +177,7 @@ function default_budget(): BudgetContext {
 interface ReservedStep {
 	step: GateStep
 	weight: number
+	memory_mb: number
 }
 
 async function build_reserved_steps(
@@ -188,6 +189,7 @@ async function build_reserved_steps(
 		plan.checks.map(async (check) => ({
 			step: await build_gate_step(check, start_directory, plan),
 			weight: gate_plan.check_weight(check, plan, available_cores),
+			memory_mb: gate_plan.check_memory(check, plan, available_cores),
 		})),
 	)
 }
@@ -205,8 +207,11 @@ async function run_reserved_step(
 
 	return await core_budget.with_core_reservation(
 		reserved.weight,
-		async () => await run_gate_step(reserved.step),
-		{ budget: budget.available_cores },
+		async (admission) => ({
+			...(await run_gate_step(reserved.step)),
+			budget_note: core_budget.describe_overflow(admission),
+		}),
+		{ budget: budget.available_cores, memory_mb: reserved.memory_mb },
 	)
 }
 

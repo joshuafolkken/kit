@@ -31,7 +31,7 @@ pnpm josh gate --no-unit   # the static checks only (CI only)
 - **On failure, a line per failed check with the command to re-run is printed at the tail**, just above the verdict, so a `tail` of the output keeps every failure and its next action rather than one at a time.
 - Exit `1` if any check failed. Refuses any argument other than the three flags.
 - The unit leg is the long pole; [`josh test:unit`](#josh-testunit) runs it as a two-project split — same files, less wall clock, not fewer tests.
-- **Each check claims a place in a machine-wide weighted core budget before it starts, and waits while the budget is full** (`scripts/gate/core-budget.ts`). A lone gate is admitted at once with its concurrency unchanged; overlapping gates share the machine instead of each reserving all of it. How the budget is weighted and swept: `docs/maintainers/josh-commands-rationale.md` → "`josh gate`'s core budget".
+- **Each check claims a place in a machine-wide weighted core budget before it starts, and waits while the budget is full** (`scripts/gate/core-budget.ts`). The budget is the cores and memory the machine has free, not the bare core count, and a check the wait cap admitted past it is named in the summary. A lone gate is admitted at once with its concurrency unchanged; overlapping gates share the machine instead of each reserving all of it. How the budget is weighted and swept: `docs/maintainers/josh-commands-rationale.md` → "`josh gate`'s core budget".
 
 ### `josh lint`
 

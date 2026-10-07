@@ -28,6 +28,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: ['', 'developer', ['processes']],
 		core_weight: core_budget.CORE_WEIGHTS.lint,
+		memory_mb: core_budget.MEMORY_MB.lint,
 	},
 	'lint:related': {
 		script: 'scripts/lint/lint-related.ts',
@@ -35,6 +36,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],
 		core_weight: core_budget.CORE_WEIGHTS.lint,
+		memory_mb: core_budget.MEMORY_MB.lint,
 	},
 	lines: {
 		script: 'scripts/lines/lines-command.ts',
@@ -42,6 +44,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: [REQUIRED_FILE_ARGUMENTS, 'developer', ['none']],
 		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
+		memory_mb: core_budget.MEMORY_MB.eslint_scan,
 	},
 	'refactor:scan': {
 		script: 'scripts/refactor/refactor-scan-cli.ts',
@@ -50,6 +53,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: ['', 'automation', ['processes']],
 		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
+		memory_mb: core_budget.MEMORY_MB.eslint_scan,
 	},
 	bytes: {
 		script: 'scripts/lines/bytes-command.ts',
@@ -137,6 +141,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: ['', 'developer', ['processes']],
 		core_weight: core_budget.CORE_WEIGHTS.spell_check,
+		memory_mb: core_budget.MEMORY_MB.spell_check,
 	},
 	behavior: {
 		script: 'scripts/behavior/behavior-cli.ts',
@@ -159,6 +164,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: [FILTER_ARGUMENTS, 'developer', ['processes']],
 		core_weight: gate_plan.direct_unit_weight,
+		memory_mb: gate_plan.direct_unit_memory,
 	},
 	'test:related': {
 		script: 'scripts/test/test-related.ts',
@@ -166,6 +172,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],
 		core_weight: gate_plan.direct_unit_weight,
+		memory_mb: gate_plan.direct_unit_memory,
 	},
 	'test:declared': {
 		script: 'scripts/test/test-declared.ts',
@@ -213,6 +220,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: ['[arguments...]', 'developer', ['processes']],
 		core_weight: core_budget.CORE_WEIGHTS.type_check,
+		memory_mb: core_budget.MEMORY_MB.type_check,
 	},
 	port: {
 		script: 'scripts/ports/port-command.ts',
