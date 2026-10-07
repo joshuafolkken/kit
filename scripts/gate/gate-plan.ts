@@ -36,6 +36,9 @@ interface GateCheck {
 	// The unit suite reserves nothing: it sizes its own pool from the machine, so it is capped
 	// instead of reserved, and counting it here would reserve cores against itself.
 	reserved_cores: number
+	// The memory this check holds while it runs, `core_budget.MEMORY_MB`'s measured peak; none declared is
+	// none waited for (joshuafolkken/kit#3371). The unit suite's is per worker, so it is derived instead.
+	memory_mb?: number
 }
 
 const LINT_LABEL = 'lint'
@@ -74,13 +77,24 @@ const WARNING_CHECKER_LABELS: ReadonlyArray<string> = [LINT_LABEL, TYPE_CHECK_LA
 // full length of the unit suite, to cover a burst that ends before lint does. Nothing has measured
 // that trade, so the measured shape stays.
 const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
-	{ label: LINT_LABEL, target: 'lint', reserved_cores: core_budget.CORE_WEIGHTS.lint },
+	{
+		label: LINT_LABEL,
+		target: 'lint',
+		reserved_cores: core_budget.CORE_WEIGHTS.lint,
+		memory_mb: core_budget.MEMORY_MB.lint,
+	},
 	{
 		label: TYPE_CHECK_LABEL,
 		target: 'check',
 		reserved_cores: core_budget.CORE_WEIGHTS.type_check,
+		memory_mb: core_budget.MEMORY_MB.type_check,
 	},
-	{ label: 'cspell', target: 'cspell:dot', reserved_cores: core_budget.CORE_WEIGHTS.spell_check },
+	{
+		label: 'cspell',
+		target: 'cspell:dot',
+		reserved_cores: core_budget.CORE_WEIGHTS.spell_check,
+		memory_mb: core_budget.MEMORY_MB.spell_check,
+	},
 	{ label: BEHAVIOR_LABEL, target: BEHAVIOR_LABEL, reserved_cores: 0 },
 	// **The unused-member check reserves no core** (joshuafolkken/kit#2987): it builds one TypeScript
 	// program and walks it for about 5s, and it is over well before lint and the type check. A
@@ -280,6 +294,18 @@ function check_weight(check: GateCheck, plan: GatePlan, available_cores: number)
 	return plan.unit_worker_cap ?? solo_unit_weight(available_cores)
 }
 
+function unit_memory(workers: number): number {
+	return workers * core_budget.MEMORY_MB.unit_worker
+}
+
+// The memory a check holds (joshuafolkken/kit#3371): its declared figure, or for the unit suite one
+// worker's peak for each core it reserves — its weight is its worker count.
+function check_memory(check: GateCheck, plan: GatePlan, available_cores: number): number {
+	if (check.label !== UNIT_LABEL) return check.memory_mb ?? 0
+
+	return unit_memory(check_weight(check, plan, available_cores))
+}
+
 // The cores a unit run started directly reserves (joshuafolkken/kit#3345): the share it will pass to
 // vitest while other runs are live, and otherwise the gate's own solo unit weight. **Not the whole
 // machine**, though a lone vitest sizes its own pool: FIFO admission lets a claim of every core in only
@@ -296,6 +322,11 @@ function direct_unit_weight(
 		unit_worker_share.current_share(available_cores, live_runs) ?? solo_unit_weight(available_cores)
 
 	return Math.max(unit_worker_share.MIN_WORKERS, weight)
+}
+
+// What a unit run started directly holds: one worker's peak for each worker `direct_unit_weight` gives it.
+function direct_unit_memory(): number {
+	return unit_memory(direct_unit_weight())
 }
 
 // `availableParallelism()` rather than `cpus().length`: it reports what this process may actually
@@ -383,7 +414,9 @@ const gate_plan = {
 	TYPE_CHECK_LABEL,
 	UNIT_LABEL,
 	WARNING_CHECKER_LABELS,
+	check_memory,
 	check_weight,
+	direct_unit_memory,
 	direct_unit_weight,
 	format_gate_plan,
 	format_machine,

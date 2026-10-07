@@ -178,6 +178,24 @@ describe('josh_logic.run_command — the core budget a command reserves', () => 
 	})
 })
 
+// joshuafolkken/kit#3371: the memory the command's tool holds is claimed with its cores.
+describe('josh_logic.run_command — the memory a command claims', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('claims the memory the command declares with its weight', async () => {
+		execa_sync_mock.mockReturnValue(SPAWN_SUCCESS)
+		const reservation = vi
+			.spyOn(core_budget, 'with_command_reservation')
+			.mockResolvedValue(SPAWN_SUCCESS.exitCode)
+
+		await josh_logic.run_command('lint', [])
+
+		expect(reservation.mock.calls[0]?.[2]).toEqual({ memory_mb: core_budget.MEMORY_MB.lint })
+	})
+})
+
 describe('josh_logic.run_shell_command — spawn error', () => {
 	it('returns SPAWN_ERROR_EXIT_CODE when executable fails to start', () => {
 		execa_sync_mock.mockReturnValue(SPAWN_FAILURE)

@@ -8,6 +8,8 @@ import { process_owner_schema } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { z } from 'zod'
+import { core_admission, type Admission, type LedgerEntry, type Overflow } from './core-admission'
+import { machine_capacity, type MachineBudget, type MachineReading } from './machine-capacity'
 
 // A machine-wide weighted core budget with admission control (joshuafolkken/kit#2351).
 //
@@ -34,6 +36,11 @@ import { z } from 'zod'
 // killed outright leaves its marker behind, and a ledger that trusted the file alone would fill forever
 // and admit nothing. The pid-and-start-time pair a marker carries is the same identity the unit-run
 // marker keeps, swept on read the moment its process is gone.
+//
+// **The budget is what the machine has free, in cores and in memory** (joshuafolkken/kit#3371). The
+// core count stays the ceiling, but load from outside the ledger is subtracted from it, and a claim
+// waits while the memory its tool holds is not free — `machine-capacity.ts` reads both. A claim marks
+// its marker admitted once it runs, so the reading's load is split into the ledger's and the rest.
 
 const RESERVED_PREFIX = 'josh-core-reserved-'
 const RESERVED_SUFFIX = '.json'
@@ -60,6 +67,19 @@ const CORE_WEIGHTS = {
 	eslint_scan: 1,
 } as const
 
+// **The memory each heavy tool holds, declared beside its cores** (joshuafolkken/kit#3371): peak
+// resident size in MB, rounded up. Measured with `/usr/bin/time -l` on the 11-core / 18 GB machine on
+// 2026-10-07: the type check 1,244 MB, the spell check 330 MB, and one unit worker 319 MB over 54 test
+// files. Typed eslint was 1,207 MB over one directory and was observed at 1.6–2.4 GB per whole-tree
+// `eslint .` with three lanes running the same day, so lint and the whole-tree scan take that peak.
+const MEMORY_MB = {
+	lint: 2400,
+	type_check: 1300,
+	spell_check: 350,
+	eslint_scan: 2400,
+	unit_worker: 350,
+} as const
+
 // **The environment mark that says a parent already holds this process's cores**
 // (joshuafolkken/kit#3345). `josh gate` reserves per check and then spawns `pnpm josh lint`. Without
 // the mark, that child's own dispatch would claim a second place for the cores its parent already
@@ -67,22 +87,27 @@ const CORE_WEIGHTS = {
 const HELD_KEY = 'JOSH_CORE_RESERVED'
 const HELD_VALUE = '1'
 
+// `memory_mb` and `admitted_at` are optional so a marker an older `josh` wrote still reads: it holds no
+// declared memory, and it counts as load from outside the ledger until it is gone.
 const reservation_schema = process_owner_schema.extend({
 	weight: z.number(),
 	claimed_at: z.number(),
+	memory_mb: z.number().optional(),
+	admitted_at: z.number().optional(),
 })
 
 type Reservation = z.infer<typeof reservation_schema>
 
-interface LiveReservation {
-	// The marker's filename, which is its identity in the ledger and the tiebreak when two reservations
-	// share a claim time.
-	key: string
+type ReservationFields = Pick<Reservation, 'weight' | 'claimed_at' | 'memory_mb' | 'admitted_at'>
+
+interface LiveReservation extends LedgerEntry {
 	reservation: Reservation
 }
 
 interface ReserveOptions {
 	budget?: number
+	memory_mb?: number | undefined
+	read_machine?: () => Promise<MachineReading>
 	wait_cap_ms?: number
 	poll_interval_ms?: number
 	directory?: string
@@ -92,6 +117,7 @@ interface ReserveOptions {
 
 interface Handle {
 	target: string
+	admission: Admission
 }
 
 function marker_name(key: string): string {
@@ -141,10 +167,13 @@ function live_reservation(source: string): Reservation | undefined {
 }
 
 // An unreadable temp directory answers "no other reservation", the direction that admits rather than
-// stalls a run on a guess.
+// stalls a run on a guess. The suffix leaves out `replace_stamp`'s in-flight temporary copy of a marker,
+// which would otherwise count one place twice.
 function marker_files(directory: string): Array<string> {
 	try {
-		return readdirSync(directory).filter((name) => name.startsWith(RESERVED_PREFIX))
+		return readdirSync(directory).filter(
+			(name) => name.startsWith(RESERVED_PREFIX) && name.endsWith(RESERVED_SUFFIX),
+		)
 	} catch {
 		return []
 	}
@@ -156,50 +185,6 @@ function live_reservations(directory: string = PLATFORM_TEMP_ROOT): Array<LiveRe
 
 		return reservation === undefined ? [] : { key: name, reservation }
 	})
-}
-
-// Claim order, with the filename as the tiebreak so every reader agrees on the same ledger order
-// however the wall clock rounded two near-simultaneous claims.
-function compare_claim(left: LiveReservation, right: LiveReservation): number {
-	const by_time = left.reservation.claimed_at - right.reservation.claimed_at
-
-	return by_time === 0 ? left.key.localeCompare(right.key) : by_time
-}
-
-// **The keys admitted under FIFO.** The head always runs — a single check heavier than the whole
-// machine must not wait for room that will never come — and each later reservation runs while the
-// cumulative weight ahead of it still fits the budget. The first that does not fit stops the walk, so a
-// place is never jumped: admission is in claim order, which is what removes the start-time asymmetry.
-function admitted_keys(reservations: ReadonlyArray<LiveReservation>, budget: number): Set<string> {
-	const admitted = new Set<string>()
-	let cumulative = 0
-
-	for (const [index, entry] of reservations.toSorted(compare_claim).entries()) {
-		cumulative += entry.reservation.weight
-
-		if (index !== 0 && cumulative > budget) break
-
-		admitted.add(entry.key)
-	}
-
-	return admitted
-}
-
-function is_admitted(
-	key: string,
-	reservations: ReadonlyArray<LiveReservation>,
-	budget: number,
-): boolean {
-	return admitted_keys(reservations, budget).has(key)
-}
-
-// The weight actually running at once — what the reproduction test asserts stays within the budget.
-function admitted_load(reservations: ReadonlyArray<LiveReservation>, budget: number): number {
-	const admitted = admitted_keys(reservations, budget)
-
-	return reservations
-		.filter((entry) => admitted.has(entry.key))
-		.reduce((total, entry) => total + entry.reservation.weight, 0)
 }
 
 // `Math.max` propagates `NaN` rather than clamping it, so an unusable budget is caught before it could
@@ -214,23 +199,30 @@ async function default_sleep(ms: number): Promise<void> {
 	})
 }
 
-function write_reservation(target: string, weight: number, claimed_at: number): void {
-	stamp_file.write_stamp(target, { ...process_identity.own_fields(), weight, claimed_at })
+// **Replaced atomically, never unlinked and recreated**: the admitted rewrite lands on a marker other
+// lanes are polling, and a reader that hit the gap between an unlink and its create would see the ledger
+// without this place and admit past it.
+function write_reservation(target: string, fields: ReservationFields): void {
+	stamp_file.replace_stamp(target, { ...process_identity.own_fields(), ...fields })
 }
 
 // The clock and cadence a wait runs on, resolved apart from the ledger fields so `reserve` stays under
-// the complexity limit — each default is a branch, and six in one function is past it.
+// the complexity limit — each default is a branch.
 interface TimingConfig {
 	now: () => number
 	sleep: (ms: number) => Promise<void>
 	poll_interval_ms: number
+	wait_cap_ms: number
 }
 
 interface WaitContext extends TimingConfig {
+	read_machine: () => Promise<MachineReading>
 	key: string
+	target: string
 	directory: string
 	budget: number
 	deadline: number
+	fields: ReservationFields
 }
 
 function resolve_timing(options: ReserveOptions): TimingConfig {
@@ -238,39 +230,95 @@ function resolve_timing(options: ReserveOptions): TimingConfig {
 		now: options.now ?? Date.now,
 		sleep: options.sleep ?? default_sleep,
 		poll_interval_ms: options.poll_interval_ms ?? POLL_INTERVAL_MS,
+		wait_cap_ms: options.wait_cap_ms ?? WAIT_CAP_MS,
 	}
+}
+
+// **A claim alone in the ledger reads nothing from the machine**: the head is admitted whatever the
+// budget says, so a solo run pays no sampling window and starts exactly as it did before.
+async function current_budget(
+	context: WaitContext,
+	reservations: ReadonlyArray<LiveReservation>,
+): Promise<MachineBudget> {
+	if (reservations.length <= 1) return { cores: context.budget, memory_mb: Infinity }
+
+	const reading = await context.read_machine()
+	const ledger = core_admission.ledger_load(reservations, context.now())
+	const budget = machine_capacity.machine_budget(context.budget, reading, ledger)
+
+	return { ...budget, cores: normalize_budget(budget.cores) }
+}
+
+// The claim is admitted: its marker records when, which moves its weight from "load outside the ledger"
+// to "load the ledger holds" for every later reader once its tool has had time to ramp up.
+function admit(context: WaitContext, overflow?: Overflow): Admission {
+	write_reservation(context.target, { ...context.fields, admitted_at: context.now() })
+
+	return { overflow }
+}
+
+function overflow_of(
+	context: WaitContext,
+	reservations: ReadonlyArray<LiveReservation>,
+	budget: MachineBudget,
+): Overflow {
+	return {
+		waited_ms: context.now() - context.fields.claimed_at,
+		ledger: core_admission.sum_load(reservations),
+		budget,
+	}
+}
+
+async function poll_admission(context: WaitContext): Promise<Admission | undefined> {
+	const reservations = live_reservations(context.directory)
+	const budget = await current_budget(context, reservations)
+
+	if (core_admission.is_admitted(context.key, reservations, budget)) return admit(context)
+
+	if (context.now() >= context.deadline) {
+		return admit(context, overflow_of(context, reservations, budget))
+	}
+
+	return undefined
 }
 
 // Poll the ledger until this reservation is admitted, or until the wait cap admits it at minimum width.
 // A solo run is admitted on the first read — its own claim is the ledger's head — so the loop body never
 // runs and the wait costs nothing.
-async function await_admission(context: WaitContext): Promise<void> {
-	while (!is_admitted(context.key, live_reservations(context.directory), context.budget)) {
-		if (context.now() >= context.deadline) return
+async function await_admission(context: WaitContext): Promise<Admission> {
+	let admission = await poll_admission(context)
 
+	while (admission === undefined) {
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await context.sleep(context.poll_interval_ms)
+		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
+		admission = await poll_admission(context)
 	}
+
+	return admission
 }
 
 async function reserve(weight: number, options: ReserveOptions = {}): Promise<Handle> {
 	const timing = resolve_timing(options)
 	const directory = options.directory ?? PLATFORM_TEMP_ROOT
-	const budget = normalize_budget(options.budget ?? availableParallelism())
 	const claimed_at = timing.now()
 	const name = marker_name(randomUUID())
 	const target = path.join(directory, name)
+	const fields = { weight, claimed_at, memory_mb: options.memory_mb }
 
-	write_reservation(target, weight, claimed_at)
-	await await_admission({
+	write_reservation(target, fields)
+	const admission = await await_admission({
 		...timing,
 		key: name,
+		target,
 		directory,
-		budget,
-		deadline: claimed_at + (options.wait_cap_ms ?? WAIT_CAP_MS),
+		budget: normalize_budget(options.budget ?? availableParallelism()),
+		deadline: claimed_at + timing.wait_cap_ms,
+		fields,
+		read_machine: options.read_machine ?? machine_capacity.read_machine,
 	})
 
-	return { target }
+	return { target, admission }
 }
 
 function release(handle: Handle): void {
@@ -278,16 +326,17 @@ function release(handle: Handle): void {
 }
 
 // The whole reservation lifetime around a step: claim a place, wait for admission, run, and free the
-// place on any exit. `finally`, so a step that threw still releases its cores.
+// place on any exit. `finally`, so a step that threw still releases its cores. The step is told how it was
+// admitted, so the gate can report one that started past the budget.
 async function with_core_reservation<T>(
 	weight: number,
-	run: () => Promise<T>,
+	run: (admission: Admission) => Promise<T>,
 	options: ReserveOptions = {},
 ): Promise<T> {
 	const handle = await reserve(weight, options)
 
 	try {
-		return await run()
+		return await run(handle.admission)
 	} finally {
 		release(handle)
 	}
@@ -338,9 +387,11 @@ const core_budget = {
 	CORE_WEIGHTS,
 	HELD_KEY,
 	HELD_VALUE,
+	MEMORY_MB,
 	RESERVED_PREFIX,
-	admitted_keys,
-	admitted_load,
+	admitted_keys: core_admission.admitted_keys,
+	admitted_load: core_admission.admitted_load,
+	describe_overflow: core_admission.describe_overflow,
 	is_held,
 	live_reservations,
 	release,
@@ -352,3 +403,5 @@ const core_budget = {
 
 export type { LiveReservation, Reservation, ReserveOptions }
 export { core_budget }
+
+export { type Admission } from './core-admission'
