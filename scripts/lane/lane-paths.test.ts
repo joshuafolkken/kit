@@ -109,3 +109,17 @@ describe('lane_issue_of', () => {
 		expect(lane_paths.lane_issue_of(directory, {})).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#3370: the stray sweep acts only on the names the lane machinery writes.
+describe('which names in a lanes root belong to the lane machinery', () => {
+	it.each([[ISSUE], ['.1665-lanes'], ['.app-kit-lanes']])('claims %j', (name) => {
+		expect(lane_paths.is_lane_entry(name)).toBe(true)
+	})
+
+	it.each([[lane_paths.SEAT_LOCK_DIR], ['2879-lint.txt'], ['main'], ['lanes']])(
+		'leaves %j alone',
+		(name) => {
+			expect(lane_paths.is_lane_entry(name)).toBe(false)
+		},
+	)
+})

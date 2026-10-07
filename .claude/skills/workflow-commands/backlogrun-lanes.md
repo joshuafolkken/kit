@@ -117,7 +117,7 @@ In the **primary checkout**, in this order, and never again per lane:
 1. `git switch main && git pull` — every lane branches from this ref.
 2. `pnpm josh latest:scope`, and the update on `required` — `backlogrun-child.md` → "`josh latest`
    runs once per session, not once per child".
-3. `pnpm josh lane:prune` — closes the lanes an interruption left registered without a work tree.
+3. `pnpm josh lane:prune` — closes lanes left without a work tree, sweeps unregistered leftovers.
 4. `pnpm josh run:tidy` — sweeps merged lanes and stashes (as `run:hold` does).
 
 **`pnpm josh latest` is never run inside a lane, whatever `latest:scope` answers there** — the command

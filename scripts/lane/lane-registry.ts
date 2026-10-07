@@ -217,6 +217,16 @@ async function list_lanes(): Promise<Array<LaneInfo>> {
 	return lanes.toSorted((left, right) => Number(left.issue) - Number(right.issue))
 }
 
+/**
+ * Every directory git registers as a work tree, lane or not — what a sweep of the lanes root must
+ * never touch, including a work tree at a lane's path whose branch does not read as a lane's.
+ */
+async function registered_directories(): Promise<Array<string>> {
+	const blocks = await worktree_blocks()
+
+	return blocks.flatMap((block) => line_value(block.split('\n'), WORKTREE_PREFIX) ?? [])
+}
+
 // The lanes a parent is still waiting on. A stranded lane has no child working in it, so it is not
 // in-flight — the one definition the watcher guard and the headless stop rule both read.
 async function has_lanes_in_flight(): Promise<boolean> {
@@ -259,6 +269,7 @@ const lane_registry = {
 	main_repository_root,
 	parse_block,
 	read_environment,
+	registered_directories,
 	unreadable_lanes,
 	used_seats,
 }

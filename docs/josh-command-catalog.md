@@ -1151,7 +1151,7 @@ Record, or read back, where the unit running a lane’s child writes
 
 _No arguments._
 
-Close every lane an interruption left without its work tree
+Close every lane an interruption left without its work tree, then sweep unregistered leftovers under the lanes root
 
 ---
 

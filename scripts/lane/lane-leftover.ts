@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, readdirSync, readFileSync, readlinkSync, rmSync } from 'node:fs'
 import path from 'node:path'
+import { ENV_FILE_NAME } from '#ports'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { IGNORED_CACHE_FILES } from '#scripts/josh/josh-command-types'
 
 // A lane directory git no longer registers as a work tree (joshuafolkken/kit#2857).
 //
@@ -11,31 +13,38 @@ import { git_spawn } from '#scripts/git/git-spawn'
 // here before it adds the tree.
 //
 // **The test for removing it is that removing it loses nothing**, not a list of names. Every file in
-// it has to be one the repository already holds with the same content, so it is a checkout git would
-// write again; the one exception is the `.git` file, a pointer to the registration that is gone. A
-// list of generated names would break the next time a file is generated, and would delete whatever
-// shares one of those names.
-
-// `git ls-tree -r -z`: `<mode> <type> <object>\t<path>`, entries separated by NUL — the `-z` form
-// leaves a path with an unusual character unquoted, so it can be compared to the path on disk.
-const TREE_ENTRY_PATTERN = /^\d+ blob (?<object>[\da-f]+)\t(?<path>.+)$/su
+// it has to hold content the repository's history already stores — a blob some ref reaches — so git
+// can write it again; the one exception is the `.git` file, a pointer to the registration that is
+// gone. **Any commit's content, not only `HEAD`'s at the same path** (joshuafolkken/kit#3370): a
+// leftover is a checkout of whatever commit its lane was on, and measured against `HEAD` the
+// leftovers that issue found differed in 167 to 1,431 files each while every one of them was in the
+// history. A list of generated names would break the next time a file is generated, and would delete
+// whatever shares one of those names.
+//
+// **The one list of names is what `lane:open` and the gate regenerate**, and only at the top level:
+// the install's `node_modules`, the build's `dist`, the `.env` `lane:open` writes from the root's, and
+// the gate's caches. A lane carries them on top of its checkout, none is in the history, and walking
+// `node_modules` alone would hash tens of thousands of files.
+const REGENERATED_PATHS: ReadonlySet<string> = new Set([
+	'node_modules',
+	'dist',
+	ENV_FILE_NAME,
+	...IGNORED_CACHE_FILES,
+])
 const GIT_POINTER = '.git'
 const GITDIR_PREFIX = 'gitdir: '
 // The foreign paths a refusal names before it summarizes the rest as a count.
 const NAMED_PATH_LIMIT = 10
 
-// One blob entry as `[path, object id]`; a tree, a commit (a submodule) or the trailing empty entry is
-// none.
-function tree_entry(entry: string): Array<[string, string]> {
-	const { path: entry_path, object } = TREE_ENTRY_PATTERN.exec(entry)?.groups ?? {}
-
-	if (entry_path === undefined || object === undefined) return []
-
-	return [[entry_path, object]]
+// `git rev-list --objects --all`: one `<object>[ <path>]` line per object any ref reaches — commits,
+// trees and blobs alike, which costs nothing here, because only a blob id can equal a file's.
+function parse_objects(listing: string): Set<string> {
+	return new Set(listing.split('\n').map((line) => line.split(' ', 1)[0] ?? ''))
 }
 
-function parse_tree(listing: string): Map<string, string> {
-	return new Map(listing.split('\0').flatMap((entry) => tree_entry(entry)))
+/** Every object id the repository's refs reach — the content a leftover can be restored from. */
+async function recoverable_objects(): Promise<Set<string>> {
+	return parse_objects(await git_spawn.read(['rev-list', '--objects', '--all']))
 }
 
 // The object id git gives this file — a symbolic link's is that of its target string, as git stores it.
@@ -63,9 +72,14 @@ function walk_files(directory: string, relative: string): Array<string> {
 	})
 }
 
-// Every file under `directory` as a repository path, symbolic links included and never followed.
+// Every file under `directory` as a repository path, symbolic links included and never followed —
+// less the regenerated top-level entries, which are neither walked nor listed.
 function list_files(directory: string): Array<string> {
-	return walk_files(directory, '')
+	return readdirSync(directory)
+		.filter((name) => !REGENERATED_PATHS.has(name))
+		.flatMap((name) =>
+			lstatSync(path.join(directory, name)).isDirectory() ? walk_files(directory, name) : name,
+		)
 }
 
 // The `.git` file is disposable only while the registration it points to is gone: one that still
@@ -85,25 +99,25 @@ function is_dangling_pointer(directory: string): boolean {
 function is_reclaimable_file(
 	directory: string,
 	relative: string,
-	tracked: ReadonlyMap<string, string>,
+	recoverable: ReadonlySet<string>,
 ): boolean {
 	if (relative === GIT_POINTER) return is_dangling_pointer(directory)
 
-	return tracked.get(relative) === blob_id(path.join(directory, relative))
+	return recoverable.has(blob_id(path.join(directory, relative)))
 }
 
 /**
  * The paths under `directory` whose removal would lose something — empty when it holds nothing but
- * the repository's own files and the `.git` pointer. A `.git` directory is a repository of its own,
- * so it is foreign as a whole rather than walked.
+ * content the history stores, the regenerated entries and the `.git` pointer. A `.git` directory is a
+ * repository of its own, so it is foreign as a whole rather than walked.
  */
-function foreign_paths(directory: string, tracked: ReadonlyMap<string, string>): Array<string> {
+function foreign_paths(directory: string, recoverable: ReadonlySet<string>): Array<string> {
 	const pointer = lstatSync(path.join(directory, GIT_POINTER), { throwIfNoEntry: false })
 
 	if (pointer?.isDirectory() === true) return [GIT_POINTER]
 
 	return list_files(directory).filter(
-		(relative) => !is_reclaimable_file(directory, relative, tracked),
+		(relative) => !is_reclaimable_file(directory, relative, recoverable),
 	)
 }
 
@@ -125,8 +139,7 @@ function refusal(directory: string, foreign: ReadonlyArray<string>): Error {
 async function reclaim(directory: string): Promise<void> {
 	if (!existsSync(directory)) return
 
-	const tracked = parse_tree(await git_spawn.read(['ls-tree', '-r', '-z', '--full-tree', 'HEAD']))
-	const foreign = foreign_paths(directory, tracked)
+	const foreign = foreign_paths(directory, await recoverable_objects())
 
 	if (foreign.length > 0) throw refusal(directory, foreign)
 
@@ -136,8 +149,9 @@ async function reclaim(directory: string): Promise<void> {
 const lane_leftover = {
 	blob_id,
 	foreign_paths,
-	parse_tree,
+	parse_objects,
 	reclaim,
+	recoverable_objects,
 }
 
 export { lane_leftover }

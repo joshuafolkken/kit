@@ -21,6 +21,7 @@ vi.mock('./lane-dispatch', () => ({
 	},
 }))
 vi.mock('./lane-registry', () => ({ lane_registry: { list_lanes: vi.fn() } }))
+vi.mock('./lane-stray', () => ({ lane_stray: { sweep_and_report: vi.fn() } }))
 // `lane:list` reads the `in-progress` listing to name the lane/label difference (joshuafolkken/kit#2235);
 // mocked so the unit suite makes no live `gh` call. An idle repository plus a known owner lets the
 // occupancy path run deterministically over the listed lanes.
@@ -46,6 +47,7 @@ const { lane_close } = await import('./lane-close')
 const { lane_dispatch } = await import('./lane-dispatch')
 const { lane_registry } = await import('./lane-registry')
 const { lane_output } = await import('./lane-output')
+const { lane_stray } = await import('./lane-stray')
 const { lane_cli } = await import('./lane-cli')
 const { epic_busy } = await import('#scripts/epic/epic-busy')
 const { issue_cite } = await import('#scripts/issue/issue-cite')
@@ -159,6 +161,15 @@ describe('lane:close, lane:list and lane:prune', () => {
 
 		expect(await lane_cli.run(['prune'])).toBe(SUCCESS)
 		expect(printed).toStrictEqual([OTHER_ISSUE])
+	})
+
+	// joshuafolkken/kit#3370: the lanes root's unregistered leftovers are swept by the same command,
+	// after the closes, so a close that left its directory behind is swept in the same run.
+	it('sweeps the unregistered leftovers after the closes', async () => {
+		vi.mocked(lane_close.prune_lanes).mockResolvedValue({ closed: [], failed: [] })
+
+		expect(await lane_cli.run(['prune'])).toBe(SUCCESS)
+		expect(lane_stray.sweep_and_report).toHaveBeenCalledAfter(vi.mocked(lane_close.prune_lanes))
 	})
 })
 

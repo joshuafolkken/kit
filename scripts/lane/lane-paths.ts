@@ -82,10 +82,23 @@ function lane_branch(issue: string): string {
 	return `${issue}${LANE_BRANCH_SUFFIX}`
 }
 
+// The lanes root's own bookkeeping, beside the lanes and never one of them: `lane:open` claims a seat
+// by creating a lock directory under it (joshuafolkken/kit#1494).
+const SEAT_LOCK_DIR = '.seat-locks'
+
+// A name the lane machinery writes into a lanes root: a lane's issue number, or a lanes root of its
+// own — the nested one a lane opened from inside a lane once put there. Anything else in the root
+// was put there by someone else (joshuafolkken/kit#3370).
+function is_lane_entry(name: string): boolean {
+	return LANE_ISSUE_PATTERN.test(name) || DEFAULT_LANE_ROOT_PATTERN.test(name)
+}
+
 const lane_paths = {
 	LANE_BRANCH_SUFFIX,
 	LANE_ROOT_KEY,
+	SEAT_LOCK_DIR,
 	default_lane_root,
+	is_lane_entry,
 	lane_branch,
 	lane_directory,
 	lane_issue_of,

@@ -39,7 +39,8 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'lane:prune': {
 		...LANE_ARGUMENTS,
-		description: 'Close every lane an interruption left without its work tree',
+		description:
+			'Close every lane an interruption left without its work tree, then sweep unregistered leftovers under the lanes root',
 		category: 'AI tools',
 		reference: ['', 'automation', ['files', 'git']],
 		default_script_arguments: ['prune'],
