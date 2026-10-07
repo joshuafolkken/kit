@@ -137,6 +137,7 @@ const run_cut_cli_fixture = {
 	find_open_lane,
 	launch,
 	session_verdict,
+	emit,
 	verdict,
 	worker_argv,
 	WITH_HANDOFF,

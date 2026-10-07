@@ -28,6 +28,7 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	split: { ja: '分割', en: 'split' },
 	outage: { ja: '障害', en: 'outage' },
 	cut: { ja: 'セッション交代', en: 'session cut' },
+	resume: { ja: '実装を再開', en: 'implementation resumed' },
 	drain: { ja: 'バックログが空', en: 'backlog drained' },
 	stop: { ja: '停止', en: 'stopped' },
 	'pr-opened': { ja: 'PR 作成', en: 'PR opened' },

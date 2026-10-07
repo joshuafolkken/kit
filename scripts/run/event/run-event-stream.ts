@@ -48,6 +48,10 @@ const EVENT_KIND = {
 	SPLIT: 'split',
 	OUTAGE: 'outage',
 	CUT: 'cut',
+	// A fresh session adopted an implementation cut — `run:cut --resume` answered `resume-impl`
+	// (joshuafolkken/kit#3375). The resume clears the cut record, so without this the `cut` stayed the
+	// newest position and `run:step` kept answering the resume command it had just run.
+	RESUME: 'resume',
 	// The backlog emptied while nothing of the run's own was in flight — the drain
 	// (joshuafolkken/kit#2335). It marks the position at which the end-of-run retrospective is owed,
 	// *before* the idle watch opens, so `run:step` fires the retrospective at the drain rather than after

@@ -236,9 +236,12 @@ function event_action(event: string, issue_number: string, is_lane_child: boolea
 }
 
 // A run that has planned but emitted nothing else is still at its pre-implementation position, so a
-// `plan` reads the same as an empty stream.
+// `plan` reads the same as an empty stream. A resume from an implementation cut is back at the same
+// position (joshuafolkken/kit#3375): read as the `cut` it follows, it pointed at the spent resume again.
+const IMPLEMENTATION_POSITIONS: ReadonlySet<string> = new Set([KIND.PLAN, KIND.RESUME])
+
 function is_pre_implementation(last_event: string | undefined): boolean {
-	return last_event === undefined || last_event === run_event_stream.EVENT_KIND.PLAN
+	return last_event === undefined || IMPLEMENTATION_POSITIONS.has(last_event)
 }
 
 // **No cut at the setup→implementation boundary** (joshuafolkken/kit#2489). A lane child's context is

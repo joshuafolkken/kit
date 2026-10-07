@@ -290,14 +290,27 @@ function announce_handoff(cut_record: RunCut): void {
 	}
 }
 
-function adopt(target: string, cut_record: RunCut): number {
+// **An implementation resume appends a `resume` event** (joshuafolkken/kit#3375). It clears the record
+// the `cut` event stood for, so the stream is what moves `run:step` back to implementation; a pre-gate
+// resume keeps its record and appends nothing. Best-effort, as the cut's own append is.
+async function emit_resume_event(issue: string, verdict: string): Promise<void> {
+	if (verdict !== RESUME_IMPL_VERDICT) return
+
+	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.RESUME, `#${issue} resumed`)
+}
+
+async function adopt(target: string, cut_record: RunCut): Promise<number> {
 	const taken = take_over(target, cut_record)
 
 	if (taken === undefined) return report_busy(cut_record)
 
 	announce_handoff(cut_record)
 
-	return report(resume_verdict_for(cut_record), SUCCESS_EXIT_CODE)
+	const verdict = resume_verdict_for(cut_record)
+
+	await emit_resume_event(cut_record.issue, verdict)
+
+	return report(verdict, SUCCESS_EXIT_CODE)
 }
 
 // A relaunched lane child and a fresh session both measure `under`, so only the session that took an
@@ -329,7 +342,7 @@ async function verify_and_adopt(
 
 	if (is_over_threshold_resume(cut_record)) return report_over()
 
-	return adopt(target, cut_record)
+	return await adopt(target, cut_record)
 }
 
 async function resume(target: string, issue: string): Promise<number> {

@@ -1,3 +1,4 @@
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import { run_cut } from './run-cut'
 import { run_cut_cli } from './run-cut-cli'
@@ -8,6 +9,8 @@ const {
 	CONTEXT_UNDER,
 	ISSUE,
 	WITH_HANDOFF,
+	emit,
+	existing_cut,
 	find_open_lane,
 	launch,
 	session_verdict,
@@ -113,5 +116,28 @@ describe('a cut outside a lane that is not taken', () => {
 
 		expect(verdict()).toBe(run_cut_cli.NOT_A_LANE_VERDICT)
 		expect(run_cut.read_cut(target()).kind).toBe('none')
+	})
+})
+
+// joshuafolkken/kit#3375: the implementation resume cleared its record but appended nothing, so the `cut`
+// stayed the run's newest event and `run:step` kept answering the resume it had just run.
+describe('the resume event', () => {
+	it('appends a resume event naming the issue when the resume answers resume-impl', async () => {
+		existing_cut(run_cut.IMPLEMENTATION_PHASE)
+		session_verdict.mockReturnValue(CONTEXT_UNDER)
+
+		await run_cut_cli.run(['--resume', ISSUE])
+
+		expect(verdict()).toBe(run_cut_cli.RESUME_IMPL_VERDICT)
+		expect(emit).toHaveBeenCalledWith(run_event_stream.EVENT_KIND.RESUME, `#${ISSUE} resumed`)
+	})
+
+	it('appends nothing when a pre-gate cut resumes into the gate', async () => {
+		existing_cut()
+
+		await run_cut_cli.run(['--resume', ISSUE])
+
+		expect(verdict()).toBe(run_cut_cli.RESUME_VERDICT)
+		expect(emit).not.toHaveBeenCalled()
 	})
 })
