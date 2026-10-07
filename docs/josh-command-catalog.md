@@ -509,7 +509,7 @@ Check that every published dependency range still resolves for a consumer
 
 > **Audience:** maintainer · **Side effects:** git, network, release
 
-`[version]`
+`[--dry-run]`
 
 Release the merges main has taken since the version last changed
 

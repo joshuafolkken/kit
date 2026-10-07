@@ -774,7 +774,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "release": [
-      "[version]",
+      "[--dry-run]",
       "maintainer",
       [
         "git",

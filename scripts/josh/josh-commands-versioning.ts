@@ -31,7 +31,7 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/release/release-cli.ts',
 		description: 'Release the merges main has taken since the version last changed',
 		category: 'Versioning',
-		reference: ['[version]', 'maintainer', ['git', 'network', 'release']],
+		reference: ['[--dry-run]', 'maintainer', ['git', 'network', 'release']],
 	},
 	// The read-only half of the one above (joshuafolkken/kit#1582). `release --dry-run` cannot
 	// answer this question: it refuses off the default branch and on a dirty tree, which is every
