@@ -40,20 +40,15 @@ const SUCCESSOR = {
 	process_start: DEAD_START,
 }
 
-// The predecessor is gone by default, which is the ordinary case: `--cut` is the cutting session's
-// last write and its process exits directly afterwards.
+// The owner is gone by default; the tests that need a live one say so.
 function input(read: CarryRead, woke_at?: string, attempts = NO_ATTEMPTS): WakeDecisionInput {
-	return { read, woke_at, attempts, is_owner_live: false, held_at: undefined, now: NOW }
+	return { read, woke_at, attempts, is_owner_live: false, now: NOW }
 }
 
 const HANDED_OFF: CarryRead = { kind: 'carried', carry: carry({ is_handed_off: true }) }
 // A carried record no cut handed off: either a live session spending the budget, or one that claimed
 // it and died. Which of the two is `is_owner_live`, not the record (joshuafolkken/kit#2336).
 const IN_FLIGHT: CarryRead = { kind: 'carried', carry: carry() }
-
-function long_ago(): string {
-	return new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS * 2).toISOString()
-}
 
 function overdue(attempts: number): WakeDecisionInput {
 	const woke_at = new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS * 2).toISOString()
@@ -137,62 +132,22 @@ describe('run_wake.decide — the grace window after a wake', () => {
 	})
 })
 
-describe('run_wake.decide — waiting out the session that cut', () => {
-	// `classify_claim` tests `is_foreign_live_owner` before it tests the hand-off, so a wake issued
-	// while the cutting session is still exiting is answered `busy` and claims nothing.
-	it('waits out a predecessor that has cut but not yet exited', () => {
-		const read: CarryRead = { kind: 'carried', carry: carry({ is_handed_off: true }) }
-
-		expect(run_wake.decide({ ...input(read), is_owner_live: true })).toStrictEqual({
-			kind: 'hold',
+describe('run_wake.decide — the session that cut is still running', () => {
+	// joshuafolkken/kit#3363: `classify_claim` reads the hand-off before liveness, so an interactive
+	// session that outlives its own cut must not hold the driver back for the grace window.
+	it('launches at once on a handed-off record whose cutting process is still live', () => {
+		expect(run_wake.decide({ ...input(HANDED_OFF), is_owner_live: true })).toStrictEqual({
+			kind: 'wake',
 		})
 	})
 
-	// An interactive session's process often outlives its own cut. Waited on without a bound, the
-	// supervisor would pend for the record's whole life, wake nothing, and end on `expired`, which
-	// sends no warning — a silent overnight failure, worse than the `busy` race the wait avoids.
-	it('bounds the wait on the predecessor and wakes anyway once it expires', () => {
-		const held = { ...input(HANDED_OFF), is_owner_live: true, held_at: long_ago() }
-
-		expect(run_wake.decide(held)).toStrictEqual({ kind: 'wake' })
+	it('still waits on a live owner that has not handed the record off', () => {
+		expect(run_wake.decide({ ...input(IN_FLIGHT), is_owner_live: true })).toStrictEqual({
+			kind: 'wait',
+		})
 	})
 
-	it('goes on holding while the predecessor is live and the ceiling has not passed', () => {
-		const held = { ...input(HANDED_OFF), is_owner_live: true, held_at: NOW.toISOString() }
-
-		expect(run_wake.decide(held)).toStrictEqual({ kind: 'hold' })
-	})
-
-	// **The ceiling is how long the wait may last, never how long it does.** Read once and never again,
-	// the predecessor's liveness made every wait cost the whole window — so a predecessor that exited
-	// two seconds after the hold still stalled a supervisor whose point is not to stall.
-	it('wakes the moment the predecessor exits, without waiting out the ceiling', () => {
-		const held = { ...input(HANDED_OFF), is_owner_live: false, held_at: NOW.toISOString() }
-
-		expect(run_wake.decide(held)).toStrictEqual({ kind: 'wake' })
-	})
-})
-
-describe('run_wake — the mark that bounds the wait', () => {
-	it('marks the wait without spending a retry, and apart from the wake mark', () => {
-		const marked = run_wake.mark_wait(run_wake.fresh_wake(INVOCATION, NOW), NOW)
-
-		expect(marked.held_at).toBe(NOW.toISOString())
-		expect(marked.woke_at).toBeUndefined()
-		expect(marked.attempts).toBeUndefined()
-		expect(marked.woke).toBe(0)
-	})
-
-	// Rewritten on every pass, the mark would measure from the latest pass rather than from the start
-	// of the wait, and a predecessor that never exits would be waited on for ever.
-	it('does not slide the ceiling when the hold is marked again', () => {
-		const marked = run_wake.mark_wait(run_wake.fresh_wake(INVOCATION, NOW), NOW)
-		const later = new Date(NOW.getTime() + run_wake.WAKE_GRACE_MS)
-
-		expect(run_wake.mark_wait(marked, later).held_at).toBe(NOW.toISOString())
-	})
-
-	it('stops waiting on the predecessor once a wake is already out', () => {
+	it('relaunches a lost wake while the cutting process is still live', () => {
 		const read: CarryRead = { kind: 'carried', carry: carry({ is_handed_off: true }) }
 		const woke_at = new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS * 2).toISOString()
 

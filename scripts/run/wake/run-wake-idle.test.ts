@@ -36,7 +36,6 @@ function input(overrides: Partial<WakeDecisionInput> = {}): WakeDecisionInput {
 		woke_at: undefined,
 		attempts: 0,
 		is_owner_live: false,
-		held_at: undefined,
 		now: NOW,
 		...overrides,
 	}

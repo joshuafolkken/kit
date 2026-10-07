@@ -262,49 +262,25 @@ describe('run_wake_loop.run_loop — where it stops', () => {
 	})
 })
 
-describe('run_wake_loop.run_loop — waiting out the session that cut', () => {
-	// The hold must leave a mark, or the wait never expires and the run dies silently on the carry
-	// record's own bound rather than waking anything.
-	it('marks the wait rather than waking while the predecessor is still live', async () => {
+describe('run_wake_loop.run_loop — the session that cut is still running', () => {
+	// joshuafolkken/kit#3363: an interactive session outlives its own cut, and the driver must start on
+	// the first pass rather than after a ten-minute hold.
+	it('drives on the first pass while the cutting process is still live', async () => {
 		const scripted = recorder([HANDED_OFF, ENDED])
-		const ports = { ...scripted.ports, is_owner_live: () => true }
+		let drives = 0
+		const ports = {
+			...scripted.ports,
+			is_owner_live: () => true,
+			drive: async (): Promise<DriveResult> => {
+				drives += 1
+
+				return { kind: 'released' }
+			},
+		}
 
 		await run_wake_loop.run_loop(scratch.target, ports, 0)
 
-		expect(scripted.wakes).toStrictEqual([])
-		expect(run_wake.read_wake(scratch.target)?.held_at).toBe(NOW.toISOString())
-		expect(run_wake.read_wake(scratch.target)?.woke_at).toBeUndefined()
-	})
-
-	it('wakes once the bounded wait on the predecessor has expired', async () => {
-		run_wake.write_wake(scratch.target, {
-			...run_wake.fresh_wake(INVOCATION, NOW),
-			held_at: new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS * 2).toISOString(),
-		})
-
-		const scripted = recorder([HANDED_OFF, ENDED])
-		const ports = { ...scripted.ports, is_owner_live: () => true }
-
-		await run_wake_loop.run_loop(scratch.target, ports, 0)
-
-		expect(scripted.wakes).toStrictEqual([INVOCATION])
-	})
-
-	// The ceiling is what the wait may cost, not what it does cost. Read once and never again, the
-	// predecessor's liveness made every wait cost the whole window.
-	it('wakes on the pass after the predecessor exits, well inside the ceiling', async () => {
-		run_wake.write_wake(scratch.target, {
-			...run_wake.fresh_wake(INVOCATION, NOW),
-			held_at: NOW.toISOString(),
-		})
-
-		const scripted = recorder([HANDED_OFF, HANDED_OFF, ENDED])
-		const liveness = [true, false]
-		const ports = { ...scripted.ports, is_owner_live: () => liveness.shift() ?? false }
-
-		await run_wake_loop.run_loop(scratch.target, ports, 0)
-
-		expect(scripted.wakes).toStrictEqual([INVOCATION])
+		expect(drives).toBe(1)
 	})
 })
 

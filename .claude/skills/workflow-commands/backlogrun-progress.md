@@ -218,8 +218,8 @@ ever.
 - **Every in-flight lane records a path** — **record the cut and hand the session off.** `backlogrun`
   declares a budget — `--max`, `--idle` and the 8-hour bound — so the cut is an execution detail: count
   everything the session has, then run `pnpm josh run:carry --cut --owner "$PPID"`. **Unless it answers
-  `capped`** (below), `pnpm josh run:wake` then starts the next session, which polls the still-running
-  lanes from `lane:list`. Post the progress comment naming **every lane in flight and the path each
+  `capped`** (below), the `pnpm josh run:wake` driver starts at its next poll even while this session
+  lives on, and polls the still-running lanes from `lane:list`. Post the progress comment naming **every lane in flight and the path each
   records**, name `pnpm josh run:event --watch` for a pane, and end the turn — nothing is relayed (#2492).
   `backlogrun-steps.md` → "The session cut is inside the invocation" is the single source of the
   carry; this reading is only where the cut is *taken*.
