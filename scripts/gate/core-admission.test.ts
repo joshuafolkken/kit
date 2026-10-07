@@ -22,9 +22,9 @@ function admitted(key: string, admitted_at: number | undefined): LedgerEntry {
 }
 
 describe('core_admission.ledger_load — the load already inside the machine reading', () => {
-	it('leaves out a claim admitted moments ago, whose tool has not allocated yet', () => {
+	it('counts the cores but not the memory of a claim admitted moments ago', () => {
 		expect(core_admission.ledger_load([admitted('fresh', NOW)], NOW)).toEqual({
-			cores: 0,
+			cores: TOOL_CORES,
 			memory_mb: 0,
 		})
 	})
@@ -39,7 +39,10 @@ describe('core_admission.ledger_load — the load already inside the machine rea
 	})
 
 	it('leaves out a claim that has not been admitted', () => {
-		expect(core_admission.ledger_load([admitted('waiting', undefined)], NOW).memory_mb).toBe(0)
+		expect(core_admission.ledger_load([admitted('waiting', undefined)], NOW)).toEqual({
+			cores: 0,
+			memory_mb: 0,
+		})
 	})
 })
 

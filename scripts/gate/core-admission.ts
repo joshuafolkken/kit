@@ -8,8 +8,9 @@ const MS_PER_SECOND = 1000
 // **How long an admitted claim's tool takes to reach its declared peak.** The machine reading holds only
 // what a tool has already allocated, so a claim admitted moments ago is not in it yet: adding its
 // declared memory back would admit the next claim into memory about to be taken — the concurrent start
-// this ledger exists to stop. Until the window passes, the claim's load counts only in the FIFO walk; a
-// tool partway up is then counted twice, which costs a slower admission, never a swap.
+// this ledger exists to stop. Until the window passes, the claim's memory counts only in the FIFO walk; a
+// tool partway up is then counted twice, which costs a slower admission, never a swap. Its cores are in
+// the reading from the start, so the window does not apply to them.
 const RAMP_UP_MS = 30_000
 
 // What admission reads from a marker. `memory_mb` and `admitted_at` are optional because a marker an
@@ -105,9 +106,14 @@ function is_ramped(reservation: LedgerReservation, now: number): boolean {
 	return admitted_at !== undefined && now - admitted_at >= RAMP_UP_MS
 }
 
-// The load the ledger already accounts for: the claims admitted long enough ago to be in the reading.
+// **The load the ledger already accounts for.** CPU use shows in the reading the moment a tool starts,
+// so every admitted claim's cores count at once; memory grows as the tool allocates, so only the claims
+// admitted long enough ago to be in the reading count their memory.
 function ledger_load(reservations: ReadonlyArray<LedgerEntry>, now: number): LedgerLoad {
-	return sum_load(reservations.filter((entry) => is_ramped(entry.reservation, now)))
+	const admitted = reservations.filter((entry) => entry.reservation.admitted_at !== undefined)
+	const ramped = admitted.filter((entry) => is_ramped(entry.reservation, now))
+
+	return { cores: sum_load(admitted).cores, memory_mb: sum_load(ramped).memory_mb }
 }
 
 function total_weight(reservations: ReadonlyArray<LedgerEntry>): number {

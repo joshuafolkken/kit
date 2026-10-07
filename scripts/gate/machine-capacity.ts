@@ -149,9 +149,10 @@ function external_cores(busy_cores: number | undefined, ledger_cores: number): n
 }
 
 // **The budget the ledger admits against: what is free plus what the ledger itself already holds.**
-// The ramped-up reservations' load is inside the reading, and the admission walk counts their declared
+// The admitted reservations' load is inside the reading, and the admission walk counts their declared
 // weight again, so it is added back — what is subtracted is only the load from outside the ledger. The
-// caller passes only claims past `core_admission.RAMP_UP_MS`, whose tools have had time to allocate.
+// caller passes every admitted claim's cores but only the memory of claims past
+// `core_admission.RAMP_UP_MS`, whose tools have had time to allocate.
 // Memory that could not be read is no limit at all, the behavior before memory was read.
 function machine_budget(cores: number, reading: MachineReading, ledger: LedgerLoad): MachineBudget {
 	return {

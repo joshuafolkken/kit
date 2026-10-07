@@ -249,8 +249,9 @@ async function current_budget(
 	return { ...budget, cores: normalize_budget(budget.cores) }
 }
 
-// The claim is admitted: its marker records when, which moves its weight from "load outside the ledger"
-// to "load the ledger holds" for every later reader once its tool has had time to ramp up.
+// The claim is admitted: its marker records when, which moves its load from "load outside the ledger"
+// to "load the ledger holds" for every later reader — its cores at once, its memory once its tool has
+// had time to ramp up.
 function admit(context: WaitContext, overflow?: Overflow): Admission {
 	write_reservation(context.target, { ...context.fields, admitted_at: context.now() })
 
