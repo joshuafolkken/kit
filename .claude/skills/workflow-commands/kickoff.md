@@ -86,3 +86,4 @@ split is found.
   `backlogrun #<E> --only`. (5) **Stop** — do not implement.
 
 `pnpm josh issue:file` lints the body and applies the classification labels it declares, following `prompts/collaboration-workflow/issue-template.md` for classification (`docs/josh-commands-backlog.md` → `josh issue:file`).
+An Issue a consumer can use only once it is published is filed with `--release` (`kickoff new`), or linked with `pnpm josh issue:release <N>` (`kickoff #N`) — either makes it a blocker of the repository's `release` Issue, which never gets `auto-ok` on its own.

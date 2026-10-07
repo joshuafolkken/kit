@@ -65,6 +65,12 @@ const NEEDS_HUMAN_REVIEW_LABEL = 'needs-human-review'
 // takes it off, because taking it off asserts the work is *not* done, which is the same claim in
 // reverse and is no more a run's to make.
 const ALREADY_DONE_LABEL = 'already-done'
+// Marks the Issue that tracks a repository's next release (joshuafolkken/kit#3360). An Issue whose
+// change reaches a consumer only once published is linked to it as a `blocked_by` blocker
+// (`josh issue:release`), so "merged but not yet released" is visible in the backlog. A run applies
+// it; **`auto-ok` never rides on it** — `issue-auto-ok.ts` refuses the default for it on every path,
+// since a release is Tier C — and only a person opts it into unattended execution.
+const RELEASE_LABEL = 'release'
 
 // The four labels that mean an open issue must not be handed to a run as it stands: an `epic`
 // tracks a batch and is never run directly (its children are), `in-progress` is already claimed by
@@ -228,6 +234,11 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 		color: 'e99695',
 		description: 'Offered first in a backlogrun; only a person removes it',
 	},
+	{
+		name: RELEASE_LABEL,
+		color: 'fef2c0',
+		description: 'Tracks the next release; its blockers are the merged work it publishes',
+	},
 	...FILING_ROUTE_LABELS,
 	...DEPTH_LABELS,
 ]
@@ -340,6 +351,7 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	NEEDS_HUMAN_REVIEW_LABEL,
 	ALREADY_DONE_LABEL,
 	PRIORITY_HIGH_LABEL,
+	RELEASE_LABEL,
 	INTERRUPT_ROUTE_LABEL,
 	REVIEW_CAP_ROUTE_LABEL,
 	REVIEW_ROUND2_SKIPPED_LABEL,
@@ -386,6 +398,7 @@ export {
 	PRIORITY_HIGH_LABEL,
 	RELEASE_CLASSIFICATION_LABELS,
 	RELEASE_CLASSIFICATION_NAMES,
+	RELEASE_LABEL,
 	REPOSITORY_LABELS,
 	REVIEW_CAP_ROUTE_LABEL,
 	REVIEW_ROUND2_SKIPPED_LABEL,

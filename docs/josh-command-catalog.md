@@ -999,7 +999,7 @@ Post one comment to an issue from a file, so no shell expands the body
 
 > **Audience:** automation · **Side effects:** network
 
-`<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok]`
+`<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]`
 
 File an Issue with every filing step: lint, Origin, WIP cap, duplicate scout, labels, then epic:bundle
 
@@ -1042,6 +1042,16 @@ Check an issue body file for the template's required headings
 `<issue...>`
 
 Print each issue's title, body and every comment on it, in one call
+
+---
+
+### `josh issue:release`
+
+> **Audience:** automation · **Side effects:** network
+
+`<issue>`
+
+Link an Issue to the repository's open release Issue as its blocker, filing one when none is open
 
 ---
 
