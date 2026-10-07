@@ -70,6 +70,14 @@ describe('issue_release_cli.run — no release Issue is open', () => {
 		expect(await issue_release_cli.run([String(ISSUE_NUMBER)])).toBe(FAILURE_EXIT_CODE)
 		expect(add_blocked_by).not.toHaveBeenCalled()
 	})
+
+	it('reports a created release Issue whose number is unreadable, without linking', async () => {
+		exec_gh_api.mockResolvedValue('not-a-url')
+
+		expect(await issue_release_cli.run([String(ISSUE_NUMBER)])).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('release number is unreadable')
+		expect(add_blocked_by).not.toHaveBeenCalled()
+	})
 })
 
 describe('issue_release_cli.run — a release Issue is open', () => {

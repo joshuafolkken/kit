@@ -253,10 +253,15 @@ describe('issue_file_cli.run — --release', () => {
 	})
 
 	// The Issue exists once the create returns, so a link that fails is a warning, not a failure.
-	it('still succeeds when the link fails', async () => {
+	it('still succeeds when the link fails, naming the target in the re-run hint', async () => {
 		link_release.mockResolvedValue(false)
 
-		expect(await issue_file_cli.run(argv_of(valid_path, '--release'))).toBe(SUCCESS_EXIT_CODE)
+		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', THERE, '--release'))).toBe(
+			SUCCESS_EXIT_CODE,
+		)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(
+			`GH_REPO=${THERE} pnpm josh issue:release`,
+		)
 	})
 })
 

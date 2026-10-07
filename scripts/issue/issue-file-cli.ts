@@ -184,7 +184,8 @@ function issue_number_of(url: string): number {
 }
 
 // `--release`: the filed Issue blocks the target's release Issue (joshuafolkken/kit#3360). Reported,
-// never failed, for the reason `place` gives.
+// never failed, for the reason `place` gives. The re-run hint names the target through `GH_REPO`:
+// `issue:release` links in the repository `gh` resolves, which is not the target on a `--repo` filing.
 async function link_release(url: string, filing: Filing): Promise<void> {
 	if (!filing.args.is_release) return
 	const issue_number = issue_number_of(url)
@@ -194,7 +195,7 @@ async function link_release(url: string, filing: Filing): Promise<void> {
 
 	if (is_linked) return
 	console.error(
-		`⚠ the release link did not complete for ${url} — run \`pnpm josh issue:release <N>\`.`,
+		`⚠ the release link did not complete for ${url} — run \`${GH_REPO_VARIABLE}=${filing.target} pnpm josh issue:release <N>\`.`,
 	)
 }
 

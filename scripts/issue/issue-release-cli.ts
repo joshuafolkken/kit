@@ -61,8 +61,11 @@ async function file_release(target: string): Promise<number | undefined> {
 
 	try {
 		const url = await git_gh_exec.exec_gh_api(request)
+		const issue_number = Number(github_issue_url.parse(url)?.issue_number) || undefined
 
-		return Number(github_issue_url.parse(url)?.issue_number) || undefined
+		if (issue_number === undefined) console.error(`✖ the release number is unreadable: ${url}`)
+
+		return issue_number
 	} catch (error) {
 		console.error(`✖ the release Issue could not be filed: ${error_text.message_of(error)}`)
 
