@@ -46,33 +46,54 @@ function release_answers(): Array<Response> {
 
 type ReleaseRequest = Parameters<typeof github_release.publish>[0]
 
-function kit_request(publish_status: string, ladder_answer: Response): ReleaseRequest {
-	const request = vi.fn()
-	const answers = [
-		missing_response(),
-		missing_response(),
-		runs([`Publish ${LOWER_TAG}`], publish_status),
-		response(200, { jobs: [] }),
-		ladder_answer,
-		...release_answers(),
-	]
+function lost_check(publish_status: string): Array<Response> {
+	return [runs([`Publish ${LOWER_TAG}`], publish_status), response(200, { jobs: [] })]
+}
 
-	for (const answer of answers) request.mockResolvedValueOnce(answer)
+// Each poll reads the lower tag's Publish run before its release.
+function kit_request(...answers: Array<Response>): ReleaseRequest {
+	const request = vi.fn()
+
+	for (const answer of [missing_response(), ...answers, ...release_answers()]) {
+		request.mockResolvedValueOnce(answer)
+	}
 
 	return request
 }
 
+function waited_request(publish_status: string): ReleaseRequest {
+	return kit_request(
+		...lost_check(publish_status),
+		missing_response(),
+		...lost_check(publish_status),
+		response(200, { tag_name: LOWER_TAG }),
+	)
+}
+
 describe('a lower tag published in kit without a release', () => {
 	it('is skipped once its Publish run has completed', async () => {
-		const request = kit_request('completed', response(200, { tag_name: FLOOR }))
+		const request = kit_request(
+			...lost_check('completed'),
+			missing_response(),
+			response(200, { tag_name: FLOOR }),
+		)
 
 		expect(await github_release.publish(request, TOKEN, TAG, KIT)).toBe(
 			`published ${TAG} from ${FLOOR}`,
 		)
 	})
 
+	// The run completes only after creating the release, so the release read after it is not missed.
+	it('is the baseline when its release appears as its Publish run completes', async () => {
+		const request = kit_request(...lost_check('completed'), response(200, { tag_name: LOWER_TAG }))
+
+		expect(await github_release.publish(request, TOKEN, TAG, KIT)).toBe(
+			`published ${TAG} from ${LOWER_TAG}`,
+		)
+	})
+
 	it('is waited for while its Publish run is still in progress', async () => {
-		const request = kit_request('in_progress', response(200, { tag_name: LOWER_TAG }))
+		const request = waited_request('in_progress')
 		const wait = vi.fn().mockResolvedValue(undefined)
 
 		expect(await github_release.publish(request, TOKEN, TAG, { ...KIT, wait })).toBe(
@@ -83,7 +104,7 @@ describe('a lower tag published in kit without a release', () => {
 
 	// A workflow file synced before the setting existed names no release run to rule the tag out.
 	it('is waited for when no workflow is named as creating its release', async () => {
-		const request = kit_request('completed', response(200, { tag_name: LOWER_TAG }))
+		const request = waited_request('completed')
 		const wait = vi.fn().mockResolvedValue(undefined)
 		const options = { ...KIT, release_run_workflow: undefined, wait }
 

@@ -130,11 +130,13 @@ async function default_wait(): Promise<void> {
 	await setTimeout(POLL_INTERVAL_MS)
 }
 
+// The lost state is read before the release: a run completes only after creating the release, so a
+// run that completes between the two reads still shows its release to the second one.
 async function release_state(client: Client, tag: string): Promise<PollState> {
+	const is_lost = await github_release_runs.is_release_lost(run_source(client), tag)
 	if (await existing_release(client, tag)) return 'ready'
-	if (await github_release_runs.is_release_lost(run_source(client), tag)) return 'failed'
 
-	return 'pending'
+	return is_lost ? 'failed' : 'pending'
 }
 
 async function poll(
