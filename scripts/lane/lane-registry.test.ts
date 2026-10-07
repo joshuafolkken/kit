@@ -226,3 +226,19 @@ describe('finding one lane', () => {
 		expect(lane_registry.find_lane(lanes, '9999')).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#3370: the stray sweep keeps off every registered work tree, not only the ones
+// that read as lanes — a checkout at a lane's path on another branch is still someone's.
+describe('every registered work tree', () => {
+	it('names each directory git registers, lane or not', async () => {
+		const spike = [`worktree ${LANE_ROOT}/1600`, HEAD_LINE, 'branch refs/heads/spike'].join('\n')
+
+		list_of(lane_block('1490'), spike)
+
+		expect(await lane_registry.registered_directories()).toStrictEqual([
+			MAIN_TREE,
+			path.join(LANE_ROOT, '1490'),
+			path.join(LANE_ROOT, '1600'),
+		])
+	})
+})

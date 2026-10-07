@@ -420,7 +420,7 @@ pnpm josh lane:prune
 
 **Options:**
 
-- `lane:close --all` — close every lane; `lane:prune` — close lanes left registered without a work tree.
+- `lane:close --all` — close every lane; `lane:prune` — close lanes left registered without a work tree, then sweep unregistered leftovers under the lanes root: a directory whose every file is recoverable from git is removed, anything else is kept and reported with its reason.
 
 **Settings:**
 

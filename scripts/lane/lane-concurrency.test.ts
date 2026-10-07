@@ -62,7 +62,7 @@ const FIRST_ISSUE = '7001'
 const SECOND_ISSUE = '7002'
 const OPENED = 'opened'
 const PARKED_FILE = 'parked.txt'
-const SEAT_LOCK_DIR = '.seat-locks'
+const { SEAT_LOCK_DIR } = lane_paths
 // `ports/index.js`: a lane's ports are the base plus its seat, with a root `.env` absent counting as
 // seed 0 — which is the fixture's state.
 const DEV_PORT_BASE = 5173
