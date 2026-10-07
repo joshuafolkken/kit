@@ -30,8 +30,12 @@
  * manifest that arrived with the two fields out of step kept the pnpm dual-declaration
  * warning forever. The alignment is idempotent, so running it unconditionally is free.
  *
- * Registry and pnpm failures stay non-fatal: they are logged and swallowed (exit 0)
- * so the rest of the `josh latest` chain (`latest:update`, `audit`) keeps running.
+ * A failed bump exits non-zero with its cause, the manifest restored (#3361). It used to be
+ * swallowed as a skip, so `latest:scope --record` marked the run fresh and a pnpm that could not
+ * self-update (the Corepack shim refuses it) stayed pinned silently. `josh latest` runs this step
+ * last, right before the record, so the dependency update and the audit still finish and only the
+ * record is withheld. A registry answer not newer than the pin, or nothing aged past the
+ * quarantine window yet, remains a non-fatal skip.
  *
  * Usage: tsx scripts/version/latest-corepack.ts
  */
@@ -54,9 +58,19 @@ const WORKSPACE_PATH = 'pnpm-workspace.yaml'
 const SHA512_BYTES = 64
 const INTEGRITY_RE = /^sha512-([A-Za-z0-9+/]+={0,2})$/u
 const PACKAGE_MANAGER_VALUE_RE = /("packageManager"\s*:\s*")pnpm@[^"]+(")/u
+
+// `target` is undefined both when the registry did not answer and when it answered but nothing has
+// aged past the quarantine window yet; only the first is a failure (#3361).
+interface TargetResolution {
+	target: string | undefined
+	is_registry_reachable: boolean
+}
+
 const PNPM_DEVELOPMENT_MANAGER_SCHEMA = z.object({ name: z.literal('pnpm'), version: z.string() })
 const DEV_ENGINES_SCHEMA = z.object({ packageManager: PNPM_DEVELOPMENT_MANAGER_SCHEMA })
 const DEV_ENGINES_PNPM_SCHEMA = z.object({ devEngines: DEV_ENGINES_SCHEMA.optional() })
+const COREPACK_REMEDY =
+	'pnpm runs through the Corepack shim, where pnpm 11+ refuses self-update (ERR_PNPM_CANT_SELF_UPDATE_IN_COREPACK). Run `corepack disable pnpm`, install a standalone pnpm (https://pnpm.io/installation), then rerun josh latest.'
 
 function extract_development_engines_version(package_json_content: string): string | undefined {
 	const parsed = DEV_ENGINES_PNPM_SCHEMA.safeParse(
@@ -128,22 +142,33 @@ function query_release_times(): Record<string, string> | undefined {
 	return extract_times_json(result.stdout)
 }
 
+function to_resolution(
+	version: string | undefined,
+	is_registry_reachable: boolean,
+): TargetResolution {
+	const target = version === undefined ? undefined : `${TARGET_PREFIX}${version}`
+
+	return { target, is_registry_reachable }
+}
+
 // Ask the registry for the newest pnpm release on the pinned major that has aged past the
-// quarantine window. Returns undefined when the query fails or nothing qualifies yet.
-function query_major_latest_version(major: string): string | undefined {
+// quarantine window.
+function resolve_major_target(major: string): TargetResolution {
 	const times = query_release_times()
-	if (times === undefined) return undefined
+	if (times === undefined) return to_resolution(undefined, false)
 
 	// The project's own `pnpm-workspace.yaml`, deliberately not the upward walk the version check
 	// uses: `josh latest` reads `package.json` and writes the pnpm pin relative to the working
 	// directory, so it has no subdirectory case — and honouring an ancestor's policy here could freeze
 	// pnpm bumps in a project that declares none (joshuafolkken/kit#808).
-	return release_age.select_aged_version(
+	const version = release_age.select_aged_version(
 		times,
 		major,
 		release_age.read_minimum_release_age(WORKSPACE_PATH),
 		Date.now(),
 	)
+
+	return to_resolution(version, true)
 }
 
 function parse_latest_version(stdout: string): string | undefined {
@@ -163,24 +188,40 @@ function query_latest_version(): string | undefined {
 	return parse_latest_version(result.stdout)
 }
 
-// The value handed to pnpm self-update: an exact registry-resolved version on the pinned
-// major, the latest exact version when no major can be read from package.json, or undefined when
-// the registry could not answer (the caller skips non-fatally).
+// The target handed to pnpm self-update: an exact registry-resolved version on the pinned major, or
+// the latest exact version when no major can be read from package.json. The latest-version query
+// has no quarantine selection, so resolving nothing there always means the registry did not answer.
+function resolve_target(major: string | undefined): TargetResolution {
+	if (major !== undefined) return resolve_major_target(major)
+	const version = query_latest_version()
+
+	return to_resolution(version, version !== undefined)
+}
+
 function resolve_corepack_target(major: string | undefined): string | undefined {
-	const version = major === undefined ? query_latest_version() : query_major_latest_version(major)
-	if (version === undefined) return undefined
-
-	return `pnpm@${version}`
+	return resolve_target(major).target
 }
 
-// Non-fatal skip message shared by both skip paths: keep the josh latest chain
-// (latest:update, audit) running instead of aborting on a bump failure.
+// Non-fatal skip message for a registry answer with nothing to adopt — nothing to bump, nothing failed.
 function warn_skip(reason: string): void {
-	console.warn(`⚠ Skipped pnpm bump (${reason}); the chain continues.`)
+	console.warn(`⚠ Skipped pnpm bump (${reason}).`)
 }
 
-function warn_unresolved(major: string | undefined = ''): void {
-	warn_skip(`no pnpm ${major} release resolvable from the registry`)
+// Every failure path ends here, so the exit status the `josh latest` chain stops on is one value.
+function fail_bump(reason: string): number {
+	console.error(
+		`✖ pnpm bump failed (${reason}); the run is not recorded, so the next josh latest retries it.`,
+	)
+
+	return FAILURE_EXIT_CODE
+}
+
+// Corepack exports COREPACK_ROOT to the package manager it launches, and pnpm 11+ refuses
+// `self-update` under it (ERR_PNPM_CANT_SELF_UPDATE_IN_COREPACK), so the remedy is named there.
+function fail_self_update(status: number, environment: NodeJS.ProcessEnv = process.env): number {
+	if (environment['COREPACK_ROOT'] !== undefined) console.error(COREPACK_REMEDY)
+
+	return fail_bump(`pnpm self-update exited ${String(status)}`)
 }
 
 function run_pnpm_update(target: string): number {
@@ -191,17 +232,6 @@ function run_pnpm_update(target: string): number {
 	const result = execaSync('pnpm', ['self-update', version], { stdio: 'inherit', reject: false })
 
 	return result.exitCode ?? FAILURE_EXIT_CODE
-}
-
-// The target is an already-resolved exact version, so a non-zero status here is a
-// genuine pnpm or network failure; a later run retries. Returns whether a skip
-// happened.
-function did_warn_skip(status: number): boolean {
-	if (status === 0) return false
-
-	warn_skip(`pnpm self-update exited ${String(status)}`)
-
-	return true
 }
 
 // Realign `devEngines.packageManager.version` with the `packageManager` pin so the two
@@ -224,7 +254,7 @@ function restore_package_json(
 	package_json_path: string = PACKAGE_JSON_PATH,
 ): void {
 	writeFileSync(package_json_path, content)
-	console.info('✔ Restored package.json pin (pnpm bump skipped)')
+	console.info('✔ Restored package.json pin (pnpm bump failed)')
 }
 
 function decode_integrity(encoded: string): string | undefined {
@@ -292,35 +322,19 @@ function notify_skipped_bump(target: string, pinned_version: string): void {
 	warn_skip(`registry answered ${target}, below the pinned ${pinned_version}`)
 }
 
-// Resolve the pnpm target with the pin floor applied. Undefined means the bump was
-// skipped and the reason has already been logged.
-function resolve_floored_target(original: string, major: string | undefined): string | undefined {
-	const target = resolve_corepack_target(major)
-
-	if (target === undefined) {
-		warn_unresolved(major)
-
-		return undefined
-	}
-
-	const pinned_version = extract_pinned_version(original)
-	if (!is_target_not_newer_than_pin(target, pinned_version)) return target
-
-	notify_skipped_bump(target, pinned_version ?? '')
-
-	return undefined
-}
-
-function restore_after_update(original: string, target: string, integrity: string): void {
+function restore_after_update(original: string, target: string, integrity: string): number {
 	try {
 		restore_integrity(target, integrity)
+
+		return 0
 	} catch {
 		restore_package_json(original)
-		warn_skip('pnpm self-update wrote an unexpected pin')
+
+		return fail_bump('pnpm self-update wrote an unexpected pin')
 	}
 }
 
-function pin_unpinned_manifest(original: string, target: string, integrity: string): void {
+function pin_unpinned_manifest(original: string, target: string, integrity: string): number {
 	const manifest = z.record(z.string(), z.unknown()).parse(json_value.parse_or_undefined(original))
 	const pinned = JSON.stringify(
 		{ ...manifest, packageManager: `${target}+${integrity}` },
@@ -334,53 +348,71 @@ function pin_unpinned_manifest(original: string, target: string, integrity: stri
 	)
 
 	const result = execaSync('pnpm', ['--version'], { reject: false })
-	if (result.exitCode === 0 && result.stdout.trim() === target.slice(TARGET_PREFIX.length)) return
+	if (result.exitCode === 0 && result.stdout.trim() === target.slice(TARGET_PREFIX.length)) return 0
 
 	restore_package_json(original)
-	warn_skip('the newly pinned pnpm version could not start')
+
+	return fail_bump('the newly pinned pnpm version could not start')
 }
 
-function update_pinned_manifest(original: string, target: string, integrity: string): void {
-	const is_skipped = did_warn_skip(run_pnpm_update(target))
+// The target is an already-resolved exact version, so a non-zero status here is a genuine
+// pnpm, Corepack or network failure.
+function update_pinned_manifest(original: string, target: string, integrity: string): number {
+	const status = run_pnpm_update(target)
+	if (status === 0) return restore_after_update(original, target, integrity)
 
-	if (is_skipped) {
-		restore_package_json(original)
+	restore_package_json(original)
 
-		return
-	}
-
-	restore_after_update(original, target, integrity)
+	return fail_self_update(status)
 }
 
 // Query integrity before mutating the manifest; self-update writes both pins without it.
-function bump_package_manager(original: string, target: string): void {
+function bump_package_manager(original: string, target: string): number {
 	const integrity = query_integrity(target)
+	if (integrity === undefined) return fail_bump(`no integrity for ${target}`)
+	if (!PACKAGE_MANAGER_RE.test(original)) return pin_unpinned_manifest(original, target, integrity)
 
-	if (integrity === undefined) {
-		warn_skip(`no integrity for ${target}`)
-
-		return
-	}
-
-	if (!PACKAGE_MANAGER_RE.test(original)) {
-		pin_unpinned_manifest(original, target, integrity)
-
-		return
-	}
-
-	update_pinned_manifest(original, target, integrity)
+	return update_pinned_manifest(original, target, integrity)
 }
 
-function main(): void {
+// An unreachable registry fails, so the unrecorded run is retried. A reachable one with nothing
+// aged past the quarantine window is the kit#768 skip — like a not-newer answer, there is nothing
+// to adopt yet, and failing would stall every run for up to the whole window.
+function report_unresolved(major: string | undefined, is_registry_reachable: boolean): number {
+	const label = `pnpm ${major ?? ''}`.trimEnd()
+	if (!is_registry_reachable) return fail_bump(`the registry did not answer for ${label}`)
+
+	warn_skip(`no ${label} release has aged past the quarantine window yet`)
+
+	return 0
+}
+
+// Resolve the pnpm target with the pin floor applied, then bump.
+function bump_to_registry_target(original: string, major: string | undefined): number {
+	const { target, is_registry_reachable } = resolve_target(major)
+	if (target === undefined) return report_unresolved(major, is_registry_reachable)
+
+	const pinned_version = extract_pinned_version(original)
+
+	if (!is_target_not_newer_than_pin(target, pinned_version)) {
+		return bump_package_manager(original, target)
+	}
+
+	notify_skipped_bump(target, pinned_version ?? '')
+
+	return 0
+}
+
+function main(): number {
 	const original = readFileSync(PACKAGE_JSON_PATH, 'utf8')
-	const major = extract_pnpm_major(original)
-	const target = resolve_floored_target(original, major)
-	if (target !== undefined) bump_package_manager(original, target)
+	const status = bump_to_registry_target(original, extract_pnpm_major(original))
 
 	sync_development_engines()
+
+	return status
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main()
+if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = main()
 
 const latest_corepack = {
 	extract_pnpm_major,
@@ -388,12 +420,11 @@ const latest_corepack = {
 	is_target_not_newer_than_pin,
 	notify_skipped_bump,
 	extract_times_json,
-	query_major_latest_version,
 	resolve_corepack_target,
 	run_pnpm_update,
 	query_integrity,
 	restore_integrity,
-	did_warn_skip,
+	fail_self_update,
 	sync_development_engines,
 	restore_package_json,
 	main,
