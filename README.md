@@ -5,9 +5,9 @@
 [![npm version](https://img.shields.io/npm/v/@joshuafolkken/kit)](https://www.npmjs.com/package/@joshuafolkken/kit)
 [![License](https://img.shields.io/github/license/joshuafolkken/kit)](./LICENSE)
 
-[![Node.js](https://img.shields.io/node/v/@joshuafolkken/kit?logo=nodedotjs)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fjoshuafolkken%2Fkit%2Fmain%2Fpackage.json&search=%22node%22%3A%20%22%5C%5E%28%5B0-9%5D%2B%5C.%5B0-9%5D%2B%29%5B0-9.%5D%2A%20%5C%7C%5C%7C%20%5C%5E%28%5B0-9%5D%2B%29%5B0-9.%5D%2A%20%5C%7C%5C%7C%20%3E%3D%28%5B0-9%5D%2B%29&replace=%5E%241%20%7C%20%5E%242%20%7C%20%3E%3D%243&logo=nodedotjs&label=Node.js)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/npm/dependency-version/@joshuafolkken/kit/peer/typescript?logo=typescript)](https://www.typescriptlang.org/)
-[![pnpm](https://img.shields.io/github/package-json/packageManager/joshuafolkken/kit?logo=pnpm&label=pnpm)](https://pnpm.io/)
+[![pnpm](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fjoshuafolkken%2Fkit%2Fmain%2Fpackage.json&search=pnpm%40%28%5B0-9.%5D%2B%29&replace=%241&logo=pnpm&label=pnpm)](https://pnpm.io/)
 
 [![CI](https://github.com/joshuafolkken/kit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/joshuafolkken/kit/actions/workflows/ci.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=joshuafolkken_kit&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=joshuafolkken_kit)
