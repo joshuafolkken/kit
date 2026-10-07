@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { git_command } from '#scripts/git/git-command'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 import { release_history } from './release-history'
 import { release_plan, type ReleasePlan } from './release-plan'
@@ -18,6 +19,9 @@ import { release_publish } from './release-publish'
 // root on the default branch) and can start even when the root is dirty or on another branch.
 
 const DRY_RUN_FLAG = '--dry-run'
+const KNOWN_FLAGS: ReadonlyArray<string> = [DRY_RUN_FLAG]
+const HELP_FLAGS: ReadonlySet<string> = new Set(['--help', '-h'])
+const COMMAND_NAME = 'release'
 const ARGUMENT_START = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -73,9 +77,32 @@ function is_dry_run_requested(argv: ReadonlyArray<string>): boolean {
 	return argv.slice(ARGUMENT_START).includes(DRY_RUN_FLAG)
 }
 
+// **Only a known argument reaches the release** (joshuafolkken/kit#3384). The command publishes,
+// so a `--help` it did not read once started a real release; a help request now prints the usage, and
+// anything else unknown is refused, both before the first fetch.
+async function run_argv(argv: ReadonlyArray<string>): Promise<number> {
+	const given = argv.slice(ARGUMENT_START)
+
+	if (given.some((argument) => HELP_FLAGS.has(argument))) {
+		console.info(cli_flags.usage_line(KNOWN_FLAGS, COMMAND_NAME))
+
+		return SUCCESS_EXIT_CODE
+	}
+
+	const refusal = cli_flags.refuse_unknown_flags(given, KNOWN_FLAGS, COMMAND_NAME)
+
+	if (refusal !== undefined) {
+		console.error(refusal)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	return await run(is_dry_run_requested(argv))
+}
+
 async function main(): Promise<void> {
 	try {
-		process.exit(await run(is_dry_run_requested(process.argv)))
+		process.exit(await run_argv(process.argv))
 	} catch (error) {
 		console.error(error_text.message_of(error))
 		process.exit(FAILURE_EXIT_CODE)
@@ -84,6 +111,6 @@ async function main(): Promise<void> {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) void main()
 
-const release_cli = { is_dry_run_requested, run, DRY_RUN_FLAG }
+const release_cli = { is_dry_run_requested, run, run_argv, DRY_RUN_FLAG }
 
 export { release_cli }

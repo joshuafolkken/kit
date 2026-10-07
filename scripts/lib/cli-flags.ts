@@ -1,9 +1,15 @@
 import { parseArgs, type ParseArgsConfig, type ParseArgsOptionsConfig } from 'node:util'
 
 // Argument reading for the commands under `scripts/`.
-//
+
+// The usage line `refuse_unknown_flags` ends with, for a command that prints it on its own help
+// request (`josh release --help`, joshuafolkken/kit#3384).
+function usage_line(known_flags: ReadonlyArray<string>, command: string): string {
+	return `Usage: josh ${command} [${known_flags.join('] [')}]`
+}
+
 // Reject anything not on the list rather than ignoring it: a misspelled `--dryrun` that fell through
-// would run the real write path. `josh propagate` and `josh adopt` both write into working trees, so
+// would run the real write path. `josh propagate`, `josh adopt` and `josh release` all write, so
 // the refusal is single-sourced here rather than described once per command (`CLAUDE.md` → "No
 // clones").
 function refuse_unknown_flags(
@@ -13,9 +19,8 @@ function refuse_unknown_flags(
 ): string | undefined {
 	const unknown = argv.filter((argument) => !known_flags.includes(argument))
 	if (unknown.length === 0) return undefined
-	const usage = `Usage: josh ${command} [${known_flags.join('] [')}]`
 
-	return `Unknown argument(s): ${unknown.join(' ')}\n${usage}`
+	return `Unknown argument(s): ${unknown.join(' ')}\n${usage_line(known_flags, command)}`
 }
 
 // `parseArgs`, answering `undefined` where it would throw — an unknown flag, a missing option value,
@@ -123,6 +128,7 @@ function attach_values(
 
 const cli_flags = {
 	attach_values,
+	usage_line,
 	refuse_unknown_flags,
 	parse_or_undefined,
 	values_of,

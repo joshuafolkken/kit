@@ -89,6 +89,14 @@ describe('cli_flags.refuse_unknown_flags', () => {
 	})
 })
 
+describe('cli_flags.usage_line', () => {
+	it('lists every known flag after the command', () => {
+		expect(cli_flags.usage_line(['--dry-run', '--force'], 'adopt')).toBe(
+			'Usage: josh adopt [--dry-run] [--force]',
+		)
+	})
+})
+
 describe('cli_flags.option_name', () => {
 	it('drops the long-flag prefix', () => {
 		expect(cli_flags.option_name('--decision-file')).toBe('decision-file')

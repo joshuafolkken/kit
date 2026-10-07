@@ -118,3 +118,48 @@ describe('release_cli.run', () => {
 		expect(release_publish.publish).not.toHaveBeenCalled()
 	})
 })
+
+describe('release_cli.run_argv', () => {
+	// A `--help` the command did not read once started a real release (joshuafolkken/kit#3384).
+	it.each(['--help', '-h'])('prints the usage and releases nothing on %s', async (flag) => {
+		arrange_run(THREE)
+
+		const code = await release_cli.run_argv([NODE, SCRIPT_NAME, flag])
+
+		expect(code).toBe(release_publish.SUCCESS_EXIT_CODE)
+		expect(console.info).toHaveBeenCalledWith('Usage: josh release [--dry-run]')
+		expect(git_command.fetch_branch).not.toHaveBeenCalled()
+		expect(release_publish.publish).not.toHaveBeenCalled()
+	})
+
+	it('refuses an unknown argument before anything is fetched', async () => {
+		arrange_run(THREE)
+		vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		const code = await release_cli.run_argv([NODE, SCRIPT_NAME, '--dryrun'])
+
+		expect(code).not.toBe(release_publish.SUCCESS_EXIT_CODE)
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('--dryrun'))
+		expect(git_command.fetch_branch).not.toHaveBeenCalled()
+		expect(release_publish.publish).not.toHaveBeenCalled()
+	})
+
+	it('passes --dry-run through as a rehearsal', async () => {
+		arrange_run(THREE)
+
+		const code = await release_cli.run_argv([NODE, SCRIPT_NAME, release_cli.DRY_RUN_FLAG])
+
+		expect(code).toBe(release_publish.SUCCESS_EXIT_CODE)
+		expect(console.info).toHaveBeenCalled()
+		expect(release_publish.publish).not.toHaveBeenCalled()
+	})
+
+	it('releases with no arguments', async () => {
+		arrange_run(THREE)
+
+		const code = await release_cli.run_argv([NODE, SCRIPT_NAME])
+
+		expect(code).toBe(release_publish.SUCCESS_EXIT_CODE)
+		expect(release_publish.publish).toHaveBeenCalledTimes(1)
+	})
+})
