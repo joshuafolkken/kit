@@ -1,4 +1,13 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+	existsSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { step_zero_notice } from '#scripts/hooks/step-zero-notice'
@@ -9,15 +18,36 @@ import { hook_bundle_stamp } from './hook-bundle-stamp'
 import { lane_cut_fixture } from './lane-cut-fixture'
 
 const BUILD_TIMEOUT_MS = 60_000
-const TSX_BIN = path.join('node_modules', '.bin', 'tsx')
+const REPO_ROOT = process.cwd()
+const TSX_BIN = path.join(REPO_ROOT, 'node_modules', '.bin', 'tsx')
 const UNFORMATTED_JSON = '{"value":1}'
 const CODEX_ADAPTER_SOURCE = 'scripts/hooks/codex-hook-adapter.ts'
 const CODEX_ADAPTER_BUNDLE = 'dist/hooks/codex-hook-adapter.js'
 const PRETOOL_BUNDLE = 'dist/hooks/pretool-guard.js'
 const FORMAT_BUNDLE = 'dist/hooks/format-edited.js'
 
+// Linked into the format fixture so the hook, run from there, finds this project's prettier binary
+// and config exactly as it does from the repository root.
+const FORMAT_LINKS = ['node_modules', 'prettier.config.js']
+
+// The format fixture lives outside the repository: `pnpm pack` walks every directory under the root —
+// ignore files included — so a fixture removed there between its readdir and stat failed the
+// pack-boundary test (joshuafolkken/kit#3372). The hook formats only files under its working
+// directory, so its runs use the fixture as that directory. The path is resolved because the hook's
+// working directory is: a symlinked tmpdir (macOS `/var` → `/private/var`) would read as outside it.
+function create_format_directory(): string {
+	const created = mkdtempSync(path.join(tmpdir(), 'codex-hook-'))
+	const format_root = realpathSync(created)
+
+	for (const name of FORMAT_LINKS) {
+		symlinkSync(path.join(REPO_ROOT, name), path.join(format_root, name))
+	}
+
+	return format_root
+}
+
 const directory = mkdtempSync(path.join(tmpdir(), 'build-hooks-'))
-const format_directory = mkdtempSync(path.join(process.cwd(), '.codex-hook-fixture-'))
+const format_directory = create_format_directory()
 const TRANSCRIPT_PATH = path.join(directory, 't.jsonl')
 
 interface RunResult {
@@ -29,11 +59,13 @@ async function run(
 	command: string,
 	args: ReadonlyArray<string>,
 	input: string,
+	cwd: string = REPO_ROOT,
 ): Promise<RunResult> {
 	// The Step 0 notice speaks once per transcript (joshuafolkken/kit#2994), so the first of a
 	// source-then-bundle pair would spend it and the second run silently. Each run starts unstamped.
 	rmSync(step_zero_notice.stamp_path(TRANSCRIPT_PATH), { force: true })
 	const { stdout, exitCode: exit_code } = await execa(command, [...args], {
+		cwd,
 		input,
 		// `JOSH_WATCHER_GUARD` is off so the composed watcher guard (joshuafolkken/kit#2353) does not read
 		// this machine's live lane registry: it fires on ambient state, not the payload, and records a
@@ -91,7 +123,12 @@ async function format_with_entrypoint(
 	entrypoint: string,
 ): Promise<{ content: string; result: RunResult }> {
 	writeFileSync(file_path, UNFORMATTED_JSON)
-	const result = await run(command, [entrypoint, 'posttool'], patch_payload(file_path))
+	const result = await run(
+		command,
+		[path.resolve(entrypoint), 'posttool'],
+		patch_payload(file_path),
+		format_directory,
+	)
 
 	return { content: readFileSync(file_path, 'utf8'), result }
 }
@@ -128,13 +165,24 @@ describe('launched hook bundles run their main', () => {
 		expect(result.stdout).toContain('JOSH_BATCH_GUARD')
 	})
 
+	it('keeps the format fixture outside the repository pnpm pack walks', () => {
+		const relative = path.relative(REPO_ROOT, format_directory)
+
+		expect(relative.split(path.sep)[0]).toBe('..')
+	})
+
 	it(
 		'formats the edited file',
 		async () => {
 			const file_path = path.join(format_directory, 'claude.json')
 
 			writeFileSync(file_path, UNFORMATTED_JSON)
-			await run('node', [FORMAT_BUNDLE], payload('Edit', { file_path }))
+			await run(
+				'node',
+				[path.resolve(FORMAT_BUNDLE)],
+				payload('Edit', { file_path }),
+				format_directory,
+			)
 
 			expect(readFileSync(file_path, 'utf8')).not.toBe(UNFORMATTED_JSON)
 		},

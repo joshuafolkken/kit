@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import { HOOK_BUNDLES } from './build-hooks'
 import { import_closure, SCRIPTS_DIR } from './import-closure-fixture'
 
@@ -68,12 +69,31 @@ interface PackReport {
 	files?: Array<PackedEntry>
 }
 
+interface CommandFailure {
+	stdout?: string
+	stderr?: string
+}
+
+// With `--json`, pnpm writes its error to stdout rather than stderr, so a failure carries both
+// streams — `Command failed` alone left the cause of a flaky run unrecorded (joshuafolkken/kit#3372).
+function run_pack(cwd: string): string {
+	try {
+		return execFileSync('pnpm', ['pack', '--dry-run', '--json', '--config.ignore-scripts=true'], {
+			cwd,
+			encoding: 'utf8',
+			stdio: 'pipe',
+		})
+	} catch (error) {
+		const { stdout = '', stderr = '' } = error as CommandFailure
+
+		throw new Error(`pnpm pack failed in ${cwd}\nstdout:\n${stdout}\nstderr:\n${stderr}`, {
+			cause: error,
+		})
+	}
+}
+
 function packed_files(): Set<string> {
-	const raw = execFileSync(
-		'pnpm',
-		['pack', '--dry-run', '--json', '--config.ignore-scripts=true'],
-		{ cwd: REPO_ROOT, encoding: 'utf8' },
-	)
+	const raw = run_pack(REPO_ROOT)
 	const parsed = JSON.parse(raw) as PackReport | Array<PackReport>
 	const report = Array.isArray(parsed) ? parsed[0] : parsed
 
@@ -138,6 +158,18 @@ describe('the published package boundary', () => {
 			.filter((relative) => !packed.has(relative))
 
 		expect(missing).toEqual([])
+	})
+})
+
+describe('a failed pnpm pack', () => {
+	it('reports what pnpm printed rather than only that the command failed', () => {
+		const directory = mkdtempSync(path.join(tmpdir(), 'pack-boundary-'))
+
+		onTestFinished(() => {
+			rmSync(directory, { recursive: true, force: true })
+		})
+
+		expect(() => run_pack(directory)).toThrow(/stdout:\n\S[\s\S]*ERR_PNPM/u)
 	})
 })
 
