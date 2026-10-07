@@ -1,6 +1,6 @@
 import { build_package_manager_manifest } from '#scripts/version/package-manager-manifest-fixture'
 import { package_manager_version } from '#scripts/version/package-manager-version'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { init } from './init'
 
 interface PackageJson {
@@ -26,5 +26,22 @@ describe('init.apply_package_json_merges devEngines alignment', () => {
 
 		expect(pin).toBe(PINNED_VERSION)
 		expect(parsed.devEngines.packageManager.version).toBe(PINNED_VERSION)
+	})
+})
+
+// A fresh project installed by a pnpm newer than kit's pin keeps that pnpm, so the `pnpm install`
+// `josh init` runs next resolves the lockfile it wrote (joshuafolkken/kit#3367).
+describe('init.apply_package_json_merges pin of a fresh project', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('pins the running pnpm when it is newer than the kit pin', () => {
+		vi.stubEnv('npm_config_user_agent', 'pnpm/999.0.0 npm/? node/v24.9.0 darwin arm64')
+		const result = init.apply_package_json_merges('{ "name": "fresh" }\n')
+		const parsed = JSON.parse(result) as PackageJson
+
+		expect(parsed.packageManager).toBe('pnpm@999.0.0')
+		expect(parsed.devEngines.packageManager.version).toBe('999.0.0')
 	})
 })
