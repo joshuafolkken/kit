@@ -268,7 +268,7 @@
 		"eslint-plugin-unicorn": "^77.0.0",
 		"eslint_d": "^15.0.3",
 		"globals": "^17.13.0",
-		"lefthook": "^2.1.16",
+		"lefthook": "^2.1.17",
 		"prettier": "^3.9.9",
 		"prettier-plugin-svelte": "^4.1.1",
 		"prettier-plugin-tailwindcss": "^0.8.1",
@@ -276,7 +276,7 @@
 		"rollup-plugin-dts": "^6.5.1",
 		"secretlint": "^13.0.7",
 		"typescript": "^6.0.3",
-		"typescript-eslint": "^8.71.0",
+		"typescript-eslint": "^8.71.1",
 		"vitest": "^5.0.3"
 	},
 	"dependencies": {

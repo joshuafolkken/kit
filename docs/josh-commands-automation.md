@@ -419,6 +419,8 @@ Create the GitHub Release for a tag `josh release` cut, with notes generated fro
 GH_TOKEN=… RELEASE_TAG=v1.2.0 GITHUB_REPOSITORY=owner/repo pnpm josh release:github
 ```
 
+It takes no arguments: `--help` / `-h` prints the usage line and exits 0 without reading the environment or releasing, and any other argument is refused with the usage line and a non-zero exit, before anything is released.
+
 | Environment             | Meaning                                                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------------------------------- |
 | `GH_TOKEN`              | Token with `contents: write` and `actions: read`. Required                                              |
