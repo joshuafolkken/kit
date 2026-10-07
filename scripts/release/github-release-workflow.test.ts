@@ -7,7 +7,8 @@ import { init_logic } from '#scripts/init/init-logic'
 import { afterEach, describe, expect, it } from 'vitest'
 
 const TEMPLATE = 'templates/workflows/github-release.yml'
-const KIT_PUBLISH = '.github/workflows/publish.yml'
+const KIT_PUBLISH_WORKFLOW = 'publish.yml'
+const KIT_PUBLISH = `.github/workflows/${KIT_PUBLISH_WORKFLOW}`
 const RELEASE_STEP = 'Publish GitHub Release'
 const SELECT_STEP = 'release'
 const TAG = 'v0.107.0'
@@ -78,8 +79,16 @@ describe('distributed GitHub Release workflow', () => {
 				RELEASE_TAG: '${{ steps.release.outputs.tag }}',
 				RELEASE_WORKFLOW: '${{ steps.release.outputs.workflow }}',
 				RELEASE_AWAIT_PUBLISH: '${{ steps.release.outputs.await }}',
+				RELEASE_RUN_WORKFLOW: 'github-release.yml',
 			},
 		})
+	})
+
+	// A later tag finds this run by its title to tell whether the lower tag's release is still coming.
+	it('names each run after the tag it releases', () => {
+		expect(ci_yml_fixture.read_workflow(TEMPLATE)).toMatch(
+			/^run-name: GitHub Release \$\{\{ github\.event\.client_payload\.tag \}\}$/mu,
+		)
 	})
 })
 
@@ -104,8 +113,9 @@ it("keeps kit's own release on its start tag and publish jobs", () => {
 		run: RELEASE_COMMAND,
 		env: {
 			RELEASE_START_TAG: 'v1.887.0',
-			RELEASE_WORKFLOW: 'publish.yml',
+			RELEASE_WORKFLOW: KIT_PUBLISH_WORKFLOW,
 			RELEASE_JOBS: 'pack,publish-github,publish-npm,update-production',
+			RELEASE_RUN_WORKFLOW: KIT_PUBLISH_WORKFLOW,
 		},
 	})
 })

@@ -183,3 +183,5 @@ jobs:
           RELEASE_START_TAG: v1.887.0
           RELEASE_WORKFLOW: publish.yml
           RELEASE_JOBS: pack,publish-github,publish-npm,update-production
+          # This run creates its tag's release, so a lower tag whose run finished without one is lost.
+          RELEASE_RUN_WORKFLOW: publish.yml

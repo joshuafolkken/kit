@@ -427,8 +427,9 @@ GH_TOKEN=… RELEASE_TAG=v1.2.0 GITHUB_REPOSITORY=owner/repo pnpm josh release:g
 | `RELEASE_WORKFLOW`      | Publish workflow (file or id) whose failed run for a lower tag skips it. Unset: wait for its release    |
 | `RELEASE_JOBS`          | Comma-separated jobs in that workflow whose failure counts. Unset: any failed job                       |
 | `RELEASE_AWAIT_PUBLISH` | `true`: wait for the tag's own `Publish <tag>` run in `RELEASE_WORKFLOW` to succeed; skip when it fails |
+| `RELEASE_RUN_WORKFLOW`  | Workflow whose run creates a tag's release (`RELEASE_WORKFLOW` when it does). Unset: wait for a release |
 
-Releases are created in version order: a later tag waits for the nearest lower tag above the floor to get its release, and skips it when that tag's publication failed. A tag that already has a release is left alone. The consumer's release workflow needs the `.github/release.yml` categories and a `Publish` workflow titled `Publish <tag>` (`run-name`) when it has one.
+Releases are created in version order: a later tag waits for the nearest lower tag above the floor to get its release, and skips it when that tag's publication failed, or when its `Publish <tag>` run has completed without a release and no run in `RELEASE_RUN_WORKFLOW` is still at work on it — such a tag never gains a release. A run there is at work on the tag while it is unfinished and titled `GitHub Release <tag>`, or titled without a tag (started before the title named one). A tag that already has a release is left alone. The consumer's release workflow needs the `.github/release.yml` categories and a `Publish` workflow titled `Publish <tag>` (`run-name`) when it has one.
 
 **Output / exit codes:** prints `published <tag> from <baseline>` or `already-published`; exits non-zero on an API error, an invalid tag or repository, a latest release that is not older than the tag, or a lower tag that never gets a release within the wait budget.
 
