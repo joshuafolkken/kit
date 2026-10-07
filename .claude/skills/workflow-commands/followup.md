@@ -155,3 +155,8 @@ the tag → publish → `production` chain — outward-facing and effectively ir
 Typing `fullrun` authorizes this Issue's merge and nothing past it; a person types the release in the
 primary checkout, on the default branch, with a clean tree. `release:scope` counts nothing of its own —
 it reads the same fetch-then-count `followup` uses for the Telegram line, so the two cannot disagree.
+
+**On `required`, the release request cites the open release Issue** — the one `issue:file --release` / `issue:release <N>` links blockers to — with a number-link
+(`prompts/collaboration-workflow/issue-citation.md`). List it with
+`gh api 'repos/{owner}/{repo}/issues?labels=release&state=open' --jq '.[].number'`; when none is
+open, the request names `pnpm josh release` alone.

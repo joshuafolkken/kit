@@ -11,6 +11,7 @@ import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_file_cli } from './issue-file-cli'
+import { issue_release_cli } from './issue-release-cli'
 import { issue_scout_cli } from './issue-scout-cli'
 
 // joshuafolkken/kit#2808: `josh issue:file` runs every filing step in order, and each refusal stops
@@ -62,6 +63,7 @@ const report_for = vi.spyOn(epic_bundle_cli, 'report_for')
 const ensure_labels = vi.spyOn(repository_labels, 'ensure_labels')
 const issue_list = vi.spyOn(git_gh_issue_list, 'issue_list')
 const resolve_auto_ok = vi.spyOn(issue_auto_ok, 'resolve')
+const link_release = vi.spyOn(issue_release_cli, 'link')
 const NOT_APPLIED = { is_applied: false, reason: 'stubbed' }
 
 // A listing of `count` open Issues, in the JSON shape `issue_list` answers with.
@@ -168,6 +170,7 @@ function stub_carried(): void {
 	resolve_auto_ok.mockImplementation(async (is_opted_out) => {
 		return issue_auto_ok.decide({
 			is_opted_out,
+			is_release: false,
 			is_carried: true,
 			branch_labels: undefined,
 		})
@@ -218,14 +221,14 @@ describe('issue_file_cli.run — the auto-ok opt-out and the repositories it rea
 		stub_carried()
 
 		expect(await issue_file_cli.run(argv_of(valid_path, '--no-auto-ok'))).toBe(SUCCESS_EXIT_CODE)
-		expect(resolve_auto_ok).toHaveBeenCalledWith(true, HERE, HERE)
+		expect(resolve_auto_ok).toHaveBeenCalledWith(true, HERE, HERE, [])
 		expect(create_body()).toMatchObject({ labels: ['depth:1', 'bug'] })
 		expect(vi.mocked(console.info).mock.calls.join('\n')).toContain('auto-ok: not applied — ')
 	})
 
 	it('decides auto-ok with both the target and the current repository', async () => {
 		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', THERE))).toBe(SUCCESS_EXIT_CODE)
-		expect(resolve_auto_ok).toHaveBeenCalledWith(false, THERE, HERE)
+		expect(resolve_auto_ok).toHaveBeenCalledWith(false, THERE, HERE, [])
 	})
 
 	it('does not repeat an auto-ok already named with --label', async () => {
@@ -235,6 +238,25 @@ describe('issue_file_cli.run — the auto-ok opt-out and the repositories it rea
 			await issue_file_cli.run(argv_of(valid_path, '--label', 'auto-ok', '--label', 'run:lane')),
 		).toBe(SUCCESS_EXIT_CODE)
 		expect(create_body()).toMatchObject({ labels: ['depth:1', 'auto-ok', 'run:lane', 'bug'] })
+	})
+})
+
+// joshuafolkken/kit#3360: `--release` links the filed Issue to the target's release Issue.
+describe('issue_file_cli.run — --release', () => {
+	it('links the new Issue to the release Issue, and does nothing without the flag', async () => {
+		link_release.mockResolvedValue(true)
+
+		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(SUCCESS_EXIT_CODE)
+		expect(link_release).not.toHaveBeenCalled()
+		expect(await issue_file_cli.run(argv_of(valid_path, '--release'))).toBe(SUCCESS_EXIT_CODE)
+		expect(link_release).toHaveBeenCalledWith(ISSUE_NUMBER, HERE)
+	})
+
+	// The Issue exists once the create returns, so a link that fails is a warning, not a failure.
+	it('still succeeds when the link fails', async () => {
+		link_release.mockResolvedValue(false)
+
+		expect(await issue_file_cli.run(argv_of(valid_path, '--release'))).toBe(SUCCESS_EXIT_CODE)
 	})
 })
 

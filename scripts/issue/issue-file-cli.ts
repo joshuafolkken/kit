@@ -14,23 +14,24 @@ import { repository_labels } from '#scripts/repo/repository-labels'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_lint_cli } from './issue-lint-cli'
+import { issue_release_cli } from './issue-release-cli'
 import { issue_scout_cli } from './issue-scout-cli'
 import { issue_wip } from './issue-wip'
 
 // `josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>]…
-// [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok]` — file an Issue with every
-// filing step run in order (joshuafolkken/kit#2808): the third-party refusal, the body lint, the
-// `## Origin` check for another repository, the `auto-ok` decision (joshuafolkken/kit#3213) with the
-// run label it owes (joshuafolkken/kit#3313), the WIP cap count (joshuafolkken/kit#3181), the duplicate
-// scout, the missing workflow labels created (joshuafolkken/kit#3176), the create call carrying every
-// label, and `epic:bundle` after it.
+// [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]` — file an Issue
+// with every filing step run in order (joshuafolkken/kit#2808): the third-party refusal, the body
+// lint, the `## Origin` check for another repository, the `auto-ok` decision (joshuafolkken/kit#3213)
+// with the run label it owes (joshuafolkken/kit#3313), the WIP cap count (joshuafolkken/kit#3181), the
+// duplicate scout, the missing workflow labels created (joshuafolkken/kit#3176), the create call
+// carrying every label, the release link on `--release` (joshuafolkken/kit#3360), and `epic:bundle`.
 // A direct `gh api …/issues` filing is refused by the `direct-filing` delivered rule and pointed here.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE =
-	'Usage: josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok]'
+	'Usage: josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the filing has no repository to compare against — check `gh auth status`.'
 const THIRD_PARTY_MESSAGE =
@@ -142,6 +143,7 @@ async function labels_of(filing: Filing): Promise<ReadonlyArray<string> | undefi
 		filing.args.is_auto_ok_opted_out,
 		filing.target,
 		filing.current,
+		filing.args.labels,
 	)
 
 	console.info(issue_auto_ok.line_of(auto_ok))
@@ -177,10 +179,29 @@ async function create(filing: Filing, labels: ReadonlyArray<string>): Promise<st
 	}
 }
 
+function issue_number_of(url: string): number {
+	return Number(github_issue_url.parse(url)?.issue_number)
+}
+
+// `--release`: the filed Issue blocks the target's release Issue (joshuafolkken/kit#3360). Reported,
+// never failed, for the reason `place` gives.
+async function link_release(url: string, filing: Filing): Promise<void> {
+	if (!filing.args.is_release) return
+	const issue_number = issue_number_of(url)
+	const is_linked =
+		Number.isSafeInteger(issue_number) &&
+		(await issue_release_cli.link(issue_number, filing.target))
+
+	if (is_linked) return
+	console.error(
+		`⚠ the release link did not complete for ${url} — run \`pnpm josh issue:release <N>\`.`,
+	)
+}
+
 // The Issue exists once `create` returns, so a failed placement is reported rather than failed: a
 // non-zero exit would read as "not filed" and invite the second filing the scout exists to stop.
 async function place(url: string, target: string): Promise<void> {
-	const issue_number = Number(github_issue_url.parse(url)?.issue_number)
+	const issue_number = issue_number_of(url)
 	const exit_code = Number.isSafeInteger(issue_number)
 		? await epic_bundle_cli.report_for(issue_number, target, FRESH_ISSUE_POLL)
 		: FAILURE_EXIT_CODE
@@ -204,6 +225,7 @@ async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<numb
 
 	if (url === undefined) return FAILURE_EXIT_CODE
 	console.info(url)
+	await link_release(url, filing)
 	await place(url, filing.target)
 
 	return SUCCESS_EXIT_CODE

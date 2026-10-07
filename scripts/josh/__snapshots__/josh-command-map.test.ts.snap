@@ -413,7 +413,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "issue:file": [
-      "<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok]",
+      "<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]",
       "automation",
       [
         "network",
@@ -442,6 +442,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "issue:read": [
       "<issue...>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "issue:release": [
+      "<issue>",
       "automation",
       [
         "network",

@@ -71,6 +71,7 @@ Issue には次の要素を必ず含める。
 - **`bugfix` は PR のリリース分類であり、Issue の `bug` の代わりにしない。** `enhancement` と `breaking-change` の両方を持つ Issue の PR は `breaking-change` 一つに分類する
 - **`## 発火点`** の名前は `prompts/collaboration-workflow/rule-delivery.md` の配送表と突き合わされる
 - **`## ベースライン`** の測定コマンドは、マージ後に `pnpm josh measure:rerun <N>` が再実行して before / after を印字する（作者が `OWNER` / `MEMBER` / `COLLABORATOR` の Issue に限る）
+- **公開しないと利用側が使えない変更には `--release` を付ける**（既存 Issue は `pnpm josh issue:release <N>`）。リリース用 Issue の blocker になる（`docs/josh-commands-backlog.md` → `josh issue:release`）
 
 ### 起票元へのバックリンク（`## Origin` / `## Upstream issues`）
 
