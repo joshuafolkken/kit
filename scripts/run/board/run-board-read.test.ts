@@ -56,6 +56,7 @@ describe('run_board_read.read_local', () => {
 			scope: { issues: [3431], only: true },
 			events: [INSIDE],
 			lanes: ['3432'],
+			resume: undefined,
 		})
 	})
 
@@ -70,5 +71,35 @@ describe('run_board_read.read_local', () => {
 		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
 
 		await expect(run_board_read.read_local()).resolves.toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#3437: a stopped run offers its session; a run that begins hides it.
+describe('run_board_read.read_local resume', () => {
+	it('reads the session a stopped run resumes from, only while that run is the one drawn', async () => {
+		const stopped = {
+			invocation: EPIC_RUN,
+			started_at: STARTED_AT,
+			ended_at: ENDED_AT,
+			stopped: 'decision',
+			session: 'abc',
+		}
+		const running: CarryRead = {
+			kind: 'carried',
+			carry: {
+				invocation: 'backlogrun',
+				started_at: ENDED_AT,
+				merged: 0,
+				filed: 0,
+				cuts: 0,
+				failures: 0,
+				outages: 0,
+			},
+		}
+
+		arrange(NONE, stopped)
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ resume: 'abc' })
+		vi.mocked(run_carry.read_carry).mockReturnValue(running)
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ resume: undefined })
 	})
 })
