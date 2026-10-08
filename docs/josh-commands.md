@@ -89,16 +89,16 @@ entry fullrun  227672/229376 bytes · 1704 left
 
 ### `josh metrics`
 
-Print the repository-wide quality totals that no per-function or per-file limit sees — code lines, comment lines and the comment ratio for the non-test files under `scripts/`, the lines of the rule documents (`CLAUDE.md` and `prompts/**/*.md`), and the number of `*:guard` commands — and hold them to the baseline in `.josh/metrics-baseline.json`.
+Print the repository-wide quality totals no per-function or per-file limit sees — code lines, comment lines and the comment ratio for the non-test files under `scripts/`, the lines of the rule documents (`CLAUDE.md` and `prompts/**/*.md`), the number of `*:guard` commands, and the AI cost in bytes (resident, on demand) — and hold them to the baseline in `.josh/metrics-baseline.json`.
 
 ```bash
 pnpm josh metrics                             # print the totals and check them against the baseline
 pnpm josh metrics --accept --reason "<why>"   # raise the baseline to the current totals
 ```
 
-- **A ratchet, and a step of [`josh gate`](#josh-gate).** Exit `1` when the code lines, the comment ratio, the rule-document lines or the guard count grew past the baseline, naming each with both values. A total that shrank lowers the baseline, so that gate run records no green stamp. The only way up is `--accept --reason "<why>"`, recording the reason and date; parallel branches that each accept conflict on the file — re-run `--accept` on the merged tree.
+- **A ratchet, and a step of [`josh gate`](#josh-gate).** Exit `1` when the code lines, the comment ratio, the rule lines, the guards or either AI cost grew past the baseline, naming each with both values. A total that shrank lowers the baseline, so that gate run records no green stamp. The only way up is `--accept --reason "<why>"`, recording the reason and date; parallel branches that each accept conflict on the file — re-run `--accept` on the merged tree.
 - **kit only**: it counts kit's own rule documents and guards, so a consumer's gate leaves the step out.
-- Code lines are lint's own `max-lines` count, run in process (one lower than `josh lines` on a `#!` file); a comment line is any non-blank line lint does not count as code.
+- Code lines are lint's own `max-lines` count (one lower than `josh lines` on a `#!` file); a comment line is any other non-blank line.
 - **Durations** fail past +10% of this machine's baseline; a gate times no startup — `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' durations".
 
 ### `josh format`

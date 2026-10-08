@@ -1,17 +1,21 @@
 {
 	"scripts": {
 		"files": 972,
-		"code_lines": 80440,
-		"comment_lines": 32834,
+		"code_lines": 80498,
+		"comment_lines": 32843,
 		"comment_ratio": 0.41
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2337
+		"lines": 2345
 	},
 	"guards": 8,
+	"ai_cost": {
+		"resident_bytes": 12231,
+		"on_demand_bytes": 558074
+	},
 	"accepted": {
-		"reason": "Merged #3409 (gate, unit and startup durations) with #3419 (hold re-entry / dead-owner reclaim); review fixes: trailing-median note in render_regressions, AGENT_PID_KEY single-sourced and blanked in unit projects",
+		"reason": "Add the AI-cost byte totals (resident and on-demand) to the ratchet and rewrite quality-priority as three tiers #3428",
 		"date": "2026-10-08"
 	}
 }
