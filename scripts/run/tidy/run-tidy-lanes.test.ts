@@ -70,6 +70,14 @@ describe('run_tidy_lanes.tidy_lanes', () => {
 		expect(run_hold.release_hold).toHaveBeenCalledWith(HOLD_PATH)
 	})
 
+	// joshuafolkken/kit#3451: closed here, an in-flight lane left the run with no `merge` event.
+	it('leaves a merged lane the running backlogrun still has in flight to its run:merge', async () => {
+		const outcomes = await run_tidy_lanes.tidy_lanes(is_merged, new Set([MERGED_ISSUE]))
+
+		expect(outcomes).toStrictEqual([])
+		expect(lane_close.close_lane).not.toHaveBeenCalled()
+	})
+
 	it('keeps a merged lane with uncommitted changes', async () => {
 		vi.mocked(git_stash.has_changes).mockResolvedValue(true)
 

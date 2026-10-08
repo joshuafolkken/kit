@@ -1,11 +1,13 @@
 import { backlog_idle, type IdleWindow } from '#scripts/backlog/backlog-idle'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import type { ClosedIssue } from './run-board-closed'
 import { run_board_phase, type Phase } from './run-board-phase'
 
 // What each issue of a run is doing now, read from the run's own event stream and its open lanes
 // (joshuafolkken/kit#3430). Local reads only — no `gh` call — so `run:board` can redraw it every few
-// seconds; the plan these statuses are laid over is the slow GitHub half.
+// seconds; the plan these statuses are laid over is the slow GitHub half, and so is what a child that
+// left the open listing answers when read closed (joshuafolkken/kit#3451).
 
 type ItemState = 'running' | 'merged' | 'parked' | 'done' | 'waiting' | 'human'
 
@@ -129,6 +131,8 @@ interface OpenRead {
 	// `undefined` when the listing was cut short, so absence from it proves nothing.
 	open_numbers: ReadonlySet<number> | undefined
 	read_ms: number | undefined
+	// The children read closed from GitHub (`run-board-closed.ts`), by number.
+	closed: ReadonlyMap<number, ClosedIssue>
 }
 
 function is_listed_closed(issue: number, read: OpenRead): boolean {
@@ -142,21 +146,46 @@ function is_closed_running(issue: number, status: ItemStatus, read: OpenRead): b
 	return is_listed_closed(issue, read) && (status.started_ms ?? 0) <= read.read_ms
 }
 
+// A close dated before the launch is an earlier life of the issue, not how this run's child ended.
+function is_closed_before_launch(status: ItemStatus, closed: ClosedIssue): boolean {
+	if (closed.closed_ms === undefined || status.started_ms === undefined) return false
+
+	return closed.closed_ms < status.started_ms
+}
+
+// A running child read closed ends when GitHub says it closed, merged or not (joshuafolkken/kit#3451).
+function closed_status(
+	status: ItemStatus,
+	closed: ClosedIssue | undefined,
+): ItemStatus | undefined {
+	if (closed === undefined || is_closed_before_launch(status, closed)) return undefined
+
+	const state = closed.is_merged ? 'merged' : 'done'
+
+	return { state, started_ms: status.started_ms, ended_ms: closed.closed_ms }
+}
+
+function settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
+	if (status.state !== 'running') return status
+
+	const from_closed = closed_status(status, read.closed.get(issue))
+
+	if (from_closed !== undefined) return from_closed
+
+	return is_closed_running(issue, status, read)
+		? { state: 'done', started_ms: status.started_ms }
+		: status
+}
+
 // **The stream stays the source of truth; the listing only unsticks it** (joshuafolkken/kit#3442). A child
 // whose merge never reached the stream read as running forever, so a running child the plan's open
-// listing no longer holds is drawn finished instead.
+// listing no longer holds is drawn finished instead — merged and timed once GitHub was read for it
+// (joshuafolkken/kit#3451), finished without a time while that read has not answered.
 function settle_closed(
 	statuses: ReadonlyMap<number, ItemStatus>,
 	read: OpenRead,
 ): ReadonlyMap<number, ItemStatus> {
-	return new Map(
-		[...statuses].map(([issue, status]) => [
-			issue,
-			is_closed_running(issue, status, read)
-				? { state: 'done', started_ms: status.started_ms }
-				: status,
-		]),
-	)
+	return new Map([...statuses].map(([issue, status]) => [issue, settled(issue, status, read)]))
 }
 
 function newest_of(events: ReadonlyArray<RunEvent>, kind: string): RunEvent | undefined {

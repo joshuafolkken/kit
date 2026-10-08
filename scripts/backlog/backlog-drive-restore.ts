@@ -64,4 +64,4 @@ function restore(
 	return lanes.filter((issue) => active.has(issue) && !merged_issues.includes(Number(issue)))
 }
 
-export const backlog_drive_restore = { restore, settled_issues, parked_issues }
+export const backlog_drive_restore = { active_issues, restore, settled_issues, parked_issues }

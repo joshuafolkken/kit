@@ -10,6 +10,7 @@ const CLOSED = 'closed\t'
 const CLOSED_COMPLETED = 'closed\tcompleted'
 const CLOSED_NOT_PLANNED = 'closed\tnot_planned'
 const REOPENED = 'reopened\t'
+const READ_FAILURE = new Error('rate limited')
 
 function rows(...lines: ReadonlyArray<string>): ReturnType<typeof issue_merged.parse_rows> {
 	return issue_merged.parse_rows(lines.join('\n'))
@@ -55,8 +56,25 @@ describe('issue_merged.read_merged', () => {
 	})
 
 	it('answers false when the read fails, so nothing is deleted on doubt', async () => {
-		exec_gh_api.mockRejectedValue(new Error('rate limited'))
+		exec_gh_api.mockRejectedValue(READ_FAILURE)
 
 		expect(await issue_merged.read_merged('2606')).toBe(false)
+	})
+})
+
+describe('issue_merged.read_merge_state', () => {
+	it.each([
+		['merged', [MERGED, CLOSED], true],
+		['not merged', [MERGED, CLOSED_NOT_PLANNED], false],
+	])('answers the timeline when it reads, %s', async (_label, lines, expected) => {
+		exec_gh_api.mockResolvedValue(lines.join('\n'))
+
+		expect(await issue_merged.read_merge_state('2606')).toBe(expected)
+	})
+
+	it('answers nothing when the read fails, so a kept answer is not taken from a failure', async () => {
+		exec_gh_api.mockRejectedValue(READ_FAILURE)
+
+		expect(await issue_merged.read_merge_state('2606')).toBeUndefined()
 	})
 })

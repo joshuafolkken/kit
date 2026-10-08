@@ -8,7 +8,9 @@ import { run_tidy, type Outcome, type Verdict } from './run-tidy'
 
 // The lane half of `josh run:tidy` (joshuafolkken/kit#2701): each lane whose issue merged, read for
 // what would make closing it lose work, then closed with its run record released. A lane whose work
-// tree is already gone is `lane:prune`'s, so it is left to that command.
+// tree is already gone is `lane:prune`'s, so it is left to that command. A lane the running
+// `backlogrun` still has in flight is left to its `run:merge` (joshuafolkken/kit#3451): closed here, it
+// left the run with no `merge` event, no ledger line and no merged count.
 
 const CLOSED_KIND = 'closed'
 const INCOMPLETE_REASON = 'the close left files behind'
@@ -87,20 +89,28 @@ async function settle(lane: LaneInfo): Promise<Verdict> {
 	}
 }
 
-async function tidy_lane(lane: LaneInfo, is_merged: IsMerged): Promise<Outcome | undefined> {
+async function tidy_lane(
+	lane: LaneInfo,
+	is_merged: IsMerged,
+	in_flight: ReadonlySet<string>,
+): Promise<Outcome | undefined> {
+	if (in_flight.has(lane.issue)) return undefined
 	if (lane.is_stranded || !(await is_merged(lane.issue))) return undefined
 
 	return { target: `lane #${lane.issue}`, verdict: await settle(lane) }
 }
 
 // One lane at a time: a close removes a work tree and prunes the worktree list the next read uses.
-async function tidy_lanes(is_merged: IsMerged): Promise<Array<Outcome>> {
+async function tidy_lanes(
+	is_merged: IsMerged,
+	in_flight: ReadonlySet<string> = new Set(),
+): Promise<Array<Outcome>> {
 	const outcomes: Array<Outcome> = []
 	const lanes = await lane_registry.list_lanes()
 
 	for (const lane of lanes) {
 		// eslint-disable-next-line no-await-in-loop -- a close prunes the worktree list the next one reads
-		const outcome = await tidy_lane(lane, is_merged)
+		const outcome = await tidy_lane(lane, is_merged, in_flight)
 
 		if (outcome !== undefined) outcomes.push(outcome)
 	}

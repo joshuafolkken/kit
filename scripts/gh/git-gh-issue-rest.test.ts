@@ -71,6 +71,13 @@ describe('to_gh_issue — the fields whose names or values differ', () => {
 		expect(map('createdAt')).toEqual({ createdAt: ISSUE_CREATED_AT })
 	})
 
+	// joshuafolkken/kit#3451: `run:board` dates a closed child from it.
+	it('reads closedAt from closed_at', () => {
+		expect(map('closedAt', { closed_at: ISSUE_CREATED_AT })).toEqual({
+			closedAt: ISSUE_CREATED_AT,
+		})
+	})
+
 	// The one that bites: REST's `url` is the API endpoint, and `epic_issue.is_pull_request` decides
 	// from `/pull/` appearing in the browser URL — which the endpoint never carries.
 	it('reads url from html_url rather than from the API endpoint', () => {

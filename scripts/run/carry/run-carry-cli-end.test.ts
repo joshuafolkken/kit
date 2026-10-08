@@ -26,6 +26,9 @@ vi.mock('./run-carry-stash', () => ({
 vi.mock('#scripts/run/run-stop-notify', () => ({
 	run_stop_notify: { plan: vi.fn(), announce: vi.fn() },
 }))
+vi.mock('#scripts/run/merge/run-merge-collect', () => ({
+	run_merge_collect: { collect_merged: vi.fn().mockResolvedValue(undefined) },
+}))
 
 const { git_command } = await import('#scripts/git/git-command')
 const { josh_command } = await import('#scripts/josh/josh-run')
@@ -33,6 +36,8 @@ const { run_carry_stash } = await import('./run-carry-stash')
 const git_directories = vi.mocked(git_command.git_directories)
 const josh_run = vi.mocked(josh_command.josh_run)
 const report_orphans = vi.mocked(run_carry_stash.report_orphans)
+const { run_merge_collect } = await import('#scripts/run/merge/run-merge-collect')
+const collect_merged = vi.mocked(run_merge_collect.collect_merged)
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-end-cli-test-'))
 const WORKTREE = path.join(scratch, 'worktree.git')
@@ -99,6 +104,19 @@ describe('run:carry --end — the ended run is recorded', () => {
 
 		expect(code).toBe(OK)
 		expect(run_carry.read_carry(run_carry.carry_path(REPOSITORY)).kind).toBe('none')
+	})
+})
+
+// joshuafolkken/kit#3451: a lane that merged while no driver watched it is collected at the run's end.
+describe('run:carry --end — the run’s merged lanes are collected first', () => {
+	it('collects while the record is still there to count the merges', async () => {
+		await run_carry_cli.run(['--begin', INVOCATION])
+		collect_merged.mockImplementationOnce(async () => {
+			expect(run_carry.read_carry(run_carry.carry_path(REPOSITORY)).kind).toBe('carried')
+		})
+
+		expect(await run_carry_cli.run(['--end'])).toBe(OK)
+		expect(collect_merged).toHaveBeenCalledWith(REPOSITORY)
 	})
 })
 

@@ -2,6 +2,7 @@ import { backlog_idle } from '#scripts/backlog/backlog-idle'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { describe, expect, it } from 'vitest'
+import type { ClosedIssue } from './run-board-closed'
 import { run_board_notes } from './run-board-notes'
 import { run_board_status, type ItemStatus, type OpenRead } from './run-board-status'
 
@@ -142,26 +143,60 @@ describe('run_board_status.statuses_of phases', () => {
 	})
 })
 
-describe('run_board_status.settle_closed', () => {
-	const RUNNING: ReadonlyMap<number, ItemStatus> = new Map([
-		[3409, { state: 'running', started_ms: Date.parse(T0) }],
-	])
+const RUNNING: ReadonlyMap<number, ItemStatus> = new Map([
+	[3409, { state: 'running', started_ms: Date.parse(T0) }],
+])
+const NOT_READ: ReadonlyMap<number, ClosedIssue> = new Map()
 
+function read_closed(closed: ClosedIssue): OpenRead {
+	return { open_numbers: NONE, read_ms: Date.parse(T1), closed: new Map([[3409, closed]]) }
+}
+
+describe('run_board_status.settle_closed', () => {
 	it('draws a running child the open listing no longer holds as done', () => {
 		const settled = run_board_status.settle_closed(RUNNING, {
 			open_numbers: NONE,
 			read_ms: Date.parse(T1),
+			closed: NOT_READ,
 		})
 
 		expect(settled.get(3409)).toStrictEqual({ state: 'done', started_ms: Date.parse(T0) })
 	})
 
 	it.each<[string, OpenRead]>([
-		['still open', { open_numbers: new Set([3409]), read_ms: Date.parse(T1) }],
-		['a capped listing', { open_numbers: undefined, read_ms: Date.parse(T1) }],
-		['launched after the read', { open_numbers: NONE, read_ms: Date.parse(T0) - 1 }],
+		['still open', { open_numbers: new Set([3409]), read_ms: Date.parse(T1), closed: NOT_READ }],
+		['a capped listing', { open_numbers: undefined, read_ms: Date.parse(T1), closed: NOT_READ }],
+		[
+			'launched after the read',
+			{ open_numbers: NONE, read_ms: Date.parse(T0) - 1, closed: NOT_READ },
+		],
 	])('keeps the child running when %s', (_label, read) => {
 		expect(run_board_status.settle_closed(RUNNING, read).get(3409)?.state).toBe('running')
+	})
+})
+
+// joshuafolkken/kit#3451: a child read closed from GitHub ends when it closed, merged or not.
+describe('run_board_status.settle_closed with a closed read', () => {
+	it.each<[string, boolean, string]>([
+		['merged', true, 'merged'],
+		['done', false, 'done'],
+	])('draws a child read closed as %s, timed to its close', (_label, is_merged, state) => {
+		const read = read_closed({ title: 'Fix', closed_ms: Date.parse(T2), is_merged })
+
+		expect(run_board_status.settle_closed(RUNNING, read).get(3409)).toStrictEqual({
+			state,
+			started_ms: Date.parse(T0),
+			ended_ms: Date.parse(T2),
+		})
+	})
+
+	it('ignores a close dated before the launch', () => {
+		const read = read_closed({ title: 'Fix', closed_ms: Date.parse(T0) - 1, is_merged: true })
+
+		expect(run_board_status.settle_closed(RUNNING, read).get(3409)).toStrictEqual({
+			state: 'done',
+			started_ms: Date.parse(T0),
+		})
 	})
 })
 
