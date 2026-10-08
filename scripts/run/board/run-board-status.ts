@@ -1,4 +1,9 @@
 import { backlog_idle, type IdleWindow } from '#scripts/backlog/backlog-idle'
+import {
+	has_label_name,
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+} from '#scripts/issue/issue-labels'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import type { ClosedIssue } from './run-board-closed'
@@ -9,7 +14,7 @@ import { run_board_phase, type Phase } from './run-board-phase'
 // seconds; the plan these statuses are laid over is the slow GitHub half, and so is what a child that
 // left the open listing answers when read closed (joshuafolkken/kit#3451).
 
-type ItemState = 'running' | 'merged' | 'parked' | 'done' | 'waiting' | 'human'
+type ItemState = 'running' | 'merged' | 'parked' | 'done' | 'waiting' | 'human' | 'stopped'
 
 interface ItemStatus {
 	state: ItemState
@@ -133,17 +138,40 @@ interface OpenRead {
 	read_ms: number | undefined
 	// The children read closed from GitHub (`run-board-closed.ts`), by number.
 	closed: ReadonlyMap<number, ClosedIssue>
+	// Each listed issue's label names, by number; an issue the listing did not hold has none to read.
+	labels: ReadonlyMap<number, ReadonlyArray<string>>
 }
 
 function is_listed_closed(issue: number, read: OpenRead): boolean {
 	return read.open_numbers !== undefined && !read.open_numbers.has(issue)
 }
 
+// The listing was read after the child launched, so what it says about the child is this run's.
+function is_read_after_launch(status: ItemStatus, read: OpenRead): boolean {
+	return read.read_ms !== undefined && (status.started_ms ?? 0) <= read.read_ms
+}
+
 // A child launched before the listing was read and missing from it has closed since.
 function is_closed_running(issue: number, status: ItemStatus, read: OpenRead): boolean {
-	if (status.state !== 'running' || read.read_ms === undefined) return false
+	return is_listed_closed(issue, read) && is_read_after_launch(status, read)
+}
 
-	return is_listed_closed(issue, read) && (status.started_ms ?? 0) <= read.read_ms
+// What a running child's labels say it is doing, `undefined` where they agree it is running: the child
+// applies `needs-decision` and drops `in-progress` itself when it stops, while the stream's park is
+// written by a parent that may no longer be there (joshuafolkken/kit#3459).
+function labelled_state(labels: ReadonlyArray<string> | undefined): ItemState | undefined {
+	if (labels === undefined) return undefined
+	if (has_label_name(labels, NEEDS_DECISION_LABEL)) return 'human'
+
+	return has_label_name(labels, IN_PROGRESS_LABEL) ? undefined : 'stopped'
+}
+
+function labelled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
+	const state = is_read_after_launch(status, read)
+		? labelled_state(read.labels.get(issue))
+		: undefined
+
+	return state === undefined ? status : { state, started_ms: status.started_ms }
 }
 
 // A close dated before the launch is an earlier life of the issue, not how this run's child ended.
@@ -172,15 +200,19 @@ function settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus 
 
 	if (from_closed !== undefined) return from_closed
 
-	return is_closed_running(issue, status, read)
-		? { state: 'done', started_ms: status.started_ms }
-		: status
+	if (is_closed_running(issue, status, read)) {
+		return { state: 'done', started_ms: status.started_ms }
+	}
+
+	return labelled(issue, status, read)
 }
 
 // **The stream stays the source of truth; the listing only unsticks it** (joshuafolkken/kit#3442). A child
 // whose merge never reached the stream read as running forever, so a running child the plan's open
 // listing no longer holds is drawn finished instead — merged and timed once GitHub was read for it
-// (joshuafolkken/kit#3451), finished without a time while that read has not answered.
+// (joshuafolkken/kit#3451), finished without a time while that read has not answered. One the listing
+// still holds is drawn as its labels say, so a child that stopped with no parent to record it does not
+// read as running (joshuafolkken/kit#3459).
 function settle_closed(
 	statuses: ReadonlyMap<number, ItemStatus>,
 	read: OpenRead,

@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1000,
-		"code_lines": 82865,
-		"comment_lines": 33380,
+		"code_lines": 82904,
+		"comment_lines": 33390,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 559193
 	},
 	"accepted": {
-		"reason": "#3438 auto-starts run:board in the workspace task and teaches the board tick to stop on a closed run; docs/skills now name run:board instead of run:event --watch; re-accepted after merging origin/main (#3454 run_headless.is_cut_capped)",
+		"reason": "#3438 auto-starts run:board in the workspace task and teaches the board tick to stop on a closed run; docs/skills now name run:board instead of run:event --watch; re-accepted after merging origin/main (#3459 run:board label-driven stopped lanes, #3454 run_headless.is_cut_capped)",
 		"date": "2026-10-08"
 	}
 }

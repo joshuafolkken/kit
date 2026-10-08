@@ -3,6 +3,7 @@ import type { Plan } from '#scripts/backlog/backlog-plan-read'
 import { backlog_waves } from '#scripts/backlog/backlog-waves'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_plan, type PlanPorts } from './run-board-plan'
 
@@ -103,6 +104,16 @@ describe('run_board_plan.read_plan', () => {
 		const plan = await run_board_plan.read_plan({ issues: [], only: false }, ports())
 
 		expect(wave_numbers(plan?.waves.waves)).toStrictEqual([POOL])
+	})
+
+	// joshuafolkken/kit#3459: the labels a running row is checked against, and none for an unlabelled read.
+	it('carries each listed issue’s label names, leaving out a row read without labels', async () => {
+		const labelled = { ...row(SINGLE), labels: [{ name: IN_PROGRESS_LABEL }] }
+		const listing = { rows: [labelled, row(EPIC)], is_capped: false }
+		const read = { ...ports(), fetch_open: vi.fn(async () => listing) }
+		const plan = await run_board_plan.read_plan({ issues: [SINGLE], only: false }, read)
+
+		expect(plan?.labels).toStrictEqual(new Map([[SINGLE, [IN_PROGRESS_LABEL]]]))
 	})
 
 	it('answers a failed listing read as a failed plan', async () => {
