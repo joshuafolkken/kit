@@ -4,6 +4,7 @@ import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_headless } from '#scripts/run/run-headless'
 import { run_stop_notify } from '#scripts/run/run-stop-notify'
 import {
 	run_carry,
@@ -306,7 +307,7 @@ function blocked_count(
 ): number | undefined {
 	if (run_carry.is_count_refused(carry, request.owner)) return report_count_refused(carry, is_json)
 
-	if (is_cut_count(request) && run_carry.is_at_cut_cap(carry)) {
+	if (is_cut_count(request) && run_headless.is_cut_capped(carry)) {
 		return report_cut_capped(carry, is_json)
 	}
 
