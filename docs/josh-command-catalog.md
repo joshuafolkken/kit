@@ -145,6 +145,16 @@ Check only the changed files with prettier and eslint (whole tree on fallback)
 
 ---
 
+### `josh metrics` · `josh mt`
+
+> **Audience:** developer · **Side effects:** files · **kit only**
+
+`[--write-baseline]`
+
+Print repository-wide quality totals — code and comment lines, rule lines, guard count
+
+---
+
 ### `josh port` · `josh pt`
 
 > **Audience:** developer · **Side effects:** none

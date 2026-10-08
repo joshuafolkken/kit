@@ -26,6 +26,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "lu": "latest:update",
     "mm": "main:merge",
     "ms": "main:sync",
+    "mt": "metrics",
     "ov": "overrides",
     "pf": "profile",
     "pg": "propagate",
@@ -626,6 +627,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "network",
         "processes",
+        "files",
+      ],
+    ],
+    "metrics": [
+      "[--write-baseline]",
+      "developer",
+      [
         "files",
       ],
     ],

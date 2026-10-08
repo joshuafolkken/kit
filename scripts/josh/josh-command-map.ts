@@ -37,6 +37,7 @@ const ALIASES: Record<string, string> = {
 	lr: 'lint:related',
 	ln: 'lines',
 	by: 'bytes',
+	mt: 'metrics',
 	f: 'format',
 	sd: 'cspell:dot',
 	bh: 'behavior',

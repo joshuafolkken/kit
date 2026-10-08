@@ -1,0 +1,13 @@
+{
+	"scripts": {
+		"files": 968,
+		"code_lines": 80097,
+		"comment_lines": 32535,
+		"comment_ratio": 0.41
+	},
+	"rules": {
+		"files": 26,
+		"lines": 2370
+	},
+	"guards": 8
+}

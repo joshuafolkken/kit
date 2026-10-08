@@ -46,6 +46,16 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
 		memory_mb: core_budget.MEMORY_MB.eslint_scan,
 	},
+	metrics: {
+		script: 'scripts/metrics/metrics-command.ts',
+		description:
+			'Print repository-wide quality totals — code and comment lines, rule lines, guard count',
+		category: 'Development',
+		reference: ['[--write-baseline]', 'developer', ['files']],
+		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
+		memory_mb: core_budget.MEMORY_MB.eslint_scan,
+		is_kit_only: true,
+	},
 	'refactor:scan': {
 		script: 'scripts/refactor/refactor-scan-cli.ts',
 		description:
