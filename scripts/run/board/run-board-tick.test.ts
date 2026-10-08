@@ -1,8 +1,10 @@
+import { stripVTControlCharacters } from 'node:util'
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
 import { describe, expect, it } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
 import { run_board_tick } from './run-board-tick'
 
@@ -11,12 +13,18 @@ import { run_board_tick } from './run-board-tick'
 // the plan no more often than the retry interval.
 
 const { LOCAL, START, WORDS, harness, plan_titled } = run_board_fixture
-const { FRESH_STATE, LOCAL_READ_MS, PLAN_RETRY_MS, REDRAW_MS, tick } = run_board_tick
-const SLOW_READ_MS = 2 * REDRAW_MS
+const { FRESH_STATE, LOCAL_READ_MS, MACHINE_SAMPLE_MS, PLAN_RETRY_MS, REDRAW_MS, tick } =
+	run_board_tick
+const SLOW_READ_MS = 2 * MACHINE_SAMPLE_MS
 const SWAPPED_MB = 3
+const { spinner_of } = run_board_labels
 
 function swapped(swapped_mb: number): MachineSample {
-	return { cpu: { busy: 0, total: 0 }, memory: { available_mb: 0, swapped_mb }, total_mb: 1 }
+	return {
+		cpu: { busy: 0, total: 0 },
+		memory: { available_mb: 0, swapped_mb, pressure_level: undefined },
+		total_mb: 1,
+	}
 }
 
 describe('run_board_tick.tick speeds', () => {
@@ -41,7 +49,7 @@ describe('run_board_tick.tick speeds', () => {
 		const { ports, frames, clock } = harness(LOCAL, [plan_titled('a')])
 		const first = await tick(FRESH_STATE, ports, WORDS)
 
-		clock.now_ms += REDRAW_MS
+		clock.now_ms += MACHINE_SAMPLE_MS
 		await tick(first, ports, WORDS)
 
 		expect(frames[0]).toContain('⏱ 00:00')
@@ -62,16 +70,21 @@ describe('run_board_tick.tick speeds', () => {
 	})
 })
 
-// joshuafolkken/kit#3450: the machine is sampled every redraw, and a gauge that needs two samples is
-// drawn from the second on.
+// joshuafolkken/kit#3450: a gauge that needs two samples is drawn from the second on.
+// joshuafolkken/kit#3452: the machine is sampled once a second while the board redraws four times.
 describe('run_board_tick.tick machine', () => {
-	it('samples the machine on every redraw', async () => {
-		const { ports, read_machine, clock } = harness(LOCAL, [plan_titled('a')])
-		const first = await tick(FRESH_STATE, ports, WORDS)
+	it('samples the machine once a second while redrawing every 250 ms', async () => {
+		const { ports, frames, read_machine, clock } = harness(LOCAL, [plan_titled('a')])
+		let state = await tick(FRESH_STATE, ports, WORDS)
 
-		clock.now_ms += REDRAW_MS
-		await tick(first, ports, WORDS)
+		for (let index = 1; index <= MACHINE_SAMPLE_MS / REDRAW_MS; index += 1) {
+			clock.now_ms += REDRAW_MS
+			// eslint-disable-next-line no-await-in-loop -- each redraw folds the state the last one left
+			state = await tick(state, ports, WORDS)
+		}
 
+		expect([REDRAW_MS, MACHINE_SAMPLE_MS, LOCAL_READ_MS]).toStrictEqual([250, 1000, 5000])
+		expect(frames).toHaveLength(5)
 		expect(read_machine).toHaveBeenCalledTimes(2)
 	})
 
@@ -79,7 +92,7 @@ describe('run_board_tick.tick machine', () => {
 		const { ports, frames, clock } = harness(LOCAL, [plan_titled('a')])
 		const first = await tick(FRESH_STATE, ports, WORDS)
 
-		clock.now_ms += REDRAW_MS
+		clock.now_ms += MACHINE_SAMPLE_MS
 		await tick(first, ports, WORDS)
 
 		const [first_machine, second_machine] = frames.map((frame) => frame.split('\n', 2)[1] ?? '')
@@ -100,7 +113,7 @@ describe('run_board_tick.tick machine', () => {
 		read_machine.mockResolvedValueOnce(swapped(0)).mockResolvedValueOnce(swapped(SWAPPED_MB))
 		const first = await tick(FRESH_STATE, ports, WORDS)
 
-		clock.now_ms += REDRAW_MS
+		clock.now_ms += MACHINE_SAMPLE_MS
 		await tick(first, ports, WORDS)
 
 		expect(frames.at(-1)).toContain(`${SWAPPED_MB.toFixed(1)}M/s`)
@@ -167,6 +180,8 @@ describe('run_board_tick.tick — an ended run', () => {
 const SINGLE = 3441
 const STALE_LANE = '3347'
 const ONLY_SINGLE: NamedPlan = { issues: [SINGLE], only: true }
+const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#3441 x' }
+const LAUNCHED = { ...LOCAL, scope: ONLY_SINGLE, events: [LAUNCH] }
 
 function single_plan(open: ReadonlyArray<number>): BoardPlan {
 	const child: EpicChild = { number: SINGLE, repo: 'r', state: 'OPEN', labels: [], blocked_by: [] }
@@ -191,12 +206,38 @@ describe('run_board_tick.tick — the run’s own scope', () => {
 	})
 
 	it('settles a launched child the open listing no longer holds', async () => {
-		const launch = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#3441 x' }
-		const local = { ...LOCAL, scope: ONLY_SINGLE, events: [launch] }
-		const { ports, frames } = harness(local, [single_plan([])])
+		const { ports, frames } = harness(LAUNCHED, [single_plan([])])
 
 		await tick(FRESH_STATE, ports, WORDS)
 
 		expect(frames.at(-1)).toContain(' 1/1 ')
+	})
+})
+
+// joshuafolkken/kit#3452: the spinner turns by the clock on a terminal, and stands still elsewhere.
+describe('run_board_tick.tick spinner', () => {
+	it('advances the spinner frame on each redraw of a running run', async () => {
+		const { ports, frames, clock } = harness(LAUNCHED, [single_plan([SINGLE])])
+		const first = await tick(FRESH_STATE, ports, WORDS)
+
+		clock.now_ms += REDRAW_MS
+		await tick(first, ports, WORDS)
+
+		const titles = frames.map((frame) => stripVTControlCharacters(frame).split('\n', 1)[0])
+
+		expect(titles[0]).toMatch(new RegExp(`^${spinner_of(START)} backlogrun`, 'u'))
+		expect(titles[1]).toMatch(new RegExp(`^${spinner_of(START + REDRAW_MS)} backlogrun`, 'u'))
+		expect(titles[0]).not.toBe(titles[1])
+	})
+
+	it('draws ▶ and 🔄 where the output is not a terminal', async () => {
+		const { ports, frames } = harness(LAUNCHED, [single_plan([SINGLE])])
+
+		await tick(FRESH_STATE, { ...ports, is_tty: false }, WORDS)
+
+		const frame = stripVTControlCharacters(frames.at(-1) ?? '')
+
+		expect(frame).toMatch(/^▶ backlogrun/u)
+		expect(frame).toContain(`🔄 ${String(SINGLE)}`)
 	})
 })

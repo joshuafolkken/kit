@@ -77,6 +77,16 @@ describe('machine_capacity.busy_cores_between', () => {
 	})
 })
 
+// joshuafolkken/kit#3452: the verdict Activity Monitor colors its memory pressure graph by.
+describe('machine_capacity memory pressure', () => {
+	it('reads the kernel memory pressure verdict', () => {
+		const warning = 2
+		const output = `${DARWIN_SYSCTL}\nkern.memorystatus_vm_pressure_level: ${String(warning)}`
+
+		expect(machine_capacity.parse_darwin_memory(output, EIGHTEEN_GB).pressure_level).toBe(warning)
+	})
+})
+
 describe('machine_capacity memory readers', () => {
 	// joshuafolkken/kit#3450: one `sysctl` carries the pressure level and the swap counters.
 	it('reads the macOS pressure level and the pages swapped from one sysctl output', () => {
@@ -92,9 +102,11 @@ describe('machine_capacity memory readers', () => {
 		const level_only = machine_capacity.parse_darwin_memory(DARWIN_LEVEL, EIGHTEEN_GB)
 
 		expect(level_only.swapped_mb).toBeUndefined()
+		expect(level_only.pressure_level).toBeUndefined()
 		expect(machine_capacity.parse_darwin_memory('', EIGHTEEN_GB)).toStrictEqual({
 			available_mb: undefined,
 			swapped_mb: undefined,
+			pressure_level: undefined,
 		})
 	})
 

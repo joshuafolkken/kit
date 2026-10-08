@@ -24,7 +24,7 @@ const STOPPED = new Error('stopped')
 // A machine with nothing swapped and half its memory free.
 const SAMPLE: MachineSample = {
 	cpu: { busy: 0, total: 0 },
-	memory: { available_mb: 512, swapped_mb: 0 },
+	memory: { available_mb: 512, swapped_mb: 0, pressure_level: undefined },
 	total_mb: 1024,
 }
 

@@ -34,6 +34,7 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		plan_fetched_ms: undefined,
 		plan_failed_ms: undefined,
 		machine: undefined,
+		spinner: undefined,
 		link: (reference) => reference,
 		...extra,
 	}
@@ -95,19 +96,33 @@ describe('run_board_header.header_lines shape', () => {
 
 		expect(lines_of(header({ layout }))).toStrictEqual([
 			'▶ backlogrun   ⏱ 30:00   ⌛ 7h30m',
-			`📊 ${'░'.repeat(10)}  0/2   ✅ 0  💤 0  🔄 1  ⏳ 1`,
+			`📊 ${'─'.repeat(10)}  0/2   ✅ 0  💤 0  🔄 1  ⏳ 1`,
 		])
 	})
 
 	// joshuafolkken/kit#3450
 	it('draws the machine line between the title and the progress line', () => {
-		const machine = { cpu_percent: 15, memory_percent: 37, swap_mb_per_s: 3.1 }
+		const machine = {
+			cpu_percent: 15,
+			memory_percent: 37,
+			swap_mb_per_s: 3.1,
+			memory_pressure: undefined,
+		}
 
 		expect(lines_of(header({ machine }))).toStrictEqual([
 			'⏸ backlogrun   ⏱ 30:00   ⌛ 7h30m',
-			'🔥 ━━░░░░░░░░  15%   🧠 ━━━━░░░░░░  37%   💾 ━━░░░░░░░░ 3.1M/s',
-			`📊 ${'░'.repeat(10)}  0/0   ✅ 0  💤 0  🔄 0  ⏳ 0`,
+			'⚡  15% ██────────   🧠  37% ████──────   💾 3.1M/s ██────────',
+			`📊 ${'─'.repeat(10)}  0/0   ✅ 0  💤 0  🔄 0  ⏳ 0`,
 		])
+	})
+
+	// joshuafolkken/kit#3452
+	it('turns the spinner in place of ▶ for a running run only, every other mark standing still', () => {
+		const stopped = { last_event_ms: undefined, idle: undefined, is_stopped: true }
+
+		expect(title_of(header({ layout: RUNNING_LAYOUT, spinner: '⠙' }))).toMatch(/^⠙ backlogrun/u)
+		expect(title_of(header({ spinner: '⠙' }))).toMatch(/^⏸ backlogrun/u)
+		expect(title_of(header({ activity: stopped, spinner: '⠙' }))).toMatch(/^■ backlogrun/u)
 	})
 
 	it('has no progress line without a layout', () => {

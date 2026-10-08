@@ -54,7 +54,10 @@ const LEVEL_NAME = 'kern.memorystatus_level'
 const SWAP_IN_NAME = 'vm.compressor.swapper.swapins_total'
 const SWAP_OUT_NAME = 'vm.compressor.swapper.swapouts_total'
 const PAGE_SIZE_NAME = 'hw.pagesize'
-const SYSCTL_ARGUMENTS = [LEVEL_NAME, SWAP_IN_NAME, SWAP_OUT_NAME, PAGE_SIZE_NAME]
+// The kernel's memory-pressure verdict — 1 normal, 2 warning, 4 critical — the one Activity Monitor
+// colors its "memory pressure" graph by (joshuafolkken/kit#3452).
+const PRESSURE_NAME = 'kern.memorystatus_vm_pressure_level'
+const SYSCTL_ARGUMENTS = [LEVEL_NAME, SWAP_IN_NAME, SWAP_OUT_NAME, PAGE_SIZE_NAME, PRESSURE_NAME]
 const SYSCTL_LINE = /^(?<name>[\w.]+): (?<value>\d+)$/gmu
 
 interface MachineReading {
@@ -63,10 +66,11 @@ interface MachineReading {
 }
 
 // The memory half of a reading. `swapped_mb` is a counter — every page swapped in or out since boot —
-// so a rate is the difference between two readings.
+// so a rate is the difference between two readings. `pressure_level` is read on macOS only.
 interface MemoryReading {
 	available_mb: number | undefined
 	swapped_mb: number | undefined
+	pressure_level: number | undefined
 }
 
 // What the ledger's admitted reservations declare — the part of the machine's load already accounted for.
@@ -153,6 +157,7 @@ function parse_darwin_memory(output: string, total_bytes: number): MemoryReading
 			swapped_pages(values.get(SWAP_IN_NAME), values.get(SWAP_OUT_NAME)),
 			values.get(PAGE_SIZE_NAME),
 		),
+		pressure_level: values.get(PRESSURE_NAME),
 	}
 }
 
@@ -210,10 +215,15 @@ async function read_linux_memory(): Promise<MemoryReading> {
 			vmstat === undefined || page_bytes === undefined
 				? undefined
 				: parse_linux_swapped(vmstat, page_bytes),
+		pressure_level: undefined,
 	}
 }
 
-const UNREAD_MEMORY: MemoryReading = { available_mb: undefined, swapped_mb: undefined }
+const UNREAD_MEMORY: MemoryReading = {
+	available_mb: undefined,
+	swapped_mb: undefined,
+	pressure_level: undefined,
+}
 
 async function read_memory(): Promise<MemoryReading> {
 	if (process.platform === 'darwin') return (await settled(read_darwin_memory)) ?? UNREAD_MEMORY
