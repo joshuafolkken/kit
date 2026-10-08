@@ -222,6 +222,24 @@ describe('run_event_stream.append — the bound', () => {
 	})
 })
 
+// joshuafolkken/kit#3430: a filing is what `run:board` reports the run found, not a liveness line.
+describe('run_event_stream.append — the bound keeps the findings', () => {
+	it('drops a newer liveness trace before an older filing or note', () => {
+		const target = fresh_target()
+
+		run_event_stream.append(target, KIND.FILED, '#3438 Count the seats', AT)
+		run_event_stream.append(target, KIND.NOTE, '#3415 gate slowed', AT)
+
+		for (let index = 0; index < run_event_stream.EVENT_CAP; index += 1) {
+			run_event_stream.append(target, KIND.HEARTBEAT, `beat ${String(index)}`, AT)
+		}
+
+		const kinds = run_event_stream.read_events(target).map((event) => event.kind)
+
+		expect(kinds.slice(0, 2)).toStrictEqual([KIND.FILED, KIND.NOTE])
+	})
+})
+
 describe('run_event_stream.read_events — a malformed line', () => {
 	it('skips an unparsable line rather than failing the whole stream', () => {
 		const target = fresh_target()

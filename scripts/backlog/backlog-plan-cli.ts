@@ -1,16 +1,11 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
-import { epic_index } from '#scripts/epic/epic-index'
-import type { EpicNextResult } from '#scripts/epic/epic-report'
-import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
-import { read_json_listing } from '#scripts/git/parse-json-array'
 import { run_invocation } from '#scripts/run/run-invocation'
 import { backlog_named } from './backlog-named'
-import { backlog_next, type OptedIn } from './backlog-next'
-import { backlog_plan, type NamedPlan, type PlanContext } from './backlog-plan'
-import type { GateScope } from './backlog-rank'
+import { backlog_next } from './backlog-next'
+import { backlog_plan, type NamedPlan } from './backlog-plan'
+import { backlog_plan_read, type OpenListing, type Plan } from './backlog-plan-read'
 import { backlog_scope } from './backlog-scope'
 import { backlog_waves } from './backlog-waves'
 
@@ -95,82 +90,14 @@ const OPEN_UNREADABLE_MESSAGE =
 // every other one. Reported as a gap, the way `backlog:next` reports its own truncated listings.
 const OPEN_TRUNCATED_MESSAGE = `⚠ The open-issue listing stopped at ${String(auto_ok_cli.LISTING_LIMIT)} rows, so the out-of-scope section is partial, some titles are missing, and a blocker that has since closed can still be named. The plan below is incomplete.`
 
-interface Plan {
-	result: EpicNextResult
-	repo: string
-	exclude: ReadonlyArray<number>
-	// Which **opted-in** epic is withholding which issue, narrowed by the same function the pool
-	// decided membership with (joshuafolkken/kit#1668). Without it the scope layer had no branch for
-	// "an epic is offering this one instead", so every opted-in row it could not place was reported as
-	// past the listing cap. Carrying the *whole* index here instead would move that misreport rather
-	// than remove it: the sentence would name an epic that is withholding nothing.
-	tracked: ReadonlyMap<number, number>
-	// The rows the offer's cap bounds and the paths each issue restructures, so `--waves` cuts each
-	// wave where `backlog:next` does (joshuafolkken/kit#2928, joshuafolkken/kit#3221).
-	scope: GateScope
-}
-
-// The listing plus whether it was cut. Carried together because the rows alone cannot say whether
-// what is missing from them is absent or merely past the cap.
-interface OpenListing {
-	rows: ReadonlyArray<OpenIssueData>
-	is_capped: boolean
-}
-
 // Which rendering was asked for: the named prefix the sections lead with, or the waves.
 interface PlanView {
 	named: NamedPlan
 	is_waves: boolean
 }
 
-// The same reads and the same classification `backlog:next` makes, through the same two functions.
-// `undefined` is a failure it has already reported.
-async function classify(
-	opted_in: OptedIn,
-	exclude: ReadonlyArray<number>,
-): Promise<Plan | undefined> {
-	const context = await backlog_next.context_of(opted_in, exclude)
-
-	if (context === undefined) return undefined
-
-	const result = await backlog_next.resolve(context)
-
-	if (result === undefined) return undefined
-
-	return {
-		result,
-		repo: context.repo,
-		exclude,
-		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
-		scope: backlog_next.gate_scope(context),
-	}
-}
-
-// Every open issue, read once. It carries both halves the plan needs and the pool does not hold: the
-// titles, and the set the out-of-scope rows are subtracted from. One read serves both, so the plan
-// costs exactly one `gh` call more than the answer it is rendering.
-async function fetch_open(): Promise<OpenListing | undefined> {
-	const { json, is_capped } = await git_gh_command.issue_list_recent(auto_ok_cli.LISTING_LIMIT)
-
-	if (json === undefined) return undefined
-
-	const read = read_json_listing(json, open_issue_schema)
-
-	return read.kind === 'read' ? { rows: read.rows, is_capped } : undefined
-}
-
-// A cut listing cannot say an issue is closed, only that it was not read — so the blocker filter is
-// switched off rather than fed a set that would silently report standing blockers as gone.
-function context_of(plan: Plan, listing: OpenListing): PlanContext {
-	return {
-		repo: plan.repo,
-		titles: backlog_scope.titles_of(listing.rows),
-		open_numbers: listing.is_capped ? undefined : backlog_scope.open_numbers_of(listing.rows),
-	}
-}
-
 function print_plan(plan: Plan, listing: OpenListing, view: PlanView): void {
-	const context = context_of(plan, listing)
+	const context = backlog_plan_read.context_of(plan, listing)
 
 	if (view.is_waves) {
 		console.info(backlog_waves.format_waves(plan.result, context, plan.scope))
@@ -185,7 +112,7 @@ function print_plan(plan: Plan, listing: OpenListing, view: PlanView): void {
 }
 
 async function report(plan: Plan, view: PlanView): Promise<number> {
-	const listing = await fetch_open()
+	const listing = await backlog_plan_read.fetch_open()
 
 	if (listing === undefined) {
 		console.error(OPEN_UNREADABLE_MESSAGE)
@@ -216,7 +143,7 @@ async function run_plan(rest: ReadonlyArray<string>, view: PlanView): Promise<nu
 		return FAILURE_EXIT_CODE
 	}
 
-	const plan = await classify(opted_in, options.exclude ?? [])
+	const plan = await backlog_plan_read.classify(opted_in, options.exclude ?? [])
 
 	return plan === undefined ? FAILURE_EXIT_CODE : await report(plan, view)
 }

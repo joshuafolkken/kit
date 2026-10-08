@@ -71,6 +71,30 @@ async function emit_once(kind: string, text: string): Promise<boolean> {
 	}
 }
 
+/**
+ * Append one event unless the newest event of this kind already carries this text — for a marker whose
+ * value, not its presence, is the news (joshuafolkken/kit#3430). The idle window is re-derived on every
+ * offer of a watching loop; only a window that moved is worth a line. Returns whether it appended.
+ */
+async function emit_changed(kind: string, text: string): Promise<boolean> {
+	try {
+		const target = await stream_target()
+
+		if (target === undefined) return false
+
+		const newest = run_event_stream.read_events(target).findLast((event) => event.kind === kind)
+
+		if (newest?.text === text) return false
+
+		return run_event_stream.append(target, kind, text, now_iso()).appended
+	} catch (error) {
+		// Best-effort: a failed append is dropped rather than raised into the loop's work.
+		error_text.trace_swallowed('run_event_stream_emit.emit_changed', error)
+
+		return false
+	}
+}
+
 // The events of the invocation now running: the stream outlives every invocation, so a marker a previous
 // run left — a stall that ended with no dispatch after it — must not hold back this run's first one. An
 // undetermined scope (no carry record) keeps the whole stream, the side that under-notifies rather than
@@ -136,6 +160,7 @@ async function current_events(): Promise<ReadonlyArray<RunEvent>> {
 const run_event_stream_emit = {
 	current_events,
 	emit,
+	emit_changed,
 	emit_heartbeat,
 	emit_once,
 	emit_once_since,

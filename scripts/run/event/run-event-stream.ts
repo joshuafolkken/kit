@@ -99,6 +99,17 @@ const EVENT_KIND = {
 	// (joshuafolkken/kit#2428). The position that hands control back: `run:step` prints the command that
 	// shows the stopped report, so the agent fixes it and relaunches rather than rebuilding the context.
 	SHIP_STOP: 'ship-stop',
+	// The idle watch's window — when the run began waiting on an empty backlog and when that wait ends
+	// (joshuafolkken/kit#3430). `backlog:offer` writes it whenever the window changes, so `run:board` reads
+	// the deadline rather than guessing it. It is a trace: `emit_once`'s drain dedup and `run:step`'s
+	// position both read past it, so a watching loop never re-marks the drain it is waiting after.
+	IDLE: 'idle',
+	// An Issue the run filed on its way, written by `issue:file` (joshuafolkken/kit#3430), so a run started
+	// from the command line still surfaces what it found — `run:board`'s findings section reads it.
+	FILED: 'filed',
+	// A one-line observation short of an Issue, written with `run:event --append note`
+	// (joshuafolkken/kit#3430) and shown in the same section.
+	NOTE: 'note',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -108,7 +119,22 @@ const EVENT_KINDS: ReadonlyArray<string> = Object.values(EVENT_KIND)
 // The kinds that trace progress inside a step rather than mark where the run is. Every last-event reader
 // — `run:step`'s position, `emit_once`'s dedup — asks "where is the run", and a
 // ship's four stage lines after its `merge` would otherwise read as an unknown position.
-const TRACE_KINDS: ReadonlySet<string> = new Set([EVENT_KIND.SHIP_STAGE, EVENT_KIND.HEARTBEAT])
+const TRACE_KINDS: ReadonlySet<string> = new Set([
+	EVENT_KIND.SHIP_STAGE,
+	EVENT_KIND.HEARTBEAT,
+	EVENT_KIND.IDLE,
+	EVENT_KIND.FILED,
+	EVENT_KIND.NOTE,
+])
+
+// The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or
+// `note` line is a trace to the position readers but is the board's record of what the run found, so
+// it rolls off only with the positions (joshuafolkken/kit#3430).
+const DISPOSABLE_KINDS: ReadonlySet<string> = new Set([
+	EVENT_KIND.SHIP_STAGE,
+	EVENT_KIND.HEARTBEAT,
+	EVENT_KIND.IDLE,
+])
 
 const event_schema = z.object({
 	pos: z.number(),
@@ -181,7 +207,9 @@ function bounded(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEvent> {
 
 	if (excess <= 0) return events
 
-	const dropped = new Set(events.filter((event) => TRACE_KINDS.has(event.kind)).slice(0, excess))
+	const dropped = new Set(
+		events.filter((event) => DISPOSABLE_KINDS.has(event.kind)).slice(0, excess),
+	)
 
 	return events.filter((event) => !dropped.has(event)).slice(-EVENT_CAP)
 }

@@ -1305,6 +1305,16 @@ Print each delivered rule's unaided compliance — runs reached, kept rate, refu
 
 ---
 
+### `josh run:board`
+
+> **Audience:** automation · **Side effects:** network
+
+`[--once]`
+
+Draw a live board of the running backlogrun, redrawn every five seconds
+
+---
+
 ### `josh run:carry`
 
 > **Audience:** automation · **Side effects:** files

@@ -361,7 +361,9 @@ and after a cut, the stream the run's, the position the caller's.
 `--watch` loops that pass, printing `HH:MM · <label> · <text>` in the session language.
 
 `<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `outage`, `cut`,
-`resume`, `stop`, `pr-opened`, `review-round`); a kind outside it is refused. `run:merge` appends `merge`, `park`
+`resume`, `stop`, `pr-opened`, `review-round`, `idle`, `filed`, `note`); a kind outside it is refused.
+`idle` is the idle watch's window, `filed` an Issue `issue:file` created, and `note` a one-line
+observation below the filing bar (`run:board` shows all three). `run:merge` appends `merge`, `park`
 and `outage`; other steps call `--append`. The stream is bounded, so an unattended run cannot grow it
 without limit.
 
@@ -384,6 +386,19 @@ pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 - `--hours <n>` — how long the watcher lives (default 8 with `--wait`, 1 otherwise); `--repo <owner/name>` scopes the read.
 
 **Output / exit codes:** stdout carries only the five labelled progress lines; notices go to stderr. `--once` with no run recorded prints nothing and exits 0; an unreadable listing exits 1. It sends no Telegram; `JOSH_PROGRESS=0` reports nothing (`--mark` still records).
+
+### `josh run:board`
+
+A full-screen board of the running `backlogrun`, redrawn every five seconds for a person to keep open beside the run.
+
+```bash
+pnpm josh run:board          # redraw until interrupted
+pnpm josh run:board --once   # one frame, then exit
+```
+
+The header shows the run's state, start, cut-off, newest event (yellow after 15 silent minutes), progress with arrivals as `(+N)`, and — while it waits on an empty backlog — when the wait ends and why. Below: touched children, the `backlog:plan --waves` order (epic children as a tree, other blockers as `waits on`), `needs-decision` and unreached children, and the newest filings, parks and notes. Times are local `HH:MM:SS`.
+
+**Output / exit codes:** local reads every tick; the plan from GitHub at most every two minutes, keeping the previous one on a failed read. No run here prints `no run` and reads no plan. Exits 0; an unknown argument exits 1.
 
 ### `josh run:watcher:guard`
 

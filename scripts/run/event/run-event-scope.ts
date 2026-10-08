@@ -115,13 +115,18 @@ function is_own_ship_event(event: RunEvent, issue: string): boolean {
 	return SHIP_POSITION_KINDS.has(event.kind) && !is_foreign_ship_event(event, issue)
 }
 
+// The issue an event's text names, the way every reader here — and `run:board` — keys an event to a child.
+function issue_named(event: RunEvent): string | undefined {
+	return ISSUE_REFERENCE.exec(event.text)?.[1]
+}
+
 // **A lane child's position is read only from events that name its own issue** (joshuafolkken/kit#3039).
 // The parent and every lane append to one stream under one carry scope, so anything else on it is another
 // run's: another lane's merge told a planned child to stop, the parent's stall (which names no issue)
 // pointed it at `backlog:next`, and another lane's cut at `run:cut --resume`. The child's own merge and
 // outage stay, so the parent-only stop in `run-step.ts` still holds; the parent keeps reading everything.
 function names_issue(event: RunEvent, issue: string): boolean {
-	return ISSUE_REFERENCE.exec(event.text)?.[1] === issue
+	return issue_named(event) === issue
 }
 
 function is_lane_position(event: RunEvent, issue: string): boolean {
@@ -166,6 +171,7 @@ function last_issue_event(
 
 const run_event_scope = {
 	UNKNOWN_EVENT_SCOPE,
+	issue_named,
 	last_issue_event,
 	last_scoped_event,
 	scope_of,

@@ -17,6 +17,10 @@ continues. A first-party target is Tier A, decided by `pnpm josh repo:party`; a 
 Tier C (`CLAUDE.md`). Name what was filed in the completion report. An observation nobody would act
 on is dropped rather than filed.
 
+**Below the filing bar, a line that could still change a person's judgement is a board note**:
+`pnpm josh run:event --append note "#<N> <text>"`, shown by `pnpm josh run:board`
+(`docs/josh-commands-run.md` → "`josh run:board`").
+
 **The filing ceilings still apply.** Count this filing in the ten-Issue limit for the run. An
 observation is discretionary, so above the WIP cap in the target repository, close one first or do
 not file (`prompts/collaboration-workflow/wip-cap.md`). File it with `pnpm josh issue:file`

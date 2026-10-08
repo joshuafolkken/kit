@@ -94,7 +94,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// joshuafolkken/kit#3278 moved `josh latest` and `josh overrides` — commands a person types — from
 	// the automation page to `docs/josh-commands.md`, which grew one block and the automation page shrank one.
 	{ path: 'docs/josh-commands-automation.md', bytes: 49_152 },
-	{ path: 'docs/josh-commands-run.md', bytes: 57_344 },
+	// joshuafolkken/kit#3430 raised it: `josh run:board` is a run command and its contract lives here.
+	{ path: 'docs/josh-commands-run.md', bytes: 61_440 },
 	{ path: 'docs/josh-commands-backlog.md', bytes: 57_344 },
 	{ path: 'docs/josh-commands.md', bytes: 40_960 },
 	// joshuafolkken/kit#3279 moved the label sections here out of `docs/josh-commands-backlog.md`.

@@ -2,7 +2,13 @@
 import { fileURLToPath } from 'node:url'
 import { path_decision } from '#scripts/josh/path-decision'
 import { cli_flags } from '#scripts/lib/cli-flags'
-import { backlog_budget, type BacklogAnswer, type BudgetInput } from './backlog-budget'
+import {
+	backlog_budget,
+	type BacklogAnswer,
+	type BudgetDecision,
+	type BudgetInput,
+} from './backlog-budget'
+import { backlog_idle } from './backlog-idle'
 
 // The thin half of `josh backlog:budget` (joshuafolkken/kit#1632): read the loop's state off the
 // command line, hand it to the pure decision, print the verdict on stdout and the reason on stderr
@@ -12,6 +18,7 @@ const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const JSON_KEY = 'budget'
+const EXHAUSTED_ANSWER: BacklogAnswer = 'exhausted'
 
 const USAGE = `Usage: josh backlog:budget --answer <${backlog_budget.ANSWERS.join('|')}> --started <ISO-8601> [--active <ISO-8601>, required unless the watch is off] [--merged <count>] [--running <count>] [--max <count>] [--idle <minutes>, 0 to turn the watch off] [--json]`
 
@@ -158,6 +165,29 @@ function build_input(values: ParsedValues, now_ms: number): BudgetInput | undefi
 	return input_of(values, { answer, now_ms, started_at_ms })
 }
 
+// The idle window, carried only on the watch an empty backlog opens — the one `idle_decision` reaches,
+// not the draining watch a reached bound returns while children still run — so `backlog:offer` can
+// record when that wait ends (joshuafolkken/kit#3430).
+function idle_of(input: BudgetInput, verdict: string): string | undefined {
+	const is_idle_watch =
+		verdict === backlog_budget.WATCH_VERDICT &&
+		input.answer === EXHAUSTED_ANSWER &&
+		backlog_budget.is_finish(input)
+	const window = is_idle_watch ? backlog_idle.window_of(input) : undefined
+
+	return window === undefined ? undefined : backlog_idle.text_of(window)
+}
+
+function print_json(input: BudgetInput, decision: BudgetDecision): void {
+	const { verdict, reason } = decision
+	const idle = idle_of(input, verdict)
+	const is_finish = backlog_budget.is_finish(input)
+
+	console.info(
+		JSON.stringify({ [JSON_KEY]: verdict, reason, is_finish, ...(idle !== undefined && { idle }) }),
+	)
+}
+
 function refuse(): number {
 	console.error(USAGE)
 
@@ -173,17 +203,15 @@ function run(argv: ReadonlyArray<string>, now_ms: number = Date.now()): number {
 
 	if (input === undefined) return refuse()
 
-	const { verdict, reason } = backlog_budget.decide(input)
+	const decision = backlog_budget.decide(input)
 
 	if (values.json === true) {
-		console.info(
-			JSON.stringify({ [JSON_KEY]: verdict, reason, is_finish: backlog_budget.is_finish(input) }),
-		)
+		print_json(input, decision)
 
 		return SUCCESS_EXIT_CODE
 	}
 
-	path_decision.print_decision(JSON_KEY, verdict, reason, false)
+	path_decision.print_decision(JSON_KEY, decision.verdict, decision.reason, false)
 
 	return SUCCESS_EXIT_CODE
 }

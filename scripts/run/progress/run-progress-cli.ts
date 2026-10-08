@@ -497,6 +497,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const run_progress_cli = {
+	DECLINE_RETRY_SECONDS,
 	DEFAULT_WAIT_MAX_HOURS,
 	DISABLED_NOTICE,
 	FAILED_TICK_PREFIX,

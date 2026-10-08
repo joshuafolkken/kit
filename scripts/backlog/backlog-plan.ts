@@ -260,6 +260,7 @@ const backlog_plan = {
 	WAITING_HEADING,
 	format_plan,
 	format_unusable,
+	is_standing,
 	marked_reference,
 	row_of,
 	section,

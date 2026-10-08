@@ -113,6 +113,40 @@ it('prints the finish classification beside a JSON budget verdict', () => {
 	info.mockRestore()
 })
 
+// joshuafolkken/kit#3430: the watch an empty backlog opens carries its window, so `backlog:offer` can
+// record when the wait ends; every other verdict carries none.
+function json_for(answer: string, extra: ReadonlyArray<string> = []): string {
+	const info = vi.spyOn(console, 'info').mockImplementation(vi.fn())
+	const args = ['--answer', answer, '--started', STARTED, '--active', ACTIVE, ...extra, '--json']
+
+	backlog_budget_cli.run(args, NOW_MS)
+	const [line = ''] = info.mock.calls.map(([value]) => String(value))
+
+	info.mockRestore()
+
+	return line
+}
+
+describe('backlog_budget_cli.run — the idle window beside a JSON verdict', () => {
+	it('names the window on an idle watch', () => {
+		expect(json_for('exhausted')).toContain(
+			'"idle":"idle since 2026-09-09T11:45:00.000Z until 2026-09-09T12:15:00.000Z (idle) asked 2026-09-09T12:00:00.000Z"',
+		)
+	})
+
+	it('names none on a run or a blocked watch', () => {
+		expect(json_for('candidates')).not.toContain('"idle"')
+		expect(json_for('blocked')).not.toContain('"idle"')
+	})
+
+	it('names none on the draining watch a reached maximum returns while children still run', () => {
+		const draining = json_for('exhausted', ['--max', '2', '--merged', '2', '--running', '1'])
+
+		expect(draining).toContain('"budget":"watch"')
+		expect(draining).not.toContain('"idle"')
+	})
+})
+
 describe('backlog_budget_cli.run', () => {
 	it('refuses an unknown flag rather than answering around it', () => {
 		expect(backlog_budget_cli.run([...REQUIRED, '--nope'], NOW_MS)).toBe(1)
