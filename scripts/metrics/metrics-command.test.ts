@@ -3,10 +3,23 @@ import { metrics_command } from './metrics-command'
 
 const ACCEPT = '--accept'
 const REASON = '--reason'
+const NO_STARTUP = '--no-startup'
 
 describe('metrics_command.parse_arguments', () => {
-	it('checks against the baseline when no argument is given', () => {
-		expect(metrics_command.parse_arguments([])).toStrictEqual({ reason: undefined })
+	it('checks against the baseline, timing the startups, when no argument is given', () => {
+		expect(metrics_command.parse_arguments([])).toStrictEqual({
+			reason: undefined,
+			is_startup_timed: true,
+		})
+	})
+
+	// joshuafolkken/kit#3409: the gate's form, run beside the unit suite.
+	it('checks without timing the startups in the gate form', () => {
+		expect(metrics_command.parse_arguments([NO_STARTUP])).toStrictEqual({
+			reason: undefined,
+			is_startup_timed: false,
+		})
+		expect(metrics_command.parse_arguments([NO_STARTUP, ACCEPT])).toBeUndefined()
 	})
 
 	it('raises the baseline with the trimmed reason in the full accept form', () => {
@@ -14,6 +27,7 @@ describe('metrics_command.parse_arguments', () => {
 
 		expect(metrics_command.parse_arguments([ACCEPT, REASON, `  ${reason} `])).toStrictEqual({
 			reason,
+			is_startup_timed: true,
 		})
 	})
 

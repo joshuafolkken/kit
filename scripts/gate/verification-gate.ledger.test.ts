@@ -72,6 +72,16 @@ describe('run_verification_gate — the lane ledger', () => {
 		expect(lane_ledger.read_entries(ledger_path)).toMatchObject([{ kind: 'gate', is_passed }])
 	})
 
+	it('records the unit suite duration beside the gate duration', async () => {
+		const ledger_path = path.join(scratch, 'gate-unit.jsonl')
+
+		await run_into(ledger_path, PASS)
+
+		const [entry] = lane_ledger.read_entries(ledger_path)
+
+		expect(entry?.kind === 'gate' && typeof entry.unit_ms).toBe('number')
+	})
+
 	it('writes nothing when no ledger was resolved', async () => {
 		const record_gate = vi.spyOn(lane_ledger, 'record_gate')
 

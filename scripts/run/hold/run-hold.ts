@@ -1,4 +1,5 @@
 import { git_command } from '#scripts/git/git-command'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
@@ -20,7 +21,6 @@ import { z } from 'zod'
 // key differently while two commands in the same work tree key alike.
 
 const HOLD_PREFIX = 'josh-run-hold-'
-const AGENT_PID_KEY = 'CLAUDE_PID'
 // The label a `new` entry point writes: the guard has to run *before* the issue is filed, or the
 // stopped run leaves behind the very issue it should not have created.
 const UNNUMBERED_ISSUE = 'new'
@@ -176,7 +176,7 @@ type SessionOwner = Pick<RunHold, 'owner_pid' | 'owner_start'>
 // malformed is no owner at all, never a guess at an ancestor: a wrong owner read as gone frees a live
 // run's tree, which is the one failure this guard exists to prevent.
 function session_owner(environment: Environment = process.env): SessionOwner {
-	const pid = Number(environment[AGENT_PID_KEY])
+	const pid = Number(environment[agent_session_environment.AGENT_PID_KEY])
 
 	if (!Number.isSafeInteger(pid) || pid <= 0) return {}
 

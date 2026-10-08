@@ -63,6 +63,14 @@ describe('build_gate_step — non-type checks', () => {
 		expect(step.command_args).toStrictEqual(['josh', UNIT_LABEL, CAPPED_WORKERS])
 	})
 
+	// joshuafolkken/kit#3409: the metrics step times no startup beside the unit suite.
+	it("hands the target the check's own fixed arguments", async () => {
+		const metrics = gate_plan.GATE_CHECKS.find((gate_check) => gate_check.label === 'metrics')
+		const step = await build_gate_step(metrics ?? check('metrics'), START, plan_of(WORKER_CAP))
+
+		expect(step.command_args).toStrictEqual(['josh', 'metrics', '--no-startup'])
+	})
+
 	it('leaves the unit suite uncapped when the plan sets no cap', async () => {
 		const step = await build_gate_step(check(UNIT_LABEL), START, plan_of(undefined))
 

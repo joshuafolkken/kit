@@ -34,6 +34,9 @@ const gate_schema = z.object({
 	at: z.string(),
 	elapsed_ms: z.number(),
 	is_passed: z.boolean(),
+	// The unit suite's own duration, present when this gate ran it (joshuafolkken/kit#3409) — the one
+	// record of a full vitest run `josh metrics` reads, so the suite is never timed twice.
+	unit_ms: z.number().optional(),
 })
 // `swap_mb` and `lanes` are optional because either read can fail on its own — a platform with no
 // swap reading, a `git worktree` call that did not answer — and a sample is still worth its load.
@@ -101,8 +104,13 @@ function now_iso(): string {
 }
 
 // One finished `josh gate`, whether it passed or not — a failing gate cost the lane its time as well.
-async function record_gate(path: string, elapsed_ms: number, is_passed: boolean): Promise<void> {
-	await record({ kind: KIND.GATE, at: now_iso(), elapsed_ms, is_passed }, path)
+async function record_gate(
+	path: string,
+	elapsed_ms: number,
+	is_passed: boolean,
+	unit_ms?: number,
+): Promise<void> {
+	await record({ kind: KIND.GATE, at: now_iso(), elapsed_ms, is_passed, unit_ms }, path)
 }
 
 async function record_merge(issue: number): Promise<void> {

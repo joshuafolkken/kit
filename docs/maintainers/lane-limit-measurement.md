@@ -15,8 +15,11 @@ on the common git directory so every lane, the parent and the sampler write to t
 | Entry   | Written by                                       | Fields                                        |
 | ------- | ------------------------------------------------ | --------------------------------------------- |
 | `merge` | `josh run:merge`, when a child merged            | `at`, `issue`                                 |
-| `gate`  | `josh gate`, when it finishes (passed or failed) | `at`, `elapsed_ms`, `is_passed`               |
+| `gate`  | `josh gate`, when it finishes (passed or failed) | `at`, `elapsed_ms`, `is_passed`, `unit_ms?`   |
 | `load`  | `josh lane:sample`                               | `at`, `load`, `free_mb`, `swap_mb?`, `lanes?` |
+
+`unit_ms` is the unit suite's own duration, present when the gate ran it; `josh metrics` reads the
+gate and unit durations it holds to a baseline from these entries.
 
 Recording is best-effort: a ledger that cannot be written never fails the gate or the merge it
 measures. Test suites never write to it.
