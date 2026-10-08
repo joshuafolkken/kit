@@ -13,6 +13,15 @@ import { ESLint } from 'eslint'
 // records why the API counts a hashbang as a comment where the CLI counts it as code, and why a
 // per-file budget must therefore stay on the CLI. A total compared only against its own baseline
 // needs the same method on both sides, not the CLI's, so the difference never reaches a verdict.
+//
+// **The same method has to mean the same number on every machine, so type-aware parsing is off.**
+// With `project` set, typescript-eslint infers a "single run" whenever `CI=true` (or the process is
+// the eslint bin) and then takes each file's AST from a program it read from disk, where TypeScript
+// keeps `#!` as trivia instead of the comment ESLint rewrote it to — so CI counted every hashbang as
+// code and saw `scripts.code_lines` 150 above the baseline a local run had just written. That
+// inference is also the CLI/API difference above. `max-lines` reads no type information, so parsing
+// without a program gives one answer everywhere, and in a fraction of the time.
+const UNTYPED_PARSE = { languageOptions: { parserOptions: { project: false } } }
 
 const MAX_LINES_RULE = 'max-lines'
 // The API deletes whatever `cacheLocation` names whenever `cache` is off, and its default is the
@@ -33,7 +42,7 @@ async function group_counts(
 		cacheLocation: stamp_file.stamp_path(CACHE_PREFIX, root),
 		allowInlineConfig: false,
 		ruleFilter: is_max_lines,
-		overrideConfig: { rules: line_budget.probe_rules(group.options) },
+		overrideConfig: { ...UNTYPED_PARSE, rules: line_budget.probe_rules(group.options) },
 	})
 
 	return line_budget.counts_from(await eslint.lintFiles(group.paths))
