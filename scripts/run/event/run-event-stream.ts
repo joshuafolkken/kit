@@ -110,6 +110,10 @@ const EVENT_KIND = {
 	// A one-line observation short of an Issue, written with `run:event --append note`
 	// (joshuafolkken/kit#3430) and shown in the same section.
 	NOTE: 'note',
+	// A lane child reached a phase no other event marks — its first implementation edit, written by the
+	// PreToolUse hook (joshuafolkken/kit#3444) — so `run:board` draws how far the child has got. A trace,
+	// like `SHIP_STAGE`: it says where the child's work is, not where the run is.
+	LANE_PHASE: 'lane-phase',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -125,6 +129,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.IDLE,
 	EVENT_KIND.FILED,
 	EVENT_KIND.NOTE,
+	EVENT_KIND.LANE_PHASE,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or

@@ -17,6 +17,12 @@ vi.mock('#scripts/run/run-parent-cut-hook', () => ({
 	run_parent_cut_hook: { parent_cut_reason: vi.fn().mockResolvedValue(undefined) },
 }))
 
+vi.mock('#scripts/lane/lane-phase', () => ({
+	lane_phase: { mark_implement: vi.fn().mockResolvedValue(undefined) },
+}))
+
+const { lane_phase } = await import('#scripts/lane/lane-phase')
+const mark_implement = vi.mocked(lane_phase.mark_implement)
 const { run_watcher_hook } = await import('#scripts/run/run-watcher-hook')
 const watcher_hook_reason = vi.mocked(run_watcher_hook.watcher_hook_reason)
 const { run_parent_cut_hook } = await import('#scripts/run/run-parent-cut-hook')
@@ -164,12 +170,36 @@ describe('pretool_outcome — the Step 0 reminder at Edit time', () => {
 		expect(result.notice).toBeUndefined()
 	})
 
+	// joshuafolkken/kit#3444: the reminder's edit is the lane child's move from plan to code.
+	it('marks the implement phase beside the reminder, and only then', async () => {
+		mark_implement.mockClear()
+		const payload = edit_payload_with_transcript()
+
+		await pretool_outcome_async(payload)
+		await pretool_outcome_async(payload)
+		await pretool_outcome_async(payload_with_transcript(BENIGN_COMMAND))
+
+		expect(mark_implement).toHaveBeenCalledOnce()
+	})
+
 	it('lets an asynchronous refusal win over the reminder', async () => {
 		watcher_hook_reason.mockResolvedValue(WATCHER_STALE_REASON)
 
 		const result = await pretool_outcome_async(edit_payload_with_transcript())
 
 		expect(result).toEqual(outcome(WATCHER_STALE_REASON, undefined, undefined))
+	})
+})
+
+// joshuafolkken/kit#3444: the Codex adapter marks the phase through the same helper.
+describe('pretool_guard.mark_phase', () => {
+	it('marks the implement phase from the reminder alone', async () => {
+		mark_implement.mockClear()
+
+		await pretool_guard.mark_phase(outcome(undefined, 'another notice', undefined))
+		await pretool_guard.mark_phase(outcome(undefined, step_zero_notice.NOTICE, undefined))
+
+		expect(mark_implement).toHaveBeenCalledOnce()
 	})
 })
 

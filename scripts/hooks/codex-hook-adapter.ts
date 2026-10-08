@@ -123,9 +123,19 @@ async function write_posttool_context(raw_payload: string): Promise<void> {
 	if (context !== undefined) process.stdout.write(`${build_envelope(context)}\n`)
 }
 
+// The environment file is loaded before the verdict, as `write_outcome` does, so the lane-child marker
+// the phase mark reads is in place; the mark follows the written envelope (joshuafolkken/kit#3444).
+async function write_pretool_outcome(raw_payload: string): Promise<void> {
+	hook_decision.load_environment_file()
+	const outcome = pretool_outcome(raw_payload)
+
+	hook_decision.emit_outcome(outcome)
+	await pretool_guard.mark_phase(outcome)
+}
+
 async function run(raw_payload: string, mode: string): Promise<void> {
 	if (mode === PRETOOL_MODE) {
-		hook_decision.write_outcome(raw_payload, pretool_outcome)
+		await write_pretool_outcome(raw_payload)
 
 		return
 	}
@@ -149,6 +159,7 @@ const codex_hook_adapter = {
 	posttool_payloads,
 	pretool_outcome,
 	pretool_payload,
+	write_pretool_outcome,
 }
 
 export { codex_hook_adapter }

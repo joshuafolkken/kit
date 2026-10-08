@@ -4,7 +4,7 @@ import { run_board_labels } from './run-board-labels'
 // joshuafolkken/kit#3430: the board's words follow the session language, and every time it draws is an
 // `HH:MM:SS` clock or span.
 
-const { clock_of, span_of, words_of } = run_board_labels
+const { bar_of, clock_of, elapsed_of, left_of, span_of, words_of } = run_board_labels
 const SECOND = 1000
 const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
@@ -34,6 +34,37 @@ describe('run_board_labels.span_of', () => {
 
 	it('reads a negative span as zero', () => {
 		expect(span_of(-MINUTE)).toBe('00:00:00')
+	})
+})
+
+// joshuafolkken/kit#3444: elapsed times are a short `MM:SS`, time left is `7h38m`, and the one bar the
+// board draws fills in proportion.
+describe('run_board_labels.elapsed_of', () => {
+	it('draws minutes and seconds whose minutes never carry into hours', () => {
+		expect(elapsed_of(42 * SECOND + 999)).toBe('00:42')
+		expect(elapsed_of(HOUR + MINUTE + 5 * SECOND)).toBe('61:05')
+		expect(elapsed_of(2 * HOUR + 5 * MINUTE + 30 * SECOND)).toBe('125:30')
+	})
+
+	it('reads a negative elapsed time as zero', () => {
+		expect(elapsed_of(-MINUTE)).toBe('00:00')
+	})
+})
+
+describe('run_board_labels.left_of', () => {
+	it('draws hours and zero-padded minutes, a passed deadline as zero', () => {
+		expect(left_of(7 * HOUR + 38 * MINUTE + 59 * SECOND)).toBe('7h38m')
+		expect(left_of(5 * MINUTE)).toBe('0h05m')
+		expect(left_of(-MINUTE)).toBe('0h00m')
+	})
+})
+
+describe('run_board_labels.bar_of', () => {
+	it('fills the bar in proportion, empty for nothing to do and full when done', () => {
+		expect(bar_of(1, 4, 8)).toBe('━━░░░░░░')
+		expect(bar_of(0, 0, 4)).toBe('░░░░')
+		expect(bar_of(5, 4, 4)).toBe('━━━━')
+		expect(bar_of(0, 1)).toHaveLength(20)
 	})
 })
 

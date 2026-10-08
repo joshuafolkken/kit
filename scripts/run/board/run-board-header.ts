@@ -5,20 +5,27 @@ import { run_board_labels, type Words } from './run-board-labels'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import type { RunActivity } from './run-board-status'
 
-// The top of `run:board` (joshuafolkken/kit#3430): whether the run is moving, since when, until when,
-// how far through the plan it is, and — while it waits on an empty backlog — until when it waits and
-// what ends the wait. Every time comes from a record (the carry's start, the stream's events, the
-// `idle` window); nothing here guesses one.
+// The top of `run:board` (joshuafolkken/kit#3430): whether the run is moving, how long it has run, how
+// long it has left, how fresh its last event is, and how far through the plan it is — and, while it
+// waits on an empty backlog, until when it waits and what ends the wait. Every time comes from a record
+// (the carry's start, the stream's events, the `idle` window); nothing here guesses one. Two lines of
+// symbols rather than sentences (joshuafolkken/kit#3444): the `⏱` that moves every second is the proof
+// the board is live, so no `updated` line is drawn.
 
-const { clock_of, span_of } = run_board_labels
-const SEPARATOR = ' · '
-const BAR_WIDTH = 20
-const BAR_DONE = '━'
-const BAR_LEFT = '░'
-// A running run whose newest event is older than this is drawn as stale, so a hang stands out.
+const { STATE_ICONS, bar_of, clock_of, elapsed_of, left_of, span_of } = run_board_labels
+const COUNT_GAP = '  '
+const PROGRESS_GAP = COUNT_GAP
+// The parts of the title line sit one space further apart than the counts, so the groups read apart.
+const GAP = `${COUNT_GAP} `
+// A running run whose newest event is older than this is drawn as stale, so a hang stands out; past
+// twice that it is drawn as alarming.
 const STALE_MINUTES = 15
 const STALE_MS = STALE_MINUTES * backlog_budget.MS_PER_MINUTE
+const ALARM_FACTOR = 2
+const ALARM_MS = STALE_MS * ALARM_FACTOR
 const INDENT = '  '
+const RUN_NAME = 'backlogrun'
+const CLOCK_MINUTES_END = 5
 
 interface BoardHeader {
 	now_ms: number
@@ -39,6 +46,18 @@ interface BoardCounts {
 	parked: number
 	running: number
 	remaining: number
+}
+
+type RunMark = 'running' | 'idle' | 'human' | 'stopped'
+
+type TextColor = Parameters<typeof styleText>[0]
+
+// The run's state as a colored glyph before its name.
+const RUN_MARKS: Readonly<Record<RunMark, { glyph: string; color: TextColor }>> = {
+	running: { glyph: '▶', color: 'green' },
+	idle: { glyph: '⏸', color: 'yellow' },
+	human: { glyph: '✋', color: 'magenta' },
+	stopped: { glyph: '■', color: 'gray' },
 }
 
 function count_state(rows: ReadonlyArray<BoardRow>, state: BoardRow['state']): number {
@@ -63,87 +82,83 @@ function counts_of(layout: BoardLayout): BoardCounts {
 	return { total, settled, merged, parked, running, remaining: total - settled - running }
 }
 
-// Nothing running and no idle window: the run is waiting on a person when all the plan has left is
-// what `needs-decision` holds.
-function quiet_label(header: BoardHeader): string {
-	const { layout, words } = header
-	const is_human = layout?.waves.length === 0 && layout.people.length > 0
-
-	return is_human ? words.human : words.idle
+// Nothing running: the run is waiting on a person when all the plan has left is what
+// `needs-decision` holds, and otherwise idle.
+function quiet_mark(layout: BoardLayout | undefined): RunMark {
+	return layout?.waves.length === 0 && layout.people.length > 0 ? 'human' : 'idle'
 }
 
 // The run's state, each state overriding the ones below it.
-function state_label(header: BoardHeader, running: number): string {
-	const { activity, words } = header
+function mark_of(header: BoardHeader, running: number): RunMark {
+	if (header.activity.is_stopped) return 'stopped'
+	if (running > 0) return 'running'
 
-	if (activity.is_stopped) return words.stopped
-	if (running > 0) return words.running
-
-	return activity.idle === undefined ? quiet_label(header) : words.idle_drained
+	return header.activity.idle === undefined ? quiet_mark(header.layout) : 'idle'
 }
 
-function last_event_part(header: BoardHeader, is_running: boolean): string | undefined {
+function run_part(mark: RunMark): string {
+	const { glyph, color } = RUN_MARKS[mark]
+
+	return styleText(color, `${glyph} ${RUN_NAME}`)
+}
+
+function aged(part: string, age_ms: number): string {
+	if (age_ms > ALARM_MS) return styleText('red', part)
+
+	return age_ms > STALE_MS ? styleText('yellow', part) : part
+}
+
+// How long ago the stream last moved; only a running run can be stale, so only it is colored.
+function heartbeat_part(header: BoardHeader, mark: RunMark): string | undefined {
 	const last = header.activity.last_event_ms
 
 	if (last === undefined) return undefined
 
 	const age = header.now_ms - last
-	const part = `${header.words.last_event} ${clock_of(last)} (${span_of(age)})`
+	const part = `💓 ${elapsed_of(age)}`
 
-	return is_running && age > STALE_MS ? styleText('yellow', part) : part
+	return mark === 'running' ? aged(part, age) : part
+}
+
+// A plan fetch is said only when it failed — the board otherwise keeps quiet about a routine read.
+function plan_warning(header: BoardHeader): string | undefined {
+	const failed = header.plan_failed_ms
+
+	if (failed === undefined) return undefined
+
+	return styleText(
+		'yellow',
+		`⚠ ${header.words.plan} ${clock_of(failed).slice(0, CLOCK_MINUTES_END)}`,
+	)
 }
 
 function title_line(header: BoardHeader, running: number): string {
-	const { now_ms, started_ms, words } = header
-	const state = state_label(header, running)
+	const { now_ms, started_ms } = header
+	const mark = mark_of(header, running)
 	const cutoff = started_ms + backlog_budget.WHOLE_RUN_BUDGET_MS
 	const parts = [
-		`backlogrun ${state}`,
-		`${words.started} ${clock_of(started_ms)} (${span_of(now_ms - started_ms)})`,
-		`${words.cutoff} ${clock_of(cutoff)}`,
-		last_event_part(header, state === words.running),
+		run_part(mark),
+		`⏱ ${elapsed_of(now_ms - started_ms)}`,
+		`⌛ ${left_of(cutoff - now_ms)}`,
+		heartbeat_part(header, mark),
+		plan_warning(header),
 	]
 
-	return parts.filter((part) => part !== undefined).join(SEPARATOR)
-}
-
-function plan_part(header: BoardHeader): string {
-	const { words, plan_fetched_ms, plan_failed_ms } = header
-	const fetched =
-		plan_fetched_ms === undefined
-			? words.plan_none
-			: `${words.plan} ${clock_of(plan_fetched_ms)} ${words.plan_fetched}`
-
-	if (plan_failed_ms === undefined) return fetched
-
-	const failure = `⚠ ${words.plan_failed} ${clock_of(plan_failed_ms)}`
-
-	return `${fetched}${SEPARATOR}${styleText('yellow', failure)}`
-}
-
-function update_line(header: BoardHeader): string {
-	return `${header.words.updated} ${clock_of(header.now_ms)}${SEPARATOR}${plan_part(header)}`
-}
-
-function bar_of(counts: BoardCounts): string {
-	const done = counts.total === 0 ? 0 : Math.round((counts.settled / counts.total) * BAR_WIDTH)
-
-	return BAR_DONE.repeat(done) + BAR_LEFT.repeat(BAR_WIDTH - done)
+	return parts.filter((part) => part !== undefined).join(GAP)
 }
 
 function progress_line(counts: BoardCounts, header: BoardHeader): string {
-	const { words } = header
 	const added = counts.total - (header.baseline_total ?? counts.total)
 	const plus = added > 0 ? ` (+${String(added)})` : ''
-	const icons = run_board_labels.STATE_ICONS
+	const tally = `${String(counts.settled)}/${String(counts.total)}${plus}`
 	const breakdown = [
-		`${icons.merged} ${String(counts.merged)} ${words.merged}`,
-		`${icons.parked} ${String(counts.parked)} ${words.parked}`,
-		`${icons.running} ${String(counts.running)} ${words.in_progress}`,
-		`${icons.waiting} ${String(counts.remaining)} ${words.remaining}`,
-	].join(SEPARATOR)
+		`${STATE_ICONS.merged} ${String(counts.merged)}`,
+		`${STATE_ICONS.parked} ${String(counts.parked)}`,
+		`${STATE_ICONS.running} ${String(counts.running)}`,
+		`${STATE_ICONS.waiting} ${String(counts.remaining)}`,
+	].join(COUNT_GAP)
 
-	return `${words.progress} ${String(counts.settled)}/${String(counts.total)}${plus} ${bar_of(counts)}  ${breakdown}`
+	return `${bar_of(counts.settled, counts.total)}${PROGRESS_GAP}${tally}${GAP}${breakdown}`
 }
 
 function idle_lines(idle: IdleWindow, header: BoardHeader): Array<string> {
@@ -173,9 +188,8 @@ function header_lines(header: BoardHeader): Array<string> {
 
 	return [
 		title_line(header, running),
-		...idle_block(header, running),
-		update_line(header),
 		...(counts === undefined ? [] : [progress_line(counts, header)]),
+		...idle_block(header, running),
 	]
 }
 

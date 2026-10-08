@@ -78,6 +78,25 @@ describe('run_board_layout.layout_of', () => {
 	})
 })
 
+// joshuafolkken/kit#3444: an epic row carries its title, and a wave row waiting on a decision is marked.
+describe('run_board_layout.layout_of wave rows', () => {
+	it('gives an epic the title the open listing holds for it', () => {
+		const plan = plan_of([[child(11)]], [], new Map([[11, 10]]))
+		const titled = { ...plan, context: { ...plan.context, titles: new Map([[10, 'Epic ten']]) } }
+		const layout = run_board_layout.layout_of(titled, NO_STATUSES)
+
+		expect(layout.waves[0]?.[0]).toMatchObject({ kind: 'epic', epic: 10, title: 'Epic ten' })
+	})
+
+	it('draws a needs-decision wave row as waiting on a person', () => {
+		const plan = plan_of([[child(1), child(2, [], [NEEDS_DECISION_LABEL])]])
+		const layout = run_board_layout.layout_of(plan, NO_STATUSES)
+		const states = layout.waves[0]?.map((entry) => (entry.kind === 'row' ? entry.row.state : ''))
+
+		expect(states).toStrictEqual(['waiting', 'human'])
+	})
+})
+
 describe('run_board_layout.layout_of outside the waves', () => {
 	it('drops a blocker from the waiting note once the stream has seen it merge', () => {
 		const plan = plan_of([], [child(20, [3409, 3415])])

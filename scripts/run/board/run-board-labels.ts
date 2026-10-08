@@ -1,8 +1,9 @@
 import type { ItemState } from './run-board-status'
 
 // The words and the clock `run:board` draws with (joshuafolkken/kit#3430), in the session language as
-// `run:event --watch`'s labels are. Every time on the board is a local `HH:MM:SS` and every span an
-// `HH:MM:SS` duration, so a person reads the board against the clock on their own screen.
+// `run:event --watch`'s labels are. A moment on the board is a local `HH:MM:SS` clock; how long
+// something has run is a short `MM:SS` (joshuafolkken/kit#3444), so a person reads the board against
+// the clock on their own screen.
 
 const JA = 'ja'
 const CLOCK_WIDTH = 2
@@ -11,6 +12,10 @@ const MS_PER_SECOND = 1000
 const SECONDS_PER_MINUTE = 60
 const MINUTES_PER_HOUR = 60
 const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR
+const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE
+const BAR_WIDTH = 20
+const BAR_DONE = '━'
+const BAR_LEFT = '░'
 
 interface WordPair {
 	ja: string
@@ -18,30 +23,17 @@ interface WordPair {
 }
 
 // One pair per word, as `run-event-render.ts` keeps its labels, so a word cannot be added in one
-// language without the other.
+// language without the other. The board draws most of what it says as a symbol (joshuafolkken/kit#3444);
+// the words left are the ones a symbol cannot carry, and the legend that names the symbols.
 const WORD_PAIRS = {
-	running: { ja: '▶ 実行中', en: '▶ running' },
-	idle: { ja: '⏸ 待機中', en: '⏸ waiting' },
-	idle_drained: {
-		ja: '⏸ 待機中（全件完了・新着待ち）',
-		en: '⏸ waiting (all done, watching for new issues)',
-	},
-	human: { ja: '✋ 人待ち', en: '✋ waiting on a person' },
-	stopped: { ja: '■ 終了', en: '■ ended' },
 	no_run: { ja: 'ランなし', en: 'no run' },
-	started: { ja: '開始', en: 'started' },
-	cutoff: { ja: '打ち切り', en: 'cut-off' },
-	last_event: { ja: '最終イベント', en: 'last event' },
-	updated: { ja: '更新', en: 'updated' },
 	plan: { ja: '計画', en: 'plan' },
-	plan_fetched: { ja: '取得', en: 'fetched' },
-	plan_none: { ja: '計画 未取得', en: 'plan not fetched yet' },
-	plan_failed: { ja: '計画の取得に失敗', en: 'plan fetch failed' },
-	progress: { ja: '進捗', en: 'progress' },
 	merged: { ja: 'マージ', en: 'merged' },
 	parked: { ja: 'park', en: 'parked' },
 	in_progress: { ja: '実行中', en: 'running' },
-	remaining: { ja: '残り', en: 'left' },
+	waiting: { ja: '待ち', en: 'waiting' },
+	decision: { ja: '判断待ち', en: 'decision' },
+	waits: { ja: '待ち先', en: 'waits on' },
 	idle_until: { ja: '待機終了', en: 'wait ends' },
 	idle_left: { ja: '残り', en: 'left' },
 	idle_end_idle: {
@@ -53,10 +45,6 @@ const WORD_PAIRS = {
 		en: 'ends at the whole-run cut-off and reports',
 	},
 	next_check: { ja: '次の確認', en: 'next check' },
-	active: { ja: '着手済み', en: 'started' },
-	people: { ja: '人待ち', en: 'waiting on a person' },
-	unreached: { ja: '未到達', en: 'not reached' },
-	waits: { ja: '待ち', en: 'waits on' },
 	notes: { ja: '気づき・判断待ち', en: 'findings and decisions' },
 	more: { ja: 'ほか', en: 'more' },
 	filed: { ja: '起票', en: 'filed' },
@@ -76,14 +64,20 @@ function words_in(lang: keyof WordPair): Words {
 const JA_WORDS = words_in('ja')
 const EN_WORDS = words_in('en')
 
+// Every row icon is an emoji a terminal draws two columns wide by default (Emoji_Presentation), so the
+// number after it lines up whichever state a row is in (joshuafolkken/kit#3444): 🅿 and ☑ are text
+// symbols a terminal such as VSCode's draws one column wide, which shifted a parked or finished row.
 const STATE_ICONS: Readonly<Record<ItemState, string>> = {
 	running: '🔄',
 	merged: '✅',
-	parked: '🅿',
-	done: '☑',
+	parked: '💤',
+	done: '🏁',
 	waiting: '⏳',
-	human: '✋',
+	human: '🙋',
 }
+
+// The blocking edge, chosen on the same rule: ⛓ is a text symbol.
+const WAITS_ICON = '🔗'
 
 function words_of(lang: string): Words {
 	return lang === JA ? JA_WORDS : EN_WORDS
@@ -111,7 +105,41 @@ function span_of(ms: number): string {
 	return [hours, minutes, seconds % SECONDS_PER_MINUTE].map((value) => two_digits(value)).join(':')
 }
 
-const run_board_labels = { STATE_ICONS, clock_of, span_of, words_of }
+// How long something has run, as `MM:SS` whose minutes never carry into hours (`61:05`), so the header
+// and every row read one short column; a negative span reads as zero.
+function elapsed_of(ms: number): string {
+	const seconds = Math.floor(Math.max(0, ms) / MS_PER_SECOND)
+	const minutes = Math.floor(seconds / SECONDS_PER_MINUTE)
+
+	return `${two_digits(minutes)}:${two_digits(seconds % SECONDS_PER_MINUTE)}`
+}
+
+// How long is left, as `7h38m`; a deadline already passed reads as zero.
+function left_of(ms: number): string {
+	const minutes = Math.floor(Math.max(0, ms) / MS_PER_MINUTE)
+	const hours = Math.floor(minutes / MINUTES_PER_HOUR)
+
+	return `${String(hours)}h${two_digits(minutes % MINUTES_PER_HOUR)}m`
+}
+
+// **The one progress bar the board draws** — the header's plan and every running row's phase
+// (joshuafolkken/kit#3444): `done` of `total` filled in proportion across `width` cells.
+function bar_of(done: number, total: number, width: number = BAR_WIDTH): string {
+	const filled = total === 0 ? 0 : Math.round((Math.min(done, total) / total) * width)
+
+	return BAR_DONE.repeat(filled) + BAR_LEFT.repeat(width - filled)
+}
+
+const run_board_labels = {
+	STATE_ICONS,
+	WAITS_ICON,
+	bar_of,
+	clock_of,
+	elapsed_of,
+	left_of,
+	span_of,
+	words_of,
+}
 
 export { run_board_labels }
 export type { Words }

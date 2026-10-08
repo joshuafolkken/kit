@@ -1,186 +1,30 @@
 #!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
-import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { session_language } from '#scripts/josh/session-language'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_carry } from '#scripts/run/carry/run-carry'
-import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_progress } from '#scripts/run/progress/run-progress'
-import { run_progress_cli } from '#scripts/run/progress/run-progress-cli'
-import { run_board_header } from './run-board-header'
 import { run_board_labels, type Words } from './run-board-labels'
-import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
-import { run_board_notes } from './run-board-notes'
 import { run_board_plan } from './run-board-plan'
-import { run_board_render } from './run-board-render'
 import { run_board_scope } from './run-board-scope'
 import { run_board_screen, type Screen } from './run-board-screen'
-import { run_board_status } from './run-board-status'
+import { run_board_tick, type BoardPorts, type LocalRead } from './run-board-tick'
 
 // `josh run:board` — a full-screen board of the running `backlogrun` (joshuafolkken/kit#3430), redrawn
-// every few seconds for a person to keep open beside the run. **Two speeds**: the run's own stream and
-// lanes are local reads taken every tick; the plan they are laid over is a GitHub read taken no more
-// often than `run:progress` re-reads after a decline, so a board left open all night costs what the
-// watcher already does. A failed plan read keeps the previous plan on screen and says when it failed.
-// With no run in this checkout it reads nothing from GitHub and waits for one to start.
+// every second for a person to keep open beside the run. What one redraw reads, and how often each read
+// is taken, is `run-board-tick.ts`'s; this file wires the live reads and the terminal around it. With
+// no run in this checkout it reads nothing from GitHub and waits for one to start.
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ONCE_FLAG = '--once'
-const TICK_SECONDS = 5
-const TICK_MS = TICK_SECONDS * run_progress.MS_PER_SECOND
-const PLAN_RETRY_MS = run_progress_cli.DECLINE_RETRY_SECONDS * run_progress.MS_PER_SECOND
 const SIGINT_EXIT_CODE = 130
 const SIGTERM_EXIT_CODE = 143
 const USAGE = 'Usage: josh run:board [--once]'
-
-// What the board reads locally each tick: the run's start and scope, its events and its open lanes.
-interface LocalRead {
-	started_ms: number
-	// What the run was asked to do, from the carry record's invocation (joshuafolkken/kit#3442).
-	scope: NamedPlan
-	events: ReadonlyArray<RunEvent>
-	lanes: ReadonlyArray<string>
-}
-
-interface BoardPorts {
-	read_plan: (scope: NamedPlan) => Promise<BoardPlan | undefined>
-	// `undefined` when no run has started here.
-	read_local: () => Promise<LocalRead | undefined>
-	now: () => number
-	write: (frame: string) => void
-	// Whether stdout is a terminal — only a terminal gets the alternate screen.
-	is_tty: boolean
-	// Runs `leave` however the process ends: a normal exit, Ctrl+C or SIGTERM.
-	on_exit: (leave: () => void) => void
-	sleep: (ms: number) => Promise<void>
-}
-
-interface BoardState {
-	plan: BoardPlan | undefined
-	attempted_ms: number | undefined
-	fetched_ms: number | undefined
-	failed_ms: number | undefined
-	baseline_total: number | undefined
-}
-
-const FRESH_STATE: BoardState = {
-	plan: undefined,
-	attempted_ms: undefined,
-	fetched_ms: undefined,
-	failed_ms: undefined,
-	baseline_total: undefined,
-}
-
-function is_plan_due(state: BoardState, now_ms: number): boolean {
-	return state.attempted_ms === undefined || now_ms - state.attempted_ms >= PLAN_RETRY_MS
-}
-
-// A title the board once knew stays known, so an issue that left the open listing keeps its name.
-function with_titles(plan: BoardPlan, previous: BoardPlan | undefined): BoardPlan {
-	const titles = new Map([...(previous?.context.titles ?? []), ...plan.context.titles])
-
-	return { ...plan, context: { ...plan.context, titles } }
-}
-
-// The ports and the local read one plan refresh reads with.
-interface PlanRefresh {
-	ports: BoardPorts
-	local: LocalRead
-}
-
-async function refresh(
-	state: BoardState,
-	source: PlanRefresh,
-	now_ms: number,
-): Promise<BoardState> {
-	if (!is_plan_due(state, now_ms)) return state
-
-	const plan = await source.ports.read_plan(source.local.scope)
-	const attempted = { ...state, attempted_ms: now_ms }
-
-	if (plan === undefined) return { ...attempted, failed_ms: now_ms }
-
-	return {
-		...attempted,
-		plan: with_titles(plan, state.plan),
-		fetched_ms: now_ms,
-		failed_ms: undefined,
-	}
-}
-
-// The statuses scoped to the run's plan, a running child the plan's listing no longer holds settled.
-function layout_for(state: BoardState, local: LocalRead): BoardLayout | undefined {
-	const { plan } = state
-
-	if (plan === undefined) return undefined
-
-	const in_run = run_board_layout.numbers_of(plan)
-	const statuses = run_board_status.statuses_of(local.events, local.lanes, in_run)
-	const read = { open_numbers: plan.context.open_numbers, read_ms: state.fetched_ms }
-
-	return run_board_layout.layout_of(plan, run_board_status.settle_closed(statuses, read))
-}
-
-// What one redraw draws with.
-interface Redraw {
-	ports: BoardPorts
-	words: Words
-	now_ms: number
-}
-
-function frame_of(
-	state: BoardState,
-	local: LocalRead,
-	layout: BoardLayout | undefined,
-	redraw: Redraw,
-): Array<string> {
-	const header = {
-		now_ms: redraw.now_ms,
-		words: redraw.words,
-		started_ms: local.started_ms,
-		activity: run_board_status.activity_of(local.events),
-		layout,
-		baseline_total: state.baseline_total,
-		plan_fetched_ms: state.fetched_ms,
-		plan_failed_ms: state.failed_ms,
-	}
-
-	return run_board_render.render({ header, notes: run_board_notes.notes_of(local.events) })
-}
-
-function draw(ports: BoardPorts, lines: ReadonlyArray<string>): void {
-	ports.write(`${lines.join('\n')}\n`)
-}
-
-// The first total the board sees is the baseline every later arrival is counted against.
-function draw_run(state: BoardState, local: LocalRead, redraw: Redraw): BoardState {
-	const layout = layout_for(state, local)
-	const first_total = layout === undefined ? undefined : run_board_header.counts_of(layout).total
-	const settled = { ...state, baseline_total: state.baseline_total ?? first_total }
-
-	draw(redraw.ports, frame_of(settled, local, layout, redraw))
-
-	return settled
-}
-
-// One redraw. No run reads nothing from GitHub and keeps the plan it had for when one starts.
-async function tick(state: BoardState, ports: BoardPorts, words: Words): Promise<BoardState> {
-	const now_ms = ports.now()
-	const local = await ports.read_local()
-
-	if (local === undefined) {
-		draw(ports, run_board_render.render_no_run(now_ms, words))
-
-		return state
-	}
-
-	return draw_run(await refresh(state, { ports, local }, now_ms), local, { ports, words, now_ms })
-}
+const { FRESH_STATE, REDRAW_MS, tick } = run_board_tick
 
 async function read_local(): Promise<LocalRead | undefined> {
 	const repository = await run_carry.repository_directory()
@@ -248,7 +92,7 @@ async function redraw_forever(ports: BoardPorts, words: Words): Promise<void> {
 
 	for (;;) {
 		// eslint-disable-next-line no-await-in-loop -- polling: each redraw waits out the tick before it
-		await ports.sleep(TICK_MS)
+		await ports.sleep(REDRAW_MS)
 		// eslint-disable-next-line no-await-in-loop -- polling: each redraw folds the state the last one left
 		state = await tick(state, ports, words)
 	}
@@ -288,7 +132,7 @@ async function run(argv: ReadonlyArray<string>, ports: BoardPorts = LIVE_PORTS):
 	return SUCCESS_EXIT_CODE
 }
 
-const run_board_cli = { FRESH_STATE, PLAN_RETRY_MS, run, tick }
+const run_board_cli = { run }
 
 // `.env` is read inside the guard, as `run:event --watch` reads it, so the board draws in the
 // `JOSH_SESSION_LANG` a person keeps there while the unit tests see no developer's `.env`.
@@ -298,4 +142,3 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 export { run_board_cli }
-export type { BoardPorts, BoardState, LocalRead }

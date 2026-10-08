@@ -92,6 +92,21 @@ describe('Codex pre-tool adaptation', () => {
 
 		expect(time_batch_guard.should_block(unbatched_text(MARKDOWN_FILE), call, 0)).toBe(false)
 	})
+
+	// joshuafolkken/kit#3444: a Codex lane child marks its implement phase like a Claude one.
+	it('writes the verdict and hands the same outcome to the phase mark', async () => {
+		const outcome: GuardOutcome = { ...ALLOW, notice: 'reminder' }
+
+		vi.spyOn(pretool_guard, 'pretool_outcome').mockReturnValue(outcome)
+		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
+		const emit = vi.spyOn(hook_decision, 'emit_outcome').mockReturnValue(undefined)
+		const mark = vi.spyOn(pretool_guard, 'mark_phase').mockResolvedValue(undefined)
+
+		await codex_hook_adapter.write_pretool_outcome(codex_payload([TYPESCRIPT_FILE]))
+
+		expect(emit).toHaveBeenCalledWith(outcome)
+		expect(mark).toHaveBeenCalledWith(outcome)
+	})
 })
 
 describe('Codex post-tool adaptation', () => {
