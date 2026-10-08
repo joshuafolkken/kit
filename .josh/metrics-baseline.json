@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 970,
-		"code_lines": 80136,
-		"comment_lines": 32741,
+		"code_lines": 80194,
+		"comment_lines": 32766,
 		"comment_ratio": 0.41
 	},
 	"rules": {
@@ -11,7 +11,7 @@
 	},
 	"guards": 8,
 	"accepted": {
-		"reason": "Untyped parse for the metrics probe so CI and local runs count hashbang lines alike (#3408)",
+		"reason": "#3419: same-run hold re-entry / dead-owner reclaim and --only parked-issue stop close add runtime code",
 		"date": "2026-10-08"
 	}
 }
