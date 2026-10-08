@@ -16,6 +16,7 @@ import { run_board_labels, type Words } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
 import { run_board_notes } from './run-board-notes'
 import { run_board_render } from './run-board-render'
+import { run_board_screen, type Screen } from './run-board-screen'
 import { run_board_status } from './run-board-status'
 
 // `josh run:board` — a full-screen board of the running `backlogrun` (joshuafolkken/kit#3430), redrawn
@@ -32,7 +33,8 @@ const ONCE_FLAG = '--once'
 const TICK_SECONDS = 5
 const TICK_MS = TICK_SECONDS * run_progress.MS_PER_SECOND
 const PLAN_RETRY_MS = run_progress_cli.DECLINE_RETRY_SECONDS * run_progress.MS_PER_SECOND
-const CLEAR_SCREEN = '\u{1B}[H\u{1B}[2J'
+const SIGINT_EXIT_CODE = 130
+const SIGTERM_EXIT_CODE = 143
 const USAGE = 'Usage: josh run:board [--once]'
 
 // What the board reads locally each tick: the run's start, its events and its open lanes.
@@ -48,6 +50,11 @@ interface BoardPorts {
 	read_local: () => Promise<LocalRead | undefined>
 	now: () => number
 	write: (frame: string) => void
+	// Whether stdout is a terminal — only a terminal gets the alternate screen.
+	is_tty: boolean
+	// Runs `leave` however the process ends: a normal exit, Ctrl+C or SIGTERM.
+	on_exit: (leave: () => void) => void
+	sleep: (ms: number) => Promise<void>
 }
 
 interface BoardState {
@@ -130,7 +137,7 @@ function frame_of(
 }
 
 function draw(ports: BoardPorts, lines: ReadonlyArray<string>): void {
-	ports.write(`${CLEAR_SCREEN}${lines.join('\n')}\n`)
+	ports.write(`${lines.join('\n')}\n`)
 }
 
 // The first total the board sees is the baseline every later arrival is counted against.
@@ -191,23 +198,71 @@ async function read_local(): Promise<LocalRead | undefined> {
 	}
 }
 
+// A signal exits with its conventional code, so the `exit` handler restores the screen on every path.
+function on_exit(leave: () => void): void {
+	process.once('exit', leave)
+	process.once('SIGINT', () => process.exit(SIGINT_EXIT_CODE))
+	process.once('SIGTERM', () => process.exit(SIGTERM_EXIT_CODE))
+}
+
 const LIVE_PORTS: BoardPorts = {
 	read_plan,
 	read_local,
 	now: () => Date.now(),
 	write: (frame) => process.stdout.write(frame),
+	is_tty: process.stdout.isTTY,
+	on_exit,
+	sleep: async (ms) => {
+		await sleep(ms)
+	},
 }
 
-async function watch(ports: BoardPorts, words: Words, is_once: boolean): Promise<void> {
-	let state = await tick(FRESH_STATE, ports, words)
+// Every frame starts from the top of the alternate screen, erasing what the last one left below it.
+function framed(ports: BoardPorts, screen: Screen): BoardPorts {
+	return {
+		...ports,
+		write: (frame) => {
+			ports.write(`${screen.frame}${frame}`)
+		},
+	}
+}
 
-	if (is_once) return
+// Leaves the alternate screen once, whichever path gets there first: a second leave would restore the
+// cursor saved on entering and draw over whatever was printed after the first.
+function leaver(ports: BoardPorts, screen: Screen): () => void {
+	let has_left = false
+
+	return () => {
+		if (has_left) return
+		has_left = true
+		ports.write(screen.leave)
+	}
+}
+
+async function redraw_forever(ports: BoardPorts, words: Words): Promise<void> {
+	let state = await tick(FRESH_STATE, ports, words)
 
 	for (;;) {
 		// eslint-disable-next-line no-await-in-loop -- polling: each redraw waits out the tick before it
-		await sleep(TICK_MS)
+		await ports.sleep(TICK_MS)
 		// eslint-disable-next-line no-await-in-loop -- polling: each redraw folds the state the last one left
 		state = await tick(state, ports, words)
+	}
+}
+
+// A signal leaves through `on_exit`; a failed redraw leaves before its error is printed, so the error
+// lands on the normal screen rather than vanishing with the alternate one.
+async function watch(ports: BoardPorts, words: Words): Promise<void> {
+	const screen = run_board_screen.screen_of('live')
+	const leave = leaver(ports, screen)
+
+	ports.write(screen.enter)
+	ports.on_exit(leave)
+
+	try {
+		await redraw_forever(framed(ports, screen), words)
+	} finally {
+		leave()
 	}
 }
 
@@ -222,7 +277,9 @@ async function run(argv: ReadonlyArray<string>, ports: BoardPorts = LIVE_PORTS):
 
 	const words = run_board_labels.words_of(session_language.resolve_session_lang().lang)
 
-	await watch(ports, words, is_once)
+	const mode = run_board_screen.mode_of({ is_tty: ports.is_tty, is_once })
+
+	await (mode === 'live' ? watch(ports, words) : tick(FRESH_STATE, ports, words))
 
 	return SUCCESS_EXIT_CODE
 }

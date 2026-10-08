@@ -398,7 +398,9 @@ pnpm josh run:board --once   # one frame, then exit
 
 The header shows the run's state, start, cut-off, newest event (yellow after 15 silent minutes), progress with arrivals as `(+N)`, and — while it waits on an empty backlog — when the wait ends and why. Below: touched children, the `backlog:plan --waves` order (epic children as a tree, other blockers as `waits on`), `needs-decision` and unreached children, and the newest filings, parks and notes. Times are local `HH:MM:SS`.
 
-**Output / exit codes:** local reads every tick; the plan from GitHub at most every two minutes, keeping the previous one on a failed read. No run here prints `no run` and reads no plan. Exits 0; an unknown argument exits 1.
+On a terminal it draws on the alternate screen, as `top` and `less` do, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and the cursor that were there before. `--once`, or a stdout that is not a terminal (a pipe or a redirect), writes one frame with no screen control and exits — no color either when it is not a terminal.
+
+**Output / exit codes:** local reads every tick; the plan from GitHub at most every two minutes, keeping the previous one on a failed read. No run here prints `no run` and reads no plan. Exits 0; an unknown argument exits 1; Ctrl+C exits 130 and SIGTERM 143.
 
 ### `josh run:watcher:guard`
 

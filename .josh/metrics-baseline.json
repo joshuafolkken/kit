@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 985,
-		"code_lines": 81612,
-		"comment_lines": 33003,
+		"files": 986,
+		"code_lines": 81682,
+		"comment_lines": 33016,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 558400
 	},
 	"accepted": {
-		"reason": "run:board (#3430) adds the live backlog board, its shared plan read and the filed-event record, with their docs",
+		"reason": "run:board alternate-screen module and its exit-path handling (#3441)",
 		"date": "2026-10-08"
 	}
 }
