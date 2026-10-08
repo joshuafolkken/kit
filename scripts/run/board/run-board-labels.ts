@@ -22,8 +22,8 @@ const BAR_WIDTH = 10
 // where no color is drawn, and a terminal dims the line so the gauge does not read heavy.
 const BAR_DONE = '█'
 const BAR_LEFT = '─'
-const BAR_DONE_COLOR = 'cyan'
-const BAR_LEFT_COLOR = 'dim'
+const BAR_DONE_COLOR: TextColor = 'cyan'
+const BAR_LEFT_COLOR: TextColor = 'dim'
 // The spinner a running run and a running row turn (joshuafolkken/kit#3452), four frames a second.
 const SPINNER_FRAMES = cli_spinners.dots.frames
 const SPINNER_FRAME_MS = 250
@@ -106,8 +106,8 @@ const STATE_ICONS: Readonly<Record<ItemState, string>> = {
 // The blocking edge, chosen on the same rule: ⛓ is a text symbol.
 const WAITS_ICON = '🔗'
 
-// A running row's phase as an icon after its gauge (joshuafolkken/kit#3452), chosen on the same rule,
-// so the gauge says how far a child has got and the icon what it is doing now.
+// A running row's phases as icons (joshuafolkken/kit#3452), chosen on the same rule; the row draws every
+// phase it has passed, so the rightmost icon is what it is doing now (joshuafolkken/kit#3460).
 const PHASE_ICONS: Readonly<Record<Phase, string>> = {
 	dispatched: '🚀',
 	investigate: '🔍',
@@ -219,6 +219,8 @@ function spinner_of(now_ms: number): string {
 }
 
 const run_board_labels = {
+	BAR_LEFT,
+	BAR_LEFT_COLOR,
 	HEADER_ICONS,
 	PHASE_ICONS,
 	PHASE_WORDS,

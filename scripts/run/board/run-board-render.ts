@@ -9,6 +9,7 @@ import {
 } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
 import { run_board_phase, type Phase } from './run-board-phase'
+import { run_board_track } from './run-board-track'
 
 // The whole `run:board` screen as lines (joshuafolkken/kit#3430) — pure, so what a person sees is tested
 // apart from the terminal. The header says where the run is; the sections below it follow the plan's
@@ -17,8 +18,10 @@ import { run_board_phase, type Phase } from './run-board-phase'
 // carries only what differs between rows (joshuafolkken/kit#3444).
 
 const { HEADER_ICONS, PHASE_ICONS, PHASE_WORDS, STATE_ICONS, WAITS_ICON } = run_board_labels
-const { bar_of, clock_of, elapsed_of } = run_board_labels
-const TITLE_LIMIT = 40
+const { clock_of, elapsed_of } = run_board_labels
+// The track is a fixed fourteen columns where the gauge and the phase's name took up to twenty-two, so
+// the title takes the columns it freed and a row is no wider (joshuafolkken/kit#3460).
+const TITLE_LIMIT = 48
 const ELLIPSIS = '…'
 const NOTE_LIMIT = 6
 const GAP = '  '
@@ -78,16 +81,11 @@ function shown_phase(row: BoardRow): Phase | undefined {
 	return row.state === 'running' ? row.status?.phase : undefined
 }
 
-// A running row's phase as the shared bar, filled by the phases it has passed, and the phase's icon
-// (joshuafolkken/kit#3452), so every row's phase is one column however long its name.
+// A running row's phase as its track (joshuafolkken/kit#3460), so every row's phase is one column.
 function phase_of(row: BoardRow): string | undefined {
 	const phase = shown_phase(row)
 
-	if (phase === undefined) return undefined
-
-	const bar = bar_of(run_board_phase.index_of(phase), run_board_phase.PHASES.length)
-
-	return `${bar} ${PHASE_ICONS[phase]}`
+	return phase === undefined ? undefined : run_board_track.track_of(phase)
 }
 
 function waits_of(row: BoardRow, header: BoardHeader): string | undefined {
@@ -169,9 +167,16 @@ function time_width(header: BoardHeader): number {
 }
 
 // The legend names only the phases some row on screen draws, in the phases' own order — seven icons
-// most of which no row shows would crowd out the ones that do (joshuafolkken/kit#3452).
+// most of which no row shows would crowd out the ones that do (joshuafolkken/kit#3452). A track draws
+// every phase its row has passed (joshuafolkken/kit#3460), so those are named too.
+function drawn_phases(row: BoardRow): Array<Phase> {
+	const phase = shown_phase(row)
+
+	return phase === undefined ? [] : run_board_track.passed_of(phase)
+}
+
 function phase_legend(layout: BoardLayout, words: Words): Array<string> {
-	const shown = new Set(run_board_layout.rows_of(layout).map((row) => shown_phase(row)))
+	const shown = new Set(run_board_layout.rows_of(layout).flatMap((row) => drawn_phases(row)))
 
 	return run_board_phase.PHASES.filter((phase) => shown.has(phase)).map(
 		(phase) => `${PHASE_ICONS[phase]} ${words[PHASE_WORDS[phase]]}`,
