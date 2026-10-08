@@ -1,0 +1,84 @@
+import type { NamedPlan } from '#scripts/backlog/backlog-plan'
+import type { MachineSample } from '#scripts/gate/machine-capacity'
+import type { ClosedIssue } from './run-board-closed'
+import type { Fetch } from './run-board-fetch'
+import type { BoardPlan } from './run-board-layout'
+import type { Link } from './run-board-link'
+import type { MachineGauges, MachineMark } from './run-board-machine'
+import type { LocalRead } from './run-board-read'
+
+// What a `run:board` redraw reads through and folds forward (joshuafolkken/kit#3430), shared by the
+// redraw (`run-board-tick.ts`) and its GitHub reads (`run-board-github.ts`).
+
+interface BoardPorts {
+	read_plan: (scope: NamedPlan) => Promise<BoardPlan | undefined>
+	// `undefined` when no run has started here.
+	read_local: () => Promise<LocalRead | undefined>
+	read_machine: () => Promise<MachineSample>
+	// The issues that answered as closed, by number (`run-board-closed.ts`).
+	read_closed: (issues: ReadonlyArray<number>) => Promise<ReadonlyMap<number, ClosedIssue>>
+	now: () => number
+	write: (frame: string) => void
+	// Wraps an issue number in a hyperlink where the terminal opens one, and leaves it plain elsewhere.
+	link: Link
+	// Whether stdout is a terminal — only a terminal gets the alternate screen and the spinner.
+	is_tty: boolean
+	// Runs `leave` however the process ends: a normal exit, Ctrl+C or SIGTERM.
+	on_exit: (leave: () => void) => void
+	sleep: (ms: number) => Promise<void>
+}
+
+// `background` launches the GitHub reads and draws without them; `settled` waits for them before
+// drawing (joshuafolkken/kit#3455).
+type Pace = 'background' | 'settled'
+
+interface BoardState {
+	// The last local read, drawn until the next is due; `undefined` when no run had started.
+	local: LocalRead | undefined
+	read_ms: number | undefined
+	// The start of the run the plan state was built for, so a run that begins draws nothing of the last.
+	run_started_ms: number | undefined
+	plan: BoardPlan | undefined
+	// The plan read in flight, `undefined` once it has been folded in.
+	plan_fetch: Fetch<BoardPlan | undefined> | undefined
+	attempted_ms: number | undefined
+	fetched_ms: number | undefined
+	failed_ms: number | undefined
+	baseline_total: number | undefined
+	// The run's children read closed, kept for the run: a closed issue's answer does not change.
+	closed: ReadonlyMap<number, ClosedIssue>
+	closed_fetch: Fetch<ReadonlyMap<number, ClosedIssue>> | undefined
+	closed_attempted_ms: number | undefined
+	// The last machine sample, which the next one is compared against, and the gauges drawn from them.
+	machine: MachineMark | undefined
+	gauges: MachineGauges | undefined
+	// The redraw the last sample was taken on, which the next sample is due a second after.
+	sampled_ms: number | undefined
+}
+
+const FRESH_STATE: BoardState = {
+	local: undefined,
+	read_ms: undefined,
+	run_started_ms: undefined,
+	plan: undefined,
+	plan_fetch: undefined,
+	attempted_ms: undefined,
+	fetched_ms: undefined,
+	failed_ms: undefined,
+	baseline_total: undefined,
+	closed: new Map(),
+	closed_fetch: undefined,
+	closed_attempted_ms: undefined,
+	machine: undefined,
+	gauges: undefined,
+	sampled_ms: undefined,
+}
+
+function is_due(last_ms: number | undefined, interval_ms: number, now_ms: number): boolean {
+	return last_ms === undefined || now_ms - last_ms >= interval_ms
+}
+
+const run_board_state = { FRESH_STATE, is_due }
+
+export { run_board_state }
+export type { BoardPorts, BoardState, Pace }

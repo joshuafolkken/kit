@@ -49,6 +49,7 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		baseline_total: undefined,
 		plan_fetched_ms: NOW,
 		plan_failed_ms: undefined,
+		is_plan_loading: false,
 		machine: undefined,
 		spinner: undefined,
 		link: (reference) => reference,

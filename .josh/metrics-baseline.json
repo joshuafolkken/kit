@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1000,
-		"code_lines": 82880,
-		"comment_lines": 33378,
+		"files": 1003,
+		"code_lines": 82970,
+		"comment_lines": 33405,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 559132
 	},
 	"accepted": {
-		"reason": "#3459: run:board reads each listed issue's labels so a running lane whose child stopped (needs-decision, or in-progress dropped) is drawn stopped/human apart from a running one, merged over #3460's run-board-track and #3454's run_headless.is_cut_capped",
+		"reason": "run:board reads the plan in the background with a spinner while it loads (#3455)",
 		"date": "2026-10-08"
 	}
 }

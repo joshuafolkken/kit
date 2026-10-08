@@ -141,6 +141,7 @@ const HEADER_ICONS = {
 	swap: '💾',
 	progress: '📊',
 	ended: '🔚',
+	loading: '⏳',
 } as const
 
 function words_of(lang: string): Words {

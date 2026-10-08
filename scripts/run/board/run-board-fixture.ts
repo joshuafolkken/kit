@@ -5,7 +5,7 @@ import type { ClosedIssue } from './run-board-closed'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
-import type { BoardPorts } from './run-board-tick'
+import type { BoardPorts } from './run-board-state'
 
 // What the `run:board` redraw suites share (joshuafolkken/kit#3444): the ports a test drives the board
 // through — a clock it moves by hand, the frames it wrote, and counted reads.
