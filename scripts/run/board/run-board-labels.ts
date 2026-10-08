@@ -12,116 +12,69 @@ const SECONDS_PER_MINUTE = 60
 const MINUTES_PER_HOUR = 60
 const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR
 
-interface Words {
-	running: string
-	idle: string
-	idle_drained: string
-	human: string
-	stopped: string
-	no_run: string
-	started: string
-	cutoff: string
-	last_event: string
-	updated: string
-	plan: string
-	plan_fetched: string
-	plan_none: string
-	plan_failed: string
-	progress: string
-	merged: string
-	parked: string
-	in_progress: string
-	remaining: string
-	idle_until: string
-	idle_left: string
-	idle_end_idle: string
-	idle_end_run: string
-	next_check: string
-	active: string
-	people: string
-	unreached: string
-	waits: string
-	notes: string
-	more: string
-	filed: string
-	park: string
-	note: string
-	found_during: string
+interface WordPair {
+	ja: string
+	en: string
 }
 
-const JA_WORDS: Words = {
-	running: '▶ 実行中',
-	idle: '⏸ 待機中',
-	idle_drained: '⏸ 待機中（全件完了・新着待ち）',
-	human: '✋ 人待ち',
-	stopped: '■ 終了',
-	no_run: 'ランなし',
-	started: '開始',
-	cutoff: '打ち切り',
-	last_event: '最終イベント',
-	updated: '更新',
-	plan: '計画',
-	plan_fetched: '取得',
-	plan_none: '計画 未取得',
-	plan_failed: '計画の取得に失敗',
-	progress: '進捗',
-	merged: 'マージ',
-	parked: 'park',
-	in_progress: '実行中',
-	remaining: '残り',
-	idle_until: '待機終了',
-	idle_left: '残り',
-	idle_end_idle: '新着がなければ終了してレポート送信',
-	idle_end_run: '全体の打ち切りで終了してレポート送信',
-	next_check: '次の確認',
-	active: '着手済み',
-	people: '人待ち',
-	unreached: '未到達',
-	waits: '待ち',
-	notes: '気づき・判断待ち',
-	more: 'ほか',
-	filed: '起票',
-	park: 'park',
-	note: '意見',
-	found_during: '（{n} の実装中に発見）',
+// One pair per word, as `run-event-render.ts` keeps its labels, so a word cannot be added in one
+// language without the other.
+const WORD_PAIRS = {
+	running: { ja: '▶ 実行中', en: '▶ running' },
+	idle: { ja: '⏸ 待機中', en: '⏸ waiting' },
+	idle_drained: {
+		ja: '⏸ 待機中（全件完了・新着待ち）',
+		en: '⏸ waiting (all done, watching for new issues)',
+	},
+	human: { ja: '✋ 人待ち', en: '✋ waiting on a person' },
+	stopped: { ja: '■ 終了', en: '■ ended' },
+	no_run: { ja: 'ランなし', en: 'no run' },
+	started: { ja: '開始', en: 'started' },
+	cutoff: { ja: '打ち切り', en: 'cut-off' },
+	last_event: { ja: '最終イベント', en: 'last event' },
+	updated: { ja: '更新', en: 'updated' },
+	plan: { ja: '計画', en: 'plan' },
+	plan_fetched: { ja: '取得', en: 'fetched' },
+	plan_none: { ja: '計画 未取得', en: 'plan not fetched yet' },
+	plan_failed: { ja: '計画の取得に失敗', en: 'plan fetch failed' },
+	progress: { ja: '進捗', en: 'progress' },
+	merged: { ja: 'マージ', en: 'merged' },
+	parked: { ja: 'park', en: 'parked' },
+	in_progress: { ja: '実行中', en: 'running' },
+	remaining: { ja: '残り', en: 'left' },
+	idle_until: { ja: '待機終了', en: 'wait ends' },
+	idle_left: { ja: '残り', en: 'left' },
+	idle_end_idle: {
+		ja: '新着がなければ終了してレポート送信',
+		en: 'ends and reports unless a new issue arrives',
+	},
+	idle_end_run: {
+		ja: '全体の打ち切りで終了してレポート送信',
+		en: 'ends at the whole-run cut-off and reports',
+	},
+	next_check: { ja: '次の確認', en: 'next check' },
+	active: { ja: '着手済み', en: 'started' },
+	people: { ja: '人待ち', en: 'waiting on a person' },
+	unreached: { ja: '未到達', en: 'not reached' },
+	waits: { ja: '待ち', en: 'waits on' },
+	notes: { ja: '気づき・判断待ち', en: 'findings and decisions' },
+	more: { ja: 'ほか', en: 'more' },
+	filed: { ja: '起票', en: 'filed' },
+	park: { ja: 'park', en: 'park' },
+	note: { ja: '意見', en: 'note' },
+	found_during: { ja: '（{n} の実装中に発見）', en: ' (found during {n})' },
+} as const satisfies Readonly<Record<string, WordPair>>
+
+type Words = Readonly<Record<keyof typeof WORD_PAIRS, string>>
+
+function words_in(lang: keyof WordPair): Words {
+	const entries = Object.entries(WORD_PAIRS).map(([key, pair]) => [key, pair[lang]])
+
+	return Object.fromEntries(entries) as Words
 }
 
-const EN_WORDS: Words = {
-	running: '▶ running',
-	idle: '⏸ waiting',
-	idle_drained: '⏸ waiting (all done, watching for new issues)',
-	human: '✋ waiting on a person',
-	stopped: '■ ended',
-	no_run: 'no run',
-	started: 'started',
-	cutoff: 'cut-off',
-	last_event: 'last event',
-	updated: 'updated',
-	plan: 'plan',
-	plan_fetched: 'fetched',
-	plan_none: 'plan not fetched yet',
-	plan_failed: 'plan fetch failed',
-	progress: 'progress',
-	merged: 'merged',
-	parked: 'parked',
-	in_progress: 'running',
-	remaining: 'left',
-	idle_until: 'wait ends',
-	idle_left: 'left',
-	idle_end_idle: 'ends and reports unless a new issue arrives',
-	idle_end_run: 'ends at the whole-run cut-off and reports',
-	next_check: 'next check',
-	active: 'started',
-	people: 'waiting on a person',
-	unreached: 'not reached',
-	waits: 'waits on',
-	notes: 'findings and decisions',
-	more: 'more',
-	filed: 'filed',
-	park: 'park',
-	note: 'note',
-	found_during: ' (found during {n})',
-}
+const JA_WORDS = words_in('ja')
+const EN_WORDS = words_in('en')
 
 const STATE_ICONS: Readonly<Record<ItemState, string>> = {
 	running: '🔄',

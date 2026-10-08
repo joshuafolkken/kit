@@ -15,6 +15,15 @@ describe('run_board_labels.words_of', () => {
 		expect(words_of('en').no_run).toBe('no run')
 		expect(words_of('fr').no_run).toBe('no run')
 	})
+
+	it('carries the same non-empty words in both languages', () => {
+		const ja = words_of('ja')
+		const en = words_of('en')
+
+		expect(Object.keys(ja)).toStrictEqual(Object.keys(en))
+		expect(Object.values(ja).every((word) => word.length > 0)).toBe(true)
+		expect(Object.values(en).every((word) => word.length > 0)).toBe(true)
+	})
 })
 
 describe('run_board_labels.span_of', () => {
