@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 988,
-		"code_lines": 81831,
-		"comment_lines": 33059,
+		"code_lines": 81880,
+		"comment_lines": 33075,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 558400
 	},
 	"accepted": {
-		"reason": "run:board gains its own scope filter and plan module, and merge steps settle children already merged (#3442)",
+		"reason": "Serialize run event stream appends under a per-stream lock: synchronous repository lock acquisition, foreign-file guard on the rename-based text stamp replace, and the locked append (#3446)",
 		"date": "2026-10-08"
 	}
 }
