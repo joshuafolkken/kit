@@ -3,10 +3,10 @@ import { test_declared_logic } from '#scripts/test/test-declared-logic'
 // The pure half of `josh metrics`. ESLint and Sonar hold each function and file to an absolute limit, but nothing measures the repository-wide totals, so a slow growth in
 // code, comments and rules shows up nowhere. These totals are the measurement that growth needs.
 //
-// **The code-line count is never computed here.** It is `line_budget`'s, read off the project's own
-// eslint `max-lines` rule with `skipBlankLines` and `skipComments`, exactly as `josh lines` reports
-// it. A comment line is then every non-blank line eslint did not count as code — a line that holds
-// code and a trailing comment is code, the same reading the rule makes.
+// **The code-line count is never computed here.** It is read off the project's own eslint
+// `max-lines` rule with `skipBlankLines` and `skipComments` (`metrics-code-lines.ts`). A comment
+// line is then every non-blank line eslint did not count as code — a line that holds code and a
+// trailing comment is code, the same reading the rule makes.
 
 const SCRIPTS_PREFIX = 'scripts/'
 const GUARD_SUFFIX = ':guard'

@@ -49,9 +49,9 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	metrics: {
 		script: 'scripts/metrics/metrics-command.ts',
 		description:
-			'Print repository-wide quality totals — code and comment lines, rule lines, guard count',
+			'Print repository-wide quality totals and fail when one grew past the recorded baseline',
 		category: 'Development',
-		reference: ['[--write-baseline]', 'developer', ['files']],
+		reference: ['[--accept --reason "<why>"]', 'developer', ['files']],
 		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
 		memory_mb: core_budget.MEMORY_MB.eslint_scan,
 		is_kit_only: true,

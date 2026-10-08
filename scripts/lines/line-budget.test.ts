@@ -49,6 +49,9 @@ const THRESHOLD = line_budget.near_limit_threshold(LIMIT)
 
 const rule_entry_schema = z.tuple([z.string(), z.looseObject({ max: z.number() })])
 const probe_schema = z.record(z.string(), rule_entry_schema)
+const message_schema = z.object({ ruleId: z.string().nullish(), message: z.string() })
+const result_schema = z.object({ filePath: z.string(), messages: z.array(message_schema) })
+const results_schema = z.array(result_schema)
 
 const ROOTS: Array<string> = []
 
@@ -132,6 +135,19 @@ describe('line_budget.probe_rule — the project’s own rule, changed only in t
 		const probed = probe_schema.parse(JSON.parse(line_budget.probe_rule(raw)))[MAX_LINES_RULE]
 
 		expect(probed?.[1]).toEqual({ ...raw, max: 0 })
+	})
+
+	it('hands the Node API the same rule entry the CLI receives as JSON', () => {
+		expect(line_budget.probe_rules(OPTIONS)).toEqual(JSON.parse(line_budget.probe_rule(OPTIONS)))
+	})
+})
+
+describe('line_budget.counts_from — the Node API’s results read as the CLI’s', () => {
+	it('reads the same counts out of result objects as out of their JSON', () => {
+		const raw = eslint_reply([[REPO_FILE, 268]]).stdout
+		const results = results_schema.parse(JSON.parse(raw))
+
+		expect(line_budget.counts_from(results)).toEqual(line_budget.parse_counts(raw))
 	})
 })
 
