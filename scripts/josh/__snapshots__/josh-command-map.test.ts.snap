@@ -889,6 +889,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
+    "run:board": [
+      "[--once]",
+      "automation",
+      [
+        "network",
+      ],
+    ],
     "run:carry": [
       "<operation> [arguments...]",
       "automation",

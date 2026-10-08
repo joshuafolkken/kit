@@ -1,9 +1,9 @@
 {
 	"scripts": {
-		"files": 975,
-		"code_lines": 80638,
-		"comment_lines": 32876,
-		"comment_ratio": 0.41
+		"files": 985,
+		"code_lines": 81664,
+		"comment_lines": 33001,
+		"comment_ratio": 0.4
 	},
 	"rules": {
 		"files": 26,
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12231,
-		"on_demand_bytes": 558168
+		"on_demand_bytes": 558400
 	},
 	"accepted": {
-		"reason": "Merge origin/main (#3428 AI-cost totals) into the .vscode/tasks.json distribution through josh sync/init (#3420)",
+		"reason": "run:board (#3430) adds the live backlog board, its shared plan read and the filed-event record, with their docs",
 		"date": "2026-10-08"
 	}
 }

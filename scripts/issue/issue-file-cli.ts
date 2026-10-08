@@ -8,9 +8,13 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list, MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
 import type { PollOptions } from '#scripts/lib/poll'
 import { repository_labels } from '#scripts/repo/repository-labels'
+import { run_event_filed } from '#scripts/run/event/run-event-filed'
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_lint_cli } from './issue-lint-cli'
@@ -212,6 +216,18 @@ async function place(url: string, target: string): Promise<void> {
 	}
 }
 
+// Every filing lands on the run's event stream (joshuafolkken/kit#3430): this is the one filing path, so
+// one append here reaches `run:board` from every route. A filing outside a run lands too and is left
+// out by the board's own scope to the invocation; the append is best-effort, as every emit is.
+async function record(url: string, filing: Filing): Promise<void> {
+	const number = String(issue_number_of(url))
+	const reference = filing.target === filing.current ? `#${number}` : `${filing.target}#${number}`
+	const found_during = lane_child_marker.marked_issue()
+	const text = run_event_filed.text_of({ reference, title: filing.args.title, found_during })
+
+	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.FILED, text)
+}
+
 function is_admitted(filing: Filing): boolean {
 	const refusals = refusals_of(filing)
 
@@ -226,6 +242,7 @@ async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<numb
 
 	if (url === undefined) return FAILURE_EXIT_CODE
 	console.info(url)
+	await record(url, filing)
 	await link_release(url, filing)
 	await place(url, filing.target)
 
@@ -278,8 +295,9 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const issue_file_cli = { FRESH_ISSUE_POLL, THIRD_PARTY_MESSAGE, run }
+const issue_file_cli = { FRESH_ISSUE_POLL, THIRD_PARTY_MESSAGE, record, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { issue_file_cli }
+export type { Filing }

@@ -113,6 +113,53 @@ describe('run_event_stream_emit.emit_once — one marker per episode', () => {
 	})
 })
 
+// joshuafolkken/kit#3430: the idle window is re-derived on every watching poll, and only a window that
+// moved is written — however many other events landed in between.
+const { IDLE } = run_event_stream.EVENT_KIND
+const IDLE_TEXT = 'idle since 2026-01-01T00:00:00.000Z until 2026-01-01T00:30:00.000Z (idle)'
+const MOVED_TEXT = 'idle since 2026-01-01T00:10:00.000Z until 2026-01-01T00:40:00.000Z (idle)'
+
+describe('run_event_stream_emit.emit_changed — one line per value', () => {
+	it('skips a repeat of the newest value even after other events', async () => {
+		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
+
+		expect(await run_event_stream_emit.emit_changed(IDLE, IDLE_TEXT)).toBe(true)
+		await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.MERGE, '#7 merged')
+
+		expect(await run_event_stream_emit.emit_changed(IDLE, IDLE_TEXT)).toBe(false)
+		expect(await events_of_kind(IDLE)).toHaveLength(1)
+	})
+
+	it('appends a value that moved', async () => {
+		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
+
+		await run_event_stream_emit.emit_changed(IDLE, IDLE_TEXT)
+		await run_event_stream_emit.emit_changed(IDLE, MOVED_TEXT)
+
+		expect(await events_of_kind(IDLE)).toHaveLength(2)
+	})
+
+	it('swallows a failed resolve', async () => {
+		git_directories_mock.mockRejectedValue(new Error(GIT_GONE))
+
+		expect(await run_event_stream_emit.emit_changed(IDLE, IDLE_TEXT)).toBe(false)
+	})
+
+	// The idle window, a filing and a note land after the drain marker, and the watching loop must not
+	// read any of them as a new episode — or `run:step` would fire the retrospective again.
+	it('leaves the drain marker the newest position past an idle window, a filing and a note', async () => {
+		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
+
+		await run_event_stream_emit.emit_once(DRAIN, DRAIN_TEXT)
+		await run_event_stream_emit.emit_changed(IDLE, IDLE_TEXT)
+		await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.FILED, '#3438 Count the seats')
+		await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.NOTE, '#3415 gate slowed')
+
+		expect(await run_event_stream_emit.emit_once(DRAIN, DRAIN_TEXT)).toBe(false)
+		expect(await drain_events()).toHaveLength(1)
+	})
+})
+
 // joshuafolkken/kit#2464: the stall marker's episode ends at a dispatch, not at whatever event a parallel
 // lane appends next — the newest-event dedup re-sent the stall notification on every such interleave.
 const { STALL, CHILD_LAUNCH, MERGE, HEARTBEAT } = run_event_stream.EVENT_KIND

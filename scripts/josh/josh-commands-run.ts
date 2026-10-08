@@ -76,6 +76,12 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 			['files'],
 		],
 	},
+	'run:board': {
+		script: 'scripts/run/board/run-board-cli.ts',
+		description: 'Draw a live board of the running backlogrun, redrawn every five seconds',
+		category: 'AI tools',
+		reference: ['[--once]', 'automation', ['network']],
+	},
 	'run:prep': {
 		script: 'scripts/run/run-prep-cli.ts',
 		description: 'Bundle a run’s pre-edit reads: body, comments, state, dependency scope',

@@ -8,6 +8,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_file_cli } from './issue-file-cli'
@@ -64,6 +65,10 @@ const ensure_labels = vi.spyOn(repository_labels, 'ensure_labels')
 const issue_list = vi.spyOn(git_gh_issue_list, 'issue_list')
 const resolve_auto_ok = vi.spyOn(issue_auto_ok, 'resolve')
 const link_release = vi.spyOn(issue_release_cli, 'link')
+
+// The filing's `filed` event is asserted in `issue-file-cli-record.test.ts`; here it is only kept off
+// the real stream.
+vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 const NOT_APPLIED = { is_applied: false, reason: 'stubbed' }
 
 // A listing of `count` open Issues, in the JSON shape `issue_list` answers with.
