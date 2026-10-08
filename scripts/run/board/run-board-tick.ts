@@ -2,6 +2,7 @@ import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_cli } from '#scripts/run/progress/run-progress-cli'
+import type { ClosedIssue } from './run-board-closed'
 import { run_board_header } from './run-board-header'
 import type { Words } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
@@ -10,7 +11,7 @@ import { run_board_machine, type MachineGauges, type MachineMark } from './run-b
 import { run_board_notes } from './run-board-notes'
 import type { LocalRead } from './run-board-read'
 import { run_board_render } from './run-board-render'
-import { run_board_status } from './run-board-status'
+import { run_board_status, type ItemStatus } from './run-board-status'
 
 // One `run:board` redraw (joshuafolkken/kit#3430). **Three speeds** (joshuafolkken/kit#3444): the frame
 // is redrawn every second so the elapsed times move; the run's own stream and lanes are re-read no more
@@ -34,6 +35,8 @@ interface BoardPorts {
 	// `undefined` when no run has started here.
 	read_local: () => Promise<LocalRead | undefined>
 	read_machine: () => Promise<MachineSample>
+	// The issues that answered as closed, by number (`run-board-closed.ts`).
+	read_closed: (issues: ReadonlyArray<number>) => Promise<ReadonlyMap<number, ClosedIssue>>
 	now: () => number
 	write: (frame: string) => void
 	// Wraps an issue number in a hyperlink where the terminal opens one, and leaves it plain elsewhere.
@@ -56,6 +59,9 @@ interface BoardState {
 	fetched_ms: number | undefined
 	failed_ms: number | undefined
 	baseline_total: number | undefined
+	// The run's children read closed, kept for the run: a closed issue's answer does not change.
+	closed: ReadonlyMap<number, ClosedIssue>
+	closed_attempted_ms: number | undefined
 	// The last machine sample, which the next one is compared against, and the gauges drawn from them.
 	machine: MachineMark | undefined
 	gauges: MachineGauges | undefined
@@ -70,6 +76,8 @@ const FRESH_STATE: BoardState = {
 	fetched_ms: undefined,
 	failed_ms: undefined,
 	baseline_total: undefined,
+	closed: new Map(),
+	closed_attempted_ms: undefined,
 	machine: undefined,
 	gauges: undefined,
 }
@@ -138,17 +146,57 @@ async function refresh(
 	}
 }
 
+function statuses_for(plan: BoardPlan, local: LocalRead): ReadonlyMap<number, ItemStatus> {
+	return run_board_status.statuses_of(local.events, local.lanes, run_board_layout.numbers_of(plan))
+}
+
+// The children the run touched that the open listing no longer holds and the board has not read yet
+// (joshuafolkken/kit#3451). A listing cut short proves nothing missing, so it asks about none.
+function unread_closed(state: BoardState, local: LocalRead): Array<number> {
+	const open = state.plan?.context.open_numbers
+
+	if (open === undefined || state.plan === undefined) return []
+
+	const touched = [...statuses_for(state.plan, local).keys()]
+
+	return touched.filter((issue) => !open.has(issue) && !state.closed.has(issue))
+}
+
+// Reads a closed child once and keeps the answer; one that has not answered closed is asked again no
+// sooner than the plan is.
+async function read_closed(
+	state: BoardState,
+	ports: BoardPorts,
+	local: LocalRead,
+	now_ms: number,
+): Promise<BoardState> {
+	const unread = unread_closed(state, local)
+
+	if (unread.length === 0 || !is_due(state.closed_attempted_ms, PLAN_RETRY_MS, now_ms)) return state
+
+	const closed = new Map([...state.closed, ...(await ports.read_closed(unread))])
+
+	return { ...state, closed, closed_attempted_ms: now_ms }
+}
+
+// The plan with a closed child's title under the listing's own.
+function titled_closed(plan: BoardPlan, closed: ReadonlyMap<number, ClosedIssue>): BoardPlan {
+	const closed_titles = [...closed].map(([issue, { title }]) => [issue, title] as const)
+	const titles = new Map([...closed_titles, ...plan.context.titles])
+
+	return { ...plan, context: { ...plan.context, titles } }
+}
+
 // The statuses scoped to the run's plan, a running child the plan's listing no longer holds settled.
 function layout_for(state: BoardState, local: LocalRead): BoardLayout | undefined {
-	const { plan } = state
+	const { plan, closed } = state
 
 	if (plan === undefined) return undefined
 
-	const in_run = run_board_layout.numbers_of(plan)
-	const statuses = run_board_status.statuses_of(local.events, local.lanes, in_run)
-	const read = { open_numbers: plan.context.open_numbers, read_ms: state.fetched_ms }
+	const read = { open_numbers: plan.context.open_numbers, read_ms: state.fetched_ms, closed }
+	const statuses = run_board_status.settle_closed(statuses_for(plan, local), read)
 
-	return run_board_layout.layout_of(plan, run_board_status.settle_closed(statuses, read))
+	return run_board_layout.layout_of(titled_closed(plan, closed), statuses)
 }
 
 // What one redraw draws with.
@@ -209,7 +257,7 @@ async function tick(state: BoardState, ports: BoardPorts, words: Words): Promise
 	}
 
 	const refreshed = await refresh(state_for(read, local), ports, local, now_ms)
-	const sampled = await resample(refreshed, ports)
+	const sampled = await resample(await read_closed(refreshed, ports, local, now_ms), ports)
 
 	return draw_run(sampled, local, { ports, words, now_ms })
 }
