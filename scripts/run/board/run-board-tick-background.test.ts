@@ -13,7 +13,8 @@ const { LOCAL, START, WORDS, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, MACHINE_SAMPLE_MS, tick } = run_board_tick
 const { spinner_of } = run_board_labels
 const LOADING = '⏳'
-const PROGRESS = '📊'
+// The progress line's count, not its bare icon: the legend draws ✅ too whenever a layout exists.
+const PROGRESS = /✅ +\d+\/\d+/u
 const CHILD = 3439
 const LAUNCH = {
 	pos: 1,
@@ -77,7 +78,7 @@ describe('run_board_tick.tick in the background', () => {
 
 		expect(frames).toHaveLength(1)
 		expect(title_of(frames[0])).toContain(`${LOADING} ${spinner_of(START)}`)
-		expect(frames[0]).not.toContain(PROGRESS)
+		expect(frames[0]).not.toMatch(PROGRESS)
 	})
 
 	it('keeps the clock moving while the read is in flight and launches it once', async () => {
@@ -99,8 +100,8 @@ describe('run_board_tick.tick in the background, once the read lands', () => {
 	it('draws the plan on the redraw after the read lands and stops the spinner', async () => {
 		const [loading, landed] = await across_landing(answering)
 
-		expect(loading).not.toContain(PROGRESS)
-		expect(landed).toContain(PROGRESS)
+		expect(loading).not.toMatch(PROGRESS)
+		expect(landed).toMatch(PROGRESS)
 		expect(title_of(landed)).not.toContain(LOADING)
 	})
 
@@ -132,7 +133,7 @@ describe('run_board_tick.tick settled', () => {
 
 		await tick(FRESH_STATE, ports, WORDS)
 
-		expect(frames[0]).toContain(PROGRESS)
+		expect(frames[0]).toMatch(PROGRESS)
 		expect(title_of(frames[0])).not.toContain(LOADING)
 	})
 })

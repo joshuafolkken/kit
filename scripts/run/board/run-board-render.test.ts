@@ -159,7 +159,7 @@ describe('run_board_render.render sections', () => {
 
 		expect(lines.slice(start, start + 2)).toStrictEqual([people_rule, '  🙋 6  Issue 6'])
 		expect(lines.at(-1)).toBe(
-			'✅ マージ  💤 park  🔄 実行中  🛑 停止  ⏳ 待ち  🙋 判断待ち  🔗 待ち先  ⚡ cpu  🧠 mem  💾 swap  📊 進捗  🔚 終了',
+			'✅ マージ  💤 park  🔄 実行中  🛑 停止  ⏳ 待ち  🙋 判断待ち  🔗 待ち先  ⚡ cpu  🧠 mem  💾 swap  🔚 終了',
 		)
 	})
 })
@@ -271,8 +271,8 @@ describe('run_board_render.render header', () => {
 		const layout = { ...EMPTY_LAYOUT, active, unreached: [row(3)] }
 		const [, progress] = lines_of(header({ layout, baseline_total: 2 }))
 
-		expect(progress).toContain('1/3 (+1)')
-		expect(progress).toContain('✅ 1  💤 0  🔄 1  ⏳ 1')
+		expect(progress).toMatch(/^✅ 1\/3 \S+ \(\+1\)/u)
+		expect(progress).toContain('(+1)   🔄 1  ⏳ 1  💤 0')
 	})
 
 	it('says until when an idle run waits, what ends the wait and when it next looks', () => {

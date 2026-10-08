@@ -62,7 +62,6 @@ const WORD_PAIRS = {
 	cpu: { ja: 'cpu', en: 'cpu' },
 	memory: { ja: 'mem', en: 'mem' },
 	swap: { ja: 'swap', en: 'swap' },
-	progress: { ja: '進捗', en: 'progress' },
 	idle_until: { ja: '待機終了', en: 'wait ends' },
 	idle_left: { ja: '残り', en: 'left' },
 	idle_end_idle: {
@@ -154,13 +153,12 @@ const PHASE_WORDS: Readonly<Record<Phase, keyof Words>> = {
 	merged: 'merged',
 }
 
-// The header's gauges and marks (joshuafolkken/kit#3450); 📊 rather than 🏁, which is a finished row. ⚡
-// rather than 🔥 (joshuafolkken/kit#3452): a fire beside a gauge drawn green read as an alarm.
+// The header's gauges and marks (joshuafolkken/kit#3450). ⚡ rather than 🔥 (joshuafolkken/kit#3452):
+// a fire beside a gauge drawn green read as an alarm.
 const HEADER_ICONS = {
 	cpu: '⚡',
 	memory: '🧠',
 	swap: '💾',
-	progress: '📊',
 	ended: '🔚',
 	loading: '⏳',
 } as const

@@ -211,7 +211,6 @@ function legend_of(layout: BoardLayout, words: Words): string {
 		`${HEADER_ICONS.cpu} ${words.cpu}`,
 		`${HEADER_ICONS.memory} ${words.memory}`,
 		`${HEADER_ICONS.swap} ${words.swap}`,
-		`${HEADER_ICONS.progress} ${words.progress}`,
 		`${HEADER_ICONS.ended} ${words.ended}`,
 	].join(GAP)
 
