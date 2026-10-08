@@ -1,5 +1,5 @@
 import { machine_capacity, type MachineSample } from '#scripts/gate/machine-capacity'
-import { run_board_labels, type TextColor } from './run-board-labels'
+import { run_board_labels, type Paint } from './run-board-labels'
 
 // The machine line of `run:board` (joshuafolkken/kit#3450): whether a quiet run is stuck or only slow
 // on a machine that has run out of room. On 2026-10-07 three lanes reached a load average of 16.8 and
@@ -15,9 +15,10 @@ import { run_board_labels, type TextColor } from './run-board-labels'
 //
 // **Each gauge is green, yellow or red** (joshuafolkken/kit#3452), the three Activity Monitor draws. 🧠
 // takes its color from the kernel's pressure verdict, as Activity Monitor does, and from its thresholds
-// only where no verdict was read; 💾 keeps its old colors, none until it swaps.
+// only where no verdict was read; 💾 keeps its old colors, none until it swaps. The three are
+// `GAUGE_SHADES`, so no terminal palette draws them blue or orange (joshuafolkken/kit#3464).
 
-const { HEADER_ICONS, bar_of, painted } = run_board_labels
+const { GAUGE_SHADES, HEADER_ICONS, bar_of, painted } = run_board_labels
 const PERCENT = 100
 const MS_PER_SECOND = 1000
 const PERCENT_WIDTH = '100%'.length
@@ -65,7 +66,7 @@ interface MachineGauges {
 interface GaugeSpec {
 	icon: string
 	// The done part's color below the yellow threshold; `undefined` leaves it the terminal's own.
-	normal: TextColor | undefined
+	normal: Paint | undefined
 	full: number
 	yellow: number
 	red: number
@@ -85,7 +86,7 @@ function rate_text(value: number): string {
 const SPECS = {
 	cpu: {
 		icon: HEADER_ICONS.cpu,
-		normal: 'green',
+		normal: GAUGE_SHADES.normal,
 		full: PERCENT,
 		yellow: CPU_YELLOW,
 		red: CPU_RED,
@@ -93,7 +94,7 @@ const SPECS = {
 	},
 	memory: {
 		icon: HEADER_ICONS.memory,
-		normal: 'green',
+		normal: GAUGE_SHADES.normal,
 		full: PERCENT,
 		yellow: MEMORY_YELLOW,
 		red: MEMORY_RED,
@@ -174,7 +175,7 @@ function gauge(spec: GaugeSpec, value: number | undefined, pressure?: number): s
 	if (value === undefined) return undefined
 
 	const alert = alert_of(spec, value, pressure)
-	const warning = alert === 'normal' ? undefined : alert
+	const warning = alert === 'normal' ? undefined : GAUGE_SHADES[alert]
 	const bar = bar_of(value, spec.full, undefined, warning ?? spec.normal)
 
 	return `${spec.icon} ${painted(warning, spec.format(value))} ${bar}`
