@@ -11,7 +11,7 @@ import { run_board_phase } from './run-board-phase'
 // A section is a rule rather than a heading, and the legend at the foot names the symbols, so a row
 // carries only what differs between rows (joshuafolkken/kit#3444).
 
-const { STATE_ICONS, WAITS_ICON, bar_of, clock_of, elapsed_of } = run_board_labels
+const { HEADER_ICONS, STATE_ICONS, WAITS_ICON, bar_of, clock_of, elapsed_of } = run_board_labels
 const TITLE_LIMIT = 40
 const ELLIPSIS = '…'
 const NOTE_LIMIT = 6
@@ -19,8 +19,6 @@ const GAP = '  '
 const INDENT = '  '
 const BRANCH = '     ├ '
 const LAST_BRANCH = '     └ '
-// A waiting row draws no icon; the blank holds the emoji's two columns so its number lines up.
-const BLANK_ICON = '  '
 const RULE = '─'
 const RULE_LEAD = `${RULE}${RULE}`
 const RULE_WIDTH = 50
@@ -78,10 +76,10 @@ function phase_of(row: BoardRow): string | undefined {
 	return `${bar_of(run_board_phase.index_of(phase), run_board_phase.PHASES.length)} ${phase}`
 }
 
-function waits_of(row: BoardRow): string | undefined {
+function waits_of(row: BoardRow, header: BoardHeader): string | undefined {
 	if (row.waits.length === 0) return undefined
 
-	return `${WAITS_ICON} ${row.waits.join(', ')}`
+	return `${WAITS_ICON} ${row.waits.map((reference) => header.link(reference)).join(', ')}`
 }
 
 // The title is padded to its limit only where a time follows it, so the times form one column.
@@ -93,29 +91,23 @@ function timed_parts(row: BoardRow, frame: RowFrame): Array<string | undefined> 
 	return [title_of(row.title).padEnd(TITLE_LIMIT), time.padStart(frame.time_width), phase_of(row)]
 }
 
-function icon_of(row: BoardRow): string {
-	return row.state === 'waiting' ? BLANK_ICON : STATE_ICONS[row.state]
-}
-
-function row_text(row: BoardRow, frame: RowFrame, lead = `${icon_of(row)} `): string {
-	const parts = [`${lead}${String(row.number)}`, ...timed_parts(row, frame), waits_of(row)]
+// Every row carries its state's icon, a waiting one ⏳ too (joshuafolkken/kit#3450).
+function row_text(row: BoardRow, frame: RowFrame): string {
+	const { header } = frame
+	const lead = `${STATE_ICONS[row.state]} ${header.link(String(row.number))}`
+	const parts = [lead, ...timed_parts(row, frame), waits_of(row, header)]
 
 	return parts.filter((part) => part !== undefined && part !== '').join(GAP)
-}
-
-// Under an epic's branch a waiting child needs no blank: the branch already holds the column.
-function child_lead(row: BoardRow): string {
-	return row.state === 'waiting' ? '' : `${STATE_ICONS[row.state]} `
 }
 
 function epic_lines(entry: Extract<WaveEntry, { kind: 'epic' }>, frame: RowFrame): Array<string> {
 	const last = entry.rows.length - 1
 	const children = entry.rows.map(
-		(row, index) =>
-			`${index === last ? LAST_BRANCH : BRANCH}${row_text(row, frame, child_lead(row))}`,
+		(row, index) => `${index === last ? LAST_BRANCH : BRANCH}${row_text(row, frame)}`,
 	)
 	const title = title_of(entry.title)
-	const epic = title === '' ? String(entry.epic) : `${String(entry.epic)}${GAP}${title}`
+	const number = frame.header.link(String(entry.epic))
+	const epic = title === '' ? number : `${number}${GAP}${title}`
 
 	return [`${INDENT}📁 ${epic}`, ...children]
 }
@@ -162,6 +154,11 @@ function legend_of(words: Words): string {
 		`${STATE_ICONS.waiting} ${words.waiting}`,
 		`${STATE_ICONS.human} ${words.decision}`,
 		`${WAITS_ICON} ${words.waits}`,
+		`${HEADER_ICONS.cpu} ${words.cpu}`,
+		`${HEADER_ICONS.memory} ${words.memory}`,
+		`${HEADER_ICONS.swap} ${words.swap}`,
+		`${HEADER_ICONS.progress} ${words.progress}`,
+		`${HEADER_ICONS.ended} ${words.ended}`,
 	].join(GAP)
 
 	return styleText('dim', legend)

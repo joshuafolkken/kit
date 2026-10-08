@@ -49,6 +49,8 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		baseline_total: undefined,
 		plan_fetched_ms: NOW,
 		plan_failed_ms: undefined,
+		machine: undefined,
+		link: (reference) => reference,
 		...extra,
 	}
 }
@@ -126,9 +128,9 @@ describe('run_board_render.render sections', () => {
 		expect(lines.slice(lines.indexOf(wave_rule), -2)).toStrictEqual([
 			wave_rule,
 			'  📁 10  Epic ten',
-			'     ├ 11  Issue 11',
-			'     └ 12  Issue 12',
-			`     5  ${'x'.repeat(run_board_render.TITLE_LIMIT - 1)}…  🔗 3409`,
+			'     ├ ⏳ 11  Issue 11',
+			'     └ ⏳ 12  Issue 12',
+			`  ⏳ 5  ${'x'.repeat(run_board_render.TITLE_LIMIT - 1)}…  🔗 3409`,
 		])
 	})
 
@@ -139,7 +141,37 @@ describe('run_board_render.render sections', () => {
 		const start = lines.indexOf(people_rule)
 
 		expect(lines.slice(start, start + 2)).toStrictEqual([people_rule, '  🙋 6  Issue 6'])
-		expect(lines.at(-1)).toBe('✅ マージ  💤 park  🔄 実行中  ⏳ 待ち  🙋 判断待ち  🔗 待ち先')
+		expect(lines.at(-1)).toBe(
+			'✅ マージ  💤 park  🔄 実行中  ⏳ 待ち  🙋 判断待ち  🔗 待ち先  🔥 cpu  🧠 mem  💾 swap  📊 進捗  🔚 終了',
+		)
+	})
+})
+
+// joshuafolkken/kit#3450: a stand-in for the terminal link, visible so the test sees where it lands.
+function bracketed(reference: string): string {
+	return `[${reference}]`
+}
+
+describe('run_board_render.render links', () => {
+	const settled = { state: 'merged' as const, started_ms: STARTED, ended_ms: STARTED + MINUTE }
+	const active = [row(2, { state: 'merged', status: settled, waits: ['other/repo#7'] })]
+	const epic = { kind: 'epic' as const, epic: 10, title: undefined, rows: [row(11)] }
+	const layout = { ...EMPTY_LAYOUT, active, waves: [[epic]] }
+
+	it('links every issue number, the epic and the wait', () => {
+		const lines = lines_of(header({ layout, link: bracketed }))
+
+		expect(lines).toContain('  📁 [10]')
+		expect(lines).toContain('     └ ⏳ [11]  Issue 11')
+		expect(lines.join('\n')).toContain('🔗 [other/repo#7]')
+	})
+
+	it('pads the title before the number is linked, so the time column does not move', () => {
+		const linked = lines_of(header({ layout, link: bracketed }))
+		const plain = lines_of(header({ layout }))
+
+		expect(linked).toContain(`  ✅ [2]  ${padded('Issue 2')}  01:00  🔗 [other/repo#7]`)
+		expect(plain).toContain(`  ✅ 2  ${padded('Issue 2')}  01:00  🔗 other/repo#7`)
 	})
 })
 

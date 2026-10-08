@@ -1,5 +1,6 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { EpicChild } from '#scripts/epic/epic-graph'
+import type { MachineSample } from '#scripts/gate/machine-capacity'
 import { describe, expect, it } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import type { BoardPlan } from './run-board-layout'
@@ -11,6 +12,12 @@ import { run_board_tick } from './run-board-tick'
 
 const { LOCAL, START, WORDS, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, LOCAL_READ_MS, PLAN_RETRY_MS, REDRAW_MS, tick } = run_board_tick
+const SLOW_READ_MS = 2 * REDRAW_MS
+const SWAPPED_MB = 3
+
+function swapped(swapped_mb: number): MachineSample {
+	return { cpu: { busy: 0, total: 0 }, memory: { available_mb: 0, swapped_mb }, total_mb: 1 }
+}
 
 describe('run_board_tick.tick speeds', () => {
 	it('redraws on every call while reading the stream only once per local interval', async () => {
@@ -55,6 +62,51 @@ describe('run_board_tick.tick speeds', () => {
 	})
 })
 
+// joshuafolkken/kit#3450: the machine is sampled every redraw, and a gauge that needs two samples is
+// drawn from the second on.
+describe('run_board_tick.tick machine', () => {
+	it('samples the machine on every redraw', async () => {
+		const { ports, read_machine, clock } = harness(LOCAL, [plan_titled('a')])
+		const first = await tick(FRESH_STATE, ports, WORDS)
+
+		clock.now_ms += REDRAW_MS
+		await tick(first, ports, WORDS)
+
+		expect(read_machine).toHaveBeenCalledTimes(2)
+	})
+
+	it('draws the swap rate only once a previous sample exists', async () => {
+		const { ports, frames, clock } = harness(LOCAL, [plan_titled('a')])
+		const first = await tick(FRESH_STATE, ports, WORDS)
+
+		clock.now_ms += REDRAW_MS
+		await tick(first, ports, WORDS)
+
+		const [first_machine, second_machine] = frames.map((frame) => frame.split('\n', 2)[1] ?? '')
+
+		expect(first_machine).toMatch(/^🧠 /u)
+		expect(first_machine).not.toContain('💾')
+		expect(second_machine).toContain('💾')
+	})
+
+	it('times a sample when it is taken, so a slow plan read does not skew the swap rate', async () => {
+		const { ports, frames, read_plan, read_machine, clock } = harness(LOCAL, [])
+
+		read_plan.mockImplementationOnce(async () => {
+			clock.now_ms += SLOW_READ_MS
+
+			return plan_titled('a')
+		})
+		read_machine.mockResolvedValueOnce(swapped(0)).mockResolvedValueOnce(swapped(SWAPPED_MB))
+		const first = await tick(FRESH_STATE, ports, WORDS)
+
+		clock.now_ms += REDRAW_MS
+		await tick(first, ports, WORDS)
+
+		expect(frames.at(-1)).toContain(`${SWAPPED_MB.toFixed(1)}M/s`)
+	})
+})
+
 describe('run_board_tick.tick reads', () => {
 	it('keeps the previous plan and warns when a read failed', async () => {
 		const { ports, frames, clock } = harness(LOCAL, [plan_titled('kept'), undefined])
@@ -92,7 +144,7 @@ describe('run_board_tick.tick — an ended run', () => {
 		await tick(first, ports, WORDS)
 
 		expect(read_plan).toHaveBeenCalledOnce()
-		expect(frames.at(-1)).toContain(WORDS.ended_at)
+		expect(frames.at(-1)).toContain('🔚')
 	})
 
 	it('drops the ended run’s plan and baseline the moment the next run begins', async () => {

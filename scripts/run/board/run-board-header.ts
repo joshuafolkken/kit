@@ -3,6 +3,7 @@ import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { backlog_idle, type IdleWindow } from '#scripts/backlog/backlog-idle'
 import { run_board_labels, type Words } from './run-board-labels'
 import type { BoardLayout, BoardRow } from './run-board-layout'
+import { run_board_machine, type MachineGauges } from './run-board-machine'
 import type { RunActivity } from './run-board-status'
 
 // The top of `run:board` (joshuafolkken/kit#3430): whether the run is moving, how long it has run, how
@@ -10,9 +11,11 @@ import type { RunActivity } from './run-board-status'
 // waits on an empty backlog, until when it waits and what ends the wait. Every time comes from a record
 // (the carry's start, the stream's events, the `idle` window); nothing here guesses one. Two lines of
 // symbols rather than sentences (joshuafolkken/kit#3444): the `⏱` that moves every second is the proof
-// the board is live, so no `updated` line is drawn.
+// the board is live, so no `updated` line is drawn. Under the title, the machine the run is on
+// (joshuafolkken/kit#3450), so a slow run reads apart from a stuck one.
 
-const { STATE_ICONS, bar_of, clock_of, elapsed_of, left_of, span_of } = run_board_labels
+const { HEADER_ICONS, STATE_ICONS, bar_of, clock_of, elapsed_of, left_of, span_of } =
+	run_board_labels
 const COUNT_GAP = '  '
 const PROGRESS_GAP = COUNT_GAP
 // The parts of the title line sit one space further apart than the counts, so the groups read apart.
@@ -39,6 +42,11 @@ interface BoardHeader {
 	baseline_total: number | undefined
 	plan_fetched_ms: number | undefined
 	plan_failed_ms: number | undefined
+	// The machine's gauges, `undefined` before the first sample.
+	machine: MachineGauges | undefined
+	// An issue reference as the board draws it — `3450` or `owner/repo#12` — made a link where the
+	// terminal opens one.
+	link: (reference: string) => string
 }
 
 interface BoardCounts {
@@ -110,11 +118,12 @@ function aged(part: string, age_ms: number): string {
 	return age_ms > STALE_MS ? styleText('yellow', part) : part
 }
 
-// How long ago the stream last moved; only a running run can be stale, so only it is colored.
+// How long ago the stream last moved; only a running run can be stale, so only it is colored. An ended
+// run has no heartbeat to keep (joshuafolkken/kit#3450): one counting on would read as a hang.
 function heartbeat_part(header: BoardHeader, mark: RunMark): string | undefined {
 	const last = header.activity.last_event_ms
 
-	if (last === undefined) return undefined
+	if (last === undefined || header.ended_ms !== undefined) return undefined
 
 	const age = header.now_ms - last
 	const part = `💓 ${elapsed_of(age)}`
@@ -134,13 +143,15 @@ function plan_warning(header: BoardHeader): string | undefined {
 	)
 }
 
-// A running run's age and time left before the cut-off, or an ended run's frozen duration and when it
-// ended — an ended run has no cut-off left (joshuafolkken/kit#3439).
+// A running run's age and time left before the cut-off, or an ended run's frozen duration and the
+// minute it ended — an ended run has no cut-off left (joshuafolkken/kit#3439, joshuafolkken/kit#3450).
 function time_parts(header: BoardHeader): Array<string> {
-	const { now_ms, started_ms, ended_ms, words } = header
+	const { now_ms, started_ms, ended_ms } = header
 
 	if (ended_ms !== undefined) {
-		return [`⏱ ${elapsed_of(ended_ms - started_ms)}`, `${words.ended_at} ${clock_of(ended_ms)}`]
+		const ended = clock_of(ended_ms).slice(0, CLOCK_MINUTES_END)
+
+		return [`⏱ ${elapsed_of(ended_ms - started_ms)}`, `${HEADER_ICONS.ended} ${ended}`]
 	}
 
 	const cutoff = started_ms + backlog_budget.WHOLE_RUN_BUDGET_MS
@@ -171,7 +182,9 @@ function progress_line(counts: BoardCounts, header: BoardHeader): string {
 		`${STATE_ICONS.waiting} ${String(counts.remaining)}`,
 	].join(COUNT_GAP)
 
-	return `${bar_of(counts.settled, counts.total)}${PROGRESS_GAP}${tally}${GAP}${breakdown}`
+	const bar = `${HEADER_ICONS.progress} ${bar_of(counts.settled, counts.total)}`
+
+	return `${bar}${PROGRESS_GAP}${tally}${GAP}${breakdown}`
 }
 
 function idle_lines(idle: IdleWindow, header: BoardHeader): Array<string> {
@@ -198,10 +211,11 @@ function idle_block(header: BoardHeader, running: number): Array<string> {
 function header_lines(header: BoardHeader): Array<string> {
 	const counts = header.layout === undefined ? undefined : counts_of(header.layout)
 	const running = counts?.running ?? 0
+	const progress = counts === undefined ? undefined : progress_line(counts, header)
 
 	return [
 		title_line(header, running),
-		...(counts === undefined ? [] : [progress_line(counts, header)]),
+		...[run_board_machine.line_of(header.machine), progress].filter((line) => line !== undefined),
 		...idle_block(header, running),
 	]
 }

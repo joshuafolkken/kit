@@ -64,7 +64,7 @@ describe('run_board_labels.bar_of', () => {
 		expect(bar_of(1, 4, 8)).toBe('━━░░░░░░')
 		expect(bar_of(0, 0, 4)).toBe('░░░░')
 		expect(bar_of(5, 4, 4)).toBe('━━━━')
-		expect(bar_of(0, 1)).toHaveLength(20)
+		expect(bar_of(0, 1)).toHaveLength(10)
 	})
 })
 
