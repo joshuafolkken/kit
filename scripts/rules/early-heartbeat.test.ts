@@ -266,4 +266,13 @@ describe('EARLY_HEARTBEAT_REASON — the watcher it hands over', () => {
 		expect(reason).toContain('relay nothing')
 		expect(reason).not.toContain('start the next one')
 	})
+
+	// joshuafolkken/kit#3456: a backlogrun answers an explicit ask with the board, so the refusal must
+	// not steer it back to the single-run form progress-watcher.md no longer prescribes there.
+	it('names the backlogrun answer form beside the single-run one', () => {
+		const reason = delivered_rules.EARLY_HEARTBEAT_REASON
+
+		expect(reason).toContain('`pnpm josh run:progress --once`')
+		expect(reason).toContain('under `backlogrun`, `pnpm josh run:board --chat`')
+	})
 })

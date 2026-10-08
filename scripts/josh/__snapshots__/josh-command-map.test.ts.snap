@@ -900,9 +900,10 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:board": [
-      "[--once]",
+      "[--once | --chat]",
       "automation",
       [
+        "files",
         "network",
       ],
     ],

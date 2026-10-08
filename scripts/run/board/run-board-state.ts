@@ -2,6 +2,7 @@ import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { Fetch } from './run-board-fetch'
+import type { BoardForm } from './run-board-header'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
 import type { MachineGauges, MachineMark } from './run-board-machine'
@@ -23,6 +24,10 @@ interface BoardPorts {
 	link: Link
 	// Whether stdout is a terminal — only a terminal gets the alternate screen and the spinner.
 	is_tty: boolean
+	form: BoardForm
+	// Records that a progress report was just given, as `run:progress --mark` does, so the next scheduled
+	// one waits a full interval from here (joshuafolkken/kit#3456).
+	mark: () => Promise<void>
 	// Runs `leave` however the process ends: a normal exit, Ctrl+C or SIGTERM.
 	on_exit: (leave: () => void) => void
 	sleep: (ms: number) => Promise<void>

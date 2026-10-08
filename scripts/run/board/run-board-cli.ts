@@ -1,10 +1,11 @@
 #!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
-import { styleText } from 'node:util'
+import { stripVTControlCharacters, styleText } from 'node:util'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { session_language } from '#scripts/josh/session-language'
+import { run_progress_read } from '#scripts/run/progress/run-progress-read'
 import terminalLink from 'terminal-link'
 import { run_board_closed } from './run-board-closed'
 import { run_board_labels, type Words } from './run-board-labels'
@@ -24,9 +25,11 @@ const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ONCE_FLAG = '--once'
+const CHAT_FLAG = '--chat'
+const FLAGS: ReadonlySet<string> = new Set(['', ONCE_FLAG, CHAT_FLAG])
 const SIGINT_EXIT_CODE = 130
 const SIGTERM_EXIT_CODE = 143
-const USAGE = 'Usage: josh run:board [--once]'
+const USAGE = 'Usage: josh run:board [--once | --chat]'
 const { FRESH_STATE, REDRAW_MS, tick } = run_board_tick
 
 // A signal exits with its conventional code, so the `exit` handler restores the screen on every path.
@@ -46,6 +49,10 @@ const LIVE_PORTS: BoardPorts = {
 	// No fallback: a terminal that opens no link, or a pipe, gets the bare number rather than a URL.
 	link: (text, url) => terminalLink(text, url, { fallback: false }),
 	is_tty: process.stdout.isTTY,
+	form: 'screen',
+	mark: async () => {
+		run_progress_read.mark(await run_progress_read.stamp_target(), Date.now())
+	},
 	on_exit,
 	sleep: async (ms) => {
 		await sleep(ms)
@@ -107,24 +114,49 @@ async function watch(ports: BoardPorts, words: Words): Promise<void> {
 	}
 }
 
-async function run(argv: ReadonlyArray<string>, ports: BoardPorts = LIVE_PORTS): Promise<number> {
-	const is_once = argv[0] === ONCE_FLAG
-
-	if (argv.length > (is_once ? 1 : 0)) {
-		process.stderr.write(`${USAGE}\n`)
-
-		return FAILURE_EXIT_CODE
+// The answer to a progress question asked during a `backlogrun` (joshuafolkken/kit#3456): one frame in
+// the chat's form, with every escape stripped because a chat shows them as text, and recorded as the
+// report it is, so the next scheduled one waits a full interval — as `run:progress --once` does.
+async function answer(ports: BoardPorts, words: Words): Promise<void> {
+	const chat_ports: BoardPorts = {
+		...ports,
+		is_tty: false,
+		form: 'chat',
+		write: (frame) => {
+			ports.write(stripVTControlCharacters(frame))
+		},
 	}
 
-	const words = run_board_labels.words_of(session_language.resolve_session_lang().lang)
+	await tick(FRESH_STATE, chat_ports, words)
+	await ports.mark()
+}
 
-	const mode = run_board_screen.mode_of({ is_tty: ports.is_tty, is_once })
+async function draw(flag: string, ports: BoardPorts, words: Words): Promise<void> {
+	if (flag === CHAT_FLAG) {
+		await answer(ports, words)
+
+		return
+	}
+
+	const mode = run_board_screen.mode_of({ is_tty: ports.is_tty, is_once: flag === ONCE_FLAG })
 
 	// One plain frame stays on the terminal after the command, so it draws the still icons rather than a
 	// spinner frame frozen mid-turn (joshuafolkken/kit#3452).
 	const once_ports = { ...ports, is_tty: false }
 
 	await (mode === 'live' ? watch(ports, words) : tick(FRESH_STATE, once_ports, words))
+}
+
+async function run(argv: ReadonlyArray<string>, ports: BoardPorts = LIVE_PORTS): Promise<number> {
+	const [flag = '', ...rest] = argv
+
+	if (rest.length > 0 || !FLAGS.has(flag)) {
+		process.stderr.write(`${USAGE}\n`)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	await draw(flag, ports, run_board_labels.words_of(session_language.resolve_session_lang().lang))
 
 	return SUCCESS_EXIT_CODE
 }

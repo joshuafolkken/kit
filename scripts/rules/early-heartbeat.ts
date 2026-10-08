@@ -194,8 +194,8 @@ const EARLY_HEARTBEAT_REASON =
 	'(joshuafolkken/kit#1570): a new one was armed on the turn a timer fired and again on the turn a ' +
 	"child's completion woke the run, and `--mark` recorded each report without anything refusing the " +
 	'early ones. **An explicit ask is not a heartbeat**: if the person asked for progress now, run ' +
-	'`pnpm josh run:progress --once`, which prints the five labelled lines whatever the clock says. ' +
-	'If you are ' +
+	'`pnpm josh run:progress --once`, which prints the five labelled lines whatever the clock says — ' +
+	'under `backlogrun`, `pnpm josh run:board --chat` instead. If you are ' +
 	'waiting on something rather than on a clock, wait on the thing itself — `pnpm josh followup` ' +
 	'waits for CI. The procedure is `.claude/skills/workflow-commands/backlogrun.md` → "Progress while ' +
 	'the run is quiet". **This rule fires on every early arm, not once per run**, so reissuing the ' +

@@ -43,6 +43,8 @@ interface Harness extends Reads {
 	frames: Array<string>
 	clock: { now_ms: number }
 	leaves: Array<() => void>
+	// The clock at each report the board recorded.
+	marks: Array<number>
 }
 
 function plan_titled(title: string): BoardPlan {
@@ -79,6 +81,7 @@ function reads_of(local: LocalRead | undefined, plans: Array<BoardPlan | undefin
 function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefined>): Harness {
 	const frames: Array<string> = []
 	const leaves: Array<() => void> = []
+	const marks: Array<number> = []
 	const clock = { now_ms: START }
 	const reads = reads_of(local, plans)
 	const ports: BoardPorts = {
@@ -89,13 +92,17 @@ function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefine
 		},
 		link: (text) => text,
 		is_tty: true,
+		form: 'screen',
+		mark: async () => {
+			marks.push(clock.now_ms)
+		},
 		on_exit: (leave) => {
 			leaves.push(leave)
 		},
 		sleep: stopper(),
 	}
 
-	return { ...reads, ports, frames, clock, leaves }
+	return { ...reads, ports, frames, clock, leaves, marks }
 }
 
 const run_board_fixture = { LOCAL, START, STOPPED, WORDS, harness, plan_titled }

@@ -29,6 +29,11 @@ const INDENT = '  '
 const RUN_NAME = 'backlogrun'
 const CLOCK_MINUTES_END = 5
 
+// Who reads the frame: a person on a screen, or a chat a session answers a progress question in
+// (joshuafolkken/kit#3456), where a title is never cut, no legend is drawn and the machine is its memory
+// alone — a CPU or swap figure read once means nothing.
+type BoardForm = 'screen' | 'chat'
+
 interface BoardHeader {
 	now_ms: number
 	words: Words
@@ -48,6 +53,7 @@ interface BoardHeader {
 	// The spinner's frame a running run and a running row turn, `undefined` where the output is not a
 	// terminal and they draw their still icons (joshuafolkken/kit#3452).
 	spinner: string | undefined
+	form: BoardForm
 	// An issue reference as the board draws it — `3450` or `owner/repo#12` — made a link where the
 	// terminal opens one.
 	link: (reference: string) => string
@@ -215,14 +221,24 @@ function idle_block(header: BoardHeader, running: number): Array<string> {
 	return idle_lines(idle, header)
 }
 
+// The gauges the machine line draws: every one on a screen, the memory alone in a chat.
+function machine_of(header: BoardHeader): MachineGauges | undefined {
+	const { machine } = header
+
+	if (machine === undefined || header.form === 'screen') return machine
+
+	return { ...machine, cpu_percent: undefined, swap_mb_per_s: undefined }
+}
+
 function header_lines(header: BoardHeader): Array<string> {
 	const counts = header.layout === undefined ? undefined : counts_of(header.layout)
 	const running = counts?.running ?? 0
 	const progress = counts === undefined ? undefined : progress_line(counts, header)
+	const machine = run_board_machine.line_of(machine_of(header))
 
 	return [
 		title_line(header, running),
-		...[run_board_machine.line_of(header.machine), progress].filter((line) => line !== undefined),
+		...[machine, progress].filter((line) => line !== undefined),
 		...idle_block(header, running),
 	]
 }
@@ -230,4 +246,4 @@ function header_lines(header: BoardHeader): Array<string> {
 const run_board_header = { counts_of, header_lines }
 
 export { run_board_header }
-export type { BoardCounts, BoardHeader }
+export type { BoardCounts, BoardForm, BoardHeader }

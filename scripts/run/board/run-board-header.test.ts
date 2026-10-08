@@ -36,6 +36,7 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		is_plan_loading: false,
 		machine: undefined,
 		spinner: undefined,
+		form: 'screen',
 		link: (reference) => reference,
 		...extra,
 	}
@@ -128,6 +129,20 @@ describe('run_board_header.header_lines shape', () => {
 
 	it('has no progress line without a layout', () => {
 		expect(lines_of(header({ layout: undefined }))).toStrictEqual([title_of(header())])
+	})
+})
+
+// joshuafolkken/kit#3456: a figure read once means nothing, so a chat's machine line is its memory.
+describe('run_board_header.header_lines chat', () => {
+	it('draws the memory alone on the machine line of a chat', () => {
+		const machine = {
+			cpu_percent: 15,
+			memory_percent: 37,
+			swap_mb_per_s: 3.1,
+			memory_pressure: undefined,
+		}
+
+		expect(lines_of(header({ machine, form: 'chat' }))[1]).toBe('🧠  37% ████──────')
 	})
 })
 
