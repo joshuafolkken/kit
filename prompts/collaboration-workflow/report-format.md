@@ -99,6 +99,8 @@
 
 **実行証跡は「動くこと」の証拠であり、gate の緑ではない（joshuafolkken/kit#2246）。** 同じ証跡を PR 本文の `## 実機証跡` 節（コマンド＋実出力のフェンス）にも置く。無い実行時の変更は `pnpm josh followup` がマージを拒否する（#2446）。
 
+**`run:carry` の実行証跡は `JOSH_TEMP_ROOT` を新しい一時ディレクトリに向けて取る（必須）。** run の状態レコードは、走っている本物の run と共有の 1 か所にあり、作業ディレクトリを移しても `pnpm --dir` を使っても切り離せない。変数は起動時に読まれるので、`JOSH_TEMP_ROOT="$(mktemp -d)" pnpm josh run:carry --begin …` のように各コマンドの頭に付ける（`docs/environment-variables.md` → "Runs"）。**`run:merge` はこれで切り離せない** — レコードの他に main の同期・lane の close・GitHub への書き込みを行うため、一時ルートを変えても本物の run の共有状態に触れる。
+
 ### 区切りの報告（完了報告と区別する・必須）
 
 `backlogrun` の**区切り**（hand-off — 残りを新しいセッションへ渡して止まる）は、完了でも park でも失敗でもない第 4 の停止である（joshuafolkken/kit#984）。**`原因` / `対応` / `結果` を使わない** — 終わっていない epic が終わったように見える。

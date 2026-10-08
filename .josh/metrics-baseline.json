@@ -1,21 +1,21 @@
 {
 	"scripts": {
 		"files": 999,
-		"code_lines": 82684,
-		"comment_lines": 33290,
+		"code_lines": 82695,
+		"comment_lines": 33305,
 		"comment_ratio": 0.4
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2345
+		"lines": 2347
 	},
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12231,
-		"on_demand_bytes": 558400
+		"on_demand_bytes": 559132
 	},
 	"accepted": {
-		"reason": "#3451 adds merged-lane collection (run-merge-collect) and the closed-children section on run:board (run-board-closed) with their tests, plus review-round fixes",
+		"reason": "#3458: lane-carry-conflict lets a JOSH_TEMP_ROOT-prefixed run:* call through, and report-format requires run:* live evidence to redirect JOSH_TEMP_ROOT, plus review-round fixes; the gate median trails earlier machine-loaded solo gates (latest solo gate 55.6s)",
 		"date": "2026-10-08"
 	}
 }
