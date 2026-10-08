@@ -13,6 +13,9 @@ const { gauges_of, line_of } = run_board_machine
 const SECOND = 1000
 const BAR_WIDTH = 10
 const WARNING = 2
+const GREEN_RGB = '48;209;88'
+const YELLOW_RGB = '255;214;10'
+const RED_RGB = '255;69;58'
 const UNREAD = {
 	cpu_percent: undefined,
 	memory_percent: undefined,
@@ -57,6 +60,16 @@ function bar(filled: number, color: TextColor): string {
 	const left = filled === BAR_WIDTH ? '' : styleText('dim', '─'.repeat(BAR_WIDTH - filled))
 
 	return done + left
+}
+
+// Text in a 24-bit color, as the `38;2;R;G;B` escape draws it.
+function rgb(code: string, text: string): string {
+	return `\u{1B}[38;2;${code}m${text}\u{1B}[39m`
+}
+
+// A bar whose `filled` cells are in a 24-bit color, the rest dimmed.
+function rgb_bar(filled: number, code: string): string {
+	return rgb(code, '█'.repeat(filled)) + styleText('dim', '─'.repeat(BAR_WIDTH - filled))
 }
 
 describe('run_board_machine.gauges_of', () => {
@@ -149,5 +162,24 @@ describe('run_board_machine.line_of colors', () => {
 		expect(memory_line(30, undefined)).toBe(`🧠  30% ${bar(3, 'green')}`)
 		expect(memory_line(75, undefined)).toBe(`🧠 ${styleText('yellow', ' 75%')} ${bar(8, 'yellow')}`)
 		expect(memory_line(90, 3)).toBe(`🧠 ${styleText('red', ' 90%')} ${bar(9, 'red')}`)
+	})
+})
+
+// joshuafolkken/kit#3464: in 24-bit color, so no terminal palette draws green blue or red orange.
+describe('run_board_machine.line_of in 24-bit color', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('draws the CPU gauge in its 24-bit green, yellow and red where the output has them', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+
+		expect(line_of({ ...UNREAD, cpu_percent: 30 })).toBe(`⚡  30% ${rgb_bar(3, GREEN_RGB)}`)
+		expect(line_of({ ...UNREAD, cpu_percent: 75 })).toBe(
+			`⚡ ${rgb(YELLOW_RGB, ' 75%')} ${rgb_bar(8, YELLOW_RGB)}`,
+		)
+		expect(line_of({ ...UNREAD, cpu_percent: 95 })).toBe(
+			`⚡ ${rgb(RED_RGB, ' 95%')} ${rgb(RED_RGB, '█'.repeat(BAR_WIDTH))}`,
+		)
 	})
 })

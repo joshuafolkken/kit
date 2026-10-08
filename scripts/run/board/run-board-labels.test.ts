@@ -7,7 +7,7 @@ import { run_board_phase } from './run-board-phase'
 // `HH:MM:SS` clock or span.
 
 const { bar_of, clock_of, elapsed_of, left_of, span_of, spinner_of, words_of } = run_board_labels
-const { PHASE_ICONS, PHASE_WORDS, SPINNER_FRAME_MS } = run_board_labels
+const { GAUGE_SHADES, PHASE_ICONS, PHASE_WORDS, SPINNER_FRAME_MS, painted } = run_board_labels
 const SECOND = 1000
 const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
@@ -82,6 +82,48 @@ describe('run_board_labels.bar_of', () => {
 
 		expect(bar_of(1, 4, 4)).toBe(`${styleText('cyan', '█')}${styleText('dim', '───')}`)
 		expect(bar_of(4, 4, 4, 'green')).toBe(styleText('green', '████'))
+	})
+})
+
+// joshuafolkken/kit#3464: the gauge colors are 24-bit where the output draws them, the palette's own
+// where it does not, and no escape where it draws no color.
+describe('run_board_labels.painted with a gauge shade', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('draws the green, yellow and red shades as 24-bit colors where the output has them', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+
+		expect(painted(GAUGE_SHADES.normal, '█')).toBe('\u{1B}[38;2;48;209;88m█\u{1B}[39m')
+		expect(painted(GAUGE_SHADES.yellow, '█')).toBe('\u{1B}[38;2;255;214;10m█\u{1B}[39m')
+		expect(painted(GAUGE_SHADES.red, '█')).toBe('\u{1B}[38;2;255;69;58m█\u{1B}[39m')
+	})
+
+	it('falls back to the 16 palette colors where the output has no 24-bit color', () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+
+		expect(painted(GAUGE_SHADES.normal, '█')).toBe(styleText('green', '█'))
+		expect(painted(GAUGE_SHADES.yellow, '█')).toBe(styleText('yellow', '█'))
+		expect(painted(GAUGE_SHADES.red, '█')).toBe(styleText('red', '█'))
+	})
+
+	it('draws no escape where the output has no color', () => {
+		vi.stubEnv('FORCE_COLOR', '0')
+
+		expect(painted(GAUGE_SHADES.red, '█')).toBe('█')
+		expect(bar_of(1, 2, 2, GAUGE_SHADES.normal)).toBe('█─')
+	})
+
+	it('draws no 24-bit escape into an output that is not a terminal, though the environment has 24-bit color', () => {
+		vi.stubEnv('FORCE_COLOR', undefined)
+		vi.stubEnv('NO_COLOR', undefined)
+		vi.stubEnv('NODE_DISABLE_COLORS', undefined)
+		vi.stubEnv('TERM', 'xterm-256color')
+		vi.stubEnv('TMUX', '1')
+
+		expect(styleText('green', '█')).toBe('█')
+		expect(painted(GAUGE_SHADES.normal, '█')).toBe('█')
 	})
 })
 
