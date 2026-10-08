@@ -84,7 +84,7 @@ describe('run_board_render.render rows', () => {
 	it('draws a running row with its number, title, elapsed time and phase track, and no lane', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [running(1, STARTED + 40 * MINUTE, 'implement')] }
 		const lines = lines_of(header({ layout }))
-		const row_line = `  🔄 1  ${padded('Issue 1')}  90:00  ${plain_track('implement')}`
+		const row_line = `  🔨 1  ${padded('Issue 1')}  90:00  ${plain_track('implement')}`
 
 		expect(lines).toContain(row_line)
 		expect(row_line).not.toContain('█')
@@ -186,24 +186,54 @@ describe('run_board_render.render phase icons and spinner', () => {
 		expect(legend).toContain('🔗 待ち先  ⚡ cpu')
 	})
 
-	// The spinner is one column and the emoji two, so a space keeps the numbers in one column.
-	it('turns the spinner on a running row only, padded to the emoji’s two columns', () => {
-		const active = [running(1, NOW, 'review'), row(2)]
-		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active }, spinner: '⠋' }))
-
-		expect(lines.some((line) => line.startsWith('  ⠋  1  Issue 1'))).toBe(true)
-		expect(lines).toContain('  ⏳ 2  Issue 2')
-	})
-
-	it('draws no escape where the output has no color and no spinner', () => {
+	// joshuafolkken/kit#3471: and the indent a running row turns its spinner in stays blank.
+	it('draws no escape and a blank indent where the output has no color and no spinner', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 		const active = [running(1, NOW, 'review'), row(2)]
 		const board = header({ layout: { ...EMPTY_LAYOUT, active } })
 		const text = run_board_render.render({ header: board, notes: [] }).join('\n')
 
 		expect(text).not.toContain('\u{1B}')
-		expect(text).toContain('  🔄 1  Issue 1')
+		expect(text).toContain('\n  👀 1  Issue 1')
 		expect(text).toContain('▶ backlogrun')
+	})
+})
+
+const segmenter = new Intl.Segmenter()
+
+// Where `text` starts in `line`, in graphemes: every row icon is one, so equal counts are one column.
+function column_of(line: string, text: string): number {
+	return [...segmenter.segment(line.slice(0, line.indexOf(text)))].length
+}
+
+// joshuafolkken/kit#3471: a running row turns the spinner in its indent and leads with its phase.
+describe('run_board_render.render running row lead', () => {
+	it('turns the spinner in a running row’s indent only, its title in every row’s column', () => {
+		const active = [running(1, NOW, 'review'), row(2)]
+		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active }, spinner: '⠋' }))
+		const spun = lines.find((line) => line.includes('Issue 1')) ?? ''
+		const still = lines.find((line) => line.includes('Issue 2')) ?? ''
+
+		expect(spun.startsWith('⠋ 👀 1  Issue 1')).toBe(true)
+		expect(still).toBe('  ⏳ 2  Issue 2')
+		expect(column_of(spun, 'Issue 1')).toBe(column_of(still, 'Issue 2'))
+	})
+
+	it('turns the spinner in the first column of a running epic child’s branch', () => {
+		const rows = [running(4, NOW, 'gate'), row(5)]
+		const waves = [[{ kind: 'epic' as const, epic: 9, title: 'Epic', rows }]]
+		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, waves }, spinner: '⠙' }))
+
+		expect(lines.some((line) => line.startsWith('⠙    ├ 🚦 4  Issue 4'))).toBe(true)
+		expect(lines).toContain('     └ ⏳ 5  Issue 5')
+	})
+
+	it('leads a running row with its newest phase’s icon, and 🔄 before its track draws one', () => {
+		const active = [running(1, NOW, 'commit'), running(2, NOW, 'dispatched')]
+		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active } }))
+
+		expect(lines.some((line) => line.startsWith('  📦 1  Issue 1'))).toBe(true)
+		expect(lines.some((line) => line.startsWith('  🔄 2  Issue 2'))).toBe(true)
 	})
 })
 

@@ -231,7 +231,7 @@ describe('run_board_tick.tick spinner', () => {
 		expect(titles[0]).not.toBe(titles[1])
 	})
 
-	it('draws ▶ and 🔄 where the output is not a terminal', async () => {
+	it('draws ▶ and a still phase icon where the output is not a terminal', async () => {
 		const { ports, frames } = harness(LAUNCHED, [single_plan([SINGLE])])
 
 		await tick(FRESH_STATE, { ...ports, is_tty: false }, WORDS)
@@ -239,6 +239,6 @@ describe('run_board_tick.tick spinner', () => {
 		const frame = stripVTControlCharacters(frames.at(-1) ?? '')
 
 		expect(frame).toMatch(/^▶ backlogrun/u)
-		expect(frame).toContain(`🔄 ${String(SINGLE)}`)
+		expect(frame).toContain(`\n  🔍 ${String(SINGLE)}`)
 	})
 })

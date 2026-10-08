@@ -90,6 +90,14 @@ function phase_of(row: BoardRow): string | undefined {
 	return phase === undefined ? undefined : run_board_track.track_of(phase)
 }
 
+// The phases a row's track draws — every one its row has passed (joshuafolkken/kit#3460) — which the
+// legend names and whose newest leads a running row.
+function drawn_phases(row: BoardRow): Array<Phase> {
+	const phase = shown_phase(row)
+
+	return phase === undefined ? [] : run_board_track.passed_of(phase)
+}
+
 function waits_of(row: BoardRow, header: BoardHeader): string | undefined {
 	if (row.waits.length === 0) return undefined
 
@@ -105,27 +113,39 @@ function timed_parts(row: BoardRow, frame: RowFrame): Array<string | undefined> 
 	return [title_of(row.title).padEnd(TITLE_LIMIT), time.padStart(frame.time_width), phase_of(row)]
 }
 
-// A running row turns the spinner where the header has one (joshuafolkken/kit#3452), padded by a space
-// to the two columns the emoji it replaces takes, so the numbers stay in one column.
-function state_icon(row: BoardRow, header: BoardHeader): string {
-	if (row.state !== 'running' || header.spinner === undefined) return STATE_ICONS[row.state]
+// A running row leads with the icon of the phase it is in now (joshuafolkken/kit#3471) — the rightmost
+// icon of its track — and with 🔄 while its track draws none yet.
+function state_icon(row: BoardRow): string {
+	const current = drawn_phases(row).at(-1)
 
-	return `${header.spinner} `
+	return current === undefined ? STATE_ICONS[row.state] : PHASE_ICONS[current]
+}
+
+// A running row turns the spinner in the first column of its indent where the header has one
+// (joshuafolkken/kit#3471), so its title starts in the same column as every other row's.
+function indent_of(prefix: string, row: BoardRow, header: BoardHeader): string {
+	if (row.state !== 'running' || header.spinner === undefined) return prefix
+
+	return `${header.spinner}${prefix.slice(1)}`
 }
 
 // Every row carries its state's icon, a waiting one ⏳ too (joshuafolkken/kit#3450).
 function row_text(row: BoardRow, frame: RowFrame): string {
 	const { header } = frame
-	const lead = `${state_icon(row, header)} ${header.link(String(row.number))}`
+	const lead = `${state_icon(row)} ${header.link(String(row.number))}`
 	const parts = [lead, ...timed_parts(row, frame), waits_of(row, header)]
 
 	return parts.filter((part) => part !== undefined && part !== '').join(GAP)
 }
 
+function row_line(prefix: string, row: BoardRow, frame: RowFrame): string {
+	return `${indent_of(prefix, row, frame.header)}${row_text(row, frame)}`
+}
+
 function epic_lines(entry: Extract<WaveEntry, { kind: 'epic' }>, frame: RowFrame): Array<string> {
 	const last = entry.rows.length - 1
-	const children = entry.rows.map(
-		(row, index) => `${index === last ? LAST_BRANCH : BRANCH}${row_text(row, frame)}`,
+	const children = entry.rows.map((row, index) =>
+		row_line(index === last ? LAST_BRANCH : BRANCH, row, frame),
 	)
 	const title = title_of(entry.title)
 	const number = frame.header.link(String(entry.epic))
@@ -135,7 +155,7 @@ function epic_lines(entry: Extract<WaveEntry, { kind: 'epic' }>, frame: RowFrame
 }
 
 function entry_lines(entry: WaveEntry, frame: RowFrame): Array<string> {
-	if (entry.kind === 'row') return [`${INDENT}${row_text(entry.row, frame)}`]
+	if (entry.kind === 'row') return [row_line(INDENT, entry.row, frame)]
 
 	return epic_lines(entry, frame)
 }
@@ -157,7 +177,7 @@ function rows_section(
 ): Array<string> {
 	return section(
 		heading,
-		rows.map((row) => `${INDENT}${row_text(row, frame)}`),
+		rows.map((row) => row_line(INDENT, row, frame)),
 	)
 }
 
@@ -169,14 +189,7 @@ function time_width(header: BoardHeader): number {
 }
 
 // The legend names only the phases some row on screen draws, in the phases' own order — seven icons
-// most of which no row shows would crowd out the ones that do (joshuafolkken/kit#3452). A track draws
-// every phase its row has passed (joshuafolkken/kit#3460), so those are named too.
-function drawn_phases(row: BoardRow): Array<Phase> {
-	const phase = shown_phase(row)
-
-	return phase === undefined ? [] : run_board_track.passed_of(phase)
-}
-
+// most of which no row shows would crowd out the ones that do (joshuafolkken/kit#3452).
 function phase_legend(layout: BoardLayout, words: Words): Array<string> {
 	const shown = new Set(run_board_layout.rows_of(layout).flatMap((row) => drawn_phases(row)))
 
