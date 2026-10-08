@@ -17,7 +17,6 @@ import type { RunActivity } from './run-board-status'
 const { HEADER_ICONS, STATE_ICONS, bar_of, clock_of, elapsed_of, left_of, span_of } =
 	run_board_labels
 const COUNT_GAP = '  '
-const PROGRESS_GAP = COUNT_GAP
 // The parts of the title line sit one space further apart than the counts, so the groups read apart.
 const GAP = `${COUNT_GAP} `
 // A running run whose newest event is older than this is drawn as stale, so a hang stands out; past
@@ -57,7 +56,6 @@ interface BoardHeader {
 interface BoardCounts {
 	total: number
 	settled: number
-	merged: number
 	parked: number
 	running: number
 	remaining: number
@@ -81,12 +79,11 @@ function count_state(rows: ReadonlyArray<BoardRow>, state: BoardRow['state']): n
 
 function counts_of(layout: BoardLayout): BoardCounts {
 	const total = run_board_layout.rows_of(layout).length
-	const merged = count_state(layout.active, 'merged')
 	const parked = count_state(layout.active, 'parked')
-	const settled = merged + parked + count_state(layout.active, 'done')
+	const settled = count_state(layout.active, 'merged') + parked + count_state(layout.active, 'done')
 	const running = count_state(layout.active, 'running')
 
-	return { total, settled, merged, parked, running, remaining: total - settled - running }
+	return { total, settled, parked, running, remaining: total - settled - running }
 }
 
 // Nothing running: the run is waiting on a person when all the plan has left is what
@@ -179,20 +176,22 @@ function title_line(header: BoardHeader, running: number): string {
 	return parts.filter((part) => part !== undefined).join(GAP)
 }
 
+// Icon, figure, then bar, as the machine gauges above it (joshuafolkken/kit#3473): the settled count is
+// right-aligned to the total's width, so the bar starts in one column as the count grows. Arrivals since
+// the board first looked follow the bar, where they cannot move it.
 function progress_line(counts: BoardCounts, header: BoardHeader): string {
-	const added = counts.total - (header.baseline_total ?? counts.total)
+	const { settled, total } = counts
+	const added = total - (header.baseline_total ?? total)
 	const plus = added > 0 ? ` (+${String(added)})` : ''
-	const tally = `${String(counts.settled)}/${String(counts.total)}${plus}`
+	const widest = `${String(total)}/${String(total)}`
+	const tally = `${String(settled)}/${String(total)}`.padStart(widest.length)
 	const breakdown = [
-		`${STATE_ICONS.merged} ${String(counts.merged)}`,
-		`${STATE_ICONS.parked} ${String(counts.parked)}`,
 		`${STATE_ICONS.running} ${String(counts.running)}`,
 		`${STATE_ICONS.waiting} ${String(counts.remaining)}`,
+		`${STATE_ICONS.parked} ${String(counts.parked)}`,
 	].join(COUNT_GAP)
 
-	const bar = `${HEADER_ICONS.progress} ${bar_of(counts.settled, counts.total)}`
-
-	return `${bar}${PROGRESS_GAP}${tally}${GAP}${breakdown}`
+	return `${STATE_ICONS.merged} ${tally} ${bar_of(settled, total)}${plus}${GAP}${breakdown}`
 }
 
 function idle_lines(idle: IdleWindow, header: BoardHeader): Array<string> {

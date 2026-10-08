@@ -97,7 +97,7 @@ describe('run_board_header.header_lines shape', () => {
 
 		expect(lines_of(header({ layout }))).toStrictEqual([
 			'▶ backlogrun   ⏱ 30:00   ⌛ 7h30m',
-			`📊 ${'─'.repeat(10)}  0/2   ✅ 0  💤 0  🔄 1  ⏳ 1`,
+			`✅ 0/2 ${'─'.repeat(10)}   🔄 1  ⏳ 1  💤 0`,
 		])
 	})
 
@@ -113,7 +113,7 @@ describe('run_board_header.header_lines shape', () => {
 		expect(lines_of(header({ machine }))).toStrictEqual([
 			'⏸ backlogrun   ⏱ 30:00   ⌛ 7h30m',
 			'⚡  15% ██────────   🧠  37% ████──────   💾 3.1M/s ██────────',
-			`📊 ${'─'.repeat(10)}  0/0   ✅ 0  💤 0  🔄 0  ⏳ 0`,
+			`✅ 0/0 ${'─'.repeat(10)}   🔄 0  ⏳ 0  💤 0`,
 		])
 	})
 
@@ -177,6 +177,34 @@ describe('run_board_header.header_lines heartbeat color', () => {
 	})
 })
 
+// The progress line of a plan with `settled` of its `total` rows merged and the rest waiting.
+function progress_of(settled: number, total: number): string {
+	const merged = Array.from({ length: settled }, (_, index) => row(index + 1, 'merged'))
+	const waiting = Array.from({ length: total - settled }, (_, index) => row(100 + index, 'waiting'))
+	const layout = { ...EMPTY_LAYOUT, active: merged, unreached: waiting }
+
+	return lines_of(header({ layout }))[1] ?? ''
+}
+
+// joshuafolkken/kit#3473: icon, count, then bar, as the machine gauges; the done count drawn once.
+describe('run_board_header.header_lines progress line', () => {
+	it('draws ✅, the count over the total, the bar, then running, waiting and parked', () => {
+		expect(progress_of(9, 12)).toBe(`✅  9/12 ${'█'.repeat(8)}${'─'.repeat(2)}   🔄 0  ⏳ 3  💤 0`)
+	})
+
+	it('starts the bar in one column as the count gains a digit', () => {
+		const short = progress_of(9, 12)
+		const long = progress_of(12, 12)
+
+		expect(short.indexOf('█')).toBe(long.indexOf('█'))
+		expect(long).toMatch(/^✅ 12\/12 █/u)
+	})
+
+	it('draws the done count once', () => {
+		expect(progress_of(9, 12).split('✅')).toHaveLength(2)
+	})
+})
+
 describe('run_board_header.counts_of', () => {
 	it('counts the active rows by state and every planned row toward the total', () => {
 		const active = [row(1, 'merged'), row(2, 'parked'), row(3, 'done'), row(4, 'running')]
@@ -196,7 +224,6 @@ describe('run_board_header.counts_of', () => {
 		expect(run_board_header.counts_of(layout)).toStrictEqual({
 			total: 9,
 			settled: 3,
-			merged: 1,
 			parked: 1,
 			running: 1,
 			remaining: 5,

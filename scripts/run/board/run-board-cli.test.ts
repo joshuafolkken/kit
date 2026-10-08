@@ -117,7 +117,7 @@ describe('run_board_cli.run plan read', () => {
 		await run_board_cli.run(['--once'], ports)
 
 		expect(frames).toHaveLength(1)
-		expect(frames[0]).toContain('📊')
+		expect(frames[0]).toMatch(/✅ +\d+\/\d+/u)
 		expect(frames[0]?.split('\n', 1)[0]).not.toContain('⏳')
 	})
 })
