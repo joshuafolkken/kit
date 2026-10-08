@@ -1,9 +1,10 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { describe, expect, it, vi } from 'vitest'
-import { run_board_cli, type BoardPorts, type LocalRead } from './run-board-cli'
+import { run_board_cli, type BoardPorts } from './run-board-cli'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
+import type { LocalRead } from './run-board-read'
 
 // joshuafolkken/kit#3430: the board's two speeds — local reads every tick, the plan no more often than
 // the retry interval — and what it draws when a plan read fails or no run has started.
@@ -11,7 +12,13 @@ import type { BoardPlan } from './run-board-layout'
 const WORDS = run_board_labels.words_of('en')
 const START = Date.parse('2026-10-08T09:00:00.000Z')
 const ALL: NamedPlan = { issues: [], only: false }
-const LOCAL: LocalRead = { started_ms: START, scope: ALL, events: [], lanes: [] }
+const LOCAL: LocalRead = {
+	started_ms: START,
+	ended_ms: undefined,
+	scope: ALL,
+	events: [],
+	lanes: [],
+}
 
 function plan_titled(title: string): BoardPlan {
 	return {
@@ -133,6 +140,37 @@ describe('run_board_cli.tick — the run’s own scope', () => {
 		await run_board_cli.tick(run_board_cli.FRESH_STATE, ports, WORDS)
 
 		expect(frames.at(-1)).toContain(`${WORDS.progress} 1/1 `)
+	})
+})
+
+// joshuafolkken/kit#3439: an ended run stays on screen with its plan held, and the next run starts clean.
+const END = START + 60 * 60 * 1000
+
+describe('run_board_cli.tick — an ended run', () => {
+	it('draws the ended run as ended and holds its plan once it has read', async () => {
+		const { ports, frames, read_plan, clock } = harness({ ...LOCAL, ended_ms: END }, [
+			plan_titled('a'),
+		])
+		const first = await run_board_cli.tick(run_board_cli.FRESH_STATE, ports, WORDS)
+
+		clock.now_ms += run_board_cli.PLAN_RETRY_MS
+		await run_board_cli.tick(first, ports, WORDS)
+
+		expect(read_plan).toHaveBeenCalledTimes(1)
+		expect(frames.at(-1)).toContain(`backlogrun ${WORDS.stopped}`)
+		expect(frames.at(-1)).toContain(WORDS.ended_at)
+	})
+
+	it('drops the ended run’s plan and baseline the moment the next run begins', async () => {
+		const ended = harness({ ...LOCAL, ended_ms: END }, [plan_titled('old')])
+		const held = await run_board_cli.tick(run_board_cli.FRESH_STATE, ended.ports, WORDS)
+		const next = harness({ ...LOCAL, started_ms: END + 1 }, [undefined])
+		const state = await run_board_cli.tick(held, next.ports, WORDS)
+
+		expect(next.read_plan).toHaveBeenCalledTimes(1)
+		expect(state.plan).toBeUndefined()
+		expect(state.run_started_ms).toBe(END + 1)
+		expect(next.frames.at(-1)).toContain(WORDS.plan_none)
 	})
 })
 

@@ -31,6 +31,8 @@ const WORD_PAIRS = {
 	no_run: { ja: 'ランなし', en: 'no run' },
 	started: { ja: '開始', en: 'started' },
 	cutoff: { ja: '打ち切り', en: 'cut-off' },
+	ended_at: { ja: '終了', en: 'ended' },
+	took: { ja: '所要', en: 'took' },
 	last_event: { ja: '最終イベント', en: 'last event' },
 	updated: { ja: '更新', en: 'updated' },
 	plan: { ja: '計画', en: 'plan' },

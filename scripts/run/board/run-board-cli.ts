@@ -4,10 +4,6 @@ import { fileURLToPath } from 'node:url'
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { session_language } from '#scripts/josh/session-language'
-import { lane_registry } from '#scripts/lane/lane-registry'
-import { run_carry } from '#scripts/run/carry/run-carry'
-import type { RunEvent } from '#scripts/run/event/run-event-stream'
-import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_cli } from '#scripts/run/progress/run-progress-cli'
 import { run_board_header } from './run-board-header'
@@ -15,8 +11,8 @@ import { run_board_labels, type Words } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
 import { run_board_notes } from './run-board-notes'
 import { run_board_plan } from './run-board-plan'
+import { run_board_read, type LocalRead } from './run-board-read'
 import { run_board_render } from './run-board-render'
-import { run_board_scope } from './run-board-scope'
 import { run_board_screen, type Screen } from './run-board-screen'
 import { run_board_status } from './run-board-status'
 
@@ -25,7 +21,8 @@ import { run_board_status } from './run-board-status'
 // lanes are local reads taken every tick; the plan they are laid over is a GitHub read taken no more
 // often than `run:progress` re-reads after a decline, so a board left open all night costs what the
 // watcher already does. A failed plan read keeps the previous plan on screen and says when it failed.
-// With no run in this checkout it reads nothing from GitHub and waits for one to start.
+// A run that ended stays on screen, its plan held as it last read, until the next one starts
+// (joshuafolkken/kit#3439); with no run in this checkout it reads nothing from GitHub and waits.
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
@@ -37,15 +34,6 @@ const PLAN_RETRY_MS = run_progress_cli.DECLINE_RETRY_SECONDS * run_progress.MS_P
 const SIGINT_EXIT_CODE = 130
 const SIGTERM_EXIT_CODE = 143
 const USAGE = 'Usage: josh run:board [--once]'
-
-// What the board reads locally each tick: the run's start and scope, its events and its open lanes.
-interface LocalRead {
-	started_ms: number
-	// What the run was asked to do, from the carry record's invocation (joshuafolkken/kit#3442).
-	scope: NamedPlan
-	events: ReadonlyArray<RunEvent>
-	lanes: ReadonlyArray<string>
-}
 
 interface BoardPorts {
 	read_plan: (scope: NamedPlan) => Promise<BoardPlan | undefined>
@@ -61,6 +49,8 @@ interface BoardPorts {
 }
 
 interface BoardState {
+	// The start of the run this state was built for, so a run that begins draws nothing of the last one.
+	run_started_ms: number | undefined
 	plan: BoardPlan | undefined
 	attempted_ms: number | undefined
 	fetched_ms: number | undefined
@@ -69,6 +59,7 @@ interface BoardState {
 }
 
 const FRESH_STATE: BoardState = {
+	run_started_ms: undefined,
 	plan: undefined,
 	attempted_ms: undefined,
 	fetched_ms: undefined,
@@ -76,8 +67,19 @@ const FRESH_STATE: BoardState = {
 	baseline_total: undefined,
 }
 
-function is_plan_due(state: BoardState, now_ms: number): boolean {
+// An ended run's plan is read until it lands once, then held: the board keeps that run's screen.
+function is_plan_due(state: BoardState, local: LocalRead, now_ms: number): boolean {
+	if (local.ended_ms !== undefined && state.fetched_ms !== undefined) return false
+
 	return state.attempted_ms === undefined || now_ms - state.attempted_ms >= PLAN_RETRY_MS
+}
+
+// The state of the run on screen; a different run starts from nothing, so no row, count or baseline of
+// the previous run is drawn over the new one (joshuafolkken/kit#3439).
+function state_for(state: BoardState, local: LocalRead): BoardState {
+	if (state.run_started_ms === local.started_ms) return state
+
+	return { ...FRESH_STATE, run_started_ms: local.started_ms }
 }
 
 // A title the board once knew stays known, so an issue that left the open listing keeps its name.
@@ -98,7 +100,7 @@ async function refresh(
 	source: PlanRefresh,
 	now_ms: number,
 ): Promise<BoardState> {
-	if (!is_plan_due(state, now_ms)) return state
+	if (!is_plan_due(state, source.local, now_ms)) return state
 
 	const plan = await source.ports.read_plan(source.local.scope)
 	const attempted = { ...state, attempted_ms: now_ms }
@@ -143,7 +145,8 @@ function frame_of(
 		now_ms: redraw.now_ms,
 		words: redraw.words,
 		started_ms: local.started_ms,
-		activity: run_board_status.activity_of(local.events),
+		ended_ms: local.ended_ms,
+		activity: run_board_status.activity_of(local.events, local.ended_ms !== undefined),
 		layout,
 		baseline_total: state.baseline_total,
 		plan_fetched_ms: state.fetched_ms,
@@ -179,27 +182,9 @@ async function tick(state: BoardState, ports: BoardPorts, words: Words): Promise
 		return state
 	}
 
-	return draw_run(await refresh(state, { ports, local }, now_ms), local, { ports, words, now_ms })
-}
+	const refreshed = await refresh(state_for(state, local), { ports, local }, now_ms)
 
-async function read_local(): Promise<LocalRead | undefined> {
-	const repository = await run_carry.repository_directory()
-	const read =
-		repository === undefined ? undefined : run_carry.read_carry(run_carry.carry_path(repository))
-
-	if (read?.kind !== 'carried') return undefined
-
-	const [events, lanes] = await Promise.all([
-		run_event_stream_emit.current_events(),
-		lane_registry.list_lanes(),
-	])
-
-	return {
-		started_ms: Date.parse(read.carry.started_at),
-		scope: run_board_scope.scope_of(read.carry.invocation),
-		events,
-		lanes: lanes.map((lane) => lane.issue),
-	}
+	return draw_run(refreshed, local, { ports, words, now_ms })
 }
 
 // A signal exits with its conventional code, so the `exit` handler restores the screen on every path.
@@ -211,7 +196,7 @@ function on_exit(leave: () => void): void {
 
 const LIVE_PORTS: BoardPorts = {
 	read_plan: async (scope) => await run_board_plan.read_plan(scope),
-	read_local,
+	read_local: run_board_read.read_local,
 	now: () => Date.now(),
 	write: (frame) => process.stdout.write(frame),
 	is_tty: process.stdout.isTTY,
@@ -298,4 +283,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 export { run_board_cli }
-export type { BoardPorts, BoardState, LocalRead }
+export type { BoardPorts, BoardState }

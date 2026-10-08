@@ -14,6 +14,7 @@ import {
 } from './run-carry'
 import { run_carry_args, type CountRequest, type Request } from './run-carry-args'
 import { run_carry_conversation } from './run-carry-conversation'
+import { run_carry_ended } from './run-carry-ended'
 import { run_carry_stash } from './run-carry-stash'
 
 // `josh run:carry` — the record that carries one invocation's budget across its own session cuts
@@ -354,15 +355,34 @@ async function report_end(read: CarryRead): Promise<void> {
 	await run_carry_stash.report_orphans()
 }
 
+// Best-effort: the board's record of the ended run never stands between `--end` and the carry record it
+// clears, so a failed write goes to stderr rather than leaving the run carried.
+function keep_ended(directory: string, read: CarryRead): void {
+	try {
+		run_carry_ended.record_ended(run_carry_ended.ended_path(directory), read)
+	} catch (error) {
+		console.error(`run:carry: the ended run was not recorded for run:board: ${String(error)}`)
+	}
+}
+
+// The record goes, and the run it held stays readable as the last ended run, so `run:board` keeps the
+// finished run on screen until the next one begins (joshuafolkken/kit#3439).
+function close_record(directory: string): CarryRead {
+	const target = run_carry.carry_path(directory)
+	const read = run_carry.read_carry(target)
+
+	keep_ended(directory, read)
+	run_carry.end_carry(target)
+
+	return read
+}
+
 async function finish(
-	target: string,
+	directory: string,
 	stopped: string | undefined,
 	is_json: boolean,
 ): Promise<number> {
-	const read = run_carry.read_carry(target)
-
-	run_carry.end_carry(target)
-
+	const read = close_record(directory)
 	const notice = run_stop_notify.plan(read, stopped)
 
 	if (notice !== undefined) await run_stop_notify.announce(notice)
@@ -378,10 +398,12 @@ async function finish(
 	return report_carry(ENDED_VERDICT, read.carry, is_json)
 }
 
-async function act(target: string, request: Request, is_json: boolean): Promise<number> {
+async function act(
+	target: string,
+	request: Exclude<Request, { kind: 'end' }>,
+	is_json: boolean,
+): Promise<number> {
 	if (request.kind === 'claim') return claim_record(target, request.claim, is_json)
-
-	if (request.kind === 'end') return await finish(target, request.stopped, is_json)
 
 	const read = run_carry.read_carry(target)
 
@@ -400,6 +422,8 @@ async function answer(request: Request, is_json: boolean): Promise<number> {
 	const directory = await run_carry.repository_directory()
 
 	if (directory === undefined) return report_unknown(is_json)
+
+	if (request.kind === 'end') return await finish(directory, request.stopped, is_json)
 
 	return await act(run_carry.carry_path(directory), request, is_json)
 }

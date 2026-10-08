@@ -23,6 +23,7 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		now_ms: NOW,
 		words: WORDS,
 		started_ms: STARTED,
+		ended_ms: undefined,
 		activity: { last_event_ms: undefined, idle: undefined, is_stopped: false },
 		layout: EMPTY_LAYOUT,
 		baseline_total: undefined,
@@ -50,6 +51,17 @@ describe('run_board_header.header_lines state', () => {
 
 		expect(title_of(header({ layout: running }))).toContain(`backlogrun ${WORDS.running}`)
 		expect(title_of(header({ layout: human }))).toContain(`backlogrun ${WORDS.human}`)
+	})
+
+	// joshuafolkken/kit#3439
+	it('draws an ended run with its start, its end and how long it took, and no cut-off', () => {
+		const activity = { last_event_ms: undefined, idle: undefined, is_stopped: true }
+		const ended_ms = STARTED + 90 * MINUTE
+		const title = title_of(header({ activity, ended_ms }))
+
+		expect(title).toBe(
+			`backlogrun ${WORDS.stopped} · ${WORDS.started} ${clock_of(STARTED)} · ${WORDS.ended_at} ${clock_of(ended_ms)} (${WORDS.took} 01:30:00)`,
+		)
 	})
 
 	it('leaves out the last event before the stream has one', () => {
