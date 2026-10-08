@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 999,
-		"code_lines": 82799,
-		"comment_lines": 33331,
+		"files": 1002,
+		"code_lines": 83119,
+		"comment_lines": 33385,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 558400
 	},
 	"accepted": {
-		"reason": "run:board gains phase icons, a clock-driven spinner and colored gauges (#3452); gate duration rose under concurrent lane load, not from this change",
+		"reason": "josh backlogrun adds a new terminal launcher (args, cli, launch modules) and the run board's launch/resume view #3437",
 		"date": "2026-10-08"
 	}
 }

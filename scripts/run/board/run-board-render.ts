@@ -38,6 +38,8 @@ const NOTE_ICONS: Readonly<Record<BoardNote['kind'], string>> = {
 interface BoardView {
 	header: BoardHeader
 	notes: ReadonlyArray<BoardNote>
+	// The session a stopped run resumes from (joshuafolkken/kit#3437).
+	resume?: string | undefined
 }
 
 // What every row of one frame is drawn with: the header, and how wide the time column is, so a
@@ -244,12 +246,20 @@ function notes_section(notes: ReadonlyArray<BoardNote>, words: Words): Array<str
 	return section(words.notes, [...shown, ...more])
 }
 
+// The command that resumes a stopped run's session, under the header where the person looks first.
+function resume_lines(resume: string | undefined, words: Words): Array<string> {
+	if (resume === undefined) return []
+
+	return ['', `${STATE_ICONS.human} ${words.resume}${GAP}claude --resume ${resume}`]
+}
+
 function render(view: BoardView): Array<string> {
 	const { header, notes } = view
 	const legend = header.layout === undefined ? [] : ['', legend_of(header.layout, header.words)]
 
 	return [
 		...run_board_header.header_lines(header),
+		...resume_lines(view.resume, header.words),
 		...plan_sections(header),
 		...notes_section(notes, header.words),
 		...legend,

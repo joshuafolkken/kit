@@ -272,3 +272,16 @@ describe('run_board_render findings and no run', () => {
 		])
 	})
 })
+
+// joshuafolkken/kit#3437: a stopped run names the command that resumes its session, under the header.
+describe('run_board_render.render resume', () => {
+	it('draws the resume command only when the run stopped with a session', () => {
+		const board = header({ layout: undefined, ended_ms: NOW })
+		const resumed = run_board_render
+			.render({ header: board, notes: [], resume: 'abc' })
+			.map((line) => stripVTControlCharacters(line))
+
+		expect(resumed).toContain('🙋 停止中。再開  claude --resume abc')
+		expect(lines_of(board).join('\n')).not.toContain('claude --resume')
+	})
+})

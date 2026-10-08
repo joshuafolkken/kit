@@ -19,6 +19,7 @@ const LOCAL: LocalRead = {
 	scope: ALL,
 	events: [],
 	lanes: [],
+	resume: undefined,
 }
 const STOPPED = new Error('stopped')
 // A machine with nothing swapped and half its memory free.

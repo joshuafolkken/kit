@@ -7,6 +7,18 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
+	// Started from a terminal (joshuafolkken/kit#3437): the `backlogrun` keyword's launcher, and the board.
+	backlogrun: {
+		script: 'scripts/backlog/backlogrun-cli.ts',
+		description:
+			'Start a backlogrun in the background and show its board; with one already running, only show the board',
+		category: 'AI tools',
+		reference: [
+			'[#<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex]',
+			'developer',
+			['files', 'network', 'processes'],
+		],
+	},
 	'backlog:next': {
 		script: 'scripts/backlog/backlog-next.ts',
 		description:

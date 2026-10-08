@@ -358,21 +358,22 @@ async function report_end(read: CarryRead): Promise<void> {
 
 // Best-effort: the board's record of the ended run never stands between `--end` and the carry record it
 // clears, so a failed write goes to stderr rather than leaving the run carried.
-function keep_ended(directory: string, read: CarryRead): void {
+function keep_ended(directory: string, read: CarryRead, stopped: string | undefined): void {
 	try {
-		run_carry_ended.record_ended(run_carry_ended.ended_path(directory), read)
+		run_carry_ended.record_ended(run_carry_ended.ended_path(directory), read, new Date(), stopped)
 	} catch (error) {
 		console.error(`run:carry: the ended run was not recorded for run:board: ${String(error)}`)
 	}
 }
 
 // The record goes, and the run it held stays readable as the last ended run, so `run:board` keeps the
-// finished run on screen until the next one begins (joshuafolkken/kit#3439).
-function close_record(directory: string): CarryRead {
+// finished run on screen until the next one begins (joshuafolkken/kit#3439) — a stopped one with the
+// session to resume it from (joshuafolkken/kit#3437).
+function close_record(directory: string, stopped: string | undefined): CarryRead {
 	const target = run_carry.carry_path(directory)
 	const read = run_carry.read_carry(target)
 
-	keep_ended(directory, read)
+	keep_ended(directory, read, stopped)
 	run_carry.end_carry(target)
 
 	return read
@@ -385,7 +386,7 @@ async function finish(
 	is_json: boolean,
 ): Promise<number> {
 	await run_merge_collect.collect_merged(directory)
-	const read = close_record(directory)
+	const read = close_record(directory, stopped)
 	const notice = run_stop_notify.plan(read, stopped)
 
 	if (notice !== undefined) await run_stop_notify.announce(notice)
