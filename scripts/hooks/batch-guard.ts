@@ -16,8 +16,7 @@ import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-b
 // **What the transcript holds is the turns already closed, and nothing usable about the one in hand.**
 // Claude Code writes one line per content block and starts the first tool as soon as that block parses,
 // so a turn's later `tool_use` lines do not exist yet — measured on a live session, they arrive 1.4 to
-// 15 seconds afterwards. The decision is therefore made from closed history alone;
-// `time-batch-guard.ts` → "What it cannot know" carries the measurement and what it costs.
+// 15 seconds afterwards. The decision is therefore made from closed history alone.
 //
 // **The shell is `hook-decision.ts`, shared with the investigation guard** (joshuafolkken/kit#1460):
 // the payload schema, the deny envelope, the switch, the `.env` load, the stamp that makes a refusal
