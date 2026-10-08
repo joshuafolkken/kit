@@ -7,6 +7,8 @@ import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { file_reader } from '#scripts/lib/read-file'
 import { line_targets } from '#scripts/lines/line-targets'
 import { metrics_code_lines } from './metrics-code-lines'
+import { metrics_duration_probe } from './metrics-duration-probe'
+import { metrics_durations, type Durations } from './metrics-durations'
 import { metrics_logic, type Metrics, type ScriptFile } from './metrics-logic'
 import { metrics_ratchet, type Baseline, type Verdict } from './metrics-ratchet'
 
@@ -14,13 +16,17 @@ import { metrics_ratchet, type Baseline, type Verdict } from './metrics-ratchet'
 // `metrics-ratchet.ts`: enumerate the files, count them, print the totals, and hold them to the
 // baseline in the repository. It is a step of `josh gate` (joshuafolkken/kit#3408): a total that grew
 // fails it, a total that shrank rewrites the baseline, and `--accept` raises the baseline to the
-// current totals with the reason recorded beside them.
+// current totals with the reason recorded beside them. The durations beside the totals are held to
+// this machine's own baseline, with a tolerance (`metrics-durations.ts`, joshuafolkken/kit#3409).
 //
 // **It is kit-only.** The rule documents and the guard commands it counts are kit's own; a consumer
 // has no root `prompts/` to read, and the gate leaves the step out there.
 
 const ARGV_OFFSET = 2
-const USAGE = 'Usage: josh metrics [--accept --reason "<why>"]'
+const USAGE = 'Usage: josh metrics [--no-startup | --accept --reason "<why>"]'
+// The gate's form: its step runs beside the whole unit suite, so a startup timed there measures the
+// load, not josh (joshuafolkken/kit#3409) — startups are timed only when `josh metrics` runs alone.
+const NO_STARTUP_FLAG = '--no-startup'
 const ACCEPT_FLAG = '--accept'
 const REASON_FLAG = '--reason'
 const ACCEPT_ARGUMENT_COUNT = 3
@@ -40,20 +46,24 @@ const SETTLED_NOTE: Record<'improved' | 'unchanged', string> = {
 
 interface MetricsArguments {
 	reason: string | undefined
+	is_startup_timed: boolean
 }
 
-// `undefined` on anything but no argument or the full accept form: an accept without a reason is the
-// silent raise the ratchet exists to prevent, and a misspelled flag would run the check instead of
-// the raise it asked for.
+// `undefined` on anything but no argument, the gate's form or the full accept form: an accept without
+// a reason is the silent raise the ratchet exists to prevent, and a misspelled flag would run the
+// check instead of the raise it asked for.
 function accept_reason(argv: ReadonlyArray<string>): MetricsArguments | undefined {
 	const [accept_flag, reason_flag, reason = ''] = argv
 	const is_accept = accept_flag === ACCEPT_FLAG && reason_flag === REASON_FLAG
 
-	return is_accept && reason.trim().length > 0 ? { reason: reason.trim() } : undefined
+	return is_accept && reason.trim().length > 0
+		? { reason: reason.trim(), is_startup_timed: true }
+		: undefined
 }
 
 function parse_arguments(argv: ReadonlyArray<string>): MetricsArguments | undefined {
-	if (argv.length === 0) return { reason: undefined }
+	if (argv.length === 0) return { reason: undefined, is_startup_timed: true }
+	if (argv.join(' ') === NO_STARTUP_FLAG) return { reason: undefined, is_startup_timed: false }
 
 	return argv.length === ACCEPT_ARGUMENT_COUNT ? accept_reason(argv) : undefined
 }
@@ -121,7 +131,7 @@ function settle(root: string, verdict: Verdict): number {
 	return 0
 }
 
-function check(root: string, metrics: Metrics): number {
+function check_totals(root: string, metrics: Metrics): number {
 	const baseline = read_baseline(root)
 
 	if (baseline === undefined) return fail(`josh metrics: no readable baseline at ${BASELINE_PATH}`)
@@ -129,8 +139,26 @@ function check(root: string, metrics: Metrics): number {
 	return settle(root, metrics_ratchet.compare(baseline, metrics))
 }
 
-function accept(root: string, metrics: Metrics, reason: string): number {
+// Both halves always run, so one failing gate names every total and every duration that grew.
+async function check(root: string, metrics: Metrics, durations: Durations): Promise<number> {
+	const totals_exit = check_totals(root, metrics)
+	const durations_file = await metrics_duration_probe.baseline_path()
+	const durations_exit =
+		durations_file === undefined ? 0 : metrics_duration_probe.check(durations_file, durations)
+
+	return Math.max(totals_exit, durations_exit)
+}
+
+async function accept(
+	root: string,
+	metrics: Metrics,
+	durations: Durations,
+	reason: string,
+): Promise<number> {
+	const durations_file = await metrics_duration_probe.baseline_path()
+
 	write_baseline(root, metrics_ratchet.accept(metrics, reason, today()))
+	if (durations_file !== undefined) metrics_duration_probe.accept(durations_file, durations)
 	process.stdout.write(`josh metrics: baseline raised to the current totals — ${reason}\n`)
 
 	return 0
@@ -143,10 +171,15 @@ async function run_metrics(argv: ReadonlyArray<string>): Promise<number> {
 
 	const root = await git_command.repository_root()
 	const metrics = await measure(root)
+	const durations = await metrics_duration_probe.measure(root, parsed.is_startup_timed)
 
-	process.stdout.write(`${metrics_logic.render(metrics)}\n`)
+	const shown = metrics_durations.render(durations, parsed.is_startup_timed)
 
-	return parsed.reason === undefined ? check(root, metrics) : accept(root, metrics, parsed.reason)
+	process.stdout.write(`${metrics_logic.render(metrics)}\n${shown}\n`)
+
+	if (parsed.reason === undefined) return await check(root, metrics, durations)
+
+	return await accept(root, metrics, durations, parsed.reason)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

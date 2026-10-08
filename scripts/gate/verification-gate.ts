@@ -374,7 +374,9 @@ async function settle_gate(
 	const is_passed = failed_labels.length === 0
 
 	if (options.ledger_path !== undefined) {
-		await lane_ledger.record_gate(options.ledger_path, elapsed_ms, is_passed)
+		const unit_ms = results.find((result) => result.label === gate_plan.UNIT_LABEL)?.elapsed_ms
+
+		await lane_ledger.record_gate(options.ledger_path, elapsed_ms, is_passed, unit_ms)
 	}
 
 	if (!is_passed) return FAIL_EXIT_CODE

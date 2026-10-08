@@ -30,6 +30,8 @@ interface GateCheck {
 	label: string
 	// The `josh` sub-command that defines the check, and the one an appended argument belongs to.
 	target: string
+	// Arguments the gate always hands the target, before any appended one.
+	args?: ReadonlyArray<string>
 	// Cores this check holds for as long as it runs — the measured ratio above, floored to whole
 	// cores and never below one. Floored rather than rounded because this is the share the *other*
 	// checks must give up: over-reserving costs the elastic check workers it would have used.
@@ -109,9 +111,12 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 	// **The metrics ratchet is kit's own** (joshuafolkken/kit#3408): it holds kit's repository-wide
 	// totals to kit's baseline. It is one in-process eslint pass with only `max-lines` enabled, over
 	// in a few seconds, so it reserves no core for the reason the unused-member check above does not.
+	// It times no startup here: beside the unit suite that reads the load, not josh
+	// (joshuafolkken/kit#3409).
 	{
 		label: 'metrics',
 		target: 'metrics',
+		args: ['--no-startup'],
 		reserved_cores: 0,
 		memory_mb: core_budget.MEMORY_MB.eslint_scan,
 		is_kit_only: true,
