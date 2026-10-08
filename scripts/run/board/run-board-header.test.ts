@@ -33,6 +33,7 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		baseline_total: undefined,
 		plan_fetched_ms: undefined,
 		plan_failed_ms: undefined,
+		is_plan_loading: false,
 		machine: undefined,
 		spinner: undefined,
 		link: (reference) => reference,
@@ -139,6 +140,18 @@ describe('run_board_header.header_lines plan warning', () => {
 		const board = header({ plan_fetched_ms: NOW - MINUTE, plan_failed_ms: NOW })
 
 		expect(title_of(board)).toContain(`⚠ ${WORDS.plan} ${clock_of(NOW).slice(0, 5)}`)
+	})
+})
+
+// joshuafolkken/kit#3455: a plan read in flight turns the spinner after ⏳, on a terminal only.
+describe('run_board_header.header_lines plan loading', () => {
+	it('turns the spinner after ⏳ while the plan read is in flight', () => {
+		expect(title_of(header({ is_plan_loading: true, spinner: '⠙' }))).toContain(' ⏳ ⠙')
+	})
+
+	it('draws nothing for it once the read landed or where there is no spinner', () => {
+		expect(title_of(header({ is_plan_loading: false, spinner: '⠙' }))).not.toContain('⏳')
+		expect(title_of(header({ is_plan_loading: true, spinner: undefined }))).not.toContain('⏳')
 	})
 })
 

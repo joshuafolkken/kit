@@ -162,6 +162,7 @@ const HEADER_ICONS = {
 	swap: '💾',
 	progress: '📊',
 	ended: '🔚',
+	loading: '⏳',
 } as const
 
 // **The machine gauges' three colors, decided here alone** (joshuafolkken/kit#3464): Activity Monitor's

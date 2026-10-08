@@ -1,98 +1,35 @@
-import type { NamedPlan } from '#scripts/backlog/backlog-plan'
-import type { MachineSample } from '#scripts/gate/machine-capacity'
 import { run_progress } from '#scripts/run/progress/run-progress'
-import { run_progress_cli } from '#scripts/run/progress/run-progress-cli'
-import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
+import type { ClosedIssue } from './run-board-closed'
+import { run_board_github } from './run-board-github'
 import { run_board_header } from './run-board-header'
 import { run_board_labels, type Words } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
-import { run_board_link, type Link } from './run-board-link'
-import { run_board_machine, type MachineGauges, type MachineMark } from './run-board-machine'
+import { run_board_link } from './run-board-link'
+import { run_board_machine } from './run-board-machine'
 import { run_board_notes } from './run-board-notes'
 import type { LocalRead } from './run-board-read'
 import { run_board_render } from './run-board-render'
-import { run_board_status, type ItemStatus } from './run-board-status'
+import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
+import { run_board_status } from './run-board-status'
 
 // One `run:board` redraw (joshuafolkken/kit#3430). **Three speeds** (joshuafolkken/kit#3444): the frame
 // is redrawn every second so the elapsed times move; the run's own stream and lanes are re-read no more
 // often than `LOCAL_READ_MS`, because each read parses the whole stream and asks git twice, and a board
-// left open all night would otherwise grow heavier as the run grew longer; the plan they are laid over
-// is a GitHub read taken no more often than `run:progress` re-reads after a decline. Between reads the
-// last one is kept and drawn against the current time. A failed plan read keeps the previous plan on
-// screen and says when it failed. A run that ended stays on screen, its plan held as it last read,
-// until the next one starts (joshuafolkken/kit#3439). With no run in this checkout it reads nothing
-// from GitHub. The machine is sampled once a second (joshuafolkken/kit#3450): one `sysctl` takes a few
-// milliseconds, and its gauges are the differences between consecutive samples. **The redraw is four
-// times faster than every read** (joshuafolkken/kit#3452), so the spinner turns while nothing is read
-// any more often than it was.
+// left open all night would otherwise grow heavier as the run grew longer; the GitHub reads they are
+// laid over are `run-board-github.ts`'s, which a live board never waits on (joshuafolkken/kit#3455).
+// Between reads the last one is kept and drawn against the current time. A run that ended stays on
+// screen until the next one starts (joshuafolkken/kit#3439). With no run in this checkout it reads
+// nothing from GitHub. The machine is sampled once a second (joshuafolkken/kit#3450): one `sysctl`
+// takes a few milliseconds, and its gauges are the differences between consecutive samples. **The
+// redraw is four times faster than every read** (joshuafolkken/kit#3452), so the spinner turns while
+// nothing is read any more often than it was.
 
 const REDRAW_MS = run_board_labels.SPINNER_FRAME_MS
 const MACHINE_SAMPLE_MS = run_progress.MS_PER_SECOND
 const LOCAL_READ_SECONDS = 5
 const LOCAL_READ_MS = LOCAL_READ_SECONDS * run_progress.MS_PER_SECOND
-const PLAN_RETRY_MS = run_progress_cli.DECLINE_RETRY_SECONDS * run_progress.MS_PER_SECOND
-
-interface BoardPorts {
-	read_plan: (scope: NamedPlan) => Promise<BoardPlan | undefined>
-	// `undefined` when no run has started here.
-	read_local: () => Promise<LocalRead | undefined>
-	read_machine: () => Promise<MachineSample>
-	// The issues that answered as closed, and whether every issue answered (`run-board-closed.ts`).
-	read_closed: (issues: ReadonlyArray<number>) => Promise<ClosedAnswer>
-	now: () => number
-	write: (frame: string) => void
-	// Wraps an issue number in a hyperlink where the terminal opens one, and leaves it plain elsewhere.
-	link: Link
-	// Whether stdout is a terminal — only a terminal gets the alternate screen and the spinner.
-	is_tty: boolean
-	// Runs `leave` however the process ends: a normal exit, Ctrl+C or SIGTERM.
-	on_exit: (leave: () => void) => void
-	sleep: (ms: number) => Promise<void>
-}
-
-interface BoardState {
-	// The last local read, drawn until the next is due; `undefined` when no run had started.
-	local: LocalRead | undefined
-	read_ms: number | undefined
-	// The start of the run the plan state was built for, so a run that begins draws nothing of the last.
-	run_started_ms: number | undefined
-	plan: BoardPlan | undefined
-	attempted_ms: number | undefined
-	fetched_ms: number | undefined
-	failed_ms: number | undefined
-	baseline_total: number | undefined
-	// The run's children read closed, kept for the run: a closed issue's answer does not change.
-	closed: ReadonlyMap<number, ClosedIssue>
-	closed_attempted_ms: number | undefined
-	// The last ask every child answered, open or closed; a failed read leaves it where it was.
-	closed_answered_ms: number | undefined
-	// The last machine sample, which the next one is compared against, and the gauges drawn from them.
-	machine: MachineMark | undefined
-	gauges: MachineGauges | undefined
-	// The redraw the last sample was taken on, which the next sample is due a second after.
-	sampled_ms: number | undefined
-}
-
-const FRESH_STATE: BoardState = {
-	local: undefined,
-	read_ms: undefined,
-	run_started_ms: undefined,
-	plan: undefined,
-	attempted_ms: undefined,
-	fetched_ms: undefined,
-	failed_ms: undefined,
-	baseline_total: undefined,
-	closed: new Map(),
-	closed_attempted_ms: undefined,
-	closed_answered_ms: undefined,
-	machine: undefined,
-	gauges: undefined,
-	sampled_ms: undefined,
-}
-
-function is_due(last_ms: number | undefined, interval_ms: number, now_ms: number): boolean {
-	return last_ms === undefined || now_ms - last_ms >= interval_ms
-}
+const { FRESH_STATE, is_due } = run_board_state
+const { PLAN_RETRY_MS, gather_github, statuses_for } = run_board_github
 
 async function reread(state: BoardState, ports: BoardPorts, now_ms: number): Promise<BoardState> {
 	if (!is_due(state.read_ms, LOCAL_READ_MS, now_ms)) return state
@@ -113,13 +50,6 @@ async function resample(state: BoardState, ports: BoardPorts, now_ms: number): P
 	return { ...state, machine, gauges, sampled_ms: now_ms }
 }
 
-// A title the board once knew stays known, so an issue that left the open listing keeps its name.
-function with_titles(plan: BoardPlan, previous: BoardPlan | undefined): BoardPlan {
-	const titles = new Map([...(previous?.context.titles ?? []), ...plan.context.titles])
-
-	return { ...plan, context: { ...plan.context, titles } }
-}
-
 // The state of the run on screen; a different run starts its plan state from nothing, so no row, count
 // or baseline of the previous run is drawn over the new one (joshuafolkken/kit#3439).
 function state_for(state: BoardState, local: LocalRead): BoardState {
@@ -128,85 +58,6 @@ function state_for(state: BoardState, local: LocalRead): BoardState {
 	const { local: kept, read_ms } = state
 
 	return { ...FRESH_STATE, local: kept, read_ms, run_started_ms: local.started_ms }
-}
-
-// An ended run's plan is read until it lands once, then held: the board keeps that run's screen.
-function is_plan_due(state: BoardState, local: LocalRead, now_ms: number): boolean {
-	if (local.ended_ms !== undefined && state.fetched_ms !== undefined) return false
-
-	return is_due(state.attempted_ms, PLAN_RETRY_MS, now_ms)
-}
-
-async function refresh(
-	state: BoardState,
-	ports: BoardPorts,
-	local: LocalRead,
-	now_ms: number,
-): Promise<BoardState> {
-	if (!is_plan_due(state, local, now_ms)) return state
-
-	const plan = await ports.read_plan(local.scope)
-	const attempted = { ...state, attempted_ms: now_ms }
-
-	if (plan === undefined) return { ...attempted, failed_ms: now_ms }
-
-	return {
-		...attempted,
-		plan: with_titles(plan, state.plan),
-		fetched_ms: now_ms,
-		failed_ms: undefined,
-	}
-}
-
-function statuses_for(plan: BoardPlan, local: LocalRead): ReadonlyMap<number, ItemStatus> {
-	return run_board_status.statuses_of(local.events, local.lanes, run_board_layout.numbers_of(plan))
-}
-
-// The children the run touched that the open listing no longer holds and the board has not read yet
-// (joshuafolkken/kit#3451). A listing cut short proves nothing missing, so it asks about none.
-function unread_closed(state: BoardState, local: LocalRead): Array<number> {
-	const open = state.plan?.context.open_numbers
-
-	if (open === undefined || state.plan === undefined) return []
-
-	const touched = [...statuses_for(state.plan, local).keys()]
-
-	return touched.filter((issue) => !open.has(issue) && !state.closed.has(issue))
-}
-
-// An ended run asks until one ask after it ended has answered whole, then holds what it has, as its
-// plan is held: the board is left open between runs, so a child that never answers closed would
-// otherwise be asked about every retry interval while no run is going (joshuafolkken/kit#3438).
-function has_asked_since_end(state: BoardState, local: LocalRead): boolean {
-	const { closed_answered_ms } = state
-	if (closed_answered_ms === undefined || local.ended_ms === undefined) return false
-
-	return closed_answered_ms >= local.ended_ms
-}
-
-function is_closed_due(state: BoardState, local: LocalRead, now_ms: number): boolean {
-	if (has_asked_since_end(state, local)) return false
-
-	return is_due(state.closed_attempted_ms, PLAN_RETRY_MS, now_ms)
-}
-
-// Reads a closed child once and keeps the answer; one that has not answered closed is asked again no
-// sooner than the plan is, and an ended run's not again once an ask after the end has answered whole.
-async function read_closed(
-	state: BoardState,
-	ports: BoardPorts,
-	local: LocalRead,
-	now_ms: number,
-): Promise<BoardState> {
-	const unread = unread_closed(state, local)
-
-	if (unread.length === 0 || !is_closed_due(state, local, now_ms)) return state
-
-	const answer = await ports.read_closed(unread)
-	const closed = new Map([...state.closed, ...answer.closed])
-	const closed_answered_ms = answer.is_whole ? now_ms : state.closed_answered_ms
-
-	return { ...state, closed, closed_attempted_ms: now_ms, closed_answered_ms }
 }
 
 // The plan with a closed child's title under the listing's own.
@@ -257,6 +108,7 @@ function frame_of(
 		baseline_total: state.baseline_total,
 		plan_fetched_ms: state.fetched_ms,
 		plan_failed_ms: state.failed_ms,
+		is_plan_loading: state.plan_fetch !== undefined,
 		machine: state.gauges,
 		spinner: redraw.ports.is_tty ? run_board_labels.spinner_of(redraw.now_ms) : undefined,
 		link: run_board_link.linker(state.plan?.context.repo, redraw.ports.link),
@@ -282,8 +134,14 @@ function draw_run(state: BoardState, local: LocalRead, redraw: Redraw): BoardSta
 	return settled
 }
 
-// One redraw. No run reads nothing from GitHub and keeps the plan it had for when one starts.
-async function tick(state: BoardState, ports: BoardPorts, words: Words): Promise<BoardState> {
+// One redraw. No run reads nothing from GitHub and keeps the plan it had for when one starts. A live
+// board redraws at the `background` pace; one plain frame waits for the GitHub reads.
+async function tick(
+	state: BoardState,
+	ports: BoardPorts,
+	words: Words,
+	pace: Pace = 'settled',
+): Promise<BoardState> {
 	const now_ms = ports.now()
 	const read = await reread(state, ports, now_ms)
 	const { local } = read
@@ -294,10 +152,9 @@ async function tick(state: BoardState, ports: BoardPorts, words: Words): Promise
 		return read
 	}
 
-	const refreshed = await refresh(state_for(read, local), ports, local, now_ms)
-	const sampled = await resample(await read_closed(refreshed, ports, local, now_ms), ports, now_ms)
+	const gathered = await gather_github(state_for(read, local), { ports, local, now_ms, pace })
 
-	return draw_run(sampled, local, { ports, words, now_ms })
+	return draw_run(await resample(gathered, ports, now_ms), local, { ports, words, now_ms })
 }
 
 const run_board_tick = {
@@ -310,4 +167,3 @@ const run_board_tick = {
 }
 
 export { run_board_tick }
-export type { BoardPorts, BoardState }
