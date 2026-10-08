@@ -24,6 +24,8 @@ interface BoardHeader {
 	now_ms: number
 	words: Words
 	started_ms: number
+	// Set once the run has ended (joshuafolkken/kit#3439): the title then says when, and how long it took.
+	ended_ms: number | undefined
 	activity: RunActivity
 	layout: BoardLayout | undefined
 	// The total the board first saw, so arrivals since then read as `(+N)`.
@@ -93,15 +95,33 @@ function last_event_part(header: BoardHeader, is_running: boolean): string | und
 	return is_running && age > STALE_MS ? styleText('yellow', part) : part
 }
 
-function title_line(header: BoardHeader, running: number): string {
-	const { now_ms, started_ms, words } = header
-	const state = state_label(header, running)
+// A running run's age and cut-off, or an ended run's end and how long it took.
+function time_parts(header: BoardHeader): Array<string> {
+	const { now_ms, started_ms, ended_ms, words } = header
+
+	if (ended_ms !== undefined) {
+		const took = `${words.took} ${span_of(ended_ms - started_ms)}`
+
+		return [
+			`${words.started} ${clock_of(started_ms)}`,
+			`${words.ended_at} ${clock_of(ended_ms)} (${took})`,
+		]
+	}
+
 	const cutoff = started_ms + backlog_budget.WHOLE_RUN_BUDGET_MS
-	const parts = [
-		`backlogrun ${state}`,
+
+	return [
 		`${words.started} ${clock_of(started_ms)} (${span_of(now_ms - started_ms)})`,
 		`${words.cutoff} ${clock_of(cutoff)}`,
-		last_event_part(header, state === words.running),
+	]
+}
+
+function title_line(header: BoardHeader, running: number): string {
+	const state = state_label(header, running)
+	const parts = [
+		`backlogrun ${state}`,
+		...time_parts(header),
+		last_event_part(header, state === header.words.running),
 	]
 
 	return parts.filter((part) => part !== undefined).join(SEPARATOR)
