@@ -23,8 +23,9 @@ import { run_issue_number } from './run-issue-number'
 // exactly why the choice is not left to the moment — the same reason `josh delegate` and
 // `josh review:level` refuse to leave their answers to an agent.
 //
-// **The check is re-askable, which the claim it now gates deliberately is not.** A claim asked twice
-// answers `busy`, because the second ask is a second run. This check reads state and writes nothing,
+// **The check is re-askable, and so is the claim it now gates — but only by the same run.** A claim
+// asked again for the issue the record names answers `hold` (joshuafolkken/kit#3419); for any other
+// issue it answers `busy`, because that ask is a second run. This check reads state and writes nothing,
 // so the reclaim recovery ends by asking `run:hold` again on the tree it just cleaned.
 
 const CLEAN_VERDICT = 'clean'

@@ -19,6 +19,10 @@
 // one literal, so the list a child must not inherit and the selection that reads it cannot drift.
 const SESSION_ID_KEY = 'CLAUDE_CODE_SESSION_ID'
 
+// The pid of the agent session's own process, which a run hold records as its owner
+// (joshuafolkken/kit#3419).
+const AGENT_PID_KEY = 'CLAUDE_PID'
+
 const PARENT_SESSION_KEYS: ReadonlyArray<string> = [
 	'CLAUDE_CODE_MESSAGING_SOCKET',
 	'CLAUDE_CODE_MESSAGING_TOKEN',
@@ -176,6 +180,7 @@ function removed_proxy_environment(source: EnvironmentSource = process.env): Rem
 }
 
 const agent_session_environment = {
+	AGENT_PID_KEY,
 	LOOPBACK_HOSTS,
 	PARENT_SESSION_KEYS,
 	PROXY_CERTIFICATE_KEY,

@@ -110,15 +110,13 @@ describe('metrics_durations.from_ledger — solo gates', () => {
 	// joshuafolkken/kit#3409: only solo gates compare — a gate that overlapped another, failed or
 	// passed, ran under its load.
 	it('leaves out every gate whose span overlapped another gate', () => {
-		const solo = [6, 7, 8, 9, 10].map((minute) =>
-			gate_at(`2026-10-08T00:${String(minute).padStart(2, '0')}:00Z`, 50_000),
-		)
+		// Three overlapped gates sit among the last five, so counting them would move the median.
 		const entries = [
-			gate_at('2026-10-08T00:01:00Z', 60_000),
-			gate_at('2026-10-08T00:02:00Z', 90_000),
-			gate_at('2026-10-08T00:03:30Z', 60_000, false),
-			gate_at('2026-10-08T00:04:00Z', 40_000),
-			...solo,
+			...[10, 20, 30, 40].map((minute) => gate_at(`2026-10-08T00:${String(minute)}:00Z`, 50_000)),
+			gate_at('2026-10-08T00:45:00Z', 90_000),
+			gate_at('2026-10-08T00:45:30Z', 90_000, false),
+			gate_at('2026-10-08T00:46:00Z', 90_000),
+			gate_at('2026-10-08T00:50:00Z', 50_000),
 		]
 
 		expect(metrics_durations.from_ledger(entries)).toStrictEqual({ gate: 50_000, unit: 50_000 })
@@ -136,6 +134,19 @@ describe('metrics_durations.render', () => {
 
 	it('leaves the startups out when they were not timed', () => {
 		expect(metrics_durations.render(durations, false)).toBe('durations  gate 312.4s · unit —')
+	})
+})
+
+describe('metrics_durations.render_regressions', () => {
+	// joshuafolkken/kit#3409: the median trails a fix, so a fixed slowdown is not accepted as the bar.
+	it('says the gate median trails a fix by up to three gates', () => {
+		const text = metrics_durations.render_regressions(
+			[{ name: 'gate', baseline: BASELINE_MS, current: PAST_TOLERANCE_MS }],
+			'josh-metrics-durations.json',
+		)
+
+		expect(text).toContain('gate  baseline 1.0s → current 1.1s')
+		expect(text).toContain('trail a fix by up to 3 gates')
 	})
 })
 

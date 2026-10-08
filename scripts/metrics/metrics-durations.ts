@@ -27,6 +27,9 @@ const PERCENT = 100
 // by other work on the machine (a review, a related test run), few enough to follow a real change
 // within a day.
 const RECENT_GATES = 5
+// The gates after a fix that still read slow: until the fixed gates are the window's majority.
+const HALVES = 2
+const TRAILING_GATES = Math.floor(RECENT_GATES / HALVES) + 1
 const MS_PER_SECOND = 1000
 const SECONDS_DIGITS = 1
 const NEWLINE = '\n'
@@ -173,6 +176,7 @@ function render_regressions(regressions: ReadonlyArray<Change>, baseline_path: s
 			(change) =>
 				`  ${change.name}  baseline ${format(change.baseline)} → current ${format(change.current)}`,
 		),
+		`gate and unit trail a fix by up to ${String(TRAILING_GATES)} gates (the median of the last ${String(RECENT_GATES)} solo ones) — rerun the gate before accepting them.`,
 		'Find what slowed it, or record the current durations: pnpm josh metrics --accept --reason "<why>"',
 	].join(NEWLINE)
 }

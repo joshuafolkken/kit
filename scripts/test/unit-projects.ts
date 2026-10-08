@@ -36,6 +36,11 @@ const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test
 // **The detached ship supervisor's marks are blanked too** (joshuafolkken/kit#2456): the pre-push unit
 // run inherits `JOSH_SHIP_SUPERVISED` and `JOSH_AGENT_PROVIDER` from the supervisor that pushes, so a
 // ship fixture would take the supervised stop path — and try to relaunch a real lane child — only there.
+//
+// **The agent session's pid is blanked as well** (joshuafolkken/kit#3419): a claim records it as the
+// hold's owner, and the supervisor inherits it from a session that has usually ended by the time the
+// gate runs, so every hold a fixture writes would read back as `stale` there and nowhere else. A suite
+// about the owner stubs the pid it is testing.
 const PROXY_ENV: Record<string, string> = Object.fromEntries(
 	[...agent_session_environment.PROXY_KEYS, agent_session_environment.PROXY_CERTIFICATE_KEY].map(
 		(key) => [key, ''],
@@ -44,6 +49,7 @@ const PROXY_ENV: Record<string, string> = Object.fromEntries(
 
 const ENV: Record<string, string> = {
 	...PROXY_ENV,
+	[agent_session_environment.AGENT_PID_KEY]: '',
 	CLAUDE_CODE_SESSION_ID: 'vitest-session',
 	CODEX_THREAD_ID: '',
 	JOSH_AGENT_PROVIDER: '',

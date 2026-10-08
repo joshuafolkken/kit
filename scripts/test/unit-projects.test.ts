@@ -91,6 +91,12 @@ describe('each project carries the per-run environment and timeout', () => {
 		expect(env[run_ship_detach.SUPERVISED_KEY]).toBe('')
 		expect(env[agent_role_profile.HANDED_PROVIDER_KEY]).toBe('')
 	})
+
+	// joshuafolkken/kit#3419: a supervisor outliving its session would otherwise record a gone owner on
+	// every fixture's hold, which then reads back as stale.
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the agent session pid for %s', (name) => {
+		expect(project(name).env[agent_session_environment.AGENT_PID_KEY]).toBe('')
+	})
 })
 
 // The state guard belongs to the pure project alone: isolate:false is the only run a leaked branch or

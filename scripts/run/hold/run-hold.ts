@@ -1,4 +1,6 @@
 import { git_command } from '#scripts/git/git-command'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
 import { z } from 'zod'
@@ -57,6 +59,12 @@ interface RunHold {
 	// commit the green pull request stood on, so `fullrun #N` can tell an untouched branch — merge it —
 	// from one that moved since and has to pass the gate and the review again.
 	prrun_stop_head?: string | undefined
+	// The agent session the claim ran under (joshuafolkken/kit#3419) — `pid` is the short-lived `josh
+	// run:hold` itself, gone before anything reads it back, so it can never say whether the run is still
+	// there. The pair with its start time is the identity `process-identity.ts` defines. Optional for a
+	// record written before these fields, or by a claim made outside an agent session.
+	owner_pid?: number | undefined
+	owner_start?: string | undefined
 }
 
 type HoldRead =
@@ -98,6 +106,8 @@ const run_hold_schema = z.object({
 	is_fullrun: z.boolean().optional(),
 	is_halfrun_stop: z.boolean().optional(),
 	prrun_stop_head: z.string().optional(),
+	owner_pid: z.number().optional(),
+	owner_start: z.string().optional(),
 })
 
 // `undefined` for anything that is not a well-formed record, so the caller decides what a broken one
@@ -117,12 +127,29 @@ function parse_hold(raw: string): RunHold | undefined {
 // state the expiry exists to make impossible. Fail-closed is still the answer for the *tree*: a stale
 // record only lets a claim through once `run-hold-cli.ts`'s `blocking_message` has also found the
 // tree clean.
-function is_stale(hold: RunHold, now: Date): boolean {
+function is_expired(hold: RunHold, now: Date): boolean {
 	const taken = Date.parse(hold.taken_at)
 
 	if (Number.isNaN(taken)) return true
 
 	return now.getTime() - taken > HOLD_MAX_AGE_MS
+}
+
+// **A record whose session has ended is stale before its age says so** (joshuafolkken/kit#3419): the run
+// that wrote it cannot release it any more, so waiting out the eight hours only stops the next run for
+// nothing. Only a recorded session that is provably gone counts — no owner, or a live pid whose start
+// cannot be read, leaves the age as the whole test. **A stop-marked record is exempt**: a `halfrun` or
+// `prrun` stop is held across a person's latency on purpose, long after its session ends.
+function is_owner_gone(hold: RunHold): boolean {
+	const is_stop_mark = hold.is_halfrun_stop === true || hold.prrun_stop_head !== undefined
+
+	if (is_stop_mark || hold.owner_pid === undefined) return false
+
+	return process_identity.is_same_process(hold.owner_pid, hold.owner_start) === false
+}
+
+function is_stale(hold: RunHold, now: Date): boolean {
+	return is_expired(hold, now) || is_owner_gone(hold)
 }
 
 // **A record that cannot be read is `unreadable`, never `free`.** Absent is free; present and
@@ -142,8 +169,22 @@ function read_hold(target: string, now: Date = new Date()): HoldRead {
 	return classify(stamp_file.read_stamp_text(target), now)
 }
 
+type Environment = Readonly<Record<string, string | undefined>>
+type SessionOwner = Pick<RunHold, 'owner_pid' | 'owner_start'>
+
+// The agent session's own process, which Claude Code exports to every command it runs. Absent or
+// malformed is no owner at all, never a guess at an ancestor: a wrong owner read as gone frees a live
+// run's tree, which is the one failure this guard exists to prevent.
+function session_owner(environment: Environment = process.env): SessionOwner {
+	const pid = Number(environment[agent_session_environment.AGENT_PID_KEY])
+
+	if (!Number.isSafeInteger(pid) || pid <= 0) return {}
+
+	return { owner_pid: pid, owner_start: process_identity.read_start(pid) }
+}
+
 function build_hold(issue: string, now: Date, is_fullrun?: boolean): RunHold {
-	return { issue, taken_at: now.toISOString(), pid: process.pid, is_fullrun }
+	return { issue, taken_at: now.toISOString(), pid: process.pid, is_fullrun, ...session_owner() }
 }
 
 function write_hold(target: string, issue: string, now: Date = new Date()): RunHold {
@@ -208,14 +249,14 @@ function release_hold(target: string): void {
 	stamp_file.remove_stamp(target)
 }
 
-// The pid is recorded for the person reading the stop message, never as the liveness test: the process
-// that claims the tree is a short-lived `josh run:hold`, so it has exited by the time anything reads
-// the record back. Age is what expires a record; `pnpm josh run:release --force` is what clears
-// somebody else's early, and `pnpm josh run:release <N>` what the run that wrote it types.
+// The pid named is the session's where the record has one (joshuafolkken/kit#3419): the claiming `josh
+// run:hold` has exited by the time anything reads the record back, so its own pid tells a person
+// nothing. Age or an ended session is what expires a record; `pnpm josh run:release --force` is what
+// clears somebody else's early, and `pnpm josh run:release <N>` what the run that wrote it types.
 function describe_holder(hold: RunHold): string {
 	const holder = hold.issue === UNNUMBERED_ISSUE ? 'an unnumbered run' : `#${hold.issue}`
 
-	return `${holder}, recorded ${hold.taken_at} (pid ${String(hold.pid)})`
+	return `${holder}, recorded ${hold.taken_at} (pid ${String(hold.owner_pid ?? hold.pid)})`
 }
 
 // The command the run that *wrote* a record types to remove it — the claim's own spelling, mirrored,
@@ -230,6 +271,13 @@ function own_release_command(issue: string): string {
 // recorded owner against a declared one for the same reason; what differs is only who the owner is.
 function is_own_hold(hold: RunHold, claimant: string): boolean {
 	return hold.issue === claimant
+}
+
+// **A claim for the issue the record already names is the same run asking again** (joshuafolkken/kit#3419)
+// — a second `run:entry` in one session answered `busy` to its own hold and parked the run. The
+// unnumbered `new` claim names no run, so two of them are still two runs.
+function is_reentry(hold: RunHold, claimant: string): boolean {
+	return claimant !== UNNUMBERED_ISSUE && is_own_hold(hold, claimant)
 }
 
 function held_message(hold: RunHold): string {
@@ -252,11 +300,15 @@ function unreadable_message(): string {
 }
 
 function stale_message(hold: RunHold): string {
-	return `Replaced a stale run record held by ${describe_holder(hold)}: older than ${String(HOLD_MAX_AGE_HOURS)} hours, so the run that wrote it has ended without releasing it.`
+	const why = is_owner_gone(hold)
+		? 'the session that wrote it has ended'
+		: `older than ${String(HOLD_MAX_AGE_HOURS)} hours`
+
+	return `Replaced a stale run record held by ${describe_holder(hold)}: ${why}, so the run that wrote it has ended without releasing it.`
 }
 
 function uncommitted_message(hold: RunHold): string {
-	return `This working tree still has uncommitted changes, and its run record — held by ${describe_holder(hold)} — has expired. That is a run which stopped for a person rather than one that finished, so the tree is not free: commit or stash the work, or run \`${own_release_command(hold.issue)}\` once you are done with it, then ask again.`
+	return `This working tree still has uncommitted changes, and its run record — held by ${describe_holder(hold)} — has expired or outlived its session. That is a run which stopped for a person rather than one that finished, so the tree is not free: commit or stash the work, or run \`${own_release_command(hold.issue)}\` once you are done with it, then ask again.`
 }
 
 // The exclusive claim lost: another process wrote the record between this one's read and its write.
@@ -292,6 +344,7 @@ const run_hold = {
 	hold_path,
 	is_linked_worktree,
 	is_own_hold,
+	is_reentry,
 	is_tree_dirty,
 	own_release_command,
 	race_message,
