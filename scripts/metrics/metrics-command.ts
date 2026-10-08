@@ -1,7 +1,8 @@
 #!/usr/bin/env tsx
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { skill_meta } from '#scripts/claude/skill-meta'
 import { git_command } from '#scripts/git/git-command'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { file_reader } from '#scripts/lib/read-file'
@@ -9,7 +10,7 @@ import { line_targets } from '#scripts/lines/line-targets'
 import { metrics_code_lines } from './metrics-code-lines'
 import { metrics_duration_probe } from './metrics-duration-probe'
 import { metrics_durations, type Durations } from './metrics-durations'
-import { metrics_logic, type Metrics, type ScriptFile } from './metrics-logic'
+import { metrics_logic, type AiCostTotals, type Metrics, type ScriptFile } from './metrics-logic'
 import { metrics_ratchet, type Baseline, type Verdict } from './metrics-ratchet'
 
 // `josh metrics [--accept --reason "<why>"]` — the I/O around `metrics-logic.ts` and
@@ -33,6 +34,8 @@ const ACCEPT_ARGUMENT_COUNT = 3
 const FAILURE_EXIT_CODE = 1
 const BASELINE_PATH = '.josh/metrics-baseline.json'
 const RESIDENT_RULES = 'CLAUDE.md'
+// The instruction files an agent loads at the start of every session — Claude Code, Codex, Gemini.
+const RESIDENT_DOCUMENTS: ReadonlyArray<string> = [RESIDENT_RULES, 'AGENTS.md', 'GEMINI.md']
 const RULES_DIR = 'prompts'
 const MARKDOWN_EXTENSION = '.md'
 const ENCODING = 'utf8'
@@ -82,19 +85,49 @@ async function script_files(root: string): Promise<ReadonlyArray<ScriptFile>> {
 	return [...counts].map(([file_path, code_lines]) => ({ text: read_text(file_path), code_lines }))
 }
 
-function rule_paths(root: string): ReadonlyArray<string> {
-	const prompts = readdirSync(path.join(root, RULES_DIR), { recursive: true, withFileTypes: true })
+// A directory the tree does not hold yields nothing: the gate's kit fixture carries no skills.
+function markdown_paths(directory: string): ReadonlyArray<string> {
+	if (!existsSync(directory)) return []
+
+	return readdirSync(directory, { recursive: true, withFileTypes: true })
 		.filter((entry) => entry.isFile() && entry.name.endsWith(MARKDOWN_EXTENSION))
 		.map((entry) => path.join(entry.parentPath, entry.name))
+}
 
-	return [path.join(root, RESIDENT_RULES), ...prompts]
+function read_texts(paths: ReadonlyArray<string>): ReadonlyArray<string> {
+	return paths.flatMap((file) => file_reader.read_if_readable(file) ?? [])
+}
+
+function skill_descriptions(skill_documents: ReadonlyArray<string>): ReadonlyArray<string> {
+	const entries = skill_documents.filter(
+		(file) => path.basename(file) === skill_meta.SKILL_ENTRY_FILE,
+	)
+
+	return read_texts(entries).map((text) => skill_meta.description_of(text))
+}
+
+function ai_cost(root: string, prompts: ReadonlyArray<string>): AiCostTotals {
+	const documents = read_texts(RESIDENT_DOCUMENTS.map((file) => path.join(root, file)))
+	const skill_documents = markdown_paths(path.join(root, skill_meta.SKILL_ROOT))
+
+	return metrics_logic.ai_cost_totals(
+		[...documents, ...skill_descriptions(skill_documents)],
+		read_texts([...prompts, ...skill_documents]),
+	)
 }
 
 async function measure(root: string): Promise<Metrics> {
 	const scripts = metrics_logic.script_totals(await script_files(root))
-	const rules = metrics_logic.rule_totals(rule_paths(root).map((file) => read_text(file)))
+	const prompts = markdown_paths(path.join(root, RULES_DIR))
+	const rule_texts = read_texts([path.join(root, RESIDENT_RULES), ...prompts])
+	const guards = metrics_logic.guard_count(Object.keys(COMMAND_MAP))
 
-	return { scripts, rules, guards: metrics_logic.guard_count(Object.keys(COMMAND_MAP)) }
+	return {
+		scripts,
+		rules: metrics_logic.rule_totals(rule_texts),
+		guards,
+		ai_cost: ai_cost(root, prompts),
+	}
 }
 
 function write_baseline(root: string, baseline: Baseline): void {

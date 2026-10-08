@@ -121,6 +121,10 @@ const KIT_METRICS_BASELINE = metrics_logic.baseline_text({
 	scripts: metrics_logic.script_totals([]),
 	rules: metrics_logic.rule_totals(KIT_RULES.map(([, text]) => text)),
 	guards: metrics_logic.guard_count(Object.keys(COMMAND_MAP)),
+	ai_cost: metrics_logic.ai_cost_totals(
+		KIT_RULES.filter(([file]) => file === 'CLAUDE.md').map(([, text]) => text),
+		KIT_RULES.filter(([file]) => file.startsWith('prompts/')).map(([, text]) => text),
+	),
 })
 
 const KIT_FILES: ReadonlyArray<FixtureFile> = [
