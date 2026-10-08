@@ -170,7 +170,7 @@ source; what follows is this entry's branch.
 1. File the prerequisite Issue `<N>` with the `route:tier-a` label — Tier A for a first-party
    repository, no confirmation. It is filed **first** because the next step names it.
 2. **Stash the work in progress.** A child is implemented on the default branch with an uncommitted tree,
-   so `<M>`'s half-finished edits are sitting there, and the next child's `git switch main && git pull`
+   so `<M>`'s half-finished edits are sitting there, and the next child's `pnpm josh ms`
    would refuse or carry them into the prerequisite's branch and PR.
 
    ```bash
@@ -181,7 +181,7 @@ source; what follows is this entry's branch.
    **`-u` is not optional** (a new `*.test.ts` is untracked). The comment makes the paused state
    auditable and tells the session that resumes `<M>` a stash is waiting. **Pop it by message, never by
    position** — `pnpm josh stash:pop "backlogrun: paused #<M> for prerequisite #<N>"` — when `epic:next`
-   offers `<M>` again, after its `git switch main && git pull`. The stash is a repository-wide stack
+   offers `<M>` again, after its `pnpm josh ms`. The stash is a repository-wide stack
    every lane shares, so a bare `git stash pop` would take whichever lane last pushed; the message
    targets this one. The prerequisite has merged by then, so expect to resolve conflicts.
 

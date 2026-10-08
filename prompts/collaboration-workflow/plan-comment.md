@@ -20,7 +20,7 @@
    ```
 5. メインブランチへ切り替えて最新を取得する:
    ```bash
-   git switch main && git pull
+   pnpm josh ms
    ```
 6. 依存関係の更新はコマンドに問う — `pnpm josh latest:scope` が `required` と答えたときだけ `pnpm josh latest` を実行し、`dependency-update` スキルに従う（単一ソースは `.claude/skills/workflow-commands/latest-gate.md`）。脆弱性への override は `pnpm-workspace.yaml` の `overrides` に書く（pnpm 11/12 は `package.json` の `pnpm.overrides` を無視する）。
    ステップ 4 で stash した場合は、ここでメッセージ指定で復元する（stash は全 work tree が共有するため、位置指定や引数なしの `git stash pop` は使わない — joshuafolkken/kit#2050）:

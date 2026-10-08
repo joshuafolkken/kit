@@ -20,7 +20,7 @@ what is `halfrun`'s own.
 ## The step list
 
 `halfrun #<N>`: read Issue #N and its comments → **normalize the title** (same as
-`fullrun`) → post the agreed plan only if the body is blank → `git switch main && git pull`, then `pnpm
+`fullrun`) → post the agreed plan only if the body is blank → `pnpm josh ms`, then `pnpm
 josh latest:scope` and update dependencies only on `required` (`latest-gate.md`; the
 `dependency-update` skill) → implement → run the **full verification gate** (refactor →
 start `pnpm josh gate` beside a subagent `/code-review` with the brief `pnpm josh review:brief` prints,
@@ -47,6 +47,6 @@ mirror `fullrun new` (1)–(8): derive an English title (or use the provided one
 any pre-existing changes with `git stash push -m "halfrun new: pre-existing changes" -- ':!.josh/observations'`
 (the pathspec keeps the observation ledger in the tree for this run's commit; joshuafolkken/kit#2919), popped by
 message with `pnpm josh stash:pop "halfrun new: pre-existing changes"`, never a positional `git stash pop` →
-`git switch main && git pull` → `pnpm josh latest:scope` → implement → run the gate (as above, `pnpm
+`pnpm josh ms` → `pnpm josh latest:scope` → implement → run the gate (as above, `pnpm
 josh test:e2e` run by **you**) → `pnpm josh run:hold <N> --halfrun-stop` → send the `confirmation`
 Telegram and **stop**.

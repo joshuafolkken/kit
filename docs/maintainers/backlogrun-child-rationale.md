@@ -85,7 +85,7 @@ window is told `skip`, one resumed a day later `required`.
 
 An unattended run ends abnormally — a crash, a Ctrl-C, a laptop asleep, an expired token — and what it
 leaves is a working tree: a feature branch, an open pull request, uncommitted changes. The loop opens
-every child with `git switch main && git pull`, which refuses over a dirty tree, while an agent may not
+every child with `pnpm josh ms`, whose checkout refuses over a dirty tree, while an agent may not
 reach for `git stash` on its own judgement. Without the preflight an unattended batch could not recover
 from its own crash.
 

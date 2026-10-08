@@ -41,7 +41,7 @@ run in lanes".
    once a lane comes free rather than once the last child returns. Either way the child runs as
    `fullrun #<N>` does, **in a delegated unit where one is available** (`pnpm josh delegate epic-child`
    → `delegate`) and **in this session's own context where none is**, **except that `josh latest` is
-   not run** and **no progress watcher is started**. `git switch main && git pull` runs per child in
+   not run** and **no progress watcher is started**. `pnpm josh ms` runs per child in
    whichever context implements it, **and again in this session afterwards** when the child was
    delegated. **In a lane the child cannot run it at all**, so it is the parent's, immediately before
    that lane's `lane:open`.

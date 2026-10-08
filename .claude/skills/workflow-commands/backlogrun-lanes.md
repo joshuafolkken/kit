@@ -114,7 +114,7 @@ costs a resolution, a re-run gate and a review (`backlogrun-recovery.md` → "Co
 
 In the **primary checkout**, in this order, and never again per lane:
 
-1. `git switch main && git pull` — every lane branches from this ref.
+1. `pnpm josh ms` — every lane branches from this ref.
 2. `pnpm josh latest:scope`, and the update on `required` — `backlogrun-child.md` → "`josh latest`
    runs once per session, not once per child".
 3. `pnpm josh lane:prune` — closes lanes left without a work tree, sweeps unregistered leftovers.
@@ -207,7 +207,7 @@ delegated unit that stopped without reporting" applied N times, and `pnpm josh r
 child is there, `none` where it is not, and never `alive` merely because the child was dispatched. The
 command line carries no path; the `$` anchor keeps `#12` from matching a running `#123`.
 
-**`git switch main && git pull` is the parent's now, not the child's.** No lane can switch to the
+**`pnpm josh ms` is the parent's now, not the child's.** No lane can switch to the
 default branch, so the refresh moves to the primary checkout **before each `lane:open`** — the ref the
 lane is cut from.
 

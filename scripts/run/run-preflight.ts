@@ -15,7 +15,7 @@ import { run_issue_number } from './run-issue-number'
 // and it is about the run that never said anything again: an unattended run ends abnormally — a
 // crash, a Ctrl-C, a laptop asleep, an expired token — and leaves its feature branch, its open pull
 // request and its uncommitted changes behind. Every child of an `epicrun` starts with
-// `git switch main && git pull`, which refuses over a dirty tree, and an agent may not reach for
+// `pnpm josh ms`, whose checkout refuses over a dirty tree, and an agent may not reach for
 // `git stash` on its own judgement, so the batch could not recover without a person.
 //
 // **The rule answers, so the run does not judge.** "There is a branch already, I will carry on from
@@ -157,7 +157,7 @@ function to_reason(verdict: PreflightVerdict, tree: TreeState, child: ChildState
 }
 
 // **`-u` is not optional.** What an interrupted run leaves almost always includes a new `*.test.ts`,
-// which is untracked, and a stash without it leaves exactly those files for the `git switch` that
+// which is untracked, and a stash without it leaves exactly those files for the checkout that
 // follows to refuse over. **And the stash is recorded rather than popped**, which is what sets this
 // stash apart from every other sanctioned one: the work belongs to a run that is gone, so the Issue
 // comment is the only thing that can ever bring it back.
@@ -177,7 +177,7 @@ function reclaim_steps(tree: TreeState, issue: string): Array<string> {
 function reclaim_advice(tree: TreeState, issue: string): string {
 	return [
 		...reclaim_steps(tree, issue),
-		`git switch ${tree.default_branch} && git pull`,
+		'pnpm josh ms',
 		'Then ask this command again: it is re-askable, and the clean tree gets its own answer.',
 	].join('\n')
 }

@@ -4,6 +4,7 @@ import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-c
 import { error_text } from '#scripts/lib/error-message'
 import { git_command } from './git-command'
 import { gone_branch, type PruneResult } from './gone-branch'
+import { lockfile_sync } from './lockfile-sync'
 
 // `josh main:sync` (`josh ms`) — return this checkout to the default branch and pull
 // (joshuafolkken/kit#1535), then prune the local branches whose merged remote branch is gone
@@ -28,6 +29,8 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const COMMAND_NAME = 'main:sync'
+const INSTALL_FAILURE =
+	'node_modules is behind pnpm-lock.yaml and `pnpm install --frozen-lockfile` failed; run `pnpm josh ms` again, or the install here by hand.'
 
 // `git_directories()` returns `[--absolute-git-dir, --git-common-dir]`. They are the same path in the
 // main work tree and differ in a linked one, which is git's own definition of the distinction rather
@@ -87,6 +90,18 @@ async function fast_forward_quietly(default_branch: string): Promise<void> {
 	}
 }
 
+// A pull that changed the lock leaves `node_modules` behind it, and every `josh` typed in this checkout
+// then fails to load the new dependency (joshuafolkken/kit#3463) — so the install the lock now asks for
+// is part of the sync, and its failure is the sync's. A failed one is retried by the next `ms`.
+async function reinstall(root: string): Promise<number> {
+	const result = await lockfile_sync.reinstall_if_stale(root)
+
+	if (result.is_installed) return SUCCESS_EXIT_CODE
+	console.error(`${INSTALL_FAILURE}\n${result.output}`)
+
+	return FAILURE_EXIT_CODE
+}
+
 async function synchronize(): Promise<number> {
 	const default_branch = await git_command.get_default_branch()
 
@@ -96,7 +111,7 @@ async function synchronize(): Promise<number> {
 	await prune_quietly(default_branch)
 	console.info(default_branch)
 
-	return SUCCESS_EXIT_CODE
+	return await reinstall(await git_command.repository_root())
 }
 
 // The argument refusal is kept even though this is no longer an `sh -c` entry: the message is the
