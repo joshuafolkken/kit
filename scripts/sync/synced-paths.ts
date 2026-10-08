@@ -29,6 +29,7 @@ const SYNCED_CONFIG_PATHS: ReadonlyArray<string> = [
 	'.secretlintrc.json',
 	'.vscode/extensions.json',
 	'.vscode/settings.json',
+	'.vscode/tasks.json',
 ]
 
 // **`package.json` is deliberately absent.** `sync` does not overwrite it — it realigns one field,

@@ -7,6 +7,7 @@ import { init_logic } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
 import type { ProjectShape } from './project-profile'
 import { session_language_environment } from './session-language-environment'
+import { vscode_tasks } from './vscode-tasks'
 
 const PRETTIER_CONFIG_JS = 'prettier.config.js'
 const BASIC_PRETTIER_CONFIG = 'prettier.config.mjs'
@@ -38,6 +39,17 @@ function build_action(destination: string, create: () => string, merge: MergeFun
 	return { dest: destination, create, merge }
 }
 
+function build_vscode_tasks_action(): FileAction {
+	const tasks_path = path.join('.vscode', vscode_tasks.VSCODE_TASKS_FILENAME)
+	const kit_tasks = vscode_tasks.read_kit_tasks(read_package_file(tasks_path))
+
+	return build_action(
+		tasks_path,
+		() => read_package_file(tasks_path),
+		(existing) => vscode_tasks.merge_tasks(existing, kit_tasks),
+	)
+}
+
 function build_vscode_actions(): ReadonlyArray<FileAction> {
 	const extensions_path = path.join('.vscode', init_logic.VSCODE_EXTENSIONS_FILENAME)
 	const settings_path = path.join('.vscode', init_logic.get_vscode_settings_filename())
@@ -61,6 +73,7 @@ function build_vscode_actions(): ReadonlyArray<FileAction> {
 				init_logic.strip_kit_only_vscode_settings_content(read_package_file(settings_path)),
 			merge: (existing) => init_logic.merge_json_object(existing, settings_data),
 		},
+		build_vscode_tasks_action(),
 	]
 }
 

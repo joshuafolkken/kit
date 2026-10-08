@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 973,
-		"code_lines": 80509,
-		"comment_lines": 32858,
+		"files": 975,
+		"code_lines": 80638,
+		"comment_lines": 32876,
 		"comment_ratio": 0.41
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12231,
-		"on_demand_bytes": 558074
+		"on_demand_bytes": 558168
 	},
 	"accepted": {
-		"reason": "Add the AI-cost byte totals (resident and on-demand) to the ratchet and rewrite quality-priority as three tiers #3428",
+		"reason": "Merge origin/main (#3428 AI-cost totals) into the .vscode/tasks.json distribution through josh sync/init (#3420)",
 		"date": "2026-10-08"
 	}
 }

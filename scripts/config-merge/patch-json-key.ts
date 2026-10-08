@@ -441,6 +441,9 @@ const patch_json_key = {
 	set_json_key,
 	remove_json_key,
 	remove_json_path,
+	eol_of,
+	fit_value,
+	line_indent,
 }
 
 export { patch_json_key }

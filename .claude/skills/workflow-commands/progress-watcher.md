@@ -56,7 +56,8 @@ missing, say so. **A field's empty value is an observation, never a state** (`re
 
 **The heartbeat is ambient, never a Telegram.** `pnpm josh run:event --watch` is its reader, in a pane
 of the person's own; **no session relays the stream** — name the watch command once, at the first cut
-or when asked. `pnpm josh run:wake --list` is the one-line read for a person who types for it.
+or when asked; `.vscode/tasks.json` starts it on folder open once VSCode's automatic-task prompt is
+allowed. `pnpm josh run:wake --list` is the one-line read for a person who types for it.
 
 **A stop is the only interrupt** (joshuafolkken/kit#2136): a `backlogrun` that has stopped ends with
 `pnpm josh run:carry --end --stopped "<reason>"`, which sends one ⏸️ confirmation; a parked child sends
