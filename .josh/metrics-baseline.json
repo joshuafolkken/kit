@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1001,
-		"code_lines": 82923,
-		"comment_lines": 33397,
+		"code_lines": 82947,
+		"comment_lines": 33409,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12231,
-		"on_demand_bytes": 558792
+		"on_demand_bytes": 558853
 	},
 	"accepted": {
-		"reason": "#3463 adds lockfile-sync (reinstall the primary checkout's dependencies when a main sync changes pnpm-lock.yaml) and wires it into main:sync, merged over #3459's run:board label reading, #3460's run-board-track and #3454's run_headless.is_cut_capped",
+		"reason": "#3463 adds lockfile-sync (reinstall the primary checkout's dependencies when a main sync changes pnpm-lock.yaml) and wires it into main:sync; re-accepted after merging origin/main (#3438 run:board workspace auto-start, #3459 run:board label-driven stopped lanes, #3454 run_headless.is_cut_capped)",
 		"date": "2026-10-08"
 	}
 }

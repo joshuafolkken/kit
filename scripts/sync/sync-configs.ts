@@ -143,9 +143,10 @@ function sync_vscode_settings_json(destination_path: string): void {
 	)
 }
 
-// Creates the file when absent, unlike the other `.vscode` syncs: the folder-open watch task is the
-// whole point of distributing it (joshuafolkken/kit#3420), and a consumer without a tasks.json has
-// nothing of its own to protect. An existing file keeps every task whose label kit does not ship.
+// Creates the file when absent, unlike the other `.vscode` syncs: the folder-open board task is the
+// whole point of distributing it (joshuafolkken/kit#3420, joshuafolkken/kit#3438), and a consumer
+// without a tasks.json has nothing of its own to protect. An existing file keeps every task whose
+// label kit does not ship.
 function sync_vscode_tasks_json(destination_path: string): void {
 	const kit_content = readFileSync(
 		path.join(PACKAGE_DIR, '.vscode', vscode_tasks.VSCODE_TASKS_FILENAME),

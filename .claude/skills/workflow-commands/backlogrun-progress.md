@@ -220,7 +220,7 @@ ever.
   everything the session has, then run `pnpm josh run:carry --cut --owner "$PPID"`. **Unless it answers
   `capped`** (below), the `pnpm josh run:wake` driver starts at its next poll even while this session
   lives on, and polls the still-running lanes from `lane:list`. Post the progress comment naming **every lane in flight and the path each
-  records**, name `pnpm josh run:event --watch` for a pane, and end the turn — nothing is relayed (#2492).
+  records**, name `pnpm josh run:board` for a pane, and end the turn — nothing is relayed (#2492).
   `backlogrun-steps.md` → "The session cut is inside the invocation" is the single source of the
   carry; this reading is only where the cut is *taken*.
 - **`capped`** — the invocation has taken its `MAX_CUTS` cuts (joshuafolkken/kit#2346), so `--cut`

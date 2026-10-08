@@ -238,7 +238,7 @@ describe('josh run:wake --list — the ambient surface across the cut', () => {
 		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, NOW))
 
 		expect(await run_wake_cli.run(['--list'])).toBe(SUCCESS)
-		expect(errors.join('\n')).toContain('pnpm josh run:event --watch')
+		expect(errors.join('\n')).toContain('pnpm josh run:board')
 		expect(errors.join('\n')).not.toContain('run:event --follow')
 		expect(errors.join('\n')).toContain(`tail -F ${event_target()}`)
 	})
