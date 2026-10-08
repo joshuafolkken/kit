@@ -44,7 +44,7 @@ describe('run_board_cli.run', () => {
 		await run_board_cli.run(['--once'], { ...ports, is_tty: true })
 
 		expect(stripVTControlCharacters(frames[0] ?? '')).toMatch(/^▶ backlogrun/u)
-		expect(frames[0]).toContain('  🔄 1  a')
+		expect(frames[0]).toContain('  🔍 1  a')
 	})
 })
 
