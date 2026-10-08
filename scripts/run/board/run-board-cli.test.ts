@@ -18,17 +18,26 @@ function plan_titled(title: string): BoardPlan {
 	}
 }
 
+const ESCAPE = '\u{1B}'
+const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l`
+const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
+const STOPPED = new Error('stopped')
+
 interface Harness {
 	ports: BoardPorts
 	frames: Array<string>
 	read_plan: ReturnType<typeof vi.fn<() => Promise<BoardPlan | undefined>>>
 	clock: { now_ms: number }
+	leaves: Array<() => void>
 }
 
+// `sleep` lets one redraw through, then stops the loop the way an interrupt would.
 function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefined>): Harness {
 	const frames: Array<string> = []
+	const leaves: Array<() => void> = []
 	const clock = { now_ms: START }
 	const read_plan = vi.fn(async () => plans.shift())
+	let slept = 0
 	const ports: BoardPorts = {
 		read_plan,
 		read_local: async () => local,
@@ -36,9 +45,17 @@ function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefine
 		write: (frame) => {
 			frames.push(frame)
 		},
+		is_tty: true,
+		on_exit: (leave) => {
+			leaves.push(leave)
+		},
+		sleep: async () => {
+			slept += 1
+			if (slept > 1) throw STOPPED
+		},
 	}
 
-	return { ports, frames, read_plan, clock }
+	return { ports, frames, read_plan, clock, leaves }
 }
 
 describe('run_board_cli.tick', () => {
@@ -86,5 +103,51 @@ describe('run_board_cli.run', () => {
 		await expect(run_board_cli.run(['--bogus'], ports)).resolves.toBe(1)
 		expect(frames).toHaveLength(1)
 		stderr.mockRestore()
+	})
+
+	it.each([
+		{ argv: ['--once'], is_tty: true },
+		{ argv: [], is_tty: false },
+	])('writes one plain frame for $argv on tty $is_tty', async ({ argv, is_tty }) => {
+		const { ports, frames, leaves } = harness(undefined, [])
+
+		await expect(run_board_cli.run(argv, { ...ports, is_tty })).resolves.toBe(0)
+		expect(frames).toHaveLength(1)
+		expect(frames[0]).not.toContain(ESCAPE)
+		expect(leaves).toHaveLength(0)
+	})
+})
+
+// joshuafolkken/kit#3441: a terminal gets the alternate screen and has it restored on every exit path.
+describe('run_board_cli.run screen', () => {
+	it('enters the alternate screen, starts every frame at the top and leaves once a redraw fails', async () => {
+		const { ports, frames, leaves } = harness(undefined, [])
+
+		await expect(run_board_cli.run([], ports)).rejects.toBe(STOPPED)
+		expect(frames[0]).toBe(ENTER)
+		expect(frames.slice(1, -1).map((frame) => frame.split('backlogrun', 1)[0])).toStrictEqual([
+			`${ESCAPE}[H${ESCAPE}[J`,
+			`${ESCAPE}[H${ESCAPE}[J`,
+		])
+		expect(frames.at(-1)).toBe(LEAVE)
+		leaves[0]?.()
+		expect(frames.filter((frame) => frame === LEAVE)).toHaveLength(1)
+	})
+
+	it('leaves the alternate screen through the exit handler while still redrawing', async () => {
+		const { ports, frames, leaves } = harness(undefined, [])
+
+		void run_board_cli.run([], {
+			...ports,
+			sleep: async () => {
+				await new Promise<void>(() => undefined)
+			},
+		})
+		await vi.waitFor(() => {
+			expect(frames).toHaveLength(2)
+		})
+		expect(leaves).toHaveLength(1)
+		leaves[0]?.()
+		expect(frames.at(-1)).toBe(LEAVE)
 	})
 })
