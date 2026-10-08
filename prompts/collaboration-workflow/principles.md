@@ -1,6 +1,6 @@
 # 原則
 
-**このファイルは、`CLAUDE.md` の Communication 節が指す 7 つの原則の単一ソースである。** 各節は `CLAUDE.md` から `prompts/collaboration-workflow/principles.md` → "見出し" の形で引かれ、`pnpm josh doc:section` で解決する。経緯と適用例は各節が指す [`docs/maintainers/principles-rationale.md`](../../docs/maintainers/principles-rationale.md) の節にあり、実行中には読まない。
+**このファイルは、`CLAUDE.md` の Communication 節が指す原則の単一ソースである。** 各節は `CLAUDE.md` から `prompts/collaboration-workflow/principles.md` → "見出し" の形で引かれ、`pnpm josh doc:section` で解決する。経緯と適用例は各節が指す [`docs/maintainers/principles-rationale.md`](../../docs/maintainers/principles-rationale.md) の節にあり、実行中には読まない。
 
 ## no-clones — クローン禁止・単一ソース化
 
@@ -21,6 +21,16 @@
 - **足す前に断つ**: 検出・通知・叱責を強化する前に、その入力を生んでいる側を探す。入力が消えれば、それを捌く仕組みそのものが消える。適用例は `docs/maintainers/principles-rationale.md` → "An application of simplicity-first"。
 
 **書かれたコードの可読性**（意図が伝わる命名、過度な抽象化を避ける、など）は `prompts/coding-standards.md` の担当で、こちらは**設計時にどの仕組みを足すか・どこへ置くかを決める**規則。両者は別レイヤーなので、片方の本文をもう片方へ写さず、互いを指すだけにする。
+
+## quality-priority — 品質目標が衝突したときの優先順位
+
+品質目標同士が衝突したら、次の順位で上位を取る。下位の目標は、上位を損なわない範囲でだけ追う。
+
+1. **正しさ** — 仕様どおりに動き、検証ゲートが緑であること。ほかのどの目標のためにも犠牲にしない
+2. **シンプルさ・読みやすさ** — 初見の読み手が、前提知識なしに意図を追えること。部品や間接層を足すのは、それで読む量が減るときだけにする
+3. **重複なし** — 同じ知識を 1 か所に置く（no-clones）。ただし、無理な共通化で 2 を損なう（引数やフラグで別々の振る舞いを 1 つに押し込む、など）なら、重複が候補になる。既存の非自明なロジックを複製するときは、no-clones どおり代替案を提示して明示承認を得てから行う
+4. **パフォーマンス** — 計測で問題が示されたときだけ優先する。推測による最適化で 2 を損なわない
+5. **コメント最小** — コメントを書きたくなったら、まず命名・分割・型で表現できないかを試す。残すのは「なぜ」だけにする
 
 ## consult-vs-execute — 相談と実行を区別する
 

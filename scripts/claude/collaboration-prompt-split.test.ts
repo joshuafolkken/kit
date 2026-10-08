@@ -211,8 +211,9 @@ describe('the split lost nothing', () => {
 		expect(read_index()).not.toContain(marker)
 	})
 
-	// joshuafolkken/kit#2894 merged seven principle files into one; each kept its own heading so
-	// `CLAUDE.md` can still cite it by section. Losing one would orphan that citation's rule.
+	// joshuafolkken/kit#2894 merged seven principle files into one and joshuafolkken/kit#3407 added
+	// quality-priority; each keeps its own heading so `CLAUDE.md` can cite it by section. Losing one
+	// would orphan that citation's rule.
 	it.each([
 		'## no-clones — クローン禁止・単一ソース化',
 		'## elegant-design — 設計はエレガント・シンプルを第一目標にする',
@@ -221,8 +222,16 @@ describe('the split lost nothing', () => {
 		'## durable-rules — 恒久ルールは MEMORY ではなくプロンプト／ドキュメントに書く',
 		'## upstream-to-kit — 配布ドキュメント・設定の変更は kit に上流化する',
 		'## エージェント規則の単一ソースは `CLAUDE.md`',
+		'## quality-priority — 品質目標が衝突したときの優先順位',
 	])('keeps the principle %j as its own section', (heading) => {
 		expect(read_repo_file(`${WORKFLOW_PROMPT_DIRECTORY}/principles.md`)).toContain(heading)
+	})
+
+	// joshuafolkken/kit#3407: the priority order is reachable only through its `CLAUDE.md` pointer.
+	it('points CLAUDE.md at the quality-priority section', () => {
+		expect(read_repo_file('CLAUDE.md')).toMatch(
+			/`prompts\/collaboration-workflow\/principles\.md` → [^\n]*"quality-priority"/u,
+		)
 	})
 
 	it.each(topic_files())('%s is more than a heading', (file_name) => {
