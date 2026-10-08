@@ -9,6 +9,7 @@ const BASE_METRICS: Metrics = {
 	scripts: { files: 10, code_lines: 1000, comment_lines: 400, comment_ratio: 0.4 },
 	rules: { files: 3, lines: 200 },
 	guards: 5,
+	ai_cost: { resident_bytes: 9000, on_demand_bytes: 300_000 },
 }
 const BASELINE: Baseline = { ...BASE_METRICS, accepted: ACCEPTED }
 
@@ -46,6 +47,30 @@ describe('metrics_ratchet.compare', () => {
 		const current = metrics_with({ scripts: { ...BASELINE.scripts, files: 11 } })
 
 		expect(metrics_ratchet.compare(BASELINE, current)).toStrictEqual({ kind: 'unchanged' })
+	})
+})
+
+describe('metrics_ratchet.compare on the AI-cost totals', () => {
+	it('fails on a single byte of AI-cost growth, resident or on demand', () => {
+		const resident = { ...BASE_METRICS.ai_cost, resident_bytes: 9001 }
+		const on_demand = { ...BASE_METRICS.ai_cost, on_demand_bytes: 300_001 }
+
+		expect(metrics_ratchet.compare(BASELINE, metrics_with({ ai_cost: resident }))).toStrictEqual({
+			kind: 'regressed',
+			regressions: [{ name: 'ai_cost.resident_bytes', baseline: 9000, current: 9001 }],
+		})
+		expect(metrics_ratchet.compare(BASELINE, metrics_with({ ai_cost: on_demand })).kind).toBe(
+			'regressed',
+		)
+	})
+
+	it('lowers the baseline when an AI-cost total shrank', () => {
+		const current = metrics_with({ ai_cost: { resident_bytes: 8000, on_demand_bytes: 300_000 } })
+
+		expect(metrics_ratchet.compare(BASELINE, current)).toStrictEqual({
+			kind: 'improved',
+			baseline: { ...current, accepted: ACCEPTED },
+		})
 	})
 })
 

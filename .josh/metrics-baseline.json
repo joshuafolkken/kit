@@ -1,17 +1,21 @@
 {
 	"scripts": {
 		"files": 973,
-		"code_lines": 80451,
-		"comment_lines": 32849,
+		"code_lines": 80509,
+		"comment_lines": 32858,
 		"comment_ratio": 0.41
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2337
+		"lines": 2345
 	},
 	"guards": 8,
+	"ai_cost": {
+		"resident_bytes": 12231,
+		"on_demand_bytes": 558074
+	},
 	"accepted": {
-		"reason": "#3415 adds the per-worker machine guard so gate-driving suites never read the host machine",
+		"reason": "Add the AI-cost byte totals (resident and on-demand) to the ratchet and rewrite quality-priority as three tiers #3428",
 		"date": "2026-10-08"
 	}
 }

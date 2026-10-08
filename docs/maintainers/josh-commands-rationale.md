@@ -23,7 +23,7 @@ A leaked place is swept on read by the same pid-and-start-time liveness the unit
 
 ## `josh metrics`' durations
 
-Performance work waits for a measured problem, so `josh metrics` holds four durations to a baseline and fails one that slowed past a tolerance (joshuafolkken/kit#3409).
+Performance is a goal no change may worsen (`prompts/collaboration-workflow/principles.md` → "quality-priority"), so `josh metrics` holds four durations to a baseline and fails one that slowed past a tolerance (joshuafolkken/kit#3409).
 
 **Only like is compared with like.** A duration taken under load measures the load: beside the whole unit suite, `josh --help` starts 40–77% slower than on a quiet machine, and its CPU time rises as much, so no tolerance both passes the gate reliably and still catches a real slowdown. The comparison is held to one condition instead of being widened.
 

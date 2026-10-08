@@ -241,3 +241,17 @@ describe('the split lost nothing', () => {
 		expect(filled.length).toBeGreaterThan(1)
 	})
 })
+
+// joshuafolkken/kit#3428 ranked the four middle goals equal and added the order a conflict among them
+// is settled in; losing one of these would bring back a ranking among them.
+describe('quality-priority keeps the three tiers and the conflict order', () => {
+	it.each([
+		'2. **同列で、どれも悪化させない**',
+		'**AI コスト**',
+		'1. **まず、全部を満たす方法を探す**',
+		'2. **1 つを悪くするなら、同じ変更の中で別の場所を削って埋め合わせる**',
+		'3. **それでも両立しないときは、数字を示して利用者に聞く**（Tier B）',
+	])('states %j', (marker) => {
+		expect(read_repo_file(`${WORKFLOW_PROMPT_DIRECTORY}/principles.md`)).toContain(marker)
+	})
+})

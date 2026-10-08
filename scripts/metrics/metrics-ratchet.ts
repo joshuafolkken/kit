@@ -10,9 +10,9 @@ import type { Metrics } from './metrics-logic'
 // **No tolerance on these totals.** They are counts read off the tree, so the same tree always
 // produces the same values — any increase is a real one.
 //
-// **Only the four totals the ratchet is about are compared** — code lines, the comment ratio, the
-// rule-document lines and the guard count. A file count or a comment-line count moves with them and
-// would only state the same growth twice.
+// **Only the totals the ratchet is about are compared** — code lines, the comment ratio, the
+// rule-document lines, the guard count and the two AI-cost byte totals (joshuafolkken/kit#3428). A
+// file count or a comment-line count moves with them and would only state the same growth twice.
 
 const NEWLINE = '\n'
 
@@ -25,6 +25,7 @@ const baseline_schema = z.object({
 	}),
 	rules: z.object({ files: z.number(), lines: z.number() }),
 	guards: z.number(),
+	ai_cost: z.object({ resident_bytes: z.number(), on_demand_bytes: z.number() }),
 	accepted: z.object({ reason: z.string(), date: z.string() }).optional(),
 })
 
@@ -53,6 +54,8 @@ function ratcheted(metrics: Metrics): ReadonlyArray<[string, number]> {
 		['scripts.comment_ratio', metrics.scripts.comment_ratio],
 		['rules.lines', metrics.rules.lines],
 		['guards', metrics.guards],
+		['ai_cost.resident_bytes', metrics.ai_cost.resident_bytes],
+		['ai_cost.on_demand_bytes', metrics.ai_cost.on_demand_bytes],
 	]
 }
 
@@ -64,7 +67,7 @@ function changes(baseline: Metrics, current: Metrics): ReadonlyArray<Change> {
 		.filter((change) => change.current !== change.baseline)
 }
 
-// The improved baseline carries every current value, not only the four compared ones, so the file
+// The improved baseline carries every current value, not only the compared ones, so the file
 // always describes one tree. The last accepted reason stays: it is the record of the last raise.
 function lowered(baseline: Baseline, current: Metrics): Baseline {
 	return baseline.accepted === undefined ? current : { ...current, accepted: baseline.accepted }

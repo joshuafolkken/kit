@@ -11,7 +11,11 @@ const FIXTURE_METRICS: Metrics = {
 	scripts: { files: 2, code_lines: 3, comment_lines: 2, comment_ratio: 0.67 },
 	rules: { files: 2, lines: 5 },
 	guards: 2,
+	ai_cost: { resident_bytes: 120, on_demand_bytes: 4000 },
 }
+const PER_TURN_HOOK_BYTES = Buffer.byteLength(
+	'Session language (JOSH_SESSION_LANG): ja (default; set JOSH_SESSION_LANG=en for English)',
+)
 
 describe('metrics_logic.is_measured_script', () => {
 	it('measures a non-test file under scripts/', () => {
@@ -65,6 +69,22 @@ describe('metrics_logic.guard_count', () => {
 	})
 })
 
+describe('metrics_logic.ai_cost_totals', () => {
+	it('sums the bytes of each part, counting a multi-byte character by its encoding', () => {
+		expect(metrics_logic.ai_cost_totals(['ab', '品'], ['abcd', ''])).toStrictEqual({
+			resident_bytes: 5 + PER_TURN_HOOK_BYTES,
+			on_demand_bytes: 4,
+		})
+	})
+
+	it('still counts the per-turn hook line when no resident document is read', () => {
+		expect(metrics_logic.ai_cost_totals([], [])).toStrictEqual({
+			resident_bytes: PER_TURN_HOOK_BYTES,
+			on_demand_bytes: 0,
+		})
+	})
+})
+
 describe('metrics_logic.render', () => {
 	it('prints one row per metric', () => {
 		expect(metrics_logic.render(FIXTURE_METRICS)).toBe(
@@ -72,6 +92,7 @@ describe('metrics_logic.render', () => {
 				'scripts  2 files · 3 code lines · 2 comment lines · comment ratio 0.67',
 				'rules    2 files · 5 lines',
 				'guards   2',
+				'ai cost  120 resident bytes · 4000 on-demand bytes',
 			].join('\n'),
 		)
 	})
