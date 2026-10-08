@@ -190,6 +190,7 @@ function single_plan(open: ReadonlyArray<number>): BoardPlan {
 		waves: { waves: [[child]], unreached: [] },
 		tracked: new Map(),
 		context: { repo: 'r', titles: new Map(), open_numbers: new Set(open) },
+		labels: new Map(),
 	}
 }
 

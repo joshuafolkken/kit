@@ -158,7 +158,7 @@ describe('run_board_render.render sections', () => {
 
 		expect(lines.slice(start, start + 2)).toStrictEqual([people_rule, '  🙋 6  Issue 6'])
 		expect(lines.at(-1)).toBe(
-			'✅ マージ  💤 park  🔄 実行中  ⏳ 待ち  🙋 判断待ち  🔗 待ち先  ⚡ cpu  🧠 mem  💾 swap  📊 進捗  🔚 終了',
+			'✅ マージ  💤 park  🔄 実行中  🛑 停止  ⏳ 待ち  🙋 判断待ち  🔗 待ち先  ⚡ cpu  🧠 mem  💾 swap  📊 進捗  🔚 終了',
 		)
 	})
 })

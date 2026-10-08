@@ -36,6 +36,7 @@ function plan_of(
 		waves: { waves, unreached },
 		tracked,
 		context: { repo: REPO, titles: new Map(), open_numbers: new Set([...numbers, 3409]) },
+		labels: new Map(),
 	}
 }
 

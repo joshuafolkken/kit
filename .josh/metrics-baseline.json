@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1000,
-		"code_lines": 82841,
-		"comment_lines": 33368,
+		"code_lines": 82880,
+		"comment_lines": 33378,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 559132
 	},
 	"accepted": {
-		"reason": "#3454 adds run_headless.is_cut_capped, the single cut-cap reader that exempts a headless judgment session's hand-back cut",
+		"reason": "#3459: run:board reads each listed issue's labels so a running lane whose child stopped (needs-decision, or in-progress dropped) is drawn stopped/human apart from a running one, merged over #3460's run-board-track and #3454's run_headless.is_cut_capped",
 		"date": "2026-10-08"
 	}
 }

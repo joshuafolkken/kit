@@ -51,6 +51,7 @@ function plan_titled(title: string): BoardPlan {
 		waves: { waves: [], unreached: [] },
 		tracked: new Map(),
 		context: { repo: 'joshuafolkken/kit', titles: new Map([[1, title]]), open_numbers: undefined },
+		labels: new Map(),
 	}
 }
 
