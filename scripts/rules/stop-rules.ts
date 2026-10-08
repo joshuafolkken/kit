@@ -111,7 +111,7 @@ const STOP_NOTIFY_REASON =
 // keep it because their tree is dirty, which is why this row is silent whenever the tree is not clean.
 const HOLD_RELEASE_REASON =
 	'⛔ working-tree hold not released: this working tree is clean but its `run:hold` record is still in ' +
-	'place, so the next run here runs `git switch main && git pull` believing the tree is free while ' +
+	'place, so the next run here runs `pnpm josh ms` believing the tree is free while ' +
 	'you hold it. The workflow-commands skill → `working-tree-hold.md`: a stop that leaves the tree clean ' +
 	'releases the hold with `pnpm josh run:release <N>` (bare for a `new` entry). A `halfrun` ' +
 	'pre-commit stop and a `needs-human-review` stop keep the hold because their tree is dirty, and a ' +

@@ -33,7 +33,7 @@ short-circuits with a non-zero exit. The numbered steps are the detail behind ea
    dependency scope in one report; a `new` entry runs it once filed. The comment stops, the
    `human_review` stop (`needs-human-review.md`) and the dependency decision are read off it.
 5. **Print the next action — `pnpm josh run:step <N>`** — and follow it into the command's step list.
-   Before implementing, `git switch main && git pull`, then `pnpm josh latest:scope` — update
+   Before implementing, `pnpm josh ms`, then `pnpm josh latest:scope` — update
    dependencies only on `required` (`latest-gate.md`), never on every run. `run:step` names every later
    action in order, each read at the point-of-use document `SKILL.md` lists, never re-narrated here
    (`residency.md` → "順序の問い").

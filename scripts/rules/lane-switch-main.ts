@@ -12,7 +12,7 @@ import { shell_segments } from './shell-segments'
 // backlogrun, always in a lane child.
 //
 // **The source is the parent's step, not the child's.** The distributed procedures write
-// `git switch main && git pull` as the step before reading the dependency scope, and that is *correct in
+// `pnpm josh ms` as the step before reading the dependency scope, and that is *correct in
 // the primary checkout* (`backlogrun-lanes.md` → "Once per repository, before the first lane opens"). A
 // child that runs the same line verbatim fails every time, and the failure is not free: a refused call
 // drops the independent calls batched beside it (joshuafolkken/kit#2177), so a batching child loses the
@@ -113,7 +113,7 @@ const LANE_SWITCH_MAIN_REASON =
 	'and the latest default is brought in during the gate by `pnpm josh main:merge`. So skip this step ' +
 	'and keep implementing on the current branch — no `git switch`, no `git pull`. `pnpm josh main:sync` ' +
 	'(`josh ms`) is refused in a lane for the same reason, and a lane is finished with `pnpm josh ' +
-	'lane:close <issue-number>`. The parent runs `git switch main && git pull` in the primary checkout ' +
+	'lane:close <issue-number>`. The parent runs `pnpm josh ms` in the primary checkout ' +
 	'before each lane opens, never the child — `backlogrun-lanes.md` and `backlogrun-child.md` are the ' +
 	'single sources. This rule fires on every occurrence, not once per run.'
 

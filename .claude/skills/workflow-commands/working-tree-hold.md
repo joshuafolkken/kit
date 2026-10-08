@@ -6,7 +6,7 @@ procedure** (joshuafolkken/kit#2189). `SKILL.md` → §2's table keeps the trigg
 a run is about to claim or release the tree.
 
 **Ask `pnpm josh run:hold` before anything else, and obey what it answers.** It is the first call of
-`fullrun` and `halfrun` alike — before the title is normalized, before `git switch main`, and **before
+`fullrun` and `halfrun` alike — before the title is normalized, before `pnpm josh ms`, and **before
 a `new` entry files its Issue**, because a run stopped after the filing has already left behind the
 artifact it should not have created.
 
@@ -77,7 +77,7 @@ which marks its own record (re-keying a `halfrun new`'s unnumbered one to the fi
 `halfrun` still implementing or a `backlogrun` child leaves the same hold over the same dirty tree, and
 must not be adopted. On a marked hold for `#<N>` over a dirty tree, `run:entry` asks the session budget
 (`over` stops as usual), adopts the hold with the `fullrun` mark and prints `entry #<N> — resume:
-halfrun`. **Skip the title, the plan, the split assessment, `git switch main && git pull`,
+halfrun`. **Skip the title, the plan, the split assessment, `pnpm josh ms`,
 `latest:scope` and the implementation**: the diff in the tree is what the person verified. Re-read the
 issue (`pnpm josh issue:read <N>`), then run the gate **in full** from the refactor (`chain-rule.md` →
 "Run the review-to-merge chain") — a fix made during the manual check has had no gate — and ship as

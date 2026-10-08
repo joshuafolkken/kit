@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1006,
-		"code_lines": 83318,
-		"comment_lines": 33473,
+		"files": 1007,
+		"code_lines": 83361,
+		"comment_lines": 33492,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12231,
-		"on_demand_bytes": 559193
+		"on_demand_bytes": 558853
 	},
 	"accepted": {
-		"reason": "run:board reads the plan and closed children in the background with a spinner while they load (#3455); re-accepted after merging origin/main",
+		"reason": "run:board reads the plan and closed children in the background with a spinner while they load (#3455); re-accepted after merging origin/main (#3463 lockfile-sync)",
 		"date": "2026-10-08"
 	}
 }

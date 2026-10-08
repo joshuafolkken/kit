@@ -39,8 +39,7 @@ Each step is a terse trigger and a pointer; the procedure is read on demand from
    hold, the split assessment and `fullrun.md` are read by a dispatched child inside its own delegated
    `fullrun` unit (`backlogrun-child.md`), never at the parent's entry.
 2. **Begin the carry record before the plan** — `pnpm josh run:carry --begin "<invocation>" --owner
-   "$PPID"` and `pnpm josh run:wake --start`, in the same turn as the first `git switch main && git
-   pull`. The answer table (`began` / `resumed` / `busy` / `standing` / `mismatch` / `expired` /
+   "$PPID"` and `pnpm josh run:wake --start`, in the same turn as the first `pnpm josh ms`. The answer table (`began` / `resumed` / `busy` / `standing` / `mismatch` / `expired` /
    `unreadable` / `unknown`) and the counting/hand-off/resume mechanism are
    `backlogrun-steps.md` → "The session cut is inside the invocation".
 3. **What this invocation approves** — `backlogrun-steps.md` → "What one invocation approves": the

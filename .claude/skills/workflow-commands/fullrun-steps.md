@@ -30,13 +30,13 @@ one call**, `pnpm josh ship "<title> #<N>"` (gate → commit/push/PR → the CI-
 branch-2 filing (`pnpm josh issue:file`, which runs `epic:bundle` itself) run before it → **when a second round is due `ship` does not
 fit**: open the PR between the rounds with `pnpm josh git -y "<title> #<N>"`, run round 2 beside CI, then
 `pnpm josh followup` and `pnpm josh run:tail <N>`). Issue plan comments are written in the session language (`JOSH_SESSION_LANG`,
-default `ja`). Before implementing, run `git switch main && git pull`, then `pnpm josh latest:scope`
+default `ja`). Before implementing, run `pnpm josh ms`, then `pnpm josh latest:scope`
 and update dependencies only on `required` — `latest-gate.md` is its single source, and on `required`
-load the `dependency-update` skill afterwards. **A dispatched lane child skips the `git switch main &&
-git pull`**: `git switch main` is refused in a lane (the primary checkout holds the default branch, so
+load the `dependency-update` skill afterwards. **A dispatched lane child skips `pnpm josh ms`**: it
+refuses in a lane, as a raw `git switch main` does (the primary checkout holds the default branch, so
 the switch fails with `already used by worktree`), the lane was branched from a fresh default before it
 opened, and the latest default is brought in during the gate by `pnpm josh main:merge`. The parent runs
-`git switch main && git pull` in the primary checkout, never the child — `backlogrun-lanes.md` and
+`pnpm josh ms` in the primary checkout, never the child — `backlogrun-lanes.md` and
 `backlogrun-child.md` are the single sources. When running `pnpm josh followup`, pass an
 implementation summary via `--notify-message` in the session language, leading with the three
 plain-language lines: `"Implemented <title>\nCause: ...\nFix: ...\nResult: ...\n\nDetails:\n-
@@ -56,7 +56,7 @@ that covers the same work stops the run rather than filing a second Issue (`issu
 in the session language: fill the body if blank,
 otherwise add a comment. (5) If the working tree already has staged or modified files,
 `git stash push -m "fullrun new: pre-existing changes" -- ':!.josh/observations'` first
-(joshuafolkken/kit#2919). (6) `git switch main && git pull`. (7)
+(joshuafolkken/kit#2919). (6) `pnpm josh ms`. (7)
 `pnpm josh latest:scope`; on `required` run `josh latest` and load the `dependency-update` skill; on
 `skip` neither runs (`latest-gate.md` is the single source). If you stashed in (5),
 `pnpm josh stash:pop "fullrun new: pre-existing changes"` — by message, never a positional `git stash
