@@ -188,6 +188,7 @@ function legend_of(layout: BoardLayout, words: Words): string {
 		`${STATE_ICONS.merged} ${words.merged}`,
 		`${STATE_ICONS.parked} ${words.parked}`,
 		`${STATE_ICONS.running} ${words.in_progress}`,
+		`${STATE_ICONS.stopped} ${words.stopped}`,
 		`${STATE_ICONS.waiting} ${words.waiting}`,
 		`${STATE_ICONS.human} ${words.decision}`,
 		`${WAITS_ICON} ${words.waits}`,

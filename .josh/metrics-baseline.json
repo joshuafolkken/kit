@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1001,
-		"code_lines": 82877,
-		"comment_lines": 33379,
+		"code_lines": 82923,
+		"comment_lines": 33397,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 558792
 	},
 	"accepted": {
-		"reason": "#3463 adds lockfile-sync (reinstall the primary checkout's dependencies when a main sync changes pnpm-lock.yaml) and wires it into main:sync, plus its review round-1 fixes",
+		"reason": "#3463 adds lockfile-sync (reinstall the primary checkout's dependencies when a main sync changes pnpm-lock.yaml) and wires it into main:sync, merged over #3459's run:board label reading, #3460's run-board-track and #3454's run_headless.is_cut_capped",
 		"date": "2026-10-08"
 	}
 }

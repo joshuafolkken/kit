@@ -189,4 +189,12 @@ describe('run_board_header.counts_of', () => {
 			remaining: 5,
 		})
 	})
+
+	// joshuafolkken/kit#3459: a lane child its labels say stopped is not counted as running.
+	it('leaves a stopped or decision-waiting active row out of the running count', () => {
+		const active = [row(1, 'running'), row(2, 'stopped'), row(3, 'human')]
+		const counts = run_board_header.counts_of({ ...EMPTY_LAYOUT, active })
+
+		expect(counts).toMatchObject({ running: 1, settled: 0, remaining: 2 })
+	})
 })

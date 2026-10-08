@@ -1,4 +1,5 @@
 import { backlog_idle } from '#scripts/backlog/backlog-idle'
+import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { describe, expect, it } from 'vitest'
@@ -148,8 +149,15 @@ const RUNNING: ReadonlyMap<number, ItemStatus> = new Map([
 ])
 const NOT_READ: ReadonlyMap<number, ClosedIssue> = new Map()
 
+const NO_LABELS: ReadonlyMap<number, ReadonlyArray<string>> = new Map()
+
 function read_closed(closed: ClosedIssue): OpenRead {
-	return { open_numbers: NONE, read_ms: Date.parse(T1), closed: new Map([[3409, closed]]) }
+	return {
+		open_numbers: NONE,
+		read_ms: Date.parse(T1),
+		closed: new Map([[3409, closed]]),
+		labels: NO_LABELS,
+	}
 }
 
 describe('run_board_status.settle_closed', () => {
@@ -158,12 +166,13 @@ describe('run_board_status.settle_closed', () => {
 			open_numbers: NONE,
 			read_ms: Date.parse(T1),
 			closed: NOT_READ,
+			labels: NO_LABELS,
 		})
 
 		expect(settled.get(3409)).toStrictEqual({ state: 'done', started_ms: Date.parse(T0) })
 	})
 
-	it.each<[string, OpenRead]>([
+	it.each<[string, Omit<OpenRead, 'labels'>]>([
 		['still open', { open_numbers: new Set([3409]), read_ms: Date.parse(T1), closed: NOT_READ }],
 		['a capped listing', { open_numbers: undefined, read_ms: Date.parse(T1), closed: NOT_READ }],
 		[
@@ -171,6 +180,47 @@ describe('run_board_status.settle_closed', () => {
 			{ open_numbers: NONE, read_ms: Date.parse(T0) - 1, closed: NOT_READ },
 		],
 	])('keeps the child running when %s', (_label, read) => {
+		const settled = run_board_status.settle_closed(RUNNING, { ...read, labels: NO_LABELS })
+
+		expect(settled.get(3409)?.state).toBe('running')
+	})
+})
+
+// An open listing read at `read_ms` holding #3409 with the given labels.
+function read_labelled(
+	labels: ReadonlyArray<string> | undefined,
+	read_ms = Date.parse(T1),
+): OpenRead {
+	return {
+		open_numbers: new Set([3409]),
+		read_ms,
+		closed: NOT_READ,
+		labels: labels === undefined ? NO_LABELS : new Map([[3409, labels]]),
+	}
+}
+
+// joshuafolkken/kit#3459: a lane child that stopped with no parent to write its park read as running.
+describe('run_board_status.settle_closed with the listing’s labels', () => {
+	it.each<[string, ReadonlyArray<string>, string]>([
+		['needs-decision as waiting on a person', [NEEDS_DECISION_LABEL, IN_PROGRESS_LABEL], 'human'],
+		['no in-progress as stopped', ['bug'], 'stopped'],
+		['in-progress as still running', ['bug', IN_PROGRESS_LABEL], 'running'],
+	])('draws a running child labelled %s', (_label, labels, state) => {
+		const settled = run_board_status.settle_closed(RUNNING, read_labelled(labels))
+
+		expect(settled.get(3409)?.state).toBe(state)
+	})
+
+	it('keeps the launch time of a stopped child and draws no end', () => {
+		const settled = run_board_status.settle_closed(RUNNING, read_labelled(['bug']))
+
+		expect(settled.get(3409)).toStrictEqual({ state: 'stopped', started_ms: Date.parse(T0) })
+	})
+
+	it.each<[string, OpenRead]>([
+		['the listing was cut before its row', read_labelled(undefined)],
+		['the listing was read before the launch', read_labelled(['bug'], Date.parse(T0) - 1)],
+	])('keeps the labelled child running when %s', (_label, read) => {
 		expect(run_board_status.settle_closed(RUNNING, read).get(3409)?.state).toBe('running')
 	})
 })
