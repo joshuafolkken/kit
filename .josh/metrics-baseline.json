@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 972,
-		"code_lines": 80440,
-		"comment_lines": 32834,
+		"files": 974,
+		"code_lines": 80569,
+		"comment_lines": 32852,
 		"comment_ratio": 0.41
 	},
 	"rules": {
@@ -11,7 +11,7 @@
 	},
 	"guards": 8,
 	"accepted": {
-		"reason": "Merged #3409 (gate, unit and startup durations) with #3419 (hold re-entry / dead-owner reclaim); review fixes: trailing-median note in render_regressions, AGENT_PID_KEY single-sourced and blanked in unit projects",
+		"reason": "Distribute .vscode/tasks.json through josh sync/init with a label-level task merge, its tests and the round-1 review fixes (#3420)",
 		"date": "2026-10-08"
 	}
 }

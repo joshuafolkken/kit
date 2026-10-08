@@ -1,0 +1,14 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "josh: run event watch",
+			"type": "shell",
+			"command": "pnpm josh run:event --watch",
+			"isBackground": true,
+			"problemMatcher": [],
+			"presentation": { "reveal": "always", "panel": "dedicated", "focus": false },
+			"runOptions": { "runOn": "folderOpen" }
+		}
+	]
+}

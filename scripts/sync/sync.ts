@@ -137,6 +137,7 @@ function sync_config_files(): void {
 	sync_configs.sync_secretlint_config(path.join(PROJECT_ROOT, '.secretlintrc.json'))
 	sync_configs.sync_vscode_extensions_json(path.join(PROJECT_ROOT, '.vscode/extensions.json'))
 	sync_configs.sync_vscode_settings_json(path.join(PROJECT_ROOT, '.vscode/settings.json'))
+	sync_configs.sync_vscode_tasks_json(path.join(PROJECT_ROOT, '.vscode/tasks.json'))
 }
 
 function sync_package_json_with(
