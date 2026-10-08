@@ -81,15 +81,26 @@ function fold_events(events: ReadonlyArray<RunEvent>): Map<number, ItemStatus> {
 	return statuses
 }
 
-function is_open(status: ItemStatus | undefined): boolean {
-	return status === undefined || status.state === 'running'
+// A lane is this run's only when its issue is on the run's stream or in the run's plan
+// (joshuafolkken/kit#3442): every lane on the machine read as running, so a lane left over from an
+// earlier day was drawn as this run's child.
+function is_running_lane(
+	issue: number,
+	status: ItemStatus | undefined,
+	in_run: ReadonlySet<number>,
+): boolean {
+	if (status === undefined) return in_run.has(issue)
+
+	return status.state === 'running'
 }
 
 // Every child the run has touched, with the lane each running child holds. A lane the stream never saw
-// launched — a run restored after the stream rolled — still reads as running.
+// launched — a run restored after the stream rolled — still reads as running while its issue is in the
+// run's plan (`in_run`).
 function statuses_of(
 	events: ReadonlyArray<RunEvent>,
 	lanes: ReadonlyArray<string>,
+	in_run: ReadonlySet<number>,
 ): ReadonlyMap<number, ItemStatus> {
 	const statuses = fold_events(events)
 
@@ -97,10 +108,47 @@ function statuses_of(
 		const issue = Number(lane)
 		const status = statuses.get(issue)
 
-		if (is_open(status)) statuses.set(issue, { state: 'running', ...status, lane: `lane ${lane}` })
+		if (is_running_lane(issue, status, in_run)) {
+			statuses.set(issue, { state: 'running', ...status, lane: `lane ${lane}` })
+		}
 	}
 
 	return statuses
+}
+
+// The open listing the plan was read with, and when it was read.
+interface OpenRead {
+	// `undefined` when the listing was cut short, so absence from it proves nothing.
+	open_numbers: ReadonlySet<number> | undefined
+	read_ms: number | undefined
+}
+
+function is_listed_closed(issue: number, read: OpenRead): boolean {
+	return read.open_numbers !== undefined && !read.open_numbers.has(issue)
+}
+
+// A child launched before the listing was read and missing from it has closed since.
+function is_closed_running(issue: number, status: ItemStatus, read: OpenRead): boolean {
+	if (status.state !== 'running' || read.read_ms === undefined) return false
+
+	return is_listed_closed(issue, read) && (status.started_ms ?? 0) <= read.read_ms
+}
+
+// **The stream stays the source of truth; the listing only unsticks it** (joshuafolkken/kit#3442). A child
+// whose merge never reached the stream read as running forever, so a running child the plan's open
+// listing no longer holds is drawn finished instead.
+function settle_closed(
+	statuses: ReadonlyMap<number, ItemStatus>,
+	read: OpenRead,
+): ReadonlyMap<number, ItemStatus> {
+	return new Map(
+		[...statuses].map(([issue, status]) => [
+			issue,
+			is_closed_running(issue, status, read)
+				? { state: 'done', started_ms: status.started_ms }
+				: status,
+		]),
+	)
 }
 
 function newest_of(events: ReadonlyArray<RunEvent>, kind: string): RunEvent | undefined {
@@ -131,7 +179,7 @@ function activity_of(events: ReadonlyArray<RunEvent>): RunActivity {
 	}
 }
 
-const run_board_status = { activity_of, statuses_of }
+const run_board_status = { activity_of, settle_closed, statuses_of }
 
 export { run_board_status }
-export type { ItemState, ItemStatus, RunActivity }
+export type { ItemState, ItemStatus, OpenRead, RunActivity }

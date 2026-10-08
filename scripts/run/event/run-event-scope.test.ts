@@ -226,3 +226,50 @@ describe('run_event_scope.last_issue_event — a lane child’s attempt', () => 
 		).toEqual(OWN_OUTAGE)
 	})
 })
+
+// joshuafolkken/kit#3442: a child this run launched that closed without `run:merge` still owes its merge.
+describe('run_event_scope.is_merge_owed', () => {
+	const launch = named(1, KIND.CHILD_LAUNCH, `#${ISSUE} launched`)
+	const merge = named(2, KIND.MERGE, `#${ISSUE} merged`)
+
+	it('owes the merge of a launched child with no merge event', () => {
+		expect(run_event_scope.is_merge_owed([launch], since(START), ISSUE)).toBe(true)
+	})
+
+	it('owes nothing once the child’s merge is recorded', () => {
+		expect(run_event_scope.is_merge_owed([launch, merge], since(START), ISSUE)).toBe(false)
+	})
+
+	it('does not read another issue’s merge as this child’s', () => {
+		const foreign = named(2, KIND.MERGE, '#2994 merged')
+
+		expect(run_event_scope.is_merge_owed([launch, foreign], since(START), ISSUE)).toBe(true)
+	})
+
+	it('owes nothing for a child run:merge already parked or split', () => {
+		const park = named(2, KIND.PARK, `#${ISSUE} parked (needs-decision)`)
+		const split = named(2, KIND.SPLIT, `#${ISSUE} split`)
+
+		expect(run_event_scope.is_merge_owed([launch, park], since(START), ISSUE)).toBe(false)
+		expect(run_event_scope.is_merge_owed([launch, split], since(START), ISSUE)).toBe(false)
+	})
+
+	it('owes the merge of a child relaunched after its park', () => {
+		const park = named(2, KIND.PARK, `#${ISSUE} parked`)
+		const relaunch = named(3, KIND.CHILD_LAUNCH, `#${ISSUE} launched`)
+
+		expect(run_event_scope.is_merge_owed([launch, park, relaunch], since(START), ISSUE)).toBe(true)
+	})
+
+	it('owes nothing for an issue this invocation never launched', () => {
+		const stale = { ...launch, at: BEFORE }
+
+		expect(run_event_scope.is_merge_owed([stale], since(START), ISSUE)).toBe(false)
+	})
+
+	it('owes nothing when the scope is undetermined', () => {
+		expect(
+			run_event_scope.is_merge_owed([launch], run_event_scope.UNKNOWN_EVENT_SCOPE, ISSUE),
+		).toBe(false)
+	})
+})

@@ -169,8 +169,29 @@ function last_issue_event(
 	return own.findLast((event) => is_own_ship_event(event, issue))
 }
 
+// A child's launch and the endings `run:merge` settles it with — the ones `run:board` stops drawing it
+// running on. A park or a split already ran `run:merge`, so a child closed after one owes nothing.
+const LAUNCH_OR_SETTLE_KINDS: ReadonlySet<string> = new Set([
+	KIND.CHILD_LAUNCH,
+	KIND.MERGE,
+	KIND.PARK,
+	KIND.SPLIT,
+])
+
+// Whether this invocation's newest launch of the issue has not yet been settled (joshuafolkken/kit#3442).
+// `run:merge` is the merge event's one writer, so a child that closed without it stays running on
+// `run:board`; `run:step` reads this to point the parent at the merge. An undetermined scope owes nothing.
+function is_merge_owed(events: ReadonlyArray<RunEvent>, scope: EventScope, issue: string): boolean {
+	const newest = (scoped_events(events, scope) ?? []).findLast(
+		(event) => LAUNCH_OR_SETTLE_KINDS.has(event.kind) && names_issue(event, issue),
+	)
+
+	return newest?.kind === KIND.CHILD_LAUNCH
+}
+
 const run_event_scope = {
 	UNKNOWN_EVENT_SCOPE,
+	is_merge_owed,
 	issue_named,
 	last_issue_event,
 	last_scoped_event,

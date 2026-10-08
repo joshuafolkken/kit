@@ -42,6 +42,7 @@ function next_line(events: ReadonlyArray<RunEvent>): string {
 		has_completion_callback: true,
 		is_at_cut_cap: false,
 		is_handed_off: false,
+		is_merge_owed: false,
 	}
 
 	return run_step.next_action(input).line

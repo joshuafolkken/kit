@@ -1,8 +1,7 @@
 #!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
-import { backlog_plan_read } from '#scripts/backlog/backlog-plan-read'
-import { backlog_waves } from '#scripts/backlog/backlog-waves'
+import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { session_language } from '#scripts/josh/session-language'
 import { lane_registry } from '#scripts/lane/lane-registry'
@@ -15,7 +14,9 @@ import { run_board_header } from './run-board-header'
 import { run_board_labels, type Words } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
 import { run_board_notes } from './run-board-notes'
+import { run_board_plan } from './run-board-plan'
 import { run_board_render } from './run-board-render'
+import { run_board_scope } from './run-board-scope'
 import { run_board_screen, type Screen } from './run-board-screen'
 import { run_board_status } from './run-board-status'
 
@@ -37,15 +38,17 @@ const SIGINT_EXIT_CODE = 130
 const SIGTERM_EXIT_CODE = 143
 const USAGE = 'Usage: josh run:board [--once]'
 
-// What the board reads locally each tick: the run's start, its events and its open lanes.
+// What the board reads locally each tick: the run's start and scope, its events and its open lanes.
 interface LocalRead {
 	started_ms: number
+	// What the run was asked to do, from the carry record's invocation (joshuafolkken/kit#3442).
+	scope: NamedPlan
 	events: ReadonlyArray<RunEvent>
 	lanes: ReadonlyArray<string>
 }
 
 interface BoardPorts {
-	read_plan: () => Promise<BoardPlan | undefined>
+	read_plan: (scope: NamedPlan) => Promise<BoardPlan | undefined>
 	// `undefined` when no run has started here.
 	read_local: () => Promise<LocalRead | undefined>
 	now: () => number
@@ -84,10 +87,20 @@ function with_titles(plan: BoardPlan, previous: BoardPlan | undefined): BoardPla
 	return { ...plan, context: { ...plan.context, titles } }
 }
 
-async function refresh(state: BoardState, ports: BoardPorts, now_ms: number): Promise<BoardState> {
+// The ports and the local read one plan refresh reads with.
+interface PlanRefresh {
+	ports: BoardPorts
+	local: LocalRead
+}
+
+async function refresh(
+	state: BoardState,
+	source: PlanRefresh,
+	now_ms: number,
+): Promise<BoardState> {
 	if (!is_plan_due(state, now_ms)) return state
 
-	const plan = await ports.read_plan()
+	const plan = await source.ports.read_plan(source.local.scope)
 	const attempted = { ...state, attempted_ms: now_ms }
 
 	if (plan === undefined) return { ...attempted, failed_ms: now_ms }
@@ -100,13 +113,17 @@ async function refresh(state: BoardState, ports: BoardPorts, now_ms: number): Pr
 	}
 }
 
+// The statuses scoped to the run's plan, a running child the plan's listing no longer holds settled.
 function layout_for(state: BoardState, local: LocalRead): BoardLayout | undefined {
-	if (state.plan === undefined) return undefined
+	const { plan } = state
 
-	return run_board_layout.layout_of(
-		state.plan,
-		run_board_status.statuses_of(local.events, local.lanes),
-	)
+	if (plan === undefined) return undefined
+
+	const in_run = run_board_layout.numbers_of(plan)
+	const statuses = run_board_status.statuses_of(local.events, local.lanes, in_run)
+	const read = { open_numbers: plan.context.open_numbers, read_ms: state.fetched_ms }
+
+	return run_board_layout.layout_of(plan, run_board_status.settle_closed(statuses, read))
 }
 
 // What one redraw draws with.
@@ -162,21 +179,7 @@ async function tick(state: BoardState, ports: BoardPorts, words: Words): Promise
 		return state
 	}
 
-	return draw_run(await refresh(state, ports, now_ms), local, { ports, words, now_ms })
-}
-
-async function read_plan(): Promise<BoardPlan | undefined> {
-	const read = await backlog_plan_read.read_plan()
-
-	if (read === undefined) return undefined
-
-	const { plan, listing } = read
-
-	return {
-		waves: backlog_waves.build(plan.result, plan.repo, plan.scope),
-		tracked: plan.tracked,
-		context: backlog_plan_read.context_of(plan, listing),
-	}
+	return draw_run(await refresh(state, { ports, local }, now_ms), local, { ports, words, now_ms })
 }
 
 async function read_local(): Promise<LocalRead | undefined> {
@@ -193,6 +196,7 @@ async function read_local(): Promise<LocalRead | undefined> {
 
 	return {
 		started_ms: Date.parse(read.carry.started_at),
+		scope: run_board_scope.scope_of(read.carry.invocation),
 		events,
 		lanes: lanes.map((lane) => lane.issue),
 	}
@@ -206,7 +210,7 @@ function on_exit(leave: () => void): void {
 }
 
 const LIVE_PORTS: BoardPorts = {
-	read_plan,
+	read_plan: async (scope) => await run_board_plan.read_plan(scope),
 	read_local,
 	now: () => Date.now(),
 	write: (frame) => process.stdout.write(frame),
