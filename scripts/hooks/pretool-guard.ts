@@ -1,6 +1,7 @@
 import { duplicate_read_outcome } from '#scripts/delegation/duplicate-read-guard'
 import { investigation_refusal } from '#scripts/delegation/investigation-guard'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
+import { lane_phase } from '#scripts/lane/lane-phase'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { lane_background } from '#scripts/rules/lane-background'
 import { run_parent_cut_hook } from '#scripts/run/run-parent-cut-hook'
@@ -81,6 +82,13 @@ function pretool_outcome(raw_payload: string): GuardOutcome {
 	return with_step_zero_notice(guard_outcome(raw_payload), raw_payload)
 }
 
+// The Step 0 notice fires once, on the first runtime-file edit: the moment a lane child's plan turns
+// into code, which `run:board` draws as its `implement` phase (joshuafolkken/kit#3444). Both the Claude
+// path and the Codex adapter call this on their final outcome, so neither runtime skips the phase.
+async function mark_phase(outcome: GuardOutcome): Promise<void> {
+	if (outcome.notice === step_zero_notice.NOTICE) await lane_phase.mark_implement()
+}
+
 // The watcher guard is the one composed rule that cannot answer synchronously — it reads the lane
 // registry and the watcher's life record off disk (joshuafolkken/kit#2353). So it is asked after the
 // synchronous guards and only where they stayed clear: a refusal from any of them wins first, exactly
@@ -107,7 +115,11 @@ async function pretool_outcome_async(raw_payload: string): Promise<GuardOutcome>
 
 	if (reason !== undefined) return { reason, notice: undefined, fault: undefined }
 
-	return with_step_zero_notice(base, raw_payload)
+	const outcome = with_step_zero_notice(base, raw_payload)
+
+	await mark_phase(outcome)
+
+	return outcome
 }
 
 function guarded_call(raw_payload: string): GuardedCall | undefined {
@@ -151,6 +163,6 @@ function emit(raw_payload: string, outcome: GuardOutcome): void {
 	else process.stdout.write(`${rewrite}\n`)
 }
 
-const pretool_guard = { combine_outcomes, emit, foreground_rewrite, pretool_outcome }
+const pretool_guard = { combine_outcomes, emit, foreground_rewrite, mark_phase, pretool_outcome }
 
 export { pretool_guard, pretool_outcome, pretool_outcome_async }

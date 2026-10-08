@@ -31,7 +31,8 @@ interface BoardRow {
 }
 
 type WaveEntry =
-	{ kind: 'row'; row: BoardRow } | { kind: 'epic'; epic: number; rows: Array<BoardRow> }
+	| { kind: 'row'; row: BoardRow }
+	| { kind: 'epic'; epic: number; title: string | undefined; rows: Array<BoardRow> }
 
 interface BoardLayout {
 	active: ReadonlyArray<BoardRow>
@@ -97,27 +98,19 @@ function active_rows(overlay: Overlay): Array<BoardRow> {
 	return rows.toSorted((left, right) => started_of(left) - started_of(right))
 }
 
-function place_in_epic(entries: Array<WaveEntry>, epic: number, row: BoardRow): void {
+// The epic row carries its own title (joshuafolkken/kit#3444), read from the same open listing as its
+// children's — an opted-in epic is an open issue.
+function place_in_epic(
+	entries: Array<WaveEntry>,
+	epic: number,
+	overlay: Overlay,
+	row: BoardRow,
+): void {
 	const group = entries.find((entry) => entry.kind === 'epic' && entry.epic === epic)
+	const title = overlay.plan.context.titles.get(epic)
 
 	if (group?.kind === 'epic') group.rows.push(row)
-	else entries.push({ kind: 'epic', epic, rows: [row] })
-}
-
-// One wave, its rows in the plan's order, an epic's children gathered under the epic where the first
-// of them falls.
-function wave_entries(wave: ReadonlyArray<EpicChild>, overlay: Overlay): Array<WaveEntry> {
-	const entries: Array<WaveEntry> = []
-
-	for (const child of wave) {
-		const row = plan_row(child, 'waiting', overlay)
-		const epic = overlay.plan.tracked.get(child.number)
-
-		if (epic === undefined) entries.push({ kind: 'row', row })
-		else place_in_epic(entries, epic, row)
-	}
-
-	return entries
+	else entries.push({ kind: 'epic', epic, title, rows: [row] })
 }
 
 function is_untouched(child: EpicChild, overlay: Overlay): boolean {
@@ -126,6 +119,27 @@ function is_untouched(child: EpicChild, overlay: Overlay): boolean {
 
 function is_human(child: EpicChild): boolean {
 	return has_label_name(child.labels, NEEDS_DECISION_LABEL)
+}
+
+// A wave row waits, unless it waits on a person's decision — the one wait the board marks.
+function wave_state(child: EpicChild): ItemState {
+	return is_human(child) ? 'human' : 'waiting'
+}
+
+// One wave, its rows in the plan's order, an epic's children gathered under the epic where the first
+// of them falls.
+function wave_entries(wave: ReadonlyArray<EpicChild>, overlay: Overlay): Array<WaveEntry> {
+	const entries: Array<WaveEntry> = []
+
+	for (const child of wave) {
+		const row = plan_row(child, wave_state(child), overlay)
+		const epic = overlay.plan.tracked.get(child.number)
+
+		if (epic === undefined) entries.push({ kind: 'row', row })
+		else place_in_epic(entries, epic, overlay, row)
+	}
+
+	return entries
 }
 
 function unreached_rows(overlay: Overlay, is_people: boolean): Array<BoardRow> {

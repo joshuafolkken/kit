@@ -1,5 +1,6 @@
 import { backlog_idle } from '#scripts/backlog/backlog-idle'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { describe, expect, it } from 'vitest'
 import { run_board_notes } from './run-board-notes'
 import { run_board_status, type ItemStatus, type OpenRead } from './run-board-status'
@@ -14,12 +15,30 @@ const T2 = '2026-10-08T09:10:00.000Z'
 const T3 = '2026-10-08T09:15:00.000Z'
 const LAUNCH_3409 = '#3409 launched'
 const MERGE_3409 = '#3409 merged'
-const PR_3415 = '#3415 PR #3500'
+const PLAN_3415 = 'planned #3415'
 const DECISION_PARK = '#3433 parked (needs-decision)'
 const NONE: ReadonlySet<number> = new Set()
 
+const { STAGE } = run_ship_stage
+const IMPLEMENT_3409: Step = [KIND.LANE_PHASE, '#3409 implement']
+
+// One event after #3409's launch, as its kind and text.
+type Step = [string, string]
+
 function event_at(pos: number, at: string, kind: string, text: string): RunEvent {
 	return { pos, at, kind, text }
+}
+
+function ship_3409(stage: string): Step {
+	return [KIND.SHIP_STAGE, `#3409 ${stage} start`]
+}
+
+// The phase #3409 has reached after its launch and the given steps.
+function phase_after(...later: ReadonlyArray<Step>): string | undefined {
+	const steps: Array<Step> = [[KIND.CHILD_LAUNCH, LAUNCH_3409], ...later]
+	const events = steps.map(([kind, text], index) => event_at(index + 1, T0, kind, text))
+
+	return run_board_status.statuses_of(events, [], NONE).get(3409)?.phase
 }
 
 const IDLE_TEXT = backlog_idle.text_of({
@@ -34,7 +53,7 @@ describe('run_board_status.statuses_of', () => {
 		const events = [
 			event_at(1, T0, KIND.CHILD_LAUNCH, LAUNCH_3409),
 			event_at(2, T0, KIND.CHILD_LAUNCH, '#3415 launched'),
-			event_at(3, T1, KIND.PR_OPENED, PR_3415),
+			event_at(3, T1, KIND.PLAN, PLAN_3415),
 			event_at(4, T2, KIND.MERGE, MERGE_3409),
 			event_at(5, T3, KIND.PARK, DECISION_PARK),
 		]
@@ -45,7 +64,7 @@ describe('run_board_status.statuses_of', () => {
 			started_ms: Date.parse(T0),
 			ended_ms: Date.parse(T2),
 		})
-		expect(statuses.get(3415)).toMatchObject({ state: 'running', phase: KIND.PR_OPENED })
+		expect(statuses.get(3415)).toMatchObject({ state: 'running', phase: 'plan' })
 		expect(statuses.get(3433)?.state).toBe('parked')
 	})
 
@@ -76,8 +95,50 @@ describe('run_board_status.statuses_of lanes', () => {
 		expect(statuses.get(3409)).toStrictEqual({
 			state: 'running',
 			started_ms: Date.parse(T0),
+			phase: 'investigate',
 			lane: 'lane 3409',
 		})
+	})
+})
+
+// joshuafolkken/kit#3444: a running child's phase, read from the records its steps already write.
+describe('run_board_status.statuses_of phases', () => {
+	it('walks from investigate through plan and implement to the ship stages', () => {
+		expect(phase_after()).toBe('investigate')
+		expect(phase_after([KIND.PLAN, 'planned #3409'])).toBe('plan')
+		expect(phase_after(IMPLEMENT_3409)).toBe('implement')
+		expect(phase_after(ship_3409(STAGE.GATE))).toBe('gate')
+		expect(phase_after(ship_3409(STAGE.FOLLOWUP))).toBe('followup')
+	})
+
+	it('never goes back to an earlier phase', () => {
+		expect(phase_after(ship_3409(STAGE.GATE), IMPLEMENT_3409)).toBe('gate')
+	})
+
+	it('keeps the phase across a cut and its resume', () => {
+		const cut: Step = [KIND.CUT, '#3409 cut']
+
+		expect(phase_after(IMPLEMENT_3409, cut, [KIND.RESUME, '#3409'])).toBe('implement')
+	})
+
+	it('takes no phase from another issue', () => {
+		expect(phase_after([KIND.LANE_PHASE, '#3415 implement'])).toBe('investigate')
+	})
+
+	it('does not revive a merged child on a ship report after its merge', () => {
+		const events = [
+			event_at(1, T0, KIND.CHILD_LAUNCH, LAUNCH_3409),
+			event_at(2, T1, KIND.MERGE, MERGE_3409),
+			event_at(3, T2, ...ship_3409(STAGE.REPORT)),
+		]
+
+		expect(run_board_status.statuses_of(events, [], NONE).get(3409)?.state).toBe('merged')
+	})
+
+	it('ignores a plan event for an issue no lane has launched', () => {
+		const events = [event_at(1, T0, KIND.PLAN, 'planned #3999')]
+
+		expect(run_board_status.statuses_of(events, [], NONE).has(3999)).toBe(false)
 	})
 })
 

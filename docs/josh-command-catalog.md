@@ -1311,7 +1311,7 @@ Print each delivered rule's unaided compliance — runs reached, kept rate, refu
 
 `[--once]`
 
-Draw a live board of the running backlogrun, redrawn every five seconds
+Draw a live board of the running backlogrun, redrawn every second
 
 ---
 

@@ -362,7 +362,8 @@ and after a cut, the stream the run's, the position the caller's.
 `--watch` loops that pass, printing `HH:MM · <label> · <text>` in the session language.
 
 `<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `outage`, `cut`,
-`resume`, `stop`, `pr-opened`, `review-round`, `idle`, `filed`, `note`); a kind outside it is refused.
+`resume`, `stop`, `pr-opened`, `review-round`, `idle`, `filed`, `note`, `lane-phase`); a kind outside it is refused.
+`lane-phase` is a lane child's first implementation edit, written by the PreToolUse hook.
 `idle` is the idle watch's window, `filed` an Issue `issue:file` created, and `note` a one-line
 observation below the filing bar (`run:board` shows all three). `run:merge` appends `merge`, `park`
 and `outage`; other steps call `--append`. The stream is bounded, so an unattended run cannot grow it
@@ -390,18 +391,18 @@ pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 
 ### `josh run:board`
 
-A full-screen board of the running `backlogrun`, redrawn every five seconds for a person to keep open beside the run.
+A full-screen board of the running `backlogrun`, redrawn every second for a person to keep open beside the run.
 
 ```bash
 pnpm josh run:board          # redraw until interrupted
 pnpm josh run:board --once   # one frame, then exit
 ```
 
-The header shows the run's state, start, cut-off, newest event (yellow after 15 silent minutes), progress with arrivals as `(+N)`, and — while it waits on an empty backlog — when the wait ends and why. Below: touched children, the `backlog:plan --waves` order (epic children as a tree, other blockers as `waits on`), `needs-decision` and unreached children, and the newest filings, parks and notes. Times are local `HH:MM:SS`.
+The header is two lines of symbols: the run's state (`▶` running, `⏸` idle, `✋` waiting on a person, `■` ended), `⏱` elapsed, `⌛` time left to the cut-off, `💓` age of the newest event (yellow after 15 silent minutes, red after 30), `⚠` only when a plan read failed; then a progress bar with arrivals as `(+N)` and per-state counts. While the run waits on an empty backlog it adds when the wait ends and why. Below: touched children — each with its elapsed `MM:SS` and, while running, a bar of its phase (`investigate` → `plan` → `implement` → `review` → `gate` → `commit` → `followup`, read from the `child-launch`, `plan`, `lane-phase` and `ship-stage` events) — the `backlog:plan --waves` order under `── 1 ──` rules (epic children as a tree under the epic's title, other blockers as `🔗`), `needs-decision` and unreached children, and the newest filings, parks and notes. A dim legend at the foot names the symbols.
 
 On a terminal it draws on the alternate screen, as `top` and `less` do, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and the cursor that were there before. `--once`, or a stdout that is not a terminal (a pipe or a redirect), writes one frame with no screen control and exits — no color either when it is not a terminal.
 
-**Output / exit codes:** local reads every tick; the plan from GitHub at most every two minutes, keeping the previous one on a failed read. After `run:carry --end` the board keeps the ended run — its start, end and duration in the header, no cut-off, only that run's events — until the next run begins. No run here, running or ended, prints `no run` and reads no plan. Exits 0; an unknown argument exits 1; Ctrl+C exits 130 and SIGTERM 143.
+**Output / exit codes:** the stream and lanes re-read at most every five seconds; the plan from GitHub at most every two minutes, keeping the previous one on a failed read. After `run:carry --end` the board keeps the ended run — `■`, its duration as `⏱` and when it ended in the header, no `⌛`, only that run's events — until the next run begins. No run here, running or ended, prints `no run` and reads no plan. Exits 0; an unknown argument exits 1; Ctrl+C exits 130 and SIGTERM 143.
 
 ### `josh run:watcher:guard`
 

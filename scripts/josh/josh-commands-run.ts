@@ -78,7 +78,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'run:board': {
 		script: 'scripts/run/board/run-board-cli.ts',
-		description: 'Draw a live board of the running backlogrun, redrawn every five seconds',
+		description: 'Draw a live board of the running backlogrun, redrawn every second',
 		category: 'AI tools',
 		reference: ['[--once]', 'automation', ['network']],
 	},
