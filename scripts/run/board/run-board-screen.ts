@@ -1,7 +1,8 @@
 // How `josh run:board` puts its frames on the terminal (joshuafolkken/kit#3441). A board kept open
 // draws on the alternate screen, as `top` and `less` do: clearing the normal screen pushes every
 // redraw into the scrollback, so the board would grow like a log. Leaving restores the screen and the
-// cursor the person had. One frame — `--once`, or a pipe — is plain text with no control bytes.
+// cursor the person had. One frame — `--once`, or a pipe — draws no screen control; a terminal still
+// gets its colors.
 
 type ScreenMode = 'live' | 'plain'
 
