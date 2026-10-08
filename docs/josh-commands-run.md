@@ -397,7 +397,10 @@ A full-screen board of the running `backlogrun`, redrawn every second for a pers
 ```bash
 pnpm josh run:board          # redraw until interrupted
 pnpm josh run:board --once   # one frame, then exit
+pnpm josh run:board --chat   # one frame for a chat, recorded as a progress report
 ```
+
+`--chat` answers a `backlogrun` progress question: titles whole, no legend, only `🧠`, no escapes; it records the report as `run:progress --mark` does.
 
 The header is two lines of symbols: the run's state (`▶` running, `⏸` idle, `✋` waiting on a person, `■` ended), `⏱` elapsed, `⌛` time left to the cut-off, `💓` age of the newest event (yellow after 15 silent minutes, red after 30), `⚠` only when a plan read failed; then a progress bar with arrivals as `(+N)` and per-state counts. While the run waits on an empty backlog it adds when the wait ends and why. Below: touched children — each with its elapsed `MM:SS` and, while running, a bar of its phase (`investigate` → `plan` → `implement` → `review` → `gate` → `commit` → `followup`, read from the `child-launch`, `plan`, `lane-phase` and `ship-stage` events) — the `backlog:plan --waves` order under `── 1 ──` rules (epic children as a tree under the epic's title, other blockers as `🔗`), `needs-decision` and unreached children, and the newest filings, parks and notes. A dim legend at the foot names the symbols.
 

@@ -52,7 +52,10 @@ interface RowFrame {
 	time_width: number
 }
 
-function title_of(title = ''): string {
+// A chat wraps a long line rather than cutting it, so its titles are drawn whole (joshuafolkken/kit#3456).
+function title_of(header: BoardHeader, title = ''): string {
+	if (header.form === 'chat') return title
+
 	return title.length > TITLE_LIMIT ? `${title.slice(0, TITLE_LIMIT - 1)}${ELLIPSIS}` : title
 }
 
@@ -108,9 +111,11 @@ function waits_of(row: BoardRow, header: BoardHeader): string | undefined {
 function timed_parts(row: BoardRow, frame: RowFrame): Array<string | undefined> {
 	const time = time_of(row, frame.header.now_ms)
 
-	if (time === undefined) return [title_of(row.title)]
+	const title = title_of(frame.header, row.title)
 
-	return [title_of(row.title).padEnd(TITLE_LIMIT), time.padStart(frame.time_width), phase_of(row)]
+	if (time === undefined) return [title]
+
+	return [title.padEnd(TITLE_LIMIT), time.padStart(frame.time_width), phase_of(row)]
 }
 
 // A running row leads with the icon of the phase it is in now (joshuafolkken/kit#3471) — the rightmost
@@ -147,7 +152,7 @@ function epic_lines(entry: Extract<WaveEntry, { kind: 'epic' }>, frame: RowFrame
 	const children = entry.rows.map((row, index) =>
 		row_line(index === last ? LAST_BRANCH : BRANCH, row, frame),
 	)
-	const title = title_of(entry.title)
+	const title = title_of(frame.header, entry.title)
 	const number = frame.header.link(String(entry.epic))
 	const epic = title === '' ? number : `${number}${GAP}${title}`
 
@@ -271,16 +276,22 @@ function resume_lines(resume: string | undefined, words: Words): Array<string> {
 	return ['', `${STATE_ICONS.human} ${words.resume}${GAP}claude --resume ${resume}`]
 }
 
+// A chat draws no legend: the symbols are the same in every answer (joshuafolkken/kit#3456).
+function legend_lines(header: BoardHeader): Array<string> {
+	if (header.layout === undefined || header.form === 'chat') return []
+
+	return ['', legend_of(header.layout, header.words)]
+}
+
 function render(view: BoardView): Array<string> {
 	const { header, notes } = view
-	const legend = header.layout === undefined ? [] : ['', legend_of(header.layout, header.words)]
 
 	return [
 		...run_board_header.header_lines(header),
 		...resume_lines(view.resume, header.words),
 		...plan_sections(header),
 		...notes_section(notes, header.words),
-		...legend,
+		...legend_lines(header),
 	]
 }
 

@@ -12,6 +12,12 @@ const ESCAPE = '\u{1B}'
 const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l`
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
 const RUN_MARK = '■ backlogrun'
+const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
+
+// A link as a terminal that opens one draws it, so a chat frame is seen to strip it.
+function hyperlink(text: string): string {
+	return `${ESCAPE}]8;;https://x${ESCAPE}\\${text}${ESCAPE}]8;;${ESCAPE}\\`
+}
 
 describe('run_board_cli.run', () => {
 	it('draws one frame with --once and refuses any other argument', async () => {
@@ -39,13 +45,46 @@ describe('run_board_cli.run', () => {
 
 	// joshuafolkken/kit#3452: a frame left behind on the terminal draws no frozen spinner frame.
 	it('draws the still run and row icons for --once on a terminal', async () => {
-		const launch = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
-		const { ports, frames } = harness({ ...LOCAL, events: [launch] }, [plan_titled('a')])
+		const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
 
 		await run_board_cli.run(['--once'], { ...ports, is_tty: true })
 
 		expect(stripVTControlCharacters(frames[0] ?? '')).toMatch(/^▶ backlogrun/u)
 		expect(frames[0]).toContain('  🔍 1  a')
+	})
+})
+
+// joshuafolkken/kit#3456: the answer to a progress question in a `backlogrun` — one frame a chat shows
+// as it is, recorded as the report it is.
+describe('run_board_cli.run --chat', () => {
+	it('writes one frame with no escape and records the report once', async () => {
+		const { ports, frames, marks, clock } = harness({ ...LOCAL, events: [LAUNCH] }, [
+			plan_titled('a'),
+		])
+
+		await expect(run_board_cli.run(['--chat'], { ...ports, link: hyperlink })).resolves.toBe(0)
+
+		expect(frames).toHaveLength(1)
+		expect(frames[0]).not.toContain(ESCAPE)
+		expect(frames[0]).toContain('  🔍 1  a')
+		expect(marks).toStrictEqual([clock.now_ms])
+	})
+
+	it('records no report for a frame a person drew', async () => {
+		const { ports, marks } = harness(LOCAL, [plan_titled('a')])
+
+		await run_board_cli.run(['--once'], ports)
+
+		expect(marks).toHaveLength(0)
+	})
+
+	it('refuses --chat with another argument', async () => {
+		const { ports, frames } = harness(LOCAL, [])
+		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+
+		await expect(run_board_cli.run(['--chat', '--once'], ports)).resolves.toBe(1)
+		expect(frames).toHaveLength(0)
+		stderr.mockRestore()
 	})
 })
 

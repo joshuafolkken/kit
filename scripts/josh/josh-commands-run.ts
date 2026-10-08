@@ -80,7 +80,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/run/board/run-board-cli.ts',
 		description: 'Draw a live board of the running backlogrun, redrawn every second',
 		category: 'AI tools',
-		reference: ['[--once]', 'automation', ['network']],
+		reference: ['[--once | --chat]', 'automation', ['files', 'network']],
 	},
 	'run:prep': {
 		script: 'scripts/run/run-prep-cli.ts',

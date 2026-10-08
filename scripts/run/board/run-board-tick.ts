@@ -110,6 +110,7 @@ function frame_of(
 		plan_failed_ms: state.failed_ms,
 		is_plan_loading: state.plan_fetch !== undefined,
 		machine: state.gauges,
+		form: redraw.ports.form,
 		spinner: redraw.ports.is_tty ? run_board_labels.spinner_of(redraw.now_ms) : undefined,
 		link: run_board_link.linker(state.plan?.context.repo, redraw.ports.link),
 	}

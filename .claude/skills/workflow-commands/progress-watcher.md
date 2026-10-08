@@ -47,9 +47,10 @@ Rationale: `docs/maintainers/progress-watcher-rationale.md` → "Why the heartbe
 
 ### What a report says
 
-**Every unscheduled progress statement is answered by `pnpm josh run:progress --once`** — the reply to
-an explicit ask and the note just after a run starts alike; it is exempt from the interval and records
-the report itself, so no `--mark` beside it. **Relay its five field lines verbatim** — round, rephrase
+**Every unscheduled progress statement is answered by `pnpm josh run:progress --once`** — under
+`backlogrun`, `pnpm josh run:board --chat` in one code block — the reply to an explicit ask and
+the note just after a run starts alike; each is exempt from the interval and records the report
+itself, so no `--mark` beside it. **Relay its lines verbatim** — round, rephrase
 or re-label nothing, and **never write a clock time the command did not print**; where a field is
 missing, say so. **A field's empty value is an observation, never a state** (`record unread` is not
 *not stalled*), and **nothing in the lines is a verification result** — no gate, CI or check rollup.

@@ -52,6 +52,7 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		is_plan_loading: false,
 		machine: undefined,
 		spinner: undefined,
+		form: 'screen',
 		link: (reference) => reference,
 		...extra,
 	}
@@ -161,6 +162,21 @@ describe('run_board_render.render sections', () => {
 		expect(lines.at(-1)).toBe(
 			'✅ マージ  💤 park  🔄 実行中  🛑 停止  ⏳ 待ち  🙋 判断待ち  🔗 待ち先  ⚡ cpu  🧠 mem  💾 swap  🔚 終了',
 		)
+	})
+})
+
+// joshuafolkken/kit#3456: a chat wraps a long line, so it reads the whole title, and needs no legend.
+describe('run_board_render.render chat', () => {
+	it('draws a chat with every title whole and no legend', () => {
+		const long_title = 'x'.repeat(run_board_render.TITLE_LIMIT + 5)
+		const epic = { kind: 'epic' as const, epic: 10, title: long_title, rows: [row(11)] }
+		const people = [row(6, { state: 'human', title: long_title })]
+		const layout = { ...EMPTY_LAYOUT, waves: [[epic]], people }
+		const lines = lines_of(header({ layout, form: 'chat' }))
+
+		expect(lines).toContain(`  📁 10  ${long_title}`)
+		expect(lines.at(-1)).toBe(`  🙋 6  ${long_title}`)
+		expect(lines.join('\n')).not.toContain('🔚')
 	})
 })
 

@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1007,
-		"code_lines": 83386,
-		"comment_lines": 33508,
+		"code_lines": 83434,
+		"comment_lines": 33520,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12231,
-		"on_demand_bytes": 558853
+		"on_demand_bytes": 558915
 	},
 	"accepted": {
-		"reason": "run:board leads a running row with its current phase icon and spins in the indent (#3471); re-accepted after merging origin/main (#3455 background plan read)",
+		"reason": "run:board --chat answers a backlogrun progress question as one plain frame and records the report (#3456); progress-watcher names it as the backlogrun answer",
 		"date": "2026-10-08"
 	}
 }

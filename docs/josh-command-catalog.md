@@ -1317,9 +1317,9 @@ Print each delivered rule's unaided compliance — runs reached, kept rate, refu
 
 ### `josh run:board`
 
-> **Audience:** automation · **Side effects:** network
+> **Audience:** automation · **Side effects:** files, network
 
-`[--once]`
+`[--once | --chat]`
 
 Draw a live board of the running backlogrun, redrawn every second
 
