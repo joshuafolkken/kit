@@ -41,7 +41,44 @@ describe('run_carry_ended', () => {
 			ended_at: ENDED_AT.toISOString(),
 		})
 	})
+})
 
+// joshuafolkken/kit#3437: a stopped run keeps the session the board offers to resume.
+describe('run_carry_ended stop', () => {
+	it('keeps a stopped run’s reason and the session its owner transcript names', () => {
+		const target = path.join(scratch, 'stopped.json')
+		const owned = { ...carry(EPIC_RUN), owner_transcript: '/p/0b7e1c2a.jsonl' }
+
+		run_carry_ended.record_ended(target, { kind: 'carried', carry: owned }, ENDED_AT, 'decision')
+
+		expect(run_carry_ended.read_ended(target)).toStrictEqual({
+			invocation: EPIC_RUN,
+			started_at: STARTED_AT,
+			ended_at: ENDED_AT.toISOString(),
+			stopped: 'decision',
+			session: '0b7e1c2a',
+		})
+	})
+
+	it('keeps no session for a clean end, nor for a stop with no owner transcript', () => {
+		const clean = path.join(scratch, 'clean.json')
+		const bare = path.join(scratch, 'bare.json')
+		const owned = { ...carry(EPIC_RUN), owner_transcript: '/p/abc.jsonl' }
+
+		run_carry_ended.record_ended(clean, { kind: 'carried', carry: owned }, ENDED_AT)
+		run_carry_ended.record_ended(bare, { kind: 'carried', carry: carry(EPIC_RUN) }, ENDED_AT, 'x')
+
+		expect(run_carry_ended.read_ended(clean)).not.toHaveProperty('stopped')
+		expect(run_carry_ended.read_ended(bare)).toStrictEqual({
+			invocation: EPIC_RUN,
+			started_at: STARTED_AT,
+			ended_at: ENDED_AT.toISOString(),
+			stopped: 'x',
+		})
+	})
+})
+
+describe('run_carry_ended reads', () => {
 	it('keeps the previous record when the end found no record to close', () => {
 		const target = path.join(scratch, 'keep.json')
 

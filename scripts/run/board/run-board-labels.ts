@@ -75,6 +75,12 @@ const WORD_PAIRS = {
 	park: { ja: 'park', en: 'park' },
 	note: { ja: '意見', en: 'note' },
 	found_during: { ja: '（{n} の実装中に発見）', en: ' (found during {n})' },
+	// joshuafolkken/kit#3437: the session a stopped run waits in, and what closing the board leaves.
+	resume: { ja: '停止中。再開', en: 'stopped — resume with' },
+	keeps_running: {
+		ja: '閉じてもランは続きます。再表示は `pnpm josh backlogrun`',
+		en: 'Closing this keeps the run going. Reopen with `pnpm josh backlogrun`',
+	},
 } as const satisfies Readonly<Record<string, WordPair>>
 
 type Words = Readonly<Record<keyof typeof WORD_PAIRS, string>>

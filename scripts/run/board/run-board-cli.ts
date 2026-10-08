@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { styleText } from 'node:util'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { session_language } from '#scripts/josh/session-language'
@@ -50,12 +51,16 @@ const LIVE_PORTS: BoardPorts = {
 	},
 }
 
-// Every frame starts from the top of the alternate screen, erasing what the last one left below it.
-function framed(ports: BoardPorts, screen: Screen): BoardPorts {
+// Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
+// ends on the line that says closing the screen leaves the run going (joshuafolkken/kit#3437) — only a
+// screen a person can close says it.
+function framed(ports: BoardPorts, screen: Screen, words: Words): BoardPorts {
+	const footer = `\n${styleText('dim', words.keeps_running)}\n`
+
 	return {
 		...ports,
 		write: (frame) => {
-			ports.write(`${screen.frame}${frame}`)
+			ports.write(`${screen.frame}${frame}${footer}`)
 		},
 	}
 }
@@ -93,7 +98,7 @@ async function watch(ports: BoardPorts, words: Words): Promise<void> {
 	ports.on_exit(leave)
 
 	try {
-		await redraw_forever(framed(ports, screen), words)
+		await redraw_forever(framed(ports, screen, words), words)
 	} finally {
 		leave()
 	}
