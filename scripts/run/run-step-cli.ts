@@ -78,7 +78,7 @@ function read_run(
 	return {
 		carry_kind: carry.kind,
 		is_retrospective_done: run_carry.retrospective_done_of(carry),
-		is_at_cut_cap: carry.kind === 'carried' && run_carry.is_at_cut_cap(carry.carry),
+		is_at_cut_cap: carry.kind === 'carried' && run_headless.is_cut_capped(carry.carry),
 		is_handed_off: is_handed_off_here(carry),
 		is_merge_owed: run_event_scope.is_merge_owed(events, scope, issue_number),
 		last_event: last?.kind,
