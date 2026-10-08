@@ -113,7 +113,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/overview.md', bytes: 4096 },
 	// #3178 replaced the review-chain restatement with a pointer to `chain-rule.md`.
 	{ path: 'prompts/collaboration-workflow/plan-comment.md', bytes: 8192 },
-	{ path: 'prompts/collaboration-workflow/principles.md', bytes: 12_288 },
+	// #3407 added the quality-priority section; the file sat 38 bytes under its previous block.
+	{ path: 'prompts/collaboration-workflow/principles.md', bytes: 16_384 },
 	{ path: 'prompts/collaboration-workflow/proposal-request.md', bytes: 4096 },
 	// #3178 dropped the restatements `report:lint` and `chain-rule.md` already carry.
 	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 16_384 },
