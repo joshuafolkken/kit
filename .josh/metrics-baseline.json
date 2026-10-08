@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1000,
-		"code_lines": 82834,
-		"comment_lines": 33360,
+		"code_lines": 82841,
+		"comment_lines": 33368,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 559132
 	},
 	"accepted": {
-		"reason": "run:board draws a running row's phase as a track of phase icons (#3460): new run-board-track module and its tests",
+		"reason": "#3454 adds run_headless.is_cut_capped, the single cut-cap reader that exempts a headless judgment session's hand-back cut",
 		"date": "2026-10-08"
 	}
 }

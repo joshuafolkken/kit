@@ -52,7 +52,8 @@ const NO_INCREMENT = 0
 // cut drops the context it accumulated but pays a cold preamble to resume, so past a point the
 // re-establishment costs more than the accumulation it sheds; six sits well under the ~10 an 8-hour run
 // could otherwise take and refuses a run that has begun to churn. `is_at_cut_cap` reads it, and the
-// `--cut` count is refused at it rather than incrementing past it.
+// `--cut` count is refused at it rather than incrementing past it — except a headless judgment
+// session's hand-back to the driver, which `run_headless.is_cut_capped` exempts (joshuafolkken/kit#3454).
 const MAX_CUTS = 6
 
 const END_COMMAND = 'pnpm josh run:carry --end'
