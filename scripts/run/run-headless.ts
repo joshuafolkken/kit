@@ -28,6 +28,21 @@ function is_headless(source: EnvironmentSource = process.env): boolean {
 	return source[HEADLESS_ENV_KEY] === HEADLESS_VALUE
 }
 
+// The session the supervisor launched itself — marked, and not a lane child that inherited the mark.
+function is_headless_parent(source: EnvironmentSource): boolean {
+	return is_headless(source) && lane_child_marker.marked_issue(source) === undefined
+}
+
+// **The cut cap binds a session cut, never the hand-back to the driver** (joshuafolkken/kit#3454). A
+// headless parent is a judgment session the `run:wake` driver woke for one branch, and its `--cut` is
+// how it returns the loop — the driver holds the run between wakes, so the session has no accumulated
+// context for the cap to weigh against a cold preamble. Capping it left the session unable to cut
+// while the headless stop rule refused its turn-end until it did. Every reader of the cap asks here,
+// so the `--cut` refusal, `run:step` and the parent-cut hook never disagree about it.
+function is_cut_capped(carry: RunCarry, source: EnvironmentSource = process.env): boolean {
+	return !is_headless_parent(source) && run_carry.is_at_cut_cap(carry)
+}
+
 // Only a live, un-handed-off record binds the session to its lanes. After `run:carry --cut` the next
 // successor drives them, and after `--end` (`none`) or past the bound (`expired`) there is no run left
 // to drive — ending the turn is correct in all three. An unreadable record fails open, as every stop
@@ -49,9 +64,7 @@ async function read_carry_here(): Promise<CarryRead | undefined> {
  * lane child, with lanes still in flight and no cut handed the record off.
  */
 async function must_keep_waiting(source: EnvironmentSource = process.env): Promise<boolean> {
-	const is_candidate = is_headless(source) && lane_child_marker.marked_issue(source) === undefined
-
-	if (!is_candidate || !(await lane_registry.has_lanes_in_flight())) return false
+	if (!is_headless_parent(source) || !(await lane_registry.has_lanes_in_flight())) return false
 
 	return is_driving(await read_carry_here())
 }
@@ -114,6 +127,7 @@ const run_headless = {
 	driving_carry,
 	environment,
 	is_backlog_parent,
+	is_cut_capped,
 	is_headless,
 	is_owned_here,
 	must_keep_waiting,

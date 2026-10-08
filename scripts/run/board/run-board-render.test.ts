@@ -6,22 +6,22 @@ import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
-import { run_board_phase, type Phase } from './run-board-phase'
+import type { Phase } from './run-board-phase'
 import { run_board_render } from './run-board-render'
 import type { ItemStatus } from './run-board-status'
+import { run_board_track } from './run-board-track'
 
 // joshuafolkken/kit#3430: the board as a person reads it. Expected clocks are built with the board's own
 // `clock_of`, so the assertions hold in any time zone. joshuafolkken/kit#3444: a row carries its number,
-// title, elapsed `MM:SS` and — while running — its phase bar; sections are rules, symbols a legend.
+// title, elapsed `MM:SS` and — while running — its phase track; sections are rules, symbols a legend.
 
-const { bar_of, clock_of } = run_board_labels
+const { clock_of } = run_board_labels
 const WORDS = run_board_labels.words_of('ja')
 const SECOND = 1000
 const MINUTE = backlog_budget.MS_PER_MINUTE
 const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
 const NOW = STARTED + 130 * MINUTE
 const EMPTY_LAYOUT: BoardLayout = { active: [], waves: [], people: [], unreached: [] }
-const PHASE_COUNT = run_board_phase.PHASES.length
 
 function row(number: number, extra: Partial<BoardRow> = {}): BoardRow {
 	return {
@@ -66,9 +66,9 @@ function padded(title: string): string {
 	return title.padEnd(run_board_render.TITLE_LIMIT)
 }
 
-// The phase bar as the stripped lines draw it, whether or not this run's output is colored.
-function plain_bar(phase: Phase): string {
-	return stripVTControlCharacters(bar_of(run_board_phase.index_of(phase), PHASE_COUNT))
+// The phase track as the stripped lines draw it, whether or not this run's output is colored.
+function plain_track(phase: Phase): string {
+	return stripVTControlCharacters(run_board_track.track_of(phase))
 }
 
 function rule(label: string): string {
@@ -80,12 +80,13 @@ function note(at_ms: number, text: string): BoardNote {
 }
 
 describe('run_board_render.render rows', () => {
-	it('draws a running row with its elapsed time, phase bar and phase icon, and no lane', () => {
+	it('draws a running row with its number, title, elapsed time and phase track, and no lane', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [running(1, STARTED + 40 * MINUTE, 'implement')] }
 		const lines = lines_of(header({ layout }))
-		const bar = plain_bar('implement')
+		const row_line = `  🔄 1  ${padded('Issue 1')}  90:00  ${plain_track('implement')}`
 
-		expect(lines).toContain(`  🔄 1  ${padded('Issue 1')}  90:00  ${bar} 🔨`)
+		expect(lines).toContain(row_line)
+		expect(row_line).not.toContain('█')
 		expect(lines.join('\n')).not.toContain('implement')
 		expect(lines.join('\n')).not.toContain('lane')
 	})
@@ -141,6 +142,14 @@ describe('run_board_render.render sections', () => {
 		])
 	})
 
+	it('keeps a title at the limit whole, so a forty-eight column title is not cut', () => {
+		const title = 'y'.repeat(run_board_render.TITLE_LIMIT)
+		const layout = { ...EMPTY_LAYOUT, active: [row(7, { title })] }
+
+		expect(run_board_render.TITLE_LIMIT).toBe(48)
+		expect(lines_of(header({ layout }))).toContain(`  ⏳ 7  ${title}`)
+	})
+
 	it('draws a decision row under the people rule and the legend at the foot', () => {
 		const layout = { ...EMPTY_LAYOUT, people: [row(6, { state: 'human' })] }
 		const lines = lines_of(header({ layout }))
@@ -165,8 +174,15 @@ describe('run_board_render.render phase icons and spinner', () => {
 		const active = [running(1, NOW, 'implement'), running(2, NOW, 'investigate')]
 		const legend = lines_of(header({ layout: { ...EMPTY_LAYOUT, active } })).at(-1) ?? ''
 
-		expect(legend).toContain('🔗 待ち先  🔍 調査  🔨 実装  ⚡ cpu')
+		expect(legend).toContain('🔗 待ち先  🔍 調査  📝 計画  🔨 実装  ⚡ cpu')
 		expect(legend).not.toContain('👀')
+	})
+
+	it('names no phase in the legend for a dispatched child, whose track draws no icon', () => {
+		const active = [running(1, NOW, 'dispatched')]
+		const legend = lines_of(header({ layout: { ...EMPTY_LAYOUT, active } })).at(-1) ?? ''
+
+		expect(legend).toContain('🔗 待ち先  ⚡ cpu')
 	})
 
 	// The spinner is one column and the emoji two, so a space keeps the numbers in one column.

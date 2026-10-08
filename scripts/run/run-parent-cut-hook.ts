@@ -5,7 +5,7 @@ import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { error_text } from '#scripts/lib/error-message'
 import { implementation_cut_verdict } from '#scripts/rules/implementation-cut-verdict'
-import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
+import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_headless } from './run-headless'
 import { run_watcher_hook } from './run-watcher-hook'
 
@@ -73,7 +73,7 @@ const PARENT_CUT_REASON =
 async function is_due(state: ParentCutState): Promise<boolean> {
 	const carry = await state.carry()
 
-	if (carry === undefined || run_carry.is_at_cut_cap(carry)) return false
+	if (carry === undefined || run_headless.is_cut_capped(carry)) return false
 
 	return state.verdict() === cost_verdict.OVER_VERDICT
 }

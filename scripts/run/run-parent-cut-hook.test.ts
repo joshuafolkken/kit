@@ -6,7 +6,8 @@ import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_format } from '#scripts/cost-runtime/cost-format'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_headless } from './run-headless'
 import { run_parent_cut_hook, type ParentCutState } from './run-parent-cut-hook'
 
 // joshuafolkken/kit#2947: a `backlogrun` parent past the shared threshold is steered to the hand-off at
@@ -60,6 +61,12 @@ async function reason_once(
 		state(record, verdict),
 	)
 }
+
+// A gate run inside a headless lane inherits the mark, which exempts the cut cap
+// (`run_headless.is_cut_capped`); every case here is an attached parent.
+beforeEach(() => {
+	vi.stubEnv(run_headless.HEADLESS_ENV_KEY, '')
+})
 
 afterEach(() => {
 	vi.unstubAllEnvs()

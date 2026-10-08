@@ -39,7 +39,7 @@ vi.mock('#scripts/run/carry/run-carry', () => ({
 vi.mock('#scripts/lane/lane-reap', () => ({ lane_reap: { own_ancestry: ancestry_mock } }))
 // Mocked so a test run from inside a lane worktree does not read itself as a lane child.
 vi.mock('#scripts/lane/lane-child-marker', () => ({
-	lane_child_marker: { is_child_of: lane_child_mock },
+	lane_child_marker: { is_child_of: lane_child_mock, marked_issue: () => undefined },
 }))
 
 vi.mock('#scripts/run/event/run-event-stream', () => ({
@@ -139,6 +139,11 @@ beforeEach(() => {
 	repo_directory_mock.mockResolvedValue('/repo')
 	read_carry_mock.mockReturnValue({ kind: 'none' })
 	read_events_mock.mockReturnValue([])
+})
+
+// A gate run inside a headless lane inherits the mark, which exempts the cut cap.
+beforeEach(() => {
+	vi.stubEnv('JOSH_RUN_HEADLESS', '')
 })
 
 afterEach(() => {
