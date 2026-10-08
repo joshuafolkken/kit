@@ -100,6 +100,48 @@ describe('invokes_budget_command', () => {
 	})
 })
 
+// joshuafolkken/kit#3458: a `run:carry` call prefixed with a non-empty `JOSH_TEMP_ROOT` writes under that
+// root and cannot reach the parent's record, so live evidence taken that way is let through. `run:merge`
+// also acts on lanes, main and GitHub, so no root lets it through.
+describe('invokes_budget_command — a redirected state root', () => {
+	it.each([
+		['a quoted command substitution', `JOSH_TEMP_ROOT="$(mktemp -d)" ${CARRY_COMMAND}`],
+		['a quoted literal path', `JOSH_TEMP_ROOT="/tmp/ev" ${CARRY_COMMAND}`],
+		['behind another assignment', `JOSH_DEBUG=1 JOSH_TEMP_ROOT=/tmp/ev ${CARRY_COMMAND}`],
+		['behind a quoted assignment with a space', `A="x y" JOSH_TEMP_ROOT=/tmp/ev ${CARRY_COMMAND}`],
+		['a multi-word unquoted substitution', `JOSH_TEMP_ROOT=$(mktemp -d -t ev) ${CARRY_COMMAND}`],
+	])('lets %s through', (_name, command) => {
+		expect(lane_carry_conflict.invokes_budget_command(command)).toBe(false)
+	})
+
+	it.each([
+		['an empty value', `JOSH_TEMP_ROOT= ${CARRY_COMMAND}`],
+		['an empty quoted value', `JOSH_TEMP_ROOT="" ${CARRY_COMMAND}`],
+		// A variable from an earlier tool call is unset here and expands to the default root.
+		['a bare variable', `JOSH_TEMP_ROOT=$EV ${CARRY_COMMAND}`],
+		['a quoted braced variable', `JOSH_TEMP_ROOT="\${EV}" ${MERGE_COMMAND}`],
+		['an export in an earlier segment', `export JOSH_TEMP_ROOT=/tmp/ev && ${CARRY_COMMAND}`],
+		['a redirect on another segment only', `JOSH_TEMP_ROOT=/tmp/ev true; ${CARRY_COMMAND}`],
+		['the name as an argument', `${CARRY_COMMAND} JOSH_TEMP_ROOT=/tmp/ev`],
+		// run:merge acts on lanes, main and GitHub, which no root redirects.
+		['run:merge under a fresh root', `JOSH_TEMP_ROOT="$(mktemp -d)" ${MERGE_COMMAND}`],
+		['run:merge under a literal root', `JOSH_TEMP_ROOT=/tmp/ev ${MERGE_COMMAND}`],
+		// A space inside a substitution does not end the value and leave its tail as the command.
+		[
+			'run:merge under a multi-word substitution',
+			`JOSH_TEMP_ROOT=$(mktemp -d -t ev) ${MERGE_COMMAND}`,
+		],
+		[
+			'run:merge under a substitution with nested quotes',
+			`JOSH_TEMP_ROOT="$(mktemp -d "/tmp/ev.XXXX")" ${MERGE_COMMAND}`,
+		],
+		// A substitution in another variable is not read as the command position.
+		['a substitution in another variable', `EV="$(mktemp -d)" ${CARRY_COMMAND}`],
+	])('still matches %s', (_name, command) => {
+		expect(lane_carry_conflict.invokes_budget_command(command)).toBe(true)
+	})
+})
+
 describe('is_carry_conflict', () => {
 	// The dispatched-child case the refusal exists for.
 	it('fires on a budget command from a dispatched lane child', () => {
@@ -175,6 +217,9 @@ describe('LANE_CARRY_CONFLICT_REASON', () => {
 		['backlogrun-progress.md'],
 		// It refuses every occurrence rather than standing down after one.
 		['every occurrence'],
+		// The evidence route it lets through (joshuafolkken/kit#3458).
+		['`JOSH_TEMP_ROOT`'],
+		['`run:merge` is refused under any root'],
 	])('carries %j', (marker) => {
 		expect(REASON).toContain(marker)
 	})

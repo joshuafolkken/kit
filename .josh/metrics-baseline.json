@@ -1,21 +1,21 @@
 {
 	"scripts": {
 		"files": 999,
-		"code_lines": 82799,
-		"comment_lines": 33331,
+		"code_lines": 82811,
+		"comment_lines": 33351,
 		"comment_ratio": 0.4
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2345
+		"lines": 2347
 	},
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12231,
-		"on_demand_bytes": 558400
+		"on_demand_bytes": 559132
 	},
 	"accepted": {
-		"reason": "run:board gains phase icons, a clock-driven spinner and colored gauges (#3452); gate duration rose under concurrent lane load, not from this change",
+		"reason": "#3458: lane-carry-conflict lets a JOSH_TEMP_ROOT-prefixed run:carry call through, and report-format requires run:carry live evidence to redirect JOSH_TEMP_ROOT, plus review-round fixes (one shared LEADING_ASSIGNMENT pattern reads quoted and $(…) assignment values whole for both the redirect check and the strip); re-accepted on top of #3452 after the merge with origin/main",
 		"date": "2026-10-08"
 	}
 }

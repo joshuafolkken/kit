@@ -47,7 +47,9 @@ function resolve_temporary_root(
 // into the live run's records — progress lines for issues the run never touched, relayed to the
 // session watching it. The network guard's `arm` points this at a directory of its own before any
 // worker forks, so every process of one test run shares a root no real run reads, and `disarm`
-// removes it with the rest of the guard.
+// removes it with the rest of the guard. Live evidence of `run:carry` sets it for the same
+// reason: the run's state records are keyed here too, and evidence taken against the default root
+// once ended the record of the run that was actually going (joshuafolkken/kit#3458).
 const TEMP_ROOT_KEY = 'JOSH_TEMP_ROOT'
 
 function temporary_root(override: string | undefined, platform: string): string {
