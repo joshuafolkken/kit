@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 972,
-		"code_lines": 80440,
-		"comment_lines": 32834,
+		"files": 973,
+		"code_lines": 80451,
+		"comment_lines": 32849,
 		"comment_ratio": 0.41
 	},
 	"rules": {
@@ -11,7 +11,7 @@
 	},
 	"guards": 8,
 	"accepted": {
-		"reason": "Merged #3409 (gate, unit and startup durations) with #3419 (hold re-entry / dead-owner reclaim); review fixes: trailing-median note in render_regressions, AGENT_PID_KEY single-sourced and blanked in unit projects",
+		"reason": "#3415 adds the per-worker machine guard so gate-driving suites never read the host machine",
 		"date": "2026-10-08"
 	}
 }

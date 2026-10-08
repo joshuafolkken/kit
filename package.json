@@ -87,6 +87,7 @@
 		"!scripts/test/http-fault-injection.ts",
 		"!scripts/test/josh-harness*.ts",
 		"!scripts/test/pure-files.ts",
+		"!scripts/test/test-machine-guard.ts",
 		"!scripts/test/test-network-guard.ts",
 		"!scripts/test/test-repository-guard.ts",
 		"!scripts/test/test-state-guard.ts",
