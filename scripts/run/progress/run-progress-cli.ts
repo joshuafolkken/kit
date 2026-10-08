@@ -74,7 +74,7 @@ const UNREADABLE_NOTICE =
 	'The `in-progress` listing could not be read, so nothing is reported. That is not "nothing is running" — check `gh auth status` and ask again.'
 const FAILED_TICK_PREFIX =
 	'A progress reading failed, so nothing is reported for it. The watcher is still running, and will read again after the cooldown:'
-const WAIT_EXPIRED_NOTICE = `The watch bound (\`--hours\`, ${String(DEFAULT_WAIT_MAX_HOURS)} by default for \`--wait\`) ran out with no newly runnable work arriving. Every report it made is already on the run's event stream (\`pnpm josh run:event --watch\`), so there is nothing to relay. Starting another \`--wait\` resumes the same clock.`
+const WAIT_EXPIRED_NOTICE = `The watch bound (\`--hours\`, ${String(DEFAULT_WAIT_MAX_HOURS)} by default for \`--wait\`) ran out with no newly runnable work arriving. Every report it made is already on the run's event stream, which the \`pnpm josh run:board\` pane draws, so there is nothing to relay. Starting another \`--wait\` resumes the same clock.`
 // The repository name is only ever printed, never written against, so the bounded lookup is the right
 // one: a `gh` call that hangs would otherwise block the synchronous read at startup and leave the
 // watcher neither running nor saying so.
@@ -405,7 +405,7 @@ async function once(options: WatchOptions): Promise<number> {
  * command's output only on exit would relay it (joshuafolkken/kit#1576) — which cost the orchestrating
  * session one turn per heartbeat, re-reading a hundred thousand tokens of context to pass on a line it
  * was forbidden to change. Every line already reaches the run's event stream as a `heartbeat` and the
- * ambient log, which a person's `run:event --watch` pane reads with no model in between, so this form
+ * ambient log, which a person's `run:board` pane reads with no model in between, so this form
  * keeps its lines off standard output and exits only on an arrival, on `josh followup` ending its life
  * record, or on its bound. The caller starts it once and restarts it only after one of those.
  *

@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1003,
-		"code_lines": 83200,
-		"comment_lines": 33432,
+		"code_lines": 83224,
+		"comment_lines": 33444,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12231,
-		"on_demand_bytes": 559132
+		"on_demand_bytes": 559193
 	},
 	"accepted": {
-		"reason": "josh backlogrun adds a new terminal launcher (args, cli, launch modules) and the run board's launch/resume view #3437, merged over #3459's run:board label-aware lane status",
+		"reason": "josh backlogrun adds a new terminal launcher (args, cli, launch modules) and the run board's launch/resume view #3437; re-accepted after merging origin/main (#3438 run:board workspace task and closed-run stop)",
 		"date": "2026-10-08"
 	}
 }

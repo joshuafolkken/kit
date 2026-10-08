@@ -1,7 +1,7 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
 import { vi } from 'vitest'
-import type { ClosedIssue } from './run-board-closed'
+import type { ClosedAnswer } from './run-board-closed'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
@@ -35,9 +35,7 @@ interface Reads {
 	read_local: ReturnType<typeof vi.fn<() => Promise<LocalRead | undefined>>>
 	read_machine: ReturnType<typeof vi.fn<() => Promise<MachineSample>>>
 	// Nothing reads closed unless a test answers otherwise.
-	read_closed: ReturnType<
-		typeof vi.fn<(issues: ReadonlyArray<number>) => Promise<ReadonlyMap<number, ClosedIssue>>>
-	>
+	read_closed: ReturnType<typeof vi.fn<(issues: ReadonlyArray<number>) => Promise<ClosedAnswer>>>
 }
 
 interface Harness extends Reads {
@@ -71,10 +69,10 @@ function reads_of(local: LocalRead | undefined, plans: Array<BoardPlan | undefin
 		read_plan: vi.fn(async (_scope: NamedPlan) => plans.shift()),
 		read_local: vi.fn(async () => local),
 		read_machine: vi.fn(async () => SAMPLE),
-		read_closed: vi.fn(
-			async (_issues: ReadonlyArray<number>): Promise<ReadonlyMap<number, ClosedIssue>> =>
-				new Map(),
-		),
+		read_closed: vi.fn(async (_issues: ReadonlyArray<number>): Promise<ClosedAnswer> => ({
+			closed: new Map(),
+			is_whole: true,
+		})),
 	}
 }
 

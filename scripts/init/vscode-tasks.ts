@@ -11,6 +11,13 @@ const LABEL_KEY = 'label'
 const TASKS_VERSION = '2.0.0'
 const VSCODE_TASKS_FILENAME = 'tasks.json'
 
+// A label kit once shipped a task under, mapped to the label that replaced it. A consumer's task still
+// carrying the retired label is the same kit task under its old name, so it is replaced in place — an
+// append would leave the retired folder-open pane starting beside its successor (joshuafolkken/kit#3438).
+const RETIRED_LABELS: ReadonlyMap<unknown, string> = new Map([
+	['josh: run event watch', 'josh: run board'],
+])
+
 const task_array_schema = z.array(json_object_schema)
 
 function read_tasks(parsed: Record<string, unknown>): Array<Task> {
@@ -22,8 +29,10 @@ function read_tasks(parsed: Record<string, unknown>): Array<Task> {
 // A task is identified by its `label` — the name VSCode runs it by and `dependsOn` refers to it by.
 function has_label(element: unknown, label: unknown): boolean {
 	const result = json_object_schema.safeParse(element)
+	if (!result.success) return false
+	const own = result.data[LABEL_KEY]
 
-	return result.success && result.data[LABEL_KEY] === label
+	return (RETIRED_LABELS.get(own) ?? own) === label
 }
 
 // Kit owns the tasks whose label it ships: each is replaced with kit's current definition in place,
