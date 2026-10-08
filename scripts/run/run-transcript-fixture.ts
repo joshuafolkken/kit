@@ -34,6 +34,7 @@ const DEFAULTS: StepInput = {
 	has_completion_callback: true,
 	is_at_cut_cap: false,
 	is_handed_off: false,
+	is_merge_owed: false,
 }
 
 // One turn of a run: `label` names the position the run has reached in words, and `at` is the change

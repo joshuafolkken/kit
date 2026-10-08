@@ -23,6 +23,7 @@ function input(overrides: Partial<StepInput>): StepInput {
 		has_completion_callback: true,
 		is_at_cut_cap: false,
 		is_handed_off: false,
+		is_merge_owed: false,
 		...overrides,
 	}
 }

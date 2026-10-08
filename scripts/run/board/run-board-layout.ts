@@ -153,7 +153,12 @@ function layout_of(plan: BoardPlan, statuses: ReadonlyMap<number, ItemStatus>): 
 	}
 }
 
-const run_board_layout = { is_settled, layout_of }
+// Every issue the plan holds, wave or unreached — the run's scope a lane is checked against.
+function numbers_of(plan: BoardPlan): ReadonlySet<number> {
+	return new Set([...plan.waves.waves.flat(), ...plan.waves.unreached].map((child) => child.number))
+}
+
+const run_board_layout = { is_settled, layout_of, numbers_of }
 
 export { run_board_layout }
 export type { BoardLayout, BoardPlan, BoardRow, WaveEntry }

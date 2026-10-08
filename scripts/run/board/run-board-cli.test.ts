@@ -1,3 +1,5 @@
+import type { NamedPlan } from '#scripts/backlog/backlog-plan'
+import type { EpicChild } from '#scripts/epic/epic-graph'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_cli, type BoardPorts, type LocalRead } from './run-board-cli'
 import { run_board_labels } from './run-board-labels'
@@ -8,7 +10,8 @@ import type { BoardPlan } from './run-board-layout'
 
 const WORDS = run_board_labels.words_of('en')
 const START = Date.parse('2026-10-08T09:00:00.000Z')
-const LOCAL: LocalRead = { started_ms: START, events: [], lanes: [] }
+const ALL: NamedPlan = { issues: [], only: false }
+const LOCAL: LocalRead = { started_ms: START, scope: ALL, events: [], lanes: [] }
 
 function plan_titled(title: string): BoardPlan {
 	return {
@@ -26,7 +29,7 @@ const STOPPED = new Error('stopped')
 interface Harness {
 	ports: BoardPorts
 	frames: Array<string>
-	read_plan: ReturnType<typeof vi.fn<() => Promise<BoardPlan | undefined>>>
+	read_plan: ReturnType<typeof vi.fn<(scope: NamedPlan) => Promise<BoardPlan | undefined>>>
 	clock: { now_ms: number }
 	leaves: Array<() => void>
 }
@@ -36,7 +39,7 @@ function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefine
 	const frames: Array<string> = []
 	const leaves: Array<() => void> = []
 	const clock = { now_ms: START }
-	const read_plan = vi.fn(async () => plans.shift())
+	const read_plan = vi.fn(async (_scope: NamedPlan) => plans.shift())
 	let slept = 0
 	const ports: BoardPorts = {
 		read_plan,
@@ -91,6 +94,45 @@ describe('run_board_cli.tick', () => {
 		expect(state).toStrictEqual(run_board_cli.FRESH_STATE)
 		expect(read_plan).not.toHaveBeenCalled()
 		expect(frames.at(-1)).toContain(`backlogrun ${WORDS.no_run}`)
+	})
+})
+
+// joshuafolkken/kit#3442: the plan is the run's own scope, a lane outside it is not the run's child, and
+// a child the plan's listing no longer holds is not left running.
+const SINGLE = 3441
+const STALE_LANE = '3347'
+const ONLY_SINGLE: NamedPlan = { issues: [SINGLE], only: true }
+
+function single_plan(open: ReadonlyArray<number>): BoardPlan {
+	const child: EpicChild = { number: SINGLE, repo: 'r', state: 'OPEN', labels: [], blocked_by: [] }
+
+	return {
+		waves: { waves: [[child]], unreached: [] },
+		tracked: new Map(),
+		context: { repo: 'r', titles: new Map(), open_numbers: new Set(open) },
+	}
+}
+
+describe('run_board_cli.tick — the run’s own scope', () => {
+	it('reads the carry’s scope and counts only its one issue, not a stale lane', async () => {
+		const local = { ...LOCAL, scope: ONLY_SINGLE, lanes: [STALE_LANE, String(SINGLE)] }
+		const { ports, frames, read_plan } = harness(local, [single_plan([SINGLE])])
+
+		await run_board_cli.tick(run_board_cli.FRESH_STATE, ports, WORDS)
+
+		expect(read_plan).toHaveBeenCalledWith(ONLY_SINGLE)
+		expect(frames.at(-1)).toContain(`${WORDS.progress} 0/1 `)
+		expect(frames.at(-1)).not.toContain(STALE_LANE)
+	})
+
+	it('settles a launched child the open listing no longer holds', async () => {
+		const launch = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#3441 x' }
+		const local = { ...LOCAL, scope: ONLY_SINGLE, events: [launch] }
+		const { ports, frames } = harness(local, [single_plan([])])
+
+		await run_board_cli.tick(run_board_cli.FRESH_STATE, ports, WORDS)
+
+		expect(frames.at(-1)).toContain(`${WORDS.progress} 1/1 `)
 	})
 })
 

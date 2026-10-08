@@ -131,6 +131,10 @@ interface StepInput extends PreInput {
 	// The session that took the cut is the only one that can read this — a successor spends the mark when
 	// it begins — so it is what tells that session to stop.
 	is_handed_off: boolean
+	// Whether this run launched the issue and its stream holds no `merge` for it yet, read by the CLI
+	// (joshuafolkken/kit#3442). A parent that reads a closed child as `already-done` never runs
+	// `run:merge`, so the merge is never written and `run:board` shows the child running forever.
+	is_merge_owed: boolean
 }
 
 interface StepAction {
@@ -146,6 +150,10 @@ function command(line: string): StepAction {
 	return { kind: 'command', line }
 }
 
+function merge_command(issue_number: string): StepAction {
+	return command(`pnpm josh run:merge ${issue_number}`)
+}
+
 // The action for each event a run can be positioned at, keyed on the newest one. Each dispatches to the
 // command that owns that phase. `stop`, `drain` and `child-launch` are handled apart in
 // `FULL_INPUT_ACTIONS`, because each needs more than the issue number. A merge and an outage share a
@@ -157,8 +165,8 @@ const OFFER_BACKLOG = 'pnpm josh backlog:next'
 const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 	[KIND.PR_OPENED]: () => command('pnpm josh followup'),
 	[KIND.REVIEW_ROUND]: () => command('pnpm josh review:round2'),
-	[KIND.MERGE]: (issue_number) => command(`pnpm josh run:merge ${issue_number}`),
-	[KIND.OUTAGE]: (issue_number) => command(`pnpm josh run:merge ${issue_number}`),
+	[KIND.MERGE]: merge_command,
+	[KIND.OUTAGE]: merge_command,
 	[KIND.PARK]: () => command(OFFER_BACKLOG),
 	[KIND.CUT]: (issue_number) => command(`pnpm josh run:cut --resume ${issue_number}`),
 	// A stall is undispatched ready work with a free lane, so its next step is exactly a park's: offer
@@ -252,10 +260,18 @@ function pre_implementation_action(input: StepInput): StepAction {
 	return verdict(pre_verdict(input))
 }
 
+// A parent whose child closed before `run:merge` wrote the merge still owes it (joshuafolkken/kit#3442):
+// `run:merge` is the one writer of the `merge` event, so answering `already-done` here left the child
+// running on `run:board` forever. A lane child is never handed `run:merge`.
+function owes_merge(input: StepInput): boolean {
+	return input.is_merge_owed && input.carry_kind === 'carried' && !input.is_lane_child
+}
+
 // A closed issue ends the run, but a tree still holding uncommitted work is surfaced rather than
 // answered `already-done` — the answer a child read as "nothing to do" before its lane was removed
 // with the work in it (joshuafolkken/kit#2476).
 function closed_action(input: StepInput): StepAction {
+	if (owes_merge(input)) return merge_command(input.issue_number)
 	if (closed_verdict(input) === ALREADY_DONE) return verdict(ALREADY_DONE)
 
 	const message = git_stash.work_message(input.issue_number, ALREADY_DONE)

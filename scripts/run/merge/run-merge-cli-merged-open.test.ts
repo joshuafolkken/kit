@@ -10,6 +10,7 @@ const do_merged_mock = vi.hoisted(() => vi.fn())
 const do_failed_mock = vi.hoisted(() => vi.fn())
 const has_resumable_cut_mock = vi.hoisted(() => vi.fn())
 const resume_cut_mock = vi.hoisted(() => vi.fn())
+const emit_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
@@ -20,7 +21,7 @@ vi.mock('#scripts/issue/issue-closing-pr', () => ({
 }))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
-	run_event_stream_emit: { emit: vi.fn() },
+	run_event_stream_emit: { emit: emit_mock },
 }))
 
 vi.mock('#scripts/lane/lane-ledger', () => ({
@@ -64,6 +65,7 @@ beforeEach(() => {
 		.mockResolvedValue({ carry: undefined, is_parked: true, is_refused: false })
 	has_resumable_cut_mock.mockReset().mockResolvedValue(false)
 	resume_cut_mock.mockReset().mockResolvedValue(false)
+	emit_mock.mockReset()
 })
 
 describe('run_merge_cli.merge_child — a child merged while its issue stayed OPEN', () => {
@@ -86,6 +88,15 @@ describe('run_merge_cli.merge_child — a child merged while its issue stayed OP
 		expect(result.outcome).toBe('merged')
 		expect(read_closing_pr_mock).not.toHaveBeenCalled()
 		expect(do_merged_mock).toHaveBeenCalledWith(expect.objectContaining({ merged_pr: undefined }))
+	})
+
+	// joshuafolkken/kit#3442: a parent that counted the merge by hand still owes the stream its event.
+	it('writes the merge event for a child GitHub already closed', async () => {
+		read_issue_mock.mockResolvedValue({ kind: 'state', state: { state: 'CLOSED', labels: [] } })
+
+		await run_merge_cli.merge_child(context())
+
+		expect(emit_mock).toHaveBeenCalledWith('merge', `#${CHILD} merged`)
 	})
 
 	it('still parks an OPEN child no merged pull request closes', async () => {

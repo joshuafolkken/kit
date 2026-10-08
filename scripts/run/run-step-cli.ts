@@ -32,6 +32,7 @@ interface RunReads {
 	is_retrospective_done: boolean
 	is_at_cut_cap: boolean
 	is_handed_off: boolean
+	is_merge_owed: boolean
 	last_event: string | undefined
 }
 
@@ -50,6 +51,7 @@ const UNREADABLE_RUN: RunReads = {
 	is_retrospective_done: false,
 	is_at_cut_cap: false,
 	is_handed_off: false,
+	is_merge_owed: false,
 	last_event: undefined,
 }
 
@@ -70,18 +72,15 @@ function read_run(
 	// still the stream's tail. Another issue's detached ship supervisor is left out the same way
 	// (joshuafolkken/kit#2428), and so — for a lane child — is every event that does not name its own issue
 	// (joshuafolkken/kit#3039).
-	const last = run_event_scope.last_issue_event(
-		events,
-		run_event_scope.scope_of(carry),
-		issue_number,
-		is_lane_child,
-	)
+	const scope = run_event_scope.scope_of(carry)
+	const last = run_event_scope.last_issue_event(events, scope, issue_number, is_lane_child)
 
 	return {
 		carry_kind: carry.kind,
 		is_retrospective_done: run_carry.retrospective_done_of(carry),
 		is_at_cut_cap: carry.kind === 'carried' && run_carry.is_at_cut_cap(carry.carry),
 		is_handed_off: is_handed_off_here(carry),
+		is_merge_owed: run_event_scope.is_merge_owed(events, scope, issue_number),
 		last_event: last?.kind,
 	}
 }
@@ -102,6 +101,7 @@ function step_input(parts: PrepParts, run_reads: RunReads, is_lane_child: boolea
 		is_retrospective_done: run_reads.is_retrospective_done,
 		is_at_cut_cap: run_reads.is_at_cut_cap,
 		is_handed_off: run_reads.is_handed_off,
+		is_merge_owed: run_reads.is_merge_owed,
 		is_lane_child,
 		is_consumer: doctor_consumer.is_kit_consumer(find_package_directory(process.cwd())),
 		// Read here rather than in `run-step.ts` so the position logic stays a pure function of its input.

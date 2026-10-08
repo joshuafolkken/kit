@@ -2,7 +2,7 @@ import { backlog_idle } from '#scripts/backlog/backlog-idle'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import { run_board_notes } from './run-board-notes'
-import { run_board_status } from './run-board-status'
+import { run_board_status, type ItemStatus, type OpenRead } from './run-board-status'
 
 // joshuafolkken/kit#3430: what each child of a run is doing, and the run's own activity, read off the
 // event stream and the open lanes — no GitHub read.
@@ -16,6 +16,7 @@ const LAUNCH_3409 = '#3409 launched'
 const MERGE_3409 = '#3409 merged'
 const PR_3415 = '#3415 PR #3500'
 const DECISION_PARK = '#3433 parked (needs-decision)'
+const NONE: ReadonlySet<number> = new Set()
 
 function event_at(pos: number, at: string, kind: string, text: string): RunEvent {
 	return { pos, at, kind, text }
@@ -37,7 +38,7 @@ describe('run_board_status.statuses_of', () => {
 			event_at(4, T2, KIND.MERGE, MERGE_3409),
 			event_at(5, T3, KIND.PARK, DECISION_PARK),
 		]
-		const statuses = run_board_status.statuses_of(events, [])
+		const statuses = run_board_status.statuses_of(events, [], NONE)
 
 		expect(statuses.get(3409)).toStrictEqual({
 			state: 'merged',
@@ -48,8 +49,8 @@ describe('run_board_status.statuses_of', () => {
 		expect(statuses.get(3433)?.state).toBe('parked')
 	})
 
-	it('reads an open lane the stream never saw launched as running, with its lane', () => {
-		const statuses = run_board_status.statuses_of([], ['3420'])
+	it('reads an in-scope lane the stream never saw launched as running, with its lane', () => {
+		const statuses = run_board_status.statuses_of([], ['3420'], new Set([3420]))
 
 		expect(statuses.get(3420)).toStrictEqual({ state: 'running', lane: 'lane 3420' })
 	})
@@ -57,7 +58,49 @@ describe('run_board_status.statuses_of', () => {
 	it('leaves a settled child settled even while its lane is still open', () => {
 		const events = [event_at(1, T0, KIND.MERGE, MERGE_3409)]
 
-		expect(run_board_status.statuses_of(events, ['3409']).get(3409)?.state).toBe('merged')
+		expect(run_board_status.statuses_of(events, ['3409'], NONE).get(3409)?.state).toBe('merged')
+	})
+})
+
+describe('run_board_status.statuses_of lanes', () => {
+	it('leaves out a lane whose issue is neither on the stream nor in the run', () => {
+		const statuses = run_board_status.statuses_of([], ['3347'], new Set([3441]))
+
+		expect(statuses.has(3347)).toBe(false)
+	})
+
+	it('keeps a launched child running with its lane even when the plan does not name it', () => {
+		const events = [event_at(1, T0, KIND.CHILD_LAUNCH, LAUNCH_3409)]
+		const statuses = run_board_status.statuses_of(events, ['3409'], NONE)
+
+		expect(statuses.get(3409)).toStrictEqual({
+			state: 'running',
+			started_ms: Date.parse(T0),
+			lane: 'lane 3409',
+		})
+	})
+})
+
+describe('run_board_status.settle_closed', () => {
+	const RUNNING: ReadonlyMap<number, ItemStatus> = new Map([
+		[3409, { state: 'running', started_ms: Date.parse(T0) }],
+	])
+
+	it('draws a running child the open listing no longer holds as done', () => {
+		const settled = run_board_status.settle_closed(RUNNING, {
+			open_numbers: NONE,
+			read_ms: Date.parse(T1),
+		})
+
+		expect(settled.get(3409)).toStrictEqual({ state: 'done', started_ms: Date.parse(T0) })
+	})
+
+	it.each<[string, OpenRead]>([
+		['still open', { open_numbers: new Set([3409]), read_ms: Date.parse(T1) }],
+		['a capped listing', { open_numbers: undefined, read_ms: Date.parse(T1) }],
+		['launched after the read', { open_numbers: NONE, read_ms: Date.parse(T0) - 1 }],
+	])('keeps the child running when %s', (_label, read) => {
+		expect(run_board_status.settle_closed(RUNNING, read).get(3409)?.state).toBe('running')
 	})
 })
 
