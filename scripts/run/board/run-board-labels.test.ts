@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { styleText } from 'node:util'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_labels } from './run-board-labels'
+import { run_board_phase } from './run-board-phase'
 
 // joshuafolkken/kit#3430: the board's words follow the session language, and every time it draws is an
 // `HH:MM:SS` clock or span.
 
-const { bar_of, clock_of, elapsed_of, left_of, span_of, words_of } = run_board_labels
+const { bar_of, clock_of, elapsed_of, left_of, span_of, spinner_of, words_of } = run_board_labels
+const { PHASE_ICONS, PHASE_WORDS, SPINNER_FRAME_MS } = run_board_labels
 const SECOND = 1000
 const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
@@ -60,11 +63,52 @@ describe('run_board_labels.left_of', () => {
 })
 
 describe('run_board_labels.bar_of', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
 	it('fills the bar in proportion, empty for nothing to do and full when done', () => {
-		expect(bar_of(1, 4, 8)).toBe('━━░░░░░░')
-		expect(bar_of(0, 0, 4)).toBe('░░░░')
-		expect(bar_of(5, 4, 4)).toBe('━━━━')
+		vi.stubEnv('FORCE_COLOR', '0')
+
+		expect(bar_of(1, 4, 8)).toBe('██──────')
+		expect(bar_of(0, 0, 4)).toBe('────')
+		expect(bar_of(5, 4, 4)).toBe('████')
 		expect(bar_of(0, 1)).toHaveLength(10)
+	})
+
+	// joshuafolkken/kit#3452: a full block done, a dimmed thin line left where the output has color.
+	it('draws the done part in its color and the left part dimmed where the output is colored', () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+
+		expect(bar_of(1, 4, 4)).toBe(`${styleText('cyan', '█')}${styleText('dim', '───')}`)
+		expect(bar_of(4, 4, 4, 'green')).toBe(styleText('green', '████'))
+	})
+})
+
+describe('run_board_labels.PHASE_ICONS', () => {
+	it('draws every phase as its own two-column emoji', () => {
+		const icons = run_board_phase.PHASES.map((phase) => PHASE_ICONS[phase])
+
+		expect(new Set(icons).size).toBe(run_board_phase.PHASES.length)
+		expect(icons.every((icon) => /^\p{Emoji_Presentation}$/u.test(icon))).toBe(true)
+		expect(PHASE_ICONS.gate).toBe('🚦')
+	})
+
+	it('names every phase with a word of the legend in both languages', () => {
+		const words = run_board_phase.PHASES.map((phase) => words_of('ja')[PHASE_WORDS[phase]])
+
+		expect(words.every((word) => word.length > 0)).toBe(true)
+		expect(words_of('ja')[PHASE_WORDS.investigate]).toBe('調査')
+	})
+})
+
+describe('run_board_labels.spinner_of', () => {
+	it('turns one braille frame every quarter second and wraps after the last', () => {
+		expect(spinner_of(0)).toBe('⠋')
+		expect(spinner_of(SPINNER_FRAME_MS - 1)).toBe('⠋')
+		expect(spinner_of(SPINNER_FRAME_MS)).toBe('⠙')
+		expect(spinner_of(10 * SPINNER_FRAME_MS)).toBe('⠋')
+		expect(SPINNER_FRAME_MS).toBe(250)
 	})
 })
 

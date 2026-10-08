@@ -63,7 +63,7 @@ const BODY_FIELD = 'body'
 const FIELD_SEPARATOR = ','
 const EMPTY_BODY = ''
 
-// The two field names REST and `gh --json` disagree on. `url` is the one that bites: REST's `url` is
+// The field names REST and `gh --json` disagree on. `url` is the one that bites: REST's `url` is
 // the API endpoint, while `gh` answers the browser URL — and `epic_issue.is_pull_request` decides
 // from `/pull/` appearing in it, which the API endpoint never carries.
 //
@@ -71,6 +71,7 @@ const EMPTY_BODY = ''
 const REST_FIELD_NAMES = new Map<string, string>([
 	['url', 'html_url'],
 	['createdAt', 'created_at'],
+	['closedAt', 'closed_at'],
 ])
 
 const NOT_AN_ISSUE_MESSAGE = 'gh api answered something other than an issue object'

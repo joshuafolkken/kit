@@ -1,3 +1,6 @@
+import { styleText } from 'node:util'
+import cli_spinners from 'cli-spinners'
+import type { Phase } from './run-board-phase'
 import type { ItemState } from './run-board-status'
 
 // The words and the clock `run:board` draws with (joshuafolkken/kit#3430), in the session language as
@@ -15,8 +18,15 @@ const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR
 const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE
 // Every gauge is this wide — the plan, the machine and a row's phase (joshuafolkken/kit#3450).
 const BAR_WIDTH = 10
-const BAR_DONE = '━'
-const BAR_LEFT = '░'
+// A full block done and a thin line left (joshuafolkken/kit#3452): the shapes alone tell the two apart
+// where no color is drawn, and a terminal dims the line so the gauge does not read heavy.
+const BAR_DONE = '█'
+const BAR_LEFT = '─'
+const BAR_DONE_COLOR: TextColor = 'cyan'
+const BAR_LEFT_COLOR: TextColor = 'dim'
+// The spinner a running run and a running row turn (joshuafolkken/kit#3452), four frames a second.
+const SPINNER_FRAMES = cli_spinners.dots.frames
+const SPINNER_FRAME_MS = 250
 
 interface WordPair {
 	ja: string
@@ -36,6 +46,13 @@ const WORD_PAIRS = {
 	waiting: { ja: '待ち', en: 'waiting' },
 	decision: { ja: '判断待ち', en: 'decision' },
 	waits: { ja: '待ち先', en: 'waits on' },
+	dispatched: { ja: '起動', en: 'dispatched' },
+	investigate: { ja: '調査', en: 'investigate' },
+	implement: { ja: '実装', en: 'implement' },
+	review: { ja: 'レビュー', en: 'review' },
+	gate: { ja: 'gate', en: 'gate' },
+	commit: { ja: 'コミット', en: 'commit' },
+	followup: { ja: 'followup', en: 'followup' },
 	cpu: { ja: 'cpu', en: 'cpu' },
 	memory: { ja: 'mem', en: 'mem' },
 	swap: { ja: 'swap', en: 'swap' },
@@ -61,6 +78,8 @@ const WORD_PAIRS = {
 
 type Words = Readonly<Record<keyof typeof WORD_PAIRS, string>>
 
+type TextColor = Parameters<typeof styleText>[0]
+
 function words_in(lang: keyof WordPair): Words {
 	const entries = Object.entries(WORD_PAIRS).map(([key, pair]) => [key, pair[lang]])
 
@@ -85,9 +104,37 @@ const STATE_ICONS: Readonly<Record<ItemState, string>> = {
 // The blocking edge, chosen on the same rule: ⛓ is a text symbol.
 const WAITS_ICON = '🔗'
 
-// The header's gauges and marks (joshuafolkken/kit#3450); 📊 rather than 🏁, which is a finished row.
+// A running row's phases as icons (joshuafolkken/kit#3452), chosen on the same rule; the row draws every
+// phase it has passed, so the rightmost icon is what it is doing now (joshuafolkken/kit#3460).
+const PHASE_ICONS: Readonly<Record<Phase, string>> = {
+	dispatched: '🚀',
+	investigate: '🔍',
+	plan: '📝',
+	implement: '🔨',
+	review: '👀',
+	gate: '🚦',
+	commit: '📦',
+	followup: '🔁',
+	merged: STATE_ICONS.merged,
+}
+
+// The legend's word for each phase — the header's own `plan` and `merged` where the phase shares one.
+const PHASE_WORDS: Readonly<Record<Phase, keyof Words>> = {
+	dispatched: 'dispatched',
+	investigate: 'investigate',
+	plan: 'plan',
+	implement: 'implement',
+	review: 'review',
+	gate: 'gate',
+	commit: 'commit',
+	followup: 'followup',
+	merged: 'merged',
+}
+
+// The header's gauges and marks (joshuafolkken/kit#3450); 📊 rather than 🏁, which is a finished row. ⚡
+// rather than 🔥 (joshuafolkken/kit#3452): a fire beside a gauge drawn green read as an alarm.
 const HEADER_ICONS = {
-	cpu: '🔥',
+	cpu: '⚡',
 	memory: '🧠',
 	swap: '💾',
 	progress: '📊',
@@ -137,25 +184,56 @@ function left_of(ms: number): string {
 	return `${String(hours)}h${two_digits(minutes % MINUTES_PER_HOUR)}m`
 }
 
-// **The one progress bar the board draws** — the header's plan and every running row's phase
-// (joshuafolkken/kit#3444): `done` of `total` filled in proportion across `width` cells.
-function bar_of(done: number, total: number, width: number = BAR_WIDTH): string {
+// A part of a gauge in its color; an empty part, or no color, draws no escape. `styleText` drops the
+// escape itself where stdout draws no color (a pipe, `NO_COLOR`), so a gauge never disagrees with the
+// rest of the board about it.
+function painted(color: TextColor | undefined, text: string): string {
+	return color === undefined || text === '' ? text : styleText(color, text)
+}
+
+// **The one progress bar the board draws** — the header's plan, the machine and every running row's
+// phase (joshuafolkken/kit#3444): `done` of `total` filled in proportion across `width` cells, the done
+// part in `color` (`undefined` leaves it the terminal's own).
+function bar_of(
+	done: number,
+	total: number,
+	width: number = BAR_WIDTH,
+	color: TextColor | undefined = BAR_DONE_COLOR,
+): string {
 	const filled = total === 0 ? 0 : Math.round((Math.min(done, total) / total) * width)
 
-	return BAR_DONE.repeat(filled) + BAR_LEFT.repeat(width - filled)
+	return (
+		painted(color, BAR_DONE.repeat(filled)) +
+		painted(BAR_LEFT_COLOR, BAR_LEFT.repeat(width - filled))
+	)
+}
+
+// The spinner's frame at a moment, from the clock rather than a count of redraws, so the frame a redraw
+// draws needs no state carried between redraws.
+function spinner_of(now_ms: number): string {
+	const step = Math.floor(Math.max(0, now_ms) / SPINNER_FRAME_MS)
+
+	return SPINNER_FRAMES[step % SPINNER_FRAMES.length] ?? ''
 }
 
 const run_board_labels = {
+	BAR_LEFT,
+	BAR_LEFT_COLOR,
 	HEADER_ICONS,
+	PHASE_ICONS,
+	PHASE_WORDS,
+	SPINNER_FRAME_MS,
 	STATE_ICONS,
 	WAITS_ICON,
 	bar_of,
 	clock_of,
 	elapsed_of,
 	left_of,
+	painted,
 	span_of,
+	spinner_of,
 	words_of,
 }
 
 export { run_board_labels }
-export type { Words }
+export type { TextColor, Words }

@@ -172,7 +172,16 @@ function numbers_of(plan: BoardPlan): ReadonlySet<number> {
 	return new Set([...plan.waves.waves.flat(), ...plan.waves.unreached].map((child) => child.number))
 }
 
-const run_board_layout = { is_settled, layout_of, numbers_of }
+// Every row the layout draws, an epic's children among them — what the header counts and the legend reads.
+function rows_of(layout: BoardLayout): Array<BoardRow> {
+	const waves = layout.waves
+		.flat()
+		.flatMap((entry) => (entry.kind === 'row' ? [entry.row] : entry.rows))
+
+	return [...layout.active, ...waves, ...layout.people, ...layout.unreached]
+}
+
+const run_board_layout = { is_settled, layout_of, numbers_of, rows_of }
 
 export { run_board_layout }
 export type { BoardLayout, BoardPlan, BoardRow, WaveEntry }

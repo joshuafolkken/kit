@@ -1,6 +1,7 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
 import { vi } from 'vitest'
+import type { ClosedIssue } from './run-board-closed'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
@@ -23,16 +24,24 @@ const STOPPED = new Error('stopped')
 // A machine with nothing swapped and half its memory free.
 const SAMPLE: MachineSample = {
 	cpu: { busy: 0, total: 0 },
-	memory: { available_mb: 512, swapped_mb: 0 },
+	memory: { available_mb: 512, swapped_mb: 0, pressure_level: undefined },
 	total_mb: 1024,
 }
 
-interface Harness {
-	ports: BoardPorts
-	frames: Array<string>
+// The counted reads a test answers and inspects.
+interface Reads {
 	read_plan: ReturnType<typeof vi.fn<(scope: NamedPlan) => Promise<BoardPlan | undefined>>>
 	read_local: ReturnType<typeof vi.fn<() => Promise<LocalRead | undefined>>>
 	read_machine: ReturnType<typeof vi.fn<() => Promise<MachineSample>>>
+	// Nothing reads closed unless a test answers otherwise.
+	read_closed: ReturnType<
+		typeof vi.fn<(issues: ReadonlyArray<number>) => Promise<ReadonlyMap<number, ClosedIssue>>>
+	>
+}
+
+interface Harness extends Reads {
+	ports: BoardPorts
+	frames: Array<string>
 	clock: { now_ms: number }
 	leaves: Array<() => void>
 }
@@ -55,17 +64,25 @@ function stopper(): () => Promise<void> {
 	}
 }
 
+function reads_of(local: LocalRead | undefined, plans: Array<BoardPlan | undefined>): Reads {
+	return {
+		read_plan: vi.fn(async (_scope: NamedPlan) => plans.shift()),
+		read_local: vi.fn(async () => local),
+		read_machine: vi.fn(async () => SAMPLE),
+		read_closed: vi.fn(
+			async (_issues: ReadonlyArray<number>): Promise<ReadonlyMap<number, ClosedIssue>> =>
+				new Map(),
+		),
+	}
+}
+
 function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefined>): Harness {
 	const frames: Array<string> = []
 	const leaves: Array<() => void> = []
 	const clock = { now_ms: START }
-	const read_plan = vi.fn(async (_scope: NamedPlan) => plans.shift())
-	const read_local = vi.fn(async () => local)
-	const read_machine = vi.fn(async () => SAMPLE)
+	const reads = reads_of(local, plans)
 	const ports: BoardPorts = {
-		read_plan,
-		read_local,
-		read_machine,
+		...reads,
 		now: () => clock.now_ms,
 		write: (frame) => {
 			frames.push(frame)
@@ -78,7 +95,7 @@ function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefine
 		sleep: stopper(),
 	}
 
-	return { ports, frames, read_plan, read_local, read_machine, clock, leaves }
+	return { ...reads, ports, frames, clock, leaves }
 }
 
 const run_board_fixture = { LOCAL, START, STOPPED, WORDS, harness, plan_titled }

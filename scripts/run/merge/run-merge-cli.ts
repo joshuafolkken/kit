@@ -227,15 +227,26 @@ function report_count_refused(carry: RunCarry | undefined): MergeVerdict {
 	return emit(BUSY_TOKEN, FAILURE_EXIT_CODE)
 }
 
-// A merge is the only outcome that asks the hand-off check, because it is the only one that returned
-// the tree to a clean default branch. `over` stops the offer; `under` asks for the next child.
-async function on_merged(ctx: MergeContext): Promise<MergeVerdict> {
+// A merged child counted and its lane closed, the merge put on the stream and in the ledger. Returns the
+// carry when the ownership check refused it, `undefined` once recorded. `run:carry --end` records the
+// merges a run ended with through it too (`run-merge-collect.ts`, joshuafolkken/kit#3451).
+async function record_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
 	const refused = await run_merge_steps.do_merged(ctx)
 
-	if (refused !== undefined) return report_count_refused(refused)
+	if (refused !== undefined) return refused
 
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.MERGE, `#${ctx.child} merged`)
 	await lane_ledger.record_merge(Number(ctx.child))
+
+	return undefined
+}
+
+// A merge is the only outcome that asks the hand-off check, because it is the only one that returned
+// the tree to a clean default branch. `over` stops the offer; `under` asks for the next child.
+async function on_merged(ctx: MergeContext): Promise<MergeVerdict> {
+	const refused = await record_merged(ctx)
+
+	if (refused !== undefined) return report_count_refused(refused)
 
 	if (await run_merge_steps.is_over_budget(ctx.over)) return emit(OVER_TOKEN, SUCCESS_EXIT_CODE)
 
@@ -398,6 +409,8 @@ const run_merge_cli = {
 	STOP_TOKEN,
 	merge_child,
 	parse,
+	read_merged_pr,
+	record_merged,
 	run,
 }
 

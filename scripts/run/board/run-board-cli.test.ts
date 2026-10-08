@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
@@ -5,7 +6,7 @@ import { run_board_fixture } from './run-board-fixture'
 // joshuafolkken/kit#3430: the command's arguments and its terminal. What one redraw reads and draws is
 // `run-board-tick.test.ts`'s (joshuafolkken/kit#3444).
 
-const { STOPPED, harness } = run_board_fixture
+const { LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
 const ESCAPE = '\u{1B}'
 const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l`
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
@@ -33,6 +34,17 @@ describe('run_board_cli.run', () => {
 		expect(frames).toHaveLength(1)
 		expect(frames[0]).not.toContain(ESCAPE)
 		expect(leaves).toHaveLength(0)
+	})
+
+	// joshuafolkken/kit#3452: a frame left behind on the terminal draws no frozen spinner frame.
+	it('draws the still run and row icons for --once on a terminal', async () => {
+		const launch = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
+		const { ports, frames } = harness({ ...LOCAL, events: [launch] }, [plan_titled('a')])
+
+		await run_board_cli.run(['--once'], { ...ports, is_tty: true })
+
+		expect(stripVTControlCharacters(frames[0] ?? '')).toMatch(/^▶ backlogrun/u)
+		expect(frames[0]).toContain('  🔄 1  a')
 	})
 })
 

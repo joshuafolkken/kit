@@ -1,18 +1,29 @@
 import { stripVTControlCharacters, styleText } from 'node:util'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { TextColor } from './run-board-labels'
 import { run_board_machine, type MachineMark } from './run-board-machine'
 
 // joshuafolkken/kit#3450: the machine line — CPU and swap from the difference between two samples,
 // memory pressure from one, a bar that stops full, yellow and red past a threshold, and nothing drawn
-// for a figure that could not be read.
+// for a figure that could not be read. joshuafolkken/kit#3452: icon, figure, then bar; CPU and memory
+// green when normal, memory colored by the kernel's pressure verdict where one was read.
 
 const { gauges_of, line_of } = run_board_machine
 const SECOND = 1000
-const UNREAD = { cpu_percent: undefined, memory_percent: undefined, swap_mb_per_s: undefined }
+const BAR_WIDTH = 10
+const WARNING = 2
+const UNREAD = {
+	cpu_percent: undefined,
+	memory_percent: undefined,
+	swap_mb_per_s: undefined,
+	memory_pressure: undefined,
+}
 
 function sample(busy: number, total: number, swapped_mb: number | undefined): MachineSample {
-	return { cpu: { busy, total }, memory: { available_mb: 630, swapped_mb }, total_mb: 1000 }
+	const memory = { available_mb: 630, swapped_mb, pressure_level: WARNING }
+
+	return { cpu: { busy, total }, memory, total_mb: 1000 }
 }
 
 function mark(at_ms: number, machine: MachineSample): MachineMark {
@@ -36,6 +47,18 @@ function swap_line(rate: number): string {
 	return line_of({ ...UNREAD, swap_mb_per_s: rate }) ?? ''
 }
 
+function memory_line(percent: number, pressure: number | undefined): string {
+	return line_of({ ...UNREAD, memory_percent: percent, memory_pressure: pressure }) ?? ''
+}
+
+// A colored bar as the board draws it: `filled` cells in `color`, the rest dimmed.
+function bar(filled: number, color: TextColor): string {
+	const done = filled === 0 ? '' : styleText(color, '█'.repeat(filled))
+	const left = filled === BAR_WIDTH ? '' : styleText('dim', '─'.repeat(BAR_WIDTH - filled))
+
+	return done + left
+}
+
 describe('run_board_machine.gauges_of', () => {
 	it('draws CPU and swap from the difference over the time that passed', () => {
 		const before = mark(0, sample(100, 1000, 10))
@@ -45,6 +68,7 @@ describe('run_board_machine.gauges_of', () => {
 			cpu_percent: 15,
 			memory_percent: 37,
 			swap_mb_per_s: 3,
+			memory_pressure: WARNING,
 		})
 	})
 
@@ -55,6 +79,7 @@ describe('run_board_machine.gauges_of', () => {
 			cpu_percent: undefined,
 			memory_percent: 37,
 			swap_mb_per_s: undefined,
+			memory_pressure: WARNING,
 		})
 	})
 
@@ -65,20 +90,21 @@ describe('run_board_machine.gauges_of', () => {
 })
 
 describe('run_board_machine.line_of', () => {
-	it('draws the three gauges with right-aligned figures', () => {
-		const gauges = { cpu_percent: 15, memory_percent: 37, swap_mb_per_s: 3.1 }
+	it('draws each gauge as icon, right-aligned figure, then bar', () => {
+		const gauges = { ...UNREAD, cpu_percent: 15, memory_percent: 37, swap_mb_per_s: 3.1 }
 
-		expect(plain(gauges)).toBe('🔥 ━━░░░░░░░░  15%   🧠 ━━━━░░░░░░  37%   💾 ━━░░░░░░░░ 3.1M/s')
+		expect(plain(gauges)).toBe('⚡  15% ██────────   🧠  37% ████──────   💾 3.1M/s ██────────')
 	})
 
 	it('stops the bar full past the gauge’s end, keeping the figure the same width', () => {
-		const gauges = { cpu_percent: 100, memory_percent: undefined, swap_mb_per_s: 42 }
+		const gauges = { ...UNREAD, cpu_percent: 100, swap_mb_per_s: 42 }
 
-		expect(plain(gauges)).toBe(`🔥 ${'━'.repeat(10)} 100%   💾 ${'━'.repeat(10)}  42M/s`)
+		expect(plain(gauges)).toBe(`⚡ 100% ${'█'.repeat(10)}   💾  42M/s ${'█'.repeat(10)}`)
 	})
 
 	it('leaves out an unread gauge, and the whole line when none was read', () => {
-		expect(plain({ ...UNREAD, memory_percent: 37 })).toBe('🧠 ━━━━░░░░░░  37%')
+		expect(plain({ ...UNREAD, memory_percent: 37 })).toBe('🧠  37% ████──────')
+		expect(plain({ ...UNREAD, swap_mb_per_s: 0 })).toBe(`💾 0.0M/s ${'─'.repeat(10)}`)
 		expect(line_of(UNREAD)).toBeUndefined()
 		expect(line_of(undefined)).toBeUndefined()
 	})
@@ -89,20 +115,39 @@ describe('run_board_machine.line_of colors', () => {
 		vi.unstubAllEnvs()
 	})
 
-	it('colors swap yellow from 1 MB/s and red from 10 MB/s', () => {
+	it('colors swap yellow from 1 MB/s and red from 10 MB/s, and leaves a quiet swap uncolored', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(swap_line(0.5)).toBe('💾 ░░░░░░░░░░ 0.5M/s')
-		expect(swap_line(3)).toBe(`💾 ${styleText('yellow', '━━░░░░░░░░ 3.0M/s')}`)
-		expect(swap_line(12)).toBe(`💾 ${styleText('red', '━━━━━━░░░░  12M/s')}`)
+		expect(swap_line(0.5)).toBe(`💾 0.5M/s ${styleText('dim', '─'.repeat(10))}`)
+		expect(swap_line(3)).toBe(`💾 ${styleText('yellow', '3.0M/s')} ${bar(2, 'yellow')}`)
+		expect(swap_line(12)).toBe(`💾 ${styleText('red', ' 12M/s')} ${bar(6, 'red')}`)
 	})
 
-	it('colors CPU and memory past their thresholds', () => {
+	it('draws a quiet CPU green and colors it yellow and red past its thresholds', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(line_of({ ...UNREAD, cpu_percent: 95 })).toContain(styleText('red', '━━━━━━━━━━  95%'))
-		expect(line_of({ ...UNREAD, memory_percent: 75 })).toContain(
-			styleText('yellow', '━━━━━━━━░░  75%'),
+		expect(line_of({ ...UNREAD, cpu_percent: 30 })).toBe(`⚡  30% ${bar(3, 'green')}`)
+		expect(line_of({ ...UNREAD, cpu_percent: 75 })).toBe(
+			`⚡ ${styleText('yellow', ' 75%')} ${bar(8, 'yellow')}`,
 		)
+		expect(line_of({ ...UNREAD, cpu_percent: 95 })).toBe(
+			`⚡ ${styleText('red', ' 95%')} ${bar(10, 'red')}`,
+		)
+	})
+
+	it('colors memory by the kernel pressure verdict 1 / 2 / 4 whatever its share', () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+
+		expect(memory_line(90, 1)).toBe(`🧠  90% ${bar(9, 'green')}`)
+		expect(memory_line(50, 2)).toBe(`🧠 ${styleText('yellow', ' 50%')} ${bar(5, 'yellow')}`)
+		expect(memory_line(50, 4)).toBe(`🧠 ${styleText('red', ' 50%')} ${bar(5, 'red')}`)
+	})
+
+	it('falls back to the memory thresholds where no known verdict was read', () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+
+		expect(memory_line(30, undefined)).toBe(`🧠  30% ${bar(3, 'green')}`)
+		expect(memory_line(75, undefined)).toBe(`🧠 ${styleText('yellow', ' 75%')} ${bar(8, 'yellow')}`)
+		expect(memory_line(90, 3)).toBe(`🧠 ${styleText('red', ' 90%')} ${bar(9, 'red')}`)
 	})
 })

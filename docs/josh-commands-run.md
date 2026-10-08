@@ -29,7 +29,7 @@ pnpm josh run:tidy
 
 - **Lanes:** closes a lane whose issue was closed by a merge, whose work tree has no uncommitted change, whose branch has no commit that no remote reaches, and that no live run holds — then releases its run record.
 - **Stashes:** drops an entry when every issue its message names (`#N`, a leading `N: `, or an `On N-lane:` branch) was closed by a merge. An entry that touches the observation ledger has its ledger lines appended first to the running work tree's own ledger file, less those any file of `.josh/observations/` already holds.
-- **Left alone:** an issue closed as not planned or without a merged pull request, an open issue, a stash naming no issue, a lane with changes or unpushed commits.
+- **Left alone:** an issue closed as not planned or without a merged pull request, an open issue, a stash naming no issue, a lane with changes or unpushed commits, and a lane the running `backlogrun` launched and has not settled — its `run:merge` (or `run:carry --end`) records that merge.
 
 "Closed by a merge" is read from the issue's REST timeline: its latest closed/reopened event is `closed` as completed (not `not_planned` or `duplicate`) and a merged pull request cross-references it.
 
@@ -55,6 +55,7 @@ pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind pa
 - `--retrospective` marks the end-of-run retrospective run, once per invocation, and requires `--summary <text>` — the same close writes that result as one `retrospective` event on the run's event stream (best-effort), so a run that filed zero improvements reads apart from one whose retrospective never ran. Either flag without the other is refused.
 - `--stopped <reason>` rides on `--end`: the run ended by _stopping_ rather than finishing, so one ⏸️ confirmation is pushed with the reason as the record is cleared, reaching the person after a cut a headless parent's report would not. A bare `--end` (a clean finish) stays silent, and because `--end` removes the record a second `--end --stopped` never sends twice. Named without `--end` it is ignored.
 - `--end` over a live record flushes pending ledger lines once; a failed flush goes to stderr and the record is still cleared.
+- `--end` over a live record first collects each lane the run launched and never settled whose issue merged — closed by a merged pull request, or left open behind one — exactly as `run:merge` would: the merge is counted, put on the event stream and in the ledger, and the lane closed. A lane a detached `josh ship` still supervises, or one that did not merge, is left; a failed collection goes to stderr and the record is still cleared.
 - `--end` keeps the run it removes as the last ended run — its invocation, start and end, one record overwritten by the next `--end` — so `run:board` can still draw a finished run.
 
 **Output / exit codes:** stdout is one token (`--json` prints the record on one line). `began`, `resumed`, `carried`, `counted`, `ended`, `expired` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown`, `over` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
@@ -402,7 +403,7 @@ The header is two lines of symbols: the run's state (`▶` running, `⏸` idle, 
 
 On a terminal it draws on the alternate screen, as `top` and `less` do, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and the cursor that were there before. `--once`, or a stdout that is not a terminal (a pipe or a redirect), writes one frame with no screen control and exits — no color either when it is not a terminal.
 
-**Output / exit codes:** the stream and lanes re-read at most every five seconds; the plan from GitHub at most every two minutes, keeping the previous one on a failed read. After `run:carry --end` the board keeps the ended run — `■`, its duration as `⏱` and when it ended in the header, no `⌛`, only that run's events — until the next run begins. No run here, running or ended, prints `no run` and reads no plan. Exits 0; an unknown argument exits 1; Ctrl+C exits 130 and SIGTERM 143.
+**Output / exit codes:** the stream and lanes re-read at most every five seconds; the plan from GitHub at most every two minutes, keeping the previous one on a failed read. A touched child the open listing no longer holds is read from GitHub once — its title, when it closed and whether a merged pull request closed it — and drawn `✅` (merged) or `🏁` with its time; until that read answers it is drawn `🏁` with no time. After `run:carry --end` the board keeps the ended run — `■`, its duration as `⏱` and when it ended in the header, no `⌛`, only that run's events — until the next run begins. No run here, running or ended, prints `no run` and reads no plan. Exits 0; an unknown argument exits 1; Ctrl+C exits 130 and SIGTERM 143.
 
 ### `josh run:watcher:guard`
 

@@ -4,6 +4,7 @@ import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_merge_collect } from '#scripts/run/merge/run-merge-collect'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_stop_notify } from '#scripts/run/run-stop-notify'
 import {
@@ -378,11 +379,13 @@ function close_record(directory: string): CarryRead {
 	return read
 }
 
+// The merges the run ended with are recorded while its record can still count them (joshuafolkken/kit#3451).
 async function finish(
 	directory: string,
 	stopped: string | undefined,
 	is_json: boolean,
 ): Promise<number> {
+	await run_merge_collect.collect_merged(directory)
 	const read = close_record(directory)
 	const notice = run_stop_notify.plan(read, stopped)
 

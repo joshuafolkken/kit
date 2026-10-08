@@ -1,18 +1,18 @@
 {
 	"scripts": {
-		"files": 997,
-		"code_lines": 82493,
-		"comment_lines": 33247,
+		"files": 1000,
+		"code_lines": 82841,
+		"comment_lines": 33368,
 		"comment_ratio": 0.4
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2345
+		"lines": 2347
 	},
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12231,
-		"on_demand_bytes": 558400
+		"on_demand_bytes": 559132
 	},
 	"accepted": {
 		"reason": "#3454 adds run_headless.is_cut_capped, the single cut-cap reader that exempts a headless judgment session's hand-back cut",
