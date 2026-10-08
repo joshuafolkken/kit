@@ -42,7 +42,7 @@
    - ルール上書きが要るなら **正しいレイヤー**（kit / app-kit の共有設定）でスコープする。消費者リポジトリでの場当たり的な一回限りの disable にしない
    - 破壊が first-party パッケージ（kit / app-kit）起因なら、**そこに Issue を立てて適切な altitude で直す**。消費者側の回避だけで済ませない（→ `upstream-interrupt.md`）
 3. **pin-back は最終手段**: fix-forward が本当に不可能／ブロックされている（例: 未リリースの上流修正待ち）ときだけ、古いバージョンへ固定する。固定するときは **理由を記録し、最新へ戻すためのトラッキング Issue を立てる**。pin-back を既定の推奨として提示してはならない
-4. **既存の保護を尊重する**: fix-forward は保護された pin を黙って書き換える許可ではない。overrides と `devEngines` の承認ゲートの単一ソースは `CLAUDE.md` → "Dependency overrides" と `dependency-update` skill である
+4. **既存の保護を尊重する**: fix-forward は保護された pin を黙って書き換える許可ではない。overrides と `devEngines` の承認ゲートの単一ソースは `CLAUDE.md` → "Decision autonomy" と `dependency-update` skill である
 5. **タイムリーに**: バンプ起因の破壊は、可能な限り同じ作業セッション内で速やかに対処し、pin の裏に先送りしない
 
 ## durable-rules — 恒久ルールは MEMORY ではなくプロンプト／ドキュメントに書く

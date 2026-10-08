@@ -1,6 +1,6 @@
 ---
 name: epic-commands
-description: The procedures for the `josh epic:*` commands that make an epic runnable without a person watching — `epic:audit` (find contradictions across the children), `epic:next` (what is runnable, per repository), and `epic:bundle` (does a newly filed issue belong with one already in the backlog). Also how an epic spans repositories and why a cross-repository dependency waits for a publish. Read this before running any of those commands, before writing an epic that tracks a child in another repository, and when `epic:bundle` places a filed issue (anything but `Nothing to bundle.`).
+description: The procedures for the `josh epic:*` commands that make an epic runnable without a person watching — `epic:audit` (find contradictions across the children), `epic:next` (what is runnable, per repository), and `epic:bundle` (does a newly filed issue belong with one already in the backlog). Also how an epic spans repositories and why a cross-repository dependency waits for a publish. Read this before running any of those commands, before writing an epic that tracks a child in another repository, when `epic:bundle` places a filed issue (anything but `Nothing to bundle.`), and when recording a decision on a `needs-decision` child.
 ---
 
 # The `josh epic:*` commands

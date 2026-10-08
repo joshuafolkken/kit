@@ -4,6 +4,7 @@ import {
 	read_repo_file,
 	read_unwrapped,
 	WORKFLOW_PROMPT,
+	WORKFLOW_PROMPT_DIRECTORY,
 } from '#scripts/document/ai-document-fixture'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { describe, expect, it } from 'vitest'
@@ -187,15 +188,13 @@ describe(`${WIP_TOPIC} — the WIP cap and all three sides of its procedure`, ()
 	})
 })
 
-// The resident surface owes the trigger for the defaults that bind outside a command and no more: a
-// turn that never opens a pointer still has to drop rather than file, and count before filing. The
-// procedures stay at their pointers, which is what keeps `CLAUDE.md` under its budget — the count
-// command included, so the one place it is written stays the one place it has to be kept correct.
+// The resident surface owes the route to the defaults that bind outside a command and no more. The
+// disposition binds at the review that precedes a commit, which reads `prompts/review.md` (pinned by
+// `REVIEW_MARKERS` above), so the resident line names the step and its pointer (joshuafolkken/kit#3395).
 // The split default binds only once a command has started, so it is read from `split-assessment.md`
 // (pinned by `SPLIT_MARKERS` above) rather than restated resident (joshuafolkken/kit#3077).
-const RESIDENT_MARKERS: ReadonlyArray<string> = [
-	'file it as a follow-up Issue only when it is a confirmed defect that reaches a runtime path',
-]
+const RESIDENT_MARKERS: ReadonlyArray<string> = ['then the three-way disposition', REVIEW_PROMPT]
+const RULE_DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
 
 // joshuafolkken/kit#1524 moved the WIP cap off residency: filing an Issue is one nameable tool call,
 // so `pnpm josh rule:guard` refuses that call and states the rule there. **The cap is therefore
@@ -234,24 +233,14 @@ describe.each(AI_DOCS)('%s — carries the trigger for the resident defaults', (
 		expect(content).toContain(marker)
 	})
 
-	// **The cap keeps its trigger resident and loses its section.** A hook reaches this harness
-	// alone, so removing the line outright would leave a Codex, Gemini or Cursor session — each
-	// reading `CLAUDE.md` through a pointer and running no hook — able to file past 30 with nothing
-	// telling it to count. What the relocation takes out is the heading and the procedure; the
-	// explanation of why the count and the tests exist went with it (joshuafolkken/kit#3256).
-	it.each([
-		'**File through `pnpm josh issue:file`, never a hand count; above the WIP cap, close one first.**',
-		'Exempt: a filing the run is blocked by, and an **interrupt**',
-		'a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository',
-		// Without these two the three tests are listed with nothing saying what happens when none is
-		// met, and no instruction to state the overage — for the agent that runs no hook, which is
-		// the whole audience the resident line exists for.
-		'anything else stays discretionary',
-		'both proceed, stating the overage',
-		'`pnpm josh rule:guard` states the rest at the call that files',
-		WIP_TOPIC,
-	])('keeps the trigger %j resident', (marker) => {
-		expect(content).toContain(marker)
+	// **The cap keeps a route, not a trigger.** joshuafolkken/kit#3395 took the resident trigger out:
+	// an agent that runs no hook applies the delivery enumeration as a self-check list
+	// (`principles.md`, joshuafolkken/kit#3079), so the resident line names that enumeration and the
+	// enumeration names the topic file.
+	it('routes to the delivery enumeration that lists the cap', () => {
+		expect(content).toContain('WIP cap')
+		expect(content).toContain(RULE_DELIVERY)
+		expect(read_unwrapped(RULE_DELIVERY)).toContain('（`wip-cap.md`）')
 	})
 
 	it('no longer carries a section of its own', () => {

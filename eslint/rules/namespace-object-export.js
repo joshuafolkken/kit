@@ -2,7 +2,7 @@
 // （joshuafolkken/kit#2180）。kit の規約は「複数の関数は名前空間オブジェクト（`export { my_module }`）
 // にまとめる。定数は対象外」で、これは §4.2 のチェックリスト7項目のうち唯一 lint ルールが無く、
 // 目視でしか判定できなかった項目だった。散文の指示に頼るとドリフトするため、声高に失敗する lint
-// ルールでガードする。詳細は CLAUDE.md の Critical Conventions → Functions & exports。
+// ルールでガードする。詳細は prompts/coding-standards.md → Conventions。
 //
 // 検出対象は「インラインで export された関数定義」に限る。`export function foo` と
 // `export const foo = () => {}` / `export const foo = function () {}` を数え、2 件以上あれば違反。
@@ -13,7 +13,7 @@
 // 個別 export を許可しているため除外する。
 
 const RULE_MESSAGE =
-	'Group these exported functions into a single namespace object (`export { my_module }`). Individual function exports are only allowed when a file exports exactly one. See CLAUDE.md → Functions & exports.'
+	'Group these exported functions into a single namespace object (`export { my_module }`). Individual function exports are only allowed when a file exports exactly one. See prompts/coding-standards.md → Conventions.'
 
 // 2 件以上で違反。1 件の個別 export は許容される。
 const MIN_INDIVIDUAL_EXPORTS = 2

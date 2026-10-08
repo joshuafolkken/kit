@@ -5,8 +5,7 @@ import { shell_segments } from './shell-segments'
 
 // The trigger and the delivered text behind the `file-body` row of `delivered-rules.ts`
 // (joshuafolkken/kit#2120). Group 3 of the three Bash-string gaps: a file's new body carried inline in
-// a shell command, the form `CLAUDE.md` → "Never carry a file's new text inside a shell command" and
-// `file-edits.md` forbid.
+// a shell command, the form `prompts/collaboration-workflow/file-edits.md` forbids.
 //
 // **The detector existed for measurement and refused nothing.** `time-writes.ts` already knew a
 // redirection and a heredoc write a file; nothing turned that knowledge into a refusal. This row does,

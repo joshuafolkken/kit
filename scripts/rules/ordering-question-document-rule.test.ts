@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest'
 const RESIDENCY = 'prompts/collaboration-workflow/residency.md'
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const CLAUDE = 'CLAUDE.md'
+const RULE_DELIVERY = 'prompts/collaboration-workflow/rule-delivery.md'
 const FULLRUN = '.claude/skills/workflow-commands/fullrun.md'
 const BACKLOGRUN = '.claude/skills/workflow-commands/backlogrun.md'
 
@@ -35,9 +36,12 @@ describe('residency.md carries the ordering question as the single source', () =
 	})
 })
 
-describe('CLAUDE.md carries the ordering-question pointer', () => {
-	it('names run:step so agents know where an ordering rule goes', () => {
-		expect(read_repo_file(CLAUDE)).toContain(DRIVER_COMMAND)
+// joshuafolkken/kit#3395: CLAUDE.md routes to the delivery enumeration, whose rule-prose entry names
+// the ordering question and residency.md, which names run:step (asserted above).
+describe('CLAUDE.md reaches the ordering question through the delivery enumeration', () => {
+	it('names rule-delivery.md, which lists the ordering question', () => {
+		expect(read_repo_file(CLAUDE)).toContain(RULE_DELIVERY)
+		expect(read_repo_file(RULE_DELIVERY)).toContain('順序の問い')
 	})
 })
 

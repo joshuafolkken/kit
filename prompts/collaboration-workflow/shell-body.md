@@ -1,6 +1,6 @@
 ## 本文をシェルの二重引用符に載せない（joshuafolkken/kit#1198）
 
-`CLAUDE.md` →「Never put a body in shell double quotes」の単一ソース。隣にある「Never carry a file's new text inside a shell command」（[`file-edits.md`](./file-edits.md)）と対になる規則である。**あちらは「ファイルの中身をシェルに載せるな」、こちらは「本文をシェルに載せるな」** であり、禁じている理由が違う — あちらはコストの二重払い、こちらは**テキストが実行されること**である。
+「本文をシェルの二重引用符に載せない」規則の単一ソース（`CLAUDE.md` からは [`rule-delivery.md`](./rule-delivery.md) →「配送されている規則」を経て届く）。「ファイル本文をシェルに載せない」（[`file-edits.md`](./file-edits.md)）と対になる規則である。**あちらは「ファイルの中身をシェルに載せるな」、こちらは「本文をシェルに載せるな」** であり、禁じている理由が違う — あちらはコストの二重払い、こちらは**テキストが実行されること**である。
 
 ### 何が起きるのか
 

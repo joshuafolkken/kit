@@ -1,9 +1,14 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { Linter } from 'eslint'
 import { describe, expect, it } from 'vitest'
 import { english_only_prose_plugin } from './english-only-prose.js'
 
 const ECMA_VERSION = 2024
 const RULE_ID = 'kit/english-only-prose'
+const CODING_STANDARDS_PATH = fileURLToPath(
+	new URL('../../prompts/coding-standards.md', import.meta.url),
+)
 
 // A minimal flat config mirroring how `eslint.config.js` wires the rule: the plugin under the `kit`
 // namespace, the rule set to error. Linting an inline source exercises the comment scan and the
@@ -88,4 +93,18 @@ describe('english-only-prose — Japanese as data is not prose', () => {
 	it('allows Japanese inside a non-title call argument', () => {
 		expect(count("translate('日本語のデータ')\n")).toBe(0)
 	})
+})
+
+// Both messages are read by every consumer that trips the rule, so the section they cite has to
+// exist — joshuafolkken/kit#3395 moved the content rules out of `CLAUDE.md`.
+describe('english-only-prose — the messages', () => {
+	it.each(['// 日本語\n', "it('日本語', check)\n"])(
+		'cites the conventions section when it flags %j',
+		(source) => {
+			const flagged = messages_for(source).find((message) => message.ruleId === RULE_ID)
+
+			expect(flagged?.message).toContain('(prompts/coding-standards.md → Conventions)')
+			expect(readFileSync(CODING_STANDARDS_PATH, 'utf8')).toContain('\n## Conventions\n')
+		},
+	)
 })

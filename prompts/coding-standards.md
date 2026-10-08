@@ -1,8 +1,17 @@
 # コーディング指針 — lint では表せない書き方
 
-命名・関数の構文・エクスポート・ファイル名・品質上限・型安全・早期 return・マジックナンバーといった機械的な規約の単一ソースは `CLAUDE.md` → "Critical Conventions (non-standard — always apply)" である。その大半は ESLint が強制する（クラスのプロパティ・メソッドの `snake_case` など `CLAUDE.md` に書いていない細目は `eslint/rules/naming-convention.js` が持つ）。ただし **`function` 構文（アロー関数を使わない）と早期 return の 1 行形式は lint が検査しない**ので、書き手とレビューが確かめる。このファイルは本文を写さず、lint では表せない書き方の指針だけを持つ。
+命名・エクスポート・ファイル名・内容の規約の単一ソースは下記「Conventions」、関数の構文・品質上限・型安全・早期 return・マジックナンバーの単一ソースは `CLAUDE.md` → "Critical Conventions (non-standard — always apply)" である。その大半は ESLint が強制する（クラスのプロパティ・メソッドの `snake_case` などここに書いていない細目は `eslint/rules/naming-convention.js` が持つ）。ただし **`function` 構文（アロー関数を使わない）と早期 return の 1 行形式は lint が検査しない**ので、書き手とレビューが確かめる。このファイルは本文を写さず、lint では表せない書き方の指針だけを持つ。
 
 lint・型検査の実行手順は `CLAUDE.md` → "Code Change Rules" の検証ゲート（`pnpm josh gate`、実装中は `pnpm josh lint:related` / `pnpm josh test:related`）が単一ソースである。
+
+## Conventions
+
+`CLAUDE.md` から移した、lint が強制する規約の単一ソース。
+
+- **Naming**: `snake_case` variables / functions / params · `PascalCase` types / classes / interfaces / enums · `UPPER_CASE` enum members · booleans prefixed `is_` / `has_` / `should_` / `can_` / `will_` / `did_` · constants `UPPER_CASE` or `snake_case`
+- **Functions & exports**: multiple functions → a namespace object `export { my_module }` (constants exempt) · no `export default`
+- **Files**: Svelte `PascalCase.svelte(.ts)` · TypeScript `kebab-case.ts` · tests `*.test.ts` / `*.svelte.test.ts`, colocated, never `*.spec.ts` (`prompts/testing-guide.md`) · in `scripts/`, no `../` imports — use `#scripts/*`
+- **Content rules**: user-visible strings use i18n message keys in every locale · comments / test titles English only (`eslint/rules/` may explain rationale in Japanese) · no duplication; `/* @refactor-ignore */` at file top excludes a file from refactoring
 
 ## 📝 基本方針
 
@@ -76,7 +85,7 @@ find src -name "*.ts" -o -name "*.svelte" | grep -i [関連キーワード]
 
 ### 3. 名前空間オブジェクトの名付け方
 
-複数の関数を名前空間オブジェクトにまとめてエクスポートする規則そのものは `CLAUDE.md` → "Functions & exports" にある（定数は個別エクスポートでよい）。ここでは名付け方だけを述べる。
+複数の関数を名前空間オブジェクトにまとめてエクスポートする規則そのものは上記「Conventions」にある（定数は個別エクスポートでよい）。ここでは名付け方だけを述べる。
 
 - ファイル名と名前空間名で意図を明確にする（例: `git-command.ts` → `git_command`）
 - メソッド名は短く、名前空間で補完する（例: `exec_git_branch()` → `git_command.branch()`）

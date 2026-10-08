@@ -39,19 +39,26 @@ const REMINDER_DIRECTIVES: ReadonlyArray<string> = [
 // *shortening* must not drop it.
 const STEP_ZERO_DIRECTIVES: ReadonlyArray<string> = [
 	...SHARED_DIRECTIVES,
-	'in the session language',
-	'a non-programmer can follow',
-	'only internal identifiers are banned',
-	'name the concrete subject in each line',
-	'subject-less prose is not acceptable',
-	'no file paths, function or type names, or CLI option flags',
-	'Details',
-	'never wrapped in a code fence',
-	'fullrun/halfrun/prrun/backlogrun',
-	'never a confirmation stop',
-	'Cause / Fix / Result',
 	'Tests are required for ALL changes',
 	'zero tests without explicit approval is a violation',
+]
+
+// joshuafolkken/kit#3395 moved the rest of Step 0 to the report format it points at, in the session
+// language that document is written in. The same directives, pinned where they now live.
+const REPORT_FORMAT_PATH = fileURLToPath(
+	new URL('../../prompts/collaboration-workflow/report-format.md', import.meta.url),
+)
+const MOVED_STEP_ZERO_DIRECTIVES: ReadonlyArray<string> = [
+	'セッション言語',
+	'プログラマでない人にも追える',
+	'禁じるのは内部識別子だけ',
+	'各行に具体的な主語を書き、主語のない文は不可',
+	'ファイルパス・関数名や型名・CLI のオプションフラグは書かない',
+	'`技術詳細`',
+	'### 出力はコードフェンスで囲まない（必須）',
+	'`fullrun` / `halfrun` / `prrun` / `backlogrun` で必須',
+	'確認のための停止ではない',
+	'`Cause` / `Fix` / `Result`',
 ]
 
 const SETTINGS_PATH = fileURLToPath(new URL('../../.claude/settings.json', import.meta.url))
@@ -98,4 +105,11 @@ describe('the Step 0 the reminder points at kept every directive', () => {
 	it.each(STEP_ZERO_DIRECTIVES)('Step 0 still states %j', (directive) => {
 		expect(step_zero()).toContain(directive)
 	})
+
+	it.each(MOVED_STEP_ZERO_DIRECTIVES)(
+		'the report format Step 0 points at states %j',
+		(directive) => {
+			expect(readFileSync(REPORT_FORMAT_PATH, 'utf8')).toContain(directive)
+		},
+	)
 })

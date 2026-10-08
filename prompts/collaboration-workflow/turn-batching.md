@@ -1,6 +1,6 @@
 # 独立した呼び出しは同じターンに載せる（joshuafolkken/kit#1304）
 
-`CLAUDE.md` →「Put every call that does not depend on another's result in the same turn」の正典。**常駐側にはトリガと判断基準の 1 行だけが残り、規則本文は `pnpm josh batch:guard` が効く瞬間に配送する**（joshuafolkken/kit#1524、`rule-delivery.md`、`docs/maintainers/turn-batching-rationale.md` → "Why it left residency (joshuafolkken/kit#1524)"）。実測・却下した機構案・経緯は `docs/maintainers/turn-batching-rationale.md` にある。
+「独立した呼び出しは同じターンに載せる」規則の正典。**常駐側には [`rule-delivery.md`](./rule-delivery.md) →「配送されている規則」への導線だけが残り、規則本文は `pnpm josh batch:guard` が効く瞬間に配送する**（joshuafolkken/kit#1524、`docs/maintainers/turn-batching-rationale.md` → "Why it left residency (joshuafolkken/kit#1524)"）。実測・却下した機構案・経緯は `docs/maintainers/turn-batching-rationale.md` にある。
 
 ## 何を求めているか
 
