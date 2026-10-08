@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1000,
-		"code_lines": 82834,
-		"comment_lines": 33360,
+		"files": 1001,
+		"code_lines": 82877,
+		"comment_lines": 33379,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12231,
-		"on_demand_bytes": 559132
+		"on_demand_bytes": 558792
 	},
 	"accepted": {
-		"reason": "run:board draws a running row's phase as a track of phase icons (#3460): new run-board-track module and its tests",
+		"reason": "#3463 adds lockfile-sync (reinstall the primary checkout's dependencies when a main sync changes pnpm-lock.yaml) and wires it into main:sync, plus its review round-1 fixes",
 		"date": "2026-10-08"
 	}
 }

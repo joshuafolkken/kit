@@ -40,6 +40,7 @@ const commit_count_beyond = vi.mocked(git_command.commit_count_beyond)
 const default_branch_reference = vi.mocked(git_command.default_branch_reference)
 const default_branch = vi.mocked(git_command.get_default_branch)
 const status = vi.mocked(git_command.status)
+const MAIN_SYNC = 'pnpm josh ms'
 const pr_exists = vi.mocked(git_gh_pr_read.pr_exists)
 const pr_view = vi.mocked(git_gh_pr_read.pr_view)
 const find_open_lane = vi.mocked(lane_registry.find_open_lane)
@@ -112,15 +113,15 @@ describe('the advice names what the rule requires', () => {
 
 		expect(advice).not.toContain('git stash')
 		expect(advice).not.toContain('Record the stash')
-		expect(advice).toContain('git switch main && git pull')
+		expect(advice).toContain(MAIN_SYNC)
 	})
 
-	it('switches to the branch git reported, not to a hard-coded main', () => {
-		const tree: TreeState = { branch: 'work', default_branch: 'trunk', is_dirty: false }
+	// joshuafolkken/kit#3463: a raw `git pull` that changes the lock skips the reinstall `josh ms` carries.
+	it('syncs through josh ms rather than a raw git pull', () => {
+		const { advice } = run_preflight.decide({ ...CLEAN_TREE, branch: 'work' }, NO_WORK, ISSUE)
 
-		expect(run_preflight.decide(tree, NO_WORK, ISSUE).advice).toContain(
-			'git switch trunk && git pull',
-		)
+		expect(advice).toContain(MAIN_SYNC)
+		expect(advice).not.toContain('git pull')
 	})
 
 	it('requires the whole verification gate when a branch is reused', () => {

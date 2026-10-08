@@ -53,7 +53,7 @@ it is for a `new` entry** (`issue-scout.md`): a filing made mid-run is the one m
 
 - **`git stash push -u` — the `-u` is not optional.** The work in progress almost always includes a
   new `*.test.ts`, which is untracked, and a stash without `-u` leaves exactly those files in the tree
-  for the next child's `git switch main && git pull` to refuse.
+  for the next child's `pnpm josh ms` to refuse.
 - **The Issue comment is what gets the stash popped, not the Telegram.** The run that later picks the
   paused Issue up reads that comment and pops before implementing — **by message,
   `pnpm josh stash:pop "<the -m message>"`, never a positional `git stash pop`**, because the stash is
