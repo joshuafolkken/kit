@@ -168,7 +168,7 @@ back a child number — before implementing that child — and never again:
 ```bash
 pnpm josh latest:scope   # → required | skip ; the reason on stderr
 git stash push -u -m "backlogrun: josh latest #<N>"        # only if the tree has staged or modified files — never conditional on the answer
-git switch main && git pull
+pnpm josh ms
 pnpm josh latest         # on `required` only
 pnpm josh stash:pop "backlogrun: josh latest #<N>"         # only if you stashed above — by message, not a positional pop
 ```
@@ -185,7 +185,7 @@ in hand.**
 commits it — so that one PR carries the dependency bumps and the other children carry none. Should the
 first child fail CI on a bump, fix it forward before parking it.
 
-**`git switch main && git pull` stays per child** — it brings the previous child's merge into the tree,
+**`pnpm josh ms` stays per child** — it brings the previous child's merge into the tree,
 and a child that skips it implements on a stale main. Only the dependency update moves to the run. **In
 lanes it changes hands**: no lane can switch to the default branch, so the parent runs it in the primary
 checkout **before each `lane:open`**. **And in a lane `josh latest` is not even asked** — `latest:scope`

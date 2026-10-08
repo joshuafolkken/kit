@@ -142,7 +142,7 @@ pnpm josh run:carry --json                                                   # r
 be answered and every standing record is refused rather than resumed. A live PID whose start token
 the sandbox cannot read is held as `busy`.
 
-**Ask it before the plan, in the same turn as the first `git switch main && git pull`.** The contract
+**Ask it before the plan, in the same turn as the first `pnpm josh ms`.** The contract
 is `docs/josh-commands-run.md` → "`josh run:carry`"; what this loop does with each answer is here:
 
 | It answers   | What the run does                                                                                                                                                                                                          |
@@ -456,7 +456,7 @@ All of these are this file's, and are reached here in the same order and for the
 
 | Step | Where it is defined |
 | --- | --- |
-| `git switch main && git pull`, then `pnpm josh latest:scope`, then `pnpm josh lane:prune` — in the primary checkout, before the first lane opens | `backlogrun-lanes.md` → "Once per repository, before the first lane opens" |
+| `pnpm josh ms`, then `pnpm josh latest:scope`, then `pnpm josh lane:prune` — in the primary checkout, before the first lane opens | `backlogrun-lanes.md` → "Once per repository, before the first lane opens" |
 | `josh latest` on `required` only, asked once at the first child and never in a lane | `backlogrun-child.md` → "`josh latest` runs once per session, not once per child" |
 | `pnpm josh run:hold <N>`'s preflight check, before each child that is not in a lane — act on what it prints | `docs/josh-commands-run.md` → "`josh run:hold`" |
 | `pnpm josh run:progress --wait` in the background, `--mark` at every real report | `progress-watcher.md` → "Progress while the run is quiet" |

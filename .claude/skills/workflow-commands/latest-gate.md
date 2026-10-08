@@ -33,7 +33,7 @@ resolves it toward `skip` exactly when a stale dependency is most likely to matt
 
 ```bash
 git stash push -u -m "josh latest"    # only if the working tree has staged or modified files
-git switch main && git pull
+pnpm josh ms
 pnpm josh latest     # on `required` only
 pnpm josh stash:pop "josh latest"     # only if you stashed above — by message, never a positional pop
 ```
@@ -51,7 +51,7 @@ never reports the pins intact without having been run.
 the `dependency-update` skill is not read, because nothing rewrote a pin for it to check.
 
 **Two of those steps are not this gate's, and making either conditional breaks something.**
-`git switch main && git pull` runs per issue and per child either way: it is what brings the previous
+`pnpm josh ms` runs per issue and per child either way: it is what brings the previous
 merge into the tree, and an issue that skips it starts implementing on a stale default branch. The
 stash before it is the branch switch's, not the update's — a dirty tree stops `git switch` whatever
 this command answered — so it is conditional on the **tree**, never on the answer.

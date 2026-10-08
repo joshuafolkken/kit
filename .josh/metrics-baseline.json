@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1003,
-		"code_lines": 83224,
-		"comment_lines": 33444,
+		"files": 1004,
+		"code_lines": 83267,
+		"comment_lines": 33463,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12231,
-		"on_demand_bytes": 559193
+		"on_demand_bytes": 558853
 	},
 	"accepted": {
-		"reason": "josh backlogrun adds a new terminal launcher (args, cli, launch modules) and the run board's launch/resume view #3437; re-accepted after merging origin/main (#3438 run:board workspace task and closed-run stop)",
+		"reason": "#3463 adds lockfile-sync (reinstall the primary checkout's dependencies when a main sync changes pnpm-lock.yaml) and wires it into main:sync; re-accepted after merging origin/main (#3437 josh backlogrun terminal launcher, #3438 run:board workspace auto-start, #3459 run:board label-driven stopped lanes, #3454 run_headless.is_cut_capped)",
 		"date": "2026-10-08"
 	}
 }
