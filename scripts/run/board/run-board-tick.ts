@@ -2,7 +2,7 @@ import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_cli } from '#scripts/run/progress/run-progress-cli'
-import type { ClosedIssue } from './run-board-closed'
+import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import { run_board_header } from './run-board-header'
 import { run_board_labels, type Words } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
@@ -37,8 +37,8 @@ interface BoardPorts {
 	// `undefined` when no run has started here.
 	read_local: () => Promise<LocalRead | undefined>
 	read_machine: () => Promise<MachineSample>
-	// The issues that answered as closed, by number (`run-board-closed.ts`).
-	read_closed: (issues: ReadonlyArray<number>) => Promise<ReadonlyMap<number, ClosedIssue>>
+	// The issues that answered as closed, and whether every issue answered (`run-board-closed.ts`).
+	read_closed: (issues: ReadonlyArray<number>) => Promise<ClosedAnswer>
 	now: () => number
 	write: (frame: string) => void
 	// Wraps an issue number in a hyperlink where the terminal opens one, and leaves it plain elsewhere.
@@ -64,6 +64,8 @@ interface BoardState {
 	// The run's children read closed, kept for the run: a closed issue's answer does not change.
 	closed: ReadonlyMap<number, ClosedIssue>
 	closed_attempted_ms: number | undefined
+	// The last ask every child answered, open or closed; a failed read leaves it where it was.
+	closed_answered_ms: number | undefined
 	// The last machine sample, which the next one is compared against, and the gauges drawn from them.
 	machine: MachineMark | undefined
 	gauges: MachineGauges | undefined
@@ -82,6 +84,7 @@ const FRESH_STATE: BoardState = {
 	baseline_total: undefined,
 	closed: new Map(),
 	closed_attempted_ms: undefined,
+	closed_answered_ms: undefined,
 	machine: undefined,
 	gauges: undefined,
 	sampled_ms: undefined,
@@ -171,8 +174,24 @@ function unread_closed(state: BoardState, local: LocalRead): Array<number> {
 	return touched.filter((issue) => !open.has(issue) && !state.closed.has(issue))
 }
 
+// An ended run asks until one ask after it ended has answered whole, then holds what it has, as its
+// plan is held: the board is left open between runs, so a child that never answers closed would
+// otherwise be asked about every retry interval while no run is going (joshuafolkken/kit#3438).
+function has_asked_since_end(state: BoardState, local: LocalRead): boolean {
+	const { closed_answered_ms } = state
+	if (closed_answered_ms === undefined || local.ended_ms === undefined) return false
+
+	return closed_answered_ms >= local.ended_ms
+}
+
+function is_closed_due(state: BoardState, local: LocalRead, now_ms: number): boolean {
+	if (has_asked_since_end(state, local)) return false
+
+	return is_due(state.closed_attempted_ms, PLAN_RETRY_MS, now_ms)
+}
+
 // Reads a closed child once and keeps the answer; one that has not answered closed is asked again no
-// sooner than the plan is.
+// sooner than the plan is, and an ended run's not again once an ask after the end has answered whole.
 async function read_closed(
 	state: BoardState,
 	ports: BoardPorts,
@@ -181,11 +200,13 @@ async function read_closed(
 ): Promise<BoardState> {
 	const unread = unread_closed(state, local)
 
-	if (unread.length === 0 || !is_due(state.closed_attempted_ms, PLAN_RETRY_MS, now_ms)) return state
+	if (unread.length === 0 || !is_closed_due(state, local, now_ms)) return state
 
-	const closed = new Map([...state.closed, ...(await ports.read_closed(unread))])
+	const answer = await ports.read_closed(unread)
+	const closed = new Map([...state.closed, ...answer.closed])
+	const closed_answered_ms = answer.is_whole ? now_ms : state.closed_answered_ms
 
-	return { ...state, closed, closed_attempted_ms: now_ms }
+	return { ...state, closed, closed_attempted_ms: now_ms, closed_answered_ms }
 }
 
 // The plan with a closed child's title under the listing's own.

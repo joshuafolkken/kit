@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1000,
-		"code_lines": 82880,
-		"comment_lines": 33378,
+		"code_lines": 82904,
+		"comment_lines": 33390,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12231,
-		"on_demand_bytes": 559132
+		"on_demand_bytes": 559193
 	},
 	"accepted": {
-		"reason": "#3459: run:board reads each listed issue's labels so a running lane whose child stopped (needs-decision, or in-progress dropped) is drawn stopped/human apart from a running one, merged over #3460's run-board-track and #3454's run_headless.is_cut_capped",
+		"reason": "#3438 auto-starts run:board in the workspace task and teaches the board tick to stop on a closed run; docs/skills now name run:board instead of run:event --watch; re-accepted after merging origin/main (#3459 run:board label-driven stopped lanes, #3454 run_headless.is_cut_capped)",
 		"date": "2026-10-08"
 	}
 }
