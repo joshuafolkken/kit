@@ -108,6 +108,8 @@ describe('invokes_budget_command — a redirected state root', () => {
 		['a quoted command substitution', `JOSH_TEMP_ROOT="$(mktemp -d)" ${CARRY_COMMAND}`],
 		['a quoted literal path', `JOSH_TEMP_ROOT="/tmp/ev" ${CARRY_COMMAND}`],
 		['behind another assignment', `JOSH_DEBUG=1 JOSH_TEMP_ROOT=/tmp/ev ${CARRY_COMMAND}`],
+		['behind a quoted assignment with a space', `A="x y" JOSH_TEMP_ROOT=/tmp/ev ${CARRY_COMMAND}`],
+		['a multi-word unquoted substitution', `JOSH_TEMP_ROOT=$(mktemp -d -t ev) ${CARRY_COMMAND}`],
 	])('lets %s through', (_name, command) => {
 		expect(lane_carry_conflict.invokes_budget_command(command)).toBe(false)
 	})
@@ -124,6 +126,15 @@ describe('invokes_budget_command — a redirected state root', () => {
 		// run:merge acts on lanes, main and GitHub, which no root redirects.
 		['run:merge under a fresh root', `JOSH_TEMP_ROOT="$(mktemp -d)" ${MERGE_COMMAND}`],
 		['run:merge under a literal root', `JOSH_TEMP_ROOT=/tmp/ev ${MERGE_COMMAND}`],
+		// A space inside a substitution does not end the value and leave its tail as the command.
+		[
+			'run:merge under a multi-word substitution',
+			`JOSH_TEMP_ROOT=$(mktemp -d -t ev) ${MERGE_COMMAND}`,
+		],
+		[
+			'run:merge under a substitution with nested quotes',
+			`JOSH_TEMP_ROOT="$(mktemp -d "/tmp/ev.XXXX")" ${MERGE_COMMAND}`,
+		],
 		// A substitution in another variable is not read as the command position.
 		['a substitution in another variable', `EV="$(mktemp -d)" ${CARRY_COMMAND}`],
 	])('still matches %s', (_name, command) => {

@@ -42,18 +42,25 @@ const RUN_BUDGET_COMMANDS: ReadonlySet<string> = new Set(['run:merge', 'run:carr
 // assignment counts: an `export` in an earlier segment is not read, and is refused as before. A bare
 // variable is refused too: shell state does not survive between tool calls, so `$EV` set in an
 // earlier call expands to nothing here, and an empty root is the live run's default one.
+//
+// One leading assignment, its value read as the shell reads it: a run of quoted strings, `$(…)`
+// substitutions (one nested level) and plain characters, so a space inside a quote or a substitution
+// does not end it. Cut at the first space, `JOSH_TEMP_ROOT=$(mktemp -d -t ev) pnpm josh run:merge`
+// left `ev) pnpm …` behind, whose head the command reader rejects, and slipped the refusal.
+const LEADING_ASSIGNMENT = String.raw`[A-Za-z_]\w*=(?:"[^"]*"|'[^']*'|\$\((?:[^()]|\([^()]*\))*\)|[^\s"'])*\s+`
+
 const REDIRECTED_PREFIX = new RegExp(
-	String.raw`^(?:[A-Za-z_]\w*=\S*\s+)*${platform_temporary.TEMP_ROOT_KEY}=(?!""|''|\s|$|"?\$\{?[A-Za-z_])`,
+	String.raw`^(?:${LEADING_ASSIGNMENT})*${platform_temporary.TEMP_ROOT_KEY}=(?!""|''|\s|$|"?\$\{?[A-Za-z_])`,
 	'u',
 )
 
 // The budget commands with an effect outside the temp root, so a redirected root does not isolate them.
 const SHARED_STATE_COMMANDS: ReadonlySet<string> = new Set(['run:merge'])
 
-// The leading assignments, a quoted value taken whole. The shared command reader unwraps `$(…)` into
-// the command position — the subshell is the real work in a cost row — so without this
+// The leading assignments, stripped before the command is read. The shared command reader unwraps
+// `$(…)` into the command position — the subshell is the real work in a cost row — so without this
 // `JOSH_TEMP_ROOT="$(mktemp -d)" pnpm josh run:merge` read as `mktemp` and slipped the refusal.
-const LEADING_ASSIGNMENTS = /^(?:[A-Za-z_]\w*=(?:"[^"]*"|'[^']*'|\S*)\s+)*/u
+const LEADING_ASSIGNMENTS = new RegExp(`^(?:${LEADING_ASSIGNMENT})*`, 'u')
 
 function is_budget_segment(segment: string): boolean {
 	const commands = REDIRECTED_PREFIX.test(segment) ? SHARED_STATE_COMMANDS : RUN_BUDGET_COMMANDS
