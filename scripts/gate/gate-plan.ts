@@ -39,6 +39,11 @@ interface GateCheck {
 	// The memory this check holds while it runs, `core_budget.MEMORY_MB`'s measured peak; none declared is
 	// none waited for (joshuafolkken/kit#3371). The unit suite's is per worker, so it is derived instead.
 	memory_mb?: number
+	// A check whose `josh` command is kit-only, so a consumer's gate leaves it out rather than running
+	// a command that is not in the published package (joshuafolkken/kit#3408). It restates the command
+	// entry's own `is_kit_only`, because the command map imports this module; `gate-plan.test.ts` pins
+	// that the two agree.
+	is_kit_only?: boolean
 }
 
 const LINT_LABEL = 'lint'
@@ -101,6 +106,16 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 	// reservation would only take a place from the four-core CI runner's fan-out and a worker from the
 	// unit suite for the whole gate.
 	{ label: 'exports', target: 'exports:unused', reserved_cores: 0 },
+	// **The metrics ratchet is kit's own** (joshuafolkken/kit#3408): it holds kit's repository-wide
+	// totals to kit's baseline. It is one in-process eslint pass with only `max-lines` enabled, over
+	// in a few seconds, so it reserves no core for the reason the unused-member check above does not.
+	{
+		label: 'metrics',
+		target: 'metrics',
+		reserved_cores: 0,
+		memory_mb: core_budget.MEMORY_MB.eslint_scan,
+		is_kit_only: true,
+	},
 ]
 
 // The checks, in the order their output is printed — the static set, then the unit suite last (the
@@ -116,8 +131,15 @@ const GATE_CHECKS: ReadonlyArray<GateCheck> = [
 // set safe is that nothing downstream may mistake it for the full gate: `verification-gate.ts`
 // withholds both the green-gate record and the in-flight marker on a partial run, so a `--no-unit`
 // gate can never tell `josh review:brief` that the unit suite passed on this tree.
-function select_gate_checks(is_unit_included: boolean): ReadonlyArray<GateCheck> {
-	return is_unit_included ? GATE_CHECKS : STATIC_CHECKS
+//
+// A consumer's gate also drops the kit-only checks, whose commands its installed kit does not have.
+function select_gate_checks(
+	is_unit_included: boolean,
+	is_kit_repository = true,
+): ReadonlyArray<GateCheck> {
+	const checks = is_unit_included ? GATE_CHECKS : STATIC_CHECKS
+
+	return is_kit_repository ? checks : checks.filter((check) => check.is_kit_only !== true)
 }
 
 // Asked of the plan rather than of the flag, so the one question "did this gate run the unit suite"
@@ -329,6 +351,16 @@ function direct_unit_memory(): number {
 	return unit_memory(direct_unit_weight())
 }
 
+function unit_cap_for(
+	checks: ReadonlyArray<GateCheck>,
+	available_cores: number,
+	concurrent_runs: number,
+): number | undefined {
+	if (!has_unit_check(checks)) return undefined
+
+	return resolve_unit_worker_cap(available_cores, concurrent_runs)
+}
+
 // `availableParallelism()` rather than `cpus().length`: it reports what this process may actually
 // use, so a container with a CPU quota is sized by the quota rather than by the host.
 // The three fields together, for a caller that has already decided the numbers. The gate's own
@@ -351,15 +383,14 @@ function resolve_gate_plan(
 	available_cores: number = availableParallelism(),
 	concurrent_runs: number = unit_worker_share.SOLO_RUNS,
 	is_unit_included = true,
+	is_kit_repository = true,
 ): GatePlan {
-	const checks = select_gate_checks(is_unit_included)
+	const checks = select_gate_checks(is_unit_included, is_kit_repository)
 
 	return {
 		checks,
 		concurrency: resolve_concurrency(available_cores, concurrent_runs, checks),
-		unit_worker_cap: is_unit_included
-			? resolve_unit_worker_cap(available_cores, concurrent_runs)
-			: undefined,
+		unit_worker_cap: unit_cap_for(checks, available_cores, concurrent_runs),
 	}
 }
 

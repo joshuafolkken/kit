@@ -1,13 +1,17 @@
 {
 	"scripts": {
-		"files": 968,
-		"code_lines": 80097,
-		"comment_lines": 32535,
+		"files": 970,
+		"code_lines": 80136,
+		"comment_lines": 32741,
 		"comment_ratio": 0.41
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2370
+		"lines": 2337
 	},
-	"guards": 8
+	"guards": 8,
+	"accepted": {
+		"reason": "Untyped parse for the metrics probe so CI and local runs count hashbang lines alike (#3408)",
+		"date": "2026-10-08"
+	}
 }

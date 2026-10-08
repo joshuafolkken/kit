@@ -16,7 +16,7 @@ These commands replace the corresponding `package.json` scripts; consumer projec
 
 ### `josh gate`
 
-Run the completion gate's checks — lint, type check, spell check, [behavior](#josh-behavior), [unused namespace members](#josh-exportsunused) and unit tests — **concurrently**, running all to completion and reporting every failure in one pass.
+Run the completion gate's checks — lint, type check, spell check, [behavior](#josh-behavior), [unused namespace members](#josh-exportsunused), the [metrics ratchet](#josh-metrics) (kit only) and unit tests — **concurrently**, running all to completion and reporting every failure in one pass.
 
 ```bash
 pnpm josh gate
@@ -25,7 +25,7 @@ pnpm josh gate --force     # re-run even on a tree already recorded green
 pnpm josh gate --no-unit   # the static checks only (CI only)
 ```
 
-- Static checks: `pnpm josh lint`, `pnpm josh cspell:dot`, `pnpm josh behavior`, `pnpm josh exports:unused`; the unit leg is `pnpm josh test:unit`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
+- Static checks: `pnpm josh lint`, `pnpm josh cspell:dot`, `pnpm josh behavior`, `pnpm josh exports:unused`, `pnpm josh metrics` (in kit only); the unit leg is `pnpm josh test:unit`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
 - A tree recorded green is reused unless `--force` or the changed-file map moved.
 - **Refuses to start when the scoped pair has not been green on this tree.** A unit-included local gate reads the same record `josh review:brief` does and refuses — naming `pnpm josh lint:related && pnpm josh test:related` — so the first gate is the only gate. It never fires for `--no-unit` (CI has no scoped check in front of it) or `--force`, and `JOSH_SCOPED_GREEN=0` turns it off.
 - **On failure, a line per failed check with the command to re-run is printed at the tail**, just above the verdict, so a `tail` of the output keeps every failure and its next action rather than one at a time.
@@ -89,21 +89,16 @@ entry fullrun  227672/229376 bytes · 1704 left
 
 ### `josh metrics`
 
-Print the repository-wide quality totals that no per-function or per-file limit sees — code lines, comment lines and the comment ratio for the non-test files under `scripts/`, the lines of the rule documents (`CLAUDE.md` and `prompts/**/*.md`), and the number of `*:guard` commands.
+Print the repository-wide quality totals that no per-function or per-file limit sees — code lines, comment lines and the comment ratio for the non-test files under `scripts/`, the lines of the rule documents (`CLAUDE.md` and `prompts/**/*.md`), and the number of `*:guard` commands — and hold them to the baseline in `.josh/metrics-baseline.json`.
 
 ```bash
-pnpm josh metrics                     # print the totals
-pnpm josh metrics --write-baseline    # also record them in .josh/metrics-baseline.json
+pnpm josh metrics                             # print the totals and check them against the baseline
+pnpm josh metrics --accept --reason "<why>"   # raise the baseline to the current totals
 ```
 
-```
-scripts  968 files · 80097 code lines · 32535 comment lines · comment ratio 0.41
-rules    26 files · 2370 lines
-guards   8
-```
-
-- **kit only**: the rule documents and the guard commands it counts are kit's own, so a consumer project does not get it.
-- Code lines are lint's own count, the same as `josh lines`; a comment line is any non-blank line lint does not count as code. Never fails on a large total — a non-zero exit means the arguments were unusable.
+- **A ratchet, and a step of [`josh gate`](#josh-gate).** Exit `1` when the code lines, the comment ratio, the rule-document lines or the guard count grew past the baseline, naming each with both values. A total that shrank lowers the baseline, so that gate run records no green stamp. The only way up is `--accept --reason "<why>"`, recording the reason and date; parallel branches that each accept conflict on the file — re-run `--accept` on the merged tree.
+- **kit only**: the rule documents and the guard commands it counts are kit's own, so a consumer project does not get it, and a consumer's gate leaves the step out.
+- Code lines are lint's own `max-lines` count, run in process with every other rule off (a few seconds); it reads one lower than `josh lines` on a `#!` file, as does the baseline. A comment line is any non-blank line lint does not count as code.
 
 ### `josh format`
 

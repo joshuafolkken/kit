@@ -149,9 +149,9 @@ Check only the changed files with prettier and eslint (whole tree on fallback)
 
 > **Audience:** developer · **Side effects:** files · **kit only**
 
-`[--write-baseline]`
+`[--accept --reason "<why>"]`
 
-Print repository-wide quality totals — code and comment lines, rule lines, guard count
+Print repository-wide quality totals and fail when one grew past the recorded baseline
 
 ---
 

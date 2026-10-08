@@ -100,9 +100,14 @@ const CACHE_KEY_LENGTH = 8
 // Only the two fields this reads. `ruleId` is nullable on a parse error or an ignore warning, and
 // both of those are answers — "no count for this path" — rather than failures.
 const message_schema = z.object({ ruleId: z.string().nullish(), message: z.string() })
-const results_schema = z.array(
-	z.object({ filePath: z.string(), messages: z.array(message_schema) }),
-)
+const result_schema = z.object({ filePath: z.string(), messages: z.array(message_schema) })
+const results_schema = z.array(result_schema)
+
+type LintResult = z.infer<typeof result_schema>
+
+// The rule entry the probe hands eslint — as `--rule` JSON to the CLI, as `overrideConfig` rules to
+// the Node API.
+type ProbeRules = Record<string, [typeof PROBE_SEVERITY, LineRuleOptions & { max: number }]>
 
 interface LineBudget {
 	code_lines: number
@@ -150,10 +155,12 @@ function budget_of(code_lines: number, limit: number): LineBudget {
 
 // The counting options are the project's own, so a consumer that turns `skipComments` off is counted
 // its way. Lowering `max` is the only change the probe makes.
+function probe_rules(options: LineRuleOptions): ProbeRules {
+	return { [MAX_LINES_RULE]: [PROBE_SEVERITY, { ...options, max: PROBE_MAX }] }
+}
+
 function probe_rule(options: LineRuleOptions): string {
-	return JSON.stringify({
-		[MAX_LINES_RULE]: [PROBE_SEVERITY, { ...options, max: PROBE_MAX }],
-	})
+	return JSON.stringify(probe_rules(options))
 }
 
 function cache_prefix(key: string): string {
@@ -237,19 +244,24 @@ function count_or_zero(
 
 // Keyed by the absolute path eslint reports, so the caller's spelling of a path does not have to
 // match it. A path eslint refused is simply absent, and the caller reports that rather than a number.
-function counts_in(raw_output: string | undefined = 'null'): ReadonlyMap<string, number> {
+// The results are eslint's own objects whether they arrived as the CLI's JSON or from the Node API,
+// so `josh metrics` reads its in-process run through this same reading (joshuafolkken/kit#3408).
+function counts_from(results: ReadonlyArray<LintResult>): ReadonlyMap<string, number> {
 	const counts = new Map<string, number>()
-	const parsed = results_schema.safeParse(JSON.parse(raw_output))
 
-	if (!parsed.success) return counts
-
-	for (const result of parsed.data) {
+	for (const result of results) {
 		const code_lines = count_or_zero(result.messages)
 
 		if (code_lines !== undefined) counts.set(path.resolve(result.filePath), code_lines)
 	}
 
 	return counts
+}
+
+function counts_in(raw_output: string | undefined = 'null'): ReadonlyMap<string, number> {
+	const parsed = results_schema.safeParse(JSON.parse(raw_output))
+
+	return parsed.success ? counts_from(parsed.data) : new Map<string, number>()
 }
 
 // The safe entry point, and the only one exported: eslint's output can be empty or truncated, and
@@ -387,7 +399,9 @@ const line_budget = {
 	advice,
 	budget_of,
 	budgets_for,
+	counts_from,
 	describe,
+	grouped,
 	is_lintable_path,
 	near_limit_percent,
 	near_limit_threshold,
@@ -395,6 +409,7 @@ const line_budget = {
 	probe_arguments,
 	probe_command,
 	probe_rule,
+	probe_rules,
 	NEAR_LIMIT_FRACTION,
 }
 

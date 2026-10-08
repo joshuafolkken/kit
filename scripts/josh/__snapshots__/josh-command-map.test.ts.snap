@@ -631,7 +631,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "metrics": [
-      "[--write-baseline]",
+      "[--accept --reason "<why>"]",
       "developer",
       [
         "files",
