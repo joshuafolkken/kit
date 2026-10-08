@@ -43,6 +43,7 @@ const WORD_PAIRS = {
 	merged: { ja: 'マージ', en: 'merged' },
 	parked: { ja: 'park', en: 'parked' },
 	in_progress: { ja: '実行中', en: 'running' },
+	stopped: { ja: '停止', en: 'stopped' },
 	waiting: { ja: '待ち', en: 'waiting' },
 	decision: { ja: '判断待ち', en: 'decision' },
 	waits: { ja: '待ち先', en: 'waits on' },
@@ -99,6 +100,7 @@ const STATE_ICONS: Readonly<Record<ItemState, string>> = {
 	done: '🏁',
 	waiting: '⏳',
 	human: '🙋',
+	stopped: '🛑',
 }
 
 // The blocking edge, chosen on the same rule: ⛓ is a text symbol.

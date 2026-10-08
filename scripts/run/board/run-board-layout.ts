@@ -19,6 +19,9 @@ interface BoardPlan {
 	// Which opted-in epic tracks which child (`Plan.tracked`).
 	tracked: ReadonlyMap<number, number>
 	context: PlanContext
+	// Each issue's label names as the open listing read them (joshuafolkken/kit#3459), so a running row
+	// is drawn as its labels say it stopped.
+	labels: ReadonlyMap<number, ReadonlyArray<string>>
 }
 
 interface BoardRow {

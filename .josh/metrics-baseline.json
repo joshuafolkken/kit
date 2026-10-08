@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 999,
-		"code_lines": 82811,
-		"comment_lines": 33351,
+		"code_lines": 82850,
+		"comment_lines": 33361,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 559132
 	},
 	"accepted": {
-		"reason": "#3458: lane-carry-conflict lets a JOSH_TEMP_ROOT-prefixed run:carry call through, and report-format requires run:carry live evidence to redirect JOSH_TEMP_ROOT, plus review-round fixes (one shared LEADING_ASSIGNMENT pattern reads quoted and $(…) assignment values whole for both the redirect check and the strip); re-accepted on top of #3452 after the merge with origin/main",
+		"reason": "#3459: run:board reads each listed issue's labels so a running lane whose child stopped (needs-decision, or in-progress dropped) is drawn stopped/human apart from a running one — new stopped state, label map carried through the plan and tick",
 		"date": "2026-10-08"
 	}
 }
