@@ -128,6 +128,42 @@ describe('repository_lock stale and unreadable records', () => {
 	})
 })
 
+// joshuafolkken/kit#3446: the same lock for a caller that cannot await — the run event stream's append.
+describe('repository_lock.with_lock_sync', () => {
+	it('runs synchronous work and removes the lock afterwards', () => {
+		expect(repository_lock.with_lock_sync(() => DONE, state.lock, NO_WAIT_MS)).toBe(DONE)
+		expect(existsSync(state.lock)).toBe(false)
+	})
+
+	it('releases the lock when the synchronous work throws', () => {
+		expect(() => {
+			repository_lock.with_lock_sync(
+				() => {
+					throw new Error('boom')
+				},
+				state.lock,
+				NO_WAIT_MS,
+			)
+		}).toThrow('boom')
+		expect(existsSync(state.lock)).toBe(false)
+	})
+
+	it('does not run the work while a live process holds the lock past the wait', () => {
+		writeFileSync(state.lock, live_record())
+		const spy = vi.fn(() => DONE)
+
+		expect(repository_lock.with_lock_sync(spy, state.lock, RELEASE_DELAY_MS)).toBeUndefined()
+		expect(spy).not.toHaveBeenCalled()
+		expect(readFileSync(state.lock, 'utf8')).toBe(live_record())
+	})
+
+	it('reclaims the lock of an owner that is gone without waiting', () => {
+		writeFileSync(state.lock, JSON.stringify({ pid: DEAD_PID }))
+
+		expect(repository_lock.with_lock_sync(() => DONE, state.lock, NO_WAIT_MS)).toBe(DONE)
+	})
+})
+
 describe('repository_lock.clear_stale', () => {
 	it('removes a record the judge reports as gone', () => {
 		writeFileSync(state.lock, live_record())

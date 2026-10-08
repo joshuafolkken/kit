@@ -1,3 +1,4 @@
+import { repository_lock } from '#scripts/git/repository-lock'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
@@ -35,6 +36,10 @@ const EVENT_CAP = 500
 const FIRST_POSITION = 0
 const POSITION_INCREMENT = 1
 const LINE_SEPARATOR = '\n'
+// The lock sits beside the stream it guards, so every writer of one stream contends for one record.
+const LOCK_SUFFIX = '.lock'
+// An append holds the lock for one read and one rename; a wait this long means a holder is stuck.
+const LOCK_WAIT_MS = 5000
 
 // **The one enumeration of what a session-facing event is** (joshuafolkken/kit#2205). Every writer names
 // its event by one of these members rather than passing a free string, so the set of things the stream
@@ -218,21 +223,43 @@ function serialize(events: ReadonlyArray<RunEvent>): string {
 	return `${events.map((event) => JSON.stringify(event)).join(LINE_SEPARATOR)}${LINE_SEPARATOR}`
 }
 
+// The read-modify-write, run only while the stream's lock is held. `replace_text_stamp` publishes the
+// rewrite with a rename, so a reader never sees the stream absent or half-written.
+function append_held(target: string, event: Omit<RunEvent, 'pos'>): number {
+	const existing = read_events(target)
+	const position = last_position(existing) + POSITION_INCREMENT
+	const events = bounded([...existing, { pos: position, ...event }])
+
+	stamp_file.replace_text_stamp(target, serialize(events))
+
+	return position
+}
+
 /**
  * Append one event, or refuse a kind the enumeration does not name.
  *
  * The position is the previous maximum plus one — monotonic across session cuts because the stream is
- * keyed to the run's identity rather than a session. `write_text_stamp` unlinks then creates
- * exclusively, so the rewrite is symlink-safe.
+ * keyed to the run's identity rather than a session. **The read and the rewrite are one step under a
+ * per-stream lock** (joshuafolkken/kit#3446): the parent, a cut successor and every lane child append
+ * to one stream, and an unlocked read-then-rewrite lost one writer's event to another's. A lock still
+ * held after the wait is reported on stderr and thrown, which the best-effort emit side swallows.
  */
 function append(target: string, kind: string, text: string, at: string): AppendResult {
 	if (!is_event_kind(kind)) return { appended: false, position: FIRST_POSITION }
 
-	const existing = read_events(target)
-	const position = last_position(existing) + POSITION_INCREMENT
-	const events = bounded([...existing, { pos: position, at, kind, text }])
+	const lock = `${target}${LOCK_SUFFIX}`
+	const position = repository_lock.with_lock_sync(
+		() => append_held(target, { at, kind, text }),
+		lock,
+		LOCK_WAIT_MS,
+	)
 
-	stamp_file.write_text_stamp(target, serialize(events))
+	if (position === undefined) {
+		const message = `run event stream: gave up waiting for the lock at ${lock}`
+
+		process.stderr.write(`${message}\n`)
+		throw new Error(message)
+	}
 
 	return { appended: true, position }
 }

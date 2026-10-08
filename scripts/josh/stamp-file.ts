@@ -95,23 +95,56 @@ function write_stamp(target: string, payload: unknown): string {
 	return write_exclusively(target, JSON.stringify(payload))
 }
 
+// The read side of the write's problem. A record is trusted to say something is still current, so a
+// planted one suppresses the work the check exists to force. `lstatSync` reports the link rather than
+// what it points at, and it throws where the path is simply absent — both of which are "no record".
+// `getuid` is missing on Windows, where a shared temp directory is not the same hazard; the check
+// reduces to "is it a regular file" there.
+function is_own_regular_file(source: string): boolean {
+	const stats = lstatSync(source)
+
+	if (!stats.isFile()) return false
+
+	const uid = process.getuid?.()
+
+	return uid === undefined || stats.uid === uid
+}
+
+// A regular file at `target` that another account owns. An absent path or a symlink is not one: the
+// replace below swaps either out without following it.
+function is_foreign_file(target: string): boolean {
+	try {
+		return lstatSync(target).isFile() && !is_own_regular_file(target)
+	} catch {
+		return false
+	}
+}
+
 // Mutable coordination state cannot disappear between an unlink and its replacement: a reader that
 // mistakes that gap for "no child" can start the same generation twice. The temporary file lives
 // beside the target, uses the same exclusive/symlink-safe create, and rename publishes it atomically.
-function replace_stamp(target: string, payload: unknown): string {
+// `rename` replaces the path itself rather than following a symlink planted there, so the write still
+// never lands somewhere else; a regular file another account owns is refused before it is replaced,
+// the same answer the unlink gives on a sticky temp directory (joshuafolkken/kit#3446).
+function replace_text_stamp(target: string, text: string): string {
+	if (is_foreign_file(target)) {
+		throw new Error(`refusing to replace another account's file: ${target}`)
+	}
+
 	const temporary = `${target}.${String(process.pid)}.${randomUUID()}`
 
 	try {
-		writeFileSync(temporary, JSON.stringify(payload), {
-			flag: STAMP_CREATE_FLAG,
-			mode: STAMP_FILE_MODE,
-		})
+		writeFileSync(temporary, text, { flag: STAMP_CREATE_FLAG, mode: STAMP_FILE_MODE })
 		renameSync(temporary, target)
 
 		return target
 	} finally {
 		rmSync(temporary, { force: true })
 	}
+}
+
+function replace_stamp(target: string, payload: unknown): string {
+	return replace_text_stamp(target, JSON.stringify(payload))
 }
 
 // The same write for a payload that is already text. `josh gate`'s log is another tool's output read
@@ -152,21 +185,6 @@ function remove_stamp(target: string): void {
 	rmSync(target, { force: true })
 }
 
-// The read side of the write's problem. A record is trusted to say something is still current, so a
-// planted one suppresses the work the check exists to force. `lstatSync` reports the link rather than
-// what it points at, and it throws where the path is simply absent — both of which are "no record".
-// `getuid` is missing on Windows, where a shared temp directory is not the same hazard; the check
-// reduces to "is it a regular file" there.
-function is_own_regular_file(source: string): boolean {
-	const stats = lstatSync(source)
-
-	if (!stats.isFile()) return false
-
-	const uid = process.getuid?.()
-
-	return uid === undefined || stats.uid === uid
-}
-
 // `undefined` rather than a throw or an empty string: "there is no record" and "the record says
 // nothing has to be done" are two different answers, and only the first of them is a reason to act.
 function read_stamp_text(source: string): string | undefined {
@@ -185,6 +203,7 @@ const stamp_file = {
 	is_own_regular_file,
 	read_stamp_text,
 	replace_stamp,
+	replace_text_stamp,
 	remove_stamp,
 	stamp_path,
 	write_stamp,
