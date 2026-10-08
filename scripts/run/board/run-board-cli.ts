@@ -13,7 +13,7 @@ import { run_board_screen, type Screen } from './run-board-screen'
 import { run_board_tick, type BoardPorts } from './run-board-tick'
 
 // `josh run:board` — a full-screen board of the running `backlogrun` (joshuafolkken/kit#3430), redrawn
-// every second for a person to keep open beside the run. What one redraw reads, and how often each read
+// four times a second for a person to keep open beside the run. What one redraw reads, and how often each read
 // is taken, is `run-board-tick.ts`'s; this file wires the live reads and the terminal around it. A run
 // that ended stays on screen until the next one starts (joshuafolkken/kit#3439); with no run in this
 // checkout it reads nothing from GitHub and waits.
@@ -112,7 +112,11 @@ async function run(argv: ReadonlyArray<string>, ports: BoardPorts = LIVE_PORTS):
 
 	const mode = run_board_screen.mode_of({ is_tty: ports.is_tty, is_once })
 
-	await (mode === 'live' ? watch(ports, words) : tick(FRESH_STATE, ports, words))
+	// One plain frame stays on the terminal after the command, so it draws the still icons rather than a
+	// spinner frame frozen mid-turn (joshuafolkken/kit#3452).
+	const once_ports = { ...ports, is_tty: false }
+
+	await (mode === 'live' ? watch(ports, words) : tick(FRESH_STATE, once_ports, words))
 
 	return SUCCESS_EXIT_CODE
 }

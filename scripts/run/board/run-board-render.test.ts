@@ -1,12 +1,12 @@
 import { stripVTControlCharacters } from 'node:util'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import type { IdleWindow } from '#scripts/backlog/backlog-idle'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
-import { run_board_phase } from './run-board-phase'
+import { run_board_phase, type Phase } from './run-board-phase'
 import { run_board_render } from './run-board-render'
 import type { ItemStatus } from './run-board-status'
 
@@ -50,6 +50,7 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		plan_fetched_ms: NOW,
 		plan_failed_ms: undefined,
 		machine: undefined,
+		spinner: undefined,
 		link: (reference) => reference,
 		...extra,
 	}
@@ -65,6 +66,11 @@ function padded(title: string): string {
 	return title.padEnd(run_board_render.TITLE_LIMIT)
 }
 
+// The phase bar as the stripped lines draw it, whether or not this run's output is colored.
+function plain_bar(phase: Phase): string {
+	return stripVTControlCharacters(bar_of(run_board_phase.index_of(phase), PHASE_COUNT))
+}
+
 function rule(label: string): string {
 	return `── ${label} `.padEnd(50, '─')
 }
@@ -74,12 +80,13 @@ function note(at_ms: number, text: string): BoardNote {
 }
 
 describe('run_board_render.render rows', () => {
-	it('draws a running row with its elapsed time, phase bar and phase, and no lane', () => {
+	it('draws a running row with its elapsed time, phase bar and phase icon, and no lane', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [running(1, STARTED + 40 * MINUTE, 'implement')] }
 		const lines = lines_of(header({ layout }))
-		const bar = bar_of(run_board_phase.index_of('implement'), PHASE_COUNT)
+		const bar = plain_bar('implement')
 
-		expect(lines).toContain(`  🔄 1  ${padded('Issue 1')}  90:00  ${bar} implement`)
+		expect(lines).toContain(`  🔄 1  ${padded('Issue 1')}  90:00  ${bar} 🔨`)
+		expect(lines.join('\n')).not.toContain('implement')
 		expect(lines.join('\n')).not.toContain('lane')
 	})
 
@@ -142,8 +149,44 @@ describe('run_board_render.render sections', () => {
 
 		expect(lines.slice(start, start + 2)).toStrictEqual([people_rule, '  🙋 6  Issue 6'])
 		expect(lines.at(-1)).toBe(
-			'✅ マージ  💤 park  🔄 実行中  ⏳ 待ち  🙋 判断待ち  🔗 待ち先  🔥 cpu  🧠 mem  💾 swap  📊 進捗  🔚 終了',
+			'✅ マージ  💤 park  🔄 実行中  ⏳ 待ち  🙋 判断待ち  🔗 待ち先  ⚡ cpu  🧠 mem  💾 swap  📊 進捗  🔚 終了',
 		)
+	})
+})
+
+// joshuafolkken/kit#3452: the phase icons the legend names, the spinner a running row turns, and an
+// output with no color.
+describe('run_board_render.render phase icons and spinner', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('names in the legend only the phases a row on screen draws, in the phases’ order', () => {
+		const active = [running(1, NOW, 'implement'), running(2, NOW, 'investigate')]
+		const legend = lines_of(header({ layout: { ...EMPTY_LAYOUT, active } })).at(-1) ?? ''
+
+		expect(legend).toContain('🔗 待ち先  🔍 調査  🔨 実装  ⚡ cpu')
+		expect(legend).not.toContain('👀')
+	})
+
+	// The spinner is one column and the emoji two, so a space keeps the numbers in one column.
+	it('turns the spinner on a running row only, padded to the emoji’s two columns', () => {
+		const active = [running(1, NOW, 'review'), row(2)]
+		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active }, spinner: '⠋' }))
+
+		expect(lines.some((line) => line.startsWith('  ⠋  1  Issue 1'))).toBe(true)
+		expect(lines).toContain('  ⏳ 2  Issue 2')
+	})
+
+	it('draws no escape where the output has no color and no spinner', () => {
+		vi.stubEnv('FORCE_COLOR', '0')
+		const active = [running(1, NOW, 'review'), row(2)]
+		const board = header({ layout: { ...EMPTY_LAYOUT, active } })
+		const text = run_board_render.render({ header: board, notes: [] }).join('\n')
+
+		expect(text).not.toContain('\u{1B}')
+		expect(text).toContain('  🔄 1  Issue 1')
+		expect(text).toContain('▶ backlogrun')
 	})
 })
 

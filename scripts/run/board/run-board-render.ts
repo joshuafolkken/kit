@@ -1,9 +1,14 @@
 import { styleText } from 'node:util'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels, type Words } from './run-board-labels'
-import type { BoardRow, WaveEntry } from './run-board-layout'
+import {
+	run_board_layout,
+	type BoardLayout,
+	type BoardRow,
+	type WaveEntry,
+} from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
-import { run_board_phase } from './run-board-phase'
+import { run_board_phase, type Phase } from './run-board-phase'
 
 // The whole `run:board` screen as lines (joshuafolkken/kit#3430) — pure, so what a person sees is tested
 // apart from the terminal. The header says where the run is; the sections below it follow the plan's
@@ -11,7 +16,8 @@ import { run_board_phase } from './run-board-phase'
 // A section is a rule rather than a heading, and the legend at the foot names the symbols, so a row
 // carries only what differs between rows (joshuafolkken/kit#3444).
 
-const { HEADER_ICONS, STATE_ICONS, WAITS_ICON, bar_of, clock_of, elapsed_of } = run_board_labels
+const { HEADER_ICONS, PHASE_ICONS, PHASE_WORDS, STATE_ICONS, WAITS_ICON } = run_board_labels
+const { bar_of, clock_of, elapsed_of } = run_board_labels
 const TITLE_LIMIT = 40
 const ELLIPSIS = '…'
 const NOTE_LIMIT = 6
@@ -67,13 +73,21 @@ function time_of(row: BoardRow, now_ms: number): string | undefined {
 	return elapsed === undefined ? undefined : elapsed_of(elapsed)
 }
 
-// A running row's phase as the shared bar, filled by the phases it has passed, and the phase's name.
+// The phase a row draws: a running row's, and none for a settled one.
+function shown_phase(row: BoardRow): Phase | undefined {
+	return row.state === 'running' ? row.status?.phase : undefined
+}
+
+// A running row's phase as the shared bar, filled by the phases it has passed, and the phase's icon
+// (joshuafolkken/kit#3452), so every row's phase is one column however long its name.
 function phase_of(row: BoardRow): string | undefined {
-	const phase = row.status?.phase
+	const phase = shown_phase(row)
 
-	if (phase === undefined || row.state !== 'running') return undefined
+	if (phase === undefined) return undefined
 
-	return `${bar_of(run_board_phase.index_of(phase), run_board_phase.PHASES.length)} ${phase}`
+	const bar = bar_of(run_board_phase.index_of(phase), run_board_phase.PHASES.length)
+
+	return `${bar} ${PHASE_ICONS[phase]}`
 }
 
 function waits_of(row: BoardRow, header: BoardHeader): string | undefined {
@@ -91,10 +105,18 @@ function timed_parts(row: BoardRow, frame: RowFrame): Array<string | undefined> 
 	return [title_of(row.title).padEnd(TITLE_LIMIT), time.padStart(frame.time_width), phase_of(row)]
 }
 
+// A running row turns the spinner where the header has one (joshuafolkken/kit#3452), padded by a space
+// to the two columns the emoji it replaces takes, so the numbers stay in one column.
+function state_icon(row: BoardRow, header: BoardHeader): string {
+	if (row.state !== 'running' || header.spinner === undefined) return STATE_ICONS[row.state]
+
+	return `${header.spinner} `
+}
+
 // Every row carries its state's icon, a waiting one ⏳ too (joshuafolkken/kit#3450).
 function row_text(row: BoardRow, frame: RowFrame): string {
 	const { header } = frame
-	const lead = `${STATE_ICONS[row.state]} ${header.link(String(row.number))}`
+	const lead = `${state_icon(row, header)} ${header.link(String(row.number))}`
 	const parts = [lead, ...timed_parts(row, frame), waits_of(row, header)]
 
 	return parts.filter((part) => part !== undefined && part !== '').join(GAP)
@@ -146,7 +168,17 @@ function time_width(header: BoardHeader): number {
 	return Math.max(0, ...times.map((time) => time.length))
 }
 
-function legend_of(words: Words): string {
+// The legend names only the phases some row on screen draws, in the phases' own order — seven icons
+// most of which no row shows would crowd out the ones that do (joshuafolkken/kit#3452).
+function phase_legend(layout: BoardLayout, words: Words): Array<string> {
+	const shown = new Set(run_board_layout.rows_of(layout).map((row) => shown_phase(row)))
+
+	return run_board_phase.PHASES.filter((phase) => shown.has(phase)).map(
+		(phase) => `${PHASE_ICONS[phase]} ${words[PHASE_WORDS[phase]]}`,
+	)
+}
+
+function legend_of(layout: BoardLayout, words: Words): string {
 	const legend = [
 		`${STATE_ICONS.merged} ${words.merged}`,
 		`${STATE_ICONS.parked} ${words.parked}`,
@@ -154,6 +186,7 @@ function legend_of(words: Words): string {
 		`${STATE_ICONS.waiting} ${words.waiting}`,
 		`${STATE_ICONS.human} ${words.decision}`,
 		`${WAITS_ICON} ${words.waits}`,
+		...phase_legend(layout, words),
 		`${HEADER_ICONS.cpu} ${words.cpu}`,
 		`${HEADER_ICONS.memory} ${words.memory}`,
 		`${HEADER_ICONS.swap} ${words.swap}`,
@@ -213,7 +246,7 @@ function notes_section(notes: ReadonlyArray<BoardNote>, words: Words): Array<str
 
 function render(view: BoardView): Array<string> {
 	const { header, notes } = view
-	const legend = header.layout === undefined ? [] : ['', legend_of(header.words)]
+	const legend = header.layout === undefined ? [] : ['', legend_of(header.layout, header.words)]
 
 	return [
 		...run_board_header.header_lines(header),
