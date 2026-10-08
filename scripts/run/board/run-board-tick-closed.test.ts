@@ -27,6 +27,7 @@ const PLAN: BoardPlan = {
 	waves: { waves: [], unreached: [] },
 	tracked: new Map(),
 	context: { repo: 'joshuafolkken/kit', titles: new Map(), open_numbers: new Set() },
+	labels: new Map(),
 }
 
 function merged_closed(issues: ReadonlyArray<number>): ReadonlyMap<number, ClosedIssue> {

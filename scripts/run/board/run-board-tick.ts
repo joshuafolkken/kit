@@ -202,7 +202,12 @@ function layout_for(state: BoardState, local: LocalRead): BoardLayout | undefine
 
 	if (plan === undefined) return undefined
 
-	const read = { open_numbers: plan.context.open_numbers, read_ms: state.fetched_ms, closed }
+	const read = {
+		open_numbers: plan.context.open_numbers,
+		read_ms: state.fetched_ms,
+		closed,
+		labels: plan.labels,
+	}
 	const statuses = run_board_status.settle_closed(statuses_for(plan, local), read)
 
 	return run_board_layout.layout_of(titled_closed(plan, closed), statuses)

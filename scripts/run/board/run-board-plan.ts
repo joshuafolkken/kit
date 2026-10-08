@@ -4,6 +4,7 @@ import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import { backlog_plan_read, type OpenListing, type Plan } from '#scripts/backlog/backlog-plan-read'
 import { backlog_waves } from '#scripts/backlog/backlog-waves'
 import type { EpicChild } from '#scripts/epic/epic-graph'
+import type { OpenIssueData } from '#scripts/git/git-schemas'
 import type { BoardPlan } from './run-board-layout'
 
 // The plan `run:board` lays the run over, scoped to what the run was asked to do (joshuafolkken/kit#3442).
@@ -32,6 +33,15 @@ interface PlanRead {
 	ports: PlanPorts
 }
 
+// A row the listing read without its labels is left out, so it reads as unknown rather than unlabelled.
+function labels_of(rows: ReadonlyArray<OpenIssueData>): ReadonlyMap<number, ReadonlyArray<string>> {
+	const labelled = rows.flatMap((row) =>
+		row.labels === undefined ? [] : [[row.number, row.labels.map((label) => label.name)] as const],
+	)
+
+	return new Map(labelled)
+}
+
 async function board_of(
 	opted_in: OptedIn,
 	exclude: ReadonlyArray<number>,
@@ -45,6 +55,7 @@ async function board_of(
 		waves: backlog_waves.build(plan.result, plan.repo, plan.scope),
 		tracked: plan.tracked,
 		context: backlog_plan_read.context_of(plan, read.listing),
+		labels: labels_of(read.listing.rows),
 	}
 }
 
@@ -84,6 +95,7 @@ function joined(lead: BoardPlan, pool: BoardPlan): BoardPlan {
 		},
 		tracked: new Map([...pool.tracked, ...lead.tracked]),
 		context: pool.context,
+		labels: pool.labels,
 	}
 }
 
