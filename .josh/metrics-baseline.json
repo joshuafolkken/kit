@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1004,
-		"code_lines": 83267,
-		"comment_lines": 33463,
+		"code_lines": 83291,
+		"comment_lines": 33473,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 558853
 	},
 	"accepted": {
-		"reason": "#3463 adds lockfile-sync (reinstall the primary checkout's dependencies when a main sync changes pnpm-lock.yaml) and wires it into main:sync; re-accepted after merging origin/main (#3437 josh backlogrun terminal launcher, #3438 run:board workspace auto-start, #3459 run:board label-driven stopped lanes, #3454 run_headless.is_cut_capped)",
+		"reason": "#3464 adds the 24-bit gauge shades (Shade type, GAUGE_SHADES, shaded()) and their tests so run:board gauges draw true green/yellow/red regardless of the terminal palette; re-accepted after merging origin/main (#3463 lockfile-sync, #3437 josh backlogrun launcher)",
 		"date": "2026-10-08"
 	}
 }
