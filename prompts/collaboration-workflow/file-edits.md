@@ -1,6 +1,6 @@
 ## ファイル編集はコマンド本文に本文を載せない
 
-`CLAUDE.md` →「Never carry a file's new text inside a shell command.」の正典。
+「ファイル本文をシェルに載せない」規則の正典。`CLAUDE.md` からは [`rule-delivery.md`](./rule-delivery.md) →「配送されている規則」を経て届く。
 
 `pnpm josh rule:guard`（file-body の行）が、既存ファイルを書き戻すヒアドキュメント・書き込みを伴うインタプリタ heredoc / `node -e`・書き込むスクリプトファイルを作るヒアドキュメント・in-place `perl -0pi -e` を、コマンドの何行目にあってもその呼び出しで拒否し、規則を述べる。**このファイルが担うのはガードに見えないもの**である — Bash を通らない Edit / Write の全文書き直し、ガードを素通りする `sed -i` の 4 条件、そしてコストである。
 

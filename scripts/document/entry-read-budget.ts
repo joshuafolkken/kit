@@ -103,15 +103,17 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// joshuafolkken/kit#3171 cut `CLAUDE.md` to triggers and pointers (~12 KB), lowering every entry.
 	// joshuafolkken/kit#3256 moved `CLAUDE.md`'s residency prose to `residency.md`, lowering kickoff and
 	// halfrun one block each.
-	{ entry: 'kickoff', bytes: 40_960 },
+	// joshuafolkken/kit#3395 took what a hook, lint or skill already delivers out of `CLAUDE.md`
+	// (~13 KB → ~9 KB), lowering every entry one block or two.
+	{ entry: 'kickoff', bytes: 36_864 },
 	// Raised in joshuafolkken/kit#3177: #3173, #3181 and #3183 merged in parallel and together tipped
 	// fullrun 12 bytes over its block; none of #3177's documents are in its read set.
 	// Lowered back in joshuafolkken/kit#3180: the history and lint-settled proofs left its read set.
-	{ entry: 'fullrun', bytes: 57_344 },
-	{ entry: 'halfrun', bytes: 53_248 },
-	{ entry: 'prrun', bytes: 61_440 },
-	{ entry: 'backlogrun', bytes: 176_128 },
-	{ entry: LANE_CHILD, bytes: 57_344 },
+	{ entry: 'fullrun', bytes: 53_248 },
+	{ entry: 'halfrun', bytes: 49_152 },
+	{ entry: 'prrun', bytes: 57_344 },
+	{ entry: 'backlogrun', bytes: 172_032 },
+	{ entry: LANE_CHILD, bytes: 53_248 },
 ]
 
 function byte_size(root: string, relative_path: string): number {

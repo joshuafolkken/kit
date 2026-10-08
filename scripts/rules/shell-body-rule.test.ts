@@ -37,8 +37,7 @@ const ISSUE_COMMENT_SPELLING = 'pnpm josh issue:comment <N> --body-file <path>'
 // The measurement the rule rests on, and the most quotable part of it — so it is the first thing that
 // would be pasted back into an always-loaded document.
 const MEASUREMENT = '履歴展開は非対話では無効'
-// The resident trigger, asserted twice — once as present, once for where it sits relative to the rule
-// it is the counterpart of.
+// The resident trigger joshuafolkken/kit#3395 retired, asserted absent so it is not pasted back.
 const RESIDENT_TRIGGER = '**Never put a body in shell double quotes**'
 
 // Every sentence here changes what an agent does. Drop the mechanism and the refusal reads as style;
@@ -66,29 +65,20 @@ describe('the delivered text — what the refusal states', () => {
 	})
 })
 
-// **The trigger stays resident; the body does not.** A hook reaches this harness alone — `AGENTS.md`,
-// `GEMINI.md` and `.cursorrules` are pointers to `CLAUDE.md`, and a session under any of them runs no
-// hook — so a document with the line removed would leave those sessions with no statement of the rule
-// anywhere. It also has to keep working on the spellings the regex does not know.
-describe.each(AI_DOCS)('%s — keeps the trigger, not the body', (document_path) => {
+// **A route stays resident; the trigger and the body do not.** joshuafolkken/kit#3395 took the
+// trigger out: an agent that runs no hook applies the delivery enumeration as a self-check list
+// (`principles.md`, joshuafolkken/kit#3079), so the resident line names that enumeration, and the
+// enumeration's own suite below pins that it names this topic file.
+describe.each(AI_DOCS)('%s — keeps the route, not the rule', (document_path) => {
 	const content = read_unwrapped(document_path)
 
-	it.each([RESIDENT_TRIGGER, 'is _executed_', 'pass the body by path'])('states %j', (marker) => {
-		expect(content).toContain(marker)
+	it('routes to the delivery enumeration', () => {
+		expect(content).toContain('shell bodies')
+		expect(content).toContain(DELIVERY)
 	})
 
-	it('routes to the topic file that carries the procedure', () => {
-		expect(content).toContain(CANONICAL)
-	})
-
-	// It sits beside the rule it is the counterpart of: that one forbids carrying a file's new text in
-	// a command, this one forbids carrying a body. The Issue asked for exactly that placement.
-	it('sits beside the file-editing prohibition it is the counterpart of', () => {
-		const editing = content.indexOf("**Never carry a file's new text inside a shell command.**")
-		const body = content.indexOf(RESIDENT_TRIGGER)
-
-		expect(editing).toBeGreaterThan(-1)
-		expect(body).toBeGreaterThan(editing)
+	it('no longer carries the trigger', () => {
+		expect(content).not.toContain(RESIDENT_TRIGGER)
 	})
 
 	it('leaves the measurement at the pointer', () => {

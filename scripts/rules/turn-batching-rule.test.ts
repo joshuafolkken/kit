@@ -61,19 +61,17 @@ describe('the delivered text — what the refusal states', () => {
 	})
 })
 
-// **The trigger and the criterion stay resident; the body does not.** A hook reaches this harness
-// alone — `AGENTS.md`, `GEMINI.md` and `.cursorrules` are pointers to `CLAUDE.md`, and a session
-// under any of them runs no hook — so a document with the line removed would leave those sessions
-// with no statement of the rule anywhere. What the relocation takes out is the reasoning.
-describe.each(AI_DOCS)('%s — keeps the trigger, not the body', (document_path) => {
+// **A route stays resident; the trigger and the body do not.** joshuafolkken/kit#3395 took the
+// trigger and the criterion out: an agent that runs no hook applies the delivery enumeration as a
+// self-check list (`principles.md`, joshuafolkken/kit#3079), so the resident line names that
+// enumeration, and the enumeration's own suite below pins that it names this topic file.
+describe.each(AI_DOCS)('%s — keeps the route, not the rule', (document_path) => {
 	const content = read_unwrapped(document_path)
 
-	it.each([
-		"**Put every call that does not depend on another's result in the same turn.**",
-		"**The criterion is whether this call's input needs another call's result, not what kind of call it is**",
-		'edits are covered exactly as reads are',
-	])('states %j', (marker) => {
-		expect(content).toContain(marker)
+	it("no longer carries the trigger, now at the enumeration's pointer", () => {
+		expect(content).not.toContain(
+			"**Put every call that does not depend on another's result in the same turn.**",
+		)
 	})
 
 	it.each(["A run's wall clock is set by how many times it stops to wait for a tool"])(
@@ -84,11 +82,10 @@ describe.each(AI_DOCS)('%s — keeps the trigger, not the body', (document_path)
 		},
 	)
 
-	// The hook is what makes the rule fire, so the resident line has to name it — and the enumeration,
-	// so a reader learns there is a delivery channel and what a turn with no trigger means.
-	it('routes to the delivery enumeration and names the trigger', () => {
+	// The enumeration names the hook and what a turn with no trigger means, so the route is enough.
+	it('routes to the delivery enumeration', () => {
+		expect(content).toContain('turn batching')
 		expect(content).toContain(DELIVERY)
-		expect(content).toContain(GUARD_COMMAND)
 	})
 
 	// The measured breakdown is what makes the rule persuasive, not what makes it obeyed, so it

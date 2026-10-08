@@ -9,9 +9,11 @@ import { document_reachability } from './document-reachability'
 
 // The documents sat at ~83 KB each before the joshuafolkken/kit#854 split, crept back to ~56 KB, and
 // were cut below 30 KB by joshuafolkken/kit#1924. joshuafolkken/kit#3171 cut `CLAUDE.md` to ~14 KB —
-// triggers and pointers only — and lowered this ceiling with it, so the document cannot creep back. It
-// is a guard against re-inlining, not a budget to tune prose against.
-const RESIDENT_CEILING_BYTES = 18_000
+// triggers and pointers only — and lowered this ceiling with it, so the document cannot creep back.
+// joshuafolkken/kit#3395 took out what a hook, lint or skill already delivers (~9 KB) and ratcheted the
+// ceiling down so the limit below is 9 KiB. It is a guard against re-inlining, not a budget to tune
+// prose against.
+const RESIDENT_CEILING_BYTES = 12_216
 
 // joshuafolkken/kit#951: the ceiling alone stops the wrong thing. Reached, it does not block the
 // next rule — it makes that rule pay for itself by deleting a neighboring sentence, and the

@@ -18,7 +18,7 @@
 
 > **その規則が効き始める瞬間を、1 件のツール呼び出しとして名指しできるか。**
 
-**名指しできる規則は、規則本文を常駐から出し、[`rule-delivery.md`](./rule-delivery.md) の列挙表に 1 行加える**（joshuafolkken/kit#1524）。フックは Claude Code にしか届かないので、**常駐にはトリガと判断基準の 1 行を残す**。根拠は `docs/maintainers/residency-rationale.md` → "Why a delivered rule keeps one resident line"。
+**名指しできる規則は、規則本文を常駐から出し、[`rule-delivery.md`](./rule-delivery.md) の列挙表に 1 行加える**（joshuafolkken/kit#1524）。**規則ごとのトリガ行は常駐に残さない** — `CLAUDE.md` が持つのは列挙表への導線 1 行だけで、フックが走らないセッションはその表を自己点検の一覧として適用する（`principles.md` →「Claude Code 以外のエージェントでの読み替え」）。根拠は `docs/maintainers/residency-rationale.md` → "Why a delivered rule leaves no resident line"。
 
 ### 第 2 問 — skill なしのターンでも効く必要があるか
 
