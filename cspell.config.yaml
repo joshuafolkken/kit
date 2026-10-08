@@ -7,6 +7,12 @@ words:
   - purgeable
   # The macOS `sysctl` key the lane-limit measurement reads swap from (#3355).
   - swapusage
+  # The swap counters `run:board`'s machine line reads: macOS `sysctl` and Linux `/proc/vmstat` (#3450).
+  - swapins
+  - swapouts
+  - pswpin
+  - pswpout
+  - getconf
   # A run trying kit's distribution on a throwaway project of its own (#3142).
   - dogfood
   # The workflow command that stops at a green, mergeable pull request (#3023).

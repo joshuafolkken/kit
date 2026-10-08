@@ -33,6 +33,8 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		baseline_total: undefined,
 		plan_fetched_ms: undefined,
 		plan_failed_ms: undefined,
+		machine: undefined,
+		link: (reference) => reference,
 		...extra,
 	}
 }
@@ -67,13 +69,13 @@ describe('run_board_header.header_lines state', () => {
 		expect(title_of(header())).toMatch(/^⏸ backlogrun/u)
 	})
 
-	// joshuafolkken/kit#3439
-	it('draws an ended run with how long it took and when it ended, and no time left', () => {
-		const activity = { last_event_ms: undefined, idle: undefined, is_stopped: true }
+	// joshuafolkken/kit#3439, joshuafolkken/kit#3450
+	it('draws an ended run with how long it took and the minute it ended, and no heartbeat', () => {
 		const ended_ms = STARTED + 90 * MINUTE
-		const title = title_of(header({ activity, ended_ms }))
+		const activity = { last_event_ms: ended_ms, idle: undefined, is_stopped: true }
+		const title = title_of(header({ activity, ended_ms, now_ms: ended_ms + 10 * MINUTE }))
 
-		expect(title).toBe(`■ backlogrun   ⏱ 90:00   ${WORDS.ended_at} ${clock_of(ended_ms)}`)
+		expect(title).toBe(`■ backlogrun   ⏱ 90:00   🔚 ${clock_of(ended_ms).slice(0, 5)}`)
 	})
 
 	it('leaves out the heartbeat before the stream has one', () => {
@@ -93,7 +95,18 @@ describe('run_board_header.header_lines shape', () => {
 
 		expect(lines_of(header({ layout }))).toStrictEqual([
 			'▶ backlogrun   ⏱ 30:00   ⌛ 7h30m',
-			`${'░'.repeat(20)}  0/2   ✅ 0  💤 0  🔄 1  ⏳ 1`,
+			`📊 ${'░'.repeat(10)}  0/2   ✅ 0  💤 0  🔄 1  ⏳ 1`,
+		])
+	})
+
+	// joshuafolkken/kit#3450
+	it('draws the machine line between the title and the progress line', () => {
+		const machine = { cpu_percent: 15, memory_percent: 37, swap_mb_per_s: 3.1 }
+
+		expect(lines_of(header({ machine }))).toStrictEqual([
+			'⏸ backlogrun   ⏱ 30:00   ⌛ 7h30m',
+			'🔥 ━━░░░░░░░░  15%   🧠 ━━━━░░░░░░  37%   💾 ━━░░░░░░░░ 3.1M/s',
+			`📊 ${'░'.repeat(10)}  0/0   ✅ 0  💤 0  🔄 0  ⏳ 0`,
 		])
 	})
 

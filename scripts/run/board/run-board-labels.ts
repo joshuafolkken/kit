@@ -13,7 +13,8 @@ const SECONDS_PER_MINUTE = 60
 const MINUTES_PER_HOUR = 60
 const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR
 const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE
-const BAR_WIDTH = 20
+// Every gauge is this wide — the plan, the machine and a row's phase (joshuafolkken/kit#3450).
+const BAR_WIDTH = 10
 const BAR_DONE = '━'
 const BAR_LEFT = '░'
 
@@ -27,7 +28,7 @@ interface WordPair {
 // the words left are the ones a symbol cannot carry, and the legend that names the symbols.
 const WORD_PAIRS = {
 	no_run: { ja: 'ランなし', en: 'no run' },
-	ended_at: { ja: '終了', en: 'ended' },
+	ended: { ja: '終了', en: 'ended' },
 	plan: { ja: '計画', en: 'plan' },
 	merged: { ja: 'マージ', en: 'merged' },
 	parked: { ja: 'park', en: 'parked' },
@@ -35,6 +36,10 @@ const WORD_PAIRS = {
 	waiting: { ja: '待ち', en: 'waiting' },
 	decision: { ja: '判断待ち', en: 'decision' },
 	waits: { ja: '待ち先', en: 'waits on' },
+	cpu: { ja: 'cpu', en: 'cpu' },
+	memory: { ja: 'mem', en: 'mem' },
+	swap: { ja: 'swap', en: 'swap' },
+	progress: { ja: '進捗', en: 'progress' },
 	idle_until: { ja: '待機終了', en: 'wait ends' },
 	idle_left: { ja: '残り', en: 'left' },
 	idle_end_idle: {
@@ -79,6 +84,15 @@ const STATE_ICONS: Readonly<Record<ItemState, string>> = {
 
 // The blocking edge, chosen on the same rule: ⛓ is a text symbol.
 const WAITS_ICON = '🔗'
+
+// The header's gauges and marks (joshuafolkken/kit#3450); 📊 rather than 🏁, which is a finished row.
+const HEADER_ICONS = {
+	cpu: '🔥',
+	memory: '🧠',
+	swap: '💾',
+	progress: '📊',
+	ended: '🔚',
+} as const
 
 function words_of(lang: string): Words {
 	return lang === JA ? JA_WORDS : EN_WORDS
@@ -132,6 +146,7 @@ function bar_of(done: number, total: number, width: number = BAR_WIDTH): string 
 }
 
 const run_board_labels = {
+	HEADER_ICONS,
 	STATE_ICONS,
 	WAITS_ICON,
 	bar_of,

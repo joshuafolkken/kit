@@ -21,6 +21,10 @@ import { execa } from 'execa'
 // **A reading that fails answers undefined, and undefined is the old behavior.** A CI runner or a
 // container — where the host's CPU times are not this process's quota — budgets by the core count and
 // admits without looking at memory, exactly as before.
+//
+// **`run:board` draws its machine gauges from the same reading** (joshuafolkken/kit#3450), so what the
+// board shows a person is what the gate admits against. The board takes a sample with no window and
+// draws the difference from its previous one.
 
 // The window the busy cores are measured over: long enough that one scheduler tick does not dominate it,
 // short enough that a solo admission is not visibly delayed.
@@ -35,16 +39,34 @@ const BYTES_PER_MB = 1_048_576
 const KB_PER_MB = 1024
 const PERCENT = 100
 const MEMINFO_PATH = '/proc/meminfo'
+const VMSTAT_PATH = '/proc/vmstat'
 const LINUX_AVAILABLE = /^MemAvailable:\s+(?<kb>\d+) kB/mu
-// The kernel's own memory-pressure figure: the percentage of memory still available, compressible and
-// purgeable pages included — what `os.freemem()` leaves out on macOS, where it reads near zero on a
-// machine with gigabytes to spare.
-const PRESSURE_ARGUMENTS = ['-n', 'kern.memorystatus_level']
-const PRESSURE_LEVEL = /^\s*(?<level>\d+)\s*$/u
+const LINUX_SWAP_IN = /^pswpin (?<pages>\d+)$/mu
+const LINUX_SWAP_OUT = /^pswpout (?<pages>\d+)$/mu
+const PAGE_SIZE_ARGUMENTS = ['PAGESIZE']
+// The whole memory reading in one `sysctl` (joshuafolkken/kit#3450), cheap enough for `run:board` to take
+// every second. `kern.memorystatus_level` is the kernel's own memory-pressure figure: the percentage of
+// memory still available, compressible and purgeable pages included — what `os.freemem()` leaves out on
+// macOS, where it reads near zero on a machine with gigabytes to spare. The swapper counters are the
+// pages swapped in and out since boot, `vm_stat`'s `Swapins` / `Swapouts`. The names stay in the output
+// (no `-n`), so a name an older macOS lacks drops only its own line.
+const LEVEL_NAME = 'kern.memorystatus_level'
+const SWAP_IN_NAME = 'vm.compressor.swapper.swapins_total'
+const SWAP_OUT_NAME = 'vm.compressor.swapper.swapouts_total'
+const PAGE_SIZE_NAME = 'hw.pagesize'
+const SYSCTL_ARGUMENTS = [LEVEL_NAME, SWAP_IN_NAME, SWAP_OUT_NAME, PAGE_SIZE_NAME]
+const SYSCTL_LINE = /^(?<name>[\w.]+): (?<value>\d+)$/gmu
 
 interface MachineReading {
 	busy_cores: number | undefined
 	available_mb: number | undefined
+}
+
+// The memory half of a reading. `swapped_mb` is a counter — every page swapped in or out since boot —
+// so a rate is the difference between two readings.
+interface MemoryReading {
+	available_mb: number | undefined
+	swapped_mb: number | undefined
 }
 
 // What the ledger's admitted reservations declare — the part of the machine's load already accounted for.
@@ -63,6 +85,13 @@ interface CpuTimes {
 	total: number
 }
 
+// One moment of the machine for `run:board`: CPU times and the memory reading, no window waited out.
+interface MachineSample {
+	cpu: CpuTimes
+	memory: MemoryReading
+	total_mb: number
+}
+
 function cpu_times(): CpuTimes {
 	let busy = 0
 	let idle = 0
@@ -75,21 +104,56 @@ function cpu_times(): CpuTimes {
 	return { busy, total: busy + idle }
 }
 
-function busy_cores_between(before: CpuTimes, after: CpuTimes, cores: number): number | undefined {
+// The busy share of the CPU between two readings, from 0 to 1.
+function busy_share_between(before: CpuTimes, after: CpuTimes): number | undefined {
 	const total = after.total - before.total
 
 	if (total <= 0) return undefined
 
-	return ((after.busy - before.busy) / total) * cores
+	return (after.busy - before.busy) / total
 }
 
-// `kern.memorystatus_level` → `58`: the share of physical memory still available, as a percentage.
-function parse_darwin_pressure(output: string, total_bytes: number): number | undefined {
-	const level = PRESSURE_LEVEL.exec(output)?.groups?.['level']
+function busy_cores_between(before: CpuTimes, after: CpuTimes, cores: number): number | undefined {
+	const share = busy_share_between(before, after)
 
-	if (level === undefined) return undefined
+	return share === undefined ? undefined : share * cores
+}
 
-	return (Number(level) / PERCENT) * (total_bytes / BYTES_PER_MB)
+function sysctl_values(output: string): Map<string, number> {
+	const values = [...output.matchAll(SYSCTL_LINE)].map(
+		(match) => [match.groups?.['name'] ?? '', Number(match.groups?.['value'])] as const,
+	)
+
+	return new Map(values)
+}
+
+// The pages swapped in and out since boot; either count unread leaves the sum unread.
+function swapped_pages(
+	pages_in: number | undefined,
+	pages_out: number | undefined,
+): number | undefined {
+	return pages_in === undefined || pages_out === undefined ? undefined : pages_in + pages_out
+}
+
+function swapped_mb(pages: number | undefined, page_bytes: number | undefined): number | undefined {
+	if (pages === undefined || page_bytes === undefined) return undefined
+
+	return (pages * page_bytes) / BYTES_PER_MB
+}
+
+// `kern.memorystatus_level: 58` → 58% of physical memory still available, beside the swapped pages.
+function parse_darwin_memory(output: string, total_bytes: number): MemoryReading {
+	const values = sysctl_values(output)
+	const level = values.get(LEVEL_NAME)
+
+	return {
+		available_mb:
+			level === undefined ? undefined : (level / PERCENT) * (total_bytes / BYTES_PER_MB),
+		swapped_mb: swapped_mb(
+			swapped_pages(values.get(SWAP_IN_NAME), values.get(SWAP_OUT_NAME)),
+			values.get(PAGE_SIZE_NAME),
+		),
+	}
 }
 
 function parse_linux_available(meminfo: string): number | undefined {
@@ -98,22 +162,63 @@ function parse_linux_available(meminfo: string): number | undefined {
 	return kb === undefined ? undefined : Number(kb) / KB_PER_MB
 }
 
-async function read_available_mb(
-	platform: NodeJS.Platform = process.platform,
-): Promise<number | undefined> {
+function pages_of(pattern: RegExp, vmstat: string): number | undefined {
+	const pages = pattern.exec(vmstat)?.groups?.['pages']
+
+	return pages === undefined ? undefined : Number(pages)
+}
+
+// `pswpin` and `pswpout` in `/proc/vmstat` are the pages swapped in and out since boot.
+function parse_linux_swapped(vmstat: string, page_bytes: number): number | undefined {
+	const pages = swapped_pages(pages_of(LINUX_SWAP_IN, vmstat), pages_of(LINUX_SWAP_OUT, vmstat))
+
+	return swapped_mb(pages, page_bytes)
+}
+
+async function settled<T>(read: () => Promise<T>): Promise<T | undefined> {
 	try {
-		if (platform === 'darwin') {
-			const { stdout } = await execa('sysctl', PRESSURE_ARGUMENTS)
-
-			return parse_darwin_pressure(stdout, totalmem())
-		}
-
-		return platform === 'linux'
-			? parse_linux_available(await readFile(MEMINFO_PATH, 'utf8'))
-			: undefined
+		return await read()
 	} catch {
 		return undefined
 	}
+}
+
+// A name `sysctl` does not know fails the command but still prints the others, so the exit is not read.
+async function read_darwin_memory(): Promise<MemoryReading> {
+	const { stdout } = await execa('sysctl', SYSCTL_ARGUMENTS, { reject: false })
+
+	return parse_darwin_memory(stdout, totalmem())
+}
+
+async function read_page_size(): Promise<string> {
+	const { stdout } = await execa('getconf', PAGE_SIZE_ARGUMENTS)
+
+	return stdout
+}
+
+async function read_linux_memory(): Promise<MemoryReading> {
+	const [meminfo, vmstat, page_size] = await Promise.all([
+		settled(async () => await readFile(MEMINFO_PATH, 'utf8')),
+		settled(async () => await readFile(VMSTAT_PATH, 'utf8')),
+		settled(read_page_size),
+	])
+	const page_bytes = page_size === undefined ? undefined : Number(page_size)
+
+	return {
+		available_mb: meminfo === undefined ? undefined : parse_linux_available(meminfo),
+		swapped_mb:
+			vmstat === undefined || page_bytes === undefined
+				? undefined
+				: parse_linux_swapped(vmstat, page_bytes),
+	}
+}
+
+const UNREAD_MEMORY: MemoryReading = { available_mb: undefined, swapped_mb: undefined }
+
+async function read_memory(): Promise<MemoryReading> {
+	if (process.platform === 'darwin') return (await settled(read_darwin_memory)) ?? UNREAD_MEMORY
+
+	return process.platform === 'linux' ? await read_linux_memory() : UNREAD_MEMORY
 }
 
 // A CPU quota narrower than the host makes the host-wide CPU times the wrong machine, so the busy cores
@@ -132,12 +237,16 @@ async function read_machine(
 	sleep: (ms: number) => Promise<void> = default_sleep,
 ): Promise<MachineReading> {
 	const before = cpu_times()
-	const [available_mb] = await Promise.all([read_available_mb(), sleep(SAMPLE_WINDOW_MS)])
+	const [memory] = await Promise.all([read_memory(), sleep(SAMPLE_WINDOW_MS)])
 	const busy_cores = is_unquoted()
 		? busy_cores_between(before, cpu_times(), cpus().length)
 		: undefined
 
-	return { busy_cores, available_mb }
+	return { busy_cores, available_mb: memory.available_mb }
+}
+
+async function read_sample(): Promise<MachineSample> {
+	return { cpu: cpu_times(), memory: await read_memory(), total_mb: totalmem() / BYTES_PER_MB }
 }
 
 // The busy cores the ledger does not account for, beyond the baseline the weights were measured beside,
@@ -165,11 +274,14 @@ function machine_budget(cores: number, reading: MachineReading, ledger: LedgerLo
 const machine_capacity = {
 	BASELINE_CORES,
 	busy_cores_between,
+	busy_share_between,
 	machine_budget,
-	parse_darwin_pressure,
+	parse_darwin_memory,
 	parse_linux_available,
+	parse_linux_swapped,
 	read_machine,
+	read_sample,
 }
 
-export type { LedgerLoad, MachineBudget, MachineReading }
+export type { CpuTimes, LedgerLoad, MachineBudget, MachineReading, MachineSample, MemoryReading }
 export { machine_capacity }

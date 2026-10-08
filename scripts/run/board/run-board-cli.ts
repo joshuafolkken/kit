@@ -1,8 +1,10 @@
 #!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { machine_capacity } from '#scripts/gate/machine-capacity'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { session_language } from '#scripts/josh/session-language'
+import terminalLink from 'terminal-link'
 import { run_board_labels, type Words } from './run-board-labels'
 import { run_board_plan } from './run-board-plan'
 import { run_board_read } from './run-board-read'
@@ -34,8 +36,11 @@ function on_exit(leave: () => void): void {
 const LIVE_PORTS: BoardPorts = {
 	read_plan: async (scope) => await run_board_plan.read_plan(scope),
 	read_local: run_board_read.read_local,
+	read_machine: machine_capacity.read_sample,
 	now: () => Date.now(),
 	write: (frame) => process.stdout.write(frame),
+	// No fallback: a terminal that opens no link, or a pipe, gets the bare number rather than a URL.
+	link: (text, url) => terminalLink(text, url, { fallback: false }),
 	is_tty: process.stdout.isTTY,
 	on_exit,
 	sleep: async (ms) => {

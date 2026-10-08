@@ -1,9 +1,12 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
+import type { MachineSample } from '#scripts/gate/machine-capacity'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_cli } from '#scripts/run/progress/run-progress-cli'
 import { run_board_header } from './run-board-header'
 import type { Words } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
+import { run_board_link, type Link } from './run-board-link'
+import { run_board_machine, type MachineGauges, type MachineMark } from './run-board-machine'
 import { run_board_notes } from './run-board-notes'
 import type { LocalRead } from './run-board-read'
 import { run_board_render } from './run-board-render'
@@ -17,7 +20,8 @@ import { run_board_status } from './run-board-status'
 // last one is kept and drawn against the current time. A failed plan read keeps the previous plan on
 // screen and says when it failed. A run that ended stays on screen, its plan held as it last read,
 // until the next one starts (joshuafolkken/kit#3439). With no run in this checkout it reads nothing
-// from GitHub.
+// from GitHub. The machine is sampled every redraw (joshuafolkken/kit#3450): one `sysctl` takes a few
+// milliseconds, and its gauges are the differences between consecutive samples.
 
 const REDRAW_SECONDS = 1
 const REDRAW_MS = REDRAW_SECONDS * run_progress.MS_PER_SECOND
@@ -29,8 +33,11 @@ interface BoardPorts {
 	read_plan: (scope: NamedPlan) => Promise<BoardPlan | undefined>
 	// `undefined` when no run has started here.
 	read_local: () => Promise<LocalRead | undefined>
+	read_machine: () => Promise<MachineSample>
 	now: () => number
 	write: (frame: string) => void
+	// Wraps an issue number in a hyperlink where the terminal opens one, and leaves it plain elsewhere.
+	link: Link
 	// Whether stdout is a terminal — only a terminal gets the alternate screen.
 	is_tty: boolean
 	// Runs `leave` however the process ends: a normal exit, Ctrl+C or SIGTERM.
@@ -49,6 +56,9 @@ interface BoardState {
 	fetched_ms: number | undefined
 	failed_ms: number | undefined
 	baseline_total: number | undefined
+	// The last machine sample, which the next one is compared against, and the gauges drawn from them.
+	machine: MachineMark | undefined
+	gauges: MachineGauges | undefined
 }
 
 const FRESH_STATE: BoardState = {
@@ -60,6 +70,8 @@ const FRESH_STATE: BoardState = {
 	fetched_ms: undefined,
 	failed_ms: undefined,
 	baseline_total: undefined,
+	machine: undefined,
+	gauges: undefined,
 }
 
 function is_due(last_ms: number | undefined, interval_ms: number, now_ms: number): boolean {
@@ -70,6 +82,15 @@ async function reread(state: BoardState, ports: BoardPorts, now_ms: number): Pro
 	if (!is_due(state.read_ms, LOCAL_READ_MS, now_ms)) return state
 
 	return { ...state, local: await ports.read_local(), read_ms: now_ms }
+}
+
+// The sample is timed when it is taken, not when the tick began: a plan read between the two would put
+// its seconds on the wrong side of the rate's interval.
+async function resample(state: BoardState, ports: BoardPorts): Promise<BoardState> {
+	const at_ms = ports.now()
+	const machine = { sample: await ports.read_machine(), at_ms }
+
+	return { ...state, machine, gauges: run_board_machine.gauges_of(state.machine, machine) }
 }
 
 // A title the board once knew stays known, so an issue that left the open listing keeps its name.
@@ -153,6 +174,8 @@ function frame_of(
 		baseline_total: state.baseline_total,
 		plan_fetched_ms: state.fetched_ms,
 		plan_failed_ms: state.failed_ms,
+		machine: state.gauges,
+		link: run_board_link.linker(state.plan?.context.repo, redraw.ports.link),
 	}
 
 	return run_board_render.render({ header, notes: run_board_notes.notes_of(local.events) })
@@ -186,11 +209,18 @@ async function tick(state: BoardState, ports: BoardPorts, words: Words): Promise
 	}
 
 	const refreshed = await refresh(state_for(read, local), ports, local, now_ms)
+	const sampled = await resample(refreshed, ports)
 
-	return draw_run(refreshed, local, { ports, words, now_ms })
+	return draw_run(sampled, local, { ports, words, now_ms })
 }
 
-const run_board_tick = { FRESH_STATE, LOCAL_READ_MS, PLAN_RETRY_MS, REDRAW_MS, tick }
+const run_board_tick = {
+	FRESH_STATE,
+	LOCAL_READ_MS,
+	PLAN_RETRY_MS,
+	REDRAW_MS,
+	tick,
+}
 
 export { run_board_tick }
 export type { BoardPorts, BoardState }
