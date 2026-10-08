@@ -171,8 +171,13 @@ function report_hold(): number {
 // that wrote it is the one whose uncommitted work would be trampled, so a record that cannot be
 // parsed is never read as an idle tree. **And an expired record still stops it while the tree is
 // dirty** — that is a run which stopped for a person, and the work is right there in the tree.
-async function blocking_message(read: HoldRead): Promise<string | undefined> {
-	if (read.kind === 'held') return run_hold.held_message(read.hold)
+// **A live record stops every claim but its own run's** (joshuafolkken/kit#3419).
+function held_block(hold: RunHold, issue: string): string | undefined {
+	return run_hold.is_reentry(hold, issue) ? undefined : run_hold.held_message(hold)
+}
+
+async function blocking_message(read: HoldRead, issue: string): Promise<string | undefined> {
+	if (read.kind === 'held') return held_block(read.hold, issue)
 
 	if (read.kind === 'unreadable') return run_hold.unreadable_message()
 
@@ -200,6 +205,16 @@ function replace_stale(target: string, request: ClaimRequest, hold: RunHold): nu
 	run_hold.release_hold(target)
 
 	return take_free_tree(target, request)
+}
+
+// The claim on a tree nothing blocks. A `held` record that got this far is the run's own
+// (joshuafolkken/kit#3419), so it is kept as written — its stop marks included — and answered `hold`.
+function take_tree(target: string, request: ClaimRequest, read: HoldRead): number {
+	if (read.kind === 'held') return report_hold()
+
+	return read.kind === 'stale'
+		? replace_stale(target, request, read.hold)
+		: take_free_tree(target, request)
 }
 
 // A non-clean preflight verdict is not an error: it is an answer a loop branches on, exactly as
@@ -232,14 +247,11 @@ async function claim(target: string, request: ClaimRequest, is_linked: boolean):
 	if (gate !== undefined) return gate
 
 	const read = run_hold.read_hold(target)
-	const blocked = await blocking_message(read)
+	const blocked = await blocking_message(read, request.issue)
 
 	if (blocked !== undefined) return report_busy(blocked)
 
-	const code =
-		read.kind === 'stale'
-			? replace_stale(target, request, read.hold)
-			: take_free_tree(target, request)
+	const code = take_tree(target, request, read)
 
 	if (code === SUCCESS_EXIT_CODE) await run_tidy_cli.sweep()
 

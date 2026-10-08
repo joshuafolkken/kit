@@ -70,3 +70,44 @@ test('offers the next named issue after the epic root is recorded done', async (
 	expect(offer).toMatchObject({ verdict: 'run', issues: ['2'] })
 	read.mockRestore()
 })
+
+// joshuafolkken/kit#3419: a park is booked done so the run moves on, but it is not a merge — an `--only`
+// run whose named issue parked ends as a stop the driver closes with `run:carry --end --stopped`.
+const ONLY_CONTEXT = { ...CONTEXT, is_only: true, forwarded: [] }
+const DONE_CARRY = {
+	...CARRY,
+	invocation: 'backlogrun #1 #2 --only',
+	done: [1, 2],
+	merged_issues: [1],
+}
+
+function read_issue_as(state: string): void {
+	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
+		kind: 'state',
+		state: { state, labels: [], is_human_review: false },
+	})
+}
+
+test('stops an --only run naming the issue that parked instead of finishing it', async () => {
+	read_issue_as('OPEN')
+	const state = backlog_drive.initial_state([], ACTIVE)
+
+	const offer = await backlog_drive_named_offer.read(DONE_CARRY, state, ONLY_CONTEXT)
+
+	expect(offer).toMatchObject({
+		verdict: 'stop',
+		is_finish: false,
+		reason: 'only: #2 ended without a merge',
+	})
+	vi.restoreAllMocks()
+})
+
+test('finishes an --only run whose named issues all merged', async () => {
+	read_issue_as('CLOSED')
+	const state = backlog_drive.initial_state([], ACTIVE)
+
+	const offer = await backlog_drive_named_offer.read(DONE_CARRY, state, ONLY_CONTEXT)
+
+	expect(offer).toMatchObject({ verdict: 'stop', is_finish: true, reason: 'only' })
+	vi.restoreAllMocks()
+})

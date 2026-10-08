@@ -3,6 +3,7 @@ import type { IssueState } from '#scripts/issue/issue-state'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
+import { run_invocation } from '#scripts/run/run-invocation'
 import { backlog_budget } from './backlog-budget'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_named } from './backlog-drive-named'
@@ -75,13 +76,52 @@ async function classify(issue: string, named: OfferRead, owner: string): Promise
 	return named
 }
 
+// **A named issue booked done is not thereby merged** (joshuafolkken/kit#3419): a park and a failure are
+// booked done too, so the run moves past them. One the run's own merges did not record and GitHub does
+// not read as closed ended without a merge — and an unreadable state counts as that, because a false
+// stop reaches a person while a false finish ends the run where nobody sees it.
+async function is_unmerged(issue: number, merged: ReadonlyArray<number>): Promise<boolean> {
+	if (merged.includes(issue)) return false
+
+	const result = await issue_state_cli.read_issue(String(issue))
+
+	return result.kind !== 'state' || result.state.state.toUpperCase() !== 'CLOSED'
+}
+
+async function unmerged_of(carry: RunCarry): Promise<Array<number>> {
+	const declared = run_invocation.issue_numbers(carry.invocation) ?? []
+	const merged = carry.merged_issues ?? []
+	const flags = await Promise.all(declared.map(async (issue) => await is_unmerged(issue, merged)))
+
+	return declared.filter((_, index) => flags[index] === true)
+}
+
+// The `--only` run's end: a finish when every named issue merged, otherwise a stop naming the ones that
+// did not, which `backlog-drive-finish.ts` closes with `run:carry --end --stopped` and its ⏸️ notice.
+async function only_end(carry: RunCarry, named: OfferRead): Promise<OfferRead> {
+	const unmerged = await unmerged_of(carry)
+
+	if (unmerged.length === 0) return named
+
+	const listed = unmerged.map((issue) => `#${String(issue)}`).join(', ')
+
+	return { ...named, reason: `only: ${listed} ended without a merge`, is_finish: false }
+}
+
+async function not_run(
+	carry: RunCarry,
+	named: OfferRead | undefined,
+): Promise<OfferRead | undefined> {
+	return named?.is_finish === true ? await only_end(carry, named) : named
+}
+
 async function read(
 	carry: RunCarry,
 	state: DriveState,
 	context: NamedContext,
 ): Promise<OfferRead | undefined> {
 	const named = backlog_drive_named.offer(carry, state, context.is_only)
-	if (named?.verdict !== 'run') return named
+	if (named?.verdict !== 'run') return await not_run(carry, named)
 	const budget = budget_offer(carry, state, context.forwarded)
 	if (budget.verdict !== 'run') return budget
 	const [issue] = named.issues
