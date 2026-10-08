@@ -170,6 +170,16 @@ function sync_package_manager_version(destination_path: string): void {
 	)
 }
 
+// A manifest an earlier `josh init` wrote rejects a standalone pnpm of another version outright;
+// `"download"` fetches the pin instead (joshuafolkken/kit#3388).
+function sync_package_manager_on_fail(destination_path: string): void {
+	sync_package_json_with(
+		destination_path,
+		(existing) => package_manager_version.upgrade_development_engines_on_fail(existing),
+		'  ✔ synced    devEngines.packageManager.onFail',
+	)
+}
+
 // The pre-commit secretlint rule resolves secretlint from the consumer project, so a project
 // that predates the rule needs the devDependencies added here (then `pnpm install`) before the
 // hook can run. `josh init` covers fresh projects; this covers everyone already initialized.
@@ -206,6 +216,7 @@ function sync_safe_chain_preinstall(destination_path: string): void {
 // group so the next one is added here rather than at the call site.
 function sync_package_json_migrations(destination_path: string): void {
 	sync_package_manager_version(destination_path)
+	sync_package_manager_on_fail(destination_path)
 	sync_secretlint_development_deps(destination_path)
 	sync_prepare_lefthook_warning(destination_path)
 	sync_safe_chain_preinstall(destination_path)
@@ -286,6 +297,7 @@ const sync = {
 	sync_playwright_config,
 	sync_deploy_vps,
 	sync_package_manager_version,
+	sync_package_manager_on_fail,
 	sync_secretlint_development_deps,
 	sync_prepare_lefthook_warning,
 	sync_safe_chain_preinstall,

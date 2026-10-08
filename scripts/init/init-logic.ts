@@ -11,7 +11,7 @@ import { init_logic_workspace } from './init-logic-workspace'
 import { init_logic_yaml_merge } from './init-logic-yaml-merge'
 
 const DEV_ENGINES_VALUE = {
-	packageManager: { name: 'pnpm', version: '>=12.1.0', onFail: 'error' },
+	packageManager: { name: 'pnpm', version: '>=12.1.0', onFail: 'download' },
 }
 
 // The settings lines earlier kit releases wrote into a project `.npmrc`. pnpm 12 reads only registry

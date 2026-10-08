@@ -65,7 +65,9 @@ intent.
 **Restore + ask only** when `devEngines` changed in some OTHER way: its version no longer matches
 `packageManager` (a dropped, stale, or truncated integrity suffix counts as a mismatch), its
 structure changed (`name` / `onFail` / fields added or removed), or it was touched by something other
-than `josh latest`.
+than `josh latest`. The one structural change that is expected is `josh sync` moving
+`devEngines.packageManager.onFail` from `"error"` to `"download"` — a user-approved migration that
+leaves `name` and `version` untouched; keep it.
 
 ## 4. When the bump breaks something — fix forward
 
