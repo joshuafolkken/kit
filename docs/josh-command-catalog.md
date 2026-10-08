@@ -795,6 +795,16 @@ Report whether ready backlog work is sitting undispatched with a free lane and n
 
 ---
 
+### `josh backlogrun` · `josh blr`
+
+> **Audience:** developer · **Side effects:** files, network, processes
+
+`[#<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex]`
+
+Start a backlogrun in the background and show its board; with one already running, only show the board
+
+---
+
 ### `josh cases`
 
 > **Audience:** automation · **Side effects:** files

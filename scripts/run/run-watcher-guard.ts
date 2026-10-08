@@ -15,7 +15,8 @@ import { run_headless } from './run-headless'
 //
 // **It watches no relay** (joshuafolkken/kit#2492). A session following the run's event stream after a
 // cut used to be held to it here; that relay re-read the session's whole history per event, so the
-// stream is now watched from a pane of its own (`run:event --watch`) and no session owes it.
+// stream is now watched from a pane of its own (`run:board`, joshuafolkken/kit#3438) and no session
+// owes it.
 
 const WATCHER_TICK_MS = 30_000
 const TICK_MULTIPLIER = 3

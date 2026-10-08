@@ -1,6 +1,6 @@
 import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
-import type { ClosedIssue } from './run-board-closed'
+import type { ClosedAnswer } from './run-board-closed'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
@@ -114,7 +114,7 @@ describe('run_board_tick.tick in the background, once the read lands', () => {
 
 describe('run_board_tick.tick in the background, closed children', () => {
 	it('keeps redrawing while the closed children are read once the plan has landed', async () => {
-		const read_closed = vi.fn(async (): Promise<ReadonlyMap<number, ClosedIssue>> => await never())
+		const read_closed = vi.fn(async (): Promise<ClosedAnswer> => await never())
 		const { ports, frames } = harness(LOCAL_CLOSED, [OPEN_NONE])
 		const first = await tick(FRESH_STATE, { ...ports, read_closed }, WORDS, 'background')
 		const second = await tick(first, { ...ports, read_closed }, WORDS, 'background')

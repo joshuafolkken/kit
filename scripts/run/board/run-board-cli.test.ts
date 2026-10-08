@@ -64,6 +64,20 @@ describe('run_board_cli.run screen', () => {
 		leaves[0]?.()
 		expect(frames.filter((frame) => frame === LEAVE)).toHaveLength(1)
 	})
+})
+
+// joshuafolkken/kit#3437: the closable screen says closing it leaves the run going; --once does not.
+describe('run_board_cli.run footer', () => {
+	it('ends every live frame on the line that says the run keeps going', async () => {
+		const { ports, frames } = harness(undefined, [])
+		const once = harness(undefined, [])
+
+		await expect(run_board_cli.run([], ports)).rejects.toBe(STOPPED)
+		await run_board_cli.run(['--once'], once.ports)
+
+		expect(stripVTControlCharacters(frames[1] ?? '').trimEnd()).toMatch(/pnpm josh backlogrun`$/u)
+		expect(once.frames[0]).not.toContain('pnpm josh backlogrun')
+	})
 
 	it('leaves the alternate screen through the exit handler while still redrawing', async () => {
 		const { ports, frames, leaves } = harness(undefined, [])

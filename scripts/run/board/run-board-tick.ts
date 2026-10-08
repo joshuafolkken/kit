@@ -114,7 +114,9 @@ function frame_of(
 		link: run_board_link.linker(state.plan?.context.repo, redraw.ports.link),
 	}
 
-	return run_board_render.render({ header, notes: run_board_notes.notes_of(local.events) })
+	const notes = run_board_notes.notes_of(local.events)
+
+	return run_board_render.render({ header, notes, resume: local.resume })
 }
 
 function draw(ports: BoardPorts, lines: ReadonlyArray<string>): void {

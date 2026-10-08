@@ -1,6 +1,6 @@
 import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_cli } from '#scripts/run/progress/run-progress-cli'
-import type { ClosedIssue } from './run-board-closed'
+import type { ClosedAnswer } from './run-board-closed'
 import { run_board_fetch, type Fetch } from './run-board-fetch'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
@@ -15,7 +15,8 @@ import { run_board_status, type ItemStatus } from './run-board-status'
 // and says when it failed. A run that ended keeps its plan as it last read (joshuafolkken/kit#3439).
 
 const PLAN_RETRY_MS = run_progress_cli.DECLINE_RETRY_SECONDS * run_progress.MS_PER_SECOND
-const NO_CLOSED: ReadonlyMap<number, ClosedIssue> = new Map()
+// A rejected closed read answers nothing closed and not whole, so it is asked again.
+const UNANSWERED: ClosedAnswer = { closed: new Map(), is_whole: false }
 const { is_due } = run_board_state
 
 // What a step of the GitHub reads works against.
@@ -87,29 +88,53 @@ function unread_closed(state: BoardState, local: LocalRead): Array<number> {
 	return touched.filter((issue) => !open.has(issue) && !state.closed.has(issue))
 }
 
+// An ended run asks until one ask after it ended has answered whole, then holds what it has, as its
+// plan is held: the board is left open between runs, so a child that never answers closed would
+// otherwise be asked about every retry interval while no run is going (joshuafolkken/kit#3438).
+function has_asked_since_end(state: BoardState, local: LocalRead): boolean {
+	const { closed_answered_ms } = state
+	if (closed_answered_ms === undefined || local.ended_ms === undefined) return false
+
+	return closed_answered_ms >= local.ended_ms
+}
+
+function is_closed_due(state: BoardState, gather: Gather): boolean {
+	if (state.closed_fetch !== undefined || has_asked_since_end(state, gather.local)) return false
+
+	return is_due(state.closed_attempted_ms, PLAN_RETRY_MS, gather.now_ms)
+}
+
 // A closed child is read once and its answer kept; one that has not answered closed is asked again no
-// sooner than the plan is. A rejected read answers as nothing closed.
+// sooner than the plan is, and an ended run's not again once an ask after the end has answered whole.
 function launch_closed(state: BoardState, gather: Gather): BoardState {
 	const unread = unread_closed(state, gather.local)
-	const is_idle = state.closed_fetch === undefined && unread.length > 0
 
-	if (!is_idle || !is_due(state.closed_attempted_ms, PLAN_RETRY_MS, gather.now_ms)) return state
+	if (unread.length === 0 || !is_closed_due(state, gather)) return state
 
-	async function read(): Promise<ReadonlyMap<number, ClosedIssue>> {
+	async function read(): Promise<ClosedAnswer> {
 		return await gather.ports.read_closed(unread)
 	}
 
-	const closed_fetch = run_board_fetch.launch(read, NO_CLOSED)
+	const closed_fetch = run_board_fetch.launch(read, UNANSWERED)
 
 	return { ...state, closed_fetch, closed_attempted_ms: gather.now_ms }
 }
 
+// A whole answer counts as of the moment it was asked.
 function fold_closed(state: BoardState): BoardState {
 	const answer = state.closed_fetch?.answer()
 
 	if (answer === undefined) return state
 
-	return { ...state, closed: new Map([...state.closed, ...answer.value]), closed_fetch: undefined }
+	const { closed, is_whole } = answer.value
+	const closed_answered_ms = is_whole ? state.closed_attempted_ms : state.closed_answered_ms
+
+	return {
+		...state,
+		closed: new Map([...state.closed, ...closed]),
+		closed_fetch: undefined,
+		closed_answered_ms,
+	}
 }
 
 // At the `settled` pace, waits for a read in flight to land.

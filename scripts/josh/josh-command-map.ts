@@ -81,6 +81,7 @@ const ALIASES: Record<string, string> = {
 	ev: 'eval',
 	lsm: 'lane:sample',
 	lst: 'lane:stats',
+	blr: 'backlogrun',
 }
 
 // The canonical name of a `josh` subcommand: an alias expands, and anything else passes through

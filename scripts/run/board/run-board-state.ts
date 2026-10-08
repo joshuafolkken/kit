@@ -1,6 +1,6 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
-import type { ClosedIssue } from './run-board-closed'
+import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { Fetch } from './run-board-fetch'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
@@ -15,8 +15,8 @@ interface BoardPorts {
 	// `undefined` when no run has started here.
 	read_local: () => Promise<LocalRead | undefined>
 	read_machine: () => Promise<MachineSample>
-	// The issues that answered as closed, by number (`run-board-closed.ts`).
-	read_closed: (issues: ReadonlyArray<number>) => Promise<ReadonlyMap<number, ClosedIssue>>
+	// The issues that answered as closed, and whether every issue answered (`run-board-closed.ts`).
+	read_closed: (issues: ReadonlyArray<number>) => Promise<ClosedAnswer>
 	now: () => number
 	write: (frame: string) => void
 	// Wraps an issue number in a hyperlink where the terminal opens one, and leaves it plain elsewhere.
@@ -47,8 +47,10 @@ interface BoardState {
 	baseline_total: number | undefined
 	// The run's children read closed, kept for the run: a closed issue's answer does not change.
 	closed: ReadonlyMap<number, ClosedIssue>
-	closed_fetch: Fetch<ReadonlyMap<number, ClosedIssue>> | undefined
+	closed_fetch: Fetch<ClosedAnswer> | undefined
 	closed_attempted_ms: number | undefined
+	// The last ask every child answered, open or closed; a failed read leaves it where it was.
+	closed_answered_ms: number | undefined
 	// The last machine sample, which the next one is compared against, and the gauges drawn from them.
 	machine: MachineMark | undefined
 	gauges: MachineGauges | undefined
@@ -69,6 +71,7 @@ const FRESH_STATE: BoardState = {
 	closed: new Map(),
 	closed_fetch: undefined,
 	closed_attempted_ms: undefined,
+	closed_answered_ms: undefined,
 	machine: undefined,
 	gauges: undefined,
 	sampled_ms: undefined,

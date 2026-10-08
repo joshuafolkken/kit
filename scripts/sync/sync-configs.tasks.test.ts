@@ -9,7 +9,7 @@ import { sync_configs } from './sync-configs'
 const VSCODE_DIRECTORY = '.vscode'
 const TASKS_FILENAME = 'tasks.json'
 const KIT_TASKS_PATH = path.join(PACKAGE_DIR, VSCODE_DIRECTORY, TASKS_FILENAME)
-const WATCH_COMMAND = 'pnpm josh run:event --watch'
+const BOARD_COMMAND = 'pnpm josh run:board'
 
 const ctx = { work_directory: '', destination: '' }
 
@@ -33,7 +33,7 @@ describe('sync_configs.sync_vscode_tasks_json', () => {
 		expect(readFileSync(ctx.destination, 'utf8')).toBe(readFileSync(KIT_TASKS_PATH, 'utf8'))
 	})
 
-	it('merges the kit watch task into an existing file, keeping the consumer task', () => {
+	it('merges the kit board task into an existing file, keeping the consumer task', () => {
 		sync_configs.sync_vscode_tasks_json(ctx.destination)
 		const own = { label: 'dev server', type: 'shell', command: 'pnpm dev' }
 
@@ -42,7 +42,7 @@ describe('sync_configs.sync_vscode_tasks_json', () => {
 
 		const result = readFileSync(ctx.destination, 'utf8')
 
-		expect(result).toContain(WATCH_COMMAND)
+		expect(result).toContain(BOARD_COMMAND)
 		expect(parse_jsonc(result)['tasks']).toContainEqual(own)
 	})
 })
