@@ -2,7 +2,7 @@ import { styleText } from 'node:util'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { backlog_idle, type IdleWindow } from '#scripts/backlog/backlog-idle'
 import { run_board_labels, type Words } from './run-board-labels'
-import type { BoardLayout, BoardRow } from './run-board-layout'
+import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
 import type { RunActivity } from './run-board-status'
 
@@ -44,6 +44,9 @@ interface BoardHeader {
 	plan_failed_ms: number | undefined
 	// The machine's gauges, `undefined` before the first sample.
 	machine: MachineGauges | undefined
+	// The spinner's frame a running run and a running row turn, `undefined` where the output is not a
+	// terminal and they draw their still icons (joshuafolkken/kit#3452).
+	spinner: string | undefined
 	// An issue reference as the board draws it — `3450` or `owner/repo#12` — made a link where the
 	// terminal opens one.
 	link: (reference: string) => string
@@ -74,16 +77,8 @@ function count_state(rows: ReadonlyArray<BoardRow>, state: BoardRow['state']): n
 	return rows.filter((row) => row.state === state).length
 }
 
-function plan_size(layout: BoardLayout): number {
-	const wave_rows = layout.waves
-		.flat()
-		.flatMap((entry) => (entry.kind === 'row' ? [entry.row] : entry.rows))
-
-	return wave_rows.length + layout.people.length + layout.unreached.length
-}
-
 function counts_of(layout: BoardLayout): BoardCounts {
-	const total = layout.active.length + plan_size(layout)
+	const total = run_board_layout.rows_of(layout).length
 	const merged = count_state(layout.active, 'merged')
 	const parked = count_state(layout.active, 'parked')
 	const settled = merged + parked + count_state(layout.active, 'done')
@@ -106,10 +101,12 @@ function mark_of(header: BoardHeader, running: number): RunMark {
 	return header.activity.idle === undefined ? quiet_mark(header.layout) : 'idle'
 }
 
-function run_part(mark: RunMark): string {
+// A running run turns the spinner in place of ▶, both one column wide; every other mark stands still.
+function run_part(mark: RunMark, spinner: string | undefined): string {
 	const { glyph, color } = RUN_MARKS[mark]
+	const shown = mark === 'running' ? (spinner ?? glyph) : glyph
 
-	return styleText(color, `${glyph} ${RUN_NAME}`)
+	return styleText(color, `${shown} ${RUN_NAME}`)
 }
 
 function aged(part: string, age_ms: number): string {
@@ -162,7 +159,7 @@ function time_parts(header: BoardHeader): Array<string> {
 function title_line(header: BoardHeader, running: number): string {
 	const mark = mark_of(header, running)
 	const parts = [
-		run_part(mark),
+		run_part(mark, header.spinner),
 		...time_parts(header),
 		heartbeat_part(header, mark),
 		plan_warning(header),

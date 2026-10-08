@@ -4,7 +4,7 @@ import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_cli } from '#scripts/run/progress/run-progress-cli'
 import type { ClosedIssue } from './run-board-closed'
 import { run_board_header } from './run-board-header'
-import type { Words } from './run-board-labels'
+import { run_board_labels, type Words } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
 import { run_board_link, type Link } from './run-board-link'
 import { run_board_machine, type MachineGauges, type MachineMark } from './run-board-machine'
@@ -21,11 +21,13 @@ import { run_board_status, type ItemStatus } from './run-board-status'
 // last one is kept and drawn against the current time. A failed plan read keeps the previous plan on
 // screen and says when it failed. A run that ended stays on screen, its plan held as it last read,
 // until the next one starts (joshuafolkken/kit#3439). With no run in this checkout it reads nothing
-// from GitHub. The machine is sampled every redraw (joshuafolkken/kit#3450): one `sysctl` takes a few
-// milliseconds, and its gauges are the differences between consecutive samples.
+// from GitHub. The machine is sampled once a second (joshuafolkken/kit#3450): one `sysctl` takes a few
+// milliseconds, and its gauges are the differences between consecutive samples. **The redraw is four
+// times faster than every read** (joshuafolkken/kit#3452), so the spinner turns while nothing is read
+// any more often than it was.
 
-const REDRAW_SECONDS = 1
-const REDRAW_MS = REDRAW_SECONDS * run_progress.MS_PER_SECOND
+const REDRAW_MS = run_board_labels.SPINNER_FRAME_MS
+const MACHINE_SAMPLE_MS = run_progress.MS_PER_SECOND
 const LOCAL_READ_SECONDS = 5
 const LOCAL_READ_MS = LOCAL_READ_SECONDS * run_progress.MS_PER_SECOND
 const PLAN_RETRY_MS = run_progress_cli.DECLINE_RETRY_SECONDS * run_progress.MS_PER_SECOND
@@ -41,7 +43,7 @@ interface BoardPorts {
 	write: (frame: string) => void
 	// Wraps an issue number in a hyperlink where the terminal opens one, and leaves it plain elsewhere.
 	link: Link
-	// Whether stdout is a terminal — only a terminal gets the alternate screen.
+	// Whether stdout is a terminal — only a terminal gets the alternate screen and the spinner.
 	is_tty: boolean
 	// Runs `leave` however the process ends: a normal exit, Ctrl+C or SIGTERM.
 	on_exit: (leave: () => void) => void
@@ -65,6 +67,8 @@ interface BoardState {
 	// The last machine sample, which the next one is compared against, and the gauges drawn from them.
 	machine: MachineMark | undefined
 	gauges: MachineGauges | undefined
+	// The redraw the last sample was taken on, which the next sample is due a second after.
+	sampled_ms: number | undefined
 }
 
 const FRESH_STATE: BoardState = {
@@ -80,6 +84,7 @@ const FRESH_STATE: BoardState = {
 	closed_attempted_ms: undefined,
 	machine: undefined,
 	gauges: undefined,
+	sampled_ms: undefined,
 }
 
 function is_due(last_ms: number | undefined, interval_ms: number, now_ms: number): boolean {
@@ -93,12 +98,16 @@ async function reread(state: BoardState, ports: BoardPorts, now_ms: number): Pro
 }
 
 // The sample is timed when it is taken, not when the tick began: a plan read between the two would put
-// its seconds on the wrong side of the rate's interval.
-async function resample(state: BoardState, ports: BoardPorts): Promise<BoardState> {
+// its seconds on the wrong side of the rate's interval. It is due by the tick's clock, so a sample
+// taken a few milliseconds into its tick does not slip to the redraw after the second.
+async function resample(state: BoardState, ports: BoardPorts, now_ms: number): Promise<BoardState> {
+	if (!is_due(state.sampled_ms, MACHINE_SAMPLE_MS, now_ms)) return state
+
 	const at_ms = ports.now()
 	const machine = { sample: await ports.read_machine(), at_ms }
+	const gauges = run_board_machine.gauges_of(state.machine, machine)
 
-	return { ...state, machine, gauges: run_board_machine.gauges_of(state.machine, machine) }
+	return { ...state, machine, gauges, sampled_ms: now_ms }
 }
 
 // A title the board once knew stays known, so an issue that left the open listing keeps its name.
@@ -223,6 +232,7 @@ function frame_of(
 		plan_fetched_ms: state.fetched_ms,
 		plan_failed_ms: state.failed_ms,
 		machine: state.gauges,
+		spinner: redraw.ports.is_tty ? run_board_labels.spinner_of(redraw.now_ms) : undefined,
 		link: run_board_link.linker(state.plan?.context.repo, redraw.ports.link),
 	}
 
@@ -257,7 +267,7 @@ async function tick(state: BoardState, ports: BoardPorts, words: Words): Promise
 	}
 
 	const refreshed = await refresh(state_for(read, local), ports, local, now_ms)
-	const sampled = await resample(await read_closed(refreshed, ports, local, now_ms), ports)
+	const sampled = await resample(await read_closed(refreshed, ports, local, now_ms), ports, now_ms)
 
 	return draw_run(sampled, local, { ports, words, now_ms })
 }
@@ -265,6 +275,7 @@ async function tick(state: BoardState, ports: BoardPorts, words: Words): Promise
 const run_board_tick = {
 	FRESH_STATE,
 	LOCAL_READ_MS,
+	MACHINE_SAMPLE_MS,
 	PLAN_RETRY_MS,
 	REDRAW_MS,
 	tick,
