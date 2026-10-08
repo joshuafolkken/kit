@@ -1,11 +1,11 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
-import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_cli } from '#scripts/run/progress/run-progress-cli'
 import { run_board_header } from './run-board-header'
 import type { Words } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
 import { run_board_notes } from './run-board-notes'
+import type { LocalRead } from './run-board-read'
 import { run_board_render } from './run-board-render'
 import { run_board_status } from './run-board-status'
 
@@ -15,22 +15,15 @@ import { run_board_status } from './run-board-status'
 // left open all night would otherwise grow heavier as the run grew longer; the plan they are laid over
 // is a GitHub read taken no more often than `run:progress` re-reads after a decline. Between reads the
 // last one is kept and drawn against the current time. A failed plan read keeps the previous plan on
-// screen and says when it failed. With no run in this checkout it reads nothing from GitHub.
+// screen and says when it failed. A run that ended stays on screen, its plan held as it last read,
+// until the next one starts (joshuafolkken/kit#3439). With no run in this checkout it reads nothing
+// from GitHub.
 
 const REDRAW_SECONDS = 1
 const REDRAW_MS = REDRAW_SECONDS * run_progress.MS_PER_SECOND
 const LOCAL_READ_SECONDS = 5
 const LOCAL_READ_MS = LOCAL_READ_SECONDS * run_progress.MS_PER_SECOND
 const PLAN_RETRY_MS = run_progress_cli.DECLINE_RETRY_SECONDS * run_progress.MS_PER_SECOND
-
-// What the board reads locally: the run's start and scope, its events and its open lanes.
-interface LocalRead {
-	started_ms: number
-	// What the run was asked to do, from the carry record's invocation (joshuafolkken/kit#3442).
-	scope: NamedPlan
-	events: ReadonlyArray<RunEvent>
-	lanes: ReadonlyArray<string>
-}
 
 interface BoardPorts {
 	read_plan: (scope: NamedPlan) => Promise<BoardPlan | undefined>
@@ -49,6 +42,8 @@ interface BoardState {
 	// The last local read, drawn until the next is due; `undefined` when no run had started.
 	local: LocalRead | undefined
 	read_ms: number | undefined
+	// The start of the run the plan state was built for, so a run that begins draws nothing of the last.
+	run_started_ms: number | undefined
 	plan: BoardPlan | undefined
 	attempted_ms: number | undefined
 	fetched_ms: number | undefined
@@ -59,6 +54,7 @@ interface BoardState {
 const FRESH_STATE: BoardState = {
 	local: undefined,
 	read_ms: undefined,
+	run_started_ms: undefined,
 	plan: undefined,
 	attempted_ms: undefined,
 	fetched_ms: undefined,
@@ -83,13 +79,30 @@ function with_titles(plan: BoardPlan, previous: BoardPlan | undefined): BoardPla
 	return { ...plan, context: { ...plan.context, titles } }
 }
 
+// The state of the run on screen; a different run starts its plan state from nothing, so no row, count
+// or baseline of the previous run is drawn over the new one (joshuafolkken/kit#3439).
+function state_for(state: BoardState, local: LocalRead): BoardState {
+	if (state.run_started_ms === local.started_ms) return state
+
+	const { local: kept, read_ms } = state
+
+	return { ...FRESH_STATE, local: kept, read_ms, run_started_ms: local.started_ms }
+}
+
+// An ended run's plan is read until it lands once, then held: the board keeps that run's screen.
+function is_plan_due(state: BoardState, local: LocalRead, now_ms: number): boolean {
+	if (local.ended_ms !== undefined && state.fetched_ms !== undefined) return false
+
+	return is_due(state.attempted_ms, PLAN_RETRY_MS, now_ms)
+}
+
 async function refresh(
 	state: BoardState,
 	ports: BoardPorts,
 	local: LocalRead,
 	now_ms: number,
 ): Promise<BoardState> {
-	if (!is_due(state.attempted_ms, PLAN_RETRY_MS, now_ms)) return state
+	if (!is_plan_due(state, local, now_ms)) return state
 
 	const plan = await ports.read_plan(local.scope)
 	const attempted = { ...state, attempted_ms: now_ms }
@@ -134,7 +147,8 @@ function frame_of(
 		now_ms: redraw.now_ms,
 		words: redraw.words,
 		started_ms: local.started_ms,
-		activity: run_board_status.activity_of(local.events),
+		ended_ms: local.ended_ms,
+		activity: run_board_status.activity_of(local.events, local.ended_ms !== undefined),
 		layout,
 		baseline_total: state.baseline_total,
 		plan_fetched_ms: state.fetched_ms,
@@ -171,10 +185,12 @@ async function tick(state: BoardState, ports: BoardPorts, words: Words): Promise
 		return read
 	}
 
-	return draw_run(await refresh(read, ports, local, now_ms), local, { ports, words, now_ms })
+	const refreshed = await refresh(state_for(read, local), ports, local, now_ms)
+
+	return draw_run(refreshed, local, { ports, words, now_ms })
 }
 
 const run_board_tick = { FRESH_STATE, LOCAL_READ_MS, PLAN_RETRY_MS, REDRAW_MS, tick }
 
 export { run_board_tick }
-export type { BoardPorts, BoardState, LocalRead }
+export type { BoardPorts, BoardState }

@@ -176,14 +176,16 @@ function is_run_stop(event: RunEvent | undefined): boolean {
 	return event?.kind === KIND.STOP && run_event_scope.issue_named(event) === undefined
 }
 
-function activity_of(events: ReadonlyArray<RunEvent>): RunActivity {
+// `is_ended` is a run `run:carry --end` closed (joshuafolkken/kit#3439): its record says it stopped,
+// whatever its last event was.
+function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActivity {
 	const last = events.at(-1)
 	const position = events.findLast((event) => !run_event_stream.TRACE_KINDS.has(event.kind))
 
 	return {
 		last_event_ms: last === undefined ? undefined : moment(last),
 		idle: idle_of(events),
-		is_stopped: is_run_stop(position),
+		is_stopped: is_ended || is_run_stop(position),
 	}
 }
 

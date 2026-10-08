@@ -5,6 +5,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
 import { run_carry_cli_fixture } from './run-carry-cli-fixture'
+import { run_carry_ended } from './run-carry-ended'
 
 // What `--end` does once per invocation, on the read of a record that is still there.
 //
@@ -67,6 +68,37 @@ describe('run:carry --end — the batch flushes no ledger at its end', () => {
 		await run_carry_cli.run(['--end', '--stopped', 'backlog drained'])
 
 		expect(josh_run).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#3439: the run `--end` removes stays readable as the last ended run for `run:board`.
+describe('run:carry --end — the ended run is recorded', () => {
+	it('records the ended run’s invocation and start, and keeps it over a second --end', async () => {
+		await run_carry_cli.run(['--begin', INVOCATION])
+		const read = run_carry.read_carry(run_carry.carry_path(REPOSITORY))
+		const started_at = read.kind === 'carried' ? read.carry.started_at : 'missing'
+
+		await run_carry_cli.run(['--end'])
+		await run_carry_cli.run(['--end'])
+
+		const ended = run_carry_ended.read_ended(run_carry_ended.ended_path(REPOSITORY))
+
+		expect(ended).toMatchObject({ invocation: INVOCATION, started_at })
+		expect(Date.parse(ended?.ended_at ?? '')).toBeGreaterThanOrEqual(Date.parse(started_at))
+	})
+
+	it('still clears the carry record when the ended run cannot be recorded', async () => {
+		await run_carry_cli.run(['--begin', INVOCATION])
+		const record_ended = vi.spyOn(run_carry_ended, 'record_ended').mockImplementation(() => {
+			throw new Error('ENOSPC')
+		})
+
+		const code = await run_carry_cli.run(['--end'])
+
+		record_ended.mockRestore()
+
+		expect(code).toBe(OK)
+		expect(run_carry.read_carry(run_carry.carry_path(REPOSITORY)).kind).toBe('none')
 	})
 })
 

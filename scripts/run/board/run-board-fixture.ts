@@ -2,7 +2,8 @@ import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import { vi } from 'vitest'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
-import type { BoardPorts, LocalRead } from './run-board-tick'
+import type { LocalRead } from './run-board-read'
+import type { BoardPorts } from './run-board-tick'
 
 // What the `run:board` redraw suites share (joshuafolkken/kit#3444): the ports a test drives the board
 // through — a clock it moves by hand, the frames it wrote, and counted reads.
@@ -10,7 +11,13 @@ import type { BoardPorts, LocalRead } from './run-board-tick'
 const WORDS = run_board_labels.words_of('en')
 const START = Date.parse('2026-10-08T09:00:00.000Z')
 const ALL: NamedPlan = { issues: [], only: false }
-const LOCAL: LocalRead = { started_ms: START, scope: ALL, events: [], lanes: [] }
+const LOCAL: LocalRead = {
+	started_ms: START,
+	ended_ms: undefined,
+	scope: ALL,
+	events: [],
+	lanes: [],
+}
 const STOPPED = new Error('stopped')
 
 interface Harness {

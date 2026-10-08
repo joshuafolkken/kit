@@ -27,6 +27,7 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		now_ms: NOW,
 		words: WORDS,
 		started_ms: STARTED,
+		ended_ms: undefined,
 		activity: { last_event_ms: undefined, idle: undefined, is_stopped: false },
 		layout: EMPTY_LAYOUT,
 		baseline_total: undefined,
@@ -64,6 +65,15 @@ describe('run_board_header.header_lines state', () => {
 		expect(title_of(header({ layout: RUNNING_LAYOUT }))).toMatch(/^▶ backlogrun/u)
 		expect(title_of(header({ layout: human }))).toMatch(/^✋ backlogrun/u)
 		expect(title_of(header())).toMatch(/^⏸ backlogrun/u)
+	})
+
+	// joshuafolkken/kit#3439
+	it('draws an ended run with how long it took and when it ended, and no time left', () => {
+		const activity = { last_event_ms: undefined, idle: undefined, is_stopped: true }
+		const ended_ms = STARTED + 90 * MINUTE
+		const title = title_of(header({ activity, ended_ms }))
+
+		expect(title).toBe(`■ backlogrun   ⏱ 90:00   ${WORDS.ended_at} ${clock_of(ended_ms)}`)
 	})
 
 	it('leaves out the heartbeat before the stream has one', () => {

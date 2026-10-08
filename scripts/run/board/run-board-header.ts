@@ -31,6 +31,8 @@ interface BoardHeader {
 	now_ms: number
 	words: Words
 	started_ms: number
+	// Set once the run has ended (joshuafolkken/kit#3439): the title then says when, and how long it took.
+	ended_ms: number | undefined
 	activity: RunActivity
 	layout: BoardLayout | undefined
 	// The total the board first saw, so arrivals since then read as `(+N)`.
@@ -132,14 +134,25 @@ function plan_warning(header: BoardHeader): string | undefined {
 	)
 }
 
-function title_line(header: BoardHeader, running: number): string {
-	const { now_ms, started_ms } = header
-	const mark = mark_of(header, running)
+// A running run's age and time left before the cut-off, or an ended run's frozen duration and when it
+// ended — an ended run has no cut-off left (joshuafolkken/kit#3439).
+function time_parts(header: BoardHeader): Array<string> {
+	const { now_ms, started_ms, ended_ms, words } = header
+
+	if (ended_ms !== undefined) {
+		return [`⏱ ${elapsed_of(ended_ms - started_ms)}`, `${words.ended_at} ${clock_of(ended_ms)}`]
+	}
+
 	const cutoff = started_ms + backlog_budget.WHOLE_RUN_BUDGET_MS
+
+	return [`⏱ ${elapsed_of(now_ms - started_ms)}`, `⌛ ${left_of(cutoff - now_ms)}`]
+}
+
+function title_line(header: BoardHeader, running: number): string {
+	const mark = mark_of(header, running)
 	const parts = [
 		run_part(mark),
-		`⏱ ${elapsed_of(now_ms - started_ms)}`,
-		`⌛ ${left_of(cutoff - now_ms)}`,
+		...time_parts(header),
 		heartbeat_part(header, mark),
 		plan_warning(header),
 	]

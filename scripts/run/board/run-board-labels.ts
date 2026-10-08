@@ -27,6 +27,7 @@ interface WordPair {
 // the words left are the ones a symbol cannot carry, and the legend that names the symbols.
 const WORD_PAIRS = {
 	no_run: { ja: 'ランなし', en: 'no run' },
+	ended_at: { ja: '終了', en: 'ended' },
 	plan: { ja: '計画', en: 'plan' },
 	merged: { ja: 'マージ', en: 'merged' },
 	parked: { ja: 'park', en: 'parked' },

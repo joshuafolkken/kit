@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
@@ -20,6 +20,8 @@ const WOKEN_TEMP_DIRECTORY = '/Users/woken/T'
 const SHARED_ROOT = '/opt/shared/josh'
 const FIRST_ACCOUNT = 501
 const SECOND_ACCOUNT = 502
+const REPLACED_TEXT = 'mine\n'
+const STREAM_NAME = 'stream.jsonl'
 
 const scratch = mkdtempSync(path.join(tmpdir(), TEST_PREFIX))
 
@@ -153,6 +155,48 @@ describe('stamp_file.create_stamp', () => {
 		const target = path.join(scratch, 'missing-directory', 'nowhere.json')
 
 		expect(() => stamp_file.create_stamp(target, PAYLOAD)).toThrow()
+	})
+})
+
+// joshuafolkken/kit#3446: the rewrite a concurrent reader must never catch half-done. The record is
+// published by a rename, so the old one stays readable until the new one replaces it whole.
+describe('stamp_file.replace_text_stamp', () => {
+	it('replaces the text and leaves no temporary file beside it', () => {
+		const directory = mkdtempSync(path.join(scratch, 'replace-'))
+		const target = path.join(directory, STREAM_NAME)
+
+		stamp_file.replace_text_stamp(target, 'first\n')
+		stamp_file.replace_text_stamp(target, 'second\n')
+
+		expect(readFileSync(target, 'utf8')).toBe('second\n')
+		expect(readdirSync(directory)).toStrictEqual([STREAM_NAME])
+	})
+
+	it('replaces a symlink planted at the path without writing through it', () => {
+		const outside = path.join(scratch, 'replace-outside.txt')
+		const target = path.join(scratch, 'replace-link.jsonl')
+
+		writeFileSync(outside, ORIGINAL_CONTENT)
+		symlinkSync(outside, target)
+		stamp_file.replace_text_stamp(target, REPLACED_TEXT)
+
+		expect(readFileSync(outside, 'utf8')).toBe(ORIGINAL_CONTENT)
+		expect(stamp_file.read_stamp_text(target)).toBe(REPLACED_TEXT)
+	})
+
+	it.skipIf(process.getuid === undefined)('refuses to replace a file another account owns', () => {
+		const target = path.join(scratch, 'replace-foreign.jsonl')
+
+		writeFileSync(target, ORIGINAL_CONTENT)
+		vi.spyOn(process, 'getuid').mockReturnValue(SECOND_ACCOUNT)
+
+		try {
+			expect(() => stamp_file.replace_text_stamp(target, REPLACED_TEXT)).toThrow('another account')
+		} finally {
+			vi.restoreAllMocks()
+		}
+
+		expect(readFileSync(target, 'utf8')).toBe(ORIGINAL_CONTENT)
 	})
 })
 

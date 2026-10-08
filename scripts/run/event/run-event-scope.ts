@@ -195,6 +195,7 @@ const run_event_scope = {
 	issue_named,
 	last_issue_event,
 	last_scoped_event,
+	moment_of,
 	scope_of,
 	scoped_events,
 }

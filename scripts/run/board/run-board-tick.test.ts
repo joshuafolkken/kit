@@ -78,6 +78,38 @@ describe('run_board_tick.tick reads', () => {
 	})
 })
 
+// joshuafolkken/kit#3439: an ended run stays on screen with its plan held, and the next run starts clean.
+const END = START + 60 * 60 * 1000
+
+describe('run_board_tick.tick — an ended run', () => {
+	it('draws the ended run as ended and holds its plan once it has read', async () => {
+		const { ports, frames, read_plan, clock } = harness({ ...LOCAL, ended_ms: END }, [
+			plan_titled('a'),
+		])
+		const first = await tick(FRESH_STATE, ports, WORDS)
+
+		clock.now_ms += PLAN_RETRY_MS
+		await tick(first, ports, WORDS)
+
+		expect(read_plan).toHaveBeenCalledOnce()
+		expect(frames.at(-1)).toContain(WORDS.ended_at)
+	})
+
+	it('drops the ended run’s plan and baseline the moment the next run begins', async () => {
+		const ended = harness({ ...LOCAL, ended_ms: END }, [plan_titled('old')])
+		const held = await tick(FRESH_STATE, ended.ports, WORDS)
+		const next = harness({ ...LOCAL, started_ms: END + 1 }, [undefined])
+
+		next.clock.now_ms += LOCAL_READ_MS
+		const state = await tick(held, next.ports, WORDS)
+
+		expect(next.read_plan).toHaveBeenCalledOnce()
+		expect(state.plan).toBeUndefined()
+		expect(state.baseline_total).toBeUndefined()
+		expect(state.run_started_ms).toBe(END + 1)
+	})
+})
+
 // joshuafolkken/kit#3442: the plan is the run's own scope, a lane outside it is not the run's child, and
 // a child the plan's listing no longer holds is not left running.
 const SINGLE = 3441

@@ -3,19 +3,17 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { session_language } from '#scripts/josh/session-language'
-import { lane_registry } from '#scripts/lane/lane-registry'
-import { run_carry } from '#scripts/run/carry/run-carry'
-import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_board_labels, type Words } from './run-board-labels'
 import { run_board_plan } from './run-board-plan'
-import { run_board_scope } from './run-board-scope'
+import { run_board_read } from './run-board-read'
 import { run_board_screen, type Screen } from './run-board-screen'
-import { run_board_tick, type BoardPorts, type LocalRead } from './run-board-tick'
+import { run_board_tick, type BoardPorts } from './run-board-tick'
 
 // `josh run:board` — a full-screen board of the running `backlogrun` (joshuafolkken/kit#3430), redrawn
 // every second for a person to keep open beside the run. What one redraw reads, and how often each read
-// is taken, is `run-board-tick.ts`'s; this file wires the live reads and the terminal around it. With
-// no run in this checkout it reads nothing from GitHub and waits for one to start.
+// is taken, is `run-board-tick.ts`'s; this file wires the live reads and the terminal around it. A run
+// that ended stays on screen until the next one starts (joshuafolkken/kit#3439); with no run in this
+// checkout it reads nothing from GitHub and waits.
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
@@ -26,26 +24,6 @@ const SIGTERM_EXIT_CODE = 143
 const USAGE = 'Usage: josh run:board [--once]'
 const { FRESH_STATE, REDRAW_MS, tick } = run_board_tick
 
-async function read_local(): Promise<LocalRead | undefined> {
-	const repository = await run_carry.repository_directory()
-	const read =
-		repository === undefined ? undefined : run_carry.read_carry(run_carry.carry_path(repository))
-
-	if (read?.kind !== 'carried') return undefined
-
-	const [events, lanes] = await Promise.all([
-		run_event_stream_emit.current_events(),
-		lane_registry.list_lanes(),
-	])
-
-	return {
-		started_ms: Date.parse(read.carry.started_at),
-		scope: run_board_scope.scope_of(read.carry.invocation),
-		events,
-		lanes: lanes.map((lane) => lane.issue),
-	}
-}
-
 // A signal exits with its conventional code, so the `exit` handler restores the screen on every path.
 function on_exit(leave: () => void): void {
 	process.once('exit', leave)
@@ -55,7 +33,7 @@ function on_exit(leave: () => void): void {
 
 const LIVE_PORTS: BoardPorts = {
 	read_plan: async (scope) => await run_board_plan.read_plan(scope),
-	read_local,
+	read_local: run_board_read.read_local,
 	now: () => Date.now(),
 	write: (frame) => process.stdout.write(frame),
 	is_tty: process.stdout.isTTY,
