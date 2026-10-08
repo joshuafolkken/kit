@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
+import type { BoardPlan } from './run-board-layout'
 
 // joshuafolkken/kit#3430: the command's arguments and its terminal. What one redraw reads and draws is
 // `run-board-tick.test.ts`'s (joshuafolkken/kit#3444).
@@ -93,5 +94,30 @@ describe('run_board_cli.run footer', () => {
 		expect(leaves).toHaveLength(1)
 		leaves[0]?.()
 		expect(frames.at(-1)).toBe(LEAVE)
+	})
+})
+
+// joshuafolkken/kit#3455: the live board draws before a plan read that has not answered, and one plain
+// frame waits for it.
+describe('run_board_cli.run plan read', () => {
+	it('draws the first live frame without waiting on the plan read', async () => {
+		const { ports, frames } = harness(LOCAL, [])
+		const read_plan = vi.fn(
+			async (): Promise<BoardPlan | undefined> => await new Promise(() => undefined),
+		)
+
+		await expect(run_board_cli.run([], { ...ports, read_plan })).rejects.toBe(STOPPED)
+		expect(read_plan).toHaveBeenCalledOnce()
+		expect(frames[1]?.split('\n', 1)[0]).toContain('⏳')
+	})
+
+	it('draws the plan in one plain frame, with no spinner', async () => {
+		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+
+		await run_board_cli.run(['--once'], ports)
+
+		expect(frames).toHaveLength(1)
+		expect(frames[0]).toContain('📊')
+		expect(frames[0]?.split('\n', 1)[0]).not.toContain('⏳')
 	})
 })

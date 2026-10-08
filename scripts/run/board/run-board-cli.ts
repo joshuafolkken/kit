@@ -11,7 +11,8 @@ import { run_board_labels, type Words } from './run-board-labels'
 import { run_board_plan } from './run-board-plan'
 import { run_board_read } from './run-board-read'
 import { run_board_screen, type Screen } from './run-board-screen'
-import { run_board_tick, type BoardPorts } from './run-board-tick'
+import type { BoardPorts } from './run-board-state'
+import { run_board_tick } from './run-board-tick'
 
 // `josh run:board` — a full-screen board of the running `backlogrun` (joshuafolkken/kit#3430), redrawn
 // four times a second for a person to keep open beside the run. What one redraw reads, and how often each read
@@ -78,13 +79,15 @@ function leaver(ports: BoardPorts, screen: Screen): () => void {
 }
 
 async function redraw_forever(ports: BoardPorts, words: Words): Promise<void> {
-	let state = await tick(FRESH_STATE, ports, words)
+	// The plan is read in the background, so the first frame is drawn without waiting on GitHub
+	// (joshuafolkken/kit#3455).
+	let state = await tick(FRESH_STATE, ports, words, 'background')
 
 	for (;;) {
 		// eslint-disable-next-line no-await-in-loop -- polling: each redraw waits out the tick before it
 		await ports.sleep(REDRAW_MS)
 		// eslint-disable-next-line no-await-in-loop -- polling: each redraw folds the state the last one left
-		state = await tick(state, ports, words)
+		state = await tick(state, ports, words, 'background')
 	}
 }
 

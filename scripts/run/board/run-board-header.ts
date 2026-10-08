@@ -42,6 +42,8 @@ interface BoardHeader {
 	baseline_total: number | undefined
 	plan_fetched_ms: number | undefined
 	plan_failed_ms: number | undefined
+	// Whether a plan read is in flight (joshuafolkken/kit#3455).
+	is_plan_loading: boolean
 	// The machine's gauges, `undefined` before the first sample.
 	machine: MachineGauges | undefined
 	// The spinner's frame a running run and a running row turn, `undefined` where the output is not a
@@ -140,6 +142,14 @@ function plan_warning(header: BoardHeader): string | undefined {
 	)
 }
 
+// A plan read in flight turns the spinner after ⏳ and says nothing more (joshuafolkken/kit#3455); a
+// frame that is not a terminal's has no spinner, and draws nothing for it.
+function loading_part(header: BoardHeader): string | undefined {
+	const { is_plan_loading, spinner } = header
+
+	return is_plan_loading && spinner !== undefined ? `${HEADER_ICONS.loading} ${spinner}` : undefined
+}
+
 // A running run's age and time left before the cut-off, or an ended run's frozen duration and the
 // minute it ended — an ended run has no cut-off left (joshuafolkken/kit#3439, joshuafolkken/kit#3450).
 function time_parts(header: BoardHeader): Array<string> {
@@ -162,6 +172,7 @@ function title_line(header: BoardHeader, running: number): string {
 		run_part(mark, header.spinner),
 		...time_parts(header),
 		heartbeat_part(header, mark),
+		loading_part(header),
 		plan_warning(header),
 	]
 
