@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 972,
-		"code_lines": 80498,
-		"comment_lines": 32843,
+		"files": 973,
+		"code_lines": 80509,
+		"comment_lines": 32858,
 		"comment_ratio": 0.41
 	},
 	"rules": {

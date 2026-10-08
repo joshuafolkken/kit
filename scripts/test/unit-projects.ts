@@ -77,12 +77,16 @@ const STDOUT_GUARD: ReadonlyArray<string> = ['./scripts/test/test-stdout-guard.t
 // Telegram send and recording which test tried (joshuafolkken/kit#2494).
 const TELEGRAM_GUARD: ReadonlyArray<string> = ['./scripts/test/test-telegram-guard.ts']
 
+// Runs in every worker too: it replaces that worker's machine reading, so a suite that drives the gate
+// admits the same way on every platform and every load (joshuafolkken/kit#3415).
+const MACHINE_GUARD: ReadonlyArray<string> = ['./scripts/test/test-machine-guard.ts']
+
 // The guards every run of the suite arms, whichever config starts it: the network guard once in the
-// main process, the stdout and Telegram guards in every worker. Named here so `vitest.config.ts` and
+// main process, the stdout, Telegram and machine guards in every worker. Named here so `vitest.config.ts` and
 // `vitest.harness.config.ts` read one definition — the harness once ran with none of them
 // (joshuafolkken/kit#3253).
 const NETWORK_GUARD: ReadonlyArray<string> = ['./scripts/test/test-network-guard.ts']
-const WORKER_GUARDS: ReadonlyArray<string> = [...STDOUT_GUARD, ...TELEGRAM_GUARD]
+const WORKER_GUARDS: ReadonlyArray<string> = [...STDOUT_GUARD, ...TELEGRAM_GUARD, ...MACHINE_GUARD]
 
 interface UnitProjectTest {
 	name: string
@@ -140,6 +144,7 @@ const UNIT_PROJECTS: ReadonlyArray<UnitProject> = [
 const unit_projects = {
 	ENV,
 	ISOLATED_PROJECT,
+	MACHINE_GUARD,
 	MAIN_EXCLUDE,
 	NETWORK_GUARD,
 	PURE_PROJECT,
