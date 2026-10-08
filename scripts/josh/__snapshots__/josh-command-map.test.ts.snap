@@ -6,6 +6,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "a": "audit",
     "ad": "adopt",
     "bh": "behavior",
+    "blr": "backlogrun",
     "bp": "bump",
     "by": "bytes",
     "c": "check",
@@ -128,6 +129,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "network",
+      ],
+    ],
+    "backlogrun": [
+      "[#<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex]",
+      "developer",
+      [
+        "files",
+        "network",
+        "processes",
       ],
     ],
     "batch:guard": [

@@ -301,6 +301,7 @@ function parse(value: unknown): AgentProfile | undefined {
 }
 
 const agent_role_profile = {
+	CODEX_SESSION_KEY,
 	DEFAULT_PROFILES,
 	HANDED_PROVIDER_KEY,
 	IMPLEMENTATION_PHASE,

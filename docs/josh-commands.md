@@ -557,6 +557,23 @@ Runs `pnpm update --latest`, skipping **held-back** and **overridden** packages 
 
 Helpers for AI-assisted development workflows.
 
+### `josh backlogrun`
+
+Start a `backlogrun` from the terminal and watch it on [`josh run:board`](./josh-commands-run.md#josh-runboard). The agent runs in the background in the main checkout, its output going to a log file, and the board takes over the terminal at once.
+
+```bash
+pnpm josh backlogrun                    # start in Claude, then show the board
+pnpm josh backlogrun 3437 --only        # the arguments go to backlogrun as typed
+pnpm josh backlogrun --agent codex      # start in Codex
+```
+
+- The arguments are the `backlogrun` keyword's own: named Issues, `--only`, `--max <n>`, `--idle <minutes>`. A bare number in the named list is read as `#<n>`, since an unquoted `#` starts a shell comment.
+- `--agent claude|codex` picks the agent; the default is `claude`. The start command is built by `scripts/agent/agent-argv.ts`, the same builder that starts lane children, and the choice is handed to the run as `JOSH_AGENT_PROVIDER`.
+- A run already going in this repository is never joined by a second one: nothing is started, the board is shown, and each named Issue is printed as a `run:add` line to add it by hand.
+- Closing the board (Ctrl+C) closes only the board; the run goes on, and the board's last line says so. When the run stops for a person, the board prints the `claude --resume <session-id>` that reopens it.
+
+**Output / exit codes:** prints one line naming the started pid, session and log path, then the board's exit code. Bad arguments print the usage and exit 1; an agent that cannot start (a missing or outdated CLI) exits 1 without a board.
+
 ### `josh rule:value`
 
 Print each delivered rule's **unaided compliance** — how far the carried text alone kept the rule in the window before its trigger fired (`scripts/rules/rule-value.ts`). One row per rule: the runs that reached the situation it governs, the rate kept before the trigger (or `unmeasured` where the rule declares no `keeps` predicate, `unreached` where no run reached it), and the refusals the hook actually delivered.

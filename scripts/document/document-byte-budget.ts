@@ -97,7 +97,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// joshuafolkken/kit#3430 raised it: `josh run:board` is a run command and its contract lives here.
 	{ path: 'docs/josh-commands-run.md', bytes: 61_440 },
 	{ path: 'docs/josh-commands-backlog.md', bytes: 57_344 },
-	{ path: 'docs/josh-commands.md', bytes: 40_960 },
+	// joshuafolkken/kit#3437 raised it: `josh backlogrun` is a command a person types.
+	{ path: 'docs/josh-commands.md', bytes: 45_056 },
 	// joshuafolkken/kit#3279 moved the label sections here out of `docs/josh-commands-backlog.md`.
 	{ path: 'docs/labels-and-run-states.md', bytes: 8192 },
 	{ path: 'prompts/coding-standards.md', bytes: 8192 },

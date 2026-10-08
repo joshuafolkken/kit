@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1000,
-		"code_lines": 82928,
-		"comment_lines": 33400,
+		"files": 1003,
+		"code_lines": 83248,
+		"comment_lines": 33454,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 559193
 	},
 	"accepted": {
-		"reason": "#3464 adds the 24-bit gauge shades (Shade type, GAUGE_SHADES, shaded()) and their tests so run:board gauges draw true green/yellow/red regardless of the terminal palette",
+		"reason": "#3464 adds the 24-bit gauge shades (Shade type, GAUGE_SHADES, shaded()) and their tests so run:board gauges draw true green/yellow/red regardless of the terminal palette; re-accepted after merging origin/main (#3437 josh backlogrun launcher)",
 		"date": "2026-10-08"
 	}
 }

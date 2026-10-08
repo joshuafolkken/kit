@@ -39,6 +39,14 @@ function span_of(read: CarryRead, ended: EndedRun | undefined): BoardSpan | unde
 	return { invocation: read.carry.invocation, started_ms, ended_ms: undefined }
 }
 
+// The session a person resumes a stopped run from (joshuafolkken/kit#3437): only while the ended run is
+// the one drawn, and only when it stopped rather than finished. A run that begins hides it at once.
+function resume_of(read: CarryRead, ended: EndedRun | undefined): string | undefined {
+	if (read.kind !== 'none' || ended?.stopped === undefined) return undefined
+
+	return ended.session
+}
+
 function is_within(event: RunEvent, span: BoardSpan): boolean {
 	const at = moment_of(event.at)
 
@@ -52,7 +60,7 @@ function events_of(events: ReadonlyArray<RunEvent>, span: BoardSpan): ReadonlyAr
 	return events.filter((event) => is_within(event, span))
 }
 
-const run_board_span = { events_of, span_of }
+const run_board_span = { events_of, resume_of, span_of }
 
 export { run_board_span }
 export type { BoardSpan }

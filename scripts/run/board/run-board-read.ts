@@ -17,19 +17,30 @@ interface LocalRead {
 	scope: NamedPlan
 	events: ReadonlyArray<RunEvent>
 	lanes: ReadonlyArray<string>
+	// The session a stopped run is resumed from (joshuafolkken/kit#3437); `undefined` otherwise.
+	resume: string | undefined
 }
 
-function span_here(repository: string): BoardSpan | undefined {
+interface SpanHere {
+	span: BoardSpan | undefined
+	resume: string | undefined
+}
+
+function span_here(repository: string): SpanHere {
 	const read = run_carry.read_carry(run_carry.carry_path(repository))
 	const ended = run_carry_ended.read_ended(run_carry_ended.ended_path(repository))
 
-	return run_board_span.span_of(read, ended)
+	return {
+		span: run_board_span.span_of(read, ended),
+		resume: run_board_span.resume_of(read, ended),
+	}
 }
 
 // `undefined` when no run has started here.
 async function read_local(): Promise<LocalRead | undefined> {
 	const repository = await run_carry.repository_directory()
-	const span = repository === undefined ? undefined : span_here(repository)
+	const { span, resume } =
+		repository === undefined ? { span: undefined, resume: undefined } : span_here(repository)
 
 	if (repository === undefined || span === undefined) return undefined
 
@@ -42,6 +53,7 @@ async function read_local(): Promise<LocalRead | undefined> {
 		scope: run_board_scope.scope_of(span.invocation),
 		events: run_board_span.events_of(events, span),
 		lanes: lanes.map((lane) => lane.issue),
+		resume,
 	}
 }
 
