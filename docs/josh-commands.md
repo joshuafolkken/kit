@@ -87,6 +87,24 @@ entry fullrun  227672/229376 bytes · 1704 left
 - Path is repository-root-relative (a leading `./` is stripped); a path with no budget entry reads `not counted`.
 - The recorded ceiling is block-quantized — the next 4 KB multiple at or above the document's size (`document-byte-budget.ts`), so a document growing within its block needs no ceiling edit and parallel command-adding lanes stop conflicting on this record. An over-budget row names the value to record: the next block multiple, not the raw current size. Never fails — the ceiling is the gate's and `josh lint:related`'s to enforce; a non-zero exit means the argument list was unusable.
 
+### `josh metrics`
+
+Print the repository-wide quality totals that no per-function or per-file limit sees — code lines, comment lines and the comment ratio for the non-test files under `scripts/`, the lines of the rule documents (`CLAUDE.md` and `prompts/**/*.md`), and the number of `*:guard` commands.
+
+```bash
+pnpm josh metrics                     # print the totals
+pnpm josh metrics --write-baseline    # also record them in .josh/metrics-baseline.json
+```
+
+```
+scripts  968 files · 80097 code lines · 32535 comment lines · comment ratio 0.41
+rules    26 files · 2370 lines
+guards   8
+```
+
+- **kit only**: the rule documents and the guard commands it counts are kit's own, so a consumer project does not get it.
+- Code lines are lint's own count, the same as `josh lines`; a comment line is any non-blank line lint does not count as code. Never fails on a large total — a non-zero exit means the arguments were unusable.
+
 ### `josh format`
 
 Format code with prettier and eslint. A `basic` project without Prettier or ESLint skips that tool for the reason `josh lint` prints.
