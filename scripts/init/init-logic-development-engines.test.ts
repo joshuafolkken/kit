@@ -7,6 +7,9 @@ describe('get_development_engines_value', () => {
 
 		expect(result.packageManager.name).toBe('pnpm')
 		expect(result.packageManager.version).toBe('>=12.1.0')
-		expect(result.packageManager.onFail).toBe('error')
+	})
+
+	it('downloads the pinned pnpm instead of rejecting a standalone pnpm of another version', () => {
+		expect(init_logic.get_development_engines_value().packageManager.onFail).toBe('download')
 	})
 })

@@ -70,7 +70,7 @@ const PNPM_DEVELOPMENT_MANAGER_SCHEMA = z.object({ name: z.literal('pnpm'), vers
 const DEV_ENGINES_SCHEMA = z.object({ packageManager: PNPM_DEVELOPMENT_MANAGER_SCHEMA })
 const DEV_ENGINES_PNPM_SCHEMA = z.object({ devEngines: DEV_ENGINES_SCHEMA.optional() })
 const COREPACK_REMEDY =
-	'pnpm runs through the Corepack shim, where pnpm 11+ refuses self-update (ERR_PNPM_CANT_SELF_UPDATE_IN_COREPACK). Run `corepack disable pnpm`, install a standalone pnpm (https://pnpm.io/installation), then rerun josh latest.'
+	'pnpm runs through the Corepack shim, where pnpm 11+ refuses self-update (ERR_PNPM_CANT_SELF_UPDATE_IN_COREPACK). Run `corepack disable pnpm`, install a standalone pnpm (https://pnpm.io/installation), run josh sync so a devEngines.packageManager.onFail of "error" becomes "download" (the standalone pnpm then fetches the pinned version), then rerun josh latest.'
 
 function extract_development_engines_version(package_json_content: string): string | undefined {
 	const parsed = DEV_ENGINES_PNPM_SCHEMA.safeParse(
