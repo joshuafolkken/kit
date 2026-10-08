@@ -346,7 +346,7 @@ pnpm josh run:report   # print the report; the same text josh notify sends
 Appends to, or reads back, the run's append-only ordered event stream. Keyed to the run's identity — the common git directory `run:carry` uses — so parent and every
 lane child append to one stream that survives a session cut; `--from` reads everything after a position,
 `--last` the newest event alone, `--follow` one bounded read that waits, and
-`--watch` the ambient pane.
+`--watch` every event in order, for debugging — the ambient pane is `run:board`, which `.vscode/tasks.json` opens on folder open.
 
 ```bash
 pnpm josh run:event --append <kind> <text>   # append one event; prints its position
@@ -392,7 +392,7 @@ pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 
 ### `josh run:board`
 
-A full-screen board of the running `backlogrun`, redrawn every second for a person to keep open beside the run.
+A full-screen board of the running `backlogrun`, redrawn every second for a person to keep open beside the run. `.vscode/tasks.json`, distributed by `josh sync`, opens it in a pane of its own when the workspace opens.
 
 ```bash
 pnpm josh run:board          # redraw until interrupted
@@ -403,7 +403,7 @@ The header is two lines of symbols: the run's state (`▶` running, `⏸` idle, 
 
 On a terminal it draws on the alternate screen, as `top` and `less` do, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and the cursor that were there before. `--once`, or a stdout that is not a terminal (a pipe or a redirect), writes one frame with no screen control and exits — no color either when it is not a terminal.
 
-**Output / exit codes:** the stream and lanes re-read at most every five seconds; the plan from GitHub at most every two minutes, keeping the previous one on a failed read. A touched child the open listing no longer holds is read from GitHub once — its title, when it closed and whether a merged pull request closed it — and drawn `✅` (merged) or `🏁` with its time; until that read answers it is drawn `🏁` with no time. After `run:carry --end` the board keeps the ended run — `■`, its duration as `⏱` and when it ended in the header, no `⌛`, only that run's events — until the next run begins. No run here, running or ended, prints `no run` and reads no plan. Exits 0; an unknown argument exits 1; Ctrl+C exits 130 and SIGTERM 143.
+**Output / exit codes:** the stream and lanes re-read at most every five seconds; the plan from GitHub at most every two minutes, keeping the previous one on a failed read. A touched child the open listing no longer holds is read from GitHub once — its title, when it closed and whether a merged pull request closed it — and drawn `✅` (merged) or `🏁` with its time; until that read answers it is drawn `🏁` with no time. After `run:carry --end` the board keeps the ended run — `■`, its duration as `⏱` and when it ended in the header, no `⌛`, only that run's events — until the next run begins. An ended run asks GitHub about its unread closed children once after it ended, then reads nothing until the next run. No run here, running or ended, prints `no run` and reads no plan. Exits 0; an unknown argument exits 1; Ctrl+C exits 130 and SIGTERM 143.
 
 ### `josh run:watcher:guard`
 

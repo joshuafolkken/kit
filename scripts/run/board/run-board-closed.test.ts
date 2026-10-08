@@ -40,10 +40,10 @@ describe('run_board_closed.read_closed', () => {
 		expect(git_gh_issue_read.issue_view_json).toHaveBeenCalledWith('3439', 'title,state,closedAt')
 	})
 
-	it('answers nothing for an issue still open, without asking whether it merged', async () => {
+	it('answers still open for an open issue, without asking whether it merged', async () => {
 		vi.mocked(git_gh_issue_read.issue_view_json).mockResolvedValue(view('OPEN'))
 
-		await expect(run_board_closed.read_closed(3439)).resolves.toBeUndefined()
+		await expect(run_board_closed.read_closed(3439)).resolves.toBe(run_board_closed.STILL_OPEN)
 		expect(issue_merged.read_merge_state).not.toHaveBeenCalled()
 	})
 
@@ -62,12 +62,25 @@ describe('run_board_closed.read_closed', () => {
 })
 
 describe('run_board_closed.read_all', () => {
-	it('keeps only the issues that answered closed', async () => {
-		const closed = { title: TITLE, closed_ms: undefined, is_merged: false }
+	const closed = { title: TITLE, closed_ms: undefined, is_merged: false }
+
+	it('keeps only the issues that answered closed, whole when the rest answered open', async () => {
+		const read = vi.fn(async (issue: number) =>
+			issue === 1 ? closed : run_board_closed.STILL_OPEN,
+		)
+
+		const answer = await run_board_closed.read_all([1, 2], read)
+
+		expect([...answer.closed]).toStrictEqual([[1, closed]])
+		expect(answer.is_whole).toBe(true)
+	})
+
+	it('is not whole when an issue could not be read', async () => {
 		const read = vi.fn(async (issue: number) => (issue === 1 ? closed : undefined))
 
-		const answers = await run_board_closed.read_all([1, 2], read)
+		const answer = await run_board_closed.read_all([1, 2], read)
 
-		expect([...answers]).toStrictEqual([[1, closed]])
+		expect([...answer.closed]).toStrictEqual([[1, closed]])
+		expect(answer.is_whole).toBe(false)
 	})
 })

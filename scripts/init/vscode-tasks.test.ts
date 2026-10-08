@@ -2,8 +2,9 @@ import { parse_jsonc } from '#scripts/config-merge/parse-jsonc'
 import { describe, expect, it } from 'vitest'
 import { vscode_tasks } from './vscode-tasks'
 
-const KIT_LABEL = 'josh: run event watch'
-const KIT_TASK = { label: KIT_LABEL, command: 'pnpm josh run:event --watch' }
+const KIT_LABEL = 'josh: run board'
+const KIT_TASK = { label: KIT_LABEL, command: 'pnpm josh run:board' }
+const RETIRED_TASK = { label: 'josh: run event watch', command: 'pnpm josh run:event --watch' }
 const OWN_TASK = { label: 'dev server', command: 'pnpm dev' }
 
 function tasks_of(content: string): unknown {
@@ -66,6 +67,18 @@ describe('vscode_tasks.merge_tasks — consumer tasks array', () => {
 			OWN_TASK,
 			'oops',
 			KIT_TASK,
+		])
+	})
+})
+
+// joshuafolkken/kit#3438: the folder-open watch became the board; appending would open both panes.
+describe('vscode_tasks.merge_tasks — a retired kit label', () => {
+	it('replaces a task carrying a retired kit label with its successor in place', () => {
+		const existing = JSON.stringify({ version: '2.0.0', tasks: [RETIRED_TASK, OWN_TASK] })
+
+		expect(tasks_of(vscode_tasks.merge_tasks(existing, [KIT_TASK]))).toStrictEqual([
+			KIT_TASK,
+			OWN_TASK,
 		])
 	})
 })

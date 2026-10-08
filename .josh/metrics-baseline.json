@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 999,
-		"code_lines": 82811,
-		"comment_lines": 33351,
+		"code_lines": 82835,
+		"comment_lines": 33363,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12231,
-		"on_demand_bytes": 559132
+		"on_demand_bytes": 559193
 	},
 	"accepted": {
-		"reason": "#3458: lane-carry-conflict lets a JOSH_TEMP_ROOT-prefixed run:carry call through, and report-format requires run:carry live evidence to redirect JOSH_TEMP_ROOT, plus review-round fixes (one shared LEADING_ASSIGNMENT pattern reads quoted and $(…) assignment values whole for both the redirect check and the strip); re-accepted on top of #3452 after the merge with origin/main",
+		"reason": "#3438 auto-starts run:board in the workspace task and teaches the board tick to stop on a closed run; docs/skills now name run:board instead of run:event --watch; re-accepted after the round-1 review fixes (retired-label replacement in vscode-tasks, closed-run tick handling)",
 		"date": "2026-10-08"
 	}
 }
