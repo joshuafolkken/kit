@@ -7,15 +7,15 @@
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2098
+		"lines": 2099
 	},
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 457500
+		"on_demand_bytes": 457935
 	},
 	"accepted": {
-		"reason": "#3612 adds the running-lane share thresholds (lane_thresholds, UsageSlot, usage_slot) that run:board's lane colors are now computed from",
+		"reason": "#3615 adds the one-line owner-intent criterion for the bug declaration to issue-template.md",
 		"date": "2026-10-09"
 	}
 }
