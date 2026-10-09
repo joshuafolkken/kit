@@ -6,8 +6,8 @@ import { gate_plan } from './gate-plan'
 import type { GateStepResult } from './gate-report'
 import { machine_capacity } from './machine-capacity'
 
-// A finished gate's line in the lane ledger (joshuafolkken/kit#3355): its duration, its verdict, its
-// unit suite's duration, and the load it ran beside (joshuafolkken/kit#3501), so `josh metrics`
+// A finished gate's line in the lane ledger: its duration, its verdict, its
+// unit suite's duration, and the load it ran beside, so `josh metrics`
 // compares only gates the machine was quiet for. Another gate's span is not the only load: another
 // lane's lint, related tests or `ship` doubled a solo gate's duration within minutes.
 //
@@ -16,8 +16,8 @@ import { machine_capacity } from './machine-capacity'
 // machine ended at 21, its own load. The reading is the core budget's own, so "quiet" means what
 // admission means by it: no whole core busy beyond the baseline the gate's weights were measured beside.
 //
-// **Between the ends, the load is read off the core budget's ledger, not the CPU**
-// (joshuafolkken/kit#3556). Two readings missed every lane whose lint, tests or `ship` ran only while
+// **Between the ends, the load is read off the core budget's ledger, not the CPU**.
+// Two readings missed every lane whose lint, tests or `ship` ran only while
 // the gate did: seven lanes moved the solo median from 50.5s to 60.9s with no commit between. The CPU
 // mid-gate holds this gate's own checks, whose declared weights are not what they burn, so the ledger
 // is what tells the two apart: another `josh` run's admitted claim is another process's place, and its

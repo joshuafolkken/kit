@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { git_spawn } from '#scripts/git/git-spawn'
 
-// The no-argument half of joshuafolkken/kit#1809. `josh lines <path>` answers for a file someone
+// The no-argument half of `josh lines`. `josh lines <path>` answers for a file someone
 // already named; a file near the limit that nobody has named yet is invisible until the gate reports
 // it. This enumerates the repository's own lint-target files so the no-argument scan can report every
 // one of them near the limit at once, before the first edit rather than after it.

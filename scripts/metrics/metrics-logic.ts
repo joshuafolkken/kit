@@ -9,7 +9,7 @@ import { test_declared_logic } from '#scripts/test/test-declared-logic'
 // line is then every non-blank line eslint did not count as code — a line that holds code and a
 // trailing comment is code, the same reading the rule makes.
 //
-// **AI cost is measured in bytes, as a stand-in for tokens** (joshuafolkken/kit#3428): the resident
+// **AI cost is measured in bytes, as a stand-in for tokens**: the resident
 // part is read on every session or turn, the on-demand part only when a run opens it.
 
 const SCRIPTS_PREFIX = 'scripts/'
@@ -19,7 +19,7 @@ const RATIO_DIGITS = 2
 const JSON_INDENT = '\t'
 const ENCODING = 'utf8'
 // The `UserPromptSubmit` hook's line, in its default form — the same on every machine whatever its
-// `.env` says. Empty since joshuafolkken/kit#3398; kept so a default that prints again is counted.
+// `.env` says. Empty, and kept so a default that prints again is counted.
 const PER_TURN_HOOK_TEXT = session_language_cli.format_line({
 	lang: session_language_cli.DEFAULT_SESSION_LANG,
 	is_default: true,

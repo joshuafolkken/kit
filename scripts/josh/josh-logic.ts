@@ -59,7 +59,7 @@ function resolve_tsx_executable(): string {
 
 // Locating the CLI entry through tsx's own manifest never consults pnpm's generated shim, which
 // hardcodes a store path a later bump prunes. The resolution itself is `resolve_package_bin` —
-// shared with the format hook's eslint route rather than written twice (joshuafolkken/kit#1259).
+// shared with the format hook's eslint route rather than written twice.
 function resolve_tsx_cli_entry(): string | undefined {
 	for (const base_directory of [PACKAGE_DIR, process.cwd()]) {
 		const cli_entry = resolve_package_bin(base_directory, TSX_PACKAGE, TSX_BIN)
@@ -157,7 +157,7 @@ function format_help(is_all = false, is_consumer = false): string {
 }
 
 // Every name a user could type — the canonical commands and their aliases — ranked by edit distance
-// so `josh gat` points at `gate` (joshuafolkken/kit#1928).
+// so `josh gat` points at `gate`.
 function all_command_names(): Array<string> {
 	return [...Object.keys(COMMAND_MAP), ...Object.keys(ALIASES)]
 }
@@ -219,7 +219,7 @@ function spawn_script_entry(
 
 // Only the in-process branch is genuinely asynchronous; the spawning one answers the moment the
 // child exits. Both are reported as a promise so every caller has one shape to handle, and
-// `josh.ts` awaits it either way (joshuafolkken/kit#1342).
+// `josh.ts` awaits it either way.
 async function run_script_entry(
 	entry: CommandEntry,
 	subcommand_arguments: Array<string>,
@@ -242,8 +242,7 @@ function github_prerequisite_exit(resolved: string, is_consumer: boolean): numbe
 }
 
 // The exit a command answers with before it runs, or `undefined` to go ahead: a consumer is refused a
-// kit-only command with guidance, and a composite command rejects extra arguments
-// (joshuafolkken/kit#1988).
+// kit-only command with guidance, and a composite command rejects extra arguments.
 function pre_dispatch_exit(
 	resolved: string,
 	entry: CommandEntry,
@@ -283,8 +282,8 @@ function declared(value: number | (() => number) | undefined): number | undefine
 	return typeof value === 'function' ? value() : value
 }
 
-// **Every command passes through here, so this is where a declared weight is reserved**
-// (joshuafolkken/kit#3345). A heavy command run directly, outside `josh gate`, used to start its tools
+// **Every command passes through here, so this is where a declared weight is reserved**.
+// A heavy command run directly, outside `josh gate`, used to start its tools
 // without claiming a place. A command under a parent that already holds its cores claims nothing:
 // `core_budget.with_command_reservation` reads the mark that parent set.
 async function dispatch_entry(

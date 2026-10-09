@@ -20,20 +20,17 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['<message>', 'developer', ['network']],
 		default_script_arguments: ['-y', '--skip-commit', '--skip-push'],
 	},
-	// **The optional form, on both** (joshuafolkken/kit#1564). These two were the last commands
-	// passing the mandatory `--env-file=.env`, which node resolves before the script's first line: on
-	// a machine with no `.env` they died as `.env: not found` with exit code 9, even where
-	// `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` existed as real environment variables — a cloud
-	// session, and `followup` with them the merge step of every `fullrun` there. `doctor` was moved to
-	// this form for the same reason in joshuafolkken/kit#869.
+	// **The optional form, on both**. The mandatory `--env-file=.env` is resolved by node before the
+	// script's first line: on a machine with no `.env` it dies as `.env: not found` with exit code 9,
+	// even where `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` exist as real environment variables — a
+	// cloud session, and `followup` with them the merge step of every `fullrun` there.
 	//
 	// Nothing is lost by relaxing it: both scripts already load `.env` through `josh_environment_file`
 	// themselves, so the file is read either way and node's precedence — an existing environment
 	// variable wins over the file — is node's own in both spellings.
 	//
-	// **What the mandatory flag was accidentally providing was noise**, and that is replaced rather
-	// than dropped: `telegram_notify.send` now throws on missing credentials and on a failed send, so
-	// `josh notify` exits non-zero instead of warning and answering 0.
+	// **A missing credential still fails loudly**: `telegram_notify.send` throws on missing credentials
+	// and on a failed send, so `josh notify` exits non-zero instead of warning and answering 0.
 	followup: {
 		script: 'scripts/followup/git-followup-workflow.ts',
 		description: 'Follow-up git workflow',
@@ -52,16 +49,16 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['--task-type <type> --body <text>', 'automation', ['notifications']],
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
-	// One observation-ledger sighting: the key's count, the append and the second-sighting verdict
-	// (joshuafolkken/kit#3400), which a run used to type as a `cat | grep -c` and judge by hand.
+	// One observation-ledger sighting: the key's count, the append and the second-sighting verdict,
+	// which a run used to type as a `cat | grep -c` and judge by hand.
 	'observation:record': {
 		script: 'scripts/observations/observation-record-cli.ts',
 		description: 'Record an observation sighting and answer whether it is now filed',
 		category: 'Workflow',
 		reference: ['<key> <depth> <where> <what> [--checkout <path>]', 'automation', ['files']],
 	},
-	// The observation ledger's commit path for the lines no run's own commit carried
-	// (joshuafolkken/kit#1756, joshuafolkken/kit#2763): a lane's lines sit in the primary checkout, which
+	// The observation ledger's commit path for the lines no run's own commit carried:
+	// a lane's lines sit in the primary checkout, which
 	// its commit cannot see, and the recurrence count the promotion rule reads is a count of main.
 	'observations:flush': {
 		script: 'scripts/observations/observations-flush-cli.ts',
@@ -69,8 +66,8 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Workflow',
 		reference: ['', 'automation', ['git', 'network']],
 	},
-	// The one write path for a `/code-review` round's findings (joshuafolkken/kit#2325), plus the
-	// `--check` gate `followup` runs before it merges (joshuafolkken/kit#2343). It appends a `- rf:`
+	// The one write path for a `/code-review` round's findings, plus the
+	// `--check` gate `followup` runs before it merges. It appends a `- rf:`
 	// line per finding — or one zero-finding line for a clean round — to the observation ledger, so
 	// `observations:flush` commits them and the recurrence count survives the run.
 	'review:record': {
@@ -83,7 +80,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 			['files'],
 		],
 	},
-	// The reader over what `review:record` wrote (joshuafolkken/kit#2325): each recurring category’s
+	// The reader over what `review:record` wrote: each recurring category’s
 	// count, and the number of zero-finding rounds that distinguishes a quiet category from an unwatched one.
 	'review:findings': {
 		script: 'scripts/review/review-findings-cli.ts',
@@ -92,7 +89,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'developer', ['files']],
 	},
 	// After a behavior-change Issue merges, re-run its declared baseline and print before/after; a value
-	// that did not move appends a refuted-premise line to the observation ledger (joshuafolkken/kit#2212).
+	// that did not move appends a refuted-premise line to the observation ledger.
 	'measure:rerun': {
 		script: 'scripts/issue/measure-rerun-cli.ts',
 		description: 'Re-run a merged issue’s baseline command and print the before/after pair',
@@ -100,7 +97,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['<issue-number>', 'automation', ['network', 'processes', 'files']],
 	},
 	// A script rather than an `sh -c` chain, because it has a precondition to enforce: run inside a
-	// linked work tree it would hijack the default branch from every other one (joshuafolkken/kit#1535).
+	// linked work tree it would hijack the default branch from every other one.
 	'main:sync': {
 		script: 'scripts/git/main-sync.ts',
 		description:
@@ -109,9 +106,8 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'developer', ['git', 'network']],
 	},
 	// A script rather than an `sh -c` chain, because the strategy has to be named rather than left to
-	// the caller's git configuration: the `git pull` this replaced aborted with `Need to specify how
-	// to reconcile divergent branches` on exactly the diverged branch the command exists for
-	// (joshuafolkken/kit#1659).
+	// the caller's git configuration: a bare `git pull` aborts with `Need to specify how to reconcile
+	// divergent branches` on exactly the diverged branch the command exists for.
 	'main:merge': {
 		script: 'scripts/git/main-merge.ts',
 		description: 'Merge origin default branch into the current branch',

@@ -2,8 +2,8 @@ import { bash_triggers } from './bash-triggers'
 import { git_argv } from './git-argv'
 import { shell_segments } from './shell-segments'
 
-// The trigger and the delivered text behind the `worktree-mutation` row of `delivered-rules.ts`
-// (joshuafolkken/kit#2120). Group 2 of the three Bash-string gaps: a working-tree change made outside
+// The trigger and the delivered text behind the `worktree-mutation` row of `delivered-rules.ts`.
+// Group 2 of the three Bash-string gaps: a working-tree change made outside
 // the authorized routes.
 //
 // **The deny list does not cover these at all.** `git checkout -- <path>` and `git restore <path>`
@@ -83,7 +83,7 @@ function is_unauthorized_stash(args: ReadonlyArray<string>): boolean {
 	return true
 }
 
-// `git clean` deletes untracked files, which no commit can bring back (joshuafolkken/kit#2983). It
+// `git clean` deletes untracked files, which no commit can bring back. It
 // refuses to act without a force (`clean.requireForce`), so a force — `--force`, or a cluster carrying
 // `f` — is what marks the destructive call; `git clean -n` is a dry run and passes.
 const CLEAN_SUBCOMMAND = 'clean'

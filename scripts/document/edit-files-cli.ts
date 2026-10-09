@@ -4,8 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { document_section } from './document-section'
 
-// `josh edit:files <plan-path>` — apply several content-addressed edits in one call
-// (joshuafolkken/kit#2366).
+// `josh edit:files <plan-path>` — apply several content-addressed edits in one call.
 //
 // **This is the write-side counterpart of `read:files`, and it reverses what kit#2202 rejected.**
 // kit#2202 folded the pre-edit *reads* into one call and left the edits to native multiple `Edit`
@@ -25,12 +24,12 @@ import { document_section } from './document-section'
 // order against the running text; if any of them fails to match, that file is left exactly as it was
 // and its failures are named. So a partial plan never leaves a file half-edited.
 //
-// **Only independent edits are folded (joshuafolkken/kit#2493).** An edit whose original range overlaps
+// **Only independent edits are folded.** An edit whose original range overlaps
 // an earlier edit's of the same file, or whose match count that earlier edit changed, depends on it — it
 // addresses text that edit rewrote, removed or duplicated — and is refused as `dependent`. Such an edit is
 // issued on its own after the batch, so a fold never hides an ordering the author did not see.
 //
-// **`-` reads the plan from standard input (joshuafolkken/kit#2493)**, so a lane child passes its edits
+// **`-` reads the plan from standard input**, so a lane child passes its edits
 // in the one call as a quoted heredoc (`pnpm josh edit:files - <<'EDITS'`) instead of writing a plan file
 // first — the quoted delimiter expands nothing, and the call carries the old/new pairs an `Edit` would.
 

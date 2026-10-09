@@ -7,7 +7,7 @@ import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { metrics_durations, type Durations } from './metrics-durations'
 
-// The I/O around `metrics-durations.ts` (joshuafolkken/kit#3409): read the gate and unit durations
+// The I/O around `metrics-durations.ts`: read the gate and unit durations
 // off the lane ledger, time the two startups, and hold them to this machine's baseline.
 //
 // **The gate is never timed here.** `josh gate` already appends its duration and its unit suite's to

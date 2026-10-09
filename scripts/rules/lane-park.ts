@@ -4,18 +4,15 @@ import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { bash_triggers } from './bash-triggers'
 import { shell_segments } from './shell-segments'
 
-// A dispatched lane child records its park before it stops, delivered at the call it binds on
-// (joshuafolkken/kit#2034).
+// A dispatched lane child records its park before it stops, delivered at the call it binds on.
 //
-// **A lane child that stopped for a decision left no question behind.** A `backlogrun` dispatches a
-// child as a detached `fullrun #<N>` process, and its only route to ask a person anything is to park
-// the Issue — `needs-decision` plus a comment carrying the question. Measured twice in one run on
-// 2026-09-14: #2012's child had its `AskUserQuestion` refused (it is headless), wrote the question
-// into its final message, sent a `confirmation` Telegram and exited; #2011 wrote a Tier B decision to
-// its final message and exited the same way. Neither left a label or a comment, so the parent found an
-// OPEN Issue with `in-progress` and no question, and a person looking at the Issue could not tell what
-// to answer. The child is the one process that knows the question, the options and whether it stashed,
-// and that knowledge died with its turn.
+// **A lane child that stops for a decision must leave the question behind.** A `backlogrun`
+// dispatches a child as a detached `fullrun #<N>` process, and its only route to ask a person
+// anything is to park the Issue — `needs-decision` plus a comment carrying the question. A child that
+// writes the question only into its final message leaves the parent an OPEN Issue with `in-progress`
+// and no question, and a person looking at the Issue cannot tell what to answer. The child is the one
+// process that knows the question, the options and whether it stashed, and that knowledge dies with
+// its turn.
 //
 // **The stop is one shell call, so the rule is delivered rather than resident.** `CLAUDE.md` mandates
 // a `confirmation` Telegram before any mid-workflow stop, so `pnpm josh notify --task-type
@@ -53,7 +50,7 @@ function is_confirmation_notify(command: string): boolean {
 }
 
 // The josh notify invocation in either spelling, anywhere in a blob of text. The stop guard
-// (joshuafolkken/kit#2121) asks whether a confirmation notify was issued *this turn* by scanning the
+//  asks whether a confirmation notify was issued *this turn* by scanning the
 // transcript tail rather than one command, so the "is it a stop notification" judgement stays here —
 // the same `CONFIRMATION_TASK_TYPE` regex, never a second copy of it.
 const NOTIFY_INVOCATION = /josh\s+(?:notify|nf)\b/u
@@ -64,7 +61,7 @@ const NOTIFY_INVOCATION = /josh\s+(?:notify|nf)\b/u
 // on purpose — the guard's safe direction is to read a real stop notification as present, so a run
 // that sent one is never told it did not.
 //
-// **A command that sent the Telegram itself prints this line instead** (joshuafolkken/kit#3099):
+// **A command that sent the Telegram itself prints this line instead**:
 // `run:entry` notifies from inside its own stop, so no `josh notify` invocation reaches the transcript,
 // and the line it prints is what the tail carries. One constant, printed there and matched here.
 const COMMAND_NOTIFY_MARKER = 'stop notified: a confirmation Telegram was sent by this command'
@@ -81,7 +78,7 @@ function mentions_confirmation_notify(text: string): boolean {
 // human-or-child fact the pre-gate cut reads: a person working in a lane carries no mark and sees no
 // refusal, and a mark that leaked in naming another issue is read as a person too.
 //
-// **A child that handed its region to the detached ship is not parking** (joshuafolkken/kit#2962): its
+// **A child that handed its region to the detached ship is not parking**: its
 // stop waits on nobody, so the park checklist is the wrong advice. `lane_handoff.is_handed_off` is the
 // reading the `Stop` hook stands its notify demand down on, so the two hooks cannot disagree.
 function is_parking_child(directory: string = process.cwd()): boolean {
@@ -126,8 +123,7 @@ const LANE_PARK_REASON =
 	'before it stops", and the park itself is `backlogrun-park.md` → "park and continue".'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. **Once per run rather than `decide`, and
-// no `already_satisfied`.** The stop ends the turn, so it is not the recurring act joshuafolkken/kit#1570
-// wrote `decide` for. It carries no `already_satisfied` because the park it asks for is a GitHub label a
+// no `already_satisfied`.** The stop ends the turn, so it is not the recurring act `decide` is for. It carries no `already_satisfied` because the park it asks for is a GitHub label a
 // synchronous guard cannot read, and the transcript-tail alternative would read a child that merely
 // *read* `backlogrun-park.md` — whose prose carries the `labels[]=needs-decision` command — as
 // compliant and fall silent on a real violation (the header above). `keeps` reads an actual

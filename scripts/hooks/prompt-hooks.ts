@@ -1,11 +1,10 @@
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
-// The `UserPromptSubmit` hook commands declared in a `.claude/settings.json`
-// (joshuafolkken/kit#1151).
+// The `UserPromptSubmit` hook commands declared in a `.claude/settings.json`.
 //
 // What these commands echo is injected into **every** user turn and then re-read as accumulated
-// context on every turn after it, which is why joshuafolkken/kit#967 put a ceiling on their size.
+// context on every turn after it, which is why their size has a ceiling.
 // Two readers, one parser: the suite that enforces the ceiling and the Codex project-config suite
 // must agree on which commands are declared, or each guards a different list.
 

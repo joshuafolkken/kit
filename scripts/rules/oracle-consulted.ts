@@ -6,7 +6,7 @@ import { oracle_firing, type FiringPoint } from './oracle-firing'
 import { shell_segments } from './shell-segments'
 import { tail_commands } from './tail-commands'
 
-// The one generic rule that turns a declared firing point into a delivered guard (joshuafolkken/kit#2324).
+// The one generic rule that turns a declared firing point into a delivered guard.
 // `oracle-firing.ts` records, per oracle, the action that must consult it first; this generates a
 // `DeliveredRule` for each such oracle — refused when the run performs the governed action without
 // having run the oracle's command earlier, stood down once it has.

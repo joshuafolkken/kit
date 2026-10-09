@@ -5,7 +5,7 @@
 // prints nothing (`build-hooks.ts` → "`splitting: true` is load-bearing").
 //
 // Unset and empty resolve to `ja`, because a worktree without a `.env`, a cloud session and a
-// consumer repository are exactly where the drift recurs (joshuafolkken/kit#1903).
+// consumer repository are exactly where the drift recurs.
 
 const ENV_KEY = 'JOSH_SESSION_LANG'
 const DEFAULT_SESSION_LANG = 'ja'

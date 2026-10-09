@@ -6,8 +6,8 @@ import { vi } from 'vitest'
 
 // The scaffolding both gate suites need to drive `josh gate` without spawning anything.
 //
-// `verification-gate.test.ts` owned all three helpers alone until joshuafolkken/kit#1328 added
-// `gate-skip.test.ts`, which needs the same stubs behind a different mock of the changed tree. Two
+// `verification-gate.test.ts` and `gate-skip.test.ts` need the same stubs behind different mocks of
+// the changed tree. Two
 // copies of them is the clone `CLAUDE.md` prohibits — and the copies would not have stayed identical:
 // the bridging below exists because execa's real types are far wider than what the gate reads, so a
 // change to either would be made in whichever file the next failure pointed at.
@@ -70,16 +70,16 @@ interface SuiteRecords {
 // Where a suite driving the real `run_verification_gate` puts the two records it would otherwise share
 // with the live gate — and **the reason `GateOptions` carries those destinations at all**.
 //
-// A green run writes the green-gate record joshuafolkken/kit#1328 reuses, so a suite writing to the
+// A green run writes the green-gate record `gate-skip.ts` reuses, so a suite writing to the
 // shared path plants "these files are green" for whatever the *real* working tree happens to be, and
 // the next `pnpm josh gate` skips its four checks on the strength of it. The in-flight marker is the
 // same hazard one step further on: cleared here, it stops telling the review beside a live gate that
-// the unit suite is already running (joshuafolkken/kit#1242).
+// the unit suite is already running.
 //
 // Keyed on the label and the pid together, so two suites in parallel workers cannot answer for each
 // other, and `clear` comes back with the paths rather than being written out per suite — three suites
 // removing two files each is where the fourth one forgets the marker.
-// The gate log is the third destination and is here for the same reason (joshuafolkken/kit#1227):
+// The gate log is the third destination and is here for the same reason:
 // every run writes it, so a suite left on the shared path would overwrite the live gate's own log
 // with the output of four checks that never ran.
 function suite_records(label: string): SuiteRecords {
