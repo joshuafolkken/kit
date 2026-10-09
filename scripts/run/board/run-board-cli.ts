@@ -6,7 +6,6 @@ import { machine_capacity } from '#scripts/gate/machine-capacity'
 import { run_progress_read } from '#scripts/run/progress/run-progress-read'
 import terminalLink from 'terminal-link'
 import { run_board_closed } from './run-board-closed'
-import { run_board_fit } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import { run_board_plan } from './run-board-plan'
 import { run_board_read } from './run-board-read'
@@ -31,6 +30,7 @@ const FLAGS: ReadonlySet<string> = new Set(['', ONCE_FLAG, CHAT_FLAG])
 const SIGINT_EXIT_CODE = 130
 const SIGTERM_EXIT_CODE = 143
 const USAGE = 'Usage: josh run:board [--once | --chat]'
+const TRAILING_NEWLINE = /\n$/u
 const { FRESH_STATE, tick } = run_board_tick
 const { WORDS } = run_board_labels
 
@@ -66,18 +66,16 @@ const LIVE_PORTS: BoardPorts = {
 
 // Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
 // ends on the line that says closing the screen leaves the run going (joshuafolkken/kit#3437) — only a
-// screen a person can close says it. Nothing follows the footer and the frame is kept to the rows the
-// footer leaves, so writing it never scrolls the header off the top (joshuafolkken/kit#3486).
+// screen a person can close says it, and it is the first line to give way to a short pane
+// (joshuafolkken/kit#3505). Nothing follows the last line, so a frame that fills the pane never scrolls
+// the header off the top (joshuafolkken/kit#3486).
 function framed(ports: BoardPorts, screen: Screen): BoardPorts {
-	const footer = ['', styleText('dim', WORDS.keeps_running)]
-	const { size } = ports
-
 	return {
 		...ports,
+		footer: ['', styleText('dim', WORDS.keeps_running)],
 		write: (frame) => {
-			ports.write(`${screen.frame}${frame}${footer.join('\n')}`)
+			ports.write(`${screen.frame}${frame.replace(TRAILING_NEWLINE, '')}`)
 		},
-		size: size === undefined ? undefined : () => run_board_fit.reserve(size(), footer),
 	}
 }
 

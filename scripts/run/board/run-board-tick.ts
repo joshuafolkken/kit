@@ -8,7 +8,7 @@ import { run_board_link } from './run-board-link'
 import { run_board_machine } from './run-board-machine'
 import { run_board_notes } from './run-board-notes'
 import type { LocalRead } from './run-board-read'
-import { run_board_render } from './run-board-render'
+import { run_board_render, type FrameBounds } from './run-board-render'
 import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
 import { run_board_status } from './run-board-status'
@@ -133,17 +133,22 @@ function header_of(
 	}
 }
 
+// The pane a live frame is kept within and the footer it ends on, read at every redraw.
+function bounds_of(ports: BoardPorts): FrameBounds {
+	return { size: ports.size?.(), footer: ports.footer }
+}
+
 // The frame with its spinners drawn at this moment's frame, and where they are on screen.
 function frame_of(state: BoardState, local: LocalRead, layout: BoardLayout, redraw: Redraw): Spun {
-	const size = redraw.ports.size?.()
+	const bounds = bounds_of(redraw.ports)
 	const lines = run_board_render.render({
 		header: header_of(state, local, layout, redraw),
 		notes: run_board_notes.notes_of(local.events),
 		resume: local.resume,
-		size,
+		...bounds,
 	})
 
-	return run_board_spin.spun(lines, run_board_labels.spinner_of(redraw.now_ms), size)
+	return run_board_spin.spun(lines, run_board_labels.spinner_of(redraw.now_ms), bounds.size)
 }
 
 function draw(ports: BoardPorts, lines: ReadonlyArray<string>): void {
@@ -176,7 +181,7 @@ async function tick(
 	const { local } = read
 
 	if (local === undefined) {
-		draw(ports, run_board_render.render_no_run(now_ms))
+		draw(ports, run_board_render.render_no_run(now_ms, bounds_of(ports)))
 
 		return { ...read, spots: [] }
 	}
