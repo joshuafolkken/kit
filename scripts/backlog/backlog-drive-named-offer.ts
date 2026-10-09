@@ -2,6 +2,7 @@ import { EPIC_LABEL, has_label_name, NEEDS_DECISION_LABEL } from '#scripts/issue
 import type { IssueState } from '#scripts/issue/issue-state'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
+import { run_carry_added } from '#scripts/run/carry/run-carry-added'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_invocation } from '#scripts/run/run-invocation'
 import { backlog_budget } from './backlog-budget'
@@ -88,8 +89,13 @@ async function is_unmerged(issue: number, merged: ReadonlyArray<number>): Promis
 	return result.kind !== 'state' || result.state.state.toUpperCase() !== 'CLOSED'
 }
 
+// The issues `run:add` put in count too (joshuafolkken/kit#3433): one that parked is no more a merge
+// than a declared one.
 async function unmerged_of(carry: RunCarry): Promise<Array<number>> {
-	const declared = run_invocation.issue_numbers(carry.invocation) ?? []
+	const declared = run_carry_added.ordered(
+		run_invocation.issue_numbers(carry.invocation) ?? [],
+		carry.added,
+	)
 	const merged = carry.merged_issues ?? []
 	const flags = await Promise.all(declared.map(async (issue) => await is_unmerged(issue, merged)))
 

@@ -1315,6 +1315,16 @@ Print each delivered rule's unaided compliance — runs reached, kept rate, refu
 
 ---
 
+### `josh run:add`
+
+> **Audience:** automation · **Side effects:** network, files
+
+`<issue...> [--no-priority]`
+
+Add issues to a live backlogrun, ahead of the queue unless --no-priority
+
+---
+
 ### `josh run:board`
 
 > **Audience:** automation · **Side effects:** files, network

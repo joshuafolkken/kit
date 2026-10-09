@@ -3,6 +3,7 @@ import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
+import { run_invocation } from '#scripts/run/run-invocation'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_named } from './backlog-named'
@@ -48,17 +49,28 @@ function mark_one(target: string, issue: string, owner: string): boolean {
 	return true
 }
 
-function skip_after_failure(target: string, issue: string, owner: string): void {
-	const read = run_carry.read_carry(target)
-	if (read.kind !== 'carried') return
-	const remaining = run_carry.remaining_of(read.carry) ?? []
+// The skip follows the declared order alone (joshuafolkken/kit#3433): an issue `run:add` put in was
+// asked for on its own, so its failure skips nothing and a declared failure does not skip it.
+function is_declared(carry: RunCarry, issue: string): boolean {
+	return run_invocation.issue_numbers(carry.invocation)?.includes(Number(issue)) === true
+}
+
+function skipped_of(carry: RunCarry, issue: string): ReadonlyArray<number> {
+	if (!is_declared(carry, issue)) return []
+	const remaining = run_carry.remaining_of({ ...carry, added: undefined }) ?? []
 	const named = [
 		{ issue: Number(issue), is_epic: false },
 		...remaining.map((number) => ({ issue: number, is_epic: false })),
 	]
-	const { skipped } = backlog_named.after_failure(named, Number(issue))
 
-	for (const number of skipped) {
+	return backlog_named.after_failure(named, Number(issue)).skipped
+}
+
+function skip_after_failure(target: string, issue: string, owner: string): void {
+	const read = run_carry.read_carry(target)
+	if (read.kind !== 'carried') return
+
+	for (const number of skipped_of(read.carry, issue)) {
 		if (!mark_one(target, String(number), owner)) return
 	}
 }

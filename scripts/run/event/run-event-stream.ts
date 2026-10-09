@@ -119,6 +119,10 @@ const EVENT_KIND = {
 	// PreToolUse hook (joshuafolkken/kit#3444) — so `run:board` draws how far the child has got. A trace,
 	// like `SHIP_STAGE`: it says where the child's work is, not where the run is.
 	LANE_PHASE: 'lane-phase',
+	// An issue `run:add` put into the live run (joshuafolkken/kit#3433). The parent's `--wait` watcher
+	// ends on it, so the issue takes the next free lane without waiting out the arrival probe's minute. A
+	// trace: it says what the run was handed, not where the run is.
+	ADD: 'add',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -135,6 +139,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.FILED,
 	EVENT_KIND.NOTE,
 	EVENT_KIND.LANE_PHASE,
+	EVENT_KIND.ADD,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or

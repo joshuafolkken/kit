@@ -2,6 +2,7 @@ import { epic_triage } from '#scripts/epic/epic-triage'
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { run_headless } from '#scripts/run/run-headless'
+import { backlog_arrival_added } from './backlog-arrival-added'
 import { backlog_next } from './backlog-next'
 import { backlog_ready, type ReadyPorts, type ReadyReading } from './backlog-ready'
 import { backlog_stalled } from './backlog-stalled'
@@ -64,9 +65,16 @@ async function bounded_ready_issues(): Promise<ReadonlyArray<string>> {
 	return answered_issues(await backlog_ready.read_backlog_next(COMMAND_TIMEOUT_MS))
 }
 
-const ARRIVAL_PORTS: ReadyPorts = {
+// The backlog reads, plus whether `run:add` handed the run an issue since a given instant
+// (joshuafolkken/kit#3433).
+interface ArrivalPorts extends ReadyPorts {
+	is_added_since: (since_ms: number) => Promise<boolean>
+}
+
+const ARRIVAL_PORTS: ArrivalPorts = {
 	free_lane_count: backlog_ready.free_lane_count,
 	ready_issues: bounded_ready_issues,
+	is_added_since: backlog_arrival_added.is_added_since,
 }
 
 interface ArrivalProbe {
@@ -132,7 +140,7 @@ async function retry_baseline(
 // The next-probe instant is set before any read is awaited. A baseline that did not answer is read again
 // at the next probe instead of the reading, and the first one that answers is the baseline from then on
 // — never an arrival itself, since it is the pool as it stands.
-function probe_of(
+function pool_probe_of(
 	initial: ReadonlySet<string> | undefined,
 	first_ms: number,
 	ports: ReadyPorts,
@@ -159,19 +167,37 @@ function probe_of(
 	return { has_arrived }
 }
 
+// An issue `run:add` handed the run since the watcher started wakes the parent at the next tick, ahead
+// of the pool probe's minute (joshuafolkken/kit#3433).
+function probe_of(
+	initial: ReadonlySet<string> | undefined,
+	started_ms: number,
+	ports: ArrivalPorts,
+): ArrivalProbe {
+	const pool = pool_probe_of(initial, started_ms + PROBE_INTERVAL_MS, ports)
+
+	async function has_arrived(now_ms: number): Promise<boolean> {
+		if (await ports.is_added_since(started_ms)) return true
+
+		return await pool.has_arrived(now_ms)
+	}
+
+	return { has_arrived }
+}
+
 // Inert outside a driving `backlogrun` parent — a `fullrun` watcher has no pool to pick from — and there
 // it reads nothing at all.
 async function start(
 	now_ms: number,
-	ports: ReadyPorts = ARRIVAL_PORTS,
+	ports: ArrivalPorts = ARRIVAL_PORTS,
 	is_parent: () => Promise<boolean> = run_headless.is_backlog_parent,
 ): Promise<ArrivalProbe> {
 	if (!(await is_parent_safely(is_parent))) return INERT
 
-	return probe_of(await read_baseline(ports), now_ms + PROBE_INTERVAL_MS, ports)
+	return probe_of(await read_baseline(ports), now_ms, ports)
 }
 
 const backlog_arrival = { PROBE_INTERVAL_MS, answered_issues, arrivals, start }
 
-export type { ArrivalProbe }
+export type { ArrivalPorts, ArrivalProbe }
 export { backlog_arrival }
