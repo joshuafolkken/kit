@@ -267,7 +267,7 @@ describe('run_board_status.settle_closed with a closed read', () => {
 		['merged', true, 'merged'],
 		['done', false, 'done'],
 	])('draws a child read closed as %s, timed to its close', (_label, is_merged, state) => {
-		const read = read_closed({ title: 'Fix', closed_ms: Date.parse(T2), is_merged })
+		const read = read_closed({ title: 'Fix', labels: [], closed_ms: Date.parse(T2), is_merged })
 
 		expect(run_board_status.settle_closed(RUNNING, read).get(3409)).toStrictEqual({
 			state,
@@ -277,7 +277,12 @@ describe('run_board_status.settle_closed with a closed read', () => {
 	})
 
 	it('ignores a close dated before the launch', () => {
-		const read = read_closed({ title: 'Fix', closed_ms: Date.parse(T0) - 1, is_merged: true })
+		const read = read_closed({
+			title: 'Fix',
+			labels: [],
+			closed_ms: Date.parse(T0) - 1,
+			is_merged: true,
+		})
 
 		expect(run_board_status.settle_closed(RUNNING, read).get(3409)).toStrictEqual({
 			state: 'done',
@@ -304,7 +309,10 @@ describe('run_board_status settled tracks', () => {
 	])
 
 	it.each<[string, OpenRead]>([
-		['read closed', read_closed({ title: 'Fix', closed_ms: Date.parse(T2), is_merged: true })],
+		[
+			'read closed',
+			read_closed({ title: 'Fix', labels: [], closed_ms: Date.parse(T2), is_merged: true }),
+		],
 		['gone from the listing', GONE],
 		['labelled stopped', read_labelled(['bug'])],
 		['labelled needs-decision', read_labelled([NEEDS_DECISION_LABEL])],

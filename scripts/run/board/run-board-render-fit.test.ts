@@ -17,7 +17,7 @@ function row(number: number, state: ItemState, started_minute: number): BoardRow
 	const ended_ms = state === 'running' ? undefined : started_ms + MINUTE
 	const status = { state, started_ms, ended_ms }
 
-	return { number, title: `Issue ${String(number)}`, state, status, waits: [] }
+	return { number, title: `Issue ${String(number)}`, kind: undefined, state, status, waits: [] }
 }
 
 // Running and merged rows mixed as they started, and three notes. One cut row or note only trades its

@@ -21,7 +21,7 @@ const NOW = STARTED + 30 * MINUTE
 const EMPTY_LAYOUT: BoardLayout = { active: [], waves: [], people: [], unreached: [] }
 
 function row(number: number, state: BoardRow['state']): BoardRow {
-	return { number, title: undefined, state, status: undefined, waits: [] }
+	return { number, title: undefined, kind: undefined, state, status: undefined, waits: [] }
 }
 
 const RUNNING_LAYOUT: BoardLayout = { ...EMPTY_LAYOUT, active: [row(1, 'running')] }

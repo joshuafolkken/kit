@@ -51,7 +51,7 @@ describe('run_board_cli.run', () => {
 		await run_board_cli.run(['--once'], { ...ports, is_tty: true })
 
 		expect(stripVTControlCharacters(frames[0] ?? '')).toMatch(/^▶ backlogrun/u)
-		expect(frames[0]).toContain('  🔍 1  a')
+		expect(frames[0]).toContain('  🔍 1    a')
 	})
 })
 
@@ -67,7 +67,7 @@ describe('run_board_cli.run --chat', () => {
 
 		expect(frames).toHaveLength(1)
 		expect(frames[0]).not.toContain(ESCAPE)
-		expect(frames[0]).toContain('  🔍 1  a')
+		expect(frames[0]).toContain('  🔍 1    a')
 		expect(marks).toStrictEqual([clock.now_ms])
 	})
 
@@ -231,7 +231,7 @@ describe('run_board_cli.run terminal size', () => {
 
 		await run_board_cli.run(['--once'], { ...ports, size: () => ({ rows: 2, columns: 80 }) })
 
-		expect(frames[0]).toContain('  🔍 1  a')
+		expect(frames[0]).toContain('  🔍 1    a')
 		expect(frames[0]).not.toContain('more ')
 	})
 
@@ -244,7 +244,7 @@ describe('run_board_cli.run terminal size', () => {
 
 			await run_board_cli.run([flag], ports)
 
-			expect(frames[0]).toContain('  🔍 1  a')
+			expect(frames[0]).toContain('  🔍 1    a')
 			expect(frames[0]).toContain('seen')
 			expect(frames[0]).not.toMatch(JAPANESE)
 			vi.unstubAllEnvs()

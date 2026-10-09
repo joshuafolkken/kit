@@ -19,6 +19,7 @@ function view(state: string): string {
 		title: TITLE,
 		state,
 		closedAt: state === 'CLOSED' ? CLOSED_AT : undefined,
+		labels: [{ name: 'bug' }, { name: 'auto-ok' }],
 	})
 }
 
@@ -34,10 +35,14 @@ describe('run_board_closed.read_closed', () => {
 
 		await expect(run_board_closed.read_closed(3439)).resolves.toStrictEqual({
 			title: TITLE,
+			labels: ['bug', 'auto-ok'],
 			closed_ms: Date.parse(CLOSED_AT),
 			is_merged,
 		})
-		expect(git_gh_issue_read.issue_view_json).toHaveBeenCalledWith('3439', 'title,state,closedAt')
+		expect(git_gh_issue_read.issue_view_json).toHaveBeenCalledWith(
+			'3439',
+			'title,state,closedAt,labels',
+		)
 	})
 
 	it('answers still open for an open issue, without asking whether it merged', async () => {
@@ -62,7 +67,7 @@ describe('run_board_closed.read_closed', () => {
 })
 
 describe('run_board_closed.read_all', () => {
-	const closed = { title: TITLE, closed_ms: undefined, is_merged: false }
+	const closed = { title: TITLE, labels: [], closed_ms: undefined, is_merged: false }
 
 	it('keeps only the issues that answered closed, whole when the rest answered open', async () => {
 		const read = vi.fn(async (issue: number) =>
