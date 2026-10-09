@@ -13,26 +13,22 @@ import { gh_reachability } from './git-gh-reachability'
 
 // Reading one issue. Split out of `git-gh-issue.ts`, which had grown past the file-length limit
 // while holding both the reads and the writes; the reads are what every epic command goes through,
-// and telling a number that resolves to nothing from a read that failed belongs with them
-// (joshuafolkken/kit#957).
+// and telling a number that resolves to nothing from a read that failed belongs with them.
 
 // The blocker relations, which REST serves from their own endpoint rather than inside the issue.
 // `gh issue view --json blockedBy` answered them in the same response because GraphQL selects them
-// as a connection; REST needs a second request (joshuafolkken/kit#1024).
+// as a connection; REST needs a second request.
 //
 // One page of a hundred — `FULL_PAGE_QUERY`, the same one every other listing here asks for — where
 // GraphQL asked for `blockedBy(first:50)`, so `nodes` is at least as complete as it was, while
 // `totalCount` comes from the issue's own dependency summary and stays exact whatever the page
-// holds. The endpoint itself is named in `git-gh-api-path.ts`, which the two writes address as well
-// (joshuafolkken/kit#1026).
+// holds. The endpoint itself is named in `git-gh-api-path.ts`, which the two writes address as well.
 //
-// joshuafolkken/kit#1113 split this out for the one caller that may not consult the summary the
-// wrapper below trusts: the summary is GitHub's own count and it can disagree with the listing it
-// counts. Measured on joshuafolkken/kit#1111, whose `issue_dependencies_summary` read
-// `total_blocked_by: 0` while this endpoint returned `#1106` — and re-POSTing that relation was
-// refused with `Target issue has already been taken`, so the relation was real and only the counter
-// was wrong. `epic:next` then called a graph that agreed with itself contradictory and exited 1,
-// which stops an unattended run at its first step with nothing to fix.
+// Split out for the one caller that may not consult the summary the wrapper below trusts: the
+// summary is GitHub's own count and it can disagree with the listing it counts — an
+// `issue_dependencies_summary` can read `total_blocked_by: 0` while this endpoint returns a real
+// relation. Trusting the counter there makes `epic:next` call a graph that agrees with itself
+// contradictory and exit 1, which stops an unattended run at its first step with nothing to fix.
 async function read_blocked_by_listing(
 	issue_number: string,
 	repo?: string,
@@ -48,22 +44,20 @@ async function read_blocked_by_listing(
 // The same relations, with the request skipped when the issue's own summary says the count is zero.
 // That skip is the common case and the one that matters for cost: `epic:bundle` reads relations for
 // the whole open backlog, up to two hundred issues, and every one of those reads names `blockedBy`.
-// Without it the pass would be four hundred requests where `gh` made two hundred — which is why
-// joshuafolkken/kit#1113 left it in place and gave the rare path its own entry point above rather
-// than making every read pay for it.
+// Without it the pass would be four hundred requests instead of two hundred — which is why the rare
+// path has its own entry point above rather than making every read pay for it.
 //
 // A pull request is skipped ahead of that, structurally rather than on a count. It carries no
 // `issue_dependencies_summary` at all, and an absent summary is deliberately not read as a zero — so
 // the numeric skip cannot fire for one, and the endpoint was asked every time. GitHub answers an
 // empty array today, but a 404 there would fail the whole read and `epic:bundle` would report the
-// reference as `unreadable` **before** the `/pull/` check that drops it (joshuafolkken/kit#947) ever
-// ran. The guard rested on API behavior nobody controls; this makes it a fact about pull requests
-// (joshuafolkken/kit#1066).
+// reference as `unreadable` **before** the `/pull/` check that drops it ever
+// ran. The guard rested on API behavior nobody controls; this makes it a fact about pull requests.
 //
 // Exported because the *listings* need exactly this, and for exactly this reason: a listing response
 // carries every row's `issue_dependencies_summary` but no `blockedBy`, so the pickup that asks for
 // the field pays one request per row that declares a blocker and nothing for the rest. A second copy
-// beside the listing requests is the clone `CLAUDE.md` prohibits (joshuafolkken/kit#1025).
+// beside the listing requests is the clone `CLAUDE.md` prohibits.
 async function read_blocked_by(
 	issue_number: string,
 	rest: RestIssue,
@@ -88,7 +82,7 @@ function mark_followup(error: unknown): unknown {
 	return gh_failure.attach(error, { ...failure, is_followup: true })
 }
 
-// The relations, marked as the follow-up request they are (joshuafolkken/kit#1690).
+// The relations, marked as the follow-up request they are.
 //
 // **One read, two requests, one classifier.** The relations endpoint is reached only after the issue
 // itself came back, so by then the number has resolved — and yet the caller catches a single error
@@ -109,8 +103,7 @@ async function read_relations(
 }
 
 // One issue through REST, answered in the field names `gh issue view --json` used. Every read below
-// goes through it, so the request, the field mapping and the blocker relations are decided once
-// (joshuafolkken/kit#1024).
+// goes through it, so the request, the field mapping and the blocker relations are decided once.
 //
 // The blocker request is made **only** when `blockedBy` was asked for — the title, body and
 // labels-and-body reads never name it — and, when it was, only when the issue itself reports a
@@ -136,10 +129,10 @@ async function read_issue_fields(
 // another repository's number quoted in prose — which is an answer rather than a gap. `unreadable`
 // is a gap: a rate limit, expired auth, a dropped connection. Folding the two together had one
 // non-existent number reported as something the command had failed to read, which stops an
-// unattended run for a reference that never existed (joshuafolkken/kit#957).
+// unattended run for a reference that never existed.
 //
-// **`reason` splits the gap into the three answers a caller acts on differently**
-// (joshuafolkken/kit#1690). `unreachable` is retryable — nothing answered, or GitHub answered 429 or
+// **`reason` splits the gap into the three answers a caller acts on differently**.
+// `unreachable` is retryable — nothing answered, or GitHub answered 429 or
 // 5xx — so the same request a moment later can succeed and an unattended run should ask again rather
 // than report the backlog empty. `rejected` is an answer that will not change on its own: expired
 // auth, an org policy, a 403. `malformed` is a response that arrived and could not be used, which is
@@ -161,19 +154,17 @@ type FieldRead = IssueReadFailure | { kind: 'read'; text: string | undefined }
 // not there.
 const NOT_FOUND_STATUS = 404
 
-// Why the read failed, read off **the failed request** rather than off a second one
-// (joshuafolkken/kit#1690).
+// Why the read failed, read off **the failed request** rather than off a second one.
 //
-// joshuafolkken/kit#957 answered this by probing the same path again for its status, and
-// joshuafolkken/kit#1024 kept the probe because gh surfaces a failure as stderr text and classifying
-// by that wording is prose-matching. Both premises held; the conclusion did not. `gh api` writes the
-// **response body** to stdout, and GitHub's own error document carries the status there — so the
-// status was on the failed request all along, and `git-gh-failure.ts` takes it from there.
+// Classifying by gh's stderr wording would be prose-matching, but no second request is needed:
+// `gh api` writes the **response body** to stdout, and GitHub's own error document carries the
+// status there — so the status is on the failed request itself, and `git-gh-failure.ts` takes it
+// from there.
 //
 // **A second request cannot answer about the first.** A connection that dropped for a moment fails
-// the read and answers the probe `reachable`, and the read then keeps the meaning the probe gave it.
-// Removing the probe removes that, and removes the extra request with it: the classification is now
-// free, so `epic:bundle`'s bounded lookup no longer trades accuracy against a rate limit it would
+// the read and answers a probe `reachable`, and the read would then keep the meaning the probe gave
+// it. Reading the failed request avoids that and the extra request with it: the classification is
+// free, so `epic:bundle`'s bounded lookup does not trade accuracy against a rate limit it would
 // deepen.
 //
 // An error carrying no classification at all did not come from the request: `parse_rest_issue` and
@@ -191,7 +182,7 @@ function to_read_failure(error: unknown): IssueReadFailure {
 
 	if (failure === undefined) return { kind: 'unreadable', reason: 'malformed', status: undefined }
 	// Only the request that resolves the number can report it as resolving to nothing. A follow-up
-	// request's own 404 is about that endpoint (joshuafolkken/kit#1690).
+	// request's own 404 is about that endpoint.
 	if (is_number_unresolved(failure)) return { kind: 'missing' }
 
 	return {
@@ -220,8 +211,7 @@ async function issue_view_json_classified(
 //
 // The unwrapped `string | undefined` below is this same read with the reason dropped, rather than a
 // second read that never had one: a caller that only wants the text keeps its signature, and one
-// that has to tell "the body is empty" from "the body could not be read" now can
-// (joshuafolkken/kit#1690).
+// that has to tell "the body is empty" from "the body could not be read" now can.
 async function issue_view_field_classified(
 	issue_number: string,
 	field: string,
@@ -247,12 +237,10 @@ async function issue_view_field(
 	return read.kind === 'read' ? read.text : undefined
 }
 
-// An extracted string arrives raw — nothing quotes it — and an empty answer is not a title
-// (joshuafolkken/kit#993).
+// An extracted string arrives raw — nothing quotes it — and an empty answer is not a title.
 //
 // `repo` reads the title of an issue in another repository — what `josh notify` needs when the
-// `--issue-url` it was given points outside the repository the session runs in
-// (joshuafolkken/kit#903).
+// `--issue-url` it was given points outside the repository the session runs in.
 async function issue_get_title(issue_number: string, repo?: string): Promise<string | undefined> {
 	const result = await issue_view_field(issue_number, 'title', repo)
 
@@ -265,15 +253,14 @@ async function issue_get_body(issue_number: string, repo?: string): Promise<stri
 
 // The body, plus why it produced nothing when it did. An epic's body is the one read whose absence
 // is indistinguishable from a legitimate answer — an epic with no task list and an epic nobody could
-// read both parse to zero children — so the caller that builds the dependency graph takes this one
-// (joshuafolkken/kit#1690).
+// read both parse to zero children — so the caller that builds the dependency graph takes this one.
 async function issue_get_body_classified(issue_number: string, repo?: string): Promise<FieldRead> {
 	return await issue_view_field_classified(issue_number, 'body', repo)
 }
 
 // A JSON view of one issue, for every caller that wants several fields at once. Callers differ only
 // in which fields they ask for, and a helper per field list is how four near-identical functions
-// accumulated (joshuafolkken/kit#862).
+// accumulated.
 //
 // The field list is still spelled the way `gh issue view --json` spelled it, and so is the answer:
 // the translation to and from REST is `git-gh-issue-rest.ts`, so no caller downstream changed.
@@ -289,11 +276,11 @@ async function issue_view_json(
 
 // State, labels and dependency relations in one read: the epic auto-close needs state and relations
 // per child, `epic:next` needs the labels too, and splitting them would multiply the API calls for
-// no gain (joshuafolkken/kit#860).
+// no gain.
 //
 // `repo` reads a child in another repository. Cross-repository children are read this way rather
 // than from a local checkout: their state is a GitHub fact, and requiring a clone to learn it is
-// what kept the auto-close from ever running on such an epic (joshuafolkken/kit#864).
+// what kept the auto-close from ever running on such an epic.
 const STATE_AND_RELATIONS_FIELDS = 'number,state,labels,blockedBy'
 
 async function issue_get_state_and_relations(
@@ -304,8 +291,7 @@ async function issue_get_state_and_relations(
 }
 
 // The same read, plus why it produced nothing when it did. An epic's children are read this way, and
-// an unattended run has to tell a child it could not reach from one it may never reach
-// (joshuafolkken/kit#1690).
+// an unattended run has to tell a child it could not reach from one it may never reach.
 async function issue_get_state_and_relations_classified(
 	issue_number: string,
 	repo?: string,
@@ -325,8 +311,7 @@ function is_unreachable_read(failure: IssueReadFailure): boolean {
 //
 // `epic:bundle` reads a referenced issue through the same call rather than adding a helper for its
 // own field list — it needs the body and the state, which is a subset of this one, and a helper per
-// field list is exactly how the four near-identical functions above accumulated
-// (joshuafolkken/kit#947).
+// field list is exactly how the four near-identical functions above accumulated.
 const PLAN_FIELDS = 'number,title,body,state,url,labels,blockedBy'
 
 async function issue_get_plan_fields(issue_number: string): Promise<string | undefined> {
@@ -336,12 +321,12 @@ async function issue_get_plan_fields(issue_number: string): Promise<string | und
 // The same fields, with a failed read told apart from a number that resolves to nothing.
 // `epic:bundle` reads a reference this way because the two answers belong in different places: a
 // missing number is neither a candidate nor a gap, while an unreadable one is reported so a verdict
-// is never quietly based on data that never arrived (joshuafolkken/kit#957).
+// is never quietly based on data that never arrived.
 async function issue_get_plan_fields_classified(issue_number: string): Promise<IssueRead> {
 	return await issue_view_json_classified(issue_number, PLAN_FIELDS)
 }
 
-// `state` rides along for `epic-add.ts`'s closed-epic refusal (joshuafolkken/kit#2337); every
+// `state` rides along for `epic-add.ts`'s closed-epic refusal; every
 // other caller reads only the labels and body and ignores it, so it costs no extra request.
 async function issue_get_labels_and_body(issue_number: string): Promise<string | undefined> {
 	return await issue_view_json(issue_number, 'number,state,labels,body')
@@ -349,8 +334,7 @@ async function issue_get_labels_and_body(issue_number: string): Promise<string |
 
 // The conversation comments of one issue, as REST serves them. `undefined` — never `'[]'` — when the
 // listing could not be read: the one caller has to tell "this epic carries no closing comment" from
-// "nobody looked", because posting on the second answer is the duplicate it exists to prevent
-// (joshuafolkken/kit#1039).
+// "nobody looked", because posting on the second answer is the duplicate it exists to prevent.
 //
 // Paged, and for the same reason `pr_get_comments` is: REST answers 30 rows and an epic's
 // conversation outgrows that, while the comment being looked for is the **newest** one — so an
@@ -380,8 +364,7 @@ async function issue_list_comments(issue_number: string): Promise<string | undef
 // than read off `gh`'s stderr wording, because classifying by the message is prose-matching.
 //
 // **This one could read the failed request instead, and deliberately does not** — its caller reaches
-// it from a `catch`, where the error it holds already carries `gh_failure` since
-// joshuafolkken/kit#1690. What is asked here is not "why did that request fail" but "does this
+// it from a `catch`, where the error it holds already carries `gh_failure`. What is asked here is not "why did that request fail" but "does this
 // endpoint exist on this host", and the answer has to hold for a `read_blocked_by_listing` that
 // failed for some other reason entirely. Reusing the caught failure would fold the two questions
 // into one.
@@ -394,17 +377,17 @@ async function has_no_relations_endpoint(issue_number: string, repo?: string): P
 }
 
 // The blocker numbers of one issue, read from the relations listing rather than from the issue's own
-// summary count (joshuafolkken/kit#1113). Exposed on the command object so the callers that need the
+// summary count. Exposed on the command object so the callers that need the
 // uncounted answer reach it the way they reach every other read, and so a suite that already fakes
 // the command layer does not fall through to a real `gh api`.
 //
 // A 404 is answered as no relations rather than raised. `read_blocked_by` never reaches this
-// endpoint for a pull request — joshuafolkken/kit#1066 skips one structurally, since a PR carries no
+// endpoint for a pull request — it skips one structurally, since a PR carries no
 // `issue_dependencies_summary` to skip on — and this entry point has no issue payload to make that
 // judgement from. A PR pasted into an epic's task list would otherwise turn a read of an endpoint
 // that has nothing for it into a warning about a relation nobody lost. Every other failure still
 // raises: a rate limit is a gap, and the caller says so.
-// The same relations, each carrying the repository it lives in (joshuafolkken/kit#1126). A
+// The same relations, each carrying the repository it lives in. A
 // `blocked-by` relation may cross a repository, and a number alone cannot say which one it names —
 // issue numbers are unique per repository — so a caller that orders work has to keep the pair.
 //

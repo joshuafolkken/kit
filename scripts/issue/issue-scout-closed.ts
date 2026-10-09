@@ -6,11 +6,11 @@ import { z } from 'zod'
 import { EPIC_LABEL, has_any_label } from './issue-labels'
 import type { ScoutIssue } from './issue-scout'
 
-// The closed half of `issue:scout`'s duplicate scan (joshuafolkken/kit#1679), held apart from the CLI
-// so the command that reports the scan and the one that files after it (`issue:file`,
-// joshuafolkken/kit#2808) read one listing rather than two.
+// The closed half of `issue:scout`'s duplicate scan, held apart from the CLI
+// so the command that reports the scan and the one that files after it (`issue:file`) read one
+// listing rather than two.
 
-// How far back the closed half of the scan reaches (joshuafolkken/kit#1679). One page: the duplicate
+// How far back the closed half of the scan reaches. One page: the duplicate
 // this half exists to catch closed hours ago, not months, and the listing is ordered by update so
 // the newest hundred already covers a run's own day several times over.
 //

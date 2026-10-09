@@ -3,11 +3,11 @@ import { z } from 'zod'
 
 // The status checks kit's distributed workflows report, keyed by the workflow that reports them —
 // the single source `josh ruleset:check` and `josh doctor` compare a repository's required status
-// checks against (joshuafolkken/kit#3012). Each name is the job's `name:`, the string a ruleset's
+// checks against. Each name is the job's `name:`, the string a ruleset's
 // required check is matched by; `required-checks-logic.test.ts` reads it back off the workflows.
 //
-// `E2E` belongs here even though `josh followup` deliberately does not wait on it
-// (joshuafolkken/kit#991): a ruleset counts a skipped job as passing, and the job is skipped when the
+// `E2E` belongs here even though `josh followup` deliberately does not wait on it:
+// a ruleset counts a skipped job as passing, and the job is skipped when the
 // project has no E2E suite, so requiring it never blocks a merge — it only refuses a red one.
 interface WorkflowChecks {
 	workflow: string

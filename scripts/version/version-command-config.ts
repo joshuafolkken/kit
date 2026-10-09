@@ -44,7 +44,7 @@ interface UpstreamHookContext {
 //
 // `is_global_upgrade_command_pinned` declares that the command only pins versions and does not force
 // a fresh dependency resolve. Kit can then prove the command is a no-op once every version it pins is
-// already installed, and replaces the dead `Run:` hint with an explanation (#697). Leave it unset for
+// already installed, and replaces the dead `Run:` hint with an explanation. Leave it unset for
 // a command that re-resolves (e.g. `pnpm remove -g <pkg> && pnpm add -g <pkg>@<latest>`): such a
 // command changes the graph even when its pin is already installed, so it must never be suppressed.
 interface UpstreamEffectiveHooks {
@@ -140,7 +140,7 @@ function resolve_upstream(descriptor: UpstreamDescriptor): UpstreamVersionConfig
 // Resolve the config's versions endpoint: derive it from the package name when omitted, or reject an
 // explicitly-supplied blank endpoint up front. This fails fast at build time so a mis-built config
 // can never carry an empty endpoint down to `fetch_latest_version`, where it would surface as an
-// opaque `gh api` failure (see the game-kit#395 diagnosis behind this guard).
+// opaque `gh api` failure.
 function resolve_versions_endpoint(options: VersionCommandConfigOptions): string {
 	const { versions_endpoint, package_name } = options
 	if (versions_endpoint === undefined) return derive_versions_endpoint(package_name)

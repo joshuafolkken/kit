@@ -13,16 +13,16 @@ const telegram_environment_schema = z.object({
 	telegram_chat_id: z.string().min(1, { message: 'TELEGRAM_CHAT_ID is required' }),
 })
 
-// **`warning` is not `failure`** (joshuafolkken/kit#1628). It names a run that finished and merged,
+// **`warning` is not `failure`**. It names a run that finished and merged,
 // alongside something that did not work — a post-merge cleanup step that could not complete is one.
 // Sending `failure` (❌) there would say the merge failed, which is false and is
 // the more expensive lie of the two; sending `completion` (✅) twice says nothing went wrong, which
 // is the silence this type exists to end.
-// **`stalled` is not `warning`** (joshuafolkken/kit#2359). `warning` names a run that *finished* and
+// **`stalled` is not `warning`**. `warning` names a run that *finished* and
 // merged alongside something that did not work; a stall is the opposite — the run is alive and has not
 // finished, it has simply stopped advancing while ready work waits for a free lane. The ⏳ icon says
 // exactly that: not done, not broken, just not moving.
-// **`stranded` is not `stalled`** (joshuafolkken/kit#2375). A stall is a *live* run that is not
+// **`stranded` is not `stalled`**. A stall is a *live* run that is not
 // dispatching; a strand is the step before it — the run's own driver is gone. The session that cut the
 // budget handed it off and died, no successor claimed it, and no supervisor is watching, so nothing can
 // take the next step at all. The 🚨 icon says a run needs a hand, not that ready work is merely waiting.
@@ -84,9 +84,8 @@ function parse_environment_string(value: string | undefined): string {
 // so it would pull a subprocess concern into an HTTP one and degrade to exactly this line anyway.
 // **The `cause` is read, not only the message.** A `fetch` rejection's own message is the bare string
 // `fetch failed`; what says whether this was DNS, a refused connection or a timeout lives one level
-// down. Reporting the top line alone would exit non-zero with nothing a reader can act on, which is
-// half of what joshuafolkken/kit#1564 set out to fix. Redaction runs over the joined text, so the
-// deeper line is covered exactly as the top one is.
+// down. Reporting the top line alone would exit non-zero with nothing a reader can act on.
+// Redaction runs over the joined text, so the deeper line is covered exactly as the top one is.
 function join_cause(error: Error): string {
 	const { cause } = error
 
@@ -116,17 +115,14 @@ function describe_symptom(error: unknown): string {
 
 // The request URL carries the bot token in its own path, so an error raised anywhere near the
 // request can carry a credential into a log. Both values are taken out of the text before it leaves
-// this module, so no caller has to remember to do it (joshuafolkken/kit#1564).
+// this module, so no caller has to remember to do it.
 function redact_credentials(text: string, config: TelegramConfig): string {
 	return text.split(config.bot_token).join(REDACTED).split(config.chat_id).join(REDACTED)
 }
 
-// **Missing credentials are a failure, not a skip** (joshuafolkken/kit#1564). This used to warn and
-// return `undefined`, and `send` then returned quietly — so a run with no credentials was
-// indistinguishable from one whose notification arrived. Until this Issue the mandatory
-// `--env-file=.env` flag on `josh notify` and `josh followup` made a machine without that file die
-// before node started, which was loud by accident; with the flag relaxed to the optional form, this
-// is where the noise has to come from instead.
+// **Missing credentials are a failure, not a skip**: a run with no credentials that returned quietly
+// would be indistinguishable from one whose notification arrived. `josh notify` and `josh followup`
+// load `.env` only optionally, so this is where the noise has to come from.
 //
 // The message names the variables and never their values — the schema's own messages are the
 // variable names, so nothing read out of the environment reaches it.
@@ -145,10 +141,10 @@ function load_config(): TelegramConfig {
 	return { bot_token: result.data.telegram_bot_token, chat_id: result.data.telegram_chat_id }
 }
 
-// **An explicit opt-out is not a missing credential** (joshuafolkken/kit#2821). A consumer who never
-// meant to use Telegram had no way to say so, so every stop printed the #1564 failure as noise. Only
-// the stated value `off` disables the send: an unset or mistyped switch still falls through to
-// `load_config`, so a forgotten setup stays the loud failure #1564 made it.
+// **An explicit opt-out is not a missing credential**: a consumer who never means to use Telegram
+// says so, rather than seeing the missing-credential failure on every stop. Only the stated value
+// `off` disables the send: an unset or mistyped switch still falls through to `load_config`, so a
+// forgotten setup stays a loud failure.
 function is_notify_disabled(): boolean {
 	return parse_environment_string(process.env[NOTIFY_SWITCH_KEY]).toLowerCase() === NOTIFY_OFF_VALUE
 }
@@ -206,10 +202,9 @@ function head_of(body: string, kept: number): string {
 	return TRAILING_HIGH_SURROGATE.test(head) ? head.slice(0, -1) : head
 }
 
-// **The body is cut to fit Telegram's length limit, keeping its head** (joshuafolkken/kit#3242). A
-// warning carrying a whole driver stderr ran past 4096 characters and was refused with `400 Bad
-// Request`, so it reached nobody. A caller puts the cause first, so the tail is what is dropped, and the
-// header and the URLs around the body survive.
+// **The body is cut to fit Telegram's length limit, keeping its head**: a text past the limit is
+// refused with `400 Bad Request` and reaches nobody. A caller puts the cause first, so the tail is
+// what is dropped, and the header and the URLs around the body survive.
 function build_text(input: TelegramSendInput): string {
 	const text = join_blocks(input)
 	const overflow = text.length - TELEGRAM_TEXT_LIMIT
@@ -232,7 +227,7 @@ async function post_message(config: TelegramConfig, text: string): Promise<void>
 	}
 }
 
-// **The cause is re-wrapped rather than passed through** (joshuafolkken/kit#1564). The chain is kept,
+// **The cause is re-wrapped rather than passed through**. The chain is kept,
 // because a symptom error that drops its cause loses where the failure came from — but the original
 // is the one object on this path nothing has redacted, and `git_error.handle` prints a cause's own
 // message straight to the console. Both layers therefore carry the same already-redacted text.
@@ -243,9 +238,8 @@ function build_send_failure(error: unknown, config: TelegramConfig): Error {
 }
 
 // **The strict form.** A caller whose whole job is the notification has nothing left to report when
-// this fails, so it throws and `pnpm josh notify` exits non-zero. joshuafolkken/kit#1564 measured
-// the state this replaces: three notifications lost to a `504 Gateway Time-out`, each one printing a
-// warning and exiting 0, so a message that reached nobody looked exactly like one that arrived.
+// this fails, so it throws and `pnpm josh notify` exits non-zero — a warning and exit 0 would make a
+// message that reached nobody look exactly like one that arrived.
 //
 // The failure it throws carries a `cause`, and that cause is redacted too — see `build_send_failure`.
 //
@@ -274,13 +268,12 @@ async function send(input: TelegramSendInput): Promise<void> {
 
 // **The tolerant form**, for a caller whose job is something other than the notification.
 // `followup` sends the completion message on its way to the merge, and a gateway timeout at
-// Telegram is not a reason to leave a reviewed, green pull request unmerged — joshuafolkken/kit#1564
-// measured exactly that 504 with six lanes running at once. So the failure is reported and the run
-// carries on.
+// Telegram is not a reason to leave a reviewed, green pull request unmerged. So the failure is
+// reported and the run carries on.
 //
 // **Reported under `❗` on stderr, in its own block, with the caller's own recovery line** — the bar
-// joshuafolkken/kit#1539 set for a step that failed and was not allowed to end the run. The `⚠️`
-// this used to print is what every routine notice prints, which is how the failure got buried.
+// for a step that failed and was not allowed to end the run. A `⚠️` is what every routine notice
+// prints, so the failure would be buried under one.
 //
 // `recovery` is the caller's because only the caller knows one. It is `string | undefined` and not
 // optional for the reason `CleanupStep.recovery` is: a caller with no command that finishes the job
@@ -328,7 +321,7 @@ interface WarningInput {
 /**
  * Warn that something an unattended run depended on did not work.
  *
- * **One function rather than one per caller** (joshuafolkken/kit#1749). Every warning fills in the
+ * **One function rather than one per caller**. Every warning fills in the
  * same four fields the same way — the task type, the repository looked up under the same bound, and
  * two urls that are never known here — so a second caller composing its own would be free to drift
  * on the one field that is not obvious: a repository lookup with no timeout hangs the warning behind
@@ -356,8 +349,7 @@ interface ConfirmInput {
 
 /**
  * Push the ⏸️ confirmation type — a state change an unattended run made that a person now has to act
- * on, a `backlogrun` that stopped needing a decision being the one this was written for
- * (joshuafolkken/kit#2136).
+ * on, a `backlogrun` that stopped needing a decision being the one this was written for.
  *
  * **One function rather than one per caller, for `warn`'s reason exactly**: the repository lookup
  * under a timeout is the field a second caller composing the four itself would drift on, and a lookup
@@ -386,8 +378,8 @@ interface StalledInput {
 }
 
 /**
- * Push the ⏳ stalled type — ready backlog work with a free lane that nothing has dispatched for a while
- * (joshuafolkken/kit#2359). Off-screen is the whole point: the state is invisible on the terminal until
+ * Push the ⏳ stalled type — ready backlog work with a free lane that nothing has dispatched for a while.
+ * Off-screen is the whole point: the state is invisible on the terminal until
  * a person asks, so it reaches them where they are not watching.
  *
  * **`warn`'s shape exactly** — the repository looked up under the shared bound, the tolerant
@@ -415,8 +407,8 @@ interface StrandedInput {
 }
 
 /**
- * Push the 🚨 stranded type — a run whose driver is gone and which nothing can advance
- * (joshuafolkken/kit#2375). Off-screen is the whole point, as it is for `stalled`: the state is
+ * Push the 🚨 stranded type — a run whose driver is gone and which nothing can advance.
+ * Off-screen is the whole point, as it is for `stalled`: the state is
  * invisible on the terminal because the session that would show it has died, so the person hears about
  * it where they are not watching, rather than by asking.
  *
@@ -441,7 +433,7 @@ async function stranded(input: StrandedInput): Promise<boolean> {
 
 /**
  * Push the 📊 progress type — one `run:board` frame a person asked to receive periodically off-screen
- * with `run:board --every` (joshuafolkken/kit#3569). Never a heartbeat: nothing sends it unasked.
+ * with `run:board --every`. Never a heartbeat: nothing sends it unasked.
  *
  * **`stranded`'s shape exactly**, with the board's own one-frame answer as the recovery — a frame lost
  * to a Telegram timeout is read again by asking for it.

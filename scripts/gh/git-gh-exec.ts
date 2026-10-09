@@ -7,10 +7,10 @@ import { gh_failure } from './git-gh-failure'
 
 const BODY_FROM_STDIN = '-'
 
-// The budget for **one** request through this layer, and the reason nothing here waits forever
-// (joshuafolkken/kit#1065). Every GitHub access kit makes funnels through the four entries below, so
-// until this existed a single hung `gh` held the caller open with no upper bound — most visibly in
-// `josh propagate`, whose runner is single-threaded and processed no further consumer at all.
+// The budget for **one** request through this layer, and the reason nothing here waits forever.
+// Every GitHub access kit makes funnels through the four entries below, so without it a single hung
+// `gh` would hold the caller open with no upper bound — most visibly in `josh propagate`, whose
+// runner is single-threaded and would process no further consumer at all.
 //
 // **It is a request's budget, not a step's.** `STEP_TIMEOUT_MS` (30 minutes, `propagate-steps.ts`)
 // covers a consumer's whole unit suite and a `pnpm add`; one REST call has no business borrowing
@@ -33,7 +33,7 @@ const BODY_FROM_STDIN = '-'
 //
 // **What a timed-out read costs its caller is decided by that caller, and two are worth naming.**
 // In the merge gate's poll loop (`wait_for_pr_success`) it is one unreadable poll: the loop retries
-// on its next interval and gives up on the third consecutive failure (joshuafolkken/kit#1077), so a
+// on its next interval and gives up on the third consecutive failure, so a
 // timeout, a 403, a rate limit and a dropped connection all end the wait loudly rather than hanging
 // or reading as a verdict, and re-running `followup` resumes it. In `followup`'s look-ahead it costs
 // a log line: `handle_watch_failure` absorbs the error and falls through to the polling.
@@ -59,22 +59,22 @@ function to_timeout_option(timeout_ms?: number): { timeout: number } {
 	return { timeout: timeout_ms ?? GH_REQUEST_TIMEOUT_MS }
 }
 
-// **`gh` dials GitHub directly, never through a proxy this machine stood up on loopback**
-// (joshuafolkken/kit#2436). A package-manager wrapper writes one into the environment of everything
+// **`gh` dials GitHub directly, never through a proxy this machine stood up on loopback**.
+// A package-manager wrapper writes one into the environment of everything
 // its invocation spawns, and it exists to inspect package downloads — api.github.com crosses it
-// without inspection, so the hop buys nothing and can fail on its own: measured on
-// joshuafolkken/kit#2422, one 30-second stall made the wrapper refuse every later GitHub connection
-// of that `followup`, and the retries in the poll loop could only ever fail. The loopback test and
-// the list of spellings are the agent-session launcher's (joshuafolkken/kit#1760), shared rather than
+// without inspection, so the hop buys nothing and can fail on its own: one 30-second stall makes the
+// wrapper refuse every later GitHub connection of that `followup`, and the retries in the poll loop
+// can then only ever fail. The loopback test and
+// the list of spellings are the agent-session launcher's, shared rather than
 // restated. Only the scanner's proxy goes — recognized by its CA — because any other loopback proxy
 // may be this machine's only route out; a proxy naming a real host is somebody's network and stays.
 // Nothing is spread when there is nothing to remove, so a spawn outside such a wrapper keeps its
 // options exactly as they were.
 //
 // **It is exported for the one spawn that is not a REST request** — `josh start`'s `gh repo create`
-// step (`start-exec.ts`). Every `gh api` request goes through the entries below since
-// joshuafolkken/kit#2901, which `gh-subcommand-guard.test.ts` enforces, and
-// `git-gh-exec-proxy.test.ts` still refuses a `gh api` spawn that does not spread it.
+// step (`start-exec.ts`). Every `gh api` request goes through the entries below, which
+// `gh-subcommand-guard.test.ts` enforces, and `git-gh-exec-proxy.test.ts` still refuses a `gh api`
+// spawn that does not spread it.
 interface DirectEnvironment {
 	env?: Record<string, undefined>
 }
@@ -92,7 +92,7 @@ interface SpawnOptions extends DirectEnvironment {
 
 // `cwd` is spread in only when given: `{owner}/{repo}` in a path is resolved from the checkout gh
 // runs in, so a caller pinned to the project root says so, and every other caller keeps inheriting
-// the process's own directory exactly as before.
+// the process's own directory.
 function to_spawn_options(timeout_ms?: number, cwd?: string): SpawnOptions {
 	return {
 		...to_timeout_option(timeout_ms),
@@ -103,10 +103,10 @@ function to_spawn_options(timeout_ms?: number, cwd?: string): SpawnOptions {
 
 // What a request that ran out of time is labelled with, ahead of whatever gh managed to write.
 //
-// The distinction is joshuafolkken/kit#1048's, on a new failure: "the server said no" and "nobody
-// ever got an answer" are different diagnoses, and a timeout is the second. execa names it on the
-// error it throws, and without the prefix a hang that had written a line to stderr first would
-// arrive as that line — reported as whatever it happened to say instead of as a timeout.
+// "The server said no" and "nobody ever got an answer" are different diagnoses, and a timeout is
+// the second. execa names it on the error it throws, and without the prefix a hang that had written
+// a line to stderr first would arrive as that line — reported as whatever it happened to say
+// instead of as a timeout.
 const GH_REQUEST_TIMEOUT_MESSAGE = 'gh request timed out'
 
 function has_stderr_field(error: unknown): error is Error & { stderr: string } {
@@ -120,26 +120,24 @@ function has_stdout_field(error: unknown): error is Error & { stdout: string } {
 }
 
 // `has_timed_out` is shared with the push transport rather than restated here: execa marks a spawn
-// it killed the same way whichever binary was spawned, and `git push` gained a budget of its own in
-// joshuafolkken/kit#1251.
+// it killed the same way whichever binary was spawned, and `git push` has a budget of its own.
 function to_timeout_prefix(error: unknown): string {
 	return has_timed_out(error) ? `${GH_REQUEST_TIMEOUT_MESSAGE}: ` : ''
 }
 
-// Surface the gh CLI's stderr as the thrown message when present (matching the previous spawn
-// behavior), otherwise fall back to execa's own message — **and append what gh wrote to stdout**.
+// Surface the gh CLI's stderr as the thrown message when present, otherwise fall back to execa's
+// own message — **and append what gh wrote to stdout**.
 //
 // The append is not cosmetic. `gh api` splits a failed request across both streams: stderr carries
 // one summary line (`gh: Validation Failed (HTTP 422)`) and **stdout carries the JSON error body**,
-// which is the only place the reason is written. Every caller here is now a REST request, so
-// dropping stdout dropped the diagnosis from every REST failure — and `handle_pr_create_error`
-// reads the reason: a duplicate pull request is `A pull request already exists for <owner>:<branch>.`
-// inside that body, and matching it against stderr alone answers no (measured on
-// joshuafolkken/kit#1029).
+// which is the only place the reason is written. Every caller here is a REST request, so dropping
+// stdout would drop the diagnosis from every REST failure — and `handle_pr_create_error` reads the
+// reason: a duplicate pull request is `A pull request already exists for <owner>:<branch>.` inside
+// that body, and matching it against stderr alone answers no.
 //
 // The same stdout is what carries the request's own failure nature, so the classification is
 // attached here rather than reconstructed by a later probe: GitHub's error document names its status
-// and a request that never arrived wrote no document at all (joshuafolkken/kit#1690).
+// and a request that never arrived wrote no document at all.
 function to_gh_error(error: unknown): Error {
 	const stderr = has_stderr_field(error) ? error.stderr.trim() : ''
 	const stdout = has_stdout_field(error) ? error.stdout.trim() : ''
@@ -210,24 +208,22 @@ function status_of_failure(error: unknown): number | undefined {
 // The HTTP status of one `gh api` request, read from the status line rather than from `gh`'s error
 // text. A message is prose that can be reworded between releases; the status code is the protocol,
 // so a caller distinguishing "there is nothing at that number" (404) from "the read failed" (403,
-// 429, 5xx) is matching a contract instead of a string (joshuafolkken/kit#957).
+// 429, 5xx) is matching a contract instead of a string.
 //
 // `--silent` drops the response body, so only the headers are parsed; `--include` keeps them even
 // when the request failed, and execa carries that output on the error it throws. `undefined` means
 // no status was reached at all — gh missing, a dropped connection — which is itself a failed read.
 //
-// **The fifth spawn in this file, and guarded like the other four** (joshuafolkken/kit#1065). It is
-// not one of the entries joshuafolkken/kit#1065 enumerated, and that is exactly why it is included:
-// leaving one unbounded `gh` spawn beside four bounded ones is the inconsistency that Issue argues
-// against, in the same file. Its contract is unchanged — a timeout reaches the `catch` and answers
-// `undefined`, which already means "no status was reached", which its one caller already reads as a
-// failed read rather than as a 404.
+// **The fifth spawn in this file, and guarded like the other four**: leaving one unbounded `gh`
+// spawn beside four bounded ones would be an inconsistency in the same file. A timeout reaches the
+// `catch` and answers `undefined`, which already means "no status was reached", which its one
+// caller already reads as a failed read rather than as a 404.
 async function exec_gh_api_status(path: string, timeout_ms?: number): Promise<number | undefined> {
 	// Hoisted so the spawn below fits on one line, which `// NOSONAR` requires — it suppresses only
 	// the line it sits on. The **argument list** stays an inline literal for the opposite reason:
 	// `gh-subcommand-guard.ts` resolves the subcommand from it, and hoisting that into a `const`
 	// makes the scan report `<dynamic>` instead of `api`, leaving a future edit to
-	// `['issue', 'view', …]` uncaught (joshuafolkken/kit#1063).
+	// `['issue', 'view', …]` uncaught.
 	const options = to_spawn_options(timeout_ms)
 
 	try {
@@ -241,7 +237,7 @@ async function exec_gh_api_status(path: string, timeout_ms?: number): Promise<nu
 }
 
 // The synchronous twin of `exec_gh_api_status`, for `epic-cross-repo.ts`, whose resolver is
-// synchronous all the way up to `epic_classify` (joshuafolkken/kit#2901). Same request, same
+// synchronous all the way up to `epic_classify`. Same request, same
 // answer: the status line, or `undefined` when no status was reached. It cannot run
 // `check_gh_installed`, which awaits — a missing gh is a spawn that throws without stdout, so it
 // answers `undefined`, which is what that check would have led to anyway.
@@ -280,7 +276,7 @@ const JQ_FLAG = '--jq'
 // this field exists for: `--paginate` alone emits one document per page, so a two-page response
 // arrives as `{…}{…}`, which `JSON.parse` rejects, and `--slurp` wraps those pages in one outer
 // array instead. It is a separate field rather than implied by `should_paginate` for that reason,
-// and because gh refuses it alongside `--jq` (joshuafolkken/kit#1027).
+// and because gh refuses it alongside `--jq`.
 interface GhApiRequest {
 	path: string
 	method?: string
@@ -289,9 +285,9 @@ interface GhApiRequest {
 	should_slurp?: boolean
 	jq_filter?: string
 	// The budget for this one request, overriding `GH_REQUEST_TIMEOUT_MS`. A field rather than a
-	// second argument for the reason recorded beside that constant (joshuafolkken/kit#1065). `0` is
+	// second argument for the reason recorded beside that constant. `0` is
 	// execa's own "no budget", kept for the one reader whose caller's writes depend on the answer
-	// (`gh-spawn.ts`, joshuafolkken/kit#805).
+	// (`gh-spawn.ts`).
 	timeout_ms?: number
 	// The checkout gh runs in, which is what `{owner}/{repo}` in `path` resolves against. Absent means
 	// the process's own directory.
@@ -319,8 +315,8 @@ function to_gh_api_args(request: GhApiRequest): Array<string> {
 }
 
 // The response body of one `gh api` request, as text. Every REST caller that can await one goes
-// through it, so the verb, the body and the paging stop being spelled out per call site
-// (joshuafolkken/kit#1023). A caller that cannot await uses `exec_gh_api_sync` or
+// through it, so the verb, the body and the paging stop being spelled out per call site.
+// A caller that cannot await uses `exec_gh_api_sync` or
 // `read_gh_api_sync` below.
 //
 // Failure handling funnels through `to_gh_error` on both paths below, so a failed request throws
@@ -344,12 +340,11 @@ async function exec_gh_api(request: GhApiRequest): Promise<string> {
 // consumer's steps as a sequential chain of `execaSync` spawns with inherited stdio, and that shape
 // reaches from `open_issue` up through `RunStep`, `run_target` and `run_targets` — so the issue it
 // opens in the consumer is created here rather than by turning the whole runner asynchronous for
-// one request (joshuafolkken/kit#1042).
+// one request.
 //
-// It began as the write side's synchronous entry; since joshuafolkken/kit#2901 the synchronous
-// readers — `gh-spawn.ts`, `epic-cross-repo.ts`, `repo-setting.ts`, `propagate-publish.ts`,
-// `version-remote.ts` — go through it too, rather than each spelling its own `execaSync('gh', …)`
-// with its own error handling, timeout and proxy handling.
+// It serves the write side and the synchronous readers alike — `gh-spawn.ts`, `epic-cross-repo.ts`,
+// `repo-setting.ts`, `propagate-publish.ts`, `version-remote.ts` go through it rather than each
+// spelling its own `execaSync('gh', …)` with its own error handling, timeout and proxy handling.
 //
 // **It is the same layer, not a second one.** The argument builder and the error translation are
 // shared with the asynchronous path above, so `--input -` for the body, `--jq` for the unwrap, and

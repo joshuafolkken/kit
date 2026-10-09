@@ -1,7 +1,6 @@
 import { git_spawn } from './git-spawn'
 
-// What `josh main:merge` refuses before it merges, and what it tells the run to do instead
-// (joshuafolkken/kit#2445).
+// What `josh main:merge` refuses before it merges, and what it tells the run to do instead.
 //
 // **A dirty tree is not refused as such.** The chain runs `main:merge` before the commit, over the
 // uncommitted implementation, and git carries uncommitted changes through a merge that touches none of

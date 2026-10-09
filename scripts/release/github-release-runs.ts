@@ -85,7 +85,7 @@ async function is_release_over(source: RunSource, tag: string): Promise<boolean>
 }
 
 // A lower tag whose publication failed, or finished while no release run is left at work on it,
-// never gains a release: a tag cut before joshuafolkken/kit#3138 was fixed would hold every later one.
+// never gains a release, so waiting on it would hold every later one.
 async function is_release_lost(source: RunSource, tag: string): Promise<boolean> {
 	if (source.workflow === undefined) return false
 

@@ -10,11 +10,11 @@ import { baseline_measure, type Baseline } from './baseline-measure'
 import { session_cite } from './session-cite'
 
 // `josh measure:rerun <N>` — read a behavior-change Issue body after merge, re-run each baseline
-// command, and print the before/after pair (joshuafolkken/kit#2212). A value that did not move means
+// command, and print the before/after pair. A value that did not move means
 // the premise the rule rested on is refuted, so a line is appended to the observation ledger — reusing
 // that append-only, same-key mechanism rather than a second one.
 //
-// **The baseline is shell, and the body is written by whoever filed the Issue** (joshuafolkken/kit#3064).
+// **The baseline is shell, and the body is written by whoever filed the Issue**.
 // A baseline needs pipes and loops (`git log … | wc -l`, `for d in $(ls …)`), so an allow-list of
 // commands cannot make it safe; what can is who wrote it. The input is therefore the Issue number, not
 // a file, so the author's `author_association` arrives with the body from the same REST read, and only
@@ -72,7 +72,7 @@ async function append_ledger(lines: ReadonlyArray<string>, now: Date): Promise<v
 	if (lines.length === 0) return
 
 	// The running work tree's file for the checked-out issue, a lane's inside a lane — the run's own
-	// commit carries it (joshuafolkken/kit#2919).
+	// commit carries it.
 	const ledger_path = await observation_ledger_home.writer_path(now)
 
 	await observation_ledger_home.append(ledger_path, lines)

@@ -4,7 +4,7 @@ import { git_spawn } from '#scripts/git/git-spawn'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { review_diff_parts, type DiffParts } from './review-diff-parts'
 
-// Writes the change as the parts `review-diff-parts.ts` cuts it into (joshuafolkken/kit#2963).
+// Writes the change as the parts `review-diff-parts.ts` cuts it into.
 //
 // **One diff per path, read the way the target line defines the change** — `git -C <root> diff
 // <base> -- <path>` for a tracked path, and the file's own content for an untracked one, which no

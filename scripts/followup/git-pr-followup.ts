@@ -45,7 +45,7 @@ function build_telegram_input(input: {
 
 // The sibling issue URL of a pull request: same repository, the number this run is closing. Read
 // through the shared parser rather than a second pattern here, so the two cannot disagree about what
-// a github.com URL looks like (joshuafolkken/kit#994).
+// a github.com URL looks like.
 function build_issue_url(
 	pr_url: string | undefined,
 	issue_number: string | undefined,
@@ -65,7 +65,7 @@ interface FollowupInput {
 	ai_review_ignore_reason: string | undefined
 	is_skip_watch: boolean
 	should_merge: boolean
-	// The pull request merged before this run (joshuafolkken/kit#3023): only the tail is left to run.
+	// The pull request merged before this run: only the tail is left to run.
 	is_merged?: boolean | undefined
 	// When it merged — a completion report posted before it is the `prrun` stop's, not this tail's.
 	merged_at?: string | undefined
@@ -77,9 +77,9 @@ function has_closes_keyword(body: string | undefined): boolean {
 	return parse_closes_issue_number(body) !== undefined
 }
 
-// **Returns the number it warned about the absence of** (joshuafolkken/kit#1539). The issue number
-// used to reach the notification from the command line alone, so an invocation that omitted it threw
-// after the merge had already landed. This stage reads the pull request body anyway, and that body
+// **Returns the number it warned about the absence of**. Taking the issue number from the command
+// line alone would make an invocation that omitted it throw after the merge had already landed. This
+// stage reads the pull request body anyway, and that body
 // carries the number in its `closes #N` keyword — so the read the warning already makes is what
 // recovers it, at no extra request.
 async function warn_if_missing_closes(branch_name: string): Promise<string | undefined> {
@@ -99,7 +99,7 @@ async function warn_if_missing_closes(branch_name: string): Promise<string | und
 }
 
 // **The one read of the four that can depend on another.** Without an issue number on the command
-// line it is the pull request body that names it (joshuafolkken/kit#1539), so the title read waits
+// line it is the pull request body that names it, so the title read waits
 // for exactly that one and for nothing else. With a number in hand the `??` short-circuits and the
 // promise is never awaited at all, which is what lets this read go out in the same tick as the other
 // three.
@@ -119,7 +119,7 @@ interface RunContext {
 	context: TelegramContext
 }
 
-// **The four reads in front of the check wait are issued together** (joshuafolkken/kit#1446). Not one
+// **The four reads in front of the check wait are issued together**. Not one
 // of them is a wait on anything: the `closes #N` check reads the pull request body, and the
 // notification needs the repository name, the issue title and the pull request URL — four requests
 // that were sent one at a time for 5.5 of `followup`'s measured 45.8 seconds, purely because they
@@ -158,7 +158,7 @@ async function read_run_context(input: {
 	}
 }
 
-// The pending count replaces the project version line (joshuafolkken/kit#1486): children no longer
+// The pending count replaces the project version line: children no longer
 // bump, so the local `package.json` names the previous release rather than what this run ships.
 // A count that could not be read contributes no line at all, rather than a zero nobody measured.
 async function notify_completion(
@@ -170,7 +170,7 @@ async function notify_completion(
 	const lines = pending_line === undefined ? skip_notes : [pending_line, ...skip_notes]
 	const body = lines.join('\n')
 
-	// **The tolerant send** (joshuafolkken/kit#1564): this runs on the way to the merge, so a Telegram
+	// **The tolerant send**: this runs on the way to the merge, so a Telegram
 	// gateway timeout must not leave a reviewed, green pull request unmerged. The failure is reported
 	// under `❗` and the run carries on.
 	//
@@ -212,10 +212,10 @@ async function run_comment_scans(
 	return [...comment_notes, ...ai_review_notes]
 }
 
-// **The managed config-file read runs first, ahead of the check wait** (joshuafolkken/kit#1578). It
+// **The managed config-file read runs first, ahead of the check wait**. It
 // reads the branch diff and nothing else, so its answer is in hand before CI is waited on at all.
-// Since joshuafolkken/kit#1592 that answer stops nothing — it is a report — but the position is kept:
-// a read this cheap belongs beside the other things decided from the diff.
+// That answer stops nothing — it is a report — but a read this cheap belongs beside the other things
+// decided from the diff.
 //
 // **It laps no stage of its own.** The printed stage sequence is asserted as an exact list, and a
 // diff read this cheap is not what a measurement of `followup` is looking for; its cost lands inside
@@ -223,7 +223,7 @@ async function run_comment_scans(
 //
 // **The managed report comes back beside the notes as well as inside them**, because the two have
 // different destinations: every note reaches the completion notification, and this one alone also
-// reaches the completion report posted to the Issue (joshuafolkken/kit#1592). Returning it twice is
+// reaches the completion report posted to the Issue. Returning it twice is
 // what lets `run_stages` hand each destination what belongs to it without re-deriving the answer.
 async function run_review_checks(
 	input: FollowupInput,
@@ -249,7 +249,7 @@ async function run_review_checks(
 	return { notes: [...managed, ...check_notes, ...scan_notes], managed }
 }
 
-// **A tail re-run after a merge does not report twice** (joshuafolkken/kit#3023): where the issue
+// **A tail re-run after a merge does not report twice**: where the issue
 // already carries this pull request's completion report, the Telegram is skipped here and the comment
 // in the wrapup. Answers whether it was recorded, so the wrapup skips on the same read.
 async function notify_unless_recorded(
@@ -269,7 +269,7 @@ async function notify_unless_recorded(
 	return is_recorded
 }
 
-// **Answers with the issue number the run actually used** (joshuafolkken/kit#1539), which is the one
+// **Answers with the issue number the run actually used**, which is the one
 // the invocation named or, failing that, the one the pull request body closes. Everything downstream
 // takes it from here rather than from the input, so the Telegram context, the completion comment and
 // the epic close all name the same issue — and so the caller's own tail can record a run whose number
@@ -300,8 +300,8 @@ async function run_stages(input: FollowupInput, log: StageLog): Promise<string |
 	return issue_number
 }
 
-// **The stage block is printed on the way out of every run, failed ones included**
-// (joshuafolkken/kit#1349). A `followup` that exits non-zero on an AI-review blocker or a red check is
+// **The stage block is printed on the way out of every run, failed ones included**.
+// A `followup` that exits non-zero on an AI-review blocker or a red check is
 // the invocation whose wait was longest, and one that printed nothing would leave the measurement
 // blind to exactly those. The `catch` marks the lap that was still running so the failing stage is
 // reported rather than dropped, and rethrows unchanged — a silent run is still a failed run.

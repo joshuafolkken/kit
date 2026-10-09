@@ -6,7 +6,7 @@ import { lane_install } from '#scripts/lane/lane-install'
 import { lane_leftover } from '#scripts/lane/lane-leftover'
 import { lane_paths } from '#scripts/lane/lane-paths'
 
-// The dedicated linked work tree `pnpm josh release` runs inside (joshuafolkken/kit#2411). The whole
+// The dedicated linked work tree `pnpm josh release` runs inside. The whole
 // point is that the release never touches the root checkout: it is cut fresh from
 // `origin/<default>` as the `release/v<version>` branch, the version bump / commit / push all happen
 // there, and it is removed whichever way the run ends. That lets a release run beside a `backlogrun`
@@ -35,8 +35,8 @@ async function remove(directory: string, branch_name: string): Promise<void> {
 	await git_worktree.branch_delete(branch_name)
 }
 
-// **The dependency install is not optional, and disabling the hook is not the way around it**
-// (joshuafolkken/kit#2411). The release commit goes through lefthook's pre-commit, which runs
+// **The dependency install is not optional, and disabling the hook is not the way around it**.
+// The release commit goes through lefthook's pre-commit, which runs
 // `pnpm exec` / `pnpm josh`, and a sibling work tree has no `node_modules` above it — so the tree
 // needs its own, installed the same way a lane's is. A failed install cleans up the tree it created
 // rather than leaving debris, then reports what git printed.
@@ -54,7 +54,7 @@ async function install_or_clean(directory: string, branch_name: string): Promise
 // add --no-track -b release/v<version> <dir> origin/<default>`, which `worktree_add` already spells
 // when it is given a start point.
 //
-// **A failed add takes back the branch it made** (joshuafolkken/kit#3058). `git worktree add -b`
+// **A failed add takes back the branch it made**. `git worktree add -b`
 // creates the branch before it looks at the path, so an add refused for a path that already exists
 // still leaves `release/v<version>` behind — and the next run's branch guard then refuses that name
 // as a release already opened. The guard ran before this call and found no such branch, so one
@@ -80,7 +80,7 @@ async function create(branch_name: string): Promise<string> {
 	return directory
 }
 
-// **A run that never reached its `finally` leaves its tree and branch behind** (joshuafolkken/kit#3058)
+// **A run that never reached its `finally` leaves its tree and branch behind**
 // — a Ctrl-C, a closed terminal — and every later release then fails on them until a person removes
 // both by hand. They are cleared here only when clearing loses nothing: a release branch origin does
 // not have and that carries no commit beyond `origin/<default>`. Uncommitted edits in the tree are

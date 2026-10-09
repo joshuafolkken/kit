@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_spawn } from './git-spawn'
 
-// The pre-push hook, run ahead of the push instead of inside it (joshuafolkken/kit#3300).
+// The pre-push hook, run ahead of the push instead of inside it.
 //
 // **The push budget is a transfer budget, and a hook is not a transfer.** `PUSH_TIMEOUT_MS` was read
 // off what moving objects costs here, but `git push` runs the pre-push hook first and the budget

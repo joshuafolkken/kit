@@ -1,6 +1,6 @@
 import { git_command } from './git-command'
 
-// **The change base as a commit, or nothing — never a ref name** (joshuafolkken/kit#1537).
+// **The change base as a commit, or nothing — never a ref name**.
 //
 // `git_command.change_base` degrades to the default-branch *name* when `merge-base` cannot answer,
 // and a name moves. Any reader that stores one reading and compares it against a later one — the

@@ -5,7 +5,7 @@ import { release_age } from './release-age'
 // *unpinned* resolution, so anything resolved without an explicit version stops one or more releases
 // short of `latest`. Reporting that as a bare `⚠ → <latest>` is indistinguishable from an install the
 // user forgot to upgrade — and it recurs after every successful upgrade, because the newest release
-// is by definition the youngest (joshuafolkken/kit#808).
+// is by definition the youngest.
 //
 // **The window binds unpinned resolution only.** Measured on pnpm 11.22.0 with
 // `minimumReleaseAge: 1440` and a release published 3.5 h earlier:
@@ -14,7 +14,7 @@ import { release_age } from './release-age'
 //   pnpm add pkg          ->  1.78.0   (the newest release past the window)
 //
 // So a pinned `Run:` hint always works and is never suppressed. What the window actually holds back
-// is peer resolution — the mechanism behind an upstream's effective install (joshuafolkken/kit#698),
+// is peer resolution — the mechanism behind an upstream's effective install,
 // which is why this explanation is attached there and nowhere else.
 
 const MINUTES_PER_HOUR = 60

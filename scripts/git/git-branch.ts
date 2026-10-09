@@ -135,7 +135,7 @@ const git_branch = {
 	check_and_create_branch,
 	is_mismatch,
 	// Exported so a lane's branch name can be checked against the real matcher rather than against a
-	// second copy of the pattern (joshuafolkken/kit#1497). A copy is what let `lane/<N>` ship: nothing
+	// second copy of the pattern. A copy is what let `lane/<N>` ship: nothing
 	// asserted that the name `lane:open` writes is one this function accepts.
 	has_same_issue_prefix,
 	issue_from_branch,

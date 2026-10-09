@@ -7,7 +7,7 @@ import { split_assess, type SplitVerdict } from '#scripts/split/split-assess'
 import { issue_fold, type FoldVerdict } from './issue-fold'
 
 // `josh issue:fold "<title>" "<title>" …` — before a run files a second finding, answer whether the
-// findings this session holds fold into one Issue (joshuafolkken/kit#2213).
+// findings this session holds fold into one Issue.
 //
 // It is the filing-time counterpart to `split:assess`: the size half is that command's own verdict,
 // called rather than recomputed (the counting and the guide live in `split-assess.ts`), and
@@ -52,10 +52,10 @@ function read_arguments(argv: ReadonlyArray<string>): FoldArguments | undefined 
 	}
 }
 
-// The size half, single-sourced from `split:assess` (joshuafolkken/kit#2183): the same counting, the
+// The size half, single-sourced from `split:assess`: the same counting, the
 // same guide. `undefined` when the diff says nothing about size — no changed non-test file, or a diff
 // that cannot be read (no base, not a checkout) — which `fold_verdict` answers as `undetermined`
-// rather than folding on no evidence (joshuafolkken/kit#3423). `issue:file` asks it too.
+// rather than folding on no evidence. `issue:file` asks it too.
 async function size_verdict(): Promise<SplitVerdict | undefined> {
 	try {
 		const measurement = split_assess.assess(await git_command.diff_main_numstat())

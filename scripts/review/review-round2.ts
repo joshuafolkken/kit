@@ -2,27 +2,21 @@ import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { path_decision } from '#scripts/josh/path-decision'
 import { review_level } from './review-level'
 
-// Whether the second review round runs at all (joshuafolkken/kit#1433).
+// Whether the second review round runs at all.
 //
-// **Every previous measure narrowed round 2; this one asks whether it is due.** joshuafolkken/kit#1219
-// redefined its question, joshuafolkken/kit#1241 carried that question into the forked agent, and
-// `prompts/review.md` → "The narrowing is real in scope and does not show in the wall clock" recorded
-// that neither moved the wall clock. Those records answer "narrow round 2"; none of them answers "do
-// not run it", because none measured a run that skipped one.
+// **Narrowing round 2 does not show in the wall clock** (`prompts/review.md` → "The narrowing is real
+// in scope and does not show in the wall clock"), so this asks whether it is due at all.
 //
-// **The two arms are the two states in which joshuafolkken/kit#1222's reason does not arise.** That
-// issue's conclusion is that round 2 exists because round 1's *fix code* is unreviewed, and that this
-// is structural. Arm A applies where there is no fix code — the findings closed without an edit — so
+// **The two arms are the two states in which round 2's reason does not arise.** Round 2 exists
+// because round 1's *fix code* is unreviewed, and that is structural. Arm A applies where there is no fix code — the findings closed without an edit — so
 // the premise is absent rather than overridden. Arm B applies where the fix code neither executes,
 // nor instructs, nor ships, which is `review-level.ts`'s inert set: the same three ways a defect in
 // this repository escapes, read here for the fix delta instead of the whole change.
 //
-// **The wider line the issue proposed — "the fix delta touches no runtime code path" — is not
-// adopted**, and the evidence against it is already in this directory. `review-level.ts` records that
-// joshuafolkken/kit#963 and #965 were documentation-only diffs in which a `medium` review found ten
-// real defects each — dangling pointers and citations naming the wrong file, in artifacts distributed
-// to every consumer — that no test covered. A prompt fix and a test fix are exactly where the review
-// is the only detector, so exempting them would remove the round in the case it earns its keep.
+// **The wider line — "the fix delta touches no runtime code path" — is not adopted**: as
+// `review-level.ts` records, documentation-only diffs carry real defects no test covers. A prompt
+// fix and a test fix are exactly where the review is the only detector, so exempting them would
+// remove the round in the case it earns its keep.
 
 type RoundTwoVerdict = 'required' | 'skip'
 
@@ -44,7 +38,7 @@ const BASE_MOVED_REASON =
 	'the change base moved since round 1 was recorded, so the two file maps do not cover the same set of paths and their difference is not the fix delta — the round runs rather than reading that difference as one'
 
 interface RoundTwoInput {
-	// **The commit the tree above is a diff against** (joshuafolkken/kit#1537). This decision reads the
+	// **The commit the tree above is a diff against**. This decision reads the
 	// same digest comparison the brief's round-2 target does, so it inherits the same failure: taken
 	// against two different bases, the two maps do not cover the same set of paths, and an empty or
 	// inert-looking delta is then no evidence at all about what round 1 fixed. Here that evidence buys
@@ -68,11 +62,9 @@ interface RoundTwoDecision {
 }
 
 // **The snapshot's own timestamp travels with the answer**, the way `review-brief.ts` prints it
-// beside a round-2 target. An empty delta used to have two readings — round 1 wrote no fix code, or
-// the record was retaken after the fixes by a bare `josh review:brief` — and the digests cannot tell
-// them apart, so joshuafolkken/kit#1441 closed the second one at the source: the record is written
-// once per run and kept thereafter, which leaves "round 1 wrote no fix code" as the only reading of
-// an empty delta. The timestamp stays in the reason because a record can still **outlive** its run —
+// beside a round-2 target. The record is written once per run and kept thereafter, so a bare
+// `josh review:brief` cannot retake it after the fixes, which leaves "round 1 wrote no fix code" as
+// the only reading of an empty delta. The timestamp stays in the reason because a record can still **outlive** its run —
 // `josh followup` is what clears it — and a delta measured from an earlier run's record is wider
 // rather than narrower, which a reader can only see from when that record was taken.
 function empty_reason(taken_at: string): string {

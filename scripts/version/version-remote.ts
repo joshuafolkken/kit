@@ -8,7 +8,7 @@ import { release_age } from './release-age'
 // The endpoint's default page is a single entry, so it is widened to the API's maximum rather than
 // paged through: a page that cannot span the window resolves no aged release at all, which silently
 // drops the explanation and leaves the unexplained `⚠` this exists to remove. At the maximum, a
-// week-long window still needs more than 14 releases a day to overflow (joshuafolkken/kit#808).
+// week-long window still needs more than 14 releases a day to overflow.
 const TIMES_PAGE_SIZE = 100
 // Reduce the endpoint's version objects to the version → publish-date map the selector expects.
 const TIMES_JQ = '[.[] | {(.name): .created_at}] | add'
@@ -43,7 +43,7 @@ function read_github_name(endpoint: string, package_name: string): string {
 }
 
 // Refused at the source, as public npm's answer is: the value goes into an install command, so
-// anything but a semver version is never passed on (joshuafolkken/kit#3266).
+// anything but a semver version is never passed on.
 function read_github_latest(endpoint: string, package_name: string): string {
 	const name = read_github_name(endpoint, package_name)
 	const version = npm_registry.valid_version(name)
@@ -55,7 +55,7 @@ function read_github_latest(endpoint: string, package_name: string): string {
 }
 
 // Fetch the latest published version: public npm's `latest` dist-tag first, which needs no
-// credentials (joshuafolkken/kit#2882), then the GitHub Packages versions endpoint for a package
+// credentials, then the GitHub Packages versions endpoint for a package
 // public npm does not answer for. The endpoint is supplied per package (e.g.
 // `/users/joshuafolkken/packages/npm/kit/versions?per_page=1`) so the same fetcher serves kit, jgame,
 // and app-kit. Guards an undefined/empty endpoint before either source is asked.
@@ -90,7 +90,7 @@ function read_github_release_times(versions_endpoint: string): Record<string, st
 
 // Publish timestamps for the package's recent releases, or nothing. Unlike `fetch_latest_version`
 // this never throws: the timestamps only enrich an explanation, so a package whose history cannot be
-// read keeps the report it had before (joshuafolkken/kit#808). Read in the same source order as
+// read keeps the report it had before. Read in the same source order as
 // the latest, so the hold is explained against the registry `latest` came from.
 function fetch_release_times(
 	versions_endpoint: string | undefined,

@@ -4,17 +4,16 @@ import { git_gh_helpers } from './git-gh-helpers'
 import { git_gh_pr_rest, type RestPull } from './git-gh-pr-rest'
 import { to_gh_state } from './git-gh-rest-state'
 
-// Reading pull requests through REST, in the answers `gh pr view` used to give.
+// Reading pull requests through REST, in the answers `gh pr view` gives.
 //
-// `gh pr view` goes through GraphQL, which a cloud session is answered 403 for (joshuafolkken/kit#1022).
+// `gh pr view` goes through GraphQL, which a cloud session is answered 403 for.
 // The reads move to `gh api`, and every caller downstream keeps the contract it already reads — the
 // empty string from `pr_view`, `undefined` from the two comment readers. `pr_exists` is the one
 // exception, and it is deliberate: it gates a **write**, so a lookup that failed cannot answer
-// `false` there (joshuafolkken/kit#1043).
+// `false` there.
 //
 // One thing has no counterpart in REST: `gh pr view` accepted a **branch name** and every REST
-// endpoint is keyed by **number**. The resolution below is the single place that bridges the two
-// (joshuafolkken/kit#1027).
+// endpoint is keyed by **number**. The resolution below is the single place that bridges the two.
 
 // The branch → number resolution, remembered for the life of the process.
 //
@@ -35,22 +34,21 @@ const pr_number_by_branch = new Map<string, number>()
 // most recent one" while this ordering holds.
 const LOOKUP_QUERY = 'state=all&sort=created&direction=desc&per_page=100'
 // The comment listings are paged: REST answers 30 rows by default, while `gh pr view --json comments`
-// answered the whole conversation. Truncating them is the kit#973 failure again in another form — the
-// newest Claude Review blocker falls off a listing that is ordered oldest first, and the merge gate
-// finds nothing to stop on. `gh api --paginate` merges the pages of an array endpoint into one array,
-// so the answer stays the flat listing every caller parses. The page size itself is
-// `FULL_PAGE_QUERY`, shared with the merge-gate listings (joshuafolkken/kit#1028).
+// answers the whole conversation. Truncating them lets the merge gate pass on a listing it never
+// fully read — the newest Claude Review blocker falls off a listing that is ordered oldest first,
+// and the merge gate finds nothing to stop on. `gh api --paginate` merges the pages of an array
+// endpoint into one array, so the answer stays the flat listing every caller parses. The page size
+// itself is `FULL_PAGE_QUERY`, shared with the merge-gate listings.
 const COMMENTS_QUERY = FULL_PAGE_QUERY
 // Written as a constant rather than inline: `{owner}` inside a template literal reads as a broken
 // interpolation.
 const OWNER_PLACEHOLDER = '{owner}'
 // What a branch-keyed caller that cannot fold an absence into its own answer throws. Lives here
 // rather than beside either caller: the merge-gate snapshot and the two branch-keyed writes all need
-// it, and three copies of one message is the clone `CLAUDE.md` prohibits (joshuafolkken/kit#1029).
+// it, and three copies of one message is the clone `CLAUDE.md` prohibits.
 const NO_PULL_REQUEST_MESSAGE = 'gh api found no pull request for branch'
 // And what it throws when the lookup never answered at all. Separate from the message above because
-// the two are different diagnoses: one says the branch has nothing, the other says nobody looked
-// (joshuafolkken/kit#1048).
+// the two are different diagnoses: one says the branch has nothing, the other says nobody looked.
 const UNREADABLE_PULL_REQUEST_MESSAGE = 'gh api could not read the pull requests for branch'
 
 // `head` names the owner of the head repository, which for every branch this tooling opens is the
@@ -74,15 +72,15 @@ async function fetch_pr_number(branch_name: string): Promise<number | undefined>
 // auth, a dropped connection, a 200 carrying something other than a listing.
 //
 // The vocabulary is `IssueRead`'s in `git-gh-issue-read.ts`, which tells the same two apart for an
-// issue number (joshuafolkken/kit#957); reusing it rather than inventing a second spelling for one
+// issue number; reusing it rather than inventing a second spelling for one
 // distinction is the point. The *classification* is cheaper here and needs no status probe: a branch
 // with no pull request is a 200 with an empty listing rather than a 404, so the lookup's own outcome
-// already separates them (joshuafolkken/kit#1048).
+// already separates them.
 interface PullMergeState {
 	is_merged: boolean
 	merged_at: string | undefined
 	head_sha: string | undefined
-	// `josh ship` reads `DIRTY` here to re-merge a conflicting pull request (joshuafolkken/kit#3221).
+	// `josh ship` reads `DIRTY` here to re-merge a conflicting pull request.
 	merge_state_status: string | undefined
 }
 
@@ -90,15 +88,15 @@ type PullNumberRead =
 	{ kind: 'read'; pr_number: number } | { kind: 'missing' } | { kind: 'unreadable'; cause: unknown }
 
 // The branch-keyed detail read, in the same three answers. `missing` and `unreadable` are the
-// resolution's own; `unreadable` also covers a resolved number whose detail read failed, which every
-// branch-keyed reader used to fold into "no pull request" (joshuafolkken/kit#3263).
+// resolution's own; `unreadable` also covers a resolved number whose detail read failed, so no
+// branch-keyed reader folds it into "no pull request".
 type PullRead = Exclude<PullNumberRead, { kind: 'read' }> | { kind: 'read'; pull: RestPull }
 
 // The lookups still in flight, keyed the same way the resolved numbers are.
 const pending_pr_number_by_branch = new Map<string, Promise<PullNumberRead>>()
 
-// The detail reads, keyed by number and remembered for the life of the command
-// (joshuafolkken/kit#3263). `josh followup` asks `pr_get_body` and `pr_get_url` in one tick — the
+// The detail reads, keyed by number and remembered for the life of the command.
+// `josh followup` asks `pr_get_body` and `pr_get_url` in one tick — the
 // same `GET /pulls/{N}` each time. The promise is stored, so readers in one tick share the request as
 // well as its answer; a read that fails is dropped and re-tried, the rule the number memo holds.
 // **Every write to a pull request clears it** through `forget_pr_numbers`, and the two state readers
@@ -119,7 +117,7 @@ async function fetch_pr_number_read(branch_name: string): Promise<PullNumberRead
 	}
 }
 
-// **The lookup in flight is shared, not only the number it resolves to** (joshuafolkken/kit#1446).
+// **The lookup in flight is shared, not only the number it resolves to**.
 // The memo above answers a caller arriving *after* the first lookup returned, which was every caller
 // while the branch-keyed reads were issued one at a time. `josh followup` now asks `pr_get_body` and
 // `pr_get_url` about the same branch in the same tick, and two callers that both miss an empty map
@@ -170,22 +168,21 @@ async function resolve_pr_number(branch_name: string): Promise<number | undefine
 }
 
 // One definition, because both callers that refuse to fold an unreadable lookup raise it —
-// `require_pr_number` and `pr_exists` (joshuafolkken/kit#1043).
+// `require_pr_number` and `pr_exists`.
 function to_unreadable_error(branch_name: string, cause: unknown): Error {
 	return new Error(`${UNREADABLE_PULL_REQUEST_MESSAGE}: ${branch_name}`, { cause })
 }
 
 // The number for a caller that has nothing to fold an absence into. The reads above answer their own
 // empty value for a branch with no pull request; a write cannot — `gh pr comment <branch>` and
-// `gh pr merge <branch>` both failed there, and the merge-gate snapshot already threw for the same
-// reason. One throw shared by all three (joshuafolkken/kit#1029).
+// `gh pr merge <branch>` both fail there, and the merge-gate snapshot throws for the same reason.
+// One throw shared by all three.
 //
-// **This is the caller the distinction was written for.** Folding both into
-// `NO_PULL_REQUEST_MESSAGE` reported a rate-limited lookup as "there is no pull request for this
-// branch" — safe, in that the run stops without merging, but wrong about why, which is the
-// joshuafolkken/kit#973 misread costing diagnosis time instead of correctness. The failure travels as
-// the `cause`, so `git_error.handle` prints gh's own reason under 💡 Details
-// (joshuafolkken/kit#1048).
+// **This is the caller the distinction matters most for.** Folding both into
+// `NO_PULL_REQUEST_MESSAGE` would report a rate-limited lookup as "there is no pull request for this
+// branch" — safe, in that the run stops without merging, but wrong about why, which costs diagnosis
+// time instead of correctness. The failure travels as
+// the `cause`, so `git_error.handle` prints gh's own reason under 💡 Details.
 async function require_pr_number(branch_name: string): Promise<number> {
 	const read = await read_pr_number(branch_name)
 	if (read.kind === 'read') return read.pr_number
@@ -239,13 +236,13 @@ async function read_pull_or_undefined(branch_name: string): Promise<RestPull | u
 	return read.kind === 'read' ? read.pull : undefined
 }
 
-// **`false` means the branch has no pull request, and nothing else.** This is the second half of
-// joshuafolkken/kit#1048's distinction, on the caller that needs it most: `pr_exists` is not read for
-// display, it decides whether `git-pr.ts` **opens** a pull request. Folding an unreadable lookup into
-// `false` therefore made a rate-limited run try to create a second pull request on a branch that
-// already had one — surviving only because `pr_create`'s 422 → `PR_ALREADY_EXISTS` recovery caught it
-// (joshuafolkken/kit#1029), which is an accident rather than a design. The throw is the one
-// `require_pr_number` raises, so gh's own reason travels as the `cause` (joshuafolkken/kit#1043).
+// **`false` means the branch has no pull request, and nothing else.** This is the same
+// missing-versus-unreadable distinction, on the caller that needs it most: `pr_exists` is not read
+// for display, it decides whether `git-pr.ts` **opens** a pull request. Folding an unreadable lookup
+// into `false` would make a rate-limited run try to create a second pull request on a branch that
+// already has one — surviving only if `pr_create`'s 422 → `PR_ALREADY_EXISTS` recovery caught it,
+// which is an accident rather than a design. The throw is the one
+// `require_pr_number` raises, so gh's own reason travels as the `cause`.
 async function pr_exists(branch_name: string): Promise<boolean> {
 	const read = await read_pr_number(branch_name)
 	if (read.kind === 'unreadable') throw to_unreadable_error(branch_name, read.cause)
@@ -264,12 +261,12 @@ async function pr_get_url(branch_name: string): Promise<string | undefined> {
 	return git_gh_helpers.parse_pr_state_string(pull.html_url)
 }
 
-// **Where the branch's pull request stands** — a merge a person made by hand included
-// (joshuafolkken/kit#3023): whether it merged and when, and the commit its head is on, which a push
+// **Where the branch's pull request stands** — a merge a person made by hand included:
+// whether it merged and when, and the commit its head is on, which a push
 // made on GitHub moves without touching the local branch. `undefined` covers both "no pull request"
 // and "nothing could be read": `followup` then takes its ordinary path, whose merge step settles a
 // pull request that did merge after all (`pr_merge`), so an unread answer costs a wait, not a wrong tail.
-// Read past the detail memo: `josh ship` asks it again after each merge it pushes (joshuafolkken/kit#3263).
+// Read past the detail memo: `josh ship` asks it again after each merge it pushes.
 async function pr_get_merge_state(branch_name: string): Promise<PullMergeState | undefined> {
 	const read = await read_pull_of_branch(branch_name, read_pull)
 	if (read.kind !== 'read') return undefined
@@ -283,8 +280,8 @@ async function pr_get_merge_state(branch_name: string): Promise<PullMergeState |
 	}
 }
 
-// REST answers JSON null for a pull request with no body where `gh --json body` answered an empty
-// string, and both used to arrive here as the empty answer this folds to `undefined`.
+// REST answers JSON null for a pull request with no body where `gh --json body` answers an empty
+// string; both are the empty answer this folds to `undefined`.
 async function pr_get_body(branch_name: string): Promise<string | undefined> {
 	const pull = await read_pull_or_undefined(branch_name)
 	const body = pull?.body
@@ -295,7 +292,7 @@ async function pr_get_body(branch_name: string): Promise<string | undefined> {
 // The empty string means "this branch has no pull request", and nothing else. A read that failed
 // throws, carrying gh's reason as the `cause`: `git-pr.ts` decides from this state whether the
 // branch's pull request merged, and a rate limit answered as "no state" sent a merged pull request
-// down the open one's path (joshuafolkken/kit#3263). Read past the detail memo, like the merge state.
+// down the open one's path. Read past the detail memo, like the merge state.
 async function pr_view(branch_name: string): Promise<string> {
 	const read = await read_pull_of_branch(branch_name, read_pull)
 	if (read.kind === 'unreadable') throw to_unreadable_error(branch_name, read.cause)
@@ -305,11 +302,11 @@ async function pr_view(branch_name: string): Promise<string> {
 }
 
 // `undefined` when the listing could not be read — a failed request, or a PR whose number could not
-// be resolved. Not `'[]'`, which every failure used to become.
+// be resolved. Not `'[]'`.
 //
-// The two are the same string to a caller, and the callers are the merge gate: a rate limit arrived
-// as "no reviewer left a finding" and the PR merged with the gate never actually read
-// (joshuafolkken/kit#973). The direction is what makes it worse than the epic auto-close's version of
+// The two are the same string to a caller, and the callers are the merge gate: a rate limit would
+// arrive as "no reviewer left a finding" and the PR merge with the gate never actually read.
+// The direction is what makes it worse than the epic auto-close's version of
 // the same misread — that one only failed to close something.
 async function read_comments(
 	branch_name: string,
@@ -332,7 +329,7 @@ function to_comments_json(raw: string): string {
 }
 
 // `git-pr-coderabbit.ts` parses `html_url` and `user.login` itself, so the review thread is handed on
-// as REST serves it (joshuafolkken/kit#1023).
+// as REST serves it.
 function as_served(raw: string): string {
 	return raw
 }
@@ -360,8 +357,7 @@ const git_gh_pr_read = {
 
 // The merge-gate snapshot needs the same branch → number resolution and the same detail read, and it
 // needs them separately: the reviews endpoint is keyed by number while the rollup is keyed by the
-// head commit the detail carries. Exported rather than re-derived so the memo above stays one memo
-// (joshuafolkken/kit#1028).
+// head commit the detail carries. Exported rather than re-derived so the memo above stays one memo.
 export type { PullMergeState }
 export {
 	git_gh_pr_read,

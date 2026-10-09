@@ -5,8 +5,7 @@ import { git_command } from '#scripts/git/git-command'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
 
-// The tree `josh review:brief` records: every path the change touches, and the digest of its content
-// (joshuafolkken/kit#1241).
+// The tree `josh review:brief` records: every path the change touches, and the digest of its content.
 //
 // The path list is `#scripts/git/changed-paths`', the same reading `josh review:level` decides from
 // — a second definition of "changed" would let the brief describe a different change from the level
@@ -33,11 +32,11 @@ function digest_of(root: string, relative: string): string {
 // stored stamp be compared against a fresh reading without a normalization step in between.
 //
 // **The observation ledger is left out of the map**, for the reason `hook-gate-reuse.ts` drops it from
-// the status it reads: it is no code any check runs (joshuafolkken/kit#1756). Kept in, a review's line
+// the status it reads: it is no code any check runs. Kept in, a review's line
 // appended after the gate moved the map, so the ledger commit `pnpm josh followup` pushes carried a
 // tree the record no longer matched — the pre-push hook re-ran the whole unit suite inside the push's
 // 120-second budget, the timed-out push was retried over the still-running suite, and the commit's
-// undo then moved the tree under both (joshuafolkken/kit#2998). Filtered here, every reader of the map
+// undo then moved the tree under both. Filtered here, every reader of the map
 // — the gate's record, both hooks, the brief and the round-2 fix delta — agrees on it.
 function tree_of(root: string, paths: ReadonlyArray<string>): Record<string, string> {
 	const sorted = paths
@@ -54,7 +53,7 @@ function tree_of(root: string, paths: ReadonlyArray<string>): Record<string, str
 // say the gate had verified an arbitrarily edited tree, and `--round 2` would report an empty fix
 // delta. **A defect that answers "all clear" is the one shape this record cannot take**, which is why
 // the root is resolved rather than assumed (measured from `scripts/`: 18 of 25 entries `absent`).
-// The observation ledger is dropped inside `tree_of`, above (joshuafolkken/kit#3017).
+// The observation ledger is dropped inside `tree_of`, above.
 async function read_changed_tree(
 	paths?: ReadonlyArray<string>,
 	root?: string,

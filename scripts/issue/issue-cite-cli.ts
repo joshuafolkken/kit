@@ -8,12 +8,12 @@ import { z } from 'zod'
 import { issue_cite, type CiteTarget } from './issue-cite'
 
 // `josh issue:cite <N> [<N> ...] [--repo <owner/repo>]` — the paste-ready citation line for every
-// Issue named, in one call (joshuafolkken/kit#2220).
+// Issue named, in one call.
 //
-// It answers the cost that made the bare `#N` cheaper than the correct citation: the title each line
-// needs used to be a per-Issue `gh api` read, and naming several Issues at once — a backlog listing, a
-// lane status report — meant several round trips before a single correct line could be written. The
-// numbers go in together and the titles come back together, so the correct form is now the cheap one.
+// It answers the cost that makes the bare `#N` cheaper than the correct citation: a per-Issue
+// `gh api` read for each title means several round trips before a single correct line of a backlog
+// listing or lane status report can be written. The numbers go in together and the titles come back
+// together, so the correct form is the cheap one.
 //
 // **A token that is not a number refuses the whole invocation**, exactly as `issue:read` does: an
 // argument the parser cannot read is a mistake, and dropping it answers fewer Issues than were asked

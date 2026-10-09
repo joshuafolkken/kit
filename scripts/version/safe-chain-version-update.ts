@@ -6,7 +6,7 @@ import { execaSync } from 'execa'
 const SAFE_CHAIN_PKG = '@aikidosec/safe-chain'
 
 // The registry's answer is trusted only as an exact semver version: it ends up in workflow files and
-// in the installer URL (joshuafolkken/kit#3266).
+// in the installer URL.
 function fetch_latest_version(): string | undefined {
 	const result = execaSync('npm', ['view', SAFE_CHAIN_PKG, 'version'], {
 		reject: false,
@@ -18,8 +18,8 @@ function fetch_latest_version(): string | undefined {
 }
 
 // The hash-verified installer pinned in the workflows is the one place a safe-chain release is
-// recorded; `preinstall` no longer names one (joshuafolkken/kit#3269). Every repository moves the
-// files that carry the pin — app-kit's own `dast.yml` / `load.yml` included (joshuafolkken/kit#2830).
+// recorded; `preinstall` no longer names one. Every repository moves the
+// files that carry the pin — app-kit's own `dast.yml` / `load.yml` included.
 function sync(): void {
 	const latest = fetch_latest_version()
 

@@ -16,18 +16,18 @@ import {
 	type RollupCheck,
 } from './git-pr-checks-parse'
 
-// The bounded look at a pull request's checks that `gh pr checks <branch> --watch` used to give.
+// The bounded look at a pull request's checks that `gh pr checks <branch> --watch` gives.
 //
 // **`--watch` is a streaming call and REST has no counterpart** — it holds the connection open and
-// redraws a table as each check settles, which no sequence of `gh api` requests reproduces
-// (joshuafolkken/kit#1022). What it is *used* for does have one: `git-pr-followup.ts` discards its
+// redraws a table as each check settles, which no sequence of `gh api` requests reproduces.
+// What it is *used* for does have one: `git-pr-followup.ts` discards its
 // result entirely, so the answer its one caller needs is "did the checks settle within two minutes",
 // which the poll loop in `git-pr-checks.ts` already computes. No new loop is written here; this is
-// that loop with a two-minute budget (joshuafolkken/kit#1028).
+// that loop with a two-minute budget.
 //
-// **`git-pr.ts` was the second caller until joshuafolkken/kit#1232.** It read only `timed_out`, and
-// `followup` restarted the same wait the moment it returned — so the watch there was the same answer
-// waited for twice, and `pnpm josh git` now returns as soon as the pull request is open.
+// **`git-pr.ts` does not call this.** It would read only `timed_out`, and `followup` restarts the
+// same wait the moment it returns — the same answer waited for twice — so `pnpm josh git` returns as
+// soon as the pull request is open.
 //
 // **What is lost is the live table.** `gh` printed each check's name and state as it changed; the
 // poll prints `Checking PR status… (n/N)` instead. The trade is accepted because the display was
@@ -49,12 +49,12 @@ interface WatchResult {
 
 // **The watch asks a weaker question than the merge gate, and that difference is load-bearing.**
 // `evaluate_pr_state` answers `success` only for a pull request that is *mergeable*: `CLEAN` merge
-// state, every required check green, no change request standing. `gh pr checks --watch` knew nothing
-// about any of that — it waited for the checks and exited non-zero if one failed. Handing the watch
+// state, every required check green, no change request standing. `gh pr checks --watch` knows
+// nothing about any of that — it waits for the checks and exits non-zero if one fails. Handing the watch
 // the merge gate's verdict would break it on a repository that requires an approving review, where
 // `mergeable_state` is `blocked`: the watch could never succeed, so it would report "CI still
 // running" over a green build, and a standing change request would end it non-zero on something the
-// old watch ignored outright.
+// `--watch` ignores outright.
 //
 // **An empty rollup is `pending`, not `failure`** — deliberately, and it is the one place the watch
 // answers differently on the first poll than at the end. `followup` starts this right after the
@@ -62,12 +62,12 @@ interface WatchResult {
 // there would end the run red on a perfectly healthy one. Whether the branch really has no checks is
 // asked once, after the budget runs out — see `pr_checks_watch`.
 
-// Temporary (kit#753): CodeRabbit blocks nothing end to end, so a look-ahead that waits on it waits
+// Temporary: CodeRabbit blocks nothing end to end, so a look-ahead that waits on it waits
 // for something no verdict downstream reads. Its commit status posts `Review queued` within seconds
-// of the pull request opening and stays pending for the whole review — thirteen minutes on PR #1211
-// — so counting it as pending spent the entire two-minute budget on **every** run and then ended in
-// the timeout note, before the merge gate applied kit#753's exemption and merged anyway
-// (joshuafolkken/kit#1217). The name comes from `is_coderabbit_check`, the one predicate the merge
+// of the pull request opening and stays pending for the whole review, often well past the budget —
+// so counting it as pending would spend the entire two-minute budget on **every** run and end in the
+// timeout note, before the merge gate merges anyway under the CodeRabbit non-blocking exemption.
+// The name comes from `is_coderabbit_check`, the one predicate the merge
 // gate's exemption is also written in terms of, so the two cannot drift apart.
 //
 // **Only the *pending* reading is dropped.** A CodeRabbit check that has already failed still makes
@@ -114,7 +114,7 @@ function describe_checks_failure(snapshot: PrStateSnapshot): string {
 
 // **The watch never reads `review_decision`**, so the poll must not spend a request fetching it. It
 // is the same difference `evaluate_checks_settled` is written for, said to the fetcher instead of to
-// the verdict: three requests a poll rather than four (joshuafolkken/kit#1043).
+// the verdict: three requests a poll rather than four.
 function should_never_read_review_decision(): boolean {
 	return false
 }
@@ -141,7 +141,7 @@ async function watch_until_settled(branch_name: string): Promise<void> {
 
 // `gh pr checks` exited non-zero for a branch with no checks at all just as it did for a failed one,
 // and `git-pr-followup.ts` relies on that to fail rather than spend its whole 32-minute budget on a
-// required check that is *missing* rather than pending (joshuafolkken/kit#999). Asking after the
+// required check that is *missing* rather than pending. Asking after the
 // budget rather than on every poll is what keeps a pull request whose checks have not registered yet
 // from failing on the first read: two minutes is the grace, and an empty rollup at the end of them
 // is the answer `gh` gave immediately.

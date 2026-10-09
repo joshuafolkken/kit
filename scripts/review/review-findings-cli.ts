@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_finding_ledger, type CategoryCount } from './review-finding-ledger'
 
-// `josh review:findings` — the reader over the review-finding ledger (joshuafolkken/kit#2325). It
+// `josh review:findings` — the reader over the review-finding ledger. It
 // prints each recurring category's count, most frequent first, and the number of rounds that recorded
 // zero findings — the denominator that tells a genuinely quiet category apart from one nobody looked
 // at. The write half is `pnpm josh review:record`; both read one grammar from `review-finding-ledger`.
@@ -26,7 +26,7 @@ function format_report(counts: ReadonlyArray<CategoryCount>, zero_rounds: number
 	return `findings by category:\n${body}\n${zero_line(zero_rounds)}`
 }
 
-// Every issue's file of the ledger directory is counted (joshuafolkken/kit#2919): a recurring category
+// Every issue's file of the ledger directory is counted: a recurring category
 // is one whichever issue recorded each sighting.
 async function run(root: string = observation_ledger_home.ledger_root()): Promise<number> {
 	const content = (await observation_ledger_home.read(root)) ?? ''

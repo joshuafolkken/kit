@@ -5,7 +5,7 @@ import { z } from 'zod'
 //
 // **REST has no field for it.** `repos/{owner}/{repo}/pulls/{N}/reviews` answers every review ever
 // submitted, so the one value `gh pr view --json reviewDecision` gave has to be folded out of that
-// listing (joshuafolkken/kit#1028).
+// listing.
 //
 // The only consumer is `is_review_blocked` in `git-pr-checks-eval.ts`, which asks one question: is
 // `CHANGES_REQUESTED` standing? `APPROVED` and the empty string are therefore interchangeable to the
@@ -41,7 +41,7 @@ type RestReview = z.infer<typeof rest_review_schema>
 const NOT_A_REVIEW_LISTING = 'gh api answered something other than a review listing'
 
 // A listing that will not parse throws rather than answering "nobody requested changes" — the
-// merge-gate direction of joshuafolkken/kit#973 again.
+// an unread answer must never let the merge gate pass.
 function parse_rest_reviews(reviews_json: string): Array<RestReview> {
 	const parsed = parse_json_array_or_undefined(reviews_json, rest_review_schema)
 	if (parsed === undefined) throw new Error(NOT_A_REVIEW_LISTING)

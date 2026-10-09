@@ -13,7 +13,7 @@ import { issue_release } from './issue-release'
 import { session_cite } from './session-cite'
 
 // `josh issue:release <N>` — link Issue `<N>` to its repository's release Issue as a `blocked_by`
-// blocker, filing the release Issue when none is open (joshuafolkken/kit#3360). `josh issue:file
+// blocker, filing the release Issue when none is open. `josh issue:file
 // --release` calls the same `link` once its Issue exists, so a new and an existing Issue are linked
 // by one body of code.
 //

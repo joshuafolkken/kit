@@ -5,11 +5,11 @@ import { git_command } from './git-command'
 // The narrowing every scoped re-check shares: which files a check was narrowed by, or why it could
 // not be narrowed at all.
 //
-// joshuafolkken/kit#1257 gave the unit suite this shape and joshuafolkken/kit#1298 gave lint the
-// same one. The two differ only in which extensions they can read and in the words they print;
-// everything else — where the changed files come from, dropping what the tree no longer holds,
-// telling an unreadable change list apart from one that narrowed to nothing, and listing what was
-// narrowed by — was identical, so it lives here once rather than in each command.
+// The unit suite and lint share this shape. The two differ only in which extensions they can read
+// and in the words they print; everything else — where the changed files come from, dropping what
+// the tree no longer holds, telling an unreadable change list apart from one that narrowed to
+// nothing, and listing what was narrowed by — is identical, so it lives here once rather than in
+// each command.
 //
 // **A narrowed run is added in front of the whole check, never in place of it.** Both fallbacks
 // therefore end at the whole check, and each says which of the two it was: the one thing this must

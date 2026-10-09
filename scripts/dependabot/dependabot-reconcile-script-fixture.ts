@@ -6,9 +6,9 @@ import { expect } from 'vitest'
 import { dependabot_workflow_fixture } from './dependabot-workflow-fixture'
 
 // Runs the reconciling step's own script against a `gh` that answers as a case describes and records
-// what it was asked to do. The step's shell is where joshuafolkken/kit#845 put the arm-versus-withdraw
-// choice and joshuafolkken/kit#846 put the retry policy, and neither is an expression any more — so
-// the guards on them execute the script rather than matching substrings in it.
+// what it was asked to do. The arm-versus-withdraw choice and the retry policy live in the step's
+// shell rather than in expressions, so the guards on them execute the script rather than matching
+// substrings in it.
 const { RECONCILE_STEP_ID, DECISION_VARIABLE, ENTITLEMENT_VARIABLE, DIAGNOSTIC_VARIABLE } =
 	dependabot_workflow_fixture
 const { MERGE_COMMAND, template_job, find_step, step_run } = dependabot_workflow_fixture

@@ -4,7 +4,7 @@ import semver from 'semver'
 // kit ships a `preinstall` hook that installs @aikidosec/safe-chain, whose minimum-age policy hides
 // releases younger than its window from every install running behind it. A range whose floor sits
 // inside that window has no satisfying version for a consumer, so `pnpm install` fails with
-// ERR_PNPM_NO_MATCHING_VERSION naming a version that demonstrably exists and is tagged latest (#742).
+// ERR_PNPM_NO_MATCHING_VERSION naming a version that demonstrably exists and is tagged latest.
 //
 // The check asks the registry through that same filtered view instead of modelling the policy:
 // `pnpm view <name>@<range> version` prints no version and exits non-zero

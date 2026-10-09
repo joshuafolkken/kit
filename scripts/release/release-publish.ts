@@ -11,8 +11,7 @@ import { release_tag } from './release-tag'
 import { release_worktree } from './release-worktree'
 
 // The write half of `pnpm josh release`: the branch, the commit, the pull request, the merge, the
-// wait for the tag (joshuafolkken/kit#1169) and the watch on what the tag publishes
-// (`release-progress.ts`, joshuafolkken/kit#3193).
+// wait for the tag and the watch on what the tag publishes (`release-progress.ts`).
 //
 // **The merge goes through the same gate every other pull request does.** `wait_for_pr_success` is
 // the merge gate `pnpm josh followup` waits on, and it is called here rather than reimplemented —
@@ -57,7 +56,7 @@ function existing_branch_message(branch_name: string): string {
 	return `\`${branch_name}\` already exists — a previous release attempt got as far as opening it. Finish or delete that pull request and branch, then run \`pnpm josh release\` again.`
 }
 
-// **A remote that cannot be asked is refused, not read as "no branch there"** (joshuafolkken/kit#1641).
+// **A remote that cannot be asked is refused, not read as "no branch there"**.
 // `pnpm josh release` pushes, opens a pull request, merges it and waits for a tag, so it cannot
 // finish without the remote in any case: refusing here is the failure the run was going to have
 // anyway, moved in front of the version write and the commit — which is the whole point of this
@@ -72,9 +71,9 @@ function unreachable_remote_message(branch_name: string): string {
 // it and reach `push`, which then fails with git's non-fast-forward message: the raw error this
 // guard exists to replace, and now after two writes rather than before them.
 //
-// **`git branch --list --remotes` could not answer it, which is why origin is asked directly.** Its
-// short names carry the remote — `origin/x`, never `x` — so the unprefixed pattern this used to pass
-// matched nothing and the remote arm reported "absent" for every branch that has ever existed. The
+// **`git branch --list --remotes` cannot answer it, which is why origin is asked directly.** Its
+// short names carry the remote — `origin/x`, never `x` — so an unprefixed pattern matches nothing and
+// reports "absent" for every branch that has ever existed. The
 // remote-tracking refs it reads are stale anyway, since nothing in this workflow prunes them, so
 // `git_remote_branch.ask` puts the question to origin itself.
 async function is_release_branch_taken(branch_name: string): Promise<boolean> {
@@ -93,7 +92,7 @@ async function refuse_existing_branch(branch_name: string): Promise<void> {
 	throw new Error(existing_branch_message(branch_name))
 }
 
-// **The leftovers go before the guard asks** (joshuafolkken/kit#3058). A run cut off before its
+// **The leftovers go before the guard asks**. A run cut off before its
 // `finally`, or a `worktree add` that failed after creating its branch, leaves a local
 // `release/v<version>` that the guard would otherwise refuse as a release already opened.
 async function clear_the_way(branch_name: string): Promise<void> {
@@ -101,7 +100,7 @@ async function clear_the_way(branch_name: string): Promise<void> {
 	await refuse_existing_branch(branch_name)
 }
 
-// **No `checkout -b` and no branch guard here** (joshuafolkken/kit#2411). The work tree is already
+// **No `checkout -b` and no branch guard here**. The work tree is already
 // sitting on the release branch — `release_worktree.create` cut it that way — and the guard ran
 // before that creation, because `worktree_add` makes the branch local and `branch_exists` would then
 // report every release as already taken. This runs after `process.chdir` into the work tree, so the
@@ -167,7 +166,7 @@ function release_running_message(target: string): string {
 	return `Another \`pnpm josh release\` is running in this repository (lock \`${target}\`); wait for it to finish, then run it again.`
 }
 
-// **One release at a time per repository, held for the whole run** (joshuafolkken/kit#3058).
+// **One release at a time per repository, held for the whole run**.
 // `clear_leftover` removes an unpushed, commit-less release branch, which is also what a live run
 // looks like while it installs dependencies — so it may only run once no other release is alive. The
 // lock answers that: a run cut off before its `finally` leaves a record whose owner is gone, which

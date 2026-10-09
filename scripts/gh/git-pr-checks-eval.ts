@@ -7,14 +7,14 @@ import {
 } from './git-pr-checks-parse'
 
 // cspell:words coderabbit
-// Temporary (kit#753): CodeRabbit is excluded from the default required checks so slow or
+// Temporary: CodeRabbit is excluded from the default required checks so slow or
 // rate-limited CodeRabbit reviews never block the merge gate. Re-add it via JOSH_REQUIRED_CHECKS
-// to restore the old behavior. Revert once the fresh-context review subagent (kit#752) replaces it.
+// to restore the old behavior. Revert once the fresh-context review subagent replaces it.
 const DEFAULT_REQUIRED_CHECKS = ['SonarQube']
 // The single source of the check name every CodeRabbit exemption is keyed on — the merge gate's
 // `is_unstable_only_from_coderabbit`, the look-ahead's `is_awaited_check`, and the fixtures the two
 // are tested from. A second literal spelling of it anywhere is how one of them silently stops
-// matching after CodeRabbit renames its context (joshuafolkken/kit#1217).
+// matching after CodeRabbit renames its context.
 const CODERABBIT_CHECK_NAME = 'CodeRabbit'
 const REQUIRED_CHECKS_ENV_VAR = 'JOSH_REQUIRED_CHECKS'
 
@@ -73,19 +73,17 @@ function is_review_blocked(review_decision: string | undefined): boolean {
 	return review_decision === REVIEW_CHANGES_REQUESTED
 }
 
-// **A conflicting pull request ends the wait instead of polling through it**
-// (joshuafolkken/kit#1232). `DIRTY` is not CLEAN, so it used to answer `pending` and run the whole
-// 32-minute budget out on a state that resolves only when a person rebases — ending in a timeout
-// that named no cause. This is also where the conflict diagnosis `pnpm josh git` used to carry
-// landed: that command read `mergeStateStatus` after its own two-minute watch, and now returns as
-// soon as the pull request is open, so the first poll here is what reports a conflict — about ten
-// seconds against that two minutes.
+// **A conflicting pull request ends the wait instead of polling through it**.
+// `DIRTY` is not CLEAN, so it would otherwise answer `pending` and run the whole 32-minute budget
+// out on a state that resolves only when a person rebases — ending in a timeout that names no cause.
+// `pnpm josh git` returns as soon as the pull request is open, so the first poll here is what
+// reports a conflict.
 //
 // **`BLOCKED` is deliberately not here.** GitHub reports it while a required check is merely queued,
-// which is every healthy pull request for its first seconds. The old reader treated it as a conflict
-// safely only because it ran after the checks had settled; there is no equivalent moment on this
-// path, and a green-but-`BLOCKED` pull request (branch protection requiring a review, which this
-// repository does not set) therefore reaches the timeout rather than a named failure.
+// which is every healthy pull request for its first seconds. Treating it as a conflict is safe only
+// after the checks have settled; there is no such moment on this path, and a green-but-`BLOCKED`
+// pull request (branch protection requiring a review, which this repository does not set)
+// therefore reaches the timeout rather than a named failure.
 function is_merge_conflict(merge_state_status: string | undefined): boolean {
 	return merge_state_status === MERGE_STATE_DIRTY
 }
@@ -121,8 +119,8 @@ function is_coderabbit_check(check_name: string): boolean {
 	return is_required_match(check_name, CODERABBIT_CHECK_NAME)
 }
 
-// Temporary (kit#753): a pending or failing CodeRabbit check makes GitHub report UNSTABLE even
-// though CodeRabbit is no longer required. Accept that state only when CodeRabbit checks are the
+// Temporary: a pending or failing CodeRabbit check makes GitHub report UNSTABLE even
+// though CodeRabbit is not required. Accept that state only when CodeRabbit checks are the
 // sole non-passing ones — any other non-passing check keeps the gate strict.
 function is_unstable_only_from_coderabbit(snapshot: PrStateSnapshot): boolean {
 	if (snapshot.merge_state_status !== MERGE_STATE_UNSTABLE) return false
@@ -136,16 +134,16 @@ function is_required_check(check_name: string): boolean {
 	return REQUIRED_CHECKS.some((required) => is_required_match(check_name, required))
 }
 
-// A failing job outside the required list used to decide nothing: GitHub reports the pull request as
-// UNSTABLE rather than failed, so `evaluate_pr_state` answered `pending` and the wait ran out its
-// whole 32-minute budget before ending in a timeout that never named the cause
-// (joshuafolkken/kit#990). Any failed check therefore ends the wait now — except CodeRabbit's, which
-// kit#753 keeps non-blocking end to end, unless a project has put it back on the required list via
+// A failing job outside the required list does not fail the pull request on GitHub: it reports
+// UNSTABLE, so `evaluate_pr_state` alone would answer `pending` and the wait would run out its whole
+// 32-minute budget before ending in a timeout that never names the cause. Any failed check
+// therefore ends the wait — except CodeRabbit's, which the temporary CodeRabbit non-blocking policy
+// keeps non-blocking end to end, unless a project has put it back on the required list via
 // `JOSH_REQUIRED_CHECKS`. This only makes the gate report sooner: nothing here can produce
 // `success`, so no failing check gains a path to a merge. What counts as failed is whatever the
 // parser records as `fail` — `cancelled` and `timed_out` among them — which is the rule the required
-// list has always followed; the cost is that a job cancelled and re-run by hand is no longer picked
-// up by a wait already in progress, and `followup` has to be run again.
+// list follows; the cost is that a job cancelled and re-run by hand is not picked up by a wait
+// already in progress, and `followup` has to be run again.
 function is_blocking_failure(check: RollupCheck): boolean {
 	if (check.status !== CHECK_STATUS_FAIL) return false
 
@@ -163,7 +161,7 @@ function is_mergeable_state(snapshot: PrStateSnapshot): boolean {
 }
 
 // The wait's own error text: naming the checks that failed is what turns a red `followup` into
-// something actionable without opening the pull request (joshuafolkken/kit#990).
+// something actionable without opening the pull request.
 function collect_failure_reasons(snapshot: PrStateSnapshot): Array<string> {
 	const reasons: Array<string> = []
 	if (is_merge_conflict(snapshot.merge_state_status)) reasons.push(FAILURE_REASON_CONFLICT)
@@ -204,7 +202,7 @@ function evaluate_pr_state(snapshot: PrStateSnapshot): PrEvaluation {
 // `failure` without one is a poll that ends the wait, and both need it — `success` because a standing
 // change request must demote it, `failure` because `describe_pr_failure` names the reasons and
 // dropping "review requested changes" from a message that also lists failed checks loses half the
-// diagnosis (joshuafolkken/kit#1043).
+// diagnosis.
 //
 // **This is a freshness rule, not a cache.** Nothing is remembered between polls, which is the one
 // shape that would be wrong here — a stale non-blocking decision is exactly the direction that ships
@@ -212,7 +210,7 @@ function evaluate_pr_state(snapshot: PrStateSnapshot): PrEvaluation {
 // read in that same poll.
 //
 // **What it costs, stated rather than glossed.** A change request standing on a pull request whose
-// checks never settle used to end the wait on the first poll with `review requested changes`; it now
+// checks never settle does not end the wait on the first poll with `review requested changes`; it
 // runs the budget out and ends with the wait's own timeout, which names no cause. That run was red
 // either way — the trade only ever moves a red result later, never a green one earlier — but the
 // diagnosis is genuinely worse in that one case.
@@ -220,9 +218,9 @@ function is_review_decision_decisive(snapshot: PrStateSnapshot): boolean {
 	return evaluate_pr_state(snapshot) !== 'pending'
 }
 
-// **Whether GitHub's auto-merge can never fire on this pull request** (joshuafolkken/kit#2497). This is
-// narrower than the merge gate's `failure`: the gate also fails a red check outside the required list
-// (joshuafolkken/kit#990), but auto-merge waits only on the required ones, so such a pull request still
+// **Whether GitHub's auto-merge can never fire on this pull request**. This is
+// narrower than the merge gate's `failure`: the gate also fails a red check outside the required list,
+// but auto-merge waits only on the required ones, so such a pull request still
 // lands — reading it as blocked would call a landing flush stuck.
 function is_auto_merge_blocked(snapshot: PrStateSnapshot): boolean {
 	const failed_required = snapshot.rollup.filter(
@@ -238,7 +236,7 @@ function is_auto_merge_blocked(snapshot: PrStateSnapshot): boolean {
 	)
 }
 
-// A failed wait whose cause is a merge conflict (joshuafolkken/kit#3221), so `followup` names its last
+// A failed wait whose cause is a merge conflict, so `followup` names its last
 // lap `conflict` rather than `interrupted` and the cause is read from the stage block, not looked up.
 class PrConflictError extends Error {
 	override name = 'PrConflictError'

@@ -7,8 +7,7 @@ import { issue_report_failures, type ReadFailureKind } from './issue-report-fail
 import { issue_state, type IssueState } from './issue-state'
 
 // `josh issue:state <N> [<N> ...]` — print each issue's state and labels, in the spelling the
-// documents compare against (joshuafolkken/kit#1054; several numbers in one call,
-// joshuafolkken/kit#1302).
+// documents compare against, several numbers in one call.
 //
 // The numbers are read concurrently and reported together because the callers that need more than
 // one need them all: `diag`'s ranking table reads a state per row, and one process start plus one
@@ -49,7 +48,7 @@ interface StateRequest {
 }
 
 // One issue's state, or the failure kind. Named for export because `run:prep` reads the state beside
-// the body and the dependency-update scope (joshuafolkken/kit#1978), reusing this read rather than a
+// the body and the dependency-update scope, reusing this read rather than a
 // second one that would drift from the `human_review` decision `parse_issue_state` owns.
 type StateRead = { kind: 'state'; state: IssueState } | { kind: ReadFailureKind }
 
@@ -59,10 +58,9 @@ interface IssueReport {
 }
 
 // The read goes through `cli_flags`, both spellings gh itself accepts included (`--repo owner/repo`,
-// `--repo=owner/repo`), and is strict (joshuafolkken/kit#3261). An unrecognized flag refuses the
-// call: `--rep=owner/repo` used to be discarded for starting with a dash, so the call fell back to
-// the session's repository and printed a confident state for a *different* repository's issue of
-// that number (joshuafolkken/kit#1355).
+// `--repo=owner/repo`), and is strict. An unrecognized flag refuses the
+// call: discarding `--rep=owner/repo` for starting with a dash would fall back to the session's
+// repository and print a confident state for a *different* repository's issue of that number.
 const OPTIONS = { repo: { type: 'string', multiple: true } } as const
 
 // `absent` and "given but with nothing usable" are different answers. Falling back to the session's

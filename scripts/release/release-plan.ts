@@ -1,6 +1,6 @@
 import semver from 'semver'
 
-// What a release is, decided from main's history alone (joshuafolkken/kit#1169).
+// What a release is, decided from main's history alone.
 //
 // **A version is a property of main's history, not of a branch.** `bump-version.ts` reads the local
 // `package.json` and increments it, so two branches cut from the same version both claim the same
@@ -51,7 +51,7 @@ function previous_version_of(
 // **The newest commit whose `package.json` version differs from the version immediately before it.**
 //
 // **A commit that touched `package.json` without moving the version is skipped**, which is what makes
-// this right once children stop bumping (joshuafolkken/kit#1486): a dependency update rewrites the
+// this right once children stop bumping: a dependency update rewrites the
 // file every time and must not be mistaken for a release.
 //
 // **Both sides have to be readable for this to be a version change.** An unreadable neighbor makes
@@ -96,7 +96,7 @@ function short_sha(sha: string): string {
 
 // **The count is the line a person reads**, which is why it is built here rather than at each caller:
 // the release command prints it, and so does anything else that wants to say how much is waiting to
-// ship (joshuafolkken/kit#1169 → "the count of unreleased merges shows somewhere visible").
+// ship.
 function format_pending_line(pending: number): string {
 	return `${PENDING_ICON} unreleased merges on main: ${String(pending)}`
 }

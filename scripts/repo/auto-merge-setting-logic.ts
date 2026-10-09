@@ -3,13 +3,11 @@ import { repo_setting, type RepoSettingStatus } from './repo-setting'
 // GitHub's repository-level "Allow auto-merge" setting, as reported by the `allow_auto_merge` field
 // of `GET /repos/{owner}/{repo}`.
 //
-// joshuafolkken/kit#834 added `.github/workflows/dependabot-auto-merge.yml` to the distributed
-// files, so a synced consumer now runs `gh pr merge --auto` on every github-actions patch and minor
-// bump. That command needs this setting: without it the step fails with `Auto-merge is not allowed
-// for this repository`, and the pull request sits green and unmerged — which is the exact state
-// joshuafolkken/app-kit#184 was found in, and the same defect kit itself hit in
-// joshuafolkken/kit#802. The setting is off by default, so distributing the workflow without
-// reporting it would hand every consumer a workflow that never merges anything.
+// `.github/workflows/dependabot-auto-merge.yml` is a distributed file, so a synced consumer runs
+// `gh pr merge --auto` on every github-actions patch and minor bump. That command needs this
+// setting: without it the step fails with `Auto-merge is not allowed for this repository`, and the
+// pull request sits green and unmerged. The setting is off by default, so distributing the workflow
+// without reporting it would hand every consumer a workflow that never merges anything.
 type AutoMergeStatus = RepoSettingStatus
 
 const SETTING_LABEL = 'Repository auto-merge'
@@ -19,8 +17,8 @@ const WORKFLOW_PATH = '.github/workflows/dependabot-auto-merge.yml'
 
 // The remediation for `disabled`, addressed at the repository the report actually resolved. kit
 // prints it and never runs it: changing a repository setting is outward-facing, needs admin scope,
-// and is the maintainer's call — the same line joshuafolkken/kit#805 drew for
-// `automated-security-fixes`, which is why `josh doctor --fix` does not enable this either.
+// and is the maintainer's call — the same line drawn for `automated-security-fixes`, which is why
+// `josh doctor --fix` does not enable this either.
 function enable_command(repo: string | undefined): string {
 	return `gh api -X PATCH repos/${repo_setting.command_target(repo)} -f ${ALLOW_AUTO_MERGE_FIELD}=true`
 }

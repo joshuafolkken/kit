@@ -24,9 +24,9 @@ const CHECK_WAIT_INTERVAL_MS = 10_000
 // needs (2), so 27 minutes is the longest run that workflow permits, and five minutes of
 // runner-queue headroom goes on top. A unit test walks the `needs` graph of the distributed
 // workflows and fails if any declared budget outgrows this value; a job that declares no cap is a
-// gap the number cannot promise to cover rather than a reason to inflate it. Waiting longer costs nothing on a fast project: polling returns as
-// soon as the checks settle, and a failed check throws immediately rather than waiting out the
-// budget. See joshuafolkken/kit#851.
+// gap the number cannot promise to cover rather than a reason to inflate it. Waiting longer costs
+// nothing on a fast project: polling returns as soon as the checks settle, and a failed check throws
+// immediately rather than waiting out the budget.
 const DEFAULT_TIMEOUT_SECONDS = 1920
 
 // The poll loop sleeps between attempts and not after the last one, so spanning a budget takes one
@@ -51,14 +51,13 @@ const DEFAULT_STABLE_READS = 2
 // One authoritative gate poll is enough once `pr_checks_watch` has already seen every check finish:
 // the watch is the first confirmation, so the poll that follows need only agree once. The two reads
 // exist for the pending→settled window a bare poll opens on, and the watch has itself already spanned
-// that window — so waiting a second interval after it merely re-proves what the watch established
-// (joshuafolkken/kit#2029).
+// that window — so waiting a second interval after it merely re-proves what the watch established.
 const WATCH_CONFIRMED_STABLE_READS = 1
 
 // **A read that failed is not a verdict.** The loop reads every ten seconds, so a dropped connection,
 // a rate limit or one request over its budget is the kind of failure the *next* poll answers — and
-// ending a 32-minute wait on one of them costs the whole run again. Before joshuafolkken/kit#1077
-// every one of them rejected straight out of the loop, because the fetch had no `catch` at all.
+// ending a 32-minute wait on one of them costs the whole run again, so the fetch catches them rather
+// than rejecting straight out of the loop.
 //
 // **The cap is what keeps "ask again" from becoming "wait out the budget in silence".** Three
 // consecutive failures and the wait ends carrying the failure that caused it, so an endpoint that has
@@ -68,12 +67,12 @@ const WATCH_CONFIRMED_STABLE_READS = 1
 //
 // **The loop's own budget is unchanged**, so nothing here can extend a wait: a fetch that never
 // succeeds still runs out of attempts. And a failed read never counts as a passing one — it resets
-// the stable-read window, the same direction joshuafolkken/kit#925 / #950 / #973 / #1048 take.
+// the stable-read window, so an unread state is never taken as a settled answer.
 const MAX_CONSECUTIVE_READ_FAILURES = 3
 
 // The wait's own timeout, named so a caller can tell it apart from a failing check. The bounded
 // watch in `git-pr-checks-watch.ts` answers `timed_out` for one and rethrows the other, and matching
-// on prose is the only distinction the loop offers (joshuafolkken/kit#1028).
+// on prose is the only distinction the loop offers.
 const PR_CHECKS_TIMEOUT_MESSAGE = 'Timed out while waiting for PR checks to complete.'
 
 function is_pr_checks_timeout(error: unknown): boolean {
@@ -82,11 +81,10 @@ function is_pr_checks_timeout(error: unknown): boolean {
 
 // Whether this poll has to read the review listing, asked of the snapshot *without* one. It is a
 // question about the current poll rather than a cache key: answering `false` skips one request now
-// and nothing is carried into the next poll (joshuafolkken/kit#1043).
+// and nothing is carried into the next poll.
 type ReviewDecisionPredicate = (snapshot: PrStateSnapshot) => boolean
 
-// The conservative answer, and the one every evaluator that does not say gets: read it every poll,
-// which is what all of them did before the predicate existed.
+// The conservative answer, and the one every evaluator that does not say gets: read it every poll.
 function should_always_read_review_decision(): boolean {
 	return true
 }
@@ -98,12 +96,12 @@ type PrStateFetcher = (
 
 // What the loop asks of each snapshot, and what it says when the answer is `failure`.
 //
-// The loop used to hard-code the merge gate's own verdict, which is the strictest question anyone
-// asks of a pull request: mergeable *and* every required check green *and* no change request
-// standing. `gh pr checks --watch` asked a much weaker one — have the checks finished? — and the
-// conversion in joshuafolkken/kit#1028 gave the watch the strict verdict by accident: on a repository
-// whose `mergeable_state` is `blocked`, the watch could never succeed, and a standing change request
-// made it *throw* out of `pnpm josh git`. Naming the question is what keeps the two apart.
+// The merge gate's own verdict is the strictest question anyone asks of a pull request: mergeable
+// *and* every required check green *and* no change request standing. `gh pr checks --watch` asks a
+// much weaker one — have the checks finished? Hard-coding the strict verdict in the loop would hand
+// it to the watch too: on a repository whose `mergeable_state` is `blocked`, the watch could never
+// succeed, and a standing change request would make it *throw*. Naming the question is what keeps
+// the two apart.
 //
 // **`should_read_review_decision` is part of the same question.** An evaluator that never reads
 // `review_decision` must not make the fetcher pay for it, and one that does must get a value read in
@@ -190,7 +188,7 @@ interface PollAttemptResult {
 
 // The two things one poll can come back with, kept apart so that only the *read* is retried. The
 // throw `classify_poll_result` raises on a `failure` verdict is an answer — the checks are red — and
-// retrying it would undo the fast fail joshuafolkken/kit#990 added.
+// retrying it would undo the fast fail on a red check.
 type SnapshotRead =
 	{ kind: 'read'; snapshot: PrStateSnapshot } | { kind: 'unreadable'; cause: unknown }
 
@@ -289,14 +287,13 @@ async function wait_for_pr_success(options: WaitForPrSuccessOptions): Promise<Pr
 }
 
 // The snapshot module rather than `git-gh-command`, which is deliberate: `git-gh-command` also
-// exposes the watch, and the watch now polls through this file (joshuafolkken/kit#1028). Naming the
+// exposes the watch, and the watch now polls through this file. Naming the
 // one read it actually needs keeps that from closing into an import cycle.
 //
 // **Three requests, and a fourth only where it can change the answer.** The pull request detail and
 // the two commit listings are read every poll because `mergeable_state` and the rollup both move
 // while CI runs; the review listing is read when the predicate says this poll's verdict turns on it.
-// A `followup` that waits out its whole 32-minute budget went from about 800 requests to about 600
-// (joshuafolkken/kit#1043).
+// A `followup` that waits out its whole 32-minute budget went from about 800 requests to about 600.
 async function default_fetch_pr_state(
 	branch_name: string,
 	should_read_review_decision: ReviewDecisionPredicate = should_always_read_review_decision,
@@ -327,7 +324,7 @@ async function wait_for_pr_success_default(
 	})
 }
 
-// Where a pull request GitHub merges on its own stands (joshuafolkken/kit#2497). `failed` is what
+// Where a pull request GitHub merges on its own stands. `failed` is what
 // auto-merge never fires under — a red required check, a conflict, a requested change — so a wait on
 // it ends now rather than at the budget; a red check outside the required list is not among them
 // (`is_auto_merge_blocked`). A read that failed answers `waiting`, so a poll asks again.

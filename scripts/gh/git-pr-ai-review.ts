@@ -16,7 +16,7 @@ interface AiReviewPullComment {
 }
 
 // `undefined` when the answer was not a listing at all. `parse_json_array_safe` returned `[]` for
-// that, which this gate reads as "no reviewer left a finding" (joshuafolkken/kit#973).
+// that, which this gate reads as "no reviewer left a finding".
 function parse_ai_review_comments(
 	raw_json: string | undefined,
 ): Array<AiReviewPullComment> | undefined {
@@ -39,8 +39,9 @@ function format_ai_review_finding(finding: ClassifiedFinding): string {
 	return `- ${finding.author_login}: ${finding.summary}${suffix}`
 }
 
-// Temporary (kit#753): CodeRabbit findings are surfaced as console info and audit notes for the
-// completion notification instead of blocking the merge. Revert together with kit#752.
+// Temporary: CodeRabbit findings are surfaced as console info and audit notes for the
+// completion notification instead of blocking the merge. Revert together with the rest of the
+// temporary CodeRabbit non-blocking policy.
 function log_info_findings(infos: ReadonlyArray<ClassifiedFinding>): Array<string> {
 	if (infos.length === 0) return []
 
@@ -111,8 +112,8 @@ async function handle_blockers(input: {
 
 // A gate that could not be read is not a gate that passed. An unreadable listing is handled exactly
 // like an unresolved finding — the same `confirmation` Telegram, the same non-zero exit — because
-// what it means is the same: nobody has confirmed the reviewers had nothing to say
-// (joshuafolkken/kit#973). An ignore reason still gets past it, for the same reason it gets past a
+// what it means is the same: nobody has confirmed the reviewers had nothing to say.
+// An ignore reason still gets past it, for the same reason it gets past a
 // real finding: the person has looked.
 const UNREADABLE_COMMENTS_BODY =
 	'The AI reviewer comments could not be read, so no finding could be ruled out.\n' +

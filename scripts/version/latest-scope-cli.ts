@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { latest_lane_guard } from './latest-lane-guard'
 import { latest_stamp, type LatestStamp } from './latest-stamp'
 
-// `josh latest:scope` — say whether this run has to update dependencies (joshuafolkken/kit#1215).
+// `josh latest:scope` — say whether this run has to update dependencies.
 //
 // A command rather than a paragraph in a procedure, for the reason `josh review:level` is a command:
 // a rule an agent applies from memory is a rule an agent can talk itself out of, and this one is
@@ -65,7 +65,7 @@ function decide(): Decision {
 	}
 }
 
-// A lane is answered `skip` before the stamp is even read (joshuafolkken/kit#2135): the stamp is
+// A lane is answered `skip` before the stamp is even read: the stamp is
 // keyed to the project root, so a lane always reads as stale, and every lane would otherwise run its
 // own dependency update. `latest_lane_guard` is the single source of the reason and of the refusal
 // `josh latest` prints.

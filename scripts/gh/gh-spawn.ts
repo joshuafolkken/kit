@@ -6,7 +6,7 @@ import { git_gh_exec } from './git-gh-exec'
 // synchronously because `josh init` / `josh sync` / `josh doctor` decide before they can await.
 // It asks REST for the same reason — `gh repo view` goes through GraphQL, which a cloud session is
 // refused (403), and a repository that reads as unresolved makes `init` / `sync` skip
-// `sonar-project.properties` outright (joshuafolkken/kit#1023). The path comes from the shared
+// `sonar-project.properties` outright. The path comes from the shared
 // builder rather than being spelled out again here.
 //
 // An unbounded lookup asks for `NO_BUDGET`, execa's own "no timeout": the shared layer otherwise
@@ -29,7 +29,7 @@ function fetch_repo_name(timeout_ms: number | undefined): string | undefined {
 // The unbounded lookup, for callers whose *writes* depend on the answer. A timeout would surface as
 // an unresolved repository, and `josh init` / `josh sync` react to that by skipping
 // `sonar-project.properties` entirely — so a latency spike would silently leave a consumer's Sonar
-// config stale. Waiting is the safer failure mode there (joshuafolkken/kit#805).
+// config stale. Waiting is the safer failure mode there.
 function get_repo_name_with_owner(): string | undefined {
 	return fetch_repo_name(undefined)
 }

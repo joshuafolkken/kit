@@ -6,7 +6,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
 
-// The record that says which checkout a `/code-review` actually read (joshuafolkken/kit#1522).
+// The record that says which checkout a `/code-review` actually read.
 //
 // **The root cause is not ours to fix.** `/code-review` is forked by the harness and inherits the
 // session's working directory; nothing in this repository decides that. What *is* ours is the
@@ -242,7 +242,7 @@ function is_written_since(source: string, taken_at: string): boolean {
 	}
 }
 
-// **Whether the last briefed review of this branch finished** (joshuafolkken/kit#2945). A ship resumed
+// **Whether the last briefed review of this branch finished**. A ship resumed
 // after a stop re-issues round 1, and without this answer it briefed the whole change again — the
 // files the finished review had just read, re-read at full cost. It is asked before `record_target`
 // mints the next nonce, since that call drops the record it reads. The branch must match: the pointer
@@ -265,7 +265,7 @@ function is_reviewed_on(checkout: ReviewCheckout, findings_path: string, root?: 
 }
 
 // Whether a record written at `written_at` belongs to the brief the pointer names rather than an earlier
-// one (joshuafolkken/kit#2945): that brief writes it right after minting the pointer. ISO timestamps
+// one: that brief writes it right after minting the pointer. ISO timestamps
 // order as strings.
 function is_briefed_since(written_at: string, root?: string): boolean {
 	const pointer = read_pointer(root)

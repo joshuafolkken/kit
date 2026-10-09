@@ -4,15 +4,13 @@ import { review_checkout, type ReviewCheckout } from './review-checkout'
 import { review_diff_parts, type DiffParts } from './review-diff-parts'
 
 // The text `josh review:brief` prints — the `/code-review` invocation, composed from what the run
-// already knows (joshuafolkken/kit#1241).
+// already knows.
 //
 // **Why a command and not a paragraph in `prompts/review.md`.** `/code-review` runs in a forked
 // process and reads none of this repository's documents; the only thing that reaches it is the
-// argument it is invoked with. Measured on joshuafolkken/kit#1240: both rounds re-ran the unit suite
-// `josh gate` had just passed, both fumbled the runner (`npx vitest`, then a retry), and round 2
-// re-read the whole diff — 439 seconds for a seven-file change. joshuafolkken/kit#1219 had already
-// redefined round 2 as a verification pass **in a document the agent never opens**, which is why it
-// cut nothing.
+// argument it is invoked with. Without it a round re-runs the unit suite `josh gate` just passed,
+// fumbles the runner (`npx vitest`, then a retry), and round 2 re-reads the whole diff — a rule
+// written **in a document the agent never opens** cuts nothing.
 //
 // **What is mechanical and what is only an instruction.** The round-2 target is mechanical: the
 // paths are computed from a digest comparison and handed over as the scope. The "already verified"
@@ -22,8 +20,8 @@ import { review_diff_parts, type DiffParts } from './review-diff-parts'
 const TEST_COMMAND_LINE =
 	'- The unit suite is `pnpm josh test:unit`. Do not reach for `npx vitest`; it is not how this project runs them.'
 
-// **The checkout block, and why the target below names a path instead of assuming one**
-// (joshuafolkken/kit#1522). `/code-review` is forked by the harness and inherits the session's
+// **The checkout block, and why the target below names a path instead of assuming one**.
+// `/code-review` is forked by the harness and inherits the session's
 // working directory, so during a lane run it starts in a tree that holds the previous child's
 // already-merged code. Reading that tree, it finds nothing wrong and says so — and the run reads
 // that silence as a clean review. Neither half of this block is a paragraph a person has to remember
@@ -41,7 +39,7 @@ function attest_line(nonce: string): string {
 	return `Attest before you report: run \`pnpm josh review:attest ${nonce}\` from the checkout you actually read. A non-zero exit means it was not the one above — report \`REVIEW TARGET MISMATCH\` and no findings. Never report "no findings" without that command having passed: a review of the wrong tree finds nothing wrong, and the run cannot tell that apart from approval (joshuafolkken/kit#1522).`
 }
 
-// **The rubric is handed over by path, not pasted in** (joshuafolkken/kit#1927). `/code-review` runs
+// **The rubric is handed over by path, not pasted in**. `/code-review` runs
 // in a forked process that reads none of this repository's documents, so the severity tests, the nine
 // categories and the output format never reached it — the review scored the diff on whatever the
 // forked skill happened to carry. The reviewer has file access (it already runs `git -C <root> …` and
@@ -49,7 +47,7 @@ function attest_line(nonce: string): string {
 // and applied before anything is reported. Absolute because a forked agent resolves a relative path
 // against the tree it was spawned in, which is the wrong one during a lane run.
 //
-// **The path is the kit package's, not the review checkout's** (joshuafolkken/kit#2402). The rubric
+// **The path is the kit package's, not the review checkout's**. The rubric
 // ships inside the kit package (`node_modules/@joshuafolkken/kit/prompts/`), not in a consumer's own
 // tree — so deriving it from the review checkout root pointed at a `prompts/` a `docs/`-less consumer
 // never receives, and the review ran without the scoring rules. The caller resolves it against the
@@ -71,7 +69,7 @@ function checkout_block(checkout: ReviewCheckout, nonce: string): string {
 // `-C <root>` rather than a bare `git diff`, so the command works from whatever directory the
 // forked agent happens to be sitting in rather than only from the right one.
 //
-// **The base is the merge base, not `main` itself** (joshuafolkken/kit#1527). A linked work tree
+// **The base is the merge base, not `main` itself**. A linked work tree
 // shares the `main` ref with every other lane, so a two-dot `git diff main` run in an unmerged lane
 // lists whatever another lane merged in the meantime — in reverse. This line is a command the forked
 // agent runs, so printing the old spelling would hand it exactly the mixed-in listing the reading
@@ -124,7 +122,7 @@ function verified_line(taken_at: string): string {
 	return `Already verified — do not re-run these:\n- lint, the type check, the spell check and the unit tests all passed on this exact tree at ${taken_at} (\`pnpm josh gate\`).`
 }
 
-// **The in-flight sentence claims no result, and that is the point** (joshuafolkken/kit#1242). The
+// **The in-flight sentence claims no result, and that is the point**. The
 // gate and this review are started together, so the honest thing to say is that a gate is running —
 // not that it passed. What it forbids is re-running the unit suite, which is wasted whether the gate
 // ends green or red, and it names who joins the result so the reader knows the check is not being
@@ -139,7 +137,7 @@ function in_flight_line(taken_at: string): string {
 // digests alone it would say a gate is running for as long as nobody edits that tree, about a process
 // that no longer exists: exactly the state the record must never describe.
 //
-// **The written pid alone did not separate the two** (joshuafolkken/kit#1245). It names whatever holds
+// **The written pid alone did not separate the two**. It names whatever holds
 // that number now, so once the operating system reissued it the abandoned marker passed the liveness
 // probe again and this line went back to printing `Running now` about nothing — the same untrue
 // sentence, reached by a longer route. The record therefore carries the writing process's start time
@@ -156,7 +154,7 @@ function live_marker(
 	return matched
 }
 
-// **Matching digests are not enough for the green claim** (joshuafolkken/kit#1537). The map covers
+// **Matching digests are not enough for the green claim**. The map covers
 // the paths the change makes changed, so a merge of the default branch that touches nothing the
 // branch touches leaves every digest identical while the tree gains code the gate never read —
 // and the brief would tell the reviewer that lint, the type check, the spell check and the unit tests
@@ -202,8 +200,8 @@ function format_paths(root: string, paths: ReadonlyArray<string>): string {
 	return paths.map((relative) => `  ${root}/${relative}`).join('\n')
 }
 
-// **An empty target has two readings, and only one of them is "nothing changed"**
-// (joshuafolkken/kit#1537). Since the delta is intersected with the change, round 1's fixes can be
+// **An empty target has two readings, and only one of them is "nothing changed"**.
+// Since the delta is intersected with the change, round 1's fixes can be
 // real and still leave no target — a fix that reverts a file to its base content takes that path out
 // of `git diff` altogether. Printing "nothing changed since round 1" there would contradict the
 // `Not in this change` list directly below it, which is the self-disagreement this whole change
@@ -219,10 +217,10 @@ function round_two_target(root: string, scope: RoundTwoScope): string {
 	return scope.dropped.length > 0 ? NOTHING_LEFT_LINE : EMPTY_DELTA_LINE
 }
 
-// **What round 2 is sent to read, reconciled against the change it is meant to cover**
-// (joshuafolkken/kit#1537). The delta alone is not that list. It is the difference between two file
-// maps, each one a diff against `change_base` **as it stood when that map was taken** — and nothing
-// used to record which commit that was. Move the base between the rounds, which is exactly what a
+// **What round 2 is sent to read, reconciled against the change it is meant to cover**.
+// The delta alone is not that list. It is the difference between two file
+// maps, each one a diff against `change_base` **as it stood when that map was taken**, so the record
+// must name which commit that was. Move the base between the rounds, which is exactly what a
 // resumed run's merge of the default branch does, and the two maps stop covering the same set of
 // paths: their difference then names files the branch never touched and misses files it did.
 //
@@ -247,8 +245,8 @@ function sorted_names(names: ReadonlyArray<string>): ReadonlyArray<string> {
 }
 
 // A record that cannot be compared widens the round to the whole change rather than narrowing it, so
-// every path the change touches is a target. This is the same direction joshuafolkken/kit#1241 chose
-// for a missing record, extended to a record that is present and unusable.
+// every path the change touches is a target — the same direction as for a missing record, extended
+// to a record that is present and unusable.
 function whole_change_scope(tree: Record<string, string>): RoundTwoScope {
 	return {
 		recorded_at: undefined,
@@ -320,8 +318,7 @@ function reconciliation(root: string, base: string, scope: RoundTwoScope): Reado
 	]
 }
 
-// The snapshot's own timestamp, printed rather than assumed. Since joshuafolkken/kit#1441 the record
-// is round 1's own — written once per run, and kept by a later round-1 invocation rather than retaken
+// The snapshot's own timestamp, printed rather than assumed. The record is round 1's own — written once per run, and kept by a later round-1 invocation rather than retaken
 // against the fixed tree — so this line says how far back the target below is measured from. A record
 // left behind by a run that never reached `josh followup` makes the target wider, and its timestamp is
 // the only thing that shows that from here.
@@ -358,8 +355,8 @@ function round_two_block(
 	return narrow_block(scope.recorded_at, scope, root, base)
 }
 
-// **A resumed round 1 reads what changed since the attested review, reusing round 2's reconciliation**
-// (joshuafolkken/kit#2945). A ship that stopped and was re-issued briefed the whole change again, so
+// **A resumed round 1 reads what changed since the attested review, reusing round 2's reconciliation**.
+// A ship that stopped and was re-issued briefed the whole change again, so
 // the reviewer re-read every file the attested review had just read. The scope is the comparison round
 // 2 makes, measured from the tree that review was briefed on. Every reading that cannot narrow falls back to the whole
 // change: no record, a moved base, or an empty target. An empty target is included because a resumed
@@ -406,15 +403,15 @@ interface BriefInput {
 	checkout: ReviewCheckout
 	nonce: string
 	// The commit the change is measured against, resolved by the caller so the printed target carries
-	// a value rather than a subshell that can fail open (joshuafolkken/kit#1527).
+	// a value rather than a subshell that can fail open.
 	base: string
 	// The rubric's absolute path, resolved by the caller against the kit package rather than the review
-	// checkout, so it resolves in a consumer that ships no `prompts/` of its own (joshuafolkken/kit#2402).
+	// checkout, so it resolves in a consumer that ships no `prompts/` of its own.
 	rubric_path: string
-	// The tree a finished, clean review of this branch was briefed on, so round 1 is a resume
-	// (joshuafolkken/kit#2945). Absent, round 1 reads the whole change.
+	// The tree a finished, clean review of this branch was briefed on, so round 1 is a resume.
+	// Absent, round 1 reads the whole change.
 	resumed_from?: FileMapStamp | undefined
-	// The change written as parts under the Bash output cap (joshuafolkken/kit#2963). Absent when the
+	// The change written as parts under the Bash output cap. Absent when the
 	// write failed, and the target line alone then names the change.
 	diff?: { parts: DiffParts; cap: number } | undefined
 }
@@ -435,7 +432,7 @@ function target_block(input: BriefInput): string {
 	return round_two_block(input.stamps.round_one, input.tree, input.checkout.root, input.base)
 }
 
-// **Only beside a whole-change target** (joshuafolkken/kit#2963): each part is a path's diff against
+// **Only beside a whole-change target**: each part is a path's diff against
 // the base, so beside a narrowed round 2 or a resumed round 1 the list would hand the reviewer the
 // code that narrowing exists to keep out of scope. Decided by the target actually printed, not by
 // the round: every round that cannot narrow widens through `whole_change_target`, and that round

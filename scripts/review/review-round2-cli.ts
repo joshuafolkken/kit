@@ -6,7 +6,7 @@ import { review_round2 } from './review-round2'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 
-// `josh review:round2` — say whether the second review round is due (joshuafolkken/kit#1433).
+// `josh review:round2` — say whether the second review round is due.
 //
 // A command rather than a paragraph in `prompts/review.md`, for the reason `josh review:level` is a
 // command: a rule an agent applies from memory is a rule an agent can talk
@@ -56,8 +56,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const { verdict, reason } = review_round2.decide({
 		// The commit the tree below is a diff against, so the snapshot can be refused when it was taken
 		// against a different one — and the resolved commit rather than `git_command.change_base`, whose
-		// fallback is a ref name that moves and would compare equal to itself
-		// (joshuafolkken/kit#1537).
+		// fallback is a ref name that moves and would compare equal to itself.
 		base: await change_base.resolved(),
 		is_round_one_closed: options.is_round_one_closed,
 		snapshot: review_stamps.round_one_stamp.read(),

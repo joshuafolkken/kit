@@ -3,7 +3,7 @@ import { git_utilities } from './constants'
 import { git_command } from './git-command'
 import { git_location_environment, GIT_LOCATION_VARIABLES } from './git-location-environment'
 
-// The one synchronous read of a checkout's two git directories (joshuafolkken/kit#2986) — the same
+// The one synchronous read of a checkout's two git directories — the same
 // `GIT_DIRECTORY_ARGUMENTS` `git_command.git_directories` asks asynchronously, so the two spellings
 // cannot name different directories. It had been run in three places with three timeouts and no
 // memory of the answer, though a `PreToolUse` hook may ask it several times in one call.
@@ -20,8 +20,8 @@ const PROBE_TIMEOUT_MS = 5000
 const answers = new Map<string, ReadonlyArray<string>>()
 
 // With an explicit `cwd`, the git location variables are cleared so that directory is what git answers
-// for: a hook exports `GIT_DIR`, which beats `cwd` and would name the hook's checkout instead
-// (joshuafolkken/kit#2515). Without one the environment is kept, so the read resolves the same
+// for: a hook exports `GIT_DIR`, which beats `cwd` and would name the hook's checkout instead.
+// Without one the environment is kept, so the read resolves the same
 // checkout as the asynchronous `git_directories`.
 function probe_environment(cwd: string | undefined): NodeJS.ProcessEnv {
 	if (cwd === undefined) return process.env

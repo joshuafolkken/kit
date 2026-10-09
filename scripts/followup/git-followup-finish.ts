@@ -7,9 +7,9 @@ import { parse_completed_issue_number } from './followup-issue-number'
 import { git_followup_cleanup, type CleanupStep } from './git-followup-cleanup'
 import { git_followup_pending } from './git-followup-pending'
 
-// **The count of unreleased merges, not the project version** (joshuafolkken/kit#1486). This line
-// used to read the local `package.json` and was read as "the version this run just shipped"; children
-// no longer bump, so that number names the *previous* release and the reading is false. The count is
+// **The count of unreleased merges, not the project version**. The local `package.json` version
+// reads as "the version this run just shipped", but children do not bump, so that number names the
+// *previous* release and the reading is false. The count is
 // the one `pnpm josh release` acts on, and it is printed here for the same reason it goes into the
 // Telegram: a number that keeps climbing is a release nobody has run.
 //
@@ -45,8 +45,8 @@ async function print_completion(
 	await print_pending_release()
 }
 
-// A **merged** run ends here, and the round-1 review snapshot's lifetime is one run
-// (joshuafolkken/kit#1441). `--no-merge` is not the end of one — the pull request is still open and
+// A **merged** run ends here, and the round-1 review snapshot's lifetime is one run.
+// `--no-merge` is not the end of one — the pull request is still open and
 // the issue is still the current task, the same line `print_next_issues` and the epic auto-close
 // already draw — and clearing there would be the unsafe direction: the next round-1 brief would find
 // no record and write a fresh one against the already-fixed tree, which is the arm-A skip over
@@ -74,8 +74,7 @@ async function clear_review_records(should_merge: boolean): Promise<void> {
 	await clear_review_target(should_merge)
 }
 
-// joshuafolkken/kit#1091: the working-tree hold a typed entry point claims before it starts is
-// released here, on the one seam every `fullrun` — and every child of an `epicrun` or a `queue` —
+// The working-tree hold a typed entry point claims before it starts is released here, on the one seam every `fullrun` — and every child of an `epicrun` or a `queue` —
 // passes through, so a finished run never leaves the next one locked out. **Gated on `should_merge`
 // like the epic auto-close and the round-1 snapshot clear**: a `--no-merge` run has not finished, and
 // its tree is still the one nobody else may start in.
@@ -95,7 +94,7 @@ async function release_worktree_hold(should_merge: boolean): Promise<void> {
 	}
 }
 
-// joshuafolkken/kit#1821: a `run:progress` watcher outlives the turn that started it and, left alone,
+// A `run:progress` watcher outlives the turn that started it and, left alone,
 // waits out its whole bound — up to an hour — after the run it was watching has already merged.
 // Removing its liveness record here, on the same merge seam that releases the working-tree hold, lets
 // the watcher read the record gone on its next tick and stop at once. **Keyed like the hold, on the
@@ -127,10 +126,9 @@ async function end_progress_watcher(should_merge: boolean): Promise<void> {
 	}
 }
 
-// **The steps are independent, and one of them failing must not discard the rest**
-// (joshuafolkken/kit#1539). They used to be bare statements, so whichever threw first ended the
-// process — and the hold release is the last of them, which is how three merged runs left their
-// working tree locked. The order is still the contract: `print_completion` ends with the
+// **The steps are independent, and one of them failing must not discard the rest**.
+// As bare statements, whichever threw first would end the process — and the hold release is the
+// last of them, so a merged run would leave its working tree locked. The order is still the contract: `print_completion` ends with the
 // unreleased-merge count, the final console line.
 function build_report_steps(
 	issue_number: string | undefined,
@@ -160,7 +158,7 @@ function build_record_steps(should_merge: boolean): ReadonlyArray<CleanupStep> {
 		{
 			label: 'The working-tree hold release',
 			// **The forced spelling, because the run that wrote the record is this one and it is
-			// ending** (joshuafolkken/kit#1799). A release names the run it belongs to, so a person
+			// ending**. A release names the run it belongs to, so a person
 			// finishing this step by hand is releasing a record they did not write — the plain form
 			// would answer `held` and remove nothing, which is a printed recovery that cannot recover.
 			recovery: 'pnpm josh run:release --force',

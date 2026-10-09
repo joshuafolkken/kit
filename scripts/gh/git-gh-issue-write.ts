@@ -7,18 +7,17 @@ import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
 // wrappers had.
 //
 // `gh issue edit` / `comment` / `create` / `close` and `gh label create` all go through GraphQL,
-// which a cloud session is answered 403 for while the REST endpoints are served normally
-// (joshuafolkken/kit#1022). Split out of `git-gh-issue.ts` rather than added to it: that file was
+// which a cloud session is answered 403 for while the REST endpoints are served normally.
+// Split out of `git-gh-issue.ts` rather than added to it: that file was
 // already at 215 of the 300 lines a file may hold, and the reads had been split out for the same
-// reason (joshuafolkken/kit#957, joshuafolkken/kit#1026).
+// reason.
 //
-// **Every path here was measured against the live API before it was written.**
-// joshuafolkken/kit#1022 deliberately measured only the reads, because a write has side effects, and
-// left the write side as candidates to confirm one at a time. They were confirmed on a pair of
-// throwaway issues, and one of them did not behave as its name suggests — see `read_issue_id`.
+// **Every path here is measured against the live API.** A write has side effects, so each one is
+// confirmed on throwaway issues, and one of them does not behave as its name suggests — see
+// `read_issue_id`.
 //
-// The bodies still travel over stdin: `exec_gh_api` hands `body` to gh as `--input -`, so multi-line
-// markdown depends on no shell quoting, exactly as `--body-file -` did before.
+// The bodies travel over stdin: `exec_gh_api` hands `body` to gh as `--input -`, so multi-line
+// markdown depends on no shell quoting.
 
 // `gh api` promotes a request carrying `--input` to POST, so a creation names no method; the two
 // verbs that are not implied by a body do.
@@ -73,7 +72,7 @@ async function issue_comment(issue_number: string, body: string): Promise<string
 // The same comment, counted rather than thrown. `josh epic --add --decision-file` posts one per child
 // **after** the epic body already carries the record, so a refused comment costs that child's copy and
 // nothing else — an exception there would leave the caller unable to tell a landed insertion from one
-// that wrote nothing (joshuafolkken/kit#1350).
+// that wrote nothing.
 async function issue_try_comment(issue_number: string, body: string): Promise<boolean> {
 	return await did_write_succeed(async () => await issue_comment(issue_number, body))
 }
@@ -86,7 +85,7 @@ async function issue_try_comment(issue_number: string, body: string): Promise<bo
 //
 // **`comment: undefined` closes without commenting**, and it is what the ordering above costs: a run
 // whose comment landed and whose close was refused leaves the issue open carrying the comment, so
-// the next run must close it without posting a second copy (joshuafolkken/kit#1039). The return
+// the next run must close it without posting a second copy. The return
 // value keeps meaning what it meant — with no comment to post, the state change is not merely the
 // last thing attempted but the only one.
 //
@@ -104,21 +103,18 @@ async function issue_close(issue_number: string, comment: string | undefined): P
 	})
 }
 
-// `gh label create` accepted `#5319e7` and stripped the `#` itself; REST answers 422
-// `{"resource":"Label","code":"invalid","field":"color"}` for the same value. The one caller passes
-// the hash form (`EPIC_LABEL_COLOR`), so dropping it here is what keeps that call site unchanged.
+// REST answers 422 `{"resource":"Label","code":"invalid","field":"color"}` for a color carrying a
+// leading `#`. The one caller passes the hash form (`EPIC_LABEL_COLOR`), so dropping it here is what
+// keeps that call site unchanged.
 function to_label_color(color: string): string {
 	return color.startsWith(COLOR_HASH) ? color.slice(COLOR_HASH.length) : color
 }
 
-// `|| true` semantics, unchanged: an existing label answers 422 `already_exists`, which is not an
-// error here.
+// `|| true` semantics: an existing label answers 422 `already_exists`, which is not an error here.
 //
-// **What swallowing it costs did change, and in the safe direction.** Under `gh`, a label this call
-// failed to create surfaced later — `gh issue create --label epic` could not resolve it and failed
-// there. REST does not fail: `POST /issues` with `labels: [...]`, and `POST /issues/{N}/labels`,
-// both **create** a label the repository does not have, with a generated color and no description
-// (measured on joshuafolkken/kit#1026). So a swallowed failure here costs the label's color and
+// **Swallowing it is safe.** `POST /issues` with `labels: [...]`, and `POST /issues/{N}/labels`,
+// both **create** a label the repository does not have, with a generated color and no
+// description. So a swallowed failure here costs the label's color and
 // description, never the label itself — `epic:next` and the auto-close filter on the name, and the
 // name is applied either way.
 async function label_ensure(input: {
@@ -141,11 +137,11 @@ async function label_ensure(input: {
 }
 
 // What creating an issue over REST means, as one value both execution paths build from: the
-// collection to post to, the JSON body, and the `.html_url` unwrap that answers the browser URL
-// `gh issue create` used to print.
+// collection to post to, the JSON body, and the `.html_url` unwrap that answers the issue's browser
+// URL.
 //
 // It exists as a request rather than only as the writer below because `josh propagate` opens its
-// consumer's issue **synchronously** and cannot await (joshuafolkken/kit#1042). Spelling the same
+// consumer's issue **synchronously** and cannot await. Spelling the same
 // three decisions out again at that call site would be a second definition of the same write
 // (`CLAUDE.md` → "No clones"), so the request is shared and only the spawn differs.
 //
@@ -185,7 +181,7 @@ async function issue_create_with_label(input: {
 }
 
 // The outcome of applying one label, with the swallowed failure's gist kept for a caller that has to
-// say why it refused (joshuafolkken/kit#3312).
+// say why it refused.
 type LabelWrite = { is_applied: true } | { is_applied: false; reason: string }
 
 // The issue's label names, read back after a failed write. A read that itself fails answers
@@ -208,7 +204,7 @@ async function read_label_names(issue_number: string): Promise<Array<string> | u
 
 // **A failed answer is not a failed write.** The POST is idempotent, and a timeout, a non-zero exit
 // after the write or a secondary rate limit can each throw after the label landed — which refused a
-// lane dispatch whose label was in fact applied (joshuafolkken/kit#3312). So a throw is confirmed by
+// lane dispatch whose label was in fact applied. So a throw is confirmed by
 // reading the labels back, and only a label that is really absent answers `is_applied: false`.
 async function issue_apply_label(issue_number: string, label: string): Promise<LabelWrite> {
 	const labels_path = `${git_gh_api_path.issue_api_path(issue_number)}${LABELS_SEGMENT}`
@@ -233,15 +229,15 @@ async function issue_apply_label(issue_number: string, label: string): Promise<L
 
 // Applied after the body edit so a failure leaves an issue with the epic sections and no label,
 // which `epic:check` reports — rather than a labelled issue with nothing to track. The caller checks
-// the return: the label is what the auto-close filters on (joshuafolkken/kit#865).
+// the return: the label is what the auto-close filters on.
 async function issue_add_label(issue_number: string, label: string): Promise<boolean> {
 	const write = await issue_apply_label(issue_number, label)
 
 	return write.is_applied
 }
 
-// The counterpart to the addition above, for a run taking its own marker back off
-// (joshuafolkken/kit#1794). **The name travels in the path, so it is encoded**: a label is free to
+// The counterpart to the addition above, for a run taking its own marker back off.
+// **The name travels in the path, so it is encoded**: a label is free to
 // contain a `/` or a `#`, and an unencoded one would address a path that is not this label's.
 //
 // **It throws rather than answering `boolean`**, which is the one place it departs from
@@ -264,8 +260,8 @@ async function issue_remove_label(issue_number: string, label: string): Promise<
 // The endpoint takes `{"issue_id": <n>}` and does not check that `<n>` is an issue in this
 // repository, or that it is the number the caller meant. Posting `{"issue_id":1036}` to a scratch
 // issue in this repository recorded an issue in a completely unrelated repository — the one whose
-// database id happens to be 1036 — as a blocker, with a 200 and no warning (measured on
-// joshuafolkken/kit#1026, which names it). Every caller here names a blocker by its issue number, so
+// database id happens to be 1036 — as a blocker, with a 200 and no warning. Every caller here names
+// a blocker by its issue number, so
 // sending that number would silently record an arbitrary issue from anywhere on GitHub.
 //
 // A resolution that does not produce a usable id throws rather than returning something to send:
@@ -286,9 +282,8 @@ async function read_issue_id(issue_number: string): Promise<number> {
 }
 
 // Applied after creation, never as part of it: the relation is a nicety and the Issue is not, so a
-// failure here costs only the relation. It no longer depends on the gh CLI's version — the
-// dependencies endpoint is REST, and `gh api` has proxied REST since long before `--add-blocked-by`
-// existed (joshuafolkken/kit#1026).
+// failure here costs only the relation. It does not depend on the gh CLI's version — the
+// dependencies endpoint is REST, which `gh api` proxies.
 async function issue_add_blocked_by(issue_number: string, blocker: string): Promise<boolean> {
 	return await did_write_succeed(async () => {
 		const issue_id = await read_issue_id(blocker)
@@ -301,8 +296,8 @@ async function issue_add_blocked_by(issue_number: string, blocker: string): Prom
 }
 
 // The counterpart, for an insertion that re-points an existing chain: inserting `#N` between `#B`
-// and `#M` has to drop `#B -> #M`, or the epic would declare one order and record two
-// (joshuafolkken/kit#890). The id goes in the path here rather than in a body, and the endpoint is
+// and `#M` has to drop `#B -> #M`, or the epic would declare one order and record two.
+// The id goes in the path here rather than in a body, and the endpoint is
 // idempotent — deleting a relation that is not there answers 200.
 async function issue_remove_blocked_by(issue_number: string, blocker: string): Promise<boolean> {
 	return await did_write_succeed(async () => {

@@ -15,11 +15,9 @@ import {
 } from './issue-labels'
 import { markdown_section } from './markdown-section'
 
-// The decisions behind `josh issue:file` (joshuafolkken/kit#2808), kept apart from the command that
-// reads the network so each one is a pure answer a test can pin. Every filing used to be a hand-built
-// `gh api …/issues` call beside five steps spread over as many documents, and joshuafolkken/kit#2805
-// ran two of them and skipped the lint and the labels. Here the steps are the command's arguments:
-// a label the filing owes is a required option rather than a line to remember.
+// The decisions behind `josh issue:file`, kept apart from the command that
+// reads the network so each one is a pure answer a test can pin. The filing steps are the command's
+// arguments: a label the filing owes is a required option rather than a line to remember.
 
 const DEPTH_PREFIX = 'depth:'
 const ROUTE_PREFIX = 'route:'
@@ -161,7 +159,7 @@ function labels_of(args: FileArguments, body: string, is_auto_ok = false): Reado
 }
 
 // Why an `auto-ok` filing with neither `run:lane` nor `run:solo` is refused, or `undefined` when it is
-// not (joshuafolkken/kit#3313). The offer paths withhold every candidate while one opted-in Issue is
+// not. The offer paths withhold every candidate while one opted-in Issue is
 // untriaged, so a run's own filing without the judgement stopped every lane. No default is applied:
 // `run:solo` is the answer that keeps a verification defect from running beside others, and only a
 // reading of the Issue gives it (`backlogrun-lanes.md`).

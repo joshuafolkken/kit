@@ -52,7 +52,7 @@ const CHAINED_CONFIG_WITH_EFFECTIVE = create_version_command_config({
 })
 
 // Same hooks, plus the consumer's declaration that its global command only pins versions — the
-// opt-in that lets kit prove the command dead once that pin is already installed (#697).
+// opt-in that lets kit prove the command dead once that pin is already installed.
 const CHAINED_CONFIG_WITH_PINNED_COMMAND = create_version_command_config({
 	package_name: MAIN_PACKAGE,
 	upstreams: [

@@ -27,18 +27,16 @@ function build_report(hits: ReadonlyArray<ManagedHit>): Array<string> {
 	return [REPORT_HEADING, REPORT_PATHS_HEADING, managed_config_scope.format_hits(hits)]
 }
 
-// **This reports; it does not stop the merge** (joshuafolkken/kit#1592). joshuafolkken/kit#1578 made
-// it a confirmation gate that exited non-zero ahead of the CI wait, and in kit the condition it tests
-// is nearly always true: kit is the distribution source, so every change to `CLAUDE.md`, to
-// `prompts/`, to `.claude/skills/` or to the distributed part of `docs/` is by definition a change to
-// a distributed path. Measured on `epicrun #1413`, **two of three children stopped here** — and in
-// both the distributed file was what the Issue's own acceptance criteria had ordered changed. The
-// gate was not catching an unintended edit; it was stopping the work.
+// **This reports; it does not stop the merge**. In kit the condition it tests is nearly always
+// true: kit is the distribution source, so every change to `CLAUDE.md`, to `prompts/`, to
+// `.claude/skills/` or to the distributed part of `docs/` is by definition a change to a distributed
+// path, usually one the Issue's own acceptance criteria ordered changed. A gate that exits non-zero
+// here would not catch an unintended edit; it would stop the work.
 //
 // **There is deliberately no branch on which repository this is.** The alternative — stop in a
 // consumer, where editing a distributed file really is the mistake `CLAUDE.md` → "Route
-// distributed-doc / config changes upstream to kit" names, and stay quiet in kit — was weighed and
-// rejected on joshuafolkken/kit#1592: it needs a distribution-source test this package does not have,
+// distributed-doc / config changes upstream to kit" names, and stay quiet in kit — is rejected: it
+// needs a distribution-source test this package does not have,
 // no case is recorded of the gate saving a consumer's work, and the report below reaches a consumer's
 // reader just as well. `managed_config_scope` matches both ends of every mapping and distinguishes no
 // repository, and that property is kept rather than worked around.

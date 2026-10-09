@@ -1,7 +1,7 @@
 import { git_spawn } from '#scripts/git/git-spawn'
 
 // The one place a sanctioned `git stash pop` is targeted by its message rather than its stack
-// position (joshuafolkken/kit#2050). The stash is a single repository-wide stack shared by every
+// position. The stash is a single repository-wide stack shared by every
 // working tree of the repository, so a bare `git stash pop` — or a positional `stash@{n}` read
 // before another lane pushed — pops whatever now sits on top, which is how one lane's parked work
 // ended up in another lane's tree. Resolving the selector from the message the stash was pushed
@@ -70,8 +70,7 @@ function select(entries: ReadonlyArray<StashEntry>, message: string): Selection 
 }
 
 // The stash is a repository-level stack every work tree shares, so the list reads the same wherever
-// it runs; `dir` is what makes the pop land in the lane's tree rather than the primary checkout —
-// the `git -C <dir>` a lane child used to write by hand.
+// it runs; `dir` is what makes the pop land in the lane's tree rather than the primary checkout.
 function git_args(directory: string | undefined, args: Array<string>): Array<string> {
 	return directory === undefined ? args : ['-C', directory, ...args]
 }
@@ -97,7 +96,7 @@ async function has_conflict(directory?: string): Promise<boolean> {
 }
 
 // Uncommitted work is anything `git status --porcelain` lists — untracked files included, which is what
-// `push` below carries with `-u`, so the two agree on what "work" means (joshuafolkken/kit#2476).
+// `push` below carries with `-u`, so the two agree on what "work" means.
 async function has_changes(directory?: string): Promise<boolean> {
 	return (await git_spawn.read(git_args(directory, ['status', '--porcelain']))) !== ''
 }
@@ -108,7 +107,7 @@ async function push(message: string, directory?: string): Promise<void> {
 	await git_spawn.read(git_args(directory, ['stash', 'push', '-u', '-m', message]))
 }
 
-// The stack keyed by commit rather than position (joshuafolkken/kit#2701): a sweep that reads the
+// The stack keyed by commit rather than position: a sweep that reads the
 // stack, asks GitHub about each entry and only then drops one would drop whatever another lane pushed
 // on top in the meantime if it kept the `stash@{n}` it read first. The `selector` of each entry here is
 // its commit hash, which never moves.

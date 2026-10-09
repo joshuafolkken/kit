@@ -1,6 +1,6 @@
 import { split_assess, type SplitVerdict } from '#scripts/split/split-assess'
 
-// The filing-time counterpart to the split assessment (joshuafolkken/kit#2213).
+// The filing-time counterpart to the split assessment.
 //
 // `split-assessment.md` → "The question" decides whether *one request* is really several
 // deliverables; this decides whether *several findings filed from one session* fold into one Issue or
@@ -14,7 +14,7 @@ import { split_assess, type SplitVerdict } from '#scripts/split/split-assess'
 // why an unmeasurable size never tips to `separate`: that would reproduce the every-finding-its-own-Issue
 // behavior this exists to end.
 //
-// **Nor does an unmeasurable size fold** (joshuafolkken/kit#3423). The size half is read off the working
+// **Nor does an unmeasurable size fold**. The size half is read off the working
 // tree's diff, and a filing made before any implementation — `kickoff new`, a split's children — has
 // no diff that says anything about the findings' size. Reading that as `single` folded every such
 // filing; it answers `undetermined` instead, which leaves the size to the whole request's estimate

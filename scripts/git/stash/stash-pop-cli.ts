@@ -3,8 +3,8 @@ import { error_text } from '#scripts/lib/error-message'
 import { git_stash } from './git-stash'
 import { stash_pop_args, type Request } from './stash-pop-args'
 
-// `josh stash:pop "<message>"` — pop the stash whose message matches, and no other
-// (joshuafolkken/kit#2050). The stash stack is shared by every working tree of the repository, so a
+// `josh stash:pop "<message>"` — pop the stash whose message matches, and no other.
+// The stash stack is shared by every working tree of the repository, so a
 // procedure that pops by position takes whatever another lane last pushed. This resolves the
 // selector from the message and pops that entry alone; no match and more than one match are both
 // refusals rather than a guess at which was meant.
@@ -32,7 +32,7 @@ function refuse(): number {
 }
 
 // A pop that leaves unmerged paths applied the stash and only needs the conflicts resolved, so it is
-// reported `conflicted` at exit 0 rather than raised as an unknown failure (joshuafolkken/kit#2050);
+// reported `conflicted` at exit 0 rather than raised as an unknown failure;
 // any other pop error is re-thrown for `run` to report. `has_conflict` reads the tree the pop wrote.
 async function pop_selected(selector: string, directory: string | undefined): Promise<number> {
 	try {

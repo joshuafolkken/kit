@@ -4,14 +4,14 @@ import { yaml_document } from '#scripts/lib/yaml-document'
 import semver from 'semver'
 import { z } from 'zod'
 
-// The minimum-release-age quarantine (kit#768), applied natively instead of inherited from
-// safe-chain's interception. safe-chain filters the registry only when the process tree was
-// started through one of its six wrapped shell commands, so `josh latest` and
-// `pnpm josh latest` used to resolve different "newest release" answers. These functions
-// make the resolution deterministic: the policy comes from the repo-managed `pnpm-workspace.yaml`,
-// the publish timestamps from the registry, and the selection is a pure computation over both.
-// pnpm 12 reads its settings from `pnpm-workspace.yaml` — a `minimum-release-age` line in `.npmrc`
-// is ignored there, so reading it would report a window pnpm does not apply (kit#3267).
+// The minimum-release-age quarantine, applied natively instead of inherited from safe-chain's
+// interception. safe-chain filters the registry only when the process tree was started through one
+// of its wrapped shell commands, so `josh latest` and `pnpm josh latest` would resolve different
+// "newest release" answers. These functions make the resolution deterministic: the policy comes
+// from the repo-managed `pnpm-workspace.yaml`, the publish timestamps from the registry, and the
+// selection is a pure computation over both. pnpm 12 reads its settings from `pnpm-workspace.yaml`
+// — a `minimum-release-age` line in `.npmrc` is ignored there, so reading it would report a window
+// pnpm does not apply.
 
 const NO_QUARANTINE_MINUTES = 0
 const WORKSPACE_PATH = 'pnpm-workspace.yaml'
@@ -78,7 +78,7 @@ function is_eligible(
 // `major` pins the search to one major line — what `josh latest` needs, since corepack validates the
 // resolved pnpm version against `devEngines`. Pass `undefined` to search every major, which is what
 // an "is this installable at all" question wants: `pnpm add pkg@latest` resolves to the newest
-// permitted release regardless of major (joshuafolkken/kit#808).
+// permitted release regardless of major.
 function select_aged_version(
 	times: Record<string, string>,
 	major: string | undefined,
@@ -112,7 +112,7 @@ function read_declared_minimum_release_age(workspace_path: string): number | und
 //
 // Deliberately not the upward walk below: `josh latest` resolves this against the working directory
 // it also writes `corepack use` into, and honouring an ancestor's policy there could freeze pnpm
-// bumps in a project that declares none (joshuafolkken/kit#808).
+// bumps in a project that declares none.
 function read_minimum_release_age(workspace_path: string = WORKSPACE_PATH): number {
 	return read_declared_minimum_release_age(workspace_path) ?? NO_QUARANTINE_MINUTES
 }
@@ -121,7 +121,7 @@ function read_minimum_release_age(workspace_path: string = WORKSPACE_PATH): numb
 //
 // This walks rather than reading one path because `josh version` and `josh latest` both run from
 // anywhere inside a project — and from outside one — so resolving against the working directory
-// alone would silently read "no quarantine" in every subdirectory (joshuafolkken/kit#808). pnpm
+// alone would silently read "no quarantine" in every subdirectory. pnpm
 // finds its workspace root the same way, by walking up to the nearest `pnpm-workspace.yaml`.
 //
 // `boundary` stops the walk at a known root. Production passes none, while tests bound the search

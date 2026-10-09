@@ -20,7 +20,7 @@ interface PullComment {
 }
 
 // `undefined` when the listing could not be read, which is not the same as a pull request with no
-// line comments (joshuafolkken/kit#973).
+// line comments.
 function parse_pull_comments(raw_json: string | undefined): Array<PullComment> | undefined {
 	if (raw_json === undefined) return undefined
 
@@ -58,13 +58,14 @@ function log_unresolved_coderabbit(urls: ReadonlyArray<string>): void {
 	}
 }
 
-// Temporary (kit#753): unresolved CodeRabbit line comments no longer block the merge. They are
+// Temporary: unresolved CodeRabbit line comments do not block the merge. They are
 // logged, returned as audit notes for the completion notification, and — when an ignore reason is
-// supplied — still documented on the PR. Revert together with kit#752.
+// supplied — still documented on the PR. Revert together with the rest of the temporary CodeRabbit
+// non-blocking policy.
 // Unreadable is reported, never blocked — the opposite of the AI review gate's handling of the same
-// gap, and for the reason kit#753 gave: CodeRabbit does not block the merge at all right now, so an
+// gap, and for the policy's own reason: CodeRabbit does not block the merge at all right now, so an
 // unreadable CodeRabbit listing cannot either. What it must not do is pass as "nothing unresolved",
-// which is what the reader's old `'[]'` made of it (joshuafolkken/kit#973).
+// which is what reading it as `'[]'` would make of it.
 const UNREADABLE_CR_NOTE =
 	'CodeRabbit line comments could not be read; unresolved findings were not checked (kit#753).'
 
@@ -87,7 +88,8 @@ async function report_unreadable_cr(input: {
 }
 
 // Documented on the pull request when a reason was given, logged when it was not. Either way the
-// finding is recorded rather than dropped — kit#753 removed the block, not the audit trail.
+// finding is recorded rather than dropped — the non-blocking policy removes the block, not the
+// audit trail.
 async function record_unresolved_cr(input: {
 	branch_name: string
 	ignore_reason: string | undefined

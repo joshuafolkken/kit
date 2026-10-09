@@ -1,10 +1,10 @@
 import { repository_lock } from '#scripts/git/repository-lock'
 
-// One stash sweep at a time per repository (joshuafolkken/kit#2701). The stash is a single stack every
+// One stash sweep at a time per repository. The stash is a single stack every
 // work tree shares, and a `backlogrun` runs one sweep per lane seat at once: two sweeps that each
 // resolve the same entry to `stash@{n}` and drop it would have the second drop land on whichever entry
 // moved into that position, and two that carry the same ledger lines would both append them. The
-// locking itself is `repository-lock.ts`, shared with the work-tree writes (joshuafolkken/kit#2736).
+// locking itself is `repository-lock.ts`, shared with the work-tree writes.
 
 const LOCK_PREFIX = 'josh-stash-sweep-lock-'
 // The locked phase is local git and one file append per entry, so a holder finishes in well under the

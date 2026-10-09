@@ -63,8 +63,8 @@ function report_kept_back(regressions: ReadonlyArray<VersionRegression>): void {
 
 // The direct-dependency `--latest` bump lifts the package.json ranges; this second, argument-less
 // pass then re-resolves every tier the lockfile carries within those ranges, which is the only stage
-// that reaches the indirect packages a direct-only update leaves pinned at a stale resolution
-// (joshuafolkken/kit#2200). `pnpm update` defaults to depth Infinity, so no flag is needed to reach
+// that reaches the indirect packages a direct-only update leaves pinned at a stale resolution.
+// `pnpm update` defaults to depth Infinity, so no flag is needed to reach
 // the whole tree. The re-resolution stage always runs — even when every direct dependency is
 // overridden and the `--latest` stage is absent, the indirect tiers still need re-resolving.
 const PNPM_UPDATE_ALL_TIERS = ['pnpm', 'update']

@@ -5,34 +5,34 @@
  * The target version is resolved from the registry's publish timestamps
  * (`pnpm view pnpm time --json`) instead of a dist-tag, because pnpm publishes its
  * per-major tag `latest-<major>` only for SUPERSEDED majors — while <major> is the newest
- * major, the only tag covering it is `latest` (kit#750). The former `latest-<major>` pin
- * (kit#444) therefore failed on every run in the common case, and `latest` itself can
- * momentarily point below the devEngines floor. Picking the newest registry version whose
- * major equals the `packageManager` pin keeps both invariants: never below the adopted
- * major, and advancing while that major is the current one.
+ * major, the only tag covering it is `latest`, so a `latest-<major>` pin would fail on every
+ * run in the common case, and `latest` itself can momentarily point below the devEngines
+ * floor. Picking the newest registry version whose major equals the `packageManager` pin keeps
+ * both invariants: never below the adopted major, and advancing while that major is the
+ * current one.
  *
- * The `minimumReleaseAge` quarantine is applied natively from `pnpm-workspace.yaml` (kit#768,
- * #3267). safe-chain filters the registry only when the process tree was launched through one
- * of its wrapped shell commands, so `josh latest` and `pnpm josh latest` used to resolve
- * different answers and the pin oscillated. Reading the window from the repo-managed
+ * The `minimumReleaseAge` quarantine is applied natively from `pnpm-workspace.yaml`.
+ * safe-chain filters the registry only when the process tree was launched through one of its
+ * wrapped shell commands, so `josh latest` and `pnpm josh latest` would resolve different
+ * answers and the pin would oscillate. Reading the window from the repo-managed
  * `pnpm-workspace.yaml` and filtering by publish timestamp makes the resolution identical in
  * every invocation context; right after a pnpm release the answer is simply the previous
- * release, exactly as the filtered view behaved.
+ * release, exactly as the filtered view behaves.
  *
  * The resolved version is floored at the current `packageManager` pin: a filtered registry
  * view legitimately answers below a freshly adopted pin for the first 24 hours after every
- * pnpm release, and writing that answer would downgrade the protected toolchain pin
- * (kit#766). Not-newer answers skip the bump non-fatally instead.
+ * pnpm release, and writing that answer would downgrade the protected toolchain pin.
+ * Not-newer answers skip the bump non-fatally instead.
  *
  * `devEngines.packageManager.version` is realigned with the `packageManager` pin on every
- * path — bumped, skipped, or unresolvable (kit#773). Alignment used to run only after a
- * successful bump, which never fires in the steady state of an up-to-date repository, so a
- * manifest that arrived with the two fields out of step kept the pnpm dual-declaration
- * warning forever. The alignment is idempotent, so running it unconditionally is free.
+ * path — bumped, skipped, or unresolvable. A bump never fires in the steady state of an
+ * up-to-date repository, so alignment gated on one would leave a manifest that arrived with
+ * the two fields out of step warning forever. The alignment is idempotent, so running it
+ * unconditionally is free.
  *
- * A failed bump exits non-zero with its cause, the manifest restored (#3361). It used to be
- * swallowed as a skip, so `latest:scope --record` marked the run fresh and a pnpm that could not
- * self-update (the Corepack shim refuses it) stayed pinned silently. `josh latest` runs this step
+ * A failed bump exits non-zero with its cause, the manifest restored — a skip would let
+ * `latest:scope --record` mark the run fresh while a pnpm that could not self-update (the
+ * Corepack shim refuses it) stayed pinned silently. `josh latest` runs this step
  * last, right before the record, so the dependency update and the audit still finish and only the
  * record is withheld. A registry answer not newer than the pin, or nothing aged past the
  * quarantine window yet, remains a non-fatal skip.
@@ -60,7 +60,7 @@ const INTEGRITY_RE = /^sha512-([A-Za-z0-9+/]+={0,2})$/u
 const PACKAGE_MANAGER_VALUE_RE = /("packageManager"\s*:\s*")pnpm@[^"]+(")/u
 
 // `target` is undefined both when the registry did not answer and when it answered but nothing has
-// aged past the quarantine window yet; only the first is a failure (#3361).
+// aged past the quarantine window yet; only the first is a failure.
 interface TargetResolution {
 	target: string | undefined
 	is_registry_reachable: boolean
@@ -108,7 +108,7 @@ function extract_pinned_version(package_json_content: string): string | undefine
 
 // Never move the pin backwards. A filtered registry view (safe-chain's minimum-release-age
 // proxy) answers below a freshly adopted pin for 24 hours after every pnpm release, and an
-// equal answer would only rewrite the same value — both skip instead (kit#766).
+// equal answer would only rewrite the same value — both skip instead.
 function is_target_not_newer_than_pin(target: string, pinned_version: string | undefined): boolean {
 	if (pinned_version === undefined) return false
 	const target_version = target.slice(TARGET_PREFIX.length)
@@ -160,7 +160,7 @@ function resolve_major_target(major: string): TargetResolution {
 	// The project's own `pnpm-workspace.yaml`, deliberately not the upward walk the version check
 	// uses: `josh latest` reads `package.json` and writes the pnpm pin relative to the working
 	// directory, so it has no subdirectory case — and honouring an ancestor's policy here could freeze
-	// pnpm bumps in a project that declares none (joshuafolkken/kit#808).
+	// pnpm bumps in a project that declares none.
 	const version = release_age.select_aged_version(
 		times,
 		major,
@@ -238,7 +238,7 @@ function run_pnpm_update(target: string): number {
 // fields keep matching (pnpm suppresses the dual-declaration warning only on an exact
 // match). Runs on every path, not just after a successful bump: a repository that arrives
 // with the two fields already out of step sits in the no-bump steady state forever, so an
-// alignment gated on a bump would never repair it (kit#773).
+// alignment gated on a bump would never repair it.
 function sync_development_engines(package_json_path: string = PACKAGE_JSON_PATH): void {
 	const content = readFileSync(package_json_path, 'utf8')
 	const aligned = package_manager_version.align_development_engines_version(content)
@@ -311,7 +311,7 @@ function restore_integrity(target: string, integrity: string): void {
 }
 
 // The equal case is the steady state of every up-to-date run, so it logs as success; only
-// an answer strictly below the pin is the anomaly worth a warning (kit#766).
+// an answer strictly below the pin is the anomaly worth a warning.
 function notify_skipped_bump(target: string, pinned_version: string): void {
 	if (target === `${TARGET_PREFIX}${pinned_version}`) {
 		console.info(`✔ pnpm pin ${pinned_version} already matches the newest registry release.`)
@@ -376,7 +376,7 @@ function bump_package_manager(original: string, target: string): number {
 }
 
 // An unreachable registry fails, so the unrecorded run is retried. A reachable one with nothing
-// aged past the quarantine window is the kit#768 skip — like a not-newer answer, there is nothing
+// aged past the quarantine window is the quarantine skip — like a not-newer answer, there is nothing
 // to adopt yet, and failing would stall every run for up to the whole window.
 function report_unresolved(major: string | undefined, is_registry_reachable: boolean): number {
 	const label = `pnpm ${major ?? ''}`.trimEnd()

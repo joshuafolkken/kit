@@ -1,8 +1,8 @@
 import { execa } from 'execa'
 import { git_utilities } from './constants'
 
-// The ssh environment every git network call runs under (joshuafolkken/kit#2942). It began inside
-// `git-push-transport.ts` as the push's own (joshuafolkken/kit#1251), and moved here when the fetch
+// The ssh environment every git network call runs under. It began inside
+// `git-push-transport.ts` as the push's own, and moved here when the fetch
 // and pull of `josh main:sync` turned out to need the same thing: a dead connection under a `git
 // fetch` was waited on for 37 minutes, stalling the unattended backlog driver behind it.
 //

@@ -10,8 +10,8 @@ import { git_ssh_keepalive } from './git-ssh-keepalive'
 
 const MS_PER_SECOND = 1000
 
-// The budget for one `git push`, and the reason a push can no longer wait without end
-// (joshuafolkken/kit#1251). Measured on PR #1244: the commit itself took 0.6 seconds and the push
+// The budget for one `git push`, and the reason a push can no longer wait without end.
+// Measured on PR #1244: the commit itself took 0.6 seconds and the push
 // then sat silent for 8 minutes 13 seconds before it was found by hand and killed — about 9 minutes
 // 50 seconds of a 72-minute run, with no way while waiting to tell a stalled push from a slow one.
 // `execa` has always accepted a `timeout`; the push path never passed one, which left it the single

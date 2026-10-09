@@ -3,13 +3,13 @@ import { repo_origin } from '#scripts/discovery/repo-origin'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { issue_cite } from './issue-cite'
 
-// How a josh command names an Issue in what it prints to the session (joshuafolkken/kit#3424).
+// How a josh command names an Issue in what it prints to the session.
 //
 // **A line a command prints is a line a session copies.** A run quotes a progress line, a warning or a
 // refusal into its reply verbatim, and a bare `#N` in that line reaches the reply as a bare `#N` — which
 // the Stop guard then sends back for a second turn spent re-citing it. Printing the citation form at the
 // source makes the cheap path and the correct path the same one, the reasoning `issue:cite` itself was
-// built on (joshuafolkken/kit#2220).
+// built on.
 //
 // **The repository is read from the work tree's own `origin`, not asked of `gh`.** Most printing sites
 // hold no `owner/repo`, and a network read per printed line would put a round trip — and a way to fail

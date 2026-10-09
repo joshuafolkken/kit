@@ -3,16 +3,16 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 
 // The shared half of every "report a GitHub repository setting kit cannot write" check.
 //
-// Two such checks exist — `automated-security-fixes` (joshuafolkken/kit#805) and `allow_auto_merge`
-// (joshuafolkken/kit#834) — and they agree on everything that is not wording: the same bounded
+// Two such checks exist — `automated-security-fixes` and `allow_auto_merge`
+// — and they agree on everything that is not wording: the same bounded
 // `gh api` call, the same rule that an answer which cannot be read is never reported as a negative
 // answer, and the same blank-line-separated report block. That agreement is the contract, so it
 // lives here once rather than being re-derived per setting.
 type RepoSettingStatus = 'enabled' | 'disabled' | 'unreadable'
 
 // Bounded, unlike the repository lookup: these calls only decide what a report *says*, never what
-// gets written, so a timeout degrades to `could not be read` and costs nothing. `josh doctor` made
-// no network calls at all before joshuafolkken/kit#805, and this keeps it prompt.
+// gets written, so a timeout degrades to `could not be read` and costs nothing, and keeps
+// `josh doctor` prompt.
 const GH_TIMEOUT_MS = 5000
 
 // A literal `<owner>/<repo>` would be unusable when pasted into a shell, where `<` redirects — but

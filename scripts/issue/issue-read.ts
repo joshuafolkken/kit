@@ -2,8 +2,7 @@ import { parse_json_object_safe, read_json_listing } from '#scripts/git/parse-js
 import { z } from 'zod'
 
 // The block `josh issue:read` prints for one issue, kept apart from the reading and the printing so
-// the shape of the report is decided by one pure function — the seam `issue-state.ts` already has
-// (joshuafolkken/kit#1715).
+// the shape of the report is decided by one pure function — the seam `issue-state.ts` already has.
 //
 // **It exists because reading one issue costs a parent two turns.** `.claude/skills/workflow-commands/SKILL.md`
 // `issue-comments.md` requires the body *and* the comments, since a decision recorded after the body was written
@@ -11,7 +10,7 @@ import { z } from 'zod'
 // `gh api repos/{owner}/{repo}/issues/<N>/comments`. Measured over four recorded `backlogrun`
 // parents, `issue bookkeeping` was the single largest contributor to the parent's turn count — 110 of
 // 414 turns, 26.6% — and one-issue-at-a-time `gh api` reads were its dominant shape. A parent's cost
-// grows as n²/2 in its own request count (joshuafolkken/kit#1567), so those turns are the
+// grows as n²/2 in its own request count, so those turns are the
 // distribution this collapses.
 //
 // **The comments are never silently absent.** A listing that could not be read prints a line saying

@@ -1,8 +1,7 @@
 import { INTERRUPT_ROUTE_LABEL, SPLIT_ROUTE_LABEL, TIER_A_ROUTE_LABEL } from './issue-labels'
 
-// The WIP cap at the call that files (joshuafolkken/kit#3181). The count used to be a hand-run
-// `gh api … | wc -l` the agent compared with the cap itself; `josh issue:file` now reads it and asks
-// the exemption question before anything is sent, the same hold `--distinct` places on a duplicate.
+// The WIP cap at the call that files. `josh issue:file` reads the count and asks the exemption
+// question before anything is sent, the same hold `--distinct` places on a duplicate.
 // What stays judgement — whether a filing is exempt — is declared by the route or by `--over-cap`.
 
 // `WIP_CAP` is the number's single source; `wip-cap.md` states it once and a test pins the two equal.

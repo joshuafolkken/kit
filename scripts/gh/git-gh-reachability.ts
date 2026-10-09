@@ -1,20 +1,19 @@
 // Whether GitHub answered at all — the question a failed read has to ask before it calls itself a
-// structural failure (joshuafolkken/kit#1663).
+// structural failure.
 //
-// **The question is now asked of the failed request itself, not of a later one**
-// (joshuafolkken/kit#1690). `probe()` used to fire one request at `rate_limit` after the reads were
-// over and the answer otherwise final; a connection that dropped for a few hundred milliseconds
-// failed a read at t=0 and answered that probe `reachable`, so the run kept the verdict the probe
-// gave it rather than the one the read had. What remains here is the classification — status to
-// retryable-or-not — which `git-gh-issue-read.ts` applies to the status the failed request carried
-// on its own error document.
+// **The question is asked of the failed request itself, not of a later one.** A probe fired at
+// `rate_limit` after the reads are over would misread a connection that dropped for a few hundred
+// milliseconds: it fails a read at t=0 and answers the probe `reachable`, so the run would keep the
+// verdict the probe gave it rather than the one the read had. What lives here is the
+// classification — status to retryable-or-not — which `git-gh-issue-read.ts` applies to the status
+// the failed request carried on its own error document.
 //
 // A dropped connection, a name that would not resolve, a rate limit and a 5xx are **retryable**: the
 // same request a moment later can succeed, and nothing about the repository has to change first. A
 // 404 or a 401 is not — the issue is absent or the credentials are wrong, and asking again answers
-// the same. Callers that cannot tell the two apart have to choose one meaning for both, and
-// joshuafolkken/kit#1663 measured what that costs: an unattended run reported thirteen runnable
-// issues as an unresolvable dependency graph because DNS hiccuped once.
+// the same. Callers that cannot tell the two apart have to choose one meaning for both, and the
+// cost is concrete: an unattended run can report thirteen runnable issues as an unresolvable
+// dependency graph because DNS hiccuped once.
 //
 // **It classifies by status code and not by gh's wording**, which is the same argument
 // `issue_view_json_classified` records for separating 404 from the rest: a message is prose that can
@@ -25,7 +24,7 @@
 // **403 is deliberately not retryable.** GitHub does spell some secondary rate limits that way, but
 // it is equally how a SAML-SSO-unauthorized token, an IP allowlist and an org policy each answer —
 // all permanent, and all diagnosed correctly by the `gh auth status` advice the unusable-graph
-// report already carries. Reading one of those as a connection problem would be this Issue's own
+// report already carries. Reading one of those as a connection problem would be the same
 // misdirection pointed the other way, so the ambiguous status is left with the permanent meaning and
 // only the unambiguous ones — 429, 5xx, and no answer at all — are treated as worth asking again.
 const RATE_LIMITED_STATUS = 429

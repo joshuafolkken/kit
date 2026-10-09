@@ -2,7 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { lane_paths, type LaneEnvironment } from '#scripts/lane/lane-paths'
 
-// Refuse a dependency update inside a lane (joshuafolkken/kit#2135).
+// Refuse a dependency update inside a lane.
 //
 // `latest:scope` reads how long ago `josh latest` last finished, and that stamp is keyed to the
 // project root. A lane is a linked work tree whose project root is its own directory, so a fresh

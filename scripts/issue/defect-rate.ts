@@ -8,22 +8,19 @@ import {
 } from './issue-labels'
 import { markdown_section } from './markdown-section'
 
-// The defect rate of merged work over a window (joshuafolkken/kit#2449): issues filed as defects
+// The defect rate of merged work over a window: issues filed as defects
 // divided by enhancements completed. Both sides are read from labels and the defect declaration line,
 // so nothing here asks for a judgement.
 
 // A body declares itself a defect with this exact line, the sibling of the behavior-change declaration.
 // Older bodies rarely wrote it, so the labels a maintainer re-applied after review count as well — the
 // name changed over time (`bugfix` earlier, `bug` from `issue:file`), and the labels read both periods
-// by one standard where the declaration alone moved the rate with the filing habit
-// (joshuafolkken/kit#3560).
+// by one standard where the declaration alone moved the rate with the filing habit.
 const DEFECT_DECLARATION_LINE = '- 種別: 不具合'
 const DEFECT_LABELS: ReadonlyArray<string> = [BUG_LABEL, BUGFIX_LABEL, INTERRUPT_ROUTE_LABEL]
 const DEFAULT_WINDOW_DAYS = 14
-// The rate over 2026-09-09 to 2026-09-23 re-measured by the label definition — 150 / 206, rounded,
-// recorded on joshuafolkken/kit#3560 (the declaration-only 0.42 of joshuafolkken/kit#2449 counted too
-// few in that period). `backlog:next` defers new mechanisms while the current rate is above it
-// (joshuafolkken/kit#2455).
+// The rate over 2026-09-09 to 2026-09-23 measured by the label definition — 150 / 206, rounded.
+// `backlog:next` defers new mechanisms while the current rate is above it.
 const BASELINE_RATE = 0.73
 const MS_PER_DAY = 86_400_000
 const ISO_DATE_LENGTH = 10

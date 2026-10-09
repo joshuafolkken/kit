@@ -1,7 +1,7 @@
 import { git_command } from '#scripts/git/git-command'
 
 // The checkout `josh review:brief` is describing — the one thing the forked `/code-review` agent
-// cannot work out for itself (joshuafolkken/kit#1522).
+// cannot work out for itself.
 //
 // **`/code-review` runs in a fork that inherits the *session's* working directory, not the run's.**
 // Where the run implementing the change is a lane — a linked work tree under `.kit-lanes/` — that is
@@ -23,7 +23,7 @@ interface ReviewCheckout {
 
 // Three git reads that do not depend on each other, so they are issued together rather than one after
 // another: the brief is printed in front of a review the run is waiting on. The root is a near-instant
-// synchronous `rev-parse` (joshuafolkken/kit#3065); the branch and head still overlap.
+// synchronous `rev-parse`; the branch and head still overlap.
 async function read_checkout(): Promise<ReviewCheckout> {
 	const [root, branch, head] = await Promise.all([
 		git_command.repository_root(),

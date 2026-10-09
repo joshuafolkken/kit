@@ -18,7 +18,7 @@ function local_tags(): Array<string> {
 	return output.split('\n')
 }
 
-// **No argument reaches the publish** (joshuafolkken/kit#3385). The command reads only the
+// **No argument reaches the publish**. The command reads only the
 // environment, so a `--help` it ignored would create a real GitHub Release; a help request prints
 // the usage and any other argument is refused, both before the environment is read.
 async function run_argv(argv: ReadonlyArray<string>): Promise<number> {

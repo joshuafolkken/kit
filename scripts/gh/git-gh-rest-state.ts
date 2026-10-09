@@ -4,7 +4,7 @@
 // answered `OPEN` / `CLOSED` / `MERGED` and every reader downstream compares against that spelling.
 // Two endpoints have to recompose the third value from different fields — the issue endpoint from
 // `pull_request.merged_at`, the pulls endpoint from `merged` — so the rule they share is named here
-// rather than in either of them (joshuafolkken/kit#1027).
+// rather than in either of them.
 const MERGED_STATE = 'MERGED'
 
 function to_gh_state(state: string | undefined): string | undefined {

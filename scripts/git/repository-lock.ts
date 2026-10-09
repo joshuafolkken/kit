@@ -8,7 +8,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { git_common_directory } from './git-common-directory'
 
 // One holder at a time per repository, for work that every work tree of that repository shares
-// (joshuafolkken/kit#2701 for the stash sweep, joshuafolkken/kit#2736 for `git worktree add`). The
+// (the stash sweep, `git worktree add`). The
 // record is keyed on the git common directory, so every work tree of one repository contends for one
 // record per lock name, and it lives in the platform temp root beside the other stamps rather than
 // inside `.git`. Each caller names its own lock with a prefix, so two unrelated kinds of work never
@@ -121,7 +121,7 @@ async function acquire(target: string, max_wait_ms: number): Promise<boolean> {
 }
 
 // A blocking wait for a caller that cannot await. `Atomics.wait` parks the thread without spinning, so
-// a writer queued behind another costs no CPU while it waits (joshuafolkken/kit#3446).
+// a writer queued behind another costs no CPU while it waits.
 function sleep_sync(ms: number): void {
 	Atomics.wait(SLEEP_CELL, 0, 0, ms)
 }
@@ -154,7 +154,7 @@ async function with_lock<T>(
 }
 
 // `with_lock` for synchronous work — a read-modify-write that holds the lock for milliseconds, whose
-// callers are synchronous all the way up (joshuafolkken/kit#3446).
+// callers are synchronous all the way up.
 function with_lock_sync<T>(work: () => T, target: string, max_wait_ms: number): T | undefined {
 	if (!acquire_sync(target, max_wait_ms)) return undefined
 

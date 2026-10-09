@@ -9,7 +9,7 @@ import {
 import { PUSH_TIMEOUT_MS } from './git-push-transport'
 import { git_ssh_keepalive } from './git-ssh-keepalive'
 
-// The one place the ordinary git commands are spawned from (joshuafolkken/kit#1640). It sits in a
+// The one place the ordinary git commands are spawned from. It sits in a
 // module of its own rather than inside `git-command.ts` so that a second command module —
 // `git-worktree.ts` — can read it without importing the first. `read` is what resolves the git binary
 // and turns a non-zero exit into an error, and a second spawn helper beside it would be the clone
@@ -19,7 +19,7 @@ import { git_ssh_keepalive } from './git-ssh-keepalive'
 // second helper of this kind: a push needs a transport-fault retry that no other command has, so it
 // spawns git itself. The timeout it carries is shared here by `read_remote` / `with_output_remote`. Those two files are the spawn sites of the ordinary command
 // modules — the claim stops there. A synchronous caller goes through `git-spawn-sync.ts`, the same
-// binary resolution with a result instead of an exception (joshuafolkken/kit#3065). Other parts of
+// binary resolution with a result instead of an exception. Other parts of
 // this package spawn git for their own purposes (`scripts/run/progress/run-progress-clock.ts`,
 // `scripts/git/git-fixture-workspace.ts`), and an audit of how the git binary is resolved has to read
 // those too.
@@ -34,7 +34,7 @@ async function read(arguments_: Array<string>): Promise<string> {
 	return stdout.trimEnd()
 }
 
-// The budget for a git call that talks to the remote — `fetch` and `pull` (joshuafolkken/kit#2942).
+// The budget for a git call that talks to the remote — `fetch` and `pull`.
 // `read` and `with_output` wait without end, and a `git fetch --prune` under `josh main:sync` sat on
 // a dead ssh connection for 37 minutes, stalling the unattended backlog driver whose merge step runs
 // it. The push's budget is reused rather than a second number chosen: both transfer objects over the

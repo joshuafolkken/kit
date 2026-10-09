@@ -7,13 +7,13 @@ import { release_history } from './release-history'
 import { release_plan, type ReleasePlan } from './release-plan'
 import { release_publish } from './release-publish'
 
-// `pnpm josh release` — the one place that decides a version (joshuafolkken/kit#1169).
+// `pnpm josh release` — the one place that decides a version.
 //
 // It does three things and no more: count the merges main has taken since the version last changed,
 // report and stop when that count is zero, and otherwise raise the version by that many minors, open
 // a pull request, merge it and watch for the tag.
 //
-// **It never touches the root checkout** (joshuafolkken/kit#2411). The count is read from
+// **It never touches the root checkout**. The count is read from
 // `origin/<default>`, and the version bump / commit / push happen in a dedicated work tree
 // `release_publish` cuts for the release — so a release can run beside a `backlogrun` (which keeps the
 // root on the default branch) and can start even when the root is dirty or on another branch.
@@ -76,7 +76,7 @@ function is_dry_run_requested(argv: ReadonlyArray<string>): boolean {
 	return argv.slice(ARGUMENT_START).includes(DRY_RUN_FLAG)
 }
 
-// **Only a known argument reaches the release** (joshuafolkken/kit#3384). The command publishes,
+// **Only a known argument reaches the release**. The command publishes,
 // so a `--help` it did not read once started a real release; a help request now prints the usage, and
 // anything else unknown is refused, both before the first fetch.
 async function run_argv(argv: ReadonlyArray<string>): Promise<number> {

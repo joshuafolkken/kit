@@ -6,7 +6,7 @@ import {
 	RUN_SOLO_LABEL,
 } from './issue-labels'
 
-// The keys that decide which open issue is offered first (joshuafolkken/kit#2928), defined once for
+// The keys that decide which open issue is offered first, defined once for
 // every ranking that asks: the `🗒 Next issues` display, the `auto-ok` pickup and `backlog:next`.
 //
 // In order: `priority:high`, then a defect on the verification path (`bug` with `run:solo`, or

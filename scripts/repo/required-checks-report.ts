@@ -2,7 +2,7 @@ import { repo_setting } from './repo-setting'
 import type { RequiredSource } from './required-checks-logic'
 
 // What one read of a repository's required status checks found, against what kit's distributed
-// workflows report (joshuafolkken/kit#3012).
+// workflows report.
 interface RequiredChecksReport {
 	repo: string | undefined
 	branch: string | undefined

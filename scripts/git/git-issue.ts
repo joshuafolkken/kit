@@ -66,10 +66,10 @@ function parse_issue_input(input: string): IssueInfo {
 
 const BRANCH_NUMBER_PATTERN = /^(\d+)-(.+)$/u
 
-// A lane's branch is `<N>-lane` (joshuafolkken/kit#1490), so its second segment is the fixed word
-// `lane` rather than a slug of the title — de-slugging it produced commit messages like `lane #1465`
-// on joshuafolkken/kit#1586. The shape is recognized through `lane_paths.lane_branch` rather than a
-// second copy of the suffix, so the two ends cannot drift apart (joshuafolkken/kit#1590).
+// A lane's branch is `<N>-lane`, so its second segment is the fixed word
+// `lane` rather than a slug of the title — de-slugging it would produce commit messages like
+// `lane #1465`. The shape is recognized through `lane_paths.lane_branch` rather than a
+// second copy of the suffix, so the two ends cannot drift apart.
 function is_lane_branch(branch_name: string, issue_number: string): boolean {
 	return branch_name === lane_paths.lane_branch(issue_number)
 }

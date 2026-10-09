@@ -1,7 +1,7 @@
 import { telegram_notify, type TelegramSendInput } from '#scripts/notify/telegram-notify'
 
-// What to type when the confirmation notification itself could not be delivered
-// (joshuafolkken/kit#1564). The `--body-file` spelling rather than `--body`, because the body names
+// What to type when the confirmation notification itself could not be delivered.
+// The `--body-file` spelling rather than `--body`, because the body names
 // commands and a backtick inside shell double quotes is evaluated before the command runs.
 const CONFIRMATION_RECOVERY =
 	'send it by hand — `pnpm josh notify --task-type confirmation --issue-url <url> ' +
@@ -28,7 +28,7 @@ function build_confirmation_input(input: {
 	}
 }
 
-// **The tolerant send** (joshuafolkken/kit#1564). What stops the run is the blocker this
+// **The tolerant send**. What stops the run is the blocker this
 // notification is *about*, and it is raised by the caller — so a failed send must not replace that
 // diagnosis with a Telegram error. It is reported and the caller's own stop still happens.
 //
@@ -47,8 +47,8 @@ function has_ignore_reason(reason: string | undefined): reason is string {
 	return reason !== undefined && reason.trim().length > 0
 }
 
-// Shared by every `followup` gate that can stop the run — the AI review scan and, since
-// joshuafolkken/kit#1578, the managed config-file gate. They ask the same two questions (was a reason
+// Shared by every `followup` gate that can stop the run — the AI review scan and the managed
+// config-file gate. They ask the same two questions (was a reason
 // given, and how is the confirmation sent), and a second copy of either answer is what lets the two
 // gates drift apart.
 const git_pr_confirmation = {

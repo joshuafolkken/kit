@@ -3,7 +3,7 @@ import type { PullMergeState } from '#scripts/gh/git-gh-pr-read'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
-// joshuafolkken/kit#3023: `prrun` stops at a green, mergeable pull request and a person merges it by
+// `prrun` stops at a green, mergeable pull request and a person merges it by
 // hand. Re-running `pnpm josh followup` then has to finish what a merged `fullrun` finishes — the
 // completion report, the epic close, the merged issue's close, the `in-progress` removal, the hold
 // release and the completion Telegram — **from the one tail `followup` already runs**, not a copy of

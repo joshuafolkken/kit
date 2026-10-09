@@ -1,5 +1,5 @@
-// The body lines that sit under one `## heading`, up to the next `## heading` or the end
-// (joshuafolkken/kit#2212). Both the firing-point check and the baseline parser read a section this
+// The body lines that sit under one `## heading`, up to the next `## heading` or the end.
+// Both the firing-point check and the baseline parser read a section this
 // way, so the slicing lives in one place rather than being written twice.
 
 const HEADING_PREFIX = '## '
@@ -54,7 +54,7 @@ function has_line(body: string, text: string): boolean {
 
 // The lines between the first unfenced line `is_target` accepts and the next unfenced `## ` heading,
 // trimmed of the heading line itself; an empty array when no line is accepted. A `## ` line inside a
-// code fence is example text, so it neither opens nor closes a section (joshuafolkken/kit#3066).
+// code fence is example text, so it neither opens nor closes a section.
 function section_lines_matching(
 	body: string,
 	is_target: (line: string) => boolean,

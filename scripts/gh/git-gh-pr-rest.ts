@@ -7,12 +7,12 @@ import { z } from 'zod'
 import { MERGED_STATE, to_gh_state } from './git-gh-rest-state'
 
 // The translation between one REST pull request (`repos/{owner}/{repo}/pulls/{N}`) and the JSON
-// shape `gh pr view --json <fields>` used to answer with.
+// shape `gh pr view --json <fields>` answers with.
 //
 // `gh pr view` goes through GraphQL, which a cloud session is answered 403 for while the REST
-// endpoint is served normally (joshuafolkken/kit#1022). The mapping lives here rather than beside
+// endpoint is served normally. The mapping lives here rather than beside
 // the requests because it is pure: given the response, it decides the answer with nothing else to
-// know — the same split `git-gh-issue-rest.ts` already makes (joshuafolkken/kit#1027).
+// know — the same split `git-gh-issue-rest.ts` already makes.
 
 // Only the fields the mapping itself reads are named; every other key passes through untouched.
 //
@@ -24,7 +24,7 @@ import { MERGED_STATE, to_gh_state } from './git-gh-rest-state'
 // `mergeable` and `mergeable_state` are served by the single-pull endpoint only — the listing omits
 // both — which is why the branch lookup resolves a number and the reads go back for the detail.
 // `repo.full_name` is what tells a fork's head from this repository's own — `head.ref` is a bare
-// branch name that says nothing about which repository holds it (joshuafolkken/kit#1029). Named once
+// branch name that says nothing about which repository holds it. Named once
 // because both sides of a pull request carry the same shape.
 const rest_repo_schema = z.looseObject({ full_name: z.string().optional() }).nullish()
 const rest_pull_side_schema = z.looseObject({ repo: rest_repo_schema })
@@ -42,14 +42,13 @@ const rest_pull_schema = z.looseObject({
 	mergeable_state: z.string().optional(),
 	// `sha` is the head commit, which is what both halves of the merge-gate rollup are keyed by —
 	// REST hangs the check runs and the status contexts off the commit rather than off the pull
-	// request (joshuafolkken/kit#1028).
+	// request.
 	head: z
 		.looseObject({ ref: z.string().optional(), sha: z.string().optional(), repo: rest_repo_schema })
 		.nullish(),
 	base: rest_pull_side_schema.nullish(),
 	// `node_id` is what the GraphQL auto-merge mutation addresses a pull request by, and `auto_merge`
-	// is `null` until auto-merge is enabled — both read by `git-gh-pr-auto-merge.ts`
-	// (joshuafolkken/kit#2497).
+	// is `null` until auto-merge is enabled — both read by `git-gh-pr-auto-merge.ts`.
 	node_id: z.string().optional(),
 	auto_merge: z.looseObject({}).nullish(),
 })
@@ -71,8 +70,7 @@ function parse_rest_pull(rest_json: string): RestPull {
 }
 
 // A response that is not a listing must not degrade into an empty one: `pr_exists` reads an empty
-// listing as "this branch has no pull request", and `git-pr.ts` answers that by opening a second one
-// (joshuafolkken/kit#950 is the same misread on the issue side).
+// listing as "this branch has no pull request", and `git-pr.ts` answers that by opening another.
 function parse_rest_pulls(rest_json: string): Array<RestPull> {
 	const parsed = parse_json_array_or_undefined(rest_json, rest_pull_schema)
 	if (parsed === undefined) throw new Error(NOT_A_PULL_LISTING_MESSAGE)
@@ -80,7 +78,7 @@ function parse_rest_pulls(rest_json: string): Array<RestPull> {
 	return parsed
 }
 
-// Which pull request a branch name means. `gh pr view <branch>` preferred the open one and fell back
+// Which pull request a branch name means. `gh pr view <branch>` prefers the open one and falls back
 // to the most recent, and the difference is reachable in this repository's own flow: `git-pr.ts`
 // opens a *second* pull request on a branch whose first one merged, so a lookup that answered
 // "newest first, whatever its state" would still be right there while "the first row" alone would
@@ -93,7 +91,7 @@ function select_pull(pulls: ReadonlyArray<RestPull>): RestPull | undefined {
 // REST reports a merge as a field beside the state rather than as a state, and both spellings of it
 // are accepted: the single-pull endpoint carries `merged`, the listing carries only `merged_at`.
 //
-// Exported since joshuafolkken/kit#1077, because `pr_merge` asks the same question directly: a merge
+// Exported because `pr_merge` asks the same question directly: a merge
 // request that failed after the merge landed is settled by reading the pull request back, and the
 // merge-or-not verdict must be the one `to_pr_state` already uses rather than a second spelling of it.
 function is_merged(pull: RestPull): boolean {
@@ -112,7 +110,7 @@ function to_pr_state(pull: RestPull): string | undefined {
 // `gh pr checkout` reached a fork's head through `refs/pull/<N>/head`, which a plain
 // `git fetch origin <branch>` cannot: the fetch either fails outright, or — where `origin` happens to
 // carry a branch of the same name — succeeds on an unrelated branch. Both halves are read out of the
-// one response, so the test costs no second request (joshuafolkken/kit#1029).
+// one response, so the test costs no second request.
 function to_repo_name(side: RestPullSide | null | undefined): string | undefined {
 	return side?.repo?.full_name
 }
@@ -125,19 +123,18 @@ function is_same_repository_head(pull: RestPull): boolean {
 
 // The three fields `gh pr view --json mergeable,mergeStateStatus,state` answered with.
 //
-// `mergeable` was a GraphQL enum (`MERGEABLE` / `CONFLICTING` / `UNKNOWN`) and is a nullable boolean
-// in REST; `pr_info_schema` accepts both, so the boolean passes through as it arrives — including
-// the JSON null GitHub sends while it is still computing.
+// `mergeable` is a GraphQL enum (`MERGEABLE` / `CONFLICTING` / `UNKNOWN`) and a nullable boolean in
+// REST; `pr_info_schema` accepts both, so the boolean passes through as it arrives — including the
+// JSON null GitHub sends while it is still computing.
 //
-// **Nothing reads `mergeable` any more** (joshuafolkken/kit#1232 removed `git-conflict.ts`, its only
-// reader, and the conflict verdict comes off `mergeStateStatus` in `git-pr-checks-eval.ts` now). It
-// stays because this function's contract is *the shape `gh pr view --json …` answered with*, not
-// the subset today's callers happen to read — trimming a wire shape to its current readers is what
-// makes the next one look for a field the mapping silently dropped.
+// **Nothing reads `mergeable`** — the conflict verdict comes off `mergeStateStatus` in
+// `git-pr-checks-eval.ts`. It stays because this function's contract is *the shape
+// `gh pr view --json …` answers with*, not the subset today's callers happen to read — trimming a
+// wire shape to its current readers is what makes the next one look for a field the mapping
+// silently dropped.
 //
-// `mergeStateStatus` is upper-cased because that is how `gh` spelled it, and because the merge-gate
-// snapshot in `git-pr-checks-eval.ts` compares strictly against that spelling
-// (joshuafolkken/kit#1028 converts the snapshot itself).
+// `mergeStateStatus` is upper-cased because that is how `gh` spells it, and because the merge-gate
+// snapshot in `git-pr-checks-eval.ts` compares strictly against that spelling.
 function to_pr_info(pull: RestPull): Record<string, unknown> {
 	return {
 		mergeable: pull.mergeable,
@@ -148,7 +145,7 @@ function to_pr_info(pull: RestPull): Record<string, unknown> {
 
 // The conversation comments in the shape `gh pr view --json comments` answered with. A listing that
 // will not parse throws rather than answering an empty one — `git-pr-ai-review.ts` reads an empty
-// listing as "no reviewer left a finding" and merges (joshuafolkken/kit#973).
+// listing as "no reviewer left a finding" and merges.
 function to_pr_comments(rest_json: string): Array<Record<string, unknown>> {
 	const parsed = parse_json_array_or_undefined(rest_json, rest_comment_schema)
 	if (parsed === undefined) throw new Error(NOT_A_COMMENT_LISTING_MESSAGE)

@@ -94,7 +94,7 @@ function align_development_engines_version(content: string): string {
 
 // `onFail: "error"` rejects any pnpm that is not byte-for-byte the pin, so a machine that left
 // Corepack for a standalone pnpm cannot run pnpm at all; `"download"` fetches the pinned version
-// instead (joshuafolkken/kit#3388). Only `"error"` is rewritten — a `"warn"` / `"ignore"` the
+// instead. Only `"error"` is rewritten — a `"warn"` / `"ignore"` the
 // project chose itself is kept, and the rest of the file is preserved byte-for-byte.
 function upgrade_development_engines_on_fail(content: string): string {
 	return content.replace(

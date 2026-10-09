@@ -4,11 +4,10 @@
 // git exports them to every hook it runs, so a child process spawned from inside `pre-commit` or
 // `pre-push` inherits a pointer at the repository the hook is firing in. A helper that passes
 // `{ cwd: fixture_directory }` and nothing else therefore writes into the **real** checkout, with no
-// error anywhere: joshuafolkken/kit#1515 found it in `propagate-git`'s probes, and
-// joshuafolkken/kit#1530 found the same shape in `lane-change-base.test.ts`, where it committed a
-// test fixture's own commits onto a lane's live branch during the pre-push gate.
+// error anywhere — a test fixture's own commits can land on a lane's live branch during the pre-push
+// gate.
 //
-// The list is single-sourced here because it now has three consumers that must not drift apart: the
+// The list is single-sourced here because it has three consumers that must not drift apart: the
 // probes that clear it, the fixture that clears it, and the unit-suite guard that refuses a write
 // while any of it is set (`scripts/test/test-repository-guard.ts`).
 //

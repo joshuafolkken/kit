@@ -4,7 +4,7 @@ import type { GhApiRequest } from './git-gh-exec'
 // One pull request as `repos/{owner}/{repo}/pulls/{N}` answers it, the paths the reads ask for, and
 // the router that answers them. The mapping tests, the read tests and the write tests all start from
 // exactly these, so they live here rather than being written out three times — the clone `CLAUDE.md`
-// prohibits (joshuafolkken/kit#1027).
+// prohibits.
 const PR_BRANCH = 'feature-branch'
 const PR_NUMBER = 972
 const PR_HTML_URL = 'https://github.com/joshuafolkken/kit/pull/972'
@@ -18,7 +18,7 @@ const EMPTY_LISTING = '[]'
 const RATE_LIMITED = '{"message":"API rate limit exceeded"}'
 // A lookup that never answered — the rate limit, expired auth or dropped connection that
 // `require_pr_number` now reports as its own diagnosis rather than as "this branch has no pull
-// request" (joshuafolkken/kit#1048). All three pull-request test files arrange it, so the message and
+// request". All three pull-request test files arrange it, so the message and
 // the error it is wrapped in are one definition rather than three.
 const GH_FAILURE = 'gh exploded'
 
@@ -62,7 +62,7 @@ function pr_review_comments_path(pr_number = PR_NUMBER): string {
 }
 
 // The merge-gate snapshot's three listings. Two of them hang off the head *commit* rather than off
-// the pull request, which is why the fixture carries a head SHA at all (joshuafolkken/kit#1028).
+// the pull request, which is why the fixture carries a head SHA at all.
 const PR_HEAD_SHA = 'c0ffee1c0ffee1c0ffee1c0ffee1c0ffee1c0ffe'
 
 function pr_reviews_path(pr_number = PR_NUMBER): string {
@@ -108,10 +108,10 @@ function rest_pull_page(rows: ReadonlyArray<Record<string, unknown>>): string {
 }
 
 // What one path answers with: the response body, or a thunk for a request whose *outcome* is the
-// thing under test. The thunk form was added for joshuafolkken/kit#1077, where `pr_merge` has to
-// arrange "the merge request failed and the pull request reads back merged" — two different outcomes
-// on two paths, which a body-only mapping cannot express. Written as a widening of this one router
-// rather than as a second one beside it.
+// thing under test. The thunk form exists for `pr_merge`, whose tests have to arrange "the merge
+// request failed and the pull request reads back merged" — two different outcomes on two paths,
+// which a body-only mapping cannot express. Written as a widening of this one router rather than as
+// a second one beside it.
 type GhApiAnswer = string | (() => Promise<string>)
 
 // A request routed by path rather than by call order: one read now asks for the repository name, the
@@ -152,7 +152,7 @@ function find_request(requests: ReadonlyArray<GhApiRequest>, path: string): GhAp
 }
 
 // The JSON body a write sent. Both pull-request write test files ask this of the same mock, so it is
-// one helper rather than one per file (joshuafolkken/kit#1029).
+// one helper rather than one per file.
 function request_body(request: GhApiRequest): Record<string, unknown> {
 	return JSON.parse(request.body ?? '') as Record<string, unknown>
 }

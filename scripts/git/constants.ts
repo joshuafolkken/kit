@@ -7,12 +7,12 @@ const SEPARATOR_LINE = '──────────────────�
 const GIT_COMMAND_UNIX = '/usr/bin/git'
 // git's machine-readable output, asked for by the readers that parse rather than display. It lives
 // here rather than beside either of them because `status` and `worktree_list` now sit in different
-// modules (joshuafolkken/kit#1640) and a copy in each is a second answer to one question.
+// modules and a copy in each is a second answer to one question.
 const PORCELAIN_FLAG = '--porcelain'
 // The untracked-files mode every porcelain status reading passes (`git-command.ts` carries why it is
 // passed and why it is `all`), shared so another module's own reading cannot drift from it.
 const UNTRACKED_FILES_FLAG = '--untracked-files=all'
-// The git binary a spawn runs in place of the platform's own (joshuafolkken/kit#3234). The spawn path
+// The git binary a spawn runs in place of the platform's own. The spawn path
 // is absolute, so a `git` placed in front on `PATH` never stands in for it: the unit suite's network
 // guard shimmed `git` that way, and `josh ship`'s tests fetched and merged the default branch into the
 // checkout they ran in without the guard ever seeing the call. The guard names its shim here instead.

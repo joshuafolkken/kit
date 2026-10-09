@@ -30,7 +30,7 @@ const NO_QUARANTINE_MINUTES = 0
 // What the local minimum-release-age policy permits for one package. Resolved per package because
 // the newest installable release is a property of that package's own publish history. Returns a hold
 // whose `installable` is undefined when the timestamps cannot be read — the report then renders
-// exactly as it did before (joshuafolkken/kit#808).
+// exactly as it did before.
 //
 // Skipped entirely unless some target is behind `latest`: the timestamps cost a second registry
 // round trip per package, and a package with nothing stale has no gap for a hold to explain. On the
@@ -113,7 +113,7 @@ function build_upstream_effective(
 // The globally-resolved versions kit already knows for one upstream: the primary package's global
 // install (what a `pnpm add -g <primary>@<v>` command would target) and the upstream's own effective
 // install. Attached to the report only when the consumer declared its global upgrade command
-// pin-only, so the no-op guard can prove a command that pins these exact versions is dead (#697).
+// pin-only, so the no-op guard can prove a command that pins these exact versions is dead.
 function build_installed_versions(
 	report: UpstreamReport,
 	config: VersionCommandConfig,
@@ -246,7 +246,7 @@ function run_all_upgrade_commands(commands: ReadonlyArray<UpgradeCommand>): numb
 }
 
 // What to print when nothing can be upgraded: either everything is current, or a stale effective
-// upstream's global command provably cannot change it and the explanation says so (#697).
+// upstream's global command provably cannot change it and the explanation says so.
 function build_idle_message(reports: ReadonlyArray<UpstreamReport>): string {
 	const notes = version_check_logic.build_upstream_upgrade_notes(reports)
 	if (notes.length === 0) return ALREADY_UP_TO_DATE

@@ -26,17 +26,17 @@ interface WrapupInput {
 	branch_name: string
 	issue_number: string | undefined
 	// The number the pull request body's `closes #N` names — the only issue the merge claimed to
-	// close, so the only one the merged-issue close may write to (joshuafolkken/kit#2770).
+	// close, so the only one the merged-issue close may write to.
 	closes_number: string | undefined
 	notify_config: GitNotifyConfig | undefined
 	pr_url: string | undefined
 	should_merge: boolean
 	// The managed config-file report, which reaches the completion report on the Issue as well as the
-	// completion notification (joshuafolkken/kit#1592). Empty on a run that changed nothing `josh sync`
+	// completion notification. Empty on a run that changed nothing `josh sync`
 	// distributes, and an empty one adds no line.
 	managed_notes: ReadonlyArray<string>
 	// A pull request merged before this run is not merged again, and a tail whose completion report is
-	// already on the issue does not post it twice (joshuafolkken/kit#3023, `git-followup-merged.ts`).
+	// already on the issue does not post it twice (`git-followup-merged.ts`).
 	is_merged?: boolean | undefined
 	is_completion_recorded?: boolean | undefined
 }
@@ -112,7 +112,7 @@ async function post_completion_notification(input: {
 	}
 }
 
-// **Guarded only once the merge has landed** (joshuafolkken/kit#1539) — the rule and its reason are
+// **Guarded only once the merge has landed** — the rule and its reason are
 // `git-followup-cleanup.ts`, so this module and the run's tail cannot disagree about it. After the
 // merge, a step that throws is reported and the ones after it still run, rather than taking the epic
 // close and the working-tree hold release down with it.
@@ -150,7 +150,7 @@ async function epic_close_step(input: WrapupInput): Promise<void> {
 	})
 }
 
-// **The run's own mark, taken off at the end of the run that wrote it** (joshuafolkken/kit#1794).
+// **The run's own mark, taken off at the end of the run that wrote it**.
 // `in-progress` is added by every entry point before it implements, and nothing took it off on the
 // ordinary ending: the pull request merged, the issue closed, and the mark stayed. Removed here
 // rather than by the workflow procedure because this is the one step that knows the merge landed.
@@ -173,7 +173,7 @@ async function in_progress_step(input: WrapupInput): Promise<void> {
 	})
 }
 
-// **The merged issue's close, confirmed rather than assumed** (joshuafolkken/kit#2770): GitHub stopped
+// **The merged issue's close, confirmed rather than assumed**: GitHub stopped
 // applying `closes #N` on some merges, and nothing noticed. The epic auto-close does not wait on it —
 // it already excludes the merged issue from its reads — so it runs beside the other steps. It acts on
 // the body's `closes #N` rather than the run's issue number: a pull request that closes nothing, or
@@ -193,7 +193,7 @@ async function issue_close_step(input: WrapupInput): Promise<void> {
 	})
 }
 
-// **The steps after the merge are issued together** (joshuafolkken/kit#1446). The completion
+// **The steps after the merge are issued together**. The completion
 // comment writes to the issue or the pull request, the auto-close reads the open epics, the label
 // removal reads and writes the issue's labels, and the merged-issue close reads and may close the
 // issue; none needs another's answer, and measured

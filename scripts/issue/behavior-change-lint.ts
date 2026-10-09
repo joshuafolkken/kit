@@ -6,8 +6,8 @@ import { reproduction_measure } from './reproduction-measure'
 // A behavior-change Issue owes three headings the ordinary template does not — a firing-point heading
 // (the tool call the rule breaks on), a baseline heading (a re-runnable measurement) and a
 // reproduction heading (the command and its actual output). This checks them, but only for an Issue
-// that declares itself one, and never asks the model to judge whether it is (joshuafolkken/kit#2212,
-// joshuafolkken/kit#2353). The declaration, the headings and the grammars are the template's, pinned
+// that declares itself one, and never asks the model to judge whether it is. The declaration, the
+// headings and the grammars are the template's, pinned
 // by the document test.
 
 // The body declares itself a behavior-change Issue with this exact line under its opening heading.
