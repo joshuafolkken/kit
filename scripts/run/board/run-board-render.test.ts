@@ -277,10 +277,10 @@ describe('run_board_render.render header', () => {
 	it('counts the progress with the arrivals since the board first looked', () => {
 		const active = [row(1, { state: 'merged' }), row(2, { state: 'running' })]
 		const layout = { ...EMPTY_LAYOUT, active, unreached: [row(3)] }
-		const progress = lines_of(header({ layout, baseline_total: 2 }))[2] ?? ''
+		const progress = lines_of(header({ layout, baseline_total: 2 }))[0] ?? ''
 
-		expect(progress).toMatch(/^✅ 1\/3 \S+ \(\+1\)/u)
-		expect(progress).toContain('(+1)   🔄 1  ⏳ 1  💤 0')
+		expect(progress).toMatch(/ {2}✅ 1\/3 \S+ \(\+1\)/u)
+		expect(progress).toContain('(+1)  🔄 1  ⏳ 1  💤 0')
 	})
 
 	it('says until when an idle run waits, what ends the wait and when it next looks', () => {
@@ -296,7 +296,7 @@ describe('run_board_render.render header', () => {
 		const until = `wait ends ${clock_of(idle.until_ms)} (20:00 left) → ${WORDS.idle_end_idle}`
 
 		expect(lines[0]).toMatch(/^⏸ backlogrun/u)
-		expect(lines.slice(3, 5)).toStrictEqual([
+		expect(lines.slice(2, 4)).toStrictEqual([
 			'',
 			`  ⏸ ${until} · next check ${clock_of(NOW + 2 * MINUTE)}`,
 		])

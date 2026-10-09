@@ -1,4 +1,5 @@
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -9,12 +10,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const add_label_mock = vi.hoisted(() => vi.fn())
 const comment_mock = vi.hoisted(() => vi.fn())
+const remove_label_mock = vi.hoisted(() => vi.fn())
 const ensure_closed_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 	git_gh_issue_write: {
 		issue_add_label: add_label_mock,
-		issue_remove_label: vi.fn().mockResolvedValue(undefined),
+		issue_remove_label: remove_label_mock,
 		issue_try_comment: comment_mock,
 	},
 }))
@@ -40,8 +42,10 @@ const CONTEXT = {
 beforeEach(() => {
 	add_label_mock.mockReset().mockResolvedValue(true)
 	comment_mock.mockReset().mockResolvedValue(undefined)
+	remove_label_mock.mockReset().mockResolvedValue(undefined)
 	ensure_closed_mock.mockReset().mockResolvedValue(undefined)
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
+	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
 })
 
 describe('run_merge_steps.do_failed — the park is explained on the issue', () => {
@@ -62,6 +66,88 @@ describe('run_merge_steps.do_failed — the park is explained on the issue', () 
 		await run_merge_steps.do_failed(CONTEXT)
 
 		expect(comment_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#3502: a child whose order is already recorded as an open `blocked-by` waits for its
+// blocker — nothing for a person to decide, so no `needs-decision` and no failure counted.
+const KIT = 'joshuafolkken/kit'
+const BLOCKER = 3501
+const NEEDS_DECISION = 'needs-decision'
+const IN_PROGRESS = 'in-progress'
+const OWN_CARRY = {
+	invocation: 'backlogrun #3435',
+	started_at: new Date().toISOString(),
+	merged: 0,
+	filed: 0,
+	cuts: 0,
+	failures: 0,
+	outages: 0,
+}
+
+function spy_blockers(state: 'OPEN' | 'CLOSED'): void {
+	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([
+		{ repo: KIT, number: BLOCKER, state },
+	])
+}
+
+function spy_carry(carry: typeof OWN_CARRY & { is_handed_off?: boolean }): void {
+	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue('/stub')
+	vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'carried', carry })
+}
+
+describe('run_merge_steps.do_failed — a child waiting on an open blocker', () => {
+	it('releases the child to wait without needs-decision, a counted failure or a park', async () => {
+		spy_blockers('OPEN')
+		spy_carry(OWN_CARRY)
+		const apply_spy = vi.spyOn(run_carry, 'apply_change').mockReturnValue(OWN_CARRY)
+
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result).toStrictEqual({
+			carry: undefined,
+			is_parked: false,
+			is_refused: false,
+			blockers: [`${KIT}#${String(BLOCKER)}`],
+		})
+		expect(add_label_mock).not.toHaveBeenCalled()
+		expect(apply_spy).not.toHaveBeenCalled()
+		expect(comment_mock).toHaveBeenCalledWith(
+			CHILD,
+			expect.stringContaining(`open blockers: ${KIT}#${String(BLOCKER)}`),
+		)
+		expect(remove_label_mock).toHaveBeenCalledWith(CHILD, IN_PROGRESS)
+	})
+
+	it('refuses a session that does not own the run before releasing the child', async () => {
+		spy_blockers('OPEN')
+		spy_carry({ ...OWN_CARRY, is_handed_off: true })
+
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result.is_refused).toBe(true)
+		expect(remove_label_mock).not.toHaveBeenCalled()
+		expect(comment_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_merge_steps.do_failed — a child with no open blocker is parked as before', () => {
+	it('parks the child when its only blocker is closed', async () => {
+		spy_blockers('CLOSED')
+
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result.blockers).toStrictEqual([])
+		expect(add_label_mock).toHaveBeenCalledWith(CHILD, NEEDS_DECISION)
+	})
+
+	it('parks the child when its blockers cannot be read', async () => {
+		vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockRejectedValue(new Error('gh'))
+
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result.is_parked).toBe(true)
+		expect(add_label_mock).toHaveBeenCalledWith(CHILD, NEEDS_DECISION)
 	})
 })
 
