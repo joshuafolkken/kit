@@ -30,7 +30,8 @@ import { run_progress_read, type ObservationRead } from './run-progress-read'
 // **It cannot send a Telegram.** That is structural rather than a promise — nothing here imports
 // `scripts/notify/telegram-notify`, which is the only egress there is. A heartbeat every twenty minutes on
 // a phone is notification fatigue, and it would cheapen the `confirmation` and `completion` messages
-// that do need to interrupt someone.
+// that do need to interrupt someone. Only an explicit `run:board --every <minutes>`, started because a
+// person asked for periodic progress off-screen, sends one (joshuafolkken/kit#3569).
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -52,14 +53,13 @@ const DECLINE_RETRY_SECONDS = 120
 // The clock a fresh loop starts with: nothing has declined yet, so nothing is being waited out.
 const NO_RETRY = 0
 const { DEFAULT_WAIT_MAX_HOURS } = run_progress_args
-const ENVIRONMENT_KEY = 'JOSH_PROGRESS'
-const DISABLED_VALUE = '0'
+const { DISABLED_KEY, DISABLED_VALUE, is_disabled } = run_progress
 
 // joshuafolkken/kit#2480: a malformed `--wait` exits at once, and read as "started" it left a person
 // without progress until someone looked at the exit — so the refusal says the relay is down.
 const USAGE =
 	'Usage: josh run:progress [--repo <owner/repo>] [--interval <minutes>] [--output <path>] [--once | --wait] [--hours <hours>] | josh run:progress --mark | josh run:progress --path\nThe progress watcher did not start, so nothing is relaying progress to this session — fix the arguments (one flag and one value per argument) and start it again.'
-const DISABLED_NOTICE = `\`${ENVIRONMENT_KEY}=${DISABLED_VALUE}\` is set, so no progress is reported.`
+const DISABLED_NOTICE = `\`${DISABLED_KEY}=${DISABLED_VALUE}\` is set, so no progress is reported.`
 const MARKED_NOTICE =
 	'Recorded a report at this moment. The next progress line waits a full interval from here, so a heartbeat cannot land immediately behind a real report.'
 // A dispatched lane child carries `JOSH_LANE_CHILD`, and only the outermost run reports progress — a
@@ -139,10 +139,6 @@ const FRESH_LOOP: Omit<WatchLoop, 'last_ms'> = {
 	retry_at_ms: NO_RETRY,
 	said: undefined,
 	state: undefined,
-}
-
-function is_disabled(): boolean {
-	return process.env[ENVIRONMENT_KEY] === DISABLED_VALUE
 }
 
 function report_usage(): number {
