@@ -1,6 +1,6 @@
 ---
 name: workflow-commands
-description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun`, `prrun` and `backlogrun` — planning, implementation, the verification gate, unattended epic and backlog execution, the `/code-review` → `followup` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
+description: Procedures for `kickoff`, `fullrun`, `halfrun`, `prrun` and `backlogrun`. Read it the moment one is typed (with or without `#N` / `new`), before any command, and when asked what one does or a run must be resumed or repaired.
 ---
 
 # Issue-driven workflow commands
