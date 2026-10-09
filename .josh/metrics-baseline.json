@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12222,
-		"on_demand_bytes": 560076
+		"on_demand_bytes": 560565
 	},
 	"accepted": {
-		"reason": "run:board rows gain a per-lane CPU and memory column sampled every second (#3489), merged with #3502 (waiting-on-blockers merge path) and #3508 (two-line header)",
+		"reason": "run:board rows gain a per-lane CPU and memory column sampled every second (#3489), merged with #3502 (waiting-on-blockers merge path), #3508 (two-line header) and #3504 (same-file wave rule split)",
 		"date": "2026-10-09"
 	}
 }
