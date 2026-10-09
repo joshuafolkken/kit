@@ -1,7 +1,7 @@
 import { read_unwrapped } from './ai-document-fixture'
 
 // The `/code-review` subagent's agent type is named once, in `chain-rule.md` step 1, so a run stops
-// guessing a name like `code-reviewer` and receiving `Agent type not found` (joshuafolkken/kit#2297).
+// guessing a name like `code-reviewer` and receiving `Agent type not found`.
 // This reads that name back and checks it is a real Claude Code agent type rather than a plausible
 // invention.
 

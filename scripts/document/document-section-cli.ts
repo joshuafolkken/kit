@@ -6,18 +6,16 @@ import { capped_output } from './capped-print'
 import { document_section } from './document-section'
 import { entry_read_set } from './entry-read-set'
 
-// `josh doc:section` — print one section of a markdown document (joshuafolkken/kit#1776).
+// `josh doc:section` — print one section of a markdown document.
 //
-// **It exists because the documents already cite each other by section and the reader could only
-// fetch files.** `` `backlogrun-progress.md` → "The hand-off" `` names 249 lines; opening
-// `backlogrun-progress.md` costs far more. Every entry point pays that difference at the moment it
-// starts, before anything has been implemented.
+// **It exists because the documents cite each other by section.** `` `backlogrun-progress.md` →
+// "The hand-off" `` names one section; opening `backlogrun-progress.md` costs far more. Every entry
+// point would pay that difference at the moment it starts, before anything has been implemented.
 //
 // **What it is not is a summary.** The section is printed verbatim, headings and all, so a run that
 // reads a section has read the same words a run that opened the file would have. Nothing is deferred
 // and nothing is condensed — the extent of the read changes, not its content, which is why this is
-// not the "read it later" scheme joshuafolkken/kit#1344 and joshuafolkken/kit#1460 each measured
-// never firing.
+// not a "read it later" scheme, which never fires.
 //
 // **A heading that does not resolve is a refusal, not an empty answer.** A pointer whose target was
 // renamed would otherwise print nothing and read as a section with nothing in it — the one outcome
@@ -36,7 +34,7 @@ const USAGE = 'Usage: josh doc:section <file.md> "<heading>"'
 // **Every branch resolves against `root`, including the first.** Left relative to the process's own
 // directory, a bare name that happened to exist beside the caller would beat the document under
 // `root` and print a section of the wrong file — silently, which is the failure this command exists
-// to refuse (joshuafolkken/kit#1776 review round 2).
+// to refuse.
 function resolve_document(name: string, root: string = process.cwd()): string {
 	const named = path.resolve(root, name)
 

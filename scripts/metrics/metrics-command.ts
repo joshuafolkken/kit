@@ -16,15 +16,15 @@ import { metrics_ratchet, type Baseline, type Verdict } from './metrics-ratchet'
 
 // `josh metrics [--accept --reason "<why>"]` — the I/O around `metrics-logic.ts` and
 // `metrics-ratchet.ts`: enumerate the files, count them, print the totals, and hold them to the
-// baseline in the repository. It is a step of `josh gate` (joshuafolkken/kit#3408): a total that grew
+// baseline in the repository. It is a step of `josh gate`: a total that grew
 // fails it, a total that shrank rewrites the baseline, and `--accept` raises the baseline to the
 // current totals with the reason recorded beside them. The durations beside the totals are held to
-// this machine's own baseline, with a tolerance (`metrics-durations.ts`, joshuafolkken/kit#3409).
+// this machine's own baseline, with a tolerance (`metrics-durations.ts`).
 //
 // **It is kit-only.** The rule documents and the guard commands it counts are kit's own; a consumer
 // has no root `prompts/` to read, and the gate leaves the step out there.
 //
-// `--totals-only` is the form a detached `josh ship` runs before the hand-off (joshuafolkken/kit#3568):
+// `--totals-only` is the form a detached `josh ship` runs before the hand-off:
 // the totals alone, so a grown total stops the session that knows why it grew. The durations stay with
 // the supervised gate — before the detach the gate ledger they read is stale.
 
@@ -56,7 +56,7 @@ interface MetricsArguments {
 }
 
 // The check forms, keyed by their joined argv. The gate's `--no-startup` runs beside the whole unit
-// suite, so a startup timed there measures the load, not josh (joshuafolkken/kit#3409) — startups are
+// suite, so a startup timed there measures the load, not josh — startups are
 // timed only when `josh metrics` runs alone.
 const CHECK_FORMS: ReadonlyMap<string, MetricsArguments> = new Map([
 	['', { reason: undefined, is_startup_timed: true, is_totals_only: false }],

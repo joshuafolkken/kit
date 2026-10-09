@@ -2,10 +2,10 @@ import { find_local_bin_upwards } from '#scripts/build/local-bin'
 import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 
-// joshuafolkken/kit#934: `josh gate`'s type-check step used to be `tsc --noEmit` for every project.
-// A SvelteKit project type-checks with `svelte-check` behind `svelte-kit sync`, so the fixed step
-// both missed every `.svelte` type error and failed outright on a clean checkout, where `./$types`
-// has not been generated yet.
+// `josh gate`'s type-check step cannot be `tsc --noEmit` for every project. A SvelteKit project
+// type-checks with `svelte-check` behind `svelte-kit sync`, so a fixed `tsc` step would both miss
+// every `.svelte` type error and fail outright on a clean checkout, where `./$types` has not been
+// generated yet.
 //
 // The step is therefore asked of the application layer rather than assumed. Two rules decide it:
 //

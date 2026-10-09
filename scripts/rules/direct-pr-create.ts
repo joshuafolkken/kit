@@ -3,8 +3,8 @@ import { gh_api } from './gh-api'
 import { git_argv } from './git-argv'
 import { shell_segments } from './shell-segments'
 
-// The trigger and the delivered text behind the `direct-pr-create` row of `delivered-rules.ts`
-// (joshuafolkken/kit#3183). A PR opened outside `pnpm josh pr` skips `build_body`, which writes the
+// The trigger and the delivered text behind the `direct-pr-create` row of `delivered-rules.ts`.
+// A PR opened outside `pnpm josh pr` skips `build_body`, which writes the
 // `closes #N` line — so the Issue stays open after the merge. `CLAUDE.md` forbade the call in prose
 // only; this row reads the argv instead, through `git-argv.ts`'s wrapper cut, so `env gh pr create`
 // is seen too. `pnpm josh pr` itself is never claimed: its first word after the wrapper is `pnpm`,

@@ -3,8 +3,8 @@ import { fileURLToPath } from 'node:url'
 import { delivered_rules } from './delivered-rules'
 import { rule_registry, type RegisteredRule } from './rule-registry'
 
-// `josh rule:list` — the list of trigger-delivered rules, rendered from the guard rows themselves
-// (joshuafolkken/kit#3399). One item per `MEASURED_RULES` row in delivery order, then the `Stop`
+// `josh rule:list` — the list of trigger-delivered rules, rendered from the guard rows themselves.
+// One item per `MEASURED_RULES` row in delivery order, then the `Stop`
 // hook's rows; each carries its single source, the call it fires on and the turn it stays silent on.
 // The prose is `rule-registry.ts`; the order and the set are `delivered-rules.ts`, so a row added
 // there is listed without a document edit — and a row with no registry entry is listed as missing.

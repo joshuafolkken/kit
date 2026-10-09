@@ -11,8 +11,8 @@ import {
 
 const PRETTIER_ARGS = ['exec', 'prettier', '--check', '.'] as const
 // This — not the `lint:eslint` map entry — is the eslint invocation `josh gate` reaches, so the
-// cache flags come from the same constant the ignore rules are asserted against
-// (joshuafolkken/kit#1256). A copy here would keep writing the old location the day that constant
+// cache flags come from the same constant the ignore rules are asserted against.
+// A copy here would keep writing the old location the day that constant
 // moves, with every test still green.
 const ESLINT_ARGS = ['exec', 'eslint', '.', ...ESLINT_CACHE_FLAGS] as const
 
@@ -63,9 +63,9 @@ function lint_exit_code(prettier: BufferedProcessResult, eslint: BufferedProcess
 
 // The two checks are run from here whether they were pointed at the whole tree or at one change's
 // files, so `josh lint:related` reaches prettier and eslint through the same buffering, the same
-// "one failure does not abort the other" reading, and the same exit code (joshuafolkken/kit#1298) —
+// "one failure does not abort the other" reading, and the same exit code —
 // and through the same basic-project skip, so a narrowed run never reaches a tool the whole-tree
-// run would have skipped (joshuafolkken/kit#2709). The skip reasons answer nothing for a full
+// run would have skipped. The skip reasons answer nothing for a full
 // project, so the one path serves both profiles.
 async function run_lint_checks(
 	prettier_args: ReadonlyArray<string>,

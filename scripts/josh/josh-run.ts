@@ -1,6 +1,6 @@
 import { execa } from 'execa'
 
-// One captured `pnpm josh` subprocess (joshuafolkken/kit#2162). A composite command that collapses a
+// One captured `pnpm josh` subprocess. A composite command that collapses a
 // sequence of `pnpm josh` calls into one — `run:merge`, `backlog:offer`, `lane:launch` — reads each
 // step's output back rather than inheriting it, so the step's own report logic is reused rather than
 // cloned and only the composite's own token reaches the caller's stdout. This is that read, single-
@@ -11,11 +11,11 @@ import { execa } from 'execa'
 // a person sees it, so a composite streams it through; `run:merge` keeps it piped, because it composes
 // its own report from the captured values instead.
 //
-// **Forwarded stderr is captured as well** (joshuafolkken/kit#2462): a composite that writes a report
+// **Forwarded stderr is captured as well**: a composite that writes a report
 // of its own — `run:tail` — puts a failed step's reason in that report, where a detached run's log
 // otherwise showed only pnpm's `ELIFECYCLE` line.
 //
-// **`timeout_ms` bounds a read made from inside a loop** (joshuafolkken/kit#2503): the step is killed and
+// **`timeout_ms` bounds a read made from inside a loop**: the step is killed and
 // its exit reads as a failure, so a hung network call ends a pass instead of the loop around it.
 
 const PNPM = 'pnpm'

@@ -1,5 +1,5 @@
 // Phrases retracted from the distributed documents, kept so a clone or a reverted decision cannot
-// creep back unnoticed (joshuafolkken/kit#1923). This is the small negative table that replaced the
+// creep back unnoticed. This is the small negative table that replaced the
 // ~140 scattered `not.toContain` assertions the per-rule marker suites carried: each phrase is
 // checked absent from the whole document corpus at once by `document-markers.test.ts`.
 //

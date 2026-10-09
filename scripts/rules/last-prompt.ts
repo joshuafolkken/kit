@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { filing_cap } from './filing-cap'
 
 // The text of the person's last prompt on a transcript tail — what the stop guard's citation row
-// reads to tell a `#N` the person quoted from one the run brought in itself (joshuafolkken/kit#2819).
+// reads to tell a `#N` the person quoted from one the run brought in itself.
 //
 // **A prompt is `filing_cap`'s prompt line, minus what the harness wrote there.** A skill's body is a
 // `user` line with no tool result too, but it carries `isMeta`; a background task's completion notice
