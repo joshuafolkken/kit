@@ -2,7 +2,7 @@
 	"scripts": {
 		"files": 1015,
 		"code_lines": 84458,
-		"comment_lines": 33720,
+		"comment_lines": 33721,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12222,
-		"on_demand_bytes": 559192
+		"on_demand_bytes": 559681
 	},
 	"accepted": {
-		"reason": "#3503: the beacon probe now reports live / gone / unknown so a timed-out probe no longer clears a live lock holder",
+		"reason": "#3504 splits the same-file wave rule into a textual-conflict case (no dependency, lane resolves it) and a same-mechanism case (dependency), and kickoff.md now points at that criterion",
 		"date": "2026-10-09"
 	}
 }
