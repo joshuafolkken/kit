@@ -15,9 +15,9 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { backlog_defect_priority } from './backlog-defect-priority'
+import { backlog_overlap } from './backlog-overlap'
 import { backlog_pool } from './backlog-pool'
 import { backlog_rank, type GateScope } from './backlog-rank'
-import { backlog_restructure } from './backlog-restructure'
 
 // `josh backlog:next` — what the whole opted-in backlog may run next.
 //
@@ -296,12 +296,12 @@ function standalone_keys(context: PoolContext): ReadonlySet<string> {
 }
 
 // The running lanes still carry the pickup label, so the opted-in listing holds their bodies too —
-// which is what lets a candidate be held back from a restructure a running lane already makes.
+// which is what lets a candidate be held back from a path a running lane already declares.
 // `backlog:plan --waves` reads the same scope, so its first wave is this offer.
 function gate_scope(context: PoolContext): GateScope {
 	return {
 		standalone: standalone_keys(context),
-		declared: backlog_restructure.declared_of(context.opted_in.issues),
+		declared: backlog_overlap.declared_of(context.opted_in.issues),
 	}
 }
 

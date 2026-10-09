@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1043,
-		"code_lines": 87084,
-		"comment_lines": 33353,
+		"code_lines": 87093,
+		"comment_lines": 33355,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 457935
 	},
 	"accepted": {
-		"reason": "#3615 adds the one-line owner-intent criterion for the bug declaration to issue-template.md",
+		"reason": "#3617: the overlap separation normalizes directory globs and drops broad directories and issue references, replacing the verb lists",
 		"date": "2026-10-09"
 	}
 }

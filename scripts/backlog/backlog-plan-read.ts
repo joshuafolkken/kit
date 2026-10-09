@@ -23,7 +23,7 @@ interface Plan {
 	// past the listing cap. Carrying the *whole* index here instead would move that misreport rather
 	// than remove it: the sentence would name an epic that is withholding nothing.
 	tracked: ReadonlyMap<number, number>
-	// The rows the offer's cap bounds and the paths each issue restructures, so `--waves` cuts each
+	// The rows the offer's cap bounds and the paths each issue declares, so `--waves` cuts each
 	// wave where `backlog:next` does.
 	scope: GateScope
 }

@@ -19,7 +19,7 @@ import { backlog_rank, type GateScope } from './backlog-rank'
 // the asks forward under one assumption: **every issue of a wave merges before the next wave starts**.
 //
 // **No rule is written twice.** The first wave is `backlog_rank.select` — rank, `run:solo` gate,
-// restructure separation, cap —
+// overlap separation, cap —
 // over the very candidates `backlog:next` resolves, asked of an idle repository — so it is what
 // `backlog:next` prints when nothing is running. Each later wave marks the earlier waves closed and re-classifies the same pool
 // through `epic_classify.classify_children` with the resolver `epic:next` sorted it with the first
@@ -109,7 +109,7 @@ function next_wave(pool: WavePool, done: ReadonlySet<string>): ReadonlyArray<Epi
 
 // Each wave is closed before the next is asked for; a wave that offers nothing ends the plan, which
 // the pool's size bounds because every wave closes at least one child. `scope` names the rows the
-// offer's cap bounds and the paths each issue restructures; left empty, no wave is capped or separated.
+// offer's cap bounds and the paths each issue declares; left empty, no wave is capped or separated.
 function build(result: EpicNextResult, repo: string, scope: GateScope = EMPTY_SCOPE): WavePlan {
 	const pool = pool_of(result, repo, scope)
 	const done = new Set<string>()
