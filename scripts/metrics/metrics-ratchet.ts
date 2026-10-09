@@ -2,7 +2,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import type { Metrics } from './metrics-logic'
 
-// The ratchet over `josh metrics`' totals (joshuafolkken/kit#3408). Measuring a slow growth does not
+// The ratchet over `josh metrics`' totals. Measuring a slow growth does not
 // stop it, so the gate compares the totals against the recorded baseline: **a total that grew fails
 // the gate, a total that shrank moves the baseline down**, and the only way up is an explicit
 // `--accept` with a reason, recorded beside the values it raised.
@@ -11,7 +11,7 @@ import type { Metrics } from './metrics-logic'
 // produces the same values — any increase is a real one.
 //
 // **Only the totals the ratchet is about are compared** — code lines, the comment ratio, the
-// rule-document lines, the guard count and the two AI-cost byte totals (joshuafolkken/kit#3428). A
+// rule-document lines, the guard count and the two AI-cost byte totals. A
 // file count or a comment-line count moves with them and would only state the same growth twice.
 
 const NEWLINE = '\n'

@@ -2,7 +2,7 @@
 //
 // Issue-number citations and the "why / measured / rejected" prose around them are what swell the
 // documents an agent reads at run time; a reduction epic cuts them only for the next PRs to add them
-// back, because nothing held the reduced count (joshuafolkken/kit#3185). This list is that hold:
+// back, because nothing held the reduced count. This list is that hold:
 // `issue-citation-budget.test.ts` fails `pnpm josh gate` when an agent-read document cites more issue
 // numbers than its entry records, and when it cites fewer — a reduction must lower its entry in the
 // same PR, so the ceiling follows the count down and never sits loose above it. A document absent from
@@ -17,7 +17,7 @@ interface CitationBudget {
 	citations: number
 }
 
-// An issue number as a document cites it — `#3185` or `joshuafolkken/kit#3185`. Three digits or more,
+// An issue number as a document cites it — `#1234` or `joshuafolkken/kit#1234`. Three digits or more,
 // so a placeholder (`#N`, `#<N>`) and a list ordinal are not counted.
 const CITATION_PATTERN = /#\d{3,}\b/gu
 
