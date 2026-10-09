@@ -115,12 +115,9 @@ summary is bounded the way it is".
 3. **Observations that could bite later** — something noticed and not filed, a flaky check, a
    surprising diff, work a later child will collide with. **This is the only route a child's
    discretionary observation has**: a child files `route:tier-a` and `route:interrupt` only, and the
-   parent files what survives — `observation-filing.md`, the single source. **What the parent does with the
-   rest is append it, not drop it**: an observation that cannot cite the depth-0 work it blocked
-   becomes one line in the observation ledger, and a second line under the same key files it. **A
-   child appends only to its own issue's file, `.josh/observations/<N>.md`, in its own
-   lane** (joshuafolkken/kit#2919) — it merges with the child's pull request, and a sibling lane's
-   file is never one it touches.
+   parent files what survives — `observation-filing.md`, the single source. **The parent appends the
+   rest, not drops it** — one ledger line each, and a second line under the same key files it; who
+   appends which line is `observation-filing.md` → "A delegated child does not take this route".
 4. **Decisions taken and why**, where the decision was not already logged as an Issue comment.
 5. **What was left undone**, and under whose authority.
 
