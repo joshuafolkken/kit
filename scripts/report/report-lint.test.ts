@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { report_format_reference } from './report-format-reference'
 import { report_lint } from './report-lint'
 
 const PATH_VIOLATION = 'file path or CLI flag'
@@ -159,5 +160,23 @@ describe('report_lint.lint_report — inline emphasis', () => {
 		expect(
 			report_lint.lint_report(with_emphasis).some((line) => line.includes(PATH_VIOLATION)),
 		).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#3422: a violation said what was missing but not where the shape is written, so
+// the summary was rewritten twice by guesswork. One trailing line now names the template's section.
+describe('report_lint.with_reference', () => {
+	const pointer = report_format_reference.pointer(report_format_reference.SUMMARY_TEMPLATE_HEADING)
+
+	it('adds nothing to a clean summary', () => {
+		expect(report_lint.with_reference(report_lint.lint_report(CONFORMING_SUMMARY))).toEqual([])
+	})
+
+	it('ends a report with missing labels with one pointer to the template section', () => {
+		const violations = report_lint.lint_report('- prose only')
+		const report = report_lint.with_reference(violations)
+
+		expect(violations.length).toBeGreaterThan(1)
+		expect(report).toEqual([...violations, `→ the template: ${pointer}`])
 	})
 })

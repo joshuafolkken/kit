@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { report_format_reference } from '#scripts/report/report-format-reference'
+import { live_evidence } from '#scripts/review/live-evidence'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const problems_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
@@ -204,5 +206,18 @@ describe('run_ship_preflight.ahead — the ship refusals asked early', () => {
 
 	it('finds nothing for a docs-only change with a classification', async () => {
 		expect(await run_ship_preflight.ahead(ISSUE)).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#3422: the evidence stop named the heading but not its shape, so the reader went
+// looking for the format. Both wordings now carry the heading, the shape and the document section.
+describe('run_ship_preflight — the evidence problems name the format', () => {
+	it.each([
+		['EVIDENCE_PROBLEM', run_ship_preflight.EVIDENCE_PROBLEM],
+		['EVIDENCE_PENDING', run_ship_preflight.EVIDENCE_PENDING],
+	])('%s carries the heading and the format with its document', (_name, problem) => {
+		expect(problem).toContain(live_evidence.EVIDENCE_HEADING)
+		expect(problem).toContain(live_evidence.EVIDENCE_FORMAT)
+		expect(problem).toContain(report_format_reference.REPORT_FORMAT_PATH)
 	})
 })

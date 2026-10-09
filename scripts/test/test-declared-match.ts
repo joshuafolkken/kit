@@ -11,6 +11,10 @@ import { test_type_logic, type TestType } from './test-type-logic'
 const FIELD_SEPARATOR = ' — '
 const TEST_MARKER = 'Test:'
 const TYPES: ReadonlyArray<TestType> = [test_type_logic.UNIT, test_type_logic.E2E]
+// The template writes the path in a code span (`report-format.md`), so one wrapping pair of backticks
+// is the path's markup, not part of it — read raw, every template-shaped line was `path-missing`
+// (joshuafolkken/kit#3422).
+const CODE_SPAN_PATTERN = /^`(?<path>[^`]+)`$/u
 
 type MatchStatus = 'match' | 'type-mismatch' | 'path-missing' | 'test-not-created'
 
@@ -42,6 +46,12 @@ function type_in_field(field: string): TestType | undefined {
 	return TYPES.find((type) => type === value)
 }
 
+function path_of(field: string): string {
+	const trimmed = field.trim()
+
+	return CODE_SPAN_PATTERN.exec(trimmed)?.groups?.['path'] ?? trimmed
+}
+
 // One declaration parsed from a summary line, or undefined when the line carries no `Test:` field with
 // a recognized type and a path after it.
 function parse_line(line: string): Declaration | undefined {
@@ -54,7 +64,19 @@ function parse_line(line: string): Declaration | undefined {
 	const declared_type = type_in_field(marker_field)
 	if (declared_type === undefined) return undefined
 
-	return { declared_type, path: path_field.trim() }
+	return { declared_type, path: path_of(path_field) }
+}
+
+function file_name_of(path: string): string {
+	return path.slice(directory_of(path).length)
+}
+
+// The changed paths a `path-missing` declaration probably meant — the same file name in another
+// directory — so the refusal names the fix rather than leaving the reader to diff by hand.
+function path_candidates(path: string, changed: ReadonlyArray<string>): ReadonlyArray<string> {
+	const name = file_name_of(path)
+
+	return changed.filter((candidate) => candidate !== path && file_name_of(candidate) === name)
 }
 
 function parse_declarations(summary: string): ReadonlyArray<Declaration> {
@@ -100,7 +122,7 @@ function match_report(summary: string, changed: ReadonlyArray<string>): Readonly
 	}))
 }
 
-const test_declared_match = { directory_of, match_report, parse_declarations }
+const test_declared_match = { directory_of, match_report, parse_declarations, path_candidates }
 
 export type { Declaration, MatchResult, MatchStatus }
 export { test_declared_match }
