@@ -45,13 +45,10 @@ function note_text(note: BoardNote, has_legend: boolean): string {
 	return `${INDENT}${lead}${GAP}${note.text}${found_of(note)}`
 }
 
-// The newest few, and how many more there are, so the section never pushes the plan off the screen.
+// The newest few, so the section never pushes the plan off the screen; the frame counts the rest
+// together with any it cuts to fit (joshuafolkken/kit#3505).
 function note_lines(notes: ReadonlyArray<BoardNote>, has_legend: boolean): Array<string> {
-	const shown = notes.slice(0, NOTE_LIMIT).map((note) => note_text(note, has_legend))
-	const hidden = notes.length - shown.length
-	const more = hidden > 0 ? [`${INDENT}${WORDS.more} ${String(hidden)}`] : []
-
-	return [...shown, ...more]
+	return notes.slice(0, NOTE_LIMIT).map((note) => note_text(note, has_legend))
 }
 
 // 📌 while the section is on screen (joshuafolkken/kit#3478), then each kind a drawn line leads with —
