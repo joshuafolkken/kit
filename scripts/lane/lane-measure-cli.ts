@@ -92,10 +92,10 @@ async function sample_command(
 
 // The label defaults to the limit this process reads, which is the period's limit only when nobody
 // changed it since — `--limit` names it outright.
-function limit_label(given: string | undefined): string {
+async function limit_label(given: string | undefined): Promise<string> {
 	if (given !== undefined) return given
 
-	const choice = lane_capacity.lane_limit()
+	const choice = await lane_capacity.lane_limit()
 
 	return choice.kind === 'limit' ? String(choice.limit) : lane_stats.MISSING
 }
@@ -118,7 +118,7 @@ async function stats_command(
 	if (values === undefined || period_days === undefined) return refuse()
 
 	const window = lane_stats.window_of(period_days, context.now_ms ?? Date.now())
-	const label = { limit: limit_label(values.limit), period_days }
+	const label = { limit: await limit_label(values.limit), period_days }
 	const row = lane_stats.row(await read_ledger(context), window, label)
 
 	console.info(`${lane_stats.header()}\n${row}`)
