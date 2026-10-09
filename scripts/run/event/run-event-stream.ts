@@ -1,6 +1,7 @@
 import { repository_lock } from '#scripts/git/repository-lock'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
+import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { z } from 'zod'
 
 // The run's append-only, ordered event stream — the surface a reader who was away rebuilds the run's
@@ -37,6 +38,8 @@ const FIRST_POSITION = 0
 const POSITION_INCREMENT = 1
 const LINE_SEPARATOR = '\n'
 const WORD_SEPARATOR = ' '
+// `#<N> <stage> <phase>` carries the phase third.
+const STAGE_PHASE_INDEX = 2
 // The lock sits beside the stream it guards, so every writer of one stream contends for one record.
 const LOCK_SUFFIX = '.lock'
 // An append holds the lock for one read and one rename; a wait this long means a holder is stuck.
@@ -150,7 +153,8 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or
 // `note` line is a trace to the position readers but is the board's record of what the run found, so
-// it rolls off only with the positions (joshuafolkken/kit#3430).
+// it rolls off only with the positions (joshuafolkken/kit#3430). A ship-stage `start` and an `idle` line
+// are disposable but go last of them: `run:board` draws from those lines (joshuafolkken/kit#3541).
 const DISPOSABLE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.SHIP_STAGE,
 	EVENT_KIND.HEARTBEAT,
@@ -233,6 +237,32 @@ function newest_stages(events: ReadonlyArray<RunEvent>): ReadonlySet<RunEvent> {
 	return new Set(newest.values())
 }
 
+// A ship-stage that starts its stage — the line `run:board` draws a phase from. A `done`, a `failed` and
+// a passed-over stage draw none.
+function is_stage_start(event: RunEvent): boolean {
+	if (event.kind !== EVENT_KIND.SHIP_STAGE) return false
+
+	return event.text.split(WORD_SEPARATOR)[STAGE_PHASE_INDEX] === run_ship_stage.PHASE.START
+}
+
+// A disposable line `run:board` draws from: a ship-stage `start` is a phase on a lane's track, and an
+// `idle` line is the deadline of the run's wait.
+function is_drawn(event: RunEvent): boolean {
+	return event.kind === EVENT_KIND.IDLE || is_stage_start(event)
+}
+
+// The lines the bound may drop, in the order it drops them: the ones that draw nothing first, then the
+// ones `run:board` draws from, each group oldest first.
+function droppable(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEvent> {
+	const kept = newest_stages(events)
+	const disposable = events.filter((event) => DISPOSABLE_KINDS.has(event.kind) && !kept.has(event))
+
+	return [
+		...disposable.filter((event) => !is_drawn(event)),
+		...disposable.filter((event) => is_drawn(event)),
+	]
+}
+
 // The bounded stream serialized back to JSONL. The newest `EVENT_CAP` are kept and the oldest roll off;
 // each survivor keeps its original `pos`, so the bound never renumbers a position a reader is holding.
 // The stream held to `EVENT_CAP`, dropping the oldest trace events before any position
@@ -243,15 +273,17 @@ function newest_stages(events: ReadonlyArray<RunEvent>): ReadonlySet<RunEvent> {
 // **Each issue's newest ship-stage is not disposable** (joshuafolkken/kit#3521): it is the only record
 // `run:board` draws a lane's review-and-later phase from. On a stream full of positions the stage just
 // written was the one disposable line and rolled off in its own append, so the board never left implement.
+//
+// **A ship-stage `start` outlasts the other disposable lines** (joshuafolkken/kit#3541): each one is a
+// phase on the lane's track, so dropping them oldest-first with the `done` lines and the heartbeats left
+// a shipped child's track ending at 🚢 with nothing after it. An `idle` line goes with them, oldest first,
+// so a run's newest wait is not the first line a stream of starts and positions gives up.
 function bounded(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEvent> {
 	const excess = events.length - EVENT_CAP
 
 	if (excess <= 0) return events
 
-	const kept = newest_stages(events)
-	const dropped = new Set(
-		events.filter((event) => DISPOSABLE_KINDS.has(event.kind) && !kept.has(event)).slice(0, excess),
-	)
+	const dropped = new Set(droppable(events).slice(0, excess))
 
 	return events.filter((event) => !dropped.has(event)).slice(-EVENT_CAP)
 }
@@ -352,6 +384,7 @@ const run_event_stream = {
 	append,
 	format_event,
 	has_since,
+	is_stage_start,
 	read_events,
 	read_from,
 	read_last,
