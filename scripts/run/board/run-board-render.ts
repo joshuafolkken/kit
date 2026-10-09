@@ -362,7 +362,7 @@ function legend_layout(header: BoardHeader): BoardLayout | undefined {
 // many more there are, so the section never pushes the plan off the screen.
 function notes_part(notes: ReadonlyArray<BoardNote>, header: BoardHeader): NotesPart {
 	const has_legend = legend_layout(header) !== undefined
-	const lines = run_board_render_notes.note_lines(notes, has_legend)
+	const lines = run_board_render_notes.note_lines(notes, has_legend, header.link)
 	const label = has_legend ? NOTES_ICON : WORDS.notes
 
 	return { head: heading_lines(label), lines, hidden: notes.length - lines.length }
