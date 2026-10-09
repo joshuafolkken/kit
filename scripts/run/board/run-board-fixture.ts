@@ -10,7 +10,7 @@ import type { BoardPorts } from './run-board-state'
 // What the `run:board` redraw suites share (joshuafolkken/kit#3444): the ports a test drives the board
 // through — a clock it moves by hand, the frames it wrote, and counted reads.
 
-const WORDS = run_board_labels.words_of('en')
+const { WORDS } = run_board_labels
 const START = Date.parse('2026-10-08T09:00:00.000Z')
 const ALL: NamedPlan = { issues: [], only: false }
 const LOCAL: LocalRead = {
