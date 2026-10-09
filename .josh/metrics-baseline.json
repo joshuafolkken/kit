@@ -11,8 +11,8 @@
 	},
 	"guards": 8,
 	"ai_cost": {
-		"resident_bytes": 12193,
-		"on_demand_bytes": 561435
+		"resident_bytes": 11033,
+		"on_demand_bytes": 560275
 	},
 	"accepted": {
 		"reason": "run-event-stream bound orders droppable lines so ship-stage starts and idle lines roll off last, keeping run:board post-ship phases (#3541)",
