@@ -36,6 +36,21 @@ describe('bug labels at issue filing', () => {
 		expect(template).toContain(ISSUE_FILE)
 	})
 
+	// joshuafolkken/kit#3615: the bug criterion is judged against the owner's intent, not the
+	// documented design — without it, behavior matching code comments and tests was filed as non-bug.
+	// The two examples are joshuafolkken/kit#3614 (auto-ok applied as designed, wider than intended)
+	// and #3615 itself (a doc-only fix to a criterion that produced a wrong classification); the
+	// template names them by content because its issue-citation budget is an exact ratchet.
+	it('judges a bug against the owner intent even when the behavior matches the design', () => {
+		const template = read_repo_file(ISSUE_TEMPLATE)
+
+		expect(template).toContain(
+			'持ち主の意図と違う動きは、コード・コメント・テストに書かれた設計どおりでも `- 種別: 不具合` とする。',
+		)
+		expect(template).toContain('コメントとテストに固定されたまま意図より広く働く自動付与')
+		expect(template).toContain('文書だけでも意図と違う分類を生む基準')
+	})
+
 	it.each(FILING_DOCS)('%s routes the bug label through issue:file', (document_) => {
 		expect(read_repo_file(document_)).toContain(ISSUE_FILE)
 	})

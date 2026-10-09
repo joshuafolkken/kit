@@ -7,12 +7,12 @@
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2098
+		"lines": 2099
 	},
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 459125
+		"on_demand_bytes": 459560
 	},
 	"accepted": {
 		"reason": "kickoff new split children also declare --requested (review round-2 fix for #3614)",
