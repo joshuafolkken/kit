@@ -60,82 +60,35 @@ reference is named, the refusal is the whole answer. Where several are, a task-l
 `backlogrun #<N>` on its own after the epic.
 ## Each child runs in a delegated unit
 
-**A child is not run in the parent loop's context.** One child goes to an isolated execution unit,
-and only its summary comes back. Rationale: `docs/maintainers/backlogrun-child-rationale.md` → "Why
-each child runs in a delegated unit".
+**A child is not run in the parent loop's context** — **whatever offers a child — the loop, or a
+person clearing a label — the child is handed to a lane, never to the parent.** `pnpm josh delegate
+epic-child` answers `delegate`; in a lane the unit is a detached process started by `pnpm josh
+lane:launch` (`backlogrun-lanes.md` → "Opening one lane and dispatching its child"), with the invoking
+CLI's `worker` profile — Claude Code defaults to Anthropic `claude-opus-5-5` / `medium`
+(`docs/josh-commands-run.md` → "`josh lane:dispatch`", the single source).
+Where no isolated unit exists, run the child in the parent's context; the hand-off is still asked at
+every merge. Rationale: `docs/maintainers/backlogrun-child-rationale.md` → "Why each child runs in a
+delegated unit".
 
-**The supervisor's driver is the mechanical parent after hand-off.** It uses the same lane dispatch
-and GitHub verification commands; an AI parent handles only a returned judgment branch. *Every* child takes a
-delegated unit — a fresh one and **a child just released from `needs-decision`** alike. The rule is
-one sentence: **whatever offers a child — the loop, or a person clearing a label — the child is handed
-to a lane, never to the parent.**
+**The parent reads GitHub, never the summary** — `pnpm josh issue:state <N>` (or `run:merge`) is the
+verifier; **never advance the loop on the summary alone**.
 
-**The mechanism is the one `pnpm josh delegate` defines** — the enumeration plus the command — with
-the unit changed from one step of a run to one child of an epic. Never build a second. Ask the command
-rather than deciding:
-
-```bash
-pnpm josh delegate epic-child   # → delegate
-```
-
-**In a lane, that unit is a detached operating-system process rather than a subagent of this
-session.** The verifier is still `pnpm josh issue:state <N>` read from GitHub, and the summary is
-still bounded at 25 lines. `pnpm josh lane:dispatch` is where a lane's child is started; "Handing the
-child over" in `backlogrun-lanes.md` carries the command.
-
-**The lane child uses the invoking CLI's `worker` profile.** Claude Code defaults to Anthropic
-`claude-opus-5-5` / `medium`; Codex uses `codex exec`, OpenAI `gpt-6.1-sol` / `medium`, workspace-write and
-JSONL. `JOSH_WORKER_MODEL` overrides Claude Code only; `JOSH_WORKER_EFFORT` covers both providers,
-and legacy `JOSH_LANE_*` applies only here. Bad markers, missing CLI/auth and failure
-refuse or park without fallback or retry.
-`docs/josh-commands-run.md` → "`josh lane:dispatch`" is the single source.
-
-**The parent reads GitHub, never the summary.** That is `epic-child`'s verifier: a unit that reports
-a child finished without its PR merged leaves that child open, and `pnpm josh issue:state <N>` says so
-in one call. The child's own gate, `/code-review` and CI run inside the unit. **Never advance the
-loop on the summary alone** — that discards the verifier.
+**The brief names the invocation it descends from** — e.g. `backlogrun #<E> --only`, the child number,
+and that the child runs as `fullrun #<N>` under that authorization; the unit refuses a brief without it.
 
 ### What the summary carries, and how long it may be
 
-**The summary's only job is to carry what GitHub does not.** Both lists below are written out, and the
-brief hands them to the unit. Rationale: `docs/maintainers/backlogrun-child-rationale.md` → "Why the
-summary is bounded the way it is".
+**The summary carries only what GitHub does not, in at most 25 lines; the brief states the bound.**
+Rationale: `docs/maintainers/backlogrun-child-rationale.md` → "Why the summary is bounded the way it is".
 
-**Always kept — five things, because none of them is anywhere else:**
+- **Kept**: `Cause` / `Fix` / `Result`; every verification result not closed the ordinary way, named
+  as such; observations that could bite later — **the only route a child's discretionary observation
+  has** (`observation-filing.md` → "A delegated child does not take this route"); decisions not already
+  logged; what was left undone, and under whose authority.
+- **Cut**: the changed-file list, per-round review detail, and restated rules.
 
-1. **`Cause` / `Fix` / `Result`**, the three plain lines — the parent's orientation.
-2. **Every verification result the run did not close in the ordinary way**, named as such. A result
-   nobody obtained must never reach the parent as a run that passed.
-3. **Observations that could bite later** — something noticed and not filed, a flaky check, a
-   surprising diff, work a later child will collide with. **This is the only route a child's
-   discretionary observation has**: a child files `route:tier-a` and `route:interrupt` only, and the
-   parent files what survives — `observation-filing.md`, the single source. **The parent appends the
-   rest, not drops it** — one ledger line each, and a second line under the same key files it; who
-   appends which line is `observation-filing.md` → "A delegated child does not take this route".
-4. **Decisions taken and why**, where the decision was not already logged as an Issue comment.
-5. **What was left undone**, and under whose authority.
-
-**Always cut — three things, because GitHub already holds them:** the changed-file enumeration (the
-pull request's own file list), the per-round review detail (each round's verdict is one line; the
-findings are on the pull request), and restatements of rules the parent already holds.
-
-**The bound is 25 lines, and it is a number so that it is not a judgement.** **The brief states the
-bound.**
-
-**This does not shorten the person-facing completion report.**
-`prompts/collaboration-workflow/report-format.md` → 「完了報告（セッション向け）」 is unchanged. What is
-bounded here is the child's hand-back to the parent.
-
-**Read the state directly rather than asking `epic:next` again.** A child that did not finish still
-carries `in-progress`, which `epic:next` classifies as waiting on time before it consults any blocker.
-
-**The merge authorization reaches the unit**, and **so does the explicit invocation**. **The brief
-therefore names the invocation it descends from** — `backlogrun #<E> --only`, the child number, and that
-the child is to be run as `fullrun #<N>` under that authorization. A brief that omits it is the defect,
-and the unit refuses it.
-
-**Where no isolated unit exists, run the child in the parent's context.** The hand-off below is still
-asked at every merge; delegation is not an alternative to it.
+The person-facing report (`prompts/collaboration-workflow/report-format.md` → 「完了報告（セッション向け）」)
+is unchanged.
 
 ## A delegated unit that stopped without reporting
 
@@ -164,25 +117,11 @@ pnpm josh latest         # on `required` only
 pnpm josh stash:pop "backlogrun: josh latest #<N>"         # only if you stashed above — by message, not a positional pop
 ```
 
-On `required`, load the `dependency-update` skill and follow its procedure — the overrides in **both**
-`pnpm-workspace.yaml` and `package.json`, and the one expected `devEngines` pnpm bump. **The answer is
-the command's, never a judgement**, and `latest-gate.md` is its single source.
-
-**Session, not run** — each session runs one repository's children, so each updates its own checkout;
-never skip it because another repository's session already ran it. **Never ask it before a child is
-in hand.**
-
-**The lock file the update rewrites lands with the first child.** The first child's `pnpm josh git -y`
-commits it — so that one PR carries the dependency bumps and the other children carry none. Should the
-first child fail CI on a bump, fix it forward before parking it.
-
-**`pnpm josh ms` stays per child** — only the dependency update moves to the run. **`josh latest` is
-never run inside a lane, whatever `latest:scope` answers there** — `latest:scope` answers `skip` in a
-lane and `pnpm josh latest` refuses outright, fronted by `pnpm josh latest:guard`; with lanes the
-parent runs it in the primary checkout, and the stash that carries the lock file into the first lane
-is `backlogrun-lanes.md` → "Once per repository, before the first lane opens".
-
-**A resumed `backlogrun` is a new session**, so it asks once again before its first child.
+On `required`, load the `dependency-update` skill; `latest-gate.md` is the single source. **Session,
+not run** — each session updates its own checkout, and a resumed `backlogrun` asks again. **The lock
+file lands with the first child's `pnpm josh git -y`**; fix a failing bump forward. **`josh latest` is
+never run inside a lane** (`pnpm josh latest:guard` refuses it) — with lanes the parent runs it in the
+primary checkout (`backlogrun-lanes.md` → "Once per repository, before the first lane opens").
 
 Rationale: `docs/maintainers/backlogrun-child-rationale.md` → "Why `josh latest` is hoisted to the
 session".

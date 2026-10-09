@@ -19,12 +19,10 @@ it a defect (not an improvement, refactor, removal or feature)? Is it in kit's o
 (lint / type check / spell check / unit tests), the code review, the pre-push hook, or the merge
 checks — not a consumer repository's CI or template? Does it, on `main` now, make unrelated PRs
 answer wrongly (a false green or a false red)? All three, and the issue carries `run:solo`; any one
-missing, and it carries `run:lane` and fills a lane like any other child. `backlog:next` and `epic:next --lanes` enforce both (joshuafolkken/kit#2776,
-#2779), and an issue a run files (an interrupt, a split child, a prerequisite) carries one of the
-two from its filing, because an issue with neither answers `triage` and nothing starts. **It stops
-the other lanes for one reason only: a batch run on broken verification leaves nobody's result
-trustworthy** — that the issue's own verification sits under the defect is the issue's own concern,
-checked by the verification after the fix. This section is the rule's single source; rationale:
+missing, and it carries `run:lane`. `backlog:next` and `epic:next --lanes` answer `triage` for an issue
+with neither (joshuafolkken/kit#2776, #2779), so an issue a run files carries one of the two from its
+filing. **It stops the other lanes for one reason only: a batch run on broken verification leaves
+nobody's result trustworthy.** This section is the rule's single source; rationale:
 `docs/maintainers/wip-cap-rationale.md` → "Why a solo run".
 
 ## Lanes — running more than one child at a time
@@ -63,65 +61,36 @@ costs a resolution, a re-run gate and a review (`backlogrun-recovery.md` → "Co
 
 ### Once per repository, before the first lane opens
 
-In the **primary checkout**, in this order, and never again per lane:
+In the **primary checkout**, in this order, never again per lane: `pnpm josh ms`; `pnpm josh
+latest:scope` and the update on `required` (`backlogrun-child.md` → "`josh latest` runs once per
+session, not once per child"); `pnpm josh lane:prune`; `pnpm josh run:tidy`.
 
-1. `pnpm josh ms` — every lane branches from this ref.
-2. `pnpm josh latest:scope`, and the update on `required` — `backlogrun-child.md` → "`josh latest`
-   runs once per session, not once per child".
-3. `pnpm josh lane:prune` — closes lanes left without a work tree, sweeps unregistered leftovers.
-4. `pnpm josh run:tidy` — sweeps merged lanes and stashes (as `run:hold` does).
-
-**The rewritten lock file still has to reach a pull request**, and with lanes no child runs in the
-primary checkout to carry it. `git stash` is a repository-level ref shared by every work tree:
-
-```bash
-git stash push -u -m "backlogrun: josh latest before lanes"   # primary checkout, only if the update rewrote anything
-```
-
-Record it on that first child's Issue — the comment is what gets it popped if the run dies in between.
-**The first lane's `pnpm josh lane:launch "$n" --stash "backlogrun: josh latest before lanes"` pops it
-by message, after `lane:open`'s own install** — never a positional `git -C "$dir" stash pop`: the stash
-is a repository-wide stack every lane shares, so a positional pop would take whichever lane last pushed.
-**Under the supervisor's `backlog:drive` the driver passes it, never you**:
-each launch asks whether a stash under that message is on the stack and, if one is, hands it to
-`lane:launch --stash` — the pop consumes it, so the first lane takes it and every later one launches
-without. The push above stays the parent's, before the driver starts.
+**The rewritten lock file reaches a pull request through the first lane.** In the primary checkout,
+only if the update rewrote anything, `git stash push -u -m "backlogrun: josh latest before lanes"`, and
+record it on that first child's Issue. **The first lane's `pnpm josh lane:launch "$n" --stash
+"backlogrun: josh latest before lanes"` pops it by message** — never a positional `stash pop` on the
+shared stack. **Under `backlog:drive` the driver passes `--stash`, never you**; the push stays the
+parent's, before the driver starts.
 
 ### Opening one lane and dispatching its child
 
-**One command opens the lane, prepares it, and dispatches the child — `pnpm josh lane:launch`.** It
-runs `lane:open`, then — only when `--stash` is given, which is the first lane alone — pops that stash
-into the lane and re-installs against the lock it brought in, then `lane:dispatch`:
+**One command opens the lane, prepares it, and dispatches the child — `pnpm josh lane:launch`** (over
+`lane:open`, `stash:pop` and `lane:dispatch`, each guard unchanged; rationale:
+`docs/maintainers/backlogrun-lanes-rationale.md` → "Why `lane:launch` folds the lane steps into one"):
 
 ```bash
 pid=$(pnpm josh lane:launch "$n") || exit 1   # the child's pid on stdout, nothing else
-pid=$(pnpm josh lane:launch "$n" --stash "backlogrun: josh latest before lanes") || exit 1   # the first lane only, and only if `josh latest` stashed
 ```
 
-`lane:launch` is a thin layer over `lane:open`, `stash:pop` and `lane:dispatch`, so each of their
-guards, refusals and messages holds unchanged; the bullets below describe the steps it runs.
-Rationale: `docs/maintainers/backlogrun-lanes-rationale.md` → "Why `lane:launch` folds the lane steps
-into one".
+| It answers | What the run does |
+| --- | --- |
+| a pid | The child runs; poll it |
+| empty, non-zero, `full` | No free lane; wait for one |
+| empty, non-zero, `already-open` or a failed install | **Park that child and name `pnpm josh lane:close <N>`** — a lock the lane cannot build is a person's to fix |
+| `lane:open` reports a reused `<N>-lane` on stderr | The way back to a child parked after it pushed — **a reused branch is not a fresh lane** |
 
-- **A refusal is an empty capture beside a non-zero exit**, with the reason on standard error: `full`,
-  `already-open`, and a **failed install** — which leaves a real work tree behind holding its seat, so
-  the next launch answers `already-open` and never retries. **Park that child and name
-  `pnpm josh lane:close <N>`** — a lock the lane cannot build is a state a person fixes. A refused
-  `lane:open`, a pop that refused, or a failed re-install each **stop the launch before the child is
-  dispatched**.
-- **`lane:open` installs; the `--stash` lane re-installs, and only that lane needs it.** A failed
-  install fails `lane:open`, so `lane:launch` reaching `lane:dispatch` is the guarantee the lane runs.
-  **A pop that fails stops the lane** rather than re-installing anyway.
-- **A `<N>-lane` that already exists is attached to, and `lane:open` says so on standard error** — the
-  way back to a child parked after it pushed: a local branch of that name gets the work tree put on it,
-  and where there is none the **remote** is asked (`ls-remote`, fetched first) and the lane cut from
-  `origin/<N>-lane` where the branch survives — otherwise from the default branch. **A reused branch is
-  not a fresh lane.** Nothing deletes a branch to open a lane, so a reopen cannot cost the pushed work.
-- **Nothing switches the lane's branch.**
-- **`pnpm josh run:hold`'s preflight check is not asked in a lane; `lane:open`'s own answer replaces it.**
-  What a leftover looks like here is `lane:open` answering `already-open`.
-- **`pnpm josh run:hold` is unchanged, and is claimed inside the lane** — it keys on
-  `git rev-parse --absolute-git-dir` (`.git/worktrees/<name>`), so each lane holds independently.
+**Nothing switches the lane's branch.** In a lane `lane:open`'s answer replaces `pnpm josh run:hold`'s
+preflight, and the child claims `run:hold` inside the lane, keyed on its own git directory.
 
 ### Handing the child over
 
