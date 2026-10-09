@@ -7,12 +7,12 @@
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2344
+		"lines": 2325
 	},
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11121,
-		"on_demand_bytes": 560275
+		"on_demand_bytes": 559993
 	},
 	"accepted": {
 		"reason": "#3397 adds the mtime-first verified-digest memory to hook-bundle-stamp (and its tests) so PreToolUse hook launches skip re-hashing settled inputs",

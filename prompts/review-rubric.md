@@ -129,36 +129,17 @@ Example: `No issues — checked null returns on X, verified Y edge case, Z is gu
 `No issues` is only acceptable for Security, Performance, i18n, and Comments when there is genuinely
 nothing to check (no auth code, no hot paths, no user strings, no comments touched).
 
-Template:
+Template — one `###` heading per category, in the order of "Review categories" below, then
+`### Summary`:
 
 ```md
 ### Bug risks & logic errors
 
 - `src/foo.ts:42` (high) — <problem> — <fix>
 
-### Security
-
-No issues — no auth code, no user input, no unsafe casts in diff.
-
-### Performance
-
-No issues — no loops, no reactive chains, no I/O on request paths.
-
 ### Project conventions
 
-No issues — verified snake_case, no arrow functions, no magic numbers, i18n covered.
-
-### i18n
-
-No issues — no user-visible strings added.
-
-### Tests
-
-- `e2e/foo.test.ts:15` (medium) — assertion does not fail if implementation is inverted — rewrite to verify X not just that code runs
-
-### Comments & content
-
-No issues
+No issues — `parse_ids` returns what its name says; no near-copy of `split_ids` added; tests sit beside the source.
 
 ### Assumptions audit
 

@@ -1,4 +1,5 @@
 import { read_repo_file } from '#scripts/document/ai-document-fixture'
+import { document_section } from '#scripts/document/document-section'
 import { describe, expect, it } from 'vitest'
 import { review_brief } from './review-brief'
 
@@ -49,6 +50,23 @@ describe('the rubric file carries every category the review must check', () => {
 	it('carries the output format and the stop conditions', () => {
 		expect(RUBRIC).toContain('## Review output format')
 		expect(RUBRIC).toContain('## Stop conditions')
+	})
+})
+
+// joshuafolkken/kit#3405: category 4 says not to re-check what lint enforces, yet the output sample
+// proved the category clean by naming exactly those checks. A reviewer copies the sample, not the
+// rule, so the sample must not name a lint-enforced convention.
+const LINT_ENFORCED_TERMS: ReadonlyArray<string> = ['snake_case', 'arrow function', 'magic number']
+
+describe('the output format sample agrees with category 4', () => {
+	const output_format = document_section.section(RUBRIC, 'Review output format')?.text ?? ''
+
+	it('finds the output format section', () => {
+		expect(output_format).toContain('### Summary')
+	})
+
+	it.each([...LINT_ENFORCED_TERMS])('does not name the lint-enforced %s', (term) => {
+		expect(output_format.toLowerCase()).not.toContain(term)
 	})
 })
 
