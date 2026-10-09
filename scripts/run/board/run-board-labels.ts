@@ -1,6 +1,7 @@
 import { WriteStream } from 'node:tty'
 import { styleText } from 'node:util'
 import cli_spinners from 'cli-spinners'
+import type { BoardNote } from './run-board-notes'
 import type { Phase } from './run-board-phase'
 import type { ItemState } from './run-board-status'
 
@@ -153,6 +154,16 @@ const PHASE_WORDS: Readonly<Record<Phase, keyof Words>> = {
 	merged: 'merged',
 }
 
+// The findings section's rule and each note kind's lead (joshuafolkken/kit#3478), chosen on the same
+// rule and apart from every phase and state icon, so the legend names them and a row needs no word. 🆕
+// rather than 🐞: a filed issue is not always a bug.
+const NOTES_ICON = '📌'
+const NOTE_ICONS: Readonly<Record<BoardNote['kind'], string>> = {
+	filed: '🆕',
+	park: STATE_ICONS.parked,
+	note: '💬',
+}
+
 // The header's gauges and marks (joshuafolkken/kit#3450). ⚡ rather than 🔥 (joshuafolkken/kit#3452):
 // a fire beside a gauge drawn green read as an alarm.
 const HEADER_ICONS = {
@@ -268,6 +279,8 @@ const run_board_labels = {
 	BAR_LEFT_COLOR,
 	GAUGE_SHADES,
 	HEADER_ICONS,
+	NOTES_ICON,
+	NOTE_ICONS,
 	PHASE_ICONS,
 	PHASE_WORDS,
 	SPINNER_FRAME_MS,

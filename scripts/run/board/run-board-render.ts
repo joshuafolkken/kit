@@ -17,7 +17,8 @@ import { run_board_track } from './run-board-track'
 // A section is a rule rather than a heading, and the legend at the foot names the symbols, so a row
 // carries only what differs between rows (joshuafolkken/kit#3444).
 
-const { HEADER_ICONS, PHASE_ICONS, PHASE_WORDS, STATE_ICONS, WAITS_ICON } = run_board_labels
+const { HEADER_ICONS, NOTES_ICON, NOTE_ICONS, PHASE_ICONS, PHASE_WORDS, STATE_ICONS, WAITS_ICON } =
+	run_board_labels
 const { clock_of, elapsed_of } = run_board_labels
 // The track is a fixed fourteen columns where the gauge and the phase's name took up to twenty-two, so
 // the title takes the columns it freed and a row is no wider (joshuafolkken/kit#3460).
@@ -32,11 +33,6 @@ const RULE = '─'
 const RULE_LEAD = `${RULE}${RULE}`
 const RULE_WIDTH = 50
 const NUMBER_PLACEHOLDER = '{n}'
-const NOTE_ICONS: Readonly<Record<BoardNote['kind'], string>> = {
-	filed: '🐞',
-	park: STATE_ICONS.parked,
-	note: '💬',
-}
 
 interface BoardView {
 	header: BoardHeader
@@ -203,7 +199,18 @@ function phase_legend(layout: BoardLayout, words: Words): Array<string> {
 	)
 }
 
-function legend_of(layout: BoardLayout, words: Words): string {
+// The findings' symbols, named only while the section is on screen (joshuafolkken/kit#3478).
+function notes_legend(notes: ReadonlyArray<BoardNote>, words: Words): Array<string> {
+	if (notes.length === 0) return []
+
+	return [
+		`${NOTES_ICON} ${words.notes}`,
+		`${NOTE_ICONS.filed} ${words.filed}`,
+		`${NOTE_ICONS.note} ${words.note}`,
+	]
+}
+
+function legend_of(layout: BoardLayout, notes: ReadonlyArray<BoardNote>, words: Words): string {
 	const legend = [
 		`${STATE_ICONS.merged} ${words.merged}`,
 		`${STATE_ICONS.parked} ${words.parked}`,
@@ -217,6 +224,7 @@ function legend_of(layout: BoardLayout, words: Words): string {
 		`${HEADER_ICONS.memory} ${words.memory}`,
 		`${HEADER_ICONS.swap} ${words.swap}`,
 		`${HEADER_ICONS.ended} ${words.ended}`,
+		...notes_legend(notes, words),
 	].join(GAP)
 
 	return styleText('dim', legend)
@@ -253,20 +261,32 @@ function found_of(note: BoardNote, words: Words): string {
 	return words.found_during.split(NUMBER_PLACEHOLDER).join(note.found_during)
 }
 
-function note_text(note: BoardNote, words: Words): string {
-	const issue = note.issue === undefined ? '' : `${note.issue} `
-	const lead = `${note_icon(note)} ${clock_of(note.at_ms)} ${issue}${words[note.kind]}`
+// The layout a legend is drawn for: none in a chat (joshuafolkken/kit#3456), nor before a plan is read.
+function legend_layout(header: BoardHeader): BoardLayout | undefined {
+	return header.form === 'chat' ? undefined : header.layout
+}
+
+// Where the legend names the symbols a note leads with its icon alone; where no legend is drawn it
+// keeps the kind's word (joshuafolkken/kit#3478).
+function note_text(note: BoardNote, header: BoardHeader): string {
+	const { words } = header
+	const kind = legend_layout(header) === undefined ? words[note.kind] : undefined
+	const lead = [note_icon(note), clock_of(note.at_ms), note.issue, kind]
+		.filter((part) => part !== undefined)
+		.join(' ')
 
 	return `${INDENT}${lead}${GAP}${note.text}${found_of(note, words)}`
 }
 
 // The newest few, and how many more there are, so the section never pushes the plan off the screen.
-function notes_section(notes: ReadonlyArray<BoardNote>, words: Words): Array<string> {
-	const shown = notes.slice(0, NOTE_LIMIT).map((note) => note_text(note, words))
+function notes_section(notes: ReadonlyArray<BoardNote>, header: BoardHeader): Array<string> {
+	const { words } = header
+	const shown = notes.slice(0, NOTE_LIMIT).map((note) => note_text(note, header))
 	const hidden = notes.length - shown.length
 	const more = hidden > 0 ? [`${INDENT}${words.more} ${String(hidden)}`] : []
+	const label = legend_layout(header) === undefined ? words.notes : NOTES_ICON
 
-	return section(words.notes, [...shown, ...more])
+	return section(label, [...shown, ...more])
 }
 
 // The command that resumes a stopped run's session, under the header where the person looks first.
@@ -277,10 +297,12 @@ function resume_lines(resume: string | undefined, words: Words): Array<string> {
 }
 
 // A chat draws no legend: the symbols are the same in every answer (joshuafolkken/kit#3456).
-function legend_lines(header: BoardHeader): Array<string> {
-	if (header.layout === undefined || header.form === 'chat') return []
+function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Array<string> {
+	const layout = legend_layout(header)
 
-	return ['', legend_of(header.layout, header.words)]
+	if (layout === undefined) return []
+
+	return ['', legend_of(layout, notes, header.words)]
 }
 
 function render(view: BoardView): Array<string> {
@@ -290,8 +312,8 @@ function render(view: BoardView): Array<string> {
 		...run_board_header.header_lines(header),
 		...resume_lines(view.resume, header.words),
 		...plan_sections(header),
-		...notes_section(notes, header.words),
-		...legend_lines(header),
+		...notes_section(notes, header),
+		...legend_lines(header, notes),
 	]
 }
 
