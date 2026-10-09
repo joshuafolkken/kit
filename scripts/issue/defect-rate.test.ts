@@ -9,13 +9,14 @@ const DAYS = 14
 const SINCE = '2026-09-09'
 const LOWER_BOUNDS = 'lower bounds'
 const INTERRUPT = 'route:interrupt'
+const ENHANCEMENT = 'enhancement'
 
 function issue(body: string, labels: ReadonlyArray<string> = []): RateIssue {
 	return { body, labels }
 }
 
-function result(defects: number, behavior_changes: number, is_capped = false): DefectRate {
-	return { days: DAYS, since: SINCE, defects, behavior_changes, is_capped }
+function result(defects: number, enhancements: number, is_capped = false): DefectRate {
+	return { days: DAYS, since: SINCE, defects, enhancements, is_capped }
 }
 
 describe('defect_rate.window_start', () => {
@@ -31,7 +32,7 @@ describe('defect_rate queries', () => {
 
 	it('searches issues closed as completed since the window start', () => {
 		expect(defect_rate.completed_query('o/r', SINCE)).toBe(
-			'repo:o/r is:issue is:closed reason:completed closed:>=2026-09-09',
+			'repo:o/r is:issue is:closed reason:completed label:enhancement closed:>=2026-09-09',
 		)
 	})
 })
@@ -45,6 +46,10 @@ describe('defect_rate.is_defect', () => {
 		expect(defect_rate.is_defect(issue(BEHAVIOR_BODY, ['Route:Interrupt']))).toBe(true)
 	})
 
+	it.each(['bug', 'bugfix', 'Bugfix'])('counts the %s label without a declaration', (label) => {
+		expect(defect_rate.is_defect(issue(CODE_ONLY_BODY, [label]))).toBe(true)
+	})
+
 	it('does not count a declaration mentioned inside a sentence', () => {
 		expect(defect_rate.is_defect(issue('see `- 種別: 不具合` in the template'))).toBe(false)
 	})
@@ -55,20 +60,30 @@ describe('defect_rate.is_defect', () => {
 })
 
 describe('defect_rate.measure', () => {
-	it('counts defects among filed issues and behavior changes among completed ones', () => {
+	it('counts defects among filed issues and enhancements among completed ones', () => {
 		const measured = defect_rate.measure({
 			days: DAYS,
 			since: SINCE,
-			filed: [issue(DEFECT_BODY), issue(CODE_ONLY_BODY, [INTERRUPT]), issue(BEHAVIOR_BODY)],
-			completed: [issue(BEHAVIOR_BODY), issue(BEHAVIOR_BODY), issue(CODE_ONLY_BODY), issue('')],
+			filed: [
+				issue(DEFECT_BODY),
+				issue(CODE_ONLY_BODY, [INTERRUPT]),
+				issue('', ['bugfix']),
+				issue(BEHAVIOR_BODY),
+			],
+			completed: [
+				issue(CODE_ONLY_BODY, [ENHANCEMENT]),
+				issue('', [ENHANCEMENT]),
+				issue(BEHAVIOR_BODY),
+				issue(''),
+			],
 			is_capped: false,
 		})
 
-		expect(measured).toStrictEqual(result(2, 2))
-		expect(defect_rate.rate_of(measured)).toBe(1)
+		expect(measured).toStrictEqual(result(3, 2))
+		expect(defect_rate.rate_of(measured)).toBe(1.5)
 	})
 
-	it('has no rate when no behavior change completed', () => {
+	it('has no rate when no enhancement completed', () => {
 		expect(defect_rate.rate_of(result(3, 0))).toBeUndefined()
 	})
 })
@@ -77,6 +92,7 @@ describe('defect_rate.kind_of', () => {
 	it.each([
 		['a defect declaration', issue(DEFECT_BODY), 'defect'],
 		['a behavior change under route:interrupt', issue(BEHAVIOR_BODY, [INTERRUPT]), 'defect'],
+		['a behavior change labelled bugfix', issue(BEHAVIOR_BODY, ['bugfix']), 'defect'],
 		['a behavior change', issue(BEHAVIOR_BODY), 'mechanism'],
 		['a code-only change', issue(CODE_ONLY_BODY), 'other'],
 		['an undeclared body', issue(''), 'other'],
@@ -87,9 +103,9 @@ describe('defect_rate.kind_of', () => {
 
 describe('defect_rate.is_above_baseline', () => {
 	it('is true only strictly above the baseline', () => {
-		expect(defect_rate.is_above_baseline(result(22, 50))).toBe(true)
-		expect(defect_rate.is_above_baseline(result(21, 50))).toBe(false)
-		expect(defect_rate.is_above_baseline(result(1, 50))).toBe(false)
+		expect(defect_rate.is_above_baseline(result(74, 100))).toBe(true)
+		expect(defect_rate.is_above_baseline(result(73, 100))).toBe(false)
+		expect(defect_rate.is_above_baseline(result(1, 100))).toBe(false)
 	})
 
 	it('is false when there is no rate', () => {
@@ -102,6 +118,14 @@ describe('defect_rate.format', () => {
 		expect(defect_rate.format(result(20, 48))[0]).toBe(
 			'Defect rate over the last 14 days (since 2026-09-09): 0.42 (20 / 48)',
 		)
+	})
+
+	it('names both definitions on the detail lines', () => {
+		const [, defects, enhancements] = defect_rate.format(result(20, 48))
+
+		expect(defects).toContain('bug / bugfix / route:interrupt')
+		expect(defects).toContain(defect_rate.DEFECT_DECLARATION_LINE)
+		expect(enhancements).toContain('labelled enhancement, closed as completed')
 	})
 
 	it('prints n/a rather than a number when the denominator is zero', () => {

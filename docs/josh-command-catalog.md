@@ -851,7 +851,7 @@ Say whether the next turn of a run crosses the context-cut threshold (--cut) or 
 
 `[--days <n>]`
 
-Print the defect rate of merged work: defects filed per behavior change completed
+Print the defect rate of merged work: defects filed per enhancement completed
 
 ---
 
