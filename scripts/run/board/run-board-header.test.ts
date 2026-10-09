@@ -116,7 +116,7 @@ describe('run_board_header.header_lines shape', () => {
 
 		expect(lines_of(header({ machine }))).toStrictEqual([
 			'⏸ backlogrun   ⏱ 30:00   ⌛ 7h30m',
-			'⚡  15% ██────────   🧠  37% ████──────   💾 3.1M/s ██────────',
+			'⚡  15% ■■────────   🧠  37% ■■■■──────   💾 3.1M/s ■■────────',
 			`✅ 0/0 ${'─'.repeat(10)}   🔄 0  ⏳ 0  💤 0`,
 		])
 	})
@@ -159,7 +159,7 @@ describe('run_board_header.header_lines chat', () => {
 			memory_pressure: undefined,
 		}
 
-		expect(lines_of(header({ machine, form: 'chat' }))[1]).toBe('🧠  37% ████──────')
+		expect(lines_of(header({ machine, form: 'chat' }))[1]).toBe('🧠  37% ■■■■──────')
 	})
 })
 
@@ -221,15 +221,15 @@ function progress_of(settled: number, total: number): string {
 // joshuafolkken/kit#3473: icon, count, then bar, as the machine gauges; the done count drawn once.
 describe('run_board_header.header_lines progress line', () => {
 	it('draws ✅, the count over the total, the bar, then running, waiting and parked', () => {
-		expect(progress_of(9, 12)).toBe(`✅  9/12 ${'█'.repeat(8)}${'─'.repeat(2)}   🔄 0  ⏳ 3  💤 0`)
+		expect(progress_of(9, 12)).toBe(`✅  9/12 ${'■'.repeat(8)}${'─'.repeat(2)}   🔄 0  ⏳ 3  💤 0`)
 	})
 
 	it('starts the bar in one column as the count gains a digit', () => {
 		const short = progress_of(9, 12)
 		const long = progress_of(12, 12)
 
-		expect(short.indexOf('█')).toBe(long.indexOf('█'))
-		expect(long).toMatch(/^✅ 12\/12 █/u)
+		expect(short.indexOf('■')).toBe(long.indexOf('■'))
+		expect(long).toMatch(/^✅ 12\/12 ■/u)
 	})
 
 	it('draws the done count once', () => {

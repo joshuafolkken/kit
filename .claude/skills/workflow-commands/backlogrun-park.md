@@ -28,9 +28,9 @@ authorization, whether it came from a named epic or from the opted-in pool:
 - **`in-progress` left behind by an interrupted run** is → "`in-progress` is removed by
   whoever finds it stale".
 - **A child released from `needs-decision` is re-dispatched to a lane, never implemented by the
-  parent.** The parent is an orchestrator: → "The parent orchestrates and never
-  implements a child in its own context" is the single source, and → "Removing the label
-  is Tier A" carries the re-dispatch itself. A released child takes a lane exactly as any batch child
+  parent.** The parent is an orchestrator: `backlogrun.md` → "Claim nothing at the entry — this
+  parent orchestrates and never implements" is the single source, and "Removing the label
+  is Tier A" below carries the re-dispatch itself. A released child takes a lane exactly as any batch child
   does.
 
 ## The parent does not investigate a lane failure itself
@@ -81,7 +81,7 @@ uncommitted work stays in the lane's tree — never in the stash, which every wo
 local branch the resume needs. **A lost merge race is not one of
 these rows** — it resolves in its lane (`backlogrun-recovery.md` → "Conflicts are not predicted"), and parks only under that
 section's four conditions, which take the after-commit row. Both rows and the `pnpm josh run:release
-<N>` every parked ending owes are "What happens to a lane" above, the single source.
+<N>` every parked ending owes are `backlogrun-lanes.md` → "What happens to a lane", the single source.
 
 **Parking replaces stopping the session, not the rule that produced the stop.** An upstream defect is
 still filed immediately and unconditionally (Tier A for a first-party target), and a workaround is still
@@ -102,7 +102,7 @@ gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/needs-decision 2>/dev/nu
 rather than picking up its diff itself — `pnpm josh lane:launch <N>`, which dispatches into the lane the
 park kept, or opens one where none is. A
 parent that implements the released child inline is the failure the orchestrator rule is written against:
-"The parent orchestrates and never implements a child in its own context" above.
+`backlogrun.md` → "Claim nothing at the entry — this parent orchestrates and never implements".
 
 Without removing the label the parked child never runs again — it is the second half of the
 human-in-the-loop cycle, not an optional tidy-up.

@@ -151,9 +151,11 @@ could bite later" line (`backlogrun-child.md` → "What the summary carries, and
 parent files what survives — under the depth test above, and inside the run's ceiling.
 
 **A delegated child does not append to the ledger either — the parent collapses the duplicates and
-appends what is left.** The child's route is unchanged and is the only one it has —
-the summary's "Observations that could bite later" line — and the parent chooses the key, checks the
-count and writes the line. **The 10-per-run ceiling for this route is the parent's to count.**
+appends what is left.** The child's only route is the summary's "Observations that could bite later"
+line; the parent chooses the key, checks the count and writes the line. **The 10-per-run ceiling for this route is the parent's to
+count.** **Lines its own `review:record` and `measure:rerun` write are not this route** — they go to
+its issue's file in its lane (`observation-ledger.md` → "The ledger — where an observation that
+cannot cite a blockage goes").
 
 Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why a delegated child neither files
 nor appends".

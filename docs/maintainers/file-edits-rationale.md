@@ -78,7 +78,7 @@ tests gave way to structural document checks; `scripts/document/document-markers
 replaced them, does not cover this rule. What is pinned today is the hook, not the wording:
 `scripts/rules/file-body.test.ts` pins which commands carry a file body and that the refusal names
 `file-edits.md`, and `scripts/rules/shell-body-rule.test.ts` pins that the `CLAUDE.md` file-edit line
-is present. The list is kept as the record of what the deleted suite held ("the procedure" below is
+is present. The list is kept as the record of what the deleted suite held (_the procedure_ in the list is
 `file-edits.md`):
 
 - The rule's trigger sentence and its criterion sentence are resident in `CLAUDE.md`

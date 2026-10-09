@@ -49,7 +49,7 @@ describe('run_board_render.render rows', () => {
 		const row_line = `  🔨 1  ${padded('Issue 1')}  90:00  ${plain_track('implement')}`
 
 		expect(lines).toContain(row_line)
-		expect(row_line).not.toContain('█')
+		expect(row_line).not.toContain('■')
 		expect(lines.slice(0, -1).join('\n')).not.toContain('implement')
 		expect(lines.join('\n')).not.toContain('lane')
 	})

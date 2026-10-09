@@ -24,6 +24,14 @@ const LABEL_PATTERN = /(?:labels\[\]=|\/labels\/|labels -f name=)([a-z][a-z0-9:_
 const SECTION_PATTERN =
 	/(?<![\w./:`-])(?<tick>`?)(?<file>[\w./-]+\.md)\k<tick>\s*→\s*(?:§\w+,\s*)?["「](?<heading>[^"」]+)["」]/gu
 
+// A reference to a heading of the same document, which names no file: a quoted heading followed by
+// `above` or `below`, or an arrow with no file name before it — `→ "The hand-off"`. A broken one
+// sends the reader after a section that is not there as surely as a cross-document one does
+// (joshuafolkken/kit#3403). A bare arrow is read only once every `file.md →` form is dropped, so a
+// cross-document reference is never re-read as a reference to the document it sits in.
+const ADJACENT_PATTERN = /["「](?<heading>[^"「」]+)["」]\s+(?:above|below)\b/gu
+const BARE_ARROW_PATTERN = /→\s*(?:§\w+,\s*)?["「](?<heading>[^"「」]+)["」]/gu
+
 // A markdown link's `(target)`, dropped before the section scan so a linked name sits right before its
 // arrow — the link text already carries the file the reference names.
 const LINK_TARGET_PATTERN = /\]\([^)\s]*\)/gu
@@ -79,6 +87,20 @@ function section_references(text: string): Array<SectionReference> {
 		.filter((reference) => !is_placeholder_file(reference.file))
 }
 
+function headings_matching(text: string, pattern: RegExp): Array<string> {
+	return matches(text, pattern).map(({ groups }) => groups?.['heading'] ?? '')
+}
+
+function adjacent_references(text: string): Array<string> {
+	return headings_matching(text, ADJACENT_PATTERN)
+}
+
+function bare_arrow_references(text: string): Array<string> {
+	const unfiled = text.replaceAll(LINK_TARGET_PATTERN, '').replaceAll(SECTION_PATTERN, '')
+
+	return headings_matching(unfiled, BARE_ARROW_PATTERN)
+}
+
 function link_targets(text: string): Array<string> {
 	return matches(text, LINK_PATTERN)
 		.map((match) => match[1] ?? '')
@@ -105,6 +127,8 @@ function reference_forms(title: string): Array<string> {
 }
 
 const document_scan = {
+	adjacent_references,
+	bare_arrow_references,
 	command_references,
 	label_references,
 	link_targets,
