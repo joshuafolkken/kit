@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1033,
-		"code_lines": 86265,
-		"comment_lines": 34155,
+		"files": 1034,
+		"code_lines": 86296,
+		"comment_lines": 34163,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 546477
 	},
 	"accepted": {
-		"reason": "#3399 moves the delivered-rule list from rule-delivery.md prose into the rule-registry data that rule:list renders",
+		"reason": "run:board --chat pads titles to one column (#3544); the legend moved to its own module to keep run-board-render.ts under the 300-line limit, adding its imports and export",
 		"date": "2026-10-09"
 	}
 }
