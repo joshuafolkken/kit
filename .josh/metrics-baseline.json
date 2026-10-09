@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1043,
-		"code_lines": 87097,
-		"comment_lines": 33357,
+		"code_lines": 87111,
+		"comment_lines": 33365,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -12,7 +12,7 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 457935
+		"on_demand_bytes": 459560
 	},
 	"accepted": {
 		"reason": "#3617 round-2 fix: root-level files are claimed only by a known extension so dotted code identifiers no longer serialize lanes",

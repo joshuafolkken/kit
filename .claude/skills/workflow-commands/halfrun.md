@@ -42,7 +42,8 @@ back with fixes, treat each as a new round: implement, re-run `pnpm josh gate`, 
 
 `halfrun new` or `halfrun new "<title>"`: `kickoff new` + `halfrun #<N>` (no Issue exists yet). Steps
 mirror `fullrun new` (1)–(8): derive an English title (or use the provided one) → create the Issue
-(`pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>`, body per
+(`pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --requested`, with the labels
+`kickoff.md` → "Words typed after `new`" maps, body per
 `prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `issue-scout.md`) → add `in-progress` (as `fullrun new` (3)) → post the agreed plan → stash
 any pre-existing changes with `git stash push -m "halfrun new: pre-existing changes" -- ':!.josh/observations'`
 (the pathspec keeps the observation ledger in the tree for this run's commit), popped by

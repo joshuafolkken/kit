@@ -77,7 +77,8 @@ moment that child merges and closes.
 
 **Each split child is filed with the `route:split` label** —
 `pnpm josh issue:file "<sub-title>" --body-file <body-file> --depth <n> --route split` — so the
-backlog's composition stays countable by filing route rather than by grepping issue bodies.
+backlog's composition stays countable by filing route rather than by grepping issue bodies. A split of
+a person's `kickoff new` also takes `--requested` (`kickoff.md` → "Words typed after `new`").
 
 ## Promote, or create a new epic
 

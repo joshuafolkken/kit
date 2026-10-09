@@ -84,6 +84,7 @@ pnpm josh issue:file "<title>" --body-file body.md --depth 1 --distinct 2801,279
 - `--distinct <N,…>` — duplicate candidates you read and judged distinct.
 - `--over-cap` — the run is blocked by this filing; the cap lets it through.
 - `--no-auto-ok` — needs a person's judgement (Tier B / C); no `auto-ok`.
+- `--requested` — a person asked for this filing (a `new` entry, or a request in conversation). The carry record and the branch's issue are not read, so `auto-ok` comes only from `--label auto-ok`.
 - `--release` — a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).
 
 **Steps (run in this order):**
@@ -91,7 +92,7 @@ pnpm josh issue:file "<title>" --body-file body.md --depth 1 --distinct 2801,279
 1. Refuse when the target is third-party (Tier C).
 2. Check the body against the same criteria as [`josh issue:lint`](#josh-issuelint). Refuse on any problem.
 3. For another repository, confirm `## Origin` names the originating issue (`owner/repo#N` or a URL). Refuse when it does not.
-4. Print the `auto-ok` decision (applied in a `backlogrun` or when the branch's issue has it). When the labels carry `auto-ok` but neither `run:lane` nor `run:solo`, refuse: an untriaged opted-in issue stops `backlog:next` from offering anything. Pass `--label run:lane`, or `--label run:solo` for a defect in kit's own verification (`backlogrun-lanes.md`), or `--no-auto-ok`.
+4. Print the `auto-ok` decision (applied in a `backlogrun` or when the branch's issue has it, unless `--no-auto-ok`, `--requested` or a `release` label withholds it). When the labels carry `auto-ok` but neither `run:lane` nor `run:solo`, refuse: an untriaged opted-in issue stops `backlog:next` from offering anything. Pass `--label run:lane`, or `--label run:solo` for a defect in kit's own verification (`backlogrun-lanes.md`), or `--no-auto-ok`.
 5. Unless the filing is a split child (`--route split` — the split assessment already decided it is separate), when the same finder already filed an issue into the same repository that is still open (a `filed` event not named in `--distinct`, by the same finder — the lane child, else the issue the branch names, read across every invocation on the stream; with no finder, a `filed` event with none in the current invocation), ask the [`josh issue:fold`](#josh-issuefold) question and print `fold: <reason> · filed earlier by this finder: <refs>`. Only `fold` refuses, naming the earlier issue to add the finding to and the `--distinct <N>` that declares it a separate deliverable; `undetermined` (no diff that measures the size) files. A first filing asks nothing.
 6. Count the target's open issues and print `wip: <count> open in <owner/repo> · cap <cap> · <verdict>`: `within` up to the cap; past it `exempt` (route `interrupt` / `split` / `tier-a`, or `--over-cap`), else `held`, which asks the exemption question and refuses; an unreadable count warns.
 7. Run the same duplicate search as [`josh issue:scout`](#josh-issuescout) and print its report. While there are candidates, file nothing until every one is named in `--distinct`. A duplicate is not filed; it is folded into the existing issue by `issue-fold-existing.md`. A filing to another repository points `GH_REPO` at the target, so the duplicate search and the epic decision run there.

@@ -45,7 +45,8 @@ primary checkout; a Claude run keeps it.
 ## The `fullrun new` step list
 
 `kickoff new` + `fullrun #N` in one run. Steps: (1) Derive an English title, or use the provided one.
-(2) Create Issue: `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>` (per
+(2) Create Issue: `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --requested`,
+with the labels `kickoff.md` → "Words typed after `new`" maps (per
 `prompts/collaboration-workflow/issue-template.md`) — its duplicate scan runs first, and a candidate
 that covers the same work stops the run rather than filing a second Issue (`issue-scout.md`). Capture
 `<N>`. (3) Add `in-progress` (the bare hold named no issue):

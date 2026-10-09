@@ -16,6 +16,8 @@ person's `auto-ok` on a child; the brake below bounds it. A Tier C action inside
 `auto-ok: not applied` with the reason; `scripts/issue/issue-auto-ok.ts` is the single source. **Pass
 `--no-auto-ok` only when the new issue needs a person's judgement** — a Tier B toss-up or a Tier C
 action inside it. The retrospective's filings take the same default and count against the same brake.
+**A filing a person asked for declares `--requested` and takes no default** — `auto-ok` only when they
+named it (`kickoff.md` → "Words typed after `new`").
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the authorization boundary is shaped this way";
 provenance of each rule: `docs/maintainers/backlogrun-steps-rationale.md` → "Where each rule came from"

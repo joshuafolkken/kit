@@ -68,7 +68,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 			'File an Issue with every filing step: lint, Origin, fold, WIP cap, duplicate scout, labels, then epic:bundle',
 		category: 'AI tools',
 		reference: [
-			'<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]',
+			'<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--requested] [--release]',
 			'automation',
 			['network'],
 		],
