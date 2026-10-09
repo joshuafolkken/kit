@@ -20,10 +20,10 @@ import type { BoardNote } from './run-board-notes'
 import type { Phase } from './run-board-phase'
 import { run_board_render_legend } from './run-board-render-legend'
 import { run_board_render_notes } from './run-board-render-notes'
+import { run_board_render_slot } from './run-board-render-slot'
 import type { ItemState } from './run-board-status'
 import { run_board_track } from './run-board-track'
 import type { LaneUsages } from './run-board-usage'
-import { run_board_usage_text } from './run-board-usage-text'
 
 // The whole `run:board` screen as lines (joshuafolkken/kit#3430) — pure, so what a person sees is tested
 // apart from the terminal. The header says where the run is; the sections below it follow the plan's
@@ -35,6 +35,7 @@ import { run_board_usage_text } from './run-board-usage-text'
 const { NOTES_ICON, PHASE_ICONS, STATE_ICONS, WAITS_ICON, WORDS } = run_board_labels
 const { clock_of, elapsed_of } = run_board_labels
 const { NOTE_LIMIT } = run_board_render_notes
+const { cell_of, column_width, slot_of } = run_board_render_slot
 // The track is a fixed fourteen columns where the gauge and the phase's name took up to twenty-two, so
 // the title takes the columns it freed and a row is no wider (joshuafolkken/kit#3460).
 const TITLE_LIMIT = 48
@@ -64,12 +65,13 @@ interface BoardView extends FrameBounds {
 // What every row of one frame is drawn with: the header, how wide the title column is, so every time
 // starts in one column (joshuafolkken/kit#3544), how wide the time column is, so a three-digit `125:30`
 // and a `00:42` end in the same column, and each lane's usage where its column is drawn
-// (joshuafolkken/kit#3489).
+// (joshuafolkken/kit#3489), with the column's width (joshuafolkken/kit#3554).
 interface RowFrame {
 	header: BoardHeader
 	title_width: number
 	time_width: number
 	usages: LaneUsages | undefined
+	slot_width: number
 }
 
 // A chat wraps a long line rather than cutting it, so its titles are drawn whole (joshuafolkken/kit#3456).
@@ -128,15 +130,20 @@ function waits_of(row: BoardRow, header: BoardHeader): string | undefined {
 	return `${WAITS_ICON} ${row.waits.map((reference) => header.link(reference)).join(', ')}`
 }
 
-// The title is padded to the title column only where a time follows it, so the times form one column.
-function timed_parts(row: BoardRow, frame: RowFrame): Array<string | undefined> {
+// The title is padded to the title column where a time or the usage column follows it, so the times
+// form one column; a row with no time draws blanks in its place before the usage column.
+function timed_parts(
+	row: BoardRow,
+	frame: RowFrame,
+	is_slotted: boolean,
+): Array<string | undefined> {
 	const time = time_of(row, frame.header.now_ms)
 
 	const title = title_of(frame.header, row_title(row, frame.header))
 
-	if (time === undefined) return [title]
+	if (time === undefined && !is_slotted) return [title]
 
-	return [title.padEnd(frame.title_width), time.padStart(frame.time_width)]
+	return [title.padEnd(frame.title_width), (time ?? '').padStart(frame.time_width)]
 }
 
 // A running row leads with the icon of the phase it is in now (joshuafolkken/kit#3471) — the rightmost
@@ -155,12 +162,15 @@ function indent_of(prefix: string, row: BoardRow, header: BoardHeader): string {
 	return `${header.spinner}${prefix.slice(1)}`
 }
 
-// A running row's CPU and memory (joshuafolkken/kit#3489); a settled lane runs no process, so its track
-// follows its time column (joshuafolkken/kit#3535).
-function usage_of(row: BoardRow, usages: LaneUsages | undefined): string | undefined {
-	if (row.state !== 'running') return undefined
+// A row's usage column where the frame draws one (joshuafolkken/kit#3489), padded to one width on every
+// row so every track starts in one column (joshuafolkken/kit#3554). A plan row the run has not touched
+// has no time, usage or track to align, so it draws none and what it waits on stays beside its title.
+function cell_text(row: BoardRow, frame: RowFrame): string | undefined {
+	const { usages, slot_width } = frame
 
-	return run_board_usage_text.text_of(usages?.get(row.number))
+	if (usages === undefined || slot_width === 0 || row.status === undefined) return undefined
+
+	return cell_of(slot_of(row, usages, frame.header.now_ms), slot_width)
 }
 
 function joined(parts: ReadonlyArray<string | undefined>): string {
@@ -171,13 +181,15 @@ function joined(parts: ReadonlyArray<string | undefined>): string {
 // (joshuafolkken/kit#3526).
 function head_text(row: BoardRow, frame: RowFrame): string {
 	const lead = `${state_icon(row)} ${frame.header.link(String(row.number))}`
+	const cell = cell_text(row, frame)
 
-	return joined([lead, ...timed_parts(row, frame), usage_of(row, frame.usages)])
+	return joined([lead, ...timed_parts(row, frame, cell !== undefined), cell])
 }
 
-// Every row carries its state's icon, a waiting one ⏳ too (joshuafolkken/kit#3450).
+// Every row carries its state's icon, a waiting one ⏳ too (joshuafolkken/kit#3450); a row with nothing
+// after its padded columns ends where its text does.
 function row_text(row: BoardRow, frame: RowFrame): string {
-	return joined([head_text(row, frame), track_text(row), waits_of(row, frame.header)])
+	return joined([head_text(row, frame), track_text(row), waits_of(row, frame.header)]).trimEnd()
 }
 
 // The stage each state's row gives way in when the pane is short (joshuafolkken/kit#3505).
@@ -280,41 +292,40 @@ function title_width(header: BoardHeader, layout: BoardLayout): number {
 	return Math.max(TITLE_LIMIT, ...titles)
 }
 
-// Whether every running row's usage column still fits one terminal line — measured as the deepest, an
-// epic's child — where a frame is kept within a terminal (joshuafolkken/kit#3486). The track after it
-// is left out (joshuafolkken/kit#3526): it grows without bound, so one long history would otherwise
-// take the usage column off every row.
+// Whether every row's usage column still fits one terminal line — measured as the deepest, an epic's
+// child — where a frame is kept within a terminal (joshuafolkken/kit#3486). The track after it is left
+// out (joshuafolkken/kit#3526): it grows without bound, so one long history would otherwise take the
+// usage column off every row.
 function is_usage_fitting(
-	layout: BoardLayout,
+	rows: ReadonlyArray<BoardRow>,
 	frame: RowFrame,
 	size: TerminalSize | undefined,
 ): boolean {
 	if (size === undefined) return true
 
-	return run_board_layout
-		.rows_of(layout)
-		.filter((row) => row.state === 'running')
-		.every(
-			(row) => run_board_fit.height_of(`${BRANCH}${head_text(row, frame)}`, size.columns) === 1,
-		)
+	return rows.every(
+		(row) => run_board_fit.height_of(`${BRANCH}${head_text(row, frame)}`, size.columns) === 1,
+	)
 }
 
-// The usage column is drawn on every running row or on none (joshuafolkken/kit#3489): a pane too
-// narrow for it on any row, and a chat, draw it on none.
+// The usage column is drawn on every row or on none (joshuafolkken/kit#3489, joshuafolkken/kit#3554):
+// a pane too narrow for it on any row, and a chat, draw it on none — a finish time with it.
 function frame_of(
 	header: BoardHeader,
 	layout: BoardLayout,
 	size: TerminalSize | undefined,
 ): RowFrame {
 	const usages = header.form === 'chat' ? undefined : header.usages
+	const rows = run_board_layout.rows_of(layout)
 	const frame = {
 		header,
 		title_width: title_width(header, layout),
 		time_width: time_width(header),
 		usages,
+		slot_width: usages === undefined ? 0 : column_width(rows, usages, header.now_ms),
 	}
 
-	return is_usage_fitting(layout, frame, size) ? frame : { ...frame, usages: undefined }
+	return is_usage_fitting(rows, frame, size) ? frame : { ...frame, usages: undefined }
 }
 
 function plan_sections(header: BoardHeader, size: TerminalSize | undefined): Array<PlanSection> {

@@ -1,5 +1,6 @@
 import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
+import { run_board_fit } from './run-board-fit'
 import type { BoardHeader } from './run-board-header'
 import type { BoardRow } from './run-board-layout'
 import type { Phase } from './run-board-phase'
@@ -7,10 +8,10 @@ import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import type { LaneUsages } from './run-board-usage'
 
-// joshuafolkken/kit#3489: each running lane's CPU and memory at the end of its row — on running rows
-// only, never in a chat, and on no row where the pane is too narrow for it on any.
+// joshuafolkken/kit#3489: each running lane's CPU and memory at the end of its row — never in a chat,
+// and on no row where the pane is too narrow for it on any.
 
-const { EMPTY_LAYOUT, NOW, header, lines_of } = run_board_render_fixture
+const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 const GB = 1024 * 1024 * 1024
 const USAGE = '⚡ 20% 🧠1.6G'
 const WIDE = 200
@@ -86,5 +87,100 @@ describe('run_board_render.render usage column', () => {
 		})
 
 		expect(stripVTControlCharacters(row_line(lines, 'Issue 1'))).toContain(USAGE)
+	})
+})
+
+// joshuafolkken/kit#3554: the usage column on every row, a finished row's filled with its finish time,
+// so every track starts in one column.
+const TRACK: Array<Phase> = ['investigate', 'plan', 'ship']
+const FINISH = /🔚 (?:\d+\/\d+ )?\d{2}:\d{2}/u
+
+function tracked(number: number, state: BoardRow['state'], ended_ms?: number): BoardRow {
+	const status = { state, started_ms: NOW - MINUTE, ended_ms, track: TRACK }
+
+	return { number, title: `Issue ${String(number)}`, state, status, waits: [] }
+}
+
+const mixed: ReadonlyArray<BoardRow> = [
+	tracked(1, 'running'),
+	tracked(3, 'merged', NOW - MINUTE),
+	tracked(4, 'running'),
+	tracked(5, 'done', NOW - MINUTE),
+	tracked(6, 'running'),
+	tracked(7, 'merged'),
+	tracked(8, 'stopped', NOW - MINUTE),
+]
+const mixed_usages: LaneUsages = new Map([
+	[1, { cpu_percent: 20, memory_bytes: 1.6 * GB, memory_percent: 9 }],
+	[4, { cpu_percent: undefined, memory_bytes: GB, memory_percent: 5 }],
+])
+
+function mixed_lines(extra: Partial<BoardHeader> = {}, columns = WIDE): Array<string> {
+	const layout = { ...EMPTY_LAYOUT, active: mixed }
+	const size = { columns, rows: 50 }
+
+	return run_board_render
+		.render({ header: header({ layout, usages: mixed_usages, ...extra }), notes: [], size })
+		.map((line) => stripVTControlCharacters(line))
+		.filter((line) => line.includes('Issue'))
+}
+
+// The columns before a row's track, as the terminal counts them.
+function track_column(line: string): number {
+	return run_board_fit.width_of(line.slice(0, line.indexOf('🔍')))
+}
+
+describe('run_board_render.render usage column on every row', () => {
+	it('starts every row’s track in one column whatever each row draws in the column', () => {
+		const columns = mixed_lines().map((line) => track_column(line))
+
+		expect(new Set(columns).size).toBe(1)
+	})
+
+	it('draws a finished row’s finish time, and none on a row with no end or not finished', () => {
+		const lines = mixed_lines()
+
+		expect(row_line(lines, 'Issue 3')).toMatch(FINISH)
+		expect(row_line(lines, 'Issue 5')).toMatch(FINISH)
+		expect(row_line(lines, 'Issue 7')).not.toContain('🔚')
+		expect(row_line(lines, 'Issue 8')).not.toContain('🔚')
+	})
+
+	it('drops the finish time with the usage where the column does not fit', () => {
+		const lines = mixed_lines({}, NARROW)
+
+		expect(lines.join('\n')).not.toMatch(/[🔚⚡]/u)
+		expect(row_line(lines, 'Issue 3')).toMatch(/\d{2}:\d{2} {2}🔍/u)
+	})
+
+	it('draws neither in a chat, whose rows stay as they were', () => {
+		const lines = mixed_lines({ form: 'chat' })
+
+		expect(lines.join('\n')).not.toMatch(/[🔚⚡]/u)
+		expect(row_line(lines, 'Issue 7')).toMatch(/Issue 7 {2}🔍/u)
+	})
+})
+
+// A plan row the run has not touched draws no column, so what it waits on stays beside its title.
+function planned_line(): string {
+	const planned: BoardRow = { ...waiting, number: 9, title: 'Planned', waits: ['3554'] }
+	const waves = [[{ kind: 'row' as const, row: planned }]]
+	const layout = { ...EMPTY_LAYOUT, active: mixed, waves }
+	const size = { columns: WIDE, rows: 50 }
+	const lines = run_board_render.render({
+		header: header({ layout, usages: mixed_usages }),
+		notes: [],
+		size,
+	})
+
+	return row_line(
+		lines.map((line) => stripVTControlCharacters(line)),
+		'Planned',
+	)
+}
+
+describe('run_board_render.render usage column on a plan row', () => {
+	it('keeps what an untouched row waits on right after its title', () => {
+		expect(planned_line()).toMatch(/Planned {2}\S+ \S*3554$/u)
 	})
 })

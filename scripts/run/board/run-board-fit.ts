@@ -68,10 +68,13 @@ interface Cut {
 
 const NO_CUT: Cut = { footer: false, legend: false, notes: 0, rows: new Set() }
 
-function height_of(line: string, columns: number): number {
-	const width = string_width(stripVTControlCharacters(line))
+// The columns a line takes on screen: its color escapes take none, an emoji two.
+function width_of(line: string): number {
+	return string_width(stripVTControlCharacters(line))
+}
 
-	return Math.max(1, Math.ceil(width / Math.max(1, columns)))
+function height_of(line: string, columns: number): number {
+	return Math.max(1, Math.ceil(width_of(line) / Math.max(1, columns)))
 }
 
 function heights(lines: ReadonlyArray<string>, columns: number): number {
@@ -210,7 +213,7 @@ function fit(parts: FrameParts, size: TerminalSize): Array<string> {
 	return clamped(fitting ?? frames.at(-1) ?? [], size)
 }
 
-const run_board_fit = { fit, height_of, whole }
+const run_board_fit = { fit, height_of, whole, width_of }
 
 export { run_board_fit }
 export type { FrameParts, NotesPart, PlanLine, PlanSection, RowYield, TerminalSize, YieldStage }

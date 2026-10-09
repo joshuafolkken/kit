@@ -7,7 +7,7 @@ import { run_board_usage_text } from './run-board-usage-text'
 // and red from two fifths.
 
 const { GAUGE_SHADES, painted } = run_board_labels
-const { text_of } = run_board_usage_text
+const { finish_of, text_of } = run_board_usage_text
 const GB = 1024 * 1024 * 1024
 
 function usage(cpu_percent: number | undefined, memory_percent = 5): LaneUsage {
@@ -44,5 +44,22 @@ describe('run_board_usage_text.text_of', () => {
 		expect(text_of(usage(percent, percent))).toBe(
 			`⚡${painted(GAUGE_SHADES[shade], text)} 🧠${memory}`,
 		)
+	})
+})
+
+// joshuafolkken/kit#3554: a settled row's finish time in the usage column, dated on another day.
+describe('run_board_usage_text.finish_of', () => {
+	const NOW = new Date(2026, 9, 9, 16, 30).getTime()
+
+	it('draws a finish time of the board’s own day as `🔚 HH:MM`', () => {
+		expect(finish_of(new Date(2026, 9, 9, 14, 5).getTime(), NOW)).toBe('🔚 14:05')
+	})
+
+	it('dates a finish time of another day', () => {
+		expect(finish_of(new Date(2026, 9, 8, 23, 59).getTime(), NOW)).toBe('🔚 10/8 23:59')
+	})
+
+	it('draws nothing for a row settled with no recorded end', () => {
+		expect(finish_of(undefined, NOW)).toBeUndefined()
 	})
 })
