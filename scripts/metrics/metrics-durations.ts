@@ -11,9 +11,9 @@ import type { Change } from './metrics-ratchet'
 // **A tolerance of +10%, where the static totals have none.** A count read off a tree is the same on
 // every run; a duration is not, so only a slowdown past the noise fails.
 //
-// **Only like is compared with like.** A duration measured under another gate's load is the load's,
-// so the gate and unit durations come from solo gates alone, and the startups are timed only outside
-// a gate (`metrics-command.ts`).
+// **Only like is compared with like.** A duration measured under another gate's load, or any other
+// work's, is the load's, so the gate and unit durations come from solo gates alone, and the startups
+// are timed only outside a gate (`metrics-command.ts`).
 //
 // **The baseline never moves down on its own.** One quiet run would otherwise set a bar the next
 // ordinary one misses; a speedup is recorded with `--accept`, as a raise is.
@@ -119,11 +119,19 @@ function is_overlapped(span: GateSpan, other: GateSpan): boolean {
 	return other !== span && other.start_ms < span.end_ms && span.start_ms < other.end_ms
 }
 
+// A quiet gate ran beside no whole core of other work at its start or its end (joshuafolkken/kit#3501):
+// another lane's lint, related tests or `ship` are no gate, yet doubled a solo gate's duration. A gate
+// whose load was never read — an older line, a machine that could not be read — is not known quiet.
+function is_quiet(entry: GateEntry): boolean {
+	return entry.external_cores === 0
+}
+
 // A solo gate: no other gate in this repository ran at any point between its start and its end — a
-// failed one included, since it loaded the machine as much. The overlap is read off the gates'
-// own spans rather than the count of open lanes, which run gates far less often than they exist.
+// failed one included, since it loaded the machine as much — and the machine was quiet besides. The
+// overlap is read off the gates' own spans rather than the count of open lanes, which run gates far
+// less often than they exist.
 function is_solo(span: GateSpan, spans: ReadonlyArray<GateSpan>): boolean {
-	return spans.every((other) => !is_overlapped(span, other))
+	return is_quiet(span.entry) && spans.every((other) => !is_overlapped(span, other))
 }
 
 // A failed gate is a sample as well: every check runs to completion whether it passes, so it timed the
