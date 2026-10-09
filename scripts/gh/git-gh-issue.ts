@@ -28,7 +28,7 @@ const SUMMARY_FIELDS = 'number,title,labels,createdAt'
 // behind the next-issues display too — where a refused one becomes a failure with no message at all,
 // since the listing swallows the error. `body` costs
 // no request — the REST listing row already carries it — and is what the backlog offer reads for
-// the restructures each issue declares.
+// the paths each issue declares.
 const PICKUP_FIELDS = `${SUMMARY_FIELDS},blockedBy,body`
 
 // Every listing below goes through the one REST invocation in `git-gh-issue-list.ts`. It kept the
@@ -112,7 +112,7 @@ async function issue_list_by_label(label: string, limit: number): Promise<IssueL
 }
 
 // The same filter with the fields the `auto-ok` pickup needs: it orders by
-// `createdAt`, re-checks `labels` client-side and reads each body for its declared restructures. A
+// `createdAt`, re-checks `labels` client-side and reads each body for its declared paths. A
 // label that does not exist in the repository is not an error — the listing comes back empty, which
 // is exactly "nobody has opted anything in".
 // `json_fields` overrides the pickup's list. Its only caller is the probe that runs *after* a failed

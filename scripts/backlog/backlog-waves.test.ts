@@ -11,9 +11,9 @@ import {
 } from '#scripts/issue/issue-labels'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
+import { backlog_overlap } from './backlog-overlap'
 import { backlog_plan, type PlanContext } from './backlog-plan'
 import { backlog_rank, type GateScope } from './backlog-rank'
-import { backlog_restructure } from './backlog-restructure'
 import { backlog_waves } from './backlog-waves'
 
 // joshuafolkken/kit#2778: the order a `backlogrun` takes, wave by wave, assuming every wave merges
@@ -173,11 +173,11 @@ describe('backlog_waves.build — the same offer backlog:next makes', () => {
 	})
 })
 
-// joshuafolkken/kit#3221: two issues that restructure the same file are separated in the plan as in
+// joshuafolkken/kit#3617: two issues that declare the same file are separated in the plan as in
 // the run, so wave 1 still matches backlog:next and the second issue moves to the next wave.
-describe('backlog_waves.build — issues that restructure the same file', () => {
+describe('backlog_waves.build — issues that declare the same file', () => {
 	const SHARED_PATH = 'scripts/run/ship/run-ship.ts'
-	const declared = backlog_restructure.declared_of([
+	const declared = backlog_overlap.declared_of([
 		{ number: FIRST, body: `Split \`${SHARED_PATH}\` into two modules.` },
 		{ number: SECOND, body: `Move \`${SHARED_PATH}\` under a new directory.` },
 	])
@@ -193,7 +193,7 @@ describe('backlog_waves.build — issues that restructure the same file', () => 
 		expect(backlog_waves.build(input, REPO, scope).waves[0]).toStrictEqual(offered)
 	})
 
-	it('puts the second restructure of a path in the wave after the first', () => {
+	it('puts the second claim on a path in the wave after the first', () => {
 		const { waves } = backlog_waves.build(input, REPO, scope)
 
 		expect(waves.map((wave) => wave.map((entry) => entry.number))).toStrictEqual([
