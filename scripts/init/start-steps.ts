@@ -104,7 +104,7 @@ function add_missing_labels(): void {
 }
 
 // Main already has a history here, so the setup reaches it the way every other change does: through
-// an Issue and a pull request a person merges (joshuafolkken/kit#2816).
+// an Issue and a pull request a person merges.
 async function open_setup_pull_request(context: RunContext): Promise<void> {
 	await start_setup_pr.open(context.root, context.baseline)
 }
@@ -112,7 +112,7 @@ async function open_setup_pull_request(context: RunContext): Promise<void> {
 // What was already changed before the setup ran, read whenever a setup pull request will follow, so
 // it can tell the setup's files from the user's own (#2872). Kit's own `josh init` needs it as much as
 // a caller's command: its `josh format` rewrites the project's own sources, which kit cannot name, and
-// leaving them out failed the pull request's Prettier check (joshuafolkken/kit#3136).
+// leaving them out failed the pull request's Prettier check.
 function baseline_of(
 	steps: ReadonlyArray<StartStep>,
 	context: StepContext,

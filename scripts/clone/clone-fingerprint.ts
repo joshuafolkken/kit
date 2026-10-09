@@ -1,6 +1,6 @@
 import type { Fingerprint } from './clone-aggregate'
 
-// Turning source text into fingerprints (joshuafolkken/kit#2217).
+// Turning source text into fingerprints.
 //
 // A fingerprint is a block of consecutive significant lines, each normalized so that reindentation
 // and reflowed whitespace do not hide a copy. Blank lines and comment-only lines are dropped before

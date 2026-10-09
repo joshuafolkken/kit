@@ -6,7 +6,7 @@ import { run_wake, type RunWake } from '#scripts/run/wake/run-wake'
 import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { time_run_state, type RunStateFacts, type WhiffSession } from './time-run-state'
 
-// The I/O half of the run-state block (joshuafolkken/kit#1939): resolve this checkout's records,
+// The I/O half of the run-state block: resolve this checkout's records,
 // find the wake sessions that did no work, and hand a pure `RunStateFacts` back. The classification
 // and rendering are `time-run-state.ts`'s, kept free of disk so a fixture can drive them.
 //
@@ -45,7 +45,7 @@ function to_whiff(
 	if (!time_run_state.is_whiff(spans)) return undefined
 
 	// Priced through the same `cost_pricing.cost_of` every other `josh cost` figure uses, so a whiff's
-	// dollars cannot diverge from the rest of the report (joshuafolkken/kit#1939).
+	// dollars cannot diverge from the rest of the report.
 	const cost_usd = cost_pricing.cost_of(records)
 
 	return { at: new Date(at_ms).toISOString(), cost_usd }
@@ -58,7 +58,7 @@ function whiff_of(file: SessionFile): WhiffSession | undefined {
 }
 
 // **A whiff is attributed to a session this supervisor actually started, not to any transcript that
-// moved while it was alive** (joshuafolkken/kit#2407). The old test — every file touched since the
+// moved while it was alive**. The old test — every file touched since the
 // wake record began — swept in unrelated read-only sessions, so its total was a ceiling rather than
 // the real figure: the very session that filed #2407 met that condition. The supervisor now forces
 // each woken session's transcript id with `--session-id` and records it on the wake record, so the

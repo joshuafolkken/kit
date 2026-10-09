@@ -1,4 +1,4 @@
-// Where a fixed-shape failure points its reader (joshuafolkken/kit#3422). `report:lint`, `test:declared
+// Where a fixed-shape failure points its reader. `report:lint`, `test:declared
 // --match` and the live-evidence check each said what was missing but not where the shape is written,
 // so the reader grepped for it. **The document and its headings are named once, here**, and every
 // failure builds its pointer from them — a renamed heading then fails this module's test rather than

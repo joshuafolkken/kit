@@ -1,7 +1,7 @@
 import { init_logic } from '#scripts/init/init-logic'
 
 // **`josh sync` distributes more than the three `AI_COPY_*` lists**, and a gate that reads only
-// those is narrower than the instruction it replaced (joshuafolkken/kit#1578). The prose that
+// those is narrower than the instruction it replaced. The prose that
 // instruction lived in named `playwright.config.ts` as its own worked example — a file no `AI_COPY_*`
 // list holds — so a matcher built from those lists alone would have answered "not distributed" for
 // the very file the rule was written about.

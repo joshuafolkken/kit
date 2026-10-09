@@ -12,7 +12,7 @@ const OUT_DIR = path.join(PACKAGE_DIR, BUNDLED_COMMAND_DIRECTORY)
 
 // Each `is_bundled` command is pre-built to its own `dist/commands/<script basename>.js`, so a
 // consumer's `dist/josh.js` imports it under plain node instead of spawning tsx for its `.ts`
-// (joshuafolkken/kit#3328, `docs/maintainers/runtime-bundling.md`).
+// (`docs/maintainers/runtime-bundling.md`).
 //
 // **No code splitting, and that is why the import closure is checked.** Every entry is one
 // self-contained file, so every module it imports shares the entry's `import.meta.url`; a second

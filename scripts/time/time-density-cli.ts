@@ -7,7 +7,7 @@ import { time_round_trips } from '#scripts/time-runtime/time-round-trips'
 import { time_spans } from '#scripts/time-runtime/time-spans'
 
 // `josh time:density` — how many tool calls a run issued per round trip, aggregated across the recent
-// lane sessions (joshuafolkken/kit#2405).
+// lane sessions.
 //
 // **The number the batching work is measured on had no command.** Every re-measurement of the guard
 // (kit#1344, kit#2164, kit#2276) recomputed it with a throwaway `node -e` over

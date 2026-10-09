@@ -5,7 +5,7 @@ const START_HINT =
 	'To use the GitHub Issue workflow, run pnpm exec josh start next: it puts this setup on GitHub, through a pull request when main already has commits.'
 
 // Whether the commit checked out records kit in its manifest — the sign that kit's setup has already
-// reached the branch, so `josh start` has no setup pull request to open (joshuafolkken/kit#2816).
+// reached the branch, so `josh start` has no setup pull request to open.
 function is_kit_committed(root: string): boolean {
 	// `./` resolves the path from `root` rather than from the repository's top level.
 	const manifest = start_exec.git_read(['show', 'HEAD:./package.json'], root)

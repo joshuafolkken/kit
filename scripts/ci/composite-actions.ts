@@ -3,8 +3,7 @@ import { existsSync, readdirSync } from 'node:fs'
 // A local composite action is one directory under `.github/actions`, and GitHub resolves
 // `uses: ./.github/actions/<name>` to that directory's `action.yml` (or `action.yaml`). Workflow
 // scanners that read `.github/workflows` read these files too: `.github/actions/setup-pnpm` holds
-// the pnpm/setup pin and the safe-chain installer pin kit's workflows used to carry inline
-// (joshuafolkken/kit#2982).
+// the pnpm/setup pin and the safe-chain installer pin kit's workflows used to carry inline.
 const ACTIONS_DIRECTORY = '.github/actions'
 const ACTION_FILE_NAMES = ['action.yml', 'action.yaml']
 

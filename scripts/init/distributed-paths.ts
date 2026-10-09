@@ -1,5 +1,5 @@
 // The path transform that makes kit's distributed AI documents resolve in a consumer, and the
-// one-line CLAUDE.md import that replaces the old byte-copy (joshuafolkken/kit#1878). Applied at
+// one-line CLAUDE.md import that replaces the old byte-copy. Applied at
 // publish time to CLAUDE.md (scripts/build/build-claude-md.ts) and at copy time to the pointer files kit
 // still ships whole (AGENTS.md / GEMINI.md / .cursorrules, via init-copy-content.ts).
 
@@ -28,7 +28,7 @@ const CLAUDE_MD_BOOTSTRAP =
 // A span containing `*` is excluded: it is a **glob**, not a reference to a file a consumer can
 // open. A distributed document that writes a directory set as `prompts/**` means "anything beneath
 // it", and rewriting that to `node_modules/@joshuafolkken/kit/prompts/**` would print a path that can
-// never appear in a consumer's diff and is not what the set matches (joshuafolkken/kit#907).
+// never appear in a consumer's diff and is not what the set matches.
 function transform_prompt_paths(content: string): string {
 	return content.replaceAll(
 		/`prompts\/([^`*]+)`/gu,
@@ -97,8 +97,8 @@ function ensure_claude_md_import(existing: string | undefined): string {
 	return `${CLAUDE_MD_BOOTSTRAP}\n\n${CLAUDE_MD_IMPORT_LINE}\n\n${updated}`
 }
 
-// The lines `ensure_claude_md_import` writes. A basic project imports other rules, so a sync from
-// before joshuafolkken/kit#2827, or a switch from full, leaves these behind for it to remove.
+// The lines `ensure_claude_md_import` writes. A basic project imports other rules, so an older sync,
+// or a switch from full, leaves these behind for it to remove.
 const FULL_CLAUDE_MD_LINES = new Set([
 	CLAUDE_MD_BOOTSTRAP,
 	OLD_CLAUDE_MD_BOOTSTRAP,

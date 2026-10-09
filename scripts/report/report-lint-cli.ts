@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { report_lint } from './report-lint'
 
 // `josh report:lint` — read a two-layer work summary candidate from stdin and print `ok`, or the
-// mechanical violations one per line, exiting non-zero so it works as a gate (joshuafolkken/kit#2123).
+// mechanical violations one per line, exiting non-zero so it works as a gate.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1

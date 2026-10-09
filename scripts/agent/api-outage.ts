@@ -1,7 +1,7 @@
 import type { ClaudeResultEvent } from './claude-result-event'
 
 // Whether a dispatched lane child's exit record is an API-connection outage rather than a child that
-// stopped mid-implementation on its own (joshuafolkken/kit#2240). Measured twice: on 2026-09-15 four
+// stopped mid-implementation on its own. Measured twice: on 2026-09-15 four
 // children ended `The socket connection was closed unexpectedly`, and on 2026-09-21 a child spent all
 // ten connection retries on `Unable to connect to API (ConnectionRefused)`. The parent read both as
 // ordinary failures — `in-progress` stripped, `needs-decision` applied, counted against the

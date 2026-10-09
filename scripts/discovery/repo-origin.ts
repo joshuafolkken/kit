@@ -3,7 +3,7 @@
 // Kept separate from the map that consumes it (`repo-map-logic.ts`) because the shapes a remote can
 // take are the part with real variety: a single machine's siblings were measured carrying SSH,
 // an SSH host alias, HTTPS with embedded credentials and a trailing slash, and plain HTTPS — all
-// four pointing at the same repository (joshuafolkken/kit#869).
+// four pointing at the same repository.
 
 // A repository's identity on GitHub. The `owner` half is what the discovery map filters on, so it is
 // derived here from the remote and never from a directory name.
@@ -88,7 +88,7 @@ function parse_url_like(url: string): RepoIdentity | undefined {
 
 // `owner/repo` for a GitHub remote, or nothing for every other remote. Returning nothing is the
 // exclusion the owner restriction depends on: a self-hosted or third-party host never reaches the
-// owner comparison at all (joshuafolkken/kit#869).
+// owner comparison at all.
 function parse_origin_url(url: string): RepoIdentity | undefined {
 	const trimmed = url.trim()
 	if (trimmed === '') return undefined
@@ -147,7 +147,7 @@ function section_groups(lines: ReadonlyArray<string>): Array<Array<string>> {
 }
 
 // The `url` of every `[remote "…"]` section, in config order — the candidates `gh` picks its base
-// repository from when it expands the `{owner}` placeholder (joshuafolkken/kit#3188).
+// repository from when it expands the `{owner}` placeholder.
 function parse_remote_urls_from_config(content: string): Array<string> {
 	const lines = content.split('\n').map((line) => line.trim())
 

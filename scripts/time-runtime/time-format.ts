@@ -1,4 +1,4 @@
-// The column and number formatting every timing report is laid out through (joshuafolkken/kit#1309).
+// The column and number formatting every timing report is laid out through.
 //
 // It was `time-report.ts`'s until three renderers shared it: the run scope's own tables, the epic
 // scope's child rows, and the failure block `time-failures.ts` prints. Two of those already reached
@@ -29,18 +29,18 @@ const MINUTES_WIDTH = 9
 const NOT_MEASURED = 'not measured'
 // What a row says instead of a rate when there was no round trip to divide by. It sits here rather
 // than in `time-report.ts` because two blocks print it — the round-trip price and the bundling block —
-// and `time-bundles.ts` cannot import `time-report.ts`, which imports it (joshuafolkken/kit#1344).
+// and `time-bundles.ts` cannot import `time-report.ts`, which imports it.
 const NO_CALLS = 'no tool call to divide'
 // How many rows of a table any of these reports prints. Capped, because a long run touches thirty-odd
 // distinct leading commands and a table that long is read by nobody. `--json` carries every row the
 // report holds, so the display cap costs a caller nothing.
 //
 // **It moved here when the segment and per-invocation tables became the fourth and fifth renderers to
-// need it** (joshuafolkken/kit#1311). Those two cannot import `time-report.ts`, which imports them —
+// need it**. Those two cannot import `time-report.ts`, which imports them —
 // and a second cap beside a second renderer is exactly the drift this file was split out to prevent.
 const MAX_ROWS = 15
 
-// **The parenthetical says "this report" rather than "them all"** (joshuafolkken/kit#1301): since
+// **The parenthetical says "this report" rather than "them all"**: since
 // `--top` can cut the record itself before either rendering, a promise that `--json` carries every row
 // *there ever was* would be false beside a `--top` above this display cap — and the report would then
 // contradict its own truncation note. What was cut from the record, if anything, is said in `notes`;
@@ -74,7 +74,7 @@ function format_share(part: number, whole: number): string {
 // to the cent, a per-round-trip figure finer), so the decimals are the caller's and only the `$` and
 // the `toFixed` are shared. It sits here beside the other number formatters rather than in one block,
 // for the reason `format_minutes` does: a second copy beside the second renderer is how two cost rows
-// of one report come to punctuate a dollar amount two ways (joshuafolkken/kit#1606).
+// of one report come to punctuate a dollar amount two ways.
 function usd(amount: number, decimals: number): string {
 	return `$${amount.toFixed(decimals)}`
 }

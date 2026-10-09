@@ -2,8 +2,8 @@ import { patch_json_key } from '#scripts/config-merge/patch-json-key'
 import { claude_plugin_config } from './claude-plugin-config'
 
 // Keys kit's own `.claude/settings.json` sets for its sessions but never ships. `enableArtifact:
-// false` keeps the Artifact tool's ~12k tokens out of every call of a kit run
-// (joshuafolkken/kit#3140), but Claude Code lets any layer that sets it to `false` win, so a
+// false` keeps the Artifact tool's ~12k tokens out of every call of a kit run,
+// but Claude Code lets any layer that sets it to `false` win, so a
 // consumer given it could not turn the tool back on from `.claude/settings.local.json`.
 const KIT_ONLY_SETTING_KEYS: ReadonlyArray<string> = ['enableArtifact']
 

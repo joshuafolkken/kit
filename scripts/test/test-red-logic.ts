@@ -3,12 +3,10 @@ import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { z } from 'zod'
 import { test_declared_logic } from './test-declared-logic'
 
-// The verdict `josh test:red` prints, and the Issue declaration that makes `josh git -y` ask for it
-// (joshuafolkken/kit#2448).
+// The verdict `josh test:red` prints, and the Issue declaration that makes `josh git -y` ask for it.
 //
 // **A regression test that is green on the pre-fix tree does not reproduce the reported symptom.**
-// joshuafolkken/kit#2308 closed with a test that never went red, and joshuafolkken/kit#2393 was the
-// same symptom back. `josh test:declared` only answers whether a test was added; this answers whether
+// An Issue closed with such a test leaves the symptom free to come back. `josh test:declared` only answers whether a test was added; this answers whether
 // that test catches anything — the added and changed tests run against the merge-base, and at least one
 // of them has to fail there.
 
@@ -34,11 +32,11 @@ function unit_test_files(paths: ReadonlyArray<string>): Array<string> {
 		.filter((path) => test_declared_logic.is_test_file(path) && path.endsWith(UNIT_TEST_SUFFIX))
 }
 
-// **A change whose every path is a test file has no pre-fix code to run against**
-// (joshuafolkken/kit#3214). The merge-base then runs the same code as HEAD, so its result equals HEAD's
+// **A change whose every path is a test file has no pre-fix code to run against**.
+// The merge-base then runs the same code as HEAD, so its result equals HEAD's
 // and says nothing about the fix. Exempt paths do not count: a document-rule test reads `*.md` and
 // `prompts/` files, so a change to one of those is pre-fix content the test can be red against.
-// Observation ledger paths do not count either way (joshuafolkken/kit#3230): a run commits its own
+// Observation ledger paths do not count either way: a run commits its own
 // ledger entry, and no test reads it as pre-fix content.
 function is_test_only(paths: ReadonlyArray<string>): boolean {
 	const counted = paths.filter((path) => !observation_ledger.is_ledger_path(path))

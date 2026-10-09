@@ -113,7 +113,7 @@ function merge_eslint_config(existing: string): string {
 }
 
 // The default is SvelteKit's stylesheet, and prettier-plugin-tailwindcss aborts every format when
-// the named file is missing — so it is written only for a project that has it (joshuafolkken/kit#2710).
+// the named file is missing — so it is written only for a project that has it.
 function detect_tailwind_stylesheet(project_root: string): string | undefined {
 	return existsSync(path.join(project_root, DEFAULT_TAILWIND_STYLESHEET))
 		? DEFAULT_TAILWIND_STYLESHEET

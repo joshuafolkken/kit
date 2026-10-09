@@ -79,7 +79,7 @@ function decide_reclaim(
 
 // The discovered map, as `josh doctor` prints it. Printing it is what makes a wrong map noticeable:
 // the map decides which checkouts other commands write to, and a silent one would only be found by
-// the write landing in the wrong place (joshuafolkken/kit#869).
+// the write landing in the wrong place.
 function format_repository_map(map: ReadonlyMap<string, string>): string {
 	if (map.size === 0) return [REPOSITORY_MAP_HEADING, NO_REPOSITORIES_FOUND].join('\n')
 	const rows: Array<string> = []

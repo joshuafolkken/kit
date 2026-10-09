@@ -6,7 +6,7 @@ import type { RunNode } from './cost-run-nodes'
 import { cost_run_roles, type RoleTotals, type SessionRow } from './cost-run-roles'
 import { cost_run_tree } from './cost-run-tree'
 
-// The `--run` scope's report: a run tree summed by role, in dollars (joshuafolkken/kit#1937).
+// The `--run` scope's report: a run tree summed by role, in dollars.
 //
 // It is the axis the hand measurement of 2026-09-13 read and no command could print — what share of
 // a whole batch the parent, its lane children, their subagents and the wakes each cost. Merges are
@@ -40,7 +40,7 @@ interface RunCostReport {
 	roles: ReadonlyArray<RoleTotals>
 	sessions: ReadonlyArray<SessionRow>
 	// The sessions summed per Issue, with whether the implementation cut ended any of them — the
-	// comparison joshuafolkken/kit#3223 asks of a batch. Carried in `--json` only.
+	// comparison a batch is judged by. Carried in `--json` only.
 	issues: ReadonlyArray<IssueTotals>
 }
 
@@ -119,7 +119,7 @@ function session_lines(report: RunCostReport): Array<string> {
 
 // **`lead` is prepended, not built here.** The run-state block the no-argument `josh time` leads with
 // is a caller's concern — `josh cost --run` passes none — so this report stays a cost report and only
-// the lines it is handed sit above it (joshuafolkken/kit#1939).
+// the lines it is handed sit above it.
 function format_report(report: RunCostReport, lead: ReadonlyArray<string> = []): string {
 	const body = [...header_lines(report), ...role_lines(report), ...session_lines(report)]
 

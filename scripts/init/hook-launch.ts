@@ -1,18 +1,18 @@
 import { GIT_LOCATION_VARIABLES } from '#scripts/git/git-location-environment'
 
 // The shell command a Claude Code hook is launched with, so it starts without a `pnpm` wrapper — and,
-// for a consumer, without the `dist/josh.js` dispatcher re-spawning `tsx` for the hook's `.ts`
-// (joshuafolkken/kit#2023). Each hook is pre-built to its own `dist/hooks/<name>.js`
+// for a consumer, without the `dist/josh.js` dispatcher re-spawning `tsx` for the hook's `.ts`.
+// Each hook is pre-built to its own `dist/hooks/<name>.js`
 // (`scripts/build/build-hooks.ts`) and launched directly with `node`.
 //
-// **The command starts from the project root, never from wherever the session happens to be**
-// (joshuafolkken/kit#2984). Every path after the prefix is relative, so a hook fired from a
+// **The command starts from the project root, never from wherever the session happens to be**.
+// Every path after the prefix is relative, so a hook fired from a
 // subdirectory would otherwise miss its script. The root is git's, resolved with the location
 // variables a git hook exports cleared first, and resolved with them only when that fails — git
 // metadata outside the work tree. The consumer rewrite (`hook-command-rewrite.ts`) keeps this prefix,
 // so both sides stay one mechanism for Claude Code and Codex alike.
 //
-// **Everything after the root is one script** (`scripts/hooks/run-hook.sh`, joshuafolkken/kit#3184):
+// **Everything after the root is one script** (`scripts/hooks/run-hook.sh`):
 // clearing the location variables for the hook itself, the bundle-ready gate and the live-source
 // fallback live there once, so each hook command names only its hook.
 
