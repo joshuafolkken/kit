@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1033,
-		"code_lines": 86286,
-		"comment_lines": 34149,
+		"code_lines": 86265,
+		"comment_lines": 34155,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -11,8 +11,8 @@
 	},
 	"guards": 8,
 	"ai_cost": {
-		"resident_bytes": 11121,
-		"on_demand_bytes": 546485
+		"resident_bytes": 11033,
+		"on_demand_bytes": 546477
 	},
 	"accepted": {
 		"reason": "#3399 moves the delivered-rule list from rule-delivery.md prose into the rule-registry data that rule:list renders",

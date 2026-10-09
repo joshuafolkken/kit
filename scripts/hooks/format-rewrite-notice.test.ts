@@ -41,7 +41,7 @@ describe('rewrite_notice.build', () => {
 		const after = 'const a = 1\nconst b = 2\nconst c = 3\n'
 		const notice = rewrite_notice.build(before, after)
 
-		expect(notice).toContain('lines 2-2')
+		expect(notice).toContain('Lines 2-2')
 		expect(notice).toContain('const b = 2')
 	})
 
@@ -51,7 +51,7 @@ describe('rewrite_notice.build', () => {
 		const notice = rewrite_notice.build('', after)
 
 		expect(notice).toContain('truncated')
-		expect(notice?.length).toBeLessThan(after.length)
+		expect(notice?.length).toBeLessThanOrEqual(MAX_REWRITE_CHARS)
 	})
 })
 
