@@ -1,6 +1,7 @@
 import { existsSync, globSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
+import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import { project_profile } from '#scripts/init/project-profile'
 import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { json_value } from '#scripts/lib/json-value'
@@ -49,6 +50,12 @@ function project_root(directory: string): string {
 			existsSync(path.join(candidate, PACKAGE_JSON)),
 		) ?? directory
 	)
+}
+
+// The kit repository itself rather than a consumer of it — the gate's and the detached ship's one
+// answer to whether kit-only checks run (joshuafolkken/kit#3408, joshuafolkken/kit#3568).
+function is_kit_repository(directory: string): boolean {
+	return !doctor_consumer.is_kit_consumer(project_root(directory))
 }
 
 function is_ignored(entry: string): boolean {
@@ -163,6 +170,7 @@ const project_checks = {
 	has_config,
 	has_files,
 	is_basic,
+	is_kit_repository,
 	prettier_skip_reason,
 	project_root,
 	skip_notice,

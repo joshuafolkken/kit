@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1040,
-		"code_lines": 86839,
-		"comment_lines": 34328,
+		"code_lines": 86863,
+		"comment_lines": 34342,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,7 +12,7 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 501371
+		"on_demand_bytes": 501557
 	},
 	"accepted": {
 		"reason": "#3569 adds the model-free periodic board push (run:board --every) replacing the CronCreate progress job, plus its catalog/skill docs",

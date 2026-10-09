@@ -649,7 +649,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "metrics": [
-      "[--no-startup | --accept --reason "<why>"]",
+      "[--no-startup | --totals-only | --accept --reason "<why>"]",
       "developer",
       [
         "files",

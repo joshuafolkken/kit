@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { project_checks } from '#scripts/gate/project-checks'
 import { type_check_step } from '#scripts/gate/type-check-step'
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
@@ -14,11 +15,18 @@ import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffe
 //
 // The test targets are the directories those resumes failed in. A consumer has none of them, so only
 // the ones present run, and a consumer meets the type check alone.
+//
+// In kit the metrics ratchet's totals join them (joshuafolkken/kit#3568): a feature grows a total
+// almost every time, and 47 of 61 measured gate-failure resumes were that ratchet — a relaunched
+// session reading its preamble again only to run `--accept`. Here the session that grew the total
+// writes the reason itself. The durations are left out: they read the gate ledger, stale before the
+// detach, so they stay with the supervised gate.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const SECTION_SEPARATOR = '\n\n'
-const PASSED = 'type check and document tests passed'
+const PASSED = 'pre-detach checks passed'
+const METRICS_TOTALS_COMMAND: ReadonlyArray<string> = ['josh', 'metrics', '--totals-only']
 const DOCUMENT_TEST_TARGETS: ReadonlyArray<string> = [
 	'scripts/document',
 	'scripts/claude',
@@ -33,11 +41,21 @@ function present_targets(directory: string): ReadonlyArray<string> {
 	return DOCUMENT_TEST_TARGETS.filter((target) => existsSync(path.join(directory, target)))
 }
 
-async function command_lists(directory: string): Promise<Array<ReadonlyArray<string>>> {
-	const type_check = await type_check_step.resolve_type_check_args(directory)
+function document_tests(directory: string): Array<ReadonlyArray<string>> {
 	const targets = present_targets(directory)
 
-	return targets.length === 0 ? [type_check] : [type_check, [...DOCUMENT_TEST_COMMAND, ...targets]]
+	return targets.length === 0 ? [] : [[...DOCUMENT_TEST_COMMAND, ...targets]]
+}
+
+// The same kit-only rule as the gate's `is_kit_only` step: a consumer's kit has no `josh metrics`.
+function kit_only(directory: string): Array<ReadonlyArray<string>> {
+	return project_checks.is_kit_repository(directory) ? [METRICS_TOTALS_COMMAND] : []
+}
+
+async function command_lists(directory: string): Promise<Array<ReadonlyArray<string>>> {
+	const type_check = await type_check_step.resolve_type_check_args(directory)
+
+	return [type_check, ...document_tests(directory), ...kit_only(directory)]
 }
 
 async function run_in(
@@ -61,6 +79,6 @@ async function checks(directory: string = process.cwd()): Promise<JoshResult> {
 	}
 }
 
-const run_ship_pre_detach = { DOCUMENT_TEST_TARGETS, PASSED, checks }
+const run_ship_pre_detach = { DOCUMENT_TEST_TARGETS, METRICS_TOTALS_COMMAND, PASSED, checks }
 
 export { run_ship_pre_detach }
