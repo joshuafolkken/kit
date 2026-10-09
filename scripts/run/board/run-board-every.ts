@@ -4,9 +4,8 @@ import type { BoardPorts } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
 
 // The chat frame `run:board --chat` answers with, and `--every <minutes>`, which pushes that same frame
-// off-screen on a schedule with no model in between (joshuafolkken/kit#3569). A session asked for
-// periodic progress once armed a CronCreate job that re-read its whole context to paste this frame; the
-// frame needs no model, so a plain background process sends it and ends with the run.
+// off-screen on a schedule with no model in between. The frame needs no model, so a plain background
+// process sends it and ends with the run, rather than a scheduled session re-reading its whole context.
 
 const { FRESH_STATE, tick } = run_board_tick
 

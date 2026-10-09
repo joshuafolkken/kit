@@ -4,7 +4,7 @@ import { run_halfrun_resume } from './run-halfrun-resume'
 import { run_prrun_resume, type PrrunToken } from './run-prrun-resume'
 import { run_stage, type StageState } from './run-stage'
 
-// The reading half of the stage ladder (joshuafolkken/kit#3042): the facts `run_stage.state_of` folds
+// The reading half of the stage ladder: the facts `run_stage.state_of` folds
 // into one state, each read from where the stage that produced it left it — never from the
 // conversation. A closed issue and the `run:planned` label come from GitHub; a `halfrun` stop and a `prrun`
 // stop come from the stop's own mark on the tree's hold (`run-halfrun-resume.ts`,
@@ -40,7 +40,7 @@ async function read_stop(
 }
 
 // An unreadable issue reads as neither closed nor planned: the ordinary entry that follows reads it
-// again and answers `unknown` for it, exactly as before the ladder existed.
+// again and answers `unknown` for it.
 async function read_stage(issue: string): Promise<StageRead> {
 	const [issue_read, stop] = await Promise.all([
 		issue_state_cli.read_issue(issue),

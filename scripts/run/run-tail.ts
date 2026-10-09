@@ -1,5 +1,5 @@
-// `josh run:tail [<N> ...]` — the one call that closes a run (joshuafolkken/kit#2372). It folds the
-// fixed post-merge bookkeeping a lane spends three separate round trips on — commit the observation
+// `josh run:tail [<N> ...]` — the one call that closes a run. It folds the fixed
+// post-merge bookkeeping that would otherwise take three separate round trips — commit the observation
 // ledger (`observations:flush`), read the completion citations (`issue:cite`), and decide whether a
 // release is owed (`release:scope`) — into one composite, the same shape `run:prep` bundles three reads
 // on. None of the three needs a decision between it and the next, so nothing the reader had to judge is
@@ -32,9 +32,9 @@ function format_report(sections: ReadonlyArray<TailSection>): string {
 	return sections.map((section) => section_report(section)).join(SECTION_SEPARATOR)
 }
 
-// **A failed step's stderr joins its body** (joshuafolkken/kit#2462). A detached run's log keeps the
-// report, not the terminal, so a refusal printed only to stderr left the section reading
-// `ELIFECYCLE` alone. A passing step's stderr is commentary and stays out of the report.
+// **A failed step's stderr joins its body.** A detached run's log keeps the report, not the
+// terminal, so a refusal printed only to stderr would leave the section reading `ELIFECYCLE` alone. A
+// passing step's stderr is commentary and stays out of the report.
 function section_body(out: string, error_output: string | undefined, code: number): string {
 	if (code === SUCCESS_EXIT_CODE || error_output === undefined) return out
 

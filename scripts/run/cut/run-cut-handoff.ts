@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { z } from 'zod'
 
-// The session state a cut carries across the process boundary (joshuafolkken/kit#2354). `RunCut`'s six
+// The session state a cut carries across the process boundary. `RunCut`'s six
 // scalar fields say *which* tree a fresh process resumes into — the branch, the issue, that a declared
 // cut put it here. This says *what the run was told to do* there, which nothing else recovers: the
 // user's instruction is not on GitHub, and what was done — or deliberately left alone — is not written
@@ -9,8 +9,8 @@ import { z } from 'zod'
 // instruction, and is put under the refactoring limits `CLAUDE.md` sets, so the shortest path out is to
 // restructure or delete code it does not understand.
 //
-// **This is not the conversation the cut exists to drop.** joshuafolkken/kit#1839 measured 176K of a
-// lane's 204K output as accumulated thinking, and the cut's whole point is to shed it. The instruction
+// **This is not the conversation the cut exists to drop.** Most of a lane's output is accumulated
+// thinking, and the cut's whole point is to shed it. The instruction
 // and a curated list of what is done, left, and untouched is the irreducible intent under that
 // thinking — a few short lines, bounded by `MAX_HANDOFF_BYTES` in `run-cut.ts` — so carrying it keeps
 // the resume on course without re-establishing the context the cut dropped.
@@ -50,8 +50,8 @@ function describe_key(key: HandoffKey): string {
 }
 
 // The shape a handoff file must have, derived from `handoff_schema` so the refusal that asks for the file
-// and the error that rejects it can never name a key the parser does not read (joshuafolkken/kit#3195).
-// A refusal that listed the four items in prose was answered with Markdown, which `parse_handoff` rejects.
+// and the error that rejects it can never name a key the parser does not read — a refusal listing the
+// items in prose invites Markdown, which `parse_handoff` rejects.
 const HANDOFF_FORMAT = `a JSON object {${handoff_schema
 	.keyof()
 	.options.map((key) => describe_key(key))
@@ -78,8 +78,7 @@ function read_handoff_file(handoff_path: string): Handoff | undefined {
 }
 
 // A complete handoff carries a non-empty instruction; the lists may be empty. This is the required
-// field the resume checks so a session is never silently continued without the instruction it needs
-// (joshuafolkken/kit#2354).
+// field the resume checks so a session is never silently continued without the instruction it needs.
 function is_complete_handoff(handoff: Handoff | undefined): boolean {
 	return handoff !== undefined && handoff.instruction.trim() !== ''
 }
@@ -93,7 +92,7 @@ function is_within_bound(handoff: Handoff, max_bytes: number): boolean {
 }
 
 // A path is read into a handoff, refused when it will not parse or would push the record past its
-// bound — the cut is only worth its resume while the record stays small (joshuafolkken/kit#2354).
+// bound — the cut is only worth its resume while the record stays small.
 function load_handoff(handoff_path: string | undefined, max_bytes: number): HandoffLoad {
 	if (handoff_path === undefined) return { kind: 'ok', handoff: undefined }
 

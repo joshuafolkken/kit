@@ -7,10 +7,10 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import type { BoardPlan } from './run-board-layout'
 
-// The plan `run:board` lays the run over, scoped to what the run was asked to do (joshuafolkken/kit#3442).
+// The plan `run:board` lays the run over, scoped to what the run was asked to do.
 // **`--only`** draws the named issues alone — a named epic expanded into its children; **a named prefix
 // without it** draws the named issues first and the opted-in waves after them; **nothing named** draws the
-// opted-in waves, as before. The named issues are classified through the very function `backlog:next`
+// opted-in waves. The named issues are classified through the very function `backlog:next`
 // places the pool with, fed as an opted-in set of their own, so an epic is expanded the way the run
 // expands it and no second placement exists to disagree with it.
 

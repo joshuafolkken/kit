@@ -6,7 +6,7 @@ import type { BoardLayout } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
 import { run_board_render } from './run-board-render'
 
-// What the `run_board_render` suites share (joshuafolkken/kit#3478): a header at a fixed moment, and the
+// What the `run_board_render` suites share: a header at a fixed moment, and the
 // board's lines with the color escapes stripped, so an assertion reads the screen as a person does.
 
 const { WORDS } = run_board_labels

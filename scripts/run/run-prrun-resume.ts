@@ -5,7 +5,7 @@ import { git_command } from '#scripts/git/git-command'
 import { run_hold, type HoldRead } from '#scripts/run/hold/run-hold'
 import { run_halfrun_resume, type StopMark } from './run-halfrun-resume'
 
-// joshuafolkken/kit#3023: a `prrun` stops at a green, mergeable pull request and **keeps** its hold, so
+// A `prrun` stops at a green, mergeable pull request and **keeps** its hold, so
 // a person can look before anything merges. What comes next is one of three, and `run:entry` answers
 // which as the resume token `fullrun #N` acts on — read, never inferred:
 //
@@ -74,7 +74,7 @@ async function read_facts(stop_head: string): Promise<ResumeFacts> {
 }
 
 // Read-only, so `run:entry` can ask the session budget before it takes anything over. `undefined` is
-// "no `prrun` stop for this issue here", and the ordinary claim decides the tree as before.
+// "no `prrun` stop for this issue here", and the ordinary claim decides the tree.
 async function resume_token(issue: string): Promise<PrrunToken | undefined> {
 	const target = await run_halfrun_resume.hold_target()
 

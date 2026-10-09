@@ -5,34 +5,28 @@ import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { run_invocation } from '#scripts/run/run-invocation'
 
 // How the supervisor starts things: the next agent session, and — at `--start` — its own detached
-// self. Both go through one `launch`, because the two differ only in what is being run
-// (joshuafolkken/kit#1719).
+// self. Both go through one `launch`, because the two differ only in what is being run.
 //
-// **The launch itself is no longer this file's** (joshuafolkken/kit#1749). `detached-launch.ts` holds
-// it, because a delegated child dispatched into a lane needs the same mechanism and none of the
-// invocation parsing this supervisor needs. What stays here is the constants naming the agent CLI and
-// the two argument vectors this supervisor composes.
+// **The launch itself is `detached-launch.ts`'s**, because a delegated child dispatched into a lane
+// needs the same mechanism and none of the invocation parsing this supervisor needs. What stays here
+// is the constants naming the agent CLI and the two argument vectors this supervisor composes.
 //
-// **The invocation grammar is no longer this file's either** (joshuafolkken/kit#1774; folded into
-// `backlogrun` by joshuafolkken/kit#1984). `run-carry.ts` reads the same grammar to say which of a
-// `backlogrun`'s named issues are still outstanding — so it is `run-invocation.ts`'s, imported
-// rather than restated. What that move does **not** change is the rebuild-from-constants design: the
-// invocation handed to the agent CLI is still composed out of that module's own constants and
-// validated integers; a judgment handoff adds the driver's result after that validated invocation.
+// **The invocation grammar is `run-invocation.ts`'s**, imported rather than restated, because
+// `run-carry.ts` reads the same grammar to say which of a `backlogrun`'s named issues are still
+// outstanding. The invocation handed to the agent CLI is composed out of that module's own constants
+// and validated integers; a judgment handoff adds the driver's result after that validated invocation.
 //
-// **The agent CLI is a constant, not configuration, and it is the Claude adapter's constant.** It was
-// an environment variable first (`JOSH_WAKE_COMMAND`), which put the choice of *which binary runs* in
-// reach of anything that can set an environment — and this binary runs unattended, overnight, in the
-// person's own checkout with the person's own credentials. Shape-checking the name does not address
-// that; removing the choice does. The two names below are aliases of that one constant rather than a
-// second copy of it (joshuafolkken/kit#1749).
+// **The agent CLI is a constant, not configuration, and it is the Claude adapter's constant.** An
+// environment variable would put the choice of *which binary runs* in reach of anything that can set
+// an environment — and this binary runs unattended, overnight, in the person's own checkout with the
+// person's own credentials. Shape-checking the name does not address that; removing the choice does.
+// The two names below are aliases of that one constant rather than a second copy of it.
 //
 // **The waker adds nothing to what may be run.** The argument vector is the constant command plus an
 // invocation rebuilt to say exactly what the record said, and nothing here writes a label: `auto-ok`
 // arrives only through `issue:file`'s default, so a woken session is offered by exactly the rules the
-// first one was. A
-// pool that grew across the seam is `backlogrun-steps.md` → "What one invocation approves", not the
-// waker's doing (joshuafolkken/kit#1675).
+// first one was. A pool that grew across the seam is `backlogrun-steps.md` → "What one invocation
+// approves", not the waker's doing.
 const WAKE_COMMAND = claude_agent_argv.AGENT_COMMAND
 const WAKE_FLAGS = claude_agent_argv.AGENT_FLAGS
 const LOOP_FLAG = '--loop'
@@ -75,12 +69,12 @@ function safe_invocation(invocation: string): string | undefined {
 	return rebuilt === invocation ? rebuilt : undefined
 }
 
-// **The two failure modes are kept apart, not folded into one `undefined`** (joshuafolkken/kit#1932).
+// **The two failure modes are kept apart, not folded into one `undefined`.**
 // An unmatched or unsafe invocation is `undefined` and the caller names it as one; a rejected effort
 // override carries the role resolver's own note through the `rejected` variant, so a
 // `JOSH_SCHEDULER_EFFORT` typo is reported as the env typo it is rather than as unreadable carried text.
-// **`session_id` forces the woken session's transcript id, and only where a work tree is given**
-// (joshuafolkken/kit#2407). A wake always resolves both a profile and the primary checkout, so it
+// **`session_id` forces the woken session's transcript id, and only where a work tree is given.** A
+// wake always resolves both a profile and the primary checkout, so it
 // reaches the `with_profile_in` branch; the cwd-less branch stays for callers that force nothing.
 function profiled_argv(
 	invocation: string,
@@ -99,7 +93,7 @@ function resolved_argv(invocation: string, cwd?: string): AgentArgvResult {
 		: agent_argv.resolve_in(invocation, agent_role_profile.SCHEDULER, cwd)
 }
 
-// **Handoff material is made safe to launch rather than refused** (joshuafolkken/kit#2931). It is the
+// **Handoff material is made safe to launch rather than refused.** It is the
 // driver's own output, not the record, so it is flattened — a newline becomes a separator, any other
 // control character a space — and the prompt is cut at the cap `is_safe_value` enforces. The driver puts
 // its verdict and resume line first, so the cut only ever shortens the details. The check itself is
@@ -143,8 +137,8 @@ function supervisor_argv(script_path: string, interval?: string): LaunchArgv {
 }
 
 // **`ensure_log`, `is_safe_argv` and `launch` are re-exported rather than reimplemented.** They are
-// `detached-launch.ts`'s now; naming them here keeps `run:wake`'s own callers reading one namespace,
-// and there is exactly one implementation behind both names (joshuafolkken/kit#1749).
+// `detached-launch.ts`'s; naming them here keeps `run:wake`'s own callers reading one namespace, and
+// there is exactly one implementation behind both names.
 const run_wake_session = {
 	INTERVAL_FLAG,
 	LOOP_FLAG,

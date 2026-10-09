@@ -1,14 +1,13 @@
 import { issue_state, type IssueState } from '#scripts/issue/issue-state'
 
-// `josh run:status <N>` — the read-only status a run glances at, assembled into one report
-// (joshuafolkken/kit#2165). A run reads three independent facts to know where it stands — the issue's
-// own state, whether the session has crossed the hand-off budget, and its own carry counters — and
-// the procedure had it type `issue:state`, `cost --cut` and `run:carry` as three separate steps. This
-// joins the answers those three commands give, reusing each rather than reproducing it.
+// `josh run:status <N>` — the read-only status a run glances at, assembled into one report.
+// A run reads three independent facts to know where it stands — the issue's own state, whether the
+// session has crossed the hand-off budget, and its own carry counters. This joins the answers
+// `issue:state`, `cost --cut` and `run:carry` give, reusing each rather than reproducing it.
 //
 // **It is read-only, and that is the whole point** — the merge event has its own composite
-// (`run:merge`), and the pre-edit reads have theirs (`run:prep`); what was left was the passive glance
-// a resumed session or a non-merge decision takes, which must not write. `run:hold`'s claim and
+// (`run:merge`), and the pre-edit reads have theirs (`run:prep`); this is the passive glance a resumed
+// session or a non-merge decision takes, which must not write. `run:hold`'s claim and
 // `run:progress`'s clock mark are excluded for exactly that reason.
 //
 // The leading summary line carries the three facts on one line — the state, the cost verdict and the

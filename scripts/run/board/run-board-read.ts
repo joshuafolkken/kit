@@ -6,18 +6,17 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 import { run_board_scope } from './run-board-scope'
 import { run_board_span, type BoardSpan } from './run-board-span'
 
-// What `run:board` reads locally each tick (joshuafolkken/kit#3430): the run's span and scope, its
-// events and its open lanes. The run is the running one, or the one that last ended until the next run
-// begins (joshuafolkken/kit#3439).
+// What `run:board` reads locally each tick: the run's span and scope, its events and its open lanes.
+// The run is the running one, or the one that last ended until the next run begins.
 interface LocalRead {
 	started_ms: number
 	// Set only once the run has ended; the board then draws its end-of-run screen.
 	ended_ms: number | undefined
-	// What the run was asked to do, from its invocation (joshuafolkken/kit#3442).
+	// What the run was asked to do, from its invocation.
 	scope: NamedPlan
 	events: ReadonlyArray<RunEvent>
 	lanes: ReadonlyArray<string>
-	// The session a stopped run is resumed from (joshuafolkken/kit#3437); `undefined` otherwise.
+	// The session a stopped run is resumed from; `undefined` otherwise.
 	resume: string | undefined
 }
 

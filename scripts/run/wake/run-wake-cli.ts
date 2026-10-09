@@ -18,10 +18,9 @@ import { run_wake_restart, type RestartPorts } from './run-wake-restart'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
 
 // `josh run:wake --start | --list | --stop | --loop` — the supervisor that continues a cut
-// `backlogrun` or `queue` without a person retyping the keyword (joshuafolkken/kit#1719,
-// joshuafolkken/kit#1774). **Which invocations it may continue is `run-invocation.ts`'s answer**, not
-// this file's: nothing here reads the recorded text, it is handed to `wake_argv` and either rebuilt
-// from that module's own constants or refused.
+// `backlogrun` or `queue` without a person retyping the keyword. **Which invocations it may continue
+// is `run-invocation.ts`'s answer**, not this file's: nothing here reads the recorded text, it is
+// handed to `wake_argv` and either rebuilt from that module's own constants or refused.
 //
 // The stdout/stderr split is the contract every `run:*` command shares: exactly one verdict token on
 // stdout on every path, the reason and the advice on stderr, so a loop branches on one token.
@@ -56,26 +55,24 @@ const UNKNOWN_VERDICT = 'unknown'
 const FAILED_VERDICT = 'failed'
 
 // **The note covers both ways `wake_argv` answers `undefined`**, because it cannot tell them apart and
-// a message that named only the first would accuse a legitimate invocation of carrying unsafe text
-// (joshuafolkken/kit#1774). The second is the one a person actually meets: a `queue` whose references
-// carry a `owner/repo#` prefix is a grammar this supervisor does not rebuild, and `queue.md` → "The
-// session boundary" is why such a queue begins no record in the first place.
+// a message that named only the first would accuse a legitimate invocation of carrying unsafe text.
+// The second is the one a person actually meets: a `queue` whose references carry a `owner/repo#`
+// prefix is a grammar this supervisor does not rebuild, and `queue.md` → "The session boundary" is why
+// such a queue begins no record in the first place.
 const UNSAFE_INVOCATION_NOTE =
 	'the carried invocation is not one this supervisor can continue — it is neither a backlogrun nor a queue it can rebuild, or it carries text that may not be passed to a command line'
-// The command rather than one entry point: since joshuafolkken/kit#1774 the supervisor continues a
-// `queue` as readily as a `backlogrun`, and a warning that named the wrong one would send the reader
-// looking at a run that is not the one that stopped.
+// The command rather than one entry point: the supervisor continues a `queue` as readily as a
+// `backlogrun`, and a warning that named the wrong one would send the reader looking at a run that is
+// not the one that stopped.
 const WARNING_TITLE = 'run:wake supervisor'
 const WARNING_RECOVERY = `Check the wake command, then restart with \`pnpm josh run:wake --start\`.`
-// **The stop reasons that reach a person, and what each one tells them** (joshuafolkken/kit#1746). A
-// reason absent from this map is one where nothing went wrong: `ended` is the run finishing through
-// `run:carry --end`, `stopped` is a person's own `--stop` or a supervisor being superseded, and a
-// warning channel that fired on those is one that stops being read.
+// **The stop reasons that reach a person, and what each one tells them.** A reason mapped to
+// `undefined` is one where nothing went wrong: `ended` is the run finishing through `run:carry --end`,
+// `stopped` is a person's own `--stop` or a supervisor being superseded, and a warning channel that
+// fired on those is one that stops being read.
 //
-// **`expired` and `unreadable` were silent until joshuafolkken/kit#1746, and that was the defect
-// rather than the design.** Both end the supervisor while a carry record is still sitting there handed
-// off, so the run is left asleep with nothing anywhere saying so — a silent overnight failure, while
-// only the `failed` reason was wired to the notification.
+// **`expired` and `unreadable` warn**, because both end the supervisor while a carry record is still
+// sitting there handed off, so the run would otherwise be left asleep with nothing anywhere saying so.
 // **Every reason is listed, and the silent two are listed as `undefined`.** A partial map would let a
 // sixth stop reason compile straight past this and reach nobody, which is the defect class this
 // section exists to close.
@@ -145,7 +142,7 @@ async function resolve_context(): Promise<WakeContext | undefined> {
 
 	// Every verb reaches this one function, so creating the log here is what makes the path each of
 	// them prints a path that exists — including `--list` and the already-running branch of `--start`,
-	// neither of which launches anything (joshuafolkken/kit#1759).
+	// neither of which launches anything.
 	run_wake_session.ensure_log(log_target, note_to_stderr)
 
 	return {
@@ -178,7 +175,7 @@ function wake_session(
 	if (built.kind === 'rejected') return { kind: 'failed', note: built.note }
 
 	// The headless mark is what lets the stop hook hold this session's turn open while its lanes run —
-	// under `claude -p` a turn-end is the process's end (`run-headless.ts`, joshuafolkken/kit#2437).
+	// under `claude -p` a turn-end is the process's end (`run-headless.ts`).
 	const environment = run_headless.environment()
 	const target = { cwd: context.worktree, env: environment, log_path: context.log_target }
 
@@ -224,10 +221,9 @@ async function warn_of_stop(stop: LoopStop, body: string, context: WakeContext):
 	})
 }
 
-// **Only a failed wake exits non-zero, and the two reasons that newly warn do not**
-// (joshuafolkken/kit#1746). The verdict-and-exit-code table in `docs/josh-commands-automation.md` is a contract
-// callers branch on; what `expired` and `unreadable` were missing is the notification, not a different
-// exit code, and changing both at once would break a caller to fix a silence.
+// **Only a failed wake exits non-zero; `expired` and `unreadable` warn but exit zero.** The
+// verdict-and-exit-code table in `docs/josh-commands-automation.md` is a contract callers branch on,
+// and what those two need is the notification, not a different exit code.
 function exit_code_of(reason: WakeStopReason): number {
 	return reason === run_wake_loop.FAILED_REASON ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
 }
@@ -235,7 +231,7 @@ function exit_code_of(reason: WakeStopReason): number {
 // A failure that reached nobody is the defect, so the Telegram goes out before the verdict is printed.
 // Which stops reach a person, and what each one says — `undefined` for the two where nothing went
 // wrong. It is a function rather than a bare lookup so the decision can be asserted for every reason
-// the loop can end on, which is the contract joshuafolkken/kit#1746 changed.
+// the loop can end on.
 function stop_body(reason: WakeStopReason): string | undefined {
 	return STOP_BODIES[reason]
 }
@@ -256,8 +252,8 @@ function spawn_supervisor(context: WakeContext, interval: string | undefined): n
 	if (profile === undefined) return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
 	const argv = run_wake_session.supervisor_argv(SCRIPT_PATH, interval)
 	// **The supervisor's own output goes to the same file as the sessions it starts.** It is detached
-	// with the same call, so before joshuafolkken/kit#1746 its `console.error` — the launch note that
-	// says the agent CLI is not on `PATH`, and the stop note behind every warning — went nowhere at all.
+	// with the same call, so otherwise its `console.error` — the launch note that says the agent CLI is
+	// not on `PATH`, and the stop note behind every warning — would go nowhere at all.
 	const result = run_wake_session.launch(
 		{
 			argv,
@@ -297,9 +293,8 @@ function start(context: WakeContext, interval: string | undefined): number {
 	return spawn_supervisor(context, interval)
 }
 
-// **The loop removes its record on the way out, and only its own** (joshuafolkken/kit#1727). A loop
-// that ended after its record was taken over used to delete the *successor's* record here, and the
-// run then went on with nobody watching it.
+// **The loop removes its record on the way out, and only its own.** A loop that ended after its record
+// was taken over must not delete the *successor's* record, or the run goes on with nobody watching it.
 //
 // **`superseded` is announced, because the two ways of ending look identical otherwise.** A `--stop`
 // and a take-over both leave this loop reporting `stopped` at exit 0, so a supervisor that was
@@ -322,7 +317,7 @@ function restart_ports(context: WakeContext, ports: LoopPorts, interval_ms: numb
 }
 
 // A failed pass is restarted while the carry record is still resumable (`run-wake-restart.ts`), so
-// only a failure past the restart bound reaches `finish` and its warning (joshuafolkken/kit#3332).
+// only a failure past the restart bound reaches `finish` and its warning.
 // **The record is claimed once and held across every restart**, so a `--stop` landing in the pause
 // between two passes still finds it, signals this process, and the next pass reads the removal as the
 // person's stop rather than claiming a fresh record and resuming.

@@ -5,9 +5,9 @@ import { issue_merged } from '#scripts/issue/issue-merged'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { z } from 'zod'
 
-// A child the run touched that has left the open listing, read from GitHub one issue at a time
-// (joshuafolkken/kit#3451). The listing is the board's only other source of a title, so a board opened
-// after its children closed drew them nameless, timeless and without saying whether they merged.
+// A child the run touched that has left the open listing, read from GitHub one issue at a time. The
+// listing is the board's only other source of a title, so without this read a board opened after its
+// children closed would draw them nameless, timeless and without saying whether they merged.
 // **A closed issue is read once**: what it answers does not change while it stays closed, so the board
 // keeps the answer for the run and asks GitHub only about children it has not read yet.
 

@@ -5,7 +5,7 @@ import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { z } from 'zod'
 
 // The run's append-only, ordered event stream — the surface a reader who was away rebuilds the run's
-// recent shape from (joshuafolkken/kit#2205). The report clock (`run-progress-clock.ts`) keeps only the
+// recent shape from. The report clock (`run-progress-clock.ts`) keeps only the
 // *last* heartbeat, and its `.log` sibling keeps only heartbeat *lines* with no position; neither lets
 // a woken reader ask "everything since the position I last read". This does.
 //
@@ -21,7 +21,7 @@ import { z } from 'zod'
 // dropped older events. Renumbering on compaction would silently shift a reader past unseen events.
 //
 // **The write is best-effort by contract, and the safety lives on the emit side.** The reporting path
-// must never fail the work it reports on (joshuafolkken/kit#2205), so `run-event-stream-emit.ts` wraps
+// must never fail the work it reports on, so `run-event-stream-emit.ts` wraps
 // every append in a swallow; this module is free to throw on a genuinely broken write.
 
 const EVENT_PREFIX = 'josh-run-events-'
@@ -31,8 +31,7 @@ const EVENT_PREFIX = 'josh-run-events-'
 const EVENT_SUFFIX = '.jsonl'
 // A run's session-facing events over the 8-hour whole-run bound: a plan, a launch/PR/review-round/merge
 // per child across a few dozen children, plus parks, cuts and stops. Five hundred keeps the whole of a
-// large `backlogrun` and still bounds an unattended run — past it the oldest events roll off, which is
-// what the acceptance criteria pin.
+// large `backlogrun` and still bounds an unattended run — past it the oldest events roll off.
 const EVENT_CAP = 500
 const FIRST_POSITION = 0
 const POSITION_INCREMENT = 1
@@ -45,7 +44,7 @@ const LOCK_SUFFIX = '.lock'
 // An append holds the lock for one read and one rename; a wait this long means a holder is stuck.
 const LOCK_WAIT_MS = 5000
 
-// **The one enumeration of what a session-facing event is** (joshuafolkken/kit#2205). Every writer names
+// **The one enumeration of what a session-facing event is.** Every writer names
 // its event by one of these members rather than passing a free string, so the set of things the stream
 // carries is defined here and nowhere else; `append` refuses a kind outside it, which is what keeps a
 // caller from quietly widening the stream.
@@ -57,77 +56,76 @@ const EVENT_KIND = {
 	SPLIT: 'split',
 	OUTAGE: 'outage',
 	CUT: 'cut',
-	// A fresh session adopted an implementation cut — `run:cut --resume` answered `resume-impl`
-	// (joshuafolkken/kit#3375). The resume clears the cut record, so without this the `cut` stayed the
-	// newest position and `run:step` kept answering the resume command it had just run.
+	// A fresh session adopted an implementation cut — `run:cut --resume` answered `resume-impl`. The
+	// resume clears the cut record, so without this the `cut` would stay the newest position and
+	// `run:step` would keep answering the resume command it had just run.
 	RESUME: 'resume',
-	// The backlog emptied while nothing of the run's own was in flight — the drain
-	// (joshuafolkken/kit#2335). It marks the position at which the end-of-run retrospective is owed,
-	// *before* the idle watch opens, so `run:step` fires the retrospective at the drain rather than after
-	// the watch runs its course. It is not itself a stop: the run watches on once the retrospective has
-	// run, and the real `STOP` follows when the watch expires.
+	// The backlog emptied while nothing of the run's own was in flight — the drain. It marks the position
+	// at which the end-of-run retrospective is owed, *before* the idle watch opens, so `run:step` fires
+	// the retrospective at the drain rather than after the watch runs its course. It is not itself a
+	// stop: the run watches on once the retrospective has run, and the real `STOP` follows when the watch
+	// expires.
 	DRAIN: 'drain',
 	STOP: 'stop',
 	PR_OPENED: 'pr-opened',
 	REVIEW_ROUND: 'review-round',
-	// The end-of-run retrospective's result, recorded when the run marks the retrospective done
-	// (joshuafolkken/kit#2342). A retrospective that files zero improvements and one that never ran look
+	// The end-of-run retrospective's result, recorded when the run marks the retrospective done. A
+	// retrospective that files zero improvements and one that never ran look
 	// the same from outside — no new Issue either way — so the result is put on the stream the report is
 	// generated from: the issues filed (or that none were), and the candidates dropped with why. It is
 	// emitted from the `run:carry --retrospective` close, so marking the retrospective done and recording
 	// what it found are one action rather than two the run could do only one of.
 	RETROSPECTIVE: 'retrospective',
 	// Ready backlog work is sitting undispatched while a lane is free and nothing has dispatched for a
-	// while (joshuafolkken/kit#2359). Emitted once per stall episode by the stop-time detector, it is
-	// both the dedup marker — `emit_once_since` refuses a second until a `CHILD_LAUNCH` intervenes
-	// (joshuafolkken/kit#2464) — and the line a
-	// terminal reader following the stream sees. `run:step` reads it as `backlog:next`, so a run that
+	// while. Emitted once per stall episode by the stop-time detector, it is both the dedup marker —
+	// `emit_once_since` refuses a second until a `CHILD_LAUNCH` intervenes — and the line a terminal
+	// reader following the stream sees. `run:step` reads it as `backlog:next`, so a run that
 	// stalled is pointed straight at dispatching the work rather than left waiting.
 	STALL: 'stall',
 	// The run's own driver is gone: the cut handed the budget off, the owner has died, and no supervisor
-	// is watching (joshuafolkken/kit#2375). Emitted once per strand episode by the stop-time detector,
+	// is watching. Emitted once per strand episode by the stop-time detector,
 	// exactly as `STALL` is — the newest-event dedup keeps a run polled every stop from notifying more
 	// than once, and a terminal reader following the stream sees the line. The strand is the step before
 	// the stall: a stalled run still has a driver that could dispatch, a stranded one has none.
 	STRANDED: 'stranded',
-	// One `josh ship` stage starting, succeeding or failing (joshuafolkken/kit#2426). It is a trace of the
+	// One `josh ship` stage starting, succeeding or failing. It is a trace of the
 	// composite's progress rather than a position the run is at — the positions a ship leaves behind are
 	// the closed issue its `followup` merges, or a detached supervisor's `SHIP_LAUNCH` / `SHIP_STOP` below
 	// — so it is one of the `TRACE_KINDS` the last-event read skips.
 	SHIP_STAGE: 'ship-stage',
-	// One progress watcher line — the `at … / next …` heartbeat `run:progress` prints
-	// (joshuafolkken/kit#2437). Printed only to the watcher's own output, a headless successor's heartbeat
-	// was buried in its log after a cut; on the stream it reaches the attached session's relay. It says
+	// One progress watcher line — the `at … / next …` heartbeat `run:progress` prints. Printed only to
+	// the watcher's own output, a headless successor's heartbeat would be buried in its log after a cut;
+	// on the stream it reaches the attached session's relay. It says
 	// the run is alive rather than where it is, so it is a trace kind like `SHIP_STAGE`.
 	HEARTBEAT: 'heartbeat',
-	// The post-implementation region handed to a detached `josh ship --detach` supervisor
-	// (joshuafolkken/kit#2428). Unlike a stage trace it is a position: the agent has ended and the
+	// The post-implementation region handed to a detached `josh ship --detach` supervisor. Unlike a stage
+	// trace it is a position: the agent has ended and the
 	// supervisor carries the run, so `run:step` answers `wait` until it stops or the issue closes.
 	SHIP_LAUNCH: 'ship-launch',
 	// The supervisor stopped at a failed stage — a red gate, a High/Medium review, a failed push, red CI
-	// (joshuafolkken/kit#2428). The position that hands control back: `run:step` prints the command that
+	// The position that hands control back: `run:step` prints the command that
 	// shows the stopped report, so the agent fixes it and relaunches rather than rebuilding the context.
 	SHIP_STOP: 'ship-stop',
 	// The idle watch's window — when the run began waiting on an empty backlog and when that wait ends
-	// (joshuafolkken/kit#3430). `backlog:offer` writes it whenever the window changes, so `run:board` reads
+	// `backlog:offer` writes it whenever the window changes, so `run:board` reads
 	// the deadline rather than guessing it. It is a trace: `emit_once`'s drain dedup and `run:step`'s
 	// position both read past it, so a watching loop never re-marks the drain it is waiting after.
 	IDLE: 'idle',
-	// An Issue the run filed on its way, written by `issue:file` (joshuafolkken/kit#3430), so a run started
-	// from the command line still surfaces what it found — `run:board`'s findings section reads it.
+	// An Issue the run filed on its way, written by `issue:file`, so a run started from the command line
+	// still surfaces what it found — `run:board`'s findings section reads it.
 	FILED: 'filed',
-	// A one-line observation short of an Issue, written with `run:event --append note`
-	// (joshuafolkken/kit#3430) and shown in the same section.
+	// A one-line observation short of an Issue, written with `run:event --append note` and shown in the
+	// same section.
 	NOTE: 'note',
 	// A lane child reached a phase no other event marks — its first implementation edit, written by the
-	// PreToolUse hook (joshuafolkken/kit#3444) — so `run:board` draws how far the child has got. A trace,
+	// PreToolUse hook — so `run:board` draws how far the child has got. A trace,
 	// like `SHIP_STAGE`: it says where the child's work is, not where the run is.
 	LANE_PHASE: 'lane-phase',
-	// An issue `run:add` put into the live run (joshuafolkken/kit#3433). The parent's `--wait` watcher
+	// An issue `run:add` put into the live run. The parent's `--wait` watcher
 	// ends on it, so the issue takes the next free lane without waiting out the arrival probe's minute. A
 	// trace: it says what the run was handed, not where the run is.
 	ADD: 'add',
-	// `josh lane:limit` raised a live run's lane limit (joshuafolkken/kit#3434). The `--wait` watcher's
+	// `josh lane:limit` raised a live run's lane limit. The `--wait` watcher's
 	// arrival probe reads it as a wake: the lanes a raise frees are new room for a pool its baseline
 	// already holds. A trace: it says the run gained room, not where the run is.
 	LANE_LIMIT: 'lane-limit',
@@ -153,8 +151,8 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or
 // `note` line is a trace to the position readers but is the board's record of what the run found, so
-// it rolls off only with the positions (joshuafolkken/kit#3430). A ship-stage `start` and an `idle` line
-// are disposable but go last of them: `run:board` draws from those lines (joshuafolkken/kit#3541).
+// it rolls off only with the positions. A ship-stage `start` and an `idle` line are disposable but go
+// last of them: `run:board` draws from those lines.
 const DISPOSABLE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.SHIP_STAGE,
 	EVENT_KIND.HEARTBEAT,
@@ -181,7 +179,7 @@ interface StreamRead {
 }
 
 // A kind the enumeration names, and nothing else. The predicate is what `append` asks before it writes,
-// so an event outside the enumeration is never appended (joshuafolkken/kit#2205).
+// so an event outside the enumeration is never appended.
 function is_event_kind(value: string): value is EventKind {
 	return EVENT_KINDS.includes(value)
 }
@@ -265,22 +263,20 @@ function droppable(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEvent> {
 
 // The bounded stream serialized back to JSONL. The newest `EVENT_CAP` are kept and the oldest roll off;
 // each survivor keeps its original `pos`, so the bound never renumbers a position a reader is holding.
-// The stream held to `EVENT_CAP`, dropping the oldest trace events before any position
-// (joshuafolkken/kit#3245). A long run's ship-stage and heartbeat lines once filled 396 of the 500 slots
-// and pushed its cuts off, so the retrospective counted `cut 0` for a run with thirteen; a trace says only
-// that the run was alive, so it is the first to go. Only a stream of positions alone rolls them off.
+// The stream held to `EVENT_CAP`, dropping the oldest trace events before any position: a trace says
+// only that the run was alive, so it is the first to go, and a long run's trace lines never push its
+// cuts off. Only a stream of positions alone rolls them off.
 //
-// **Each issue's newest ship-stage is not disposable** (joshuafolkken/kit#3521): it is the only record
-// `run:board` draws a lane's review-and-later phase from. On a stream full of positions the stage just
-// written was the one disposable line and rolled off in its own append, so the board never left implement.
+// **Each issue's newest ship-stage is not disposable**: it is the only record `run:board` draws a lane's
+// review-and-later phase from, and on a stream full of positions it would otherwise roll off in its own
+// append.
 //
-// **A ship-stage `start` outlasts the other disposable lines** (joshuafolkken/kit#3541): each one is a
-// phase on the lane's track, so dropping them oldest-first with the `done` lines and the heartbeats left
-// a shipped child's track ending at 🚢 with nothing after it. An `idle` line goes with them, oldest first,
+// **A ship-stage `start` outlasts the other disposable lines**: each one is a phase on the lane's track,
+// so it is kept past the `done` lines and the heartbeats. An `idle` line goes with them, oldest first,
 // so a run's newest wait is not the first line a stream of starts and positions gives up.
 //
-// **The kept line carries the history** (joshuafolkken/kit#3552): on a stream the positions fill, every
-// append still rolls off the issue's previous stage line, so the newest one lists every stage its
+// **The kept line carries the history**: on a stream the positions fill, every append still rolls off
+// the issue's previous stage line, so the newest one lists every stage its
 // attempt has started (`run-ship-stage.ts` → `event_text`) and the track is redrawn from it alone.
 function bounded(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEvent> {
 	const excess = events.length - EVENT_CAP
@@ -313,8 +309,8 @@ function append_held(target: string, event: Omit<RunEvent, 'pos'>): number {
  *
  * The position is the previous maximum plus one — monotonic across session cuts because the stream is
  * keyed to the run's identity rather than a session. **The read and the rewrite are one step under a
- * per-stream lock** (joshuafolkken/kit#3446): the parent, a cut successor and every lane child append
- * to one stream, and an unlocked read-then-rewrite lost one writer's event to another's. A lock still
+ * per-stream lock**: the parent, a cut successor and every lane child append to one stream, and an
+ * unlocked read-then-rewrite would lose one writer's event to another's. A lock still
  * held after the wait is reported on stderr and thrown, which the best-effort emit side swallows.
  */
 function append(target: string, kind: string, text: string, at: string): AppendResult {
@@ -353,16 +349,16 @@ function read_from(target: string, position: number): StreamRead {
 	}
 }
 
-// The degenerate single-event read the "last line" consumers keep working as (joshuafolkken/kit#2205):
-// the newest positional event, or `undefined` for a stream with none. Trace events are skipped
-// (joshuafolkken/kit#2426), so the answer stays the run's position however many stage lines follow it.
+// The degenerate single-event read the "last line" consumers use: the newest positional event, or
+// `undefined` for a stream with none. Trace events are skipped, so the answer stays the run's position
+// however many stage lines follow it.
 function read_last(target: string): RunEvent | undefined {
 	return read_events(target).findLast((event) => !TRACE_KINDS.has(event.kind))
 }
 
 // Whether `kind` is already on the stream after the newest `reset_kind` — or anywhere, before the first
 // one. The episode test for a marker whose episode ends only when something specific happens rather than
-// when any other event lands (joshuafolkken/kit#2464): a stall ends at a dispatch, and the merges, parks
+// when any other event lands: a stall ends at a dispatch, and the merges, parks
 // and heartbeats every parallel lane appends in between must not read as a fresh stall.
 function has_since(events: ReadonlyArray<RunEvent>, kind: string, reset_kind: string): boolean {
 	const reset_at = events.findLastIndex((event) => event.kind === reset_kind)
@@ -370,7 +366,7 @@ function has_since(events: ReadonlyArray<RunEvent>, kind: string, reset_kind: st
 	return events.slice(reset_at + POSITION_INCREMENT).some((event) => event.kind === kind)
 }
 
-// One event as the line a reader relays (joshuafolkken/kit#2207). The follow reader and the degenerate
+// One event as the line a reader relays. The follow reader and the degenerate
 // `run:wake --list` both present events to a person, so the "what an event reads as" lives here, beside
 // the enumeration it names, rather than being spelled twice at the two call sites. `at`, `kind` and
 // `text` are joined with a separator no field carries, so the three stay legible in one line.

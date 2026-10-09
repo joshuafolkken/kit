@@ -11,12 +11,12 @@ const USAGE =
 
 const OPTIONS = {
 	end: { type: 'boolean' },
-	// The path to the handoff file the cut carries — the run's instruction and work state
-	// (joshuafolkken/kit#2354). A value rather than a boolean: the body is passed by path, never inlined
-	// on the command line, so a backtick or `$` in the instruction is not executed. It modifies the bare
-	// cut like `--impl`, so it is refused only when paired with a mode that asks about a cut.
+	// The path to the handoff file the cut carries — the run's instruction and work state. A value
+	// rather than a boolean: the body is passed by path, never inlined on the command line, so a
+	// backtick or `$` in the instruction is not executed. It modifies the bare cut like `--impl`, so it
+	// is refused only when paired with a mode that asks about a cut.
 	handoff: { type: 'string' },
-	// The implementation-phase cut (joshuafolkken/kit#1933). It modifies the bare cut rather than being
+	// The implementation-phase cut. It modifies the bare cut rather than being
 	// a mode of its own — `run:cut --impl <issue>` still takes a cut — so it is refused only when it is
 	// paired with `--resume`, `--json` or `--end`, which ask about a cut rather than take one.
 	impl: { type: 'boolean' },

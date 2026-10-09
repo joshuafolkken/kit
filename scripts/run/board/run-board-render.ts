@@ -25,20 +25,19 @@ import type { ItemState } from './run-board-status'
 import { run_board_track } from './run-board-track'
 import type { LaneUsages } from './run-board-usage'
 
-// The whole `run:board` screen as lines (joshuafolkken/kit#3430) — pure, so what a person sees is tested
-// apart from the terminal. The header says where the run is; the sections below it follow the plan's
-// order; the findings at the bottom are what the run would otherwise have said in no chat anyone reads.
-// A section is a rule rather than a heading, and the legend at the foot names the symbols, so a row
-// carries only what differs between rows (joshuafolkken/kit#3444). Every word is English whatever the
-// session language (joshuafolkken/kit#3486): one set of words reads the same on every board.
+// The whole `run:board` screen as lines — pure, so what a person sees is tested apart from the
+// terminal. The header says where the run is; the sections below it follow the plan's order; the
+// findings at the bottom are what the run would otherwise have said in no chat anyone reads. A section
+// is a rule rather than a heading, and the legend at the foot names the symbols, so a row carries only
+// what differs between rows. Every word is English whatever the session language: one set of words
+// reads the same on every board.
 
 const { FILED_KIND_ICONS, KIND_BLANK, NOTES_ICON, PHASE_ICONS, STATE_ICONS, WAITS_ICON, WORDS } =
 	run_board_labels
 const { clock_of, elapsed_of } = run_board_labels
 const { NOTE_LIMIT } = run_board_render_notes
 const { cell_of, column_width, slot_of } = run_board_render_slot
-// The track is a fixed fourteen columns where the gauge and the phase's name took up to twenty-two, so
-// the title takes the columns it freed and a row is no wider (joshuafolkken/kit#3460).
+// The columns a terminal row gives its title: a longer one is cut to an ellipsis.
 const TITLE_LIMIT = 48
 const ELLIPSIS = '…'
 const GAP = '  '
@@ -49,8 +48,8 @@ const RULE = '─'
 const RULE_LEAD = `${RULE}${RULE}`
 const RULE_WIDTH = 50
 
-// The live terminal a frame is kept within, and the footer the frame ends on and gives way first
-// (joshuafolkken/kit#3505); neither for a frame that is not redrawn in place.
+// The live terminal a frame is kept within, and the footer the frame ends on and gives way first;
+// neither for a frame that is not redrawn in place.
 interface FrameBounds {
 	size?: TerminalSize | undefined
 	footer?: ReadonlyArray<string> | undefined
@@ -59,14 +58,13 @@ interface FrameBounds {
 interface BoardView extends FrameBounds {
 	header: BoardHeader
 	notes: ReadonlyArray<BoardNote>
-	// The session a stopped run resumes from (joshuafolkken/kit#3437).
+	// The session a stopped run resumes from.
 	resume?: string | undefined
 }
 
 // What every row of one frame is drawn with: the header, how wide the title column is, so every time
-// starts in one column (joshuafolkken/kit#3544), how wide the time column is, so a three-digit `125:30`
-// and a `00:42` end in the same column, and each lane's usage where its column is drawn
-// (joshuafolkken/kit#3489), with the column's width (joshuafolkken/kit#3554).
+// starts in one column, how wide the time column is, so a three-digit `125:30` and a `00:42` end in
+// the same column, and each lane's usage where its column is drawn, with the column's width.
 interface RowFrame {
 	header: BoardHeader
 	title_width: number
@@ -75,14 +73,14 @@ interface RowFrame {
 	slot_width: number
 }
 
-// A chat wraps a long line rather than cutting it, so its titles are drawn whole (joshuafolkken/kit#3456).
+// A chat wraps a long line rather than cutting it, so its titles are drawn whole.
 function title_of(header: BoardHeader, title = ''): string {
 	if (header.form === 'chat') return title
 
 	return title.length > TITLE_LIMIT ? `${title.slice(0, TITLE_LIMIT - 1)}${ELLIPSIS}` : title
 }
 
-// A row drawn before the plan is read has no title yet, and says so (joshuafolkken/kit#3486).
+// A row drawn before the plan is read has no title yet, and says so.
 function row_title(row: BoardRow, header: BoardHeader): string | undefined {
 	if (row.title !== undefined || run_board_header.is_plan_read(header)) return row.title
 
@@ -111,13 +109,12 @@ function time_of(row: BoardRow, now_ms: number): string | undefined {
 	return elapsed === undefined ? undefined : elapsed_of(elapsed)
 }
 
-// The phases a row's track draws — every one the child passed while running (joshuafolkken/kit#3460),
-// kept once it settles (joshuafolkken/kit#3535).
+// The phases a row's track draws — every one the child passed while running, kept once it settles.
 function drawn_phases(row: BoardRow): ReadonlyArray<Phase> {
 	return row.status?.track ?? []
 }
 
-// A row's phases as its track, drawn last (joshuafolkken/kit#3526): it grows with every round, so the
+// A row's phases as its track, drawn last: it grows with every round, so the
 // columns before it stay where they are whatever its length. A settled row's ends on its state icon.
 function track_text(row: BoardRow): string | undefined {
 	const phases = drawn_phases(row)
@@ -147,7 +144,7 @@ function timed_parts(
 	return [title.padEnd(frame.title_width), (time ?? '').padStart(frame.time_width)]
 }
 
-// A running row leads with the icon of the phase it is in now (joshuafolkken/kit#3471) — the rightmost
+// A running row leads with the icon of the phase it is in now — the rightmost
 // icon of its track — and with 🔄 while its track draws none yet.
 function state_icon(row: BoardRow): string {
 	const current = row.state === 'running' ? drawn_phases(row).at(-1) : undefined
@@ -155,17 +152,17 @@ function state_icon(row: BoardRow): string {
 	return current === undefined ? STATE_ICONS[row.state] : PHASE_ICONS[current]
 }
 
-// A running row turns the spinner in the first column of its indent where the header has one
-// (joshuafolkken/kit#3471), so its title starts in the same column as every other row's.
+// A running row turns the spinner in the first column of its indent where the header has one, so its
+// title starts in the same column as every other row's.
 function indent_of(prefix: string, row: BoardRow, header: BoardHeader): string {
 	if (row.state !== 'running' || header.spinner === undefined) return prefix
 
 	return `${header.spinner}${prefix.slice(1)}`
 }
 
-// A row's usage column where the frame draws one (joshuafolkken/kit#3489), padded to one width on every
-// row so every track starts in one column (joshuafolkken/kit#3554). A plan row the run has not touched
-// has no time, usage or track to align, so it draws none and what it waits on stays beside its title.
+// A row's usage column where the frame draws one, padded to one width on every row so every track
+// starts in one column. A plan row the run has not touched has no time, usage or track to align, so it
+// draws none and what it waits on stays beside its title.
 function cell_text(row: BoardRow, frame: RowFrame): string | undefined {
 	const { usages, slot_width } = frame
 
@@ -178,8 +175,8 @@ function joined(parts: ReadonlyArray<string | undefined>): string {
 	return parts.filter((part) => part !== undefined && part !== '').join(GAP)
 }
 
-// The release kind's icon between the number and the title, one space either side (joshuafolkken/kit#3577);
-// a row with no title ends at its icon, so what follows keeps its usual gap.
+// The release kind's icon between the number and the title, one space either side; a row with no title
+// ends at its icon, so what follows keeps its usual gap.
 function lead_of(row: BoardRow, header: BoardHeader, title: string): string {
 	const kind = row.kind === undefined ? KIND_BLANK : FILED_KIND_ICONS[row.kind]
 	const lead = `${state_icon(row)} ${header.link(String(row.number))} ${kind}`
@@ -187,8 +184,7 @@ function lead_of(row: BoardRow, header: BoardHeader, title: string): string {
 	return title === '' ? lead : `${lead} ${title}`
 }
 
-// A row up to its usage column — the columns that stay where they are whatever the track's length
-// (joshuafolkken/kit#3526).
+// A row up to its usage column — the columns that stay where they are whatever the track's length.
 function head_text(row: BoardRow, frame: RowFrame): string {
 	const cell = cell_text(row, frame)
 	const [title = '', ...time] = timed_parts(row, frame, cell !== undefined)
@@ -196,13 +192,13 @@ function head_text(row: BoardRow, frame: RowFrame): string {
 	return joined([lead_of(row, frame.header, title), ...time, cell])
 }
 
-// Every row carries its state's icon, a waiting one ⏳ too (joshuafolkken/kit#3450); a row with nothing
+// Every row carries its state's icon, a waiting one ⏳ too; a row with nothing
 // after its padded columns ends where its text does.
 function row_text(row: BoardRow, frame: RowFrame): string {
 	return joined([head_text(row, frame), track_text(row), waits_of(row, frame.header)]).trimEnd()
 }
 
-// The stage each state's row gives way in when the pane is short (joshuafolkken/kit#3505).
+// The stage each state's row gives way in when the pane is short.
 const YIELD_STAGES: Readonly<Record<ItemState, YieldStage>> = {
 	merged: 'finished',
 	done: 'finished',
@@ -290,7 +286,7 @@ function time_width(header: BoardHeader): number {
 
 // The title column's width: the limit a terminal cuts every title to, and in a chat — which draws each
 // title whole — the widest title a timed row draws in this frame, so its times still start in one
-// column (joshuafolkken/kit#3544).
+// column.
 function title_width(header: BoardHeader, layout: BoardLayout): number {
 	if (header.form !== 'chat') return TITLE_LIMIT
 
@@ -303,9 +299,8 @@ function title_width(header: BoardHeader, layout: BoardLayout): number {
 }
 
 // Whether every row's usage column still fits one terminal line — measured as the deepest, an epic's
-// child — where a frame is kept within a terminal (joshuafolkken/kit#3486). The track after it is left
-// out (joshuafolkken/kit#3526): it grows without bound, so one long history would otherwise take the
-// usage column off every row.
+// child — where a frame is kept within a terminal. The track after it is left out: it grows without
+// bound, so one long history would otherwise take the usage column off every row.
 function is_usage_fitting(
 	rows: ReadonlyArray<BoardRow>,
 	frame: RowFrame,
@@ -318,8 +313,8 @@ function is_usage_fitting(
 	)
 }
 
-// The usage column is drawn on every row or on none (joshuafolkken/kit#3489, joshuafolkken/kit#3554):
-// a pane too narrow for it on any row, and a chat, draw it on none — a finish time with it.
+// The usage column is drawn on every row or on none: a pane too narrow for it on any row, and a chat,
+// draw it on none — a finish time with it.
 function frame_of(
 	header: BoardHeader,
 	layout: BoardLayout,
@@ -359,7 +354,7 @@ function plan_sections(header: BoardHeader, size: TerminalSize | undefined): Arr
 	]
 }
 
-// The layout a legend is drawn for: none in a chat (joshuafolkken/kit#3456), nor before a plan is read.
+// The layout a legend is drawn for: none in a chat, nor before a plan is read.
 function legend_layout(header: BoardHeader): BoardLayout | undefined {
 	return header.form === 'chat' ? undefined : header.layout
 }
@@ -381,7 +376,7 @@ function resume_lines(resume: string | undefined): Array<string> {
 	return ['', `${STATE_ICONS.human} ${WORDS.resume}${GAP}claude --resume ${resume}`]
 }
 
-// A chat draws no legend: the symbols are the same in every answer (joshuafolkken/kit#3456).
+// A chat draws no legend: the symbols are the same in every answer.
 function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Array<string> {
 	const layout = legend_layout(header)
 
@@ -393,7 +388,7 @@ function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Arr
 	return ['', ...run_board_render_legend.legend_of(rows, drawn, notes)]
 }
 
-// A live frame is kept within its terminal (joshuafolkken/kit#3486); any other is drawn whole.
+// A live frame is kept within its terminal; any other is drawn whole.
 function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
 	const { size } = bounds
 

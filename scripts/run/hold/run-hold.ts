@@ -6,11 +6,10 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
 import { z } from 'zod'
 
-// joshuafolkken/kit#1091: `epicrun` asks `epic-busy.ts` whether a *repository* already has a child in
-// flight, and the entry points a person types — `fullrun`, `halfrun`, `kickoff` — never reach that
-// guard, because they do not go through `epic:next`. On 2026-08-30 two sessions therefore implemented
-// two issues in one checkout at once, and the second was one command away from committing nine files
-// onto the first one's branch.
+// One run at a time per working tree. The entry points a person types — `fullrun`, `halfrun`,
+// `kickoff` — never reach `epic-busy.ts`'s guard, because they do not go through `epic:next`, so
+// without this two sessions could implement two issues in one checkout and commit onto each other's
+// branch.
 //
 // **The unit is the working tree, not the repository.** What these entries contend for is one branch,
 // one index and one uncommitted diff; a linked work tree has its own three, so a second run there is
@@ -33,11 +32,9 @@ const MILLISECONDS_PER_HOUR = 3_600_000
 const HOLD_MAX_AGE_MS = HOLD_MAX_AGE_HOURS * MILLISECONDS_PER_HOUR
 
 const RELEASE_COMMAND = 'pnpm josh run:release'
-// The spelling that removes a record this run did not write (joshuafolkken/kit#1799). **It is a
-// separate spelling rather than the same one** because a stop message has to name something a person
-// can type when a record really has been abandoned — and the one it named until now removed a *live*
-// run's record just as readily, which is the incident this guard was written after, reached through
-// the guard's own recovery instruction.
+// The spelling that removes a record this run did not write. **It is a separate spelling rather than
+// the same one** because a stop message has to name something a person can type when a record really
+// has been abandoned, without the plain release removing a *live* run's record just as readily.
 const FORCE_RELEASE_COMMAND = `${RELEASE_COMMAND} --force`
 // The sentence `epic-busy.ts` prints for the same reason: a guard that cannot read its record has not
 // established that the tree is free, and reporting it as free is the one failure that matters here.
@@ -47,23 +44,23 @@ interface RunHold {
 	issue: string
 	taken_at: string
 	pid: number
-	// Set only by `fullrun #N`'s entry (`run:entry` claims with `--fullrun`, joshuafolkken/kit#2760).
-	// The implementation cut outside a lane resumes as `fullrun #N`, so a `halfrun` or an in-session
-	// `backlogrun` child — which hold the tree just the same — must not be read as one. Optional and
-	// `| undefined` because a record written before this field existed is simply not a `fullrun`'s.
+	// Set only by `fullrun #N`'s entry (`run:entry` claims with `--fullrun`). The implementation cut
+	// outside a lane resumes as `fullrun #N`, so a `halfrun` or an in-session `backlogrun` child — which
+	// hold the tree just the same — must not be read as one. Optional and `| undefined` because a record
+	// without this field is simply not a `fullrun`'s.
 	is_fullrun?: boolean | undefined
-	// Set only at a `halfrun`'s stop before commit (`run:hold <N> --halfrun-stop`, joshuafolkken/kit#2796):
-	// the positive record that the run has *ended* over its verified diff, which is what lets
-	// `fullrun #N` adopt the hold. A running `halfrun` or a `backlogrun` child never carries it.
+	// Set only at a `halfrun`'s stop before commit (`run:hold <N> --halfrun-stop`): the positive record
+	// that the run has *ended* over its verified diff, which is what lets `fullrun #N` adopt the hold. A
+	// running `halfrun` or a `backlogrun` child never carries it.
 	is_halfrun_stop?: boolean | undefined
-	// Set only at a `prrun`'s stop before merge (`run:hold <N> --prrun-stop`, joshuafolkken/kit#3023): the
-	// commit the green pull request stood on, so `fullrun #N` can tell an untouched branch — merge it —
-	// from one that moved since and has to pass the gate and the review again.
+	// Set only at a `prrun`'s stop before merge (`run:hold <N> --prrun-stop`): the commit the green pull
+	// request stood on, so `fullrun #N` can tell an untouched branch — merge it — from one that moved
+	// since and has to pass the gate and the review again.
 	prrun_stop_head?: string | undefined
-	// The agent session the claim ran under (joshuafolkken/kit#3419) — `pid` is the short-lived `josh
-	// run:hold` itself, gone before anything reads it back, so it can never say whether the run is still
-	// there. The pair with its start time is the identity `process-identity.ts` defines. Optional for a
-	// record written before these fields, or by a claim made outside an agent session.
+	// The agent session the claim ran under — `pid` is the short-lived `josh run:hold` itself, gone
+	// before anything reads it back, so it can never say whether the run is still there. The pair with
+	// its start time is the identity `process-identity.ts` defines. Optional for a record without these
+	// fields, or by a claim made outside an agent session.
 	owner_pid?: number | undefined
 	owner_start?: string | undefined
 }
@@ -92,8 +89,7 @@ async function worktree_directory(): Promise<string | undefined> {
 // A linked work tree — a lane — reports its own git directory as the first path and the common
 // directory every work tree of the repository shares as the second; the primary checkout reports one
 // path for both. Comparing the two detects a lane without assuming the git directory is named `.git`:
-// a `--separate-git-dir` clone or a bare repository defeats any `.git`-segment match
-// (joshuafolkken/kit#1106).
+// a `--separate-git-dir` clone or a bare repository defeats any `.git`-segment match.
 async function is_linked_worktree(): Promise<boolean> {
 	const directories = await git_command.git_directories()
 
@@ -136,7 +132,7 @@ function is_expired(hold: RunHold, now: Date): boolean {
 	return now.getTime() - taken > HOLD_MAX_AGE_MS
 }
 
-// **A record whose session has ended is stale before its age says so** (joshuafolkken/kit#3419): the run
+// **A record whose session has ended is stale before its age says so**: the run
 // that wrote it cannot release it any more, so waiting out the eight hours only stops the next run for
 // nothing. Only a recorded session that is provably gone counts — no owner, or a live pid whose start
 // cannot be read, leaves the age as the whole test. **A stop-marked record is exempt**: a `halfrun` or
@@ -197,9 +193,8 @@ function write_hold(target: string, issue: string, now: Date = new Date()): RunH
 }
 
 // The claim on a tree that read as free. **Exclusive rather than a plain write**: two sessions typing
-// an entry point in the same second both read `free`, and a write would tell both of them they won —
-// which is the incident this guard was written after, reproduced by the guard itself. `false` means
-// the other one got there first.
+// an entry point in the same second both read `free`, and a write would tell both of them they won.
+// `false` means the other one got there first.
 function create_hold(
 	target: string,
 	issue: string,
@@ -210,7 +205,7 @@ function create_hold(
 }
 
 // What a stopped run's record carries on top of the claim: the `halfrun` stop's flag, or the commit a
-// `prrun` stop stood on (joshuafolkken/kit#3023).
+// `prrun` stop stood on.
 type StopMarkFields = Pick<RunHold, 'is_halfrun_stop' | 'prrun_stop_head'>
 
 const HALFRUN_STOP_FIELDS: StopMarkFields = { is_halfrun_stop: true }
@@ -250,10 +245,10 @@ function release_hold(target: string): void {
 	stamp_file.remove_stamp(target)
 }
 
-// The pid named is the session's where the record has one (joshuafolkken/kit#3419): the claiming `josh
-// run:hold` has exited by the time anything reads the record back, so its own pid tells a person
-// nothing. Age or an ended session is what expires a record; `pnpm josh run:release --force` is what
-// clears somebody else's early, and `pnpm josh run:release <N>` what the run that wrote it types.
+// The pid named is the session's where the record has one: the claiming `josh run:hold` has exited by
+// the time anything reads the record back, so its own pid tells a person nothing. Age or an ended
+// session is what expires a record; `pnpm josh run:release --force` is what clears somebody else's
+// early, and `pnpm josh run:release <N>` what the run that wrote it types.
 function describe_holder(hold: RunHold): string {
 	const holder =
 		hold.issue === UNNUMBERED_ISSUE ? 'an unnumbered run' : session_cite.issue(hold.issue)
@@ -275,9 +270,9 @@ function is_own_hold(hold: RunHold, claimant: string): boolean {
 	return hold.issue === claimant
 }
 
-// **A claim for the issue the record already names is the same run asking again** (joshuafolkken/kit#3419)
-// — a second `run:entry` in one session answered `busy` to its own hold and parked the run. The
-// unnumbered `new` claim names no run, so two of them are still two runs.
+// **A claim for the issue the record already names is the same run asking again** — a second
+// `run:entry` in one session must not answer `busy` to its own hold. The unnumbered `new` claim names
+// no run, so two of them are still two runs.
 function is_reentry(hold: RunHold, claimant: string): boolean {
 	return claimant !== UNNUMBERED_ISSUE && is_own_hold(hold, claimant)
 }

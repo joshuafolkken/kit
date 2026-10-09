@@ -2,14 +2,14 @@ import { stripVTControlCharacters } from 'node:util'
 import string_width from 'string-width'
 import { run_board_labels } from './run-board-labels'
 
-// A live `run:board` frame kept within the terminal (joshuafolkken/kit#3486). A frame taller than the
-// pane scrolls the alternate screen as it is written, and the header — the lines that say whether the
-// run moves and how far it is — is what scrolls off. So the parts below it give way instead, least
-// wanted first (joshuafolkken/kit#3505): the footer, the legend, the finished rows, the notes, the rows
-// not yet started, the parked rows and, last, the running rows — what a person keeps the board open
-// to see. Each stage stops once the frame fits, a cut row is counted on its section's `more N` line,
-// and the order a row is drawn in never changes. A line wider than the pane wraps, so every line is
-// counted by the rows it takes on screen, not as one.
+// A live `run:board` frame kept within the terminal. A frame taller than the pane scrolls the
+// alternate screen as it is written, and the header — the lines that say whether the run moves and
+// how far it is — is what scrolls off. So the parts below it give way instead, least wanted first:
+// the footer, the legend, the finished rows, the notes, the rows not yet started, the parked rows
+// and, last, the running rows — what a person keeps the board open to see. Each stage stops once the
+// frame fits, a cut row is counted on its section's `more N` line, and the order a row is drawn in
+// never changes. A line wider than the pane wraps, so every line is counted by the rows it takes on
+// screen, not as one.
 
 const { WORDS } = run_board_labels
 const INDENT = '  '
@@ -147,7 +147,7 @@ function yielding(rows: ReadonlyArray<Indexed>, stage: YieldStage): Array<PlanLi
 		.map((entry) => entry.line)
 }
 
-// Everything that gives way, in the order it does (joshuafolkken/kit#3505).
+// Everything that gives way, in the order it does.
 function order_of(parts: FrameParts): Array<Yielder> {
 	const rows = parts.plan
 		.flatMap((section) => section.lines)

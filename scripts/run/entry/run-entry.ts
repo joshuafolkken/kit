@@ -1,12 +1,11 @@
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { run_step } from '#scripts/run/run-step'
 
-// `josh run:entry <N>` — the one call a `fullrun` makes to open a run (joshuafolkken/kit#2372). It
-// folds the fixed entry sequence a lane spends four separate round trips on — claim the tree
-// (`run:hold`), read the session budget (`cost --cut`), gather the issue reads (`run:prep`), and decide
-// the pre-implementation step (`run:step`) — into one composite, the same shape `backlog:offer` folded
-// the parent loop head on (joshuafolkken/kit#2162). Context cost grows with the square of a lane's
-// round trips, so collapsing four into one is where the fold pays the most.
+// `josh run:entry <N>` — the one call a `fullrun` makes to open a run. It folds the fixed entry
+// sequence of four round trips — claim the tree (`run:hold`), read the session budget (`cost --cut`),
+// gather the issue reads (`run:prep`), and decide the pre-implementation step (`run:step`) — into one
+// composite, the same shape `backlog:offer` gives the parent loop head. Context cost grows with the
+// square of a lane's round trips, so collapsing four into one is where the fold pays the most.
 //
 // **This module is the pure half**, kept apart from the chaining CLI the way `run-prep.ts` is kept from
 // `run-prep-cli.ts` and `run-review.ts` from its steps. It shapes the summary line the reader branches

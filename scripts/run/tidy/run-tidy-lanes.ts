@@ -7,11 +7,11 @@ import { error_text } from '#scripts/lib/error-message'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_tidy, type Outcome, type Verdict } from './run-tidy'
 
-// The lane half of `josh run:tidy` (joshuafolkken/kit#2701): each lane whose issue merged, read for
-// what would make closing it lose work, then closed with its run record released. A lane whose work
-// tree is already gone is `lane:prune`'s, so it is left to that command. A lane the running
-// `backlogrun` still has in flight is left to its `run:merge` (joshuafolkken/kit#3451): closed here, it
-// left the run with no `merge` event, no ledger line and no merged count.
+// The lane half of `josh run:tidy`: each lane whose issue merged, read for what would make closing it
+// lose work, then closed with its run record released. A lane whose work tree is already gone is
+// `lane:prune`'s, so it is left to that command. A lane the running `backlogrun` still has in flight
+// is left to its `run:merge`: closed here, it would leave the run with no `merge` event, no ledger
+// line and no merged count.
 
 const CLOSED_KIND = 'closed'
 const INCOMPLETE_REASON = 'the close left files behind'

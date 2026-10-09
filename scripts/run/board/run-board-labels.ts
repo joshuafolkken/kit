@@ -6,9 +6,9 @@ import type { BoardNote } from './run-board-notes'
 import type { Phase } from './run-board-phase'
 import type { ItemState } from './run-board-status'
 
-// The words and the clock `run:board` draws with (joshuafolkken/kit#3430). A moment on the board is a
-// local `HH:MM:SS` clock; how long something has run is a short `MM:SS` (joshuafolkken/kit#3444), so a
-// person reads the board against the clock on their own screen.
+// The words and the clock `run:board` draws with. A moment on the board is a local `HH:MM:SS` clock;
+// how long something has run is a short `MM:SS`, so a person reads the board against the clock on
+// their own screen.
 
 const CLOCK_WIDTH = 2
 const CLOCK_PAD = '0'
@@ -16,17 +16,16 @@ const MS_PER_SECOND = 1000
 const SECONDS_PER_MINUTE = 60
 const MINUTES_PER_HOUR = 60
 const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE
-// Every gauge is this wide — the plan, the machine and a row's phase (joshuafolkken/kit#3450).
+// Every gauge is this wide — the plan, the machine and a row's phase.
 const BAR_WIDTH = 10
-// A centered square done and a thin line left (joshuafolkken/kit#3452): the shapes alone tell the two
-// apart where no color is drawn, and a terminal dims the line so the gauge does not read heavy. The
-// square, not a full block, leaves a gap between stacked bars at line height 1 (joshuafolkken/kit#3498).
+// A centered square done and a thin line left: the shapes alone tell the two apart where no color is
+// drawn, and a terminal dims the line so the gauge does not read heavy. The square, not a full block,
+// leaves a gap between stacked bars at line height 1.
 const BAR_DONE = '■'
 const BAR_LEFT = '─'
 const BAR_DONE_COLOR: TextColor = 'cyan'
 const BAR_LEFT_COLOR: TextColor = 'dim'
-// The spinner a running run and a running row turn (joshuafolkken/kit#3452), at the package's own
-// interval (joshuafolkken/kit#3495).
+// The spinner a running run and a running row turn, at the package's own interval.
 const SPINNER_FRAMES = cli_spinners.dots.frames
 const SPINNER_INTERVAL_MS = cli_spinners.dots.interval
 // The color depth from which a terminal draws a 24-bit color, and the escapes that draw one.
@@ -34,10 +33,9 @@ const RGB_COLOR_DEPTH = 24
 const ESC = '\u{1B}'
 const DEFAULT_FOREGROUND = `${ESC}[39m`
 
-// The words the board draws, English whatever the session language (joshuafolkken/kit#3486): one set
-// of words reads the same on every board. The board draws most of what it says as a symbol
-// (joshuafolkken/kit#3444); the words left are the ones a symbol cannot carry, and the legend that
-// names the symbols.
+// The words the board draws, English whatever the session language: one set of words reads the same
+// on every board. The board draws most of what it says as a symbol; the words left are the ones a
+// symbol cannot carry, and the legend that names the symbols.
 const WORDS = {
 	no_run: 'no run',
 	plan: 'plan',
@@ -74,7 +72,7 @@ const WORDS = {
 	park: 'park',
 	note: 'note',
 	found_during: ' (found during {n})',
-	// joshuafolkken/kit#3437: the session a stopped run waits in, and what closing the board leaves.
+	// The session a stopped run waits in, and what closing the board leaves.
 	resume: 'stopped — resume with',
 	keeps_running: 'Closing this screen leaves the run going · reopen with `pnpm josh backlogrun`',
 } as const
@@ -83,7 +81,7 @@ type Words = typeof WORDS
 
 type TextColor = Parameters<typeof styleText>[0]
 
-// A color that does not depend on the terminal's palette (joshuafolkken/kit#3464): `rgb` as the
+// A color that does not depend on the terminal's palette: `rgb` as the
 // `38;2;R;G;B` escape takes it, drawn where the output has 24-bit color, and `named` — the palette's own
 // — where it does not.
 interface Shade {
@@ -94,8 +92,8 @@ interface Shade {
 type Paint = TextColor | Shade
 
 // Every row icon is an emoji a terminal draws two columns wide by default (Emoji_Presentation), so the
-// number after it lines up whichever state a row is in (joshuafolkken/kit#3444): 🅿 and ☑ are text
-// symbols a terminal such as VSCode's draws one column wide, which shifted a parked or finished row.
+// number after it lines up whichever state a row is in: 🅿 and ☑ are text symbols a terminal such as
+// VSCode's draws one column wide, which would shift a parked or finished row.
 const STATE_ICONS: Readonly<Record<ItemState, string>> = {
 	running: '🔄',
 	merged: '✅',
@@ -109,9 +107,9 @@ const STATE_ICONS: Readonly<Record<ItemState, string>> = {
 // The blocking edge, chosen on the same rule: ⛓ is a text symbol.
 const WAITS_ICON = '🔗'
 
-// A running row's phases as icons (joshuafolkken/kit#3452), chosen on the same rule; the row draws every
-// phase it has passed, so the rightmost icon is what it is doing now (joshuafolkken/kit#3460). Each of
-// `josh ship`'s stages has its own (joshuafolkken/kit#3526); ⚓ rather than 🔁, which reads as a retry.
+// A running row's phases as icons, chosen on the same rule; the row draws every phase it has passed,
+// so the rightmost icon is what it is doing now. Each of `josh ship`'s stages has its own; ⚓ rather
+// than 🔁, which reads as a retry.
 const PHASE_ICONS: Readonly<Record<Phase, string>> = {
 	investigate: '🔍',
 	plan: '📝',
@@ -143,18 +141,18 @@ const PHASE_WORDS: Readonly<Record<Phase, keyof Words>> = {
 	failed: 'failed',
 }
 
-// The findings section's rule and each note kind's lead (joshuafolkken/kit#3478), chosen on the same
-// rule and apart from every phase and state icon, so the legend names them and a row needs no word. 🆕
-// is a filed issue whose kind is none of `FILED_KIND_ICONS`.
+// The findings section's rule and each note kind's lead, chosen on the same rule and apart from every
+// phase and state icon, so the legend names them and a row needs no word. 🆕 is a filed issue whose
+// kind is none of `FILED_KIND_ICONS`.
 const NOTES_ICON = '📌'
 const NOTE_ICONS: Readonly<Record<BoardNote['kind'], string>> = {
 	filed: '🆕',
 	park: STATE_ICONS.parked,
 	note: '💬',
 }
-// A filed issue's line leads with its kind in place of 🆕 (joshuafolkken/kit#3494): inside the 📌
-// section a line is already read as a filing, so 🆕 beside the kind would only widen it. 🧨 rather
-// than 💥, which a failed ship draws (joshuafolkken/kit#3526).
+// A filed issue's line leads with its kind in place of 🆕: inside the 📌 section a line is already
+// read as a filing, so 🆕 beside the kind would only widen it. 🧨 rather than 💥, which a failed ship
+// draws.
 const FILED_KIND_ICONS: Readonly<Record<FiledKind, string>> = {
 	'breaking-change': '🧨',
 	bug: '🐛',
@@ -169,8 +167,8 @@ const KIND_WORDS: Readonly<Record<FiledKind, keyof Words>> = {
 	bug: 'fix',
 }
 
-// The header's gauges and marks (joshuafolkken/kit#3450). ⚡ rather than 🔥 (joshuafolkken/kit#3452):
-// a fire beside a gauge drawn green read as an alarm.
+// The header's gauges and marks. ⚡ rather than 🔥: a fire beside a gauge drawn green reads as an
+// alarm.
 const HEADER_ICONS = {
 	cpu: '⚡',
 	memory: '🧠',
@@ -179,9 +177,9 @@ const HEADER_ICONS = {
 	loading: '⏳',
 } as const
 
-// **The machine gauges' three colors, decided here alone** (joshuafolkken/kit#3464): Activity Monitor's
-// green, yellow and red in the system's dark-mode values. A palette's `green` drew blue and its `red`
-// orange in a VSCode terminal, so the normal gauge read as the cyan plan bar and the busy one as yellow.
+// **The machine gauges' three colors, decided here alone**: Activity Monitor's green, yellow and red
+// in the system's dark-mode values. A palette's `green` draws blue and its `red` orange in a VSCode
+// terminal, so the normal gauge would read as the cyan plan bar and the busy one as yellow.
 const GAUGE_SHADES = {
 	normal: { rgb: '48;209;88', named: 'green' },
 	yellow: { rgb: '255;214;10', named: 'yellow' },
@@ -202,7 +200,7 @@ function clock_of(ms: number): string {
 }
 
 // The local wall-clock `HH:MM` of a moment, for one a person reads to the minute — when a run ended, or
-// when a finding was filed (joshuafolkken/kit#3489).
+// when a finding was filed.
 function minute_of(ms: number): string {
 	const date = new Date(ms)
 
@@ -250,8 +248,8 @@ function painted(color: Paint | undefined, text: string): string {
 }
 
 // **The one progress bar the board draws** — the header's plan, the machine and every running row's
-// phase (joshuafolkken/kit#3444): `done` of `total` filled in proportion across `width` cells, the done
-// part in `color` (`undefined` leaves it the terminal's own).
+// phase: `done` of `total` filled in proportion across `width` cells, the done part in `color`
+// (`undefined` leaves it the terminal's own).
 function bar_of(
 	done: number,
 	total: number,

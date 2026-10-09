@@ -18,10 +18,10 @@ import type { BoardPorts } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
 import { run_board_usage_read } from './run-board-usage-read'
 
-// `josh run:board` — a full-screen board of the running `backlogrun` (joshuafolkken/kit#3430), redrawn
-// once a second, its spinners turned between redraws, for a person to keep open beside the run. What one redraw reads, and how often each read
-// is taken, is `run-board-tick.ts`'s; this file wires the live reads and the terminal around it. A run
-// that ended stays on screen until the next one starts (joshuafolkken/kit#3439); with no run in this
+// `josh run:board` — a full-screen board of the running `backlogrun`, redrawn once a second, its
+// spinners turned between redraws, for a person to keep open beside the run. What one redraw reads,
+// and how often each read is taken, is `run-board-tick.ts`'s; this file wires the live reads and the
+// terminal around it. A run that ended stays on screen until the next one starts; with no run in this
 // checkout it reads nothing from GitHub and waits.
 
 const ARGV_OFFSET = 2
@@ -57,7 +57,7 @@ const LIVE_PORTS: BoardPorts = {
 	// No fallback: a terminal that opens no link, or a pipe, gets the bare number rather than a URL.
 	link: (text, url) => terminalLink(text, url, { fallback: false }),
 	is_tty: process.stdout.isTTY,
-	// Read on every redraw, so a resized pane is fitted on the next one (joshuafolkken/kit#3486).
+	// Read on every redraw, so a resized pane is fitted on the next one.
 	size: () => ({ rows: process.stdout.rows, columns: process.stdout.columns }),
 	form: 'screen',
 	mark: async () => {
@@ -73,10 +73,9 @@ const LIVE_PORTS: BoardPorts = {
 }
 
 // Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
-// ends on the line that says closing the screen leaves the run going (joshuafolkken/kit#3437) — only a
-// screen a person can close says it, and it is the first line to give way to a short pane
-// (joshuafolkken/kit#3505). Nothing follows the last line, so a frame that fills the pane never scrolls
-// the header off the top (joshuafolkken/kit#3486).
+// ends on the line that says closing the screen leaves the run going — only a screen a person can
+// close says it, and it is the first line to give way to a short pane. Nothing follows the last line,
+// so a frame that fills the pane never scrolls the header off the top.
 function framed(ports: BoardPorts, screen: Screen): BoardPorts {
 	return {
 		...ports,
@@ -99,12 +98,11 @@ function leaver(ports: BoardPorts, screen: Screen): () => void {
 	}
 }
 
-// A frame on the second, its spinners turned until the next (joshuafolkken/kit#3495): the turns are
+// A frame on the second, its spinners turned until the next: the turns are
 // written past the frame's own control bytes, each to its spot on the screen the frame drew.
 async function redraw_forever(ports: BoardPorts, screen: Screen): Promise<void> {
 	const drawn = framed(ports, screen)
-	// The plan is read in the background, so the first frame is drawn without waiting on GitHub
-	// (joshuafolkken/kit#3455).
+	// The plan is read in the background, so the first frame is drawn without waiting on GitHub.
 	let state = await tick(FRESH_STATE, drawn, 'background')
 
 	for (;;) {
@@ -131,8 +129,8 @@ async function watch(ports: BoardPorts): Promise<void> {
 	}
 }
 
-// The answer to a progress question asked during a `backlogrun` (joshuafolkken/kit#3456): one frame in
-// the chat's form, recorded as the report it is, so the next scheduled one waits a full interval — as
+// The answer to a progress question asked during a `backlogrun`: one frame in the chat's form,
+// recorded as the report it is, so the next scheduled one waits a full interval — as
 // `run:progress --once` does.
 async function answer(ports: BoardPorts): Promise<void> {
 	const { text } = await run_board_every.chat_frame(ports)
@@ -147,7 +145,7 @@ function refuse(): number {
 	return FAILURE_EXIT_CODE
 }
 
-// `--every <minutes>` (joshuafolkken/kit#3569): the chat frame pushed off-screen each interval until the
+// `--every <minutes>`: the chat frame pushed off-screen each interval until the
 // run ends — started only because a person asked, so the heartbeat's no-Telegram rule is untouched.
 async function push_every(minutes: string | undefined, ports: BoardPorts): Promise<number> {
 	const interval = run_progress.minutes_from(minutes)
@@ -175,7 +173,7 @@ async function draw(flag: string, ports: BoardPorts): Promise<void> {
 	const mode = run_board_screen.mode_of({ is_tty: ports.is_tty, is_once: flag === ONCE_FLAG })
 
 	// One plain frame stays on the terminal after the command, so it draws the still icons rather than a
-	// spinner frame frozen mid-turn (joshuafolkken/kit#3452).
+	// spinner frame frozen mid-turn.
 	const once_ports = { ...ports, is_tty: false, size: undefined }
 
 	await (mode === 'live' ? watch(ports) : tick(FRESH_STATE, once_ports))

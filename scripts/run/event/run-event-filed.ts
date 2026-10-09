@@ -6,12 +6,12 @@ import {
 	has_label_name,
 } from '#scripts/issue/issue-labels'
 
-// The text of a `filed` event (joshuafolkken/kit#3430): the Issue a run filed, its kind, its title, and
-// the child whose work turned it up. `issue:file` writes it and `run:board` reads it back, both through
-// this module, so the two never spell it differently.
+// The text of a `filed` event: the Issue a run filed, its kind, its title, and the child whose work
+// turned it up. `issue:file` writes it and `run:board` reads it back, both through this module, so the
+// two never spell it differently.
 
-// The classification labels a filing's kind is read from, in precedence order (joshuafolkken/kit#3494):
-// a breaking change is named as one whatever else it is.
+// The classification labels a filing's kind is read from, in precedence order: a breaking change is
+// named as one whatever else it is.
 const KINDS = [BREAKING_CHANGE_LABEL, BUG_LABEL, ENHANCEMENT_LABEL] as const
 
 type FiledKind = (typeof KINDS)[number]

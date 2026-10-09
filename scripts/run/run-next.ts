@@ -1,12 +1,11 @@
 import type { PrepParts } from './run-prep'
 import { run_step, type PreVerdict } from './run-step'
 
-// `josh run:next <N>` — the next step a `fullrun` takes, printed from the run's state
-// (joshuafolkken/kit#2188). It is the foundation the epic #2166 rests on: the entry read is trimmed by
-// replacing prose that a reader has to interpret with a command that answers "what now" from the same
-// state `run:prep` already gathered, so the answer is computed rather than judged.
+// `josh run:next <N>` — the next step a `fullrun` takes, printed from the run's state.
+// It replaces prose that a reader has to interpret with a command that answers "what now" from the
+// same state `run:prep` already gathered, so the answer is computed rather than judged.
 //
-// **It is now the degenerate form of `run:step`** (joshuafolkken/kit#2248). `run:step` computes a run's
+// **It is the degenerate form of `run:step`.** `run:step` computes a run's
 // position from the event stream, the carry record and the issue state; a `fullrun` with nothing emitted
 // yet is at its pre-implementation position, which is exactly what this prints. The state → step mapping
 // lives once, in `run-step.ts`'s `pre_verdict`, and this maps each verdict to the prose sentence a

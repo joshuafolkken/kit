@@ -19,8 +19,8 @@ import { run_carry_conversation } from './run-carry-conversation'
 import { run_carry_ended } from './run-carry-ended'
 import { run_carry_stash } from './run-carry-stash'
 
-// `josh run:carry` — the record that carries one invocation's budget across its own session cuts
-// (joshuafolkken/kit#1714). A `backlogrun` begins it, counts a merge and a filing into it, marks each
+// `josh run:carry` — the record that carries one invocation's budget across its own session cuts.
+// A `backlogrun` begins it, counts a merge and a filing into it, marks each
 // cut, and ends it; a session that resumes after a cut reads the same budget back rather than
 // starting a new one. **Turning `argv` into a request is `run-carry-args.ts`'s**; what is here acts
 // on the record and prints.
@@ -45,12 +45,11 @@ const MISMATCH_VERDICT = 'mismatch'
 const BUSY_VERDICT = 'busy'
 const STANDING_VERDICT = 'standing'
 const UNKNOWN_VERDICT = 'unknown'
-// The invocation has taken its maximum cuts (joshuafolkken/kit#2346). A benign, non-failing refusal:
+// The invocation has taken its maximum cuts. A benign, non-failing refusal:
 // the run carries on uncut rather than paying a cold preamble the accumulation it would shed no longer
 // covers, exactly as an under-threshold pre-gate cut carries on to the gate.
 const CAPPED_VERDICT = 'capped'
-// The asking session is over the shared context-cut threshold, so nothing was claimed
-// (joshuafolkken/kit#2760).
+// The asking session is over the shared context-cut threshold, so nothing was claimed.
 const OVER_VERDICT = 'over'
 const NO_CUTS = 0
 
@@ -70,9 +69,8 @@ function report(
 	// **`remaining` rides along with the record rather than behind a flag of its own.** `--json` is
 	// already the one answer a resumed session reads back in full, and the question it has to answer
 	// there — which of a `backlogrun`'s named issues are still outstanding — is determined by two fields
-	// of the record it is already printing (joshuafolkken/kit#1774, folded in by joshuafolkken/kit#1984).
-	// A budget-only `backlogrun` names no issues, so the value is `undefined` and `JSON.stringify` drops
-	// the key entirely.
+	// of the record it is already printing. A budget-only `backlogrun` names no issues, so the value is
+	// `undefined` and `JSON.stringify` drops the key entirely.
 	console.info(
 		is_json
 			? JSON.stringify({ verdict, carry, remaining: run_carry.remaining_of(carry) })
@@ -183,8 +181,7 @@ function start_fresh(
 
 // **The bound ends *that* run, so a spent record whose owner is still running is not replaced
 // either.** Replacing it would delete a live parent's budget and answer `began` — two parents on one
-// record, which is the half of the defect the expiry path would otherwise have kept. Only that run,
-// or a person who knows it is over, ends it.
+// record. Only that run, or a person who knows it is over, ends it.
 function begin_over_expired(
 	target: string,
 	carry: RunCarry,
@@ -207,7 +204,7 @@ function begin_over_expired(
 
 // **A live record is never replaced, and never resumed into by something else.** Replacing one would
 // restart the budget the cut exists to carry, and resuming into one would put two parents on a single
-// budget — the two halves of the defect this command was written for. An expired one is replaced,
+// budget. An expired one is replaced,
 // because its run has spent the whole-run bound and a person typing the keyword again is starting a
 // new run — unless its owner is still running, which is the case above.
 function begin(target: string, request: CarryClaimRequest, is_json: boolean): number {
@@ -243,10 +240,9 @@ function adopt(target: string, request: CarryClaimRequest, is_json: boolean): nu
 	return report_claim(target, read.carry, request, is_json)
 }
 
-// **A session already over the shared cut threshold claims nothing** (joshuafolkken/kit#2760). A claim
-// assumed the asking session was fresh, so a `backlogrun` parent that had taken its cut at 233k could
-// retype the keyword in the same conversation and be answered `resumed` by its own hand-off — measured
-// twice, at 232k and 258k. The verdict is `pnpm josh cost --cut`'s, so no second threshold exists; only a
+// **A session already over the shared cut threshold claims nothing**: a `backlogrun` parent that has
+// taken its cut could otherwise retype the keyword in the same conversation and be answered `resumed`
+// by its own hand-off. The verdict is `pnpm josh cost --cut`'s, so no second threshold exists; only a
 // measured `over` refuses, because a provider with no transcript cannot be priced at all.
 function report_over(is_json: boolean): number {
 	console.error(
@@ -263,7 +259,7 @@ function claim_record(target: string, request: CarryClaimRequest, is_json: boole
 }
 
 // The record is no longer this session's to advance — handed off at a cut, or taken over by a live
-// successor. It is a refusal exit, said without applying the change (joshuafolkken/kit#1935).
+// successor. It is a refusal exit, said without applying the change.
 function report_count_refused(carry: RunCarry, is_json: boolean): number {
 	console.error(run_carry.count_refused_message(carry))
 
@@ -271,9 +267,8 @@ function report_count_refused(carry: RunCarry, is_json: boolean): number {
 }
 
 // The retrospective's result on the run's event stream, so a run that filed zero improvements reads
-// apart from one whose retrospective never ran (joshuafolkken/kit#2342). It rides the `--retrospective`
-// mark rather than a call of its own, so closing the retrospective and recording what it found are one
-// action; the emit is best-effort, the same contract every other append on this stream keeps, and it
+// apart from one whose retrospective never ran. It rides the `--retrospective` mark rather than a call
+// of its own, so closing the retrospective and recording what it found are one action; the emit is best-effort, the same contract every other append on this stream keeps, and it
 // happens only after the mark applied — a refused count records nothing.
 async function record_retrospective(request: CountRequest): Promise<void> {
 	if (request.summary === undefined) return
@@ -281,7 +276,7 @@ async function record_retrospective(request: CountRequest): Promise<void> {
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.RETROSPECTIVE, request.summary)
 }
 
-// A cut count is the one increment with a ceiling (joshuafolkken/kit#2346); a merge or a filing has
+// A cut count is the one increment with a ceiling; a merge or a filing has
 // none. `--cut` sets `cuts` to one, so a positive count is what marks this count a cut.
 function is_cut_count(request: CountRequest): boolean {
 	return (request.change.cuts ?? NO_CUTS) > NO_CUTS
@@ -298,9 +293,8 @@ function report_cut_capped(carry: RunCarry, is_json: boolean): number {
 }
 
 // The refusals read before a count is applied: a record this session no longer owns (handed off or
-// taken over) keeps the single writer joshuafolkken/kit#1722 established across a cut, and a cut past
-// the cap carries on uncut (joshuafolkken/kit#2346). `undefined` when neither applies, so the count
-// lands.
+// taken over) keeps a single writer across a cut, and a cut past the cap carries on uncut. `undefined`
+// when neither applies, so the count lands.
 function blocked_count(
 	carry: RunCarry,
 	request: CountRequest,
@@ -318,7 +312,7 @@ function blocked_count(
 // A count against a record that is not there is `none` and exits non-zero: the loop believed it was
 // carrying a budget and it was not, and a silent zero would let the run keep its own tally instead. A
 // count against a record this session no longer owns is refused, and a cut past the cap carries on
-// uncut, both before the change is applied (joshuafolkken/kit#1935, joshuafolkken/kit#2346).
+// uncut, both before the change is applied.
 async function count(
 	target: string,
 	read: CarryRead,
@@ -343,14 +337,11 @@ async function count(
 		: report_carry(COUNTED_VERDICT, carry, is_json)
 }
 
-// **A stop over a record that is still there pushes one ⏸️ confirmation before the record goes**
-// (joshuafolkken/kit#2136). `plan` is read from the record `--end` is about to remove, so the second
-// `--end` reads `none` and plans nothing — one stop never notifies twice. A clean `--end` passes no
-// reason and stays silent, because a completed run has its own notification. The closed-issue stash
-// report (joshuafolkken/kit#2505, `run-carry-stash.ts`) is once per invocation on the same read.
-//
-// **No ledger flush rides it any more** (joshuafolkken/kit#2919): each lane merges its own ledger
-// lines with its own pull request, so there is nothing left in the primary checkout to flush.
+// **A stop over a record that is still there pushes one ⏸️ confirmation before the record goes**.
+// `plan` is read from the record `--end` is about to remove, so the second `--end` reads `none` and
+// plans nothing — one stop never notifies twice. A clean `--end` passes no reason and stays silent,
+// because a completed run has its own notification. The closed-issue stash report
+// (`run-carry-stash.ts`) is once per invocation on the same read.
 async function report_end(read: CarryRead): Promise<void> {
 	if (read.kind === 'none') return
 
@@ -368,8 +359,7 @@ function keep_ended(directory: string, read: CarryRead, stopped: string | undefi
 }
 
 // The record goes, and the run it held stays readable as the last ended run, so `run:board` keeps the
-// finished run on screen until the next one begins (joshuafolkken/kit#3439) — a stopped one with the
-// session to resume it from (joshuafolkken/kit#3437).
+// finished run on screen until the next one begins — a stopped one with the session to resume it from.
 function close_record(directory: string, stopped: string | undefined): CarryRead {
 	const target = run_carry.carry_path(directory)
 	const read = run_carry.read_carry(target)
@@ -380,7 +370,7 @@ function close_record(directory: string, stopped: string | undefined): CarryRead
 	return read
 }
 
-// The merges the run ended with are recorded while its record can still count them (joshuafolkken/kit#3451).
+// The merges the run ended with are recorded while its record can still count them.
 async function finish(
 	directory: string,
 	stopped: string | undefined,
