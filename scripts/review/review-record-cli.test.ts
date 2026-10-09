@@ -4,6 +4,7 @@ import path from 'node:path'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { afterAll, describe, expect, it, vi } from 'vitest'
+import { review_finding_ledger } from './review-finding-ledger'
 import { review_record_cli } from './review-record-cli'
 
 vi.mock('#scripts/observations/observation-ledger-home', async (original) => {
@@ -107,6 +108,43 @@ describe('review_record_cli.run', () => {
 
 		expect(code).toBe(1)
 		expect(existsSync(root)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#3422: a refused spec printed only the usage line, so the reader grepped for the
+// category and severity vocabulary. The refusal now names it, built from the ledger's constants.
+async function refusal_of(argv: ReadonlyArray<string>): Promise<string> {
+	const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+	await review_record_cli.run(argv, NOW, root_of('refused'))
+	const printed = error.mock.calls.flat().join('\n')
+
+	error.mockRestore()
+
+	return printed
+}
+
+describe('review_record_cli.run — a refused spec names the accepted values', () => {
+	it.each(review_finding_ledger.CATEGORIES)('names the category %s', async (category) => {
+		expect(await refusal_of(['--issue', '3422', 'bug:low:package.json'])).toContain(category)
+	})
+
+	it.each(review_finding_ledger.SEVERITIES)('names the severity %s', async (severity) => {
+		expect(await refusal_of(['--issue', '3422', 'bug-risks:minor:a.ts'])).toContain(severity)
+	})
+
+	it('names the accepted values on an unknown flag too', async () => {
+		expect(await refusal_of(['--bogus'])).toBe(review_record_cli.usage_text())
+	})
+
+	it('builds the accepted-values line from the list it is given', () => {
+		expect(review_record_cli.accepted_values('<x>', ['one', 'two'])).toBe('  <x>: one | two')
+	})
+
+	it('keeps the --check usage short', async () => {
+		const printed = await refusal_of(['--check'])
+
+		expect(printed).not.toContain(review_finding_ledger.CATEGORIES[0])
 	})
 })
 
