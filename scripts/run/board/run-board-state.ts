@@ -8,6 +8,7 @@ import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
 import type { MachineGauges, MachineMark } from './run-board-machine'
 import type { LocalRead } from './run-board-read'
+import type { Spot } from './run-board-spin'
 
 // What a `run:board` redraw reads through and folds forward (joshuafolkken/kit#3430), shared by the
 // redraw (`run-board-tick.ts`) and its GitHub reads (`run-board-github.ts`).
@@ -65,6 +66,8 @@ interface BoardState {
 	gauges: MachineGauges | undefined
 	// The redraw the last sample was taken on, which the next sample is due a second after.
 	sampled_ms: number | undefined
+	// Where the last frame drew its spinners, turned between redraws (joshuafolkken/kit#3495).
+	spots: ReadonlyArray<Spot>
 }
 
 const FRESH_STATE: BoardState = {
@@ -84,6 +87,7 @@ const FRESH_STATE: BoardState = {
 	machine: undefined,
 	gauges: undefined,
 	sampled_ms: undefined,
+	spots: [],
 }
 
 function is_due(last_ms: number | undefined, interval_ms: number, now_ms: number): boolean {

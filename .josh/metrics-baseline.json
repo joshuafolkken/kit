@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1015,
-		"code_lines": 84545,
-		"comment_lines": 33749,
+		"files": 1016,
+		"code_lines": 84627,
+		"comment_lines": 33768,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 560565
 	},
 	"accepted": {
-		"reason": "#3504 splits the same-file wave rule into a textual-conflict case (no dependency, lane resolves it) and a same-mechanism case (dependency), merged over #3502's waiting-on-blockers merge path",
+		"reason": "run:board spins its spinners between once-a-second redraws via a new run-board-spin module that records spinner cells and rewrites only them (#3495)",
 		"date": "2026-10-09"
 	}
 }
