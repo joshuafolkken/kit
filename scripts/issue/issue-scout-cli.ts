@@ -15,6 +15,7 @@ import {
 	type ScoutIssue,
 } from './issue-scout'
 import { issue_scout_closed, type ClosedScan } from './issue-scout-closed'
+import { session_cite } from './session-cite'
 
 const { CLOSED_CEILING_LINE, CLOSED_UNREADABLE_LINE, read_recently_closed, warn_about_closed } =
 	issue_scout_closed
@@ -104,13 +105,13 @@ function draft_of(args: ScoutArguments, repo: string): BacklogIssue {
 // below decides from prose references, and a title-only draft has none to give it.
 function format_duplicate(candidate: DuplicateCandidate): string {
 	const score = candidate.is_referenced === true ? 'ref' : candidate.score.toFixed(SCORE_DIGITS)
-	const epic = candidate.epic === undefined ? '' : ` (epic #${String(candidate.epic)})`
+	const epic = candidate.epic === undefined ? '' : ` (epic ${session_cite.issue(candidate.epic)})`
 	// The reader does two different things with the two states, so the row has to say which it is: an
 	// open candidate means somebody is already tracking this, a closed one means it may already be
 	// done — and the second is the exit `issue-comments.md` names, not a second filing.
 	const closed = candidate.is_closed === true ? ' (closed)' : ''
 
-	return `  #${String(candidate.number)}  ${score}  ${candidate.title}${closed}${epic}`
+	return `  ${session_cite.issue(candidate.number)}  ${score}  ${candidate.title}${closed}${epic}`
 }
 
 // Weak matches are not padding for an empty answer: a list nobody trusts is read once and skipped
@@ -147,7 +148,7 @@ const NO_EPIC_LINE = 'Epic: none — file it standalone; nothing open shares a r
 function format_epic(decision: BundleDecision): Array<string> {
 	const lines = [`Epic: ${epic_bundle_cli.ACTION_LINES[decision.action] ?? ''}`]
 
-	if (decision.epic !== undefined) lines.push(`  Target epic: #${String(decision.epic)}`)
+	if (decision.epic !== undefined) lines.push(`  Target epic: ${session_cite.issue(decision.epic)}`)
 
 	if (decision.candidates.length > 0) {
 		lines.push(`  Related: ${epic_bundle_cli.format_numbers(decision.candidates)}`)

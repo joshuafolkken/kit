@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { git_command } from '#scripts/git/git-command'
+import { issue_cite } from '#scripts/issue/issue-cite'
 
 interface CheckResult {
 	success: boolean
@@ -85,11 +86,13 @@ function extract_issue_number(branch_name: string): string | undefined {
 }
 
 function create_error_message(issue_number: string, branch: string, message: string): string {
+	const reference = issue_cite.plain(issue_number)
+
 	return (
-		`🚫 Error: Commit message must include #${issue_number}\n` +
+		`🚫 Error: Commit message must include ${reference}\n` +
 		`   Current branch: ${branch}\n` +
 		`   Commit message: ${message}\n` +
-		`   Please include #${issue_number} in your commit message\n`
+		`   Please include ${reference} in your commit message\n`
 	)
 }
 
@@ -106,7 +109,7 @@ async function check_commit_message(): Promise<CheckResult> {
 
 	const commit_message = await get_commit_message()
 
-	if (!commit_message.includes(`#${issue_number}`)) {
+	if (!commit_message.includes(issue_cite.plain(issue_number))) {
 		return {
 			success: false,
 			message: create_error_message(issue_number, current_branch, commit_message),
@@ -115,7 +118,7 @@ async function check_commit_message(): Promise<CheckResult> {
 
 	return {
 		success: true,
-		message: `✅ Commit message check passed: Found #${issue_number}`,
+		message: `✅ Commit message check passed: Found ${issue_cite.plain(issue_number)}`,
 	}
 }
 

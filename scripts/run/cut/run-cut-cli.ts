@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { git_command } from '#scripts/git/git-command'
+import { issue_cite } from '#scripts/issue/issue-cite'
+import { session_cite } from '#scripts/issue/session-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
@@ -96,7 +98,7 @@ function report_relaunch_failure(target: string, note: string): number {
 
 function report_missing_supervisor(issue: string): number {
 	console.error(
-		`The OpenAI supervisor for #${issue} is not live, so this nested process was not cut and can continue. Re-dispatch the lane to recover the supervisor.`,
+		`The OpenAI supervisor for ${session_cite.issue(issue)} is not live, so this nested process was not cut and can continue. Re-dispatch the lane to recover the supervisor.`,
 	)
 
 	return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
@@ -153,7 +155,7 @@ interface CutRequest {
 async function emit_cut_event(request: CutRequest): Promise<void> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.CUT,
-		`#${request.issue} cut (${request.phase})`,
+		`${issue_cite.plain(request.issue)} cut (${request.phase})`,
 	)
 }
 
@@ -202,7 +204,7 @@ async function finish_cut(target: string, lane: LaneInfo, request: CutRequest): 
 // person is watching, so the run is handed on the way `fullrun`'s entry `over` stop hands it on.
 function report_held_cut(issue: string): number {
 	console.error(
-		`The cut is recorded for #${issue} outside a lane, so nothing was relaunched. Keep the hold, send a \`confirmation\` Telegram whose body names the resume command \`fullrun #${issue}\`, and end the turn; the fresh session's \`pnpm josh run:cut --resume ${issue}\` answers \`resume-impl\` with the handoff.`,
+		`The cut is recorded for ${session_cite.issue(issue)} outside a lane, so nothing was relaunched. Keep the hold, send a \`confirmation\` Telegram whose body names the resume command \`fullrun ${issue_cite.plain(issue)}\`, and end the turn; the fresh session's \`pnpm josh run:cut --resume ${issue}\` answers \`resume-impl\` with the handoff.`,
 	)
 
 	return report(CUT_VERDICT, SUCCESS_EXIT_CODE)
@@ -296,7 +298,10 @@ function announce_handoff(cut_record: RunCut): void {
 async function emit_resume_event(issue: string, verdict: string): Promise<void> {
 	if (verdict !== RESUME_IMPL_VERDICT) return
 
-	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.RESUME, `#${issue} resumed`)
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.RESUME,
+		`${issue_cite.plain(issue)} resumed`,
+	)
 }
 
 async function adopt(target: string, cut_record: RunCut): Promise<number> {

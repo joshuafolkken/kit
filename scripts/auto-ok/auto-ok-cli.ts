@@ -10,6 +10,7 @@ import { cutoff_cause, cutoff_of, type ScanCutoff } from '#scripts/git/listing-c
 import { read_json_listing } from '#scripts/git/parse-json-array'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
 import { AUTO_OK_LABEL } from '#scripts/issue/issue-labels'
+import { session_cite } from '#scripts/issue/session-cite'
 
 // `josh auto-ok:next` — which issue outside the epic an unattended run picks up next
 // (joshuafolkken/kit#906).
@@ -414,7 +415,7 @@ function report(context: PickupContext): number {
 		return SUCCESS_EXIT_CODE
 	}
 
-	console.error(`#${String(next.number)} ${next.title}`)
+	console.error(session_cite.issue(next.number, next.title))
 	console.info(String(next.number))
 
 	return SUCCESS_EXIT_CODE

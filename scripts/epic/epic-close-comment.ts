@@ -1,6 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { rest_comment_schema, type RestCommentData } from '#scripts/git/git-schemas'
 import { read_json_listing } from '#scripts/git/parse-json-array'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { epic_parse, type ExternalChild } from './epic-parse'
 
 // The comment the epic auto-close announces itself with, and how a run recognizes the one a previous
@@ -43,8 +44,8 @@ const MARKER_CLOSE = ' -->'
 // child issues are closed ()" (joshuafolkken/kit#864).
 function child_references(epic: EpicChildren): Array<string> {
 	return [
-		...epic.children.map((child) => `#${String(child)}`),
-		...epic.external_children.map((child) => `${child.repo}#${String(child.number)}`),
+		...epic.children.map((child) => issue_cite.plain(child)),
+		...epic.external_children.map((child) => issue_cite.plain(child.number, child.repo)),
 	]
 }
 

@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_any_label, has_label_name, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { epic_busy, type BusyRead } from './epic-busy'
@@ -55,14 +56,14 @@ function solo_holder(read: BusyRead): number | undefined {
 
 function held_message(holder: number, repo: string): string {
 	return issue_citation.linkify(
-		`#${String(holder)} carries \`${RUN_SOLO_LABEL}\` and is running in ${repo}; nothing else starts until it merges or is parked.`,
+		`${issue_cite.plain(holder)} carries \`${RUN_SOLO_LABEL}\` and is running in ${repo}; nothing else starts until it merges or is parked.`,
 		repo,
 	)
 }
 
 function waiting_message(solo: number, repo: string): string {
 	return issue_citation.linkify(
-		`#${String(solo)} carries \`${RUN_SOLO_LABEL}\` and waits for ${repo}'s running lanes to finish; nothing ranked below it is offered past it.`,
+		`${issue_cite.plain(solo)} carries \`${RUN_SOLO_LABEL}\` and waits for ${repo}'s running lanes to finish; nothing ranked below it is offered past it.`,
 		repo,
 	)
 }

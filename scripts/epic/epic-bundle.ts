@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { epic_audit_logic } from './epic-audit'
 import { epic_graph } from './epic-graph'
 import type { DependencyLink } from './epic-parse'
@@ -120,7 +121,7 @@ const NO_SIGNAL_REASON = 'no existing issue shares a reference or a dependency w
 // and an issue tracked by two epics gives the auto-close two task lists to disagree about
 // (joshuafolkken/kit#943). The decision already carried the number; only this sentence dropped it.
 function already_tracked_reason(epic: number): string {
-	return `#${String(epic)} already tracks this issue`
+	return `${issue_cite.plain(epic)} already tracks this issue`
 }
 
 const SPREAD_REASON =
@@ -132,7 +133,7 @@ function to_numbers(candidates: ReadonlyArray<BacklogIssue>): Array<number> {
 
 function create_decision(subject: BacklogIssue, numbers: ReadonlyArray<number>): BundleDecision {
 	const count = String(numbers.length)
-	const reason = `#${String(subject.number)} and ${count} related issue(s) belong to no epic`
+	const reason = `${issue_cite.plain(subject.number)} and ${count} related issue(s) belong to no epic`
 
 	return { action: 'create_epic', epics: [], candidates: numbers, reason }
 }
@@ -200,7 +201,7 @@ function narrow_to_innermost(
 // reported without narrowing above, so a lone survivor of two or more means the graph was acyclic,
 // and there every dropped epic is a transitive parent of the one left.
 function tracks_reason(epic: number, involved: ReadonlyArray<number>): string {
-	const tracks = `#${String(epic)} already tracks a related issue`
+	const tracks = `${issue_cite.plain(epic)} already tracks a related issue`
 	if (involved.length === 1) return tracks
 
 	return `${tracks}; the other epics the candidates sit in are its own parents`

@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 import { epic_parse } from './epic-parse'
@@ -61,7 +62,7 @@ async function reread_child(child: EpicChild, read_blockers: BlockersReader): Pr
 		const reason = error_text.message_of(error)
 
 		console.warn(
-			`⚠ could not re-read the blockers of #${String(child.number)}: ${reason}\n` +
+			`⚠ could not re-read the blockers of ${session_cite.issue(child.number, undefined, child.repo)}: ${reason}\n` +
 				'  a mismatch reported below may be this read failing rather than a missing relation',
 		)
 

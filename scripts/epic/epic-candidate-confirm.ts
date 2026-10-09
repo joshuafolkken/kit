@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
 import { epic_classify, type ResolveDependency } from './epic-classify'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
@@ -123,7 +124,7 @@ async function read_or_withhold(
 		const reason = error_text.message_of(error)
 
 		console.warn(
-			`⚠ could not confirm the blockers of #${String(candidate.number)}: ${reason}\n` +
+			`⚠ could not confirm the blockers of ${session_cite.issue(candidate.number, undefined, candidate.repo)}: ${reason}\n` +
 				'  it is withheld rather than offered; asking again is what resolves this',
 		)
 
@@ -137,7 +138,7 @@ function warn_withheld(candidate: EpicChild, listed: ReadonlyArray<IssueReferenc
 	const named = listed.map((blocker) => epic_graph.key_of(blocker)).join(', ')
 
 	console.warn(
-		`⚠ #${String(candidate.number)} is withheld: its relations listing names ${named}, ` +
+		`⚠ ${session_cite.issue(candidate.number, undefined, candidate.repo)} is withheld: its relations listing names ${named}, ` +
 			'which the dependency summary it was classified from did not count',
 	)
 }
@@ -161,7 +162,7 @@ function warn_untracked(candidate: EpicChild, untracked: ReadonlyArray<IssueRefe
 	const named = untracked.map((blocker) => epic_graph.key_of(blocker)).join(', ')
 
 	console.warn(
-		`⚠ #${String(candidate.number)} is offered although its relations listing names ${named}: ` +
+		`⚠ ${session_cite.issue(candidate.number, undefined, candidate.repo)} is offered although its relations listing names ${named}: ` +
 			'this epic does not track those, and every one of them is already finished',
 	)
 }

@@ -1,4 +1,5 @@
 import { parseArgs } from 'node:util'
+import { session_cite } from '#scripts/issue/session-cite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const repo_get_name_with_owner_mock = vi.hoisted(() => vi.fn())
@@ -148,7 +149,9 @@ describe('telegram_test.fetch_issue_title', () => {
 
 		expect(result).toBeUndefined()
 		expect(warn_spy).toHaveBeenCalledWith(
-			expect.stringContaining(`${OTHER_REPO_NAME_WITH_OWNER}#${OTHER_REPO_ISSUE_NUMBER}`),
+			expect.stringContaining(
+				session_cite.issue(OTHER_REPO_ISSUE_NUMBER, undefined, OTHER_REPO_NAME_WITH_OWNER),
+			),
 		)
 		warn_spy.mockRestore()
 	})

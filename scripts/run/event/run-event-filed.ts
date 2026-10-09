@@ -1,3 +1,5 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
+
 // The text of a `filed` event (joshuafolkken/kit#3430): the Issue a run filed, its title, and the child
 // whose work turned it up. `issue:file` writes it and `run:board` reads it back, both through this module,
 // so the two never spell it differently.
@@ -13,7 +15,10 @@ interface Filed {
 const TEXT_PATTERN = /^(?<reference>\S*#\d+) (?<title>.*?)(?: \(found during #(?<during>\d+)\))?$/u
 
 function text_of(filed: Filed): string {
-	const suffix = filed.found_during === undefined ? '' : ` (found during #${filed.found_during})`
+	const suffix =
+		filed.found_during === undefined
+			? ''
+			: ` (found during ${issue_cite.plain(filed.found_during)})`
 
 	return `${filed.reference} ${filed.title}${suffix}`
 }

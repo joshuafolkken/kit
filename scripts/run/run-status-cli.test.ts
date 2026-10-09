@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import type { IssueState } from '#scripts/issue/issue-state'
+import { session_cite } from '#scripts/issue/session-cite'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -125,7 +126,7 @@ describe('run_status_cli.run bundles the three reads', () => {
 
 		const out = printed()
 		const expected = [
-			`${run_status.SUMMARY_PREFIX}${ISSUE}`,
+			session_cite.text(`${run_status.SUMMARY_PREFIX}${ISSUE}`),
 			run_status.STATE_HEADER,
 			'labels: in-progress',
 			run_status.COST_HEADER,

@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1014,
-		"code_lines": 84243,
-		"comment_lines": 33684,
+		"files": 1015,
+		"code_lines": 84448,
+		"comment_lines": 33715,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12222,
-		"on_demand_bytes": 558710
+		"on_demand_bytes": 559192
 	},
 	"accepted": {
-		"reason": "issue:file now runs the fold check and the WIP-cap exemption itself (#3423): the new issue-file-fold module and its run-event read replace the deleted issue-fold-rule / wip-cap delivered rules; merged with #3486 run:board header fit and early local rows, #3491 lane-await now/sleep seam and virtual test clock, #3434 lane:limit, #3421 guard-friction and investigation-payback, #3422 accepted-value hints, #3480 run:board legend and #3425 prose_lines reuse",
+		"reason": "josh output prints session-facing Issue references in the issue:cite form through a single session_cite module (#3424); merged with #3423 issue:file fold check and WIP-cap exemption (issue-file-fold module), #3486 run:board header fit and local rows before plan load, #3491 lane-await now/sleep seam, #3434 lane:limit, #3421 guard-friction and investigation-payback, #3422 accepted-value hints, #3480 run:board legend and #3425 prose_lines reuse",
 		"date": "2026-10-09"
 	}
 }

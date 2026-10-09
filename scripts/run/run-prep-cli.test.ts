@@ -1,4 +1,5 @@
 import type { IssueState } from '#scripts/issue/issue-state'
+import { session_cite } from '#scripts/issue/session-cite'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_prep } from './run-prep'
@@ -118,7 +119,7 @@ describe('run_prep_cli.run', () => {
 
 		const out = printed()
 		const expected = [
-			`${run_prep.SUMMARY_PREFIX}${ISSUE}`,
+			session_cite.text(`${run_prep.SUMMARY_PREFIX}${ISSUE}`),
 			'human_review: no',
 			run_prep.CONTENT_HEADER,
 			BLOCK,

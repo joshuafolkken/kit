@@ -1,3 +1,5 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
+
 // An epic Issue tracks its children as a markdown task list (`- [ ] #101`). Only that syntax
 // counts as tracked: GitHub auto-checks such an entry when the referenced Issue closes, whereas a
 // bare `#101` reference produces a cross-link with no progress tracking.
@@ -168,7 +170,7 @@ function parse_external_task_list_children(body: string | undefined): Array<Exte
 	const seen = new Set<string>()
 
 	return found.filter((child) => {
-		const key = `${child.repo}#${String(child.number)}`
+		const key = issue_cite.plain(child.number, child.repo)
 		const is_new = !seen.has(key)
 
 		seen.add(key)

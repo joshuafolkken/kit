@@ -18,6 +18,18 @@ describe('issue_cite.citation_line', () => {
 	})
 })
 
+// joshuafolkken/kit#3424: the single place the bare form is assembled, for text GitHub renders or a
+// program reads.
+describe('issue_cite.plain', () => {
+	it('prints the bare number', () => {
+		expect(issue_cite.plain(Number(NUMBER))).toBe(`#${NUMBER}`)
+	})
+
+	it('qualifies the number with a repository when one is named', () => {
+		expect(issue_cite.plain(NUMBER, OTHER_REPO)).toBe(`${OTHER_REPO}#${NUMBER}`)
+	})
+})
+
 // joshuafolkken/kit#2943: the progress listings name an issue through this, so the form a report copies
 // is decided by what the listing holds, never left as the bare `#N` the Stop guard sends back.
 describe('issue_cite.citer', () => {

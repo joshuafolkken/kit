@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 
 // A blocker no graph in this invocation tracks, weighed rather than ignored (joshuafolkken/kit#1943).
@@ -39,7 +40,7 @@ interface OutsideAnswer {
 const CLOSED = 'CLOSED'
 
 function name_of(child: EpicChild): string {
-	return `#${String(child.number)}`
+	return session_cite.issue(child.number, undefined, child.repo)
 }
 
 // A closed reference as the child record a resolver takes, so a closed blocker in another repository

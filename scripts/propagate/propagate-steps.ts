@@ -1,6 +1,7 @@
 import { pr_classification } from '#scripts/ci/pr-classification'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { OTHER_CHANGE_LABEL } from '#scripts/issue/issue-labels'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { error_text } from '#scripts/lib/error-message'
@@ -335,7 +336,7 @@ function pull_request_step(
 ): StepResult {
 	const number = issue_numbers.get(target.repo)
 	if (number === undefined) return { step, is_ok: false, detail: 'no issue number' }
-	const argument = `${plan_title(plan.releases)} #${number}`
+	const argument = `${plan_title(plan.releases)} ${issue_cite.plain(number)}`
 	const outcome = spawn_captured(target, step, ['pnpm', 'josh', 'git', '-y', argument])
 	if (outcome.result.is_ok) return outcome.result
 

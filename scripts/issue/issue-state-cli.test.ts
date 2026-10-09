@@ -9,6 +9,7 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 }))
 
 const { issue_state_cli } = await import('./issue-state-cli')
+const { session_cite } = await import('./session-cite')
 
 const SUCCESS = 0
 const FAILURE = 1
@@ -204,7 +205,9 @@ describe('issue_state_cli.run — a number that produced no state among several'
 
 		expect(await issue_state_cli.run([ISSUE, OTHER_ISSUE])).toBe(FAILURE)
 		expect(info_mock).toHaveBeenCalledWith(expect.stringContaining(`issue: ${OTHER_ISSUE}`))
-		expect(error_mock).toHaveBeenCalledWith(expect.stringContaining(`#${ISSUE} does not resolve`))
+		expect(error_mock).toHaveBeenCalledWith(
+			expect.stringContaining(`${session_cite.issue(ISSUE)} does not resolve`),
+		)
 	})
 
 	// The two failure kinds stay apart in a batch: a gap is retried, an answer about the number is not.
@@ -215,7 +218,7 @@ describe('issue_state_cli.run — a number that produced no state among several'
 
 		expect(await issue_state_cli.run([ISSUE, OTHER_ISSUE])).toBe(FAILURE)
 		expect(error_mock).toHaveBeenCalledWith(
-			expect.stringContaining(`could not read issue #${ISSUE}`),
+			expect.stringContaining(`could not read issue ${session_cite.issue(ISSUE)}`),
 		)
 	})
 })

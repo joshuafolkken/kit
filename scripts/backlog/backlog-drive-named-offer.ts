@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { EPIC_LABEL, has_label_name, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
@@ -70,7 +71,7 @@ async function classify(issue: string, named: OfferRead, owner: string): Promise
 	}
 
 	if (has_label_name(result.state.labels, EPIC_LABEL)) {
-		return { verdict: `epic #${issue}`, issues: [], retries: NO_RETRIES }
+		return { verdict: `epic ${issue_cite.plain(issue)}`, issues: [], retries: NO_RETRIES }
 	}
 
 	return named
@@ -103,7 +104,7 @@ async function only_end(carry: RunCarry, named: OfferRead): Promise<OfferRead> {
 
 	if (unmerged.length === 0) return named
 
-	const listed = unmerged.map((issue) => `#${String(issue)}`).join(', ')
+	const listed = unmerged.map((issue) => issue_cite.plain(issue)).join(', ')
 
 	return { ...named, reason: `only: ${listed} ended without a merge`, is_finish: false }
 }

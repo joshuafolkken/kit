@@ -1,6 +1,7 @@
 import type { BusyRead } from '#scripts/epic/epic-busy'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import { session_cite } from '#scripts/issue/session-cite'
 import { describe, expect, it } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_rank } from './backlog-rank'
@@ -77,7 +78,7 @@ describe('backlog_restructure.separate', () => {
 		expect(numbers(selection.offered)).toStrictEqual([FIRST, THIRD])
 		expect(numbers(selection.withheld)).toStrictEqual([SECOND])
 		expect(selection.notice).toBe(
-			`#${String(SECOND)} waits: it and #${String(FIRST)} both restructure \`${MOVED}\`.`,
+			`${session_cite.issue(SECOND)} waits: it and ${session_cite.issue(FIRST)} both restructure \`${MOVED}\`.`,
 		)
 	})
 

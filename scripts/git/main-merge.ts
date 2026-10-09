@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { extract_issue_number } from '#scripts/hooks/check-commit-message'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
 import { error_text } from '#scripts/lib/error-message'
 import { git_command } from './git-command'
@@ -41,7 +42,7 @@ function merge_message(default_branch: string, current_branch: string): string |
 
 	if (issue_number === undefined) return undefined
 
-	return `Merge ${default_branch} into ${current_branch} #${issue_number}`
+	return `Merge ${default_branch} into ${current_branch} ${issue_cite.plain(issue_number)}`
 }
 
 // What one merge of the default branch came to (joshuafolkken/kit#3221). `josh ship` merges it again

@@ -1,5 +1,6 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { issue_cite, type IssueCiter } from '#scripts/issue/issue-cite'
+import { session_cite } from '#scripts/issue/session-cite'
 import { run_liveness } from '#scripts/run/run-liveness'
 import type { LaneInfo } from './lane-registry'
 
@@ -84,7 +85,7 @@ function describe_ports(lane: LaneInfo): string {
 // The one-line confirmation a person reads on standard error while standard output carries the
 // directory alone, so `dir=$(pnpm josh lane:open 1490)` stays usable.
 function describe_opened(lane: LaneInfo): string {
-	return `Opened a lane for #${lane.issue} on ${lane.branch}: ${describe_ports(lane)}.`
+	return `Opened a lane for ${session_cite.issue(lane.issue)} on ${lane.branch}: ${describe_ports(lane)}.`
 }
 
 const lane_report = {

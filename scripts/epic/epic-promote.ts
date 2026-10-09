@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { epic_body } from './epic-body'
 import { epic_parse } from './epic-parse'
 
@@ -33,7 +34,7 @@ function has_conflicting_tracking(body: string | undefined): boolean {
 function conflict_reason(body: string | undefined): string {
 	if (body?.includes(PROMOTED_HEADING) === true) return 'it already carries the epic sections'
 	const tracked = epic_parse.parse_task_list_issue_numbers(body)
-	const list = tracked.map((child) => `#${String(child)}`).join(', ')
+	const list = tracked.map((child) => session_cite.issue(child)).join(', ')
 
 	return `its body already tracks ${list} as a task list, which would become a second child list`
 }

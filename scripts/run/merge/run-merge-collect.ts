@@ -1,6 +1,7 @@
 import { backlog_drive_restore } from '#scripts/backlog/backlog-drive-restore'
 import { issue_merged } from '#scripts/issue/issue-merged'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
+import { session_cite } from '#scripts/issue/session-cite'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/run-carry'
@@ -65,7 +66,9 @@ async function collect_all(lanes: ReadonlyArray<LaneInfo>, owner: CarryOwner): P
 			// eslint-disable-next-line no-await-in-loop -- a close prunes the worktree list the next one reads
 			await collect_lane(lane, owner)
 		} catch (error) {
-			console.error(`run:carry: lane #${lane.issue} was not collected: ${String(error)}`)
+			console.error(
+				`run:carry: lane ${session_cite.issue(lane.issue)} was not collected: ${String(error)}`,
+			)
 		}
 	}
 }

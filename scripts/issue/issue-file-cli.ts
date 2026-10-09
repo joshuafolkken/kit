@@ -15,6 +15,7 @@ import { run_event_filed } from '#scripts/run/event/run-event-filed'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { issue_auto_ok } from './issue-auto-ok'
+import { issue_cite } from './issue-cite'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_lint_cli } from './issue-lint-cli'
@@ -222,7 +223,10 @@ async function place(url: string, target: string): Promise<void> {
 // out by the board's own scope to the invocation; the append is best-effort, as every emit is.
 async function record(url: string, filing: Filing): Promise<void> {
 	const number = String(issue_number_of(url))
-	const reference = `${issue_file_fold.reference_prefix(filing.target, filing.current)}#${number}`
+	const reference = issue_cite.plain(
+		number,
+		issue_file_fold.reference_prefix(filing.target, filing.current),
+	)
 	const found_during = await issue_file_fold.finder()
 	const text = run_event_filed.text_of({ reference, title: filing.args.title, found_during })
 

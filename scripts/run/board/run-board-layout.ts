@@ -2,6 +2,7 @@ import { backlog_plan, type PlanContext } from '#scripts/backlog/backlog-plan'
 import type { WavePlan } from '#scripts/backlog/backlog-waves'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { IssueReference } from '#scripts/epic/epic-reference'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_label_name, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import type { ItemState, ItemStatus } from './run-board-status'
 
@@ -66,7 +67,7 @@ function is_waiting_on(edge: IssueReference, overlay: Overlay): boolean {
 }
 
 function reference_of(edge: IssueReference, repo: string): string {
-	return edge.repo === repo ? String(edge.number) : `${edge.repo}#${String(edge.number)}`
+	return edge.repo === repo ? String(edge.number) : issue_cite.plain(edge.number, edge.repo)
 }
 
 function plan_row(child: EpicChild, state: ItemState, overlay: Overlay): BoardRow {

@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
 import { run_event_stream, type RunEvent } from './run-event-stream'
 
@@ -108,7 +109,9 @@ const BATCH_RECORD_KINDS: ReadonlySet<string> = new Set([
 const ISSUE_REFERENCE = /#(\d+)/u
 
 function is_foreign_ship_event(event: RunEvent, issue: string): boolean {
-	return SHIP_POSITION_KINDS.has(event.kind) && !event.text.startsWith(`#${issue} `)
+	return (
+		SHIP_POSITION_KINDS.has(event.kind) && !event.text.startsWith(`${issue_cite.plain(issue)} `)
+	)
 }
 
 function is_own_ship_event(event: RunEvent, issue: string): boolean {

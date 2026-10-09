@@ -1,5 +1,6 @@
 import { git_gh_pr_read } from '#scripts/gh/git-gh-pr-read'
 import { git_command } from '#scripts/git/git-command'
+import { session_cite } from '#scripts/issue/session-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { z } from 'zod'
@@ -170,7 +171,7 @@ function reclaim_steps(tree: TreeState, issue: string): Array<string> {
 
 	return [
 		`git stash push -u -m "${STASH_LABEL_PREFIX}${issue}"`,
-		`Record the stash on #${issue} — the comment is what gets it popped; nothing pops it for you.`,
+		`Record the stash on ${session_cite.issue(issue)} — the comment is what gets it popped; nothing pops it for you.`,
 	]
 }
 

@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import {
 	ALREADY_DONE_LABEL,
 	EPIC_LABEL,
@@ -185,7 +186,7 @@ function park_comment(reason: ParkReason): string {
 		`- Why: ${reason.cause}`,
 		'- Read: the issue is OPEN, carries none of `needs-decision`, `already-done`, `needs-human-review` or `epic`, and no merged pull request’s `closes #N` names it.',
 		streak_line(reason.carry),
-		`- Next: read the child’s transcript${transcript}, then either resume it with \`fullrun #${reason.child}\`, or record the decision here and remove \`needs-decision\`.`,
+		`- Next: read the child’s transcript${transcript}, then either resume it with \`fullrun ${issue_cite.plain(reason.child)}\`, or record the decision here and remove \`needs-decision\`.`,
 	].join('\n')
 }
 

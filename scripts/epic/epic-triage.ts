@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_label_name, RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import type { EpicChild } from './epic-graph'
@@ -37,7 +38,7 @@ function untriaged(children: ReadonlyArray<EpicChild>): ReadonlyArray<EpicChild>
 
 // Names every untriaged number, so the parent reading standard error knows which issues to judge.
 function message(children: ReadonlyArray<EpicChild>, repo: string): string {
-	const numbers = children.map((child) => `#${String(child.number)}`).join(', ')
+	const numbers = children.map((child) => issue_cite.plain(child.number)).join(', ')
 
 	return issue_citation.linkify(
 		`Untriaged: ${numbers} carry neither \`${RUN_SOLO_LABEL}\` nor \`${RUN_LANE_LABEL}\` in ${repo}, so nothing is offered until each is judged. Read each one, record its blocked-by order and one of the two labels with a comment saying why, then ask again.`,

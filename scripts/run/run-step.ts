@@ -1,4 +1,5 @@
 import { git_stash } from '#scripts/git/stash/git-stash'
+import { session_cite } from '#scripts/issue/session-cite'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
@@ -278,7 +279,7 @@ function closed_action(input: StepInput): StepAction {
 
 	return {
 		kind: 'decide',
-		line: `decide: #${input.issue_number} is closed but this tree holds uncommitted work — keep it with \`git stash push -u -m "${message}"\` | carry it into a new issue`,
+		line: `decide: ${session_cite.issue(input.issue_number)} is closed but this tree holds uncommitted work — keep it with \`git stash push -u -m "${message}"\` | carry it into a new issue`,
 	}
 }
 

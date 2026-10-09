@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { UNORDERED_DEPENDENCIES } from './epic-parse'
 import { DEPENDENCY_ARROW, to_issue_reference } from './epic-reference'
 
@@ -52,7 +53,7 @@ const EPIC_PLACEHOLDER = '<this epic>'
 function format_run_command(epic_number: number | undefined): string {
 	const epic = epic_number === undefined ? EPIC_PLACEHOLDER : String(epic_number)
 
-	return `backlogrun #${epic} --only`
+	return `backlogrun ${issue_cite.plain(epic)} --only`
 }
 
 // A backlink to the Issue this split came from, when the split originated in another repository.

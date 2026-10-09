@@ -1,4 +1,5 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { session_cite } from '#scripts/issue/session-cite'
 import { epic_fetch } from './epic-fetch'
 import { epic_graph, type EpicChild } from './epic-graph'
 import { epic_parse } from './epic-parse'
@@ -56,7 +57,8 @@ async function read_recorded(
 // The epic and its current graph, or the reason neither could be read.
 async function read_epic(epic_number: number): Promise<EpicReading | { error: string }> {
 	const subject = await read_subject(epic_number)
-	if (subject === undefined) return { error: `Could not read issue #${String(epic_number)}.` }
+	const unread = `Could not read issue ${session_cite.issue(epic_number)}.`
+	if (subject === undefined) return { error: unread }
 
 	const recorded = await read_recorded(subject.body)
 	if ('error' in recorded) return { error: recorded.error }
