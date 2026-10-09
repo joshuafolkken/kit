@@ -1,34 +1,20 @@
 import { lane_child_marker, type MarkerSource } from './lane-child-marker'
 
 // How each `PreToolUse` guard behaves in a dispatched lane child, as an enumeration rather than a
-// judgement (joshuafolkken/kit#2138, joshuafolkken/kit#2164).
+// judgement.
 //
 // **The three guards were built for the interactive main line, where a refusal is guidance.** A denial
 // rewrites the next move of a person's session. A dispatched lane child is a headless `claude -p`
-// process, so a *denial* ends the conversation with nothing committed — joshuafolkken/kit#2138 measured
-// a child killed before its commit by two investigation refusals and one batching refusal, every one of
-// them a read of a file the child was about to edit. So a guard whose correction is a denial cannot fire
-// as one in a child.
+// process, so a *denial* ends the conversation with nothing committed. So a guard whose correction is a
+// denial cannot fire as one in a child.
 //
-// **But a denial is not the only way a guard can speak, and that is what kit#2164 tried.** A guard can
-// also raise a *notice* — a non-blocking `additionalContext` that carries the same guidance without a
-// `permissionDecision`, so the turn is never ended. kit#2164 downgraded the batching guard to a notice
-// in the child for exactly that reason. So the choice is three-valued, not two:
+// **But a denial is not the only way a guard can speak.** A guard can also raise a *notice* — a
+// non-blocking `additionalContext` that carries the same guidance without a `permissionDecision`, so the
+// turn is never ended. So the choice is three-valued, not two:
 //
 //   - `refuse` — deny the call (the main-line default; the child keeps this for the safety rules).
 //   - `notice` — let the call through but attach the guidance, so a headless child is nudged, not killed.
 //   - `off`    — say nothing at all, for a guard whose remedy the child cannot carry out.
-//
-// **The notice did not move the number, kit#2178 took it off, and kit#2276 restores it changed.** The
-// lane child that ran right after kit#2164 merged came in at 1.00 calls per turn on both sides of the
-// first notice (transcript `f39efeb5`), so kit#2178 turned the batching notice `off` in the child rather
-// than pay the per-turn context cost of guidance measured not to work. But with it off, the notice fired
-// **zero** times across the 2026-09-21 backlogrun the density was next measured on, so the 1.147 read
-// there is the rate with no guidance at all — not a second measurement of the notice failing. kit#2276
-// therefore restores it as `notice`, with the two things #2164's lacked: it names the concrete recent
-// calls the run issued one-per-turn, and it recurs every single-call turn rather than every three. The
-// mode stays a genuine experiment — the density is re-measured on the next backlogrun, and a notice that
-// still does not move it is redesigned rather than kept.
 //
 // **It is an enumeration and not a judgement, for the reason `delegation-policy.ts` is one.** "This
 // guard's mode in a child" is a call made under the same pressure that produced the misfire. The list is
@@ -37,7 +23,7 @@ import { lane_child_marker, type MarkerSource } from './lane-child-marker'
 // survived once. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior
 // cannot disagree.
 
-// The three ways a guard may behave in a lane child (joshuafolkken/kit#2164). Outside a lane child every
+// The three ways a guard may behave in a lane child. Outside a lane child every
 // guard is `refuse`, which is why that is also the fail-safe default below.
 type LaneGuardMode = 'refuse' | 'notice' | 'off'
 type LaneGuardId = 'investigation' | 'batching' | 'rule' | 'duplicate-read'

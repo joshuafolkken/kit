@@ -7,7 +7,7 @@ import { lane_registry } from '#scripts/lane/lane-registry'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import type { BusyRead } from './epic-busy'
 
-// A `run:solo` holder nothing is running for (joshuafolkken/kit#3017).
+// A `run:solo` holder nothing is running for.
 //
 // A running `run:solo` issue lets nothing new start (`epic-solo.ts`), and "running" is read off the
 // `in-progress` label alone. A label nothing removed — a child that parked itself, then had its

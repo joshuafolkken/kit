@@ -11,13 +11,13 @@ import {
 // `epic:next` has to build this graph anyway to decide what is runnable, so the anomaly checks live
 // here rather than in a separate auditor: a cycle makes every session wait forever, and a body that
 // declares one order while the `blocked-by` relations record another means the implementation would
-// proceed in an order nobody agreed to (joshuafolkken/kit#860).
+// proceed in an order nobody agreed to.
 
 // One child, as the graph sees it. `repo` is the `owner/repo` the child lives in, so a caller can
 // bundle candidates per repository.
 //
-// `blocked_by` carries the native relations **with their repository**, not as bare numbers
-// (joshuafolkken/kit#1126). A relation may cross a repository — REST records and returns one — and a
+// `blocked_by` carries the native relations **with their repository**, not as bare numbers.
+// A relation may cross a repository — REST records and returns one — and a
 // number alone cannot say which repository it names, so a bare read resolved every blocker against
 // the blocked child's own repository. A cross-repository blocker then keyed to an issue that does not
 // exist, `blocker_categories` dropped it, and the child ran as though nothing blocked it. It also
@@ -41,15 +41,15 @@ interface GraphAnomaly {
 	// Set when the reads behind this anomaly failed on the transport, so a caller can ask again
 	// instead of reporting an unusable graph. It travels from the failed request itself rather than
 	// from a probe fired afterwards, which is what let a connection that recovered in a few hundred
-	// milliseconds report the graph as permanently broken (joshuafolkken/kit#1690).
+	// milliseconds report the graph as permanently broken.
 	is_unreachable?: boolean
 }
 
 // An issue's identity across the whole epic. Issue numbers are unique per repository, not globally:
 // an epic tracking both `#7` and `app-kit#7` has two different children, and keying by number alone
-// had them overwrite each other — and had one's blockers resolve against the other
-// (joshuafolkken/kit#864). The audit keys the issues its children *cite* the same way, through this
-// one function rather than a second spelling of it (joshuafolkken/kit#1014).
+// would have them overwrite each other — and one's blockers resolve against the other.
+// The audit keys the issues its children *cite* the same way, through this
+// one function rather than a second spelling of it.
 function reference_key(repo: string, issue_number: number): string {
 	return `${repo}${to_issue_reference(issue_number)}`
 }
@@ -61,13 +61,11 @@ function key_of(reference: IssueReference): string {
 
 // How a reference is written in a message. Bare inside the repository the command runs in — the form
 // every body writes and every existing message used — and `owner/repo#N` outside it, because a bare
-// number resolves against the reader's own repository and names a different issue there
-// (joshuafolkken/kit#864).
+// number resolves against the reader's own repository and names a different issue there.
 //
 // It lives here rather than in the audit, beside the key it is the readable half of: `epic:next`
 // reports the children it could not read too, and a second spelling there would print a bare `#7`
-// for a child in another repository — the very misreading this exists to prevent
-// (joshuafolkken/kit#1016).
+// for a child in another repository — the very misreading this exists to prevent.
 function format_reference(reference: IssueReference, current_repo: string): string {
 	const is_local = reference.repo === '' || reference.repo === current_repo
 
@@ -81,9 +79,9 @@ function format_references(
 	return join_references(references.map((reference) => format_reference(reference, current_repo)))
 }
 
-// A blocker's key, read from the blocker's own repository rather than from the child it blocks
-// (joshuafolkken/kit#1126). The child is no longer part of the answer: taking the repository from it
-// is exactly what sent a cross-repository blocker to this repository's issue of that number.
+// A blocker's key, read from the blocker's own repository rather than from the child it blocks.
+// The child is not part of the answer: taking the repository from it
+// would send a cross-repository blocker to this repository's issue of that number.
 function blocker_key(blocker: IssueReference): string {
 	return key_of(blocker)
 }
@@ -140,7 +138,7 @@ function find_stuck_children(children: ReadonlyArray<EpicChild>): Array<string> 
 //
 // Declared links are always written as bare numbers, which name issues in the epic's own repository —
 // so the blocker they name is matched against that repository rather than against any relation that
-// happens to carry the number (joshuafolkken/kit#1126).
+// happens to carry the number.
 function is_link_recorded(
 	link: DependencyLink,
 	children: ReadonlyArray<EpicChild>,
@@ -171,7 +169,7 @@ function missing_relations(
 // The other half: declared links a relation actually backs. It is what a caller about to *drop*
 // relations needs — asking `gh` to remove a link that was never recorded is reported as a failure
 // nobody can act on. Written beside `missing_relations` rather than as a subtraction in each caller,
-// so the two answers cannot come to disagree about what "recorded" means (joshuafolkken/kit#1712).
+// so the two answers cannot come to disagree about what "recorded" means.
 function recorded_relations(
 	links: ReadonlyArray<DependencyLink>,
 	children: ReadonlyArray<EpicChild>,
@@ -182,7 +180,7 @@ function recorded_relations(
 
 // Every relation recorded on one child, as links between children of this epic.
 //
-// Matched by identity rather than by number (joshuafolkken/kit#1126): keyed by number alone, a child
+// Matched by identity rather than by number: keyed by number alone, a child
 // in another repository whose number happened to equal a blocker's was reported as a relation nobody
 // recorded. Only relations inside the declared repository become links, because a declared link is
 // written as a bare number and has no way to name one that crosses a repository.

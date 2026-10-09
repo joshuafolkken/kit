@@ -1,7 +1,7 @@
 import { EPIC_LABEL, has_label_name } from '#scripts/issue/issue-labels'
 import type { EpicChild } from './epic-graph'
 
-// Whether a task-list row points at another epic (joshuafolkken/kit#1476).
+// Whether a task-list row points at another epic.
 //
 // An epic's body can hold `- [ ] #<another epic>` — nothing stops it being typed — and until this
 // module nothing read it. `epic-classify.ts` sorted the row like any other child and

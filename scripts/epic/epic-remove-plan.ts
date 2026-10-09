@@ -9,11 +9,10 @@ import { epic_shape } from './epic-shape'
 // Everything `josh epic --remove` decides before it writes anything.
 //
 // A declared order lives in two places at once — the epic body's `Dependencies` declaration and the
-// native `blocked-by` relations — and until this command there was no way to delete one from both at
-// once. The only route was the hand edit `CLAUDE.md` forbids plus a bare `DELETE` on the
-// dependencies endpoint, and doing either half alone leaves `epic:next` answering
-// `declaration_mismatch`, which stops an unattended run. Epic joshuafolkken/kit#1262 recorded
-// twenty-nine such removals before the command existed (joshuafolkken/kit#1712).
+// native `blocked-by` relations — and this command deletes one from both at once. The alternative is
+// the hand edit `CLAUDE.md` forbids plus a bare `DELETE` on the dependencies endpoint, and doing
+// either half alone leaves `epic:next` answering `declaration_mismatch`, which stops an unattended
+// run.
 //
 // Kept apart from the GitHub calls for the reason `epic-add-plan.ts` is: the whole decision is
 // asserted without a network, and a refusal path only reachable through `gh` is one nobody tests.

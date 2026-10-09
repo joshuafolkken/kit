@@ -24,7 +24,7 @@ import { epic_issue } from './epic-issue'
 import { format_dependency_links, type IssueReference } from './epic-reference'
 
 // `josh epic:bundle <N>` — after an issue is filed, look at the open backlog and say whether it
-// belongs with something already there (joshuafolkken/kit#873).
+// belongs with something already there.
 //
 // The machine finds the candidates; the decision to bundle is the caller's. This command prints what
 // it found and what it recommends, and writes nothing.
@@ -39,12 +39,12 @@ const USAGE = 'Usage: josh epic:bundle <issue-number>'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the backlog cannot be keyed by repository — check `gh auth status` and that this is a checkout with an `origin` remote.'
 
-// The backlog listing asks for the title too (joshuafolkken/kit#1252). Kept apart from the epic
+// The backlog listing asks for the title too. Kept apart from the epic
 // listing's schema rather than made optional on one: the epic listing does not ask for the field, and
 // a schema that tolerates its absence everywhere would let a missing title pass unnoticed here.
 //
-// `blocked_by_count` is the blocker count GitHub already puts in the listing response
-// (joshuafolkken/kit#1736). It is **nullish rather than defaulted**, and that is the whole safety of
+// `blocked_by_count` is the blocker count GitHub already puts in the listing response.
+// It is **nullish rather than defaulted**, and that is the whole safety of
 // the read below: a row the listing carries no summary for must not be read as a row with no
 // blockers, because that reading is what would silently drop a relation instead of costing a
 // request. Nothing in today's pipeline is expected to arrive without one — the response carries the
@@ -58,8 +58,7 @@ const backlog_schema = epic_schema.extend({
 
 type BacklogRow = z.infer<typeof backlog_schema>
 
-// The epic index is `epic-index.ts`'s, shared with the `auto-ok` pickup since
-// joshuafolkken/kit#1633: both commands ask which epic tracks an issue, and a second copy of the
+// The epic index is `epic-index.ts`'s, shared with the `auto-ok` pickup: both commands ask which epic tracks an issue, and a second copy of the
 // task-list read would answer differently the first time that shape moved.
 const { build_epic_index } = epic_index
 
@@ -82,21 +81,19 @@ async function epic_issue_relations(
 
 // One read per backlog issue *that has blockers*, a few at a time.
 //
-// Since joshuafolkken/kit#1024 a read is `gh api`: one REST request for the issue, and a second to
-// its `dependencies/blocked_by` endpoint unless the issue's own dependency summary reports exactly
-// zero blockers. That second request was already skipped on a zero; the first one was not, so the
-// command still paid one request for every open issue in the repository — a cost that grows with the
-// backlog and made the command heavier exactly as more issues made it more useful
-// (joshuafolkken/kit#1736). The listing that produced these rows already carries that same summary,
-// so the zero is known *before* the read rather than inside it, and the read is skipped outright.
+// A read is `gh api`: one REST request for the issue, and a second to its `dependencies/blocked_by`
+// endpoint unless the issue's own dependency summary reports exactly zero blockers. The listing that
+// produced these rows already carries that same summary, so the zero is known *before* the read
+// rather than inside it, and the read is skipped outright — otherwise the command would pay one
+// request for every open issue in the repository, a cost that grows with the backlog.
 //
 // One read would do if `gh` exposed the reverse of `blockedBy`, but it does not (`blocks` is not a
 // JSON field), so a dependency declared on the *other* issue is only visible by asking that issue.
 // Spawning all of them at once is what turns a rate limit into a wrong answer: a refused read becomes
 // an empty relation list, and a bundle that should have been proposed is reported as "no strong
 // signal" instead. Batching bounds the burst; the `unreadable` list below is what keeps a refused
-// read from passing as an answer (joshuafolkken/kit#873). The pool itself is `bounded-pool.ts`,
-// shared with the reference reads below it and with the eval suite (joshuafolkken/kit#1144).
+// read from passing as an answer. The pool itself is `bounded-pool.ts`,
+// shared with the reference reads below it and with the eval suite.
 const RELATION_CONCURRENCY = 8
 const NO_BLOCKERS = 0
 
@@ -126,8 +123,8 @@ interface FetchedBacklog {
 	issues: Array<BacklogIssue>
 	unreadable: Array<number>
 	is_readable: boolean
-	// Why the backlog listing stopped short, or that it did not. A `ScanCutoff` rather than a flag
-	// since joshuafolkken/kit#1067: the page ceiling now bounds this listing too, and the two cutoffs
+	// Why the backlog listing stopped short, or that it did not. A `ScanCutoff` rather than a flag:
+	// the page ceiling bounds this listing too, and the two cutoffs
 	// cite different numbers.
 	cutoff?: ScanCutoff
 	has_epic_list?: boolean
@@ -160,7 +157,7 @@ function to_backlog_issue(
 // What a caller does not need read for it. `issue:scout` asks about an issue that does not exist yet:
 // it has no number, so no recorded dependency can name it and it declares none of its own — the
 // relation reads cannot change its answer, and skipping them takes one request per open issue off the
-// command a run makes before every filing (joshuafolkken/kit#1252). `epic:bundle` leaves it unset and
+// command a run makes before every filing. `epic:bundle` leaves it unset and
 // reads them exactly as before.
 interface BacklogOptions {
 	include_relations?: boolean
@@ -214,7 +211,7 @@ const ACTION_LINES: Readonly<Record<string, string>> = {
 
 // `Nothing to bundle.` is right when nothing was found, and wrong when an epic already tracks the
 // issue — there the answer is actionable: a caller looking for somewhere to put a prerequisite adds
-// it to *that* epic rather than creating a second one (joshuafolkken/kit#943).
+// it to *that* epic rather than creating a second one.
 const ALREADY_TRACKED_LINE = 'Already in an epic — add to that one, do not create a second.'
 
 function headline(decision: BundleDecision): string {
@@ -225,7 +222,7 @@ function headline(decision: BundleDecision): string {
 
 // The epics currently open, at this command's own listing limit. A failed read stays `undefined` and
 // is reported: without the list, an issue an epic already tracks is told to create a second one —
-// confidently, and with exit 0 (joshuafolkken/kit#950).
+// confidently, and with exit 0.
 async function fetch_epics(): Promise<FetchedEpics | undefined> {
 	return await epic_index.fetch_epics(BACKLOG_LIMIT)
 }
@@ -252,7 +249,7 @@ function format_order(
 	const children = epic_bundle.bundle_children(subject, members)
 
 	// The evidence goes under the order rather than beside the verdict: what it explains is the
-	// order, and a reader checking one reads straight on into the other (joshuafolkken/kit#1737).
+	// order, and a reader checking one reads straight on into the other.
 	return [
 		`  Children: ${format_numbers(children)}`,
 		format_links(epic_bundle.bundle_dependency_links(subject, members)),
@@ -262,7 +259,7 @@ function format_order(
 
 // The verdicts that put the subject into an epic. Each one asserts that no epic already tracks it —
 // `create_epic` asserts as much about the candidates too — and that negative is exactly what a cut
-// epic listing cannot establish (joshuafolkken/kit#1697). `none` is absent on purpose: it either
+// epic listing cannot establish. `none` is absent on purpose: it either
 // names the epic it *found* tracking the subject, which a cut cannot unseat, or reports no candidate
 // at all, which says nothing about epics.
 const PLACING_ACTIONS: ReadonlySet<BundleAction> = new Set<BundleAction>([
@@ -307,7 +304,7 @@ async function read_backlog(repo: string, options?: BacklogOptions): Promise<Fet
 	const epics = build_epic_index(open_epics.epics)
 	// From the epic list itself, not from the index's values: an epic tracking no child yet has no
 	// entry in the index, and would enter the backlog as an ordinary issue that its own children then
-	// propose bundling with (joshuafolkken/kit#873).
+	// propose bundling with.
 	const epic_numbers = new Set(open_epics.epics.map((epic) => epic.number))
 
 	return {
@@ -320,7 +317,7 @@ async function read_backlog(repo: string, options?: BacklogOptions): Promise<Fet
 
 // The backlog the decision is made from: the open listing, plus the referenced issues it could not
 // show. Without the second half the command answers about a window that closes minutes after the
-// follow-up issue is filed (joshuafolkken/kit#947).
+// follow-up issue is filed.
 async function widen_with_referenced(
 	subject: BacklogIssue,
 	backlog: FetchedBacklog,
@@ -376,7 +373,7 @@ function report_decision(subject: BacklogIssue, backlog: FetchedBacklog, repo: s
 	const decision = epic_bundle.decide_bundle(subject, others)
 
 	// The `Related:` / `Children:` listings name issues as `#N`; linkified here so the recommendation a
-	// run copies into its reply carries clickable references rather than bare ones (joshuafolkken/kit#2329).
+	// run copies into its reply carries clickable references rather than bare ones.
 	const report = format_decision(decision, subject, others, is_established)
 
 	console.info(issue_citation.linkify(report, repo))
@@ -441,8 +438,8 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	const repo = await git_gh_command.repo_get_name_with_owner()
 
-	// A repository that could not be read is refused rather than stood in for. Since
-	// joshuafolkken/kit#1130 the members are keyed by repository and the blockers carry their own, so a
+	// A repository that could not be read is refused rather than stood in for. The members are keyed
+	// by repository and the blockers carry their own, so a
 	// placeholder matches nothing: every recorded dependency would vanish and the command would answer
 	// `Nothing to bundle.` with exit 0 — a confident verdict built on a read that failed, on the
 	// command a run consults before deciding an issue belongs nowhere.
@@ -458,7 +455,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 // `process.exitCode` rather than `process.exit()`: the answer goes to standard output and a write to
 // a pipe is asynchronous on macOS, so exiting can tear the process down before it drains. This
 // command's answer is what a workflow reads and acts on, which is exactly that pipe. The same shape
-// is in `scripts/cost-runtime/cost-cli.ts`, which met the truncation first (joshuafolkken/kit#1005).
+// is in `scripts/cost-runtime/cost-cli.ts`, which met the truncation first.
 async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }

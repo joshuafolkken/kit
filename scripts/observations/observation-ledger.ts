@@ -1,20 +1,20 @@
 // The observation ledger's one location, named here rather than inside any of the places that act on
-// it (joshuafolkken/kit#1756). `git-staging.ts` stages it with the run's own commit when its grammar
-// holds (joshuafolkken/kit#2763), `hook-gate-reuse.ts` excludes it from what a hook calls a carried
+// it. `git-staging.ts` stages it with the run's own commit when its grammar
+// holds, `hook-gate-reuse.ts` excludes it from what a hook calls a carried
 // tree, and `observations-flush.ts` commits what no run carried — so a literal in each would be three
 // answers to one question, and a rename reaching only some of them would silently split them.
 //
-// **It sits outside `docs/`** (joshuafolkken/kit#3341): its files are machine-written data lines, not
-// documents a person reads, and at about forty new files a day they were most of `docs/`.
+// **It sits outside `docs/`**: its files are machine-written data lines, not
+// documents a person reads, and at about forty new files a day they would be most of `docs/`.
 //
-// **It is a directory of one file per issue, not one file** (joshuafolkken/kit#2919). One file every
-// run appended to made two lanes' pull requests conflict at its tail, so lanes parked their lines in
-// the primary checkout for a batch-end flush — and another run's stash took them from there, and the
-// flush never saw them. A run now appends to `<issue>.md` in its own work tree and merges it with its
-// own pull request: parallel lanes write different files, so nothing conflicts and nothing waits.
+// **It is a directory of one file per issue, not one file**. One file every run appends to makes two
+// lanes' pull requests conflict at its tail, and parking the lines in the primary checkout for a
+// batch-end flush lets another run's stash take them before the flush sees them. A run appends to
+// `<issue>.md` in its own work tree and merges it with its own pull request: parallel lanes write
+// different files, so nothing conflicts and nothing waits.
 const OBSERVATION_LEDGER_DIRECTORY = '.josh/observations'
 
-// Where the directory lived until joshuafolkken/kit#3341, a migration source for the same reasons as
+// The directory's previous location, a migration source for the same reasons as
 // the single-file ledgers below: each `<name>.md` in it moves to the same name in the directory.
 const LEGACY_OBSERVATION_LEDGER_DIRECTORY = 'docs/maintainers/observations'
 
@@ -29,10 +29,9 @@ const LEDGER_FILE_EXTENSION = '.md'
 // lost to the split.
 const LEGACY_LEDGER_FILE = `legacy${LEDGER_FILE_EXTENSION}`
 
-// Where the ledger lived as one file — `docs/observations.md` before joshuafolkken/kit#2724 and
-// `docs/maintainers/observations.md` until joshuafolkken/kit#2919 — kept as migration sources rather
-// than forgotten: a run still on the old code, a stash cut before the move and a consumer repository's
-// existing ledger all write there, and `observation-ledger-migrate.ts` moves what it finds into the
+// The single-file ledger paths, `docs/observations.md` and `docs/maintainers/observations.md`, kept
+// as migration sources rather than forgotten: a run still on the old code, a stash cut before the
+// move and a consumer repository's existing ledger all write there, and `observation-ledger-migrate.ts` moves what it finds into the
 // directory. Every place that recognizes the ledger recognizes them, so a line on either path is never
 // staged into an ordinary commit. Remove them once every repository holding a ledger has migrated.
 const LEGACY_OBSERVATION_LEDGER_PATHS: ReadonlyArray<string> = [
@@ -105,7 +104,7 @@ function ledger_paths(status_output: string): ReadonlyArray<string> {
 
 // **The one place that answers "does this working tree hold a pending observation append?"**
 // `observations-flush.ts`'s `has_ledger_change` and `pnpm josh followup`'s pre-merge ledger commit
-// both ask it (joshuafolkken/kit#1810), so a literal in each would be the clone the header above
+// both ask it, so a literal in each would be the clone the header above
 // warns against. A blank porcelain line carries no ledger path, so `is_ledger_line` answers false for
 // it and no filtering is needed.
 function has_pending_append(status_output: string): boolean {

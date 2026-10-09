@@ -7,7 +7,7 @@ import { lane_ledger } from './lane-ledger'
 import { lane_load } from './lane-load'
 import { lane_stats } from './lane-stats'
 
-// `josh lane:sample` / `josh lane:stats` — the lane-limit measurement (joshuafolkken/kit#3355).
+// `josh lane:sample` / `josh lane:stats` — the lane-limit measurement.
 //
 // `lane:sample` appends one machine-load sample to the ledger, or one every `--every <seconds>` until it
 // is stopped; `lane:stats` reduces a period of the ledger to the one table row #3347 records per lane

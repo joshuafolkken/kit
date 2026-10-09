@@ -2,7 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { delegation_policy } from './delegation-policy'
 
-// `josh delegate <step>` — may this step run in a cheaper execution tier? (joshuafolkken/kit#969)
+// `josh delegate <step>` — may this step run in a cheaper execution tier?
 //
 // A command rather than a paragraph, for the reason `josh review:level` is one: a rule an agent
 // applies from memory is a rule an agent can talk itself out of, and this is the rule that decides
@@ -36,15 +36,15 @@ const FLAG_PREFIX = '-'
 // Every reading of the argument goes through this one function, because the guard and the branch
 // disagreeing about surrounding whitespace is the defect itself: the guard trimmed and `run` did
 // not, so `josh delegate ' --list'` passed as a known flag and then fell through to a verdict about
-// a step called ` --list` (joshuafolkken/kit#1096). The policy lookup trims too, which is why
-// `josh delegate ' --help'` had already slipped past an untrimmed guard (joshuafolkken/kit#969).
+// a step called ` --list`. The policy lookup trims too, which is why
+// `josh delegate ' --help'` had already slipped past an untrimmed guard.
 function normalized(argument: string): string {
 	return argument.trim()
 }
 
 // A step name never starts with a dash, so anything that does is a flag — and the only flag this
 // command has is `--list`. Without this, `josh delegate --help` answered `keep`: a mistyped
-// invocation would read as a verdict about a step called `--help` (joshuafolkken/kit#969).
+// invocation would read as a verdict about a step called `--help`.
 function is_unknown_flag(argument: string): boolean {
 	const trimmed = normalized(argument)
 

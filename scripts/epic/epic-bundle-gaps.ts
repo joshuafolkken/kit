@@ -1,8 +1,7 @@
 import { cutoff_cause, type ScanCutoff } from '#scripts/git/listing-cutoff'
 
-// What `epic:bundle` could not see, said in the `⚠ … cap` shape joshuafolkken/kit#1033 settled on
-// for `epic:audit`. Split out of `epic-bundle-cli.ts` because the wording carries more explanation
-// than the command it warns from (joshuafolkken/kit#1067).
+// What `epic:bundle` could not see, said in the `⚠ … cap` shape `epic:audit` uses. Split out of
+// `epic-bundle-cli.ts` because the wording carries more explanation than the command it warns from.
 //
 // **Two listings, and two cuts each.** The listing decides *what* is hidden — a backlog issue, or
 // the epic that tracks one — and the cut decides *which number to cite*, because a reader who wants
@@ -21,7 +20,7 @@ function backlog_gap(cutoff: ScanCutoff, limit: number): string | undefined {
 
 // Named separately from the backlog's. What this one hides is *which epic tracks a candidate*, so
 // `Nothing to bundle.` under it may mean "the epic was past the cut" rather than "no epic tracks
-// it" — and acting on the second reading creates the duplicate epic (joshuafolkken/kit#950).
+// it" — and acting on the second reading creates the duplicate epic.
 function epic_gap(cutoff: ScanCutoff, limit: number): string | undefined {
 	const cause = cutoff_cause(cutoff, `hit its ${String(limit)}-epic cap`)
 	if (cause === undefined) return undefined
@@ -36,8 +35,7 @@ function epic_gap(cutoff: ScanCutoff, limit: number): string | undefined {
 // the assertion is only as good as the epic listing it was read from: an epic past the cut tracks its
 // children invisibly, so each of them reads as tracked by nothing. Acted on as Tier A, that absence
 // puts a **second** epic over an issue one already tracks — the state `fullrun.md` forbids, because
-// the auto-close then has two task lists to disagree about and `epic:next` answers from two graphs
-// (joshuafolkken/kit#943).
+// the auto-close then has two task lists to disagree about and `epic:next` answers from two graphs.
 //
 // A membership that *was* found is untouched, and that is the whole of what survives a cut: `none`
 // reporting `#E already tracks this issue` read the epic it names, and more epics past the cut cannot
@@ -46,12 +44,11 @@ function epic_gap(cutoff: ScanCutoff, limit: number): string | undefined {
 // The cut is the whole condition, and deliberately so. An epic the listing answered without a body
 // would hide its children the same way, but it cannot arrive: the listing mapping coerces a REST
 // `null` body to `''` before this module's caller ever parses one (`git-gh-issue-rest.ts`,
-// `to_gh_field_value`), so a gate arm for it would be code no input can reach
-// (joshuafolkken/kit#1697).
+// `to_gh_field_value`), so a gate arm for it would be code no input can reach.
 //
 // The cutoff is optional because the fetched backlog carries it that way: a listing nothing capped
 // records no cut at all, which is the same answer as `none`. Defaulted here rather than at each call
-// site, so a caller holding the optional field cannot forget the coercion (joshuafolkken/kit#1703).
+// site, so a caller holding the optional field cannot forget the coercion.
 function is_membership_established(cutoff: ScanCutoff = 'none'): boolean {
 	return cutoff === 'none'
 }

@@ -9,14 +9,14 @@ import { epic_validate, type EpicSubject } from './epic-validate'
 //
 // `--add` and `--remove` need exactly the same three things before they may compute anything: the
 // epic's labels and body, the repository a declared bare number names, and every child with its
-// native relations. They were the same forty lines twice until joshuafolkken/kit#1712 gave the
-// removal a home; a second copy is where one of them comes to accept a graph the other refuses.
+// native relations. They share this one read because a second copy is where one of them comes to
+// accept a graph the other refuses.
 
-// Refused rather than stood in for, and both callers *write*. Since joshuafolkken/kit#1126 a plan
-// filters recorded relations by the declared repository, so a placeholder drops every one of them:
-// the "reconcile them before inserting" guard never fires, the superseded link is never dropped, and
-// relations that already exist are re-POSTed — leaving the epic in exactly the mismatched state
-// `epic:audit` refuses to run on.
+// Refused rather than stood in for, and both callers *write*. A plan filters recorded relations by
+// the declared repository, so a placeholder drops every one of them: the "reconcile them before
+// inserting" guard never fires, the superseded link is never dropped, and relations that already
+// exist are re-POSTed — leaving the epic in exactly the mismatched state `epic:audit` refuses to run
+// on.
 const UNKNOWN_REPO =
 	"Could not read this repository from `git remote`, so the epic's relations cannot be keyed by repository — check `gh auth status` and that this is a checkout with an `origin` remote."
 

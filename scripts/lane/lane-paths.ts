@@ -1,6 +1,6 @@
 import path from 'node:path'
 
-// Where a lane lives on disk, and what its branch is called (joshuafolkken/kit#1490).
+// Where a lane lives on disk, and what its branch is called.
 //
 // **A lane is deliberately not nested inside the repository.** A linked work tree is a second full
 // checkout, so putting it under the main one would hand every path-walking tool in the project a
@@ -13,7 +13,7 @@ import path from 'node:path'
 const LANE_ROOT_KEY = 'JOSH_LANE_ROOT'
 const LANE_DIRECTORY_SUFFIX = '-lanes'
 // **The issue number comes first because `pnpm josh git` will not commit from a branch that starts
-// any other way** (joshuafolkken/kit#1497). Its `has_same_issue_prefix` reads `/^\d+-/`, so the
+// any other way**. Its `has_same_issue_prefix` reads `/^\d+-/`, so the
 // original `lane/<N>` spelling made every lane a checkout nothing could be committed from — and
 // switching the branch inside the lane is not the way round it, because `lane_registry` identifies a
 // lane *by* this name: the moment it changes, the work tree drops out of `lane:list`, its seat is
@@ -62,8 +62,8 @@ function is_lane_root(directory: string, environment: LaneEnvironment): boolean 
 // **The inverse of `lane_directory`, and the one lane test that needs no git.** `lane_registry`
 // answers the same question authoritatively by parsing `git worktree list`, but that read is
 // asynchronous and a `PreToolUse` guard is synchronous by contract — so a guard that has to know
-// whether the checkout it is running in is a lane reads it off the path instead
-// (joshuafolkken/kit#1864). It is deliberately the weaker of the two: it says the directory *sits
+// whether the checkout it is running in is a lane reads it off the path instead.
+// It is deliberately the weaker of the two: it says the directory *sits
 // where a lane sits*, never that a work tree is registered there, so a caller that needs the
 // registration still goes through `lane_registry`.
 function lane_issue_of(
@@ -83,12 +83,12 @@ function lane_branch(issue: string): string {
 }
 
 // The lanes root's own bookkeeping, beside the lanes and never one of them: `lane:open` claims a seat
-// by creating a lock directory under it (joshuafolkken/kit#1494).
+// by creating a lock directory under it.
 const SEAT_LOCK_DIR = '.seat-locks'
 
 // A name the lane machinery writes into a lanes root: a lane's issue number, or a lanes root of its
 // own — the nested one a lane opened from inside a lane once put there. Anything else in the root
-// was put there by someone else (joshuafolkken/kit#3370).
+// was put there by someone else.
 function is_lane_entry(name: string): boolean {
 	return LANE_ISSUE_PATTERN.test(name) || DEFAULT_LANE_ROOT_PATTERN.test(name)
 }

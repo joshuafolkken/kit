@@ -2,14 +2,13 @@ import { lane_limit_override } from './lane-limit-override'
 import type { LaneEnvironment } from './lane-paths'
 import { lane_seed_policy } from './lane-seed'
 
-// How many lanes one repository may run at once, and how many of them are free
-// (joshuafolkken/kit#1491).
+// How many lanes one repository may run at once, and how many of them are free.
 //
 // **Nothing here knows what a lane holds.** The limit is a number, the occupancy is a number, and
 // the answer is a number — so the same pool serves an epic's children, several epics' children at
 // once, or anything else a scheduler decides to put in a lane. Threading an epic through this module
-// is what would have to be undone the first time two epics run together, and the whole reason
-// joshuafolkken/kit#1491 built the scheduler epic-free from the start.
+// is what would have to be undone the first time two epics run together, which is why the scheduler
+// is epic-free.
 //
 // **It is a ceiling, not a prediction.** Six lanes does not say six children will run at once; it
 // says a seventh will not start. What actually runs is bounded by what is runnable, by the port
@@ -48,7 +47,7 @@ function read_limit(raw: string | undefined, name: string): LimitChoice {
 	return { kind: 'limit', limit: Number(trimmed) }
 }
 
-// **A live run's `lane:limit` override outranks the environment** (joshuafolkken/kit#3434): a running
+// **A live run's `lane:limit` override outranks the environment**: a running
 // parent keeps the environment it started with, so the override is the only way its limit moves. This
 // stays the one place the limit is read; the override reader is injected so a test reads none.
 async function lane_limit(
@@ -62,7 +61,7 @@ async function lane_limit(
 	return read_limit(environment[LANE_LIMIT_KEY], LANE_LIMIT_KEY)
 }
 
-// **A limit above the seat count is capped at the seats** (joshuafolkken/kit#3027). `lane:open` refuses
+// **A limit above the seat count is capped at the seats**. `lane:open` refuses
 // a tenth lane however high the limit is set, so a limit past the seats offers launches bound to be
 // refused.
 function seated_limit(limit: number): number {

@@ -51,8 +51,8 @@ function budget_offer(
 }
 
 // The outcome a named issue has already reached without this run dispatching it: closed is merged, and
-// a `needs-decision` park waits on a person, so re-dispatching it only repeats the stop it parked on
-// (joshuafolkken/kit#2965). Either is booked done rather than offered.
+// a `needs-decision` park waits on a person, so re-dispatching it only repeats the stop it parked on.
+// Either is booked done rather than offered.
 function settled_outcome(state: IssueState): MergeResult['outcome'] | undefined {
 	if (state.state.toUpperCase() === 'CLOSED') return 'merged'
 
@@ -82,7 +82,7 @@ async function classify(
 		: named
 }
 
-// **A named issue booked done is not thereby merged** (joshuafolkken/kit#3419): a park and a failure are
+// **A named issue booked done is not thereby merged**: a park and a failure are
 // booked done too, so the run moves past them. One the run's own merges did not record and GitHub does
 // not read as closed ended without a merge — and an unreadable state counts as that, because a false
 // stop reaches a person while a false finish ends the run where nobody sees it.
@@ -94,7 +94,7 @@ async function is_unmerged(issue: number, merged: ReadonlyArray<number>): Promis
 	return result.kind !== 'state' || result.state.state.toUpperCase() !== 'CLOSED'
 }
 
-// The issues `run:add` put in count too (joshuafolkken/kit#3433): one that parked is no more a merge
+// The issues `run:add` put in count too: one that parked is no more a merge
 // than a declared one.
 async function unmerged_of(carry: RunCarry): Promise<Array<number>> {
 	const declared = run_carry_added.ordered(

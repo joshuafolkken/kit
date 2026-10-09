@@ -2,7 +2,7 @@ import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { AUTO_OK_LABEL, EPIC_LABEL } from '#scripts/issue/issue-labels'
 
 // Fixtures shared by the `auto-ok:next` suites. Split out when the pickup gained its dependency
-// check and the tests outgrew one file (joshuafolkken/kit#996) — a second copy of these builders is
+// check and the tests outgrew one file — a second copy of these builders is
 // the clone `CLAUDE.md` prohibits, and a listing row built two ways is exactly what stops pinning
 // the behavior it was written for.
 
@@ -11,7 +11,7 @@ const CREATED_LATER = '2026-08-02T00:00:00Z'
 const OLD_ISSUE_NUMBER = 700
 const NEW_ISSUE_NUMBER = 900
 const BLOCKER_NUMBER = 500
-// The epic whose task list tracks a child in the tracking cases (joshuafolkken/kit#1633).
+// The epic whose task list tracks a child in the tracking cases.
 const EPIC_NUMBER = 800
 const FAILURE_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
@@ -44,7 +44,7 @@ function blocked_issue(
 }
 
 // The epic root opted in for its children — the row that decides whether a tracked child is this
-// epic's to sequence or the standalone half's to offer (joshuafolkken/kit#1668). It is a row of the
+// epic's to sequence or the standalone half's to offer. It is a row of the
 // opted-in listing itself, which is how the two halves read one answer rather than two.
 function opted_in_epic(): OpenIssueData {
 	return issue(EPIC_NUMBER, CREATED_LATER, [AUTO_OK_LABEL, EPIC_LABEL])
@@ -65,8 +65,8 @@ function capped_listing(limit: number, labels: ReadonlyArray<string>): string {
 	)
 }
 
-// The epic listing the pickup reads to answer "does an epic already track this issue?"
-// (joshuafolkken/kit#1633). Each entry becomes one epic whose body is the task list naming its
+// The epic listing the pickup reads to answer "does an epic already track this issue?".
+// Each entry becomes one epic whose body is the task list naming its
 // children, because a task-list row is the only thing that records tracking.
 function epic_listing(
 	epics: ReadonlyArray<{ number: number; children: ReadonlyArray<number> }>,
@@ -89,7 +89,7 @@ function record(lines: Array<string>): (...args: Array<unknown>) => void {
 
 // The two streams the contract is about: one token on standard output for a loop to branch on, and
 // every explanation on standard error. Held here because every `auto-ok` suite asserts on the same
-// two, and a copy per suite is the clone `CLAUDE.md` prohibits (joshuafolkken/kit#1633). The suite
+// two, and a copy per suite is the clone `CLAUDE.md` prohibits. The suite
 // hands `info` and `error` to `vi.spyOn`, which is the only part that needs vitest.
 interface ConsoleStreams {
 	info: (...args: Array<unknown>) => void

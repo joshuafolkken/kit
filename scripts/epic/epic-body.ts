@@ -11,7 +11,7 @@ const RATIONALE_PLACEHOLDER = '<why the work was split this way>'
 // Where a creation records its reasoning, including the reasoning for the order `--ordered` declares.
 // Exported because `epic:audit`'s unjustified-order check reads it as one of the places a declared
 // order's reason may live, and a second spelling of the heading is one that comes to disagree with
-// the writer (joshuafolkken/kit#1712).
+// the writer.
 const SPLIT_RATIONALE_HEADING = '## Split rationale'
 // One child declares no order, so there is nothing for the record below to name.
 const CHAIN_MINIMUM_LENGTH = 2
@@ -39,7 +39,7 @@ function format_dependencies(children: ReadonlyArray<number>, is_ordered: boolea
 }
 
 // The command that runs the batch. `backlogrun #E --only` takes the epic itself rather than a list of
-// children (joshuafolkken/kit#861, joshuafolkken/kit#1985): it re-reads the state from GitHub each
+// children: it re-reads the state from GitHub each
 // round, so an interrupted run resumes without anyone retyping the remaining numbers, and a child that
 // needs a decision is parked rather than ending the run. `--only` runs exactly the epic's children and
 // stops, which is the scope the removed `epicrun #E` keyword had.
@@ -47,7 +47,7 @@ function format_dependencies(children: ReadonlyArray<number>, is_ordered: boolea
 // The epic number is not known while its own body is being built, so the placeholder is filled in by
 // `format_run_command` once the issue exists. Bodies written before this change still say
 // `epicrun …` or `queue …`; nothing reads the `Execution` section — the auto-close reads the task
-// list and `epic:check` never looks at it — so those epics are unaffected (joshuafolkken/kit#865).
+// list and `epic:check` never looks at it — so those epics are unaffected.
 const EPIC_PLACEHOLDER = '<this epic>'
 
 function format_run_command(epic_number: number | undefined): string {
@@ -71,14 +71,13 @@ function to_rationale(rationale: string): string {
 	return trimmed.length > 0 ? trimmed : RATIONALE_PLACEHOLDER
 }
 
-// The record that `--ordered` itself is the decision behind the chain it writes
-// (joshuafolkken/kit#1712).
+// The record that `--ordered` itself is the decision behind the chain it writes.
 //
 // **Without it every `--ordered` epic is born failing its own audit.** `epic:audit`'s
-// unjustified-order check asks where a declared order's reason was recorded, and a creation used to
-// record none — the split rationale explains the split in prose that need not name a single issue
-// number, so the check found nothing for any of the links and `epicrun` stopped at step one on a
-// brand-new epic created exactly as documented.
+// unjustified-order check asks where a declared order's reason was recorded, and the split rationale
+// explains the split in prose that need not name a single issue number — so without this record the
+// check finds nothing for any of the links and `backlogrun #E` stops at its audit on a brand-new
+// epic created exactly as documented.
 //
 // **It is a real record, not a formality.** `--ordered` is a person stating the order deliberately,
 // and this says so, when, and where the reasoning is — which is exactly what the check exists to

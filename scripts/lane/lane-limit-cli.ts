@@ -5,8 +5,8 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { lane_capacity, type LimitChoice } from './lane-capacity'
 import { lane_limit_override } from './lane-limit-override'
 
-// `josh lane:limit [<limit>] [--reset]` — change a live `backlogrun`'s lane limit without stopping it
-// (joshuafolkken/kit#3434). A running parent keeps the environment it started with, so `JOSH_LANE_LIMIT`
+// `josh lane:limit [<limit>] [--reset]` — change a live `backlogrun`'s lane limit without stopping it.
+// A running parent keeps the environment it started with, so `JOSH_LANE_LIMIT`
 // cannot move under it; this writes an override onto the run's carry record, which
 // `lane_capacity.lane_limit` reads first. Bare, it prints the limit, the lanes in use and the free ones.
 //

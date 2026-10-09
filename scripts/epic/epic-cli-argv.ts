@@ -1,16 +1,16 @@
 import type { ParseArgsOptionsConfig } from 'node:util'
 import { cli_flags } from '#scripts/lib/cli-flags'
 
-// The argument reading every `josh epic` form shares, on top of `cli_flags` (joshuafolkken/kit#3261).
+// The argument reading every `josh epic` form shares, on top of `cli_flags`.
 //
-// They were private to `epic-cli.ts` until `--remove` needed the same readers (joshuafolkken/kit#1712),
+// They were private to `epic-cli.ts` until `--remove` needed the same readers,
 // at which point the choice was to copy them or to name them. Copying is what `CLAUDE.md` prohibits,
 // and the failure it would produce is specific: two readers disagreeing about what counts as a flag
 // value would have one form silently take a `--decision-file` path for an issue number.
 //
 // **Each form names its own flags, and the read is strict.** Which flags consume the argument after
 // them is per form: `--before` takes a value only under `--add`, and treating it as one everywhere had
-// `josh epic "T" 101 102 --after 103` silently drop #103 (joshuafolkken/kit#890). A flag the form does
+// `josh epic "T" 101 102 --after 103` silently drop #103. A flag the form does
 // not know refuses the invocation — a mistyped flag would otherwise leave its value positional, so it
 // becomes an issue number and the edit silently lands somewhere else.
 
@@ -88,7 +88,7 @@ function is_switch_set(parsed: EpicArgv, flag: string): boolean {
 // A value-taking flag given without a usable value, or given twice. **Refused rather than read as "none
 // was asked for"** — `--decision-file` is passed precisely because the record has to exist, so a shell
 // that ate the path would otherwise land the edit, write no record, post no comment and exit 0: success
-// reported for half the job. Repeated, it names two records (joshuafolkken/kit#1350).
+// reported for half the job. Repeated, it names two records.
 function is_value_unusable(argv: ReadonlyArray<string>, flag: string): boolean {
 	return (
 		cli_flags.given_values(argv, flag).length > SINGLE || cli_flags.is_value_unusable(argv, flag)

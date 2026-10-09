@@ -8,15 +8,15 @@ import {
 	type GateCacheSpec,
 } from '#scripts/josh/josh-command-types'
 
-// Warming a fresh lane's verification caches from the main checkout (joshuafolkken/kit#1849).
+// Warming a fresh lane's verification caches from the main checkout.
 //
 // `git worktree add` writes a checkout and nothing beside it, and the three caches the gate reads —
 // `.eslintcache`, `.tsbuildinfo`, `.cspellcache` — are all git-ignored, so a new lane has none of
-// them and only its *first* `josh gate` runs fully cold (measured at 353.9 s against 27.5 s warm,
-// joshuafolkken/kit#1839). The initial seed warms that run; the per-tool sync below keeps the
-// portable ESLint and CSpell caches current afterwards (#2060).
+// them and only its *first* `josh gate` runs fully cold (several minutes against well under a minute
+// warm). The initial seed warms that run; the per-tool sync below keeps the portable ESLint and
+// CSpell caches current afterwards.
 //
-// Content hashes make stale entries safe, but do not by themselves make a cache portable (#2060).
+// Content hashes make stale entries safe, but do not by themselves make a cache portable.
 // ESLint keys entries by absolute file path, so its JSON is rebased while cspell's relative keys and
 // TypeScript's build info move raw. The spec in `josh-command-types.ts` is the one declaration of
 // which treatment and which continuous sharing each gate cache receives.
@@ -103,7 +103,7 @@ function seed_caches(source_root: string, destination: string): void {
 /**
  * Copy the pre-built hook bundles (`dist/hooks/`) from `source_root` into `destination`, so a fresh
  * lane's child runs each Claude Code hook off `node dist/hooks/<name>.js` rather than the slower
- * `pnpm josh …` fallback (joshuafolkken/kit#2160). The bundles are git-ignored, so a lane's work tree
+ * `pnpm josh …` fallback. The bundles are git-ignored, so a lane's work tree
  * never carries them and every hook falls back without this seed.
  *
  * Best-effort, exactly like `seed_caches`: a source with no bundles (a checkout that never ran

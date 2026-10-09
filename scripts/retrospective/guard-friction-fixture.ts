@@ -5,7 +5,7 @@ import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 import type { SessionTranscript } from './guard-friction'
 
 // A run session built from fixture transcript lines, shared by the guard-friction and
-// investigation-payback suites (joshuafolkken/kit#3421).
+// investigation-payback suites.
 
 const { BRANCH, at, ms } = time_transcript_fixture
 const MODEL = 'claude-haiku-4-5'

@@ -5,7 +5,7 @@ import { epic_busy, type BusyRead } from './epic-busy'
 import type { EpicChild } from './epic-graph'
 import { epic_report, type EpicNextResult } from './epic-report'
 
-// The `run:solo` gate on what a run is offered (joshuafolkken/kit#2776).
+// The `run:solo` gate on what a run is offered.
 //
 // `backlogrun-lanes.md`'s run-alone rule says an issue whose defect reaches the verification path runs
 // alone, and until this gate that was a judgement made at dispatch — the offer handed such an issue
@@ -17,16 +17,15 @@ import { epic_report, type EpicNextResult } from './epic-report'
 // disagree about what may start beside what.
 //
 // Three rules, all against the repository's `in-progress` holders (`epic_busy.read_repository`, with
-// a stale `run:solo` holder taken out by `epic_solo_stale.release` — joshuafolkken/kit#3017):
+// a stale `run:solo` holder taken out by `epic_solo_stale.release`):
 // a running `run:solo` issue lets nothing new start; a `run:solo` candidate starts only into an idle
 // repository and then alone; and nothing ranked below a waiting `run:solo` candidate is offered past
 // it, so it is not starved by the lanes it is waiting on. A listing that could not be read is not an
 // idle repository — the same fail-safe answer `epic_busy` gives.
 //
-// **The label does not move a candidate up the ranking** (joshuafolkken/kit#2928, reversing
-// joshuafolkken/kit#2778). `run:solo` means "runs alone", and tidying that merely touches the
-// verification path carries it as well as a defect that breaks it. Which of them goes first is the
-// ranking's question — `issue-rank.ts` puts a verification-path defect at the head — so an idle
+// **The label does not move a candidate up the ranking**. `run:solo` means "runs alone", and tidying
+// that merely touches the verification path carries it as well as a defect that breaks it. Which of
+// them goes first is the ranking's question — `issue-rank.ts` puts a verification-path defect at the head — so an idle
 // repository takes the candidates in rank order like any other.
 
 const SOLO_LABELS: ReadonlySet<string> = new Set([RUN_SOLO_LABEL])

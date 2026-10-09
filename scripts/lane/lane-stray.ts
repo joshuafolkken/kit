@@ -6,7 +6,7 @@ import { lane_open } from './lane-open'
 import { lane_paths } from './lane-paths'
 import { lane_registry } from './lane-registry'
 
-// What the lanes root holds that no registered work tree accounts for (joshuafolkken/kit#3370).
+// What the lanes root holds that no registered work tree accounts for.
 //
 // **Every other sweep starts from `git worktree list`**, so a directory whose registration is gone —
 // a lane whose `rmSync` stopped half-way, one whose `.git` points at a registration git pruned, an

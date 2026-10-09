@@ -8,11 +8,10 @@ import type { IssueReference } from './epic-reference'
 //
 // "Two or more always means an epic" already holds when one request is split on the spot. It does
 // not reach the other way in: two issues filed days apart that turn out to be the front and back of
-// one job are executed separately, in whatever order, with the reasoning recorded nowhere
-// (joshuafolkken/kit#873).
+// one job are executed separately, in whatever order, with the reasoning recorded nowhere.
 //
-// The candidate search reads issue references out of prose — the same reading joshuafolkken/kit#870
-// does inside one epic. That analysis is imported rather than written a second time; the only
+// The candidate search reads issue references out of prose — the same reading `epic:audit` does
+// inside one epic. That analysis is imported rather than written a second time; the only
 // difference is what it is pointed at.
 
 // An open issue as the search sees it.
@@ -22,17 +21,17 @@ interface BacklogIssue {
 	body: string
 	// Optional because nothing in this module reads it: the strong signals below are references and
 	// recorded dependencies, and a title resemblance is deliberately not one of them. It rides on the
-	// same listing for `issue:scout`, whose duplicate search is the one thing that does compare titles
-	// (joshuafolkken/kit#1252), and is absent on an issue read one at a time by reference.
+	// same listing for `issue:scout`, whose duplicate search is the one thing that does compare titles,
+	// and is absent on an issue read one at a time by reference.
 	title?: string
 	// The epic tracking it, when one does. An issue belongs to at most one epic, because that is what
 	// a task list can express.
 	epic?: number
 	// Whether this issue *is* an epic. An epic is a container, not a sibling: every child names it as
 	// its parent, so without this every child would find its own epic as a candidate and be told to
-	// bundle with it (joshuafolkken/kit#873, found by running the command on a real backlog).
+	// bundle with it.
 	is_epic?: boolean
-	// Repository-qualified, not bare numbers (joshuafolkken/kit#1130). Issue numbers are unique per
+	// Repository-qualified, not bare numbers. Issue numbers are unique per
 	// repository, so a blocker read as `40` alone matched any candidate numbered 40 — including one in
 	// a different repository entirely. That produced a bundle nobody's data supported, and, through
 	// `bundle_dependency_links`, a `blocked-by` relation recorded onto the wrong issue: a write, not
@@ -56,8 +55,7 @@ interface BundleDecision {
 
 // Whether `from`'s body names `to`. One direction of the citation test, because which direction it
 // was is what `epic-bundle-evidence.ts` reports — and the read is single-sourced here rather than
-// written a second time there, so the candidate search and the evidence beside it cannot drift apart
-// (joshuafolkken/kit#1737).
+// written a second time there, so the candidate search and the evidence beside it cannot drift apart.
 function names_in_body(from: BacklogIssue, to: BacklogIssue): boolean {
 	return epic_audit_logic.parse_references(from.body, from.repo).includes(to.number)
 }
@@ -118,8 +116,8 @@ const NO_SIGNAL_REASON = 'no existing issue shares a reference or a dependency w
 
 // Names the epic, rather than only reporting that one exists. The number is what the caller does
 // something with: the prerequisite procedure inserts into that epic instead of creating a second one,
-// and an issue tracked by two epics gives the auto-close two task lists to disagree about
-// (joshuafolkken/kit#943). The decision already carried the number; only this sentence dropped it.
+// and an issue tracked by two epics gives the auto-close two task lists to disagree about.
+// The decision already carried the number; only this sentence dropped it.
 function already_tracked_reason(epic: number): string {
 	return `${issue_cite.plain(epic)} already tracks this issue`
 }
@@ -139,7 +137,7 @@ function create_decision(subject: BacklogIssue, numbers: ReadonlyArray<number>):
 }
 
 // Which epic each issue is itself tracked by. An epic is a row of the backlog like any other, so a
-// nested one carries its own parent here and no second read is needed (joshuafolkken/kit#1079).
+// nested one carries its own parent here and no second read is needed.
 // The repository filter is defensive: every caller stamps one repository onto the whole listing
 // today, and the filter is what keeps a bare epic number naming the subject's repository if one ever
 // assembles two.
@@ -182,8 +180,8 @@ function is_cyclic(
 }
 
 // Nested epics are not two peers to choose between: the parent already contains the child, so an
-// issue related to both belongs in the child and no merge is on the table. Asking anyway is the
-// false positive joshuafolkken/kit#1079 recorded three times, one of which stopped a whole batch.
+// issue related to both belongs in the child and no merge is on the table. Asking anyway is a false
+// positive that can stop a whole batch.
 function narrow_to_innermost(
 	epics: ReadonlyArray<number>,
 	parents: ReadonlyMap<number, number>,
@@ -257,7 +255,7 @@ function decide_bundle(
 
 // The dependency links a bundle should record, from what the candidates already declare. Bundling
 // without the order records the batch and loses the reason it is a batch — an issue that must follow
-// another is exactly the case this exists to catch (joshuafolkken/kit#873).
+// another is exactly the case this exists to catch.
 //
 // Only relations already declared are carried over; an order nobody stated is not invented here.
 function bundle_dependency_links(
@@ -270,7 +268,7 @@ function bundle_dependency_links(
 	// rather than from each member: comparing a blocker against its *own* member's repository would
 	// let two members elsewhere emit a link between them, and the epic body would then resolve those
 	// bare numbers against this repository — a different pair of issues. `epic_graph.child_links`
-	// guards the identical case the identical way (joshuafolkken/kit#1130).
+	// guards the identical case the identical way.
 	const declared_repo = subject.repo
 
 	return members

@@ -4,7 +4,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { z } from 'zod'
 
-// The measurement ledger the lane limit is tuned against (joshuafolkken/kit#3355): one JSON line per
+// The measurement ledger the lane limit is tuned against: one JSON line per
 // lane merge, per finished `josh gate`, and per machine-load sample, read back by `josh lane:stats`.
 //
 // **Its own file rather than the run's event stream.** The stream is capped at 500 events and is
@@ -34,11 +34,11 @@ const gate_schema = z.object({
 	at: z.string(),
 	elapsed_ms: z.number(),
 	is_passed: z.boolean(),
-	// The unit suite's own duration, present when this gate ran it (joshuafolkken/kit#3409) — the one
+	// The unit suite's own duration, present when this gate ran it — the one
 	// record of a full vitest run `josh metrics` reads, so the suite is never timed twice.
 	unit_ms: z.number().optional(),
 	// The whole cores busy outside this gate, beyond the machine's baseline, at its start or its end —
-	// whichever was higher (joshuafolkken/kit#3501). Absent when the machine could not be read.
+	// whichever was higher. Absent when the machine could not be read.
 	external_cores: z.number().optional(),
 })
 // `swap_mb` and `lanes` are optional because either read can fail on its own — a platform with no

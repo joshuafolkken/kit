@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { openai_lane_supervisor_decision } from './openai-lane-supervisor-decision'
 
 // The supervisor's owner and state stamps — who holds a lane, and which child it last launched —
-// split out of `openai-lane-supervisor.ts` when it reached its line limit (joshuafolkken/kit#3264).
+// split out of `openai-lane-supervisor.ts` when it reached its line limit.
 // `openai_lane_supervisor` re-exports each public one under the name it always had, so the move
 // changed no call site and no suite that spies on `openai_lane_supervisor`.
 

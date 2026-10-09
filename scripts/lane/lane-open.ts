@@ -13,8 +13,7 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_seed_policy } from './lane-seed'
 import { lane_start_point } from './lane-start-point'
 
-// Opening a lane: one linked work tree, one branch, one port seed, and the dependencies to run in it
-// (joshuafolkken/kit#1490, joshuafolkken/kit#1554).
+// Opening a lane: one linked work tree, one branch, one port seed, and the dependencies to run in it.
 //
 // **The reading side of a linked work tree already worked; only the creating side was missing.**
 // `git_directories()` resolves the tree's own git directory, `run-hold.ts` keys its record on it and
@@ -42,7 +41,7 @@ const FULL_OUTCOME: OpenOutcome = { kind: 'full' }
 // `lane_paths.SEAT_LOCK_DIR`, in the lanes root and clear of the lanes themselves (which are numbered, never dot-prefixed). The claim
 // is what closes the gap between reading the free seats and writing the lane's `.env`: two
 // `lane:open` runs that both saw seat 1 free cannot both create the same lock, so the loser steps to
-// the next free seat (joshuafolkken/kit#1494). The lock is released once the lane's `.env` is on
+// the next free seat. The lock is released once the lane's `.env` is on
 // disk and the seat is discoverable — or on any failure — so only a hard crash mid-open can strand
 // one, which removing the lanes-root `.seat-locks` directory clears.
 const SEAT_LOCK_PREFIX = 'seat-'
@@ -133,8 +132,8 @@ function reserve_seat(root: string, free: ReadonlyArray<number>): SeatReservatio
  * collision nothing reports until an E2E run fails somewhere else. Failing here names the lane and
  * what to do about it.
  *
- * **A lane git already lists but whose `.env` is not yet on disk is mid-open, not broken**
- * (joshuafolkken/kit#2147). It holds a seat lock from its seat claim until its `.env` write — the
+ * **A lane git already lists but whose `.env` is not yet on disk is mid-open, not broken**.
+ * It holds a seat lock from its seat claim until its `.env` write — the
  * whole window in which it reads as unreadable — and that lock keeps its seat off this open's table
  * (`reserve_seat` cannot claim a locked seat), so tolerating it here cannot cause a collision. The
  * count of held locks is the count of opens in flight, so only the unreadable lanes beyond it are
@@ -160,7 +159,7 @@ function guard_unreadable(root: string, lanes: ReadonlyArray<LaneInfo>): void {
  *
  * Reported as a success, the caller captures the directory and types the first `pnpm josh …` in it —
  * which fails with `tsx: command not found`, the exact failure the install exists to remove, now
- * with a success line printed above it (joshuafolkken/kit#1554). The work tree is left where it is
+ * with a success line printed above it. The work tree is left where it is
  * because both ways out need it there: the install can be run again against it, or `lane:close` can
  * take it away. The child's own output is carried along, since it is the only thing that says which
  * of the two applies.
@@ -199,19 +198,19 @@ function build_plan(
 //
 // The start point comes from `lane_start_point` rather than from the default branch's bare name:
 // that name resolves to a local ref nothing advances, and the lane would start without the work
-// merged just before it (joshuafolkken/kit#1535). **It answers `undefined` when a branch of this
+// merged just before it. **It answers `undefined` when a branch of this
 // lane's name already exists**, which puts the work tree on that branch instead of creating one —
-// the only route back to a child that was parked after pushing (joshuafolkken/kit#1627).
+// the only route back to a child that was parked after pushing.
 //
-// **The install is the last step rather than a caller's, because a lane without it is unusable**
-// (joshuafolkken/kit#1554). Leaving it to whoever opened the lane made it a step nothing enforced,
+// **The install is the last step rather than a caller's, because a lane without it is unusable**.
+// Leaving it to whoever opened the lane made it a step nothing enforced,
 // and every lane opened without it failed on its first `pnpm josh …`. It runs after the `.env`
 // rather than before, so a lane that fails here still carries the seat it was allocated and the
 // failure is recoverable by re-running the install alone.
 //
-// **The gate's verification caches are seeded from the main checkout before the install**
-// (joshuafolkken/kit#1849), so the lane's first `josh gate` is warm rather than cold. The pre-built
-// hook bundles are seeded the same way (joshuafolkken/kit#2160): `dist/hooks/` is git-ignored, so a
+// **The gate's verification caches are seeded from the main checkout before the install**,
+// so the lane's first `josh gate` is warm rather than cold. The pre-built
+// hook bundles are seeded the same way: `dist/hooks/` is git-ignored, so a
 // lane's work tree never carries it and every Claude Code hook drops to the slow `pnpm josh …`
 // fallback without this copy. Both are best-effort and run after the `.env` write for the same reason
 // the install does: a lane whose warming found nothing still carries its seat and is perfectly
@@ -220,7 +219,7 @@ async function materialize(plan: LanePlan, source_root: string): Promise<void> {
 	// The seat lock is released the moment the `.env` is on disk — from then the lane is readable and
 	// its seat discoverable, so nothing more holds the seat. It must **not** ride the multi-minute
 	// install: a lock outlasting the unreadable window would inflate `open_in_flight_count` and mask a
-	// genuinely broken lane (joshuafolkken/kit#2147). The `finally` covers a failure before the `.env`
+	// genuinely broken lane. The `finally` covers a failure before the `.env`
 	// is written, where nothing was created that should hold it.
 	try {
 		mkdirSync(path.dirname(plan.lane.directory), { recursive: true })
@@ -239,8 +238,7 @@ async function materialize(plan: LanePlan, source_root: string): Promise<void> {
 }
 
 // Both refusals run before the seat is claimed, so neither leaves a lock behind. A directory at the
-// lane's path that git does not register is `lane_leftover`'s to remove or refuse
-// (joshuafolkken/kit#2857).
+// lane's path that git does not register is `lane_leftover`'s to remove or refuse.
 async function clear_the_way(
 	root: string,
 	issue: string,
@@ -260,7 +258,7 @@ async function clear_the_way(
 async function open_lane(issue: string): Promise<OpenOutcome> {
 	// The main work tree's, never this one's: run from inside a lane, the current root would put the
 	// new lane under `<lane>/.<lane>-lanes` and read the lane's own seed as the root's — a lane
-	// `list_lanes` cannot see, on ports it never recorded (joshuafolkken/kit#1497).
+	// `list_lanes` cannot see, on ports it never recorded.
 	const repository_root = await lane_registry.main_repository_root()
 	const lanes = await lane_registry.list_lanes()
 	const existing = lane_registry.find_lane(lanes, issue)

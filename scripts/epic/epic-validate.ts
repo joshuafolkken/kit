@@ -16,7 +16,7 @@ interface EpicSubject {
 	// The epic's own state, as GitHub returned it (`OPEN` / `CLOSED`, casing unnormalized). Only
 	// `epic-add.ts` reads it — to refuse adding a child to a closed epic — so it is optional: a read
 	// that came back without the field leaves it undefined, which the refusal treats as "not confirmed
-	// closed" rather than blocking (joshuafolkken/kit#2337).
+	// closed" rather than blocking.
 	state?: string | undefined
 	labels: ReadonlyArray<string>
 	body: string | undefined
@@ -30,7 +30,7 @@ interface CheckResult {
 
 // The `number,labels,body` read's answer, as the shape every epic writer reads. It lives beside
 // the checks because `EpicSubject` is defined here, and each command that wanted one had otherwise
-// to restate the unwrapping (joshuafolkken/kit#890).
+// to restate the unwrapping.
 function parse_epic_subject(raw_json: string | undefined): EpicSubject | undefined {
 	if (raw_json === undefined) return undefined
 

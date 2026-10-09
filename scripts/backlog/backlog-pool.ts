@@ -14,7 +14,7 @@ import {
 	NEEDS_DECISION_LABEL,
 } from '#scripts/issue/issue-labels'
 
-// The candidate pool `josh backlog:next` answers from (joshuafolkken/kit#1630).
+// The candidate pool `josh backlog:next` answers from.
 //
 // Two sources feed one pool: the opted-in issues no epic tracks, and the children of the epics whose
 // **root** carries `auto-ok`. Splitting them apart lives here so the command itself stays a list of
@@ -26,8 +26,8 @@ import {
 const EPIC_LABELS: ReadonlySet<string> = new Set([EPIC_LABEL])
 // The labels that put a withheld row in the "needs a person" bucket rather than the "waiting on
 // time" one. `already-done` belongs with `needs-decision` because no amount of waiting moves it: the
-// work is merged and the close is Tier C, so a person is the only thing that resolves it
-// (joshuafolkken/kit#1679). Read as `time`, it would be reported as something that resolves itself
+// work is merged and the close is Tier C, so a person is the only thing that resolves it.
+// Read as `time`, it would be reported as something that resolves itself
 // and nobody would ever be told to close it.
 const DECISION_LABELS: ReadonlySet<string> = new Set([NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL])
 
@@ -35,7 +35,7 @@ const DECISION_LABELS: ReadonlySet<string> = new Set([NEEDS_DECISION_LABEL, ALRE
 // instead, the ones the caller has named as done, and the repository the rows belong to.
 //
 // `tracked` is the narrowed set `epic_index.withheld_children` builds, not every child an epic
-// tracks (joshuafolkken/kit#1668) — the narrowing itself is defined there, once, for this half and
+// tracks — the narrowing itself is defined there, once, for this half and
 // `auto-ok:next` alike.
 // Child number to every open epic whose task list names it — `epic_index.build_tracking_index`.
 type TrackingIndex = ReadonlyMap<number, ReadonlyArray<number>>
@@ -47,7 +47,7 @@ interface StandaloneContext {
 	tracked: ReadonlyMap<number, number>
 	exclude: ReadonlyArray<number>
 	repo: string
-	// Every issue this backlog may run (joshuafolkken/kit#1943). A row whose open blocker is outside it
+	// Every issue this backlog may run. A row whose open blocker is outside it
 	// waits on a person rather than on time, exactly as an epic child's does.
 	running: ReadonlySet<string>
 }
@@ -77,7 +77,7 @@ function epic_keys_of(tracking: TrackingIndex, repo: string): ReadonlySet<string
 	return new Set([...tracking.values()].flat().map((number) => epic_graph.key_of({ repo, number })))
 }
 
-// The set with every epic that tracks a member added, nested epics included (joshuafolkken/kit#3289).
+// The set with every epic that tracks a member added, nested epics included.
 // An epic is a container rather than work, so it is never run itself — but it closes once its children
 // do, so a row blocked by it waits on time exactly when one of those children is in this run.
 function with_tracking_epics(
@@ -136,8 +136,8 @@ function settle_standalone(
 // classification covers all of them and the verdict is decided once rather than per source.
 //
 // `repo` stamps the row itself, never its blockers: issue numbers are unique per repository, so a
-// blocker read bare resolves against the *reading* repository and names a different issue there
-// (joshuafolkken/kit#1654). `epic_issue.blocker_references_of` is the epic side's own resolution —
+// blocker read bare resolves against the *reading* repository and names a different issue there.
+// `epic_issue.blocker_references_of` is the epic side's own resolution —
 // `repository_url` when the node names one, this repository only as the fallback an unqualified
 // relation has always meant — and it is reused rather than repeated.
 function to_child(issue: OpenIssueData, repo: string): EpicChild {
@@ -155,7 +155,7 @@ function to_children(issues: ReadonlyArray<OpenIssueData>, repo: string): Array<
 }
 
 // The epics whose `auto-ok` stands for their children — the opted-in roots and, transitively, every
-// nested epic reached through their task lists (joshuafolkken/kit#2244, extending joshuafolkken/kit#1668).
+// nested epic reached through their task lists.
 //
 // The roots come out of the opted-in listing itself: an epic that carries `auto-ok` is a row in that
 // listing which also carries `epic`, so no second listing reads an epic's labels. From each root the
@@ -177,8 +177,7 @@ function standalone_rows(issues: ReadonlyArray<OpenIssueData>): ReadonlyArray<Op
 }
 
 // A row an **opted-in** epic tracks belongs to that epic's order and never to the standalone half —
-// the rule joshuafolkken/kit#1633 established, narrowed by joshuafolkken/kit#1668 to the epics that
-// are actually going to offer their children and applied here for the same reason. Which rows those
+// limited to the epics that are actually going to offer their children. Which rows those
 // are is `epic_index.withheld_children`'s answer, not a second test made here. A row the caller
 // excluded is out of the pool entirely rather than merely unoffered: it has just merged.
 function is_considered(issue: OpenIssueData, context: ConsideredContext): boolean {
@@ -193,7 +192,7 @@ function is_considered(issue: OpenIssueData, context: ConsideredContext): boolea
 // and everything else — a standing blocker, a run already in progress — resolves on its own and is
 // waiting on time.
 //
-// **The display's cap is not applied here** (joshuafolkken/kit#2928). Cut at this point, a sixth
+// **The display's cap is not applied here**. Cut at this point, a sixth
 // runnable `run:solo` issue never reached the gate that holds back what is ranked below it, so the
 // cap is applied after that gate instead (`backlog-rank.ts`). A row past it is still reported as
 // waiting and offered by a later ask, so the backlog drains without it ever being lost.
@@ -221,8 +220,8 @@ function classify_standalone(
 	}
 }
 
-// Every issue the backlog may run: each opted-in epic's children and the standalone rows
-// (joshuafolkken/kit#1943). A child is opted in through its epic's `auto-ok` even where it carries none
+// Every issue the backlog may run: each opted-in epic's children and the standalone rows.
+// A child is opted in through its epic's `auto-ok` even where it carries none
 // of its own, which is why the set is built from the graphs that were read rather than from labels. A
 // standalone row a person has to resolve is left out, so a row waiting on it waits for that person too;
 // an epic child in the same state is taken out by `epic_next_views.settle_views`. An open epic with a

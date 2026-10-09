@@ -8,8 +8,8 @@ import type { LaneInfo } from './lane-registry'
 
 // Relaunching a lane child session into its own lane — a fresh agent process started detached, under
 // the lane's stored profile at the effort of the phase it resumes into, logging to the lane's dispatch
-// log and carrying the dispatch mark afresh. **It was `run:cut`'s alone until a second caller needed it**
-// (joshuafolkken/kit#2428): the detached `josh ship` supervisor hands a stopped stage back to an agent
+// log and carrying the dispatch mark afresh. **It was `run:cut`'s alone until a second caller needed it**:
+// the detached `josh ship` supervisor hands a stopped stage back to an agent
 // the same way the pre-gate cut hands the gate to one, so the launch is shared rather than copied — the
 // copy that drifts is the one that forgets the mark and is read as a person by every guard.
 //
@@ -38,9 +38,9 @@ function relaunch(
 			log_path: lane_dispatch_log.default_log_path(lane),
 			profile: built.profile,
 			// The relaunch keeps the mark, so the resumed child is still a dispatched child to every rule
-			// that reads it (joshuafolkken/kit#1904); the inherited environment cannot be relied on here,
-			// since the parent-session strip runs on the way in. **The ship supervisor's mark is dropped**
-			// (joshuafolkken/kit#2428): a detached supervisor is what relaunches after a stopped stage, and an
+			// that reads it; the inherited environment cannot be relied on here,
+			// since the parent-session strip runs on the way in. **The ship supervisor's mark is dropped**:
+			// a detached supervisor is what relaunches after a stopped stage, and an
 			// agent that inherited its mark would read its own in-turn `josh ship` failure as a supervisor's —
 			// relaunching a second child into the lane beside itself.
 			env: { ...lane_child_marker.env_for(lane.issue), [SUPERVISED_KEY]: undefined },
@@ -50,14 +50,14 @@ function relaunch(
 }
 
 // An OpenAI lane's process is started by its supervisor, never by a relaunch — both `run:cut` and the
-// `run:merge` cut fallback ask this one predicate (joshuafolkken/kit#2484).
+// `run:merge` cut fallback ask this one predicate.
 function is_openai_lane(lane: LaneInfo): boolean {
 	return lane.profile?.provider === OPENAI_PROVIDER
 }
 
-// The relaunch after a cut: the resume-specific prompt, not the record's bare `fullrun #<N>`
-// (joshuafolkken/kit#2022), so the successor goes straight to `run:cut --resume` without reading the
-// workflow-commands entry documents. Shared by `run:cut` and the `run:merge` fallback (joshuafolkken/kit#2484).
+// The relaunch after a cut: the resume-specific prompt, not the record's bare `fullrun #<N>`,
+// so the successor goes straight to `run:cut --resume` without reading the
+// workflow-commands entry documents. Shared by `run:cut` and the `run:merge` fallback.
 function resume(lane: LaneInfo, phase: string, on_note: (note: string) => void): RelaunchResult {
 	return relaunch(lane, lane_child_invocation.resume_invocation(lane.issue), phase, on_note)
 }

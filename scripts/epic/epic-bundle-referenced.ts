@@ -6,22 +6,20 @@ import { epic_issue, type EpicIssue } from './epic-issue'
 
 // Candidates the open backlog cannot show, read from the subject's own prose.
 //
-// `epic:bundle` searched open issues only, which left a window of minutes in which it could answer
-// correctly: a follow-up issue names its parent, and the parent's pull request merges right after —
-// on joshuafolkken/kit#943 the gap between filing and the parent closing was about three minutes.
-// Past it the command reported `Nothing to bundle.` with exit 0, asserting there was no relation
-// rather than that it had not looked (joshuafolkken/kit#947).
+// The open backlog alone cannot answer: a follow-up issue names its parent, and the parent's pull
+// request often merges minutes later. Searching open issues only would then report
+// `Nothing to bundle.` with exit 0, asserting there was no relation rather than that it had not looked.
 //
-// The numbers a body names are information the command already holds; the open listing was never
-// what supplied them. Only the *reading* of those issues needs a request, and this module decides
+// The numbers a body names are information the command already holds; the open listing is not
+// what supplies them. Only the *reading* of those issues needs a request, and this module decides
 // which ones are worth one and which of the answers count.
 
 // One read each, so the count is what bounds the cost. Chosen an order of magnitude above the
-// references a real issue body carries — kit#946's body names five — so the cap is a runaway guard
+// handful of references a real issue body carries, so the cap is a runaway guard
 // rather than something an ordinary issue reaches. A body naming more than this is prose about the
 // backlog, not an issue with twenty prerequisites.
 //
-// Since joshuafolkken/kit#1024 a read is `gh api`, and one reference costs one REST request in the
+// A read is `gh api`, and one reference costs one REST request in the
 // common case. Three cases cost two. The `dependencies/blocked_by` endpoint is asked unless the
 // issue's own dependency summary reports exactly zero blockers, so an issue that declares one pays
 // for it. So does a pull request, which the issue endpoint serves as readily as an issue and which
@@ -88,7 +86,7 @@ function to_backlog_issue(issue: EpicIssue, context: ReferencedContext): Backlog
 function is_usable_candidate(issue: BacklogIssue, read: EpicIssue): boolean {
 	// The issue endpoint answers for a pull request too, and a body citing "the fix landed in #952"
 	// is ordinary prose. Without this, a merged PR reads as an open issue in no epic and the command
-	// proposes creating an epic with a pull request among its children (joshuafolkken/kit#947).
+	// proposes creating an epic with a pull request among its children.
 	if (issue.is_epic === true || epic_issue.is_pull_request(read)) return false
 
 	return epic_issue.is_open(read.state) || issue.epic !== undefined
@@ -96,8 +94,7 @@ function is_usable_candidate(issue: BacklogIssue, read: EpicIssue): boolean {
 
 // How one referenced number came back. `missing` is GitHub resolving it to nothing — a typo, or a
 // number belonging to another repository quoted in prose — which is an answer, not a gap: there is
-// no candidate and nothing was lost. `unreadable` is the gap, and it is the only one reported
-// (joshuafolkken/kit#957).
+// no candidate and nothing was lost. `unreadable` is the gap, and it is the only one reported.
 interface ReferencedRead {
 	number: number
 	result: EpicIssue | 'missing' | 'unreadable'
@@ -113,7 +110,7 @@ interface ReferencedResult {
 	// The ones whose read failed, and the ones the cap never reached. Both are gaps rather than
 	// answers: folded into "no relation found" they become the confident wrong verdict this whole
 	// module exists to remove. A number that resolves to nothing is **not** here — reporting it as a
-	// gap stops an unattended run over a reference that never existed (joshuafolkken/kit#957).
+	// gap stops an unattended run over a reference that never existed.
 	unreadable: Array<number>
 }
 
@@ -156,7 +153,7 @@ async function read_one(number: number): Promise<ReferencedRead> {
 
 // The pool is shared with the eval suite rather than spelled out again here: this was written as
 // waves — slice, `Promise.all`, next slice — which holds every finished read's slot until the whole
-// slice returns (joshuafolkken/kit#1144).
+// slice returns.
 async function fetch_referenced(numbers: ReadonlyArray<number>): Promise<Array<ReferencedRead>> {
 	return await bounded_pool.bounded_map(
 		numbers,

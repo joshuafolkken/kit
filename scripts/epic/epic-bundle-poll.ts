@@ -1,6 +1,6 @@
 import { poll, type PollOptions } from '#scripts/lib/poll'
 
-// **The open listing trails the create call** (joshuafolkken/kit#3332): `issue:file` asks
+// **The open listing trails the create call**: `issue:file` asks
 // `epic:bundle` about the issue it has just filed, and the list endpoint had not shown it yet on every
 // filing of one run, so the placement was skipped each time. A caller that knows the issue is fresh
 // passes a poll and the listing is read again until it shows the issue. An unreadable listing is

@@ -6,7 +6,7 @@ import { epic_parse } from './epic-parse'
 // declaration is replaced inside it rather than wherever a declaration-shaped line happens to sit.
 // `## Decisions` needs the identical search, and a second copy of it is the clone `CLAUDE.md`
 // prohibits — the fence mask especially, since a heading inside a fenced block is an illustration and
-// a copy that forgot it would append a decision into a quoted template (joshuafolkken/kit#1350).
+// a copy that forgot it would append a decision into a quoted template.
 //
 // Nothing here writes. The two consumers decide what to do with a range; this decides where one is.
 
@@ -65,7 +65,7 @@ function is_section_end(input: BodyLines, index: number, level: number): boolean
 // Where the named section runs: the lines after its heading, up to the next heading **of the same or a
 // higher level**. Not "the next heading of any level" — `## Decisions` is written as one `###` entry per
 // decision, the template the epic body documents, so ending at any heading would make the section one
-// line long and place every appended record after its first entry (joshuafolkken/kit#1350). A `##`
+// line long and place every appended record after its first entry. A `##`
 // section running to the next `##` is what a reader of the body already takes it to mean.
 //
 // `undefined` is "the body has no such section", which is a different answer from an empty one — the

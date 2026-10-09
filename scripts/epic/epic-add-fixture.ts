@@ -8,10 +8,10 @@ import { epic_parse, type DependencyLink } from './epic-parse'
 // `build_plan` takes the epic's children as `epic:next` reads them, so each test needs the same
 // `EpicChild` construction and the same unwrap of a `PlanOutcome`. Three test files were writing them
 // out identically, which is the clone `CLAUDE.md` prohibits — so they live here and every caller
-// imports them (joshuafolkken/kit#1253).
+// imports them.
 //
-// The body builder and the three readings of a rewritten body joined them for the same reason
-// (joshuafolkken/kit#1738): a second placement suite would otherwise have started by copying them out
+// The body builder and the three readings of a rewritten body joined them for the same reason:
+// a second placement suite would otherwise have started by copying them out
 // of the first, and two copies of "what the task list says afterwards" can come to disagree.
 
 const EPIC_FIXTURE_REPO = 'joshuafolkken/kit'

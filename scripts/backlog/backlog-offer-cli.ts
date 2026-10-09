@@ -8,11 +8,11 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { z } from 'zod'
 import { backlog_offer, type OfferAnswer } from './backlog-offer'
 
-// `josh backlog:offer` — one composite command for a `backlogrun` loop-head event
-// (joshuafolkken/kit#2162). The loop used to spend a turn on `backlog:next` and a second turn feeding
+// `josh backlog:offer` — one composite command for a `backlogrun` loop-head event.
+// Without it the loop spends a turn on `backlog:next` and a second turn feeding
 // its answer, translated to a word by hand, into `backlog:budget`; the parent's context is largest
 // here, so collapsing the two saves the turn where a turn costs the most — the same reasoning
-// `run:merge` collapsed a merge event on.
+// `run:merge` collapses a merge event on.
 //
 // **The contract matches the path-decided commands': stdout carries the budget verdict on its first
 // line**, then — only on `run` — the issue numbers to start, one per line, so a loop reads the branch
@@ -28,7 +28,7 @@ const DEFAULT_COUNT = 0
 const RUN_VERDICT = 'run'
 const BUDGET_JSON_KEY = 'budget'
 // The one budget verdict and mapped answer that name a drain, plus the running count that means the run
-// has nothing of its own in flight (joshuafolkken/kit#2335). Read together in `mark_drain`.
+// has nothing of its own in flight. Read together in `mark_drain`.
 const WATCH_VERDICT = 'watch'
 const STOP_VERDICT = 'stop'
 const EXHAUSTED_ANSWER = 'exhausted'
@@ -196,13 +196,12 @@ function refuse(): number {
 
 // The drain: the backlog is empty (`exhausted`) and nothing of the run's own is in flight, so the run is
 // about to open its idle watch or stop with `--idle 0`. Marking once per drain with `emit_once`
-// is what lets `run:step` fire the end-of-run retrospective *before* the watch rather than after it
-// (joshuafolkken/kit#2335), so the improvement issues the retrospective files are what the watch then
+// is what lets `run:step` fire the end-of-run retrospective *before* the watch rather than after it,
+// so the improvement issues the retrospective files are what the watch then
 // picks up. A watch that opened while children were still merging (`running > 0`) is not this drain: the
 // retrospective waits for the true idle, and the marker is emitted from the loop head for the same
 // reason `run:merge` emits its own events — the command that detects the event owns writing it.
-// Returns whether this call wrote the marker, so `backlog:drive` stops once per drain
-// (joshuafolkken/kit#2508).
+// Returns whether this call wrote the marker, so `backlog:drive` stops once per drain.
 async function mark_drain(verdict: string, answer: string, running: number): Promise<boolean> {
 	if (answer !== EXHAUSTED_ANSWER || running !== NO_RUNNING) return false
 	if (verdict !== WATCH_VERDICT && verdict !== STOP_VERDICT) return false
@@ -231,7 +230,7 @@ async function decide(values: ParsedValues, counts: OfferCounts): Promise<number
 	await mark_drain(decision.verdict, offer.answer, counts.running)
 
 	// The idle window with the ask that read it, once per watching poll, so `run:board` counts the next
-	// check from the poll that ran rather than guessing one (joshuafolkken/kit#3430).
+	// check from the poll that ran rather than guessing one.
 	if (decision.idle !== undefined) {
 		await run_event_stream_emit.emit_changed(run_event_stream.EVENT_KIND.IDLE, decision.idle)
 	}
@@ -246,9 +245,9 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	// The loop head is the one place `rule:value` is read from: once per iteration, the parent's
 	// context still small, so a rule that never fires shows up as a printed row rather than as
-	// something a person has to remember to measure (joshuafolkken/kit#2271). It prints the cached
-	// reading and refreshes it in a detached process, so the offer never waits on the measurement
-	// (joshuafolkken/kit#2881), and it never fails, so a broken reading never stops the backlog.
+	// something a person has to remember to measure. It prints the cached
+	// reading and refreshes it in a detached process, so the offer never waits on the measurement,
+	// and it never fails, so a broken reading never stops the backlog.
 	rule_value_cache.emit()
 
 	const counts = counts_of(values)

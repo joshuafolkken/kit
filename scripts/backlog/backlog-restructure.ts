@@ -3,8 +3,8 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { SoloSelection } from '#scripts/epic/epic-solo'
 import { session_cite } from '#scripts/issue/session-cite'
 
-// Which candidates may not run side by side because both restructure the same file
-// (joshuafolkken/kit#3221). The condition is deliberately narrow: plain overlap is not serialized,
+// Which candidates may not run side by side because both restructure the same file.
+// The condition is deliberately narrow: plain overlap is not serialized,
 // because every resume record of the 2026-10-05 backlog run was resolved mechanically by merging
 // main. What git cannot resolve on its own is a rename or modify/delete conflict — two lanes that
 // each move, split, rename or delete the same file — so only a path both bodies name on a line with

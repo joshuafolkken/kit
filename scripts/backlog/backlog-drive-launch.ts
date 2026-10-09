@@ -2,7 +2,7 @@ import { git_stash } from '#scripts/git/stash/git-stash'
 import { lane_launch_cli, type LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import { backlog_drive_owner } from './backlog-drive-owner'
 
-// The driver's lane launch (joshuafolkken/kit#3272). The parent that ran `josh latest` in the primary
+// The driver's lane launch. The parent that ran `josh latest` in the primary
 // checkout leaves its rewritten lock file in a stash under this message — `backlogrun-lanes.md` →
 // "Once per repository, before the first lane opens" — and the lane that pops it carries the update
 // into its pull request. **The stash itself is the "first lane" marker**: each launch asks whether it

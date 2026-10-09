@@ -12,7 +12,7 @@ import {
 import { backlog_plan, type PlanContext } from './backlog-plan'
 import { backlog_rank, type GateScope } from './backlog-rank'
 
-// The order a `backlogrun` takes, wave by wave, before it starts (joshuafolkken/kit#2778).
+// The order a `backlogrun` takes, wave by wave, before it starts.
 //
 // `backlog:next` answers one ask — what may start now — and `backlog:plan` shows the pool that ask is
 // made from, so the order past the first answer was left for a person to work out by hand. This plays
@@ -21,7 +21,7 @@ import { backlog_rank, type GateScope } from './backlog-rank'
 // **No rule is written twice.** The first wave is `backlog_rank.select` — rank, `run:solo` gate,
 // restructure separation, cap —
 // over the very candidates `backlog:next` resolves, asked of an idle repository — so it is what
-// `backlog:next` prints when nothing is running (joshuafolkken/kit#2928). Each later wave marks the earlier waves closed and re-classifies the same pool
+// `backlog:next` prints when nothing is running. Each later wave marks the earlier waves closed and re-classifies the same pool
 // through `epic_classify.classify_children` with the resolver `epic:next` sorted it with the first
 // time — `epic_cross_repo.resolve_cross_repo`, so a blocker in another repository still waits for its
 // release rather than counting as done on close — then puts the runnable set through

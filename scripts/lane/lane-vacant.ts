@@ -3,7 +3,7 @@ import { run_hold } from '#scripts/run/hold/run-hold'
 import { lane_await } from './lane-await'
 import type { LaneInfo } from './lane-registry'
 
-// Whether an open lane holds nothing worth keeping (joshuafolkken/kit#3289): no commit on its branch
+// Whether an open lane holds nothing worth keeping: no commit on its branch
 // beyond the default branch, a clean work tree, and no child or ship supervisor alive for its issue. A
 // `backlogrun` cut between `lane:open` and `lane:dispatch` leaves exactly such a lane, and `lane:open`
 // refuses it as `already-open` — so the next launch of that issue failed on a lane with nothing in it.

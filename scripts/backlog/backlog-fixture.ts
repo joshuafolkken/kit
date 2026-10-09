@@ -28,7 +28,7 @@ const CHECKOUT_PATH = '/checkouts/kit'
 
 // GitHub answering normally, which is the sixth question the command asks — and the only one that is
 // asked of the network rather than of a stub, so leaving it out would let a case that reaches the
-// `error` verdict spawn a real `gh` (joshuafolkken/kit#1663). A case about the transport overrides it.
+// `error` verdict spawn a real `gh`. A case about the transport overrides it.
 const REACHABLE_STATUS = 200
 
 interface ChildInput {
@@ -36,7 +36,7 @@ interface ChildInput {
 	state?: string
 	labels?: ReadonlyArray<string>
 	blocked_by?: ReadonlyArray<number>
-	// The body the defect priority classifies the child by (joshuafolkken/kit#2455).
+	// The body the defect priority classifies the child by.
 	body?: string
 }
 
@@ -56,18 +56,17 @@ interface BacklogInput {
 	epics?: ReadonlyArray<EpicInput>
 	// The children a fetch can read. One left out is a child that could not be read.
 	children?: ReadonlyArray<ChildInput>
-	// The measured defect rate. Left out, the rate is at the baseline, so the order is the graph's own
-	// (joshuafolkken/kit#2455).
+	// The measured defect rate. Left out, the rate is at the baseline, so the order is the graph's own.
 	defect_rate?: DefectRate
 	// A measurement that could not be read at all.
 	is_rate_unreadable?: boolean
-	// The repository's open `in-progress` issues, which the `run:solo` gate reads on a `run` answer
-	// (joshuafolkken/kit#2776). Left out, nothing is running.
+	// The repository's open `in-progress` issues, which the `run:solo` gate reads on a `run` answer.
+	// Left out, nothing is running.
 	in_progress?: ReadonlyArray<OpenIssueData>
 	// The `in-progress` holders no process is running for, each with a lane on this machine — a stale
-	// label (joshuafolkken/kit#3017). Left out, every holder is running.
+	// label. Left out, every holder is running.
 	stale?: ReadonlyArray<number>
-	// The issues left without `run:solo` or `run:lane` (joshuafolkken/kit#2779). Every other child and
+	// The issues left without `run:solo` or `run:lane`. Every other child and
 	// opted-in row is given `run:lane` unless it carries `run:solo`, so a case about something else is
 	// not answered `triage`.
 	untriaged?: ReadonlyArray<number>
@@ -141,7 +140,7 @@ function epic_bodies(epics: ReadonlyArray<EpicInput>): Map<string, string> {
 }
 
 // A child the fixture has text for, or a read that failed permanently — the two states the
-// unclassified read expressed as a string and `undefined` (joshuafolkken/kit#1690). A case that wants
+// unclassified read expressed as a string and `undefined`. A case that wants
 // the transport failure builds its own `unreachable` read instead.
 function to_child_read(json: string | undefined): IssueRead {
 	if (json === undefined) return { kind: 'unreadable', reason: 'rejected', status: 403 }
@@ -182,7 +181,7 @@ function stub_defect_priority(input: BacklogInput): void {
 }
 
 // The three label listings: the opted-in rows, the epics, and the `in-progress` holders the
-// `run:solo` gate reads (joshuafolkken/kit#2776).
+// `run:solo` gate reads.
 function stub_listings(input: BacklogInput, epics: ReadonlyArray<EpicInput>): void {
 	const untriaged = input.untriaged ?? []
 	const rows = (input.opted_in ?? []).map((row) => triaged_row(row, untriaged))
@@ -213,7 +212,7 @@ function stub_backlog(input: BacklogInput): void {
 
 	stub_environment()
 	stub_listings(input, epics)
-	// The classified reads (joshuafolkken/kit#1690). An epic the fixture has no body for is a body that
+	// The classified reads. An epic the fixture has no body for is a body that
 	// is simply absent, which is what it always meant here; a child it has no text for is a read that
 	// failed for a reason asking again will not change, which is what an absent payload meant.
 	vi.spyOn(git_gh_command, 'issue_get_body_classified').mockImplementation(async (number) => ({
@@ -227,7 +226,7 @@ function stub_backlog(input: BacklogInput): void {
 	stub_defect_priority(input)
 }
 
-// How a plan row names this repository's issue (joshuafolkken/kit#3099), so a case asserts the citation
+// How a plan row names this repository's issue, so a case asserts the citation
 // through `issue_cite` rather than restating the link's shape.
 function cite(number: number, title?: string): string {
 	return issue_cite.reference(REPO, String(number), title)

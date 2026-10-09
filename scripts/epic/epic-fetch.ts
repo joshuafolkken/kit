@@ -10,7 +10,7 @@ import { epic_relation_recheck } from './epic-relation-recheck'
 //
 // All execution state lives on GitHub and nowhere else — no local state file. A run interrupted
 // halfway is resumed by asking again, which is the whole reason `epic:next` can be the base of an
-// unattended run (joshuafolkken/kit#860).
+// unattended run.
 
 const CHILD_LIMIT = 200
 
@@ -30,17 +30,17 @@ function to_child(parsed: EpicIssue, repo: string): EpicChild {
 // reads it — and a child elsewhere is read through its own repository, exactly as
 // `fetch_external_children` does. Every read of a child's fields goes through this, bodies included:
 // an unqualified read of a cross-repository child returns *this* repository's issue of that number,
-// a different issue entirely (joshuafolkken/kit#1012).
+// a different issue entirely.
 function scope_for(child_repo: string, current_repo: string): string | undefined {
 	return child_repo === current_repo ? undefined : child_repo
 }
 
 // One child's blockers, read from the relations listing rather than from the issue's own summary
-// count (joshuafolkken/kit#1113). Addressed through the same `scope_for` every other read of a child
+// count. Addressed through the same `scope_for` every other read of a child
 // goes through. The recheck only ever reaches children of the epic's own repository, so what the
 // scope varies with is where the *epic* is: `epic:next owner/other#858` run from here reads them
 // through `owner/other`, and reading them unqualified would answer from this repository's issues of
-// those numbers instead (joshuafolkken/kit#1012).
+// those numbers instead.
 async function read_child_blockers(
 	child: EpicChild,
 	current_repo: string,
@@ -60,7 +60,7 @@ interface EpicBody {
 	// failure is invisible downstream**: `parse_task_list_issue_numbers(undefined)` answers `[]`, so a
 	// body nobody could read is indistinguishable from an epic that tracks no children — and that one
 	// is dropped from the views as an ordinary, unpopulated epic. A run whose DNS hiccuped on this one
-	// request therefore reported the backlog empty and ended (joshuafolkken/kit#1690).
+	// request therefore reported the backlog empty and ended.
 	body_failure: IssueReadFailure | undefined
 	child_numbers: ReadonlyArray<number>
 	external: ReadonlyArray<ExternalChild>
@@ -86,7 +86,7 @@ interface RecheckScope {
 	current_repo: string
 }
 
-// joshuafolkken/kit#1113: the second look at the relations, taken here rather than in `epic:next`
+// The second look at the relations, taken here rather than in `epic:next`
 // and `epic:audit` separately — both read their children through this one snapshot, so correcting it
 // once corrects both, and neither command needs to know the check exists.
 // `repo` is the epic's own repository, which is what a bare declared number names — not
@@ -109,7 +109,7 @@ function to_references(issue_numbers: ReadonlyArray<number>, repo: string): Arra
 }
 
 // One child's read: the child when it came back, and whether the failure was one the same request
-// could succeed at a moment later (joshuafolkken/kit#1690). A response that arrived and would not
+// could succeed at a moment later. A response that arrived and would not
 // parse is **not** unreachable — asking again answers the same thing.
 interface ChildRead {
 	child: EpicChild | undefined
@@ -152,20 +152,18 @@ async function fetch_child(
 //
 // Dropping them is not an option in either direction. An epic whose children all failed to read
 // would otherwise look like an epic with no open children — "complete" — and a single unreadable
-// child would vanish from the graph, so whatever it blocks would look unblocked and be run
-// (joshuafolkken/kit#860).
+// child would vanish from the graph, so whatever it blocks would look unblocked and be run.
 //
 // The unread ones carry their repository, not just their number. An epic tracking
-// `- [ ] sveltejs/kit#7` had it refused by the owner restriction and reported as `Could not read #7`,
-// which a reader resolves against the repository they are standing in — a different issue
-// (joshuafolkken/kit#1016).
+// `- [ ] sveltejs/kit#7` refused by the owner restriction and reported as `Could not read #7` would be
+// resolved by a reader against the repository they are standing in — a different issue.
 interface FetchedChildren {
 	children: ReadonlyArray<EpicChild>
 	unreadable: ReadonlyArray<IssueReference>
 	skipped: ReadonlyArray<IssueReference>
 	// How many of the unreadable ones failed on the transport. Carried from the reads themselves
 	// rather than probed afterwards: a connection that dropped for a moment fails a read at t=0 and
-	// answers a probe fired at t=1 that everything is fine (joshuafolkken/kit#1690).
+	// answers a probe fired at t=1 that everything is fine.
 	//
 	// **A count rather than a flag, because the question the caller asks is about _every_ failure.**
 	// One child unreachable beside another permanently refused is not a run worth repeating — the
@@ -211,10 +209,9 @@ async function fetch_children(
 // The children that live in other repositories, read by naming that repository in the read's REST
 // path (`repos/<owner>/<repo>/issues/<n>`). No local checkout is needed: their state is a GitHub
 // fact, and requiring a clone to learn it is what kept the auto-close from ever running on such an
-// epic (joshuafolkken/kit#864).
+// epic.
 //
-// A repository with a different owner is dropped before it is read, inheriting
-// joshuafolkken/kit#869's restriction rather than restating it.
+// A repository with a different owner is dropped before it is read.
 async function fetch_external_children(
 	external: ReadonlyArray<ExternalChild>,
 	current_owner: string,
@@ -244,21 +241,19 @@ async function fetch_external_children(
 interface EpicSnapshot {
 	body: string | undefined
 	// The repository the *epic* lives in — what a bare number in its body and in a declared dependency
-	// names. Distinct from `current_repo` below, which is where the command is running
-	// (joshuafolkken/kit#1126).
+	// names. Distinct from `current_repo` below, which is where the command is running.
 	repo: string
 	// The `owner/repo` the command is running in — the repository against which a reference is written
 	// bare, and every other one written `owner/repo#N`. Deliberately *not* where the epic lives:
 	// `epic:next owner/other#858` reads an epic elsewhere while the person reading the answer is
-	// standing here, so writing an unread child bare would send them to their own issue of that number
-	// (joshuafolkken/kit#1016).
+	// standing here, so writing an unread child bare would send them to their own issue of that number.
 	current_repo: string
 	children: ReadonlyArray<EpicChild>
 	child_numbers: ReadonlyArray<number>
 	unreadable: ReadonlyArray<IssueReference>
 	skipped: ReadonlyArray<IssueReference>
 	has_external_children: boolean
-	// Why the epic's own body produced nothing, when it produced nothing (joshuafolkken/kit#1690).
+	// Why the epic's own body produced nothing, when it produced nothing.
 	body_failure: IssueReadFailure | undefined
 	// Whether **every** read behind this snapshot that failed — the body and each child — failed on
 	// the transport, and at least one did. What a caller does with it is its own: `epic:next` marks
@@ -266,7 +261,7 @@ interface EpicSnapshot {
 	//
 	// It is `every` rather than `any` so the answer terminates: one child refused for good beside one
 	// unreachable would otherwise be retried for ever, and the run would never reach the verdict that
-	// says a person is needed (joshuafolkken/kit#1690).
+	// says a person is needed.
 	is_unreachable: boolean
 }
 
@@ -323,15 +318,14 @@ async function to_snapshot(
 }
 
 // The epic and its children, as one read. `has_external_children` is surfaced rather than silently
-// ignored: a cross-repository child needs joshuafolkken/kit#864, and an epic that holds one is not
-// fully answered by this command yet.
+// ignored: an epic that holds a cross-repository child is not fully answered by this command alone.
 //
 // `repo` is where the *epic* lives and `current_repo` is where the command is running, so the body
 // and its local rows are read through the same `scope_for` every other read goes through. Read
-// unqualified, `epic:next joshuafolkken/app-kit#858` answered from *this* repository's issue 858 and
-// then stamped the children it found there as app-kit's — and since joshuafolkken/kit#1016 makes
-// `repo` decide how an unread child is written, that mislabelling reached the message too. The
-// default keeps a command whose epic is always local reading exactly as before.
+// unqualified, `epic:next joshuafolkken/app-kit#858` would answer from *this* repository's issue 858
+// and stamp the children it found there as app-kit's — and since `repo` decides how an unread child
+// is written, that mislabelling would reach the message too. The default keeps a command whose epic
+// is always local reading its own repository.
 async function fetch_epic(
 	epic_number: number,
 	repo: string,
@@ -339,9 +333,9 @@ async function fetch_epic(
 ): Promise<EpicSnapshot> {
 	const scope = scope_for(repo, current_repo)
 	const epic_body = await fetch_epic_body(epic_number, scope)
-	// joshuafolkken/kit#869's restriction is about who *we* are, so the owner comes from the repository
-	// the command runs in. Derived from the epic's own repository instead, a qualified reference to
-	// somebody else's epic would have made their whole organization readable.
+	// The owner restriction is about who *we* are, so the owner comes from the repository the command
+	// runs in. Derived from the epic's own repository instead, a qualified reference to somebody else's
+	// epic would make their whole organization readable.
 	const owner = epic_cross_repo.owner_of(current_repo)
 	const local = await fetch_children(epic_body.child_numbers, repo, scope)
 	const remote = await fetch_external_children(epic_body.external, owner)

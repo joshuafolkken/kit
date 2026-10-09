@@ -4,7 +4,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { run_liveness } from '#scripts/run/run-liveness'
 import type { LaneInfo } from './lane-registry'
 
-// What a person reads when they ask what is open (joshuafolkken/kit#1490, joshuafolkken/kit#1494).
+// What a person reads when they ask what is open.
 //
 // The dev and preview ports are the ones the registry already resolved through `ports/index.js`
 // when it read each lane's `.env`, so the numbers printed here are the same ones `josh port` and
@@ -32,7 +32,7 @@ function value_or_unknown(value: number | undefined): string {
 }
 
 // The recorded output path goes last and is labelled, so it is told apart from the directory beside
-// it (joshuafolkken/kit#1713). A lane that records none prints `output -` rather than nothing at
+// it. A lane that records none prints `output -` rather than nothing at
 // all: a session that did not open the lane has to be able to see that the record is missing, not
 // read a shorter row as one field it failed to notice.
 function output_column(output: string | undefined): string {
@@ -53,7 +53,7 @@ function event_column(lane: LaneInfo): string {
 // The plain `#N`, for a caller that could not read the repository the issue would link into.
 const PLAIN_CITE: IssueCiter = issue_cite.citer(undefined, new Map())
 
-// The issue leads as a citation (joshuafolkken/kit#2943): a lane status report copies this row, and a
+// The issue leads as a citation: a lane status report copies this row, and a
 // bare `#N` copied into it is what the Stop guard sends back.
 function describe_lane(lane: LaneInfo, cite: IssueCiter = PLAIN_CITE): string {
 	return [

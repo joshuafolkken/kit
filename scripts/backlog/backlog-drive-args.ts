@@ -2,7 +2,7 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import type { DriveState } from './backlog-drive'
 
 // The `josh backlog:drive` flags — read into a `DriveContext`, and written back as the `resume:` line —
-// split out of `backlog-drive-cli.ts` when it neared its line limit (joshuafolkken/kit#3264).
+// split out of `backlog-drive-cli.ts` when it neared its line limit.
 // `backlog_drive_cli` re-exports `parse` and `resume_line` under the names they always had, so the move
 // changed no call site and no suite that reads them through `backlog_drive_cli`.
 

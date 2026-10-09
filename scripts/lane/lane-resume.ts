@@ -3,8 +3,8 @@ import { api_outage } from '#scripts/agent/api-outage'
 import type { ClaudeResultEvent } from '#scripts/agent/claude-result-event'
 import { lane_child_invocation } from './lane-child-invocation'
 
-// How a lane re-dispatch chooses between resuming the disconnected child's session and starting fresh
-// (joshuafolkken/kit#2317). The premise the whole issue rests on: a child that could not reach the API
+// How a lane re-dispatch chooses between resuming the disconnected child's session and starting fresh.
+// The premise the whole issue rests on: a child that could not reach the API
 // left a `session_id` in its exit record, and re-dispatching it as a bare `fullrun #<N>` threw that
 // context away — a resumed child keeps it and loses only the last round-trip.
 //

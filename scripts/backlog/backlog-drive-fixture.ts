@@ -2,7 +2,7 @@ import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import { backlog_drive, type DriveState, type LoopPorts, type OfferRead } from './backlog-drive'
 
 // The scripted ports every `backlog_drive` suite drives the loop through — one copy, so the suites
-// cannot drift on how a child finishes, a merge answers or an offer is queued (joshuafolkken/kit#2881).
+// cannot drift on how a child finishes, a merge answers or an offer is queued.
 
 const ACTIVE = '2026-09-24T00:00:00.000Z'
 const START_MS = Date.parse(ACTIVE)

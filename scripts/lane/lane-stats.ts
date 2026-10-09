@@ -1,6 +1,6 @@
 import type { GateEntry, LedgerEntry, LoadEntry } from './lane-ledger'
 
-// The lane-limit measurement's one table row (joshuafolkken/kit#3355): the ledger entries of one period
+// The lane-limit measurement's one table row: the ledger entries of one period
 // reduced to throughput, gate duration and machine load, in the column order
 // `docs/maintainers/lane-limit-measurement.md` documents, so the row pastes into #3347's table as is.
 //

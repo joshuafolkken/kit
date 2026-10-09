@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { fanout, type FanoutUnit } from './fanout'
 
 // `josh fanout <unit-files> <unit-files> …` — may the Step 0 change list be cut into file-disjoint
-// units and dispatched in one fan-out turn? (joshuafolkken/kit#2345)
+// units and dispatched in one fan-out turn?
 //
 // A command rather than a paragraph, for the reason `josh delegate` is one: "these units look
 // independent" is a judgement made under the same cost pressure, and the answer is mechanical — read

@@ -1,18 +1,16 @@
-// The named-issue prefix of a `backlogrun` invocation (joshuafolkken/kit#1984). `backlogrun #N1 #N2 …`
+// The named-issue prefix of a `backlogrun` invocation. `backlogrun #N1 #N2 …`
 // runs the issues typed after the keyword in the order they were typed, one at a time, and only once
 // they are all done does the opted-in backlog drain. This module is the single source of that order
 // and of what a failure partway through it does, so the plan a person reads (`backlog:plan`) and the
 // loop that runs it (`backlogrun.md`) cannot disagree.
 //
-// **It replaces the old `queue` keyword.** `queue #N1 #N2 …` was a separate entry point for exactly
-// this sequential run; folding it in means one command carries both the named prefix and the backlog
-// that follows it, under one authorization and one carried budget.
+// **One command carries both the named prefix and the backlog that follows it**, under one
+// authorization and one carried budget, rather than a separate entry point for the sequential run.
 //
-// **A named item is a single issue or an epic** (joshuafolkken/kit#1985, folding in the old `epicrun`
-// keyword). A single-issue item is one `fullrun`; an epic item runs every child in dependency order,
-// across the free lanes, and is done only once every child has been processed — merged or parked. The
-// run does not advance to the next named item until the epic item is complete, which is `epicrun`'s
-// whole-epic execution at the granularity of one named item.
+// **A named item is a single issue or an epic.** A single-issue item is one `fullrun`; an epic item
+// runs every child in dependency order, across the free lanes, and is done only once every child has
+// been processed — merged or parked. The run does not advance to the next named item until the epic
+// item is complete, so a whole epic executes at the granularity of one named item.
 
 const NAMED_KIND = 'named'
 const BACKLOG_KIND = 'backlog'
@@ -51,12 +49,11 @@ type PlanStep = NamedStep | BacklogStep
 // A named issue that could not finish parks like any other child; what is specific to a sequential run
 // is that the issues declared *after* it are not started — the order was the point of naming them. What
 // follows is the pool by default, or nothing under `--only`, so the run then drains the opted-in
-// backlog or ends (joshuafolkken/kit#1984).
+// backlog or ends.
 //
 // **This skip only applies to a single-issue item.** An epic item does not park as a unit — its
 // children park individually and the epic item completes anyway (`epic_item_outcome`), so a parked
-// epic child, which is never in the named list, skips nothing and the run advances to the next item
-// (joshuafolkken/kit#1985).
+// epic child, which is never in the named list, skips nothing and the run advances to the next item.
 interface FailureOutcome {
 	parked: number
 	skipped: ReadonlyArray<number>
@@ -65,8 +62,7 @@ interface FailureOutcome {
 
 // The completion of one epic named item. It runs every child and finishes once each has been
 // processed; the children that parked are carried here so the completion report can list them, and the
-// item is complete regardless — a parked child never holds up the next named item
-// (joshuafolkken/kit#1985).
+// item is complete regardless — a parked child never holds up the next named item.
 interface EpicItemOutcome {
 	epic: number
 	parked: ReadonlyArray<number>
@@ -130,7 +126,7 @@ function after_failure(
 // An epic named item is complete once every child has been processed — merged or parked. The parked
 // children are carried out so the completion report can list them, and the item is complete either
 // way: a parked epic child does not hold up the next named item, which is `epicrun`'s park-and-continue
-// at the granularity of one named epic item (joshuafolkken/kit#1985).
+// at the granularity of one named epic item.
 function epic_item_outcome(
 	epic: number,
 	children: ReadonlyArray<EpicChildOutcome>,

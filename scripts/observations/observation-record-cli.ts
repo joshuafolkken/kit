@@ -10,7 +10,7 @@ import {
 } from './observation-record'
 
 // `josh observation:record <key> <depth> <where> <what>` — count the key's earlier sightings, append
-// this one, and answer what the run does next (joshuafolkken/kit#3400). Exactly one token on stdout:
+// this one, and answer what the run does next. Exactly one token on stdout:
 // `file` on the second sighting, which the promotion rule files; `ledger` on any other, which the line
 // alone records. The earlier sightings and the file written go to stderr, so the Issue a `file` answer
 // opens can quote the first sighting's date from them.

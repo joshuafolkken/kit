@@ -1,4 +1,4 @@
-// Which steps of a run may be delegated to a cheaper execution tier (joshuafolkken/kit#969).
+// Which steps of a run may be delegated to a cheaper execution tier.
 //
 // **The decision takes no judgement.** "This one is simple enough" is a judgement made under cost
 // pressure, and cost pressure resolves it toward "simple enough" exactly when a mistake is most
@@ -23,19 +23,18 @@ interface DelegatableStep {
 	verifier: string
 }
 
-// Where the pre-implementation reading stops being cheaper in the main line (joshuafolkken/kit#1426).
+// Where the pre-implementation reading stops being cheaper in the main line.
 //
 // **A count, not a forecast.** The reads are counted as they are made rather than predicted before
 // the investigation starts, so nothing here rests on guessing how large it will be. Two files the run
 // will not edit stay in the main line, because delegating costs two extra main-line turns — one to
-// write the brief, one to read the result, about 18 seconds at run #1406's measured 8.8 s of model
+// write the brief, one to read the result, about 18 seconds at roughly 8.8 s of model
 // wait per turn — and below the threshold that round trip costs more than carrying the text.
 const INVESTIGATION_FILE_THRESHOLD = 3
 
-// The same boundary for searches, counted in turns (joshuafolkken/kit#3139). A `grep` carries no file
-// text, so it never reached the file count — yet across 100 lane transcripts on 2026-10-04, 424 turns
-// were searches alone and 160 of them came third or later since the last edit or delegation, each
-// re-reading the whole main-line context. Three keeps the first two searches, which locate an edit
+// The same boundary for searches, counted in turns. A `grep` carries no file
+// text, so it never reaches the file count — yet a search that comes third or later since the last
+// edit or delegation re-reads the whole main-line context all the same. Three keeps the first two searches, which locate an edit
 // target, in the main line and sends the continuing sweep to a unit.
 const INVESTIGATION_SEARCH_TURN_THRESHOLD = 3
 
@@ -50,10 +49,9 @@ const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
 	},
 	{
 		name: 'epic-child',
-		// One row, two entry points: an epic's child under `epicrun` and one named issue of a
-		// `backlogrun` are the same unit — same brief, same summary, same verifier
-		// (joshuafolkken/kit#1149, folded from `queue` into `backlogrun` by joshuafolkken/kit#1984). A
-		// second row for the batch would be the clone `CLAUDE.md` prohibits.
+		// One row, two entry points: an epic's child and one named issue of a `backlogrun` are the same
+		// unit — same brief, same summary, same verifier. A second row for the batch would be the clone
+		// `CLAUDE.md` prohibits.
 		does: "run one child of a batch end to end in an isolated unit — an epic's child or one named issue of a `backlogrun` alike — plan, verification gate, PR, merge — and return only its summary to the parent loop",
 		verifier:
 			"the parent reads the child's state from GitHub with `pnpm josh issue:state`, not from the summary; a child reported done but not merged is still open, which is the failure showing rather than a run continuing, and its own gate, `/code-review` and CI ran inside the unit before `followup` would touch the PR",
@@ -61,9 +59,9 @@ const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
 	{
 		name: 'followup-filing',
 		// The late-run follow-up filing chain — `issue:file` (which scouts, lints, labels and runs
-		// epic:bundle itself, joshuafolkken/kit#2808) → epic --add — is a dependency chain `batch:guard`
+		// epic:bundle itself) → epic --add — is a dependency chain `batch:guard`
 		// correctly keeps one call per step, and what makes it expensive is the ~340k context it runs in
-		// at the tail of a run, not the step count (joshuafolkken/kit#1892). A fresh unit runs the same
+		// at the tail of a run, not the step count. A fresh unit runs the same
 		// chain at a small context, and the review round cap already composed the finding text, so what
 		// the unit is handed is mechanical: run the commands and act on their deterministic answers. This
 		// is not `batch:guard`'s business — delegation only moves the chain to a cheaper context.
@@ -77,7 +75,7 @@ const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
 		// which is why `design` is rejected below. What is delegated is the *writing* of one unit of that
 		// list, and only a unit whose files are disjoint from every other dispatched unit: two subagents
 		// editing one file in parallel race on it. `pnpm josh fanout` confirms that disjointness
-		// mechanically, so the split is read off the file sets rather than judged (joshuafolkken/kit#2345).
+		// mechanically, so the split is read off the file sets rather than judged.
 		does: 'implement one file-disjoint unit of the Step 0 change list in an isolated subagent — the files it edits shared with no other dispatched unit, confirmed by `pnpm josh fanout` — and return the edited files, never a summary standing in for the diff; the main line keeps integration and the verification gate. Units that share a file, or an Issue that will not split, stay serial',
 		verifier:
 			"the parent runs the whole integrated change through `pnpm josh gate` and a `/code-review` subagent it would run anyway — a unit's mistake fails the same gate and review a serial edit passes through, so delegating writes nothing the backstop does not already catch, and the `pnpm josh fanout` disjointness removes the one failure parallelism adds, two units colliding on a file",
@@ -101,7 +99,7 @@ const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
 	},
 	{
 		name: 'lane-failure-investigation',
-		// The `backlogrun` parent's counterpart of `investigation` (joshuafolkken/kit#2947). The parent
+		// The `backlogrun` parent's counterpart of `investigation`. The parent
 		// orchestrates and never implements, yet it read a failed lane's logs, records and sources in its
 		// own context — about 150 grep / cat / sed calls on 2026-10-02 — and every later request of the
 		// batch re-read them. The verifier is `investigation`'s, and so is the boundary: the unit reports

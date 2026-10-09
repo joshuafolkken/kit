@@ -1,7 +1,7 @@
 import type { AgentProvider } from '#scripts/agent/agent-role-profile'
 import { run_invocation } from '#scripts/run/run-invocation'
 
-// `josh backlogrun`'s arguments (joshuafolkken/kit#3437). `--agent claude|codex` picks the agent the run
+// `josh backlogrun`'s arguments. `--agent claude|codex` picks the agent the run
 // is started in; everything else is the `backlogrun` invocation itself, read by `run-invocation.ts`'s
 // grammar — the one the carry record and the woken session read — so the launcher accepts exactly what a
 // typed `backlogrun` would carry, and the text the agent is handed is the grammar's rebuild of it.

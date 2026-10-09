@@ -6,7 +6,7 @@ import { lane_paths } from './lane-paths'
 import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
 
-// Closing a lane: no work tree, no branch, no directory (joshuafolkken/kit#1490).
+// Closing a lane: no work tree, no branch, no directory.
 //
 // **A lane is closed after a park, a failure or an interruption as readily as after a success**, so
 // every step here is written to run over a subject that is already gone or that still holds
@@ -21,7 +21,7 @@ interface LaneTargets {
 
 // The lane an issue number names: its registration, when there is one, and the paths a close acts on.
 // Resolved once here so a caller that has to look inside the tree before closing it reads the same
-// directory the close removes (joshuafolkken/kit#2476).
+// directory the close removes.
 interface ResolvedLane {
 	existing: LaneInfo | undefined
 	targets: LaneTargets
@@ -107,8 +107,8 @@ function close_kind(did_exist: boolean, left_behind: ReadonlyArray<string>): Clo
 }
 
 // The main work tree's root, not this one's — the same reading `list_lanes` uses, so the fallback
-// directory an unregistered lane is closed by is the one `lane:open` would have created
-// (joshuafolkken/kit#1497). Derived here from the current work tree, a close run inside a lane
+// directory an unregistered lane is closed by is the one `lane:open` would have created.
+// Derived here from the current work tree, a close run inside a lane
 // reports `none` over a directory that is still on disk.
 async function lane_root_directory(): Promise<string> {
 	return lane_paths.lane_root(await lane_registry.main_repository_root())
@@ -130,8 +130,8 @@ async function close_lane(issue: string): Promise<CloseOutcome> {
 	const { existing, targets } = await resolve_lane(issue)
 	const did_exist = existing !== undefined || existsSync(targets.directory)
 	// Before the removal, not after: a child still running in the tree would keep writing into a
-	// directory being deleted, and a process outliving its lane is the half-discarded state
-	// joshuafolkken/kit#2421 found — the work tree gone, the child still answering `alive`.
+	// directory being deleted, and a process outliving its lane is a half-discarded state — the work
+	// tree gone, the child still answering `alive`.
 	const reaped = lane_reap.reap_child(issue)
 
 	await remove_lane(targets)

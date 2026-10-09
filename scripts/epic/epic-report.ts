@@ -3,9 +3,8 @@ import { epic_graph, type EpicChild, type GraphAnomaly } from './epic-graph'
 
 // Turning a classification into the answer a caller acts on.
 //
-// The verdict is what `epicrun` (joshuafolkken/kit#861) branches on, so the three "nothing to run"
-// cases are kept apart: waiting, stopping, and being finished are different instructions
-// (joshuafolkken/kit#860).
+// The verdict is what `epicrun` branches on, so the three "nothing to run"
+// cases are kept apart: waiting, stopping, and being finished are different instructions.
 
 // What the caller should do next.
 type EpicVerdict = 'run' | 'wait' | 'stop' | 'complete' | 'error'
@@ -13,17 +12,16 @@ type EpicVerdict = 'run' | 'wait' | 'stop' | 'complete' | 'error'
 interface RepoCandidates {
 	repo: string
 	children: ReadonlyArray<EpicChild>
-	// The local checkout a runner would work in, from joshuafolkken/kit#869's map. Absent when the
+	// The local checkout a runner would work in, from the checkout discovery map. Absent when the
 	// repository is not checked out here — reported rather than cloned, since creating a working tree
-	// nobody asked for is not a step this command takes (joshuafolkken/kit#864).
+	// nobody asked for is not a step this command takes.
 	path?: string
 }
 
 interface EpicNextResult {
 	verdict: EpicVerdict
 	// Runnable children bundled per repository. How many of one bundle may start at once is the
-	// repository's free-lane count, which `epic-lane-offer.ts` decides and this report does not know
-	// (joshuafolkken/kit#1491).
+	// repository's free-lane count, which `epic-lane-offer.ts` decides and this report does not know.
 	candidates: ReadonlyArray<RepoCandidates>
 	waiting: ReadonlyArray<EpicChild>
 	blocked_on_people: ReadonlyArray<EpicChild>
@@ -32,12 +30,12 @@ interface EpicNextResult {
 
 // Bundle by repository, repositories in name order, so a run is reproducible rather than dependent
 // on the order GitHub happened to list the repositories in. **The children are not re-ordered at
-// all** since joshuafolkken/kit#1583 — they keep the order the epic's task list gave them, which is
+// all** — they keep the order the epic's task list gave them, which is
 // how an epic says which of its runnable children goes first; the reasoning is at `bundle_by_repo`
 // below.
 // The discovery map is keyed lowercase — GitHub resolves owner and repository names
 // case-insensitively — so the lookup lowercases too. Without it any capital in a repository name
-// printed "no local checkout" for a repository that is checked out (joshuafolkken/kit#864).
+// printed "no local checkout" for a repository that is checked out.
 //
 // `exactOptionalPropertyTypes` rejects `{ path: undefined }`, so the key is added only when there
 // is a path to put in it.
@@ -63,14 +61,14 @@ function bundle_by_repo(
 	for (const [repo] of grouped) repos.push(repo)
 
 	// **The children keep the order they arrived in, which is the order the epic's task list names
-	// them** (joshuafolkken/kit#1583). They used to be re-sorted by issue number here, on the premise
-	// that number order is split order — true only of an epic whose children were all filed in one
-	// split, and false of every epic that grows as work is found: there the number order is *filing*
-	// order, and an epic had no way at all to say which of its runnable children should go first.
+	// them**. Re-sorting by issue number would assume that number order is split order — true only of
+	// an epic whose children were all filed in one split, and false of every epic that grows as work
+	// is found: there the number order is *filing* order, and an epic would have no way at all to say
+	// which of its runnable children should go first.
 	//
-	// Nothing else had to change to make the body order authoritative: `epic-fetch.ts` →
-	// `fetch_children` already reads the task list in body order and `epic-classify.ts` fills
-	// `runnable` in that order, so this sort was the one step discarding it.
+	// The body order is authoritative end to end: `epic-fetch.ts` → `fetch_children` reads the task
+	// list in body order and `epic-classify.ts` fills `runnable` in that order, so a sort here would be
+	// the one step discarding it.
 	//
 	// **The repositories are still sorted by name**, which is a different question — that is grouping,
 	// not the order work is offered in.
@@ -115,7 +113,7 @@ function build_result(
 }
 
 // Every runnable child of one repository, in the order they would be offered — **the order the
-// epic's own task list names them** (joshuafolkken/kit#1583). It was lowest number first until then,
+// epic's own task list names them**. It was lowest number first until then,
 // on the premise that number order is split order; an epic that gains children as work is found has
 // no such property, and the epic could not express a priority at all.
 //
@@ -126,7 +124,7 @@ function build_result(
 //
 // The whole bundle rather than only its head, because the confirmation walk needs the rest of it: a
 // candidate whose relations listing disagrees with its summary is withheld and the next one is
-// confirmed in its place (joshuafolkken/kit#1121).
+// confirmed in its place.
 function candidates_for_repo(result: EpicNextResult, repo: string): ReadonlyArray<EpicChild> {
 	return result.candidates.find((bundle) => bundle.repo === repo)?.children ?? []
 }
@@ -138,8 +136,8 @@ function format_bundle_heading(bundle: RepoCandidates): string {
 }
 
 // A child in another repository is written `owner/repo#N`, not a bare `#N` — a bare number resolves
-// against the reader's own repository and would linkify to the wrong issue there
-// (joshuafolkken/kit#2329). This reuses the one spelling `epic_graph.format_reference` already gives
+// against the reader's own repository and would linkify to the wrong issue there.
+// This reuses the one spelling `epic_graph.format_reference` already gives
 // every other read of a child, rather than a second one here.
 function format_child(child: EpicChild, current_repo: string): string {
 	return `    ${epic_graph.format_reference(child, current_repo)}`

@@ -5,8 +5,7 @@ import { epic_graph, type GraphAnomaly, type IssueReference } from './epic-graph
 //
 // Only errors decide the exit code. A warning is something a reader has to look at, not something a
 // gate may fail on: check 1 fires on a legitimate forward reference as readily as on a real missing
-// dependency, and a gate that failed on both would make design notes unwritable
-// (joshuafolkken/kit#870).
+// dependency, and a gate that failed on both would make design notes unwritable.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -34,9 +33,7 @@ function anomaly_findings(anomalies: ReadonlyArray<GraphAnomaly>): Array<AuditFi
 // command that acts on it.
 //
 // Each one is written with the repository it lives in. `- [ ] sveltejs/kit#7`, refused by the owner
-// restriction, was reported as `Could not read #7` and sent the reader to this repository's issue 7
-// — the one message joshuafolkken/kit#1014 left resolving against the wrong repository
-// (joshuafolkken/kit#1016).
+// restriction, reported as `Could not read #7` would send the reader to this repository's issue 7.
 function unreadable_findings(
 	missing: ReadonlyArray<IssueReference>,
 	current_repo: string,

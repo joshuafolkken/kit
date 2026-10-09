@@ -5,7 +5,7 @@ import { defect_rate, type DefectRate, type IssueKind } from '#scripts/issue/def
 import { defect_rate_cli } from '#scripts/issue/defect-rate-cli'
 
 // While the defect rate is above its baseline, `backlog:next` offers defects and hardening first and
-// defers new mechanisms (joshuafolkken/kit#2455). The re-ordering stays inside the runnable set — every
+// defers new mechanisms. The re-ordering stays inside the runnable set — every
 // candidate is already ready to start — so no dependency the graph recorded is crossed.
 
 const UNMEASURED_MESSAGE =

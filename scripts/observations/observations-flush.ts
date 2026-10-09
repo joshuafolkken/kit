@@ -7,9 +7,9 @@ import type { BrokenLine } from './observation-ledger-line'
 import { observation_ledger_prepare } from './observation-ledger-prepare'
 import { observations_flush_landing } from './observations-flush-landing'
 
-// The commit path for the ledger lines no run's own commit carried (joshuafolkken/kit#1756). Every run —
+// The commit path for the ledger lines no run's own commit carried. Every run —
 // a lane's included — commits its appended lines with its own pull request (`scripts/git/
-// git-staging.ts`, joshuafolkken/kit#2763, joshuafolkken/kit#2919), and `pnpm josh followup` commits a
+// git-staging.ts`), and `pnpm josh followup` commits a
 // line appended after that commit before it merges, so what is left here is a line written on the
 // default branch outside any issue's run — the date-named file `observation-ledger-home.ts` resolves.
 //
@@ -17,7 +17,7 @@ import { observations_flush_landing } from './observations-flush-landing'
 // their own over one path, wait on the same required checks every other pull request waits on, and
 // merge — so this reuses the same primitives rather than growing a second answer to "how does a
 // josh command open and land a pull request". The one difference is that this pull request is handed
-// to GitHub's auto-merge as soon as it opens (joshuafolkken/kit#2497), so it lands even when the wait
+// to GitHub's auto-merge as soon as it opens, so it lands even when the wait
 // below does not survive — `observations-flush-landing.ts` carries why.
 
 const COMMIT_MESSAGE = 'Record observation ledger entries'
@@ -72,7 +72,7 @@ function status_paths(status_output: string): ReadonlyArray<string> {
 		.map((line) => observation_ledger.status_path(line))
 }
 
-// **Single-sourced with `pnpm josh followup`'s pre-flush short-circuit** (joshuafolkken/kit#1810):
+// **Single-sourced with `pnpm josh followup`'s pre-flush short-circuit**:
 // the ledger-change test lives in `observation-ledger.ts`, so the two callers cannot drift.
 function has_ledger_change(status_output: string): boolean {
 	return observation_ledger.has_pending_append(status_output)
@@ -89,17 +89,17 @@ function other_changed_paths(status_output: string): ReadonlyArray<string> {
 // is what the ordinary off-default refusal says — would abandon them without a word, so this branch
 // of the refusal says the opposite.
 //
-// **The exits it names are ones the caller can actually take** (joshuafolkken/kit#1785). It used to
-// say "finish or delete that branch", and both are closed to an agent: the distributed
+// **The exits it names are ones the caller can actually take**. "Finish or delete that branch" are
+// both closed to an agent: the distributed
 // `.claude/settings.json` denies `Bash(git commit*)` and `Bash(git branch -d*)`, and `pnpm josh git`
-// excludes the ledger from staging by design (joshuafolkken/kit#1756), so finishing through it is not
+// excludes the ledger from staging by design, so finishing through it is not
 // possible either. Pushing the branch and landing its pull request is the route that is open.
 function stranded_flush_message(current: string): string {
 	return `\`${current}\` is a flush branch an earlier \`pnpm josh observations:flush\` left behind, and its appended observations are committed only there. Land it before flushing again — \`git push -u origin ${current}\`, then open and merge its pull request; \`pnpm josh ms\` here would leave the only copy of those lines behind.`
 }
 
-// **A flush branch with no commit on it strands nothing, so it is told the opposite**
-// (joshuafolkken/kit#1785). The appended lines never left the working tree, which makes the "only
+// **A flush branch with no commit on it strands nothing, so it is told the opposite**.
+// The appended lines never left the working tree, which makes the "only
 // copy" premise above factually false here — and makes `pnpm josh ms` the correct exit, the very one
 // the other message forbids.
 function empty_flush_message(current: string): string {
@@ -120,9 +120,9 @@ function off_default_message(current: string, default_branch: string): string {
 }
 
 // **A branch cut from a default branch that predates another merged flush conflicts by
-// construction** (joshuafolkken/kit#1768). The ledger is append-only and every writer adds at the
+// construction**. The ledger is append-only and every writer adds at the
 // same tail, so a stale start point opens a pull request `wait_for_pr_success` waits on until it
-// exhausts its budget rather than merging. The flush fast-forwards first (joshuafolkken/kit#2462), so
+// exhausts its budget rather than merging. The flush fast-forwards first, so
 // this is printed only when that fast-forward was refused — the reason is git's own.
 function behind_default_message(default_branch: string, reason: string): string {
 	return `\`pnpm josh observations:flush\` cuts its branch from \`${default_branch}\`, which is behind \`origin/${default_branch}\` and could not be fast-forwarded (${reason}) — a branch cut here would open a pull request that cannot merge. Run \`pnpm josh ms\` first.`
@@ -183,7 +183,7 @@ async function refuse_off_default(current: string, default_branch: string): Prom
 }
 
 // **The start point's freshness is judged without moving the working tree**, which is the whole
-// point of doing it here rather than pulling (joshuafolkken/kit#1768). `git fetch` updates the
+// point of doing it here rather than pulling. `git fetch` updates the
 // remote-tracking ref and `git rev-list --count HEAD..origin/<default>` reads it — neither writes a
 // file, so the ledger, dirty by definition when this runs, is left exactly as it is.
 async function commits_behind_default(default_branch: string): Promise<number> {
@@ -192,8 +192,8 @@ async function commits_behind_default(default_branch: string): Promise<number> {
 	return await git_command.commit_count_beyond('HEAD', `origin/${default_branch}`)
 }
 
-// **A default branch that is only behind is brought forward rather than refused**
-// (joshuafolkken/kit#2462). A lane's flush acts on the primary checkout, whose default branch is
+// **A default branch that is only behind is brought forward rather than refused**.
+// A lane's flush acts on the primary checkout, whose default branch is
 // behind by the lane's own merge every time — so the refusal alone stopped every lane close. A
 // `--ff-only` merge moves no file the dirty ledger conflicts with: git refuses it, untouched, when an
 // incoming commit changes the ledger too, and only that case is still refused.
@@ -231,7 +231,7 @@ async function refuse_unsafe_flush(status_output: string): Promise<string> {
 // **Its exit code is read rather than discarded**: `run` catches its own errors and returns `1`, so a
 // checkout left on the flush branch would otherwise be reported as a completed flush.
 //
-// **The local default branch is fast-forwarded before it is checked out** (joshuafolkken/kit#2462).
+// **The local default branch is fast-forwarded before it is checked out**.
 // Lines appended while the pull request waited leave the ledger dirty, and git refuses to check out a
 // default branch whose ledger differs from the flush branch's. Once the merge is in, the fast-forwarded
 // default branch holds the same ledger the flush branch does, so the checkout carries those lines over.
@@ -266,9 +266,8 @@ async function push_and_open(branch_name: string): Promise<string> {
 	}
 }
 
-// **The side that created the branch is the side that rolls it back** (joshuafolkken/kit#1785). A
-// commit rejected by the pre-commit hook used to leave the branch behind with nothing on it, and the
-// refusal the next run printed named two exits an agent cannot take. Nothing is stranded at this
+// **The side that created the branch is the side that rolls it back**, so a commit rejected by the
+// pre-commit hook does not leave the branch behind with nothing on it. Nothing is stranded at this
 // point — the appended lines are still in the working tree, staged and uncommitted — so returning to
 // the default branch and removing the branch loses none of them.
 //
@@ -300,7 +299,7 @@ function rejection_message(
 	return roll_back_failure_message(branch_name, reason, roll_back_reason)
 }
 
-// **Every ledger path the status names is staged, not the one constant** (joshuafolkken/kit#2724).
+// **Every ledger path the status names is staged, not the one constant**.
 // After a migration the change is the new file together with the old one's deletion, and a commit
 // holding only the first would leave the deletion behind as a change no later flush could tell apart
 // from a fresh append.
@@ -342,8 +341,8 @@ async function open_pull_request(branch_name: string, default_branch: string): P
 // at any more. The next flush would read `has_ledger_change` as false and report `clean`, which is
 // the silent loss the refusals above exist to prevent. Left on the branch, the refusal fires.
 //
-// With auto-merge on, a failed wait no longer strands the lines for good — GitHub still merges once
-// the checks pass (joshuafolkken/kit#2497) — but the checkout stays on the branch all the same,
+// With auto-merge on, a failed wait does not strand the lines for good — GitHub still merges once
+// the checks pass — but the checkout stays on the branch all the same,
 // because only a merge this command has seen makes returning to the default branch safe.
 async function land(
 	branch_name: string,
@@ -380,9 +379,9 @@ function broken_lines_message(broken: ReadonlyArray<BrokenLine>): string {
 }
 
 // **A malformed line is refused before a branch is cut, not after.** The ledger path was collected
-// without a line ever being parsed (joshuafolkken/kit#2123), so a broken append could ride a flush
+// without a line ever being parsed, so a broken append could ride a flush
 // through; validating here keeps the committed ledger to its grammar. The migration and the parse are
-// `observation-ledger-prepare.ts`'s, shared with the run's own commit (joshuafolkken/kit#2763).
+// `observation-ledger-prepare.ts`'s, shared with the run's own commit.
 async function prepare_ledger(): Promise<void> {
 	const broken = await observation_ledger_prepare.prepare(process.cwd())
 
@@ -392,12 +391,12 @@ async function prepare_ledger(): Promise<void> {
 // **Nothing pulls in front of the branch, and that is deliberate.** The ledger is dirty by
 // definition at this point, so `git pull --ff-only` aborts on it in exactly the case a pull would
 // have been for — an upstream flush that already advanced the ledger — and reports a failure about
-// the wrong thing (joshuafolkken/kit#1756's second review round). So the freshness of the start
-// point is read from the remote first (joshuafolkken/kit#1768), and `catch_up_default` fast-forwards
-// only where git can do it without touching the ledger (joshuafolkken/kit#2462): a default branch
+// the wrong thing. So the freshness of the start
+// point is read from the remote first, and `catch_up_default` fast-forwards
+// only where git can do it without touching the ledger: a default branch
 // that predates another merged flush still stops here — before a branch is cut — rather than opening
 // a pull request that cannot merge. An earlier flush pull request still open is checked for the same
-// reason (joshuafolkken/kit#2497): a branch cut beside it conflicts with it at the ledger's tail.
+// reason: a branch cut beside it conflicts with it at the ledger's tail.
 async function flush(now: Date): Promise<string> {
 	const status_output = await git_command.status()
 	const default_branch = await refuse_unsafe_flush(status_output)

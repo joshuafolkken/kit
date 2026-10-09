@@ -7,7 +7,7 @@ import { run_carry } from '#scripts/run/carry/run-carry'
 import { backlogrun_args, type BacklogrunArguments } from './backlogrun-args'
 import { backlogrun_launch, type LaunchTarget, type StartResult } from './backlogrun-launch'
 
-// `josh backlogrun` — start a `backlogrun` from the terminal and watch it (joshuafolkken/kit#3437). A
+// `josh backlogrun` — start a `backlogrun` from the terminal and watch it. A
 // run already going is never joined by a second one: the board is shown, and any issue named is pointed
 // at `run:add` rather than added behind the person's back. Otherwise the agent is started in the
 // background, its output to a log file, and the board takes over the terminal at once. Closing the

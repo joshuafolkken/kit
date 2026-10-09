@@ -8,11 +8,10 @@ import { format_dependency_links } from './epic-reference'
 // The relation is a nicety, not part of the contract: losing it costs only the native link, while
 // the Issue and its task list are already correct. A failure is therefore counted and reported
 // rather than aborting a batch that is otherwise fine. It no longer depends on the gh CLI's version
-// — the relation is written through the REST dependencies endpoint (joshuafolkken/kit#1026).
+// — the relation is written through the REST dependencies endpoint.
 //
 // Shared by epic creation and `--add` rather than written once per caller: both apply the same
-// relations for the same reason, and a second copy would be the place a fix is forgotten
-// (joshuafolkken/kit#890).
+// relations for the same reason, and a second copy would be the place a fix is forgotten.
 
 type RelationAction = 'record' | 'drop'
 
@@ -42,10 +41,9 @@ function describe_action(action: RelationAction): string {
 	return action === 'record' ? 'recorded' : 'removed'
 }
 
-// What happened, and to which pairs. The count used to stand on its own, and a count cannot be
-// checked: an insertion that recorded an order nobody declared printed the same
-// `1 blocked-by relation(s) recorded.` as a correct one, so the invented chains of
-// joshuafolkken/kit#1080 were caught only by whoever thought to open the epic body afterwards. The
+// What happened, and to which pairs. A count on its own cannot be checked: an insertion that
+// recorded an order nobody declared would print the same `1 blocked-by relation(s) recorded.` as a
+// correct one, so an invented chain would be caught only by whoever opened the epic body. The
 // links are named in the `#blocker -> #blocked` form the declaration itself uses, so the reader
 // compares like with like.
 //

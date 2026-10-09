@@ -11,8 +11,7 @@ import { epic_parse } from './epic-parse'
 // task list does not track. It would never be run, and the epic would close without it.
 //
 // Split from the command because it shares nothing with the rest of it — the other three checks read
-// the children the epic already names, while this one searches for issues the epic does *not* name
-// (joshuafolkken/kit#1016).
+// the children the epic already names, while this one searches for issues the epic does *not* name.
 
 const SEARCH_LIMIT = 50
 const PARENT_MARKERS: ReadonlyArray<string> = ['親:', 'Parent:', '親：']
@@ -37,10 +36,10 @@ function has_parent_marker(line: string): boolean {
 // every such issue as an orphan.
 //
 // The number is read through the same reference parse the checks use, so a parent line (a PARENT_MARKERS
-// prefix) such as `owner/other#858` names that repository's epic and not this one's (joshuafolkken/kit#1014).
+// prefix) such as `owner/other#858` names that repository's epic and not this one's.
 // The known set is this repository alone — a parent line names this epic or it names nothing here —
 // and it is passed rather than omitted so a repository whose own name contains a dot still recognizes
-// `joshuafolkken/site.com#858` (joshuafolkken/kit#1016).
+// `joshuafolkken/site.com#858`.
 function names_this_epic(line: string, epic_number: number, repo: string): boolean {
 	return epic_audit_logic
 		.parse_issue_references(line, repo, epic_audit_logic.known_repos([], repo))
@@ -55,12 +54,12 @@ function claims_parent(body: string | null, epic_number: number, repo: string): 
 
 // Why the scan stopped before the end of the open backlog, or that it did not. Both cutoffs hide the
 // same thing — an older issue naming this epic — and they are told apart only so the report can say
-// which one to raise (joshuafolkken/kit#1033).
+// which one to raise.
 //
-// The vocabulary is `listing-cutoff.ts`'s since joshuafolkken/kit#1067, because every caller of the
-// listing now asks this question and a second definition of "I saw everything" is the clone
-// `CLAUDE.md` prohibits. `page_ceiling` is the paging's; `row_limit` here means `SEARCH_LIMIT` body
-// mentions of `#<epic>` came back and the scan stopped there.
+// The vocabulary is `listing-cutoff.ts`'s, because every caller of the listing asks this question
+// and a second definition of "I saw everything" is the clone `CLAUDE.md` prohibits. `page_ceiling`
+// is the paging's; `row_limit` here means `SEARCH_LIMIT` body mentions of `#<epic>` came back and
+// the scan stopped there.
 
 // What the search found, and what it could not cover. The `read` / `unreadable` vocabulary is
 // `git-gh-issue-read.ts`'s, and the union rather than a flag beside the numbers is deliberate: a
@@ -71,11 +70,10 @@ type ClaimingSearch =
 // Open issues naming this epic as their parent. Searched rather than derived, because an orphan is
 // by definition absent from the one list that would otherwise name it.
 //
-// A failed search used to yield `[]` on the reasoning that an unavailable search is no evidence of
-// an orphan. That is true of the *finding* and false of the *report*: `[]` is what "no issue claims
-// this epic" looks like, so a rate limit arrived as a clean audit — the same "could not read" read
-// as "there is nothing" that joshuafolkken/kit#925, #950, #973 and #1048 closed elsewhere. The
-// answer is now carried out and reported instead (joshuafolkken/kit#1033).
+// A failed search is not answered with `[]`, even though an unavailable search is no evidence of an
+// orphan. That is true of the *finding* and false of the *report*: `[]` is what "no issue claims
+// this epic" looks like, so a rate limit would arrive as a clean audit — a "could not read" read as
+// "there is nothing". The answer is carried out and reported instead.
 async function find_claiming_issues(epic_number: number, repo: string): Promise<ClaimingSearch> {
 	const { json, is_capped } = await git_gh_command.issue_search_body(
 		issue_cite.plain(epic_number),
@@ -104,7 +102,7 @@ function search_finding(level: FindingLevel, message: string): Array<AuditFindin
 //
 // Either cutoff is a **warning**: the scan *did* run, over the newest issues, and an orphan is
 // normally an issue filed minutes ago. That is something to read rather than a check that did not
-// happen — the level `epic:bundle` reports its own `⚠ … cap` at (joshuafolkken/kit#950).
+// happen — the level `epic:bundle` reports its own `⚠ … cap` at.
 function search_findings(search: ClaimingSearch): Array<AuditFinding> {
 	if (search.kind === 'unreadable') return search_finding('error', UNREADABLE_SEARCH)
 	if (search.cutoff === 'page_ceiling') return search_finding('warning', CAPPED_BY_ISSUES)
@@ -123,7 +121,7 @@ function claimed_numbers(search: ClaimingSearch): Array<number> {
 // The task-list numbers that name issues in *this* repository. `snapshot.child_numbers` appends the
 // cross-repository children's numbers, and an orphan is recognized by number alone — so a local
 // issue whose number collided with a child in another repository was accepted as tracked and never
-// reported (joshuafolkken/kit#1014). Read with the same parser `epic_fetch` reads the local rows
+// reported. Read with the same parser `epic_fetch` reads the local rows
 // with, which never matches a `- [ ] owner/repo#N` row.
 function locally_tracked(snapshot: EpicSnapshot): Array<number> {
 	return epic_parse.parse_task_list_issue_numbers(snapshot.body)

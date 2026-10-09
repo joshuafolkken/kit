@@ -19,9 +19,8 @@ import {
 } from './observation-ledger'
 import { observation_ledger_line } from './observation-ledger-line'
 
-// Moves the ledger's lines from the single files it was before joshuafolkken/kit#2919 into the
-// directory it is now, as `legacy.md` (`observation-ledger.ts` carries why the old paths are still
-// recognized). Changing a constant alone splits the appends: a run still on the old code recreates the
+// Moves the ledger's lines from its old single files into the directory, as `legacy.md`
+// (`observation-ledger.ts` carries why the old paths are still recognized). Changing a constant alone splits the appends: a run still on the old code recreates the
 // old file, and a consumer repository's existing ledger stays where nothing reads it. So resolving the
 // ledger migrates first (`observation-ledger-home.ts`), and whatever reached an old path lands in the
 // directory before anything reads or appends.
@@ -164,7 +163,7 @@ function legacy_directory_names(directory: string): ReadonlyArray<string> {
 	}
 }
 
-// **The old directory moves file by file into the same names** (joshuafolkken/kit#3341), so an
+// **The old directory moves file by file into the same names**, so an
 // issue's lines stay in that issue's file; the emptied directory is removed when nothing else is left.
 function migrate_directory(root: string): boolean {
 	const legacy_directory = path.join(root, LEGACY_OBSERVATION_LEDGER_DIRECTORY)

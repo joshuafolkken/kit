@@ -1,8 +1,7 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { epic_bundle, type BacklogIssue } from './epic-bundle'
 
-// The facts the bundle decision was already made from, printed beside the order it prints
-// (joshuafolkken/kit#1737).
+// The facts the bundle decision was already made from, printed beside the order it prints.
 //
 // `is_strong_signal` reads exactly two things — whether a body names the other issue's number, and
 // whether a `blocked-by` is already recorded in either direction — and neither ever reached the
@@ -76,7 +75,7 @@ function member_pairs(
 //
 // The repository filter is the one `bundle_dependency_links` applies: a bare number declared in a
 // member elsewhere would be resolved against this repository by the epic body, naming a different
-// issue entirely (joshuafolkken/kit#1130).
+// issue entirely.
 function ordering_evidence(
 	subject: BacklogIssue,
 	candidates: ReadonlyArray<BacklogIssue>,

@@ -9,7 +9,7 @@ const FAILURE_EXIT_CODE = 1
 // as a stack: "this checkout is on a feature branch" and "the tree holds somebody else's work" are
 // both things the person fixes in one step, and a trace hides the sentence that says which.
 //
-// **It acts on the checkout it runs in** (joshuafolkken/kit#2919). A lane's ledger lines merge with
+// **It acts on the checkout it runs in**. A lane's ledger lines merge with
 // the lane's own pull request, so a lane has nothing to flush and is refused like any feature branch.
 async function main(): Promise<void> {
 	try {

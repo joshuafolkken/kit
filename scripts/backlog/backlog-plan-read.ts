@@ -9,7 +9,7 @@ import type { PlanContext } from './backlog-plan'
 import type { GateScope } from './backlog-rank'
 import { backlog_scope } from './backlog-scope'
 
-// The reads a backlog plan is drawn from — `backlog:plan`'s and `run:board`'s (joshuafolkken/kit#3430).
+// The reads a backlog plan is drawn from — `backlog:plan`'s and `run:board`'s.
 // Moved out of `backlog-plan-cli.ts` so the board places each issue through the very classification the
 // plan prints, rather than a second copy of it that could promise a different order.
 
@@ -18,13 +18,13 @@ interface Plan {
 	repo: string
 	exclude: ReadonlyArray<number>
 	// Which **opted-in** epic is withholding which issue, narrowed by the same function the pool
-	// decided membership with (joshuafolkken/kit#1668). Without it the scope layer had no branch for
+	// decided membership with. Without it the scope layer had no branch for
 	// "an epic is offering this one instead", so every opted-in row it could not place was reported as
 	// past the listing cap. Carrying the *whole* index here instead would move that misreport rather
 	// than remove it: the sentence would name an epic that is withholding nothing.
 	tracked: ReadonlyMap<number, number>
 	// The rows the offer's cap bounds and the paths each issue restructures, so `--waves` cuts each
-	// wave where `backlog:next` does (joshuafolkken/kit#2928, joshuafolkken/kit#3221).
+	// wave where `backlog:next` does.
 	scope: GateScope
 }
 

@@ -3,16 +3,13 @@ import type { AuditChild } from './epic-audit-checks'
 import { epic_graph, type IssueReference } from './epic-graph'
 import type { DependencyLink } from './epic-parse'
 
-// Check 6 — a declared order between two open children that nobody wrote a reason for
-// (joshuafolkken/kit#1712).
+// Check 6 — a declared order between two open children that nobody wrote a reason for.
 //
 // **Every other check looks the other way.** They report a dependency the epic *omitted* — prose or
 // acceptance criteria naming a sibling with nothing ordering the two. Not one of them reads the
-// declaration itself, so a chain somebody typed by hand passed the audit exactly as a justified one
-// did: on 2026-09-10 the chain `#1690 -> #1694 -> #1703 -> #1679 -> #1675 -> #1676` serialized five
-// otherwise independent children through `epicrun`, and the audit reported **0 errors** both while
-// it stood and after it was deleted. It was found because a person asked why the backlog had gone
-// single-file, which is not a mechanism.
+// declaration itself, so without this check a chain somebody typed by hand passes the audit exactly
+// as a justified one does — serializing otherwise independent children through `backlogrun #E`
+// with **0 errors** reported.
 //
 // **Where a reason lives is already settled**, so this check does not invent a place to look:
 // `josh epic --add --decision-file` writes the record to the epic's `## Decisions` **and** as a
@@ -51,7 +48,7 @@ function find_child(
 // finding would be wrong about rather than merely noisy:
 //
 // **Both ends open.** A settled order can no longer stall anything, which is the same reason
-// `order_level` demotes a settled contradiction — and joshuafolkken/kit#1712 asks for it by name.
+// `order_level` demotes a settled contradiction.
 // **Both ends in the repository the audit runs in.** The comment listing reads that repository and
 // takes no `--repo` (`git-gh-issue-read.ts`), so a cross-repository end's record cannot be read at
 // all and every such order would be reported as unjustified whatever its author wrote.
@@ -136,20 +133,18 @@ function is_justified(input: RationaleInput, pair: OrderPair): boolean {
 	)
 }
 
-// **An error rather than a warning**, and the choice is the one joshuafolkken/kit#1712 asks to be
-// recorded.
+// **An error rather than a warning.**
 //
-// A warning would not be read: one real epic carries 447 of them, and the whole reason this check
+// A warning would not be read: a real epic can carry hundreds of them, and the whole reason this check
 // exists is that a false order was invisible. The counter-argument is `order_level`'s doctrine —
 // where the machine cannot tell whether something is wrong, it warns — and it does not reach this
 // check, because what is asserted here is not "this order is wrong". It is "this order's reason is
 // not recorded", which is a fact about the repository's own rule that a placement decision is
 // written down, not a judgement about the order.
 //
-// What makes the level affordable is that both remedies are now one command: `josh epic --remove`
-// deletes the order, and `--decision-file` on either command records the reason. Before
-// joshuafolkken/kit#1712 the first of those did not exist, and an error would have sent the reader
-// to the hand edit `CLAUDE.md` forbids.
+// What makes the level affordable is that both remedies are one command: `josh epic --remove`
+// deletes the order, and `--decision-file` on either command records the reason, so an error never
+// sends the reader to the hand edit `CLAUDE.md` forbids.
 function unjustified_message(pair: OrderPair, current_repo: string): string {
 	const blocker = epic_graph.format_reference(pair.blocker, current_repo)
 	const blocked = epic_graph.format_reference(pair.blocked, current_repo)
