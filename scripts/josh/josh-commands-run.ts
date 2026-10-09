@@ -38,6 +38,12 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<operation> [arguments...]', 'automation', ['files']],
 	},
+	'run:add': {
+		script: 'scripts/run/add/run-add-cli.ts',
+		description: 'Add issues to a live backlogrun, ahead of the queue unless --no-priority',
+		category: 'AI tools',
+		reference: ['<issue...> [--no-priority]', 'automation', ['network', 'files']],
+	},
 	'run:wake': {
 		script: 'scripts/run/wake/run-wake-cli.ts',
 		// `.env` rather than the ambient environment:

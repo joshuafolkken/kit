@@ -12,6 +12,8 @@ const GAP = '  '
 const INDENT = '  '
 const NUMBER_PLACEHOLDER = '{n}'
 
+type Link = (reference: string) => string
+
 // The icons the legend can name, in its order, each with its word.
 const NOTE_LEGEND: ReadonlyArray<readonly [string, keyof Words]> = [
 	[FILED_KIND_ICONS['breaking-change'], 'breaking'],
@@ -28,27 +30,33 @@ function note_icon(note: BoardNote): string {
 	return note.filed_kind === undefined ? NOTE_ICONS[note.kind] : FILED_KIND_ICONS[note.filed_kind]
 }
 
-function found_of(note: BoardNote): string {
+function found_of(note: BoardNote, link: Link): string {
 	if (note.found_during === undefined) return ''
 
-	return WORDS.found_during.split(NUMBER_PLACEHOLDER).join(note.found_during)
+	return WORDS.found_during.split(NUMBER_PLACEHOLDER).join(link(note.found_during))
 }
 
 // Where the legend names the symbols a note leads with its icon alone; where no legend is drawn it
 // keeps the kind's word (joshuafolkken/kit#3478).
-function note_text(note: BoardNote, has_legend: boolean): string {
+function note_text(note: BoardNote, has_legend: boolean, link: Link): string {
 	const kind = has_legend ? undefined : WORDS[note.kind]
-	const lead = [note_icon(note), minute_of(note.at_ms), note.issue, kind]
+	const issue = note.issue === undefined ? undefined : link(note.issue)
+	const lead = [note_icon(note), minute_of(note.at_ms), issue, kind]
 		.filter((part) => part !== undefined)
 		.join(' ')
 
-	return `${INDENT}${lead}${GAP}${note.text}${found_of(note)}`
+	return `${INDENT}${lead}${GAP}${note.text}${found_of(note, link)}`
 }
 
 // The newest few, so the section never pushes the plan off the screen; the frame counts the rest
-// together with any it cuts to fit (joshuafolkken/kit#3505).
-function note_lines(notes: ReadonlyArray<BoardNote>, has_legend: boolean): Array<string> {
-	return notes.slice(0, NOTE_LIMIT).map((note) => note_text(note, has_legend))
+// together with any it cuts to fit (joshuafolkken/kit#3505). Their numbers go through the board's
+// `header.link`, so they open their GitHub issue as the plan's rows do (joshuafolkken/kit#3520).
+function note_lines(
+	notes: ReadonlyArray<BoardNote>,
+	has_legend: boolean,
+	link: Link,
+): Array<string> {
+	return notes.slice(0, NOTE_LIMIT).map((note) => note_text(note, has_legend, link))
 }
 
 // 📌 while the section is on screen (joshuafolkken/kit#3478), then each kind a drawn line leads with —

@@ -95,7 +95,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// the automation page to `docs/josh-commands.md`, which grew one block and the automation page shrank one.
 	{ path: 'docs/josh-commands-automation.md', bytes: 49_152 },
 	// joshuafolkken/kit#3430 raised it: `josh run:board` is a run command and its contract lives here.
-	{ path: 'docs/josh-commands-run.md', bytes: 61_440 },
+	// joshuafolkken/kit#3433 raised it: `josh run:add` puts an issue into a live run.
+	{ path: 'docs/josh-commands-run.md', bytes: 65_536 },
 	{ path: 'docs/josh-commands-backlog.md', bytes: 57_344 },
 	// joshuafolkken/kit#3437 raised it: `josh backlogrun` is a command a person types.
 	{ path: 'docs/josh-commands.md', bytes: 45_056 },
