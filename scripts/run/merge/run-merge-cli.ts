@@ -14,7 +14,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ending } from '#scripts/run/run-ending'
 import { run_issue_number } from '#scripts/run/run-issue-number'
 import { run_merge, type ChildOutcome, type EndingSignals } from './run-merge'
-import { run_merge_steps, type MergeContext } from './run-merge-steps'
+import { run_merge_steps, type FailedResult, type MergeContext } from './run-merge-steps'
 
 // `josh run:merge <N>` — one composite command for a `backlogrun` merge event (joshuafolkken/kit#2024).
 // The parent's context is the largest and its per-turn cost the highest, and the event was two turns:
@@ -257,11 +257,22 @@ async function on_merged(ctx: MergeContext): Promise<MergeVerdict> {
 	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
 }
 
-async function on_failed(ctx: MergeContext, cause?: string): Promise<MergeVerdict> {
-	const result = await run_merge_steps.do_failed(ctx, cause)
+// A child released to wait on its open blockers (joshuafolkken/kit#3502): settled for this run like a
+// parked one, so it goes on the stream the same way, but nothing was counted — the failure guard is not
+// read, and the next child is offered.
+async function on_waiting(
+	ctx: MergeContext,
+	blockers: ReadonlyArray<string>,
+): Promise<MergeVerdict> {
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.PARK,
+		`${issue_cite.plain(ctx.child)} waiting on ${blockers.join(', ')}`,
+	)
 
-	if (result.is_refused) return report_count_refused(result.carry)
+	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
+}
 
+async function on_parked_failure(ctx: MergeContext, result: FailedResult): Promise<MergeVerdict> {
 	if (!result.is_parked) {
 		console.error(PARK_FAILURE_NOTE)
 
@@ -278,6 +289,16 @@ async function on_failed(ctx: MergeContext, cause?: string): Promise<MergeVerdic
 	}
 
 	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
+}
+
+async function on_failed(ctx: MergeContext, cause?: string): Promise<MergeVerdict> {
+	const result = await run_merge_steps.do_failed(ctx, cause)
+
+	if (result.is_refused) return report_count_refused(result.carry)
+
+	if (result.blockers.length > 0) return await on_waiting(ctx, result.blockers)
+
+	return await on_parked_failure(ctx, result)
 }
 
 // An API-outage child: counted into its own streak and left re-dispatchable, not parked

@@ -111,7 +111,11 @@ function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefine
 	return { ...reads, ports, frames, clock, leaves, marks }
 }
 
-const run_board_fixture = { LOCAL, START, STOPPED, WORDS, harness, plan_titled }
+// The plan read's loading spinner after its ⏳, not the waiting count the same line draws after its own
+// ⏳ (joshuafolkken/kit#3508).
+const SPINNING = /⏳ [^\d-]/u
+
+const run_board_fixture = { LOCAL, SPINNING, START, STOPPED, WORDS, harness, plan_titled }
 
 export { run_board_fixture }
 export type { Harness }

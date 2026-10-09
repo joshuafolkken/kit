@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1019,
-		"code_lines": 84785,
-		"comment_lines": 33791,
+		"code_lines": 84841,
+		"comment_lines": 33812,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12222,
-		"on_demand_bytes": 559181
+		"on_demand_bytes": 560076
 	},
 	"accepted": {
-		"reason": "run:board rows gain a per-lane CPU and memory column sampled every second (#3489): new usage sampling, reading and text modules plus the round-1 review fixes",
+		"reason": "run:board rows gain a per-lane CPU and memory column sampled every second (#3489), merged with #3502 (waiting-on-blockers merge path) and #3508 (two-line header)",
 		"date": "2026-10-09"
 	}
 }

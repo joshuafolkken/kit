@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
@@ -57,6 +58,7 @@ beforeEach(() => {
 	remove_label_mock.mockReset().mockResolvedValue(undefined)
 	reap_mock.mockReset().mockReturnValue([])
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
+	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
 })
 
 // joshuafolkken/kit#2421: the branches that judge a child finished are where its lingering process is
@@ -92,6 +94,7 @@ describe('run_merge_steps.do_failed — parking is part of the result', () => {
 			carry: undefined,
 			is_parked: false,
 			is_refused: false,
+			blockers: [],
 		})
 	})
 })

@@ -12,17 +12,16 @@ import type { LaneUsages } from './run-board-usage'
 // waits on an empty backlog, until when it waits and what ends the wait. Every time comes from a record
 // (the carry's start, the stream's events, the `idle` window); nothing here guesses one. Lines of
 // symbols rather than sentences (joshuafolkken/kit#3444): the `⏱` that moves every second is the proof
-// the board is live, so no `updated` line is drawn. Under the title, the machine the run is on
-// (joshuafolkken/kit#3450), so a slow run reads apart from a stuck one. **Always three lines**
-// (joshuafolkken/kit#3486): a value not read yet is drawn `-`, never `0`, so a header still loading
-// reads as unknown rather than as an empty run.
+// the board is live, so no `updated` line is drawn. Beside the time, the machine the run is on
+// (joshuafolkken/kit#3450), so a slow run reads apart from a stuck one. **Always two lines**
+// (joshuafolkken/kit#3486, joshuafolkken/kit#3508): the run's state with its progress, then the time
+// with the machine. A value not read yet is drawn `-`, never `0`, so a header still loading reads as
+// unknown rather than as an empty run.
 
 const { HEADER_ICONS, STATE_ICONS, WORDS, bar_of, clock_of, elapsed_of, left_of, minute_of } =
 	run_board_labels
 const UNKNOWN = '-'
-const COUNT_GAP = '  '
-// The parts of the title line sit one space further apart than the counts, so the groups read apart.
-const GAP = `${COUNT_GAP} `
+const { GAP } = run_board_machine
 // A running run whose newest event is older than this is drawn as stale, so a hang stands out; past
 // twice that it is drawn as alarming.
 const STALE_MINUTES = 15
@@ -171,19 +170,6 @@ function time_parts(header: BoardHeader): Array<string> {
 	return [`⏱ ${elapsed_of(now_ms - started_ms)}`, `⌛ ${left_of(cutoff - now_ms)}`]
 }
 
-function title_line(header: BoardHeader, running: number): string {
-	const mark = mark_of(header, running)
-	const parts = [
-		run_part(mark, header.spinner),
-		...time_parts(header),
-		heartbeat_part(header, mark),
-		loading_part(header),
-		plan_warning(header),
-	]
-
-	return parts.filter((part) => part !== undefined).join(GAP)
-}
-
 function layout_of(header: BoardHeader): BoardLayout {
 	return header.layout ?? run_board_layout.EMPTY_LAYOUT
 }
@@ -201,7 +187,7 @@ function plus_of(counts: BoardCounts, header: BoardHeader): string {
 	return added > 0 ? ` (+${String(added)})` : ''
 }
 
-// Icon, figure, then bar, as the machine gauges above it (joshuafolkken/kit#3473): the settled count is
+// Icon, figure, then bar, as the machine gauges (joshuafolkken/kit#3473): the settled count is
 // right-aligned to the total's width, so the bar starts in one column as the count grows. Arrivals since
 // the board first looked follow the bar, where they cannot move it.
 function tally_part(counts: BoardCounts, is_read: boolean): string {
@@ -213,16 +199,29 @@ function tally_part(counts: BoardCounts, is_read: boolean): string {
 	return `${STATE_ICONS.merged} ${tally} ${bar}`
 }
 
-function progress_line(counts: BoardCounts, header: BoardHeader): string {
+function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string> {
 	const is_read = is_plan_read(header)
-	const plus = is_read ? plus_of(counts, header) : ''
-	const breakdown = [
+
+	return [
+		`${tally_part(counts, is_read)}${is_read ? plus_of(counts, header) : ''}`,
 		`${STATE_ICONS.running} ${String(counts.running)}`,
 		`${STATE_ICONS.waiting} ${is_read ? String(counts.remaining) : UNKNOWN}`,
 		`${STATE_ICONS.parked} ${String(counts.parked)}`,
-	].join(COUNT_GAP)
+	]
+}
 
-	return `${tally_part(counts, is_read)}${plus}${GAP}${breakdown}`
+// The run's mark and its progress, then how fresh its stream is and what its plan read is doing.
+function state_line(counts: BoardCounts, header: BoardHeader): string {
+	const mark = mark_of(header, counts.running)
+	const parts = [
+		run_part(mark, header.spinner),
+		...progress_parts(counts, header),
+		heartbeat_part(header, mark),
+		loading_part(header),
+		plan_warning(header),
+	]
+
+	return parts.filter((part) => part !== undefined).join(GAP)
 }
 
 function idle_line(idle: IdleWindow, now_ms: number): string {
@@ -254,18 +253,21 @@ function machine_of(header: BoardHeader): MachineGauges | undefined {
 	return { ...machine, cpu_percent: undefined, swap_mb_per_s: undefined }
 }
 
-// The machine line before a gauge could be read: each gauge's icon, its figure unknown, apart as the
-// gauges sit under the title's parts.
+// The machine before a gauge could be read: each gauge's icon, its figure unknown, apart as the gauges.
 const MACHINE_UNKNOWN = [HEADER_ICONS.cpu, HEADER_ICONS.memory, HEADER_ICONS.swap]
 	.map((icon) => `${icon} ${UNKNOWN}`)
 	.join(GAP)
 
-// The title, the machine and the progress, in every state the board can be in.
-function header_lines(header: BoardHeader): Array<string> {
-	const counts = counts_of(layout_of(header))
+// The time, then the machine the run is on.
+function clock_line(header: BoardHeader): string {
 	const machine = run_board_machine.line_of(machine_of(header)) ?? MACHINE_UNKNOWN
 
-	return [title_line(header, counts.running), machine, progress_line(counts, header)]
+	return [...time_parts(header), machine].join(GAP)
+}
+
+// The run's state with its progress, then the time with the machine, in every state the board can be in.
+function header_lines(header: BoardHeader): Array<string> {
+	return [state_line(counts_of(layout_of(header)), header), clock_line(header)]
 }
 
 const run_board_header = { counts_of, header_lines, idle_lines, is_plan_read }

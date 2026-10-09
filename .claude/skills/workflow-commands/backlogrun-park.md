@@ -16,11 +16,9 @@ authorization, whether it came from a named epic or from the opted-in pool:
   and continue", which is that rule's single source, including what happens to the issue's lane.
 - **A prerequisite discovered mid-run is recorded as a dependency rather than parked** —
   → "A prerequisite discovered mid-run", and `prerequisite.md` for the three-way
-  distinction between a prerequisite, a split and an upstream defect. **One thing is genuinely
-  different**: with no epic, there is no `pnpm josh epic --add` to record the ordering into, so the
-  prerequisite is filed with `route:tier-a` and the blocked issue is parked with `needs-decision`
-  naming it. The parked issue returns to the pool when a person clears the label, and the
-  prerequisite is offered on the next ask if it carries `auto-ok`.
+  distinction between a prerequisite, a split and an upstream defect. With no epic there is no
+  `pnpm josh epic --add` to record the ordering into, so the `blocked-by` relation is written on the
+  issue itself (step 3 below) — still a dependency, never a `needs-decision` park.
 - **A split found mid-run** files the children and the epic and does not stop the batch, because the
   keyword already authorized a batch — `split-assessment.md` for the assessment, → "Splitting a child
   mid-run" for the branch. The split child is not parked or counted as a failure; its new children
@@ -188,15 +186,17 @@ source; what follows is this entry's branch.
 3. `pnpm josh epic --add <E> <N> --before <M>` — one command writes the task-list row, the declaration
    and the `blocked-by` relation together. Never edit the body by hand: the declaration and the relations
    then disagree, `epic:next` returns `error`, and the unattended run stops.
+   **With no epic** (a pool child), record the relation alone, `<M>` blocked by `<N>`, with the
+   `gh api …/dependencies/blocked_by` call in `prompts/collaboration-workflow/issue-template.md` →
+   "複数 Issue に分割するときの epic Issue", step 4.
 4. **Remove `in-progress` from `<M>`** — `pnpm josh run:release <M>`, which removes the label with the hold.
    This is what lets `<M>` run again: `epic:next` classifies a child carrying `in-progress` as waiting on
    time **before** it looks at any blocker, so a child left labelled is never offered again.
 5. **Do not park.** Go back to step 1 of the loop. `epic:next` classifies the original child as resolving
    on its own and hands back the prerequisite first, so the order is kept with no human input.
 
-**Parking is only for a prerequisite that cannot be expressed as a dependency** — one that needs a design
-decision nobody has made, or that is a Tier B toss-up or a Tier C action. Parking one that *can* be
-expressed inverts the whole point: `needs-decision` is cleared by a person.
+**A stop a dependency can express is never parked**, and a defect in this repository's own gate or run
+tooling is such a stop — `prerequisite.md` holds that rule and what the driver does with it.
 
 ## Splitting a child mid-run
 
