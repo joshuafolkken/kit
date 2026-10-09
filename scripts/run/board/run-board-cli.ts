@@ -6,16 +6,17 @@ import { machine_capacity } from '#scripts/gate/machine-capacity'
 import { run_progress_read } from '#scripts/run/progress/run-progress-read'
 import terminalLink from 'terminal-link'
 import { run_board_closed } from './run-board-closed'
-import { run_board_fit } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import { run_board_plan } from './run-board-plan'
 import { run_board_read } from './run-board-read'
 import { run_board_screen, type Screen } from './run-board-screen'
+import { run_board_spin } from './run-board-spin'
 import type { BoardPorts } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
+import { run_board_usage_read } from './run-board-usage-read'
 
 // `josh run:board` — a full-screen board of the running `backlogrun` (joshuafolkken/kit#3430), redrawn
-// four times a second for a person to keep open beside the run. What one redraw reads, and how often each read
+// once a second, its spinners turned between redraws, for a person to keep open beside the run. What one redraw reads, and how often each read
 // is taken, is `run-board-tick.ts`'s; this file wires the live reads and the terminal around it. A run
 // that ended stays on screen until the next one starts (joshuafolkken/kit#3439); with no run in this
 // checkout it reads nothing from GitHub and waits.
@@ -29,7 +30,8 @@ const FLAGS: ReadonlySet<string> = new Set(['', ONCE_FLAG, CHAT_FLAG])
 const SIGINT_EXIT_CODE = 130
 const SIGTERM_EXIT_CODE = 143
 const USAGE = 'Usage: josh run:board [--once | --chat]'
-const { FRESH_STATE, REDRAW_MS, tick } = run_board_tick
+const TRAILING_NEWLINE = /\n$/u
+const { FRESH_STATE, tick } = run_board_tick
 const { WORDS } = run_board_labels
 
 // A signal exits with its conventional code, so the `exit` handler restores the screen on every path.
@@ -43,6 +45,7 @@ const LIVE_PORTS: BoardPorts = {
 	read_plan: async (scope) => await run_board_plan.read_plan(scope),
 	read_local: run_board_read.read_local,
 	read_machine: machine_capacity.read_sample,
+	read_usage: run_board_usage_read.usage_reader(),
 	read_closed: async (issues) => await run_board_closed.read_all(issues),
 	now: () => Date.now(),
 	write: (frame) => process.stdout.write(frame),
@@ -63,18 +66,16 @@ const LIVE_PORTS: BoardPorts = {
 
 // Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
 // ends on the line that says closing the screen leaves the run going (joshuafolkken/kit#3437) — only a
-// screen a person can close says it. Nothing follows the footer and the frame is kept to the rows the
-// footer leaves, so writing it never scrolls the header off the top (joshuafolkken/kit#3486).
+// screen a person can close says it, and it is the first line to give way to a short pane
+// (joshuafolkken/kit#3505). Nothing follows the last line, so a frame that fills the pane never scrolls
+// the header off the top (joshuafolkken/kit#3486).
 function framed(ports: BoardPorts, screen: Screen): BoardPorts {
-	const footer = ['', styleText('dim', WORDS.keeps_running)]
-	const { size } = ports
-
 	return {
 		...ports,
+		footer: ['', styleText('dim', WORDS.keeps_running)],
 		write: (frame) => {
-			ports.write(`${screen.frame}${frame}${footer.join('\n')}`)
+			ports.write(`${screen.frame}${frame.replace(TRAILING_NEWLINE, '')}`)
 		},
-		size: size === undefined ? undefined : () => run_board_fit.reserve(size(), footer),
 	}
 }
 
@@ -90,16 +91,19 @@ function leaver(ports: BoardPorts, screen: Screen): () => void {
 	}
 }
 
-async function redraw_forever(ports: BoardPorts): Promise<void> {
+// A frame on the second, its spinners turned until the next (joshuafolkken/kit#3495): the turns are
+// written past the frame's own control bytes, each to its spot on the screen the frame drew.
+async function redraw_forever(ports: BoardPorts, screen: Screen): Promise<void> {
+	const drawn = framed(ports, screen)
 	// The plan is read in the background, so the first frame is drawn without waiting on GitHub
 	// (joshuafolkken/kit#3455).
-	let state = await tick(FRESH_STATE, ports, 'background')
+	let state = await tick(FRESH_STATE, drawn, 'background')
 
 	for (;;) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each redraw waits out the tick before it
-		await ports.sleep(REDRAW_MS)
+		// eslint-disable-next-line no-await-in-loop -- polling: each redraw waits for the next second
+		await run_board_spin.spin_to_second(state.spots, ports)
 		// eslint-disable-next-line no-await-in-loop -- polling: each redraw folds the state the last one left
-		state = await tick(state, ports, 'background')
+		state = await tick(state, drawn, 'background')
 	}
 }
 
@@ -113,7 +117,7 @@ async function watch(ports: BoardPorts): Promise<void> {
 	ports.on_exit(leave)
 
 	try {
-		await redraw_forever(framed(ports, screen))
+		await redraw_forever(ports, screen)
 	} finally {
 		leave()
 	}

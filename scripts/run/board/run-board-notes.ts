@@ -1,5 +1,5 @@
 import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
-import { run_event_filed } from '#scripts/run/event/run-event-filed'
+import { run_event_filed, type FiledKind } from '#scripts/run/event/run-event-filed'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 
@@ -18,6 +18,8 @@ interface BoardNote {
 	text: string
 	// Whose work turned up a filed Issue: the lane child, else the Issue the branch names.
 	found_during?: string | undefined
+	// A filed Issue's classification, which its line leads with (joshuafolkken/kit#3494).
+	filed_kind?: FiledKind | undefined
 	// A park waiting on a person's decision, drawn apart from an ordinary park.
 	is_decision: boolean
 }
@@ -37,6 +39,7 @@ function filed_note(event: RunEvent): BoardNote | undefined {
 		issue: filed.reference.replace(/^#/u, ''),
 		text: filed.title,
 		found_during: filed.found_during,
+		filed_kind: filed.kind,
 		is_decision: false,
 	}
 }
@@ -72,4 +75,4 @@ function notes_of(events: ReadonlyArray<RunEvent>): ReadonlyArray<BoardNote> {
 const run_board_notes = { notes_of }
 
 export { run_board_notes }
-export type { BoardNote, NoteKind }
+export type { BoardNote }

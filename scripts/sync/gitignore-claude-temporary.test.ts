@@ -1,6 +1,7 @@
 import { copyFileSync, mkdtempSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { git_location_environment } from '#scripts/git/git-location-environment'
 import { package_path } from '#scripts/init/init-paths'
 import { execaSync } from 'execa'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -8,17 +9,23 @@ import { afterEach, describe, expect, it } from 'vitest'
 const GIT = 'git'
 const GITIGNORE = '.gitignore'
 const roots: Array<string> = []
+// Under the pre-push hook git exports GIT_DIR / GIT_INDEX_FILE, which beat `cwd` — cleared so each
+// call answers about the scratch repository instead of the checkout the hook is firing in.
+const SCRATCH_ENVIRONMENT = git_location_environment.location_free_environment()
 
 function is_ignored_by(gitignore_source: string, relative_path: string): boolean {
 	const root = mkdtempSync(path.join(os.tmpdir(), 'josh-gitignore-'))
 
 	roots.push(root)
-	execaSync(GIT, ['init', '--quiet'], { cwd: root })
+	execaSync(GIT, ['init', '--quiet'], { cwd: root, env: SCRATCH_ENVIRONMENT })
 	copyFileSync(package_path(gitignore_source), path.join(root, GITIGNORE))
 
 	return (
-		execaSync(GIT, ['check-ignore', '--quiet', relative_path], { cwd: root, reject: false })
-			.exitCode === 0
+		execaSync(GIT, ['check-ignore', '--quiet', relative_path], {
+			cwd: root,
+			env: SCRATCH_ENVIRONMENT,
+			reject: false,
+		}).exitCode === 0
 	)
 }
 
