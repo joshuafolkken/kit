@@ -20,10 +20,9 @@ import type { BoardNote } from './run-board-notes'
 import type { Phase } from './run-board-phase'
 import { run_board_render_legend } from './run-board-render-legend'
 import { run_board_render_notes } from './run-board-render-notes'
-import { run_board_render_slot } from './run-board-render-slot'
+import { run_board_render_slot, type UsageSlot } from './run-board-render-slot'
 import type { ItemState } from './run-board-status'
 import { run_board_track } from './run-board-track'
-import type { LaneUsages } from './run-board-usage'
 
 // The whole `run:board` screen as lines — pure, so what a person sees is tested apart from the
 // terminal. The header says where the run is; the sections below it follow the plan's order; the
@@ -36,7 +35,7 @@ const { FILED_KIND_ICONS, KIND_BLANK, NOTES_ICON, PHASE_ICONS, STATE_ICONS, WAIT
 	run_board_labels
 const { clock_of, elapsed_of } = run_board_labels
 const { NOTE_LIMIT } = run_board_render_notes
-const { cell_of, column_width, slot_of } = run_board_render_slot
+const { cell_of, column_width, slot_of, usage_slot } = run_board_render_slot
 // The columns a terminal row gives its title: a longer one is cut to an ellipsis.
 const TITLE_LIMIT = 48
 const ELLIPSIS = '…'
@@ -69,7 +68,7 @@ interface RowFrame {
 	header: BoardHeader
 	title_width: number
 	time_width: number
-	usages: LaneUsages | undefined
+	usage: UsageSlot | undefined
 	slot_width: number
 }
 
@@ -164,11 +163,11 @@ function indent_of(prefix: string, row: BoardRow, header: BoardHeader): string {
 // starts in one column. A plan row the run has not touched has no time, usage or track to align, so it
 // draws none and what it waits on stays beside its title.
 function cell_text(row: BoardRow, frame: RowFrame): string | undefined {
-	const { usages, slot_width } = frame
+	const { usage, slot_width } = frame
 
-	if (usages === undefined || slot_width === 0 || row.status === undefined) return undefined
+	if (usage === undefined || slot_width === 0 || row.status === undefined) return undefined
 
-	return cell_of(slot_of(row, usages, frame.header.now_ms), slot_width)
+	return cell_of(slot_of(row, usage, frame.header.now_ms), slot_width)
 }
 
 function joined(parts: ReadonlyArray<string | undefined>): string {
@@ -322,15 +321,16 @@ function frame_of(
 ): RowFrame {
 	const usages = header.form === 'chat' ? undefined : header.usages
 	const rows = run_board_layout.rows_of(layout)
+	const usage = usages === undefined ? undefined : usage_slot(rows, usages)
 	const frame = {
 		header,
 		title_width: title_width(header, layout),
 		time_width: time_width(header),
-		usages,
-		slot_width: usages === undefined ? 0 : column_width(rows, usages, header.now_ms),
+		usage,
+		slot_width: usage === undefined ? 0 : column_width(rows, usage, header.now_ms),
 	}
 
-	return is_usage_fitting(rows, frame, size) ? frame : { ...frame, usages: undefined }
+	return is_usage_fitting(rows, frame, size) ? frame : { ...frame, usage: undefined }
 }
 
 function plan_sections(header: BoardHeader, size: TerminalSize | undefined): Array<PlanSection> {

@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1043,
-		"code_lines": 87061,
-		"comment_lines": 33344,
+		"code_lines": 87084,
+		"comment_lines": 33353,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 457500
 	},
 	"accepted": {
-		"reason": "#3577 review fix: a title-less row keeps its usual gap (lead_of takes the title)",
+		"reason": "#3612 adds the running-lane share thresholds (lane_thresholds, UsageSlot, usage_slot) that run:board's lane colors are now computed from",
 		"date": "2026-10-09"
 	}
 }

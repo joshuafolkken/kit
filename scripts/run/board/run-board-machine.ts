@@ -191,7 +191,15 @@ function line_of(gauges: MachineGauges | undefined): string | undefined {
 	return parts.length === 0 ? undefined : parts.join(GAP)
 }
 
-const run_board_machine = { GAP, gauges_of, line_of, percent_text, threshold_alert }
+const run_board_machine = {
+	CPU_YELLOW,
+	GAP,
+	MEMORY_YELLOW,
+	gauges_of,
+	line_of,
+	percent_text,
+	threshold_alert,
+}
 
 export { run_board_machine }
 export type { Alert, MachineGauges, MachineMark }
