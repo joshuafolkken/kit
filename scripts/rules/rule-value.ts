@@ -4,6 +4,7 @@ import {
 	type TranscriptLine,
 } from '#scripts/time-runtime/time-transcript-line'
 import { delivered_rules, type MeasuredRule } from './delivered-rules'
+import { hook_context_line } from './hook-context-line'
 
 // What a rule is worth on the channel that carries it when its delivery has not fired
 // (joshuafolkken/kit#1525).
@@ -65,6 +66,9 @@ interface RuleReading {
 	unaided_kept: number
 	// Of those, the runs in which a refusal was actually delivered.
 	refusals: number
+	// Of those, the runs in which the hook rewrote the call instead of refusing it
+	// (joshuafolkken/kit#3570) — a delivery that cost no round trip.
+	rewrites: number
 	// Whether the rule declares what keeping it looks like. False makes `unaided_kept` meaningless.
 	is_measurable: boolean
 }
@@ -96,12 +100,19 @@ interface RuleState {
 	is_reached: boolean
 	is_triggered: boolean
 	is_refused: boolean
+	is_rewritten: boolean
 }
 
 function blank_states(): Map<string, RuleState> {
 	const entries = delivered_rules.MEASURED_RULES.map((rule): [string, RuleState] => [
 		rule.id,
-		{ is_kept: false, is_reached: false, is_triggered: false, is_refused: false },
+		{
+			is_kept: false,
+			is_reached: false,
+			is_triggered: false,
+			is_refused: false,
+			is_rewritten: false,
+		},
 	])
 
 	return new Map(entries)
@@ -148,13 +159,14 @@ function observe_call(
 	observe_before_trigger(rule, state, call, context)
 }
 
-// One transcript line, parsed once, as the two things a reading is taken from: the calls it issued
-// and the bodies of the results the harness wrote back as failures.
+// One transcript line, parsed once, as the things a reading is taken from: the calls it issued, the
+// bodies of the results the harness wrote back as failures, and the context a hook attached.
 interface DatedLine {
 	at_ms: number
 	message_id: string
 	calls: Array<IssuedCall>
 	errors: Array<string>
+	contexts: Array<string>
 }
 
 function calls_of(parsed: TranscriptLine): Array<IssuedCall> {
@@ -182,6 +194,7 @@ function dated_line(line: string): DatedLine | undefined {
 		message_id: parsed.message_id,
 		calls: calls_of(parsed),
 		errors: errors_of(parsed),
+		contexts: hook_context_line.hook_contexts_of(line),
 	}
 }
 
@@ -239,8 +252,11 @@ function turns_by_key(entries: ReadonlyArray<DatedLine>): Map<string, Array<Issu
 // what separates the two, so no count of how many signatures appear is needed — and a body naming
 // several can no longer be attributed to any of them.
 function refused_id(text: string): string | undefined {
+	const body = text.trimStart()
 	const found = delivered_rules.MEASURED_RULES.find((rule) =>
-		text.trimStart().startsWith(rule.reason.slice(0, REASON_SIGNATURE_LENGTH)),
+		[rule.reason, ...(rule.former_reasons ?? [])].some((reason) =>
+			body.startsWith(reason.slice(0, REASON_SIGNATURE_LENGTH)),
+		),
 	)
 
 	return found?.id
@@ -257,6 +273,29 @@ function observe_error(states: Map<string, RuleState>, text: string): void {
 	// hook refuses only where the rule bound, so the window in which compliance is the carried text's
 	// closes here — for the six rows this is already true by the time the result comes back, and for
 	// a row declaring no call-shaped trigger it is the only thing that can close it.
+	state.is_triggered = true
+}
+
+// **A rewrite is a delivery too, read off the note the hook attached** (joshuafolkken/kit#3570). The
+// call is recorded as typed and nothing errors, so the note is the one trace — matched at its opening,
+// exactly as a refusal's reason is.
+function rewritten_id(text: string): string | undefined {
+	const found = delivered_rules.MEASURED_RULES.find((rule) => {
+		const note = rule.rewrite_note
+
+		return note !== undefined && text.trimStart().startsWith(note.slice(0, REASON_SIGNATURE_LENGTH))
+	})
+
+	return found?.id
+}
+
+function observe_rewrite(states: Map<string, RuleState>, text: string): void {
+	const id = rewritten_id(text)
+	const state = id === undefined ? undefined : states.get(id)
+
+	if (state === undefined) return
+
+	state.is_rewritten = true
 	state.is_triggered = true
 }
 
@@ -293,6 +332,7 @@ function observe_line(
 	observe_calls(states, entry.calls, context)
 
 	for (const text of entry.errors) observe_error(states, text)
+	for (const text of entry.contexts) observe_rewrite(states, text)
 }
 
 // **One timeline, ordered by timestamp — not the files read back to back.** "Kept before the
@@ -337,6 +377,7 @@ function credit(reading: RuleReading, state: RuleState): void {
 	reading.sessions += 1
 	reading.unaided_kept += state.is_kept ? 1 : 0
 	reading.refusals += state.is_refused ? 1 : 0
+	reading.rewrites += state.is_rewritten ? 1 : 0
 }
 
 function reading_to_credit(
@@ -363,6 +404,7 @@ function blank_readings(): Map<string, RuleReading> {
 			sessions: 0,
 			unaided_kept: 0,
 			refusals: 0,
+			rewrites: 0,
 			is_measurable: rule.keeps !== undefined,
 		},
 	])

@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1040,
-		"code_lines": 86863,
-		"comment_lines": 34343,
+		"files": 1041,
+		"code_lines": 87003,
+		"comment_lines": 34392,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 474830
+		"on_demand_bytes": 475208
 	},
 	"accepted": {
-		"reason": "#3569 adds the model-free periodic board push (run:board --every) replacing the CronCreate progress job, plus its catalog/skill docs",
+		"reason": "#3570 round-2 security fix: refuse the pipefail rewrite beside lone &, redirection, backtick or $( and cover it with regression cases",
 		"date": "2026-10-09"
 	}
 }

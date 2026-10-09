@@ -150,7 +150,7 @@ describe('rule_delivery — the comments at the call that reads the body', () =>
 	// comments are required rather than present, and without the conflict rule the deciding goes back
 	// to judgement at the moment nothing else is open to read — joshuafolkken/kit#1518's failure.
 	it.each([
-		'read them before implementing, not only the body',
+		'pnpm josh issue:read <N>',
 		'gh issue view <N> --comments',
 		'gh api repos/{owner}/{repo}/issues/<N>/comments',
 		'the later text is the agreement in force',

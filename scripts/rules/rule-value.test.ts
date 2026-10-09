@@ -3,6 +3,8 @@ import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
 import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
+import { hook_context_line } from './hook-context-line'
+import { piped_verification } from './piped-verification'
 import { rule_value, type RuleReading } from './rule-value'
 import { rule_value_fixture } from './rule-value-fixture'
 
@@ -128,6 +130,14 @@ describe('rule_value.measure — refusals and unmeasurable rules', () => {
 		expect(reading_for(ISSUE_COMMENTS, [[text]]).refusals).toBe(1)
 	})
 
+	it('still counts a refusal delivered before the reason was reworded', () => {
+		const former =
+			"⛔ an Issue's comments are part of the Issue: read them before implementing, not only the body."
+		const text = `${session(BODY_READ)}\n${result_line(former)}`
+
+		expect(reading_for(ISSUE_COMMENTS, [[text]]).refusals).toBe(1)
+	})
+
 	it("does not read another rule's refusal as this one's", () => {
 		const text = `${session(BODY_READ)}\n${result_line(delivered_rules.SHELL_BODY_REASON)}`
 
@@ -159,6 +169,31 @@ describe('rule_value.measure — refusals and unmeasurable rules', () => {
 		const reading = reading_for(ISSUE_COMMENTS, [[text]])
 
 		expect(reading.refusals).toBeLessThanOrEqual(reading.sessions)
+	})
+})
+
+// joshuafolkken/kit#3570: a rewritten call leaves only the note the hook attached.
+const PIPED_VERIFICATION = 'piped-verification'
+
+function context_line(content: string): string {
+	const attachment = { type: hook_context_line.HOOK_CONTEXT_TYPE, content: [content] }
+
+	return JSON.stringify({ type: 'attachment', timestamp: TIMESTAMP, attachment })
+}
+
+describe('rule_value.measure — a rewrite is a delivery', () => {
+	it('counts the rewrite note as a rewrite, not a refusal', () => {
+		const text = `${session('ls')}\n${context_line(piped_verification.PIPEFAIL_NOTE)}`
+		const reading = reading_for(PIPED_VERIFICATION, [[text]])
+
+		expect(reading.rewrites).toBe(1)
+		expect(reading.refusals).toBe(0)
+	})
+
+	it("does not read another hook's context as a rewrite", () => {
+		const text = `${session('ls')}\n${context_line(delivered_rules.SHELL_BODY_REASON)}`
+
+		expect(reading_for(PIPED_VERIFICATION, [[text]]).rewrites).toBe(0)
 	})
 })
 
@@ -244,6 +279,7 @@ describe('rule_value.measure — rules nothing can score', () => {
 			sessions: 3,
 			unaided_kept: 0,
 			refusals: 0,
+			rewrites: 0,
 			is_measurable: false,
 		}
 

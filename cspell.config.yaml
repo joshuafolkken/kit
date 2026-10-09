@@ -2,6 +2,8 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The signal a pipe reader that exits early sends a writer, exit 141 under `pipefail` (#3570).
+  - SIGPIPE
   # `lsof -F`'s field line naming a working directory, which the run:board usage reader parses (#3489).
   - fcwd
   # The macOS `libproc` call and mach clock the run:board usage reader reaches through `node:ffi` (#3529).

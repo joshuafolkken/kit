@@ -2,8 +2,10 @@ import { duplicate_read_outcome } from '#scripts/delegation/duplicate-read-guard
 import { investigation_refusal } from '#scripts/delegation/investigation-guard'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
 import { lane_phase } from '#scripts/lane/lane-phase'
+import { json_value } from '#scripts/lib/json-value'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { lane_background } from '#scripts/rules/lane-background'
+import { piped_verification } from '#scripts/rules/piped-verification'
 import { run_parent_cut_hook } from '#scripts/run/run-parent-cut-hook'
 import { run_watcher_hook } from '#scripts/run/run-watcher-hook'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
@@ -134,6 +136,11 @@ function guarded_call(raw_payload: string): GuardedCall | undefined {
 	}
 }
 
+// A rewrite's note first, so the transcript's context line opens with it; the outcome's notice after.
+function rewrite_context(note: string, outcome: GuardOutcome): string {
+	return [note, outcome.notice ?? outcome.fault].filter(Boolean).join('\n\n')
+}
+
 // The envelope that replaces the outcome's own when a lane child backgrounded `josh ship` alone
 // (joshuafolkken/kit#3154): the call is run in the foreground instead of being refused. A refusal from
 // any guard still wins, and a notice the outcome carried rides along in the same context.
@@ -150,19 +157,75 @@ function foreground_rewrite(
 
 	if (input === undefined) return undefined
 
-	const context = [lane_background.FOREGROUND_NOTE, outcome.notice ?? outcome.fault]
-
-	return hook_decision.rewrite_envelope(input, context.filter(Boolean).join('\n\n'))
+	return hook_decision.rewrite_envelope(
+		input,
+		rewrite_context(lane_background.FOREGROUND_NOTE, outcome),
+	)
 }
 
-// The hook's one write: the foreground rewrite where it applies, the outcome's own envelope otherwise.
-function emit(raw_payload: string, outcome: GuardOutcome): void {
-	const rewrite = foreground_rewrite(outcome, raw_payload)
+interface PipefailRewrite {
+	payload: string
+	input: Record<string, unknown>
+}
+
+// A piped josh check the hook runs under `set -o pipefail` instead of refusing it
+// (joshuafolkken/kit#3570): the rewritten input, and the payload that carries it. The rewrite is the
+// rule guard's delivery, so the rule guard's switch turns it off too.
+function pipefail_rewrite(raw_payload: string): PipefailRewrite | undefined {
+	if (!delivered_rules.is_enabled()) return undefined
+
+	const call = guarded_call(raw_payload)
+	const input = call === undefined ? undefined : piped_verification.pipefail_input(call)
+	const payload = json_value.parse_or_undefined(raw_payload)
+
+	if (input === undefined || !json_value.is_record(payload)) return undefined
+
+	return { payload: JSON.stringify({ ...payload, tool_input: input }), input }
+}
+
+function pipefail_envelope(
+	outcome: GuardOutcome,
+	input: Record<string, unknown> | undefined,
+): string | undefined {
+	if (input === undefined || outcome.reason !== undefined) return undefined
+
+	return hook_decision.rewrite_envelope(
+		input,
+		rewrite_context(piped_verification.PIPEFAIL_NOTE, outcome),
+	)
+}
+
+// The hook's one write: a rewrite where one applies, the outcome's own envelope otherwise.
+function emit(
+	raw_payload: string,
+	outcome: GuardOutcome,
+	pipefail_input?: Record<string, unknown>,
+): void {
+	const rewrite =
+		pipefail_envelope(outcome, pipefail_input) ?? foreground_rewrite(outcome, raw_payload)
 
 	if (rewrite === undefined) hook_decision.emit_outcome(outcome)
 	else process.stdout.write(`${rewrite}\n`)
 }
 
-const pretool_guard = { combine_outcomes, emit, foreground_rewrite, mark_phase, pretool_outcome }
+// **The guards judge the call that will run.** A rewritable piped check reaches every guard already
+// prefixed, so the piped-verification row stays quiet on it while any other guard's refusal still wins
+// over the rewrite. The Codex adapter cannot rewrite a call, so it goes on judging the call as typed.
+async function respond(raw_payload: string): Promise<void> {
+	const pipefail = pipefail_rewrite(raw_payload)
+	const judged = pipefail?.payload ?? raw_payload
+
+	emit(judged, await pretool_outcome_async(judged), pipefail?.input)
+}
+
+const pretool_guard = {
+	combine_outcomes,
+	emit,
+	foreground_rewrite,
+	mark_phase,
+	pipefail_rewrite,
+	pretool_outcome,
+	respond,
+}
 
 export { pretool_guard, pretool_outcome, pretool_outcome_async }

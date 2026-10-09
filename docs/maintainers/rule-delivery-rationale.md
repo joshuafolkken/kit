@@ -49,6 +49,12 @@ was delivered.
 - **The switch**: `JOSH_RULE_GUARD` for the rule guard — on by default, off with `off` / `0` /
   `false` / `no`. The batching and investigation guards each have their own.
 
+**A delivery may be a rewrite rather than a refusal** (joshuafolkken/kit#3570) — only where the rule's
+outcome can be produced mechanically, as the piped-verification row's `set -o pipefail;` prefix is
+(`output-bounds-rationale.md`). The call is recorded as typed and nothing errors, so the note the hook
+attaches (a row's `rewrite_note`) is the one trace; `scripts/rules/hook-context-line.ts` reads it and
+`pnpm josh rule:value` counts it as `rewritten`, a delivery that cost no round trip.
+
 **The rule guard's enumeration holds only rules whose moment is a shell call** (the later `Edit` /
 `Write` and `AskUserQuestion` rows aside). Claude Code refuses one call of a turn and runs the rest,
 so a refused `Edit` leaves the state where only its siblings were applied (joshuafolkken/kit#1390).
