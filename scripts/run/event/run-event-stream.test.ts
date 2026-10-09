@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { run_board_phase } from '#scripts/run/board/run-board-phase'
 import { afterAll, describe, expect, it } from 'vitest'
 import { run_event_stream, type RunEvent } from './run-event-stream'
 
@@ -13,6 +14,9 @@ import { run_event_stream, type RunEvent } from './run-event-stream'
 
 const KIND = run_event_stream.EVENT_KIND
 const AT = '2026-09-21T00:00:00.000Z'
+const REVIEW_STAGE = '#3521 review start'
+const GATE_STAGE = '#3521 gate start'
+const OTHER_ISSUE_STAGE = '#3522 gate start'
 const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-event-stream-'))
 
 function fresh_target(): string {
@@ -237,6 +241,57 @@ describe('run_event_stream.append — the bound keeps the findings', () => {
 		const kinds = run_event_stream.read_events(target).map((event) => event.kind)
 
 		expect(kinds.slice(0, 2)).toStrictEqual([KIND.FILED, KIND.NOTE])
+	})
+})
+
+// A stream full of lines the bound may not drop, one lane-phase per slot.
+function fill_with_lane_phases(target: string): void {
+	for (let index = 0; index < run_event_stream.EVENT_CAP; index += 1) {
+		run_event_stream.append(target, KIND.LANE_PHASE, `#${String(index)} implement`, AT)
+	}
+}
+
+function ship_stages_of(target: string): ReadonlyArray<string> {
+	return run_event_stream
+		.read_events(target)
+		.filter((event) => event.kind === KIND.SHIP_STAGE)
+		.map((event) => event.text)
+}
+
+// joshuafolkken/kit#3521: the newest ship-stage is the board's only record of a lane past implement.
+describe('run_event_stream.append — the bound keeps each issue’s newest ship stage', () => {
+	it('keeps a ship stage appended to a stream full of positions', () => {
+		const target = fresh_target()
+
+		fill_with_lane_phases(target)
+		run_event_stream.append(target, KIND.SHIP_STAGE, REVIEW_STAGE, AT)
+
+		const events = run_event_stream.read_events(target)
+		const last = events.at(-1)
+
+		expect(events).toHaveLength(run_event_stream.EVENT_CAP)
+		expect(last?.text).toBe(REVIEW_STAGE)
+		expect(last === undefined ? undefined : run_board_phase.phase_of(last)).toBe('review')
+	})
+
+	it('drops an older ship stage of the same issue before its newest', () => {
+		const target = fresh_target()
+
+		run_event_stream.append(target, KIND.SHIP_STAGE, REVIEW_STAGE, AT)
+		fill_with_lane_phases(target)
+		run_event_stream.append(target, KIND.SHIP_STAGE, GATE_STAGE, AT)
+
+		expect(ship_stages_of(target)).toStrictEqual([GATE_STAGE])
+	})
+
+	it('keeps the newest ship stage of every issue, not only the newest overall', () => {
+		const target = fresh_target()
+
+		fill_with_lane_phases(target)
+		run_event_stream.append(target, KIND.SHIP_STAGE, REVIEW_STAGE, AT)
+		run_event_stream.append(target, KIND.SHIP_STAGE, OTHER_ISSUE_STAGE, AT)
+
+		expect(ship_stages_of(target)).toStrictEqual([REVIEW_STAGE, OTHER_ISSUE_STAGE])
 	})
 })
 
