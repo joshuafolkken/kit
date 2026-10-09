@@ -13,6 +13,7 @@ const prrun_token_mock = vi.hoisted(() => vi.fn())
 const read_issue_mock = vi.hoisted(() => vi.fn())
 const confirm_mock = vi.hoisted(() => vi.fn())
 const mark_mock = vi.hoisted(() => vi.fn())
+const emit_plan_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/notify/telegram-notify', () => ({ telegram_notify: { confirm: confirm_mock } }))
@@ -27,6 +28,9 @@ vi.mock('#scripts/run/run-prep-cli', () => ({
 }))
 vi.mock('#scripts/run/run-prep', () => ({ run_prep: { format_report: format_report_mock } }))
 vi.mock('#scripts/run/run-label', () => ({ run_label: { mark: mark_mock } }))
+vi.mock('#scripts/run/event/run-event-plan', () => ({
+	run_event_plan: { emit_plan: emit_plan_mock },
+}))
 vi.mock('#scripts/run/run-halfrun-resume', () => ({
 	run_halfrun_resume: { adopt: adopt_mock, is_pending: is_pending_mock },
 }))
@@ -77,6 +81,7 @@ function reset_resume_mocks(): void {
 	prrun_token_mock.mockReset().mockResolvedValue(undefined)
 	read_issue_mock.mockReset().mockResolvedValue(issue_read('OPEN'))
 	mark_mock.mockReset().mockResolvedValue(true)
+	emit_plan_mock.mockReset().mockResolvedValue(undefined)
 }
 
 beforeEach(() => {
@@ -111,6 +116,7 @@ describe('run_entry_cli.run — a held tree in budget folds hold, cost, prep and
 		])
 		expect(gather_mock).toHaveBeenCalledTimes(1)
 		expect(mark_mock).toHaveBeenCalledExactlyOnceWith(ISSUE)
+		expect(emit_plan_mock).not.toHaveBeenCalled()
 		expect(info_lines).toStrictEqual([
 			stage_line('fresh', 'fullrun', 'plan'),
 			`entry ${CITED} — hold: hold · cost: under · verdict: implement\n\n${PREP_BODY}`,
@@ -298,6 +304,7 @@ describe('run_entry_cli.run — the command decides what is claimed (joshuafolkk
 
 		expect(calls()[1]).toStrictEqual(['run:hold', ISSUE])
 		expect(info_lines[0]).toBe(stage_line('planned', 'halfrun', 'implement'))
+		expect(emit_plan_mock).toHaveBeenCalledExactlyOnceWith(ISSUE)
 	})
 
 	it('prints the stage line alone for kickoff, asking no cut and claiming nothing', async () => {

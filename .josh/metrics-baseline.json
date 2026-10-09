@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1029,
-		"code_lines": 85764,
-		"comment_lines": 34071,
+		"files": 1030,
+		"code_lines": 85811,
+		"comment_lines": 34087,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,7 +12,7 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12281,
-		"on_demand_bytes": 561365
+		"on_demand_bytes": 561435
 	},
 	"accepted": {
 		"reason": "#3538 adds the interactive ask-before-filing rule: stop-guard filing check + tests, and the attended/unattended filing split in CLAUDE.md, SKILL.md, observation-filing.md and rule-delivery docs (incl. review round 1 wording)",

@@ -2,8 +2,8 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 
 // How far a running lane child has got (joshuafolkken/kit#3444), read from the events that name its
-// issue. **Each phase comes from a record a step already writes**: the launch, the `plan` event the
-// `fullrun` steps emit before implementing, the `lane-phase` the PreToolUse hook writes at the first
+// issue. **Each phase comes from a record a step already writes**: the launch, the `plan` event
+// `run-event-plan.ts` writes (joshuafolkken/kit#3536), the `lane-phase` the PreToolUse hook writes at the first
 // implementation edit of each session, the ship supervisor's launch, `josh ship`'s own stage trace and
 // its stop. Nothing is guessed from the clock, so a child that never reaches a record stays on the
 // phase before it rather than being drawn further on.
