@@ -7,7 +7,7 @@ import {
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { behavior_change_lint } from '#scripts/issue/behavior-change-lint'
 import { defect_rate, type DefectRate } from '#scripts/issue/defect-rate'
-import { INTERRUPT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
+import { BUGFIX_LABEL, INTERRUPT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_defect_priority } from './backlog-defect-priority'
 import { backlog_fixture, type BacklogInput, type ChildInput } from './backlog-fixture'
@@ -24,6 +24,8 @@ const CODE_ONLY = 902
 const DEFECT = 903
 const INTERRUPTED_MECHANISM = 904
 const UNDECLARED = 905
+// joshuafolkken/kit#3560: a defect known only by the `bugfix` label a maintainer applied.
+const BUGFIX_ONLY = 906
 
 const CHILDREN: ReadonlyArray<ChildInput> = [
 	{ number: MECHANISM, body: behavior_change_lint.DECLARATION_LINE },
@@ -35,14 +37,25 @@ const CHILDREN: ReadonlyArray<ChildInput> = [
 		labels: [INTERRUPT_ROUTE_LABEL],
 	},
 	{ number: UNDECLARED },
+	{ number: BUGFIX_ONLY, labels: [BUGFIX_LABEL] },
 ]
 
-const GRAPH_ORDER = [MECHANISM, CODE_ONLY, DEFECT, INTERRUPTED_MECHANISM, UNDECLARED]
+const GRAPH_ORDER = [MECHANISM, CODE_ONLY, DEFECT, INTERRUPTED_MECHANISM, UNDECLARED, BUGFIX_ONLY]
 // joshuafolkken/kit#2928: `route:interrupt` is a ranking key above the defect-rate order, so the
 // interrupted issue heads the offer whatever the rate; the rest keep the order this file pins.
-const RANKED_GRAPH_ORDER = [INTERRUPTED_MECHANISM, MECHANISM, CODE_ONLY, DEFECT, UNDECLARED]
+const RANKED_GRAPH_ORDER = [
+	INTERRUPTED_MECHANISM,
+	MECHANISM,
+	CODE_ONLY,
+	DEFECT,
+	UNDECLARED,
+	BUGFIX_ONLY,
+]
 
-const ABOVE_BASELINE: DefectRate = { ...backlog_fixture.AT_BASELINE, defects: 22 }
+const ABOVE_BASELINE: DefectRate = {
+	...backlog_fixture.AT_BASELINE,
+	defects: backlog_fixture.AT_BASELINE.defects + 1,
+}
 
 const streams = console_streams()
 const { stdout, stderr } = streams
@@ -80,7 +93,7 @@ describe('backlog:next while the defect rate is above its baseline', () => {
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(offered()).toBe(
-			joined([INTERRUPTED_MECHANISM, DEFECT, CODE_ONLY, UNDECLARED, MECHANISM]),
+			joined([INTERRUPTED_MECHANISM, DEFECT, BUGFIX_ONLY, CODE_ONLY, UNDECLARED, MECHANISM]),
 		)
 		expect(stderr()).toContain(ABOVE_NOTE)
 	})

@@ -33,8 +33,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'defect:rate': {
 		script: 'scripts/issue/defect-rate-cli.ts',
-		description:
-			'Print the defect rate of merged work: defects filed per behavior change completed',
+		description: 'Print the defect rate of merged work: defects filed per enhancement completed',
 		category: 'AI tools',
 		reference: ['[--days <n>]', 'automation', ['network']],
 	},
