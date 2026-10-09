@@ -10,6 +10,7 @@ const { lane_of, parse_lsof, parse_ps, sample, usage_reader } = run_board_usage_
 const KB = 1024
 const ROOT = '/Users/me/Development/.kit-lanes'
 const LANE = `${ROOT}/3423`
+const PARENT_AND_CHILD = '1 7 0:01 4\n2 1 0:01 4'
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -113,7 +114,7 @@ describe('run_board_usage_read.sample', () => {
 describe('run_board_usage_read.sample with reaped children', () => {
 	it('reads the CPU time with reaped children where it can, and keeps every process’s parent', async () => {
 		const rusage = vi.fn((pid: number) => (pid === 1 ? 5000 : undefined))
-		const ports = ports_of(['1 7 0:01 4\n2 1 0:01 4'], new Map([[1, LANE]]), rusage)
+		const ports = ports_of([PARENT_AND_CHILD], new Map([[1, LANE]]), rusage)
 		const mark = await sample(undefined, ports)
 
 		expect(mark.processes.get(1)).toStrictEqual({ cpu_ms: 5000, rss_bytes: 4 * KB })
@@ -125,6 +126,17 @@ describe('run_board_usage_read.sample with reaped children', () => {
 			]),
 		)
 		expect(mark.folded).toStrictEqual(new Set([1]))
+	})
+
+	it('keeps a process’s last folded reading while its read fails, so its reaped children are not counted twice', async () => {
+		// The child's one read holds a minute of its reaped children's time; its next read fails.
+		const child_reads = [60_000]
+		const rusage = vi.fn((pid: number) => (pid === 2 ? child_reads.shift() : 1000))
+		const ports = ports_of([PARENT_AND_CHILD, '1 7 0:01 4\n2 1 0:02 4'], new Map(), rusage)
+		const second = await sample(await sample(undefined, ports), ports)
+
+		expect(second.processes.get(2)?.cpu_ms).toBe(60_000)
+		expect(second.folded.has(2)).toBe(false)
 	})
 
 	it('keeps ps’s own time and no parent where there is no reader', async () => {

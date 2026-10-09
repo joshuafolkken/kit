@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1029,
-		"code_lines": 85733,
-		"comment_lines": 34055,
+		"code_lines": 85743,
+		"comment_lines": 34058,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 560565
 	},
 	"accepted": {
-		"reason": "#3529 adds the node:ffi proc_pid_rusage reader so run:board folds reaped children into lane CPU",
+		"reason": "#3529 keeps a failed read's last folded reading so a reaped child's time is not counted twice",
 		"date": "2026-10-09"
 	}
 }

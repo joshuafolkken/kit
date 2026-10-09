@@ -82,8 +82,25 @@ function parse_ps(output: string): Map<number, ProcessListing> {
 	return new Map(listings.filter((listing) => listing !== undefined))
 }
 
-function folded_reading(reading: ProcessReading, cpu_ms: number | undefined): ProcessReading {
-	return cpu_ms === undefined ? reading : { ...reading, cpu_ms }
+// A process whose read failed keeps the larger of `ps`'s own time and its last reading: once reaped,
+// its whole folded count lands in its parent's, so what comes off there has to be that count — its own
+// time alone would count its reaped children a second time.
+function folded_reading(
+	reading: ProcessReading,
+	cpu_ms: number | undefined,
+	earlier: ProcessReading | undefined,
+): ProcessReading {
+	if (cpu_ms !== undefined) return { ...reading, cpu_ms }
+
+	return { ...reading, cpu_ms: Math.max(reading.cpu_ms, earlier?.cpu_ms ?? 0) }
+}
+
+type Readings = Pick<UsageMark, 'folded' | 'parents' | 'processes'>
+
+function own_readings(listings: ReadonlyMap<number, ProcessListing>): Readings {
+	const processes = new Map([...listings].map(([pid, { reading }]) => [pid, reading] as const))
+
+	return { processes, parents: new Map(), folded: new Set() }
 }
 
 // `ps`'s own-time readings, each replaced by its reaped-children-folded time where `rusage` reads one.
@@ -92,17 +109,18 @@ function folded_reading(reading: ProcessReading, cpu_ms: number | undefined): Pr
 function readings_of(
 	listings: ReadonlyMap<number, ProcessListing>,
 	rusage: RusageReader | undefined,
-): Pick<UsageMark, 'folded' | 'parents' | 'processes'> {
+	earlier: ReadonlyMap<number, ProcessReading> = new Map(),
+): Readings {
+	if (rusage === undefined) return own_readings(listings)
+
 	const processes = new Map<number, ProcessReading>()
 	const folded = new Set<number>()
-	const parents = new Map(
-		rusage === undefined ? [] : [...listings].map(([pid, { parent }]) => [pid, parent] as const),
-	)
+	const parents = new Map([...listings].map(([pid, { parent }]) => [pid, parent] as const))
 
 	for (const [pid, { reading }] of listings) {
-		const cpu_ms = rusage?.(pid)
+		const cpu_ms = rusage(pid)
 
-		processes.set(pid, folded_reading(reading, cpu_ms))
+		processes.set(pid, folded_reading(reading, cpu_ms, earlier.get(pid)))
 		if (cpu_ms !== undefined) folded.add(pid)
 	}
 
@@ -154,7 +172,7 @@ async function lanes_for(
 
 async function sample(before: UsageMark | undefined, ports: UsagePorts): Promise<UsageMark> {
 	const at_ms = ports.now()
-	const readings = readings_of(parse_ps(await ports.list()), ports.rusage)
+	const readings = readings_of(parse_ps(await ports.list()), ports.rusage, before?.processes)
 	const lanes = await lanes_for(before?.lanes ?? new Map(), readings.processes, ports)
 
 	return { at_ms, ...readings, lanes, cores: cpus().length, total_bytes: totalmem() }
@@ -191,7 +209,6 @@ interface ReaderSetup {
 
 // `undefined` where the processes cannot be read — no `ps`, no way to a working directory, no
 // repository — so the board draws no column rather than failing.
-
 async function read_usage(
 	before: UsageMark | undefined,
 	setup: ReaderSetup,

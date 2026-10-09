@@ -24,7 +24,7 @@ interface UsageMark {
 	// (joshuafolkken/kit#3529) — empty on the `ps` path, so nothing is deducted there.
 	parents: ReadonlyMap<number, number>
 	// The processes whose count was read with its reaped children folded in — one whose own read failed
-	// keeps `ps`'s own time, so nothing reaped is taken off it.
+	// keeps the larger of `ps`'s own time and its last reading, so nothing reaped is taken off it.
 	folded: ReadonlySet<number>
 	cores: number
 	total_bytes: number
