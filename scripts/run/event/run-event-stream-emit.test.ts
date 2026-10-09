@@ -255,6 +255,35 @@ describe('run_event_stream_emit.current_events — the invocation now running', 
 	})
 })
 
+// joshuafolkken/kit#3536: a writer asking whether its marker is there keeps the whole stream unscoped.
+describe('run_event_stream_emit.invocation_or_all_events', () => {
+	it('keeps the whole stream when no carry record scopes it', async () => {
+		const repository = fresh_repository()
+
+		git_directories_mock.mockResolvedValue([WORKTREE, repository])
+		run_event_stream.append(run_event_stream.target_of(repository), MERGE, '#6 merged', EARLIER_ISO)
+
+		const events = await run_event_stream_emit.invocation_or_all_events()
+
+		expect(events.map((event) => event.text)).toStrictEqual(['#6 merged'])
+	})
+
+	it('drops a previous invocation under a carry scope', async () => {
+		const repository = fresh_repository()
+		const carry = run_carry.carry_path(repository)
+
+		git_directories_mock.mockResolvedValue([WORKTREE, repository])
+		run_event_stream.append(run_event_stream.target_of(repository), MERGE, '#6 merged', EARLIER_ISO)
+		run_carry.begin_carry(carry, 'backlogrun')
+		await run_event_stream_emit.emit(MERGE, '#7 merged')
+
+		const events = await run_event_stream_emit.invocation_or_all_events()
+
+		rmSync(carry, { force: true })
+		expect(events.map((event) => event.text)).toStrictEqual(['#7 merged'])
+	})
+})
+
 // joshuafolkken/kit#3423: the fold reads a finder's filings across invocations, carry record or none.
 describe('run_event_stream_emit.all_events — the whole stream', () => {
 	it('reads every invocation’s events through all_events, with no carry record', async () => {

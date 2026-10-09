@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1029,
-		"code_lines": 85761,
-		"comment_lines": 34077,
+		"files": 1030,
+		"code_lines": 85808,
+		"comment_lines": 34093,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,7 +12,7 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12222,
-		"on_demand_bytes": 560565
+		"on_demand_bytes": 560635
 	},
 	"accepted": {
 		"reason": "run-event-stream bound orders droppable lines so ship-stage starts and idle lines roll off last, keeping run:board post-ship phases (#3541)",
