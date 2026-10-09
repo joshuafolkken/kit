@@ -75,7 +75,7 @@ function is_kit_written(key: string, value: string): boolean {
 }
 
 // A retired name alone does not make a script kit's: `sv create` writes its own `check`, which must
-// survive `josh init` (joshuafolkken/kit#3069). Only a value kit itself wrote is retired.
+// survive `josh init`. Only a value kit itself wrote is retired.
 function is_retired_script(key: string, value: string): boolean {
 	return RETIRED_MANAGED_SCRIPTS.has(key) && is_kit_written(key, value)
 }

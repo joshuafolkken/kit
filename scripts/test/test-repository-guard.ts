@@ -5,24 +5,17 @@ import {
 	GIT_LOCATION_VARIABLES,
 } from '#scripts/git/git-location-environment'
 
-// **A unit test must not write into the repository the suite is running in**, and until
-// joshuafolkken/kit#1530 nothing said so out loud.
+// **A unit test must not write into the repository the suite is running in.**
 //
-// `lane-change-base.test.ts` builds a real git topology in a temp directory and hands its helper
-// `{ cwd }` and nothing else. Run from the pre-push hook it inherited `GIT_DIR` and `GIT_INDEX_FILE`
-// from the hook environment — both of which beat `cwd` — so the fixture's own commits landed on the
-// branch being pushed. `1085-lane`'s reflog carries three of them, titled `base` and
-// `another lane merged`, 26 seconds after the run's real commit; `1080-lane` took one. The same
-// helper's `git config user.email` wrote a fixture identity into `--local` config, which every
-// linked work tree of the repository shares, so all five checkouts on the machine started authoring
-// commits as `Lane Fixture <lane@example.test>`.
+// A test that builds a real git topology in a temp directory and hands its helper `{ cwd }` and
+// nothing else, run from the pre-push hook, inherits `GIT_DIR` and `GIT_INDEX_FILE` from the hook
+// environment — both of which beat `cwd` — so the fixture's own commits land on the branch being
+// pushed. A fixture's `git config user.email` writes into `--local` config, which every linked work
+// tree of the repository shares, so every checkout on the machine starts authoring commits as the
+// fixture. Fixing one instance does not stop the class: it arrives silently, with the only evidence a
+// reflog someone has to go and read.
 //
-// **This is the second instance of one class in a day.** joshuafolkken/kit#1515 fixed the first, in
-// `propagate-git`'s probes, by clearing the location variables — and fixing the instance is all it
-// did. The class recurred within hours, in a file written after it, arriving the same way: silently,
-// with the only evidence a reflog someone had to go and read.
-//
-// **So the guard is built one dimension over from #1515's own network guard, on the same mechanism**
+// **So the guard is built one dimension over from the network guard, on the same mechanism**
 // (`test-network-guard.ts` arms the `PATH` shim, holds the record and fails the run from
 // `globalSetup`'s teardown; this module contributes the `sh` that decides). Reusing it rather than
 // writing a second guard is `CLAUDE.md` → "No clones", and it is also the only way the two can share
@@ -59,7 +52,7 @@ import {
 // and the command and the finding on stderr, so `execa` throws inside the test and vitest names the
 // file and the test itself. The record read at teardown is the backstop for a test that swallows the
 // error, and it carries the command and the finding for the same reason — so nobody has to
-// reconstruct it from a reflog the way joshuafolkken/kit#1530 was.
+// reconstruct it from a reflog.
 
 // The `git` subcommands that can write to a repository, an index or a config. Absent from it are the
 // reads the suite lives on (`status`, `log`, `diff`, `rev-parse`, `merge-base`, `show`,
@@ -97,9 +90,8 @@ const GIT_WRITING_SUBCOMMANDS: ReadonlyArray<string> = [
 // They are refused on the inherited-environment finding only.
 //
 // **Which is not a hole, but the line between the two findings drawn where it belongs.** An
-// inherited environment is wrong for a read as surely as for a write — it is the other half of what
-// joshuafolkken/kit#1530 did, where `git_command`'s readings answered about the repository being
-// pushed — so finding 1 covers these whole, `config user.email <value>` and `worktree add` included.
+// inherited environment is wrong for a read as surely as for a write — a read then answers about
+// the repository being pushed — so finding 1 covers these whole, `config user.email <value>` and `worktree add` included.
 // Finding 2 is the one that cannot tell them apart: an ambient `cwd` inside the checkout is exactly
 // how a legitimate read of the real repository is spelled, and refusing that would stop the suite
 // rather than the defect (`test-network-guard.ts` names the worktree machinery as a read that has to
@@ -120,12 +112,12 @@ const GIT_AMBIGUOUS_SUBCOMMANDS: ReadonlyArray<string> = [
 const WRITE_MARKER = 'repository write:'
 // **The headline states the rule and the detail line states the finding**, because the two findings
 // have different fixes: clearing the environment is the answer to the first and gives the second a
-// misleading instruction, which is what the same sentence said for both until review round 1.
+// misleading instruction.
 const BLOCKED_WRITE_MESSAGE =
 	'josh: a unit test must not run a writing git command against the repository the suite is running in'
 // Finding-neutral, like the stderr message and for the same reason: each recorded line carries its
 // own `— via …`, and a run failed on the working-directory finding must not be told to clear an
-// environment that was already clean (review round 2).
+// environment that was already clean.
 const WRITE_VIOLATION_HEADING =
 	'The unit suite ran a writing git command against the repository it is running in. Each line names what took it there:'
 
@@ -140,7 +132,7 @@ const GIT_DIRECTORY_ARGUMENTS = ['rev-parse', '--path-format=absolute', '--git-c
 // `PROJECT_ROOT`, so finding 2 has nothing to protect and is left out of the generated shim while
 // finding 1 stays armed. Every other failure — an unreadable directory, a git that cannot run — is a
 // guard that does not know what it is guarding, and a guard that cannot answer must not report the
-// run clean (review round 1 of joshuafolkken/kit#1530).
+// run clean.
 const NOT_A_REPOSITORY = 'not a git repository'
 const RESOLUTION_HEADING =
 	'The unit-suite repository guard could not work out which repository it protects, so the run proves nothing:'

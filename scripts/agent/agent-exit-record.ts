@@ -2,7 +2,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { claude_result_event, type ClaudeResultEvent } from './claude-result-event'
 
 // The exit record of a dispatched lane child — the terminal `result` event a `claude -p` session
-// writes as the last line of its transcript (joshuafolkken/kit#2139). `run:ending` classifies how a
+// writes as the last line of its transcript. `run:ending` classifies how a
 // child ended from it, so this reads the *record*, not the liveness state `agent-event.ts` folds a
 // transcript into: `subtype`, `num_turns` and `permission_denials` are dropped by that fold, and they
 // are exactly what a park comment has to name.

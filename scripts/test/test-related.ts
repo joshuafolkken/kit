@@ -8,12 +8,12 @@ import { review_stamps } from '#scripts/review/review-stamps'
 import { related_scope } from './test-related-scope'
 import { test_unit_guard } from './test-unit-guard'
 
-// `josh test:related` — the unit check an implementation loop runs between edits
-// (joshuafolkken/kit#1257). The narrowing itself is `test-related-scope.ts` over the shared
+// `josh test:related` — the unit check an implementation loop runs between edits.
+// The narrowing itself is `test-related-scope.ts` over the shared
 // decision in `changed-file-scope.ts`; this is the process around it — how the run reaches vitest
 // through the same guard `josh test:unit` goes through.
 //
-// **A green run leaves a record of the tree it was green on** (joshuafolkken/kit#1511), so
+// **A green run leaves a record of the tree it was green on**, so
 // `josh review:brief` can tell a tree this check has read from one it has not. What the record means,
 // and the three states in which it is withheld, are `scoped-green.ts`.
 

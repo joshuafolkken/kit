@@ -61,8 +61,8 @@ function refused(refusal: string): StepPlan {
 }
 
 // Main already has a history but not kit's setup, so the setup reaches main the way every later change
-// does — an Issue and a pull request a person merges — rather than a commit on main
-// (joshuafolkken/kit#2816). On another branch the pull request would not be based on main, so it waits
+// does — an Issue and a pull request a person merges — rather than a commit on main.
+// On another branch the pull request would not be based on main, so it waits
 // — except the setup branch a failed hook left checked out, where a re-run resumes. Once kit is
 // committed there, nothing is left for the step, so a later run on that branch plans none.
 function needs_setup_pr(state: GitState): boolean {

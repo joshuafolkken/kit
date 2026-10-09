@@ -19,7 +19,7 @@ function is_older_than(kit_pin: string, version: string): boolean {
 
 // Never pin a project below the pnpm installing it: the lockfile that pnpm just wrote can name a
 // version an older pnpm fails to resolve, so `pnpm install` under kit's older pin breaks the
-// first `josh init` (joshuafolkken/kit#3367). The kit pin keeps its integrity suffix when it wins.
+// first `josh init`. The kit pin keeps its integrity suffix when it wins.
 function choose(kit_pin: string | undefined, user_agent: string | undefined): string | undefined {
 	const running = running_pnpm_version(user_agent)
 	if (kit_pin === undefined || running === undefined) return kit_pin

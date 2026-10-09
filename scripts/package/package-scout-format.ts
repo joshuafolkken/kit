@@ -6,8 +6,8 @@ import {
 } from './package-scout'
 
 // The printed shape of `josh pkg:scout` — one line per candidate with each metric labelled, then a
-// verdict line that names whether the choice is a Tier A pick or a Tier B question
-// (joshuafolkken/kit#2216). Formatting is pure so the layout and the verdict wording are unit-tested
+// verdict line that names whether the choice is a Tier A pick or a Tier B question.
+// Formatting is pure so the layout and the verdict wording are unit-tested
 // without a registry.
 
 // The blank shown for a metric the registry did not report — a fact absent, never a zero measured.

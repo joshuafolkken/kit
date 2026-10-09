@@ -1,5 +1,5 @@
 // `josh init` seeds `JOSH_SESSION_LANG` in `.env` from the OS locale, so a newly adopting user starts
-// in their own language (joshuafolkken/kit#2818). A project already using kit keeps its language: the
+// in their own language. A project already using kit keeps its language: the
 // session language takes effect only through the `session:lang` hook, so a project whose
 // `.claude/settings.json` already wires it is left alone, and an existing `.env` value — the `export`
 // form included — is never touched. The unset default stays `ja`.

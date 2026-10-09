@@ -14,14 +14,14 @@ import { json_format } from './json-format'
 // tolerant JSONC parse and write the whole file back from the parsed object, which silently deleted
 // the consumer's comments — including the `// Path aliases are handled by ...` block `sv create`
 // ships. Editing text in place instead keeps comments, trailing commas, key order and any
-// hand-formatting outside the one value being changed. See joshuafolkken/kit#798.
+// hand-formatting outside the one value being changed.
 //
 // jsonc-parser is used ONLY to locate text, never to produce it. Two independent reasons:
 //
 //  1. Its formatter breaks every array one element per line regardless of width — the layout
 //     prettier wants for `package.json`, and the opposite of what it wants for the files edited
-//     here, where the `json` printer keeps a short array inline. Letting it render would
-//     re-introduce joshuafolkken/kit#797 on a new axis.
+//     here, where the `json` printer keeps a short array inline. Letting it render would fail
+//     `prettier --check` on the rewritten file.
 //  2. `modify` with `formattingOptions` reformats a region around its edit, not just the edit —
 //     removing `compilerOptions` from a document also expanded the untouched `extends` array above
 //     it. Dropping `formattingOptions` avoids that but then places inserted keys with no newline or

@@ -8,7 +8,7 @@ const WORKFLOW_DESTINATION_PATTERN = /(?:^|[/\\])\.github[/\\]workflows[/\\][^/\
 
 // A local composite action is a workflow file too: it pins actions of its own, the distributed
 // `dependabot.yml` bumps it (`/.github/actions/*`), and the next sync writes it back — so it needs
-// the same pins and the same managed stamp as the workflow that calls it (joshuafolkken/kit#3013).
+// the same pins and the same managed stamp as the workflow that calls it.
 const COMPOSITE_ACTION_DESTINATION_PATTERN =
 	/(?:^|[/\\])\.github[/\\]actions[/\\][^/\\]+[/\\]action\.ya?ml$/u
 

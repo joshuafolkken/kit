@@ -1,7 +1,7 @@
 import { cost_pricing } from './cost-pricing'
 
-// **When a context cut pays back, priced from the cost model rather than fixed at a ceiling**
-// (joshuafolkken/kit#2406). A cut ends the oversized session and relaunches a fresh one that rebuilds
+// **When a context cut pays back, priced from the cost model rather than fixed at a ceiling**.
+// A cut ends the oversized session and relaunches a fresh one that rebuilds
 // only its preamble, so what it saves is not decided by a ceiling on the accumulated context but by a
 // *rate*: a cache read bills the whole context on every request, so whether to cut turns on how many
 // requests are still to come and what each would pay, not on how much has piled up.
@@ -21,9 +21,8 @@ const POST_CUT_CONTEXT = 60_000
 // The requests a resumed session is expected to still run — the horizon the break-even is measured
 // against. A cut only pays if enough requests remain to recoup the preamble rewrite; even the shortest
 // resume (into the gate, commit, PR and merge) runs on the order of ten. Ten is the conservative
-// horizon: it keeps the shared threshold near joshuafolkken/kit#2374's empirically validated 150_000
-// (this lands at 135_000, inside the 100k–200k band that PR simulated) while pricing the decision from
-// the cost model. It is the knob a before/after lane measurement tunes.
+// horizon: it keeps the shared threshold near the empirically validated 150_000 (this lands at
+// 135_000, inside the simulated 100k–200k band) while pricing the decision from the cost model. It is the knob a before/after lane measurement tunes.
 const EXPECTED_REMAINING_REQUESTS = 10
 
 // The price of a dropped token relative to a rewritten one, from `cost-pricing.ts`. A cache read bills

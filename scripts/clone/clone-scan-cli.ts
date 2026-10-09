@@ -2,7 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { clone_scan } from './clone-scan'
 
-// `josh clone:scan` — count duplication across files and repositories (joshuafolkken/kit#2217).
+// `josh clone:scan` — count duplication across files and repositories.
 //
 // A command rather than a paragraph, for the reason `josh repo:party` is one: the `no-clones` rule
 // fires on the agent's own recognition that it is about to copy something, which is exactly the moment

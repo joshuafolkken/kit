@@ -30,7 +30,7 @@ function sync_ai_file(source_path: string, destination_path: string): boolean {
 
 // Both copied hook files must run against the consumer's installed bundle. When sync is run from a
 // newer source than that install, writing either file would leave hooks
-// that fail every prompt (joshuafolkken/kit#1930); skip it and print how to update instead.
+// that fail every prompt; skip it and print how to update instead.
 function should_skip_hook_file(filename: string): boolean {
 	if (filename !== CLAUDE_SETTINGS_FILE && filename !== CODEX_HOOKS_FILE) return false
 	const warning = sync_hook_safety.hook_write_warning(
@@ -60,7 +60,7 @@ function sync_file_mapping(source_path: string, destination_path: string): void 
 
 	// Routed through sync_ai_file rather than cpSync: templates/workflows/ci.yml is a mapped
 	// file, so a byte copy would hand the consumer the template's own action pins. The pins
-	// have to be resolved from .github/workflows at write time (joshuafolkken/kit#747).
+	// have to be resolved from .github/workflows at write time.
 	const did_change = sync_ai_file(source_path, destination_path)
 
 	console.info(`  ✔ ${did_change ? 'synced   ' : 'unchanged'} ${path.basename(destination_path)}`)
@@ -121,8 +121,8 @@ function sync_directory(directory_name: string): void {
 }
 
 // A consumer's stale copy of a distributed skill is removed once it still matches the shipment and
-// kept with a warning once it does not (joshuafolkken/kit#1879). Plugin skills compare against the
-// package source; a retired skill compares against the frozen manifest (joshuafolkken/kit#1990). The
+// kept with a warning once it does not. Plugin skills compare against the
+// package source; a retired skill compares against the frozen manifest. The
 // note distinguishes the two, and `absent` — the consumer never had the copy — prints nothing.
 function report_migration_result(result: MigrationResult): void {
 	if (result.action === 'absent') return
@@ -151,7 +151,7 @@ function ensured_claude_md(existing: string | undefined, shape?: ProjectShape): 
 		: init_logic.ensure_claude_md_import(existing)
 }
 
-// CLAUDE.md is not byte-copied (joshuafolkken/kit#1878): a consumer's file is one @import of kit's
+// CLAUDE.md is not byte-copied: a consumer's file is one @import of kit's
 // published rules plus the project's own additions below it. Ensure the import line is present
 // without ever disturbing those additions — so this ignores --force, which would otherwise mean
 // discarding a consumer's content.
@@ -171,7 +171,7 @@ function sync_claude_md(destination_path: string, shape?: ProjectShape): void {
 }
 
 // A basic shape syncs the file set `josh init` writes for that profile; no shape is the full set,
-// unfiltered, as sync has always written it (joshuafolkken/kit#2827).
+// unfiltered, as sync has always written it.
 function sync_ai_copy_all(is_force: boolean, shape?: ProjectShape): void {
 	console.info('AI files:')
 
@@ -191,7 +191,7 @@ function sync_ai_copy_all(is_force: boolean, shape?: ProjectShape): void {
 
 	migrate_removed_skills()
 	// Both profiles write the Safe Chain `preinstall`, so both get the hook that keeps it out of a
-	// published package (joshuafolkken/kit#3110).
+	// published package.
 	pack_hook.sync_pack_hook(PROJECT_ROOT, PACKAGE_DIR)
 }
 

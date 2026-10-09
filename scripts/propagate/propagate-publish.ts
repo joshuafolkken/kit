@@ -7,9 +7,8 @@ import { with_page_size } from '#scripts/version/version-remote'
 //
 // A merge is not a publish: kit's auto-tag and publish workflows run after the merge commit lands,
 // so a consumer told to upgrade the instant the PR merged resolves the previous release. The wait is
-// implemented once here because joshuafolkken/kit#864 resolves a cross-repository child on the same
-// condition — two implementations would drift, and the looser one would decide
-// (joshuafolkken/kit#863).
+// implemented once here because resolving a cross-repository epic child waits on the same
+// condition — two implementations would drift, and the looser one would decide.
 
 const VERSIONS_PAGE_SIZE = 100
 const NAMES_JQ = '[.[] | .name]'

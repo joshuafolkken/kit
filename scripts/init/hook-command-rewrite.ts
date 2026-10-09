@@ -2,9 +2,9 @@ import { claude_plugin_config } from './claude-plugin-config'
 import { hook_launch } from './hook-launch'
 
 // The consumer's `.claude/settings.json` runs its hooks off the published package directly, not
-// through `pnpm josh` (joshuafolkken/kit#1930, joshuafolkken/kit#2023). Two paths inside a hook
-// command are rebased onto the installed package: the hook launcher `scripts/hooks/run-hook.sh`
-// (joshuafolkken/kit#3184), which picks the bundle or the dispatcher from where it is installed, and a
+// through `pnpm josh`. Two paths inside a hook
+// command are rebased onto the installed package: the hook launcher `scripts/hooks/run-hook.sh`,
+// which picks the bundle or the dispatcher from where it is installed, and a
 // plain `pnpm josh <command>`, which becomes the `dist/josh.js` dispatcher — the published package
 // always ships `dist`, and a `pnpm` launch would only add the wrapper this exists to remove.
 //
