@@ -1,13 +1,11 @@
 import { stripVTControlCharacters } from 'node:util'
-import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import type { IdleWindow } from '#scripts/backlog/backlog-idle'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
-import type { BoardLayout, BoardRow } from './run-board-layout'
-import type { BoardNote } from './run-board-notes'
+import type { BoardRow } from './run-board-layout'
 import type { Phase } from './run-board-phase'
 import { run_board_render } from './run-board-render'
+import { run_board_render_fixture } from './run-board-render-fixture'
 import type { ItemStatus } from './run-board-status'
 import { run_board_track } from './run-board-track'
 
@@ -16,12 +14,9 @@ import { run_board_track } from './run-board-track'
 // title, elapsed `MM:SS` and — while running — its phase track; sections are rules, symbols a legend.
 
 const { clock_of } = run_board_labels
-const WORDS = run_board_labels.words_of('ja')
+const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, WORDS, header, lines_of, rule } =
+	run_board_render_fixture
 const SECOND = 1000
-const MINUTE = backlog_budget.MS_PER_MINUTE
-const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
-const NOW = STARTED + 130 * MINUTE
-const EMPTY_LAYOUT: BoardLayout = { active: [], waves: [], people: [], unreached: [] }
 
 function row(number: number, extra: Partial<BoardRow> = {}): BoardRow {
 	return {
@@ -38,32 +33,6 @@ function running(number: number, started_ms: number, phase: ItemStatus['phase'])
 	return row(number, { state: 'running', status: { state: 'running', started_ms, phase } })
 }
 
-function header(extra: Partial<BoardHeader> = {}): BoardHeader {
-	return {
-		now_ms: NOW,
-		words: WORDS,
-		started_ms: STARTED,
-		ended_ms: undefined,
-		activity: { last_event_ms: NOW - MINUTE, idle: undefined, is_stopped: false },
-		layout: EMPTY_LAYOUT,
-		baseline_total: undefined,
-		plan_fetched_ms: NOW,
-		plan_failed_ms: undefined,
-		is_plan_loading: false,
-		machine: undefined,
-		spinner: undefined,
-		form: 'screen',
-		link: (reference) => reference,
-		...extra,
-	}
-}
-
-function lines_of(board: BoardHeader, notes: ReadonlyArray<BoardNote> = []): Array<string> {
-	return run_board_render
-		.render({ header: board, notes })
-		.map((line) => stripVTControlCharacters(line))
-}
-
 function padded(title: string): string {
 	return title.padEnd(run_board_render.TITLE_LIMIT)
 }
@@ -71,14 +40,6 @@ function padded(title: string): string {
 // The phase track as the stripped lines draw it, whether or not this run's output is colored.
 function plain_track(phase: Phase): string {
 	return stripVTControlCharacters(run_board_track.track_of(phase))
-}
-
-function rule(label: string): string {
-	return `── ${label} `.padEnd(50, '─')
-}
-
-function note(at_ms: number, text: string): BoardNote {
-	return { kind: 'note', at_ms, issue: '3415', text, is_decision: false }
 }
 
 describe('run_board_render.render rows', () => {
@@ -306,45 +267,5 @@ describe('run_board_render.render header', () => {
 			`  待機終了 ${clock_of(idle.until_ms)} (残り 00:20:00) → ${WORDS.idle_end_idle}`,
 		)
 		expect(lines[2]).toBe(`  次の確認 ${clock_of(NOW + 2 * MINUTE)}`)
-	})
-})
-
-describe('run_board_render findings and no run', () => {
-	it('shows the newest findings and how many more there are', () => {
-		const notes = Array.from({ length: run_board_render.NOTE_LIMIT + 2 }, (_, index) =>
-			note(NOW - index * MINUTE, `observation ${String(index)}`),
-		)
-		const filed: BoardNote = {
-			kind: 'filed',
-			at_ms: NOW,
-			issue: '3438',
-			text: 'Count seats',
-			found_during: '3415',
-			is_decision: false,
-		}
-		const lines = lines_of(header({ layout: undefined }), [filed, ...notes])
-
-		expect(lines).toContain(`  🐞 ${clock_of(NOW)} 3438 起票  Count seats（3415 の実装中に発見）`)
-		expect(lines).toContain(`  💬 ${clock_of(NOW)} 3415 意見  observation 0`)
-		expect(lines.at(-1)).toBe('  ほか 3')
-	})
-
-	it('says there is no run when none has started', () => {
-		expect(run_board_render.render_no_run(NOW, WORDS)).toStrictEqual([
-			`■ backlogrun  ランなし  ${clock_of(NOW)}`,
-		])
-	})
-})
-
-// joshuafolkken/kit#3437: a stopped run names the command that resumes its session, under the header.
-describe('run_board_render.render resume', () => {
-	it('draws the resume command only when the run stopped with a session', () => {
-		const board = header({ layout: undefined, ended_ms: NOW })
-		const resumed = run_board_render
-			.render({ header: board, notes: [], resume: 'abc' })
-			.map((line) => stripVTControlCharacters(line))
-
-		expect(resumed).toContain('🙋 停止中。再開  claude --resume abc')
-		expect(lines_of(board).join('\n')).not.toContain('claude --resume')
 	})
 })

@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1007,
-		"code_lines": 83434,
-		"comment_lines": 33520,
+		"files": 1008,
+		"code_lines": 83513,
+		"comment_lines": 33530,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 558915
 	},
 	"accepted": {
-		"reason": "run:board --chat answers a backlogrun progress question as one plain frame and records the report (#3456); progress-watcher names it as the backlogrun answer",
-		"date": "2026-10-08"
+		"reason": "run:board names its notes section with an icon and leads filed rows with icons named in the legend (#3478), with a notes test and shared render fixture",
+		"date": "2026-10-09"
 	}
 }
