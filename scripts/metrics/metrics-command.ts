@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { skill_meta } from '#scripts/claude/skill-meta'
+import { gate_own_write } from '#scripts/gate/gate-own-write'
 import { git_command } from '#scripts/git/git-command'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { file_reader } from '#scripts/lib/read-file'
@@ -33,7 +34,7 @@ const ACCEPT_FLAG = '--accept'
 const REASON_FLAG = '--reason'
 const ACCEPT_ARGUMENT_COUNT = 3
 const FAILURE_EXIT_CODE = 1
-const BASELINE_PATH = '.josh/metrics-baseline.json'
+const { BASELINE_PATH } = gate_own_write
 const RESIDENT_RULES = 'CLAUDE.md'
 // The instruction files an agent loads at the start of every session — Claude Code, Codex, Gemini.
 const RESIDENT_DOCUMENTS: ReadonlyArray<string> = [RESIDENT_RULES, 'AGENTS.md', 'GEMINI.md']
@@ -44,7 +45,7 @@ const ENCODING = 'utf8'
 const DATE_LENGTH = 10
 // A total that shrank moves the baseline down with it, so the next growth is measured from there.
 const SETTLED_NOTE: Record<'improved' | 'unchanged', string> = {
-	improved: ` — a total shrank, so ${BASELINE_PATH} now records the current totals`,
+	improved: ` — ${gate_own_write.SHRUNK_NOTE}`,
 	unchanged: '',
 }
 

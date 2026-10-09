@@ -12,6 +12,7 @@ import { review_tree } from '#scripts/review/review-tree'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { core_budget } from './core-budget'
 import { gate_ledger, type GateLedgerStart } from './gate-ledger'
+import { gate_own_write } from './gate-own-write'
 import { gate_plan, type GatePlan } from './gate-plan'
 import { gate_report, type GateStep, type GateStepResult } from './gate-report'
 import { gate_skip } from './gate-skip'
@@ -77,7 +78,8 @@ async function run_gate_step(step: GateStep): Promise<GateStepResult> {
 // false positive withholds the whole record and turns a green gate's `run:review --join` red — so a
 // benign line from another tool (a Vite config deprecation on `test:unit`) must not withhold it. A
 // tree that moved while
-// the checks were in flight (the `PostToolUse` formatter, an editor save) is not the tree they read.
+// the checks were in flight (the `PostToolUse` formatter, an editor save) is not the tree they read —
+// save for the metrics step's own baseline rewrite, recorded on the tree it left (`gate-own-write.ts`).
 // And a failed write leaves no record at all, which a temp-directory problem must never turn into a
 // red gate.
 //
@@ -98,7 +100,7 @@ async function record_green_gate(
 	try {
 		const after = await review_tree.read_changed_tree()
 
-		if (JSON.stringify(after) !== JSON.stringify(before)) return
+		if (!gate_own_write.is_unmoved(before, after, results)) return
 
 		review_stamps.gate_stamp.write(after, target, base)
 	} catch {
