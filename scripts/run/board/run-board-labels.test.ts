@@ -53,18 +53,18 @@ describe('run_board_labels.bar_of', () => {
 	it('fills the bar in proportion, empty for nothing to do and full when done', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
-		expect(bar_of(1, 4, 8)).toBe('██──────')
+		expect(bar_of(1, 4, 8)).toBe('■■──────')
 		expect(bar_of(0, 0, 4)).toBe('────')
-		expect(bar_of(5, 4, 4)).toBe('████')
+		expect(bar_of(5, 4, 4)).toBe('■■■■')
 		expect(bar_of(0, 1)).toHaveLength(10)
 	})
 
-	// joshuafolkken/kit#3452: a full block done, a dimmed thin line left where the output has color.
+	// joshuafolkken/kit#3452: a centered square done (joshuafolkken/kit#3498), a dimmed thin line left where the output has color.
 	it('draws the done part in its color and the left part dimmed where the output is colored', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(bar_of(1, 4, 4)).toBe(`${styleText('cyan', '█')}${styleText('dim', '───')}`)
-		expect(bar_of(4, 4, 4, 'green')).toBe(styleText('green', '████'))
+		expect(bar_of(1, 4, 4)).toBe(`${styleText('cyan', '■')}${styleText('dim', '───')}`)
+		expect(bar_of(4, 4, 4, 'green')).toBe(styleText('green', '■■■■'))
 	})
 })
 
@@ -78,24 +78,24 @@ describe('run_board_labels.painted with a gauge shade', () => {
 	it('draws the green, yellow and red shades as 24-bit colors where the output has them', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 
-		expect(painted(GAUGE_SHADES.normal, '█')).toBe('\u{1B}[38;2;48;209;88m█\u{1B}[39m')
-		expect(painted(GAUGE_SHADES.yellow, '█')).toBe('\u{1B}[38;2;255;214;10m█\u{1B}[39m')
-		expect(painted(GAUGE_SHADES.red, '█')).toBe('\u{1B}[38;2;255;69;58m█\u{1B}[39m')
+		expect(painted(GAUGE_SHADES.normal, '■')).toBe('\u{1B}[38;2;48;209;88m■\u{1B}[39m')
+		expect(painted(GAUGE_SHADES.yellow, '■')).toBe('\u{1B}[38;2;255;214;10m■\u{1B}[39m')
+		expect(painted(GAUGE_SHADES.red, '■')).toBe('\u{1B}[38;2;255;69;58m■\u{1B}[39m')
 	})
 
 	it('falls back to the 16 palette colors where the output has no 24-bit color', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(painted(GAUGE_SHADES.normal, '█')).toBe(styleText('green', '█'))
-		expect(painted(GAUGE_SHADES.yellow, '█')).toBe(styleText('yellow', '█'))
-		expect(painted(GAUGE_SHADES.red, '█')).toBe(styleText('red', '█'))
+		expect(painted(GAUGE_SHADES.normal, '■')).toBe(styleText('green', '■'))
+		expect(painted(GAUGE_SHADES.yellow, '■')).toBe(styleText('yellow', '■'))
+		expect(painted(GAUGE_SHADES.red, '■')).toBe(styleText('red', '■'))
 	})
 
 	it('draws no escape where the output has no color', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
-		expect(painted(GAUGE_SHADES.red, '█')).toBe('█')
-		expect(bar_of(1, 2, 2, GAUGE_SHADES.normal)).toBe('█─')
+		expect(painted(GAUGE_SHADES.red, '■')).toBe('■')
+		expect(bar_of(1, 2, 2, GAUGE_SHADES.normal)).toBe('■─')
 	})
 
 	it('draws no 24-bit escape into an output that is not a terminal, though the environment has 24-bit color', () => {
@@ -105,8 +105,8 @@ describe('run_board_labels.painted with a gauge shade', () => {
 		vi.stubEnv('TERM', 'xterm-256color')
 		vi.stubEnv('TMUX', '1')
 
-		expect(styleText('green', '█')).toBe('█')
-		expect(painted(GAUGE_SHADES.normal, '█')).toBe('█')
+		expect(styleText('green', '■')).toBe('■')
+		expect(painted(GAUGE_SHADES.normal, '■')).toBe('■')
 	})
 })
 

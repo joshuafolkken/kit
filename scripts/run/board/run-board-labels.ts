@@ -17,9 +17,10 @@ const MINUTES_PER_HOUR = 60
 const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE
 // Every gauge is this wide — the plan, the machine and a row's phase (joshuafolkken/kit#3450).
 const BAR_WIDTH = 10
-// A full block done and a thin line left (joshuafolkken/kit#3452): the shapes alone tell the two apart
-// where no color is drawn, and a terminal dims the line so the gauge does not read heavy.
-const BAR_DONE = '█'
+// A centered square done and a thin line left (joshuafolkken/kit#3452): the shapes alone tell the two
+// apart where no color is drawn, and a terminal dims the line so the gauge does not read heavy. The
+// square, not a full block, leaves a gap between stacked bars at line height 1 (joshuafolkken/kit#3498).
+const BAR_DONE = '■'
 const BAR_LEFT = '─'
 const BAR_DONE_COLOR: TextColor = 'cyan'
 const BAR_LEFT_COLOR: TextColor = 'dim'
