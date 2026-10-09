@@ -1,15 +1,11 @@
 # An Issue's comments are part of the Issue
 
-**This file is the single source, so the entry read carries the trigger and the pointer, not the
-procedure** (joshuafolkken/kit#2189). `SKILL.md` → §2's table keeps the trigger, and every `#N` entry
-file routes here for the definition. It is read at its point of use — before implementing a
-`#N` Issue.
+**The single source of the comment read**, read at its point of use — before implementing a `#N`
+Issue. Rationale and history: `docs/maintainers/issue-comments-rationale.md` → "Why comments are read".
 
 **Every `#N` entry point reads the Issue's comments before it implements** — `fullrun`, `halfrun` and
-`kickoff`. A `backlogrun` named issue and a `backlogrun` epic child inherit it rather than restate it: each runs in a
-delegated unit executing `fullrun`'s procedure, and the hook keys its once-per-run record on the
-*fork's* transcript, so every child is delivered to in its own right. The read is one call, made in the
-same turn as whatever else the run already needs:
+`kickoff`; a `backlogrun` named issue and epic child inherit it through `fullrun`'s procedure. The read
+is one call, made in the same turn as whatever else the run already needs:
 
 ```bash
 pnpm josh issue:read <N> [<N> ...]     # body and comments, one call per batch
@@ -18,21 +14,12 @@ gh api repos/{owner}/{repo}/issues/<N>/comments --jq '.[] | {user: .user.login, 
 
 **The first line is the one to type**; `pnpm josh issue:read` answers the body and the comments for
 every number named, in one call, and **says when a comment listing could not be read rather than
-showing no comments** — which matters here, because the rule below is that the later text wins and a
-comment nobody read cannot win anything. The `gh api` form stays for a **cross-repository** read: the
-command takes no `--repo`.
+showing no comments**. The `gh api` form stays for a **cross-repository** read: the command takes no
+`--repo`. Never `gh issue view <N> --comments` — it is GraphQL-backed and a cloud session is answered
+`403`.
 
-`gh issue view <N> --comments` is GraphQL-backed, a cloud session is answered `403`, and
-`scripts/gh/gh-document-guard.test.ts` refuses it in a runnable block. The REST call above is the portable
-form.
-
-**This repository writes its agreements into comments and then reads only bodies.** A Tier A decision
-is logged as an Issue comment; the review round cap records a dropped finding's disposition; the
-backlog's decision pass writes each decision to a comment on the child; a stash left behind is recorded on the Issue. **The
-place a run is told to write is the place it was never told to read**, and nothing in a body says it
-has been superseded, so the mistake is silent.
-
-**What the reading is for**, so it is not skimmed: the boundary of the scope — work a comment moved to
+**This repository writes its agreements into comments and then reads only bodies.** **What the
+reading is for**, so it is not skimmed: the boundary of the scope — work a comment moved to
 another Issue, or added to this one; the record of an auto-decision already made; a split or epic
 agreement reached after filing; a recorded stash or an in-flight branch; and a **correction of the
 body's own diagnosis**.
@@ -102,7 +89,5 @@ brief a delegated unit to return **the agreements in force plus the comment URLs
 never the comment text.
 
 **`pnpm josh rule:guard` refuses the body-only read** and hands over the reissue and the conflict rule
-at the moment they bind (`prompts/collaboration-workflow/rule-delivery.md`,
-`scripts/rules/delivered-rules.test.ts`). The refusal reaches Claude Code alone and repeats until the comments are read,
-so **this file is the rule and the hook is what makes it hard to walk past** — a session that runs
-no hooks still owes the read.
+at the moment they bind (`prompts/collaboration-workflow/rule-delivery.md`). **This file is the rule,
+not the hook** — a session that runs no hooks still owes the read.

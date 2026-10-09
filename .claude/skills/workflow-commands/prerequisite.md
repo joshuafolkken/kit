@@ -1,17 +1,13 @@
 # A prerequisite discovered mid-run — a dependency, not a park
 
-**This file is the single source, so the entry read carries the trigger and the pointer, not the
-procedure** (joshuafolkken/kit#2189). `SKILL.md` → §2's table keeps the trigger, and each entry file
-(`entry-sequence.md` / `backlogrun-park.md`) routes here for the definition. It is
-read at its point of use — the moment a run discovers that another Issue in this repository has to
-land first.
+**The single source of the prerequisite branch**, read at its point of use — the moment a run
+discovers that another Issue in this repository has to land first. History:
+`docs/maintainers/prerequisite-rationale.md` → "Where each rule came from".
 
-**A prerequisite discovered mid-run is a dependency, not a park.** Finding that something else in
-*this* repository has to land first is a third situation, distinct from an upstream defect and from a
-split: the Issue in hand is still one deliverable, it just needs another one before it.
+**A prerequisite discovered mid-run is a dependency, not a park** — the Issue in hand is still one
+deliverable, it just needs another one before it.
 
-**Four kinds of other work turn up mid-run, and the procedure differs for each.** Reading one as
-another is the failure this section exists to prevent:
+**Four kinds of other work turn up mid-run, and the procedure differs for each:**
 
 | What turned up                                                              | What to do                                                                                                              |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |

@@ -20,10 +20,11 @@ it a defect (not an improvement, refactor, removal or feature)? Is it in kit's o
 checks — not a consumer repository's CI or template? Does it, on `main` now, make unrelated PRs
 answer wrongly (a false green or a false red)? All three, and the issue carries `run:solo`; any one
 missing, and it carries `run:lane`. `backlog:next` and `epic:next --lanes` answer `triage` for an issue
-with neither (joshuafolkken/kit#2776, #2779), so an issue a run files carries one of the two from its
+with neither, so an issue a run files carries one of the two from its
 filing. **It stops the other lanes for one reason only: a batch run on broken verification leaves
 nobody's result trustworthy.** This section is the rule's single source; rationale:
-`docs/maintainers/wip-cap-rationale.md` → "Why a solo run".
+`docs/maintainers/wip-cap-rationale.md` → "Why a solo run"; provenance:
+`docs/maintainers/backlogrun-lanes-rationale.md` → "Where each rule came from".
 
 ## Lanes — running more than one child at a time
 

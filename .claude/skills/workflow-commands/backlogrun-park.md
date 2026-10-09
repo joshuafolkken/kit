@@ -3,9 +3,9 @@
 **Read this file in full when a child cannot finish** — before parking it, before a
 `needs-human-review` stop, or before recording a mid-run prerequisite or split. It is a point-of-use
 document, never an entry read: the entry procedure is `backlogrun.md`, which points here at that
-moment (joshuafolkken/kit#2010). This file is the single source of park-and-continue, the
+moment. This file is the single source of park-and-continue, the
 `needs-human-review` stop, a stale `in-progress`, a prerequisite discovered mid-run, and a mid-run
-split.
+split. Provenance of each rule: `docs/maintainers/backlogrun-park-rationale.md` → "Where each rule came from".
 
 ## What happens to a child that cannot finish
 
@@ -34,7 +34,7 @@ authorization, whether it came from a named epic or from the opted-in pool:
 ## The parent does not investigate a lane failure itself
 
 **A lane failure whose reason is not on its Issue is read by a unit** — `pnpm josh delegate
-lane-failure-investigation` (joshuafolkken/kit#2947); the parent checks the cited lines and
+lane-failure-investigation`; the parent checks the cited lines and
 `pnpm josh issue:state` before it parks, re-dispatches or files.
 
 ## `needs-human-review` — the one stop that is not a park
@@ -44,17 +44,14 @@ there** — implementation and the verification gate run, nothing is committed, 
 dirty and unstashed, a `confirmation` Telegram carrying the resume command goes out, and the remaining
 children are not started.
 
-**This is the exception to park-and-continue below, and it is not an oversight.** Parking works because
-the parked child leaves the checkout clean; this child does not. Its uncommitted work is the artifact a
-person has to look at — which is why the alternative that kept the batch running (commit, open a PR,
-merge nothing) was rejected: it satisfies "a person approves publication" and fails "a person chooses".
+**This is the exception to park-and-continue below** — rationale:
+`docs/maintainers/backlogrun-park-rationale.md` → "Why `needs-human-review` ends the run instead of parking".
 
 **The child goes on holding its repository.** `needs-decision` outranks `in-progress` in the
 per-repository exclusion so a parked child releases the checkout; this label deliberately does not,
 because releasing it would start the next child on top of uncommitted work. **Its lane is left open and
-untouched**, for the same reason. **Name the lane directory in the stop report and in the Telegram** — a
-person told to look at a working tree and not told which one has been told nothing. The lanes already in
-flight finish; no new lane is opened.
+untouched**, for the same reason. **Name the lane directory in the stop report and in the Telegram.** The lanes
+already in flight finish; no new lane is opened.
 
 **Never apply or remove the label** — a person's alone. Full definition and the
 `needs-decision` comparison: `needs-human-review.md`, which is the single source.
@@ -109,10 +106,10 @@ It never carries:
 - a defect in the running repository's own run tooling — the run fixes it and resumes
   (`prompts/collaboration-workflow/upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合").
 
-**When in doubt, it is Tier A**: decide, comment the decision, and continue. A label a person has to
-clear for nothing spends their attention and stalls the child. **A label a mechanical step applied** — a
+**When in doubt, it is Tier A**: decide, comment the decision, and continue. **A label a mechanical step applied** — a
 failed or abandoned child, a lost merge race's four conditions — is read against this list once its
-reason is known, and removed (Tier A, above) when the reason is not on it.
+reason is known, and removed (Tier A, above) when the reason is not on it. Rationale:
+`docs/maintainers/backlogrun-park-rationale.md` → "Why a run spends no attention on a non-finding".
 
 ## `in-progress` is removed by whoever finds it stale
 
@@ -136,9 +133,7 @@ start a second child on top of that work.
 
 **A closed issue's labels are neither a finding nor something to clean up.** A closed issue holds no lane
 (`epic-busy.ts` counts holders from the open listing alone) and `epic:next` never offers it, so
-`in-progress` left behind on one changes nothing. **Do not report it, and do not strip it** — a report is
-read as something that needs attention, so a run that lists non-findings is a run whose real findings are
-harder to see.
+`in-progress` left behind on one changes nothing. **Do not report it, and do not strip it.**
 
 ```bash
 gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true

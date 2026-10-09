@@ -86,3 +86,11 @@ many trees as there are lanes.
 Past a GitHub account's concurrency entitlement, jobs queue rather than fail, which could cancel out
 what the lanes bought. `ci.yml`'s concurrency group is keyed on `${{ github.ref }}`, so N lanes on N
 branches are N independent groups and no lane cancels another's run.
+
+## Where each rule came from
+
+The procedure states these rules without their issue numbers; the provenance is kept here.
+
+- The `run:solo` / `run:lane` labels, and the solo run's three conditions — joshuafolkken/kit#2776
+- `backlog:next` and `epic:next --lanes` answer `triage` for an issue carrying neither label, so a run's
+  own filing carries one from the start — joshuafolkken/kit#2779

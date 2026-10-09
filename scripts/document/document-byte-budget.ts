@@ -66,9 +66,9 @@ function block_ceiling(size: number): number {
 const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/dependency-update/SKILL.md', bytes: 8192 },
 	// joshuafolkken/kit#3173 split the waves and the `epic:bundle` detail into lazily read references.
-	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 20_480 },
-	{ path: '.claude/skills/epic-commands/epic-bundle.md', bytes: 12_288 },
-	{ path: '.claude/skills/epic-commands/execution-waves.md', bytes: 12_288 },
+	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 16_384 },
+	{ path: '.claude/skills/epic-commands/epic-bundle.md', bytes: 8192 },
+	{ path: '.claude/skills/epic-commands/execution-waves.md', bytes: 8192 },
 	{ path: '.claude/skills/verify-ui/SKILL.md', bytes: 8192 },
 	// joshuafolkken/kit#3401 moved the hand-off report out of `report-format.md`, read only at the hand-off.
 	{ path: '.claude/skills/workflow-commands/backlogrun-handoff-report.md', bytes: 4096 },
@@ -76,7 +76,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/into-target.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/issue-comments.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/issue-fold-existing.md', bytes: 4096 },
-	{ path: '.claude/skills/workflow-commands/needs-human-review.md', bytes: 8192 },
+	{ path: '.claude/skills/workflow-commands/needs-human-review.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 12_288 },
 	// joshuafolkken/kit#3176 moved the ledger out of `observation-filing.md`, read only when it appends.
 	{ path: '.claude/skills/workflow-commands/observation-ledger.md', bytes: 12_288 },
@@ -85,7 +85,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// two budgets must not hold it twice — the reachability line moved it from `unreached` to
 	// `point-of-use`.
 	{ path: '.claude/skills/workflow-commands/prerequisite.md', bytes: 8192 },
-	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 8192 },
+	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
 	// joshuafolkken/kit#2998 split the reference: the developer commands stay, the rest moved out.
 	// joshuafolkken/kit#3175 raised it: the supervisor, provider-table and answer-to-budget prose moved
