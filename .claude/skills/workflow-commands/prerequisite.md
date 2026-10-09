@@ -20,6 +20,18 @@ another is the failure this section exists to prevent:
 | Another Issue in **this** repository has to land first (**a prerequisite**) | This section                                                                                                            |
 | Something worth filing that is **none of the three** (**an observation**)   | File it **without asking** — Tier A for a first-party target — and **carry the run straight on**: nothing is stashed, nothing is parked (`observation-filing.md`). **A delegated child does not file here**, and a filing at depth 1 or deeper cites the depth-0 work it blocked; one that cannot cite it goes to the run's own `.josh/observations/<N>.md` and is filed on its second sighting — all of them `observation-filing.md`'s |
 
+**A stop on a defect in this repository's own gate or run tooling is a prerequisite too.** The
+defect's Issue is the prerequisite — filed if it is not yet, used by its number if it is — and it is
+never recorded as an upstream interrupt, because the tooling is not another package
+(`prompts/collaboration-workflow/upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合").
+
+**A stop that a dependency can express is never a person's decision.** This is the single source of
+that rule. A recommendation of "record `<N>` must land first and go on" is taken without asking;
+`needs-decision` is reserved for a design decision nobody has made, a Tier B toss-up, or a Tier C
+action. `pnpm josh run:merge` enforces the computable half: an unfinished child with an open
+blocked-by is released to **wait** — no `needs-decision` label, no failure counted — and the backlog
+offer hands it back once its blockers merge.
+
 **File the prerequisite with the `route:tier-a` label**, so a Tier A filing made during implementation
 stays countable by filing route afterwards. **This paragraph belongs to the prerequisite row, not to
 the table** — the label means a filing the run is *blocked by*, so the observation row carries no
@@ -42,8 +54,8 @@ it is for a `new` entry** (`issue-scout.md`): a filing made mid-run is the one m
 - **A named epic under `backlogrun`** files without confirmation, records the dependency with
   `pnpm josh epic --add <E> <N> --before <M>` — `<E>` the epic, `<N>` the prerequisite just filed,
   `<M>` the child in hand — and the run **continues rather than parking it** (`backlogrun-park.md` → "A
-  prerequisite discovered mid-run"). Parking is only for a prerequisite that *cannot* be expressed as
-  a dependency — one needing a design decision nobody has made, a Tier B toss-up, or a Tier C action.
+  prerequisite discovered mid-run"). A child outside any epic records the same relation on itself
+  directly; that branch is the same section's.
 - **`fullrun` / `halfrun`** file the same way without asking, insert the prerequisite into the epic
   that already tracks the Issue or create one over both, and then **stop**, leaving the person one
   command to type (`fullrun.md` / `halfrun.md`). Typing `fullrun` approved implementing **one** Issue;

@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1015,
-		"code_lines": 84458,
-		"comment_lines": 33720,
+		"code_lines": 84514,
+		"comment_lines": 33739,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12222,
-		"on_demand_bytes": 559192
+		"on_demand_bytes": 560087
 	},
 	"accepted": {
-		"reason": "#3503: the beacon probe now reports live / gone / unknown so a timed-out probe no longer clears a live lock holder",
+		"reason": "#3502 adds the waiting-on-blockers merge path (open_blockers, do_waiting, on_waiting, waiting_comment) and documents it in backlogrun-park.md / prerequisite.md",
 		"date": "2026-10-09"
 	}
 }

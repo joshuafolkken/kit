@@ -190,6 +190,17 @@ function park_comment(reason: ParkReason): string {
 	].join('\n')
 }
 
+// Why the run released a child it would otherwise have parked (joshuafolkken/kit#3502): the child
+// records open blockers, so its order is already decided and it waits rather than asking a person.
+// Script-emitted, so English.
+function waiting_comment(blockers: ReadonlyArray<string>): string {
+	return [
+		'Released to wait by `pnpm josh run:merge`, the `backlogrun` driver — not parked, and not counted as a failure.',
+		`- Why: the child’s session ended unfinished while it records open blockers: ${blockers.join(', ')}.`,
+		'- Next: its order is already recorded — it becomes runnable again once its blockers merge; a blocker outside the backlog still needs a person to land it.',
+	].join('\n')
+}
+
 const run_merge = {
 	CONSECUTIVE_FAILURE_LIMIT,
 	CONSECUTIVE_OUTAGE_LIMIT,
@@ -197,6 +208,7 @@ const run_merge = {
 	classify_child,
 	counters_comment,
 	park_comment,
+	waiting_comment,
 	is_guard_tripped,
 	is_outage_guard_tripped,
 }
