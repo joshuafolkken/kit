@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
-import type { BoardNote } from './run-board-notes'
+import { run_board_notes, type BoardNote } from './run-board-notes'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 
@@ -157,6 +157,16 @@ describe('run_board_render.render findings links', () => {
 		expect(lines_of(header(), [found])).toContain(
 			`  🆕 ${minute_of(NOW)} other/repo#12  Lead (found during 3415)`,
 		)
+	})
+})
+
+// joshuafolkken/kit#3531: a bare park's line names the parked issue by the board's title.
+describe('run_board_render.render park titles', () => {
+	it('draws a bare park with the title the board holds for it', () => {
+		const events = [{ pos: 1, at: new Date(NOW).toISOString(), kind: 'park', text: '#3526 parked' }]
+		const notes = run_board_notes.notes_of(events, new Map([[3526, 'Lead the lanes']]))
+
+		expect(lines_of(header(), notes)).toContain(`  💤 ${minute_of(NOW)} 3526  Lead the lanes`)
 	})
 })
 

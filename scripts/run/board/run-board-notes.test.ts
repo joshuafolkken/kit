@@ -11,10 +11,44 @@ const AT = '2026-10-08T09:00:00.000Z'
 const AT_MS = Date.parse(AT)
 const TITLE = 'Count the seats'
 const FOUND_DURING = '3415'
+const NO_TITLES = new Map<number, string>()
+const PARKED_TITLE = 'Read the lanes'
+const BARE_PARK = '#13 parked'
 
 function event(kind: string, text: string, pos = 1): RunEvent {
 	return { pos, at: AT, kind, text }
 }
+
+function park_texts(texts: ReadonlyArray<string>): Array<[string, boolean]> {
+	const titles = new Map([[13, PARKED_TITLE]])
+	const events = texts.map((text) => event(KIND.PARK, text))
+
+	return run_board_notes
+		.notes_of(events, titles)
+		.toReversed()
+		.map((note) => [note.text, note.is_decision])
+}
+
+// joshuafolkken/kit#3531: a park names the parked issue by the board's title, its reason after it.
+describe('run_board_notes.notes_of park titles', () => {
+	it('names a bare park by its title', () => {
+		expect(park_texts([BARE_PARK])).toStrictEqual([[PARKED_TITLE, false]])
+	})
+
+	it('puts the reason after the title, a decision still told apart', () => {
+		expect(park_texts(['#13 parked (needs-decision)', '#13 waiting on #7'])).toStrictEqual([
+			[`${PARKED_TITLE} (needs-decision)`, true],
+			[`${PARKED_TITLE} (waiting on #7)`, false],
+		])
+	})
+
+	it('keeps the reason alone for an issue the board has no title for', () => {
+		expect(park_texts(['#14 waiting on #7', '#14 parked'])).toStrictEqual([
+			['waiting on #7', false],
+			['', false],
+		])
+	})
+})
 
 describe('run_board_notes.notes_of filings', () => {
 	it('reads a filing with the child that found it', () => {
@@ -25,7 +59,7 @@ describe('run_board_notes.notes_of filings', () => {
 			found_during: FOUND_DURING,
 		})
 
-		expect(run_board_notes.notes_of([event(KIND.FILED, text)])).toStrictEqual([
+		expect(run_board_notes.notes_of([event(KIND.FILED, text)], NO_TITLES)).toStrictEqual([
 			{
 				kind: 'filed',
 				at_ms: AT_MS,
@@ -41,10 +75,10 @@ describe('run_board_notes.notes_of filings', () => {
 
 describe('run_board_notes.notes_of parks and order', () => {
 	it('reads a park waiting on a decision apart from a bare park', () => {
-		const notes = run_board_notes.notes_of([
-			event(KIND.PARK, '#12 parked (needs-decision)'),
-			event(KIND.PARK, '#13 parked'),
-		])
+		const notes = run_board_notes.notes_of(
+			[event(KIND.PARK, '#12 parked (needs-decision)'), event(KIND.PARK, BARE_PARK)],
+			NO_TITLES,
+		)
 
 		expect(notes.map((note) => [note.issue, note.text, note.is_decision])).toStrictEqual([
 			['13', '', false],
@@ -53,12 +87,15 @@ describe('run_board_notes.notes_of parks and order', () => {
 	})
 
 	it('keeps notes newest first and leaves out every other event and an unreadable filing', () => {
-		const notes = run_board_notes.notes_of([
-			event(KIND.NOTE, 'first #7', 1),
-			event(KIND.STOP, 'stopped', 2),
-			event(KIND.FILED, 'filed something', 3),
-			event(KIND.NOTE, 'second', 4),
-		])
+		const notes = run_board_notes.notes_of(
+			[
+				event(KIND.NOTE, 'first #7', 1),
+				event(KIND.STOP, 'stopped', 2),
+				event(KIND.FILED, 'filed something', 3),
+				event(KIND.NOTE, 'second', 4),
+			],
+			NO_TITLES,
+		)
 
 		expect(notes.map((note) => [note.text, note.issue])).toStrictEqual([
 			['second', undefined],

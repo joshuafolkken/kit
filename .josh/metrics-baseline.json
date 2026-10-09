@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1028,
-		"code_lines": 85565,
-		"comment_lines": 34006,
+		"code_lines": 85584,
+		"comment_lines": 34017,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 560565
 	},
 	"accepted": {
-		"reason": "run:board draws lane tracks as a stage history with josh ship's own stages and failed-ship marks (#3526)",
+		"reason": "#3531 names a parked issue by its plan title in run:board's findings (titles_of in run-board-tick.ts, park_text/reason_of in run-board-notes.ts)",
 		"date": "2026-10-09"
 	}
 }

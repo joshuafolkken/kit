@@ -25,7 +25,9 @@ interface BoardNote {
 }
 
 const KIND = run_event_stream.EVENT_KIND
-const PARKED_PREFIX = /^#\d+ parked\s*/u
+// `#<N> parked`, `#<N> parked (<reason>)` and `#<N> waiting on #<M>` lose their leading number, so a
+// waiting park does not name its issue twice.
+const PARK_PREFIX = /^#\d+ (?:parked\s*)?/u
 const PARENTHESES = /^\((?<inner>.*)\)$/u
 
 function filed_note(event: RunEvent): BoardNote | undefined {
@@ -44,14 +46,37 @@ function filed_note(event: RunEvent): BoardNote | undefined {
 	}
 }
 
+// The board's titles by issue number: the plan's listing with its closed children's.
+type Titles = ReadonlyMap<number, string>
+
 // `#<N> parked (needs-decision)` reads as the reason `needs-decision`; a bare park has none.
-function park_note(event: RunEvent): BoardNote {
-	const rest = event.text.replace(PARKED_PREFIX, '')
-	const reason = PARENTHESES.exec(rest)?.groups?.['inner'] ?? rest
+function reason_of(event: RunEvent): string {
+	const rest = event.text.replace(PARK_PREFIX, '')
+
+	return PARENTHESES.exec(rest)?.groups?.['inner'] ?? rest
+}
+
+// The parked issue's title with its reason after it (joshuafolkken/kit#3531); before the plan is read
+// there is no title, and the reason alone is drawn.
+function park_text(title: string | undefined, reason: string): string {
+	if (title === undefined) return reason
+
+	return reason === '' ? title : `${title} (${reason})`
+}
+
+function park_note(event: RunEvent, titles: Titles): BoardNote {
+	const reason = reason_of(event)
 	const issue = run_event_scope.issue_named(event)
+	const title = issue === undefined ? undefined : titles.get(Number(issue))
 	const is_decision = reason.includes(NEEDS_DECISION_LABEL)
 
-	return { kind: 'park', at_ms: Date.parse(event.at), issue, text: reason, is_decision }
+	return {
+		kind: 'park',
+		at_ms: Date.parse(event.at),
+		issue,
+		text: park_text(title, reason),
+		is_decision,
+	}
 }
 
 function plain_note(event: RunEvent): BoardNote {
@@ -60,19 +85,19 @@ function plain_note(event: RunEvent): BoardNote {
 	return { kind: 'note', at_ms: Date.parse(event.at), issue, text: event.text, is_decision: false }
 }
 
-function note_of(event: RunEvent): BoardNote | undefined {
+function note_of(event: RunEvent, titles: Titles): BoardNote | undefined {
 	if (event.kind === KIND.FILED) return filed_note(event)
-	if (event.kind === KIND.PARK) return park_note(event)
+	if (event.kind === KIND.PARK) return park_note(event, titles)
 
 	return event.kind === KIND.NOTE ? plain_note(event) : undefined
 }
 
 // Newest first: the line a person glancing at the board needs is the latest one.
-function notes_of(events: ReadonlyArray<RunEvent>): ReadonlyArray<BoardNote> {
-	return events.flatMap((event) => note_of(event) ?? []).toReversed()
+function notes_of(events: ReadonlyArray<RunEvent>, titles: Titles): ReadonlyArray<BoardNote> {
+	return events.flatMap((event) => note_of(event, titles) ?? []).toReversed()
 }
 
 const run_board_notes = { notes_of }
 
 export { run_board_notes }
-export type { BoardNote }
+export type { BoardNote, Titles }
