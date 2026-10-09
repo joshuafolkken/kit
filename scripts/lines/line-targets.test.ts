@@ -1,5 +1,18 @@
-import { describe, expect, it } from 'vitest'
-import { line_targets } from './line-targets'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { afterAll, describe, expect, it, vi } from 'vitest'
+
+vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
+
+const { git_spawn } = await import('#scripts/git/git-spawn')
+const { line_targets } = await import('./line-targets')
+
+const scratch = mkdtempSync(path.join(tmpdir(), 'line-targets-test-'))
+
+afterAll(() => {
+	rmSync(scratch, { recursive: true, force: true })
+})
 
 describe('line_targets.is_lint_target', () => {
 	// The extension pre-filter keeps the eslint probe off non-source paths; every JS/TS variant and
@@ -22,5 +35,18 @@ describe('line_targets.split_names', () => {
 
 	it('returns nothing for empty output', () => {
 		expect(line_targets.split_names('')).toEqual([])
+	})
+})
+
+describe('line_targets.lint_target_files', () => {
+	// `--cached` still lists a file deleted from the working tree but not yet staged; handing that
+	// path to eslint fails the whole metrics run, so only files still on disk are returned.
+	it('drops a tracked path that is no longer on disk', async () => {
+		writeFileSync(path.join(scratch, 'kept.ts'), '')
+		vi.mocked(git_spawn.read).mockResolvedValue('kept.ts\0deleted.ts\0notes.md\0')
+
+		const files = await line_targets.lint_target_files(scratch)
+
+		expect(files).toEqual([path.join(scratch, 'kept.ts')])
 	})
 })

@@ -254,3 +254,24 @@ describe('run_event_stream_emit.current_events — the invocation now running', 
 		expect(await run_event_stream_emit.current_events()).toStrictEqual([])
 	})
 })
+
+// joshuafolkken/kit#3423: the fold reads a finder's filings across invocations, carry record or none.
+describe('run_event_stream_emit.all_events — the whole stream', () => {
+	it('reads every invocation’s events through all_events, with no carry record', async () => {
+		const repository = fresh_repository()
+
+		git_directories_mock.mockResolvedValue([WORKTREE, repository])
+		run_event_stream.append(run_event_stream.target_of(repository), MERGE, '#6 merged', EARLIER_ISO)
+		await run_event_stream_emit.emit(MERGE, '#7 merged')
+
+		const events = await run_event_stream_emit.all_events()
+
+		expect(events.map((event) => event.text)).toStrictEqual(['#6 merged', '#7 merged'])
+	})
+
+	it('reads no events through all_events when the target will not resolve', async () => {
+		git_directories_mock.mockRejectedValue(new Error(GIT_GONE))
+
+		expect(await run_event_stream_emit.all_events()).toStrictEqual([])
+	})
+})

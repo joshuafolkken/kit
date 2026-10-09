@@ -8,7 +8,6 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list, MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
-import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
 import type { PollOptions } from '#scripts/lib/poll'
 import { repository_labels } from '#scripts/repo/repository-labels'
@@ -17,6 +16,7 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_file, type FileArguments } from './issue-file'
+import { issue_file_fold } from './issue-file-fold'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_release_cli } from './issue-release-cli'
 import { issue_scout_cli } from './issue-scout-cli'
@@ -26,7 +26,8 @@ import { issue_wip } from './issue-wip'
 // [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]` — file an Issue
 // with every filing step run in order (joshuafolkken/kit#2808): the third-party refusal, the body
 // lint, the `## Origin` check for another repository, the `auto-ok` decision (joshuafolkken/kit#3213)
-// with the run label it owes (joshuafolkken/kit#3313), the WIP cap count (joshuafolkken/kit#3181), the
+// with the run label it owes (joshuafolkken/kit#3313), the fold question against the run's earlier
+// filings (joshuafolkken/kit#3423), the WIP cap count (joshuafolkken/kit#3181), the
 // duplicate scout, the missing workflow labels created (joshuafolkken/kit#3176), the create call
 // carrying every label, the release link on `--release` (joshuafolkken/kit#3360), and `epic:bundle`.
 // A direct `gh api …/issues` filing is refused by the `direct-filing` delivered rule and pointed here.
@@ -221,8 +222,8 @@ async function place(url: string, target: string): Promise<void> {
 // out by the board's own scope to the invocation; the append is best-effort, as every emit is.
 async function record(url: string, filing: Filing): Promise<void> {
 	const number = String(issue_number_of(url))
-	const reference = filing.target === filing.current ? `#${number}` : `${filing.target}#${number}`
-	const found_during = lane_child_marker.marked_issue()
+	const reference = `${issue_file_fold.reference_prefix(filing.target, filing.current)}#${number}`
+	const found_during = await issue_file_fold.finder()
 	const text = run_event_filed.text_of({ reference, title: filing.args.title, found_during })
 
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.FILED, text)
@@ -249,12 +250,21 @@ async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<numb
 	return SUCCESS_EXIT_CODE
 }
 
+// The holds that read the run and the backlog, in the order they cost: the fold reads the local event
+// stream and diff, the WIP count one listing, the scout a search.
+async function is_clear(filing: Filing): Promise<boolean> {
+	const prefix = issue_file_fold.reference_prefix(filing.target, filing.current)
+
+	if (!(await issue_file_fold.is_fold_clear(prefix, filing.args))) return false
+
+	return (await is_wip_clear(filing)) && (await is_scout_clear(filing))
+}
+
 async function file(filing: Filing): Promise<number> {
 	if (!is_admitted(filing)) return FAILURE_EXIT_CODE
 	const labels = await labels_of(filing)
 
-	if (labels === undefined) return FAILURE_EXIT_CODE
-	if (!(await is_wip_clear(filing)) || !(await is_scout_clear(filing))) return FAILURE_EXIT_CODE
+	if (labels === undefined || !(await is_clear(filing))) return FAILURE_EXIT_CODE
 
 	return await send(filing, labels)
 }

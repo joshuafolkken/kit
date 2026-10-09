@@ -6,7 +6,7 @@ import {
 	read_repo_file,
 	read_unwrapped,
 } from '#scripts/document/ai-document-fixture'
-import { delivered_rules } from '#scripts/rules/delivered-rules'
+import { issue_wip } from '#scripts/issue/issue-wip'
 import { split_assess } from '#scripts/split/split-assess'
 import { describe, expect, it } from 'vitest'
 
@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest'
 // points at that document instead of restating it — so this suite pins both halves: the stating
 // document agrees with the code, and the documents that used to restate it no longer do.
 
-const WIP_CAP = String(delivered_rules.WIP_CAP)
+const WIP_CAP = String(issue_wip.WIP_CAP)
 const FILE_GUIDE = String(split_assess.FILE_GUIDE)
 const LINE_GUIDE = String(split_assess.LINE_GUIDE)
 

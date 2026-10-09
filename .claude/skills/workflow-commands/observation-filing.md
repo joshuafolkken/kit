@@ -27,8 +27,8 @@ not file (`prompts/collaboration-workflow/wip-cap.md`). File it with `pnpm josh 
 (`issue-scout.md`), which lints the body against `prompts/collaboration-workflow/issue-template.md`,
 applies the classification labels it declares, runs the duplicate scan, and runs `epic:bundle` on the
 new Issue so it is offered by its epic; an `auto-ok` epic adds it to the backlog pool
-(`backlogrun-steps.md` → "What one invocation approves"). When it is the second filing of the run, run
-`pnpm josh issue:fold` first; the guard refuses that filing without the fold
+(`backlogrun-steps.md` → "What one invocation approves"). When it is the second filing of the run, the
+command asks the fold question itself and holds a `fold`
 (`split-assessment.md` → "The same two questions decide the filing-time fold").
 
 The marker suite pins the rules below.
