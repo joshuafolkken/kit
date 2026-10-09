@@ -574,6 +574,23 @@ pnpm josh backlogrun --agent codex      # start in Codex
 
 **Output / exit codes:** prints one line naming the started pid, session and log path, then the board's exit code. Bad arguments print the usage and exit 1; an agent that cannot start (a missing or outdated CLI) exits 1 without a board.
 
+### `josh lane:limit`
+
+Change a running `backlogrun`'s lane limit without stopping it. The run keeps the environment it started with, so `JOSH_LANE_LIMIT` cannot change under it; this writes an override onto the run's record, which every lane-limit read takes over the environment.
+
+```bash
+pnpm josh lane:limit 8        # raise or lower the live run's limit to 8
+pnpm josh lane:limit          # print the limit, the lanes in use and the free lanes
+pnpm josh lane:limit --reset  # clear the override; JOSH_LANE_LIMIT applies again
+```
+
+- The next lane allocation uses the new limit. Raising it writes a `lane-limit` event, and the parent's `run:progress --wait` watcher wakes the parent within a minute to fill the freed lanes.
+- Lowering it stops no running child: a lane that finishes is simply not refilled.
+- A limit above the nine port seats is shown and counted at the seats, as `JOSH_LANE_LIMIT` already is. A value that is not a positive integer is refused by the same rule.
+- The override lives and ends with the run (`run:carry --end` removes it). With no run in progress, the command refuses and points at `JOSH_LANE_LIMIT`.
+
+**Output / exit codes:** prints `lane limit <n> (<source>) · in use <n> · free <n>` and exits 0. Bad arguments, an invalid limit or no run in progress exit 1.
+
 ### `josh rule:value`
 
 Print each delivered rule's **unaided compliance** — how far the carried text alone kept the rule in the window before its trigger fired (`scripts/rules/rule-value.ts`). One row per rule: the runs that reached the situation it governs, the rate kept before the trigger (or `unmeasured` where the rule declares no `keeps` predicate, `unreached` where no run reached it), and the refusals the hook actually delivered.
