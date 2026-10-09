@@ -24,9 +24,6 @@
 - **調査の委譲しきい値**（`delegation.md`）
   - 発火点: `pnpm josh investigation:guard` — 編集しないファイルの読み取りが 3 件目に達した `Read` / `Bash`。拒否の後も読み取りがもう一度しきい値まで積み上がれば**再び発火する**
   - 発火しないとき: 読み取りがしきい値未満 ＝ 委譲する対象がまだ無い
-- **バックログ WIP 上限**（`wip-cap.md`）
-  - 発火点: `pnpm josh rule:guard` — Issue を起票する `Bash`（`pnpm josh issue:file`）
-  - 発火しないとき: Issue が起票されていない ＝ 上限に触れる行為が無い
 - **直接起票の禁止**（`docs/josh-commands-backlog.md` → `josh issue:file`、joshuafolkken/kit#2808）
   - 発火点: `pnpm josh rule:guard` — `josh issue:file` を通さずに Issue を作成する `Bash`（`gh issue create`、または `…/issues` への `title` 付き POST）。拒否文は `pnpm josh issue:file` の書式を渡す。**毎回発火する**
   - 発火しないとき: `pnpm josh issue:file` で起票している ＝ 重複探し・本文の検査・`epic:bundle` までの全段がそろっている

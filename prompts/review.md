@@ -158,11 +158,11 @@ Only branch 2 files an Issue. What follows applies to that branch.
   `pnpm josh git -y` and before `pnpm josh followup`; where it does not — `halfrun`, or a standalone
   pre-commit self-review — they run as soon as the disposition is decided. **The chain may run in a
   delegated unit** — `pnpm josh delegate followup-filing`.
-- **When the round files a second follow-up, run `pnpm josh issue:fold` first.** Several findings from
-  one review fold into one Issue by default — the filing-time counterpart to the split assessment,
-  reading the same two questions (`.claude/skills/workflow-commands/split-assessment.md` → "The same
-  two questions decide the filing-time fold"). `pnpm josh rule:guard` refuses the second
-  `pnpm josh issue:file` call until it is folded; the first filing asks nothing.
+- **A second follow-up from one round folds into the first by default.** Several findings from one
+  review fold into one Issue — the filing-time counterpart to the split assessment, reading the same
+  two questions (`.claude/skills/workflow-commands/split-assessment.md` → "The same two questions
+  decide the filing-time fold"). `pnpm josh issue:file` asks the fold question itself on the run's
+  second filing and holds a `fold`; the first filing asks nothing.
 
   1. File the follow-up Issue referencing the current one, tagged `route:review-cap` — **before the current Issue closes.**
      `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --route review-cap`.

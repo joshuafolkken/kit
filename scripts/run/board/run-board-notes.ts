@@ -16,7 +16,7 @@ interface BoardNote {
 	// The issue the line is about: the filed Issue, the parked child, or the one a note names.
 	issue: string | undefined
 	text: string
-	// The lane child whose work turned up a filed Issue.
+	// Whose work turned up a filed Issue: the lane child, else the Issue the branch names.
 	found_during?: string | undefined
 	// A park waiting on a person's decision, drawn apart from an ordinary park.
 	is_decision: boolean

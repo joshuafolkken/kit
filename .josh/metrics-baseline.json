@@ -1,21 +1,21 @@
 {
 	"scripts": {
-		"files": 1008,
-		"code_lines": 83516,
-		"comment_lines": 33545,
+		"files": 1007,
+		"code_lines": 83551,
+		"comment_lines": 33539,
 		"comment_ratio": 0.4
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2347
+		"lines": 2344
 	},
 	"guards": 8,
 	"ai_cost": {
-		"resident_bytes": 12231,
-		"on_demand_bytes": 558915
+		"resident_bytes": 12222,
+		"on_demand_bytes": 558710
 	},
 	"accepted": {
-		"reason": "run:board legend split into a fixed phase line and an on-screen state line needs an explicit state/word table (#3480); merged with epic:bundle/issue:scout prose_lines reuse (#3425): one import line",
+		"reason": "issue:file now runs the fold check and the WIP-cap exemption itself (#3423): the new issue-file-fold module and its run-event read replace the deleted issue-fold-rule / wip-cap delivered rules",
 		"date": "2026-10-09"
 	}
 }

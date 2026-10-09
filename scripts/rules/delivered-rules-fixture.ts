@@ -1,9 +1,8 @@
 import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 
 // Command and transcript-tail fixtures shared by the delivery suites — `delivered-rules.test.ts`,
-// `delivered-rules-predicates.test.ts`, `delivered-rules-filing.test.ts`, `issue-fold.test.ts` and
-// `filing-cap.test.ts`. The first two were one file until joshuafolkken/kit#1884 split the
-// pure-predicate blocks off to keep the delivery suite under the 300-line limit; the filing rows of
+// `delivered-rules-predicates.test.ts`, `delivered-rules-filing.test.ts` and `filing-cap.test.ts`.
+// The first two were one file until joshuafolkken/kit#1884 split the pure-predicate blocks off to keep the delivery suite under the 300-line limit; the filing rows of
 // joshuafolkken/kit#2119 added the tail builders (`filing_lines`, `filings_tail`).
 // These are used across the suites, so they live here rather than being redeclared in each (no
 // clones — single source).

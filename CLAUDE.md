@@ -17,7 +17,7 @@ Stack: TypeScript · pnpm · SvelteKit · Vitest · Playwright · TailwindCSS ·
 - **Latest-first, fix forward — pin back only as a last resort.** `prompts/collaboration-workflow/principles.md` → "latest-first".
 - **Output language follows `JOSH_SESSION_LANG`** (default `ja`) for session output and artifact prose; English for Issue/PR titles, code comments, test titles, commit messages and script strings. `prompts/collaboration-workflow/overview.md`.
 - **Durable rules belong in prompts/docs, not local MEMORY.** `prompts/collaboration-workflow/principles.md` → "durable-rules".
-- **Hook-delivered rules** (file edits, shell bodies, turn batching, Issue citation, WIP cap, …): `prompts/collaboration-workflow/rule-delivery.md` → "配送されている規則".
+- **Hook-delivered rules** (file edits, shell bodies, turn batching, Issue citation, …): `prompts/collaboration-workflow/rule-delivery.md` → "配送されている規則".
 
 ### Decision autonomy
 

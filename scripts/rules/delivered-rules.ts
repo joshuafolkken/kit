@@ -10,7 +10,6 @@ import { filing_cap } from './filing-cap'
 import { git_force } from './git-force'
 import { implementation_cut } from './implementation-cut'
 import { issue_comments } from './issue-comments'
-import { issue_fold_rule } from './issue-fold-rule'
 import { josh_git_bare } from './josh-git-bare'
 import { lane_background } from './lane-background'
 import { lane_carry_conflict } from './lane-carry-conflict'
@@ -29,7 +28,6 @@ import { run_tail_rule } from './run-tail-rule'
 import { shell_body_trigger } from './shell-body-trigger'
 import { test_declared_commit } from './test-declared-commit'
 import { third_party_write } from './third-party-write'
-import { wip_cap } from './wip-cap'
 import { worktree_guard } from './worktree-guard'
 
 // The rules delivered by a `PreToolUse` refusal at the moment they bind, rather than carried resident
@@ -84,12 +82,10 @@ const { SHELL_BODY_REASON, carries_a_body, is_shell_evaluated_body, keeps_body_s
 const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// First: a third-party write is stopped before the first-party filing rows count anything.
 	third_party_write.ROW,
-	// The direct call only; the rows below trigger on `issue:file`.
+	// The direct call only; `filing-cap` below triggers on `issue:file`. The WIP cap and the fold
+	// question are `issue:file`'s own steps, so no row gates them (joshuafolkken/kit#3423).
 	direct_filing.ROW,
-	wip_cap.ROW,
-	// After `wip-cap`, so the backlog count speaks first.
 	filing_cap.ROW,
-	issue_fold_rule.ROW,
 	issue_comments.ROW,
 	{
 		id: 'shell-body',
@@ -281,7 +277,6 @@ const delivered_rules = {
 	FILING_CAP_REASON: filing_cap.FILING_CAP_REASON,
 	GIT_FORCE_REASON: git_force.GIT_FORCE_REASON,
 	ISSUE_COMMENTS_REASON: issue_comments.ISSUE_COMMENTS_REASON,
-	ISSUE_FOLD_REASON: issue_fold_rule.ISSUE_FOLD_REASON,
 	LANE_INTERACTIVE_ASK_REASON: lane_interactive_ask.LANE_INTERACTIVE_ASK_REASON,
 	LANE_PARK_REASON: lane_park.LANE_PARK_REASON,
 	MEASURED_RULES,
@@ -293,8 +288,6 @@ const delivered_rules = {
 	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,
 	THIRD_PARTY_WRITE_REASON: third_party_write.THIRD_PARTY_WRITE_REASON,
-	WIP_CAP: wip_cap.WIP_CAP,
-	WIP_CAP_REASON: wip_cap.WIP_CAP_REASON,
 	WORKTREE_MUTATION_REASON: worktree_guard.WORKTREE_MUTATION_REASON,
 	delivery,
 	delivery_path,

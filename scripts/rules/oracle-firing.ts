@@ -83,10 +83,7 @@ const NOT_NAMED: ReadonlyMap<string, string> = new Map([
 	['epic:bundle', FILING_STEP_REASON],
 	['issue:scout', FILING_STEP_REASON],
 	['issue:lint', FILING_STEP_REASON],
-	[
-		'issue:fold',
-		'the second filing it governs is already gated by the `issue-fold` delivered rule',
-	],
+	['issue:fold', '`issue:file` asks the fold question itself on the second filing it governs'],
 	['cases', READ],
 	['issue:state', READ],
 	['run:cut:resume', SELF],
