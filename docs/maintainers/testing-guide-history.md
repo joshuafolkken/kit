@@ -61,3 +61,18 @@ remember to wire in, the ban reached only the projects that did — and never th
 distributing it (joshuafolkken/kit#1233). Lint was chosen over tightening the vitest `{test,spec}`
 matchers because matcher-tightening causes silent non-execution of a stray `*.spec.ts`, whereas a lint
 rule fails loudly. Doc-only guidance had already failed to prevent this drift twice.
+
+The building blocks (`eslint/rules/test-filename.js`) are wired into `eslint/base.js` itself, so every
+project built on `create_base_config` — kit included — flags any `*.spec.*` file and any file under a
+top-level `tests/` directory, and fails `josh lint` for kit, for every consumer of the base config, and
+for every AI tool. **Both bans cover every JS/TS extension** — `.ts` `.tsx` `.mts` `.cts` `.js` `.jsx`
+`.mjs` `.cjs` — since joshuafolkken/kit#1414; `.svelte` is deliberately outside them, because the base
+config has no Svelte parser and a `tests/Foo.svelte` would report a parse error instead of the move
+instruction.
+
+A config that does not use the base can import the blocks alone, as
+`@joshuafolkken/kit/eslint/test-filename` — but wire them through
+`extend_restricted_syntax(<your own rules>, SPEC_FILENAME_ENTRY)`: flat config replaces
+`no-restricted-syntax` rather than merging it, so the ready-made `spec_filename_rules` /
+`centralized_tests_directory_rules` records drop whatever selectors that config already restricted, on
+exactly the files the ban applies to (joshuafolkken/kit#1414).

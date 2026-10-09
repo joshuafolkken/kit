@@ -88,10 +88,14 @@ type ShipCommand = { kind: 'ship'; args: ShipArguments } | { kind: 'log'; number
 
 // What a resumed ship knows before its first stage: the record's path (absent outside a repository),
 // the stages it says completed, and the repository's actual state (`run-ship-stage.ts` decides from it).
+// `started` opens with the stages the record says this attempt started — a supervisor that ended
+// without a stop leaves them — and grows as each stage starts; every stage line carries it
+// (joshuafolkken/kit#3552).
 interface ShipContext {
 	target: string | undefined
 	done: ReadonlySet<string>
 	state: ShipState
+	started: Array<string>
 }
 
 // The notify tail `followup` takes — whichever body form the caller composed, forwarded unchanged so a
@@ -177,8 +181,13 @@ async function run_step(step: Step, args: ShipArguments, state: ShipState): Prom
 	return result.conflicts === undefined ? section : { ...section, conflicts: result.conflicts }
 }
 
-async function emit_phase(args: ShipArguments, stage: Stage, phase: Phase): Promise<void> {
-	const text = run_ship_stage.event_text(args.number, stage, phase)
+async function emit_phase(
+	args: ShipArguments,
+	context: ShipContext,
+	stage: Stage,
+	phase: Phase,
+): Promise<void> {
+	const text = run_ship_stage.event_text(args.number, stage, phase, context.started)
 
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.SHIP_STAGE, text)
 }
@@ -203,7 +212,7 @@ async function settle(
 ): Promise<void> {
 	const is_green = code === SUCCESS_EXIT_CODE
 
-	await emit_phase(args, step.stage, is_green ? PHASE.DONE : PHASE.FAILED)
+	await emit_phase(args, context, step.stage, is_green ? PHASE.DONE : PHASE.FAILED)
 
 	if (!is_green) return
 
@@ -219,12 +228,16 @@ async function run_stage(
 	context: ShipContext,
 ): Promise<ShipSection> {
 	if (run_ship_stage.is_done(step.stage, context.done, context.state, args.body.length > 0)) {
-		await emit_phase(args, step.stage, PHASE.SKIPPED)
+		await emit_phase(args, context, step.stage, PHASE.SKIPPED)
 
 		return { header: step.header, body: run_ship.SKIPPED_BODY, code: SUCCESS_EXIT_CODE }
 	}
 
-	await emit_phase(args, step.stage, PHASE.START)
+	context.started.push(step.stage)
+	record(context.target, (path) => {
+		run_ship_stage.mark_started(path, step.stage)
+	})
+	await emit_phase(args, context, step.stage, PHASE.START)
 	const section = await run_step(step, args, context.state)
 
 	await settle(step, args, context, section.code)
@@ -239,24 +252,28 @@ async function open_context(args: ShipArguments): Promise<ShipContext> {
 	])
 
 	const done = target === undefined ? new Set<string>() : run_ship_stage.read_done(target)
+	const started = target === undefined ? [] : [...run_ship_stage.read_started(target)]
 
-	return { target, done, state }
+	return { target, done, state, started }
 }
 
 // A detached supervisor hands the stopped stage back (`run-ship-return.ts`, joshuafolkken/kit#2428); a
-// ship in an agent's own turn has its report in front of that agent already.
+// ship in an agent's own turn has its report in front of that agent already. The `ship-stop` ends the
+// attempt, so the record's started stages go with it (joshuafolkken/kit#3552).
 async function stopped(
 	sections: ReadonlyArray<ShipSection>,
 	args: ShipArguments,
-	stage: Stage,
+	step: Step,
+	context: ShipContext,
 ): Promise<ReadonlyArray<ShipSection>> {
 	if (run_ship_detach.is_supervised()) {
 		const conflicts = sections.at(-1)?.conflicts
 		const resume = run_ship_next.resume_of(args)
 
+		record(context.target, run_ship_stage.end_attempt)
 		await run_ship_return.return_control(
 			args.number,
-			stage,
+			step.stage,
 			conflicts === undefined ? resume : { ...resume, conflicts },
 		)
 	}
@@ -278,7 +295,7 @@ async function ship(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 		sections.push(section)
 
 		// eslint-disable-next-line no-await-in-loop -- stages run in order and the first failure stops the ship
-		if (section.code !== SUCCESS_EXIT_CODE) return await stopped(sections, args, step.stage)
+		if (section.code !== SUCCESS_EXIT_CODE) return await stopped(sections, args, step, context)
 	}
 
 	record(context.target, (path) => {

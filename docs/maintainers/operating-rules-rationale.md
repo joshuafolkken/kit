@@ -28,6 +28,20 @@ addition or wording fix is written once:
 - **The overrides protection** was a near-verbatim copy of `.claude/skills/dependency-update/SKILL.md`
   §1–§2, which is now its single source.
 
+Where each one lives now:
+
+- **Auto-merge and `completion`** — `.claude/skills/workflow-commands/followup.md` → "`auto-merge` —
+  Default `fullrun` behavior" and → "Completion notifications: always via `pnpm josh followup`"
+- **Explicit invocation** — `CLAUDE.md` → "Explicit invocation required (MANDATORY)" (resident) and
+  `.claude/skills/workflow-commands/SKILL.md` → "0. The rule that fires before any of them — explicit
+  invocation" (the skill-side single source)
+- **The `confirmation` stop notification** — `CLAUDE.md` → "Mid-workflow stop notification
+  (`confirmation`)"
+- **The working-tree hold (`josh run:hold`)** — `.claude/skills/workflow-commands/working-tree-hold.md`
+  → "The working-tree hold — one run per tree"
+- **The overrides protection** — `.claude/skills/dependency-update/SKILL.md` → "1. Effective overrides
+  live in the workspace — inspect both files"
+
 ## Why the index is the user's
 
 A user sometimes stages on purpose, to keep a baseline snapshot to diff later changes against;

@@ -38,6 +38,8 @@ const ISSUE_COMMENT_SPELLING = 'pnpm josh issue:comment <N> --body-file <path>'
 // The measurement the rule rests on, and the most quotable part of it — so it is the first thing that
 // would be pasted back into an always-loaded document.
 const MEASUREMENT = '履歴展開は非対話では無効'
+// joshuafolkken/kit#3401 moved the measurement table and the blind-spot list into the rationale.
+const RATIONALE_MEASUREMENT = 'history expansion is off when non-interactive'
 // The resident trigger joshuafolkken/kit#3395 retired, asserted absent so it is not pasted back.
 const RESIDENT_TRIGGER = '**Never put a body in shell double quotes**'
 
@@ -84,7 +86,7 @@ describe.each(AI_DOCS)('%s — keeps the route, not the rule', (document_path) =
 
 	it('leaves the measurement at the pointer', () => {
 		expect(content).not.toContain(MEASUREMENT)
-		expect(read_unwrapped(CANONICAL)).toContain(MEASUREMENT)
+		expect(read_unwrapped(SHELL_BODY_RATIONALE)).toContain(RATIONALE_MEASUREMENT)
 	})
 })
 
@@ -106,9 +108,16 @@ describe(`${CANONICAL} — carries the damage, the measurement and the safe spel
 		expect(content).toContain(marker)
 	})
 
-	// The trigger sees a shell string and nothing else, so what it cannot see is part of the rule
-	// rather than a footnote — it is the reason the resident line was not deleted.
-	it.each(['### 引き金が見えないもの', 'gh api --input <file>', '`-b`'])(
+	// The trigger sees a shell string and nothing else, so the procedure says the rule binds beyond it.
+	it('states the rule binds where the trigger cannot see', () => {
+		expect(content).toContain('引き金が見えない綴り')
+	})
+})
+
+describe(`${SHELL_BODY_RATIONALE} — records what the trigger cannot see`, () => {
+	const content = read_unwrapped(SHELL_BODY_RATIONALE)
+
+	it.each(['### What the trigger cannot see', 'gh api --input <file>', '`-b`'])(
 		'records the blind spot %j',
 		(marker) => {
 			expect(content).toContain(marker)

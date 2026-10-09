@@ -1,18 +1,18 @@
 {
 	"scripts": {
 		"files": 1037,
-		"code_lines": 86517,
-		"comment_lines": 34203,
+		"code_lines": 86597,
+		"comment_lines": 34237,
 		"comment_ratio": 0.4
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2240
+		"lines": 2098
 	},
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 545914
+		"on_demand_bytes": 535097
 	},
 	"accepted": {
 		"reason": "observation:record and epic label-age commands replace hand procedures in the backlogrun documents, plus review-round fixes (#3400)",

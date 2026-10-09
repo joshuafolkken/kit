@@ -183,6 +183,25 @@ on another call's result goes in the same turn; and the criterion is dependence,
 does not fire nothing happens, and that is correct** — not firing means calls per round trip are above
 the 1.50 floor, which is the state of the rule being kept.
 
+## Where the guard cannot see
+
+`prompts/collaboration-workflow/turn-batching.md` → "ガードが見えないところ". The guard judges from the
+closed history (the sequence of turns whose results have returned) and treats calls sharing a target as
+dependent, so it does not stop them. The mechanism is `docs/josh-commands-automation.md` →
+"`josh batch:guard`".
+
+- **The turn in progress is invisible.** Only the head of the same turn's edits may be refused; it
+  fails rather than breaks — a reissue either matches the body or reports the mismatch
+- **A whole-file `Write` is never refused**, because a reissue could overwrite a sibling edit
+- **Only the read-only `pnpm josh …` allow-list (`READ_JOSH_SUBCOMMANDS`) is bundleable** — a writing
+  or sending subcommand and a chained line (`&&` / `|` / `>`) fall to the ordinary judgement
+- **A tool-less turn, and a lane child whose guard is `off`** — the round-trip measurement and the
+  composite commands cover them. In a lane child nothing stops an alternating `Read` → `Edit` sequence,
+  which is why the composite commands were added (joshuafolkken/kit#2202, `edit:files`
+  joshuafolkken/kit#2366); since joshuafolkken/kit#2311 the guard's notice hands over the
+  `read:files` / `edit:files` call that folds the singles it fired on (the plan body is still the
+  model's to write)
+
 ## What the marker test pins
 
 `scripts/rules/turn-batching-rule.test.ts` pins:

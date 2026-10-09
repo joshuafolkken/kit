@@ -236,8 +236,8 @@ the lane is named in the epic progress comment, and the run goes back to step 1.
 
 **The hand-off report belongs to the stop, not to the reading.** For the one reading that does not stop —
 an `unreadable` lane, or an `open` one recording no path — the run goes back to step 1 and writes no
-hand-off report; the epic progress comment is the record. `report-format.md` → "区切りの報告" states it
-from the format's side.
+hand-off report; the epic progress comment is the record. The report's format is
+`backlogrun-handoff-report.md`.
 
 **This is not a failure and not a park.** No child needs a decision; the run is either handing its lanes
 on or standing at the seam. `needs-decision` is not applied, nothing is stashed, and no Issue is filed.

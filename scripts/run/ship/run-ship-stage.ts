@@ -50,8 +50,21 @@ const RECORD_PREFIX = 'josh-ship-stages-'
 const RECORD_SEPARATOR = '-'
 const SKIP_COMMIT_FLAG = '--skip-commit'
 const SKIP_PUSH_FLAG = '--skip-push'
+const WORD_SEPARATOR = ' '
+const STARTED_SEPARATOR = ','
+const STARTED_INDEX = 3
+const WORD_COUNT = STARTED_INDEX + 1
 
-const record_schema = z.object({ done: z.array(z.string()) })
+// `started` lists the stages the current attempt started, kept across a supervisor that ended without a
+// stop so its successor's lines still carry them (joshuafolkken/kit#3552).
+const record_schema = z.object({
+	done: z.array(z.string()),
+	started: z.array(z.string()).default([]),
+})
+
+type ShipRecord = z.infer<typeof record_schema>
+
+const EMPTY_RECORD: ShipRecord = { done: [], started: [] }
 
 // Keyed on the repository and the issue: every lane of one repository shares the common git directory,
 // and two issues shipping from two lanes keep two records.
@@ -59,26 +72,48 @@ function record_path(repository: string, issue: string): string {
 	return stamp_file.stamp_path(`${RECORD_PREFIX}${issue}${RECORD_SEPARATOR}`, repository)
 }
 
-function parse_done(raw: string): ReadonlySet<string> {
+function parse_record(raw: string): ShipRecord {
 	try {
-		return new Set(record_schema.parse(JSON.parse(raw)).done)
+		return record_schema.parse(JSON.parse(raw))
 	} catch {
-		return new Set()
+		return EMPTY_RECORD
 	}
 }
 
-// The stages the record says completed. An absent, planted or malformed record reads as none — the
-// state decides from there, so "no record" is always the safe answer.
-function read_done(target: string): ReadonlySet<string> {
+// An absent, planted or malformed record reads as empty — the state decides from there, so "no
+// record" is always the safe answer.
+function read_record(target: string): ShipRecord {
 	const raw = stamp_file.read_stamp_text(target)
 
-	return raw === undefined ? new Set() : parse_done(raw)
+	return raw === undefined ? EMPTY_RECORD : parse_record(raw)
+}
+
+// The stages the record says completed.
+function read_done(target: string): ReadonlySet<string> {
+	return new Set(read_record(target).done)
 }
 
 function mark_done(target: string, stage: Stage): void {
-	const done = new Set([...read_done(target), stage])
+	const record = read_record(target)
 
-	stamp_file.replace_stamp(target, { done: [...done] })
+	stamp_file.replace_stamp(target, { ...record, done: [...new Set([...record.done, stage])] })
+}
+
+// The stages the current attempt has started, in the order it started them.
+function read_started(target: string): ReadonlyArray<string> {
+	return read_record(target).started
+}
+
+function mark_started(target: string, stage: Stage): void {
+	const record = read_record(target)
+
+	stamp_file.replace_stamp(target, { ...record, started: [...new Set([...record.started, stage])] })
+}
+
+// A `ship-stop` ends the attempt on the board (`run-board-phase.ts`), so the next attempt lists afresh
+// while the completed stages stay recorded.
+function end_attempt(target: string): void {
+	stamp_file.replace_stamp(target, { ...read_record(target), started: [] })
 }
 
 // Removed once the report stage completes, so a later ship of the same issue starts from the preflight.
@@ -139,8 +174,26 @@ function commit_flags(state: ShipState): ReadonlyArray<string> {
 	return state.is_pushed ? [SKIP_COMMIT_FLAG, SKIP_PUSH_FLAG] : [SKIP_COMMIT_FLAG]
 }
 
-function event_text(issue: string, stage: Stage, phase: Phase): string {
-	return `${issue_cite.plain(issue)} ${stage} ${phase}`
+// **The newest line carries the attempt's history** (joshuafolkken/kit#3552): a fourth word lists every
+// stage the attempt has started, so the one line per issue a stream full of positions keeps still
+// draws the whole track. A line with no started stage keeps the three-word form.
+function event_text(
+	issue: string,
+	stage: Stage,
+	phase: Phase,
+	started: ReadonlyArray<string> = [],
+): string {
+	const words = [issue_cite.plain(issue), stage, phase]
+	const listed = [...new Set(started)].join(STARTED_SEPARATOR)
+
+	const full = started.length > 0 ? [...words, listed] : words
+
+	return full.join(WORD_SEPARATOR)
+}
+
+// The stages a line says its attempt has started, `undefined` for a three-word line.
+function started_of(text: string): ReadonlyArray<string> | undefined {
+	return text.split(WORD_SEPARATOR, WORD_COUNT)[STARTED_INDEX]?.split(STARTED_SEPARATOR)
 }
 
 // A stop on a merge git could not finish is named `conflict` rather than by the stage it happened in
@@ -156,11 +209,15 @@ const run_ship_stage = {
 	STAGE,
 	clear,
 	commit_flags,
+	end_attempt,
 	event_text,
 	is_done,
 	mark_done,
+	mark_started,
 	read_done,
+	read_started,
 	record_path,
+	started_of,
 	stop_reason,
 }
 

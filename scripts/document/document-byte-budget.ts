@@ -70,6 +70,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/epic-commands/epic-bundle.md', bytes: 12_288 },
 	{ path: '.claude/skills/epic-commands/execution-waves.md', bytes: 12_288 },
 	{ path: '.claude/skills/verify-ui/SKILL.md', bytes: 8192 },
+	// joshuafolkken/kit#3401 moved the hand-off report out of `report-format.md`, read only at the hand-off.
+	{ path: '.claude/skills/workflow-commands/backlogrun-handoff-report.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/fullrun-steps.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/into-target.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/issue-comments.md', bytes: 8192 },
@@ -139,7 +141,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/review-rubric.md', bytes: 16_384 },
 	{ path: 'prompts/review.md', bytes: 16_384 },
 	{ path: 'prompts/sonar-hotspot-handling.md', bytes: 8192 },
-	{ path: 'prompts/testing-guide.md', bytes: 20_480 },
+	{ path: 'prompts/testing-guide.md', bytes: 16_384 },
 ]
 
 // The recorded ceiling for one path, or undefined when it carries no budget entry.
