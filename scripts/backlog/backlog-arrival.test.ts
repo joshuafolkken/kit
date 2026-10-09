@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { backlog_arrival } from './backlog-arrival'
-import type { ReadyPorts } from './backlog-ready'
+import { backlog_arrival, type ArrivalPorts } from './backlog-arrival'
 
 // joshuafolkken/kit#2503: #2493 was opted in with `auto-ok` while children were in flight and started
 // 10.5 minutes later, picked up by the stall detector. The probe wakes the parent within a minute.
@@ -15,10 +14,11 @@ interface Pool {
 	free: number
 }
 
-function ports_of(pool: Pool): ReadyPorts {
+function ports_of(pool: Pool, added_at: Array<number> = []): ArrivalPorts {
 	return {
 		free_lane_count: vi.fn(async () => pool.free),
 		ready_issues: vi.fn(async () => [...pool.issues]),
+		is_added_since: vi.fn(async (since_ms: number) => added_at.some((at) => at >= since_ms)),
 	}
 }
 
@@ -98,6 +98,30 @@ describe('backlog_arrival.start — what never wakes the parent', () => {
 		const probe = await backlog_arrival.start(START_MS, ports, parent)
 
 		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
+	})
+})
+
+// joshuafolkken/kit#3433: an issue `run:add` handed the run wakes the parent at the next tick, without
+// the minute — and a `--only` run, whose pool is always empty, wakes at all.
+describe('backlog_arrival.start — an issue run:add handed the run', () => {
+	it('wakes the parent before the first pool probe is due', async () => {
+		const probe = await backlog_arrival.start(
+			START_MS,
+			ports_of({ issues: [], free: NO_FREE }, [START_MS + 1]),
+			parent,
+		)
+
+		await expect(probe.has_arrived(START_MS + 1)).resolves.toBe(true)
+	})
+
+	it('does not wake for an addition made before the watcher started', async () => {
+		const probe = await backlog_arrival.start(
+			START_MS,
+			ports_of({ issues: [], free: FREE }, [START_MS - 1]),
+			parent,
+		)
+
+		await expect(probe.has_arrived(START_MS + 1)).resolves.toBe(false)
 	})
 })
 
