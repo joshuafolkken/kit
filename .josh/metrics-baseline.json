@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1039,
-		"code_lines": 86745,
-		"comment_lines": 34296,
+		"code_lines": 86769,
+		"comment_lines": 34310,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 501159
+		"on_demand_bytes": 501345
 	},
 	"accepted": {
-		"reason": "git fixture runs every command with maintenance.auto=false so a detached auto-maintenance writer no longer races close_workspace (ENOTEMPTY) #3558",
+		"reason": "Pre-detach metrics totals check in josh ship, with --totals-only in the command synopsis (#3568)",
 		"date": "2026-10-09"
 	}
 }
