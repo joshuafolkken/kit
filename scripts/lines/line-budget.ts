@@ -8,12 +8,8 @@ import { execa } from 'execa'
 import { z } from 'zod'
 import { effective_limit, type LineRuleOptions } from './effective-limit'
 
-// joshuafolkken/kit#1425: the file line limit was only ever reported *after* the writing was done.
-// Measured by hand from run #1406's transcript (PR #1422, 45.8 minutes), 19.8% of the whole run —
-// 543 seconds — went on reacting to `max-lines` once the implementation was already finished:
-// `pnpm josh gate` five times and `pnpm josh lint` four, of which 115 seconds was tool execution and
-// the remaining 353 was model time in between. The splitting itself was correct work; what was wrong
-// is that it was decided after the fact rather than at design time.
+// Reports each file's line headroom before the writing starts, so a split is decided at design time
+// rather than after the gate reports `max-lines`.
 //
 // **The limit is not changed here, and nothing in this file counts lines its own way.** That is the
 // trap a headroom report walks into: a second counting method becomes a way to satisfy the limit by
@@ -22,21 +18,16 @@ import { effective_limit, type LineRuleOptions } from './effective-limit'
 // invocation `pnpm josh lint` reaches, with `max-lines` lowered to 0 so the rule reports
 // unconditionally and its message carries the count it would have compared against the real limit.
 //
-// **Running ESLint in process instead was tried first and is wrong.** `new Linter().verify(...)` and
-// `new ESLint().lintFiles(...)` both answer **one line lower than the `eslint` CLI on any file that
-// starts with `#!`** — measured on eslint 10.10.0 with this repository's own config, `301` from the
-// CLI against `300` from either API for the same file. Every `scripts/*.ts` entry point has a
-// hashbang, so an in-process count would have been quietly wrong for most of this package while the
-// gate went on failing at a number the report never showed. Spawning costs a process; agreeing with
+// **The count comes from the `eslint` CLI, not the in-process API.** `new Linter().verify(...)` and
+// `new ESLint().lintFiles(...)` both answer **one line lower than the CLI on any file that starts with
+// `#!`**, and every `scripts/*.ts` entry point has a hashbang. Spawning costs a process; agreeing with
 // the gate is the whole point of the report.
 //
-// **joshuafolkken/kit#1454: the limit and the counting options come from the same place the count
-// does.** They used to be read from kit's own `eslint/rules/code-quality.js` while the count was asked
-// of the project's eslint — identical in kit, and two different rules in a consumer that overrides
-// `max-lines` after `create_base_config`. `effective-limit.ts` resolves the entry the project's own
-// eslint applies **to each file**, and nothing in this file reads kit's copy any more. Where no entry
-// can be resolved there is no budget, and the count is reported without one: falling back to kit's
-// number would restore the defect and do it silently.
+// **The limit and the counting options come from the same place the count does.**
+// `effective-limit.ts` resolves the `max-lines` entry the project's own eslint applies **to each
+// file**, so a consumer that overrides `max-lines` after `create_base_config` is held to its own rule.
+// Where no entry can be resolved there is no budget, and the count is reported without one: falling
+// back to kit's number would report a limit the project does not enforce.
 
 const MAX_LINES_RULE = 'max-lines'
 // The rule reports when the count is **greater than** `max`, and 0 is the lowest value its own schema
@@ -60,13 +51,9 @@ const NO_CODE_LINES = 0
 const COUNT_PATTERN = /\((\d+)\)/u
 const COUNT_GROUP = 1
 
-// **Why 85%, and how it lines up with joshuafolkken/kit#1249.** That issue asks for the same shape
-// for a distributed document's resident budget and is still open with nothing settled, so there is no
-// number there to copy; what it and joshuafolkken/kit#951 settle is the *form* — a margin that turns
-// "at the limit" into a warning while there is still room to write the fix. Matching the resident
-// reserve's fraction instead (2,000 of 60,000 bytes, 3.3%) would leave 10 lines of margin, less than
-// one function is allowed to be, which is a warning arriving with nowhere left to go. 45 lines is a
-// little under two functions at the 25-line function limit — enough to write the split into.
+// **Why 85%.** The margin turns "at the limit" into a warning while there is still room to write the
+// fix: 45 lines of a 300-line limit is a little under two functions at the 25-line function limit —
+// enough to write the split into.
 const NEAR_LIMIT_FRACTION = 0.85
 const PERCENT = 100
 
@@ -81,15 +68,14 @@ const PNPM_EXEC = 'exec'
 const FORMAT_FLAGS: ReadonlyArray<string> = ['--format', 'json', '--no-inline-config']
 const RULE_FLAG = '--rule'
 // **No `--cache`, and a `--cache-location` all the same.** An eslint run started *without* `--cache`
-// deletes whatever `--cache-location` names, which is how the edit hook once wiped the gate's cache
-// (joshuafolkken/kit#1332) — so the flag has to be here, pointed somewhere harmless, even though this
+// deletes whatever `--cache-location` names, which would wipe the gate's cache — so the flag has to be here, pointed somewhere harmless, even though this
 // probe keeps no cache. It keeps none because the only key available is the checkout, and two
 // `josh lines` calls at once in one repository — routine with parallel agents here — would then be two
-// unsynchronized writers of one file. A cold run is a couple of seconds against the 543 this report
-// exists to save, so the cache is not worth a shared-state hazard.
+// unsynchronized writers of one file. A cold run is a couple of seconds, so the cache is not worth a
+// shared-state hazard.
 //
-// **The path is per probe, not per call** (joshuafolkken/kit#1454). Since the counting method decides
-// how many probes one call starts, two of them can now run concurrently — and each deletes whatever
+// **The path is per probe, not per call.** Since the counting method decides how many probes one call
+// starts, two of them can run concurrently — and each deletes whatever
 // `--cache-location` names as it starts, so one shared path would have them racing to unlink the file
 // the other just made. The option set's own key is folded into the name, which makes the paths
 // distinct exactly when the probes are.
@@ -118,7 +104,7 @@ interface LineBudget {
 
 // `limit` is carried beside the budget, and it is not the same thing as `budget.limit`: a path this
 // project enforces no `max-lines` on has no limit at all, and the caller has to be able to say that
-// rather than say the count failed (joshuafolkken/kit#1454).
+// rather than say the count failed.
 interface FileBudget {
 	file_path: string
 	limit: number | undefined
@@ -183,8 +169,7 @@ function probe_arguments(group: ProbeGroup, project_root: string): Array<string>
 // The project's own eslint, through its own shim when there is one and `pnpm exec` when there is not
 // — the same two routes every other command in this package reaches a local binary by. The lookup
 // **walks up** from the given directory, because pnpm does: resolving only the directory the command
-// was invoked in would disagree with the very binary it spawns, which is joshuafolkken/kit#934 and the
-// reason `local-bin.ts` ships this variant.
+// was invoked in would disagree with the very binary it spawns.
 function probe_command(project_root: string, probe_args: ReadonlyArray<string>): Array<string> {
 	const shim = find_local_bin_upwards(project_root, ESLINT_BIN)
 
@@ -245,7 +230,7 @@ function count_or_zero(
 // Keyed by the absolute path eslint reports, so the caller's spelling of a path does not have to
 // match it. A path eslint refused is simply absent, and the caller reports that rather than a number.
 // The results are eslint's own objects whether they arrived as the CLI's JSON or from the Node API,
-// so `josh metrics` reads its in-process run through this same reading (joshuafolkken/kit#3408).
+// so `josh metrics` reads its in-process run through this same reading.
 function counts_from(results: ReadonlyArray<LintResult>): ReadonlyMap<string, number> {
 	const counts = new Map<string, number>()
 
@@ -296,7 +281,7 @@ function lintable_paths(file_paths: ReadonlyArray<string>): ReadonlyArray<string
 // One eslint run per *distinct counting method*, rather than one per path. The cost of this report is
 // a process start, so the number of paths is the one thing that must not multiply it — and the number
 // of distinct `max-lines` option sets in one project is one, in every configuration that does not
-// deliberately count two groups of files differently (joshuafolkken/kit#1454).
+// deliberately count two groups of files differently.
 // The keys are sorted before they are written out, so two config blocks that state the same options in
 // a different order are one group rather than two. Unsorted, a purely cosmetic difference would split
 // the probe in two and cost a second eslint process for nothing.

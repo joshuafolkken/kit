@@ -1,5 +1,5 @@
 // The byte ceiling on what each workflow entry reads before it starts — the primary budget, a
-// ratchet like the per-document one (joshuafolkken/kit#2257).
+// ratchet like the per-document one.
 //
 // **The per-document ceiling was a proxy for a run's cost, not the cost.** A run does not pay "one
 // document's size"; it pays the total its entry reads — the mandated skill files, the sections they
@@ -10,7 +10,7 @@
 // documents no entry reads (`document-reachability.ts` draws the line). A document an entry reads is
 // held by the entry total and carries no per-document ceiling, so neither budget holds it twice.
 //
-// THE CEILING IS BLOCK-QUANTIZED, exactly as the per-document one is (joshuafolkken/kit#2231): an
+// THE CEILING IS BLOCK-QUANTIZED, exactly as the per-document one is: an
 // entry total is one number, so recording its raw size would make every lane that nudges a covered
 // document bump this shared line. The recorded ceiling is the smallest `BLOCK_BYTES` multiple at or
 // above the measured total, so growth within a block needs no edit and a crossing bumps to the same
@@ -44,79 +44,10 @@ interface EntryBudget {
 // size. Names exactly the entries `known_entries` offers: the test fails on a stale entry and on an
 // entry with no row, so the definition cannot rot as entries are added or removed.
 const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
-	// Raised in joshuafolkken/kit#2289 when `pre-gate-cut.md` joined the point-of-use set: its ~29KB
-	// read is a point-of-use read every entry's total now counts, a correction of an under-count rather
-	// than new reading. Raised again in joshuafolkken/kit#2282 when the same document grew by its
-	// status-quo decision record, and once more in joshuafolkken/kit#2295 when it recorded the
-	// recent-context hand-off. Lowered in joshuafolkken/kit#2294 — the FIRST downward move on this
-	// ratchet — when `pre-gate-cut.md` was compressed (37,786 B → ~20,300 B): every entry that reads it
-	// crossed a block downward, so the recorded ceilings drop to the block multiples the stale-ratchet
-	// message named rather than staying loose above the reduction. `kickoff` and the lane child rose one
-	// block again in joshuafolkken/kit#2312 when `pre-gate-cut.md` recorded the resume-side cost the
-	// conditional cut is built on; the other entries stayed within their block. `backlogrun` rose one
-	// block in joshuafolkken/kit#2317 when `backlogrun-child.md`'s outage section recorded the
-	// session-resume re-dispatch and the outage-fold window.
-	// Raised in joshuafolkken/kit#2328 when `retrospective.md` joined the point-of-use set and `SKILL.md`
-	// grew by `retrospective.md`: every entry that reads `SKILL.md` discovers the retrospective document, so its ~5KB
-	// and the new section crossed a block for each. The lane child is exempt — it never runs the
-	// retrospective (`run:step` answers `stop` for a child at the stop position), so it skips both.
-	// joshuafolkken/kit#2335 recorded the drain-time firing with the operational detail in
-	// `retrospective.md` (which the lane child skips) and a one-line pointer in `backlogrun-steps.md`, so
-	// every entry stayed within its block rather than climbing back to a pre-#2294 ceiling the downward
-	// ratchet holds shut. joshuafolkken/kit#2342 added the `--summary` close to `retrospective.md` in a
-	// single sentence, kept short so every entry that reads it stays within its block.
-	// Lowered for the lane child in joshuafolkken/kit#2357 — a downward move on this ratchet — when
-	// `backlogrun-steps.md` left the child's point-of-use set: the child never opened the scheduler's step
-	// list, so its ~48KB read crossed a block downward and the recorded ceiling drops to the block multiple
-	// the stale-ratchet message named. The other entries still read it, so their rows hold.
-	// joshuafolkken/kit#2345 added the `implementation-unit` delegation row (full fan-out procedure in
-	// `docs/josh-commands-backlog.md` → "`josh fanout`"); `delegation.md` gained only a one-clause mention and a
-	// pointer, folded into the existing enumeration and offset by tightening `delegation.md` prose, so every entry
-	// stayed within its block (kickoff has no block of headroom — its pre-#2294 ceiling is the next
-	// multiple, which the downward ratchet holds shut).
-	// joshuafolkken/kit#2353 wired the watcher-guard note into `backlogrun-progress.md` (read by the three
-	// planning entries): kickoff has no headroom, so the addition was offset by tightening that file's
-	// heartbeat prose, keeping every entry within its existing block.
-	// joshuafolkken/kit#2762 moved the rationale of five point-of-use documents to
-	// `docs/maintainers/*-rationale.md`, and the ratchet holds the reduction. joshuafolkken/kit#2895 did
-	// the same for eight more, lowering fullrun, halfrun and backlogrun one block each.
-	// joshuafolkken/kit#2998 split the command reference, so every reference to an automation command
-	// now names `josh-commands-automation.md`; the longer path tipped backlogrun one block over.
-	// joshuafolkken/kit#2994 moved `CLAUDE.md`'s explanations to `docs/maintainers/claude-md-history.md`,
-	// lowering backlogrun one block; kickoff's reduction was offset by joshuafolkken/kit#3024's longer
-	// `wip-cap.md`, so its ceiling stays.
-	// joshuafolkken/kit#3023 added the `prrun` keyword to `SKILL.md` and `CLAUDE.md`, tipping backlogrun
-	// one block over; `prrun` reads `fullrun`'s set plus its own short manifest.
-	// Lowered in joshuafolkken/kit#3078 — a correction of an over-count, not a trim: every entry was
-	// charged for every global point-of-use document, so `kickoff` paid for `followup.md` and the
-	// `backlogrun-*` phase documents it never opens. Each total now counts only what its path reaches.
-	// joshuafolkken/kit#3077 trimmed non-resident rule bodies from `CLAUDE.md`, lowering fullrun, prrun
-	// and backlogrun one block each.
-	// Lowered in joshuafolkken/kit#3172: the heartbeat left `backlogrun-progress.md` for its own
-	// `progress-watcher.md`, and `pre-gate-cut.md` became the lane child's alone, so fullrun, halfrun
-	// and prrun stop paying for ~50KB of batch and lane procedure; backlogrun lost the moved prose.
-	// Lowered in joshuafolkken/kit#3174: `SKILL.md` was cut to a manifest (~21KB → ~11KB) and the entry
-	// sequence `fullrun`, `halfrun` and `prrun` shared moved into one `entry-sequence.md`.
-	// Lowered in joshuafolkken/kit#3175: the loop became the driver's hand-backs, the supervisor and
-	// provider prose moved to `docs/josh-commands-automation.md`, and the failure-only sections moved to
-	// `backlogrun-recovery.md`, which the parent's reach still charges whole.
-	// joshuafolkken/kit#3171 cut `CLAUDE.md` to triggers and pointers (~12 KB), lowering every entry.
-	// joshuafolkken/kit#3256 moved `CLAUDE.md`'s residency prose to `residency.md`, lowering kickoff and
-	// halfrun one block each.
-	// joshuafolkken/kit#3395 took what a hook, lint or skill already delivers out of `CLAUDE.md`
-	// (~13 KB → ~9 KB), lowering every entry one block or two.
 	{ entry: 'kickoff', bytes: 36_864 },
-	// Raised in joshuafolkken/kit#3177: #3173, #3181 and #3183 merged in parallel and together tipped
-	// fullrun 12 bytes over its block; none of #3177's documents are in its read set.
-	// Lowered back in joshuafolkken/kit#3180: the history and lint-settled proofs left its read set.
 	{ entry: 'fullrun', bytes: 53_248 },
 	{ entry: 'halfrun', bytes: 49_152 },
 	{ entry: 'prrun', bytes: 57_344 },
-	// Lowered in joshuafolkken/kit#3396: `backlogrun.md` became a route table naming one section per
-	// moment, a point-of-use document is charged at the union of the sections its path names, and the
-	// driver's own mechanics moved to `docs/maintainers/backlogrun-driver.md`. The route table also names
-	// `latest-gate.md`, `progress-watcher.md` and `followup.md`, which the parent reads itself.
-	// Lowered in joshuafolkken/kit#3564: the `backlogrun-*` sections became command-to-token tables.
 	{ entry: 'backlogrun', bytes: 90_112 },
 	{ entry: LANE_CHILD, bytes: 49_152 },
 ]
