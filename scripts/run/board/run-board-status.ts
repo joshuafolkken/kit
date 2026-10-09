@@ -71,14 +71,33 @@ function continued(previous: ItemStatus | undefined): ItemStatus {
 	return { state: 'running', started_ms: previous?.started_ms, track: previous?.track }
 }
 
-// A phase moves only a running child, so a ship's `report` stage after its merge — or a `plan` event
-// naming an issue no lane has launched — leaves the status as it was.
-function advanced(previous: ItemStatus | undefined, event: RunEvent): ItemStatus | undefined {
+// A stage line carrying its attempt redraws the track of any child launched on this stream — a settled
+// one too, since the line that survived a full stream is often the `report` after the merge
+// (joshuafolkken/kit#3552) — and starts one for a running child whose launch has rolled off.
+function replayed(
+	previous: ItemStatus | undefined,
+	attempt: ReadonlyArray<Phase>,
+): ItemStatus | undefined {
+	if (previous === undefined) return previous
+	if (previous.track === undefined && previous.state !== 'running') return previous
+
+	return { ...previous, track: run_board_phase.replayed(previous.track ?? [], attempt) }
+}
+
+// A phase moves only a running child, so a three-word `report` stage after its merge — or a `plan`
+// event naming an issue no lane has launched — leaves the status as it was.
+function phased(previous: ItemStatus | undefined, event: RunEvent): ItemStatus | undefined {
 	const phase = run_board_phase.phase_of(event)
 
 	if (phase === undefined || previous?.state !== 'running') return previous
 
 	return { ...previous, track: run_board_phase.history_after(previous.track ?? [], phase) }
+}
+
+function advanced(previous: ItemStatus | undefined, event: RunEvent): ItemStatus | undefined {
+	const attempt = run_board_phase.attempt_of(event)
+
+	return attempt === undefined ? phased(previous, event) : replayed(previous, attempt)
 }
 
 // One event folded into the status of the child it names; an event the board does not track keeps it.

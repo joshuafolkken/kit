@@ -11,7 +11,8 @@ import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 // **A child's phases are a history, not a high-water mark** (joshuafolkken/kit#3526): a ship that stops
 // sends the child back to implement, so a furthest phase that never went back held a row on 👀 while it
 // was coding again. Each phase is written after the last, and a failed ship's own stages fold into the
-// `ship`, `failed` pair, so the retries read as the count of 🔨 and of 🚢💥.
+// `ship`, `failed` pair, so the retries read as the count of 🔨 and of 🚢💥. A stage line that lists
+// its attempt redraws that attempt whole (`replayed`, joshuafolkken/kit#3552).
 
 const PHASES = [
 	'investigate',
@@ -93,7 +94,43 @@ function history_after(track: ReadonlyArray<Phase>, next: Phase): Array<Phase> {
 	return track.at(-1) === next ? [...track] : [...track, next]
 }
 
-const run_board_phase = { LAUNCHED_PHASE, PHASES, history_after, phase_of }
+const ATTEMPT_PHASES: ReadonlySet<Phase | undefined> = new Set(Object.values(SHIP_PHASES))
+
+// The phases a `ship-stage` line says its attempt has started (`run-ship-stage.ts` → `event_text`), in
+// the order they ran and led by the ship's own start, which a resumed ship's passed-over preflight does
+// not list. `undefined` for a line that carries none — an older three-word line is read one phase at a
+// time.
+function attempt_of(event: RunEvent): ReadonlyArray<Phase> | undefined {
+	const started = event.kind === KIND.SHIP_STAGE ? run_ship_stage.started_of(event.text) : undefined
+
+	if (started === undefined) return undefined
+
+	return [...new Set<Phase>(['ship', ...started.flatMap((stage) => SHIP_PHASES[stage] ?? [])])]
+}
+
+// Where the current ship attempt starts on a track: the first `ship` of the stages that end it, else the
+// end — a failed or re-implemented attempt before it is history, never redrawn. A supervisor restarted
+// with no stop between adds a second `ship` inside the same attempt, which the line redraws whole.
+function attempt_start(track: ReadonlyArray<Phase>): number {
+	const tail = track.findLastIndex((phase) => !ATTEMPT_PHASES.has(phase)) + 1
+	const ship = track.indexOf('ship', tail)
+
+	return ship === -1 ? track.length : ship
+}
+
+// **The newest line restores what the bound dropped** (joshuafolkken/kit#3552): on a stream full of
+// positions only each issue's newest stage line survives, so the current attempt is redrawn from it, in
+// the order the line lists. A line that misses a phase the track holds — a restarted supervisor's, which
+// lists none of the stages it passed over — is added after them rather than replacing them.
+function replayed(track: ReadonlyArray<Phase>, attempt: ReadonlyArray<Phase>): Array<Phase> {
+	const start = attempt_start(track)
+	const current = track.slice(start)
+	const is_covered = current.every((phase) => attempt.includes(phase))
+
+	return [...track.slice(0, start), ...(is_covered ? attempt : new Set([...current, ...attempt]))]
+}
+
+const run_board_phase = { LAUNCHED_PHASE, PHASES, attempt_of, history_after, phase_of, replayed }
 
 export { run_board_phase }
 export type { Phase }
