@@ -1,21 +1,21 @@
 {
 	"scripts": {
-		"files": 1030,
-		"code_lines": 85889,
-		"comment_lines": 34124,
+		"files": 1033,
+		"code_lines": 86286,
+		"comment_lines": 34149,
 		"comment_ratio": 0.4
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2325
+		"lines": 2240
 	},
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11121,
-		"on_demand_bytes": 559993
+		"on_demand_bytes": 546485
 	},
 	"accepted": {
-		"reason": "#3397 adds the mtime-first verified-digest memory to hook-bundle-stamp (and its tests) so PreToolUse hook launches skip re-hashing settled inputs",
+		"reason": "#3399 moves the delivered-rule list from rule-delivery.md prose into the rule-registry data that rule:list renders",
 		"date": "2026-10-09"
 	}
 }

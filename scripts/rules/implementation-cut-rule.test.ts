@@ -1,10 +1,7 @@
-import {
-	read_unwrapped,
-	RULE_DELIVERY_RATIONALE,
-	WORKFLOW_PROMPT_DIRECTORY,
-} from '#scripts/document/ai-document-fixture'
+import { read_unwrapped, RULE_DELIVERY_RATIONALE } from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 import { implementation_cut } from './implementation-cut'
+import { rule_list } from './rule-list'
 
 // joshuafolkken/kit#2310: the implementation-phase cut existed, was documented, and its verdict was
 // read only at session entry — so it fired **0 times** across five lanes while 33.9% of their requests
@@ -16,7 +13,6 @@ import { implementation_cut } from './implementation-cut'
 // precaution, and a precaution is the first thing dropped when the enumeration is next trimmed.
 const TOPIC_FILE = '.claude/skills/workflow-commands/pre-gate-cut.md'
 const RATIONALE_FILE = 'docs/maintainers/pre-gate-cut-rationale.md'
-const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
 const FIRING_SUITE = 'scripts/rules/implementation-cut.test.ts'
 const RULE_SUITE = 'scripts/rules/implementation-cut-rule.test.ts'
 // The section this rule's procedure is single-sourced under; a marker test exists so a rewrite of the
@@ -93,8 +89,8 @@ describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 	})
 })
 
-describe(`${DELIVERY} — the enumeration names this rule and its suites`, () => {
-	const content = read_unwrapped(DELIVERY)
+describe(`pnpm josh rule:list — the enumeration names this rule and its suites`, () => {
+	const content = rule_list.render()
 
 	it('states the section the procedure lives under', () => {
 		expect(content).toContain(TOPIC_HEADING.replace('### ', ''))
