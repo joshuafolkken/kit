@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1039,
-		"code_lines": 86751,
-		"comment_lines": 34302,
+		"code_lines": 86775,
+		"comment_lines": 34316,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 501159
+		"on_demand_bytes": 501345
 	},
 	"accepted": {
-		"reason": "defect:rate counts defects by the bug / bugfix / route:interrupt labels over enhancement-labelled completions (#3560): the label imports and the defect label set add 6 code lines",
+		"reason": "Pre-detach metrics totals check in josh ship, with --totals-only in the command synopsis (#3568)",
 		"date": "2026-10-09"
 	}
 }

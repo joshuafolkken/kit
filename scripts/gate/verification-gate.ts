@@ -1,7 +1,6 @@
 #!/usr/bin/env tsx
 import { availableParallelism } from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
@@ -282,9 +281,7 @@ async function run_marked_gate<T>(
 // (joshuafolkken/kit#1515).
 function announce_gate_plan(is_unit_included: boolean, available_cores: number): GatePlan {
 	const concurrent_runs = unit_worker_share.live_run_count() + unit_worker_share.SOLO_RUNS
-	const is_kit_repository = !doctor_consumer.is_kit_consumer(
-		project_checks.project_root(process.cwd()),
-	)
+	const is_kit_repository = project_checks.is_kit_repository(process.cwd())
 	const plan = gate_plan.resolve_gate_plan(
 		available_cores,
 		concurrent_runs,

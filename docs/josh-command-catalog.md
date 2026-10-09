@@ -149,7 +149,7 @@ Check only the changed files with prettier and eslint (whole tree on fallback)
 
 > **Audience:** developer · **Side effects:** files · **kit only**
 
-`[--no-startup | --accept --reason "<why>"]`
+`[--no-startup | --totals-only | --accept --reason "<why>"]`
 
 Print repository-wide quality totals and durations, and fail when one grew past its baseline
 
