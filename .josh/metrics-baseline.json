@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1033,
-		"code_lines": 86287,
-		"comment_lines": 34150,
+		"code_lines": 86266,
+		"comment_lines": 34156,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -11,8 +11,8 @@
 	},
 	"guards": 8,
 	"ai_cost": {
-		"resident_bytes": 11121,
-		"on_demand_bytes": 535668
+		"resident_bytes": 11033,
+		"on_demand_bytes": 535660
 	},
 	"accepted": {
 		"reason": "#3401 adds the byte-budget entry for the new on-demand document backlogrun-handoff-report.md, split out of report-format.md",
