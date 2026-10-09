@@ -50,6 +50,8 @@ interface Harness extends Reads {
 	leaves: Array<() => void>
 	// The clock at each report the board recorded.
 	marks: Array<number>
+	// The frames `--every` sent off-screen.
+	pushes: Array<string>
 }
 
 function plan_titled(title: string): BoardPlan {
@@ -84,14 +86,13 @@ function reads_of(local: LocalRead | undefined, plans: Array<BoardPlan | undefin
 	}
 }
 
-function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefined>): Harness {
-	const frames: Array<string> = []
-	const leaves: Array<() => void> = []
-	const marks: Array<number> = []
-	const clock = { now_ms: START }
-	const reads = reads_of(local, plans)
-	const ports: BoardPorts = {
-		...reads,
+type Recorded = Pick<Harness, 'frames' | 'clock' | 'leaves' | 'marks' | 'pushes'>
+
+// The ports that only record what the board did with them.
+function recording_ports(recorded: Recorded): Omit<BoardPorts, keyof Reads> {
+	const { frames, clock, leaves, marks, pushes } = recorded
+
+	return {
 		now: () => clock.now_ms,
 		write: (frame) => {
 			frames.push(frame)
@@ -102,13 +103,27 @@ function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefine
 		mark: async () => {
 			marks.push(clock.now_ms)
 		},
+		push: async (frame) => {
+			pushes.push(frame)
+		},
 		on_exit: (leave) => {
 			leaves.push(leave)
 		},
 		sleep: stopper(),
 	}
+}
 
-	return { ...reads, ports, frames, clock, leaves, marks }
+function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefined>): Harness {
+	const recorded: Recorded = {
+		frames: [],
+		clock: { now_ms: START },
+		leaves: [],
+		marks: [],
+		pushes: [],
+	}
+	const reads = reads_of(local, plans)
+
+	return { ...reads, ...recorded, ports: { ...reads, ...recording_ports(recorded) } }
 }
 
 // The plan read's loading spinner after its ⏳, not the waiting count the same line draws after its own

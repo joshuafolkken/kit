@@ -35,6 +35,7 @@ type TelegramTaskType =
 	| 'confirmation'
 	| 'stalled'
 	| 'stranded'
+	| 'progress'
 
 interface TelegramSendInput {
 	task_type: TelegramTaskType
@@ -64,6 +65,7 @@ const TASK_DEFINITIONS: Record<TelegramTaskType, TaskDefinition> = {
 	confirmation: { icon: '⏸️', label: 'Confirmation required' },
 	stalled: { icon: '⏳', label: 'Ready work is sitting undispatched' },
 	stranded: { icon: '🚨', label: 'Run stranded — nobody is driving it' },
+	progress: { icon: '📊', label: 'Progress' },
 }
 
 const NOTIFY_SWITCH_KEY = 'JOSH_NOTIFY'
@@ -437,8 +439,30 @@ async function stranded(input: StrandedInput): Promise<boolean> {
 	)
 }
 
+/**
+ * Push the 📊 progress type — one `run:board` frame a person asked to receive periodically off-screen
+ * with `run:board --every` (joshuafolkken/kit#3569). Never a heartbeat: nothing sends it unasked.
+ *
+ * **`stranded`'s shape exactly**, with the board's own one-frame answer as the recovery — a frame lost
+ * to a Telegram timeout is read again by asking for it.
+ */
+async function progress(body: string): Promise<boolean> {
+	return await send_or_report(
+		{
+			task_type: 'progress',
+			repo_name: gh_spawn.get_repo_name_with_owner_within(REPO_LOOKUP_TIMEOUT_MS),
+			issue_title: undefined,
+			body,
+			issue_url: undefined,
+			pr_url: undefined,
+		},
+		'pnpm josh run:board --chat',
+	)
+}
+
 const telegram_notify = {
 	confirm,
+	progress,
 	send,
 	send_or_report,
 	stalled,
