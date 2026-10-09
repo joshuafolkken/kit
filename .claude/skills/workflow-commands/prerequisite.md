@@ -45,7 +45,7 @@ The command lints the body against `prompts/collaboration-workflow/issue-templat
 classification labels it declares, and runs the duplicate scan and `epic:bundle` itself
 (`docs/josh-commands-backlog.md` → `josh issue:file`).
 
-Every "file the prerequisite" below means that labelled filing, and it always happens **first**: the
+Every *file the prerequisite* step below means that labelled filing, and it always happens **first**: the
 steps after it name a number that does not exist until it is. **Its duplicate scan is read exactly as
 it is for a `new` entry** (`issue-scout.md`): a filing made mid-run is the one most likely to duplicate something.
 

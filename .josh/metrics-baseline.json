@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1015,
-		"code_lines": 84514,
-		"comment_lines": 33739,
+		"code_lines": 84545,
+		"comment_lines": 33746,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,7 +12,7 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12222,
-		"on_demand_bytes": 560087
+		"on_demand_bytes": 560117
 	},
 	"accepted": {
 		"reason": "#3502 adds the waiting-on-blockers merge path (open_blockers, do_waiting, on_waiting, waiting_comment) and documents it in backlogrun-park.md / prerequisite.md",
