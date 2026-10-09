@@ -3,7 +3,7 @@ import type { IdleWindow } from '#scripts/backlog/backlog-idle'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
-import type { Phase } from './run-board-phase'
+import { run_board_phase, type Phase } from './run-board-phase'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import type { ItemStatus } from './run-board-status'
@@ -29,8 +29,16 @@ function row(number: number, extra: Partial<BoardRow> = {}): BoardRow {
 	}
 }
 
-function running(number: number, started_ms: number, phase: ItemStatus['phase']): BoardRow {
-	return row(number, { state: 'running', status: { state: 'running', started_ms, phase } })
+function passed_of(phase: Phase): Array<Phase> {
+	return run_board_phase.PHASES.slice(0, run_board_phase.PHASES.indexOf(phase) + 1)
+}
+
+// A running row whose phases are `track` — the phases up to `phase` in the track's order where one
+// phase is named, as a child that never went back would have passed them.
+function running(number: number, started_ms: number, phase: Phase | ItemStatus['track']): BoardRow {
+	const track = typeof phase === 'string' ? passed_of(phase) : phase
+
+	return row(number, { state: 'running', status: { state: 'running', started_ms, track } })
 }
 
 function padded(title: string): string {
@@ -39,7 +47,7 @@ function padded(title: string): string {
 
 // The phase track as the stripped lines draw it, whether or not this run's output is colored.
 function plain_track(phase: Phase): string {
-	return stripVTControlCharacters(run_board_track.track_of(phase))
+	return stripVTControlCharacters(run_board_track.track_of(passed_of(phase)))
 }
 
 describe('run_board_render.render rows', () => {
@@ -50,7 +58,7 @@ describe('run_board_render.render rows', () => {
 
 		expect(lines).toContain(row_line)
 		expect(row_line).not.toContain('■')
-		expect(lines.slice(0, -1).join('\n')).not.toContain('implement')
+		expect(lines.slice(0, -2).join('\n')).not.toContain('implement')
 		expect(lines.join('\n')).not.toContain('lane')
 	})
 
@@ -96,7 +104,7 @@ describe('run_board_render.render sections', () => {
 		const lines = lines_of(header({ layout }))
 		const wave_rule = rule('1')
 
-		expect(lines.slice(lines.indexOf(wave_rule), -3)).toStrictEqual([
+		expect(lines.slice(lines.indexOf(wave_rule), -4)).toStrictEqual([
 			wave_rule,
 			'  📁 10  Epic ten',
 			'     ├ ⏳ 11  Issue 11',
@@ -124,9 +132,11 @@ describe('run_board_render.render sections', () => {
 	})
 })
 
-// joshuafolkken/kit#3489: seven phases from 🔍, the 🚀 no row ever drew gone.
-const PHASE_LEGEND =
-	'🔍 investigate  📝 plan  🔨 implement  👀 review  🚦 gate  📦 commit  🔁 followup'
+// joshuafolkken/kit#3526: the track's twelve marks in its order, six to a line.
+const PHASE_LEGEND = [
+	'🔍 investigate  📝 plan  🔨 implement  🚢 ship  👀 review  🚦 gate',
+	'🔀 sync  📦 commit  🔂 round-2  ⚓ followup  📣 report  💥 failed',
+]
 
 function legend_of(rows: ReadonlyArray<BoardRow>): Array<string> {
 	const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: [...rows] } }))
@@ -134,10 +144,10 @@ function legend_of(rows: ReadonlyArray<BoardRow>): Array<string> {
 	return lines.slice(lines.lastIndexOf('') + 1)
 }
 
-// joshuafolkken/kit#3480: every phase on one line, the states the rows draw on a second, in English.
+// joshuafolkken/kit#3480: every phase on its lines, the states the rows draw on one more, in English.
 describe('run_board_render.render legend', () => {
-	it('names every phase but merged in order on the first line, though no row draws a phase', () => {
-		expect(legend_of([row(1)])).toStrictEqual([PHASE_LEGEND, '⏳ waiting'])
+	it('names every phase in order on its lines, though no row draws a phase', () => {
+		expect(legend_of([row(1)])).toStrictEqual([...PHASE_LEGEND, '⏳ waiting'])
 	})
 
 	it('names only the states the rows draw, in the legend’s order', () => {
@@ -153,7 +163,7 @@ describe('run_board_render.render legend', () => {
 	it('names 🔄 only while a row draws it, not for a row led by its phase', () => {
 		const launched = row(1, { state: 'running' })
 
-		expect(legend_of([running(2, NOW, 'review')])).toStrictEqual([PHASE_LEGEND])
+		expect(legend_of([running(2, NOW, 'review')])).toStrictEqual(PHASE_LEGEND)
 		expect(legend_of([launched]).at(-1)).toBe('🔄 running')
 	})
 
@@ -165,7 +175,7 @@ describe('run_board_render.render legend', () => {
 	it('draws the phase line alone on a screen with no rows, and none of the header’s marks', () => {
 		const legend = legend_of([])
 
-		expect(legend).toStrictEqual([PHASE_LEGEND])
+		expect(legend).toStrictEqual(PHASE_LEGEND)
 
 		for (const icon of ['⚡', '🧠', '💾', '🔚']) {
 			expect(legend.join('\n')).not.toContain(icon)

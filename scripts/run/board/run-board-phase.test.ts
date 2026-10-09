@@ -1,50 +1,100 @@
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { describe, expect, it } from 'vitest'
-import { run_board_phase } from './run-board-phase'
+import { run_board_phase, type Phase } from './run-board-phase'
 
-// joshuafolkken/kit#3444: which phase one event marks, and that a phase never goes back.
+// joshuafolkken/kit#3444: which phase one event marks. joshuafolkken/kit#3526: every ship stage its own
+// phase, and the phases a history in which a failed ship folds into 🚢💥.
 
 const KIND = run_event_stream.EVENT_KIND
 const { PHASE, STAGE } = run_ship_stage
+const { history_after, phase_of } = run_board_phase
 
 function event_of(kind: string, text: string): RunEvent {
 	return { pos: 1, at: '2026-10-08T09:00:00.000Z', kind, text }
 }
 
-function ship(stage: (typeof STAGE)[keyof typeof STAGE]): RunEvent {
-	return event_of(KIND.SHIP_STAGE, run_ship_stage.event_text('3444', stage, PHASE.START))
+function ship(
+	stage: (typeof STAGE)[keyof typeof STAGE],
+	phase: (typeof PHASE)[keyof typeof PHASE] = PHASE.START,
+): RunEvent {
+	return event_of(KIND.SHIP_STAGE, run_ship_stage.event_text('3444', stage, phase))
+}
+
+function history_of(...phases: ReadonlyArray<Phase>): Array<Phase> {
+	let track: Array<Phase> = []
+
+	for (const phase of phases) track = history_after(track, phase)
+
+	return track
 }
 
 describe('run_board_phase.phase_of', () => {
-	it('reads plan from the plan event and implement from the lane phase', () => {
-		expect(run_board_phase.phase_of(event_of(KIND.PLAN, 'planned #3444'))).toBe('plan')
-		expect(run_board_phase.phase_of(event_of(KIND.LANE_PHASE, '#3444 implement'))).toBe('implement')
+	it('reads plan, implement, the ship launch and its stop from their own records', () => {
+		expect(phase_of(event_of(KIND.PLAN, 'planned #3444'))).toBe('plan')
+		expect(phase_of(event_of(KIND.LANE_PHASE, '#3444 implement'))).toBe('implement')
+		expect(phase_of(event_of(KIND.SHIP_LAUNCH, '#3444 ship supervisor launched'))).toBe('ship')
+		expect(phase_of(event_of(KIND.SHIP_STOP, '#3444 review failed'))).toBe('failed')
 	})
 
 	it.each([
-		[STAGE.PREFLIGHT, 'review'],
+		[STAGE.PREFLIGHT, 'ship'],
 		[STAGE.REVIEW, 'review'],
 		[STAGE.GATE, 'gate'],
-		[STAGE.SYNC, 'commit'],
+		[STAGE.SYNC, 'sync'],
 		[STAGE.COMMIT, 'commit'],
-		[STAGE.ROUND_TWO, 'followup'],
+		[STAGE.ROUND_TWO, 'round_two'],
 		[STAGE.FOLLOWUP, 'followup'],
-		[STAGE.REPORT, 'followup'],
-	])('folds the ship stage %s onto %s', (stage, phase) => {
-		expect(run_board_phase.phase_of(ship(stage))).toBe(phase)
+		[STAGE.REPORT, 'report'],
+	])('reads the ship stage %s as %s when it starts', (stage, phase) => {
+		expect(phase_of(ship(stage))).toBe(phase)
+	})
+
+	it('marks no phase for a stage that finished, failed or was passed over', () => {
+		expect(phase_of(ship(STAGE.GATE, PHASE.DONE))).toBeUndefined()
+		expect(phase_of(ship(STAGE.GATE, PHASE.FAILED))).toBeUndefined()
+		expect(phase_of(ship(STAGE.COMMIT, PHASE.SKIPPED))).toBeUndefined()
 	})
 
 	it('marks no phase for an event that names none', () => {
-		expect(run_board_phase.phase_of(event_of(KIND.NOTE, '#3444 a note'))).toBeUndefined()
-		expect(run_board_phase.phase_of(event_of(KIND.LANE_PHASE, '#3444 bogus'))).toBeUndefined()
+		expect(phase_of(event_of(KIND.NOTE, '#3444 a note'))).toBeUndefined()
+		expect(phase_of(event_of(KIND.LANE_PHASE, '#3444 bogus'))).toBeUndefined()
 	})
 })
 
-describe('run_board_phase.later_of', () => {
-	it('moves forward and never back', () => {
-		expect(run_board_phase.later_of(undefined, 'plan')).toBe('plan')
-		expect(run_board_phase.later_of('plan', 'gate')).toBe('gate')
-		expect(run_board_phase.later_of('gate', 'implement')).toBe('gate')
+describe('run_board_phase.history_after', () => {
+	it('writes each phase after the last, going back to implement as well as forward', () => {
+		expect(history_of('investigate', 'plan', 'implement', 'ship', 'review')).toStrictEqual([
+			'investigate',
+			'plan',
+			'implement',
+			'ship',
+			'review',
+		])
+		expect(history_of('gate', 'implement')).toStrictEqual(['gate', 'implement'])
+	})
+
+	it('writes the same phase twice in a row once', () => {
+		expect(history_of('implement', 'ship', 'ship', 'review', 'review')).toStrictEqual([
+			'implement',
+			'ship',
+			'review',
+		])
+	})
+
+	it('folds a failed ship’s stages into ship and failed', () => {
+		const track = history_of('implement', 'ship', 'review', 'gate', 'failed', 'implement', 'ship')
+
+		expect(track).toStrictEqual(['implement', 'ship', 'failed', 'implement', 'ship'])
+	})
+
+	it('folds only the newest ship, keeping an earlier failed round', () => {
+		const track = history_of('ship', 'failed', 'implement', 'ship', 'review', 'failed')
+
+		expect(track).toStrictEqual(['ship', 'failed', 'implement', 'ship', 'failed'])
+	})
+
+	it('writes failed alone where no ship launch was recorded', () => {
+		expect(history_of('implement', 'failed')).toStrictEqual(['failed'])
 	})
 })

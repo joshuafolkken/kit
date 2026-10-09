@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import type { BoardHeader } from './run-board-header'
 import type { BoardRow } from './run-board-layout'
+import type { Phase } from './run-board-phase'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import type { LaneUsages } from './run-board-usage'
@@ -13,7 +14,9 @@ const { EMPTY_LAYOUT, NOW, header, lines_of } = run_board_render_fixture
 const GB = 1024 * 1024 * 1024
 const USAGE = '⚡ 20% 🧠1.6G'
 const WIDE = 200
-const NARROW = 90
+const NARROW = 80
+// Wide enough for a running row up to its usage, not for its three-round track after it too.
+const FITTING = 100
 
 const usages: LaneUsages = new Map([
 	[1, { cpu_percent: 20, memory_bytes: 1.6 * GB, memory_percent: 9 }],
@@ -24,7 +27,7 @@ const running: BoardRow = {
 	number: 1,
 	title: 'Issue 1',
 	state: 'running',
-	status: { state: 'running', started_ms: NOW, phase: 'implement' },
+	status: { state: 'running', started_ms: NOW, track: ['investigate', 'plan', 'implement'] },
 	waits: ['3'],
 }
 const waiting: BoardRow = {
@@ -52,10 +55,11 @@ function sized(columns: number): Array<string> {
 }
 
 describe('run_board_render.render usage column', () => {
-	it('ends a running row with its lane’s usage, before what it waits on', () => {
+	// joshuafolkken/kit#3526: the usage before the track, which grows with every round.
+	it('draws a running row’s usage before its track, and both before what it waits on', () => {
 		const lines = lines_of(board())
 
-		expect(row_line(lines, 'Issue 1')).toMatch(/ {2}⚡ 20% 🧠1\.6G {2}🔗 3$/u)
+		expect(row_line(lines, 'Issue 1')).toMatch(/ {2}⚡ 20% 🧠1\.6G {2}🔍📝🔨 {2}🔗 3$/u)
 		expect(row_line(lines, 'Issue 2')).not.toContain('⚡')
 	})
 
@@ -67,5 +71,20 @@ describe('run_board_render.render usage column', () => {
 		expect(row_line(sized(WIDE), 'Issue 1')).toContain(USAGE)
 		expect(row_line(sized(NARROW), 'Issue 1')).not.toContain('⚡')
 		expect(row_line(sized(NARROW), 'Issue 1')).toContain('Issue 1')
+	})
+
+	// joshuafolkken/kit#3526: the track grows without bound, so its length never takes the column away.
+	it('keeps the column on every row however long a running row’s track has grown', () => {
+		const round: Array<Phase> = ['implement', 'ship', 'failed']
+		const track: Array<Phase> = ['investigate', 'plan', ...round, ...round, ...round]
+		const long: BoardRow = { ...running, status: { state: 'running', started_ms: NOW, track } }
+		const layout = { ...EMPTY_LAYOUT, active: [long, waiting] }
+		const lines = run_board_render.render({
+			header: header({ layout, usages }),
+			notes: [],
+			size: { columns: FITTING, rows: 50 },
+		})
+
+		expect(stripVTControlCharacters(row_line(lines, 'Issue 1'))).toContain(USAGE)
 	})
 })

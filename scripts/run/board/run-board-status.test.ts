@@ -23,6 +23,8 @@ const NONE: ReadonlySet<number> = new Set()
 
 const { STAGE } = run_ship_stage
 const IMPLEMENT_3409: Step = [KIND.LANE_PHASE, '#3409 implement']
+const PLAN_3409: Step = [KIND.PLAN, 'planned #3409']
+const SHIP_LAUNCH_3409: Step = [KIND.SHIP_LAUNCH, '#3409 ship supervisor launched']
 
 // One event after #3409's launch, as its kind and text.
 type Step = [string, string]
@@ -35,12 +37,17 @@ function ship_3409(stage: string): Step {
 	return [KIND.SHIP_STAGE, `#3409 ${stage} start`]
 }
 
-// The phase #3409 has reached after its launch and the given steps.
-function phase_after(...later: ReadonlyArray<Step>): string | undefined {
+// Every phase #3409 has passed after its launch and the given steps.
+function track_after(...later: ReadonlyArray<Step>): ReadonlyArray<string> {
 	const steps: Array<Step> = [[KIND.CHILD_LAUNCH, LAUNCH_3409], ...later]
 	const events = steps.map(([kind, text], index) => event_at(index + 1, T0, kind, text))
 
-	return run_board_status.statuses_of(events, [], NONE).get(3409)?.phase
+	return run_board_status.statuses_of(events, [], NONE).get(3409)?.track ?? []
+}
+
+// The phase #3409 is on after its launch and the given steps.
+function phase_after(...later: ReadonlyArray<Step>): string | undefined {
+	return track_after(...later).at(-1)
 }
 
 const IDLE_TEXT = backlog_idle.text_of({
@@ -66,7 +73,7 @@ describe('run_board_status.statuses_of', () => {
 			started_ms: Date.parse(T0),
 			ended_ms: Date.parse(T2),
 		})
-		expect(statuses.get(3415)).toMatchObject({ state: 'running', phase: 'plan' })
+		expect(statuses.get(3415)).toMatchObject({ state: 'running', track: ['investigate', 'plan'] })
 		expect(statuses.get(3433)?.state).toBe('parked')
 	})
 
@@ -97,7 +104,7 @@ describe('run_board_status.statuses_of lanes', () => {
 		expect(statuses.get(3409)).toStrictEqual({
 			state: 'running',
 			started_ms: Date.parse(T0),
-			phase: 'investigate',
+			track: ['investigate'],
 			lane: 'lane 3409',
 		})
 	})
@@ -107,14 +114,10 @@ describe('run_board_status.statuses_of lanes', () => {
 describe('run_board_status.statuses_of phases', () => {
 	it('walks from investigate through plan and implement to the ship stages', () => {
 		expect(phase_after()).toBe('investigate')
-		expect(phase_after([KIND.PLAN, 'planned #3409'])).toBe('plan')
+		expect(phase_after(PLAN_3409)).toBe('plan')
 		expect(phase_after(IMPLEMENT_3409)).toBe('implement')
 		expect(phase_after(ship_3409(STAGE.GATE))).toBe('gate')
 		expect(phase_after(ship_3409(STAGE.FOLLOWUP))).toBe('followup')
-	})
-
-	it('never goes back to an earlier phase', () => {
-		expect(phase_after(ship_3409(STAGE.GATE), IMPLEMENT_3409)).toBe('gate')
 	})
 
 	it('keeps the phase across a cut and its resume', () => {
@@ -141,6 +144,35 @@ describe('run_board_status.statuses_of phases', () => {
 		const events = [event_at(1, T0, KIND.PLAN, 'planned #3999')]
 
 		expect(run_board_status.statuses_of(events, [], NONE).has(3999)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#3526: the phases a history, so a ship that stops sends the row back to 🔨.
+describe('run_board_status.statuses_of failed ship', () => {
+	const failed_ship: ReadonlyArray<Step> = [
+		PLAN_3409,
+		IMPLEMENT_3409,
+		SHIP_LAUNCH_3409,
+		ship_3409(STAGE.PREFLIGHT),
+		ship_3409(STAGE.REVIEW),
+		[KIND.SHIP_STOP, '#3409 review failed'],
+		IMPLEMENT_3409,
+	]
+	const after_failure = ['investigate', 'plan', 'implement', 'ship', 'failed', 'implement']
+
+	it('goes back to implement, folding the failed ship into ship and failed', () => {
+		expect(track_after(...failed_ship)).toStrictEqual(after_failure)
+	})
+
+	it('writes the next ship after the failed one', () => {
+		const retried = [SHIP_LAUNCH_3409, ship_3409(STAGE.REVIEW), ship_3409(STAGE.GATE)]
+
+		expect(track_after(...failed_ship, ...retried)).toStrictEqual([
+			...after_failure,
+			'ship',
+			'review',
+			'gate',
+		])
 	})
 })
 

@@ -51,10 +51,15 @@ const WORDS = {
 	waits: 'waits on',
 	investigate: 'investigate',
 	implement: 'implement',
+	ship: 'ship',
 	review: 'review',
 	gate: 'gate',
+	sync: 'sync',
 	commit: 'commit',
+	round_two: 'round-2',
 	followup: 'followup',
+	report: 'report',
+	failed: 'failed',
 	idle_until: 'wait ends',
 	idle_left: 'left',
 	idle_end_idle: 'ends and reports if nothing new',
@@ -105,28 +110,37 @@ const STATE_ICONS: Readonly<Record<ItemState, string>> = {
 const WAITS_ICON = '🔗'
 
 // A running row's phases as icons (joshuafolkken/kit#3452), chosen on the same rule; the row draws every
-// phase it has passed, so the rightmost icon is what it is doing now (joshuafolkken/kit#3460).
+// phase it has passed, so the rightmost icon is what it is doing now (joshuafolkken/kit#3460). Each of
+// `josh ship`'s stages has its own (joshuafolkken/kit#3526); ⚓ rather than 🔁, which reads as a retry.
 const PHASE_ICONS: Readonly<Record<Phase, string>> = {
 	investigate: '🔍',
 	plan: '📝',
 	implement: '🔨',
+	ship: '🚢',
 	review: '👀',
 	gate: '🚦',
+	sync: '🔀',
 	commit: '📦',
-	followup: '🔁',
-	merged: STATE_ICONS.merged,
+	round_two: '🔂',
+	followup: '⚓',
+	report: '📣',
+	failed: '💥',
 }
 
-// The legend's word for each phase — the header's own `plan` and `merged` where the phase shares one.
+// The legend's word for each phase — the header's own `plan` where the phase shares one.
 const PHASE_WORDS: Readonly<Record<Phase, keyof Words>> = {
 	investigate: 'investigate',
 	plan: 'plan',
 	implement: 'implement',
+	ship: 'ship',
 	review: 'review',
 	gate: 'gate',
+	sync: 'sync',
 	commit: 'commit',
+	round_two: 'round_two',
 	followup: 'followup',
-	merged: 'merged',
+	report: 'report',
+	failed: 'failed',
 }
 
 // The findings section's rule and each note kind's lead (joshuafolkken/kit#3478), chosen on the same
@@ -139,9 +153,10 @@ const NOTE_ICONS: Readonly<Record<BoardNote['kind'], string>> = {
 	note: '💬',
 }
 // A filed issue's line leads with its kind in place of 🆕 (joshuafolkken/kit#3494): inside the 📌
-// section a line is already read as a filing, so 🆕 beside the kind would only widen it.
+// section a line is already read as a filing, so 🆕 beside the kind would only widen it. 🧨 rather
+// than 💥, which a failed ship draws (joshuafolkken/kit#3526).
 const FILED_KIND_ICONS: Readonly<Record<FiledKind, string>> = {
-	'breaking-change': '💥',
+	'breaking-change': '🧨',
 	bug: '🐛',
 	enhancement: '✨',
 }
@@ -252,8 +267,6 @@ function spinner_of(now_ms: number): string {
 }
 
 const run_board_labels = {
-	BAR_LEFT,
-	BAR_LEFT_COLOR,
 	FILED_KIND_ICONS,
 	GAUGE_SHADES,
 	HEADER_ICONS,

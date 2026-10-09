@@ -117,7 +117,7 @@ describe('run_board_render.render filed kinds', () => {
 	it('leads each filed line with its kind’s icon, and an unclassified one with 🆕', () => {
 		const lines = lines_of(header(), [breaking, bug, enhancement, filed])
 
-		for (const icon of ['💥', '🐛', '✨', '🆕']) {
+		for (const icon of ['🧨', '🐛', '✨', '🆕']) {
 			expect(lines).toContain(`  ${icon} ${minute_of(NOW)} 3473  Lead`)
 		}
 	})
@@ -125,7 +125,7 @@ describe('run_board_render.render filed kinds', () => {
 	it('names only the kinds drawn, in the legend’s order', () => {
 		const every = lines_of(header(), [filed, enhancement, bug, breaking]).at(-1)
 
-		expect(every).toBe(`${NOTES_LEGEND}  💥 breaking  🐛 bug  ✨ enhancement  🆕 filed`)
+		expect(every).toBe(`${NOTES_LEGEND}  🧨 breaking  🐛 bug  ✨ enhancement  🆕 filed`)
 		expect(lines_of(header(), [enhancement, bug]).at(-1)).toBe(
 			`${NOTES_LEGEND}  🐛 bug  ✨ enhancement`,
 		)
