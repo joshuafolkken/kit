@@ -24,7 +24,7 @@ import { issue_scout_cli } from './issue-scout-cli'
 import { issue_wip } from './issue-wip'
 
 // `josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>]…
-// [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]` — file an Issue
+// [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--requested] [--release]` — file an Issue
 // with every filing step run in order: the third-party refusal, the body
 // lint, the `## Origin` check for another repository, the `auto-ok` decision
 // with the run label it owes, the fold question against the run's earlier
@@ -37,7 +37,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE =
-	'Usage: josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]'
+	'Usage: josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--requested] [--release]'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the filing has no repository to compare against — check `gh auth status`.'
 const THIRD_PARTY_MESSAGE =
@@ -145,8 +145,12 @@ async function is_scout_clear(filing: Filing): Promise<boolean> {
 // Every label the create call carries, or `undefined` when an `auto-ok` filing names neither run label.
 // Decided before the WIP count and the scout, so a refusal costs no listing.
 async function labels_of(filing: Filing): Promise<ReadonlyArray<string> | undefined> {
+	const declared = {
+		is_opted_out: filing.args.is_auto_ok_opted_out,
+		is_requested: filing.args.is_requested,
+	}
 	const auto_ok = await issue_auto_ok.resolve(
-		filing.args.is_auto_ok_opted_out,
+		declared,
 		filing.target,
 		filing.current,
 		filing.args.labels,

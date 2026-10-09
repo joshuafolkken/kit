@@ -43,7 +43,8 @@ is read on demand when a split is found.
 - `kickoff new` or `kickoff new "<title>"`: No Issue exists yet. Steps: (0) **Scope assessment** per
   `split-assessment.md`. If multiple → the **multi-issue split path**; if single → the **single-issue
   path**. **Single-issue path**: (1) Derive an English title from the conversation, or use the provided
-  title. (2) Create Issue: `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>` (body
+  title. (2) Create Issue: `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>
+  --requested` plus the labels the words typed after `new` name ("Words typed after `new`", below) (body
   per `prompts/collaboration-workflow/issue-template.md`) — its duplicate scan runs first, and a
   candidate that covers the same work stops the run rather than filing a second Issue (`SKILL.md` →
   `issue-scout.md`). Capture `<N>`. (3)
@@ -51,7 +52,7 @@ is read on demand when a split is found.
   Telegram notification. (5) **Stop** — do not implement. **Multi-issue split path**: (1) For each
   independent deliverable, derive a focused English title and create a separate Issue with the
   `route:split` label (its duplicate scan is read per `issue-scout.md`): `pnpm josh issue:file
-  "<sub-title>" --body-file <body-file> --depth <n> --route split`. Capture each Issue number. **When the split is filed into a repository other than
+  "<sub-title>" --body-file <body-file> --depth <n> --route split --requested` plus the labels the words typed after `new` name. Capture each Issue number. **When the split is filed into a repository other than
   the one this session is running in**, every child body gets the `## Origin` backlink described in the
   cross-package rule the AI documents keep resident, the epic body carries the same link as prose or a
   plain bullet (never as a checkbox row, which would disable its auto-close), and the originating Issue
@@ -81,3 +82,18 @@ is read on demand when a split is found.
 
 `pnpm josh issue:file` lints the body and applies the classification labels it declares, following `prompts/collaboration-workflow/issue-template.md` for classification (`docs/josh-commands-backlog.md` → `josh issue:file`).
 An Issue a consumer can use only once it is published is filed with `--release` (`kickoff new`), or linked with `pnpm josh issue:release <N>` (`kickoff #N`) — either makes it a blocker of the repository's `release` Issue, which never gets `auto-ok` on its own.
+
+## Words typed after `new`
+
+**An Issue a person asked for is filed with `--requested`** — every `new` entry (each child of its
+multi-issue split included), and a request in conversation. A live carry record or an `auto-ok` branch Issue then does not opt it in, so no lane takes
+it before the person picks the run; `auto-ok` comes only from the words below (`issue-auto-ok.ts`). A
+filing the run decides on its own — observation, retrospective, a split the run finds itself, routed — never declares it.
+
+**Words after `new`** (`kickoff new auto ok high`) are read like `into <target>`, never inferred. Each
+adds its labels to the `--requested` filing; a word not in the table is asked about:
+
+| Typed     | Added to `pnpm josh issue:file`    |
+| --------- | ---------------------------------- |
+| `auto ok` | `--label auto-ok --label run:lane` |
+| `high`    | `--label priority:high`            |
