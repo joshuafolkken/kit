@@ -7,12 +7,12 @@
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2202
+		"lines": 2183
 	},
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11121,
-		"on_demand_bytes": 549458
+		"on_demand_bytes": 549176
 	},
 	"accepted": {
 		"reason": "#3401 adds the byte-budget entry for the new on-demand document backlogrun-handoff-report.md, split out of report-format.md",
