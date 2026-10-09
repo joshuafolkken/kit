@@ -151,7 +151,7 @@ The `Stop` hook: one process delivering the four stop-time rules — stop-notifi
 
 ### `josh session:lang`
 
-Print the language this session writes in, resolved from `JOSH_SESSION_LANG`. Wired to `UserPromptSubmit` so the value is injected every turn.
+Print the language this session writes in, resolved from `JOSH_SESSION_LANG`. Wired to `UserPromptSubmit`; the `ja` default prints nothing.
 
 ```json
 { "type": "command", "command": "pnpm josh session:lang", "timeout": 10 }

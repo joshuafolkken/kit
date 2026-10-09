@@ -13,9 +13,8 @@ const FIXTURE_METRICS: Metrics = {
 	guards: 2,
 	ai_cost: { resident_bytes: 120, on_demand_bytes: 4000 },
 }
-const PER_TURN_HOOK_BYTES = Buffer.byteLength(
-	'Session language (JOSH_SESSION_LANG): ja (default; set JOSH_SESSION_LANG=en for English)',
-)
+// The default session language prints nothing (joshuafolkken/kit#3398).
+const PER_TURN_HOOK_BYTES = 0
 
 describe('metrics_logic.is_measured_script', () => {
 	it('measures a non-test file under scripts/', () => {
@@ -77,7 +76,7 @@ describe('metrics_logic.ai_cost_totals', () => {
 		})
 	})
 
-	it('still counts the per-turn hook line when no resident document is read', () => {
+	it('counts no per-turn hook bytes for the default language, which prints no line', () => {
 		expect(metrics_logic.ai_cost_totals([], [])).toStrictEqual({
 			resident_bytes: PER_TURN_HOOK_BYTES,
 			on_demand_bytes: 0,
