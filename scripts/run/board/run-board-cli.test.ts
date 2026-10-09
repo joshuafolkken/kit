@@ -114,7 +114,10 @@ describe('run_board_cli.run footer', () => {
 		await expect(run_board_cli.run([], ports)).rejects.toBe(STOPPED)
 		await run_board_cli.run(['--once'], once.ports)
 
-		expect(stripVTControlCharacters(frames[1] ?? '').trimEnd()).toMatch(/pnpm josh backlogrun`$/u)
+		// joshuafolkken/kit#3489: one English line that keeps the command that reopens the board.
+		expect(stripVTControlCharacters(frames[1] ?? '').trimEnd()).toMatch(
+			/\nClosing this screen leaves the run going · reopen with `pnpm josh backlogrun`$/u,
+		)
 		expect(once.frames[0]).not.toContain('pnpm josh backlogrun')
 	})
 

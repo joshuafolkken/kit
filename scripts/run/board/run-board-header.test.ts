@@ -10,7 +10,7 @@ import type { BoardLayout, BoardRow } from './run-board-layout'
 // lines of symbols, no `updated` line, and a heartbeat colored by how stale the stream is.
 // joshuafolkken/kit#3508: the run's state with its progress, then the time with the machine.
 
-const { clock_of } = run_board_labels
+const { minute_of } = run_board_labels
 const { WORDS } = run_board_labels
 const MACHINE_UNKNOWN = '⚡ -  🧠 -  💾 -'
 const RUNNING_CLOCK = `⏱ 30:00  ⌛ 7h30m  ${MACHINE_UNKNOWN}`
@@ -87,7 +87,7 @@ describe('run_board_header.header_lines state', () => {
 
 		expect(lines_of(board)).toStrictEqual([
 			`■ backlogrun  ✅ 0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
-			`⏱ 90:00  🔚 ${clock_of(ended_ms).slice(0, 5)}  ${MACHINE_UNKNOWN}`,
+			`⏱ 90:00  🔚 ${minute_of(ended_ms)}  ${MACHINE_UNKNOWN}`,
 		])
 	})
 
@@ -181,9 +181,7 @@ describe('run_board_header.header_lines plan warning', () => {
 	it('warns with the minute of a failed plan read', () => {
 		const board = header({ plan_fetched_ms: NOW - MINUTE, plan_failed_ms: NOW })
 
-		expect(title_of(board)).toMatch(
-			new RegExp(`💤 0  ⚠ ${WORDS.plan} ${clock_of(NOW).slice(0, 5)}$`, 'u'),
-		)
+		expect(title_of(board)).toMatch(new RegExp(`💤 0  ⚠ ${WORDS.plan} ${minute_of(NOW)}$`, 'u'))
 	})
 })
 
