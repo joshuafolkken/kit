@@ -23,7 +23,7 @@ Stack: TypeScript · pnpm · SvelteKit · Vitest · Playwright · TailwindCSS ·
 
 Classify each decision point and act; stop **only** where the user's judgment is genuinely needed. `prompts/collaboration-workflow/operating-rules.md` → "decision-autonomy".
 
-- **Tier A — reversible implementation / design choices** (library, naming, layout, tests, refactor shape; placing a filed Issue into an epic; self-correction). Pick the clearly-better option, proceed, log it.
+- **Tier A — reversible implementation / design choices** (library, naming, layout, tests, refactor shape; placing a filed Issue into an epic; self-correction). Pick the clearly-better option, proceed, log it. Unasked filing: unattended only (`observation-filing.md`).
 - **Tier B — genuine toss-up.** The only tier that stops — ask with the candidates and trade-offs.
 - **Tier C — irreversible / shared-state / out-of-scope actions** (merge, branch delete, force push, destructive ops, repo settings, out-of-scope work, `devEngines` / overrides edits): explicit user instruction only, never auto-decided. Deleting a git-tracked file is reversible, so it is not a destructive op — inspect the target first and surface any contradiction. After a dependency-update command, load the `dependency-update` skill before reporting on the pins.
 

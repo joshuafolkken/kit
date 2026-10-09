@@ -54,7 +54,7 @@ lane child starts none and never reads that document (`pnpm josh read:set lane-c
 - **A prerequisite** — file it (`route:tier-a`), stash, record the dependency, and **STOP** with
   "Please run `backlogrun #<E> --only` to execute this epic"; `prerequisite.md` is the single source of
   the filing, the `-u` stash and the epic:bundle branch.
-- **An observation** — file it without asking and carry on; `observation-filing.md`.
+- **An observation** — `observation-filing.md` (ask first if interactive).
 
 **Automatic filing is capped at 10 Issues per run.** On reaching it, stop and report.
 
