@@ -73,37 +73,25 @@ pnpm josh issue:comment <N> --body-file <path>   # what needs deciding, and the 
 `needs-decision` precedence over `in-progress`, so the next child is offered normally. Then return to
 step 1; the other children are unaffected unless they depend on this one.
 
-**A parked child's lane is kept, whether or not it had committed.** **Parked before its commit**, the
-uncommitted work stays in the lane's tree — never in the stash, which every work tree shares — and
-`lane:close` would remove it by force. **Parked after its commit and push**, closing would delete the
-local branch the resume needs. **A lost merge race is not one of
-these rows** — it resolves in its lane (`backlogrun-recovery.md` → "Conflicts are not predicted"), and parks only under that
-section's four conditions, which take the after-commit row. Both rows and the `pnpm josh run:release
-<N>` every parked ending owes are `backlogrun-lanes.md` → "What happens to a lane", the single source.
+**A parked child's lane is kept, whether or not it had committed**, and every parked ending owes
+`pnpm josh run:release <N>` — `backlogrun-lanes.md` → "What happens to a lane", the single source. A
+lost merge race resolves in its lane instead (`backlogrun-recovery.md` → "Conflicts are not predicted").
 
-**Parking replaces stopping the session, not the rule that produced the stop.** An upstream defect is
-still filed immediately and unconditionally (Tier A for a first-party target), and a workaround is still
-forbidden. **A placement choice is not one of the things this run may not decide.** `epic:bundle`'s
-`ask` is Tier A: choose the epic you recommend, add it with `pnpm josh epic --add <E> <N> --after <M>`,
-and record the decision on both the new Issue and that epic's `## Decisions`. What remains a park is a
-genuine toss-up between two equally apt epics, and that is rare.
+**Parking replaces stopping the session, not the rule that produced the stop** — an upstream defect is
+still filed at once, and a workaround is still forbidden. `epic:bundle`'s `ask` is Tier A, not a park:
+add the epic you recommend with `pnpm josh epic --add <E> <N> --after <M>` and record it on both
+Issues' `## Decisions`.
 
-**Removing the label is Tier A — do it without asking.** When the decision is recorded (to the epic's
-`## Decisions`), remove the label; the state is on GitHub, so the run picks up where it left off.
+**Removing the label is Tier A — do it without asking**, once the decision is recorded; without it the
+parked child never runs again:
 
 ```bash
 gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/needs-decision 2>/dev/null || true
 ```
 
-**The released child goes back to a lane, never into the parent's own context.** A parent that is
-*already* running, and clears a label mid-run because a person just answered, dispatches it the same way
-rather than picking up its diff itself — `pnpm josh lane:launch <N>`, which dispatches into the lane the
-park kept, or opens one where none is. A
-parent that implements the released child inline is the failure the orchestrator rule is written against:
-`backlogrun.md` → "Claim nothing at the entry — this parent orchestrates and never implements".
-
-Without removing the label the parked child never runs again — it is the second half of the
-human-in-the-loop cycle, not an optional tidy-up.
+**The released child goes back to a lane, never into the parent's own context** — `pnpm josh
+lane:launch <N>` (`backlogrun.md` → "Claim nothing at the entry — this parent orchestrates and never
+implements").
 
 ## Only a person's judgement carries `needs-decision`
 
