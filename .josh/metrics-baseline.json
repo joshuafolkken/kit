@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1038,
-		"code_lines": 86661,
-		"comment_lines": 34263,
+		"files": 1039,
+		"code_lines": 86724,
+		"comment_lines": 34281,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 535097
+		"on_demand_bytes": 535381
 	},
 	"accepted": {
-		"reason": "Gate ledger samples other processes' admitted core claims every 3s throughout a gate so mid-gate load from other lanes keeps the gate out of the solo median (#3556)",
+		"reason": "#3558 adds backlog-drive-epic (named epic drives its children from epic:next, including children added mid-run) plus its review-round fixes, and documents it in backlogrun-steps",
 		"date": "2026-10-09"
 	}
 }

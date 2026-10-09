@@ -8,6 +8,7 @@ import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_invocation } from '#scripts/run/run-invocation'
 import { backlog_budget } from './backlog-budget'
 import type { DriveState, OfferRead } from './backlog-drive'
+import { backlog_drive_epic } from './backlog-drive-epic'
 import { backlog_drive_named } from './backlog-drive-named'
 
 interface NamedContext {
@@ -58,7 +59,12 @@ function settled_outcome(state: IssueState): MergeResult['outcome'] | undefined 
 	return has_label_name(state.labels, NEEDS_DECISION_LABEL) ? 'parked' : undefined
 }
 
-async function classify(issue: string, named: OfferRead, owner: string): Promise<OfferRead> {
+async function classify(
+	issue: string,
+	named: OfferRead,
+	state: DriveState,
+	owner: string,
+): Promise<OfferRead> {
 	const result = await issue_state_cli.read_issue(issue)
 
 	if (result.kind !== 'state') return { verdict: 'issue-state', issues: [], retries: NO_RETRIES }
@@ -71,11 +77,9 @@ async function classify(issue: string, named: OfferRead, owner: string): Promise
 		return { verdict: 'wait', issues: [], retries: NO_RETRIES }
 	}
 
-	if (has_label_name(result.state.labels, EPIC_LABEL)) {
-		return { verdict: `epic ${issue_cite.plain(issue)}`, issues: [], retries: NO_RETRIES }
-	}
-
-	return named
+	return has_label_name(result.state.labels, EPIC_LABEL)
+		? await backlog_drive_epic.offer(issue, state, owner)
+		: named
 }
 
 // **A named issue booked done is not thereby merged** (joshuafolkken/kit#3419): a park and a failure are
@@ -133,7 +137,7 @@ async function read(
 	if (budget.verdict !== 'run') return budget
 	const [issue] = named.issues
 
-	return issue === undefined ? undefined : await classify(issue, named, context.owner)
+	return issue === undefined ? undefined : await classify(issue, named, state, context.owner)
 }
 
 export const backlog_drive_named_offer = { read }

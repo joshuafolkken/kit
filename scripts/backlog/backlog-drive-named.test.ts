@@ -31,6 +31,21 @@ test('dispatches named issues in order and waits for the first one in flight', (
 	expect(backlog_drive_named.offer(CARRY, running, true)?.verdict).toBe('wait')
 })
 
+// joshuafolkken/kit#3558: a `run:add`ed issue in flight at the head held the named epic behind it, so
+// a child filed into the epic waited for a parent session.
+test('offers the declared item past an added issue already in flight', () => {
+	const carry = { ...CARRY, added: [{ issue: 9, is_priority: true }] }
+	const running = backlog_drive.initial_state(['9'], ACTIVE)
+	const declared = backlog_drive.initial_state(['1'], ACTIVE)
+
+	expect(backlog_drive_named.offer(carry, running, true)).toMatchObject({
+		verdict: 'run',
+		issues: ['1'],
+	})
+	expect(backlog_drive_named.offer(carry, declared, true)?.verdict).toBe('run')
+	expect(backlog_drive_named.offer(CARRY, declared, true)?.verdict).toBe('wait')
+})
+
 test('stops after all named issues when only mode is declared', () => {
 	const carry = { ...CARRY, done: [1, 2] }
 	const state = backlog_drive.initial_state([], ACTIVE)

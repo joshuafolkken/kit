@@ -226,11 +226,15 @@ person's**: the supervisor spends the declared budget and never declares another
 from the existing offer command. The supervisor writes no label of its own; `auto-ok` arrives only
 through `issue:file`'s default. A judgment session receives
 the original invocation plus the driver's reason and resume state.
-For a named epic, the driver hands off `epic #N` with the original invocation. The judgment session
-follows the named epic procedure and dispatches its children; the epic root is never launched as a
-standalone `fullrun` child. Once every child has merged or parked, record the root with
-`pnpm josh run:carry --done <E> --owner "$PPID"` before continuing the invocation. This removes it
-from the carry record's remaining named list, so the next driver pass can advance. The named prefix
+For a named epic, the driver dispatches the children itself from the epic's current children
+(`scripts/backlog/backlog-drive-epic.ts`), so a child filed into it mid-run needs no `run:add`. The
+epic root is never launched as a standalone `fullrun` child. It hands off `epic #N` with the original
+invocation only on `epic:next`'s `stop`, when every child left waits on a person, or after
+`backlog:offer`'s retry limit of consecutive `epic:next` failures, which a broken graph causes on
+every pass. The judgment session
+settles what it can, then records the root with `pnpm josh run:carry --done <E> --owner "$PPID"`
+before continuing the invocation. The record removes it from the carry record's remaining named
+list, so the next driver pass can advance. The named prefix
 also consults the carried maximum and whole-run bound
 before each launch, and a failed named issue skips the remaining named prefix.
 
