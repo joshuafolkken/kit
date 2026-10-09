@@ -121,8 +121,7 @@ the sandbox cannot read is held as `busy`.
 **The record is the parent loop's, and a lane never touches it.** A delegated unit is briefed with its
 child and nothing about the budget. `--begin` claims the record exclusively, so a second parent is
 answered `busy`. Count into it — `--merged <N>`, `--filed 1`, each with `--owner "$PPID"` — and **`--cut`
-is the session's last write**: a count after it is refused. The counting rules are
-`docs/maintainers/backlogrun-driver.md` → "The carry record across a cut".
+is the session's last write**: a count after it is refused.
 
 **End the record when the run ends** — `pnpm josh run:report`, then `pnpm josh run:carry --end`, **never
 batched with it**: `run:report` scopes by the record `--end` removes. Stop the supervisor in the same

@@ -12,7 +12,7 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 500913
+		"on_demand_bytes": 500890
 	},
 	"accepted": {
 		"reason": "#3396: point-of-use documents are charged at the union of their named sections (entry-read-set.ts); review-round fixes added 1.4 KB, still 34 KB below main",

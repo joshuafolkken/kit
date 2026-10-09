@@ -40,7 +40,7 @@ ending reads as a plain failure. The named-epic flags are dropped for the opted-
 | It prints | What the child was, or what the run does |
 | --- | --- |
 | numbers | **merged** (counted, `ms`, `lane:close`, epic comment), **parked** (left alone), **outage** (stale `in-progress` dropped, re-dispatchable, uncounted) or **failed** (parked `needs-decision`, counted against the consecutive-failure guard) — then run the numbers it offers next. A kept label answers to `backlogrun-park.md` → "Only a person's judgement carries `needs-decision`" |
-| `wait` / `complete` | `epic:next`'s own verdict: wait for the next wake, or post the epic summary |
+| `wait` / `complete` | `epic:next`'s own verdict: wait for the next wake, or post the epic summary — with nothing in flight, on the polling interval below |
 | `over` | The merge crossed the budget: hand the lanes over and take the cut — "The hand-off" below |
 | `human-review` | The child stopped before its commit (`needs-human-review.md`): stop, leave `in-progress` on, send no second `confirmation` (the unit sent one; where the child ran in this session's own context, it is yours to send) |
 | `stop` | `epic:next` found only parked children left, or the consecutive-failure guard tripped: report the parked children and stop |
@@ -179,7 +179,7 @@ the cut is re-dispatched, never adopted** — `pnpm josh lane:open <N>` then `pn
 
 | Setting | Value | Meaning |
 | --- | --- | --- |
-| Polling interval | 60 s | **A floor between two asks, never a clock the parent sets** — the wake is a child's completion or an arrival (`docs/maintainers/backlogrun-driver.md` → "Waiting while something is in flight"). |
+| Polling interval | 60 s | **In flight, a floor between two asks, never a clock** — the wake is `lane:await`'s completion or the watcher's arrival exit, never a report. **With nothing in flight no wake comes: it is the parent's own clock.** |
 | `backlogrun` idle-watch poll | 5 min | Not the interval above, and a floor in the same sense. |
 | Silent delegated unit | 30 min | Not the child's duration — the time its output has gone **unchanged**. Past it, ask `run:liveness` and book a stopped unit as a failure. |
 | Stale `in-progress` | 90 min | Past it, the other session is gone. |
