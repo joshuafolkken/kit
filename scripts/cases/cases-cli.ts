@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { cases, type Boundary } from './cases-logic'
 
 // `josh cases <path...>` — print the I/O boundaries the changed paths cross and the abnormal cases
-// each owes (joshuafolkken/kit#2246). The boundary tokens go on stdout so `$(pnpm josh cases …)` reads
+// each owes. The boundary tokens go on stdout so `$(pnpm josh cases …)` reads
 // them; the required cases go on stderr so a person sees them without a shell parsing around them.
 // The logic and the vocabulary live in `cases-logic.ts`; everything here is the invocation.
 

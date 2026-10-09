@@ -3,8 +3,8 @@ import path from 'node:path'
 import { initial_commit } from '#scripts/init/initial-commit'
 import { start_exec } from '#scripts/init/start-exec'
 
-// `josh dogfood:commit <dir>` makes the first commit of a test project a dogfood run created itself
-// (joshuafolkken/kit#3142). An agent's own `git add` / `git commit` is refused wherever it points,
+// `josh dogfood:commit <dir>` makes the first commit of a test project a dogfood run created itself.
+// An agent's own `git add` / `git commit` is refused wherever it points,
 // because the index guard cannot tell a throwaway project from the user's work; this command is the
 // one sanctioned route, and it accepts only a directory that cannot be anyone's work: named
 // `kit-test-*`, outside the kit checkout, and with no commit yet — a `.git` without history, as

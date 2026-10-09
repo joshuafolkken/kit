@@ -7,7 +7,7 @@ import type { StepResult } from './propagate-run'
 // a failed spawn reports one exit code for all three. The run's report then appended "upgrade/sync
 // changes left uncommitted" to that code, which names the *first* of the three: so a consumer whose
 // pre-push hook refused the push was reported as a consumer whose sync never got committed, and the
-// reader went looking at a sync that had worked (joshuafolkken/kit#1417).
+// reader went looking at a sync that had worked.
 //
 // **Nothing here changes whether a push is blocked.** A consumer's pre-push gate refusing a push is
 // the gate doing its job, and the probes below are read-only. What is fixed is the sentence.

@@ -1,5 +1,5 @@
 // The Step B disposition for each SonarCloud hotspot on a pull request, computed rather than read by
-// eye (joshuafolkken/kit#2182).
+// eye.
 //
 // `prompts/sonar-hotspot-handling.md` carried Step A and Step B as prose: the reader built the API
 // URL by hand and then walked a decision table whose one mechanical branch key — "is this path

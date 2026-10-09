@@ -18,8 +18,8 @@ import { josh_cli_fixture, type JoshLauncher } from '#scripts/josh/josh-cli-fixt
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { metrics_logic } from '#scripts/metrics/metrics-logic'
 
-// Most defects reach a run at an environment boundary rather than inside a function
-// (joshuafolkken/kit#2447): a consumer without `docs/` (#2402), a lane worktree whose ledger lives in
+// Most defects reach a run at an environment boundary rather than inside a function:
+// a consumer without `docs/` (#2402), a lane worktree whose ledger lives in
 // the primary checkout (#2419), two processes racing on one marker (#2434). Unit tests call functions
 // inside this checkout, so none of those boundaries exists for them. Each environment here is a real
 // directory in the system temp dir, assembled the way a run meets it, and josh is spawned into it as a

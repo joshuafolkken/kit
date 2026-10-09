@@ -19,21 +19,21 @@ const USAGE_SCHEMA = z.looseObject({
 
 interface ClaudeResultEvent {
 	is_error: boolean
-	// The exit-record fields a supervisor classifies a dispatched lane child's ending from
-	// (joshuafolkken/kit#2139). `subtype` and `num_turns` describe how the turn ended, and
+	// The exit-record fields a supervisor classifies a dispatched lane child's ending from.
+	// `subtype` and `num_turns` describe how the turn ended, and
 	// `permission_denials` is the count of tool calls the harness refused — the direct cause of a child
 	// that stopped mid-implementation without parking, so a classifier can name it in the park comment.
 	subtype: string | undefined
 	num_turns: number | undefined
 	permission_denials: number
-	// The refused interactive ask lifted out of `permission_denials` (joshuafolkken/kit#2201). Where a
+	// The refused interactive ask lifted out of `permission_denials`. Where a
 	// child reached for `AskUserQuestion` and was refused, its question and options are stranded in the
 	// exit record; `run:ending` puts them into the park comment so a person can answer, instead of the
 	// parent opening the JSONL by hand. Undefined when no denial was an interactive ask.
 	refused_ask: string | undefined
 	reason: string | undefined
 	// The Claude Code session identifier the `-p --output-format stream-json` run wrote on its result
-	// event (joshuafolkken/kit#2317). An `outage` re-dispatch reads it to resume the disconnected child's
+	// event. An `outage` re-dispatch reads it to resume the disconnected child's
 	// stored session — recovering its accumulated context — rather than starting a fresh `fullrun`.
 	// Undefined when the event carried none, which sends the re-dispatch down the fresh fallback.
 	session_id: string | undefined

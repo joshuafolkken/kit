@@ -4,15 +4,13 @@ import {
 } from '#scripts/time-runtime/time-transcript-line'
 
 // Verifying an agent's behavior against the transcripts every run already writes, with no live
-// Claude session and no model call (joshuafolkken/kit#2365).
+// Claude session and no model call.
 //
-// **The mechanism that measured behavior used to be the completion gate's own, and it was removed
-// for being slow rather than for being wrong.** joshuafolkken/kit#1922 took `josh eval`'s five
-// scenarios out of the gate because each starts a real Claude session, so the step never ran without
-// `JOSH_EVAL` and paid a prompt-and-report cost every run for nothing. What it left behind is a gate
-// that proves the *machinery* works — 8,000-odd unit tests — and nothing at all that proves the
-// agent *behaves*. This is the half worth keeping, separated from the half worth removing: an
-// assertion read off a recorded transcript is deterministic, re-runnable and never calls a model.
+// **`josh eval`'s scenarios stay out of the completion gate for being slow rather than for being
+// wrong**: each starts a real Claude session. Without them the gate would prove only that the
+// *machinery* works and nothing at all that the agent *behaves*. This module is the half of eval
+// worth keeping: an assertion read off a recorded transcript is deterministic, re-runnable and never
+// calls a model.
 //
 // **The reading is single-sourced, not re-implemented.** One transcript line is parsed by
 // `time-transcript-line.ts` — the reader the span walk and the guards already use — and the files are

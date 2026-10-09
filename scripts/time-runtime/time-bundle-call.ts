@@ -6,12 +6,12 @@ import { time_shell } from './time-shell'
 const { BASH_TOOL } = cost_blocks
 
 // What one call has to say about itself before anything can ask whether it could have gone out
-// beside another (joshuafolkken/kit#1344).
+// beside another.
 //
 // `time-round-trips.ts` counts how many times a run stopped, and `time-density.ts` says the count is
 // too high while the run is still going. Neither can say **which** of those stops were avoidable, and
-// that is the number joshuafolkken/kit#1344 was filed for: the estimate it carries — 33 of 136 round
-// trips — was arithmetic on a target density, not a reading of what the run actually did.
+// that is the number this reads: an estimate drawn from a target density is arithmetic, not a
+// reading of what the run actually did.
 //
 // **Two facts, and both have to be read while the input is in hand.** A span keeps no input, for the
 // reason `time-spans.ts` states beside `marker`: the tool's input is what decides the answer, and by
@@ -36,7 +36,7 @@ const { BASH_TOOL } = cost_blocks
 // or a stop for a person.
 const BUNDLEABLE_TOOLS = new Set(['Edit', 'Glob', 'Grep', 'Read', 'WebFetch', 'WebSearch', 'Write'])
 
-// The tools that launch a *fresh* subagent (joshuafolkken/kit#1854). Both spellings occur across
+// The tools that launch a *fresh* subagent. Both spellings occur across
 // harnesses — this one names it `Agent`, others `Task` — and `time-batch-guard.ts` already treats the
 // two the same. They are deliberately not `time-parent-turns.ts`'s wider dispatch set: `SendMessage`
 // continues an existing agent and is dependent by nature, so a fan-out could never have included it.
@@ -46,7 +46,7 @@ const LAUNCH_TOOLS = new Set(['Agent', 'Task'])
 
 // A launch whose prompt builds on an earlier agent's *finding* rather than on the codebase as it
 // stands — the one dependency `time-agent-bundles.ts` cannot see from an intervening write, because a
-// read-only investigation chain writes nothing between its links (joshuafolkken/kit#1847). It is a
+// read-only investigation chain writes nothing between its links. It is a
 // marker scan and therefore a floor: a prompt that quotes the prior finding without any of these
 // phrases reads as independent, which is the same output-only blind spot this module documents beside
 // `targets`. It never over-calls — a marker present is treated as dependent, which drops the launch
@@ -170,7 +170,7 @@ const MUTATION_WORDS = new Set([
 	'wget',
 ])
 
-// The read-only `pnpm josh` bookkeeping subcommands (joshuafolkken/kit#1875). Every `pnpm josh …`
+// The read-only `pnpm josh` bookkeeping subcommands. Every `pnpm josh …`
 // leads with `pnpm`, which is a mutation word above so the writing josh commands — `gate`, `followup`,
 // `git` — are turned away; that same leading word turned the read-only ones away too, so the batching
 // guard never saw the bookkeeping calls the Issue measured going out one per turn, and `Bundling:`
@@ -242,7 +242,7 @@ const FLAG_PREFIX = '-'
 const PATH_SEPARATOR = '/'
 const MIN_TARGET_LENGTH = 3
 
-// The tools that write. **Kept here rather than in the guard** (joshuafolkken/kit#1509): the guard
+// The tools that write. **Kept here rather than in the guard**: the guard
 // held its own copy, and the sequence builder had no way to ask at all — so a run of edits to one
 // file was read as a chain of dependent calls and no sequence ever formed. One answer, one place.
 const WRITING_TOOLS: ReadonlySet<string> = new Set(['Edit', 'Write', 'NotebookEdit'])
@@ -272,8 +272,7 @@ interface BundleFacts {
 	targets: ReadonlyArray<string>
 	// Whether the call **certainly** rewrites what it names. **Two writes to one file do not depend on
 	// each other** — the text is already held, so both belong in one turn — while a write after a read
-	// of the same file genuinely does. `time-bundles.ts` reads this to tell the two apart
-	// (joshuafolkken/kit#1509).
+	// of the same file genuinely does. `time-bundles.ts` reads this to tell the two apart.
 	is_writing: boolean
 	// Whether the call **might** write, which is a different question and needs the opposite bias.
 	//
@@ -283,8 +282,8 @@ interface BundleFacts {
 	// dependency *removed*, so `sed -n '1,200p' x.ts` twice would read as a bundleable pair when the
 	// second may well have needed the first. Same bias, opposite consequences, so they are two fields.
 	may_write: boolean
-	// Whether this is a subagent launch whose prompt builds on an earlier launch's finding
-	// (joshuafolkken/kit#1854). `false` for every call that is not a launch, and for a launch whose
+	// Whether this is a subagent launch whose prompt builds on an earlier launch's finding.
+	// `false` for every call that is not a launch, and for a launch whose
 	// prompt names no back-reference marker. `time-agent-bundles.ts` reads it to break a fan-out group
 	// that a read-only investigation chain would otherwise slip through, since such a chain writes
 	// nothing between its links for the intervening-write test to catch.
@@ -306,7 +305,7 @@ function not_bundleable(): BundleFacts {
 }
 
 // Whether a tool name is a fresh subagent launch. Exported so `time-agent-bundles.ts` reads the one
-// set rather than keeping a second copy of it (joshuafolkken/kit#1854).
+// set rather than keeping a second copy of it.
 function is_launch_tool(name: string): boolean {
 	return LAUNCH_TOOLS.has(name)
 }
@@ -339,7 +338,7 @@ function josh_subcommand(command: string): string | undefined {
 // line falls through. An alias is resolved to its canonical name first, so the allow-list holds
 // canonical names alone. Everything not on the list falls
 // through to the read/mutation test, which is what keeps `josh gate` / `followup` / `git`
-// non-bundleable (joshuafolkken/kit#1875).
+// non-bundleable.
 function is_read_josh(command: string): boolean {
 	if (COMMAND_CHAIN.test(command)) return false
 
@@ -365,8 +364,7 @@ function may_write_command(command: string): boolean {
 // one shell line that certainly rewrites a file *and* is bundleable is the in-place `sed`: `sed` is on
 // the read list because `sed -n` prints, so the flag is what separates the two spellings. Everything
 // else answers `false` — a genuine write missed here only leaves a sequence broken the way it already
-// was, while a read caught here would have its dependency removed, which is the failure that matters
-// (joshuafolkken/kit#1509).
+// was, while a read caught here would have its dependency removed, which is the failure that matters.
 // **The one segment that runs the command, with its quoted text removed first — never the whole
 // line.** Each half closes an over-call, and this predicate feeds the dependency test, so an
 // over-call removes a dependency that is really there:
@@ -382,8 +380,8 @@ function write_segment(command: string): string {
 
 // **The certain half of the write question, asked in one place for both readers.** `time-writes.ts`
 // answers *which* files an in-place `sed` wrote and this module answers *whether* it wrote at all;
-// they were two implementations of the same test and disagreed in both directions
-// (joshuafolkken/kit#1509). The predicate lives here because `time-writes.ts` already imports this
+// they were two implementations of the same test and disagreed in both directions.
+// The predicate lives here because `time-writes.ts` already imports this
 // module, so the reverse direction would be a cycle.
 function is_in_place_sed(segment: string): boolean {
 	if (time_shell.leading_word(segment) !== IN_PLACE_COMMAND) return false
@@ -466,7 +464,7 @@ function tool_facts(name: string, input: unknown): BundleFacts {
 	// A tool names what it does, so here the two questions have the same answer.
 	const writes = { is_writing: WRITING_TOOLS.has(name), may_write: WRITING_TOOLS.has(name) }
 	// Only a launch is asked, and only a launch can answer `true` — a non-launch tool has no prompt to
-	// build on a prior finding (joshuafolkken/kit#1854).
+	// build on a prior finding.
 	const has_prior_reference = LAUNCH_TOOLS.has(name) && prompt_references_prior(input)
 
 	if (!BUNDLEABLE_TOOLS.has(name)) return { ...not_bundleable(), ...writes, has_prior_reference }
@@ -478,7 +476,7 @@ function tool_facts(name: string, input: unknown): BundleFacts {
 // second reader here — the two answers have to be the same one, or a call could be labelled by one
 // command and classified by another.
 //
-// **The quoted spans come off before the targets are read** (joshuafolkken/kit#1611). `words_of`
+// **The quoted spans come off before the targets are read**. `words_of`
 // treats a quote as a separator rather than as a boundary, and `/` is not a separator at all — so
 // `sed -i '' 's/old/new/' scripts/one.ts` yielded `s/old/new` beside the real path, and
 // `investigation-reads.ts` then held a file that no edit could ever name pending for the rest of the
@@ -500,8 +498,8 @@ function bash_facts(command: string): BundleFacts {
 	}
 
 	// A read-only `josh` bookkeeping command is bundleable even though `pnpm` leads it and is a mutation
-	// word: the allow-list above is the read-only half the leading-word test could not reach
-	// (joshuafolkken/kit#1875). Its writes are already `false` — no `>`, no in-place `sed` — so the guard
+	// word: the allow-list above is the read-only half the leading-word test could not reach.
+	// Its writes are already `false` — no `>`, no in-place `sed` — so the guard
 	// can refuse a run of them and `Bundling:` can count them recoverable.
 	if (is_read_josh(command)) {
 		return {
@@ -526,7 +524,7 @@ function bash_facts(command: string): BundleFacts {
 }
 
 // The facts for one call named the way a caller holding a raw tool invocation names it — a tool and
-// its input, with nothing unwrapped yet (joshuafolkken/kit#1390).
+// its input, with nothing unwrapped yet.
 //
 // **It exists so the live guard and the parser cannot disagree about what a call is.** `time-spans.ts`
 // reaches the two functions above directly because it has already read the shell command out of the
@@ -545,27 +543,27 @@ const time_bundle_call = {
 	bash_facts,
 	call_facts,
 	tool_facts,
-	// Exported for `time-agent-bundles.ts` (joshuafolkken/kit#1854), which asks the launch question of a
+	// Exported for `time-agent-bundles.ts`, which asks the launch question of a
 	// span's `label` — the tool name for a non-Bash call — so the set lives in one place.
 	is_launch_tool,
-	// Exported for `time-writes.ts` (joshuafolkken/kit#1472), which asks what a call *wrote* rather
+	// Exported for `time-writes.ts`, which asks what a call *wrote* rather
 	// than what it named. The extraction is the same one either way — a second copy of it would let a
 	// path be recognized as a target when read and missed when written.
 	targets_in,
 	tool_targets,
-	// Exported for the batching guard's own word scan (joshuafolkken/kit#1390), so the two scanners
+	// Exported for the batching guard's own word scan, so the two scanners
 	// cannot come to disagree about where one word of a shell line ends and the next begins.
-	// Exported for the read-fold notice (joshuafolkken/kit#2311), which offers `read:files <path>` only
+	// Exported for the read-fold notice, which offers `read:files <path>` only
 	// over file-shaped targets — a bare directory like `scripts/` is a target here but not something
 	// `read:files` can read, so the notice reuses this test rather than keep a second copy that could
 	// drift from what counts as a file path.
 	has_extension,
-	// Exported for `time-writes.ts` (joshuafolkken/kit#1509), which needs the same two answers to say
+	// Exported for `time-writes.ts`, which needs the same two answers to say
 	// *which* files an in-place `sed` wrote. Two copies of this test disagreed in both directions at
 	// once — one called a piped `grep -i` a write, the other missed a bundled `sed -ni`.
 	write_segment,
 	is_in_place_sed,
-	// Exported for the drift test in `time-bundle-call.test.ts` (joshuafolkken/kit#1875), which pins that
+	// Exported for the drift test in `time-bundle-call.test.ts`, which pins that
 	// every name here is a real `josh` command and none of them writes.
 	READ_JOSH_SUBCOMMANDS,
 }

@@ -5,7 +5,7 @@ import {
 } from '#scripts/cost-runtime/cost-pricing'
 
 // A run's dollars split by what they were spent on — fresh input, the two cache-write TTLs, cache
-// reads, and output (joshuafolkken/kit#1912). `josh cost` already prints the *tokens* under each of
+// reads, and output. `josh cost` already prints the *tokens* under each of
 // these headings; this is the same split in money, which is the axis a hand measurement kept
 // re-deriving because the report carried only the combined `cost_usd`.
 //

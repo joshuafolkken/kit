@@ -6,7 +6,7 @@ import { z } from 'zod'
 // assistant messages carry `tool_use` blocks, and those blocks are the whole measurement: a name and
 // the input it was called with, in the order the run made them. Everything else in the stream —
 // reasoning, text, usage, the final result — is deliberately not read, because judging any of it
-// would put the suite back to grading prose (joshuafolkken/kit#855).
+// would put the suite back to grading prose.
 
 const TOOL_USE_BLOCK_SCHEMA = z.looseObject({
 	type: z.literal('tool_use'),
@@ -38,7 +38,7 @@ function tool_calls_in_content(content: ReadonlyArray<unknown>): ReadonlyArray<T
 // A malformed line is skipped rather than thrown on: the stream carries progress lines that are not
 // events, and a run that produced a hundred good calls should not be unreadable because of one.
 // Three readers ask different questions of the same lines, and a `try` around each is three chances
-// for them to disagree about what an unreadable line means (joshuafolkken/kit#1001), so all three
+// for them to disagree about what an unreadable line means, so all three
 // read a line through `json_value.parse_or_undefined` — blank or not JSON is `undefined`.
 function tool_calls_in_line(line: string): ReadonlyArray<ToolCall> {
 	const parsed = STREAM_EVENT_SCHEMA.safeParse(json_value.parse_or_undefined(line))
@@ -51,8 +51,7 @@ function tool_calls_in_line(line: string): ReadonlyArray<ToolCall> {
 // Whether the session got far enough to announce itself. `claude -p --output-format stream-json`
 // writes a `{"type":"system","subtype":"init"}` line before anything else, so its presence is the
 // observable difference between a session that never started and one that started and then died —
-// two failures that both leave no tool calls and read identically without it
-// (joshuafolkken/kit#1001).
+// two failures that both leave no tool calls and read identically without it.
 const INIT_EVENT_SCHEMA = z.looseObject({ type: z.literal('system'), subtype: z.literal('init') })
 
 function has_started(transcript: string): boolean {
@@ -62,15 +61,12 @@ function has_started(transcript: string): boolean {
 }
 
 // The stream's own account of why it stopped, for the case stderr is silent — which is every one
-// observed during joshuafolkken/kit#908: `session exited 1 without running` with nothing after it.
-// The CLI reports a failed run as a `result` event carrying `is_error`, so the reason is in the
-// transcript even when nothing reached stderr.
-// `result` is `unknown` rather than `string`: typing it narrowly meant a payload carrying a non-string
-// there failed the whole parse, and the `subtype` sitting beside it — a perfectly good reason — went
-// with it, leaving the reasonless line this reader exists to remove (joshuafolkken/kit#1001).
+// observed: `session exited 1 without running` with nothing after it. The CLI reports a failed run as
+// a `result` event carrying `is_error`, so the reason is in the transcript even when nothing reached
+// stderr.
 // Every field but the discriminator is `unknown`: typing any of them narrowly means an unexpected
 // value in *one* of them fails the whole parse and discards the others — which is how a perfectly
-// good reason was lost beside a `result` that was not a string (joshuafolkken/kit#1001).
+// good reason was lost beside a `result` that was not a string.
 function error_in_line(line: string): string | undefined {
 	const result = claude_result_event.decode(json_value.parse_or_undefined(line))
 
@@ -91,11 +87,11 @@ function read_tool_calls(transcript: string): ReadonlyArray<ToolCall> {
 // "The session ran and did not settle the rule" and "the session never reached the API" are different
 // states, and only the first is worth a retry or a `unmeasured` verdict. The second is a setup
 // failure that costs a whole Claude session to learn and returns nothing, so it is named here and
-// separated everywhere downstream (joshuafolkken/kit#1197).
+// separated everywhere downstream.
 //
 // Matched on the reason text because that is where it arrives: the CLI reports it as the `result` of
-// a `type:"result"`, `is_error:true` line in the stdout stream, with stderr empty on every occurrence
-// measured under joshuafolkken/kit#1001. Two phrasings rather than one — the CLI has emitted the
+// a `type:"result"`, `is_error:true` line in the stdout stream, with stderr empty on every measured
+// occurrence. Two phrasings rather than one — the CLI has emitted the
 // wrapper sentence and the bare cause independently — and both are matched case-insensitively so a
 // re-worded prefix does not silently turn an unreachable API back into `unmeasured`.
 const UNREACHABLE_PATTERNS: ReadonlyArray<RegExp> = [

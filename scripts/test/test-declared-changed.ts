@@ -4,7 +4,7 @@ import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { test_declared_logic, type Verdict } from './test-declared-logic'
 
 // The working-tree change set and the verdict over it, read **synchronously** for the `PreToolUse`
-// trigger in `delivered-rules.ts` (joshuafolkken/kit#2118).
+// trigger in `delivered-rules.ts`.
 //
 // **Synchronous on purpose, and separate from `git-command.ts` for the same reason `run-cut.ts` keeps
 // a `carried_cut_sync`.** A guard answers a hook synchronously — an `await` or a network call is out —
@@ -45,7 +45,7 @@ function read_changed_paths_sync(): Array<string> {
 }
 
 // The working-tree read behind `current_verdict`, injectable so the delivery path can be exercised
-// without a checkout (joshuafolkken/kit#2169). Held on a `const` object rather than a reassigned
+// without a checkout. Held on a `const` object rather than a reassigned
 // variable — production leaves `paths` unset and the real reader runs; a test fixes it for the span of
 // one call through `with_paths`, and it is cleared afterwards.
 const injected: { paths?: ReadonlyArray<string> } = {}
@@ -64,7 +64,7 @@ function current_verdict(paths: ReadonlyArray<string> = source_paths()): Verdict
 
 // Put the injection back to what it was before a `with_paths` span — cleared to the live reader when
 // nothing was in force, else the outer span's set. Restoring rather than always clearing lets a nested
-// span prove the clear happened without reading the live tree (joshuafolkken/kit#2169).
+// span prove the clear happened without reading the live tree.
 function restore_injection(previous: ReadonlyArray<string> | undefined): void {
 	if (previous === undefined) {
 		delete injected.paths
@@ -75,7 +75,7 @@ function restore_injection(previous: ReadonlyArray<string> | undefined): void {
 	injected.paths = previous
 }
 
-// The seam the `rule_delivery` call path needs (joshuafolkken/kit#2169). `is_untested_commit` reads the
+// The seam the `rule_delivery` call path needs. `is_untested_commit` reads the
 // tree at trigger time rather than from an argument, so a unit test driving `rule_delivery` cannot reach
 // `current_verdict`'s `paths` port from the outside. Running `body` inside `with_paths` fixes the read
 // to `paths` for its duration and restores it afterwards — the `PreToolUse` production path, which never

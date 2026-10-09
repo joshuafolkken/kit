@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 
-// Which transcript a Claude Code hook payload is actually about (joshuafolkken/kit#1424).
+// Which transcript a Claude Code hook payload is actually about.
 //
 // **A hook fired for a forked agent's tool call is handed the *parent* session's transcript.** Both
 // events this package wires carry the same session fields, and neither of them names the fork's own
@@ -10,8 +10,8 @@ import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 // `<projects>/<slug>/<session-id>/subagents/agent-<agent-id>.jsonl`.
 //
 // **So every reader built on `transcript_path` alone has been reading the wrong run inside a fork**,
-// and two of them are: the batching guard (joshuafolkken/kit#1390) and the live density line
-// (joshuafolkken/kit#1329). Measured on 551 forked review agents in this checkout, the guard refused
+// and two of them are: the batching guard and the live density line.
+// Measured on 551 forked review agents in this checkout, the guard refused
 // **zero** calls — while a replay of the same transcripts through the fork's own file refuses 1–4 per
 // review round. The parent's timeline is frozen for as long as a fork runs, because the fork's lines
 // go to the fork's file: its open sequence never advances, so it either never reaches the limit or

@@ -64,7 +64,7 @@ function sync_prettier_config(destination_path: string): void {
 	write_merged_prettier_config(destination_path)
 }
 
-// A basic project's prettier config written before joshuafolkken/kit#2829 still imports the static
+// A basic project's prettier config written under the static profile name still imports the static
 // preset path; it is moved onto the basic one with the rule `josh init` applies.
 function sync_basic_prettier_config(destination_path: string): void {
 	if (!existsSync(destination_path)) return
@@ -172,7 +172,7 @@ function sync_package_manager_version(destination_path: string): void {
 }
 
 // A manifest an earlier `josh init` wrote rejects a standalone pnpm of another version outright;
-// `"download"` fetches the pin instead (joshuafolkken/kit#3388).
+// `"download"` fetches the pin instead.
 function sync_package_manager_on_fail(destination_path: string): void {
 	sync_package_json_with(
 		destination_path,
@@ -193,7 +193,7 @@ function sync_secretlint_development_deps(destination_path: string): void {
 }
 
 // `lefthook install` fails silently when `core.hooksPath` is set, leaving a consumer with no hooks
-// and no message (joshuafolkken/kit#1503). `josh init` rewrites the clause it wrote so the failure
+// and no message. `josh init` rewrites the clause it wrote so the failure
 // is reported; this covers everyone already initialized, who never re-runs `josh init`.
 function sync_prepare_lefthook_warning(destination_path: string): void {
 	sync_package_json_with(
@@ -203,7 +203,7 @@ function sync_prepare_lefthook_warning(destination_path: string): void {
 	)
 }
 
-// The `preinstall` earlier kits wrote fetched safe-chain on every install (joshuafolkken/kit#3269);
+// The `preinstall` earlier kits wrote fetched safe-chain on every install;
 // `josh init` replaces it, and this covers everyone already initialized.
 function sync_safe_chain_preinstall(destination_path: string): void {
 	sync_package_json_with(
@@ -225,16 +225,16 @@ function sync_package_json_migrations(destination_path: string): void {
 
 // Two distributed artifacts each depend on a repository setting kit cannot write, and both reports
 // are tied to the moment the artifact reaches the consumer. `.github/dependabot.yml` disables npm
-// version updates (joshuafolkken/kit#803), so a synced consumer only receives npm Dependabot pull
-// requests through the security-advisory path (joshuafolkken/kit#805);
+// version updates, so a synced consumer only receives npm Dependabot pull
+// requests through the security-advisory path;
 // `.github/workflows/dependabot-auto-merge.yml` runs `gh pr merge --auto`, which fails outright
-// unless the repository allows auto-merge (joshuafolkken/kit#834). Neither ever fails the sync: both
+// unless the repository allows auto-merge. Neither ever fails the sync: both
 // are GitHub-side state, not synced artifacts. Unconditional, unlike `init`, because `sync`
 // overwrites both files on every run.
 //
 // The labels are the same kind of GitHub-side prerequisite, and one kit *can* write: the synced
 // `pr-classification.yml` requires one of the release classification labels, so the missing ones are
-// created here rather than reported (joshuafolkken/kit#2797).
+// created here rather than reported.
 function report_repository_settings(name_with_owner: string | undefined): void {
 	security_updates.report_security_updates_section(name_with_owner)
 	auto_merge_setting.report_auto_merge_section(name_with_owner)
@@ -254,7 +254,7 @@ function sync_project_artifacts(is_force: boolean): void {
 	sync_sonar_with_template(name_with_owner, is_force)
 	sync_config_files()
 	// After `sync_ai_copy_all`, which may add the `pnpm-workspace.yaml` window `.aikido`'s age is
-	// derived from (joshuafolkken/kit#2743, #3267).
+	// derived from.
 	project_config.sync_project_config(PROJECT_ROOT)
 	sync_package_json_migrations(path.join(PROJECT_ROOT, PACKAGE_JSON))
 	report_repository_settings(name_with_owner)
@@ -262,7 +262,7 @@ function sync_project_artifacts(is_force: boolean): void {
 
 // A basic project gets what `josh init` gives that profile and nothing more: its AI file set and the
 // move of its prettier preset path. The full toolchain's configs, Sonar, package.json migrations and
-// repository settings are never written into it (joshuafolkken/kit#2827).
+// repository settings are never written into it.
 function sync_basic_artifacts(is_force: boolean): void {
 	console.info('profile: basic (package.json josh.profile)\n')
 	sync_ai_files.sync_ai_copy_all(is_force, project_profile.inspect_project(PROJECT_ROOT, 'basic'))
@@ -271,7 +271,7 @@ function sync_basic_artifacts(is_force: boolean): void {
 
 // Checked before anything is written, never per file: the damage is the whole run, and a partial
 // sync that stopped halfway would leave the source repository in a state neither `git checkout` nor
-// a re-run describes (joshuafolkken/kit#868).
+// a re-run describes.
 //
 // Only a recorded basic profile switches the file set; an unrecorded one stays full, as every
 // project initialized before the profile was recorded was set up.
