@@ -73,6 +73,8 @@ const link_release = vi.spyOn(issue_release_cli, 'link')
 vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 const fold_clear = vi.spyOn(issue_file_fold, 'is_fold_clear').mockResolvedValue(true)
 const NOT_APPLIED = { is_applied: false, reason: 'stubbed' }
+const UNDECLARED = { is_opted_out: false, is_requested: false }
+const REQUESTED_FLAG = '--requested'
 
 // A listing of `count` open Issues, in the JSON shape `issue_list` answers with.
 function listing_of(count: number): { json: string; is_capped: boolean } {
@@ -177,14 +179,11 @@ describe('issue_file_cli.run — the labels it applies exist first', () => {
 
 // joshuafolkken/kit#3213: the create call carries `auto-ok` when the filing opted in, unless
 // `--no-auto-ok` is declared, and the decision is printed with its reason.
+const CARRIED = { is_release: false, is_carried: true, branch_labels: undefined }
+
 function stub_carried(): void {
-	resolve_auto_ok.mockImplementation(async (is_opted_out) => {
-		return issue_auto_ok.decide({
-			is_opted_out,
-			is_release: false,
-			is_carried: true,
-			branch_labels: undefined,
-		})
+	resolve_auto_ok.mockImplementation(async (declared) => {
+		return issue_auto_ok.decide({ ...declared, ...CARRIED })
 	})
 }
 
@@ -227,27 +226,30 @@ describe('issue_file_cli.run — the run label an auto-ok filing owes', () => {
 	})
 })
 
+// joshuafolkken/kit#3614: `--requested` (a person asked for the filing) withholds it like the opt-out.
 describe('issue_file_cli.run — the auto-ok opt-out and the repositories it reads', () => {
-	it('leaves auto-ok off with --no-auto-ok, printing why', async () => {
+	it.each([
+		['--no-auto-ok', { ...UNDECLARED, is_opted_out: true }],
+		[REQUESTED_FLAG, { ...UNDECLARED, is_requested: true }],
+	])('leaves auto-ok off with %s, printing why', async (flag, declared) => {
 		stub_carried()
 
-		expect(await issue_file_cli.run(argv_of(valid_path, '--no-auto-ok'))).toBe(SUCCESS_EXIT_CODE)
-		expect(resolve_auto_ok).toHaveBeenCalledWith(true, HERE, HERE, [])
+		expect(await issue_file_cli.run(argv_of(valid_path, flag))).toBe(SUCCESS_EXIT_CODE)
+		expect(resolve_auto_ok).toHaveBeenCalledWith(declared, HERE, HERE, [])
 		expect(create_body()).toMatchObject({ labels: ['depth:1', 'bug'] })
 		expect(vi.mocked(console.info).mock.calls.join('\n')).toContain('auto-ok: not applied — ')
 	})
 
 	it('decides auto-ok with both the target and the current repository', async () => {
 		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', THERE))).toBe(SUCCESS_EXIT_CODE)
-		expect(resolve_auto_ok).toHaveBeenCalledWith(false, THERE, HERE, [])
+		expect(resolve_auto_ok).toHaveBeenCalledWith(UNDECLARED, THERE, HERE, [])
 	})
 
-	it('does not repeat an auto-ok already named with --label', async () => {
+	it.each([[[]], [[REQUESTED_FLAG]]])('keeps a named auto-ok once (%j)', async (extra) => {
 		stub_carried()
+		const argv = argv_of(valid_path, ...extra, '--label', 'auto-ok', '--label', 'run:lane')
 
-		expect(
-			await issue_file_cli.run(argv_of(valid_path, '--label', 'auto-ok', '--label', 'run:lane')),
-		).toBe(SUCCESS_EXIT_CODE)
+		expect(await issue_file_cli.run(argv)).toBe(SUCCESS_EXIT_CODE)
 		expect(create_body()).toMatchObject({ labels: ['depth:1', 'auto-ok', 'run:lane', 'bug'] })
 	})
 })

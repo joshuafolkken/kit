@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1043,
-		"code_lines": 87084,
-		"comment_lines": 33353,
+		"code_lines": 87098,
+		"comment_lines": 33361,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 457500
+		"on_demand_bytes": 459125
 	},
 	"accepted": {
-		"reason": "#3612 adds the running-lane share thresholds (lane_thresholds, UsageSlot, usage_slot) that run:board's lane colors are now computed from",
+		"reason": "kickoff new split children also declare --requested (review round-2 fix for #3614)",
 		"date": "2026-10-09"
 	}
 }
