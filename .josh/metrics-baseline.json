@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1014,
-		"code_lines": 84102,
-		"comment_lines": 33654,
+		"files": 1015,
+		"code_lines": 84194,
+		"comment_lines": 33686,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 558915
 	},
 	"accepted": {
-		"reason": "#3491 adds an injectable now/sleep seam to lane-await and a virtual test clock so the resume-gap test no longer depends on wall-clock scheduling; merged with #3434 lane:limit carry-record override, #3421 guard-friction and investigation-payback retrospective modules, #3422 accepted-value hints in josh error output, #3480 run:board legend and #3425 prose_lines reuse",
+		"reason": "run:board pins the three-line header by fitting each line to the terminal width (new run-board-fit module) and draws local rows before the plan loads (#3486); merged with #3491 injectable now/sleep seam in lane-await, #3434 lane:limit carry-record override, #3421 guard-friction and investigation-payback retrospective modules, #3422 accepted-value hints in josh error output, #3480 run:board legend and #3425 prose_lines reuse",
 		"date": "2026-10-09"
 	}
 }

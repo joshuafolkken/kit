@@ -25,14 +25,14 @@ describe('run_board_render findings and no run', () => {
 		}
 		const lines = lines_of(header({ layout: undefined }), [filed, ...notes])
 
-		expect(lines).toContain(`  🆕 ${clock_of(NOW)} 3438 起票  Count seats（3415 の実装中に発見）`)
-		expect(lines).toContain(`  💬 ${clock_of(NOW)} 3415 意見  observation 0`)
-		expect(lines.at(-1)).toBe('  ほか 3')
+		expect(lines).toContain(`  🆕 ${clock_of(NOW)} 3438 filed  Count seats (found during 3415)`)
+		expect(lines).toContain(`  💬 ${clock_of(NOW)} 3415 note  observation 0`)
+		expect(lines.at(-1)).toBe('  more 3')
 	})
 
 	it('says there is no run when none has started', () => {
-		expect(run_board_render.render_no_run(NOW, WORDS)).toStrictEqual([
-			`■ backlogrun  ランなし  ${clock_of(NOW)}`,
+		expect(run_board_render.render_no_run(NOW)).toStrictEqual([
+			`■ backlogrun  no run  ${clock_of(NOW)}`,
 		])
 	})
 })
@@ -56,26 +56,23 @@ describe('run_board_render.render findings icons', () => {
 		expect(lines).toContain(`  💤 ${clock_of(NOW)} 3473  Lead`)
 		expect(lines).toContain(`  💬 ${clock_of(NOW)} 3415  seen`)
 
-		for (const word of ['気づき・判断待ち', '起票', 'park', '意見']) {
+		for (const word of [WORDS.notes, 'filed', 'park', ' note ']) {
 			expect(board).not.toContain(word)
 		}
 	})
 
-	// joshuafolkken/kit#3480: in English whatever the session language.
-	it('names the findings icons in the legend only while a finding is on screen, in English', () => {
+	it('names the findings icons in the legend only while a finding is on screen', () => {
 		const legend = '📌 findings and decisions  🆕 filed  💬 note'
-		const english = header({ words: run_board_labels.words_of('en') })
 
 		expect(lines_of(header(), [filed]).at(-1)).toBe(legend)
-		expect(lines_of(english, [filed]).at(-1)).toBe(legend)
 		expect(lines_of(header()).join('\n')).not.toContain('📌')
 	})
 
 	it('keeps the heading and the kind words in a chat, which draws no legend', () => {
 		const lines = lines_of(header({ form: 'chat' }), [filed])
 
-		expect(lines).toContain(rule('気づき・判断待ち'))
-		expect(lines.at(-1)).toBe(`  🆕 ${clock_of(NOW)} 3473 起票  Lead`)
+		expect(lines).toContain(rule(WORDS.notes))
+		expect(lines.at(-1)).toBe(`  🆕 ${clock_of(NOW)} 3473 filed  Lead`)
 	})
 })
 
@@ -83,8 +80,8 @@ describe('run_board_render.render findings with no legend', () => {
 	it('keeps the heading and the kind words on a screen with no plan read yet, which draws no legend', () => {
 		const lines = lines_of(header({ layout: undefined }), [filed])
 
-		expect(lines).toContain(rule('気づき・判断待ち'))
-		expect(lines.at(-1)).toBe(`  🆕 ${clock_of(NOW)} 3473 起票  Lead`)
+		expect(lines).toContain(rule(WORDS.notes))
+		expect(lines.at(-1)).toBe(`  🆕 ${clock_of(NOW)} 3473 filed  Lead`)
 	})
 })
 
@@ -95,7 +92,7 @@ describe('run_board_render.render resume', () => {
 
 		expect(lines_of(board).join('\n')).not.toContain('claude --resume')
 		expect(run_board_render.render({ header: board, notes: [], resume: 'abc' })).toContain(
-			'🙋 停止中。再開  claude --resume abc',
+			'🙋 stopped — resume with  claude --resume abc',
 		)
 	})
 })

@@ -89,10 +89,13 @@ function started_of(row: BoardRow): number {
 }
 
 // Every child the run has touched, in the order each started.
-function active_rows(overlay: Overlay): Array<BoardRow> {
-	const rows = [...overlay.statuses].map(([number, status]) => ({
+function active_rows(
+	statuses: ReadonlyMap<number, ItemStatus>,
+	titles: ReadonlyMap<number, string>,
+): Array<BoardRow> {
+	const rows = [...statuses].map(([number, status]) => ({
 		number,
-		title: overlay.plan.context.titles.get(number),
+		title: titles.get(number),
 		state: status.state,
 		status,
 		waits: [],
@@ -163,11 +166,20 @@ function layout_of(plan: BoardPlan, statuses: ReadonlyMap<number, ItemStatus>): 
 	)
 
 	return {
-		active: active_rows(overlay),
+		active: active_rows(statuses, plan.context.titles),
 		waves: waves.filter((wave) => wave.length > 0),
 		people: unreached_rows(overlay, true),
 		unreached: unreached_rows(overlay, false),
 	}
+}
+
+const EMPTY_LAYOUT: BoardLayout = { active: [], waves: [], people: [], unreached: [] }
+
+// The run's own children before the plan is read (joshuafolkken/kit#3486): the stream and the lanes are
+// local and read at once, so the rows, their states and how long each has run are drawn while GitHub
+// answers; the titles and every issue the run has not touched wait for the plan.
+function local_layout_of(statuses: ReadonlyMap<number, ItemStatus>): BoardLayout {
+	return { ...EMPTY_LAYOUT, active: active_rows(statuses, new Map()) }
 }
 
 // Every issue the plan holds, wave or unreached — the run's scope a lane is checked against.
@@ -184,7 +196,14 @@ function rows_of(layout: BoardLayout): Array<BoardRow> {
 	return [...layout.active, ...waves, ...layout.people, ...layout.unreached]
 }
 
-const run_board_layout = { is_settled, layout_of, numbers_of, rows_of }
+const run_board_layout = {
+	EMPTY_LAYOUT,
+	is_settled,
+	layout_of,
+	local_layout_of,
+	numbers_of,
+	rows_of,
+}
 
 export { run_board_layout }
 export type { BoardLayout, BoardPlan, BoardRow, WaveEntry }

@@ -3,12 +3,11 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { stripVTControlCharacters, styleText } from 'node:util'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
-import { josh_environment_file } from '#scripts/josh/josh-environment-file'
-import { session_language } from '#scripts/josh/session-language'
 import { run_progress_read } from '#scripts/run/progress/run-progress-read'
 import terminalLink from 'terminal-link'
 import { run_board_closed } from './run-board-closed'
-import { run_board_labels, type Words } from './run-board-labels'
+import { run_board_fit } from './run-board-fit'
+import { run_board_labels } from './run-board-labels'
 import { run_board_plan } from './run-board-plan'
 import { run_board_read } from './run-board-read'
 import { run_board_screen, type Screen } from './run-board-screen'
@@ -31,6 +30,7 @@ const SIGINT_EXIT_CODE = 130
 const SIGTERM_EXIT_CODE = 143
 const USAGE = 'Usage: josh run:board [--once | --chat]'
 const { FRESH_STATE, REDRAW_MS, tick } = run_board_tick
+const { WORDS } = run_board_labels
 
 // A signal exits with its conventional code, so the `exit` handler restores the screen on every path.
 function on_exit(leave: () => void): void {
@@ -49,6 +49,8 @@ const LIVE_PORTS: BoardPorts = {
 	// No fallback: a terminal that opens no link, or a pipe, gets the bare number rather than a URL.
 	link: (text, url) => terminalLink(text, url, { fallback: false }),
 	is_tty: process.stdout.isTTY,
+	// Read on every redraw, so a resized pane is fitted on the next one (joshuafolkken/kit#3486).
+	size: () => ({ rows: process.stdout.rows, columns: process.stdout.columns }),
 	form: 'screen',
 	mark: async () => {
 		run_progress_read.mark(await run_progress_read.stamp_target(), Date.now())
@@ -61,15 +63,18 @@ const LIVE_PORTS: BoardPorts = {
 
 // Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
 // ends on the line that says closing the screen leaves the run going (joshuafolkken/kit#3437) — only a
-// screen a person can close says it.
-function framed(ports: BoardPorts, screen: Screen, words: Words): BoardPorts {
-	const footer = `\n${styleText('dim', words.keeps_running)}\n`
+// screen a person can close says it. Nothing follows the footer and the frame is kept to the rows the
+// footer leaves, so writing it never scrolls the header off the top (joshuafolkken/kit#3486).
+function framed(ports: BoardPorts, screen: Screen): BoardPorts {
+	const footer = ['', styleText('dim', WORDS.keeps_running)]
+	const { size } = ports
 
 	return {
 		...ports,
 		write: (frame) => {
-			ports.write(`${screen.frame}${frame}${footer}`)
+			ports.write(`${screen.frame}${frame}${footer.join('\n')}`)
 		},
+		size: size === undefined ? undefined : () => run_board_fit.reserve(size(), footer),
 	}
 }
 
@@ -85,22 +90,22 @@ function leaver(ports: BoardPorts, screen: Screen): () => void {
 	}
 }
 
-async function redraw_forever(ports: BoardPorts, words: Words): Promise<void> {
+async function redraw_forever(ports: BoardPorts): Promise<void> {
 	// The plan is read in the background, so the first frame is drawn without waiting on GitHub
 	// (joshuafolkken/kit#3455).
-	let state = await tick(FRESH_STATE, ports, words, 'background')
+	let state = await tick(FRESH_STATE, ports, 'background')
 
 	for (;;) {
 		// eslint-disable-next-line no-await-in-loop -- polling: each redraw waits out the tick before it
 		await ports.sleep(REDRAW_MS)
 		// eslint-disable-next-line no-await-in-loop -- polling: each redraw folds the state the last one left
-		state = await tick(state, ports, words, 'background')
+		state = await tick(state, ports, 'background')
 	}
 }
 
 // A signal leaves through `on_exit`; a failed redraw leaves before its error is printed, so the error
 // lands on the normal screen rather than vanishing with the alternate one.
-async function watch(ports: BoardPorts, words: Words): Promise<void> {
+async function watch(ports: BoardPorts): Promise<void> {
 	const screen = run_board_screen.screen_of('live')
 	const leave = leaver(ports, screen)
 
@@ -108,7 +113,7 @@ async function watch(ports: BoardPorts, words: Words): Promise<void> {
 	ports.on_exit(leave)
 
 	try {
-		await redraw_forever(framed(ports, screen, words), words)
+		await redraw_forever(framed(ports, screen))
 	} finally {
 		leave()
 	}
@@ -117,23 +122,24 @@ async function watch(ports: BoardPorts, words: Words): Promise<void> {
 // The answer to a progress question asked during a `backlogrun` (joshuafolkken/kit#3456): one frame in
 // the chat's form, with every escape stripped because a chat shows them as text, and recorded as the
 // report it is, so the next scheduled one waits a full interval — as `run:progress --once` does.
-async function answer(ports: BoardPorts, words: Words): Promise<void> {
+async function answer(ports: BoardPorts): Promise<void> {
 	const chat_ports: BoardPorts = {
 		...ports,
 		is_tty: false,
+		size: undefined,
 		form: 'chat',
 		write: (frame) => {
 			ports.write(stripVTControlCharacters(frame))
 		},
 	}
 
-	await tick(FRESH_STATE, chat_ports, words)
+	await tick(FRESH_STATE, chat_ports)
 	await ports.mark()
 }
 
-async function draw(flag: string, ports: BoardPorts, words: Words): Promise<void> {
+async function draw(flag: string, ports: BoardPorts): Promise<void> {
 	if (flag === CHAT_FLAG) {
-		await answer(ports, words)
+		await answer(ports)
 
 		return
 	}
@@ -142,9 +148,9 @@ async function draw(flag: string, ports: BoardPorts, words: Words): Promise<void
 
 	// One plain frame stays on the terminal after the command, so it draws the still icons rather than a
 	// spinner frame frozen mid-turn (joshuafolkken/kit#3452).
-	const once_ports = { ...ports, is_tty: false }
+	const once_ports = { ...ports, is_tty: false, size: undefined }
 
-	await (mode === 'live' ? watch(ports, words) : tick(FRESH_STATE, once_ports, words))
+	await (mode === 'live' ? watch(ports) : tick(FRESH_STATE, once_ports))
 }
 
 async function run(argv: ReadonlyArray<string>, ports: BoardPorts = LIVE_PORTS): Promise<number> {
@@ -156,17 +162,14 @@ async function run(argv: ReadonlyArray<string>, ports: BoardPorts = LIVE_PORTS):
 		return FAILURE_EXIT_CODE
 	}
 
-	await draw(flag, ports, run_board_labels.words_of(session_language.resolve_session_lang().lang))
+	await draw(flag, ports)
 
 	return SUCCESS_EXIT_CODE
 }
 
 const run_board_cli = { run }
 
-// `.env` is read inside the guard, as `run:event --watch` reads it, so the board draws in the
-// `JOSH_SESSION_LANG` a person keeps there while the unit tests see no developer's `.env`.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	josh_environment_file.load_environment_file()
 	process.exitCode = await run(process.argv.slice(ARGV_OFFSET))
 }
 

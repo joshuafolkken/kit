@@ -277,7 +277,7 @@ describe('run_board_render.render header', () => {
 	it('counts the progress with the arrivals since the board first looked', () => {
 		const active = [row(1, { state: 'merged' }), row(2, { state: 'running' })]
 		const layout = { ...EMPTY_LAYOUT, active, unreached: [row(3)] }
-		const [, progress] = lines_of(header({ layout, baseline_total: 2 }))
+		const progress = lines_of(header({ layout, baseline_total: 2 }))[2] ?? ''
 
 		expect(progress).toMatch(/^✅ 1\/3 \S+ \(\+1\)/u)
 		expect(progress).toContain('(+1)   🔄 1  ⏳ 1  💤 0')
@@ -293,10 +293,12 @@ describe('run_board_render.render header', () => {
 		const activity = { last_event_ms: NOW, idle, is_stopped: false }
 		const lines = lines_of(header({ activity, layout: undefined }))
 
+		const until = `wait ends ${clock_of(idle.until_ms)} (20:00 left) → ${WORDS.idle_end_idle}`
+
 		expect(lines[0]).toMatch(/^⏸ backlogrun/u)
-		expect(lines[1]).toBe(
-			`  待機終了 ${clock_of(idle.until_ms)} (残り 00:20:00) → ${WORDS.idle_end_idle}`,
-		)
-		expect(lines[2]).toBe(`  次の確認 ${clock_of(NOW + 2 * MINUTE)}`)
+		expect(lines.slice(3, 5)).toStrictEqual([
+			'',
+			`  ⏸ ${until} · next check ${clock_of(NOW + 2 * MINUTE)}`,
+		])
 	})
 })
