@@ -38,6 +38,8 @@ interface BoardPorts {
 	// Records that a progress report was just given, as `run:progress --mark` does, so the next scheduled
 	// one waits a full interval from here (joshuafolkken/kit#3456).
 	mark: () => Promise<void>
+	// Sends one chat frame off-screen, for `--every` alone (joshuafolkken/kit#3569).
+	push: (frame: string) => Promise<void>
 	// Runs `leave` however the process ends: a normal exit, Ctrl+C or SIGTERM.
 	on_exit: (leave: () => void) => void
 	sleep: (ms: number) => Promise<void>

@@ -132,6 +132,15 @@ describe('build_text — stranded header', () => {
 	})
 })
 
+// joshuafolkken/kit#3569: a periodic board frame reads apart from a confirmation or a completion.
+describe('build_text — progress header', () => {
+	it('uses the progress icon and label', () => {
+		const result = build_text(make_base({ task_type: 'progress' }))
+
+		expect(result).toBe(`📊 ${REPO_NAME}: Progress\n${ISSUE_TITLE}`)
+	})
+})
+
 describe('build_text — body and URL blocks', () => {
 	it('separates body from issue title with a blank line, URLs as separated blocks', () => {
 		const result = build_text(

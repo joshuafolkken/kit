@@ -53,6 +53,9 @@ const INTERVAL_KEY = 'JOSH_PROGRESS_INTERVAL_MINUTES'
 const MS_PER_MINUTE = 60_000
 const MS_PER_SECOND = 1000
 const DEFAULT_INTERVAL_MS = DEFAULT_INTERVAL_MINUTES * MS_PER_MINUTE
+// The switch that silences every progress report — the watcher's and `run:board --every`'s alike.
+const DISABLED_KEY = 'JOSH_PROGRESS'
+const DISABLED_VALUE = '0'
 
 // What one child looked like on this tick. `pr_state` is `run_preflight`'s own vocabulary rather than
 // a second spelling of it — `none` / `open` / `merged` / `closed`.
@@ -353,9 +356,15 @@ function minutes_from(raw: string | undefined): number | undefined {
 	return minutes
 }
 
+function is_disabled(): boolean {
+	return process.env[DISABLED_KEY] === DISABLED_VALUE
+}
+
 const run_progress = {
 	DEFAULT_INTERVAL_MINUTES,
 	DEFAULT_INTERVAL_MS,
+	DISABLED_KEY,
+	DISABLED_VALUE,
 	INTERVAL_KEY,
 	MS_PER_MINUTE,
 	MS_PER_SECOND,
@@ -368,6 +377,7 @@ const run_progress = {
 	format_next_line,
 	format_next_report,
 	format_report,
+	is_disabled,
 	is_due,
 	minutes_from,
 	next_state,

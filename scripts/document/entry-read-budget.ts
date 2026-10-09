@@ -116,8 +116,9 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// moment, a point-of-use document is charged at the union of the sections its path names, and the
 	// driver's own mechanics moved to `docs/maintainers/backlogrun-driver.md`. The route table also names
 	// `latest-gate.md`, `progress-watcher.md` and `followup.md`, which the parent reads itself.
-	{ entry: 'backlogrun', bytes: 118_784 },
-	{ entry: LANE_CHILD, bytes: 53_248 },
+	// Lowered in joshuafolkken/kit#3564: the `backlogrun-*` sections became command-to-token tables.
+	{ entry: 'backlogrun', bytes: 90_112 },
+	{ entry: LANE_CHILD, bytes: 49_152 },
 ]
 
 function byte_size(root: string, relative_path: string): number {
