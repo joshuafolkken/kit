@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import type { Phase } from './run-board-phase'
 import { run_board_render_fixture } from './run-board-render-fixture'
@@ -9,6 +10,7 @@ import type { LaneUsages } from './run-board-usage'
 // the lane's CPU and memory so those stay in one column whatever the track's length.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
+const { minute_of } = run_board_labels
 const GB = 1024 * 1024 * 1024
 const CPU = '⚡'
 
@@ -101,16 +103,26 @@ function settled_line(state: ItemState, track: ReadonlyArray<Phase>): string {
 }
 
 // joshuafolkken/kit#3535: a settled row keeps its track, ended on its own state icon rather than a fixed
-// ✅, right after its time — it runs no process, so it draws no CPU or memory.
+// ✅ — it runs no process, so it draws no CPU or memory; a finished one draws its finish time in their
+// place (joshuafolkken/kit#3554).
 describe('run_board_render.render settled history', () => {
+	const title = 'Sample 1'.padEnd(48)
+
 	it.each<[ItemState, string]>([
 		['merged', '✅'],
 		['done', '🏁'],
+	])('draws a %s row’s finish time, then its track ended on its state icon', (state, icon) => {
+		const finish = `🔚 ${minute_of(NOW)}`
+
+		expect(settled_line(state, FAILED)).toBe(
+			`  ${icon} 1  ${title}  05:00  ${finish}  🔍📝🔨🚢💥${icon}`,
+		)
+	})
+
+	it.each<[ItemState, string]>([
 		['stopped', '🛑'],
 		['parked', '💤'],
-	])('draws a %s row’s track ended on its state icon, with no usage', (state, icon) => {
-		const title = 'Sample 1'.padEnd(48)
-
+	])('draws a %s row’s track ended on its state icon right after its time', (state, icon) => {
 		expect(settled_line(state, FAILED)).toBe(`  ${icon} 1  ${title}  05:00  🔍📝🔨🚢💥${icon}`)
 	})
 })

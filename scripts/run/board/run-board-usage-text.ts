@@ -8,7 +8,7 @@ import type { LaneUsage } from './run-board-usage'
 // lane turns yellow at a fifth of the machine and red at two fifths — on an 11-core, 18 GB machine about
 // 2.2 and 4.4 cores, 3.6 and 7.2 GB.
 
-const { GAUGE_SHADES, HEADER_ICONS, painted } = run_board_labels
+const { GAUGE_SHADES, HEADER_ICONS, minute_of, painted } = run_board_labels
 const { percent_text, threshold_alert } = run_board_machine
 const LANE_THRESHOLDS = { yellow: 20, red: 40 } as const
 const BYTES_PER_KB = 1024
@@ -42,6 +42,24 @@ function text_of(usage: LaneUsage | undefined): string | undefined {
 		.join(PART_GAP)
 }
 
-const run_board_usage_text = { text_of }
+// The day a settled row finished, `10/8 `, where that is not the board's own day.
+function day_of(ended_ms: number, now_ms: number): string {
+	const ended = new Date(ended_ms)
+
+	if (ended.toDateString() === new Date(now_ms).toDateString()) return ''
+
+	return `${String(ended.getMonth() + 1)}/${String(ended.getDate())} `
+}
+
+// A settled row's finish time, drawn in the usage column (joshuafolkken/kit#3554): `🔚 14:05`, or
+// `🔚 10/8 14:05` on another day; `undefined` for a row settled with no recorded end. 🔚 is the
+// header's own end mark — 🏁 is already a done row's state icon.
+function finish_of(ended_ms: number | undefined, now_ms: number): string | undefined {
+	if (ended_ms === undefined) return undefined
+
+	return `${HEADER_ICONS.ended} ${day_of(ended_ms, now_ms)}${minute_of(ended_ms)}`
+}
+
+const run_board_usage_text = { finish_of, text_of }
 
 export { run_board_usage_text }
