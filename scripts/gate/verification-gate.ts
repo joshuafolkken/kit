@@ -12,6 +12,7 @@ import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { core_budget } from './core-budget'
+import { gate_ledger, type GateLedgerStart } from './gate-ledger'
 import { gate_plan, type GatePlan } from './gate-plan'
 import { gate_report, type GateStep, type GateStepResult } from './gate-report'
 import { gate_skip } from './gate-skip'
@@ -362,7 +363,7 @@ async function settle_gate(
 	plan: GatePlan,
 	results: ReadonlyArray<GateStepResult>,
 	tree: GateTree,
-	options: GateOptions & { started_at: number },
+	options: GateOptions & { started_at: number; ledger: GateLedgerStart },
 ): Promise<number> {
 	const elapsed_ms = performance.now() - options.started_at
 	const failed_labels = gate_report.report_gate_steps(results, {
@@ -373,11 +374,7 @@ async function settle_gate(
 	})
 	const is_passed = failed_labels.length === 0
 
-	if (options.ledger_path !== undefined) {
-		const unit_ms = results.find((result) => result.label === gate_plan.UNIT_LABEL)?.elapsed_ms
-
-		await lane_ledger.record_gate(options.ledger_path, elapsed_ms, is_passed, unit_ms)
-	}
+	await gate_ledger.record(options.ledger, results, { elapsed_ms, is_passed })
 
 	if (!is_passed) return FAIL_EXIT_CODE
 
@@ -396,6 +393,9 @@ async function run_checked_gate(
 	started_at: number,
 ): Promise<number> {
 	const is_unit_included = options.is_unit_included ?? true
+	// Read before the concurrent-run count, never between it and the marker below: the reading waits out
+	// a sample window, and a lane counting inside that window would miss this gate (joshuafolkken/kit#1515).
+	const ledger = await gate_ledger.start(options.ledger_path)
 	// Resolved at the gate's entry, before this gate sets `JOSH_UNIT_RUN_MARKED`, so a gate nested in the
 	// unit suite reads the flag as set and reserves nothing (joshuafolkken/kit#2351).
 	const budget = default_budget()
@@ -410,7 +410,7 @@ async function run_checked_gate(
 	async function run_and_settle(): Promise<number> {
 		const results = await run_gate_steps(plan, budget)
 
-		return await settle_gate(plan, results, tree, { ...options, started_at })
+		return await settle_gate(plan, results, tree, { ...options, started_at, ledger })
 	}
 
 	return await run_marked_gate(tree.files, plan, run_and_settle, options.marker_path)

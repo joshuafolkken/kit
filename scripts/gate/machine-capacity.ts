@@ -285,6 +285,7 @@ const machine_capacity = {
 	BASELINE_CORES,
 	busy_cores_between,
 	busy_share_between,
+	external_cores,
 	machine_budget,
 	parse_darwin_memory,
 	parse_linux_available,

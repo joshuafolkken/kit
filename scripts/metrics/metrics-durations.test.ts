@@ -5,14 +5,23 @@ import { metrics_durations } from './metrics-durations'
 const BASELINE_MS = 1000
 const WITHIN_TOLERANCE_MS = 1100
 const PAST_TOLERANCE_MS = 1101
+// A gate the machine was quiet for: no whole core busy outside it at its start or its end.
+const QUIET = 0
 
 function gate(elapsed_ms: number, unit_ms?: number, is_passed = true): LedgerEntry {
-	return { kind: 'gate', at: '2026-10-08T00:00:00Z', elapsed_ms, is_passed, unit_ms }
+	return {
+		kind: 'gate',
+		at: '2026-10-08T00:00:00Z',
+		elapsed_ms,
+		is_passed,
+		unit_ms,
+		external_cores: QUIET,
+	}
 }
 
 // A gate that ran the unit suite for its whole span, ending at `at`.
 function gate_at(at: string, elapsed_ms: number, is_passed = true): LedgerEntry {
-	return { kind: 'gate', at, elapsed_ms, is_passed, unit_ms: elapsed_ms }
+	return { kind: 'gate', at, elapsed_ms, is_passed, unit_ms: elapsed_ms, external_cores: QUIET }
 }
 
 describe('metrics_durations.compare — the tolerance', () => {
@@ -120,6 +129,42 @@ describe('metrics_durations.from_ledger — solo gates', () => {
 		]
 
 		expect(metrics_durations.from_ledger(entries)).toStrictEqual({ gate: 50_000, unit: 50_000 })
+	})
+})
+
+const BASELINE = { gate: 70_000, unit: 50_000 }
+const BUSY_CORES = 9
+
+// Five quiet gates at `seconds`, then `slow` more at twice that, each ran beside `external_cores`.
+function quiet_then_slow(
+	slow: number,
+	external_cores: number | undefined,
+): ReadonlyArray<LedgerEntry> {
+	const quiet = Array.from({ length: 5 }, () => gate(BASELINE.gate, BASELINE.unit))
+	const doubled = { ...gate(BASELINE.gate * 2, BASELINE.unit * 2), external_cores }
+
+	return hourly([...quiet, ...Array.from({ length: slow }, () => doubled)])
+}
+
+function regressions_of(entries: ReadonlyArray<LedgerEntry>): ReadonlyArray<string> {
+	const verdict = metrics_durations.compare(BASELINE, metrics_durations.from_ledger(entries))
+
+	return verdict.regressions.map((change) => change.name)
+}
+
+// joshuafolkken/kit#3501: other lanes' lint and tests are no gate, yet doubled a solo gate's duration,
+// and every lane's `metrics` failed on that noise until a person accepted it into the baseline.
+describe('metrics_durations.from_ledger — quiet gates', () => {
+	it('does not fail on gates that ran beside other work, however slow', () => {
+		expect(regressions_of(quiet_then_slow(5, BUSY_CORES))).toStrictEqual([])
+	})
+
+	it('still fails on a slowdown the quiet machine measured', () => {
+		expect(regressions_of(quiet_then_slow(3, QUIET))).toStrictEqual(['gate', 'unit'])
+	})
+
+	it('does not count a gate whose load was never read', () => {
+		expect(regressions_of(quiet_then_slow(5, undefined))).toStrictEqual([])
 	})
 })
 
