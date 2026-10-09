@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1015,
-		"code_lines": 84489,
-		"comment_lines": 33728,
+		"code_lines": 84545,
+		"comment_lines": 33746,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12222,
-		"on_demand_bytes": 559181
+		"on_demand_bytes": 560076
 	},
 	"accepted": {
-		"reason": "#3403 adds the same-document section-reference scan (document-scan.ts, its tests and fixture) and rewords skill arrows the scan flagged",
+		"reason": "#3502 adds the waiting-on-blockers merge path (open_blockers, do_waiting, on_waiting, waiting_comment) and documents it in backlogrun-park.md / prerequisite.md",
 		"date": "2026-10-09"
 	}
 }

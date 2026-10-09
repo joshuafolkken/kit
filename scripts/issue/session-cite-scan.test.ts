@@ -45,6 +45,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['observations/observations-flush-landing.ts', 1],
 	['propagate/propagate-steps.ts', 1],
 	['review/review-finding-ledger.ts', 1],
+	['run/merge/run-merge-steps.ts', 1],
 	// A person reads it on Telegram.
 	['notify/git-notify.ts', 1],
 	// A program reads it back: the run event stream, a process pattern, a child prompt, a parse key.
@@ -62,7 +63,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/entry/run-entry-stop.ts', 3],
 	['run/event/run-event-filed.ts', 1],
 	['run/event/run-event-scope.ts', 1],
-	['run/merge/run-merge-cli.ts', 6],
+	['run/merge/run-merge-cli.ts', 7],
 	['run/merge/run-merge.ts', 1],
 	['run/ship/run-ship-detach.ts', 1],
 	['run/ship/run-ship-stage.ts', 1],

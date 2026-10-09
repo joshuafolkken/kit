@@ -67,6 +67,8 @@ const IN_PROGRESS = 'in-progress'
 const EPIC = 'epic'
 const NEEDS_DECISION = 'needs-decision'
 const NEEDS_HUMAN_REVIEW = 'needs-human-review'
+const NOT_REFUSED = { is_refused: false, blockers: [] }
+const PARKED_FAILURE = { carry: { failures: BELOW_GUARD }, is_parked: true, ...NOT_REFUSED }
 
 function state_read(
 	state: string,
@@ -158,11 +160,7 @@ describe('run_merge_cli.run — a split child', () => {
 describe('run_merge_cli.run — a failed child', () => {
 	it('parks a failed or budget-exhausted worker once without retrying it', async () => {
 		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
-		do_failed_mock.mockResolvedValue({
-			carry: { failures: BELOW_GUARD },
-			is_parked: true,
-			is_refused: false,
-		})
+		do_failed_mock.mockResolvedValue(PARKED_FAILURE)
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
 		expect(do_failed_mock).toHaveBeenCalledOnce()
@@ -177,6 +175,7 @@ describe('run_merge_cli.run — a failed child', () => {
 			carry: { failures: AT_GUARD },
 			is_parked: true,
 			is_refused: false,
+			blockers: [],
 		})
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
@@ -187,7 +186,6 @@ describe('run_merge_cli.run — a failed child', () => {
 
 // joshuafolkken/kit#2484: a child that ended its session with a cut its successor never adopted is
 // resumed in its own lane — not parked and not counted — while a child that simply stopped is parked.
-const PARKED_FAILURE = { carry: { failures: BELOW_GUARD }, is_parked: true, is_refused: false }
 const OUTPUT_ARGS = [...EPIC_ARGS, '--output', 'child.jsonl']
 
 describe('run_merge_cli.run — a child that ended on a cut', () => {
@@ -273,11 +271,7 @@ describe('run_merge_cli.run — the outage split is off without --output', () =>
 	it('classifies an OPEN unparked child as failed when no output was passed', async () => {
 		is_outage_mock.mockReturnValue(true)
 		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
-		do_failed_mock.mockResolvedValue({
-			carry: { failures: BELOW_GUARD },
-			is_parked: true,
-			is_refused: false,
-		})
+		do_failed_mock.mockResolvedValue(PARKED_FAILURE)
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
 		expect(do_failed_mock).toHaveBeenCalledOnce()
@@ -301,6 +295,7 @@ describe('run_merge_cli.run — a carry ownership refusal', () => {
 			carry: { failures: BELOW_GUARD },
 			is_parked: false,
 			is_refused: true,
+			blockers: [],
 		})
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
@@ -330,6 +325,7 @@ describe('run_merge_cli.run — a stop and a refusal', () => {
 			carry: { failures: BELOW_GUARD },
 			is_parked: false,
 			is_refused: false,
+			blockers: [],
 		})
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
