@@ -13,7 +13,7 @@ const VSCODE_TASKS_FILENAME = 'tasks.json'
 
 // A label kit once shipped a task under, mapped to the label that replaced it. A consumer's task still
 // carrying the retired label is the same kit task under its old name, so it is replaced in place — an
-// append would leave the retired folder-open pane starting beside its successor (joshuafolkken/kit#3438).
+// append would leave the retired folder-open pane starting beside its successor.
 const RETIRED_LABELS: ReadonlyMap<unknown, string> = new Map([
 	['josh: run event watch', 'josh: run board'],
 ])

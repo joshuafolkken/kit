@@ -1,10 +1,9 @@
 import { cases } from '#scripts/cases/cases-logic'
 
-// joshuafolkken/kit#2355: the network boundary's abnormal cases were declared and never run. The unit
-// suite blocks the network by construction (`test-network-guard.ts` shims the `gh` and `git`
-// binaries), so `josh cases`' network vocabulary had no way to be *executed* — only named in a test
-// declaration, where the failure mode nobody anticipated is exactly the one that never gets declared
-// (the transport failure of joshuafolkken/kit#2317 was hit before it was foreseen).
+// The unit suite blocks the network by construction (`test-network-guard.ts` shims the `gh` and
+// `git` binaries), so without this `josh cases`' network vocabulary has no way to be *executed* —
+// only named in a test declaration, where the failure mode nobody anticipated is exactly the one
+// that never gets declared.
 //
 // This makes each of those failure modes injectable as a `fetch` stand-in that produces the failure
 // without opening a connection. It does not weaken the guard: the shims are untouched, no real request

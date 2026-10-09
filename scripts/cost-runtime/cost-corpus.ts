@@ -10,20 +10,20 @@ interface MissingData {
 	malformed_lines: number
 	unreadable_sessions: number
 	// Delegated units whose owning session's issue could not be determined, so their cost is charged
-	// to no issue at all (joshuafolkken/kit#1812). Filled by the attribution, which is the only step
+	// to no issue at all. Filled by the attribution, which is the only step
 	// that knows a unit could not follow its parent; zero from a per-session tally.
 	unattributed_sessions: number
 }
 
-// The corpus of a project's session transcripts, and how each request in it attributes to an issue
-// (joshuafolkken/kit#962, joshuafolkken/kit#1812). Split out of `cost-cli.ts` when that file passed
+// The corpus of a project's session transcripts, and how each request in it attributes to an issue.
+// Split out of `cost-cli.ts` when that file passed
 // its length limit: the CLI parses flags and prints reports, and this is the reading underneath every
 // scope it prints — the same walk `josh time`'s phase costs read through `cost_cli.attributed`.
 
 interface Corpus {
 	sessions: Array<SessionUsage>
 	// Kept beside the sessions so the whole-session scope can re-read its transcript for the two
-	// decompositions (joshuafolkken/kit#1151). Parsed lazily and only for that one file: classifying
+	// decompositions. Parsed lazily and only for that one file: classifying
 	// the content blocks of all 158 transcripts to print one issue's cost would be work nothing reads.
 	files: Array<SessionFile>
 	missing: MissingData
@@ -59,7 +59,7 @@ interface AttributedRecord {
 	baseline_tokens: number
 	// The session this record was read from, and whether that session is a delegated unit. The cost
 	// curve is built from the non-delegated (main-line) sessions' records alone, so it needs both to
-	// group an issue's records back by session and drop the units (joshuafolkken/kit#1853).
+	// group an issue's records back by session and drop the units.
 	session_id: string
 	is_delegated: boolean
 }
@@ -82,7 +82,7 @@ function session_meta(corpus: Corpus): Map<string, SessionMeta> {
 }
 
 // Every distinct issue a session's own records attribute to. A delegated unit reads this from the
-// session that delegated it (joshuafolkken/kit#1812): a `fullrun`'s parent names exactly one, so its
+// session that delegated it: a `fullrun`'s parent names exactly one, so its
 // units follow it; a parent that ran several names them all, and its unattributed unit could belong to
 // any of them.
 function issue_set(records: ReadonlyArray<UsageRecord>): Set<number> {
@@ -116,7 +116,7 @@ function owner_sets(
 }
 
 // A session's records, each tagged with the issue its own branch names — and, for a delegated unit,
-// the parent's sole issue substituted wherever the branch named none (joshuafolkken/kit#1812). A child
+// the parent's sole issue substituted wherever the branch named none. A child
 // that committed carries its own `<N>-` branch exactly as a top-level session does, so it attributes
 // by its own records; only a sub-step that never commits — a review, a survey — carries `main`
 // throughout and falls to the inherited issue. `inherited` is `UNATTRIBUTED_KEY` for a non-delegated
@@ -183,8 +183,8 @@ interface CorpusAttribution {
 	unattributed: Array<ReadonlySet<number>>
 }
 
-// Attribution across the whole corpus, delegated units followed to the session that delegated them
-// (joshuafolkken/kit#1812). The fill-forward walk itself is untouched — a unit is tagged with its
+// Attribution across the whole corpus, delegated units followed to the session that delegated them.
+// The fill-forward walk itself is untouched — a unit is tagged with its
 // parent's issue and a non-delegated session keeps `group_by_issue` exactly as before — so
 // `josh cost --issue` and `josh time`'s phase costs, which both read this, stay in step.
 function attribute_corpus(corpus: Corpus): CorpusAttribution {
@@ -249,8 +249,8 @@ function attributed(corpus: Corpus): Array<AttributedRecord> {
 
 // The in-scope records of each non-delegated (main-line) session, grouped and kept in the order they
 // were read. The curve is built from these: a delegated unit starts from low context, so mixing its
-// records into the positional quartiles breaks the growth curve a hand-off decision reads
-// (joshuafolkken/kit#1853). A single-issue run on one session yields one group; a run resumed in a
+// records into the positional quartiles breaks the growth curve a hand-off decision reads.
+// A single-issue run on one session yields one group; a run resumed in a
 // second session yields two, which the curve then withholds rather than mixing.
 function mainline_records(pairs: ReadonlyArray<AttributedRecord>): Array<Array<UsageRecord>> {
 	const groups = new Map<string, Array<UsageRecord>>()

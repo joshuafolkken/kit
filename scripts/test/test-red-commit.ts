@@ -3,7 +3,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { test_red, type RedRun } from './test-red'
 import { test_red_logic } from './test-red-logic'
 
-// The commit-stage half of joshuafolkken/kit#2448: `josh git -y` on an Issue that declares itself a
+// The commit-stage half of `josh test:red`: `josh git -y` on an Issue that declares itself a
 // bug fix (`test_red_logic.BUG_DECLARATION_LINE`) refuses a commit whose tests are all green on the
 // pre-fix tree.
 //

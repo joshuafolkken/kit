@@ -15,7 +15,7 @@ import { propagate_steps, type ReleasePlan } from './propagate-steps'
 import { propagate_targets, type PropagateTarget } from './propagate-targets'
 
 // `josh propagate` — carry the release this repository just published into every consumer checked
-// out next to it (joshuafolkken/kit#863).
+// out next to it.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -32,7 +32,7 @@ const UNTOUCHED_NOTE = 'No consumer was touched.'
 interface RunOptions {
 	is_dry_run: boolean
 	is_publish_wait_skipped: boolean
-	// The one consumer to propagate to, when `--target` narrowed the run (joshuafolkken/kit#2755).
+	// The one consumer to propagate to, when `--target` narrowed the run.
 	target?: string
 	// The usage message, when the arguments were not accepted. Carried alongside rather than returned
 	// instead, so the caller has one shape to branch on.
@@ -87,11 +87,11 @@ function parse_options(argv: ReadonlyArray<string>): RunOptions {
 }
 
 // Propagation runs from the supplier's own repository, and only there — kit's, or a toolkit's built
-// on it (joshuafolkken/kit#2879).
+// on it.
 //
 // This is also what decides who propagates when several sessions are running: in the
 // per-repository concurrency model there is one session per checkout, so the session standing in
-// the supplier repository is the one that can run this command (joshuafolkken/kit#861). It is a
+// the supplier repository is the one that can run this command. It is a
 // convention enforced at the boundary, not a lock — two checkouts of the supplier would both pass,
 // which is why each consumer is additionally refused unless its working tree is clean.
 function refuse_outside_source_repository(project_root: string): string | undefined {
@@ -192,7 +192,7 @@ interface RunPlan {
 
 // The consumers this run will consider, narrowed by `--target`. Resolved before the publish wait so
 // a mistyped name fails at once instead of after minutes of polling the registry. A consumer that
-// installs a toolkit above the supplier is left to that toolkit's propagation (joshuafolkken/kit#2879).
+// installs a toolkit above the supplier is left to that toolkit's propagation.
 function resolve_run_targets(
 	releases: ReleasePlan,
 	version: string,

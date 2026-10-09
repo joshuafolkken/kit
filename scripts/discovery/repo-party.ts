@@ -1,7 +1,7 @@
 import { repo_discovery } from './repo-discovery'
 import { repo_origin } from './repo-origin'
 
-// **First-party vs third-party, computed rather than judged** (joshuafolkken/kit#2122). `CLAUDE.md`
+// **First-party vs third-party, computed rather than judged**. `CLAUDE.md`
 // and `upstream-interrupt.md` both declared the test mechanical — owner equality between the target
 // repository and the session's — yet nothing computed it: three prose spots restated the manual
 // `gh api … --jq .owner.login`, and whether an owner had actually been read was left to trust. This is
@@ -56,7 +56,7 @@ function remote_owners(repository_path: string): Array<string | undefined> {
 		.map((url) => repo_origin.parse_origin_url(url)?.owner)
 }
 
-// Every owner `gh` could expand the `{owner}` placeholder to (joshuafolkken/kit#3188). `GH_REPO`
+// Every owner `gh` could expand the `{owner}` placeholder to. `GH_REPO`
 // (`[HOST/]OWNER/REPO`) overrides the remotes outright; otherwise `gh` picks its base repository among
 // the GitHub remotes — `upstream` ahead of `origin`, or a `gh repo set-default` choice — so in a fork
 // checkout it can expand to the upstream owner. Answering the whole candidate set rather than

@@ -7,7 +7,7 @@ import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { z } from 'zod'
 
-// The consumer-setup checks `josh doctor` runs in a repository that installs kit (joshuafolkken/kit#1930).
+// The consumer-setup checks `josh doctor` runs in a repository that installs kit.
 // Each failure was a way the distribution went silently wrong: the plugin never installed so skills
 // were missing, `core.hooksPath` set so lefthook installed nothing, the `CLAUDE.md` pointer resolving
 // to a file that is not there before `pnpm install`, and secretlint not runnable so the pre-commit

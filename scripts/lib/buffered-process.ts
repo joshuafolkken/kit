@@ -7,8 +7,7 @@ import { SUITE_TIMEOUT_MS } from './timeouts'
 // need the same three things: the output buffered until the child finishes (concurrent writers
 // otherwise interleave into an unreadable transcript), a non-zero exit reported rather than thrown
 // (so one failing check does not abort its siblings), and a bound on how long a child may hang.
-// They had the same code twice, which is how a fix to one of them missed the other
-// (joshuafolkken/kit#914).
+// They had the same code twice, which is how a fix to one of them missed the other.
 
 const PNPM = 'pnpm'
 const FORCE_COLOR = '1'
@@ -21,13 +20,12 @@ interface BufferedProcessResult {
 	exit_code: number | undefined
 	// How long the child ran, in milliseconds. Measured here rather than at each call site because
 	// this function owns the child's lifetime — a caller timing it from outside would have to repeat
-	// the same two readings, and every fan-out caller would repeat them once per branch
-	// (joshuafolkken/kit#1248).
+	// the same two readings, and every fan-out caller would repeat them once per branch.
 	elapsed_ms: number
 }
 
-// The two things a caller outside the fan-out needs to vary, and the only two
-// (joshuafolkken/kit#1554). `lane:open` runs its install in the work tree it just created rather
+// The two things a caller outside the fan-out needs to vary, and the only two.
+// `lane:open` runs its install in the work tree it just created rather
 // than in the directory `josh` was typed in, and bounds it well under the fan-out's half hour
 // because an install that never answers has to end the command rather than hold a parallel run
 // open. Everything else — the buffering, the non-throwing exit, and the color policy that respects

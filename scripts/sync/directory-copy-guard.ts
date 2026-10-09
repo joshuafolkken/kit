@@ -7,7 +7,7 @@ import { file_content } from './file-content'
 // `josh init` and `josh sync` both copy a distributed directory with `cpSync`, and both have to
 // answer the same question first: is this copy one that `cpSync` will refuse? The answer lives here
 // rather than in each command, because the failure modes are the same and a second copy of the list
-// would drift (joshuafolkken/kit#853, which made the directory list non-empty for the first time).
+// would drift.
 //
 // Every check goes through `lstat`, never `existsSync` or `stat`:
 //   - `stat` follows a symlink, so a link pointing at a directory would read as a directory while
@@ -49,8 +49,7 @@ function directory_copy_blocker(source_path: string, destination_path: string): 
 // `cpSync` copies bytes, so a distributed directory would otherwise carry the package's own
 // `prompts/…` references into a consumer, where that directory does not exist — the very rewrite
 // every file copy already runs through `transform_copied_content`. Running it over the copied tree
-// puts both copy paths on one transform, which is what lets a skill cite the prompt it extends
-// (joshuafolkken/kit#854).
+// puts both copy paths on one transform, which is what lets a skill cite the prompt it extends.
 //
 // Markdown only, and deliberately so: the rewrite is a text substitution, the workflow pin and
 // managed-marker passes inside `transform_copied_content` are gated on a `.github/workflows`

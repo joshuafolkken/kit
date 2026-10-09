@@ -2,8 +2,8 @@ import { appendFileSync } from 'node:fs'
 import { expect } from 'vitest'
 import { GUARD_LOG_KEY } from './unit-guard-environment'
 
-// **A unit test that forgets to mock a notification must fail rather than notify**
-// (joshuafolkken/kit#2494). A lane child's new test drove `run_carry_cli.run(['--end', '--stopped',
+// **A unit test that forgets to mock a notification must fail rather than notify**.
+// A lane child's new test drove `run_carry_cli.run(['--end', '--stopped',
 // …])` without replacing `./run-stop-notify`, and two runs of it sent two real "backlogrun stopped"
 // confirmations — while the run was still going — and the test passed. `telegram-notify.ts` posts
 // with Node's own `fetch`, which the `gh` / `git` `PATH` shims in `test-network-guard.ts` never see.

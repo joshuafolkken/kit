@@ -1,6 +1,6 @@
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
 
-// The size half of the split assessment, measured rather than estimated (joshuafolkken/kit#2218).
+// The size half of the split assessment, measured rather than estimated.
 //
 // `split-assessment.md` → "The question" asks two things, and only the second is mechanical: does the
 // change **clearly exceed** what one verification gate confirms in one pass, the guide being about 10
@@ -27,8 +27,8 @@ interface SizeMeasurement {
 	verdict: SplitVerdict
 }
 
-// The guide's single source: `split-assessment.md` states these once and a test pins the two equal
-// (joshuafolkken/kit#2996). Strictly greater than: "about 10 changed files" and a change
+// The guide's single source: `split-assessment.md` states these once and a test pins the two equal.
+// Strictly greater than: "about 10 changed files" and a change
 // that "lands at 11 files is not thereby a split" put the bar above the round number, not at it.
 const FILE_GUIDE = 10
 const LINE_GUIDE = 400

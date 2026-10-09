@@ -10,29 +10,26 @@ import { time_transcript_line, type Block, type TranscriptLine } from './time-tr
 const { NO_MESSAGE_ID, parse_line } = time_transcript_line
 const { NO_CALL, UNKNOWN_CALL, UNKNOWN_TOOL, to_tool_call } = time_tool_call
 
-// Turning a session transcript into timed spans (joshuafolkken/kit#1267).
+// Turning a session transcript into timed spans.
 //
 // `cost-*` reads the same files for what a run was billed. This reads the other axis: where its wall
 // clock went. Discovery and reading are `cost-transcript.ts`'s and are reused rather than copied;
 // what is here is the arithmetic, which has no counterpart on the cost side.
 //
-// **Reading one line is `time-transcript-line.ts`'s** since joshuafolkken/kit#1406, when this file
-// passed its length limit — the schemas, the two records a line yields and the parse that produces
-// them. `NO_MESSAGE_ID` and `parse_line` are re-exported below under the names they always had, so
-// the move changed no call site. `cost_blocks`' three type constants are still imported rather than
-// restated.
+// **Reading one line is `time-transcript-line.ts`'s** — the schemas, the two records a line yields
+// and the parse that produces them. `NO_MESSAGE_ID` and `parse_line` are re-exported below, and
+// `cost_blocks`' three type constants are imported rather than restated.
 //
-// **Reading a `tool_use` block into a `ToolCall` is `time-tool-call.ts`'s** since
-// joshuafolkken/kit#3264, when this file reached its length limit again. `UNKNOWN_TOOL` and
-// `to_tool_call` are re-exported below, so that move changed no call site either.
+// **Reading a `tool_use` block into a `ToolCall` is `time-tool-call.ts`'s**; `UNKNOWN_TOOL` and
+// `to_tool_call` are re-exported below.
 //
 // **The partition is by gap, not by pair.** Every span is the interval between two consecutive
 // events, classified by the *later* one: a span ending at an assistant line is model wait, one
 // ending at a tool result is that tool's execution, one ending at a user prompt is human wait.
 // Classifying by pairs instead would double-count parallel tool calls and leave the three shares
 // summing to something other than the elapsed time — the property that makes two runs comparable.
-// Measured against the three sessions joshuafolkken/kit#1267 restored by hand: 49.6 / 73.3 / 54.6
-// minutes, every share within 0.4 points of the hand figure.
+// Measured against three sessions restored by hand: 49.6 / 73.3 / 54.6 minutes, every share within
+// 0.4 points of the hand figure.
 
 const ASSISTANT_TYPE = 'assistant'
 const USER_TYPE = 'user'
@@ -43,7 +40,7 @@ const MODEL_CATEGORY: SpanCategory = 'model'
 const TOOL_CATEGORY: SpanCategory = 'tool'
 const HUMAN_CATEGORY: SpanCategory = 'human'
 
-// How the call this span paid for came back (joshuafolkken/kit#1309).
+// How the call this span paid for came back.
 //
 // **Three answers rather than two.** `unknown` is not a polite `ok`: a fifth of the tool results in
 // the transcripts measured carry no `is_error` at all — a file read, an answered question — and
@@ -67,17 +64,17 @@ const UNKNOWN_OUTCOME: SpanOutcome = 'unknown'
 interface ResultFacts {
 	call_id: string
 	outcome: SpanOutcome
-	// Which guard refused the call this result closed, and `''` for every non-refusal
-	// (joshuafolkken/kit#1913). Carried here for the reason `outcome` is: the result block is gone by
+	// Which guard refused the call this result closed, and `''` for every non-refusal.
+	// Carried here for the reason `outcome` is: the result block is gone by
 	// the time the per-guard refusal breakdown aggregates, and only what was read off it survives.
 	refusal_guard: string
 	// The id the harness assigned when it took this call's command into the background, and `''` for
-	// every other result (joshuafolkken/kit#1662). Fourth field for the reason the others are here:
+	// every other result. Fourth field for the reason the others are here:
 	// the launch's body is the only place the id is written, and the body is gone by the time
 	// anything places the command on the timeline.
 	background_id: string
-	// The stage rows a `pnpm josh followup` call printed into its own output
-	// (joshuafolkken/kit#1445). Third field for the reason the two above are here: the result block is
+	// The stage rows a `pnpm josh followup` call printed into its own output.
+	// Third field for the reason the two above are here: the result block is
 	// gone by the time anything aggregates, so what a table wants from it has to be read off it now.
 	// Empty for every span that is not a measured `followup` invocation.
 	followup_stages: ReadonlyArray<FollowupStage>
@@ -93,8 +90,8 @@ const NO_RESULT: ResultFacts = {
 
 // `ended_ms` is the absolute instant the span closed, so `[ended_ms - duration_ms, ended_ms]` is the
 // interval it occupied. A duration alone cannot say *when*, and two things need that: the CI wait,
-// which is the part of the PR-open→merge window no span covers (joshuafolkken/kit#1268), and the
-// phase breakdown that slices the same array by boundary (joshuafolkken/kit#1269).
+// which is the part of the PR-open→merge window no span covers, and the
+// phase breakdown that slices the same array by boundary.
 //
 // `branch` rides along for the same reason `cost-usage.ts` carries it on a record: it is what
 // `cost_attribute` reads to decide which issue the span belongs to.
@@ -103,17 +100,16 @@ const NO_RESULT: ResultFacts = {
 interface Span extends ToolCall, ResultFacts {
 	category: SpanCategory
 	duration_ms: number
-	// What the call itself took, before any of its minutes were handed to a delegated unit
-	// (joshuafolkken/kit#1591). Carried beside `duration_ms` rather than derived from it, because
+	// What the call itself took, before any of its minutes were handed to a delegated unit.
+	// Carried beside `duration_ms` rather than derived from it, because
 	// nothing downstream could recover it: `time_overlap.trim` replaces `duration_ms` and keeps no
 	// record of what it replaced.
 	//
 	// **The two answer different questions, and a report needs both.** `duration_ms` is this span's
 	// share of the run's wall clock, so the subtraction shortens it wherever a unit covered the same
-	// minutes — without that the four category shares stop reconstructing `elapsed_ms`, which is the
-	// double count joshuafolkken/kit#1287 fixed. This one is what a per-invocation row is asked for:
-	// a `Skill` call that really ran for five minutes was printed as 65 ms, because 65 ms is all the
-	// subtraction had left of it.
+	// minutes — without that the four category shares double-count and stop reconstructing
+	// `elapsed_ms`. This one is what a per-invocation row is asked for: a `Skill` call that really ran
+	// for five minutes would otherwise print as the few milliseconds the subtraction left of it.
 	//
 	// It survives that subtraction because `trim` copies the span and overwrites only `duration_ms`
 	// and `ended_ms`, so every fragment of one call carries the same value — which is why the tables
@@ -122,19 +118,19 @@ interface Span extends ToolCall, ResultFacts {
 	ended_ms: number
 	branch: string
 	// Whether this span is the *remainder* of a call whose middle was given to a delegated unit, cut
-	// out by `time_overlap.trim` (joshuafolkken/kit#1304). One call comes back as two spans there, so
+	// out by `time_overlap.trim`. One call comes back as two spans there, so
 	// anything counting calls rather than intervals has to skip the second — the round-trip block and
 	// the per-tool table's `call_count` both do. Every span the transcript itself yields is `false`;
 	// only the subtraction sets it.
 	is_continuation: boolean
 	// The `pnpm josh <cmd>` this span ran *beside*, where it sits inside a backgrounded command's
-	// window, and `''` everywhere else (joshuafolkken/kit#1662). It is resolved after the walk rather
+	// window, and `''` everywhere else. It is resolved after the walk rather
 	// than read off a call, because the window is not known until the join that closes it has been
 	// seen — so it has `is_continuation`'s shape rather than `marker`'s: every span the walk yields is
 	// empty, and only `time_background.positioned` sets it.
 	background_command: string
 	// When the harness said the command this span launched had finished, and `NO_FINISH` where nothing
-	// said (joshuafolkken/kit#1696). It is the notice's own instant rather than a reading's, so it is
+	// said. It is the notice's own instant rather than a reading's, so it is
 	// keyed to the launch by id at parse time — the notice sits on a line of its own, which is why no
 	// field read off this span's own result could carry it.
 	background_ended_ms: number
@@ -157,7 +153,7 @@ interface Timeline {
 // the empty string, where the next result that carries no `tool_use_id` would match it and be
 // labelled with an unrelated tool — a wrong name where `UNKNOWN_TOOL` is the honest one.
 // A `tool_use` block with the assistant message it was written under, which is the turn that issued
-// it (joshuafolkken/kit#1406). The pair is kept rather than the block alone because the id lives on
+// it. The pair is kept rather than the block alone because the id lives on
 // the *line* and the flatten below is where it would otherwise be lost.
 interface IssuedCall {
 	block: Block
@@ -207,8 +203,8 @@ function event_of(
 // outcome — a file read, an answered question — would otherwise be counted as calls that succeeded,
 // and a run whose whole transcript was written by them would report a measured zero failures.
 //
-// **What the command said outranks what the harness recorded, in one direction only**
-// (joshuafolkken/kit#1361). A josh check run inside a pipeline exits with the pipe's status, so the
+// **What the command said outranks what the harness recorded, in one direction only**.
+// A josh check run inside a pipeline exits with the pipe's status, so the
 // harness writes `is_error: false` over a red gate; the failure line the command printed is the only
 // surviving evidence, and it is read *before* the field. The reverse never happens — a call the
 // harness marked failed is failed whatever it printed.
@@ -250,8 +246,7 @@ function to_event(
 ): TimelineEvent | undefined {
 	// **A model span carries the message its own line belongs to**, which is what makes a turn
 	// countable: Claude Code writes one line per content block and repeats the id on each, so the
-	// lines are what a naive count sees and the id is what says how many turns they were
-	// (joshuafolkken/kit#1406).
+	// lines are what a naive count sees and the id is what says how many turns they were.
 	if (line.type === ASSISTANT_TYPE) {
 		return event_of(line, MODEL_CATEGORY, { ...NO_CALL, message_id: line.message_id })
 	}
@@ -276,15 +271,15 @@ function to_events(
 // interval paid for is the work the later line records, and taking the opening line's branch would
 // attribute the first span after a `josh git` to whatever preceded the branch.
 // The two durations of a span that nothing has taken a share of yet, which is every span a
-// transcript itself yields and every span a test builds (joshuafolkken/kit#1591). Written once here
+// transcript itself yields and every span a test builds. Written once here
 // so no builder can set one and forget the other — the drift would be silent, and would surface as a
 // per-invocation row disagreeing with the transcript it was read from.
 function equal_durations(duration_ms: number): Pick<Span, 'duration_ms' | 'own_duration_ms'> {
 	return { duration_ms, own_duration_ms: duration_ms }
 }
 
-// The four background fields of a span nothing backgrounded, which is every span a test builds
-// (joshuafolkken/kit#1662). Written once here for the reason `equal_durations` above is: three
+// The four background fields of a span nothing backgrounded, which is every span a test builds.
+// Written once here for the reason `equal_durations` above is: three
 // fixtures assemble a `Span` literal, and a field added to two of them is a drift that surfaces only
 // as a table disagreeing with the transcript it was read from.
 type BackgroundFields = Pick<
@@ -368,15 +363,15 @@ function parse_timeline(text: string): Timeline {
 	return {
 		started_ms: events[0]?.timestamp_ms ?? 0,
 		ended_ms: events.at(-1)?.timestamp_ms ?? 0,
-		// **The positioning happens here rather than in a caller** (joshuafolkken/kit#1662): a launch and
+		// **The positioning happens here rather than in a caller**: a launch and
 		// the call that reads its output are in one transcript, and by the time spans have been merged
 		// across sessions and trimmed they are fragments rather than calls.
 		spans: time_background.positioned(to_spans(events, time_background.finished_at(lines))),
 	}
 }
 
-// **"No span was read" is the one criterion every scope withholds a transcript figure on**
-// (joshuafolkken/kit#1295). A run whose transcript could not be attributed, a child of an epic in
+// **"No span was read" is the one criterion every scope withholds a transcript figure on**.
+// A run whose transcript could not be attributed, a child of an epic in
 // that state, and a batch no child contributed to are the same fact asked at three scales, and each
 // used to spell it out for itself — which is how the run scope came to print three `0.0 min` rows
 // beside the epic scope's `not measured` for the very same child.
@@ -401,7 +396,7 @@ const time_spans = {
 	equal_durations,
 	no_background,
 	// Re-exported so the suites that measure how a command is read keep asking one namespace, and so
-	// `time-shell.ts` moving out of this file changed no call site (joshuafolkken/kit#1344).
+	// `time-shell.ts` moving out of this file changed no call site.
 	bash_label: time_shell.bash_label,
 	josh_command_of: time_shell.josh_command_of,
 	josh_commands_of: time_shell.josh_commands_of,

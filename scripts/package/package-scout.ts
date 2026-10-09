@@ -1,6 +1,6 @@
 // The measured metrics behind `josh pkg:scout` — the ranking of package candidates and the near-tie
 // verdict that turns the Package-First "clearly best (Tier A) / genuine toss-up (Tier B)" branch from
-// an impression into a computed answer (joshuafolkken/kit#2216).
+// an impression into a computed answer.
 //
 // This module is the pure half: it takes candidates already gathered from the npm registry and
 // answers two things — the order they rank in, and whether the top two are close enough that the

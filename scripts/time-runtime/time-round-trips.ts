@@ -1,6 +1,6 @@
 import { time_spans, type Span } from './time-spans'
 
-// How many times a run stopped and waited for a tool result (joshuafolkken/kit#1304).
+// How many times a run stopped and waited for a tool result.
 //
 // The other `time-*` modules measure *duration*: where the wall clock went, and which command spent
 // it. This measures the one thing duration cannot see. Measured on four runs, the tools themselves
@@ -13,7 +13,7 @@ import { time_spans, type Span } from './time-spans'
 // spans.** Counting calls instead would report a turn that batched four reads as four round trips —
 // which is the improvement, scored as the defect.
 //
-// **Adjacency was the original rule and it was wrong on real transcripts** (joshuafolkken/kit#1406).
+// **Adjacency was the original rule and it was wrong on real transcripts**.
 // It rested on "tool spans sit adjacent exactly when their calls were issued together in one turn",
 // and Claude Code does not write a turn that way: each `tool_use` block is its own assistant line and
 // the harness returns each result as soon as it has one, so a turn issuing three calls is written
@@ -43,10 +43,9 @@ import { time_spans, type Span } from './time-spans'
 //   the model share was right on run #1399 while the turn count was not.
 
 // Below this, a run is issuing about one call per turn: nothing is being batched, and the turn count
-// (which is what the wall clock is charged per) is as high as the call count. Set from the four runs
-// measured on joshuafolkken/kit#1304 — #1251, #1290, #1292 and #1295 — whose densities were 1.13,
-// 1.04, 1.03 and 1.00: every one of them a run in which independent reads and edits went out one per
-// turn. A run that batches even occasionally clears this, so it flags the absence of batching rather
+// (which is what the wall clock is charged per) is as high as the call count. Set from four measured
+// runs whose densities were 1.13, 1.04, 1.03 and 1.00: every one of them a run in which independent
+// reads and edits went out one per turn. A run that batches even occasionally clears this, so it flags the absence of batching rather
 // than grading its degree.
 const CALLS_PER_ROUND_TRIP_FLOOR = 1.5
 const DENSITY_DECIMALS = 2
@@ -95,7 +94,7 @@ function count_calls(spans: ReadonlyArray<Span>): number {
 }
 
 // The nearest span before this one that is not a model span, or `undefined` where none is.
-// **The walk back crosses model spans and stops at everything else** (joshuafolkken/kit#1406): a
+// **The walk back crosses model spans and stops at everything else**: a
 // turn's own calls are separated only by its own model spans, while a human wait means the next turn
 // was composed after an interruption and a continuation means a delegated unit ran in between —
 // neither of which any message could have issued its calls across. A human span that stops the walk
@@ -128,8 +127,8 @@ function continues_turn(spans: ReadonlyArray<Span>, index: number, message_id: s
 // the density in *both* wrong directions at once, one call fewer over one trip more, which is how a
 // turn that batched and delegated could print the warning meant for a turn that did neither.
 //
-// **Two rules, and the adjacency one is the fallback rather than the definition**
-// (joshuafolkken/kit#1406). A call issued beside another in the array is the shape the transcript
+// **Two rules, and the adjacency one is the fallback rather than the definition**.
+// A call issued beside another in the array is the shape the transcript
 // writes when the results arrive together, and it stays as it was — including for a span carrying no
 // message id at all. Everything else asks the id, which is what catches the shape Claude Code
 // actually writes: `use → result → use → result`, one turn, its calls separated by its own model
@@ -158,7 +157,7 @@ interface TripWalk {
 	open: Array<Span> | undefined
 }
 
-// **A model span no longer closes the open trip** (joshuafolkken/kit#1406). It is what sits between
+// **A model span no longer closes the open trip**. It is what sits between
 // two calls of one turn, so closing on it left the turn's second call with no trip to join and the
 // per-tool counts reporting a batched turn as a run of solitary calls. What still closes one is a
 // human wait: the turn after it was composed after an interruption, so its calls belong to a trip of
@@ -179,7 +178,7 @@ function step_trip(walk: TripWalk, span: Span, is_opener: boolean): void {
 	else if (!is_model(span)) walk.open = undefined
 }
 
-// **A round trip as the calls it carried, rather than as a count** (joshuafolkken/kit#1385). The count
+// **A round trip as the calls it carried, rather than as a count**. The count
 // is what this returns the length of, so the two cannot come to disagree about what a round trip is —
 // which is the whole point of asking here rather than grouping the spans a second time next door.
 //
@@ -210,8 +209,8 @@ function turn_key(span: Span, index: number): string {
 	return span.message_id === time_spans.NO_MESSAGE_ID ? `#${String(index)}` : span.message_id
 }
 
-// **How many assistant messages the run's model spans came from — the definition of a turn**
-// (joshuafolkken/kit#1406). Not how many model spans there are: Claude Code writes one line per
+// **How many assistant messages the run's model spans came from — the definition of a turn**.
+// Not how many model spans there are: Claude Code writes one line per
 // content block and repeats the message id on each, so a turn that thought and then issued two calls
 // is three lines and three model spans. Counting the spans reported run #1399's 41 turns as 79, and
 // with them halved every per-turn figure divided by this — `josh time --epic`'s `ms_per_turn` above
@@ -223,7 +222,7 @@ function count_turns(spans: ReadonlyArray<Span>): number {
 }
 
 // What one round trip cost, in whatever unit the numerator carries: calls, for the density the floor
-// above is quoted in, and milliseconds for the price joshuafolkken/kit#1307 added. **One divisor with
+// above is quoted in, and milliseconds for the price per round trip. **One divisor with
 // one guard, rather than a second copy per unit** — the two are the same question about the same
 // denominator, and a guard written into only one of them would print, in the unit that lacked it,
 // exactly the measurement the other withholds.
@@ -252,23 +251,21 @@ const time_round_trips = {
 	CALLS_PER_ROUND_TRIP_FLOOR,
 	count_calls,
 	count_round_trips,
-	// Exported since joshuafolkken/kit#1406, so a turn is defined in the one module that already
-	// defines a round trip rather than as a span filter in the report next door.
+	// Exported so a turn is defined in the one module that already defines a round trip rather than
+	// as a span filter in the report next door.
 	count_turns,
 	format_density,
-	// Exported since joshuafolkken/kit#1385, so the per-tool counts are read off the very groups this
-	// module counts rather than off a second grouping beside them.
+	// Exported so the per-tool counts are read off the very groups this module counts rather than off
+	// a second grouping beside them.
 	group_round_trips,
-	// Exported since joshuafolkken/kit#1309, so the failure aggregation orders a run's spans through
+	// Exported so the failure aggregation orders a run's spans through
 	// the one function that already knows why they need it — a second `toSorted` beside it would be
 	// the clone `CLAUDE.md` prohibits, and the seam it guards (a delegated unit's spans appended
 	// after the parent's) is not one a second copy would keep remembering.
 	in_time_order,
 	is_below_floor,
-	// The four below are exported since joshuafolkken/kit#1406, when the model-gap walk moved to
-	// `time-model-gaps.ts` and needed the same predicates and the same opener test this walk uses. A
-	// private copy there would be the clone `CLAUDE.md` prohibits, in the one place a drift would have
-	// the distribution and the count disagreeing about what a round trip is.
+	// Exported so callers price a round trip with the same divisor and guard rather than a private
+	// copy — the clone `CLAUDE.md` prohibits.
 	per_round_trip,
 }
 

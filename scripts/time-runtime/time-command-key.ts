@@ -1,6 +1,6 @@
 import { time_spans, type Span } from './time-spans'
 
-// What counts as *the same command* across a run's spans (joshuafolkken/kit#1311).
+// What counts as *the same command* across a run's spans.
 //
 // Two questions need it and used to answer it separately: the failure chain asks whether a call
 // repeats one that just failed, and the per-invocation listing asks which calls belong on one row.
@@ -22,7 +22,7 @@ import { time_spans, type Span } from './time-spans'
 const UNNAMED_KEY = ''
 
 // **The parameter is the two fields it reads, not the whole `Span`.** A full span satisfies it, and so
-// does a `ToolCall` the batching guard builds for a live call (joshuafolkken/kit#1979) — the key has
+// does a `ToolCall` the batching guard builds for a live call — the key has
 // to mean the same thing whether it is read off a recorded span or the call about to repeat it.
 function command_key(span: Pick<Span, 'label' | 'josh_command'>): string {
 	if (span.label === time_spans.UNKNOWN_TOOL) return UNNAMED_KEY

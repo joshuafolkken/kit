@@ -4,7 +4,7 @@ import path from 'node:path'
 import { json_value } from '#scripts/lib/json-value'
 
 // What a hook build was made from, so a later launch can tell whether `dist/hooks/` still matches the
-// source it runs beside (joshuafolkken/kit#2984). `dist/` is git-ignored and rebuilt only by
+// source it runs beside. `dist/` is git-ignored and rebuilt only by
 // `pnpm build`, so without this record an edited guard keeps running its old bundle with nothing to
 // say so — and a lane's bundles are copied from the main checkout, whose source can differ.
 //
@@ -16,7 +16,7 @@ import { json_value } from '#scripts/lib/json-value'
 // **The digest is taken from the bytes the build read, never re-read from disk afterwards.** A source
 // edited while the build runs would otherwise be recorded as built, and its stale bundle read as fresh.
 //
-// **A verified digest is remembered by each input's mtime and size** (joshuafolkken/kit#3397). Hashing
+// **A verified digest is remembered by each input's mtime and size**. Hashing
 // every input on every hook launch is the gate's whole cost, so once the digest has matched, the
 // inputs' signatures are written beside the stamp and a later launch whose signatures all match skips
 // the hash. The digest stays the record: a copied or checked-out tree matches no remembered signature

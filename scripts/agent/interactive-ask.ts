@@ -1,13 +1,10 @@
 import { z } from 'zod'
 
-// The tools a session uses to ask a person, and how to lift a refused ask out of an exit record
-// (joshuafolkken/kit#2201).
+// The tools a session uses to ask a person, and how to lift a refused ask out of an exit record.
 //
 // **A dispatched lane child cannot ask a person.** It is a headless `claude -p` process, so an
-// interactive ask is refused — and with nowhere to route it the turn ends with nothing on the Issue,
-// the gap joshuafolkken/kit#2034 measured. Two consumers share the one notion of "an interactive ask":
-// the
-// `PreToolUse` rule that refuses it in a lane child (`scripts/rules/lane-interactive-ask.ts`), and
+// interactive ask is refused — and with nowhere to route it the turn ends with nothing on the Issue.
+// Two consumers share the one notion of "an interactive ask": the `PreToolUse` rule that refuses it in a lane child (`scripts/rules/lane-interactive-ask.ts`), and
 // `run:ending`, which reads the refused ask back out of the child's exit record so the parent can put
 // the question and its options into the park comment. Both read `INTERACTIVE_TOOLS`, so the set lives
 // here rather than in either.

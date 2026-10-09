@@ -22,9 +22,9 @@ const SCRUBBED_ENV: Readonly<Record<string, string>> = {
 
 // Cleared to empty is not the same as absent, and the parent-session variables need to be *absent*:
 // execa runs with `extendEnv: true` by default, so the child inherits this process's whole
-// environment. The list and the reasoning are `agent-session-environment.ts`, shared with `run:wake` since
-// joshuafolkken/kit#1719 — a second launcher of a headless session, and a second copy of the list
-// would be the clone that fails silently.
+// environment. The list and the reasoning are `agent-session-environment.ts`, shared with `run:wake` —
+// a second launcher of a headless session, and a second copy of the list would be the clone that
+// fails silently.
 
 const GH_CONFIG_KEY = 'GH_CONFIG_DIR'
 const SPAWN_FAILURE_EXIT_CODE = -1
@@ -41,7 +41,7 @@ function is_timeout_result(result: { timedOut?: boolean | undefined }): boolean 
 // execa names the signal that terminated a process; anything else — including an empty string — is
 // not a kill. One definition, because `spawn_failure_note` asks the same question and a second
 // spelling of it let `signal: ''` count as a kill there and as no signal here, which dropped the
-// signal name and the message together (joshuafolkken/kit#1005).
+// signal name and the message together.
 function read_signal(result: { signal?: string | undefined }): string | undefined {
 	return typeof result.signal === 'string' && result.signal !== '' ? result.signal : undefined
 }
@@ -52,7 +52,7 @@ function read_signal(result: { signal?: string | undefined }): string | undefine
 // **Only for that case.** A process killed by a signal also has no exit code, and execa's message for
 // one is `<prefix>: <the whole escaped command>` — for this suite, the entire scenario prompt printed
 // where a diagnosis belongs. A kill is recognized by its signal and named from that instead, so this
-// message is used only when nothing ever started (joshuafolkken/kit#1001).
+// message is used only when nothing ever started.
 function spawn_failure_note(result: {
 	exitCode?: number | undefined
 	message?: string | undefined
@@ -76,7 +76,7 @@ interface SessionResult {
 	stderr: string
 	// Whether the timeout above is what ended it. Carried out because the exit code cannot say: execa
 	// reports no exit code at all for a signal-terminated process, so a timeout is otherwise
-	// indistinguishable from a failed spawn (joshuafolkken/kit#1001).
+	// indistinguishable from a failed spawn.
 	is_timed_out: boolean
 	// The signal that killed it, when one did. A session ended by the OOM killer or by a harness
 	// watchdog is neither a timeout nor a spawn failure, and saying which signal arrived is the only

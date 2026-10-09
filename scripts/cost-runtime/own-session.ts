@@ -1,7 +1,7 @@
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { cost_transcript, type SessionFile } from './cost-transcript'
 
-// Which transcript in a listing is the *calling* session's own (joshuafolkken/kit#2403).
+// Which transcript in a listing is the *calling* session's own.
 //
 // **The mtime was measuring another session.** `latest_own_index` took the newest non-delegated
 // transcript as "the run that just finished", which is right for a report run after a run ends but

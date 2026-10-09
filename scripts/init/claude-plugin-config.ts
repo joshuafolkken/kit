@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { init_logic_json_merge } from './init-logic-json-merge'
 
-// The Claude Code plugin that ships kit's distributed skills (joshuafolkken/kit#1879). A consumer no
+// The Claude Code plugin that ships kit's distributed skills. A consumer no
 // longer receives the five skill directories as a byte copy under its own `.claude/skills/`; it
 // receives this marketplace and plugin declaration in its `.claude/settings.json`, and the skills
 // load from the package as `kit:<name>`.
@@ -16,7 +16,7 @@ const CLAUDE_SETTINGS_DESTINATION = path.join('.claude', 'settings.json')
 // `enabledPlugins` declares the plugin; `extraKnownMarketplaces` says where to find it. Nothing needs
 // installing: in a trusted workspace Claude Code registers the marketplace from this declaration and
 // loads the skills — an interactive session from its first session, a headless one (`claude -p`) from
-// its second (joshuafolkken/kit#2990).
+// its second.
 const PLUGIN_SETTINGS: Record<string, unknown> = {
 	extraKnownMarketplaces: {
 		[MARKETPLACE_NAME]: { source: { source: 'directory', path: MARKETPLACE_PATH } },

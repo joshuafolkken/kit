@@ -7,8 +7,7 @@ import { git_command } from '#scripts/git/git-command'
 import { file_reader } from '#scripts/lib/read-file'
 import { ui_routes } from './ui-routes'
 
-// `josh ui:routes [--staged]` — list the screenshot-target routes the current change touches
-// (joshuafolkken/kit#2182).
+// `josh ui:routes [--staged]` — list the screenshot-target routes the current change touches.
 //
 // The derivation lives in `ui-routes.ts`; this file is the I/O around it: read the changed paths
 // (the branch diff, or the staged diff with `--staged`), and resolve a shared component to the routes

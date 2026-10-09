@@ -16,10 +16,10 @@ import { eval_transcript } from './eval-transcript'
 
 // `pnpm josh eval [name...]`. Deliberately not wired into CI: every scenario is a real Claude
 // session, so the suite costs tokens and minutes and is run when a document or hook changes — the
-// moment its answer is worth paying for (joshuafolkken/kit#855).
+// moment its answer is worth paying for.
 //
 // The command around the run; how the run spends its wall-clock is `eval-runner.ts`, which is where
-// the loop can be tested without spawning a session (joshuafolkken/kit#1144).
+// the loop can be tested without spawning a session.
 const SCENARIO_DIRECTORY = path.join(PACKAGE_DIR, 'evals/scenarios')
 const DEFAULT_MODEL = 'sonnet'
 const MODEL_ENV_KEY = 'JOSH_EVAL_MODEL'
@@ -86,7 +86,7 @@ function unknown_scenarios(
 
 // Not silence: without a verdict line the caller's rule reads this as `unmeasured`, which does not
 // block a merge — and this path is reached by a typo in the very re-run a `blocked` verdict asked
-// for (joshuafolkken/kit#907).
+// for.
 function report_startup_problem(message: string): boolean {
 	console.error(message)
 	eval_report.report_not_run()
@@ -98,7 +98,7 @@ function report_startup_problem(message: string): boolean {
 // write to shared state from a point where nothing guarantees the process is still the one that
 // started the run, and the lint rule that says so is right.
 // Recorded before the first session starts, so a `/code-review` running alongside can afterwards be
-// checked against exactly the tree the suite read (joshuafolkken/kit#1152). Best-effort on
+// checked against exactly the tree the suite read. Best-effort on
 // purpose: a record that could not be written leaves a reader of the per-checkout record with
 // nothing, so it must measure again rather than trust a result nothing vouches for. Failing
 // the run instead would turn a temp-directory problem into a lost measurement.
@@ -110,7 +110,7 @@ function record_measured_tree(): void {
 	}
 }
 
-// The other half of the record, written once the run has returned a verdict (joshuafolkken/kit#1164).
+// The other half of the record, written once the run has returned a verdict.
 // A run interrupted at the keyboard, or one whose scenarios threw, never reaches this line, and the
 // record it leaves says only that a run started — an incomplete record a reader must treat as
 // `required`, the same answer no record at all gets. Best-effort for the same reason the write is: an
@@ -145,7 +145,7 @@ async function run_selection(
 	// **Above the verdict line.** Every documented procedure reads the run's *last* line as the
 	// one-token verdict, so a warning printed after it would send an agent following the gate to the
 	// wrong line. Whether it is written at all is `run_recorded`'s single whole-suite condition,
-	// carried down rather than re-tested (joshuafolkken/kit#1197).
+	// carried down rather than re-tested.
 	if (is_whole_suite) eval_streak.report_streak(verdict)
 
 	eval_report.print_verdict(verdict)
@@ -156,8 +156,7 @@ async function run_selection(
 // Both halves of the record are written under one condition — the whole-suite run below — so it is
 // asked once rather than twice, and neither half can be written without the other's guard. The run
 // of verdicts is carried down rather than re-tested here for the same reason: it belongs to the same
-// condition, and it has to be *printed* from inside the selection, above the verdict line
-// (joshuafolkken/kit#1197).
+// condition, and it has to be *printed* from inside the selection, above the verdict line.
 async function run_recorded(
 	chosen: ReadonlyArray<Scenario>,
 	concurrency: number,
@@ -188,10 +187,10 @@ async function main(): Promise<boolean> {
 	// would otherwise overwrite the record with a newer timestamp and the tree as it is now, and
 	// a reader would then compare that tree against itself and see nothing changed: a one-scenario
 	// reading standing in for the suite's measurement. The record says what the suite measured, so it
-	// is written only where the suite is what ran — and, since joshuafolkken/kit#1164, the completion
-	// it later takes is written under the same condition rather than a second one. The run of verdicts
-	// joshuafolkken/kit#1197 counts is the third thing under that one condition, and for the same
-	// reason: a named re-run would otherwise clear the count with a single scenario.
+	// is written only where the suite is what ran — and the completion it later takes is written under
+	// the same condition rather than a second one. The run of verdicts the suite counts is the third
+	// thing under that one condition, and for the same reason: a named re-run would otherwise clear the
+	// count with a single scenario.
 	if (names.length > 0) return await run_selection(chosen, choice.limit, false)
 
 	return await run_recorded(chosen, choice.limit)

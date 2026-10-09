@@ -23,7 +23,7 @@ function merge_yaml_list_entry(content: string, key: string, value: string): str
 // lefthook preset (kit's own, or an app-kit / game-kit framework preset that already extends kit
 // base) is present. Adding kit's `vanilla.yml` alongside such a preset would extend
 // `lefthook/base.yml` twice, which lefthook rejects with a hard "possible recursion in extends"
-// crash. See joshuafolkken/kit#660.
+// crash.
 function merge_lefthook_extends(content: string, value: string): string {
 	const entries = config_merge.read_yaml_list_field(content, LEFTHOOK_EXTENDS_FIELD)
 	if (kit_base_preset.is_lefthook_base_present(entries)) return content
@@ -35,7 +35,7 @@ function merge_lefthook_extends(content: string, value: string): string {
 // preset (kit's own base, or an app-kit / game-kit framework preset that already imports kit's
 // cspell base) is present. Adding kit's base alongside such a preset is a redundant double import.
 // kit owns this dedup because there is no downstream overlay in kit's `josh sync` path — every
-// consumer drives the sync through kit's CLI, so the check must live here. See joshuafolkken/kit#660.
+// consumer drives the sync through kit's CLI, so the check must live here.
 function merge_cspell_import(content: string, value: string): string {
 	const entries = config_merge.read_yaml_list_field(content, CSPELL_IMPORT_FIELD)
 	if (kit_base_preset.is_cspell_base_present(entries)) return content

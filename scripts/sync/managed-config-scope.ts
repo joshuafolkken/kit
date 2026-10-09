@@ -13,8 +13,8 @@ const AI_COPY_DIRECTORIES_LIST = 'AI_COPY_DIRECTORIES'
 // `init-logic.ts`: these destinations are written by `sync.ts` directly and appear on no list there.
 const SYNCED_PATHS_LIST = 'SYNCED_PATHS'
 
-// The fifth source: the skill directories that ship as the `kit` plugin rather than as a copy
-// (joshuafolkken/kit#1879). They are no longer in `AI_COPY_DIRECTORIES`, but a change to one still
+// The fifth source: the skill directories that ship as the `kit` plugin rather than as a copy.
+// They are no longer in `AI_COPY_DIRECTORIES`, but a change to one still
 // reaches consumers through the package, so the gate keeps flagging it.
 const PLUGIN_SKILL_DIRECTORIES_LIST = 'PLUGIN_SKILL_DIRECTORIES'
 
@@ -57,7 +57,7 @@ function matches_plugin_skill(path: string): boolean {
 
 // The paths `josh sync` writes outside the three `AI_COPY_*` lists — `playwright.config.ts` and the
 // rest. Reading only those three made the gate **narrower than the instruction it replaced**, whose
-// own worked example was a file none of them holds (joshuafolkken/kit#1578).
+// own worked example was a file none of them holds.
 function matches_synced_path(path: string): boolean {
 	return synced_paths.get_synced_paths().includes(path)
 }
@@ -96,7 +96,7 @@ function has_managed_path(paths: ReadonlyArray<string>): boolean {
 
 // The path *and* the list that claimed it, because the two answer different questions: which file to
 // look at, and why it counts as distributed. `AI_COPY_DIRECTORIES` is the one a reader cannot derive
-// by eye — the path matched a directory entry it does not textually equal (joshuafolkken/kit#1578).
+// by eye — the path matched a directory entry it does not textually equal.
 function format_hit(hit: ManagedHit): string {
 	return `${hit.path} (${hit.list})`
 }

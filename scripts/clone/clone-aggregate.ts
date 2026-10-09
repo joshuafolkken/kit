@@ -1,4 +1,4 @@
-// Grouping fingerprints into clones, and classifying how far each clone spans (joshuafolkken/kit#2217).
+// Grouping fingerprints into clones, and classifying how far each clone spans.
 //
 // This is the pure core the `no-clones` rule was missing a measurement for: `sonarjs/no-identical-
 // functions` sees only inside one file, and the rule's real target is duplication that crosses file

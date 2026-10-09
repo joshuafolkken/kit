@@ -13,7 +13,7 @@ import { package_scout_format } from './package-scout-format'
 
 // `josh pkg:scout <keywords> [--size <n>]` — before the Package-First tier decision, rank the
 // candidate packages by measured metrics so "clearly best (Tier A)" and "genuine toss-up (Tier B)"
-// are read off the output rather than judged (joshuafolkken/kit#2216).
+// are read off the output rather than judged.
 //
 // The registry answers in three reads: one search for the candidates, then per candidate a downloads
 // point and the latest version metadata (bundled types, license, unpacked size). A per-candidate read

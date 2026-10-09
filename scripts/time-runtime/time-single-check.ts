@@ -1,7 +1,6 @@
 import { time_shell } from './time-shell'
 
-// Which calls are one verification check run on its own, and what makes two of them the same call
-// (joshuafolkken/kit#1383).
+// Which calls are one verification check run on its own, and what makes two of them the same call.
 //
 // Measured on run #1379, that run issued eight of these — 45.9 seconds of tool time, six of them in
 // the fix phase, each its own round trip — and 18.1 seconds after the last one `josh gate` ran lint,

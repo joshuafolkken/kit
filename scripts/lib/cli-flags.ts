@@ -5,7 +5,7 @@ import { parseArgs, type ParseArgsConfig, type ParseArgsOptionsConfig } from 'no
 const HELP_FLAGS: ReadonlySet<string> = new Set(['--help', '-h'])
 
 // The usage line `refuse_unknown_flags` ends with, for a command that prints it on its own help
-// request (`josh release --help`, joshuafolkken/kit#3384).
+// request (`josh release --help`).
 function usage_line(known_flags: ReadonlyArray<string>, command: string): string {
 	if (known_flags.length === 0) return `Usage: josh ${command}`
 
@@ -27,9 +27,8 @@ function refuse_unknown_flags(
 	return `Unknown argument(s): ${unknown.join(' ')}\n${usage_line(known_flags, command)}`
 }
 
-// The argument gate of a command that publishes (`josh release`, `josh release:github`,
-// joshuafolkken/kit#3384, joshuafolkken/kit#3385): a help request prints the usage and exits 0, an
-// unknown argument is refused with exit 1, both before any side effect. `undefined` means the
+// The argument gate of a command that publishes (`josh release`, `josh release:github`): a help
+// request prints the usage and exits 0, an unknown argument is refused with exit 1, both before any side effect. `undefined` means the
 // arguments are all known and the command may run.
 function answer_help_or_unknown(
 	argv: ReadonlyArray<string>,
@@ -53,7 +52,7 @@ function answer_help_or_unknown(
 // `parseArgs`, answering `undefined` where it would throw — an unknown flag, a missing option value,
 // or a positional the config does not allow. Each caller turns that into its usage line and a failure
 // exit rather than a stack trace, on commands whose output a workflow reads; eleven of them had begun
-// to carry a copy of the same try/catch each (joshuafolkken/kit#2902), and this is the one copy.
+// to carry a copy of the same try/catch each, and this is the one copy.
 function parse_or_undefined<T extends ParseArgsConfig>(
 	config: T,
 ): ReturnType<typeof parseArgs<T>> | undefined {
@@ -66,7 +65,7 @@ function parse_or_undefined<T extends ParseArgsConfig>(
 
 // The two shapes every command reads `argv` in: flags alone, or flags beside positionals. Both are
 // strict, so an unknown flag is `undefined` rather than a silently ignored typo; the commands had each
-// carried a one-line wrapper spelling these out (joshuafolkken/kit#3072).
+// carried a one-line wrapper spelling these out.
 type FlagsOnly<T extends ParseArgsOptionsConfig> = ReturnType<
 	typeof parseArgs<{ args: Array<string>; options: T }>
 >

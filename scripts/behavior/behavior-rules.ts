@@ -3,7 +3,7 @@ import { time_shell } from '#scripts/time-runtime/time-shell'
 import type { Block, TranscriptLine } from '#scripts/time-runtime/time-transcript-line'
 import type { Assertion, Finding } from './behavior-assertion'
 
-// The behavior assertions checked against recorded transcripts (joshuafolkken/kit#2365). This is the
+// The behavior assertions checked against recorded transcripts. This is the
 // **seed set** — the issue's own plan is to land one rule that is green across the recorded corpus,
 // then add more one at a time, each verified green before it joins. Starting with many would land a
 // wall of red that says nothing about which behavior actually regressed.
@@ -14,7 +14,7 @@ const COMMAND_KEY = 'command'
 const FIRST_POSITION_OFFSET = 1
 const TOOL_RESULT = 'tool_result'
 // The openings of the two results that mean a Bash call never ran: the permission layer's refusal,
-// and a PreToolUse hook's block (joshuafolkken/kit#3197). A PostToolUse hook error is deliberately
+// and a PreToolUse hook's block. A PostToolUse hook error is deliberately
 // absent — that hook fires after the command has already run.
 const DENIED_BASH_PREFIXES = [
 	'Permission to use Bash with command ',
@@ -65,7 +65,7 @@ function command_of(block: Block): string | undefined {
 // subcommand and is not a dry run. Each `;`/`&&`/`|`-separated segment is judged on its own, so a
 // mutation anywhere in a chain is caught while a mention inside another command's argument is not.
 //
-// Quoted spans are removed before the split (joshuafolkken/kit#2841): a `|` inside a quoted pattern —
+// Quoted spans are removed before the split: a `|` inside a quoted pattern —
 // `grep -E "commit|git add" file` — is not a separator, and cutting there synthesized a segment that
 // began with `git add` out of a read-only search. `unquoted` honors escapes and heredoc bodies, so a
 // stray `it's` cannot pair with a later quote and erase the real `git add` between them.

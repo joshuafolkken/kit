@@ -33,7 +33,7 @@ const BASIC_AI_FILES = [
 	SECURITY_MD,
 	WORKSPACE_YAML,
 ]
-// A basic project gets its own template for these, not kit's development copy (joshuafolkken/kit#2693).
+// A basic project gets its own template for these, not kit's development copy.
 const BASIC_SOURCES: Readonly<Record<string, string>> = {
 	[PRETTIER_IGNORE]: 'templates/prettierignore.basic',
 	[WORKSPACE_YAML]: 'templates/pnpm-workspace.basic.yaml',
@@ -68,8 +68,8 @@ function copy_ai_file(source_path: string, destination_path: string): void {
 // destination may hold a workflow the consumer wrote themselves, and a header claiming this package
 // owns it would hold every bump to it back on a false premise. But an unstamped workflow is not
 // merely out of date either — the consumer's auto-merge workflow reads the stamp, so until `sync`
-// writes one, a bump to a workflow this package does overwrite merges and the next sync reverts it
-// (joshuafolkken/kit#844). A warning is the honest middle: `sync` resolves it either way, and this
+// writes one, a bump to a workflow this package does overwrite merges and the next sync reverts it.
+// A warning is the honest middle: `sync` resolves it either way, and this
 // names the consequence rather than leaving it to be discovered from a revert.
 //
 // The destination is checked before the file is opened, and a read failure is stepped over, so
@@ -103,9 +103,9 @@ function did_skip_copy_if_absent(
 }
 
 // The merged file is written back, and reported as `updated`, only when the merge changed it — a
-// second `josh init` over an already-merged file reports `unchanged` (joshuafolkken/kit#2873).
+// second `josh init` over an already-merged file reports `unchanged`.
 // The workspace template with the project's own `.npmrc` values carried over: once the file holds a
-// key, the merge keeps it, so this is the one chance to move the value (joshuafolkken/kit#3267).
+// key, the merge keeps it, so this is the one chance to move the value.
 function read_workspace_template(source_path: string, destination_path: string): string {
 	const npmrc = file_reader.read_file_or_empty(path.join(path.dirname(destination_path), '.npmrc'))
 
@@ -242,10 +242,10 @@ function did_skip_ai_directory_copy(directory_name: string): boolean {
 
 // `josh init` writes the one-line CLAUDE.md import when the consumer has none, and — like every other
 // AI file — leaves an existing one untouched so a consumer's additions are never disturbed. `josh sync`
-// is what ensures the import line on an existing file (sync.ts). CLAUDE.md is no longer byte-copied
-// (joshuafolkken/kit#1878), so it is handled here rather than through AI_COPY_FILES.
+// is what ensures the import line on an existing file (sync.ts). CLAUDE.md is no longer byte-copied,
+// so it is handled here rather than through AI_COPY_FILES.
 //
-// The one edit made to an existing file is the rules import written before joshuafolkken/kit#2829,
+// The one edit made to an existing file is the rules import written under the static profile name,
 // moved onto the basic path — only that kit-written line, never the consumer's additions.
 // An unreadable file is left as it is and reported as skipped, as it was before the migration.
 function read_if_readable(destination_path: string): string | undefined {
@@ -271,8 +271,8 @@ function basic_claude_md(): string {
 }
 
 // A basic CLAUDE.md imports the basic rules alone: the full bootstrap and import are removed, a
-// pre-rename path is moved, and the basic header is restored when no basic import is left
-// (joshuafolkken/kit#2827). The project's own lines stay as they are.
+// pre-rename path is moved, and the basic header is restored when no basic import is left.
+// The project's own lines stay as they are.
 function ensure_basic_claude_md(existing: string | undefined): string {
 	if (existing === undefined) return basic_claude_md()
 	const kept = basic_path_migration.migrate_basic_paths(
@@ -303,7 +303,7 @@ function did_skip_claude_md_import(shape?: ProjectShape): boolean {
 }
 
 // Returns the repository name resolved for the Sonar config, so `josh init` can reuse it for the
-// security-updates report instead of spawning a second `gh repo view` (joshuafolkken/kit#805).
+// security-updates report instead of spawning a second `gh repo view`.
 // Resolving it here rather than in the caller keeps every AI-file write ahead of the network call.
 function should_copy_git_file(filename: string, shape?: ProjectShape): boolean {
 	if (shape?.has_git !== false) return true

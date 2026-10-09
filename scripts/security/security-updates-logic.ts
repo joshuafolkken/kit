@@ -3,12 +3,11 @@ import { repo_setting, type RepoSettingStatus } from '#scripts/repo/repo-setting
 // GitHub's Dependabot security-updates setting, as reported by
 // `GET /repos/{owner}/{repo}/automated-security-fixes`.
 //
-// joshuafolkken/kit#803 set `open-pull-requests-limit: 0` on the npm entry of the distributed
+// `open-pull-requests-limit: 0` is set on the npm entry of the distributed
 // `.github/dependabot.yml`, which makes the security-advisory path the only remaining source of npm
 // Dependabot PRs. That path depends on this repository-level setting, which is opt-in and off by
 // default for private repositories — so a consumer that syncs the file without it gets zero npm
-// Dependabot PRs, advisories included. The failure is silent: no PR looks exactly like no advisory
-// (joshuafolkken/kit#805).
+// Dependabot PRs, advisories included. The failure is silent: no PR looks exactly like no advisory.
 //
 // `paused` is this setting's own third state, which is why the shared two-state classifier is only
 // half the answer here (see classify_security_updates).

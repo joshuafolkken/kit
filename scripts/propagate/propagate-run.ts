@@ -5,11 +5,11 @@ import type { PropagateTarget } from './propagate-targets'
 //
 // One consumer's failure never stops another: the whole point of the command is to leave the run
 // knowing which consumers took the release and which did not, and a run that aborts on the first
-// failure answers that for a prefix of them (joshuafolkken/kit#863).
+// failure answers that for a prefix of them.
 
 // The steps, in order, that carry a release into one consumer. `josh` here is the consumer's own
 // installed CLI, run from the consumer's directory — which is what keeps kit's self-sync guard
-// (joshuafolkken/kit#868) out of the way: the sync runs in a consumer project, where it belongs.
+// out of the way: the sync runs in a consumer project, where it belongs.
 const STEP_PRECHECK = 'working tree check'
 const STEP_UPGRADE = 'josh vu'
 const STEP_SYNC = 'josh sync'
@@ -44,8 +44,7 @@ interface StepResult {
 	// file, for instance. The sequence ends here as a skip rather than opening an empty pull request.
 	is_complete?: boolean
 	// What this failure actually left in the consumer, as the failing step measured it. Only the
-	// steps that can probe set it; for the rest the standing note below is what they always leave
-	// (joshuafolkken/kit#1417).
+	// steps that can probe set it; for the rest the standing note below is what they always leave.
 	leftover?: string
 }
 
@@ -89,9 +88,8 @@ function has_leftover_changes(steps: ReadonlyArray<StepResult>): boolean {
 
 // What to say the failure left behind. A step that measured it wins; the note above stands in only
 // where none did, which is every step before the commit — and there it is accurate, since nothing
-// has committed yet. Before joshuafolkken/kit#1417 it was appended to *every* failure after the
-// upgrade, including one whose commit had already been made, so a push refused by the consumer's
-// pre-push hook was reported as changes that were never committed.
+// has committed yet. Appended to *every* failure after the upgrade, it would report a push refused
+// by the consumer's pre-push hook as changes that were never committed.
 function leftover_of(result: StepResult, steps: ReadonlyArray<StepResult>): string | undefined {
 	if (!has_leftover_changes(steps)) return undefined
 

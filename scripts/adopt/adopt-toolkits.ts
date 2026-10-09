@@ -5,8 +5,7 @@ import { propagate_targets, type Manifest } from '#scripts/propagate/propagate-t
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { z } from 'zod'
 
-// Which `@joshuafolkken/*` toolkits `josh adopt` can upgrade in the repository it is run from
-// (joshuafolkken/kit#1085).
+// Which `@joshuafolkken/*` toolkits `josh adopt` can upgrade in the repository it is run from.
 //
 // Discovery is a filesystem fact rather than a roster written here: a hardcoded list would go stale
 // the day a fourth toolkit is published, and a project that depends on only one of them would be
@@ -112,7 +111,7 @@ function resolve_toolkit(project_root: string, package_name: string): Release | 
 // package turns out to be. A package that is installed perfectly well and simply ships **no** CLI is
 // a scoped *library* rather than a toolkit: nothing about it is broken, so it is not this, and it is
 // not misplaced either. The `@joshuafolkken/` prefix alone cannot tell the two apart, which is why
-// the question is asked of the installed `bin` field (joshuafolkken/kit#1540 review round 1).
+// the question is asked of the installed `bin` field.
 function is_unreachable_toolkit(project_root: string, package_name: string): boolean {
 	const installed = read_installed_manifest(project_root, package_name)
 	if (installed === undefined) return true
@@ -153,8 +152,8 @@ function all_declared_toolkits(project_root: string): ReadonlyArray<string> {
 }
 
 // The other half of the same read: which declared packages the run cannot reach at all. Dropping
-// them silently is what let a partial install sync kit alone and revert the overlay tier
-// (joshuafolkken/kit#1540), so the caller refuses on this list rather than discovering it as a
+// them silently is what let a partial install sync kit alone and revert the overlay tier,
+// so the caller refuses on this list rather than discovering it as a
 // shorter plan. A scoped library that ships no CLI appears in neither list, because nothing about it
 // is broken.
 function unresolved_toolkits(project_root: string): ReadonlyArray<string> {

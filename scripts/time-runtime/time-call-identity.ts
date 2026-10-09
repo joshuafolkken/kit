@@ -1,7 +1,7 @@
 import { time_command_key } from './time-command-key'
 import type { Span } from './time-spans'
 
-// What "the same call" means, in one place (joshuafolkken/kit#1979).
+// What "the same call" means, in one place.
 //
 // Two readers ask it and must agree. `time-guard-refusals.ts` asks whether a refused call was later
 // re-issued unchanged — the false-positive hint on the guard breakdown — and `time-batch-guard.ts`

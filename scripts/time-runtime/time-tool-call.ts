@@ -8,7 +8,7 @@ import { time_transcript_line } from './time-transcript-line'
 import { time_writes } from './time-writes'
 
 // Reading a `tool_use` block into the label a span carries — split out of `time-spans.ts` when it
-// reached its line limit (joshuafolkken/kit#3264). `time_spans` re-exports `UNKNOWN_TOOL` and
+// reached its line limit. `time_spans` re-exports `UNKNOWN_TOOL` and
 // `to_tool_call` under the names they always had, so the move changed no call site.
 
 const { NO_MESSAGE_ID } = time_transcript_line
@@ -19,31 +19,31 @@ const UNKNOWN_TOOL = 'unknown'
 // `pnpm josh <cmd>` invocation, and the report drops empty labels rather than printing a bucket.
 //
 // `marker` names the workflow boundary the call is, for the phase breakdown that slices the same
-// spans by stage (joshuafolkken/kit#1269). It is carried here rather than re-derived later because
+// spans by stage. It is carried here rather than re-derived later because
 // the tool's *input* is what decides it, and a span keeps no input — only the label read off it.
 //
-// `is_bundleable` and `targets` are carried for exactly that reason too (joshuafolkken/kit#1344).
+// `is_bundleable` and `targets` are carried for exactly that reason too.
 // Whether a call could have gone out beside another, and what it names, are both read off the input —
 // so a module asking about them after the fact would have nothing to read. `time-bundle-call.ts`
 // decides both; the rule each one follows is stated there.
 //
-// `check_key` is the fourth, and the third time this reason has applied (joshuafolkken/kit#1383). Two
+// `check_key` is the fourth, and the third time this reason has applied. Two
 // runs of one verification check are the same call only if they named the same files, and the files
 // are in the input — so `josh_command` alone cannot say, and nothing downstream could recover it.
 // `time-single-check.ts` decides it.
 //
-// `message_id` is the fifth, and it is the one that says which *turn* a call belongs to
-// (joshuafolkken/kit#1406). It is read off the line the `tool_use` block sat on rather than off the
+// `message_id` is the fifth, and it is the one that says which *turn* a call belongs to.
+// It is read off the line the `tool_use` block sat on rather than off the
 // result that closes the span, because a `tool_result` line carries no message id at all — so a span
 // that did not keep it here could never be attributed to the turn that issued it.
 //
-// `writes` is the sixth, and it is what `targets` could not say (joshuafolkken/kit#1472). `targets`
+// `writes` is the sixth, and it is what `targets` could not say. `targets`
 // names what a call mentioned; `marker` says a call was *an* edit but not of what, and for a tool
 // outside `BUNDLEABLE_TOOLS` it arrived with no target at all. So a consumer subtracting edits from
 // reads — `investigation-reads.ts` — had nothing to subtract for `MultiEdit` / `NotebookEdit`, and
 // nothing at all to tell an in-place `sed -i` from the `sed -n` it shares a label with.
 // `time-writes.ts` decides it, from the input this span is about to discard.
-// `issue` is the seventh, and it is the one `branch` could not carry (joshuafolkken/kit#1617). Under
+// `issue` is the seventh, and it is the one `branch` could not carry. Under
 // lanes the session writing the transcript stays on the default branch while the work runs in a linked
 // work tree, so `branch` names no issue on any line of the run; the `in-progress` label call does, and
 // like every field above it that answer is read off the *input* a span is about to discard.
@@ -51,7 +51,7 @@ const UNKNOWN_TOOL = 'unknown'
 interface ToolCall {
 	label: string
 	josh_command: string
-	// Every josh subcommand the call ran, where `josh_command` is only the first (joshuafolkken/kit#1883).
+	// Every josh subcommand the call ran, where `josh_command` is only the first.
 	// A chained `pnpm josh lint:related && pnpm josh test:related` carries both; the count tables expand
 	// it so the ones `josh_command` drops are still counted.
 	josh_commands: ReadonlyArray<string>
@@ -60,21 +60,20 @@ interface ToolCall {
 	is_bundleable: boolean
 	targets: ReadonlyArray<string>
 	// Carried beside `targets` because sharing a target means something different depending on it: a
-	// second write to one file is independent work, a read of a file just written is not
-	// (joshuafolkken/kit#1509).
+	// second write to one file is independent work, a read of a file just written is not.
 	is_writing: boolean
 	// The conservative write answer `is_read_only_call` asks of a live call, carried so a reader of the
-	// transcript asks the same read-only question as the guard (joshuafolkken/kit#3139).
+	// transcript asks the same read-only question as the guard.
 	may_write: boolean
-	// Whether this is a subagent launch whose prompt builds on an earlier launch's finding
-	// (joshuafolkken/kit#1854). Carried for the reason every field here is — the prompt it is read from
+	// Whether this is a subagent launch whose prompt builds on an earlier launch's finding.
+	// Carried for the reason every field here is — the prompt it is read from
 	// is the input, and a span keeps none. `time-agent-bundles.ts` reads it.
 	has_prior_reference: boolean
 	writes: ReadonlyArray<string>
 	message_id: string
 	issue: number
-	// The background run this call reads the output of, and `''` for every other call
-	// (joshuafolkken/kit#1662). It is the eighth field carried for the reason the seven above are:
+	// The background run this call reads the output of, and `''` for every other call.
+	// It is the eighth field carried for the reason the seven above are:
 	// the id sits in the command string, which a span does not keep, and it is the only thing that
 	// says a `tail` two turns later is the join of a command started minutes ago.
 	reads_background: string

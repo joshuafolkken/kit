@@ -21,8 +21,7 @@ const NOT_ON_PATH = '(not on PATH)'
 const SELF_DIR = path.dirname(fileURLToPath(import.meta.url))
 // Deliberately smaller than the setting query's budget: the two run back to back, so `doctor`'s
 // worst case is the git probe plus this plus GH_TIMEOUT_MS — 2000 + 3000 + 5000, ten seconds. That
-// keeps a command which made no network calls at all before joshuafolkken/kit#805 prompt enough to
-// stay usable when the network is unreachable.
+// keeps the command prompt enough to stay usable when the network is unreachable.
 const REPO_LOOKUP_TIMEOUT_MS = 3000
 
 // Where the local applicability gates look for the artifacts that decide whether a report applies.
@@ -108,7 +107,7 @@ function resolve_gate_scope(git: GitTopLevel): GateScope | undefined {
 }
 
 // Which prerequisites this repository actually has, decided locally so the answer does not depend on
-// `gh` working. The two are independent: a consumer synced before joshuafolkken/kit#834 has the
+// `gh` working. The two are independent: a consumer synced from an older kit can have the
 // Dependabot config and no auto-merge workflow, and a repository that only ever added an auto-merge
 // workflow of its own has the second prerequisite and not the first.
 function resolve_applicable(scope: GateScope): ApplicableSettings {
@@ -125,7 +124,7 @@ function has_any_applicable(applicable: ApplicableSettings): boolean {
 }
 
 // Everything past the gate reports, including a failed lookup: `could not be read` is informative
-// while silence is the false all-clear joshuafolkken/kit#805 exists to remove.
+// while silence would be a false all-clear.
 function report_applicable_settings(
 	applicable: ApplicableSettings,
 	repo: string | undefined,
@@ -140,7 +139,7 @@ function report_applicable_settings(
 
 // Last, and after the local diagnosis: this is the only part of `doctor` that touches the network,
 // and `doctor` is what a user runs when the install is already broken. Offline or behind a hanging
-// proxy the PATH report and `--fix` must still complete (joshuafolkken/kit#805).
+// proxy the PATH report and `--fix` must still complete.
 //
 // Applicability is decided by the artifact rather than by the directory. `doctor` diagnoses the
 // global install and is routinely run from a home directory or from a clone of an unrelated project;
@@ -166,7 +165,7 @@ function report_repository_settings(git: GitTopLevel): void {
 
 // The discovery map, printed for whichever repository `doctor` is standing in. Nothing is printed
 // from outside a repository: discovery is anchored on the current repository's own owner, so without
-// one there is no map to be right or wrong about (joshuafolkken/kit#869).
+// one there is no map to be right or wrong about.
 function report_repository_map(git: GitTopLevel): void {
 	if (git.state !== 'inside') return
 
@@ -177,7 +176,7 @@ function report_repository_map(git: GitTopLevel): void {
 }
 
 // Each discovered repository's port seed and the ports it resolves to, and any seed shared by more
-// than one of them (joshuafolkken/kit#1494). Anchored on the same map as `report_repository_map`, so
+// than one of them. Anchored on the same map as `report_repository_map`, so
 // it prints from inside a repository and nowhere else.
 function report_port_seeds(git: GitTopLevel): void {
 	if (git.state !== 'inside') return
@@ -203,7 +202,7 @@ function consumer_root(git: GitTopLevel): string {
 	return git.state === 'inside' ? git.top_level : PROJECT_ROOT
 }
 
-// The port seed table is opt-in since joshuafolkken/kit#1930: it discovers every sibling repository
+// The port seed table is opt-in: it discovers every sibling repository
 // and was the slowest, least diagnostic part of the default output. `--ports` brings it back.
 function run_reports(ctx: DoctorContext, git: GitTopLevel, options: DoctorOptions): void {
 	print_report(ctx)
@@ -220,7 +219,7 @@ function main(): void {
 
 	// Resolved once and shared: `doctor` is what a user runs when things are already broken, and a
 	// second `git rev-parse` would add a second timeout to a command whose whole contract is to stay
-	// responsive when git itself is hanging (joshuafolkken/kit#805).
+	// responsive when git itself is hanging.
 	const git = doctor_io.resolve_git_top_level()
 
 	run_reports(ctx, git, options)

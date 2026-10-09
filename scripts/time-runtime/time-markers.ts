@@ -1,7 +1,7 @@
 import { cost_attribute } from '#scripts/cost-runtime/cost-attribute'
 import { json_value } from '#scripts/lib/json-value'
 
-// Which workflow boundary a tool call marks (joshuafolkken/kit#1269).
+// Which workflow boundary a tool call marks.
 //
 // The per-tool totals answer "which command is slow" and say nothing about "which *stage* is long".
 // A stage is bounded by things a transcript can be read for, so this module is the one rule for what
@@ -14,7 +14,7 @@ import { json_value } from '#scripts/lib/json-value'
 // would be a second rule for the same thing. What is left is four: the plan comment, the first
 // edit, the code-review invocation, and the instant the workflow itself opened.
 //
-// **The workflow boundary has two spellings, and both are the same marker** (joshuafolkken/kit#1299).
+// **The workflow boundary has two spellings, and both are the same marker**.
 // A run is not a session: the transcript attributed to an issue reaches back into whatever the
 // session was doing before the keyword was typed, so without a marker for "the run starts here"
 // that earlier conversation is measured as part of it. Loading the `workflow-commands` skill is the
@@ -22,22 +22,18 @@ import { json_value } from '#scripts/lib/json-value'
 // them performs on GitHub — so the earliest of the two is taken and neither is required, which is
 // what keeps a delegated unit (whose parent loaded the skill) and a resumed run measurable.
 //
-// **The review boundary sits on whatever call the main line spends the review inside**, and since
-// joshuafolkken/kit#1855 that is an `Agent` call rather than a `Skill` one. Before it, the main line
-// loaded `/code-review` through the `Skill` tool and that call returned three to four minutes later
-// with the finding list — so the `Skill(code-review)` call carried the review's whole duration and
-// was the marker. #1855 moved the review into a forked subagent launched with the `Agent` tool, and
-// the main line no longer loads the skill at all: the `Skill(code-review)` call now lives inside the
-// fork's own transcript, where it returns instantly (it only loads the skill text), and the review's
+// **The review boundary sits on whatever call the main line spends the review inside**, which is an
+// `Agent` call: the review runs in a forked subagent, and the `Skill(code-review)` call lives inside
+// the fork's own transcript, where it returns instantly (it only loads the skill text). The review's
 // real wall clock is the fork's own `Read`/`grep` spans. Those spans carry no marker of their own, so
-// they inherit the marker of the parent span they run inside — the `Agent` call (`time-overlap.ts`,
-// joshuafolkken/kit#1439). Left unmarked that parent deletes the phase rather than moving it, which is
-// the ~0 ms `review` joshuafolkken/kit#1846 measured. So the `Agent` launch is marked here, exactly
-// as the `Skill` call was, and the old `Skill(code-review)` marker stays for pre-#1855 transcripts.
+// they inherit the marker of the parent span they run inside — the `Agent` call (`time-overlap.ts`).
+// Left unmarked that parent deletes the phase rather than moving it, leaving a ~0 ms `review`. So the
+// `Agent` launch is marked here, and the `Skill(code-review)` marker stays for older transcripts in
+// which the main line loaded the skill itself.
 //
 // **The launch is recognized by its prompt carrying both `/code-review` and `review:attest`.** The
 // first is the instruction to invoke the review skill; the second is the attestation line
-// `pnpm josh review:brief` emits into the brief the launch passes verbatim (joshuafolkken/kit#1522).
+// `pnpm josh review:brief` emits into the brief the launch passes verbatim.
 // Neither alone is enough: an investigation subagent about the review tooling quotes `/code-review`
 // in prose and is handed no brief, so `review:attest` is what tells a genuine review launch from a
 // discussion of one — measured against five real launches, it admits the review and rejects every
@@ -59,7 +55,7 @@ const SKILL_KEY = 'skill'
 const REVIEW_SKILL = 'code-review'
 const WORKFLOW_SKILL = 'workflow-commands'
 
-// The forked review launch (joshuafolkken/kit#1846). `Agent` is the tool the main line spawns the
+// The forked review launch. `Agent` is the tool the main line spawns the
 // review subagent with, and `prompt` is where the instruction to it lives.
 const AGENT_TOOL = 'Agent'
 const PROMPT_KEY = 'prompt'
@@ -99,7 +95,7 @@ const BODY_FLAG_PATTERN = /--body(?:-file)?\b/u
 // The API path is required alongside it for the reason the plan boundary requires one: a command that
 // merely quotes the flag, which this repository's own issue bodies do, is not the call.
 // The number is captured because the same call is the only place a run states, in its own transcript,
-// which issue it is running (joshuafolkken/kit#1617). Capturing changes nothing for the `test` above
+// which issue it is running. Capturing changes nothing for the `test` above
 // it — the boundary is still the whole match.
 // **The trailing `(?!\/)` is what keeps the capture on the issue being labelled.** `labels[]=in-progress`
 // only has to appear somewhere in the command, and the capture takes the leftmost match — so one call
@@ -111,7 +107,7 @@ const BODY_FLAG_PATTERN = /--body(?:-file)?\b/u
 const ISSUE_LABELS_PATTERN = /repos\/\S+\/issues\/(\d+)\/labels\b(?!\/)/u
 const IN_PROGRESS_FIELD = 'labels[]=in-progress'
 
-// **`run:entry` applies the label itself now** (joshuafolkken/kit#3182), so a run opened through it
+// **`run:entry` applies the label itself now**, so a run opened through it
 // leaves no `gh api` add form in its transcript — the call that opens the run and names its issue is
 // `pnpm josh run:entry <N>`, and it is read as the same declaration. `run:release` is not: like the
 // removal form above, it ends a hold rather than opening one.
@@ -173,8 +169,8 @@ function is_run_start(command: string): boolean {
 
 // Which issue a Bash call declares its run to be running, or `undefined` where it declares nothing.
 //
-// **Attribution's other evidence is the branch, and a lane run has none to give**
-// (joshuafolkken/kit#1617): the session writing the transcript stays on the default branch while the
+// **Attribution's other evidence is the branch, and a lane run has none to give**:
+// the session writing the transcript stays on the default branch while the
 // child's commands run in a linked work tree, so `gitBranch` says `main` on every line and
 // `cost_attribute` has nothing to fill forward. This call is what is left, and it is the right thing
 // to be left with — it is the run naming its own issue, once, and `time-sessions.ts` already treats

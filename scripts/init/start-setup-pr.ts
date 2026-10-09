@@ -65,7 +65,7 @@ function carried_paths(root: string, current: string | undefined): Array<string>
 }
 
 // The Issue carries the release classification the pull request is opened with, so the PR step finds
-// one without a person adding it (joshuafolkken/kit#2816).
+// one without a person adding it.
 function file_setup_issue(): string {
 	const request = git_gh_issue_write.issue_create_request({
 		title: SETUP_TITLE,

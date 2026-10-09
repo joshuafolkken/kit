@@ -11,9 +11,9 @@ const BASIC_CLAUDE_FILENAME = 'CLAUDE.basic.md'
 const SOURCE_CLAUDE_MD = path.join(REPO_ROOT, 'CLAUDE.md')
 const DIST_CLAUDE_MD = path.join(DIST_ROOT, 'CLAUDE.md')
 const SOURCE_BASIC_CLAUDE_MD = path.join(REPO_ROOT, 'templates', BASIC_CLAUDE_FILENAME)
-// A basic project's `CLAUDE.md` imports the rules from dist/. One initialized before
-// joshuafolkken/kit#2829 imports them under the profile's old name until `josh init` is re-run
-// and migrates that import, so the same rules ship under both names.
+// A basic project's `CLAUDE.md` imports the rules from dist/. An older one imports them under the
+// profile's old name until `josh init` is re-run and migrates that import, so the same rules ship
+// under both names.
 const DIST_BASIC_CLAUDE_MDS: ReadonlyArray<string> = [
 	path.join(DIST_ROOT, BASIC_CLAUDE_FILENAME),
 	path.join(DIST_ROOT, 'CLAUDE.static.md'),
@@ -21,7 +21,7 @@ const DIST_BASIC_CLAUDE_MDS: ReadonlyArray<string> = [
 
 // Read kit's own CLAUDE.md and apply the distribution path transform. kit's source keeps relative
 // paths so it resolves inside the kit repository; the published copy rewrites them so every backtick
-// reference resolves in a consumer too (joshuafolkken/kit#1878). Pure — the guard test asserts the
+// reference resolves in a consumer too. Pure — the guard test asserts the
 // result carries no reference a consumer cannot open.
 function generate_distributed_claude_md(): string {
 	return init_logic.transform_distributed_paths(readFileSync(SOURCE_CLAUDE_MD, 'utf8'))

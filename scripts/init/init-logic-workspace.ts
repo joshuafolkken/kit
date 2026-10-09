@@ -45,7 +45,7 @@ function remove_deprecated_yaml_keys(content: string): string {
 // pnpm 11+ writes this placeholder into `allowBuilds` for every build script it ignored, and fails
 // every later install until it is answered. `pnpm add -D @joshuafolkken/kit` before `josh init`
 // leaves one for esbuild, and the key-level merge below keeps an existing `allowBuilds` whole, so a
-// placeholder the template decides is answered here (joshuafolkken/kit#2693).
+// placeholder the template decides is answered here.
 const BUILD_PLACEHOLDER_PATTERN = /^([ \t]+)([^\s:#][^:#]*): set this to true or false$/gmu
 const TEMPLATE_BUILD_PATTERN = /^[ \t]+(?<key>[^\s:#][^:#]*):[ \t]*(?<value>true|false)\b/u
 
@@ -89,8 +89,8 @@ function build_entry_keys(block: string): Set<string> {
 
 // The key-level merge keeps an existing `allowBuilds` whole, and `pnpm add -D @joshuafolkken/kit`
 // before `josh init` always leaves one (esbuild's), so without this the template's other approvals
-// never landed and the first `pnpm install` failed on the next build script, e.g. unrs-resolver's
-// (joshuafolkken/kit#2710). Entries the project already answered keep their value.
+// never landed and the first `pnpm install` failed on the next build script, e.g. unrs-resolver's.
+// Entries the project already answered keep their value.
 // Only a block mapping can take appended entry lines; a flow map (`allowBuilds: { … }`) is left whole.
 const BLOCK_MAPPING_HEADER_PATTERN = /^allowBuilds:[ \t]*(?:#[^\n]*)?(?:\n|$)/u
 const LEADING_INDENT_PATTERN = /^[ \t]+/u
@@ -133,7 +133,7 @@ interface MovedNpmrcSetting {
 
 // `.npmrc` settings pnpm 12 reads only from `pnpm-workspace.yaml`, with the value shape each takes.
 // A project's own value (a longer age window, `engine-strict=false`) replaces the template's, so the
-// move neither loosens nor tightens what the project chose (joshuafolkken/kit#3267).
+// move neither loosens nor tightens what the project chose.
 const MOVED_NPMRC_SETTINGS: ReadonlyArray<MovedNpmrcSetting> = [
 	{ npmrc_key: 'minimum-release-age', workspace_key: 'minimumReleaseAge', value_pattern: /^\d+$/u },
 	{ npmrc_key: 'engine-strict', workspace_key: 'engineStrict', value_pattern: /^(?:true|false)$/u },

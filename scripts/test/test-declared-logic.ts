@@ -1,5 +1,4 @@
-// The verdict `josh test:declared` prints, decided from the changed paths alone
-// (joshuafolkken/kit#2118).
+// The verdict `josh test:declared` prints, decided from the changed paths alone.
 //
 // **The input is a set of paths, never a judgement.** The spelling of a test file is fixed by
 // `eslint/rules/test-filename.js` (`*.test.ts` / `*.e2e.ts`), and the mechanically-exempt non-runtime
@@ -30,7 +29,7 @@ const EXEMPT_PREFIXES: ReadonlyArray<string> = ['.idea/', '.vscode/', 'prompts/'
 const EXEMPT_SUFFIXES: ReadonlyArray<string> = ['.md']
 const BASIC_VISUAL_SUFFIXES: ReadonlyArray<string> = ['.html', '.css']
 
-// What stays `required` under the basic profile (joshuafolkken/kit#2820): the languages kit's own
+// What stays `required` under the basic profile: the languages kit's own
 // runner can test, and the data and config formats a JS/TS test can load. Any other file — HTML/CSS, or
 // the source of a project kit does not run, such as Lua — has no test kit could execute, so `required`
 // there would be unsatisfiable; it is confirmed by hand instead. The kept side is enumerated rather than

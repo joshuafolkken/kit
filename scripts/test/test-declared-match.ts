@@ -1,7 +1,7 @@
 import { test_type_logic, type TestType } from './test-type-logic'
 
-// The Step 0 declaration lines checked against the tests actually in the working-tree change set
-// (joshuafolkken/kit#2181). `CLAUDE.md` Step 0 fixes the shape of each line —
+// The Step 0 declaration lines checked against the tests actually in the working-tree change set.
+// `CLAUDE.md` Step 0 fixes the shape of each line —
 // `<what changes> — Test: <Unit|E2E> — <path> — <what it verifies>` — and `testing-guide.md` §0 asks
 // that the count of declared tests match the count added, yet nothing read the correspondence. This
 // reads it: for every declaration, whether the declared type matches the path, whether the path was
@@ -12,8 +12,7 @@ const FIELD_SEPARATOR = ' — '
 const TEST_MARKER = 'Test:'
 const TYPES: ReadonlyArray<TestType> = [test_type_logic.UNIT, test_type_logic.E2E]
 // The template writes the path in a code span (`report-format.md`), so one wrapping pair of backticks
-// is the path's markup, not part of it — read raw, every template-shaped line was `path-missing`
-// (joshuafolkken/kit#3422).
+// is the path's markup, not part of it — read raw, every template-shaped line was `path-missing`.
 const CODE_SPAN_PATTERN = /^`(?<path>[^`]+)`$/u
 
 type MatchStatus = 'match' | 'type-mismatch' | 'path-missing' | 'test-not-created'

@@ -16,8 +16,8 @@ interface AgentArgv {
 type AgentArgvResult =
 	{ kind: 'argv'; argv: AgentArgv; profile: AgentProfile } | { kind: 'rejected'; note: string }
 
-// **`session_id` forces the fresh session's id, and only the Claude path can honour it**
-// (joshuafolkken/kit#2407). Codex has no such flag, and the run-state report reads Claude transcripts
+// **`session_id` forces the fresh session's id, and only the Claude path can honour it**.
+// Codex has no such flag, and the run-state report reads Claude transcripts
 // alone, so an OpenAI scheduler simply builds as before; whiff attribution is a Claude-transcript
 // property, so nothing is lost by the omission.
 function build(
@@ -31,7 +31,7 @@ function build(
 		: claude_agent_argv.build(invocation, profile, session_id, cwd)
 }
 
-// The resume counterpart of `build` (joshuafolkken/kit#2317). Only the Claude path resumes by session
+// The resume counterpart of `build`. Only the Claude path resumes by session
 // id; an OpenAI lane carries no such id at the outage re-dispatch, so it falls back to a fresh build —
 // which is never reached in practice, because `lane-resume.ts` only plans a resume for an Anthropic
 // provider. The fallback keeps this total rather than throwing on a provider it was not handed.
@@ -47,7 +47,7 @@ function build_resume(
 }
 
 // **`session_id` threads to the Claude build, so a wake launched in a lane's work tree still forces
-// its transcript id** (joshuafolkken/kit#2407). It is optional, so every other caller of the
+// its transcript id**. It is optional, so every other caller of the
 // cwd-scoped build is unchanged.
 function with_profile_in(
 	invocation: string,
@@ -62,7 +62,7 @@ function with_profile_in(
 }
 
 // A resume build under the same profile diagnostics as `with_profile_in`, so a lane re-dispatch that
-// resumes a session runs the identical readiness check a fresh one does (joshuafolkken/kit#2317).
+// resumes a session runs the identical readiness check a fresh one does.
 function with_resume_in(
 	invocation: string,
 	profile: AgentProfile,
@@ -92,8 +92,8 @@ function resolve(
 	return resolved.kind === 'rejected' ? resolved : with_profile(invocation, resolved.profile)
 }
 
-// **A cut relaunch's profile, resolved for the phase the resumed child is entering**
-// (joshuafolkken/kit#2382). A stored lane profile keeps its model and takes only the phase's effort; a
+// **A cut relaunch's profile, resolved for the phase the resumed child is entering**.
+// A stored lane profile keeps its model and takes only the phase's effort; a
 // lane without one resolves the worker for the phase. An env override wins over the phase in either path.
 function resume_argv(
 	invocation: string,

@@ -4,7 +4,7 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { line_targets } from '#scripts/lines/line-targets'
 
 // The target-file selection of `josh refactor:scan` — the priority `prompts/refactoring.md` §4.1
-// used to spell out in prose (joshuafolkken/kit#2180). The scope is the same reading every scoped
+// used to spell out in prose. The scope is the same reading every scoped
 // command decides from — the branch diff plus the untracked files (`changed-paths.ts`) — and only
 // when that is empty does it fall back to `scripts/`, so a run on a clean `main` still has something
 // to scan rather than reporting nothing.

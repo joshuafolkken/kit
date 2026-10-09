@@ -2,12 +2,12 @@ import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { time_round_trips } from './time-round-trips'
 import { time_spans, type TranscriptLine } from './time-spans'
 
-// The round-trip density a run can be told **while it is still running** (joshuafolkken/kit#1329).
+// The round-trip density a run can be told **while it is still running**.
 //
 // `time-round-trips.ts` already computes the number this reads, and `josh time` already warns on it
 // — after the run has ended. Measured on run #1299, that report changed nothing: the density stayed
 // at 1.08 with 159 of 172 tool-issuing turns making a single call, because the norm
-// joshuafolkken/kit#1304 shipped as prose in `CLAUDE.md` reaches a reader who has already finished.
+// stated as prose in `CLAUDE.md` reaches a reader who has already finished.
 // What was missing is the number arriving in time to change the next turn.
 //
 // **The density is `time_round_trips`, reused rather than restated.** A second calculation here
@@ -25,8 +25,8 @@ import { time_spans, type TranscriptLine } from './time-spans'
 // to skip — which costs more than the line saves.
 const MIN_ROUND_TRIPS = 10
 // At most one line per this interval, per checkout. The line lands in the run's context and stays
-// there, so a reminder with no throttle would spend exactly the budget joshuafolkken/kit#1322 is
-// about: 65 edits of run #1299 would have carried 65 copies of it. Five minutes is roughly 30 round
+// there, so a reminder with no throttle would spend the very context budget it is
+// meant to save: 65 edits of run #1299 would have carried 65 copies of it. Five minutes is roughly 30 round
 // trips at
 // the 9.7s each cost in that run — often enough to reach the phase that is drifting, rare enough that
 // a whole run pays well under a thousand tokens for the feedback.
@@ -121,7 +121,7 @@ function is_due(reading: DensityReading, since_last_ms: number): boolean {
 // what to do differently. The instruction is last because it is the only part worth acting on, and it
 // names the resident rule rather than restating it — the rule is already in the run's context, and a
 // second wording of it would be a clone that can drift. `candidates` is the concrete calls that could
-// have shared a turn (joshuafolkken/kit#3157), appended last so the line ends on what to do next.
+// have shared a turn, appended last so the line ends on what to do next.
 function format_notice(reading: DensityReading, candidates = ''): string {
 	const density = time_round_trips.format_density(reading.density)
 	const floor = time_round_trips.format_density(time_round_trips.CALLS_PER_ROUND_TRIP_FLOOR)

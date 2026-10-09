@@ -1,5 +1,4 @@
-// Estimating tokens for the parts of the context the transcript records as text
-// (joshuafolkken/kit#1151).
+// Estimating tokens for the parts of the context the transcript records as text.
 //
 // **Why an estimate exists at all.** The transcript reports real token counts for exactly two
 // things: what each request was billed, and how many of a response's output tokens were thinking.

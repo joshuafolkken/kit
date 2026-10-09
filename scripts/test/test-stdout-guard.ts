@@ -1,6 +1,6 @@
 import { beforeEach } from 'vitest'
 
-// **Fixture writes to the real streams no longer reach the gate's output** (joshuafolkken/kit#2296).
+// **Fixture writes to the real streams no longer reach the gate's output**.
 // A unit test that drives a CLI `main`/`run` — `test:declared --match`, `run:review` with a bad
 // argument — writes its `match:` / `Usage: josh …` lines straight to `process.stdout` and
 // `process.stderr`, which Vitest forwards from the worker verbatim. Those lines then sat at the tail

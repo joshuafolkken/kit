@@ -1,7 +1,7 @@
 import { hook_launch } from '#scripts/init/hook-launch'
 
-// `.codex/hooks.json` is derived from `.claude/settings.json`, never written by hand
-// (joshuafolkken/kit#2997). The hand copy carried every hook command twice, so a change to one side
+// `.codex/hooks.json` is derived from `.claude/settings.json`, never written by hand.
+// The hand copy carried every hook command twice, so a change to one side
 // left the other silently stale. Codex differs from Claude Code in three places only, and each is a
 // rule applied here rather than a line maintained in the copy:
 //

@@ -3,7 +3,7 @@ import { propagate_run, type RunStep, type StepResult } from './propagate-run'
 import { propagate_steps, type Release, type ReleasePlan } from './propagate-steps'
 import { propagate_targets, type Manifest, type PropagateTarget } from './propagate-targets'
 
-// What one `josh propagate` run carries, decided from the repository it runs in (joshuafolkken/kit#2879).
+// What one `josh propagate` run carries, decided from the repository it runs in.
 //
 // The supplier is kit or any toolkit built on it — app-kit, game-kit — and a toolkit's propagation
 // carries the base packages under it too, at the versions that toolkit itself has installed and was
@@ -77,7 +77,7 @@ function pin_installed(project_root: string, release: Release): Release | undefi
 }
 
 // Why a declared base toolkit would fall out of the plan, naming it — either way `josh adopt` refuses
-// one for (joshuafolkken/kit#1540). A base left out is not merely left behind: every consumer that
+// one for. A base left out is not merely left behind: every consumer that
 // installs it would then read it as a toolkit above this one and be skipped.
 function incomplete_cause(project_root: string): string | undefined {
 	const misplaced = adopt_toolkits.misplaced_toolkits(project_root)

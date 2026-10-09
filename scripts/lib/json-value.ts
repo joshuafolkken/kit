@@ -1,10 +1,10 @@
-// Reading JSON that may not be JSON (joshuafolkken/kit#1151).
+// Reading JSON that may not be JSON.
 //
 // Readers under `scripts/` parse text that a defect, a truncated write or an older format can make
 // unparseable — a transcript line, a settings file, an MCP declaration, a lock record, CLI output —
 // and every one of them answers "could not read this" rather than throwing, because a single bad line
 // must not fail a whole report. They had begun to carry a copy of the same try/catch each; this is the
-// one copy, and `is_record` beside it is the one object test (joshuafolkken/kit#2986).
+// one copy, and `is_record` beside it is the one object test.
 
 function parse_or_undefined(text: string): unknown {
 	try {

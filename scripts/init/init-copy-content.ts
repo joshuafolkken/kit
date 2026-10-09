@@ -21,11 +21,11 @@ import { init_logic } from './init-logic'
  * managed-marker-logic.ts for why the stamp is on the file rather than in a list.
  *
  * The consumer's `.claude/settings.json` gets three further passes. The keys kit sets only for its
- * own sessions are removed (joshuafolkken/kit#3140, see claude-kit-only-settings.ts). The kit plugin's marketplace and
+ * own sessions are removed (see claude-kit-only-settings.ts). The kit plugin's marketplace and
  * `enabledPlugins` declaration is injected, because the skills that used to be copied now ship as the
- * `kit` plugin and load from that declaration (joshuafolkken/kit#1879). And its hook commands are
- * rewritten from `pnpm josh` to the published bundle invoked directly with node
- * (joshuafolkken/kit#1930), so a consumer's guarded call does not pay a `pnpm` launch it never needed.
+ * `kit` plugin and load from that declaration. And its hook commands are
+ * rewritten from `pnpm josh` to the published bundle invoked directly with node,
+ * so a consumer's guarded call does not pay a `pnpm` launch it never needed.
  * Keeping both on this one function is the same guarantee as the workflow passes — a copy path that
  * skipped the plugin block would ship a settings file that never enables the plugin, and one that
  * skipped the rewrite would leave every consumer hook slower than it has to be.

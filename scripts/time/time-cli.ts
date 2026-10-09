@@ -7,13 +7,13 @@ import { time_run_state } from './time-run-state'
 import { time_run_state_collect } from './time-run-state-collect'
 
 // `josh time` — where a run's wall clock went, read from Claude Code's own session transcripts and,
-// for the part no transcript records, from GitHub (joshuafolkken/kit#1267, joshuafolkken/kit#1268).
+// for the part no transcript records, from GitHub.
 //
 // The wall-clock sibling of `josh cost`: same files, same discovery, the other axis. Discovery and
 // reading come from `cost-transcript.ts` unchanged — a second copy of the slug rule is how one of
 // the two commands quietly stops finding a project's transcripts.
 //
-// **The only scope is the run tree** (joshuafolkken/kit#2017). The additional report scopes
+// **The only scope is the run tree**. The additional report scopes
 // (`--epic` / `--last` / `--period` / `--session` / `--issue`) and the `--instructions` / `--top`
 // modifiers they carried were retired with no rule or decision reading them; `--run` names the same
 // default tree explicitly, while `--json` shapes it and `--path` redirects the read.
@@ -25,7 +25,7 @@ const USAGE = 'Usage: josh time [--run] [--json] [--path <dir>]'
 interface Options {
 	is_json: boolean
 	// The target project whose transcripts to read, or `undefined` for this process's own working
-	// directory (joshuafolkken/kit#1987). From the kit checkout, `--path <dir>` points the read at
+	// directory. From the kit checkout, `--path <dir>` points the read at
 	// another project's transcripts, history and config.
 	path: string | undefined
 }
@@ -46,7 +46,7 @@ function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 
 // The run-state lead the run-tree path prepends: the run this checkout is carrying, read from the
 // `run:carry` / `run:wake` records so a stopped run is surfaced at the front rather than left for the
-// run-tree report to bury (joshuafolkken/kit#1939). Text only — `--json` prints the structured
+// run-tree report to bury. Text only — `--json` prints the structured
 // run-tree record alone.
 async function run_state_lead(cwd: string, is_json: boolean): Promise<Array<string>> {
 	if (is_json) return []
@@ -66,9 +66,7 @@ async function run_tree(cwd: string, is_json: boolean): Promise<number> {
 }
 
 // **The default is this process's own working directory.** A dispatched lane child writes its
-// transcript under the lane's own slug, which is all a lane searches (joshuafolkken/kit#1749,
-// joshuafolkken/kit#2236); `--path <dir>` reads the target project instead of the process cwd
-// (joshuafolkken/kit#1987).
+// transcript under the lane's own slug, which is all a lane searches; `--path <dir>` reads the target project instead of the process cwd.
 async function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): Promise<number> {
 	const options = parse_options(argv)
 

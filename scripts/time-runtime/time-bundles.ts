@@ -3,11 +3,10 @@ import { time_format } from './time-format'
 import { time_round_trips } from './time-round-trips'
 import { time_spans, type Span } from './time-spans'
 
-// How many of a run's round trips were avoidable, read from the run rather than assumed
-// (joshuafolkken/kit#1344).
+// How many of a run's round trips were avoidable, read from the run rather than assumed.
 //
 // Three runs in a row came in at 1.10–1.12 calls per round trip against a 1.50 floor, and neither the
-// end-of-run warning (joshuafolkken/kit#1304) nor the live line (joshuafolkken/kit#1329) moved the
+// end-of-run warning nor the live line moved the
 // number. The Issue's estimate of what batching would return — 33 round trips of 136, about 4.8
 // minutes — was arithmetic on the floor: it assumed every call could be bundled to 1.50 and said
 // nothing about which ones actually could. **A mechanism proposed on that figure would be sized by an
@@ -42,7 +41,7 @@ const SAVING_LABEL = 'recoverable wait'
 // transcript has no per-tool answer either, and a table printed under a `not measured` heading would
 // be the empty-means-nothing-to-recover reading this block refuses everywhere else.
 const BY_TOOL_LABEL = 'recoverable by tool'
-// The one label the spread-apart series contributes (joshuafolkken/kit#1854). Both launch spellings —
+// The one label the spread-apart series contributes. Both launch spellings —
 // `Agent` here, `Task` elsewhere — collapse into this one row, so the reconciliation stays balanced.
 const AGENT_ROW_LABEL = 'Agent'
 // The per-tool rows sit one level under that row. Two spaces rather than a separate column, because
@@ -62,7 +61,7 @@ const FIRST_CALL = 1
 // what it leaves out is exactly what `unattributed_round_trips` below then reports.
 const NO_LABEL = ''
 
-// One tool's share of what the run could have recovered (joshuafolkken/kit#1607). `sequence_count` is
+// One tool's share of what the run could have recovered. `sequence_count` is
 // the number of sequences this tool contributed a recoverable trip to, not the number of calls it
 // made — a tool appearing four times inside one sequence is one sequence to go and look at.
 interface BundleToolRow {
@@ -75,7 +74,7 @@ interface BundleToolRow {
 // batched everything genuinely has no sequence, and a run whose transcript was never read has none
 // either — printing `0` for both would report the first as though it were the second.
 //
-// **`by_tool` is what makes the count actionable** (joshuafolkken/kit#1607). `recoverable_round_trips`
+// **`by_tool` is what makes the count actionable**. `recoverable_round_trips`
 // says how many turns could have been one and nothing about *whose* turns they were, so a diag that
 // read only it could name a density and never a tool — and the tool was then found by reading the
 // transcript by hand, once per run.
@@ -141,7 +140,7 @@ function shares_target(left: ReadonlyArray<string>, right: ReadonlyArray<string>
 // earlier one's result", and for a read after a write it is a good one — an `Edit`'s `old_string`
 // came from the `Read` before it.
 //
-// **Between two writes it is not** (joshuafolkken/kit#1509). A second edit to a file already held
+// **Between two writes it is not**. A second edit to a file already held
 // needs nothing from the first, so both belong in one turn — and treating the pair as dependent is
 // what kept the guard silent for a whole run. `extend` below does not merely decline to count such a
 // pair: it *flushes* the sequence and restarts it at the conflicting call, so a stretch of single-call
@@ -183,7 +182,7 @@ function is_turn_boundary(span: Span): boolean {
 // The walk's three running pieces: the calls of the round trip currently open, the sequence being
 // extended, and the sequences already closed.
 //
-// **`closed` keeps the calls rather than their lengths** (joshuafolkken/kit#1607). A length is all the
+// **`closed` keeps the calls rather than their lengths**. A length is all the
 // three totals need, and it is also everything the per-tool breakdown cannot be rebuilt from — the
 // labels are gone by the time anything asks. Retaining the spans is what lets one walk answer both,
 // and a second walk over the same rule would be the clone `CLAUDE.md` prohibits.
@@ -225,7 +224,7 @@ function close_trip(walk: Walk): void {
 
 // Whether this span is still the turn whose calls are pending. **A turn's calls are separated by its
 // own model spans**, because Claude Code writes one line per content block and the harness returns
-// each result as it arrives (joshuafolkken/kit#1406) — so closing the trip on every model span read
+// each result as it arrives — so closing the trip on every model span read
 // one batched turn as several single-call ones and offered it back as a sequence that could have been
 // bundled, which it already was. An absent id matches nothing, leaving the adjacency reading intact
 // for a transcript that wrote none.
@@ -286,7 +285,7 @@ function tally_for(tallies: Map<string, ToolTally>, label: string): ToolTally {
 	return created
 }
 
-// **Attribution is per call, not per sequence** (joshuafolkken/kit#1607). A sequence of `n` calls
+// **Attribution is per call, not per sequence**. A sequence of `n` calls
 // holds `n - 1` avoidable trips, and the call that made each of them its own turn is the one after
 // the first — so each trip goes to *that* call's tool. Attributing a whole sequence to one tool would
 // have named a tool only where every call in the sequence shared one, and a real run's sequences are
@@ -338,7 +337,7 @@ function attributed_of(rows: ReadonlyArray<BundleToolRow>): number {
 // arrive in time order: a delegated unit's are appended after the parent's, and `time_corpus`
 // concatenates one session after another. Walked in array order, two turns from different sessions
 // would read as consecutive and be counted as a sequence nobody could have batched.
-// The spread-apart launch series folded in as one row (joshuafolkken/kit#1854). Appended and re-sorted
+// The spread-apart launch series folded in as one row. Appended and re-sorted
 // rather than pushed in place, so the heaviest-first order still holds; omitted entirely when it
 // recovered nothing, so a run that fanned out its launches shows no empty `Agent` row. Its whole count
 // enters the total below beside it, which is what keeps `unattributed_round_trips` at zero.
@@ -387,7 +386,7 @@ function build_bundles(spans: ReadonlyArray<Span>): BundleTotals {
 }
 
 // The sequence the walk is still inside when the spans run out — the trailing run of consecutive
-// single-call bundleable turns (joshuafolkken/kit#1390).
+// single-call bundleable turns.
 //
 // **Neither `close_trip` nor `flush` is called, and that is the whole difference from
 // `build_bundles`.** The report closes the walk because it is pricing a run that has ended; a guard

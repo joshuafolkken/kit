@@ -5,8 +5,7 @@ import { repo_origin, type RepoIdentity } from './repo-origin'
 // The owner restriction lives here, on the single path every entry travels, rather than in the
 // scanner: an override that could re-enter the map behind the filter would be the hole the
 // restriction exists to close. Discovered entries and overrides are both funnelled through
-// `add_entry`, so there is exactly one place that decides what is allowed in
-// (joshuafolkken/kit#869).
+// `add_entry`, so there is exactly one place that decides what is allowed in.
 
 // One candidate the scan produced: a directory holding a git work tree, and the `origin` remote it
 // declares. `origin_url` is undefined for a work tree with no `origin` at all.

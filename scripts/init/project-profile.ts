@@ -23,7 +23,7 @@ const IGNORED_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', 'build', '.
 const WEB_EXTENSIONS = new Set(['.html', '.css', '.js', '.jsx', '.mjs', '.cjs'])
 const TYPESCRIPT_EXTENSIONS = new Set(['.ts', '.tsx'])
 const PROFILE_ARG_LENGTH = 2
-// The names before joshuafolkken/kit#2829. A project that recorded one, or a script that passes one
+// The names before the profile rename. A project that recorded one, or a script that passes one
 // to `--profile`, keeps working: each reads as the profile it was renamed to.
 const PROFILE_NAMES: Readonly<Record<string, ProjectProfile>> = {
 	basic: 'basic',
@@ -39,7 +39,7 @@ function parse_profile(value: unknown): ProjectProfile | undefined {
 }
 
 // The pre-rename name of each profile, which every kit with `--profile` accepts — the new one only
-// from joshuafolkken/kit#2829 on.
+// from the rename on.
 const LEGACY_NAMES: Readonly<Record<ProjectProfile, string>> = { basic: 'static', full: 'node' }
 
 // A `josh init` handed to the project's kit may run an older kit than the one handing off: the
@@ -91,7 +91,7 @@ function has_build_script(value: unknown): boolean {
 
 // kit itself is not evidence of a Node toolchain: `pnpm add -D @joshuafolkken/kit` before
 // `josh init` is the documented order, and it must still leave an `index.html` site on the basic
-// profile (joshuafolkken/kit#2693).
+// profile.
 function has_project_dependencies(value: unknown): boolean {
 	if (!json_value.is_record(value)) return false
 

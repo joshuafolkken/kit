@@ -11,7 +11,7 @@ import {
 import { sonar_project } from './sonar-project'
 
 // `josh sonar:hotspots <PR>` — fetch the SonarCloud hotspots on a pull request and print the Step B
-// disposition of each (joshuafolkken/kit#2182).
+// disposition of each.
 //
 // The decision itself lives in `sonar-hotspots.ts`; this file is the I/O around it: read the project
 // key from `sonar-project.properties`, fetch the public search API, and answer the upstream-synced

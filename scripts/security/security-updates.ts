@@ -4,8 +4,7 @@ import { security_updates_logic, type SecurityUpdatesStatus } from './security-u
 const SECURITY_FIXES_PATH = 'automated-security-fixes'
 
 // Read the repository's Dependabot security-updates setting. Never throws and never propagates a
-// non-zero exit: an unreadable answer is a reported status, not a command failure
-// (joshuafolkken/kit#805).
+// non-zero exit: an unreadable answer is a reported status, not a command failure.
 function read_security_updates(repo: string): SecurityUpdatesStatus {
 	const { exit_code, stdout } = repo_setting.query_repo_api(`repos/${repo}/${SECURITY_FIXES_PATH}`)
 
@@ -14,8 +13,7 @@ function read_security_updates(repo: string): SecurityUpdatesStatus {
 
 // Report the repository's setting as a blank-line-separated block. A repository that cannot be
 // resolved (no `gh`, not a GitHub remote) reports `unreadable` rather than skipping the check
-// silently — the whole point of joshuafolkken/kit#805 is that an absent answer must not look like a
-// clean one.
+// silently — an absent answer must not look like a clean one.
 //
 // `repo` is always supplied by the caller — deliberately not a default parameter. A default fires
 // on an explicitly-passed `undefined`, so `josh sync` handing over a failed lookup would silently

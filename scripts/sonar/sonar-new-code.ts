@@ -1,5 +1,5 @@
 // Whether a pull request adds any new SonarCloud finding — computed from the counts rather than from
-// the Quality Gate (joshuafolkken/kit#3045).
+// the Quality Gate.
 //
 // The built-in `Sonar way` gate judges a ratio and a rating, not a count: a few MINOR code smells keep
 // the maintainability rating at A, and a copied block in a large pull request stays under the 3%

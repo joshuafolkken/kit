@@ -12,7 +12,7 @@ import { string_array_schema } from '#scripts/lib/schemas'
 // `*.json`; a consumer whose `extends` still points at the old path would never be repaired by the
 // ensure-based merge — an `@joshuafolkken/*` tsconfig entry is already present, so nothing is added
 // — hence the rewrite here. Scoped to `@joshuafolkken/*/tsconfig/*` paths so an unrelated
-// project-local `.jsonc` config is left alone. See joshuafolkken/kit#681.
+// project-local `.jsonc` config is left alone.
 const LEGACY_PRESET_ENTRY = /@joshuafolkken\/[^/]+\/tsconfig\/[^/]+\.jsonc$/u
 const LEGACY_SUFFIX = '.jsonc'
 const CURRENT_SUFFIX = '.json'

@@ -11,7 +11,7 @@ import { execa } from 'execa'
 import { test_red_logic, type RedVerdict } from './test-red-logic'
 
 // `josh test:red` — run the added and changed Vitest files against the pre-fix tree and print `red`,
-// `green`, `no-test` or `test-only` (joshuafolkken/kit#2448).
+// `green`, `no-test` or `test-only`.
 //
 // **The pre-fix tree is a detached worktree at the merge-base, never the caller's checkout.** The tests
 // are copied in from the working tree, so what runs is the new test against the old code, and the

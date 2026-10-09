@@ -94,7 +94,7 @@ function collect_glob(glob: string): Array<string> {
 
 // Code-point order, never localeCompare: the list is generated on one machine and re-derived in CI,
 // and ICU collation differs across platforms — so localeCompare reorders the list under CI's Linux
-// ICU and fails the drift test on order alone (joshuafolkken/kit#2170).
+// ICU and fails the drift test on order alone.
 function by_code_point(left: string, right: string): number {
 	if (left < right) return -1
 

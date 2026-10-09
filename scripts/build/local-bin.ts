@@ -25,7 +25,7 @@ function resolve_local_bin(project_root: string, bin_name: string): string {
 
 // pnpm finds a shim by walking up from the working directory, so a caller that resolved only the
 // directory it was invoked in would disagree with the very commands it spawns — `josh gate` typed
-// in `src/lib` would miss the toolkit its sibling checks resolve fine (joshuafolkken/kit#934).
+// in `src/lib` would miss the toolkit its sibling checks resolve fine.
 // Ascending for the shim itself, rather than for a `package.json` first, is what keeps the two in
 // step: a nested manifest that owns no `node_modules` is not where pnpm would stop either.
 function find_local_bin_upwards(start_directory: string, bin_name: string): string | undefined {
@@ -58,7 +58,7 @@ function read_bin_entry(
 // none in a consumer's tree — resolving it from this package's own directory finds it anyway. And
 // pnpm's shim hardcodes the store path of the version present when it was written: after a bump the
 // old store entry is pruned but the shim is not regenerated, so spawning it dies with
-// MODULE_NOT_FOUND (joshuafolkken/kit#668). Returns the CLI entry to hand `process.execPath`, or
+// MODULE_NOT_FOUND. Returns the CLI entry to hand `process.execPath`, or
 // nothing when the package, its `bin` field or the entry on disk is missing — every caller has a
 // slower route to fall back to, so a failure here is never thrown.
 // One constraint worth knowing before adding a caller: this reads the target's manifest through

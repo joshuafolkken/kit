@@ -5,7 +5,7 @@ import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { eval_trigger } from './eval-trigger'
 
-// What a `josh eval` run measured, and when (joshuafolkken/kit#1152).
+// What a `josh eval` run measured, and when.
 //
 // `/code-review` and `josh eval` both only *read* the working tree — a review's fixes are applied
 // after it reports — so the suite can start when the review does instead of following it. What that
@@ -20,10 +20,10 @@ import { eval_trigger } from './eval-trigger'
 const STAMP_PREFIX = 'josh-eval-stamp-'
 
 // The payload, its validation, the guarded read and the comparison are
-// `#scripts/josh/file-map-stamp`'s since joshuafolkken/kit#1241 — `josh review:brief` keeps two more
-// records of exactly this shape, and a second copy of them would let the three drift. Those in turn
-// build on `#scripts/josh/stamp-file`, which has held the path, the symlink defense and the
-// ownership check since joshuafolkken/kit#1215. **What stays here is the one thing that differs: which
+// `#scripts/josh/file-map-stamp`'s — `josh review:brief` keeps two more records of exactly this
+// shape, and a second copy of them would let the three drift. Those in turn build on
+// `#scripts/josh/stamp-file`, which holds the path, the symlink defense and the ownership check.
+// **What stays here is the one thing that differs: which
 // tree is read.**
 type EvalStamp = FileMapStamp
 
@@ -88,7 +88,7 @@ function write_stamp(target: string = stamp_path()): string {
 }
 
 // The record's other half. `write_stamp` says a run measured this tree; this says that run reached a
-// verdict (joshuafolkken/kit#1164). Best-effort in the same direction as the write: a completion that
+// verdict. Best-effort in the same direction as the write: a completion that
 // could not be recorded leaves the record incomplete, and an incomplete record answers `required`.
 function complete_stamp(target: string = stamp_path()): string | undefined {
 	return access.complete(target)

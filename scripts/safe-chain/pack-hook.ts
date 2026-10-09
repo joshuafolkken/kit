@@ -6,8 +6,8 @@ import { z } from 'zod'
 
 // kit writes the Safe Chain `preinstall` into every project it sets up, and a package that publishes
 // would ship it: the consumer's pnpm then refuses it as an unapproved build script and `pnpm add`
-// exits 1 (joshuafolkken/kit#3110). kit's own `.pnpmfile.mjs` strips it at pack time
-// (joshuafolkken/kit#2693), so that one file is what a publishing project receives — never a copy of
+// exits 1. kit's own `.pnpmfile.mjs` strips it at pack time,
+// so that one file is what a publishing project receives — never a copy of
 // its logic.
 //
 // A private package is left alone: it never packs, and a new pnpmfile changes the lockfile's

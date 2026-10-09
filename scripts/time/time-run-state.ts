@@ -3,7 +3,7 @@ import type { RunWake } from '#scripts/run/wake/run-wake'
 import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 
 // The state of the run this checkout is *carrying*, read from the `run:carry` and `run:wake` records
-// rather than from a merged pull request (joshuafolkken/kit#1939).
+// rather than from a merged pull request.
 //
 // **`josh time` measured merged runs and could not see a stopped one.** The backlogrun of
 // 2026-09-13 lost more time to a run cut and never resumed than to any work it did: the parent cut

@@ -1,9 +1,9 @@
 // The `preinstall` kit writes fetches nothing: it only checks that safe-chain is scanning the install
-// and warns when it is not (joshuafolkken/kit#3269). It used to run `pnpm dlx @aikidosec/safe-chain
+// and warns when it is not. It used to run `pnpm dlx @aikidosec/safe-chain
 // setup-ci`, which downloaded an unverified package on every install and — `setup-ci` acting only on
 // a CI runner, where kit installs with `--ignore-scripts` — protected nothing. safe-chain's shell
 // integration runs pnpm behind its registry proxy and hands `GLOBAL_AGENT_HTTP_PROXY` to it, which a
-// bare pnpm never sets — the one signal a lifecycle script can read (joshuafolkken/kit#2707).
+// bare pnpm never sets — the one signal a lifecycle script can read.
 const INSTALL_GUIDE_ANCHOR = 'installing-safe-chain'
 const INSTALL_GUIDE_URL = `https://github.com/joshuafolkken/kit/blob/main/SECURITY.md#${INSTALL_GUIDE_ANCHOR}`
 // `.pnpmfile.mjs` recognizes the command by the package name, so the hint names it.

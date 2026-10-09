@@ -1,7 +1,7 @@
 import { cost_usage, type UsageTotals } from './cost-usage'
 
 // The current Claude price list, and the three multipliers that make a token's price depend on how
-// it was sent (joshuafolkken/kit#962).
+// it was sent.
 //
 // A run's cost is not "tokens x one rate". A cache read costs a tenth of base input, a 5-minute
 // cache write 1.25x, a 1-hour cache write 2x, and output 5x. On a measured request with
@@ -44,7 +44,7 @@ const CONTEXT_MARKER = '['
 // to its longest prefix that the table knows rather than reported as unknown.
 //
 // The `[1m]` marker is the 1M-context beta, and stripping it to the base rate is confirmed correct,
-// not an approximation (joshuafolkken/kit#1838). The published price list — platform.claude.com
+// not an approximation. The published price list — platform.claude.com
 // "Long context pricing", read 2026-09 — states that Claude 4.6 and later models "include the full
 // 1M token context window at standard pricing (a 900k-token request is billed at the same per-token
 // rate as a 9k-token request)". Every id in `MODEL_PRICES` is 4.6-or-later, so no request has an
@@ -76,7 +76,7 @@ function estimate_cost(totals: UsageTotals, price: ModelPrice): number {
 }
 
 // The five dollar terms `estimate_cost` sums, kept apart so a report can say what a run's dollars
-// were spent on rather than only their total (joshuafolkken/kit#1912). Each is priced by the same
+// were spent on rather than only their total. Each is priced by the same
 // multipliers `estimate_cost` uses — the exported constants above — so the five always sum to
 // `estimate_cost(totals, price)`. It is a decomposition of the same arithmetic, not a second price
 // list, which is why the weights live in the constants both read rather than in either function.
@@ -154,7 +154,7 @@ function total_cost(costs: ReadonlyArray<ModelCost>): { usd: number; unpriced: A
 
 // The priced total in dollars, discarding the unpriced-model list — the one-line composition of
 // `total_cost` over `cost_by_model` that callers reach for when they need only the number, kept here
-// so it is not spelled out at each call site (joshuafolkken/kit#1939).
+// so it is not spelled out at each call site.
 function cost_of(records: ReadonlyArray<ModelUsage>): number {
 	return total_cost(cost_by_model(records)).usd
 }

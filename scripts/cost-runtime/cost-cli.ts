@@ -12,7 +12,7 @@ import { own_session } from './own-session'
 import { transcript_cwd } from './transcript-cwd'
 
 // `josh cost` — what the next turn of a run will cost, read from the active provider's own session
-// usage (joshuafolkken/kit#962).
+// usage.
 //
 // Since #2016 this is the `--over` hand-off verdict alone. The readerless report scopes
 // (`--session` / `--issue` / `--all` / `--run` / `--json`) and the `--cap` counterfactual were
@@ -32,7 +32,7 @@ type CostVerdict = ReturnType<typeof cost_verdict.classify> | typeof UNMEASURABL
 interface Options {
 	over?: number
 	// The target project whose transcripts to read, or absent for this process's own working
-	// directory (joshuafolkken/kit#1987). From the kit checkout, `--path <dir>` reads another
+	// directory. From the kit checkout, `--path <dir>` reads another
 	// project's cost.
 	path?: string
 }
@@ -110,7 +110,7 @@ function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 
 // An empty corpus is reported, never priced at zero. "No transcript was found" and "this run was
 // free" are different answers, and only one of them is ever true. `session_id` names the session the
-// environment pointed at when its transcript is the one absent (joshuafolkken/kit#2403), so the
+// environment pointed at when its transcript is the one absent, so the
 // message says "No transcript named <id>" rather than the whole-corpus "No transcripts found". The
 // wording is `cost_transcript`'s, so `josh time` says the same thing about the same directory.
 function report_empty(cwd: string, session_id: string | undefined): number {
@@ -128,7 +128,7 @@ function provider_of(environment: Environment): AgentProvider | undefined {
 }
 
 // The own-session measurement, and — when there is none — which of the two "nothing to measure"
-// answers it is (joshuafolkken/kit#2403). `absent`: the environment named a session whose transcript
+// answers it is. `absent`: the environment named a session whose transcript
 // is not in this corpus, reported by that name and never measured as another session's newest file.
 // `empty`: no transcript at all. `measured` still carries a session that exists but billed nothing,
 // which `report_over` reports as "no requests" — a third, distinct answer.
@@ -200,7 +200,7 @@ function measure(
 // `--over` for the anthropic provider: measured → the verdict; `absent` → the named session's
 // missing message; `empty` → the whole-corpus missing message. A measured session that billed
 // nothing falls to `report_over`'s "no requests", which keeps a 0-request transcript distinct from a
-// transcript that is not there at all (joshuafolkken/kit#2403).
+// transcript that is not there at all.
 function run_over_anthropic(own: OwnMeasurement, target: string, limit: number): number {
 	if (own.kind === 'measured') return cost_verdict.report_over(own.measurement, limit)
 
@@ -217,7 +217,7 @@ function run_over_codex(target: string, limit: number, environment: Environment)
 }
 
 // `--over`: what the next turn of this session will cost, read from the session's own transcript
-// alone — identified by id, not by mtime (joshuafolkken/kit#2403).
+// alone — identified by id, not by mtime.
 function run_over(
 	target: string,
 	limit: number,
@@ -241,7 +241,7 @@ function verdict_of(measurement: OverMeasurement | undefined): CostVerdict {
 	return cost_verdict.classify(measurement, CONTEXT_CUT_THRESHOLD)
 }
 
-// The `--cut` verdict as a value, printing nothing (joshuafolkken/kit#2165). `run:status` bundles
+// The `--cut` verdict as a value, printing nothing. `run:status` bundles
 // this beside the issue state and the carry record, so it needs the token rather than the exit code
 // `run` returns. `unmeasurable` is the read-only counterpart of `report_empty` / the empty-session
 // error: a session with no provider, no transcript of its own, or no request cannot be priced, and
@@ -269,8 +269,8 @@ function run_context(
 }
 
 // This process's own working directory, kept as-is: from a lane the transcript search covers the
-// lane's own slug alone (joshuafolkken/kit#2236), so pre-rewriting the cwd to the main checkout here
-// would drop the lane's own slug and hide a dispatched child's transcript (joshuafolkken/kit#1749).
+// lane's own slug alone, so pre-rewriting the cwd to the main checkout here
+// would drop the lane's own slug and hide a dispatched child's transcript.
 // `time-cli.ts` gives the same reason.
 function run(
 	argv: ReadonlyArray<string>,
@@ -285,7 +285,7 @@ function run(
 		return FAILURE_EXIT_CODE
 	}
 
-	// `--path <dir>` reads the target project instead of the process cwd (joshuafolkken/kit#1987).
+	// `--path <dir>` reads the target project instead of the process cwd.
 	const target = transcript_cwd.resolve(context.path, cwd)
 	if (reject_openai_cross_project(context, target, cwd)) return FAILURE_EXIT_CODE
 

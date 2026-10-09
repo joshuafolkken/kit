@@ -20,8 +20,7 @@ const SETUP_ONLY_PATHS: ReadonlySet<string> = new Set([
 ])
 
 // Whether a changed path is one kit's setup wrote — what the setup pull request of `josh start`
-// carries, so a file the user keeps beside it (notes, an editor's own directory) never rides along
-// (joshuafolkken/kit#2816).
+// carries, so a file the user keeps beside it (notes, an editor's own directory) never rides along.
 function is_kit_written(file_path: string): boolean {
 	return SETUP_ONLY_PATHS.has(file_path) || managed_config_scope.has_managed_path([file_path])
 }

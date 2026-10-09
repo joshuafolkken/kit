@@ -2,7 +2,7 @@ import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-tr
 import type { UsageRecord } from '#scripts/cost-runtime/cost-usage'
 import { git_branch } from '#scripts/git/git-branch'
 
-// Classifying a run's transcripts into role-tagged tree nodes (joshuafolkken/kit#1937).
+// Classifying a run's transcripts into role-tagged tree nodes.
 //
 // **No transcript line records a session's role** — `JOSH_LANE_CHILD` and its siblings are live
 // environment variables that never reach disk — so the role is read from where the file sat and the
@@ -53,7 +53,7 @@ interface RunNode {
 	records: ReadonlyArray<UsageRecord>
 	baseline_tokens: number
 	is_readable: boolean
-	// Whether the implementation-phase cut ended this session (joshuafolkken/kit#3223); always `false`
+	// Whether the implementation-phase cut ended this session; always `false`
 	// outside a lane child.
 	took_cut: boolean
 }

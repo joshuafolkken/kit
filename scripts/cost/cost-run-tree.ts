@@ -4,7 +4,7 @@ import { lane_paths } from '#scripts/lane/lane-paths'
 import { cost_run_cut } from './cost-run-cut'
 import { cost_run_nodes, type NodeContext, type RunNode } from './cost-run-nodes'
 
-// Grouping a transcript store into runs and selecting one (joshuafolkken/kit#1937).
+// Grouping a transcript store into runs and selecting one.
 //
 // A run is rooted at a main-checkout parent session; the wakes that resumed it cluster with it by
 // time, and the lane children and subagents that ran inside its window hang off it. The no-argument
@@ -25,7 +25,7 @@ interface RunTree {
 	// The classified sessions of the selected run.
 	nodes: ReadonlyArray<RunNode>
 	// The selected run's transcript files, one per node, for a reader that needs more of a session than
-	// its priced records — the retrospective's guard tally (joshuafolkken/kit#3421).
+	// its priced records — the retrospective's guard tally.
 	files: ReadonlyArray<SessionFile>
 	// How many runs the store held, so a reader knows the selected one was chosen from several.
 	run_count: number

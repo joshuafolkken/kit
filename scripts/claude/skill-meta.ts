@@ -1,5 +1,4 @@
-// Where a skill lives and how its frontmatter is read (joshuafolkken/kit#854, single-sourced for
-// joshuafolkken/kit#1151).
+// Where a skill lives and how its frontmatter is read.
 //
 // The suites that assert a skill ships correctly and the `josh cost` resident breakdown that sizes
 // the skills index both need the same two facts: which directory holds the skills, and what the

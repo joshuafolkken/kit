@@ -25,7 +25,7 @@ const KIT_TSCONFIG_PRESET = /@joshuafolkken\/[^/]+\/tsconfig\//u
 // this segment-anchored fallback covers the prefix-less relative form. The `(?<![\w-])` /
 // `(?![\w-])` boundaries anchor `sveltekit` to a complete path segment — mirroring app-kit's
 // config-patch anchoring — so a `sveltekit-*` / `*-sveltekit` sibling and hyphenated `svelte-kit`
-// are left untouched. See joshuafolkken/kit#664.
+// are left untouched.
 const SVELTEKIT_PRESET = /(?<![\w-])sveltekit(?![\w-])/u
 
 function has_match(entries: ReadonlyArray<string>, pattern: RegExp): boolean {

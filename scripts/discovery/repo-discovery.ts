@@ -8,7 +8,7 @@ import { repo_origin } from './repo-origin'
 // Discovery is automatic by default rather than registered in a config file: on the machine this was
 // written for, every first-party repository is a sibling of every other, so scanning the current
 // repository's parent one level deep produces the same map from whichever of them the command runs
-// in. `JOSH_REPO_PATHS` exists only for the exceptions (joshuafolkken/kit#869).
+// in. `JOSH_REPO_PATHS` exists only for the exceptions.
 
 const GIT_DIRECTORY = '.git'
 const GIT_CONFIG = 'config'

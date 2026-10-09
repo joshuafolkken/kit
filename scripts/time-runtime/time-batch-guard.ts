@@ -47,7 +47,7 @@ type NamedCall = Pick<Span, 'is_bundleable' | 'is_writing' | 'label' | 'targets'
 // loudly; `depends_on_sequence` withholds the refusal where the call shares a target with the sequence.
 
 // The three texts carry the action and a pointer; the criterion's reasoning and measured cost stay
-// at the pointer, so a firing does not re-bill the rule body (joshuafolkken/kit#3398).
+// at the pointer, so a firing does not re-bill the rule body.
 const RULE_POINTER = '`prompts/collaboration-workflow/turn-batching.md`'
 const STREAK = `${String(CONSECUTIVE_LIMIT)} single-call turns in a row`
 

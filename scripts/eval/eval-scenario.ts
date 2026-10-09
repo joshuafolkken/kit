@@ -4,9 +4,8 @@ import { error_text } from '#scripts/lib/error-message'
 import { z } from 'zod'
 
 // A scenario is a rule from the distributed documents, restated as something an agent either does or
-// does not do. joshuafolkken/kit#855: the documents grew because every observed violation was
-// answered with more prose, and prose was the only evidence either way — so a rule that never worked
-// looked exactly like one that did. What makes this measurable is judging the transcript, never the
+// does not do. Answering every observed violation with more prose grows the documents, and when prose
+// is the only evidence either way a rule that never worked looks exactly like one that did. What makes this measurable is judging the transcript, never the
 // reply: `should_call` / `should_not_call` name tool invocations, which are facts about the run.
 
 // Enough turns to read the documents, act, and report; a scenario that needs more is usually one

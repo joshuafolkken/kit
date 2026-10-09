@@ -13,7 +13,7 @@ import {
 import { sonar_project } from './sonar-project'
 
 // `josh sonar:new-code <PR>` — fail when a pull request adds any new SonarCloud issue or duplicated
-// block (joshuafolkken/kit#3045).
+// block.
 //
 // `sonar-qube.yml` runs it after the scan on every pull request, so the `SonarQube` check turns red on
 // a single finding instead of only when the Quality Gate's ratios tip over. The verdict lives in

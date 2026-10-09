@@ -1,7 +1,7 @@
 import { readdirSync } from 'node:fs'
 import path from 'node:path'
 
-// The sources under `scripts/` with no test named after them, frozen (joshuafolkken/kit#3253).
+// The sources under `scripts/` with no test named after them, frozen.
 //
 // **Coverage was neither measured nor enforced, so nothing stopped a source landing with no test.**
 // This is the regression stop the Issue allowed in place of a coverage threshold: a source whose stem

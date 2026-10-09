@@ -6,7 +6,7 @@ import { behavior_assertion, type Violation } from './behavior-assertion'
 import { behavior_rules } from './behavior-rules'
 
 // `josh behavior` — check the current run's recorded transcript against the behavior assertions and
-// report where any broke (joshuafolkken/kit#2365). It runs inside `pnpm josh gate`, calls no model,
+// report where any broke. It runs inside `pnpm josh gate`, calls no model,
 // and reads one file: the session it is running in.
 //
 // **The scope is the current run, not the whole corpus.** The store holds thousands of transcripts

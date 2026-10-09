@@ -10,7 +10,7 @@ const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
 const NODE_MODULES = 'node_modules'
 const PACKAGE_JSON = 'package.json'
 // The basic template lists exactly the build scripts kit's own dependency tree carries, which is
-// what installing kit alone needs approved (joshuafolkken/kit#2785).
+// what installing kit alone needs approved.
 const KIT_BUILDS_TEMPLATE = 'templates/pnpm-workspace.basic.yaml'
 const HANDOFF_FAILURE = 'josh init from the project-installed kit failed — see the output above'
 // Set on the handed-off run, so a kit that still does not find itself installed in the project — pnpm
@@ -29,7 +29,7 @@ function real_directory(directory: string): string | undefined {
 
 // A `pnpm dlx` (or global) run executes whatever kit its cache held, which may be days behind the
 // registry — and `init` pins the kit it runs as, so a stale cache used to leave its version and its
-// templates in the project for good (joshuafolkken/kit#2794). Only the kit the project itself installs
+// templates in the project for good. Only the kit the project itself installs
 // does the setup. Compared by real path, so a global virtual store shared with the project still
 // reads as the project's own kit.
 function is_project_kit(package_directory: string, project_root: string): boolean {
@@ -75,7 +75,7 @@ function handoff_step(args: ReadonlyArray<string>): InstallStep {
 }
 
 // pnpm walks up to the nearest `package.json`, so without one here it installs kit into whatever
-// project an ancestor directory holds and rewrites that project's files (joshuafolkken/kit#2866).
+// project an ancestor directory holds and rewrites that project's files.
 function ensure_project_manifest(project_root: string): void {
 	const manifest_path = path.join(project_root, PACKAGE_JSON)
 

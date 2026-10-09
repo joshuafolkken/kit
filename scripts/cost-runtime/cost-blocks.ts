@@ -1,7 +1,7 @@
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
-// Reading the content blocks out of a session transcript (joshuafolkken/kit#1151).
+// Reading the content blocks out of a session transcript.
 //
 // `cost-usage.ts` reads the same file for what each request was billed and skips everything else.
 // This module reads the other half: what the conversation is actually made of. They stay apart
@@ -43,9 +43,8 @@ const BASH_TOOL = 'Bash'
 const COMMAND_KEY = 'command'
 
 // One block, reduced to what a token estimate needs. `command` is split out from the rest of a Bash
-// tool_use's input because the command body is the quantity joshuafolkken/kit#1150 measured at 30.2%
-// of one run's context and joshuafolkken/kit#1159 has to re-measure — folded into the rest of the
-// input it would not be readable at all.
+// tool_use's input because the command body is a large, separately measured share of a run's
+// context — folded into the rest of the input it would not be readable at all.
 interface ContentBlock {
 	type: string
 	tool_name: string

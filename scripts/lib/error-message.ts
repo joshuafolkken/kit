@@ -7,7 +7,7 @@ function message_of(error: unknown): string {
 const DEBUG_ENV_KEY = 'JOSH_DEBUG'
 
 // A catch that folds a failure into a state verdict — "dirty", "not merged", "not written" — leaves no
-// trace of why by default, so a wrong verdict cannot be followed back to its cause (joshuafolkken/kit#3067).
+// trace of why by default, so a wrong verdict cannot be followed back to its cause.
 // `JOSH_DEBUG` set to any non-blank value writes the swallowed reason to stderr; unset, nothing changes.
 function trace_swallowed(where: string, error: unknown): void {
 	if ((process.env[DEBUG_ENV_KEY] ?? '').trim() === '') return

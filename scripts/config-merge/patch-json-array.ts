@@ -75,7 +75,7 @@ function upsert_in(content: string, site: ArraySite, upsert: ElementUpsert): str
 
 // Replace the element `is_target` picks with `value`, or append `value` when none matches — touching
 // only that one element's text. Rewriting the whole array, as `set_json_key` does, would drop every
-// comment and hand-layout inside the elements the consumer owns (joshuafolkken/kit#798). An element
+// comment and hand-layout inside the elements the consumer owns. An element
 // already equal to `value` is left byte-for-byte as authored; an absent or empty array is created.
 function upsert_element(content: string, upsert: ElementUpsert): string {
 	const site = find_array(content, upsert.key)

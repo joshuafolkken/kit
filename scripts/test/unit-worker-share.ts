@@ -7,19 +7,18 @@ import { process_owner_schema, type ProcessOwner } from '#scripts/josh/process-o
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
 
-// How wide one vitest run may fan out when it is not the only one on the machine
-// (joshuafolkken/kit#1515).
+// How wide one vitest run may fan out when it is not the only one on the machine.
 //
 // **`gate-plan.ts` sizes the unit suite from the core count and nothing else**, so six lanes running
 // `josh gate` at once each concluded "11 cores, take 7 workers" and put 42 workers on 11 cores. The
-// pre-push hook once passed no cap at all; it now runs the suite through `test_unit_guard.run_guarded_unit`
-// (joshuafolkken/kit#1334), the same guard `josh test:unit` uses, so the share below applies there too.
+// pre-push hook once passed no cap at all; it now runs the suite through `test_unit_guard.run_guarded_unit`,
+// the same guard `josh test:unit` uses, so the share below applies there too.
 // Measured on the machine this was found on — load average 14.97 in the field, and 209 in a deliberate
 // reproduction of six concurrent suites, against 22 once the share below was applied.
 //
 // **What it fixes, and what it does not.** Six concurrent copies of the full suite produced ten
 // `Test timed out in 10000ms` failures across six runs; at the share this module hands out, the same
-// six runs produced **none**. It is the *second* multiplicand of joshuafolkken/kit#1515 — the first
+// six runs produced **none**. It is the *second* multiplicand of those timeouts — the first
 // was a live `git fetch` inside two test files, which is fixed in `test-network-guard.ts` and its
 // callers, and which no worker count would have repaired: that one failed on an idle machine at one
 // worker.
@@ -57,7 +56,7 @@ function marker_path(pid: number = process.pid): string {
 // long-lived one, so unlike a `run:hold` record its identity is a liveness test rather than a note for
 // the reader.
 //
-// **The pid alone was not that identity** (joshuafolkken/kit#1245). The section below already named
+// **The pid alone was not that identity**. The section below already named
 // what goes wrong — a reissued pid turns a leaked marker into a permanent phantom — and answered it by
 // sweeping, which only ever collected the markers whose pid had *not* yet been reissued. Since the
 // record now carries the writing process's start time beside its pid, a reissued pid is recognized as
@@ -69,8 +68,8 @@ function marker_path(pid: number = process.pid): string {
 // readers do with it, and deliberately so.** A marker with no recorded start time — written before the
 // field existed, or on a platform where it cannot be read — resolves toward *more* sharing: being
 // wrong that way costs this run a narrower share of the machine, while being wrong the other way puts
-// six unit suites on eleven cores, which is the oversubscription joshuafolkken/kit#1515 measured at a
-// load average of 209.
+// six unit suites on eleven cores, an oversubscription measured at a load
+// average of 209.
 function is_running(marker: RunMarker): boolean {
 	return process_identity.is_same_process(marker.pid, marker.process_start) !== false
 }

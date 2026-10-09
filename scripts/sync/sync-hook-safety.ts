@@ -6,11 +6,11 @@ import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import semver from 'semver'
 
 // `josh sync` writes the consumer's Claude and Codex hook files, whose hooks invoke bundles under
-// `node_modules/@joshuafolkken/kit/dist/` (joshuafolkken/kit#1930). When sync is run from a
+// `node_modules/@joshuafolkken/kit/dist/`. When sync is run from a
 // newer source than the consumer's installed package — an `npx @joshuafolkken/kit sync`, or a global
 // josh — the settings it writes reference commands (e.g. `pretool:guard`) the older installed bundle
 // does not have, and every prompt then fails a hook that exits `Unknown command`
-// (joshuafolkken/kit#1930's own observation, kit 1.214). This checks the version before writing and
+// (observed on kit 1.214). This checks the version before writing and
 // asks the consumer to update first rather than leaving broken hooks behind.
 //
 // Run through `pnpm josh sync` in the consumer the two versions are equal by construction — the same

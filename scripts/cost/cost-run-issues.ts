@@ -1,6 +1,6 @@
 import type { SessionRow } from './cost-run-roles'
 
-// A run tree's sessions summed per Issue (joshuafolkken/kit#3223).
+// A run tree's sessions summed per Issue.
 //
 // **The question is whether the implementation cut pays back**, and it is asked per Issue: a cut moves
 // cost from one session into the resumed one, so a per-session row cannot say whether the Issue as a

@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { project_profile } from './project-profile'
 
 const ARGUMENT_START_INDEX = 2
-// A `ci.yml` synced before joshuafolkken/kit#2829 matches `*'profile: static ('*` on this output to
+// A `ci.yml` synced before the profile rename matches `*'profile: static ('*` on this output to
 // hand a basic project to `josh gate`. A consumer can upgrade kit without re-syncing that workflow,
 // so a basic project keeps printing the old phrase on a line of its own until every workflow reads
 // the new name.

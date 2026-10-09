@@ -1,5 +1,4 @@
-// The test type a changed path calls for — `Unit` or `E2E` — decided from the path alone
-// (joshuafolkken/kit#2181).
+// The test type a changed path calls for — `Unit` or `E2E` — decided from the path alone.
 //
 // **This mechanizes `prompts/testing-guide.md` §1's two-row table**, whose last line used to be "When
 // ambiguous, ask the user" — a Tier B stop on a question the path already answers. The table routes

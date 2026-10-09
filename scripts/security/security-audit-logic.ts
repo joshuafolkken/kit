@@ -4,7 +4,7 @@ const BINARY_NAME = 'osv-scanner'
 const LOCKFILE_PATH = 'pnpm-lock.yaml'
 
 // Where `josh audit:provision` puts a scanner it fetched itself, and the second place `josh audit`
-// looks once PATH has come up empty (joshuafolkken/kit#1563). Under `node_modules` because that is
+// looks once PATH has come up empty. Under `node_modules` because that is
 // the one directory every consumer of this package already ignores: a directory of our own would
 // need a `.gitignore` entry distributed to every repository `josh sync` reaches, and a home-relative
 // cache is refused outright by `no-global-shim-write.test.ts`. Losing the binary to `pnpm install`

@@ -5,7 +5,7 @@ import { refactor_lint, type CategoryResult } from './refactor-lint'
 import { refactor_targets } from './refactor-targets'
 
 // `josh refactor:scan` — the command `prompts/refactoring.md` §4.1–§4.3 now point to instead of
-// describing the search by hand (joshuafolkken/kit#2180). It selects the target files, expands the
+// describing the search by hand. It selects the target files, expands the
 // scope along the import graph, asks the project's own eslint which refactoring candidates the scope
 // holds, and answers whether any high- or medium-priority candidate remains.
 //
@@ -16,7 +16,7 @@ import { refactor_targets } from './refactor-targets'
 
 // The convergence vocabulary. `clear` is what §4.3's self-reported "no high- or medium-priority
 // candidate left" loop exit becomes once a command answers it: a token a caller can read, not a claim.
-// `error` is the third answer (joshuafolkken/kit#2180): the eslint run itself did not complete, so the
+// `error` is the third answer: the eslint run itself did not complete, so the
 // scope's state is unknown — kept distinct from `clear` so a failed scan is never read as converged.
 const CLEAR = 'clear'
 const CANDIDATES = 'candidates'

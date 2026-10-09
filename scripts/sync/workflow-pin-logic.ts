@@ -147,7 +147,7 @@ function list_workflow_sources(relative_directory: string): Array<WorkflowSource
 }
 
 // The local composite actions are runtime sources too: `.github/actions/setup-pnpm` is the only
-// place kit's own workflows still pin pnpm/setup (joshuafolkken/kit#2982).
+// place kit's own workflows still pin pnpm/setup.
 function list_composite_action_sources(): Array<WorkflowSource> {
 	return composite_actions
 		.list(package_path)

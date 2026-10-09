@@ -1,9 +1,9 @@
 import type { UsageRecord } from './cost-usage'
 
-// Which Issue a request belongs to (joshuafolkken/kit#962).
+// Which Issue a request belongs to.
 //
 // **The walk is keyed on the branch and nothing else**, which is why its input is `BranchBearing`
-// rather than `UsageRecord` (joshuafolkken/kit#1268). `josh time` attributes *spans* to an issue by
+// rather than `UsageRecord`. `josh time` attributes *spans* to an issue by
 // exactly this rule, and the alternative to widening the parameter was a second copy of the
 // fill-forward walk over a different element type — the clone `CLAUDE.md` prohibits, in the one
 // place where a drift between the two would make `josh cost --issue` and `josh time --issue`
@@ -28,7 +28,7 @@ const UNATTRIBUTED_KEY = -1
 
 // Everything the attribution reads. `UsageRecord` satisfies it, and so does a timed span.
 //
-// **`issue` is the branch's answer where the branch cannot give one** (joshuafolkken/kit#1617). The
+// **`issue` is the branch's answer where the branch cannot give one**. The
 // paragraph above assumes the session and the work share a checkout, and under lanes they do not: a
 // child's commands run in a linked work tree on `<N>-lane` while the session writing the transcript
 // sits on the default branch, so every line of a lane run reads `gitBranch: "main"` and no fill

@@ -10,7 +10,7 @@ const MAX_VALUE_LENGTH = 4096
 const ROLE_SCHEMA = z.enum(['scheduler', 'worker', 'reviewer'])
 const PROVIDER_SCHEMA = z.enum(['anthropic', 'openai'])
 const EFFORT_SCHEMA = z.enum(['low', 'medium', 'high', 'xhigh', 'max'])
-// The run phases effort may vary by (joshuafolkken/kit#2382). They are the cut boundaries a lane child
+// The run phases effort may vary by. They are the cut boundaries a lane child
 // resumes across — `run-cut.ts` imports these names for its own cut record, so the phase a run passes
 // and the phase this table is keyed on cannot drift. A phase-less call resolves the role default, which
 // is what keeps every existing caller unchanged.
@@ -40,7 +40,7 @@ const IMPLEMENTATION_PHASE: AgentPhase = 'implementation'
 const PRE_GATE_PHASE: AgentPhase = 'pre-gate'
 const ANTHROPIC_PROVIDER: AgentProvider = 'anthropic'
 const OPENAI_PROVIDER: AgentProvider = 'openai'
-// **Pinned model ids, never a floating alias** (joshuafolkken/kit#2415). An alias such as `opus` moves
+// **Pinned model ids, never a floating alias**. An alias such as `opus` moves
 // whenever the CLI moves it, so a run log could not say which model produced it and a model migration
 // could not be measured apart from everything else. A new lane records the id it resolved; a lane
 // created before a migration keeps the model it recorded (`with_phase_effort` leaves it untouched).
@@ -72,7 +72,7 @@ const OPENAI_PROFILES: Readonly<Record<AgentRole, AgentProfile>> = {
 
 const PROVIDER_PROFILES = { anthropic: DEFAULT_PROFILES, openai: OPENAI_PROFILES }
 
-// **Effort as a function of the run phase, not the role alone** (joshuafolkken/kit#2382). For the first
+// **Effort as a function of the run phase, not the role alone**. For the first
 // merge only the mechanical ship/bookkeeping region is lowered: the pre-gate resume drives the gate,
 // commit, PR and merge, applying fixes the gate has already named — work delegation.md calls the opposite
 // of judgement. The design-judgment implementation phases keep the role default, as does any role/phase
@@ -170,8 +170,8 @@ function session_rejection(is_conflicting: boolean): Rejected {
 	return { kind: 'rejected', note }
 }
 
-// The provider a detached launcher hands a process that is not itself an agent session
-// (joshuafolkken/kit#2456). `detached_launch` strips the parent-session keys — the very keys the
+// The provider a detached launcher hands a process that is not itself an agent session.
+// `detached_launch` strips the parent-session keys — the very keys the
 // detection below reads — so a `josh ship --detach --review` supervisor could never resolve its reviewer.
 // **It is a fallback, read only when no session is detected**: the mark is inherited by everything the
 // supervisor starts, and a real session's own keys must keep deciding for that session.
@@ -201,8 +201,8 @@ function resolve_provider(environment: AgentEnvironment = process.env): Provider
 	return detected_provider(environment) ?? handed_provider(environment)
 }
 
-// Whether this session is woken when a background command it started completes
-// (joshuafolkken/kit#2653). Claude Code re-invokes the session at the completion; a Codex session is not
+// Whether this session is woken when a background command it started completes.
+// Claude Code re-invokes the session at the completion; a Codex session is not
 // re-invoked, so a parent there can only wait by polling, each poll a model call over its whole context.
 // Only a resolved Codex session answers no — an unresolved one keeps the behavior it had before.
 function has_completion_callback(environment: AgentEnvironment = process.env): boolean {
@@ -230,7 +230,7 @@ function validate(profile: AgentProfile, model_key: string): ProfileResult {
 }
 
 // The effort a phase resolves to before any env override: the phase's own value where the table names
-// one, otherwise the fallback (joshuafolkken/kit#2382). A phase-less or unrecognized call returns the
+// one, otherwise the fallback. A phase-less or unrecognized call returns the
 // fallback unchanged, which is what keeps every existing caller reading the current default.
 function phase_effort(
 	role: AgentRole,
@@ -244,7 +244,7 @@ function phase_effort(
 }
 
 // The effort a stored profile takes in a phase: an env override wins, then the phase value, then the
-// profile's own effort (joshuafolkken/kit#2382). A cut relaunch that keeps a lane's stored model resolves
+// profile's own effort. A cut relaunch that keeps a lane's stored model resolves
 // the effort through this so a person's `JOSH_WORKER_EFFORT` is never overwritten by the phase value.
 function overridden_effort(
 	profile: AgentProfile,
@@ -257,7 +257,7 @@ function overridden_effort(
 }
 
 // A stored profile with its effort resolved for the phase the run is entering, its model and provider
-// left as they were (joshuafolkken/kit#2382).
+// left as they were.
 function with_phase_effort(
 	profile: AgentProfile,
 	phase: string,

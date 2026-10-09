@@ -4,7 +4,7 @@ import { lane_environment } from '#scripts/lane/lane-environment'
 import { file_reader } from '#scripts/lib/read-file'
 
 // Each discovered repository's port seed and the dev / preview ports it resolves to, plus which
-// repositories share a seed (joshuafolkken/kit#1494).
+// repositories share a seed.
 //
 // The formula `seed × 10 + lane` makes distinct seeds occupy disjoint bands, but two repositories on
 // the *same* seed still collide — as do the many that never set one and sit together on seed 0. That

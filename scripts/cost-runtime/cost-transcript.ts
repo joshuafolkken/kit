@@ -5,7 +5,7 @@ import { lane_paths } from '#scripts/lane/lane-paths'
 import { file_reader } from '#scripts/lib/read-file'
 import { cost_usage, type UsageRecord } from './cost-usage'
 
-// Finding and reading Claude Code's session transcripts (joshuafolkken/kit#962).
+// Finding and reading Claude Code's session transcripts.
 //
 // They live at `~/.claude/projects/<slug>/<session-id>.jsonl`, where the slug is the working
 // directory with every character that is not a letter, digit or hyphen turned into a hyphen.
@@ -23,7 +23,7 @@ const TRANSCRIPT_ROOT = path.join('.claude', 'projects')
 const TRANSCRIPT_EXTENSION = '.jsonl'
 const SLUG_PATTERN = /[^a-zA-Z0-9-]/gu
 
-// Where a delegated unit's transcript is written (joshuafolkken/kit#1285).
+// Where a delegated unit's transcript is written.
 //
 // `epicrun` and `queue` run each child in a delegated unit, and `gate-fix` / `survey` delegate one
 // step of a run. **None of that lands beside the session's own transcript**: the unit writes to
@@ -45,7 +45,7 @@ function transcript_directory(cwd: string, home: string = homedir()): string {
 }
 
 // The checkout a session's transcripts are filed under, which is not always the one a command runs
-// in (joshuafolkken/kit#1617).
+// in.
 //
 // **A lane is a checkout no session ever ran in.** `epicrun` gives each child a linked work tree and
 // the child prefixes every command with it, but the Claude session itself stays in the main checkout
@@ -100,7 +100,7 @@ function read_directory(directory: string): Array<string> {
 	}
 }
 
-// The lane transcript directories filed under a main checkout's lane root (joshuafolkken/kit#1832).
+// The lane transcript directories filed under a main checkout's lane root.
 //
 // **`session_cwd` resolved a lane to its main checkout, but nothing resolved a main checkout to its
 // lanes.** From the main checkout `own === rewritten`, so the search collapsed to one directory and a
@@ -134,17 +134,15 @@ function lane_transcript_directories(main_cwd: string, home: string): Array<stri
 // in. Two sources are legitimate, so both are searched and `list_sessions_across` merges what they
 // hold:
 //   - the cwd's own slug — where a *dispatched* lane child writes, because `lane:dispatch` launches it
-//     as a `claude -p fullrun #N` process whose working directory is the lane (joshuafolkken/kit#1749);
+//     as a `claude -p fullrun #N` process whose working directory is the lane;
 //   - every lane transcript directory under the main checkout's lane root — so a report run *from the
-//     main checkout* reaches the lane runs it dispatched (joshuafolkken/kit#1832).
+//     main checkout* reaches the lane runs it dispatched.
 //
-// **A lane never reads the main checkout it resolves to (joshuafolkken/kit#2236).** The reverse of the
-// second source — a lane reading the main checkout's slug — used to be searched as well (the
-// joshuafolkken/kit#1617 case, a session that stayed in the main checkout and only prefixed its
-// commands with the lane path). But `lane:dispatch` now runs the child *in* the lane, so the child's
-// transcript is under the lane's own slug; the main slug held only a connected conversation session's
-// transcript, which the child then measured as its own — its `--cut` verdict read that session's cost
-// and every dispatched child stopped before implementing. So the main slug is no longer a candidate
+// **A lane never reads the main checkout it resolves to.** `lane:dispatch` runs the child *in* the
+// lane, so the child's transcript is under the lane's own slug; the main slug holds only a connected
+// conversation session's transcript, which the child would measure as its own — its `--cut` verdict
+// would read that session's cost and every dispatched child would stop before implementing. So the
+// main slug is not a candidate
 // from a lane, and a lane's measurement reads its own records alone.
 //
 // **Only a checkout that resolves to itself reads the lane root**, which is what keeps the from-main
@@ -175,8 +173,8 @@ interface SessionFile {
 	// units.
 	is_delegated: boolean
 	// How many `subagents/` levels down from a session's own transcript this was found: `0` for a
-	// session's own file, `1` for a unit it delegated, `2` for a unit that unit delegated, and so on
-	// (joshuafolkken/kit#1937). The filesystem is the only record of it — no transcript line carries a
+	// session's own file, `1` for a unit it delegated, `2` for a unit that unit delegated, and so on.
+	// The filesystem is the only record of it — no transcript line carries a
 	// parent link — so the run-tree scope reads depth and the immediate parent from where the file sat.
 	depth: number
 }
@@ -249,7 +247,7 @@ function level_units(
 }
 
 // The units under one `subagents/` directory, and — recursively — the units those units delegated in
-// a `subagents/` of their own (joshuafolkken/kit#1937). A subdirectory beside the transcripts is an
+// a `subagents/` of their own. A subdirectory beside the transcripts is an
 // agent that itself delegated, so its own `subagents/` is walked one level deeper and the qualified
 // id gains another segment. Nested units do not occur today — a subagent has no `Agent` tool to
 // dispatch with — but the run-tree scope's depth is defined by this walk rather than by what exists.
@@ -297,7 +295,7 @@ function list_sessions(directory: string): Array<SessionFile> {
 	)
 }
 
-// Every session found across a set of candidate directories (joshuafolkken/kit#1825), newest first and
+// Every session found across a set of candidate directories, newest first and
 // each `session_id` kept once. `transcript_directories` is what produces the set; a session file lives
 // under exactly one slug, so the candidates normally hold disjoint sets and the dedupe is what keeps a
 // run counted a single time should the same session ever surface under more than one candidate
@@ -331,7 +329,7 @@ function owning_session_id(file: SessionFile): string {
 }
 
 // The immediate parent a delegated unit was written under: everything before the *last* separator of
-// its qualified id (joshuafolkken/kit#1937). `owning_session_id` returns the *root* session — the id
+// its qualified id. `owning_session_id` returns the *root* session — the id
 // before the first separator — which the overlap reader needs; the run-tree scope needs the direct
 // parent instead, so a depth-2 unit links to the depth-1 unit that spawned it rather than to the
 // session at the top. A session's own file has no separator and is its own parent.
@@ -342,7 +340,7 @@ function parent_session_id(file: SessionFile): string {
 }
 
 // Which of a listing is "the run that just finished": the newest transcript that is a session's own
-// rather than one of its delegated units (joshuafolkken/kit#1285).
+// rather than one of its delegated units.
 //
 // **A delegated unit is part of a run, not a run of its own**, and it writes the newer file whenever
 // a session delegates — the parent is waiting while the unit works. Taking the head of the listing
@@ -422,7 +420,7 @@ function read_raw(file: SessionFile): string {
 	return file_reader.read_if_readable(file.path) ?? ''
 }
 
-// The same read, with the failure left visible (joshuafolkken/kit#1439). **An unreadable transcript
+// The same read, with the failure left visible. **An unreadable transcript
 // and an empty one are different answers**, and `read_raw` folds both to `''` — right for a reader
 // that only wants lines to parse, and wrong for one that has to report a transcript as *not
 // measured* rather than as measured at zero. `is_readable` on `SessionUsage` is the same distinction
@@ -432,9 +430,8 @@ function read_optional(file: SessionFile): string | undefined {
 }
 
 // One directory the search looked in, and whether it was there to look in. `exists` tells a directory
-// that was absent from one that was present but held no transcript — the distinction
-// joshuafolkken/kit#1617 found `read_directory` swallowing, which is what let a lane's missing slug
-// read the same as an empty one and delayed finding this bug (joshuafolkken/kit#1825).
+// that was absent from one that was present but held no transcript, so a lane's missing slug does
+// not read the same as an empty one.
 interface SearchedDirectory {
 	path: string
 	exists: boolean
@@ -467,14 +464,14 @@ function describe_searched(directory: SearchedDirectory): string {
 
 // What to say when the discovery above found nothing. It lives here rather than in either command
 // because both `josh cost` and `josh time` reach it, and a second copy would drift the moment one of
-// them learned something about where transcripts live (joshuafolkken/kit#1267). The message, not the
+// them learned something about where transcripts live. The message, not the
 // printing: each command owns its own streams and exit code.
 //
 // **The directories are passed in, not resolved here.** The whole point of the message is to name
 // where the command looked, so they have to be the same paths the search used — resolving them a
 // second time can name a directory that was never searched. Both candidates are listed, each with its
 // own reason (absent, or present but empty), so a run whose lane slug does not exist reads differently
-// from one whose main slug exists and is empty (joshuafolkken/kit#1825).
+// from one whose main slug exists and is empty.
 //
 // "No transcript was found" and "this run cost nothing" are different answers, and only one of them
 // is ever true — which is why neither command may report an empty corpus as a zero.

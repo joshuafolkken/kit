@@ -9,10 +9,9 @@ import type { Visibility } from './start-plan'
 // step and the `josh init` hint so none of them keeps a copy of its own.
 //
 // The git shapes below act on `root`, so `cwd` has to mean it: an inherited `GIT_DIR` and friends beat `cwd`
-// and would carry a `git init` or commit into whichever repository a calling hook was firing in
-// (joshuafolkken/kit#3151).
+// and would carry a `git init` or commit into whichever repository a calling hook was firing in.
 //
-// **Every git and gh call here is bounded** (joshuafolkken/kit#3262). A read asks the local
+// **Every git and gh call here is bounded**. A read asks the local
 // repository and takes git's own budget. A write — and `gh repo create --push` — can fire the
 // project's own commit and push hooks, which may run its whole suite, so it takes the suite budget:
 // long enough for that, short enough that a push that never answers ends the run.
@@ -42,7 +41,7 @@ function git_run(args: ReadonlyArray<string>, root: string): void {
 }
 
 // Every gh spawn here dials GitHub directly, past a scanner's loopback proxy, the same as every
-// other `gh` spawn under scripts/ (joshuafolkken/kit#2436). Each argument list is written inline so
+// other `gh` spawn under scripts/. Each argument list is written inline so
 // `gh-subcommand-guard.ts` reads its subcommand rather than `<dynamic>`.
 interface GhProbeOptions {
 	cwd: string

@@ -1,13 +1,13 @@
 import { git_followup_stages, type FollowupStage } from '#scripts/followup/git-followup-stages'
 
-// Reading `followup`'s own stage rows back out of what it printed (joshuafolkken/kit#1445).
+// Reading `followup`'s own stage rows back out of what it printed.
 //
-// joshuafolkken/kit#1349 gave `pnpm josh followup` a per-stage block — one
-// `followup stage: <name> <n> s` row per lap — and declared the prefix as a constant so a reader
-// could be added without matching a string the printer is free to reword. **There was no reader.**
-// `josh time` sees a `followup` invocation as one Bash span, so the breakdown existed only on the
-// screen of whoever happened to be watching that run: two runs could not be compared stage by stage,
-// and a transcript recorded last week could not be read at all.
+// `pnpm josh followup` prints a per-stage block — one
+// `followup stage: <name> <n> s` row per lap — and declares the prefix as a constant so a reader
+// can be added without matching a string the printer is free to reword. This is that reader.
+// `josh time` sees a `followup` invocation as one Bash span, so without it the breakdown exists only
+// on the screen of whoever happened to be watching that run: two runs cannot be compared stage by
+// stage, and a transcript recorded last week cannot be read at all.
 //
 // **The prefix is imported rather than retyped**, which is the whole of what keeps this from being a
 // guess about another module's output — the shape `time-reported-failure.ts` already uses for

@@ -5,7 +5,7 @@
 // grew past its length limit as phases were added to it, and this is the half with nothing to decide
 // — it says what a phase *is*, while the file it left decides which one a span belongs to. Nothing
 // here imports the classifier, so the dependency runs one way and the next phase added costs one
-// line rather than a fresh argument about where to put it (joshuafolkken/kit#1331).
+// line rather than a fresh argument about where to put it.
 
 type PhaseName =
 	| 'plan'
@@ -71,12 +71,12 @@ const PHASE_ORDER: ReadonlyArray<PhaseName> = [
 // transcript was read at all, rather than on a marker.
 //
 // **They are withheld on exactly the terms the three transcript category rows are**
-// (joshuafolkken/kit#1295) — no span read at all. `wait` printing `0.0 min` where nothing was read
+// — no span read at all. `wait` printing `0.0 min` where nothing was read
 // asserts that nobody waited, and the run that produces it is the one a reader is least able to check.
 // Keying every one of them off the same criterion is also what keeps `wait` + `wait-outside` equal to
 // the `human wait` category row: they are withheld together or printed together, never some of each.
 //
-// **`wait-outside` is in this set rather than detected on the run's edges** (joshuafolkken/kit#1331),
+// **`wait-outside` is in this set rather than detected on the run's edges**,
 // which is where it differs from `pre-run` and `post-run`. Its zero is not a claim about an unchecked
 // half, because those two rows report the same two boundaries in their own right — a reader seeing
 // `pre-run  not detected` beside `wait-outside  0.0 min` already knows that edge was never found, and

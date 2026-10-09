@@ -10,7 +10,7 @@ import { GIT_TIMEOUT_MS } from '#scripts/lib/timeouts'
 // Propagation commits and pushes. A consumer with uncommitted work would have that work swept into
 // the upgrade commit — `josh git` stages the whole tree — and a supplier repository that is behind
 // its remote would propagate the *previous* release, which is already published and would report
-// success (joshuafolkken/kit#863).
+// success.
 
 // The probes that talk to the remote get their own budget. Ten seconds is generous for a local
 // `rev-parse` and tight for an ssh handshake, and a probe that times out answers "no" — which for
@@ -27,7 +27,7 @@ interface TreeState {
 	reason?: string
 }
 
-// **`cwd` alone does not say which repository this is about** (joshuafolkken/kit#1515). `GIT_DIR` and
+// **`cwd` alone does not say which repository this is about**. `GIT_DIR` and
 // `GIT_WORK_TREE` beat it outright, and git exports both to every hook it runs — so under
 // `pnpm josh git`'s pre-push hook every probe below silently answered about the checkout the hook was
 // firing in rather than the path it was handed. The visible cost was in the unit suite, where
@@ -42,8 +42,8 @@ interface TreeState {
 // because every call below already passes the path this way and a second spelling of the same intent
 // is one more thing to keep in step.
 //
-// **The list itself moved to `#scripts/git/git-location-environment`** when joshuafolkken/kit#1530
-// found the same defect in a second file: three consumers now clear the same names, and a list kept
+// **The list itself lives in `#scripts/git/git-location-environment`**: three consumers clear the
+// same names, and a list kept
 // in one of them is a list the other two drift away from. It widened there past `GIT_DIR` /
 // `GIT_WORK_TREE` to the index and object-store variables, which redirect a *write* rather than a
 // lookup — inert for the read-only probes below, and required by the fixture that commits.
@@ -116,8 +116,8 @@ function commit_ahead(repository_path: string, default_name: string): string | u
 // remote-tracking ref: a push that was refused leaves no such ref behind, and neither does a branch
 // that was never pushed at all, so the ref cannot tell the two apart.
 //
-// **The arguments come from `git-ls-remote.ts`, which anchors the pattern at `refs/heads/`**
-// (joshuafolkken/kit#1732). Built here from the bare name, the query answered for any branch whose
+// **The arguments come from `git-ls-remote.ts`, which anchors the pattern at `refs/heads/`**.
+// Built here from the bare name, the query answered for any branch whose
 // ref ends in it — so a lane pushed as `wip/1641-lane` reported `1641-lane` as already on origin,
 // and propagation classified an unpushed branch as pushed.
 function has_remote_branch(repository_path: string, branch: string): boolean {
@@ -130,7 +130,7 @@ function has_remote_branch(repository_path: string, branch: string): boolean {
 // --git-path` does not. Without this the classification would name a hook on the strength of a dry
 // run alone, and **any** push failure that has cleared by the time the probe runs satisfies that: a
 // dropped ssh connection, a refreshed token, one 500 from GitHub. Naming a hook that does not exist
-// is the same misattribution joshuafolkken/kit#1417 was filed for, pointed the other way.
+// is the same misattribution as blaming the wrong push sub-step, pointed the other way.
 function hooks_directory(repository_path: string): string | undefined {
 	const configured = run_git(repository_path, ['config', '--get', 'core.hooksPath'])
 	if (configured !== undefined && configured !== '') return configured

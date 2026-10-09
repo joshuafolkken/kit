@@ -1,7 +1,7 @@
 import { time_bundle_call } from './time-bundle-call'
 import { time_markers } from './time-markers'
 
-// Which files one tool call **wrote** (joshuafolkken/kit#1472).
+// Which files one tool call **wrote**.
 //
 // **A span keeps no tool input**, so anything read off the input has to be read while the input is
 // still in hand — the reason `marker`, `targets` and `check_key` are already carried on `ToolCall`
@@ -22,11 +22,11 @@ import { time_markers } from './time-markers'
 // **This module is the one place that answers the question**, so the two callers cannot come to
 // disagree about it, and it reuses the extraction `time-bundle-call.ts` already owns rather than
 // writing a second one: `tool_targets` for a tool's own path fields, `targets_in` for a shell line.
-// Nothing here widens `BUNDLEABLE_TOOLS` — that set is what the batching measurement of
-// joshuafolkken/kit#1390 is defined over, and a call that writes is deliberately not bundleable.
+// Nothing here widens `BUNDLEABLE_TOOLS` — that set is what the batching measurement is
+// defined over, and a call that writes is deliberately not bundleable.
 
-// **Whether a line is an in-place `sed` is `time-bundle-call.ts`'s answer, not a second one here**
-// (joshuafolkken/kit#1509). That module needs the same test as a boolean for the batching sequences,
+// **Whether a line is an in-place `sed` is `time-bundle-call.ts`'s answer, not a second one here**.
+// That module needs the same test as a boolean for the batching sequences,
 // and while the two were written separately they disagreed in both directions at once — one read the
 // whole line, so a piped `grep -i` made a read into a write; the other missed a bundled `sed -ni`, so
 // one span could carry `writes: ['x.ts']` beside `is_writing: false`. The segment scoping and the

@@ -25,7 +25,7 @@ const ANY_PATH = /.*/
 
 // Each Claude Code hook is bundled to its own `dist/hooks/<name>.js`, so a consumer (and kit itself)
 // invokes `node dist/hooks/<name>.js` directly — no `pnpm` launch and no `tsx` re-spawn from the
-// `dist/josh.js` dispatcher (joshuafolkken/kit#2023).
+// `dist/josh.js` dispatcher.
 //
 // **`splitting: true` is load-bearing, not an optimization.** Every hook module decides whether to
 // run its main from `process.argv[1] === fileURLToPath(import.meta.url)`. A single-file bundle would
@@ -35,7 +35,7 @@ const ANY_PATH = /.*/
 // splitting keeps every entry in its own file with its own `import.meta.url`, so an imported guard's
 // `import.meta.url` never equals `argv[1]` and only the file actually launched runs its main.
 //
-// **The flip side: an entry another entry imports loses its main** (joshuafolkken/kit#2922). Splitting
+// **The flip side: an entry another entry imports loses its main**. Splitting
 // moves a module two entries share into a chunk, so a launched hook whose own module is imported
 // elsewhere becomes a re-export stub that runs nothing. Each launched hook is therefore a `*-cli.ts`
 // file holding only the self-invoke, which no other module imports.
@@ -136,12 +136,12 @@ function place_build(out_directory: string, files: ReadonlyArray<OutputFile>, st
 }
 
 // With `splitting: true` every build emits freshly hashed `chunk-*.js` files, so without a cleanup
-// the chunks of every earlier build pile up beside the live ones and ship in any local pack
-// (joshuafolkken/kit#2885). The cleanup runs after the new files are in place rather than emptying
+// the chunks of every earlier build pile up beside the live ones and ship in any local pack.
+// The cleanup runs after the new files are in place rather than emptying
 // the directory first: this checkout's own settings.json launches `node dist/hooks/<name>.js` on
 // every tool call, and an emptied directory would make a hook launched mid-build fail to load and its
 // guard fail open. The source digest is placed last (`hook-bundle-stamp.ts`), so a launch only reads
-// the bundles as fresh once every one of them is in place (joshuafolkken/kit#2984).
+// the bundles as fresh once every one of them is in place.
 async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
 	const sources = new Map<string, Uint8Array>()
 	const { outputFiles: files } = await build({

@@ -2,8 +2,7 @@ import { time_bundle_call } from './time-bundle-call'
 import { time_round_trips } from './time-round-trips'
 import { time_spans, type Span } from './time-spans'
 
-// Independent subagent launches that went out one per turn, when they could have fanned out in one
-// (joshuafolkken/kit#1854).
+// Independent subagent launches that went out one per turn, when they could have fanned out in one.
 //
 // **This is a second series, deliberately kept apart from the consecutive one in `time-bundles.ts`.**
 // That one reads *consecutive* single-call turns, so a launch fired minutes apart with implementation
@@ -36,8 +35,7 @@ import { time_spans, type Span } from './time-spans'
 //
 // **A prompt that references a prior finding** (`has_prior_reference`, from `time-bundle-call.ts`). A
 // read-only investigation chain — the second question only askable once the first is answered — writes
-// nothing between its links, so the write test cannot see it; the marker scan is what does, and it is
-// the caveat joshuafolkken/kit#1847 recorded.
+// nothing between its links, so the write test cannot see it; the marker scan is what does.
 //
 // **Parallel launches are one turn and cost nothing.** Launches sharing a non-empty message id were
 // issued together, so they collapse to a single turn here — the review trio is one turn, not three —

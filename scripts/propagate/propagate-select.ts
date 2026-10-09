@@ -1,7 +1,7 @@
 import { propagate_run } from './propagate-run'
 import type { PropagateTarget, TargetState } from './propagate-targets'
 
-// Narrowing a run to the one consumer `--target` names (joshuafolkken/kit#2755).
+// Narrowing a run to the one consumer `--target` names.
 //
 // Every other consumer stays in the list as `not_selected`, so the report still accounts for each
 // repository considered and says why it was left alone. A name that matches nothing — or matches a

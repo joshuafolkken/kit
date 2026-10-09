@@ -3,8 +3,7 @@
 // EXCEPT one case: prettier keeps a short array of primitives on a single line when it fits within
 // printWidth, whereas JSON.stringify always expands every non-empty array. We post-process the
 // stringify output, collapsing exactly those arrays back inline — reusing JSON.stringify for all
-// string escaping, number formatting, and key ordering so we never diverge on those. See
-// joshuafolkken/kit#660 (a synced tsconfig `exclude` was emitted multi-line and failed prettier).
+// string escaping, number formatting, and key ordering so we never diverge on those.
 //
 // Scope note: an OVER-width array is left one-element-per-line, which matches prettier for string
 // arrays (the only kind these config files hold). prettier uses a packed "fill" layout only for
@@ -114,7 +113,6 @@ function format_json(value: unknown): string {
 // own line regardless of printWidth — so the inlining above, correct everywhere else, produces a
 // file the consumer's own `prettier --check` rejects. Plain `JSON.stringify` with tab indent is
 // byte-for-byte what that printer emits, so the fix is to skip the inlining rather than model it.
-// See joshuafolkken/kit#797.
 function format_package_json(value: unknown): string {
 	return `${JSON.stringify(value, undefined, '\t')}\n`
 }

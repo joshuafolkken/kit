@@ -8,14 +8,11 @@ import { file_reader } from '#scripts/lib/read-file'
 import { test_repository_guard, type WriteGuard } from './test-repository-guard'
 import { GUARD_LOG_KEY } from './unit-guard-environment'
 
-// The unit suite must not reach the network, and until joshuafolkken/kit#1353 nothing said so out
-// loud. One test in `epic-bundle-cli.test.ts` mocked the listing read but not the per-issue relation
-// read, so `fetch_backlog` called through to a live `gh api` against real issues — 768ms against its
-// 26 siblings' 0–1ms, and a CI failure at the 10-second test timeout that had nothing to do with
-// the change under test (PR #1351). Three more in `doctor-report.test.ts` drove `doctor.main()`
-// without stubbing the Dependabot read and spawned `gh api …/automated-security-fixes` for real.
+// The unit suite must not reach the network. A test that mocks one read but not the next calls
+// through to a live `gh api` against real issues — hundreds of milliseconds against its siblings'
+// zero, and a CI failure at the test timeout that has nothing to do with the change under test.
 //
-// Fixing those four is the repair; this file is what keeps it repaired. A one-off audit answers for
+// This file is what keeps the suite repaired. A one-off audit answers for
 // the suite as it stands today and for nothing after it — and the failure mode is invisible by
 // construction, because a test that calls through still *passes*, just slowly and against whatever
 // GitHub happens to answer.
@@ -30,7 +27,7 @@ import { GUARD_LOG_KEY } from './unit-guard-environment'
 // It is deliberately not `gh-subcommand-guard.ts`. That one reads source text and proves a call was
 // *written*; this one observes the run and proves a call was *made*.
 //
-// **`git` is guarded too, and differently** (joshuafolkken/kit#1515). Guarding `gh` alone left the
+// **`git` is guarded too, and differently**. Guarding `gh` alone left the
 // other way out of the machine wide open: `git-pr-followup.test.ts` and its stages suite drove
 // `notify_completion`, whose release count fetches `origin/<default>` for real — 4.1s per test on the
 // machine it was found on, fifteen tests in one file, against a 10s test timeout. The two files were
@@ -48,8 +45,8 @@ import { GUARD_LOG_KEY } from './unit-guard-environment'
 // and the rest `exec` the real binary at the absolute path resolved before `PATH` was touched, so a
 // subprocess that spawns `git` in turn is still behind the shim.
 //
-// **The `git` shim also refuses a write into the repository the suite is running in**
-// (joshuafolkken/kit#1530). That is a second dimension rather than a second guard: the arming, the
+// **The `git` shim also refuses a write into the repository the suite is running in**.
+// That is a second dimension rather than a second guard: the arming, the
 // `PATH` shim, the shared record and the teardown that throws are all this file's, and only the `sh`
 // that decides comes from `test-repository-guard.ts`, which is where the defect, the two findings
 // and what is deliberately left unguarded are written down. Sharing the record is what lets one run
@@ -81,8 +78,8 @@ const GUARD_DIRECTORY = path.join(
 	'.cache',
 	`${GUARD_PREFIX}${String(process.pid)}`,
 )
-// Where the run's host-shared records land instead of the real temp root (joshuafolkken/kit#2494,
-// `platform-temporary.ts`). **Beside the real root rather than inside `GUARD_DIRECTORY`**, because
+// Where the run's host-shared records land instead of the real temp root
+// (`platform-temporary.ts`). **Beside the real root rather than inside `GUARD_DIRECTORY`**, because
 // some of those records are Unix sockets, and a socket path under a checkout's `node_modules/.cache`
 // runs past the 104-byte limit macOS puts on one. The platform root is resolved directly, not read
 // from `PLATFORM_TEMP_ROOT`, so a suite nested inside another's test does not nest its root.
@@ -170,7 +167,7 @@ function shim_script(log_file: string): string {
 //
 // `exec` rather than a call, so the real `git`'s exit code and signals are the shim's own — a caller
 // checking either must not be able to tell the shim is there.
-// The writing arm, from joshuafolkken/kit#1530. Unlike the network arm it does not refuse on sight:
+// The writing arm. Unlike the network arm it does not refuse on sight:
 // the `sh` it splices in decides, and `break` ends the scan when it lets the command through — the
 // subcommand has been found either way.
 function guarded_arm(
@@ -185,7 +182,7 @@ function guarded_arm(
 	]
 }
 
-// The two arms from joshuafolkken/kit#1530. Unlike the network arm neither refuses on sight — the
+// The two write-guard arms. Unlike the network arm neither refuses on sight — the
 // `sh` spliced in decides — and each ends in `break`, because the subcommand has been found whether
 // or not it was let through.
 function git_write_arms(guard: WriteGuard): Array<string> {
@@ -306,7 +303,7 @@ function section(heading: string, calls: ReadonlyArray<string>): Array<string> {
 
 // One section per kind. The two guards share one record, so a run that both reached the network and
 // wrote into its own repository has to report each under its own heading — filing one under the
-// other's would tell the reader to mock a read that was never made (joshuafolkken/kit#1530).
+// other's would tell the reader to mock a read that was never made.
 function describe_violations(calls: ReadonlyArray<string>): string {
 	const writes = calls.filter((call) => test_repository_guard.is_write_violation(call))
 	const network = calls.filter((call) => !test_repository_guard.is_write_violation(call))
@@ -347,8 +344,7 @@ function install_git_shim(directory: string, guarded_directory: string | undefin
 // the one the suite actually runs behind.
 // **`undefined` here means "there is no repository to guard", and a parameter default could not say
 // that** — a JavaScript default fires on an explicit `undefined` too, so a caller asking for the
-// no-repository shim silently got one guarding the real checkout, and the branch that omits the
-// resolver had no test at all (review round 2 of joshuafolkken/kit#1530). The default lives in the
+// no-repository shim would silently get one guarding the real checkout. The default lives in the
 // wrapper below instead, where it is applied rather than defaulted.
 function install_shim_guarding(directory: string, guarded_directory: string | undefined): string {
 	const shim_file = path.join(directory, SHIM_NAME)
@@ -385,7 +381,7 @@ function arm(directory: string = GUARD_DIRECTORY, temporary_root: string = TEMPO
 }
 
 // Thrown rather than logged: a warning on a suite that already exited 0 is a warning nobody reads,
-// which is the state joshuafolkken/kit#1353 was filed from. The directory goes either way, so a
+// which is how a network-reaching suite stays green unnoticed. The directory goes either way, so a
 // failing run does not leave the next one reading its records.
 function disarm(directory: string = GUARD_DIRECTORY): void {
 	const log_text = read_log(log_in(directory))

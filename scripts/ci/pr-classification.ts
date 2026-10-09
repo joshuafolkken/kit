@@ -15,7 +15,7 @@ const CLASSIFICATION_SET: ReadonlySet<string> = new Set(CLASSIFICATION_LABELS)
 const ISSUE_BUG_LABEL = 'bug'
 // The line an Issue body declares its release classification with. A body written by a script
 // (`josh propagate`'s upgrade issue) builds it with `declaration`, so the writer and this parser share
-// one format (joshuafolkken/kit#2858).
+// one format.
 const DECLARATION_PREFIX = '- リリース分類: '
 const DECLARATION = new RegExp(`^${DECLARATION_PREFIX}(.+)$`, 'gmu')
 const LEGACY_LABELS: ReadonlySet<string> = new Set(['semver-major', 'semver-minor'])
@@ -94,7 +94,7 @@ function select_issue_classification(issue_json: string): ReleaseClassification 
 // The labels as they stand when the check runs, not as the event carried them. `josh pr` opens the
 // pull request and labels it in a second call, so the `opened` event carries none; judged from the
 // payload, that run fails, and when it lands in the newer check suite GitHub keeps its red result —
-// a rerun replays the same payload and fails again (joshuafolkken/kit#2712).
+// a rerun replays the same payload and fails again.
 function fetch_current_labels(repository: string, pull_number: number): ReadonlyArray<string> {
 	const path = `repos/${repository}/issues/${String(pull_number)}/labels`
 

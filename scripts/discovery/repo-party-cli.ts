@@ -2,8 +2,8 @@
 import { fileURLToPath } from 'node:url'
 import { repo_party, type Party } from './repo-party'
 
-// `josh repo:party [<owner/repo>]` — say whether a repository is first-party or third-party
-// (joshuafolkken/kit#2122). A command rather than a paragraph, for the reason `josh latest:scope` is
+// `josh repo:party [<owner/repo>]` — say whether a repository is first-party or third-party.
+// A command rather than a paragraph, for the reason `josh latest:scope` is
 // one: a rule an agent applies from memory is a rule an agent can talk itself out of, and this one is
 // argued against at exactly the moment a workflow wants to write to another repository.
 //

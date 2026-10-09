@@ -3,7 +3,7 @@ import { cost_usage, type UsageRecord } from '#scripts/cost-runtime/cost-usage'
 import { cost_dollar_composition, type DollarComposition } from './cost-dollar-composition'
 import type { RunNode, RunRole } from './cost-run-nodes'
 
-// Rolling a run tree's nodes up by role, in dollars (joshuafolkken/kit#1937).
+// Rolling a run tree's nodes up by role, in dollars.
 //
 // The question the hand measurement of 2026-09-13 answered and no command could — what share of a
 // backlogrun the lanes, the subagents, the parent and the wakes each cost — is one `group by role`
@@ -32,8 +32,8 @@ interface RoleTotals {
 	cost_share: number
 	// The active wall time this role's sessions spent, summed across them, and its share of the run's
 	// summed active time. Summed rather than merged into one span because lane children run at once:
-	// the question is how much work each role did, and the run's own wall clock is the parent's window
-	// (joshuafolkken/kit#1937). `josh time --run` leads with this axis, `josh cost --run` with dollars.
+	// the question is how much work each role did, and the run's own wall clock is the parent's window.
+	// `josh time --run` leads with this axis, `josh cost --run` with dollars.
 	elapsed_ms: number
 	elapsed_share: number
 }
@@ -67,7 +67,7 @@ interface RunRoles {
 	total_usd: number
 	total_elapsed_ms: number
 	// Sessions whose transcript could not be measured — reported as a count, never as a zero folded
-	// into the shares above (joshuafolkken/kit#1937).
+	// into the shares above.
 	unreadable_count: number
 }
 

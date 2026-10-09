@@ -6,7 +6,7 @@ import { timed_fetch } from '#scripts/lib/timed-fetch'
 import type { z } from 'zod'
 
 // The SonarCloud project a `josh sonar:*` command reads, shared by every command that calls the
-// SonarCloud API (joshuafolkken/kit#3045): the host, the project key `sonar-project.properties`
+// SonarCloud API: the host, the project key `sonar-project.properties`
 // records — the file `josh init` / `josh sync` generate from the GitHub repository name — and the
 // `<PR>` positional each command takes.
 

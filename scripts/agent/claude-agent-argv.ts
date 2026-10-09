@@ -11,16 +11,16 @@ const AGENT_COMMAND = 'claude'
 const AGENT_FLAGS: ReadonlyArray<string> = ['-p', '--verbose', '--output-format', 'stream-json']
 const MODEL_FLAG = '--model'
 const EFFORT_FLAG = '--effort'
-// Resumes a stored session by id (joshuafolkken/kit#2317). An `outage` re-dispatch passes the
+// Resumes a stored session by id. An `outage` re-dispatch passes the
 // disconnected child's `session_id` so the relaunched process continues that conversation — its
 // accumulated context intact — rather than reading everything from scratch.
 const RESUME_FLAG = '--resume'
-// Forces a fresh session's id rather than resuming one (joshuafolkken/kit#2407). The wake supervisor
+// Forces a fresh session's id rather than resuming one. The wake supervisor
 // generates the id, so it knows without asking the child which transcript that session will write —
 // `<session-id>.jsonl` — and can later attribute a whiff to a session it actually started rather than
 // to any transcript that happened to move while it was alive.
 const SESSION_ID_FLAG = '--session-id'
-// **A launched child carries only the tools a lane has ever used** (joshuafolkken/kit#2435). Every
+// **A launched child carries only the tools a lane has ever used**. Every
 // tool definition and every user-side claude.ai connector rides on each request's cached preamble, and
 // across the lanes measured none of Artifact, Workflow or a connector was ever called, while
 // AskUserQuestion has nobody to answer it in an unattended lane. Narrowing them cut the preamble by
@@ -97,7 +97,7 @@ function build(
 }
 
 // The resume counterpart: the same vector with `--resume <session_id>` ahead of the model flags, so the
-// relaunched child continues the stored session rather than opening a new one (joshuafolkken/kit#2317).
+// relaunched child continues the stored session rather than opening a new one.
 function build_resume(
 	invocation: string,
 	profile: AgentProfile,

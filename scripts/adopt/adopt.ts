@@ -9,8 +9,7 @@ import { adopt_logic } from './adopt-logic'
 import { adopt_toolkits } from './adopt-toolkits'
 
 // `josh adopt` — upgrade every `@joshuafolkken/*` toolkit installed in this repository to latest,
-// sync each one's managed files, run the verification gate, and open the issue and pull request
-// (joshuafolkken/kit#1085).
+// sync each one's managed files, run the verification gate, and open the issue and pull request.
 //
 // It is `josh propagate` seen from the other end: propagation stands in the supplier and pushes one
 // released version out to every consumer, adoption stands in the consumer and pulls whatever is
@@ -67,7 +66,7 @@ function run_sequence(target: PropagateTarget, plan: ReleasePlan | undefined): n
 }
 
 // A declared toolkit that cannot be carried stops the run, whichever of the two ways it fell out —
-// placed under `dependencies`, or declared with no runnable CLI here (joshuafolkken/kit#1540). The
+// placed under `dependencies`, or declared with no runnable CLI here. The
 // refusal names each one and its cause, so the exclusion is still reported as it was before; what
 // changed is that it no longer leaves the run to sync kit alone and revert the overlay tier.
 //

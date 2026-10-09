@@ -1,4 +1,4 @@
-// The icons josh prints in front of a result line (joshuafolkken/kit#1361).
+// The icons josh prints in front of a result line.
 //
 // They were one character each, declared beside whichever command printed them — the verification
 // gate, the health check, the propagation run — and that was harmless while nothing ever *read*
@@ -11,9 +11,9 @@
 // the health check use `✔`, and unifying those would change what a command prints in order to tidy a
 // constant — a decision about output, not about single-sourcing.
 //
-// **The success icon is read too since joshuafolkken/kit#1374.** `josh-verdict.ts` reads the gate's
+// **The success icon is read too.** `josh-verdict.ts` reads the gate's
 // `✔ verification gate passed` line to tell a green gate from the third-party warning bodies it
-// forwards, so the pass icon is now under the same rule the failure icon has been under: declared
+// forwards, so the pass icon is under the same rule as the failure icon: declared
 // once, imported by the printer and the reader alike.
 
 const FAIL_ICON = '✗'

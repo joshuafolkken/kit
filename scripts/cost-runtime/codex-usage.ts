@@ -28,7 +28,7 @@ function same_project(cwd: string, target: string): boolean {
 	return cost_transcript.session_cwd(cwd) === cost_transcript.session_cwd(target)
 }
 
-// The billed input each request paid, oldest first (joshuafolkken/kit#2295). Each `token_count`
+// The billed input each request paid, oldest first. Each `token_count`
 // event carries `last_token_usage` — that request's own input — so the per-request sequence the
 // hand-off's recent window reads is those deltas, not a cumulative-total difference. A session
 // resumed with inherited context is excluded for free: the inherited tokens are in the cumulative

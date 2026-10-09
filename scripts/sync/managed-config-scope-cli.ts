@@ -3,8 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { path_decision } from '#scripts/josh/path-decision'
 import { managed_config_scope } from './managed-config-scope'
 
-// `josh sync:scope` — say whether this change touches a file `josh sync` distributes
-// (joshuafolkken/kit#1578).
+// `josh sync:scope` — say whether this change touches a file `josh sync` distributes.
 //
 // A command rather than a paragraph, for the reason `josh review:level` is one: the confirmation
 // stop this feeds was written as an instruction to compare the diff against three arrays by eye, and

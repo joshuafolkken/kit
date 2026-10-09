@@ -3,7 +3,7 @@
 // `import` and tsconfig `extends` patches through `config_merge`, which exposes ensure + remove
 // semantics for one YAML or JSON list field while preserving every other key, value, and ordering.
 // JSON patches rewrite only the targeted field's own value, so comments, trailing commas and the
-// consumer's hand-formatting elsewhere in the document survive (joshuafolkken/kit#798).
+// consumer's hand-formatting elsewhere in the document survive.
 import { json_list } from './patch-json-list'
 import { yaml_list } from './patch-yaml-list'
 

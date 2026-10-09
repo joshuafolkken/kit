@@ -132,8 +132,8 @@ async function attempt(
 }
 
 // PATH first, but only when its scanner meets the floor: a below-floor PATH build (or a leftover
-// managed copy from an earlier pinned version) reads a fraction of the lockfile and calls it clean
-// (joshuafolkken/kit#2200), so it must not be reported as "already available" — doing so is what
+// managed copy from an earlier pinned version) reads a fraction of the lockfile and calls it clean,
+// so it must not be reported as "already available" — doing so is what
 // suppresses the fetch of a floor-meeting build. `is_executable_file` still guards the managed path
 // so a zero-byte or non-executable leftover is never spawned just to read its version.
 function existing_scanner(target_path: string): string | undefined {

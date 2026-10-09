@@ -1,4 +1,4 @@
-// One decision about an unparseable timestamp, made once (joshuafolkken/kit#1268).
+// One decision about an unparseable timestamp, made once.
 //
 // Both halves of a run carry dates from somewhere else — the transcript's `timestamp` and GitHub's
 // `created_at` / `merged_at` / check-run times — and both have to answer the same question about a
