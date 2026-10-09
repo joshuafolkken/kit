@@ -1,4 +1,3 @@
-import { styleText } from 'node:util'
 import {
 	run_board_fit,
 	type FrameParts,
@@ -10,7 +9,7 @@ import {
 	type YieldStage,
 } from './run-board-fit'
 import { run_board_header, type BoardHeader } from './run-board-header'
-import { run_board_labels, type Words } from './run-board-labels'
+import { run_board_labels } from './run-board-labels'
 import {
 	run_board_layout,
 	type BoardLayout,
@@ -18,7 +17,8 @@ import {
 	type WaveEntry,
 } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
-import { run_board_phase, type Phase } from './run-board-phase'
+import type { Phase } from './run-board-phase'
+import { run_board_render_legend } from './run-board-render-legend'
 import { run_board_render_notes } from './run-board-render-notes'
 import type { ItemState } from './run-board-status'
 import { run_board_track } from './run-board-track'
@@ -32,7 +32,7 @@ import { run_board_usage_text } from './run-board-usage-text'
 // carries only what differs between rows (joshuafolkken/kit#3444). Every word is English whatever the
 // session language (joshuafolkken/kit#3486): one set of words reads the same on every board.
 
-const { NOTES_ICON, PHASE_ICONS, PHASE_WORDS, STATE_ICONS, WAITS_ICON, WORDS } = run_board_labels
+const { NOTES_ICON, PHASE_ICONS, STATE_ICONS, WAITS_ICON, WORDS } = run_board_labels
 const { clock_of, elapsed_of } = run_board_labels
 const { NOTE_LIMIT } = run_board_render_notes
 // The track is a fixed fourteen columns where the gauge and the phase's name took up to twenty-two, so
@@ -61,11 +61,13 @@ interface BoardView extends FrameBounds {
 	resume?: string | undefined
 }
 
-// What every row of one frame is drawn with: the header, how wide the time column is, so a
-// three-digit `125:30` and a `00:42` end in the same column, and each lane's usage where its column is
-// drawn (joshuafolkken/kit#3489).
+// What every row of one frame is drawn with: the header, how wide the title column is, so every time
+// starts in one column (joshuafolkken/kit#3544), how wide the time column is, so a three-digit `125:30`
+// and a `00:42` end in the same column, and each lane's usage where its column is drawn
+// (joshuafolkken/kit#3489).
 interface RowFrame {
 	header: BoardHeader
+	title_width: number
 	time_width: number
 	usages: LaneUsages | undefined
 }
@@ -126,7 +128,7 @@ function waits_of(row: BoardRow, header: BoardHeader): string | undefined {
 	return `${WAITS_ICON} ${row.waits.map((reference) => header.link(reference)).join(', ')}`
 }
 
-// The title is padded to its limit only where a time follows it, so the times form one column.
+// The title is padded to the title column only where a time follows it, so the times form one column.
 function timed_parts(row: BoardRow, frame: RowFrame): Array<string | undefined> {
 	const time = time_of(row, frame.header.now_ms)
 
@@ -134,7 +136,7 @@ function timed_parts(row: BoardRow, frame: RowFrame): Array<string | undefined> 
 
 	if (time === undefined) return [title]
 
-	return [title.padEnd(TITLE_LIMIT), time.padStart(frame.time_width)]
+	return [title.padEnd(frame.title_width), time.padStart(frame.time_width)]
 }
 
 // A running row leads with the icon of the phase it is in now (joshuafolkken/kit#3471) — the rightmost
@@ -264,51 +266,18 @@ function time_width(header: BoardHeader): number {
 	return Math.max(0, ...times.map((time) => time.length))
 }
 
-// Every phase a run passes through, in the track's own order and whatever is on screen
-// (joshuafolkken/kit#3480): a row's phase moves between redraws, so fixed lines keep each icon where
-// the eye last found it — six to a line (joshuafolkken/kit#3526), so the twelve fit a narrow pane.
-const PHASES_PER_LINE = 6
-const PHASE_ENTRIES = run_board_phase.PHASES.map(
-	(phase) => `${PHASE_ICONS[phase]} ${WORDS[PHASE_WORDS[phase]]}`,
-)
-const PHASE_LEGEND = Array.from(
-	{ length: Math.ceil(PHASE_ENTRIES.length / PHASES_PER_LINE) },
-	(_, line) => PHASE_ENTRIES.slice(line * PHASES_PER_LINE, (line + 1) * PHASES_PER_LINE).join(GAP),
-)
+// The title column's width: the limit a terminal cuts every title to, and in a chat — which draws each
+// title whole — the widest title a timed row draws in this frame, so its times still start in one
+// column (joshuafolkken/kit#3544).
+function title_width(header: BoardHeader, layout: BoardLayout): number {
+	if (header.form !== 'chat') return TITLE_LIMIT
 
-// The row states the legend can name, in its order, each with its word.
-const STATE_LEGEND: ReadonlyArray<readonly [ItemState, keyof Words]> = [
-	['merged', 'merged'],
-	['parked', 'parked'],
-	['done', 'done'],
-	['running', 'in_progress'],
-	['stopped', 'stopped'],
-	['waiting', 'waiting'],
-	['human', 'decision'],
-]
+	const titles = run_board_layout
+		.rows_of(layout)
+		.filter((row) => time_of(row, header.now_ms) !== undefined)
+		.map((row) => title_of(header, row_title(row, header)).length)
 
-// The states some row on screen leads with (`drawn`) — a running row leads with its phase, so 🔄 is
-// named only while a row draws it (joshuafolkken/kit#3480).
-function state_legend(drawn: ReadonlySet<string>): Array<string> {
-	return STATE_LEGEND.filter(([state]) => drawn.has(STATE_ICONS[state])).map(
-		([state, word]) => `${STATE_ICONS[state]} ${WORDS[word]}`,
-	)
-}
-
-function waits_legend(rows: ReadonlyArray<BoardRow>): Array<string> {
-	return rows.some((row) => row.waits.length > 0) ? [`${WAITS_ICON} ${WORDS.waits}`] : []
-}
-
-// The phases on their lines and what the screen draws on one more, drawn only when it names something
-// (joshuafolkken/kit#3480). The header's gauges and marks read by their place, so the legend leaves them.
-function legend_of(layout: BoardLayout, notes: ReadonlyArray<BoardNote>): Array<string> {
-	const rows = run_board_layout.rows_of(layout)
-	const drawn = new Set(rows.map((row) => state_icon(row)))
-	const notes_named = run_board_render_notes.notes_legend(notes, drawn)
-	const shown = [...state_legend(drawn), ...waits_legend(rows), ...notes_named]
-	const lines = shown.length === 0 ? PHASE_LEGEND : [...PHASE_LEGEND, shown.join(GAP)]
-
-	return lines.map((line) => styleText('dim', line))
+	return Math.max(TITLE_LIMIT, ...titles)
 }
 
 // Whether every running row's usage column still fits one terminal line — measured as the deepest, an
@@ -338,7 +307,12 @@ function frame_of(
 	size: TerminalSize | undefined,
 ): RowFrame {
 	const usages = header.form === 'chat' ? undefined : header.usages
-	const frame = { header, time_width: time_width(header), usages }
+	const frame = {
+		header,
+		title_width: title_width(header, layout),
+		time_width: time_width(header),
+		usages,
+	}
 
 	return is_usage_fitting(layout, frame, size) ? frame : { ...frame, usages: undefined }
 }
@@ -392,7 +366,10 @@ function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Arr
 
 	if (layout === undefined) return []
 
-	return ['', ...legend_of(layout, notes)]
+	const rows = run_board_layout.rows_of(layout)
+	const drawn = new Set(rows.map((row) => state_icon(row)))
+
+	return ['', ...run_board_render_legend.legend_of(rows, drawn, notes)]
 }
 
 // A live frame is kept within its terminal (joshuafolkken/kit#3486); any other is drawn whole.

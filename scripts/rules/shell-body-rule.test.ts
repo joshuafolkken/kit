@@ -6,6 +6,7 @@ import {
 } from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
+import { rule_list } from './rule-list'
 
 // joshuafolkken/kit#1198: a body handed to a command inside shell double quotes is evaluated before
 // the command runs. The Issue recorded both halves of what that costs — a Telegram body that silently
@@ -146,8 +147,8 @@ describe.each([RESIDENCY])('%s — lists the rule as delivered', (list_path) => 
 	})
 })
 
-describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, () => {
-	const content = read_unwrapped(DELIVERY)
+describe(`pnpm josh rule:list — the enumeration names this rule and its silent turn`, () => {
+	const content = rule_list.render()
 
 	it.each([TOPIC_FILE, GUARD_COMMAND])('states %j', (marker) => {
 		expect(content).toContain(marker)
@@ -160,6 +161,6 @@ describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, 
 	// The condition the whole enumeration turns on: a turn where nothing fires has to be a turn where
 	// the rule is already kept, or the hook is firing on the wrong turns.
 	it('says what a turn with no trigger means', () => {
-		expect(content).toContain('本文がシェルに評価されない ＝ 規則は既に守られている')
+		expect(content).toContain('the shell does not evaluate the body')
 	})
 })

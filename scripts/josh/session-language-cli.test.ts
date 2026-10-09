@@ -42,9 +42,8 @@ describe('format_line', () => {
 		expect(format_line({ lang: 'en', is_default: false })).toBe(`Session language (${ENV_KEY}): en`)
 	})
 
-	it('marks the ja default and names the English opt-in, with no scope note, when unset', () => {
-		expect(format_line({ lang: DEFAULT_SESSION_LANG, is_default: true })).toBe(
-			`Session language (${ENV_KEY}): ${DEFAULT_SESSION_LANG} (default; set ${ENV_KEY}=en for English)`,
-		)
+	// The resident `CLAUDE.md` line already names the default, so the hook adds nothing per prompt.
+	it('prints nothing for the ja default', () => {
+		expect(format_line({ lang: DEFAULT_SESSION_LANG, is_default: true })).toBe('')
 	})
 })

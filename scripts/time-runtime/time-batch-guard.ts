@@ -46,41 +46,26 @@ type NamedCall = Pick<Span, 'is_bundleable' | 'is_writing' | 'label' | 'targets'
 // siblings applied, but a refusable write is content-addressed, so a reissue either applies or fails
 // loudly; `depends_on_sequence` withholds the refusal where the call shares a target with the sequence.
 
+// The three texts carry the action and a pointer; the criterion's reasoning and measured cost stay
+// at the pointer, so a firing does not re-bill the rule body (joshuafolkken/kit#3398).
+const RULE_POINTER = '`prompts/collaboration-workflow/turn-batching.md`'
+const STREAK = `${String(CONSECUTIVE_LIMIT)} single-call turns in a row`
+
 // Includes what to do when the turn was already batching — the guard cannot see the turn it interrupted.
 const REASON =
-	`⛔ batching: the last ${String(SEQUENCE_BEFORE_LIMIT)} turns each issued a single tool call, so ` +
-	`this one would make ${String(CONSECUTIVE_LIMIT)} in a row. Reissue it in one turn together with ` +
-	`the calls meant to follow it that do not need its result. **The criterion is whether this call's ` +
-	`input needs another call's result, not what kind of call it is** — edits are covered exactly as ` +
-	`reads are, and it never authorizes weakening a verification gate or a review: fewer turns, never ` +
-	`less work. The rule, and where its measured cost and rejected mechanisms are, is in ` +
-	`\`prompts/collaboration-workflow/turn-batching.md\`. If this turn was already batching, or the call ` +
-	`genuinely has nothing to go beside it, reissue it as it was: this fires once per run of ` +
-	`single-call turns and cannot repeat on the call in hand.`
+	`⛔ batching: ${STREAK}. Reissue this with the calls that do not need its result — the test is ` +
+	`whether a call's input needs another call's result, not what kind of call it is (edits are covered ` +
+	`exactly as reads), and it never authorizes weakening a verification gate or a review. Already ` +
+	`batching, or nothing to pair? Reissue it unchanged; this fires once per streak. ${RULE_POINTER}`
 
 // A whole-file write earns a notice, not a refusal: a `Write` cannot be refused safely.
 const NOTICE =
-	`💡 batching: the last ${String(SEQUENCE_BEFORE_LIMIT)} turns each issued a single tool call, so ` +
-	`this Write makes ${String(CONSECUTIVE_LIMIT)} in a row. This is a notice, not a refusal — the ` +
-	`write proceeds. Where the writes meant to follow it do not need its result, issue them in one turn ` +
-	`together. **The criterion is whether a call's input needs another call's result, not what kind of ` +
-	`call it is** — it never authorizes weakening a verification gate or a review: fewer turns, never ` +
-	`less work. The rule, and where its measured cost and rejected mechanisms are, is in ` +
-	`\`prompts/collaboration-workflow/turn-batching.md\`. If this run was already batching, or the write ` +
-	`genuinely has nothing to go beside it, carry on: this recurs every ` +
-	`${String(NOTICE_REFIRE_EVERY)} further single-call turn(s).`
+	`💡 batching: ${STREAK}; the Write proceeds. Issue the writes that do not need its result in one ` +
+	`turn, never by weakening a gate or a review. ${RULE_POINTER}`
 
 // A headless lane child ends its turn on a denial, so a refusable call there earns a notice instead.
-const LANE_NOTICE =
-	`💡 batching: the last ${String(SEQUENCE_BEFORE_LIMIT)} turns each issued a single tool call, so ` +
-	`this one makes ${String(CONSECUTIVE_LIMIT)} in a row. This is a notice, not a refusal — the call ` +
-	`proceeds, because a dispatched lane child ends its turn on a denial. Where the calls meant to follow ` +
-	`it do not need its result, issue them in one turn together. **The criterion is whether a call's ` +
-	`input needs another call's result, not what kind of call it is** — it never authorizes weakening a ` +
-	`verification gate or a review: fewer turns, never less work. The rule, and where its measured cost ` +
-	`and rejected mechanisms are, is in \`prompts/collaboration-workflow/turn-batching.md\`. If this run was already ` +
-	`batching, or the call genuinely has nothing to go beside it, carry on: this recurs every ` +
-	`${String(NOTICE_REFIRE_EVERY)} further single-call turn(s).`
+// It recurs every single-call turn, so it is kept to one line.
+const LANE_NOTICE = `💡 batching: ${STREAK}; the call proceeds. Pair independent calls. ${RULE_POINTER}`
 
 // Never refused: its reissue overwrites an applied sibling edit with no error anywhere.
 const WHOLE_FILE_WRITE_TOOL = 'Write'

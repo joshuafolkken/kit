@@ -1,6 +1,7 @@
 import { read_repo_file } from '#scripts/document/ai-document-fixture'
 import { run_step } from '#scripts/run/run-step'
 import { describe, expect, it } from 'vitest'
+import { rule_list } from './rule-list'
 
 // joshuafolkken/kit#2251: the ordering question of the rule-placement criterion lives in residency.md
 // as the single source, applied right after question 0. A rule that decides *when or in what order* to
@@ -41,7 +42,8 @@ describe('residency.md carries the ordering question as the single source', () =
 describe('CLAUDE.md reaches the ordering question through the delivery enumeration', () => {
 	it('names rule-delivery.md, which lists the ordering question', () => {
 		expect(read_repo_file(CLAUDE)).toContain(RULE_DELIVERY)
-		expect(read_repo_file(RULE_DELIVERY)).toContain('順序の問い')
+		expect(read_repo_file(RULE_DELIVERY)).toContain('pnpm josh rule:list')
+		expect(rule_list.render()).toContain(ORDERING_EN_MARKER)
 	})
 })
 

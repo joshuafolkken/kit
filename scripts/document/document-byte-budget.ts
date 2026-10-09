@@ -94,6 +94,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// joshuafolkken/kit#3278 moved `josh latest` and `josh overrides` — commands a person types — from
 	// the automation page to `docs/josh-commands.md`, which grew one block and the automation page shrank one.
 	// joshuafolkken/kit#3400 raised it: `josh observation:record` replaced the ledger's hand-typed count.
+	// joshuafolkken/kit#3399 raised it: `josh rule:list` replaced the rule table in `rule-delivery.md`,
+	// which every child reads whole, so its contract lives here instead.
 	{ path: 'docs/josh-commands-automation.md', bytes: 53_248 },
 	// joshuafolkken/kit#3430 raised it: `josh run:board` is a run command and its contract lives here.
 	// joshuafolkken/kit#3433 raised it: `josh run:add` puts an issue into a live run.
@@ -125,8 +127,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// #3177 cut it to the four questions; the history and lists moved to `docs/maintainers/residency-rationale.md`.
 	{ path: 'prompts/collaboration-workflow/residency.md', bytes: 8192 },
 	// #3186 moved the hook wiring and history to `docs/maintainers/rule-delivery-rationale.md`;
-	// #3179 adds the `index-mutation` / `destructive-command` / `protected-file` entries.
-	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 20_480 },
+	// #3399 moved the rule list to `pnpm josh rule:list`, rendered from `delivered-rules.ts`.
+	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/shell-body.md', bytes: 8192 },
 	// #3177 moved the measurements and rejected mechanisms to `docs/maintainers/turn-batching-rationale.md`.
 	{ path: 'prompts/collaboration-workflow/turn-batching.md', bytes: 8192 },

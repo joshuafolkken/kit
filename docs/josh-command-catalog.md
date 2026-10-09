@@ -201,7 +201,7 @@ List refactoring candidates in the changed scope by category and answer clear/ca
 
 _No arguments._
 
-Claude Code hook: print the resolved JOSH_SESSION_LANG (defaults to ja) for the session context
+Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context (the ja default prints nothing)
 
 ---
 
@@ -1322,6 +1322,16 @@ Say whether the second /code-review round is due, or may be skipped entirely
 _No arguments._
 
 Claude Code hook: deliver a trigger-delivered rule at the call that binds it (reads the tool call on stdin)
+
+---
+
+### `josh rule:list`
+
+> **Audience:** automation · **Side effects:** none
+
+_No arguments._
+
+Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows
 
 ---
 

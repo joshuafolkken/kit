@@ -79,6 +79,13 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[--refresh]', 'developer', ['files']],
 	},
+	'rule:list': {
+		script: 'scripts/rules/rule-list.ts',
+		description:
+			"Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows",
+		category: 'AI tools',
+		reference: ['', 'automation', ['none']],
+	},
 	format: {
 		script: 'scripts/lint/format.ts',
 		description: 'Format code with prettier and eslint (skips a tool a basic project lacks)',
@@ -128,7 +135,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	'session:lang': {
 		script: 'scripts/josh/session-language-cli.ts',
 		description:
-			'Claude Code hook: print the resolved JOSH_SESSION_LANG (defaults to ja) for the session context',
+			'Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context (the ja default prints nothing)',
 		category: 'Development',
 		reference: ['', 'automation', ['none']],
 		// **No `tsx_arguments`, deliberately**, the same as `batch:guard` above: this runs on every
