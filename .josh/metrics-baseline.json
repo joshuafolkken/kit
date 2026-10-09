@@ -12,7 +12,7 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12222,
-		"on_demand_bytes": 559192
+		"on_demand_bytes": 559151
 	},
 	"accepted": {
 		"reason": "#3503: the beacon probe now reports live / gone / unknown so a timed-out probe no longer clears a live lock holder",
