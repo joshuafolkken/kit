@@ -15,6 +15,12 @@ vi.mock('#scripts/gate/type-check-step', () => ({
 	type_check_step: { resolve_type_check_args: vi.fn(async () => ['josh', 'check']) },
 }))
 
+const is_kit_mock = vi.hoisted(() => vi.fn(() => false))
+
+vi.mock('#scripts/gate/project-checks', () => ({
+	project_checks: { is_kit_repository: is_kit_mock },
+}))
+
 const { run_ship_pre_detach } = await import('./run-ship-pre-detach')
 
 // joshuafolkken/kit#3222: the type check and the document tests a detached ship runs before the hand-off.
@@ -26,6 +32,7 @@ const DOCUMENT_TARGET = 'scripts/document'
 const DOCUMENT_TEST_COMMAND = 'josh test:unit --passWithNoTests'
 const DOCUMENT_TESTS = `${DOCUMENT_TEST_COMMAND} ${DOCUMENT_TARGET}`
 const TYPE_ERROR = 'scripts/a.test.ts(3,7): error TS4111: Property comes from an index signature'
+const ACCEPT_HINT = 'pnpm josh metrics --accept --reason "<why>"'
 const DOCUMENT_FAILURE = 'FAIL scripts/document/document-byte-budget.test.ts > stays under budget'
 
 interface Answer {
@@ -61,6 +68,7 @@ function create(target: string): void {
 beforeEach(() => {
 	tree.directory = mkdtempSync(path.join(tmpdir(), 'pre-detach-'))
 	run_mock.mockReset()
+	is_kit_mock.mockReturnValue(false)
 	answer(new Map())
 })
 
@@ -135,6 +143,38 @@ describe('run_ship_pre_detach.checks — what fails', () => {
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
 			out: `${TYPE_ERROR}\n\n${DOCUMENT_FAILURE}`,
+		})
+	})
+})
+
+// joshuafolkken/kit#3568: the metrics totals, in kit only, so a grown total stops the session that grew it.
+describe('run_ship_pre_detach.checks — the metrics totals', () => {
+	const metrics = run_ship_pre_detach.METRICS_TOTALS_COMMAND.join(' ')
+	const grown = `josh metrics: 1 total(s) grew past the baseline\n${ACCEPT_HINT}`
+
+	it('runs no metrics outside kit', async () => {
+		await run_ship_pre_detach.checks(tree.directory)
+
+		expect(commands()).toStrictEqual([TYPE_CHECK])
+	})
+
+	it('passes in kit when no total grew', async () => {
+		is_kit_mock.mockReturnValue(true)
+
+		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
+			code: OK,
+			out: run_ship_pre_detach.PASSED,
+		})
+		expect(commands()).toStrictEqual([TYPE_CHECK, metrics])
+	})
+
+	it('fails in kit with the accept hint when a total grew', async () => {
+		is_kit_mock.mockReturnValue(true)
+		answer(new Map([[metrics, { exit_code: FAILED, output: grown }]]))
+
+		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
+			code: FAILED,
+			out: grown,
 		})
 	})
 })

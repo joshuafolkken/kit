@@ -51,7 +51,11 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Print repository-wide quality totals and durations, and fail when one grew past its baseline',
 		category: 'Development',
-		reference: ['[--no-startup | --accept --reason "<why>"]', 'developer', ['files']],
+		reference: [
+			'[--no-startup | --totals-only | --accept --reason "<why>"]',
+			'developer',
+			['files'],
+		],
 		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
 		memory_mb: core_budget.MEMORY_MB.eslint_scan,
 		is_kit_only: true,

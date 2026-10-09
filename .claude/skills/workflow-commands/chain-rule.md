@@ -75,7 +75,9 @@ once here; the measurements that motivated each one live in the linked Issues.
 - **A single check answers once per tree** — while implementing, re-run a single check by name
   (`pnpm josh lint:related`, `pnpm josh cspell:dot`, `pnpm josh test:related`, or the project's type
   check) after every edit; a repeat of the same command with the same arguments over a tree nothing has
-  touched since buys only a copy of the answer already in hand (joshuafolkken/kit#1383).
+  touched since buys only a copy of the answer already in hand (joshuafolkken/kit#1383). In kit a
+  detached `pnpm josh ship` also checks the metrics totals before the hand-off, so the implementing
+  session accepts a grown total with its reason, as the ship's output names.
 - **The pull request opens between the rounds, so CI runs beside round 2** — `pnpm josh git -y` sits
   between the two review rounds. Round 1 runs on the uncommitted tree and its High/Medium findings are
   fixed before anything is committed; the verification pass over those fixes then runs against the open

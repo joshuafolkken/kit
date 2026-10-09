@@ -4,12 +4,14 @@ import { metrics_command } from './metrics-command'
 const ACCEPT = '--accept'
 const REASON = '--reason'
 const NO_STARTUP = '--no-startup'
+const TOTALS_ONLY = '--totals-only'
 
 describe('metrics_command.parse_arguments', () => {
 	it('checks against the baseline, timing the startups, when no argument is given', () => {
 		expect(metrics_command.parse_arguments([])).toStrictEqual({
 			reason: undefined,
 			is_startup_timed: true,
+			is_totals_only: false,
 		})
 	})
 
@@ -18,16 +20,30 @@ describe('metrics_command.parse_arguments', () => {
 		expect(metrics_command.parse_arguments([NO_STARTUP])).toStrictEqual({
 			reason: undefined,
 			is_startup_timed: false,
+			is_totals_only: false,
 		})
 		expect(metrics_command.parse_arguments([NO_STARTUP, ACCEPT])).toBeUndefined()
 	})
 
+	// joshuafolkken/kit#3568: the pre-detach form of `josh ship`, the totals without the durations.
+	it('checks the totals alone in the pre-detach form', () => {
+		expect(metrics_command.parse_arguments([TOTALS_ONLY])).toStrictEqual({
+			reason: undefined,
+			is_startup_timed: false,
+			is_totals_only: true,
+		})
+		expect(metrics_command.parse_arguments([TOTALS_ONLY, NO_STARTUP])).toBeUndefined()
+	})
+})
+
+describe('metrics_command.parse_arguments — the accept form', () => {
 	it('raises the baseline with the trimmed reason in the full accept form', () => {
 		const reason = 'New guard for #1'
 
 		expect(metrics_command.parse_arguments([ACCEPT, REASON, `  ${reason} `])).toStrictEqual({
 			reason,
 			is_startup_timed: true,
+			is_totals_only: false,
 		})
 	})
 
