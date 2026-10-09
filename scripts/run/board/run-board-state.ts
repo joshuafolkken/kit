@@ -8,6 +8,7 @@ import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
 import type { MachineGauges, MachineMark } from './run-board-machine'
 import type { LocalRead } from './run-board-read'
+import type { Spot } from './run-board-spin'
 import type { LaneUsages, UsageMark } from './run-board-usage'
 
 // What a `run:board` redraw reads through and folds forward (joshuafolkken/kit#3430), shared by the
@@ -70,6 +71,8 @@ interface BoardState {
 	gauges: MachineGauges | undefined
 	// The redraw the last sample was taken on, which the next sample is due a second after.
 	sampled_ms: number | undefined
+	// Where the last frame drew its spinners, turned between redraws (joshuafolkken/kit#3495).
+	spots: ReadonlyArray<Spot>
 	// The last process reading, which the next one is compared against, and each lane's usage drawn from
 	// them (joshuafolkken/kit#3489).
 	usage: UsageMark | undefined
@@ -93,6 +96,7 @@ const FRESH_STATE: BoardState = {
 	machine: undefined,
 	gauges: undefined,
 	sampled_ms: undefined,
+	spots: [],
 	usage: undefined,
 	usages: undefined,
 }

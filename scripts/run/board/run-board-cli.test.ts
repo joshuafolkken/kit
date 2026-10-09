@@ -1,13 +1,14 @@
 import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
-import { run_board_fixture } from './run-board-fixture'
+import { run_board_fixture, type Harness } from './run-board-fixture'
 import type { BoardPlan } from './run-board-layout'
+import type { BoardPorts } from './run-board-state'
 
 // joshuafolkken/kit#3430: the command's arguments and its terminal. What one redraw reads and draws is
 // `run-board-tick.test.ts`'s (joshuafolkken/kit#3444).
 
-const { LOCAL, SPINNING, STOPPED, harness, plan_titled } = run_board_fixture
+const { LOCAL, SPINNING, START, STOPPED, harness, plan_titled } = run_board_fixture
 const ESCAPE = '\u{1B}'
 const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l`
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
@@ -161,6 +162,52 @@ describe('run_board_cli.run plan read', () => {
 		expect(frames).toHaveLength(1)
 		expect(frames[0]).toMatch(/✅ +\d+\/\d+/u)
 		expect(frames[0]?.split('\n', 1)[0]).not.toMatch(SPINNING)
+	})
+})
+
+// joshuafolkken/kit#3495: a live board redraws on each second and only turns its spinners in between.
+const HOME = `${ESCAPE}[H${ESCAPE}[J`
+// eslint-disable-next-line no-control-regex -- a turn is made of control characters
+const TURN = /^(?:\u{1B}\[\d+;\d+H(?:\u{1B}\[[\d;]*m)*.\u{1B}\[0m)+$/u
+const PACED_MS = 2000
+
+// Ports whose sleeps move the clock, stopping the board once `PACED_MS` have passed, and every write
+// with how long after the start it was made.
+function paced(board: Harness): {
+	live: BoardPorts
+	writes: Array<{ at_ms: number; text: string }>
+} {
+	const { ports, clock } = board
+	const writes: Array<{ at_ms: number; text: string }> = []
+	const live = {
+		...ports,
+		write: (text: string) => {
+			writes.push({ at_ms: clock.now_ms - START, text })
+		},
+		sleep: async (ms: number) => {
+			if (clock.now_ms >= START + PACED_MS) throw STOPPED
+			clock.now_ms += ms
+		},
+	}
+
+	return { live, writes }
+}
+
+describe('run_board_cli.run redraw pace', () => {
+	it('redraws once a second on the second, writing only spinner turns between, reading nothing', async () => {
+		const board = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
+		const { live, writes } = paced(board)
+
+		await expect(run_board_cli.run([], live)).rejects.toBe(STOPPED)
+
+		const frames = writes.filter(({ text }) => text.startsWith(HOME))
+		const between = writes.slice(1, -1).filter(({ text }) => !text.startsWith(HOME))
+
+		expect(frames.map(({ at_ms }) => at_ms)).toStrictEqual([0, 1000, 2000])
+		expect(between.length).toBeGreaterThan(0)
+		expect(between.every(({ text }) => TURN.test(text))).toBe(true)
+		expect(board.read_machine).toHaveBeenCalledTimes(frames.length)
+		expect(board.read_local).toHaveBeenCalledOnce()
 	})
 })
 
