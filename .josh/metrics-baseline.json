@@ -12,7 +12,7 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 535381
+		"on_demand_bytes": 535366
 	},
 	"accepted": {
 		"reason": "#3558 adds backlog-drive-epic (named epic drives its children from epic:next, including children added mid-run) plus its review-round fixes, and documents it in backlogrun-steps",
