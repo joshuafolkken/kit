@@ -2,6 +2,7 @@ import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { Fetch } from './run-board-fetch'
+import type { TerminalSize } from './run-board-fit'
 import type { BoardForm } from './run-board-header'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
@@ -24,6 +25,9 @@ interface BoardPorts {
 	link: Link
 	// Whether stdout is a terminal — only a terminal gets the alternate screen and the spinner.
 	is_tty: boolean
+	// The terminal a live frame is kept within, read at every redraw so a resized pane is fitted on the
+	// next one (joshuafolkken/kit#3486); none where the frame is drawn whole — one frame, a pipe, a chat.
+	size?: (() => TerminalSize) | undefined
 	form: BoardForm
 	// Records that a progress report was just given, as `run:progress --mark` does, so the next scheduled
 	// one waits a full interval from here (joshuafolkken/kit#3456).

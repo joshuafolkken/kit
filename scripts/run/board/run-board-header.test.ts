@@ -10,7 +10,9 @@ import type { BoardLayout, BoardRow } from './run-board-layout'
 // lines of symbols, no `updated` line, and a heartbeat colored by how stale the stream is.
 
 const { clock_of } = run_board_labels
-const WORDS = run_board_labels.words_of('en')
+const { WORDS } = run_board_labels
+const MACHINE_UNKNOWN = '⚡ -   🧠 -   💾 -'
+const RUNNING_TITLE = '▶ backlogrun   ⏱ 30:00   ⌛ 7h30m'
 const MINUTE = backlog_budget.MS_PER_MINUTE
 const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
 const NOW = STARTED + 30 * MINUTE
@@ -25,13 +27,12 @@ const RUNNING_LAYOUT: BoardLayout = { ...EMPTY_LAYOUT, active: [row(1, 'running'
 function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 	return {
 		now_ms: NOW,
-		words: WORDS,
 		started_ms: STARTED,
 		ended_ms: undefined,
 		activity: { last_event_ms: undefined, idle: undefined, is_stopped: false },
 		layout: EMPTY_LAYOUT,
 		baseline_total: undefined,
-		plan_fetched_ms: undefined,
+		plan_fetched_ms: NOW,
 		plan_failed_ms: undefined,
 		is_plan_loading: false,
 		machine: undefined,
@@ -93,11 +94,13 @@ describe('run_board_header.header_lines shape', () => {
 		expect(title_of(header({ activity }))).toBe('⏸ backlogrun   ⏱ 30:00   ⌛ 7h30m   💓 01:00')
 	})
 
-	it('draws the title and the progress bar only, with no updated line', () => {
+	// joshuafolkken/kit#3486: three lines in every state, a machine not sampled yet drawn as `-`.
+	it('draws the title, the machine and the progress bar, with no updated line', () => {
 		const layout = { ...RUNNING_LAYOUT, unreached: [row(2, 'waiting')] }
 
 		expect(lines_of(header({ layout }))).toStrictEqual([
-			'▶ backlogrun   ⏱ 30:00   ⌛ 7h30m',
+			RUNNING_TITLE,
+			MACHINE_UNKNOWN,
 			`✅ 0/2 ${'─'.repeat(10)}   🔄 1  ⏳ 1  💤 0`,
 		])
 	})
@@ -126,9 +129,23 @@ describe('run_board_header.header_lines shape', () => {
 		expect(title_of(header({ spinner: '⠙' }))).toMatch(/^⏸ backlogrun/u)
 		expect(title_of(header({ activity: stopped, spinner: '⠙' }))).toMatch(/^■ backlogrun/u)
 	})
+})
 
-	it('has no progress line without a layout', () => {
-		expect(lines_of(header({ layout: undefined }))).toStrictEqual([title_of(header())])
+describe('run_board_header.header_lines before the plan is read', () => {
+	// joshuafolkken/kit#3486: before the plan is read the run's own children are counted, and what only
+	// the plan knows — the total and what waits — is `-`, not a `0` that reads as nothing.
+	it('draws three lines, with - for what only the plan knows', () => {
+		const board = header({ layout: RUNNING_LAYOUT, plan_fetched_ms: undefined, baseline_total: 0 })
+
+		expect(lines_of(board)).toStrictEqual([
+			RUNNING_TITLE,
+			MACHINE_UNKNOWN,
+			`✅ 0/- ${'─'.repeat(10)}   🔄 1  ⏳ -  💤 0`,
+		])
+	})
+
+	it('draws three lines with no layout at all', () => {
+		expect(lines_of(header({ layout: undefined }))).toHaveLength(3)
 	})
 })
 
@@ -198,7 +215,7 @@ function progress_of(settled: number, total: number): string {
 	const waiting = Array.from({ length: total - settled }, (_, index) => row(100 + index, 'waiting'))
 	const layout = { ...EMPTY_LAYOUT, active: merged, unreached: waiting }
 
-	return lines_of(header({ layout }))[1] ?? ''
+	return lines_of(header({ layout }))[2] ?? ''
 }
 
 // joshuafolkken/kit#3473: icon, count, then bar, as the machine gauges; the done count drawn once.

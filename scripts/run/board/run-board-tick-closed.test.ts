@@ -10,7 +10,7 @@ import { run_board_tick } from './run-board-tick'
 // open listing no longer holds is read closed from GitHub once, then drawn with its title, its time and
 // whether it merged.
 
-const { LOCAL, START, WORDS, harness } = run_board_fixture
+const { LOCAL, START, harness } = run_board_fixture
 const { FRESH_STATE, PLAN_RETRY_MS, tick } = run_board_tick
 const CHILDREN = [3439, 3444, 3446]
 const LAUNCHED_AT = '2026-10-08T08:00:00.000Z'
@@ -52,7 +52,7 @@ describe('run_board_tick.tick — children that closed', () => {
 	it('draws a closed child nameless and timeless while GitHub has not answered', async () => {
 		const { ports, frames } = harness(LOCAL_CLOSED, [PLAN])
 
-		await tick(FRESH_STATE, ports, WORDS)
+		await tick(FRESH_STATE, ports)
 
 		expect(row_of(frames.at(-1), 3439)?.trim()).toBe('🏁 3439')
 	})
@@ -61,7 +61,7 @@ describe('run_board_tick.tick — children that closed', () => {
 		const { ports, frames, read_closed } = harness(LOCAL_CLOSED, [PLAN])
 
 		read_closed.mockImplementation(async (issues) => merged_closed(issues))
-		await tick(FRESH_STATE, ports, WORDS)
+		await tick(FRESH_STATE, ports)
 
 		expect(read_closed).toHaveBeenCalledWith(CHILDREN)
 
@@ -76,10 +76,10 @@ describe('run_board_tick.tick — children that closed', () => {
 		const { ports, read_closed, clock } = harness(LOCAL_CLOSED, [PLAN, PLAN])
 
 		read_closed.mockImplementation(async (issues) => merged_closed(issues))
-		const first = await tick(FRESH_STATE, ports, WORDS)
+		const first = await tick(FRESH_STATE, ports)
 
 		clock.now_ms += PLAN_RETRY_MS
-		await tick(first, ports, WORDS)
+		await tick(first, ports)
 
 		expect(read_closed).toHaveBeenCalledOnce()
 	})
@@ -90,10 +90,10 @@ describe('run_board_tick.tick — children that closed', () => {
 describe('run_board_tick.tick — children of an ended run', () => {
 	it('asks again after the retry interval while the run is going', async () => {
 		const { ports, read_closed, clock } = harness(LOCAL_CLOSED, [PLAN, PLAN])
-		const first = await tick(FRESH_STATE, ports, WORDS)
+		const first = await tick(FRESH_STATE, ports)
 
 		clock.now_ms += PLAN_RETRY_MS
-		await tick(first, ports, WORDS)
+		await tick(first, ports)
 
 		expect(read_closed).toHaveBeenCalledTimes(2)
 	})
@@ -101,13 +101,13 @@ describe('run_board_tick.tick — children of an ended run', () => {
 	it('asks once after the run ended and never again', async () => {
 		const ended = { ...LOCAL_CLOSED, ended_ms: START }
 		const { ports, read_closed, clock } = harness(ended, [PLAN])
-		const first = await tick(FRESH_STATE, ports, WORDS)
+		const first = await tick(FRESH_STATE, ports)
 
 		clock.now_ms += PLAN_RETRY_MS
-		const second = await tick(first, ports, WORDS)
+		const second = await tick(first, ports)
 
 		clock.now_ms += PLAN_RETRY_MS
-		await tick(second, ports, WORDS)
+		await tick(second, ports)
 
 		expect(read_closed).toHaveBeenCalledOnce()
 	})
@@ -115,14 +115,14 @@ describe('run_board_tick.tick — children of an ended run', () => {
 	it('asks once more after a run asked while going ended', async () => {
 		const ended = { ...LOCAL_CLOSED, ended_ms: START + PLAN_RETRY_MS }
 		const { ports, read_closed, read_local, clock } = harness(LOCAL_CLOSED, [PLAN, PLAN])
-		const first = await tick(FRESH_STATE, ports, WORDS)
+		const first = await tick(FRESH_STATE, ports)
 
 		read_local.mockResolvedValue(ended)
 		clock.now_ms += PLAN_RETRY_MS
-		const second = await tick(first, ports, WORDS)
+		const second = await tick(first, ports)
 
 		clock.now_ms += PLAN_RETRY_MS
-		await tick(second, ports, WORDS)
+		await tick(second, ports)
 
 		expect(read_closed).toHaveBeenCalledTimes(2)
 	})
@@ -136,13 +136,13 @@ describe('run_board_tick.tick — an ended run whose read failed', () => {
 		const { ports, read_closed, clock } = harness(ended, [PLAN])
 
 		read_closed.mockResolvedValueOnce(FAILED)
-		const first = await tick(FRESH_STATE, ports, WORDS)
+		const first = await tick(FRESH_STATE, ports)
 
 		clock.now_ms += PLAN_RETRY_MS
-		const second = await tick(first, ports, WORDS)
+		const second = await tick(first, ports)
 
 		clock.now_ms += PLAN_RETRY_MS
-		await tick(second, ports, WORDS)
+		await tick(second, ports)
 
 		expect(read_closed).toHaveBeenCalledTimes(2)
 	})

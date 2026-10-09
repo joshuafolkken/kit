@@ -62,10 +62,10 @@ function title_of(frame = ''): string {
 async function across_landing(read: () => Promise<BoardPlan | undefined>): Promise<Array<string>> {
 	const { ports, frames } = harness(LOCAL, [])
 	const live = { ...ports, read_plan: read }
-	const first = await tick(FRESH_STATE, live, WORDS, 'background')
+	const first = await tick(FRESH_STATE, live, 'background')
 
 	await flush()
-	await tick(first, live, WORDS, 'background')
+	await tick(first, live, 'background')
 
 	return frames
 }
@@ -74,7 +74,7 @@ describe('run_board_tick.tick in the background', () => {
 	it('draws the first frame before the plan read lands, the spinner turning after ⏳', async () => {
 		const { ports, frames } = harness(LOCAL, [])
 
-		await tick(FRESH_STATE, { ...ports, read_plan: never }, WORDS, 'background')
+		await tick(FRESH_STATE, { ...ports, read_plan: never }, 'background')
 
 		expect(frames).toHaveLength(1)
 		expect(title_of(frames[0])).toContain(`${LOADING} ${spinner_of(START)}`)
@@ -85,10 +85,10 @@ describe('run_board_tick.tick in the background', () => {
 		const read_plan = vi.fn(never)
 		const { ports, frames, clock } = harness(LOCAL, [])
 		const live = { ...ports, read_plan }
-		const first = await tick(FRESH_STATE, live, WORDS, 'background')
+		const first = await tick(FRESH_STATE, live, 'background')
 
 		clock.now_ms += MACHINE_SAMPLE_MS
-		await tick(first, live, WORDS, 'background')
+		await tick(first, live, 'background')
 
 		expect(frames[0]).toContain('⏱ 00:00')
 		expect(frames[1]).toContain('⏱ 00:01')
@@ -117,10 +117,10 @@ describe('run_board_tick.tick in the background, closed children', () => {
 	it('keeps redrawing while the closed children are read once the plan has landed', async () => {
 		const read_closed = vi.fn(async (): Promise<ClosedAnswer> => await never())
 		const { ports, frames } = harness(LOCAL_CLOSED, [OPEN_NONE])
-		const first = await tick(FRESH_STATE, { ...ports, read_closed }, WORDS, 'background')
-		const second = await tick(first, { ...ports, read_closed }, WORDS, 'background')
+		const first = await tick(FRESH_STATE, { ...ports, read_closed }, 'background')
+		const second = await tick(first, { ...ports, read_closed }, 'background')
 
-		await tick(second, { ...ports, read_closed }, WORDS, 'background')
+		await tick(second, { ...ports, read_closed }, 'background')
 
 		expect(frames).toHaveLength(3)
 		expect(read_closed).toHaveBeenCalledOnce()
@@ -131,7 +131,7 @@ describe('run_board_tick.tick settled', () => {
 	it('waits for the plan and draws no loading spinner', async () => {
 		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
 
-		await tick(FRESH_STATE, ports, WORDS)
+		await tick(FRESH_STATE, ports)
 
 		expect(frames[0]).toMatch(PROGRESS)
 		expect(title_of(frames[0])).not.toContain(LOADING)

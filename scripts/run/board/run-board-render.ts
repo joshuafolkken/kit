@@ -1,4 +1,5 @@
 import { styleText } from 'node:util'
+import { run_board_fit, type PlanLine, type TerminalSize } from './run-board-fit'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels, type Words } from './run-board-labels'
 import {
@@ -16,11 +17,12 @@ import { run_board_track } from './run-board-track'
 // apart from the terminal. The header says where the run is; the sections below it follow the plan's
 // order; the findings at the bottom are what the run would otherwise have said in no chat anyone reads.
 // A section is a rule rather than a heading, and the legend at the foot names the symbols, so a row
-// carries only what differs between rows (joshuafolkken/kit#3444).
+// carries only what differs between rows (joshuafolkken/kit#3444). Every word is English whatever the
+// session language (joshuafolkken/kit#3486): one set of words reads the same on every board.
 
-const { NOTES_ICON, NOTE_ICONS, PHASE_ICONS, PHASE_WORDS, STATE_ICONS, WAITS_ICON } =
+const { NOTES_ICON, NOTE_ICONS, PHASE_ICONS, PHASE_WORDS, STATE_ICONS, WAITS_ICON, WORDS } =
 	run_board_labels
-const { clock_of, elapsed_of, words_of } = run_board_labels
+const { clock_of, elapsed_of } = run_board_labels
 // The track is a fixed fourteen columns where the gauge and the phase's name took up to twenty-two, so
 // the title takes the columns it freed and a row is no wider (joshuafolkken/kit#3460).
 const TITLE_LIMIT = 48
@@ -34,15 +36,14 @@ const RULE = '─'
 const RULE_LEAD = `${RULE}${RULE}`
 const RULE_WIDTH = 50
 const NUMBER_PLACEHOLDER = '{n}'
-// The legend is English whatever the session language (joshuafolkken/kit#3480): it names symbols, and
-// one set of words reads the same on every board.
-const LEGEND_WORDS = words_of('en')
 
 interface BoardView {
 	header: BoardHeader
 	notes: ReadonlyArray<BoardNote>
 	// The session a stopped run resumes from (joshuafolkken/kit#3437).
 	resume?: string | undefined
+	// The live terminal the frame is kept within; none for a frame that is not redrawn in place.
+	size?: TerminalSize | undefined
 }
 
 // What every row of one frame is drawn with: the header, and how wide the time column is, so a
@@ -57,6 +58,13 @@ function title_of(header: BoardHeader, title = ''): string {
 	if (header.form === 'chat') return title
 
 	return title.length > TITLE_LIMIT ? `${title.slice(0, TITLE_LIMIT - 1)}${ELLIPSIS}` : title
+}
+
+// A row drawn before the plan is read has no title yet, and says so (joshuafolkken/kit#3486).
+function row_title(row: BoardRow, header: BoardHeader): string | undefined {
+	if (row.title !== undefined || run_board_header.is_plan_read(header)) return row.title
+
+	return ELLIPSIS
 }
 
 // A running row runs until now; a settled one until its recorded end. A child settled from the open
@@ -111,7 +119,7 @@ function waits_of(row: BoardRow, header: BoardHeader): string | undefined {
 function timed_parts(row: BoardRow, frame: RowFrame): Array<string | undefined> {
 	const time = time_of(row, frame.header.now_ms)
 
-	const title = title_of(frame.header, row.title)
+	const title = title_of(frame.header, row_title(row, frame.header))
 
 	if (time === undefined) return [title]
 
@@ -143,11 +151,16 @@ function row_text(row: BoardRow, frame: RowFrame): string {
 	return parts.filter((part) => part !== undefined && part !== '').join(GAP)
 }
 
-function row_line(prefix: string, row: BoardRow, frame: RowFrame): string {
-	return `${indent_of(prefix, row, frame.header)}${row_text(row, frame)}`
+// A plan line that draws one issue row, and one that draws none — a blank, a rule, an epic's own line.
+function row_line(prefix: string, row: BoardRow, frame: RowFrame): PlanLine {
+	return { text: `${indent_of(prefix, row, frame.header)}${row_text(row, frame)}`, rows: 1 }
 }
 
-function epic_lines(entry: Extract<WaveEntry, { kind: 'epic' }>, frame: RowFrame): Array<string> {
+function bare(text: string): PlanLine {
+	return { text, rows: 0 }
+}
+
+function epic_lines(entry: Extract<WaveEntry, { kind: 'epic' }>, frame: RowFrame): Array<PlanLine> {
 	const last = entry.rows.length - 1
 	const children = entry.rows.map((row, index) =>
 		row_line(index === last ? LAST_BRANCH : BRANCH, row, frame),
@@ -156,10 +169,10 @@ function epic_lines(entry: Extract<WaveEntry, { kind: 'epic' }>, frame: RowFrame
 	const number = frame.header.link(String(entry.epic))
 	const epic = title === '' ? number : `${number}${GAP}${title}`
 
-	return [`${INDENT}📁 ${epic}`, ...children]
+	return [bare(`${INDENT}📁 ${epic}`), ...children]
 }
 
-function entry_lines(entry: WaveEntry, frame: RowFrame): Array<string> {
+function entry_lines(entry: WaveEntry, frame: RowFrame): Array<PlanLine> {
 	if (entry.kind === 'row') return [row_line(INDENT, entry.row, frame)]
 
 	return epic_lines(entry, frame)
@@ -169,18 +182,31 @@ function rule_of(label: string): string {
 	return `${RULE_LEAD} ${label} `.padEnd(RULE_WIDTH, RULE)
 }
 
+function heading_lines(heading: string | undefined): Array<string> {
+	return heading === undefined ? [''] : ['', rule_of(heading)]
+}
+
 function section(heading: string | undefined, lines: ReadonlyArray<string>): Array<string> {
 	if (lines.length === 0) return []
 
-	return heading === undefined ? ['', ...lines] : ['', rule_of(heading), ...lines]
+	return [...heading_lines(heading), ...lines]
+}
+
+function plan_section(
+	heading: string | undefined,
+	lines: ReadonlyArray<PlanLine>,
+): Array<PlanLine> {
+	if (lines.length === 0) return []
+
+	return [...heading_lines(heading).map((line) => bare(line)), ...lines]
 }
 
 function rows_section(
 	heading: string | undefined,
 	rows: ReadonlyArray<BoardRow>,
 	frame: RowFrame,
-): Array<string> {
-	return section(
+): Array<PlanLine> {
+	return plan_section(
 		heading,
 		rows.map((row) => row_line(INDENT, row, frame)),
 	)
@@ -198,7 +224,7 @@ function time_width(header: BoardHeader): number {
 // the eye last found it. `merged` is the states' ✅. 🚀 is named though a dispatched row, its track
 // still empty, leads with 🔄 — the line is the run's phases, not the marks a row draws.
 const PHASE_LEGEND = run_board_phase.PHASES.filter((phase) => phase !== 'merged')
-	.map((phase) => `${PHASE_ICONS[phase]} ${LEGEND_WORDS[PHASE_WORDS[phase]]}`)
+	.map((phase) => `${PHASE_ICONS[phase]} ${WORDS[PHASE_WORDS[phase]]}`)
 	.join(GAP)
 
 // The row states the legend can name, in its order, each with its word.
@@ -218,12 +244,12 @@ function state_legend(rows: ReadonlyArray<BoardRow>): Array<string> {
 	const drawn = new Set(rows.map((row) => state_icon(row)))
 
 	return STATE_LEGEND.filter(([state]) => drawn.has(STATE_ICONS[state])).map(
-		([state, word]) => `${STATE_ICONS[state]} ${LEGEND_WORDS[word]}`,
+		([state, word]) => `${STATE_ICONS[state]} ${WORDS[word]}`,
 	)
 }
 
 function waits_legend(rows: ReadonlyArray<BoardRow>): Array<string> {
-	return rows.some((row) => row.waits.length > 0) ? [`${WAITS_ICON} ${LEGEND_WORDS.waits}`] : []
+	return rows.some((row) => row.waits.length > 0) ? [`${WAITS_ICON} ${WORDS.waits}`] : []
 }
 
 // The findings' symbols, named only while the section is on screen (joshuafolkken/kit#3478).
@@ -231,9 +257,9 @@ function notes_legend(notes: ReadonlyArray<BoardNote>): Array<string> {
 	if (notes.length === 0) return []
 
 	return [
-		`${NOTES_ICON} ${LEGEND_WORDS.notes}`,
-		`${NOTE_ICONS.filed} ${LEGEND_WORDS.filed}`,
-		`${NOTE_ICONS.note} ${LEGEND_WORDS.note}`,
+		`${NOTES_ICON} ${WORDS.notes}`,
+		`${NOTE_ICONS.filed} ${WORDS.filed}`,
+		`${NOTE_ICONS.note} ${WORDS.note}`,
 	]
 }
 
@@ -247,14 +273,14 @@ function legend_of(layout: BoardLayout, notes: ReadonlyArray<BoardNote>): Array<
 	return lines.map((line) => styleText('dim', line))
 }
 
-function plan_sections(header: BoardHeader): Array<string> {
+function plan_sections(header: BoardHeader): Array<PlanLine> {
 	const { layout } = header
 
 	if (layout === undefined) return []
 
 	const frame = { header, time_width: time_width(header) }
 	const waves = layout.waves.flatMap((wave, index) =>
-		section(
+		plan_section(
 			String(index + 1),
 			wave.flatMap((entry) => entry_lines(entry, frame)),
 		),
@@ -272,10 +298,10 @@ function note_icon(note: BoardNote): string {
 	return note.is_decision ? STATE_ICONS.human : NOTE_ICONS[note.kind]
 }
 
-function found_of(note: BoardNote, words: Words): string {
+function found_of(note: BoardNote): string {
 	if (note.found_during === undefined) return ''
 
-	return words.found_during.split(NUMBER_PLACEHOLDER).join(note.found_during)
+	return WORDS.found_during.split(NUMBER_PLACEHOLDER).join(note.found_during)
 }
 
 // The layout a legend is drawn for: none in a chat (joshuafolkken/kit#3456), nor before a plan is read.
@@ -286,31 +312,29 @@ function legend_layout(header: BoardHeader): BoardLayout | undefined {
 // Where the legend names the symbols a note leads with its icon alone; where no legend is drawn it
 // keeps the kind's word (joshuafolkken/kit#3478).
 function note_text(note: BoardNote, header: BoardHeader): string {
-	const { words } = header
-	const kind = legend_layout(header) === undefined ? words[note.kind] : undefined
+	const kind = legend_layout(header) === undefined ? WORDS[note.kind] : undefined
 	const lead = [note_icon(note), clock_of(note.at_ms), note.issue, kind]
 		.filter((part) => part !== undefined)
 		.join(' ')
 
-	return `${INDENT}${lead}${GAP}${note.text}${found_of(note, words)}`
+	return `${INDENT}${lead}${GAP}${note.text}${found_of(note)}`
 }
 
 // The newest few, and how many more there are, so the section never pushes the plan off the screen.
 function notes_section(notes: ReadonlyArray<BoardNote>, header: BoardHeader): Array<string> {
-	const { words } = header
 	const shown = notes.slice(0, NOTE_LIMIT).map((note) => note_text(note, header))
 	const hidden = notes.length - shown.length
-	const more = hidden > 0 ? [`${INDENT}${words.more} ${String(hidden)}`] : []
-	const label = legend_layout(header) === undefined ? words.notes : NOTES_ICON
+	const more = hidden > 0 ? [`${INDENT}${WORDS.more} ${String(hidden)}`] : []
+	const label = legend_layout(header) === undefined ? WORDS.notes : NOTES_ICON
 
 	return section(label, [...shown, ...more])
 }
 
 // The command that resumes a stopped run's session, under the header where the person looks first.
-function resume_lines(resume: string | undefined, words: Words): Array<string> {
+function resume_lines(resume: string | undefined): Array<string> {
 	if (resume === undefined) return []
 
-	return ['', `${STATE_ICONS.human} ${words.resume}${GAP}claude --resume ${resume}`]
+	return ['', `${STATE_ICONS.human} ${WORDS.resume}${GAP}claude --resume ${resume}`]
 }
 
 // A chat draws no legend: the symbols are the same in every answer (joshuafolkken/kit#3456).
@@ -322,20 +346,27 @@ function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Arr
 	return ['', ...legend_of(layout, notes)]
 }
 
+// A live frame is kept within its terminal (joshuafolkken/kit#3486); any other is drawn whole.
 function render(view: BoardView): Array<string> {
-	const { header, notes } = view
-
-	return [
+	const { header, notes, size } = view
+	const above = [
 		...run_board_header.header_lines(header),
-		...resume_lines(view.resume, header.words),
-		...plan_sections(header),
-		...notes_section(notes, header),
-		...legend_lines(header, notes),
+		...resume_lines(view.resume),
+		...run_board_header.idle_lines(header),
 	]
+	const parts = {
+		above,
+		plan: plan_sections(header),
+		below: [...notes_section(notes, header), ...legend_lines(header, notes)],
+	}
+
+	if (size === undefined) return [...above, ...parts.plan.map((line) => line.text), ...parts.below]
+
+	return run_board_fit.fit(parts, size)
 }
 
-function render_no_run(now_ms: number, words: Words): Array<string> {
-	return [`■ backlogrun${GAP}${words.no_run}${GAP}${clock_of(now_ms)}`]
+function render_no_run(now_ms: number): Array<string> {
+	return [`■ backlogrun${GAP}${WORDS.no_run}${GAP}${clock_of(now_ms)}`]
 }
 
 const run_board_render = {
