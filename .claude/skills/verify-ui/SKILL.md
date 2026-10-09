@@ -1,6 +1,6 @@
 ---
 name: verify-ui
-description: Close the UI verification gate on a change that alters the rendered screen — capture a screenshot of the affected route through this project's own screenshot command, look at it, and report whether it matches the intent. Use it before reporting any UI, layout, styling, copy, visible-state or interaction change as done. It reports that the project has no screenshot command rather than passing when it cannot capture anything.
+description: Screenshot the affected route with the project's own command and check it matches the intent. Use it before reporting any UI, layout, styling, copy or interaction change as done.
 argument-hint: '[route] [route...]'
 ---
 

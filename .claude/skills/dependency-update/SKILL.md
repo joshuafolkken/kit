@@ -1,6 +1,6 @@
 ---
 name: dependency-update
-description: The verification procedure that runs after `pnpm update`, `josh latest`, `pnpm josh overrides` or any other dependency-update command — how to confirm the `overrides` entries in both `pnpm-workspace.yaml` and `package.json` survived, and which single `devEngines` change is the expected one rather than a violation. Read it before reporting that a dependency update left the pins intact, and whenever a bump has to be resolved forward or pinned back.
+description: Checks after `pnpm update`, `josh latest`, `pnpm josh overrides` or any dependency update — the `overrides` survived, the one expected `devEngines` change. Read it before reporting the pins intact or pinning a bump back.
 ---
 
 # After a dependency-update command
