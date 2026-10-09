@@ -1,8 +1,8 @@
 import { run_progress } from '#scripts/run/progress/run-progress'
 import type { ClosedIssue } from './run-board-closed'
 import { run_board_github } from './run-board-github'
-import { run_board_header } from './run-board-header'
-import { run_board_labels, type Words } from './run-board-labels'
+import { run_board_header, type BoardHeader } from './run-board-header'
+import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
 import { run_board_link } from './run-board-link'
 import { run_board_machine } from './run-board-machine'
@@ -69,10 +69,15 @@ function titled_closed(plan: BoardPlan, closed: ReadonlyMap<number, ClosedIssue>
 }
 
 // The statuses scoped to the run's plan, a running child the plan's listing no longer holds settled.
-function layout_for(state: BoardState, local: LocalRead): BoardLayout | undefined {
+// Before the plan is read, the run's own children alone (joshuafolkken/kit#3486).
+function layout_for(state: BoardState, local: LocalRead): BoardLayout {
 	const { plan, closed } = state
 
-	if (plan === undefined) return undefined
+	if (plan === undefined) {
+		return run_board_layout.local_layout_of(
+			run_board_status.statuses_of(local.events, local.lanes, new Set()),
+		)
+	}
 
 	const read = {
 		open_numbers: plan.context.open_numbers,
@@ -88,19 +93,17 @@ function layout_for(state: BoardState, local: LocalRead): BoardLayout | undefine
 // What one redraw draws with.
 interface Redraw {
 	ports: BoardPorts
-	words: Words
 	now_ms: number
 }
 
-function frame_of(
+function header_of(
 	state: BoardState,
 	local: LocalRead,
-	layout: BoardLayout | undefined,
+	layout: BoardLayout,
 	redraw: Redraw,
-): Array<string> {
-	const header = {
+): BoardHeader {
+	return {
 		now_ms: redraw.now_ms,
-		words: redraw.words,
 		started_ms: local.started_ms,
 		ended_ms: local.ended_ms,
 		activity: run_board_status.activity_of(local.events, local.ended_ms !== undefined),
@@ -114,20 +117,32 @@ function frame_of(
 		spinner: redraw.ports.is_tty ? run_board_labels.spinner_of(redraw.now_ms) : undefined,
 		link: run_board_link.linker(state.plan?.context.repo, redraw.ports.link),
 	}
+}
 
-	const notes = run_board_notes.notes_of(local.events)
-
-	return run_board_render.render({ header, notes, resume: local.resume })
+function frame_of(
+	state: BoardState,
+	local: LocalRead,
+	layout: BoardLayout,
+	redraw: Redraw,
+): Array<string> {
+	return run_board_render.render({
+		header: header_of(state, local, layout, redraw),
+		notes: run_board_notes.notes_of(local.events),
+		resume: local.resume,
+		size: redraw.ports.size?.(),
+	})
 }
 
 function draw(ports: BoardPorts, lines: ReadonlyArray<string>): void {
 	ports.write(`${lines.join('\n')}\n`)
 }
 
-// The first total the board sees is the baseline every later arrival is counted against.
+// The first total the plan gives is the baseline every later arrival is counted against; the run's own
+// children before it are no total.
 function draw_run(state: BoardState, local: LocalRead, redraw: Redraw): BoardState {
 	const layout = layout_for(state, local)
-	const first_total = layout === undefined ? undefined : run_board_header.counts_of(layout).total
+	const first_total =
+		state.plan === undefined ? undefined : run_board_header.counts_of(layout).total
 	const settled = { ...state, baseline_total: state.baseline_total ?? first_total }
 
 	draw(redraw.ports, frame_of(settled, local, layout, redraw))
@@ -140,7 +155,6 @@ function draw_run(state: BoardState, local: LocalRead, redraw: Redraw): BoardSta
 async function tick(
 	state: BoardState,
 	ports: BoardPorts,
-	words: Words,
 	pace: Pace = 'settled',
 ): Promise<BoardState> {
 	const now_ms = ports.now()
@@ -148,14 +162,14 @@ async function tick(
 	const { local } = read
 
 	if (local === undefined) {
-		draw(ports, run_board_render.render_no_run(now_ms, words))
+		draw(ports, run_board_render.render_no_run(now_ms))
 
 		return read
 	}
 
 	const gathered = await gather_github(state_for(read, local), { ports, local, now_ms, pace })
 
-	return draw_run(await resample(gathered, ports, now_ms), local, { ports, words, now_ms })
+	return draw_run(await resample(gathered, ports, now_ms), local, { ports, now_ms })
 }
 
 const run_board_tick = {

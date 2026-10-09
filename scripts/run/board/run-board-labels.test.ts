@@ -3,40 +3,23 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_labels } from './run-board-labels'
 import { run_board_phase } from './run-board-phase'
 
-// joshuafolkken/kit#3430: the board's words follow the session language, and every time it draws is an
-// `HH:MM:SS` clock or span.
+// joshuafolkken/kit#3430: every time the board draws is an `HH:MM:SS` clock or a short span.
+// joshuafolkken/kit#3486: its words are English whatever the session language.
 
-const { bar_of, clock_of, elapsed_of, left_of, span_of, spinner_of, words_of } = run_board_labels
+const { WORDS, bar_of, clock_of, elapsed_of, left_of, spinner_of } = run_board_labels
 const { GAUGE_SHADES, PHASE_ICONS, PHASE_WORDS, SPINNER_FRAME_MS, painted } = run_board_labels
 const SECOND = 1000
 const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
+const JAPANESE = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u
 
-describe('run_board_labels.words_of', () => {
-	it('answers Japanese for ja and English for any other language', () => {
-		expect(words_of('ja').no_run).toBe('ランなし')
-		expect(words_of('en').no_run).toBe('no run')
-		expect(words_of('fr').no_run).toBe('no run')
-	})
+describe('run_board_labels.WORDS', () => {
+	it('carries one non-empty English word per key and no Japanese', () => {
+		const words: Array<string> = Object.values(WORDS)
 
-	it('carries the same non-empty words in both languages', () => {
-		const ja = words_of('ja')
-		const en = words_of('en')
-
-		expect(Object.keys(ja)).toStrictEqual(Object.keys(en))
-		expect(Object.values(ja).every((word) => word.length > 0)).toBe(true)
-		expect(Object.values(en).every((word) => word.length > 0)).toBe(true)
-	})
-})
-
-describe('run_board_labels.span_of', () => {
-	it('draws a span as zero-padded hours, minutes and seconds', () => {
-		expect(span_of(2 * HOUR + 5 * MINUTE + 7 * SECOND + 999)).toBe('02:05:07')
-		expect(span_of(26 * HOUR)).toBe('26:00:00')
-	})
-
-	it('reads a negative span as zero', () => {
-		expect(span_of(-MINUTE)).toBe('00:00:00')
+		expect(WORDS.no_run).toBe('no run')
+		expect(words.every((word) => word.length > 0)).toBe(true)
+		expect(words.filter((word) => JAPANESE.test(word))).toStrictEqual([])
 	})
 })
 
@@ -136,11 +119,11 @@ describe('run_board_labels.PHASE_ICONS', () => {
 		expect(PHASE_ICONS.gate).toBe('🚦')
 	})
 
-	it('names every phase with a word of the legend in both languages', () => {
-		const words = run_board_phase.PHASES.map((phase) => words_of('ja')[PHASE_WORDS[phase]])
+	it('names every phase with a word of the legend', () => {
+		const words = run_board_phase.PHASES.map((phase) => WORDS[PHASE_WORDS[phase]])
 
 		expect(words.every((word) => word.length > 0)).toBe(true)
-		expect(words_of('ja')[PHASE_WORDS.investigate]).toBe('調査')
+		expect(WORDS[PHASE_WORDS.investigate]).toBe('investigate')
 	})
 })
 

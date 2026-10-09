@@ -160,3 +160,44 @@ describe('run_board_cli.run plan read', () => {
 		expect(frames[0]?.split('\n', 1)[0]).not.toContain('⏳')
 	})
 })
+
+// joshuafolkken/kit#3486: a live frame ends on its footer with nothing after it and is kept to the
+// terminal's rows; every other frame is drawn whole, and every frame is in English.
+describe('run_board_cli.run terminal size', () => {
+	const SHORT = { rows: 8, columns: 80 }
+	const JAPANESE = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u
+
+	it('ends a live frame with no newline after the footer', async () => {
+		const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
+
+		await expect(run_board_cli.run([], { ...ports, size: () => SHORT })).rejects.toBe(STOPPED)
+
+		expect(frames[1]).not.toMatch(/\n$/u)
+		expect(stripVTControlCharacters(frames[1] ?? '').split('\n').length).toBeLessThanOrEqual(8)
+	})
+
+	it('draws a --once frame whole whatever the terminal size', async () => {
+		const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
+
+		await run_board_cli.run(['--once'], { ...ports, size: () => ({ rows: 2, columns: 80 }) })
+
+		expect(frames[0]).toContain('  🔍 1  a')
+		expect(frames[0]).not.toContain('more ')
+	})
+
+	it.each([['--once'], ['--chat']])(
+		'draws %s with no Japanese under a ja session',
+		async (flag) => {
+			vi.stubEnv('JOSH_SESSION_LANG', 'ja')
+			const note = { pos: 2, at: LAUNCH.at, kind: 'note', text: '#1 seen' }
+			const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH, note] }, [plan_titled('a')])
+
+			await run_board_cli.run([flag], ports)
+
+			expect(frames[0]).toContain('  🔍 1  a')
+			expect(frames[0]).toContain('seen')
+			expect(frames[0]).not.toMatch(JAPANESE)
+			vi.unstubAllEnvs()
+		},
+	)
+})
