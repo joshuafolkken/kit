@@ -13,7 +13,7 @@ You have several Issues, or an epic, that an agent may implement and merge witho
    To add an Issue to a run that is already going, run [`pnpm josh run:add <N>`](../josh-commands-run.md#josh-runadd): it is taken at the next free lane, ahead of the queue, without stopping a running child. Add `--no-priority` to put it at the end instead.
 4. Put `needs-human-review` on any Issue that must not be committed without you: the run implements and verifies it, then stops before the commit ([the label](../labels-and-run-states.md#needs-human-review--the-opposite-label)).
 
-The run's budgets — the idle watch, the child limit and the whole-run bound — are described in [the two budgets](../../.claude/skills/workflow-commands/backlogrun-steps.md#the-two-budgets).
+The run's budgets — the idle watch, the child limit and the whole-run bound — are described in [the two budgets](../maintainers/backlogrun-driver.md#the-two-budgets).
 
 ## Check it worked
 
@@ -23,5 +23,5 @@ The run's budgets — the idle watch, the child limit and the whole-run bound �
 ## Common failures
 
 - An Issue is never picked up: it lacks `auto-ok` and is not under an opted-in epic, or it waits on an open dependency or a `run:solo` Issue (`josh backlog:next` answers `wait` and says which).
-- The run stops early: it stops at 30 children, 10 filed Issues or 3 consecutive child failures, and on a `needs-human-review` Issue ([where the run stops](../../.claude/skills/workflow-commands/backlogrun-steps.md#where-the-run-stops)).
+- The run stops early: it stops at 30 children, 10 filed Issues or 3 consecutive child failures, and on a `needs-human-review` Issue ([where the run stops](../maintainers/backlogrun-driver.md#where-the-run-stops)).
 - The session was cut part-way: see [Recover a stopped run](./recover-a-run.md).

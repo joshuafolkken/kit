@@ -1,65 +1,31 @@
 # `backlogrun` — lanes and concurrency
 
-**Read this file in full before the first lane opens** — in the turn that reaches
-`pnpm josh lane:open`. It is a point-of-use document, never an entry read: the entry procedure is
-`backlogrun.md`, which points here at that step. This file is the single source of the per-repository
-lane ceiling, the lane lifecycle, and how a merge conflict between lanes is resolved.
+Point-of-use, read one section at a time from `backlogrun.md` → "The route table".
 
 ## Concurrency: as many children per repository as it has free lanes
 
-**An `backlogrun` need not be a single session.** One session per repository; each calls
-`josh epic:next <E> --repo <owner/repo>` and runs only its own repository's children.
+**One session per repository**, each running only its own repository's children; the per-repository
+lane ceiling (`JOSH_LANE_LIMIT`, counted from the `in-progress` listing by `epic:next`) is
+`.claude/skills/epic-commands/SKILL.md` → "An `in-progress` issue occupies a lane", and a dependency that crosses a
+repository is `.claude/skills/epic-commands/SKILL.md` → "Epics that span repositories". Rationale:
+`docs/maintainers/backlogrun-lanes-rationale.md` → "Why the lane ceiling is shaped the way it is".
 
-```bash
-# In the kit checkout
-pnpm josh epic:next 858 --repo joshuafolkken/kit
-```
+## A solo run
 
-A child in another repository is read against that repository through `gh api`, so no clone is needed
-to learn its state — only to implement it. A repository with no checkout here says so rather than being
-cloned.
-
-**A dependency that crosses a repository is not satisfied when the blocking issue closes.** Merging
-kit's issue does not publish kit, so such a dependency resolves only once the blocker is closed *and*
-its release has appeared in the registry — and while the blocker is still open the registry is never
-consulted. **Unless that repository publishes nothing** — no `package.json` on its default branch, or
-one declaring `private` — in which case a closed blocker there resolves. The answer is read from the
-blocker repository's manifest, never from the registry.
-
-**The lane count is per repository, and `epic:next` is what applies it.** When it has a child to offer,
-it first asks that repository **how many of its lanes are already running something**: every open issue
-carrying `in-progress` and not parked counts for one — whichever epic it belongs to. What is left of
-`JOSH_LANE_LIMIT` (**default 6**) is what gets offered, and at zero the answer is `wait`. It is asked
-**only when there is a candidate**. A **parked** issue does not hold a lane: `needs-decision` outranks
-`in-progress` here exactly as in the classification. A child stopped by `needs-human-review` is
-deliberately not parked and goes on holding its lane.
-
-**It is advisory and not atomic.** The label is applied when a child is dispatched — the parent claims
-it in `lane:dispatch` before the child process starts, and a standalone `fullrun` / `halfrun` claims it
-the moment `run:hold` answers `hold` — *after* this read. It is a guard, not a mutex.
-
-**It is scoped to the resource, not the epic.** A lane is its own checkout with its own branch and
-ports, so the repository-wide number is a **ceiling on how many lanes run at once**. How a session
-drives more than one child at a time is "Lanes — running more than one child at a time" below.
-
-**A stale label holds a lane, so the stale rule reaches past this epic's own children** — `backlogrun-park.md` →
-"`in-progress` is removed by whoever finds it stale" applies to **any** open issue in the repository. `epic:next`
-names the holders on standard error, and the 90-minute stale window bounds the wait.
-
-**A listing it could not read is not an idle repository.** `epic:next` answers `wait` there rather than
-offering the child. **A listing that was *cut short* is the same answer**: a short one with no visible
-holder is `wait`, with its own message.
-
-**Two children of one repository may run at once, and the section below is how.** The guard is a
-ceiling rather than a prohibition, scoped to the lane rather than to the epic. **Do not read this as
-"concurrency needs no coordination"**: the coordination is this section plus the one below, and
-switching the guard off is not one of the ways to get parallelism.
-
-Parallelism only helps children that do not depend on each other. When app-kit's child needs kit's new
-feature, that is recorded as `blocked-by` and `epic:next` makes it wait.
-
-Rationale: `docs/maintainers/backlogrun-lanes-rationale.md` → "Why the lane ceiling is shaped the way
-it is".
+**One kind of child takes no lane beside anything: a defect in kit's own verification that makes
+unrelated PRs answer wrongly on `main` today.** It runs alone, and the batch resumes only once it has
+merged. **Decide it from three conditions that must all hold, never from how serious it looks** — is
+it a defect (not an improvement, refactor, removal or feature)? Is it in kit's own verification gate
+(lint / type check / spell check / unit tests), the code review, the pre-push hook, or the merge
+checks — not a consumer repository's CI or template? Does it, on `main` now, make unrelated PRs
+answer wrongly (a false green or a false red)? All three, and the issue carries `run:solo`; any one
+missing, and it carries `run:lane` and fills a lane like any other child. `backlog:next` and `epic:next --lanes` enforce both (joshuafolkken/kit#2776,
+#2779), and an issue a run files (an interrupt, a split child, a prerequisite) carries one of the
+two from its filing, because an issue with neither answers `triage` and nothing starts. **It stops
+the other lanes for one reason only: a batch run on broken verification leaves nobody's result
+trustworthy** — that the issue's own verification sits under the defect is the issue's own concern,
+checked by the verification after the fix. This section is the rule's single source; rationale:
+`docs/maintainers/wip-cap-rationale.md` → "Why a solo run".
 
 ## Lanes — running more than one child at a time
 
@@ -75,21 +41,6 @@ fresh one resumes the same lane from the gate onward — the boundary, the two c
 verification are `pre-gate-cut.md`, the single source. **The child is told apart from a person, and its
 resume stage is handed to it, by a mark the dispatch sets** — `JOSH_LANE_CHILD`, the lane's issue
 number (`pre-gate-cut.md` → "The dispatch mark" and "The stage is passed to the resumed child").
-
-**One kind of child takes no lane beside anything: a defect in kit's own verification that makes
-unrelated PRs answer wrongly on `main` today.** It runs alone, and the batch resumes only once it has
-merged. **Decide it from three conditions that must all hold, never from how serious it looks** — is
-it a defect (not an improvement, refactor, removal or feature)? Is it in kit's own verification gate
-(lint / type check / spell check / unit tests), the code review, the pre-push hook, or the merge
-checks — not a consumer repository's CI or template? Does it, on `main` now, make unrelated PRs
-answer wrongly (a false green or a false red)? All three, and the issue carries `run:solo`; any one
-missing, and it carries `run:lane` and fills a lane like any other child. `backlog:next` and `epic:next --lanes` enforce both (joshuafolkken/kit#2776,
-#2779), and an issue a run files (an interrupt, a split child, a prerequisite) carries one of the
-two from its filing, because an issue with neither answers `triage` and nothing starts. **It stops
-the other lanes for one reason only: a batch run on broken verification leaves nobody's result
-trustworthy** — that the issue's own verification sits under the defect is the issue's own concern,
-checked by the verification after the fix. This paragraph is the rule's single source; rationale:
-`docs/maintainers/wip-cap-rationale.md` → "Why a solo run".
 
 **A lane's review does not inherit the lane, and `pnpm josh review:brief` is what closes that.**
 `pnpm josh review:brief` prints the lane's absolute root, branch and HEAD, hands over targets written
@@ -119,10 +70,6 @@ In the **primary checkout**, in this order, and never again per lane:
    runs once per session, not once per child".
 3. `pnpm josh lane:prune` — closes lanes left without a work tree, sweeps unregistered leftovers.
 4. `pnpm josh run:tidy` — sweeps merged lanes and stashes (as `run:hold` does).
-
-**`pnpm josh latest` is never run inside a lane, whatever `latest:scope` answers there** — the command
-enforces it: `latest:scope` answers `skip` in a lane and `pnpm josh latest` refuses outright, fronted
-by `pnpm josh latest:guard`. Ask it in the primary checkout, per step 2 above.
 
 **The rewritten lock file still has to reach a pull request**, and with lanes no child runs in the
 primary checkout to carry it. `git stash` is a repository-level ref shared by every work tree:
@@ -200,11 +147,9 @@ The bullets below describe that dispatch:
   `.claude/settings.json` to decide; a headless child reaches `gh` and merges through `pnpm josh
   followup` without the flag, and the run reports what stopped rather than loosening it.
 
-**Start each child without blocking on it, and poll them all.** That is `backlogrun-child.md` → "A
-delegated unit that stopped without reporting" applied N times, and `pnpm josh run:liveness <N>
---output <path>` is read **in that child's lane**. **It reads the child's process for itself** —
-the child's own command line or its detached ship supervisor — so no `pgrep` is run by hand and no
-`--process` is passed.
+**Start each child without blocking on it, and poll them all** — a silent one is
+`backlogrun-recovery.md` → "A delegated unit that stopped without reporting", read in that child's
+lane.
 
 **`pnpm josh ms` is the parent's now, not the child's.** No lane can switch to the
 default branch, so the refresh moves to the primary checkout **before each `lane:open`** — the ref the
