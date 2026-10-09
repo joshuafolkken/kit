@@ -25,9 +25,8 @@ const PERCENT_WIDTH = '100%'.length
 const RATE_WIDTH = '3.1M/s'.length
 // Below this a rate keeps one decimal, so `0.4M/s` is not drawn as `0M/s`.
 const RATE_DECIMAL_BELOW = 10
-// The title line's gap, so the gauges sit under its parts.
-const GAUGE_GAP_WIDTH = 3
-const GAUGE_GAP = ' '.repeat(GAUGE_GAP_WIDTH)
+// The header's gap between its parts, the gauges' as well (joshuafolkken/kit#3508).
+const GAP = '  '
 
 // Where each gauge is full and where it turns yellow and red. **Provisional, not yet measured**: set
 // from the 2026-10-07 incident and to be tuned against a heavy run's readings.
@@ -191,10 +190,10 @@ function line_of(gauges: MachineGauges | undefined): string | undefined {
 		gauge(SPECS.swap, gauges.swap_mb_per_s),
 	].filter((part) => part !== undefined)
 
-	return parts.length === 0 ? undefined : parts.join(GAUGE_GAP)
+	return parts.length === 0 ? undefined : parts.join(GAP)
 }
 
-const run_board_machine = { gauges_of, line_of }
+const run_board_machine = { GAP, gauges_of, line_of }
 
 export { run_board_machine }
 export type { MachineGauges, MachineMark }

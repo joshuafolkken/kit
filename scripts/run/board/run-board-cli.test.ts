@@ -7,7 +7,7 @@ import type { BoardPlan } from './run-board-layout'
 // joshuafolkken/kit#3430: the command's arguments and its terminal. What one redraw reads and draws is
 // `run-board-tick.test.ts`'s (joshuafolkken/kit#3444).
 
-const { LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
+const { LOCAL, SPINNING, STOPPED, harness, plan_titled } = run_board_fixture
 const ESCAPE = '\u{1B}'
 const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l`
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
@@ -147,7 +147,7 @@ describe('run_board_cli.run plan read', () => {
 
 		await expect(run_board_cli.run([], { ...ports, read_plan })).rejects.toBe(STOPPED)
 		expect(read_plan).toHaveBeenCalledOnce()
-		expect(frames[1]?.split('\n', 1)[0]).toContain('⏳')
+		expect(frames[1]?.split('\n', 1)[0]).toMatch(SPINNING)
 	})
 
 	it('draws the plan in one plain frame, with no spinner', async () => {
@@ -157,7 +157,7 @@ describe('run_board_cli.run plan read', () => {
 
 		expect(frames).toHaveLength(1)
 		expect(frames[0]).toMatch(/✅ +\d+\/\d+/u)
-		expect(frames[0]?.split('\n', 1)[0]).not.toContain('⏳')
+		expect(frames[0]?.split('\n', 1)[0]).not.toMatch(SPINNING)
 	})
 })
 

@@ -68,13 +68,13 @@ async function loading(events: ReadonlyArray<typeof LAUNCH>): Promise<Array<stri
 }
 
 describe('run_board_tick.tick before the plan is read', () => {
-	it('draws three header lines and a blank, the run’s own child, and - for what it does not know', async () => {
+	it('draws two header lines and a blank, the run’s own child, and - for what it does not know', async () => {
 		const lines = await loading([LAUNCH])
 
+		expect(lines[0]).toMatch(/ {2}✅ 0\/- ─+ {2}🔄 1 {2}⏳ - {2}💤 0/u)
 		expect(lines[1]).toContain('🧠')
-		expect(lines[2]).toMatch(/^✅ 0\/- ─+ {3}🔄 1 {2}⏳ - {2}💤 0$/u)
-		expect(lines[3]).toBe('')
-		expect(lines[4]).toMatch(new RegExp(`^. 🔍 ${String(CHILD)}  …`, 'u'))
+		expect(lines[2]).toBe('')
+		expect(lines[3]).toMatch(new RegExp(`^. 🔍 ${String(CHILD)}  …`, 'u'))
 	})
 
 	// The regression: the running count was the plan's, so a board still loading drew a run as waiting.
@@ -89,7 +89,7 @@ describe('run_board_tick.tick before the plan is read', () => {
 		const lines = await loading([{ ...IDLE, pos: 1 }])
 
 		expect(lines[0]).toMatch(/^⏸ backlogrun/u)
-		expect(lines.slice(3, 5)).toStrictEqual(['', expect.stringMatching(/^ {2}⏸ wait ends /u)])
+		expect(lines.slice(2, 4)).toStrictEqual(['', expect.stringMatching(/^ {2}⏸ wait ends /u)])
 	})
 })
 
