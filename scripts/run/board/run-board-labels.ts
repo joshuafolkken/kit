@@ -1,5 +1,6 @@
 import { WriteStream } from 'node:tty'
 import { styleText } from 'node:util'
+import type { FiledKind } from '#scripts/run/event/run-event-filed'
 import cli_spinners from 'cli-spinners'
 import type { BoardNote } from './run-board-notes'
 import type { Phase } from './run-board-phase'
@@ -61,6 +62,9 @@ const WORDS = {
 	notes: 'findings and decisions',
 	more: 'more',
 	filed: 'filed',
+	breaking: 'breaking',
+	bug: 'bug',
+	enhancement: 'enhancement',
 	park: 'park',
 	note: 'note',
 	found_during: ' (found during {n})',
@@ -126,12 +130,19 @@ const PHASE_WORDS: Readonly<Record<Phase, keyof Words>> = {
 
 // The findings section's rule and each note kind's lead (joshuafolkken/kit#3478), chosen on the same
 // rule and apart from every phase and state icon, so the legend names them and a row needs no word. 🆕
-// rather than 🐞: a filed issue is not always a bug.
+// is a filed issue whose kind is none of `FILED_KIND_ICONS`.
 const NOTES_ICON = '📌'
 const NOTE_ICONS: Readonly<Record<BoardNote['kind'], string>> = {
 	filed: '🆕',
 	park: STATE_ICONS.parked,
 	note: '💬',
+}
+// A filed issue's line leads with its kind in place of 🆕 (joshuafolkken/kit#3494): inside the 📌
+// section a line is already read as a filing, so 🆕 beside the kind would only widen it.
+const FILED_KIND_ICONS: Readonly<Record<FiledKind, string>> = {
+	'breaking-change': '💥',
+	bug: '🐛',
+	enhancement: '✨',
 }
 
 // The header's gauges and marks (joshuafolkken/kit#3450). ⚡ rather than 🔥 (joshuafolkken/kit#3452):
@@ -242,6 +253,7 @@ function spinner_of(now_ms: number): string {
 const run_board_labels = {
 	BAR_LEFT,
 	BAR_LEFT_COLOR,
+	FILED_KIND_ICONS,
 	GAUGE_SHADES,
 	HEADER_ICONS,
 	NOTES_ICON,

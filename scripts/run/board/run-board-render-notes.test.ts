@@ -107,6 +107,37 @@ describe('run_board_render.render findings legend', () => {
 	})
 })
 
+// joshuafolkken/kit#3494: a filed Issue's line leads with its kind in place of 🆕, and the legend
+// names only the kinds drawn.
+describe('run_board_render.render filed kinds', () => {
+	const bug: BoardNote = { ...filed, filed_kind: 'bug' }
+	const enhancement: BoardNote = { ...filed, filed_kind: 'enhancement' }
+	const breaking: BoardNote = { ...filed, filed_kind: 'breaking-change' }
+
+	it('leads each filed line with its kind’s icon, and an unclassified one with 🆕', () => {
+		const lines = lines_of(header(), [breaking, bug, enhancement, filed])
+
+		for (const icon of ['💥', '🐛', '✨', '🆕']) {
+			expect(lines).toContain(`  ${icon} ${minute_of(NOW)} 3473  Lead`)
+		}
+	})
+
+	it('names only the kinds drawn, in the legend’s order', () => {
+		const every = lines_of(header(), [filed, enhancement, bug, breaking]).at(-1)
+
+		expect(every).toBe(`${NOTES_LEGEND}  💥 breaking  🐛 bug  ✨ enhancement  🆕 filed`)
+		expect(lines_of(header(), [enhancement, bug]).at(-1)).toBe(
+			`${NOTES_LEGEND}  🐛 bug  ✨ enhancement`,
+		)
+	})
+
+	it('keeps the kind word filed in a chat, which draws no legend', () => {
+		expect(lines_of(header({ form: 'chat' }), [bug]).at(-1)).toBe(
+			`  🐛 ${minute_of(NOW)} 3473 filed  Lead`,
+		)
+	})
+})
+
 describe('run_board_render.render findings with no legend', () => {
 	it('keeps the heading and the kind words on a screen with no plan read yet, which draws no legend', () => {
 		const lines = lines_of(header({ layout: undefined }), [filed])
