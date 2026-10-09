@@ -1,6 +1,6 @@
 // A stand-in for execa's `execaSync` that keeps the one property a `gh` caller's contract rests on:
 // **a non-zero exit throws unless the spawn said `reject: false`**, carrying the captured streams on
-// the error the way `ExecaSyncError` does (joshuafolkken/kit#2901).
+// the error the way `ExecaSyncError` does.
 //
 // A bare `vi.fn()` returning `{ exitCode: 1 }` answers a failed spawn as a value whichever way it was
 // asked, so a caller that spawns `gh` with `reject: false` and a caller that goes through

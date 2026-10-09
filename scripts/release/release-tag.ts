@@ -6,12 +6,11 @@ import { poll, type PollOptions } from '#scripts/lib/poll'
 //
 // Merging is what starts the distribution chain: `ci.yml`'s `notify-auto-tag` dispatches, `auto-tag.yml`
 // creates `v<version>`, and `publish.yml` / `production.yml` run off that tag. Every link after the
-// merge can fail silently, and one of them is known to (joshuafolkken/kit#1481: a later push to main
-// cancels the release commit's CI run, so nothing dispatches and nothing is tagged). An automatic
-// release would have been picked up by the next cycle; a release a person types has no next cycle, so
-// the person walks away believing something shipped when nothing did.
+// merge can fail silently — a later push to main cancels the release commit's CI run, so nothing
+// dispatches and nothing is tagged. A release a person types has no next cycle to pick it up, so the
+// person would walk away believing something shipped when nothing did.
 //
-// So this waits for the tag and **reports its absence as a failure** (joshuafolkken/kit#1169 → §3).
+// So this waits for the tag and **reports its absence as a failure**.
 
 const HTTP_OK = 200
 const TAG_POLL_INTERVAL_MS = 15_000
@@ -50,8 +49,7 @@ async function tag_exists(version: string): Promise<boolean> {
 }
 
 // The poll budget for one watched stage, read from that stage's environment variable. Every stage
-// `josh release` waits on — the tag, npm and the GitHub Release — is tuned the same way
-// (joshuafolkken/kit#3193).
+// `josh release` waits on — the tag, npm and the GitHub Release — is tuned the same way.
 function poll_options_for(
 	timeout_environment: string,
 	sleeper?: (duration_ms: number) => Promise<void>,
@@ -79,7 +77,7 @@ async function wait_for_tag(
 
 // **The failure text says what did not happen rather than what went wrong**, because the command
 // cannot know which link broke — only that the tag it was waiting for is not there, and that nothing
-// downstream of the tag can have run. **The tag is not the release** (joshuafolkken/kit#3193): npm and
+// downstream of the tag can have run. **The tag is not the release**: npm and
 // the GitHub Release follow it, so the success line names only the tag.
 function format_result(version: string, is_tagged: boolean): string {
 	if (is_tagged) return `🏷 Tag ${tag_name(version)} created`

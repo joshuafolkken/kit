@@ -1,8 +1,8 @@
 // The upstream backlink headings (`prompts/collaboration-workflow/issue-template.md`) are fixed so
 // they can be found by grep — the document says so outright — yet nothing greps them, and a
 // one-directional link (an origin that lists an upstream the upstream never points back at) survives
-// undetected. This classifies an origin issue's filed backlinks into one of four fixed words
-// (joshuafolkken/kit#2123). The headings are the single source's, pinned by the document test.
+// undetected. This classifies an origin issue's filed backlinks into one of four fixed words.
+// The headings are the single source's, pinned by the document test.
 
 import { markdown_section } from './markdown-section'
 
@@ -28,7 +28,7 @@ interface UpstreamEntry {
 	body: string
 }
 
-// A heading inside a code fence is example text, so neither lookup counts one (joshuafolkken/kit#3066).
+// A heading inside a code fence is example text, so neither lookup counts one.
 function has_heading(body: string, heading: string): boolean {
 	return markdown_section.has_line(body, heading)
 }
@@ -134,7 +134,7 @@ function upstream_references(origin_body: string): ReadonlyArray<string> {
 // Whether classifying the origin needs the upstream bodies fetched. Only the `## Origin` back-check
 // does; a wrong, malformed or missing upstream heading is decided from the origin body alone. So the
 // CLI can skip the network for those, and never mask a `wrong-heading` verdict behind an upstream
-// that happens to be unreadable (joshuafolkken/kit#2123).
+// that happens to be unreadable.
 function needs_upstreams(origin_body: string): boolean {
 	if (has_wrong_upstream_heading(origin_body)) return false
 

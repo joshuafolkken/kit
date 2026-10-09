@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { lane_install } from '#scripts/lane/lane-install'
 
-// Keeping the primary checkout's `node_modules` in step with its lock (joshuafolkken/kit#3463). A
+// Keeping the primary checkout's `node_modules` in step with its lock. A
 // fast-forward that brought in a merge adding `cli-spinners` left the primary checkout without it, and
 // every `josh` typed there — the supervisor's driver included — failed with `ERR_MODULE_NOT_FOUND`
 // until someone ran the install by hand.

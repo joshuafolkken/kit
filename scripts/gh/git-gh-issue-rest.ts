@@ -11,11 +11,10 @@ import { MERGED_STATE, to_gh_state } from './git-gh-rest-state'
 // `gh issue view --json <fields>` used to answer with.
 //
 // `gh issue view` goes through GraphQL, which a cloud session is answered 403 for while the REST
-// endpoint is served normally (joshuafolkken/kit#1022). The reads in `git-gh-issue-read.ts` are what
+// endpoint is served normally. The reads in `git-gh-issue-read.ts` are what
 // every epic command goes through, so they move to REST — and every caller downstream keeps reading
 // the field names it already reads. The mapping lives here rather than beside the requests because
-// it is pure: given the two responses, it decides the answer with nothing else to know
-// (joshuafolkken/kit#1024).
+// it is pure: given the two responses, it decides the answer with nothing else to know.
 
 // Only the fields the mapping itself reads are named; every other key passes through untouched,
 // which is what lets a caller ask for a field this file has never heard of.
@@ -52,7 +51,7 @@ const BLOCKED_BY_FIELD = 'blockedBy'
 // purpose: `blockedBy` is a connection `gh` served inside the issue, while this is the exact count
 // GitHub already puts in the listing's own `issue_dependencies_summary`. A caller that asks for it
 // learns whether an issue has blockers **without** the per-issue request that reading `blockedBy`
-// costs — which is what lets `epic:bundle` stop re-reading every open issue (joshuafolkken/kit#1736).
+// costs — which is what lets `epic:bundle` stop re-reading every open issue.
 //
 // It is `undefined` rather than `0` where the summary is absent — a pull request, which this
 // endpoint serves as readily as an issue, carries none. Reading that as "no blockers" is the one
@@ -132,8 +131,7 @@ function parse_rest_issue(rest_json: string): RestIssue {
 
 // `repos/{owner}/{repo}/issues` serves pull requests alongside issues; `gh issue list` never did,
 // and its six callers all read the answer as issues. The key is present on a pull request and
-// absent on an issue, which is the same signal `to_issue_state` already reads
-// (joshuafolkken/kit#1025).
+// absent on an issue, which is the same signal `to_issue_state` already reads.
 function is_pull_request(rest: RestIssue): boolean {
 	return rest.pull_request !== undefined && rest.pull_request !== null
 }
@@ -141,7 +139,7 @@ function is_pull_request(rest: RestIssue): boolean {
 // One page of the listing endpoint, whose elements are the same objects `parse_rest_issue` reads one
 // of. It throws for the reason that one does: a response that is not a listing — `gh` answering
 // `{"message":"API rate limit exceeded"}` — must not degrade into an empty listing, which every
-// caller here reads as "there is nothing" (joshuafolkken/kit#950).
+// caller here reads as "there is nothing".
 function parse_rest_issues(rest_json: string): Array<RestIssue> {
 	const parsed = parse_json_array_or_undefined(rest_json, rest_issue_schema)
 	if (parsed === undefined) throw new Error(NOT_AN_ISSUE_LISTING_MESSAGE)
@@ -152,7 +150,7 @@ function parse_rest_issues(rest_json: string): Array<RestIssue> {
 // The connection for an issue GitHub itself says has no blockers, answered without a request. `gh`
 // sent `blockedBy` inside the issue response, so a second request per issue would double
 // `epic:bundle`'s pass over the whole open backlog — and the issue's own summary settles the common
-// case, which is an issue with no blockers at all (joshuafolkken/kit#1024).
+// case, which is an issue with no blockers at all.
 function empty_blocked_by(): BlockedBy {
 	return { nodes: [], totalCount: 0 }
 }
@@ -161,7 +159,7 @@ function empty_blocked_by(): BlockedBy {
 //
 // A blocker relation may cross a repository, and the number alone cannot say which one it is: issue
 // numbers are unique per repository, so a blocker read bare resolves against the blocked child's own
-// repository and names a different issue there (joshuafolkken/kit#1126). Undefined when the field is
+// repository and names a different issue there. Undefined when the field is
 // absent or shaped otherwise; the caller then falls back to the repository it is reading in, which is
 // what an unqualified relation has always meant.
 function repo_of_url(repository_url: string | undefined = ''): string | undefined {
@@ -175,7 +173,7 @@ function repo_of_url(repository_url: string | undefined = ''): string | undefine
 //
 // A listing that will not parse throws instead of answering an empty connection. That direction is
 // the point: an empty `nodes` reads as "this child has no blockers", and `epic:next` would then hand
-// a dependent to an unattended run before its prerequisite (joshuafolkken/kit#1005).
+// a dependent to an unattended run before its prerequisite.
 function to_blocked_by(blockers_json: string, exact_total?: number): BlockedBy {
 	const parsed = parse_json_array_or_undefined(blockers_json, blocking_issue_schema)
 	if (parsed === undefined) throw new Error(NOT_A_BLOCKER_LISTING_MESSAGE)
@@ -210,8 +208,8 @@ function to_field_text(value: unknown): string {
 
 const CLOSED = 'CLOSED'
 
-// One blocker node as a reference, keeping the state the relation response carried
-// (joshuafolkken/kit#1943). Single-sourced here because the snapshot read and the candidate re-read
+// One blocker node as a reference, keeping the state the relation response carried.
+// Single-sourced here because the snapshot read and the candidate re-read
 // both unwrap the same node, and the state is omitted rather than guessed when REST did not send it.
 function reference_of_blocker(
 	node: z.infer<typeof blocking_issue_schema>,

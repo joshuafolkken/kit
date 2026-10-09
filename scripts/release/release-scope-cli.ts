@@ -4,12 +4,11 @@ import { git_followup_pending } from '#scripts/followup/git-followup-pending'
 import { path_decision } from '#scripts/josh/path-decision'
 import { release_plan } from './release-plan'
 
-// **Whether a release is owed is a command's answer, not a judgement** (joshuafolkken/kit#1582).
+// **Whether a release is owed is a command's answer, not a judgement**.
 //
-// joshuafolkken/kit#1169 took the version off the branch and put it behind one command a person
-// types, and nothing ever said *when* to type it. Nothing fails when nobody does — CI green, every
-// pull request merged, every Issue closed — so 53 merges reached main unreleased and no consumer of
-// this package saw one of them.
+// A release is one command a person types, and nothing fails when nobody types it — CI green, every
+// pull request merged, every Issue closed — so merges can pile up on main that no consumer of this
+// package ever sees.
 //
 // **`pnpm josh release --dry-run` cannot be the check.** It refuses off the default branch and on a
 // dirty working tree, and it counts against `HEAD`; every position a run asks the question from is
@@ -37,8 +36,8 @@ const FAILURE_EXIT_CODE = 1
 const NOTHING_PENDING_REASON = 'main has taken no merge since the version last changed'
 const RELEASE_HINT = 'run `pnpm josh release` on the default branch of the primary checkout'
 // **Not `skip`.** An unreadable version, a fetch that could not run or a base the search cannot
-// resolve is not "nothing is waiting to ship", and reporting it as one is how a release goes
-// missing quietly a second time.
+// resolve is not "nothing is waiting to ship", and reporting it as one lets a release go missing
+// quietly.
 const UNKNOWN_REASON = 'the unreleased-merge count could not be read — report unknown, never skip'
 
 type ReleaseScope = typeof REQUIRED_SCOPE | typeof SKIPPED_SCOPE | typeof UNKNOWN_SCOPE
@@ -48,9 +47,8 @@ interface Decision {
 	reason: string
 }
 
-// **The threshold is one, and the position carries the rest.** A release per invocation is the
-// cadence joshuafolkken/kit#1582 asks for — its own complaint is that accumulating makes a single
-// version larger and its contents harder to trace afterwards — so anything above zero is owed. What
+// **The threshold is one, and the position carries the rest.** A release per invocation keeps each
+// version small and its contents traceable, so anything above zero is owed. What
 // keeps this from firing per child of a batch is where the question is asked, which belongs to the
 // procedure rather than to this command.
 function decide(pending: number | undefined): Decision {

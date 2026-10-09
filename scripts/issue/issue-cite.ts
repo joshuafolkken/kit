@@ -1,5 +1,5 @@
 // The paste-ready citation line `josh issue:cite` prints, kept apart from the reading and the
-// printing so the shape of the line is decided by one pure function (joshuafolkken/kit#2220).
+// printing so the shape of the line is decided by one pure function.
 //
 // **It exists because the correct citation form has a cost the bare `#N` does not.** `CLAUDE.md` and
 // `prompts/collaboration-workflow/issue-citation.md` require session-facing output to cite an Issue
@@ -12,7 +12,7 @@
 // translate deterministically, and an LLM call per Issue would defeat the point of a cheap citation
 // helper and make the output untestable; the title already says what the Issue does, which is all the
 // rule asks of the summary — knowing what it does is enough. The reader adapts it to the session
-// language when it matters, without the round trip that used to be needed to learn the title at all.
+// language when it matters, without a round trip to learn the title at all.
 
 const GITHUB_URL_PREFIX = 'https://github.com/'
 const ISSUE_PATH = '/issues/'
@@ -33,7 +33,7 @@ interface CiteTarget {
 }
 
 // The plain `#N`, or `owner/repo#N` when a repository is named — the one place the bare form is
-// assembled (joshuafolkken/kit#3424). It is for text GitHub renders or a program reads: an Issue or PR
+// assembled. It is for text GitHub renders or a program reads: an Issue or PR
 // body, a comment, a commit message, a pattern, a key. GitHub links that text itself, so it needs no
 // link of its own; what a session reads goes through `session_cite.issue` instead, and the scan in
 // `session-cite-scan.test.ts` refuses a bare `#${…}` assembled anywhere else.
@@ -49,14 +49,14 @@ function citation_line(slug: string, number: string, summary: string): string {
 	return `[${plain(number)}](${issue_url(slug, number)})${SUMMARY_SEPARATOR}${summary}`
 }
 
-// How a listing names one issue, given what it already holds (joshuafolkken/kit#2943). A progress
+// How a listing names one issue, given what it already holds. A progress
 // command's output is copied into a report verbatim, so the line it prints is the citation the report
 // carries: the full form when the title is in hand, the bare number-link when only the repository is,
 // and the plain `#N` only when the repository could not be read at all.
 type IssueCiter = (number: string) => string
 
 // One issue, named from what the caller holds — the single decision every listing's citation goes
-// through (joshuafolkken/kit#3099), so a renderer holding one title never re-derives the fallback.
+// through, so a renderer holding one title never re-derives the fallback.
 function reference(slug: string | undefined, number: string, title: string | undefined): string {
 	if (slug === undefined) return plain(number)
 

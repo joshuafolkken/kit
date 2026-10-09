@@ -3,8 +3,7 @@ import { git_command } from './git-command'
 // The set of changed paths a mechanical, path-driven decision is made from.
 //
 // `josh review:level` asks this same question of the same tree (which level to review at), and a
-// second copy would let a caller disagree about what "changed" means. joshuafolkken/kit#907: sharing
-// this reading is the moment it stopped being one command's private helper.
+// second copy would let a caller disagree about what "changed" means.
 
 function to_paths(raw: string): Array<string> {
 	return raw

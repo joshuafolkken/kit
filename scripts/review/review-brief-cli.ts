@@ -23,22 +23,20 @@ import { review_level, type ReviewLevel } from './review-level'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 
-// `josh review:brief` — print the whole `/code-review` invocation, not just the level
-// (joshuafolkken/kit#1241).
+// `josh review:brief` — print the whole `/code-review` invocation, not just the level.
 //
 // The level is decided in-process by the `review_level` module and is also exposed on its own as
-// `--level-only` (joshuafolkken/kit#1927 folded the former `josh review:level` command in here), so
-// the level a brief prints and the level `--level-only` answers can never disagree. What the full
-// brief adds is everything else the forked review agent cannot find out for itself: whether the gate
-// has passed **or is running** on this tree (joshuafolkken/kit#1242 — the two are started together,
+// `--level-only`, so the level a brief prints and the level `--level-only` answers can never
+// disagree. What the full brief adds is everything else the forked review agent cannot find out for
+// itself: whether the gate has passed **or is running** on this tree (the two are started together,
 // so "still running" is the usual answer at this point), how this project runs its unit tests, and —
 // on round 2 — which files the first round's fixes touched.
 
 const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh review:brief [--round <1|2>] | --level-only [--staged] [--json]'
 
-// The rubric's absolute path, resolved against the kit package rather than the review checkout root
-// (joshuafolkken/kit#2402). The rubric ships inside the package, so a consumer that keeps no
+// The rubric's absolute path, resolved against the kit package rather than the review checkout root.
+// The rubric ships inside the package, so a consumer that keeps no
 // `prompts/` of its own still receives it at `node_modules/@joshuafolkken/kit/prompts/`.
 // `find_package_directory` ascends to the nearest package.json, so this resolves from both the tsx
 // source and the bundled `dist/josh.js`.
@@ -48,7 +46,7 @@ const RUBRIC_PATH = path.join(
 	review_brief.RUBRIC_RELATIVE_PATH,
 )
 const ROUND_FLAG = '--round'
-// `review:level` folded in here (joshuafolkken/kit#1927): it was a second command deciding the same
+// `review:level` folded in here: it was a second command deciding the same
 // thing `review:brief` already prints on its first line, so it is now a mode of this one. `--level-only`
 // answers the level alone — for a pre-commit review run outside any workflow — and, unlike the full
 // brief, it never refuses on the scoped-green gate: the level takes no judgement and reads the changed
@@ -93,7 +91,7 @@ function kept_note(taken_at: string): string {
 // digests describe the implementation as the first round read it. Taking it again on round 2 would
 // overwrite the very record the delta is measured against.
 //
-// **It is written once per run and never retaken** (joshuafolkken/kit#1441). Overwriting on every
+// **It is written once per run and never retaken**. Overwriting on every
 // round-1 invocation put a wrong `skip` one command away: run a bare `josh review:brief` after round
 // 1's fixes are in and the record is retaken against the fixed tree, the fix delta reads empty, and
 // `josh review:round2 --round-1-closed` fires arm A on unreviewed fix code. Keeping the record the
@@ -110,7 +108,7 @@ function kept_note(taken_at: string): string {
 // The write is swallowed for the same reason the gate's is: the brief has already been printed and
 // is correct, so a temp-directory problem must not turn it into a non-zero exit. What a missing
 // snapshot costs is a round 2 that reviews the whole change — wider, never narrower.
-// **The base is recorded beside the file map** (joshuafolkken/kit#1537). The map is a diff against
+// **The base is recorded beside the file map**. The map is a diff against
 // `change_base`, and `change_base` is recomputed on every invocation — so without the commit it was
 // measured against, round 2 cannot tell a fix from a base that moved under it, and reports the
 // difference between two incomparable sets as round 1's fixes.
@@ -137,13 +135,13 @@ function record_round_one(
 	}
 }
 
-// **Recorded before it is printed, and the write is not swallowed** (joshuafolkken/kit#1522). The
+// **Recorded before it is printed, and the write is not swallowed**. The
 // nonce the brief prints is a contract the run enforces later; a brief that printed one it had
 // failed to record would hand the review a command that cannot succeed and the run a check that
 // answers `not-required` — the guard gone, silently, which is the shape this whole record exists to
 // remove.
 //
-// **Whether this is a resume is read first** (joshuafolkken/kit#2945): `record_target` drops the
+// **Whether this is a resume is read first**: `record_target` drops the
 // previous nonce's records, so asked afterwards the finished review would always read as absent. The
 // findings file is the ship's, keyed on `PROJECT_ROOT` as the ship keys it; a review run outside the
 // ship writes none, so it never reads as a resume and keeps the whole change.
@@ -180,7 +178,7 @@ async function open_contract(): Promise<{
 	return { checkout, nonce: review_attest.record_target(checkout, checkout.root), resumed_from }
 }
 
-// Retaken on every round-1 brief, after the pointer it pairs with (joshuafolkken/kit#2945). Swallowed:
+// Retaken on every round-1 brief, after the pointer it pairs with. Swallowed:
 // a record that failed to write predates the next pointer, so the resume widens rather than narrows.
 function record_briefed(round: number, tree: Record<string, string>, base?: string): void {
 	if (round !== FIRST_ROUND) return
@@ -200,7 +198,7 @@ interface ComposeRequest {
 	profile: AgentProfile
 }
 
-// **Swallowed, and the brief keeps its target line** (joshuafolkken/kit#2963): parts that could not be
+// **Swallowed, and the brief keeps its target line**: parts that could not be
 // written leave the reviewer the whole `git diff` to read, which costs truncated output rather than
 // scope — the direction every failure here falls.
 async function read_diff(
@@ -234,9 +232,9 @@ async function compose_brief(request: ComposeRequest): Promise<string> {
 		stamps,
 		// Resolved by the caller rather than printed as a `$(…)` the forked agent would expand: a
 		// subshell that fails expands to nothing, and the bare `git diff` left behind lists only the
-		// unstaged working tree — a review silently narrowed to a fraction of the change
-		// (joshuafolkken/kit#1527). One reading is shared with the record written below, so the commit
-		// the map is stored against is the same one the brief printed (joshuafolkken/kit#1537).
+		// unstaged working tree — a review silently narrowed to a fraction of the change.
+		// One reading is shared with the record written below, so the commit
+		// the map is stored against is the same one the brief printed.
 		base,
 		rubric_path: RUBRIC_PATH,
 		...contract,
@@ -244,7 +242,7 @@ async function compose_brief(request: ComposeRequest): Promise<string> {
 	})
 }
 
-// **What is printed and what is recorded are two readings of one thing** (joshuafolkken/kit#1537).
+// **What is printed and what is recorded are two readings of one thing**.
 // `commit` is what the record stores and round 2 compares, and it has to be a commit: `change_base`
 // degrades to the default-branch *name* when `merge-base` cannot answer, and two rounds storing that
 // same name compare equal while the ref moves under them — the guard failing open, which is the
@@ -256,7 +254,7 @@ async function read_bases(): Promise<{ base: string; commit: string | undefined 
 	return { base: commit ?? (await git_command.change_base()), commit }
 }
 
-// **The refusal goes to stderr and the exit code, never into the brief** (joshuafolkken/kit#1511).
+// **The refusal goes to stderr and the exit code, never into the brief**.
 // A line printed inside a brief is read by the review agent as one more fact about the tree; what has
 // to happen here is that no brief is composed at all, since composing one is what starts round 1 —
 // and this command is where `review:attest` mints the nonce a round is counted against, so there is

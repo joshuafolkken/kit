@@ -1,5 +1,4 @@
-// Which `/code-review` level a change is reviewed at, decided from the changed paths alone
-// (joshuafolkken/kit#966).
+// Which `/code-review` level a change is reviewed at, decided from the changed paths alone.
 //
 // **The decision takes no judgement.** "This one is small" is a judgement made under cost pressure,
 // and cost pressure resolves it toward "small" exactly when a defect is most likely to be shipped —
@@ -24,11 +23,9 @@ const REDUCED_LEVEL: ReviewLevel = 'low'
 // **Documentation is deliberately absent from this list**, which is the opposite of what the
 // "Non-runtime updates" testing exception does with it, and the difference is not an oversight.
 // That exception is about whether an automated test could have caught the defect; this is about
-// whether a human reading the diff is the only thing that can. Measured on this epic:
-// joshuafolkken/kit#963 and #965 were both documentation-only by that classification, and a
-// `medium` review found ten real defects in each — dangling pointers into sections that had been
-// removed, and citations naming the wrong file, in artifacts distributed to every consumer. No test
-// covered them, because prose is what they were.
+// whether a human reading the diff is the only thing that can. Documentation-only diffs carry real
+// defects — dangling pointers into removed sections, and citations naming the wrong file, in
+// artifacts distributed to every consumer — that no test covers, because prose is what they are.
 const INERT_PATHS: ReadonlyArray<string> = [
 	'.editorconfig',
 	'.gitignore',

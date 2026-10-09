@@ -2,7 +2,7 @@ import { auto_merge_setting_logic, type AutoMergeStatus } from './auto-merge-set
 import { repo_setting } from './repo-setting'
 
 // Read the repository's "Allow auto-merge" setting. Never throws and never propagates a non-zero
-// exit: an unreadable answer is a reported status, not a command failure (joshuafolkken/kit#834).
+// exit: an unreadable answer is a reported status, not a command failure.
 //
 // The whole repository object is requested rather than a `--jq` projection, because a projection
 // cannot distinguish a field that is `false` from a field the response never carried — and that

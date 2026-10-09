@@ -4,11 +4,11 @@
 // decision was already being spelled out per call site — in `git-gh-issue-read.ts`, and as a bare
 // string concatenation in `git-gh-pr.ts` and `epic-cross-repo.ts`. All three now build their paths
 // from here. Converting kit's GitHub calls to REST multiplies those call sites, so the decision is
-// made once rather than at each one (joshuafolkken/kit#1023).
+// made once rather than at each one.
 
 // One full page of a listing. REST answers 30 rows by default, and every listing this tooling reads
 // is paged through with `--paginate`, so asking for the largest page turns a long listing into fewer
-// round trips. Named once because three readers append it (joshuafolkken/kit#1028).
+// round trips. Named once because three readers append it.
 const FULL_PAGE_QUERY = '?per_page=100'
 
 // `gh api` expands `{owner}` and `{repo}` from the current repository, so the unqualified form needs
@@ -19,7 +19,7 @@ function repo_api_path(repo = '{owner}/{repo}'): string {
 }
 
 // The issue collection — what a listing pages through and what a creation posts to. One segment,
-// named once: the reads, the listing and the writes all build on it (joshuafolkken/kit#1026).
+// named once: the reads, the listing and the writes all build on it.
 function issues_api_path(repo?: string): string {
 	return `${repo_api_path(repo)}/issues`
 }
@@ -30,15 +30,14 @@ function issue_api_path(issue_number: string, repo?: string): string {
 
 // The dependency relations, which REST serves from their own endpoint rather than inside the issue.
 // Named here because three call sites address it — the read in `git-gh-issue-read.ts` and both
-// writes in `git-gh-issue-write.ts` (joshuafolkken/kit#1026).
+// writes in `git-gh-issue-write.ts`.
 function blocked_by_api_path(issue_number: string, repo?: string): string {
 	return `${issue_api_path(issue_number, repo)}/dependencies/blocked_by`
 }
 
 // A pull request's *conversation* comments. REST serves them from the issue endpoint rather than the
 // pull one — `pulls/{N}/comments` is the review thread, which is a different listing with a
-// different shape, and reading one where the other was meant is a silent mistake rather than a 404
-// (joshuafolkken/kit#1027).
+// different shape, and reading one where the other was meant is a silent mistake rather than a 404.
 function issue_comments_api_path(issue_number: string, repo?: string): string {
 	return `${issue_api_path(issue_number, repo)}/comments`
 }
@@ -49,14 +48,14 @@ function pulls_api_path(repo?: string): string {
 }
 
 // One pull request, addressed by number. `gh pr view` accepted a branch name and REST does not, so
-// every read below the branch lookup names the number instead (joshuafolkken/kit#1027).
+// every read below the branch lookup names the number instead.
 function pull_api_path(pr_number: string, repo?: string): string {
 	return `${pulls_api_path(repo)}/${pr_number}`
 }
 
 // The merge of one pull request. `gh pr merge <branch> --merge` is the GraphQL call this replaces,
 // and the method it named is sent as the `merge_method` field of the request body rather than being
-// left to the endpoint's default (joshuafolkken/kit#1029).
+// left to the endpoint's default.
 function pull_merge_api_path(pr_number: string, repo?: string): string {
 	return `${pull_api_path(pr_number, repo)}/merge`
 }
@@ -68,7 +67,7 @@ function pull_comments_api_path(pr_number: string, repo?: string): string {
 }
 
 // The review history of one pull request. There is no REST counterpart to GraphQL's
-// `reviewDecision`, so the merge gate folds this listing into one instead (joshuafolkken/kit#1028).
+// `reviewDecision`, so the merge gate folds this listing into one instead.
 function pull_reviews_api_path(pr_number: string, repo?: string): string {
 	return `${pull_api_path(pr_number, repo)}/reviews`
 }
@@ -92,13 +91,13 @@ function commit_status_api_path(commit_sha: string, repo?: string): string {
 }
 
 // A single tag reference. REST answers 404 when the tag does not exist, which is the whole of the
-// question the release command's tag watch asks (joshuafolkken/kit#1169).
+// question the release command's tag watch asks.
 function tag_reference_api_path(tag: string, repo?: string): string {
 	return `${repo_api_path(repo)}/git/ref/tags/${tag}`
 }
 
 // The GitHub Release published for one tag. REST answers 404 until `publish.yml`'s `create-release`
-// job has run, which is what the release command's progress watch asks (joshuafolkken/kit#3193).
+// job has run, which is what the release command's progress watch asks.
 function release_by_tag_api_path(tag: string, repo?: string): string {
 	return `${repo_api_path(repo)}/releases/tags/${tag}`
 }

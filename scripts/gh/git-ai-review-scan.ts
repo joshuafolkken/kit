@@ -111,8 +111,9 @@ function classify_claude_comment(comment: ReviewComment): ClassifiedFinding {
 	}
 }
 
-// Temporary (kit#753): CodeRabbit actionable comments are informational, never blockers, so a
-// slow CodeRabbit review cannot stall the merge gate. Revert together with kit#752.
+// Temporary: CodeRabbit actionable comments are informational, never blockers, so a
+// slow CodeRabbit review cannot stall the merge gate. Revert together with the rest of the
+// temporary CodeRabbit non-blocking policy.
 function build_coderabbit_info(comment: ReviewComment, count: number): ClassifiedFinding {
 	return {
 		author_login: comment.author_login,

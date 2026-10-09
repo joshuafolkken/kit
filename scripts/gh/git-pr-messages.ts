@@ -1,5 +1,5 @@
 // What `pnpm josh git` prints once the pull request is open. It no longer claims anything about the
-// checks: this command returns before they have run (joshuafolkken/kit#1232), and the old
+// checks: this command returns before they have run, and the old
 // "All checks passed successfully." was printed on the strength of a watch whose verdict decided
 // nothing. Naming `pnpm josh followup` here is the whole replacement — it is what waits, and what
 // merges.

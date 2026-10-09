@@ -25,7 +25,7 @@ function package_json_path(): string {
 
 // **Set the version to an already-decided number.** `bump_version` below is this plus the decision;
 // `pnpm josh release` supplies its own, because a release raises the version by as many minors as
-// main has taken merges rather than by one (joshuafolkken/kit#1169). Written once so the two agree
+// main has taken merges rather than by one. Written once so the two agree
 // on the file's shape and indentation.
 function write_version(new_version: string): void {
 	const package_path = package_json_path()

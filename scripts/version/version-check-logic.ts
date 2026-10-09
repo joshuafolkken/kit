@@ -29,8 +29,7 @@ interface VersionSnapshot {
 // What the local minimum-release-age policy permits an unpinned resolve to reach. Carried only on an
 // upstream report, because only the effective install is peer-resolved — every other target is
 // upgraded by an explicitly pinned command the window does not block. Optional throughout: a package
-// whose publish timestamps could not be read keeps exactly the report it had before
-// (joshuafolkken/kit#808).
+// whose publish timestamps could not be read keeps exactly the report it had before.
 interface ReleaseHold {
 	installable: string
 	minimum_age_minutes: number
@@ -75,7 +74,7 @@ interface EffectiveUpgradeHint {
 // `installed_versions` is populated only when the consumer declared its global upgrade command
 // pin-only (`is_global_upgrade_command_pinned`). It lists the globally-resolved versions kit already
 // knows, so a command whose every pin is already installed can be proven dead and replaced with an
-// explanation instead of a `Run:` hint (#697). Absent, no command is ever suppressed.
+// explanation instead of a `Run:` hint. Absent, no command is ever suppressed.
 interface UpstreamReport {
 	config: PackageVersionConfig
 	project_version: string | undefined

@@ -5,14 +5,14 @@ import { issue_file } from './issue-file'
 import { AUTO_OK_LABEL, has_label_name, RELEASE_LABEL } from './issue-labels'
 import { issue_state_cli } from './issue-state-cli'
 
-// Whether `josh issue:file` applies `auto-ok` to the Issue it files (joshuafolkken/kit#3213). Work
-// found during an unattended run used to wait in the backlog until a person labelled it, so the
-// filing now computes the answer instead of leaving it to the agent's memory: an Issue filed while a
+// Whether `josh issue:file` applies `auto-ok` to the Issue it files. So that work found during an
+// unattended run does not wait in the backlog until a person labels it, the filing computes the
+// answer instead of leaving it to the agent's memory: an Issue filed while a
 // `backlogrun` carry record is live, or from a branch whose Issue carries `auto-ok`, is opted in by
 // default. `--no-auto-ok` is the one exception, declared for an Issue that needs a person's judgement
 // (a Tier B toss-up or a Tier C action). A filing to another repository is never opted in: that
 // repository's own `backlogrun` would implement and merge it though nobody opted that repository in.
-// A `release` Issue is never opted in either (joshuafolkken/kit#3360): a release is Tier C, so only a
+// A `release` Issue is never opted in either: a release is Tier C, so only a
 // person applies `auto-ok` to it, whatever the carry record or the branch's Issue says.
 
 interface AutoOkSignals {

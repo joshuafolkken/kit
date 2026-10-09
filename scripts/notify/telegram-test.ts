@@ -36,13 +36,10 @@ function parse_cli_arguments(): CliValues {
 
 // The repository this notification is about, for the Telegram header.
 //
-// joshuafolkken/kit#1063: this used to spawn `gh repo view --json nameWithOwner` through a
-// promisified `execFile`, which is why joshuafolkken/kit#1022's survey never counted it — the
-// callee was not `execa` and the file was not `scripts/`. `gh repo view` goes through GraphQL and
-// is answered 403 in a cloud session, so the header simply lost its repository name there.
-//
-// The same fact is already read over REST by `git_gh_repo`, whose failure contract is the
-// `undefined` this caller was already handling, so it is read from there rather than from a second
+// Not `gh repo view`: it goes through GraphQL and is answered 403 in a cloud session, which would
+// lose the header's repository name there. The same fact is already read over REST by
+// `git_gh_repo`, whose failure contract is the `undefined` this caller handles, so it is read from
+// there rather than from a second
 // spawn (`CLAUDE.md` → "No clones").
 async function fetch_repo_name(): Promise<string | undefined> {
 	const name_with_owner = await git_gh_repo.repo_get_name_with_owner()
@@ -54,8 +51,7 @@ async function fetch_repo_name(): Promise<string | undefined> {
 
 // The title is read from the repository the URL names, through the same reader every other
 // cross-repository read goes through. Read unqualified, `gh` would answer with the issue of that
-// number in the working directory's repository — a different issue with a different title
-// (joshuafolkken/kit#903).
+// number in the working directory's repository — a different issue with a different title.
 //
 // A repository the token cannot read answers the same `undefined` as an issue that does not exist,
 // and the notification would then go out with no title line at all. Say so, so the gap is visible
@@ -93,9 +89,8 @@ async function resolve_issue_title(
 //
 // `--issue-url` outranks `--pr-url` because it identifies the issue the title is read from as well
 // as the repository. A pull URL answers the repository half only, which is why it is read for
-// `repo_name` and not passed to `resolve_issue_title` — a completion notification carrying only a
-// PR link used to go out under the working directory's repository while its link pointed elsewhere
-// (joshuafolkken/kit#994).
+// `repo_name` and not passed to `resolve_issue_title` — otherwise a completion notification carrying
+// only a PR link goes out under the working directory's repository while its link points elsewhere.
 async function resolve_context(values: CliValues): Promise<ResolvedContext> {
 	const target = github_issue_url.parse(values['issue-url'])
 	const pull_target = github_issue_url.parse_pull(values['pr-url'])
@@ -114,7 +109,7 @@ async function main(): Promise<void> {
 	await telegram_notify.send(input)
 }
 
-// **A notification nobody received must not read as success** (joshuafolkken/kit#1564). This command
+// **A notification nobody received must not read as success**. This command
 // *is* the notification, so a failed send is its result and the exit code has to say so — the state
 // that Issue measured was three lost messages, each printing a warning and exiting 0.
 //

@@ -3,22 +3,21 @@ import { z } from 'zod'
 import { has_any_label, NEEDS_HUMAN_REVIEW_LABEL } from './issue-labels'
 
 // The answer `josh issue:state` prints, kept apart from the reading and the printing so the shape of
-// the report is decided by one pure function (joshuafolkken/kit#1054).
+// the report is decided by one pure function.
 //
-// The command exists because the *instructions* needed one. `gh issue view <N> --json state` is what
-// an unattended epic run was told to type to confirm a delegated child, and gh answers that call
-// over GraphQL — which a cloud session is refused (403). The REST endpoint is served normally, but
-// it reports `open` / `closed` in lower case, so writing the REST call into the documents would have
-// copied the casing rule out of `git-gh-rest-state.ts` and into prose. Routing the instruction
-// through a command keeps that rule in the one place joshuafolkken/kit#1024 put it.
+// The command exists because the *instructions* need one. `gh issue view <N> --json state` goes over
+// GraphQL — which a cloud session is refused (403). The REST endpoint is served normally, but it
+// reports `open` / `closed` in lower case, so writing the REST call into the documents would copy the
+// casing rule out of `git-gh-rest-state.ts` and into prose. Routing the instruction through a command
+// keeps that rule in one place.
 
 const NO_LABELS = '(none)'
 const LABEL_SEPARATOR = ', '
 const STATE_LABEL = 'state: '
 const LABELS_LABEL = 'labels: '
 // Whether this issue is one a run must stop on before committing. Printed as its own line rather than
-// left to a reader matching `needs-human-review` against the `labels:` line above
-// (joshuafolkken/kit#1132): GitHub keeps the spelling a label was created with and treats
+// left to a reader matching `needs-human-review` against the `labels:` line above:
+// GitHub keeps the spelling a label was created with and treats
 // `Needs-Human-Review` as the same label, so an eye comparing against the lowercase string misses it —
 // and a missed one is a run that does not stop and an artifact that ships, which is the whole thing
 // the label exists to prevent. Every other workflow label already reaches its decision through
@@ -26,8 +25,8 @@ const LABELS_LABEL = 'labels: '
 const HUMAN_REVIEW_LABEL_LINE = 'human_review: '
 const YES = 'yes'
 const NO = 'no'
-// The number a block belongs to, printed above it when several were asked for
-// (joshuafolkken/kit#1302). A block carries its own number rather than being matched by position,
+// The number a block belongs to, printed above it when several were asked for.
+// A block carries its own number rather than being matched by position,
 // because a batch read drops the numbers that resolve to nothing — a `diag` table mixes closed
 // issues and numbers that never existed — and a positional reading then attributes every block
 // after the gap to the wrong issue.

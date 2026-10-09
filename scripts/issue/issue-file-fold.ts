@@ -11,10 +11,9 @@ import { issue_fold_cli } from './issue-fold-cli'
 import { SPLIT_ROUTE_LABEL } from './issue-labels'
 import { issue_state_cli } from './issue-state-cli'
 
-// The fold question asked by `josh issue:file` itself (joshuafolkken/kit#3423), as the scout and
-// `epic:bundle` already are. It used to be a delivered rule that refused a run's second filing until a
-// separate `pnpm josh issue:fold` was on the transcript — two or three round trips per filing, for a
-// question whose every input the command can read: the run's earlier filings are the `filed` events
+// The fold question asked by `josh issue:file` itself, as the scout and
+// `epic:bundle` already are. A separate `pnpm josh issue:fold` would cost two or three round trips per
+// filing, for a question whose every input the command can read: the run's earlier filings are the `filed` events
 // it appends to the event stream itself, and the size is `issue:fold`'s own reading of the diff.
 //
 // **The verdict is `issue_fold.fold_verdict`, called rather than restated**, with separability
