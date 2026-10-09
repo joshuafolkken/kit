@@ -132,57 +132,6 @@ describe('run_board_render.render sections', () => {
 	})
 })
 
-// joshuafolkken/kit#3526: the track's twelve marks in its order, six to a line.
-const PHASE_LEGEND = [
-	'🔍 investigate  📝 plan  🔨 implement  🚢 ship  👀 review  🚦 gate',
-	'🔀 sync  📦 commit  🔂 round-2  ⚓ followup  📣 report  💥 failed',
-]
-
-function legend_of(rows: ReadonlyArray<BoardRow>): Array<string> {
-	const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: [...rows] } }))
-
-	return lines.slice(lines.lastIndexOf('') + 1)
-}
-
-// joshuafolkken/kit#3480: every phase on its lines, the states the rows draw on one more, in English.
-describe('run_board_render.render legend', () => {
-	it('names every phase in order on its lines, though no row draws a phase', () => {
-		expect(legend_of([row(1)])).toStrictEqual([...PHASE_LEGEND, '⏳ waiting'])
-	})
-
-	it('names only the states the rows draw, in the legend’s order', () => {
-		const merged = row(1, { state: 'merged' })
-		const parked = row(2, { state: 'parked' })
-		const done = row(5, { state: 'done' })
-		const mixed = [row(3, { state: 'human' }), row(4, { state: 'stopped' }), done, parked, merged]
-
-		expect(legend_of([parked, merged]).at(-1)).toBe('✅ merged  💤 parked')
-		expect(legend_of(mixed).at(-1)).toBe('✅ merged  💤 parked  🏁 done  🛑 stopped  🙋 decision')
-	})
-
-	it('names 🔄 only while a row draws it, not for a row led by its phase', () => {
-		const launched = row(1, { state: 'running' })
-
-		expect(legend_of([running(2, NOW, 'review')])).toStrictEqual(PHASE_LEGEND)
-		expect(legend_of([launched]).at(-1)).toBe('🔄 running')
-	})
-
-	it('names 🔗 only while a row draws a wait', () => {
-		expect(legend_of([row(1), row(2, { waits: ['1'] })]).at(-1)).toBe('⏳ waiting  🔗 waits on')
-		expect(legend_of([row(1)]).at(-1)).not.toContain('🔗')
-	})
-
-	it('draws the phase line alone on a screen with no rows, and none of the header’s marks', () => {
-		const legend = legend_of([])
-
-		expect(legend).toStrictEqual(PHASE_LEGEND)
-
-		for (const icon of ['⚡', '🧠', '💾', '🔚']) {
-			expect(legend.join('\n')).not.toContain(icon)
-		}
-	})
-})
-
 // joshuafolkken/kit#3456: a chat wraps a long line, so it reads the whole title, and needs no legend.
 describe('run_board_render.render chat', () => {
 	it('draws a chat with every title whole and no legend', () => {
@@ -195,6 +144,31 @@ describe('run_board_render.render chat', () => {
 		expect(lines).toContain(`  📁 10  ${long_title}`)
 		expect(lines.at(-1)).toBe(`  🙋 6  ${long_title}`)
 		expect(lines.join('\n')).not.toContain('🔚')
+	})
+
+	// joshuafolkken/kit#3544: a whole title longer than the limit no longer pushes its time to the right.
+	it('starts every time in one column, padding each title to the widest one a timed row draws', () => {
+		const long_title = 'x'.repeat(run_board_render.TITLE_LIMIT + 5)
+		const long = { ...running(1, NOW - 98 * SECOND, 'review'), title: long_title }
+		const short = running(2, NOW - 60 * SECOND, 'review')
+		const untimed = row(3, { title: 'z'.repeat(run_board_render.TITLE_LIMIT + 10) })
+		const lines = lines_of(
+			header({ layout: { ...EMPTY_LAYOUT, active: [long, short, untimed] }, form: 'chat' }),
+		)
+		const starts = [
+			[long_title, '01:38'],
+			['Issue 2', '01:00'],
+		].map(([title = '', time = '']) => {
+			const line = lines.find((text) => text.includes(title)) ?? ''
+
+			return line.indexOf(time)
+		})
+
+		expect(starts[0]).toBe(starts[1])
+		expect(lines).toContain(`  👀 1  ${long_title}  01:38  ${plain_track('review')}`)
+		expect(lines).toContain(
+			`  👀 2  ${'Issue 2'.padEnd(long_title.length)}  01:00  ${plain_track('review')}`,
+		)
 	})
 })
 
@@ -253,6 +227,19 @@ describe('run_board_render.render running row lead', () => {
 
 		expect(lines.some((line) => line.startsWith('  📦 1  Issue 1'))).toBe(true)
 		expect(lines.some((line) => line.startsWith('  🔄 2  Issue 2'))).toBe(true)
+	})
+
+	// joshuafolkken/kit#3480: the legend is told the icon each row leads with, not its state's.
+	it('names 🔄 in the legend only while a row draws it, not for a row led by its phase', () => {
+		const led = lines_of(
+			header({ layout: { ...EMPTY_LAYOUT, active: [running(1, NOW, 'review')] } }),
+		)
+		const spun = lines_of(
+			header({ layout: { ...EMPTY_LAYOUT, active: [running(2, NOW, undefined)] } }),
+		)
+
+		expect(led.at(-1)).not.toContain('🔄')
+		expect(spun.at(-1)).toBe('🔄 running')
 	})
 })
 
