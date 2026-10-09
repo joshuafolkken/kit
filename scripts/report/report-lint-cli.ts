@@ -27,7 +27,7 @@ function run(summary: string): number {
 		return SUCCESS_EXIT_CODE
 	}
 
-	console.error(violations.join('\n'))
+	console.error(report_lint.with_reference(violations).join('\n'))
 
 	return FAILURE_EXIT_CODE
 }

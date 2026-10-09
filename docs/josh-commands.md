@@ -185,7 +185,7 @@ pnpm josh test:declared --help    # print usage, including the --match stdin for
 
 An unknown flag is refused with the usage rather than ignored, the same convention `josh time` follows.
 
-`--match` checks each `Test: <type> — <path>` declaration on stdin against the change set, printing `match` / `type-mismatch` / `path-missing` / `test-not-created` per line and exiting non-zero on any mismatch.
+`--match` checks each `Test: <type> — <path>` declaration on stdin against the change set, printing `match` / `type-mismatch` / `path-missing` / `test-not-created` per line and exiting non-zero on any mismatch. A path wrapped in a code span, as the template writes it, is read as the path inside it. A `path-missing` line is followed by the changed paths with the same file name, when there are any, and the `report-format.md` section that defines the declaration line's shape.
 
 ### `josh test:red`
 

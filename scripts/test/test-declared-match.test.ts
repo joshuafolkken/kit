@@ -22,6 +22,20 @@ describe('test_declared_match.parse_declarations', () => {
 		])
 	})
 
+	// joshuafolkken/kit#3422: the template writes the path in a code span, and read raw every
+	// template-shaped line was path-missing.
+	it('reads a backticked path as the path inside the code span', () => {
+		const line = `Extract helper — Test: Unit — \`${RUNTIME_FILE}\` — verifies the helper`
+
+		expect(status_of(line, [RUNTIME_FILE, UNIT_TEST_FILE])).toBe('match')
+	})
+
+	it('keeps a path with an unbalanced backtick as written', () => {
+		const line = `Extract helper — Test: Unit — \`${RUNTIME_FILE} — verifies the helper`
+
+		expect(test_declared_match.parse_declarations(line)[0]?.path).toBe(`\`${RUNTIME_FILE}`)
+	})
+
 	it('ignores lines with no Test: field', () => {
 		expect(test_declared_match.parse_declarations('■ 概要\n- plain prose line')).toStrictEqual([])
 	})
@@ -58,6 +72,25 @@ describe('test_declared_match.match_report', () => {
 
 	it('is test-not-created when the only test is in another directory', () => {
 		expect(status_of(UNIT_LINE, [RUNTIME_FILE, 'scripts/sub/bar.test.ts'])).toBe(TEST_NOT_CREATED)
+	})
+})
+
+describe('test_declared_match.path_candidates', () => {
+	it('names every changed path with the same file name in another directory', () => {
+		const changed = ['a/foo.ts', 'b/foo.ts', 'a/bar.ts']
+
+		expect(test_declared_match.path_candidates('foo.ts', changed)).toStrictEqual([
+			'a/foo.ts',
+			'b/foo.ts',
+		])
+	})
+
+	it('is empty when no changed path shares the file name', () => {
+		expect(test_declared_match.path_candidates('foo.ts', [UNIT_TEST_FILE])).toStrictEqual([])
+	})
+
+	it('is empty for an empty change set', () => {
+		expect(test_declared_match.path_candidates('foo.ts', [])).toStrictEqual([])
 	})
 })
 
