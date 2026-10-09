@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1024,
-		"code_lines": 85240,
-		"comment_lines": 33929,
+		"files": 1028,
+		"code_lines": 85531,
+		"comment_lines": 33988,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 560565
 	},
 	"accepted": {
-		"reason": "Run board findings thread header.link through note rendering so their issue numbers link to GitHub (#3520)",
+		"reason": "#3433 adds run:add (scripts/run/add) and the backlog arrival/carry handling for issues injected into a live backlogrun; merged with #3434 lane:limit carry-record override, #3421 guard-friction / investigation-payback retrospective modules, #3422 accepted-value hints, #3480 run:board legend, #3425 prose_lines reuse and #3501 quiet-gate external-load recording",
 		"date": "2026-10-09"
 	}
 }

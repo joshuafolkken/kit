@@ -60,6 +60,21 @@ pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind pa
 
 **Output / exit codes:** stdout is one token (`--json` prints the record on one line). `began`, `resumed`, `carried`, `counted`, `ended`, `expired` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown`, `over` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
 
+### `josh run:add`
+
+Add issues to the `backlogrun` running in this repository without stopping it. A running child is never interrupted: an added issue takes the next lane that frees.
+
+```bash
+pnpm josh run:add 101 102                 # ahead of the rest of the queue (`#N` works too)
+pnpm josh run:add 101 --no-priority       # at the end of the queue
+```
+
+- Each issue gets `auto-ok` and `run:lane`, plus `priority:high` unless `--no-priority`. A `backlogrun #N --only` run also gets the issue written to its carry record, so its named list includes it; the recorded invocation is never rewritten.
+- A closed issue, one that could not be read, or one a label would not apply to is refused; the others are still added. An issue with open blockers is added and reported as waiting on them.
+- Each added issue is written to the run's event stream as an `add` event, which wakes a `run:progress --wait` so the run offers the issue the next free lane.
+
+**Output / exit codes:** one line per issue — `queued #N · next free lane`, `queued #N · end of the queue`, `queued #N · waiting: blocked by #M`, or `refused #N · <reason>`. Exits 0 when every issue was added, 1 when any was refused or no `backlogrun` is running here (nothing is added then), 2 on a malformed argument.
+
 ### `josh run:wake`
 
 Continue a cut `backlogrun` from outside the conversation. The detached supervisor adopts the handed-off carry record, runs `backlog:drive`, and starts an AI session only for a driver branch requiring judgment. A dead owner can be recovered through the same path.

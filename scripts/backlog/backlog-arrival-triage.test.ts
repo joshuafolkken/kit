@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { backlog_arrival } from './backlog-arrival'
-import type { ReadyPorts } from './backlog-ready'
+import { backlog_arrival, type ArrivalPorts } from './backlog-arrival'
 
 // joshuafolkken/kit#2779: a `triage` answer names no number, yet the parent has work — judging the
 // untriaged issues — so the arrival probe reads it as an arrival, never as an empty pool.
@@ -14,10 +13,11 @@ interface Pool {
 	issues: Array<string>
 }
 
-function ports_of(pool: Pool): ReadyPorts {
+function ports_of(pool: Pool): ArrivalPorts {
 	return {
 		free_lane_count: vi.fn(async () => FREE),
 		ready_issues: vi.fn(async () => [...pool.issues]),
+		is_added_since: vi.fn(async () => false),
 	}
 }
 

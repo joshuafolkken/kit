@@ -102,6 +102,27 @@ test('stops an --only run naming the issue that parked instead of finishing it',
 	vi.restoreAllMocks()
 })
 
+// joshuafolkken/kit#3433: an issue `run:add` put into the run is held to the same end check.
+test('stops an --only run naming an added issue that parked', async () => {
+	read_issue_as('OPEN')
+	const state = backlog_drive.initial_state([], ACTIVE)
+	const carry = {
+		...DONE_CARRY,
+		done: [1, 2, 3],
+		merged_issues: [1, 2],
+		added: [{ issue: 3, is_priority: true }],
+	}
+
+	const offer = await backlog_drive_named_offer.read(carry, state, ONLY_CONTEXT)
+
+	expect(offer).toMatchObject({
+		verdict: 'stop',
+		is_finish: false,
+		reason: 'only: #3 ended without a merge',
+	})
+	vi.restoreAllMocks()
+})
+
 test('finishes an --only run whose named issues all merged', async () => {
 	read_issue_as('CLOSED')
 	const state = backlog_drive.initial_state([], ACTIVE)

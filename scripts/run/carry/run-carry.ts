@@ -4,6 +4,7 @@ import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_invocation } from '#scripts/run/run-invocation'
 import { z } from 'zod'
+import { run_carry_added, type CarryAddition } from './run-carry-added'
 import { run_carry_change } from './run-carry-change'
 import { run_carry_conversation } from './run-carry-conversation'
 
@@ -131,6 +132,10 @@ interface RunCarry {
 	// `--retrospective`, and carried across a hand-off like `done`. Optional and `| undefined` for the
 	// same disk round-trip reason the owner fields carry.
 	retrospective?: boolean | undefined
+	// The issues `pnpm josh run:add` put into a named run after it began (joshuafolkken/kit#3433),
+	// kept beside `invocation` so the ownership comparison never sees them. Optional and `| undefined`
+	// for the same disk round-trip reason the owner fields carry.
+	added?: ReadonlyArray<CarryAddition> | undefined
 	// The lane limit `josh lane:limit` set on this live run (joshuafolkken/kit#3434). It outranks
 	// `JOSH_LANE_LIMIT` in `lane_capacity.lane_limit`: a running parent keeps the environment it started
 	// with, and the record is the one place both it and a person's shell read. Carried across a hand-off
@@ -195,6 +200,8 @@ const NONE_READ: CarryRead = { kind: 'none' }
 const UNREADABLE_READ: CarryRead = { kind: 'unreadable' }
 const NO_OWNER: CarryOwner = {}
 
+const carry_addition_schema = z.object({ issue: z.number(), is_priority: z.boolean() })
+
 const run_carry_schema = z.object({
 	invocation: z.string(),
 	started_at: z.string(),
@@ -218,6 +225,8 @@ const run_carry_schema = z.object({
 	done: z.array(z.number()).optional(),
 	// Optional, so a record written before the retrospective existed still parses (joshuafolkken/kit#2328).
 	retrospective: z.boolean().optional(),
+	// Optional, so a record written before `run:add` existed still parses (joshuafolkken/kit#3433).
+	added: z.array(carry_addition_schema).optional(),
 	// Optional, so a record written before `lane:limit` existed still parses (joshuafolkken/kit#3434).
 	lane_limit: z.number().int().positive().optional(),
 })
@@ -445,7 +454,7 @@ function retrospective_done_of(read: CarryRead): boolean {
 // here, `--json` answers the successor's one question — which issues are left, in the order they were
 // declared — so nothing downstream has to subtract two lists by hand. An invocation that named no
 // issues answers `undefined`, which `JSON.stringify` drops: a budget-only `backlogrun` record is
-// unchanged by this.
+// unchanged by this. The issues `run:add` put in are folded in by `run_carry_added.ordered`.
 function remaining_of(carry: RunCarry | undefined): ReadonlyArray<number> | undefined {
 	if (carry === undefined) return undefined
 
@@ -455,7 +464,7 @@ function remaining_of(carry: RunCarry | undefined): ReadonlyArray<number> | unde
 
 	const done = carry.done ?? []
 
-	return declared.filter((issue) => !done.includes(issue))
+	return run_carry_added.ordered(declared, carry.added).filter((issue) => !done.includes(issue))
 }
 
 // The finished issues are named rather than counted, because the reader of a `busy` or `standing`
