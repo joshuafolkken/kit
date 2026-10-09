@@ -9,7 +9,6 @@ const SONARLINT_KEY = 'sonarlint.connectedMode.project'
 const ESLINT_VALIDATE_KEY = 'eslint.validate'
 const TERMINAL_LINE_HEIGHT_KEY = 'terminal.integrated.lineHeight'
 const KIT_VSCODE_SETTINGS_PATH = '.vscode/settings.json'
-const KIT_TERMINAL_LINE_HEIGHT = 1.5
 
 describe('strip_kit_only_vscode_settings', () => {
 	it('removes kit-only keys while preserving other settings', () => {
@@ -28,13 +27,13 @@ describe('strip_kit_only_vscode_settings', () => {
 		expect(init_logic.strip_kit_only_vscode_settings(settings)).toEqual(settings)
 	})
 
-	// run:board runs in consumers too, and its rows read cramped at the default line height of 1, so
-	// kit's own terminal line height has to reach them rather than be stripped as a kit-only key.
-	it('distributes the kit terminal line height to consumers', () => {
+	// joshuafolkken/kit#3498: run:board's gauges draw a centered square that leaves a gap between
+	// stacked bars at VS Code's default line height of 1, so no line height reaches consumers.
+	it('distributes no terminal line height to consumers', () => {
 		const raw = readFileSync(KIT_VSCODE_SETTINGS_PATH, 'utf8')
 		const result = init_logic.strip_kit_only_vscode_settings_content(raw)
 
-		expect(result).toContain(`"${TERMINAL_LINE_HEIGHT_KEY}": ${String(KIT_TERMINAL_LINE_HEIGHT)}`)
+		expect(result).not.toContain(TERMINAL_LINE_HEIGHT_KEY)
 	})
 })
 
