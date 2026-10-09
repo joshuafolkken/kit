@@ -31,12 +31,11 @@ const PHASES = [
 type Phase = (typeof PHASES)[number]
 
 const KIND = run_event_stream.EVENT_KIND
-const { PHASE: STAGE_PHASE, STAGE } = run_ship_stage
+const { STAGE } = run_ship_stage
 // A launched child is investigating until a later record says otherwise — no event marks the start.
 const LAUNCHED_PHASE: Phase = 'investigate'
 const WORD_SEPARATOR = ' '
 const STAGE_INDEX = 1
-const STAGE_PHASE_INDEX = 2
 
 // `josh ship`'s stages, each its own phase; the preflight is the ship's own start.
 const SHIP_PHASES: Readonly<Partial<Record<string, Phase>>> = {
@@ -59,21 +58,21 @@ const KIND_PHASES: Readonly<Partial<Record<string, Phase>>> = {
 	[KIND.SHIP_STOP]: 'failed',
 }
 
-// The word at `index` after the issue — `#<N> <stage> <phase>` carries the stage second.
-function word_of(event: RunEvent, index: number): string {
-	return event.text.split(WORD_SEPARATOR)[index] ?? ''
+// The word after the issue — `#<N> <stage> <phase>` carries the stage second.
+function stage_word_of(event: RunEvent): string {
+	return event.text.split(WORD_SEPARATOR)[STAGE_INDEX] ?? ''
 }
 
 // A stage marks its phase when it starts; its `done`, and one a resumed ship passed over, mark none.
 function ship_phase_of(event: RunEvent): Phase | undefined {
-	if (word_of(event, STAGE_PHASE_INDEX) !== STAGE_PHASE.START) return undefined
+	if (!run_event_stream.is_stage_start(event)) return undefined
 
-	return SHIP_PHASES[word_of(event, STAGE_INDEX)]
+	return SHIP_PHASES[stage_word_of(event)]
 }
 
 // The phase one event marks, or `undefined` for an event that marks none.
 function phase_of(event: RunEvent): Phase | undefined {
-	if (event.kind === KIND.LANE_PHASE) return LANE_PHASES[word_of(event, STAGE_INDEX)]
+	if (event.kind === KIND.LANE_PHASE) return LANE_PHASES[stage_word_of(event)]
 	if (event.kind === KIND.SHIP_STAGE) return ship_phase_of(event)
 
 	return KIND_PHASES[event.kind]
