@@ -23,6 +23,15 @@ describe('fold_verdict — the same two questions as the split assessment', () =
 		expect(issue_fold.fold_verdict(TWO_CANDIDATES, false, SPLIT)).toBe(issue_fold.FOLD)
 	})
 
+	// joshuafolkken/kit#3423: a diff that measures nothing is no evidence of the findings' size.
+	it('answers undetermined for separable findings whose size could not be measured', () => {
+		expect(issue_fold.fold_verdict(TWO_CANDIDATES, true, undefined)).toBe(issue_fold.UNDETERMINED)
+	})
+
+	it('folds inseparable findings even when the size could not be measured', () => {
+		expect(issue_fold.fold_verdict(TWO_CANDIDATES, false, undefined)).toBe(issue_fold.FOLD)
+	})
+
 	it('answers no-fold-needed for a single candidate', () => {
 		expect(issue_fold.fold_verdict(1, true, SPLIT)).toBe(issue_fold.NO_FOLD_NEEDED)
 	})

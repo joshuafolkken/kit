@@ -1,21 +1,21 @@
 {
 	"scripts": {
-		"files": 1016,
-		"code_lines": 84396,
-		"comment_lines": 33717,
+		"files": 1015,
+		"code_lines": 84448,
+		"comment_lines": 33715,
 		"comment_ratio": 0.4
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2347
+		"lines": 2344
 	},
 	"guards": 8,
 	"ai_cost": {
-		"resident_bytes": 12231,
-		"on_demand_bytes": 559397
+		"resident_bytes": 12222,
+		"on_demand_bytes": 559192
 	},
 	"accepted": {
-		"reason": "josh output prints session-facing Issue references in the issue:cite form through a single session_cite module (#3424); merged with #3486 run:board header fit and local rows before plan load, #3491 lane-await injectable now/sleep seam, #3434 lane:limit override, #3421 guard-friction and investigation-payback retrospective modules, #3422 accepted-value hints, #3480 run:board legend and #3425 prose_lines reuse",
+		"reason": "josh output prints session-facing Issue references in the issue:cite form through a single session_cite module (#3424); merged with #3423 issue:file fold check and WIP-cap exemption (issue-file-fold module), #3486 run:board header fit and local rows before plan load, #3491 lane-await now/sleep seam, #3434 lane:limit, #3421 guard-friction and investigation-payback, #3422 accepted-value hints, #3480 run:board legend and #3425 prose_lines reuse",
 		"date": "2026-10-09"
 	}
 }

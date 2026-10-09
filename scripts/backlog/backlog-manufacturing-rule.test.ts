@@ -6,7 +6,7 @@ import {
 	WORKFLOW_PROMPT,
 	WORKFLOW_PROMPT_DIRECTORY,
 } from '#scripts/document/ai-document-fixture'
-import { delivered_rules } from '#scripts/rules/delivered-rules'
+import { issue_wip } from '#scripts/issue/issue-wip'
 import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#1469: over the seven days to 2026-09-06 the backlog took 257 filings against 163
@@ -196,33 +196,29 @@ describe(`${WIP_TOPIC} — the WIP cap and all three sides of its procedure`, ()
 const RESIDENT_MARKERS: ReadonlyArray<string> = ['then the three-way disposition', REVIEW_PROMPT]
 const RULE_DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
 
-// joshuafolkken/kit#1524 moved the WIP cap off residency: filing an Issue is one nameable tool call,
-// so `pnpm josh rule:guard` refuses that call and states the rule there. **The cap is therefore
-// pinned by what the refusal says, not by what `CLAUDE.md` holds** — and every sentence below has to
-// survive, because dropping one changes what an agent does at the only moment it will read them.
-const DELIVERED_CAP_MARKERS: ReadonlyArray<string> = [
-	"`pnpm josh issue:file` counts the target repository's open Issues",
-	`With more than ${String(delivered_rules.WIP_CAP)} open, close one first`,
+// joshuafolkken/kit#1524 moved the WIP cap off residency, and joshuafolkken/kit#3423 moved it off the
+// hook as well: `pnpm josh issue:file` counts the open Issues and holds the filing itself. **The cap is
+// therefore pinned by what the hold says, not by what `CLAUDE.md` holds** — and every sentence below
+// has to survive, because dropping one changes what an agent does at the only moment it will read them.
+const HELD_CAP_MARKERS: ReadonlyArray<string> = [
+	'over the WIP cap: close one first',
 	'nothing honestly closable means do not file',
-	'one the run is blocked by',
+	'a filing the run is blocked by',
 	// joshuafolkken/kit#1518. The three tests travel with the exemption rather than being left at the
-	// pointer, because a delivery saying only "an interrupt is exempt" hands the deciding back to
+	// pointer, because a hold saying only "an interrupt is exempt" hands the deciding back to
 	// judgement at the one moment nothing else is open to read — the state joshuafolkken/kit#1517 was
 	// lost in.
-	'three tests rather than judgement',
 	'a verification answers wrongly',
 	'a documented workflow cannot complete',
 	'data is lost or written outside the repository',
-	// A delivery that could not be acted on would wedge the very call it asked for.
-	'Reissue this call and let the command count',
 	'`--over-cap`',
 	'`--route interrupt`',
 	WIP_TOPIC,
 ]
 
-describe('the delivered text — the WIP cap at the call that files', () => {
-	it.each(DELIVERED_CAP_MARKERS)('states %j', (marker) => {
-		expect(delivered_rules.WIP_CAP_REASON).toContain(marker)
+describe('the held text — the WIP cap at the call that files', () => {
+	it.each(HELD_CAP_MARKERS)('states %j', (marker) => {
+		expect(issue_wip.HELD_MESSAGE).toContain(marker)
 	})
 })
 
@@ -233,14 +229,12 @@ describe.each(AI_DOCS)('%s — carries the trigger for the resident defaults', (
 		expect(content).toContain(marker)
 	})
 
-	// **The cap keeps a route, not a trigger.** joshuafolkken/kit#3395 took the resident trigger out:
-	// an agent that runs no hook applies the delivery enumeration as a self-check list
-	// (`principles.md`, joshuafolkken/kit#3079), so the resident line names that enumeration and the
-	// enumeration names the topic file.
-	it('routes to the delivery enumeration that lists the cap', () => {
-		expect(content).toContain('WIP cap')
-		expect(content).toContain(RULE_DELIVERY)
-		expect(read_unwrapped(RULE_DELIVERY)).toContain('（`wip-cap.md`）')
+	// **The cap keeps no route either.** joshuafolkken/kit#3395 took the resident trigger out, and
+	// joshuafolkken/kit#3423 the delivery row: the command holds the filing whether or not a hook runs,
+	// so neither the resident line nor the delivery enumeration has a cap to name.
+	it('names no WIP cap among the delivered rules', () => {
+		expect(content).not.toContain('WIP cap')
+		expect(read_unwrapped(RULE_DELIVERY)).not.toContain('（`wip-cap.md`）')
 	})
 
 	it('no longer carries a section of its own', () => {

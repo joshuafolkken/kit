@@ -1,11 +1,10 @@
-import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { describe, expect, it } from 'vitest'
 import { issue_wip } from './issue-wip'
 
 // joshuafolkken/kit#3181: `josh issue:file` counts the target's open Issues against the WIP cap and
 // holds a filing past it unless the route or `--over-cap` declares it exempt.
 
-const CAP = delivered_rules.WIP_CAP
+const CAP = issue_wip.WIP_CAP
 const OVER = CAP + 1
 const REPO = 'joshuafolkken/kit'
 const NO_ROUTE = { route: undefined, is_over_cap: false }

@@ -122,9 +122,9 @@ the one resident line stays.
 
 ### Posting a comment is not a trigger
 
-The WIP cap's trigger looks only at **creating** an Issue. `…/issues/<N>/comments` is a comment, not a
-filing — comments outnumber filings by an order of magnitude, and a hook that refused there would be
-exactly "a hook that fires on the wrong turn". `scripts/rules/delivered-rules.test.ts` pins that
+The filing rows' triggers look only at **creating** an Issue. `…/issues/<N>/comments` is a comment,
+not a filing — comments outnumber filings by an order of magnitude, and a hook that refused there would
+be exactly "a hook that fires on the wrong turn". `scripts/rules/delivered-rules.test.ts` pins that
 boundary from both sides.
 
 ### Reading Issue comments — put them in front of the run, do not ask it to read them
@@ -194,7 +194,7 @@ a timer that never ran as alive.
 **A row with `already_satisfied` (is the prerequisite action at the transcript tail?) is outside
 once-per-run** (joshuafolkken/kit#2807). Kept once-per-run, a run that skipped the prerequisite would pass on its reissue, and
 the run that skimmed the procedure would be the one that walked past the guard. The rows are
-`issue-fold`, `issue-comments`, `rule-body` and `oracle-consulted:*`. A run that complies is never
+`issue-comments`, `rule-body` and `oracle-consulted:*`. A run that complies is never
 stuck — once the prerequisite is done, the stand-down answers first and lets it through. There is no
 record to use up either, so it does not yield to `batch:guard` (yielding would let a reissue inside
 the 10-second window through without the prerequisite).
@@ -203,7 +203,6 @@ the 10-second window through without the prerequisite).
 pass is explained in a code comment. The current ones:
 
 - The transcript itself cannot be read (`hook-decision.ts`)
-- A first filing, with nothing to fold into (`issue-fold-rule.ts`)
 - No progress record (`early-heartbeat.ts`)
 - A failed git read treated as no change (the `test-declared` row in `delivered-rules.ts`)
 
@@ -238,8 +237,8 @@ test file pins:
 - `scripts/claude/claude-settings-hooks.test.ts` — `rule:guard` is wired under `PreToolUse` naming
   `Bash` alone, declares a timeout and points at a josh subcommand that exists
 - `scripts/backlog/backlog-manufacturing-rule.test.ts` — the WIP cap exists in `wip-cap.md` as its
-  single source, and the message carries the count, the refusal, the two exemptions and the three
-  conditions that decide an exemption
+  single source, and the hold `issue:file` prints carries the refusal, the two exemptions and the
+  three conditions that decide an exemption (no longer a delivered row since joshuafolkken/kit#3423)
 - `scripts/rules/turn-batching-rule.test.ts` — the batching message carries the criterion, and points
   at `turn-batching.md` in this directory rather than at `CLAUDE.md`
 - `scripts/document/document-markers.test.ts` — the early-progress-report procedure exists as its
