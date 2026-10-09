@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1008,
-		"code_lines": 83514,
-		"comment_lines": 33536,
+		"code_lines": 83516,
+		"comment_lines": 33545,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 558915
 	},
 	"accepted": {
-		"reason": "epic:bundle/issue:scout reuse issue_citation.prose_lines to skip fenced and quoted numbers (#3425): one import line",
+		"reason": "run:board legend split into a fixed phase line and an on-screen state line needs an explicit state/word table (#3480); merged with epic:bundle/issue:scout prose_lines reuse (#3425): one import line",
 		"date": "2026-10-09"
 	}
 }

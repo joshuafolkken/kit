@@ -9,6 +9,7 @@ import {
 } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
 import { run_board_phase, type Phase } from './run-board-phase'
+import type { ItemState } from './run-board-status'
 import { run_board_track } from './run-board-track'
 
 // The whole `run:board` screen as lines (joshuafolkken/kit#3430) — pure, so what a person sees is tested
@@ -17,9 +18,9 @@ import { run_board_track } from './run-board-track'
 // A section is a rule rather than a heading, and the legend at the foot names the symbols, so a row
 // carries only what differs between rows (joshuafolkken/kit#3444).
 
-const { HEADER_ICONS, NOTES_ICON, NOTE_ICONS, PHASE_ICONS, PHASE_WORDS, STATE_ICONS, WAITS_ICON } =
+const { NOTES_ICON, NOTE_ICONS, PHASE_ICONS, PHASE_WORDS, STATE_ICONS, WAITS_ICON } =
 	run_board_labels
-const { clock_of, elapsed_of } = run_board_labels
+const { clock_of, elapsed_of, words_of } = run_board_labels
 // The track is a fixed fourteen columns where the gauge and the phase's name took up to twenty-two, so
 // the title takes the columns it freed and a row is no wider (joshuafolkken/kit#3460).
 const TITLE_LIMIT = 48
@@ -33,6 +34,9 @@ const RULE = '─'
 const RULE_LEAD = `${RULE}${RULE}`
 const RULE_WIDTH = 50
 const NUMBER_PLACEHOLDER = '{n}'
+// The legend is English whatever the session language (joshuafolkken/kit#3480): it names symbols, and
+// one set of words reads the same on every board.
+const LEGEND_WORDS = words_of('en')
 
 interface BoardView {
 	header: BoardHeader
@@ -89,8 +93,8 @@ function phase_of(row: BoardRow): string | undefined {
 	return phase === undefined ? undefined : run_board_track.track_of(phase)
 }
 
-// The phases a row's track draws — every one its row has passed (joshuafolkken/kit#3460) — which the
-// legend names and whose newest leads a running row.
+// The phases a row's track draws — every one its row has passed (joshuafolkken/kit#3460) — whose newest
+// leads a running row.
 function drawn_phases(row: BoardRow): Array<Phase> {
 	const phase = shown_phase(row)
 
@@ -189,45 +193,58 @@ function time_width(header: BoardHeader): number {
 	return Math.max(0, ...times.map((time) => time.length))
 }
 
-// The legend names only the phases some row on screen draws, in the phases' own order — seven icons
-// most of which no row shows would crowd out the ones that do (joshuafolkken/kit#3452).
-function phase_legend(layout: BoardLayout, words: Words): Array<string> {
-	const shown = new Set(run_board_layout.rows_of(layout).flatMap((row) => drawn_phases(row)))
+// Every phase a run passes through, in the phases' own order and whatever is on screen
+// (joshuafolkken/kit#3480): a row's phase moves between redraws, so a fixed line keeps each icon where
+// the eye last found it. `merged` is the states' ✅. 🚀 is named though a dispatched row, its track
+// still empty, leads with 🔄 — the line is the run's phases, not the marks a row draws.
+const PHASE_LEGEND = run_board_phase.PHASES.filter((phase) => phase !== 'merged')
+	.map((phase) => `${PHASE_ICONS[phase]} ${LEGEND_WORDS[PHASE_WORDS[phase]]}`)
+	.join(GAP)
 
-	return run_board_phase.PHASES.filter((phase) => shown.has(phase)).map(
-		(phase) => `${PHASE_ICONS[phase]} ${words[PHASE_WORDS[phase]]}`,
+// The row states the legend can name, in its order, each with its word.
+const STATE_LEGEND: ReadonlyArray<readonly [ItemState, keyof Words]> = [
+	['merged', 'merged'],
+	['parked', 'parked'],
+	['done', 'done'],
+	['running', 'in_progress'],
+	['stopped', 'stopped'],
+	['waiting', 'waiting'],
+	['human', 'decision'],
+]
+
+// The states some row on screen leads with — a running row leads with its phase, so 🔄 is named only
+// while a row draws it (joshuafolkken/kit#3480).
+function state_legend(rows: ReadonlyArray<BoardRow>): Array<string> {
+	const drawn = new Set(rows.map((row) => state_icon(row)))
+
+	return STATE_LEGEND.filter(([state]) => drawn.has(STATE_ICONS[state])).map(
+		([state, word]) => `${STATE_ICONS[state]} ${LEGEND_WORDS[word]}`,
 	)
 }
 
+function waits_legend(rows: ReadonlyArray<BoardRow>): Array<string> {
+	return rows.some((row) => row.waits.length > 0) ? [`${WAITS_ICON} ${LEGEND_WORDS.waits}`] : []
+}
+
 // The findings' symbols, named only while the section is on screen (joshuafolkken/kit#3478).
-function notes_legend(notes: ReadonlyArray<BoardNote>, words: Words): Array<string> {
+function notes_legend(notes: ReadonlyArray<BoardNote>): Array<string> {
 	if (notes.length === 0) return []
 
 	return [
-		`${NOTES_ICON} ${words.notes}`,
-		`${NOTE_ICONS.filed} ${words.filed}`,
-		`${NOTE_ICONS.note} ${words.note}`,
+		`${NOTES_ICON} ${LEGEND_WORDS.notes}`,
+		`${NOTE_ICONS.filed} ${LEGEND_WORDS.filed}`,
+		`${NOTE_ICONS.note} ${LEGEND_WORDS.note}`,
 	]
 }
 
-function legend_of(layout: BoardLayout, notes: ReadonlyArray<BoardNote>, words: Words): string {
-	const legend = [
-		`${STATE_ICONS.merged} ${words.merged}`,
-		`${STATE_ICONS.parked} ${words.parked}`,
-		`${STATE_ICONS.running} ${words.in_progress}`,
-		`${STATE_ICONS.stopped} ${words.stopped}`,
-		`${STATE_ICONS.waiting} ${words.waiting}`,
-		`${STATE_ICONS.human} ${words.decision}`,
-		`${WAITS_ICON} ${words.waits}`,
-		...phase_legend(layout, words),
-		`${HEADER_ICONS.cpu} ${words.cpu}`,
-		`${HEADER_ICONS.memory} ${words.memory}`,
-		`${HEADER_ICONS.swap} ${words.swap}`,
-		`${HEADER_ICONS.ended} ${words.ended}`,
-		...notes_legend(notes, words),
-	].join(GAP)
+// The phases on one line and what the screen draws on a second, drawn only when it names something
+// (joshuafolkken/kit#3480). The header's gauges and marks read by their place, so the legend leaves them.
+function legend_of(layout: BoardLayout, notes: ReadonlyArray<BoardNote>): Array<string> {
+	const rows = run_board_layout.rows_of(layout)
+	const shown = [...state_legend(rows), ...waits_legend(rows), ...notes_legend(notes)]
+	const lines = shown.length === 0 ? [PHASE_LEGEND] : [PHASE_LEGEND, shown.join(GAP)]
 
-	return styleText('dim', legend)
+	return lines.map((line) => styleText('dim', line))
 }
 
 function plan_sections(header: BoardHeader): Array<string> {
@@ -302,7 +319,7 @@ function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Arr
 
 	if (layout === undefined) return []
 
-	return ['', legend_of(layout, notes, header.words)]
+	return ['', ...legend_of(layout, notes)]
 }
 
 function render(view: BoardView): Array<string> {
