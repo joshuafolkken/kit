@@ -5,7 +5,7 @@ import { time_batch_guard, type GuardedCall } from './time-batch-guard'
 import { time_density } from './time-density'
 import { time_hook_transcript } from './time-hook-transcript'
 
-// The disk half of the live density line (joshuafolkken/kit#1329): find the transcript, read enough
+// The disk half of the live density line: find the transcript, read enough
 // of it, and remember when the line was last emitted.
 //
 // **It rides the hook that already runs, and adds no second one.** `.claude/settings.json` wires
@@ -13,8 +13,8 @@ import { time_hook_transcript } from './time-hook-transcript'
 // tool would put a process start in front of all ~250 calls of a run to say something on a handful of
 // them.
 //
-// **`Bash` is in that list because the edit half was measured missing its audience**
-// (joshuafolkken/kit#1337). Riding the edit hook was chosen on run #1299, where `Edit` was the
+// **`Bash` is in that list because the edit half was measured missing its audience**.
+// Riding the edit hook was chosen on run #1299, where `Edit` was the
 // most-called tool at 65 calls — and that run no longer represents how these sessions work. Of the
 // ten most recent in this checkout, **seven called `Edit` and `Write` zero times**: they edit through
 // `sed` instead, and they are the same sessions measured at 1.00–1.31 against the 1.50 floor, so the
@@ -50,8 +50,8 @@ const NEVER_MS = 0
 // `tool_input` the formatter half uses, so a file is named rather than searched for — no
 // home-directory walk.
 //
-// **`agent_id` is what makes a delegated unit answerable with its own transcript**
-// (joshuafolkken/kit#1424). The path in the payload is the *parent* session's, whichever agent issued
+// **`agent_id` is what makes a delegated unit answerable with its own transcript**.
+// The path in the payload is the *parent* session's, whichever agent issued
 // the call, so without this field the line a fork read described the parent's calls per round trip —
 // a number about a run the reader is not in. `time-hook-transcript.ts` carries the derivation.
 const payload_schema = z.object({
@@ -72,7 +72,7 @@ function parse_transcript_path(raw_payload: string): string | undefined {
 	return time_hook_transcript.transcript_of(parsed.data.transcript_path, parsed.data.agent_id)
 }
 
-// The call that has just run, as the payload names it (joshuafolkken/kit#3157) — what the line checks
+// The call that has just run, as the payload names it — what the line checks
 // against the turns behind it, so a call that needed their result is never offered as one that could
 // have shared their turn. A payload without a tool name answers `undefined`, judged on those turns alone.
 function parse_call(raw_payload: string): GuardedCall | undefined {

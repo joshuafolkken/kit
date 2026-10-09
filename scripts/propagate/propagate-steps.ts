@@ -19,11 +19,11 @@ import type { PropagateTarget } from './propagate-targets'
 // Kept out of the command module because two of the steps are not plain spawns: the pre-check is a
 // decision made from git probes, and the pull-request step needs the issue number the step before it
 // created. A closure carries that number instead of module-level state, so a run is self-contained
-// and the sequencing stays testable (joshuafolkken/kit#863).
+// and the sequencing stays testable.
 
 const SUCCESS_EXIT_CODE = 0
 // The consumer-side gate. `josh gate` is the same command the AI documents require of a person
-// (joshuafolkken/kit#914) — running the four checks concurrently and reporting every failure in one
+// — running the four checks concurrently and reporting every failure in one
 // pass — so the chain is not repeated here. It resolves in the consumer's directory, which by this
 // point has already been upgraded to the version being propagated, so the command is present.
 const VERIFY_SCRIPT = `pnpm josh ${GATE_COMMAND}`
@@ -38,12 +38,11 @@ const STEP_COMMANDS: Readonly<Record<string, ReadonlyArray<string>>> = {
 
 // kit's own CLI name. The sync is spelled through the *toolkit's* bin rather than hardcoded, because
 // `@joshuafolkken/app-kit` syncs with `josh-app` and `@joshuafolkken/game-kit` with `josh-game`; a
-// run that synced only `josh` would leave the other toolkit's managed files behind
-// (joshuafolkken/kit#1085).
+// run that synced only `josh` would leave the other toolkit's managed files behind.
 const JOSH_BIN = 'josh'
 
 // `pnpm <bin>` resolves the target's own installed CLI, never this checkout — which is what keeps
-// the sync a consumer-side sync and leaves kit's self-sync guard (joshuafolkken/kit#868) satisfied.
+// the sync a consumer-side sync and leaves kit's self-sync guard satisfied.
 function sync_command(bin_name: string): ReadonlyArray<string> {
 	return ['pnpm', bin_name, 'sync']
 }
@@ -68,9 +67,9 @@ const PROPAGATE_ORIGIN =
 	'Opened by `josh propagate` from the supplier repository after the release was published.'
 const RUN_NOTE =
 	'The upgrade, the managed-file sync and the verification gate have already run here.'
-// `josh git` refuses to open a pull request for an issue that declares no release classification
-// (joshuafolkken/kit#2666), so the upgrade issue declares one. A dependency upgrade changes no code of
-// the consumer's own, which is what `other-change` covers (joshuafolkken/kit#2858).
+// `josh git` refuses to open a pull request for an issue that declares no release classification,
+// so the upgrade issue declares one. A dependency upgrade changes no code of
+// the consumer's own, which is what `other-change` covers.
 const UPGRADE_CLASSIFICATION = OTHER_CHANGE_LABEL
 const EMPTY_PLAN_TITLE = 'Upgrade the installed toolkits'
 const LAST_SEPARATOR = ' and '
@@ -92,8 +91,8 @@ function release_names(releases: ReadonlyArray<Release>): string {
 }
 
 // Each release with its own version, for a plan whose releases disagree on one — a toolkit's
-// propagation carries the base packages at the versions that toolkit was verified with
-// (joshuafolkken/kit#2879), so one shared "to <version>" would name a version most of them are not.
+// propagation carries the base packages at the versions that toolkit was verified with,
+// so one shared "to <version>" would name a version most of them are not.
 function versioned_names(releases: ReadonlyArray<Release>): string {
 	const named = releases.map((release) => ({
 		...release,
@@ -182,9 +181,8 @@ function spawn_step(
 }
 
 // The same, keeping what the command printed. Only the pull-request step uses it: a consumer's
-// pre-push hook names the check that stopped it in its own last lines, and until
-// joshuafolkken/kit#1417 nothing in the run kept them — so the report had one exit code to attribute
-// three sub-steps with, and attributed it to the wrong one.
+// pre-push hook names the check that stopped it in its own last lines, and without them
+// the report has one exit code to attribute three sub-steps with, and can blame the wrong one.
 //
 // **This step's output is replayed when it finishes rather than printed as it runs**, and that is
 // the price of keeping it. A synchronous spawn gives one target per file descriptor, so `['inherit',
@@ -234,10 +232,10 @@ function precheck_step(target: PropagateTarget, step: string): StepResult {
 // rather than a branchless pull request that cannot be opened at all.
 //
 // It posts to REST instead of running `gh issue create`: that command goes through GraphQL, which a
-// cloud session is answered 403 for, while the REST endpoint is served normally
-// (joshuafolkken/kit#1022). This was the last `gh <noun> <verb>` spawn in kit's own code, and it was
+// cloud session is answered 403 for, while the REST endpoint is served normally.
+// This was the last `gh <noun> <verb>` spawn in kit's own code, and it was
 // missed by that epic's survey because the survey counted `exec_gh_command` call sites and this one
-// spawned gh directly (joshuafolkken/kit#1042).
+// spawned gh directly.
 //
 // The request is the one every issue creation builds, and the spawn is the synchronous twin of the
 // one the asynchronous writers use — so no second write layer exists to disagree with the first.
@@ -247,7 +245,7 @@ function precheck_step(target: PropagateTarget, step: string): StepResult {
 // gh's own output is the only thing that distinguishes a missing scope from disabled issues from a
 // repository that does not exist. Reporting `could not open an issue` alone hides all three, so the
 // whole message is kept — `to_gh_error` puts the stderr summary and the JSON body REST writes to
-// stdout on separate lines (joshuafolkken/kit#1029), and both carry the reason.
+// stdout on separate lines, and both carry the reason.
 //
 // **It is folded back onto one line here.** The run's report is one line per consumer, and
 // `failure_reason` appends the "changes left uncommitted" warning to the end of this text — so a
@@ -320,7 +318,7 @@ function issue_step(
 
 // Put the consumer back on its default branch. `josh git` leaves it on the feature branch, and the
 // next run's pre-check would refuse it for that — the consumer would silently stop receiving
-// releases (joshuafolkken/kit#863).
+// releases.
 function return_step(target: PropagateTarget, step: string): StepResult {
 	if (propagate_git.return_to_default_branch(target.path)) return { step, is_ok: true }
 
@@ -353,7 +351,7 @@ interface Release {
 
 // What one run carries: the releases, and the sentence naming the command that opened the issue.
 // `josh propagate` always passes exactly one release; `josh adopt` passes every toolkit installed in
-// the repository it runs in (joshuafolkken/kit#1085). Only the upgrade and the sync repeat per
+// the repository it runs in. Only the upgrade and the sync repeat per
 // release — the pre-check, the verification gate, the issue, the pull request and the return to the
 // default branch happen once, which is why the step order itself is unchanged.
 interface ReleasePlan {

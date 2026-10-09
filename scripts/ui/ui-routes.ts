@@ -1,5 +1,4 @@
-// The screenshot-target routes a change touches, derived from the diff rather than chosen by eye
-// (joshuafolkken/kit#2182).
+// The screenshot-target routes a change touches, derived from the diff rather than chosen by eye.
 //
 // The `verify-ui` skill's §1 asked the reader to read `git diff` and name the routes whose
 // components, styles or copy it touches — but in SvelteKit a file path maps to a route path

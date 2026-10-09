@@ -2,27 +2,24 @@ import { josh_verdict } from '#scripts/josh/josh-verdict'
 import { status_icons } from '#scripts/lib/status-icons'
 import { z } from 'zod'
 
-// Reading a josh check's failure out of what it printed, when the pipe threw its exit status away
-// (joshuafolkken/kit#1361).
+// Reading a josh check's failure out of what it printed, when the pipe threw its exit status away.
 //
-// joshuafolkken/kit#1309 records how a call came back from the harness's `is_error`, which reports
-// the **tool call** rather than the command inside it. Agents call the verification gate through a
-// pipe almost every time — `pnpm josh gate 2>&1 | tail -40` — and a pipeline exits with `tail`'s
-// status, so a red gate is written back as a call that succeeded. Measured over this machine's kit
-// transcripts for 2026-09-04 onward: 83 `josh gate` calls, 13 of them printing a failure line, and
-// `is_error: true` on none of the 13. The rework figure #1309 exists to expose was therefore blind
-// to exactly the re-runs that motivated it.
+// A span's outcome is read from the harness's `is_error`, which reports the **tool call** rather than
+// the command inside it. Agents call the verification gate through a pipe almost every time —
+// `pnpm josh gate 2>&1 | tail -40` — and a pipeline exits with `tail`'s status, so a red gate is
+// written back as a call that succeeded: measured, `is_error: true` on none of 13 failing gate calls.
+// The rework figure would otherwise be blind to exactly the re-runs it exists to expose.
 //
 // **What is read is josh's own failure line, and only on a call that ran josh.** Every josh command
 // that reports a per-item result opens the failing one with `status_icons.FAIL_ICON`, so a line
 // beginning with that character in the output of a `pnpm josh <cmd>` call is that command saying it
 // failed. The gate's is `✗ verification gate failed: lint (48.2s)`.
 //
-// **Refined by joshuafolkken/kit#1374**: a command that forwards another tool's output states its own
+// **A stated verdict comes first**: a command that forwards another tool's output states its own
 // verdict, and that verdict is read first — the bare icon is only consulted where there is none. See
 // `verdict_answer` below and `josh-verdict.ts`.
 //
-// **Bounded on the other side by joshuafolkken/kit#1379**: that verdict silences the run it summarizes
+// **Bounded on the other side**: that verdict silences the run it summarizes
 // and not everything printed before it. The run begins at the gate's opening `plan:` line — printed
 // once, before any check body exists — and never at a step header, which repeats per check. See
 // `scan_line` here and `is_gate_opening` in `josh-verdict.ts`.
@@ -90,7 +87,7 @@ function is_failure_line(line: string): boolean {
 	return line.trimStart().startsWith(status_icons.FAIL_ICON)
 }
 
-// **A command's own verdict outranks the lines it forwarded** (joshuafolkken/kit#1374). `josh gate`
+// **A command's own verdict outranks the lines it forwarded**. `josh gate`
 // prints the body of a step that skipped or passed with warnings, and that body belongs to eslint,
 // svelte-check, vitest or cspell — one of them opening a line with the failure icon would otherwise
 // make a *green* gate a failed call, and charge the next gate run as rework. Where a verdict line is
@@ -105,8 +102,8 @@ function is_failure_line(line: string): boolean {
 // exists to make going quiet without failing. A forwarded body is printed *before* the verdict that
 // summarizes it, so what follows the last one belongs to whatever ran next and is still read.
 //
-// **And it speaks only for the run in front of it, not for everything printed earlier**
-// (joshuafolkken/kit#1379). "Everything before the verdict" was one-sided: a call that runs a josh
+// **And it speaks only for the run in front of it, not for everything printed earlier**.
+// "Everything before the verdict" was one-sided: a call that runs a josh
 // command stating no verdict and *then* a green gate — `pnpm josh propagate; pnpm josh gate` — is
 // labelled by its first segment, and propagate's `✗ <repo>` rows were thrown away by a verdict printed
 // by the command after them. The run a verdict summarizes begins at that gate's opening `plan:` line,
@@ -141,12 +138,11 @@ function new_scan(): FailureScan {
 // **The reading between the two is the whole fix, and the guard on it is the whole of its safety.**
 // A failure mark printed before the region opened is confirmed here, because the gate had not started
 // yet and the gate's opening line is printed before any body it could forward. One printed inside the
-// region is discarded, which is what joshuafolkken/kit#1374 closed.
+// region is discarded.
 //
-// **No opening line seen means no region, and then nothing is confirmed** — the pre-#1379 behavior
-// exactly. That is the case a `2>&1 | tail -40` produces when the head of the gate's output falls off
-// the top of the window, and reading the surviving body lines there would put #1374's false positive
-// straight back. So the fix is bounded by what it can actually see, and where it cannot see, the
+// **No opening line seen means no region, and then nothing is confirmed.** That is the case a
+// `2>&1 | tail -40` produces when the head of the gate's output falls off the top of the window, and
+// reading the surviving body lines there would count a forwarded failure mark as the gate's own. So the fix is bounded by what it can actually see, and where it cannot see, the
 // figure stays the floor it already was.
 function close_region(scan: FailureScan): void {
 	scan.did_find ||= scan.is_region_open && scan.has_failure_before_region

@@ -39,7 +39,7 @@ function report_inconclusive(verdict: Verdict): void {
 // Printed apart from an ordinary non-measurement, because it sends the reader somewhere else again.
 // A `?` line says the harness or the prompt is wrong; this one says nothing about either — the
 // session never reached the API, so the scenario, the prompt and the rule are all untested rather
-// than tested and unclear (joshuafolkken/kit#1197).
+// than tested and unclear.
 function report_unreachable(verdict: Verdict): void {
 	console.error(
 		`  ${UNREACHABLE_MARK} ${verdict.name} — ${verdict.note ?? 'the session could not reach the API'}`,
@@ -71,7 +71,7 @@ function report_verdict(verdict: Verdict): void {
 
 // The two kinds of non-measurement are counted apart. Merged into one "inconclusive" number, a suite
 // that never connected read as five scenarios that ran and said nothing — the same figure as a real
-// measurement problem, at five sessions' cost (joshuafolkken/kit#1197).
+// measurement problem, at five sessions' cost.
 function count_note(verdicts: ReadonlyArray<Verdict>): string {
 	const unreachable = verdicts.filter((verdict) => verdict.is_unreachable).length
 	const inconclusive = verdicts.filter(
@@ -106,7 +106,7 @@ function report_summary(verdicts: ReadonlyArray<Verdict>): boolean {
 	return passed === verdicts.length
 }
 
-// **What a run means for a merge, in one readable token** (joshuafolkken/kit#907). The exit code
+// **What a run means for a merge, in one readable token**. The exit code
 // cannot carry this: it is `0` only when every scenario passed, so a failed run and one that
 // measured nothing exit alike — and those are the two outcomes that must not be treated alike. A
 // failed scenario is a rule that stopped working and blocks the merge; an inconclusive one says
@@ -115,15 +115,15 @@ function report_summary(verdicts: ReadonlyArray<Verdict>): boolean {
 //
 // **It does not say *why*, and it used to.** The sentence asserted the shared budget was exhausted —
 // a cause nobody had established, and the first run that printed a reason contradicted it outright:
-// `API Error: Unable to connect to API (ConnectionRefused)` on every inconclusive scenario
-// (joshuafolkken/kit#1001). Naming one cause in a fixed string sends every reader to check the one
+// `API Error: Unable to connect to API (ConnectionRefused)` on every inconclusive scenario.
+// Naming one cause in a fixed string sends every reader to check the one
 // thing that may not be wrong; the per-scenario `?` line carries the reason that was actually
 // observed, so the verdict points there instead of guessing.
 const VERDICT_BLOCKED = 'blocked'
 const VERDICT_HELD = 'held'
 const VERDICT_UNMEASURED = 'unmeasured'
 // **A fourth word, because "the sessions ran and told us nothing" and "the sessions never ran" are
-// different things to be told** (joshuafolkken/kit#1197). Both leave the rules unmeasured and neither
+// different things to be told**. Both leave the rules unmeasured and neither
 // blocks the merge, so `unmeasured` was not *wrong* — it was unactionable: a reader sent to the `?`
 // lines to fix the harness or the prompt found nothing wrong with either, because the fault was a
 // connection. Reported under its own word, the suite says which one to look at, and a run of these
@@ -173,8 +173,7 @@ function merge_verdict(verdicts: ReadonlyArray<Verdict>): MergeVerdict {
 // A run that never started is **not** an unmeasured run. The recovery step after a `blocked` verdict
 // is `pnpm josh eval <name>`, and a mistyped name there would otherwise print no verdict at all —
 // which the documented rule reads as `unmeasured`, and `unmeasured` does not block. So an invocation
-// the suite could not act on says `blocked`: you asked for a measurement and have none
-// (joshuafolkken/kit#907).
+// the suite could not act on says `blocked`: you asked for a measurement and have none.
 function report_not_run(): MergeVerdict {
 	console.info(
 		`Verdict: ${VERDICT_BLOCKED} — the suite ran nothing, so nothing was measured; fix the invocation and re-run`,
@@ -187,8 +186,7 @@ function report_not_run(): MergeVerdict {
 // merge without anybody reading the marks and deciding.
 //
 // Split from `report_merge_verdict` so a caller that needs the verdict *before* the line is printed
-// — anything that has to say something above it — does not compute it a second time to get it
-// (joshuafolkken/kit#1197).
+// — anything that has to say something above it — does not compute it a second time to get it.
 function print_verdict(verdict: MergeVerdict): MergeVerdict {
 	console.info(`Verdict: ${verdict} — ${VERDICT_SENTENCES[verdict]}`)
 

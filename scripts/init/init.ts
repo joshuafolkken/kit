@@ -74,7 +74,7 @@ function get_kit_self_dependency(): Record<string, string> {
 // Each config `init` generates runs a CLI or imports types the consumer has to resolve itself:
 // `cspell.config.yaml` → cspell, `playwright.config.ts` → @types/node, `lefthook.yml` → lefthook.
 // Prettier, its preset plugins and @playwright/test come in as peers. Without them the first
-// `josh gate` after `pnpm install` fails (joshuafolkken/kit#2710).
+// `josh gate` after `pnpm install` fails.
 const TOOL_DEVELOPMENT_DEPENDENCIES = ['cspell', '@types/node']
 const LEFTHOOK_DEVELOPMENT_DEPENDENCY = 'lefthook'
 
@@ -203,7 +203,7 @@ function run_config_file_actions(shape: ProjectShape): void {
 }
 
 // Gated, unlike `sync`: `init` skips a file the consumer already has, so neither the npm-disable
-// (joshuafolkken/kit#803) nor the auto-merge workflow (joshuafolkken/kit#834) may have landed, and a
+// nor the auto-merge workflow may have landed, and a
 // report's claim would then be false. `sync` overwrites both unconditionally, which is why it needs
 // no gate. The gates are the artifacts themselves, so a consumer's own pre-existing auto-merge
 // workflow still gets its prerequisite reported — it needs the same repository setting kit's does.
@@ -219,8 +219,8 @@ function report_repository_settings(name_with_owner: string | undefined): void {
 
 // The same refusal `sync` makes, for a larger blast radius: `init` calls the `sync` writers directly
 // rather than through `sync`'s own `main()`, so the guard there never ran for it — and on top of the
-// 14 files #868 reproduced, `init` also rewrites `package.json` scripts and devDependencies
-// (joshuafolkken/kit#879). Checked before the first write, for the reason the sync guard is.
+// 14 files #868 reproduced, `init` also rewrites `package.json` scripts and devDependencies.
+// Checked before the first write, for the reason the sync guard is.
 function run_ai_file_actions(shape: ProjectShape): void {
 	console.info('\nAI files:')
 	// `init` writes the same npm-disabling `.github/dependabot.yml` that `sync` distributes, so a
@@ -246,7 +246,7 @@ function initialize_project(shape: ProjectShape): void {
 }
 
 // A tool `init` just listed is absent until the user installs it — and `josh lint` then fails on it
-// rather than skipping it (joshuafolkken/kit#2709). Saying so is what tells the user the next step.
+// rather than skipping it. Saying so is what tells the user the next step.
 function report_manual_install(shape: ProjectShape): void {
 	console.info(`\nDependencies:\n  ${INSTALL_HINT}`)
 	if (shape.has_git && shape.profile === 'full') install_lefthook()
@@ -266,7 +266,7 @@ function finish_dependencies(shape: ProjectShape, is_install: boolean): void {
 }
 
 // A kit run from outside the project — `pnpm dlx`, a global install — sets nothing up itself: it
-// installs the project's kit and hands the whole run to that one (joshuafolkken/kit#2794). Under
+// installs the project's kit and hands the whole run to that one. Under
 // `--no-install` nothing is installed, so the running kit does the setup as before.
 function did_hand_off(args: ReadonlyArray<string>): boolean {
 	if (init_bootstrap.is_project_kit(PACKAGE_DIR, PROJECT_ROOT)) return false
@@ -300,7 +300,7 @@ function main(args: ReadonlyArray<string> = []): boolean {
 }
 
 // Only the command a person typed points onward to `josh start`: `josh start` calls `main` itself and
-// is already the next step (joshuafolkken/kit#2816).
+// is already the next step.
 // A setup that failed after writing, such as a failed install, sets the exit code and points nowhere.
 function print_start_hint(): void {
 	if (process.exitCode !== undefined && process.exitCode !== 0) return

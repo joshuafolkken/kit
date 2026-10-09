@@ -1,6 +1,6 @@
 import path from 'node:path'
 
-// One parent-directory walk, in one place (joshuafolkken/kit#3260). Five modules had each written
+// One parent-directory walk, in one place. Five modules had each written
 // their own — the josh package-root lookup, the gate's project root, the effective-upstream version
 // read, the local-bin shim search and the progress-interval read — and they had drifted to three
 // different stop conditions. The walk stops at the filesystem root (where `dirname` answers itself)

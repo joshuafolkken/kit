@@ -5,7 +5,7 @@
 // and `epic-bundle-referenced.ts` each read one issue per reference and must not turn a rate limit
 // into a wrong answer. The reads were written as waves — slice, `Promise.all`, next slice — which
 // idles the whole batch behind its slowest member, so the three were neither the same code nor the
-// same behavior (joshuafolkken/kit#1144).
+// same behavior.
 //
 // A worker pool instead: `limit` consumers pull from one queue, so a slot is refilled the moment its
 // task ends rather than when its neighbors do.
@@ -32,7 +32,7 @@ interface Pool<Item, Result> {
 // so the clamp passes it straight through and `Array.from({ length: NaN })` builds no consumer at all
 // — an empty result for a non-empty input, which is precisely what the paragraph above promises
 // cannot happen. A caller reading that promise is entitled not to validate first, so it is closed
-// here (joshuafolkken/kit#1144). A fractional limit is floored for the same reason: `Array.from`
+// here. A fractional limit is floored for the same reason: `Array.from`
 // truncates it silently, and a width that is not the number asked for should be a decision rather
 // than a side effect.
 function pool_width(limit: number, total: number): number {

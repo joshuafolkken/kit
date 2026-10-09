@@ -1,5 +1,5 @@
-// The two references `josh init` writes into a basic project, under the paths they had before
-// joshuafolkken/kit#2829 renamed the static profile. kit still ships both old paths so an earlier
+// The two references `josh init` writes into a basic project, under the paths they had while the
+// basic profile was named static. kit still ships both old paths so an earlier
 // project keeps working; re-running `josh init` moves the project onto the new ones, which is what
 // lets the old paths be retired once projects have moved.
 const RENAMED_REFERENCES: ReadonlyArray<readonly [RegExp, string]> = [

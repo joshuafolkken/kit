@@ -31,10 +31,10 @@ function sync_with_merge(
 }
 
 // Removes only the exact settings lines earlier kit releases wrote, which pnpm 12 ignores in
-// `.npmrc` (joshuafolkken/kit#3267); every other line, a `_authToken` line included, is left alone.
+// `.npmrc`; every other line, a `_authToken` line included, is left alone.
 // Sync used to remove the env-var form, which broke every project that had opted its project
 // .npmrc in via `npmrcAuthFile` — there the line is the live credential, and the opt-in itself
-// can live in a deploy platform's dashboard where sync cannot see it (joshuafolkken/kit#759).
+// can live in a deploy platform's dashboard where sync cannot see it.
 function sync_npmrc(destination_path: string): void {
 	sync_with_merge(destination_path, '.npmrc', init_logic.merge_npmrc)
 }
@@ -144,7 +144,7 @@ function sync_vscode_settings_json(destination_path: string): void {
 }
 
 // Creates the file when absent, unlike the other `.vscode` syncs: the folder-open board task is the
-// whole point of distributing it (joshuafolkken/kit#3420, joshuafolkken/kit#3438), and a consumer
+// whole point of distributing it, and a consumer
 // without a tasks.json has nothing of its own to protect. An existing file keeps every task whose
 // label kit does not ship.
 function sync_vscode_tasks_json(destination_path: string): void {

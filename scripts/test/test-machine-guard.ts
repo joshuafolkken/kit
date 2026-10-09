@@ -1,8 +1,7 @@
 import type { machine_capacity, MachineReading } from '#scripts/gate/machine-capacity'
 import { vi } from 'vitest'
 
-// **No unit test reads the machine it happens to run on** (joshuafolkken/kit#3415). Since
-// joshuafolkken/kit#3371 the core budget admits against what the machine has free, read by
+// **No unit test reads the machine it happens to run on**. The core budget admits against what the machine has free, read by
 // `machine_capacity.read_machine` — CPU times over a window, and on macOS `execa('sysctl', …)` for the
 // memory pressure. Every suite that drives the gate went through that read, so a suite counting its
 // mocked `execa` calls saw an extra `sysctl` on macOS and none on Linux, and a loaded machine held a

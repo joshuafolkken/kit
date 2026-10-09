@@ -2,7 +2,7 @@ import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { canonical_command } from '#scripts/josh/josh-command-map'
 import { json_value } from '#scripts/lib/json-value'
 
-// Reading a shell command well enough to name what it ran (joshuafolkken/kit#1344).
+// Reading a shell command well enough to name what it ran.
 //
 // It was `time-spans.ts`'s, and it moved out when that file passed its length limit. The seam is the
 // one `time-format.ts` was cut along: this holds no timing knowledge at all — no spans, no
@@ -46,7 +46,7 @@ const CHAIN_PATTERN = /&&|\|\||;/u
 // nothing beyond the reading, while a fragment read as a command answers about work the shell never
 // did, on the shape this repository writes constantly.
 //
-// **Escapes and heredoc bodies are text too** (joshuafolkken/kit#2841). A backslash outside single
+// **Escapes and heredoc bodies are text too**. A backslash outside single
 // quotes makes the next character literal, so `it\'s` opens nothing and a `"` closes only at an
 // unescaped `"`; inside `'…'` a backslash is an ordinary character, so `'C:\'` still closes. A heredoc
 // body is not shell syntax at all — an `it's` there is prose — so it is removed before the quotes are
@@ -141,7 +141,7 @@ function leading_word(command: string): string {
 }
 
 // Every command a pipeline throws the exit status of away — one per `|`-separated segment except the
-// last (joshuafolkken/kit#1556). A shell reports a pipeline with its final command's status, so a
+// last. A shell reports a pipeline with its final command's status, so a
 // check run anywhere earlier has its verdict discarded before anything reads it.
 //
 // **The command of a segment is at the end of its chain, not the start.** `|` binds tighter than `&&`
@@ -208,7 +208,7 @@ function bash_label(command: string): string {
 	return word === '' ? cost_blocks.BASH_TOOL : `${cost_blocks.BASH_TOOL}${BASH_SEPARATOR}${word}`
 }
 
-// **An alias is expanded here, so one command is one name** (joshuafolkken/kit#1789). Every reading
+// **An alias is expanded here, so one command is one name**. Every reading
 // built on this field keyed `pnpm josh ga` and `pnpm josh gate` as two different commands: the
 // per-command table printed them as two rows, the per-invocation table dropped both for having one
 // call each, and — the one with real cost — the failure chain did not see the second as answering the
@@ -229,7 +229,7 @@ function josh_command_of(command: string): string {
 	return josh_command_of_segment(command_segment(command))
 }
 
-// Every josh subcommand a chained call ran, not just the first (joshuafolkken/kit#1883). The standard
+// Every josh subcommand a chained call ran, not just the first. The standard
 // verification form `pnpm josh lint:related && pnpm josh test:related` is two commands in one call, and
 // `josh_command_of` reads only the first segment's — so a table built on that field never counted
 // `test:related`. This reads every segment instead.
@@ -245,8 +245,8 @@ function josh_commands_of(command: string): Array<string> {
 		.filter((name) => name !== '')
 }
 
-// A redirection is not an argument, and keeping one splits a single check into two signatures
-// (joshuafolkken/kit#1383). Measured on run #1379, every `pnpm josh <check>` call there was written
+// A redirection is not an argument, and keeping one splits a single check into two signatures.
+// Measured on run #1379, every `pnpm josh <check>` call there was written
 // `… 2>&1`, so an otherwise identical call written without one would have keyed differently and the
 // repeat between them would have gone uncounted.
 //
@@ -279,7 +279,7 @@ function drop_redirections(words: ReadonlyArray<string>): Array<string> {
 	return kept
 }
 
-// What a `pnpm josh <cmd>` call passes after its subcommand (joshuafolkken/kit#1383).
+// What a `pnpm josh <cmd>` call passes after its subcommand.
 //
 // **Read from the same segment `josh_command_of` reads the subcommand from**, and past the same
 // match. Two calls of one check are told apart by their arguments, so a second reader here would be

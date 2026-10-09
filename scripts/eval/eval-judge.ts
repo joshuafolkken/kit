@@ -3,7 +3,7 @@ import { eval_transcript, type ToolCall } from './eval-transcript'
 
 // The verdict is computed from the tool calls alone. Every failure carries the scenario's own
 // `because`, so a red run reads as "the rule that broke" rather than "Edit was called" — which is
-// what makes the suite usable for deciding whether a document change worked (joshuafolkken/kit#855).
+// what makes the suite usable for deciding whether a document change worked.
 
 // `missing` is the only kind a cut-short session can produce spuriously: the agent may have been
 // about to make the call when the API dropped. A forbidden call is conclusive however the session
@@ -27,7 +27,7 @@ interface Verdict {
 	// about the rule was even attempted. Always implies `is_inconclusive`, and carried separately
 	// because the two cost different things to learn and want different answers — a session that ran
 	// and settled nothing is worth retrying, one that could not connect is worth stopping the suite
-	// for (joshuafolkken/kit#1197).
+	// for.
 	is_unreachable: boolean
 	// Why, when there is a why. Printed instead of a rule name, because the thing to fix is the
 	// harness or the prompt rather than the prose.
@@ -136,8 +136,7 @@ interface SessionOutcome {
 	stderr: string
 	// The stream the session wrote. **Required, not optional**: `has_started` reads it to say whether
 	// the session announced itself, and a caller that omitted it would get the confident answer
-	// `without starting` from an absence — the conflation this whole change removes
-	// (joshuafolkken/kit#1001).
+	// `without starting` from an absence — the conflation this whole change removes.
 	transcript: string
 	is_timed_out?: boolean
 	// The signal that killed it, when one did. A timeout and an OOM kill both arrive with no exit
@@ -146,9 +145,8 @@ interface SessionOutcome {
 }
 
 // The reason, from whichever source has one. stderr first because it is the process's own last word;
-// the stream's `result` event second, because **every** non-measurement observed across
-// joshuafolkken/kit#908 had an empty stderr, which is what made four failed scenarios in a row
-// indistinguishable from each other.
+// the stream's `result` event second, because **every** observed non-measurement had an empty
+// stderr, which left failed scenarios indistinguishable from each other.
 function session_reason(session: SessionOutcome): string | undefined {
 	const last_line = session.stderr.trim().split('\n').at(-1) ?? ''
 
@@ -169,9 +167,8 @@ function failure_detail(session: SessionOutcome): string {
 // unrelated line to stderr (a deprecation warning, an update notice) and then dies with
 // `Unable to connect to API` in the stream's `result` event would be judged on the warning, come back
 // as an ordinary `unmeasured`, and take with it both the `⚠` line and the abort. The observation
-// behind `session_reason`'s ordering is that stderr was empty on every occurrence measured under
-// joshuafolkken/kit#908 — an observation, not a guarantee, and the transcript fallback exists because
-// of that.
+// behind `session_reason`'s ordering is that stderr was empty on every measured occurrence — an
+// observation, not a guarantee, and the transcript fallback exists because of that.
 //
 // A session that reached the API and then failed a prohibition is not unreachable however it ended:
 // the flag is deliberately a subset of `is_inconclusive`, and `judge` is what enforces that.
@@ -194,7 +191,7 @@ function reached_note(session: SessionOutcome, calls: ReadonlyArray<ToolCall>): 
 
 // How the session ended, in its own terms. The exit code cannot carry this: execa reports none at all
 // for a signal-terminated process, so a timeout, an OOM kill and a `claude` that never started all
-// arrive alike and used to print the same sentence (joshuafolkken/kit#1001).
+// arrive alike and used to print the same sentence.
 function ended_note(session: SessionOutcome): string {
 	if (session.is_timed_out === true) return 'session timed out'
 	if (session.signal !== undefined) return `session was killed by ${session.signal}`

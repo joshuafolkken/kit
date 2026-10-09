@@ -30,7 +30,7 @@ const PROVIDER_CLI_TABLE: Readonly<Record<AgentProvider, ProviderCli>> = {
 	openai: { command: 'codex', name: 'Codex CLI', update: 'npm install -g @openai/codex@latest' },
 }
 
-// **The oldest CLI that can run each pinned model** (joshuafolkken/kit#2415). An older CLI either
+// **The oldest CLI that can run each pinned model**. An older CLI either
 // rejects the id after the lane has started or quietly runs something else, so the launch is refused
 // here instead. A model with no entry — a lane's recorded pre-migration model, or a person's override —
 // is not version-checked, so an existing lane resumes on the CLI it already ran on.
@@ -106,7 +106,7 @@ function check_auth(cli: ProviderCli, ports: DiagnosticPorts): DiagnosticResult 
 }
 
 // The model is checked as it was resolved: a refusal names the update and stops, and nothing here
-// retries or swaps in another model (joshuafolkken/kit#2415).
+// retries or swaps in another model.
 function check(profile: AgentProfile, ports: DiagnosticPorts = default_ports): DiagnosticResult {
 	const cli = PROVIDER_CLI_TABLE[profile.provider]
 	const version = check_version(profile.model, cli, ports)

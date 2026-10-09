@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { file_reader } from '#scripts/lib/read-file'
 
-// The scope expansion `prompts/refactoring.md` §4.3 used to describe in prose (joshuafolkken/kit#2180):
+// The scope expansion `prompts/refactoring.md` §4.3 used to describe in prose:
 // from the seed files, follow imports both ways — the files a seed imports and the files that import a
 // seed — for up to three stages, stopping as soon as a stage finds nothing new. Walking the import
 // graph is exactly computable, so it is computed here rather than read and traced by hand.

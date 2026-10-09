@@ -3,7 +3,7 @@ import { self_sync_guard } from './self-sync-guard-logic'
 // The half of the guard that `sync` and `init` share verbatim: print the refusal and leave a
 // non-zero exit code. It lives beside the detection rather than in either entry point because the
 // two commands do the same damage in the source repository — `init` a larger share of it, since it
-// rewrites `package.json` scripts and devDependencies as well (joshuafolkken/kit#879) — and a copy
+// rewrites `package.json` scripts and devDependencies as well — and a copy
 // in each `main()` would be the second implementation the shared module exists to prevent.
 //
 // Not re-exported from `index.ts`: the published `@joshuafolkken/kit/self-sync-guard` surface stays
