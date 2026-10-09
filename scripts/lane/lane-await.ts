@@ -52,6 +52,8 @@ interface AwaitOptions {
 	poll_ms?: number
 	reconfirm_ms?: number
 	never_appeared_timeout_ms?: number
+	now?: () => number
+	sleep?: (ms: number) => Promise<void>
 }
 
 interface CheckConfig {
@@ -63,6 +65,8 @@ interface CheckConfig {
 interface RunConfig extends CheckConfig {
 	is_settled: (issue: string) => Promise<boolean>
 	poll_ms: number
+	now: () => number
+	sleep: (ms: number) => Promise<void>
 }
 
 function is_process_running_default(issue: string): boolean {
@@ -142,6 +146,8 @@ function resolve_options(options: AwaitOptions): RunConfig {
 	return {
 		is_running: options.is_running ?? is_process_running_default,
 		is_settled: options.is_settled ?? is_settled_default,
+		now: options.now ?? Date.now,
+		sleep: options.sleep ?? sleep,
 		...resolve_timing(options),
 	}
 }
@@ -225,12 +231,12 @@ async function wait_for_any(
 	const states = await make_states(issues, config.is_settled)
 
 	for (;;) {
-		const completed = check_any(states, Date.now(), config)
+		const completed = check_any(states, config.now(), config)
 
 		if (completed !== undefined) return completed
 
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await sleep(config.poll_ms)
+		await config.sleep(config.poll_ms)
 	}
 }
 
