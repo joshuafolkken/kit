@@ -24,6 +24,9 @@ const NONE = -1
 interface RunTree {
 	// The classified sessions of the selected run.
 	nodes: ReadonlyArray<RunNode>
+	// The selected run's transcript files, one per node, for a reader that needs more of a session than
+	// its priced records — the retrospective's guard tally (joshuafolkken/kit#3421).
+	files: ReadonlyArray<SessionFile>
 	// How many runs the store held, so a reader knows the selected one was chosen from several.
 	run_count: number
 	// Transcripts in the store that the selected run did not claim — reported as a count, never folded
@@ -157,7 +160,12 @@ function to_tree(
 ): RunTree {
 	const nodes = cost_run_nodes.build_nodes(chosen.files, context)
 
-	return { nodes, run_count, unattributed_count: files.length - chosen.files.length }
+	return {
+		nodes,
+		files: chosen.files,
+		run_count,
+		unattributed_count: files.length - chosen.files.length,
+	}
 }
 
 // The whole store grouped into runs, with one selected. Pure over its inputs so a test drives it with

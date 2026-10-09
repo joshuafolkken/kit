@@ -81,6 +81,9 @@ const ERROR_TEXT_LIMIT = 256
 const REFUSAL_MARKER = '⛔'
 // The label the harness puts in front of a PreToolUse hook's deny reason, naming the hook and the tool.
 const HOOK_ERROR_LABEL = /^PreToolUse:\S+ hook error: /u
+// The label the harness puts in front of a Stop hook's block reason when it sends the turn back
+// (joshuafolkken/kit#3421). The reason follows on the next line, opening with the same `⛔` a deny does.
+const STOP_FEEDBACK_LABEL = /^Stop hook feedback:\s*/u
 // A line that is one bare verdict token — `cut`, `busy`, `not-a-lane` — the single word a josh verdict
 // command prints on standard output (joshuafolkken/kit#3223). How many are kept bounds the field the
 // way `ERROR_TEXT_LIMIT` bounds `error_text`.
@@ -149,6 +152,9 @@ interface TranscriptLine {
 	// every line lacking an id would otherwise fall into one bucket spanning the whole file.
 	message_id: string
 	blocks: Array<Block>
+	// The guard whose Stop-hook block sent this turn back, or `''` for every other line
+	// (joshuafolkken/kit#3421) — read the way `Block.refusal_guard` is, off the reason's opening.
+	stop_guard: string
 }
 
 // The four string fields, defaulted together and apart from the two that are not strings. Split out
@@ -183,6 +189,16 @@ function guard_from_refusal(text: string): string {
 	const colon = headline.indexOf(':')
 
 	return (colon === -1 ? headline : headline.slice(0, colon)).trim()
+}
+
+// **Only the harness's own feedback line counts.** It writes a Stop block back as a user turn whose
+// whole body is `Stop hook feedback:` and the reason, so a prompt that merely quotes one never opens
+// with the label and reads `''`.
+function stop_guard_of(data: z.infer<typeof LINE_SCHEMA>): string {
+	const content = data.message?.content
+	if (typeof content !== 'string' || !STOP_FEEDBACK_LABEL.test(content)) return ''
+
+	return guard_from_refusal(content.replace(STOP_FEEDBACK_LABEL, ''))
 }
 
 function token_lines_of(text: string): Array<string> {
@@ -260,6 +276,7 @@ function to_line(data: z.infer<typeof LINE_SCHEMA>): TranscriptLine | undefined 
 		timestamp_ms,
 		branch: data.gitBranch ?? UNKNOWN_BRANCH,
 		finished_background: time_background.finished_id(notice_text(data)),
+		stop_guard: stop_guard_of(data),
 		...message_fields(data.message),
 	}
 }
@@ -270,12 +287,18 @@ function parse_line(line: string): TranscriptLine | undefined {
 	return parsed.success ? to_line(parsed.data) : undefined
 }
 
+// A whole transcript's text read as its parsed lines, the unparseable ones dropped.
+function parse_text(text: string): Array<TranscriptLine> {
+	return text.split('\n').flatMap((line) => parse_line(line) ?? [])
+}
+
 const time_transcript_line = {
 	ERROR_TEXT_LIMIT,
 	NO_MESSAGE_ID,
 	TOKEN_LINE_LIMIT,
 	guard_from_refusal,
 	parse_line,
+	parse_text,
 }
 
 export type { Block, TranscriptLine }
