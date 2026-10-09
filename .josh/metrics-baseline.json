@@ -1,18 +1,18 @@
 {
 	"scripts": {
-		"files": 1031,
-		"code_lines": 85920,
-		"comment_lines": 34132,
+		"files": 1034,
+		"code_lines": 86317,
+		"comment_lines": 34157,
 		"comment_ratio": 0.4
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2325
+		"lines": 2240
 	},
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11121,
-		"on_demand_bytes": 559993
+		"on_demand_bytes": 546485
 	},
 	"accepted": {
 		"reason": "run:board --chat pads titles to one column (#3544); the legend moved to its own module to keep run-board-render.ts under the 300-line limit, adding its imports and export",

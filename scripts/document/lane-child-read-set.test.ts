@@ -28,7 +28,9 @@ const MAX_INITIAL_TOKENS = 24_000
 // when `backlogrun-steps.md` left the child's point-of-use set: the child never opened the scheduler's
 // step list, so its ~16k tokens were an over-count the total no longer carries. The #2021 acceptance
 // criterion the trim exists for is the 35KB saving vs `fullrun`, which is pinned above and only widens.
-const MAX_TOTAL_TOKENS = 22_000
+// Lowered to 14k in joshuafolkken/kit#3399 when `rule-delivery.md`'s rule table moved behind
+// `pnpm josh rule:list`: the child no longer reads the table whole, and the total measured 13.6k.
+const MAX_TOTAL_TOKENS = 14_000
 const NOTHING = 0
 
 function total_read_bytes(report: ReturnType<typeof entry_read_set.costed>): number {
@@ -107,7 +109,7 @@ describe('lane_child_read_set.costed — the whole reduction', () => {
 		expect(lane_child_read_set.costed(ROOT).scoped.tokens).toBeLessThanOrEqual(MAX_INITIAL_TOKENS)
 	})
 
-	it('keeps the total read at or below 22k tokens', () => {
+	it('keeps the total read at or below 14k tokens', () => {
 		const tokens = total_read_tokens(lane_child_read_set.costed(ROOT))
 
 		expect(tokens).toBeLessThanOrEqual(MAX_TOTAL_TOKENS)

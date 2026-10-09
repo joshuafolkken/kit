@@ -79,6 +79,13 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[--refresh]', 'developer', ['files']],
 	},
+	'rule:list': {
+		script: 'scripts/rules/rule-list.ts',
+		description:
+			"Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows",
+		category: 'AI tools',
+		reference: ['', 'automation', ['none']],
+	},
 	format: {
 		script: 'scripts/lint/format.ts',
 		description: 'Format code with prettier and eslint (skips a tool a basic project lacks)',

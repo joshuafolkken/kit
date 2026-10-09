@@ -1,6 +1,7 @@
 import { read_repo_file } from '#scripts/document/ai-document-fixture'
 import { decision_oracle } from '#scripts/rules/decision-oracle'
 import { describe, expect, it } from 'vitest'
+import { rule_list } from './rule-list'
 
 // joshuafolkken/kit#2117: question 0 of the rule-placement criterion lives in residency.md as the
 // single source, and both CLAUDE.md and SKILL.md §3 carry a pointer rather than repeating it.
@@ -39,7 +40,8 @@ describe('residency.md carries question 0 as the single source', () => {
 describe('CLAUDE.md reaches the residency criterion through the delivery enumeration', () => {
 	it('names rule-delivery.md, which lists residency.md', () => {
 		expect(read_repo_file(CLAUDE)).toContain(RULE_DELIVERY)
-		expect(read_repo_file(RULE_DELIVERY)).toContain('（`residency.md`')
+		expect(read_repo_file(RULE_DELIVERY)).toContain('pnpm josh rule:list')
+		expect(rule_list.render()).toContain('`residency.md`')
 	})
 })
 

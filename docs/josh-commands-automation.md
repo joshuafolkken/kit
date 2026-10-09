@@ -129,6 +129,10 @@ Deliver a rule at the tool call that binds it, instead of carrying it resident i
 
 Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. Some rows deliver once per run; some — force push / branch delete, direct filing, the bare-`git` and run-tail push rows, and the implementation-phase cut — fire on every occurrence; and a row that asks for an earlier command (the Issue comments, `pkg:scout`, the rule-body placement questions) refuses every call until that command is on the transcript.
 
+### `josh rule:list`
+
+Print the trigger-delivered rules `rule-delivery.md` points at: one item per guard row of `scripts/rules/delivered-rules.ts`, then the `Stop` hook's rows — single source, hook, trigger, silence. The prose comes from `scripts/rules/rule-registry.ts`, joined by `id`; a row with no entry prints as missing and fails `rule-list.test.ts`. A hookless agent reads it as its checklist.
+
 ### `josh pretool:guard`
 
 The `PreToolUse` dispatcher that routes each pending tool call to the delivered-rule guards (`batch:guard`, `investigation:guard`, `duplicate-read:guard`, `rule:guard`). A refusal leaves through `hookSpecificOutput.permissionDecision`; an unclaimed call writes nothing.
