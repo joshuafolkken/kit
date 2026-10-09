@@ -70,4 +70,4 @@
 
 **起票と、実行されるようにするところまでが 1 つのまとまりである。** epic の下にある割り込みを起票だけして追加しなければ、`epic:next` はそれを候補にすら出さない — Issue は残るが実行されないという、コメントに埋もれるのと大差ない状態になる。**epic の外にある割り込みでは、まとまりの後半は 4 の報告そのもの**であり、打つべきコマンドを利用者に渡すまでが 1 回の行為である。上の「ひとまとまりで判定する」がここにも効く。
 
-**割り込みをバッチの中で単独で走らせるか、並列のレーンで走らせるか**は `.claude/skills/workflow-commands/backlogrun-lanes.md` → "Lanes — running more than one child at a time" が単一ソースである（理由は `docs/maintainers/wip-cap-rationale.md` → "Why a solo run"）。上限の数字の変え方は `docs/maintainers/wip-cap-rationale.md` → "Changing the cap itself"、上限が分割判定・レビュー上限と一緒に動く理由は `docs/maintainers/wip-cap-rationale.md` → "The three move together"と `docs/maintainers/wip-cap-rationale.md` → "Why the three landed in one commit"にある。
+**割り込みをバッチの中で単独で走らせるか、並列のレーンで走らせるか**は `.claude/skills/workflow-commands/backlogrun-lanes.md` → "A solo run" が単一ソースである（理由は `docs/maintainers/wip-cap-rationale.md` → "Why a solo run"）。上限の数字の変え方は `docs/maintainers/wip-cap-rationale.md` → "Changing the cap itself"、上限が分割判定・レビュー上限と一緒に動く理由は `docs/maintainers/wip-cap-rationale.md` → "The three move together"と `docs/maintainers/wip-cap-rationale.md` → "Why the three landed in one commit"にある。

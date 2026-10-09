@@ -21,15 +21,15 @@ const RELOCATED_BODIES: ReadonlyArray<SingleSourceRule> = [
 		canonical: `${SKILL_DIR}/backlogrun-steps.md`,
 	},
 	{
-		marker: 'because the order is the point of naming them',
+		marker: 'one at a time — no lanes',
 		canonical: `${SKILL_DIR}/backlogrun-steps.md`,
 	},
 	{
-		marker: 'The authorization boundary is carried by the budget, not by the keystroke',
+		marker: 'approves every merge of every issue',
 		canonical: `${SKILL_DIR}/backlogrun-steps.md`,
 	},
 	{
-		marker: "one command's output, not an assembly of several",
+		marker: "The plan is one command's output",
 		canonical: `${SKILL_DIR}/backlogrun-steps.md`,
 	},
 	{
@@ -37,11 +37,7 @@ const RELOCATED_BODIES: ReadonlyArray<SingleSourceRule> = [
 		canonical: `${SKILL_DIR}/backlogrun-steps.md`,
 	},
 	{
-		marker: 'To become a candidate an issue needs',
-		canonical: `${SKILL_DIR}/backlogrun-steps.md`,
-	},
-	{
-		marker: 'Termination is decided by what the loop is told',
+		marker: 'Read only the one section the row names',
 		canonical: `${SKILL_DIR}/backlogrun-steps.md`,
 	},
 	{

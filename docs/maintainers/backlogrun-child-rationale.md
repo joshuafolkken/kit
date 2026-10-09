@@ -5,7 +5,7 @@ the reasons, the history and the arguments that justify its rules. It is never r
 the procedure document carries every trigger, command, bound and prohibition, and points here only for
 why they are what they are.
 
-## Why the file is read once and then by section
+## Why the file is read by section
 
 A full re-read per child stacks the whole file onto the parent's conversation for every remaining
 request, which is exactly the n²/2 growth the hand-off exists to avoid (`backlogrun-progress.md`).

@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1038,
-		"code_lines": 86661,
-		"comment_lines": 34263,
+		"code_lines": 86680,
+		"comment_lines": 34275,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 535097
+		"on_demand_bytes": 500890
 	},
 	"accepted": {
-		"reason": "Gate ledger samples other processes' admitted core claims every 3s throughout a gate so mid-gate load from other lanes keeps the gate out of the solo median (#3556)",
+		"reason": "#3396: point-of-use documents are charged at the union of their named sections (entry-read-set.ts); review-round fixes added 1.4 KB, still 34 KB below main",
 		"date": "2026-10-09"
 	}
 }

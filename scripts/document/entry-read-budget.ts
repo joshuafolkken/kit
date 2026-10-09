@@ -112,7 +112,11 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	{ entry: 'fullrun', bytes: 53_248 },
 	{ entry: 'halfrun', bytes: 49_152 },
 	{ entry: 'prrun', bytes: 57_344 },
-	{ entry: 'backlogrun', bytes: 172_032 },
+	// Lowered in joshuafolkken/kit#3396: `backlogrun.md` became a route table naming one section per
+	// moment, a point-of-use document is charged at the union of the sections its path names, and the
+	// driver's own mechanics moved to `docs/maintainers/backlogrun-driver.md`. The route table also names
+	// `latest-gate.md`, `progress-watcher.md` and `followup.md`, which the parent reads itself.
+	{ entry: 'backlogrun', bytes: 118_784 },
 	{ entry: LANE_CHILD, bytes: 53_248 },
 ]
 
