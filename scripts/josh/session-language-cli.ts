@@ -19,22 +19,22 @@ import { session_language, type Resolution } from './session-language'
 // Telegram header labels and the `--notify-message` default (`CLAUDE.md` → "Output language").
 
 const { DEFAULT_SESSION_LANG, ENV_KEY, resolve_session_lang } = session_language
-const ENGLISH_OPT_IN_LANG = 'en'
 
 // The file load happens in `main`, on the command path only; the resolver reads the environment.
 // The line carries the value alone: what the language covers is `CLAUDE.md` → "Output language",
-// already in context every turn, so repeating it here only spent context on each prompt.
+// already in context every turn, so repeating it here only spent context on each prompt. The default
+// prints nothing — that resident line already names `ja` (joshuafolkken/kit#3398).
 function format_line(resolution: Resolution): string {
-	const suffix = resolution.is_default
-		? ` (default; set ${ENV_KEY}=${ENGLISH_OPT_IN_LANG} for English)`
-		: ''
+	if (resolution.is_default) return ''
 
-	return `Session language (${ENV_KEY}): ${resolution.lang}${suffix}`
+	return `Session language (${ENV_KEY}): ${resolution.lang}`
 }
 
 function main(): void {
 	josh_environment_file.load_environment_file()
-	console.info(format_line(resolve_session_lang()))
+	const line = format_line(resolve_session_lang())
+
+	if (line !== '') console.info(line)
 }
 
 const session_language_cli = {

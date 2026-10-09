@@ -15,6 +15,7 @@ text; they moved here in joshuafolkken/kit#3179.
 - Script-emitted strings are not text the agent writes and have no translation mechanism.
 - `JOSH_SESSION_LANG` is a personal setting, so it lives in the gitignored `.env`; it differs per
   consumer and per developer, and `josh sync` never overwrites it.
-- The `UserPromptSubmit` hook injects the resolved value once per turn so the agent never has to read
-  `.env`. It was removed from `SessionStart` because the first turn resolved it twice. The variable
+- The `UserPromptSubmit` hook injects a non-default value once per turn so the agent never has to read
+  `.env`; the `ja` default prints nothing, because the resident `CLAUDE.md` line already names it
+  (joshuafolkken/kit#3398). It was removed from `SessionStart` because the first turn resolved it twice. The variable
   changes no script behavior — `session:lang` reads it only to display it.

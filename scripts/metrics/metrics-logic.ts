@@ -18,8 +18,8 @@ const NEWLINE = '\n'
 const RATIO_DIGITS = 2
 const JSON_INDENT = '\t'
 const ENCODING = 'utf8'
-// The `UserPromptSubmit` hook's line, in its default form: the longest one, and the same on every
-// machine whatever its `.env` says.
+// The `UserPromptSubmit` hook's line, in its default form — the same on every machine whatever its
+// `.env` says. Empty since joshuafolkken/kit#3398; kept so a default that prints again is counted.
 const PER_TURN_HOOK_TEXT = session_language_cli.format_line({
 	lang: session_language_cli.DEFAULT_SESSION_LANG,
 	is_default: true,

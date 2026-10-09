@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1030,
-		"code_lines": 85825,
-		"comment_lines": 34100,
+		"code_lines": 85804,
+		"comment_lines": 34106,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -11,7 +11,7 @@
 	},
 	"guards": 8,
 	"ai_cost": {
-		"resident_bytes": 12281,
+		"resident_bytes": 12193,
 		"on_demand_bytes": 561435
 	},
 	"accepted": {

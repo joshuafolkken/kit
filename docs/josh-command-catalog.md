@@ -201,7 +201,7 @@ List refactoring candidates in the changed scope by category and answer clear/ca
 
 _No arguments._
 
-Claude Code hook: print the resolved JOSH_SESSION_LANG (defaults to ja) for the session context
+Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context (the ja default prints nothing)
 
 ---
 
