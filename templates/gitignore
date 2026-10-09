@@ -72,5 +72,6 @@ e2e/.auth/chrome-profile/
 
 # Claude Code runtime artifacts
 .claude/scheduled_tasks.lock
+.claude/tmp/
 
 .pnpm-store

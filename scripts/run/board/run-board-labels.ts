@@ -1,5 +1,6 @@
 import { WriteStream } from 'node:tty'
 import { styleText } from 'node:util'
+import type { FiledKind } from '#scripts/run/event/run-event-filed'
 import cli_spinners from 'cli-spinners'
 import type { BoardNote } from './run-board-notes'
 import type { Phase } from './run-board-phase'
@@ -17,15 +18,17 @@ const MINUTES_PER_HOUR = 60
 const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE
 // Every gauge is this wide — the plan, the machine and a row's phase (joshuafolkken/kit#3450).
 const BAR_WIDTH = 10
-// A full block done and a thin line left (joshuafolkken/kit#3452): the shapes alone tell the two apart
-// where no color is drawn, and a terminal dims the line so the gauge does not read heavy.
-const BAR_DONE = '█'
+// A centered square done and a thin line left (joshuafolkken/kit#3452): the shapes alone tell the two
+// apart where no color is drawn, and a terminal dims the line so the gauge does not read heavy. The
+// square, not a full block, leaves a gap between stacked bars at line height 1 (joshuafolkken/kit#3498).
+const BAR_DONE = '■'
 const BAR_LEFT = '─'
 const BAR_DONE_COLOR: TextColor = 'cyan'
 const BAR_LEFT_COLOR: TextColor = 'dim'
-// The spinner a running run and a running row turn (joshuafolkken/kit#3452), four frames a second.
+// The spinner a running run and a running row turn (joshuafolkken/kit#3452), at the package's own
+// interval (joshuafolkken/kit#3495).
 const SPINNER_FRAMES = cli_spinners.dots.frames
-const SPINNER_FRAME_MS = 250
+const SPINNER_INTERVAL_MS = cli_spinners.dots.interval
 // The color depth from which a terminal draws a 24-bit color, and the escapes that draw one.
 const RGB_COLOR_DEPTH = 24
 const ESC = '\u{1B}'
@@ -46,7 +49,6 @@ const WORDS = {
 	waiting: 'waiting',
 	decision: 'decision',
 	waits: 'waits on',
-	dispatched: 'dispatched',
 	investigate: 'investigate',
 	implement: 'implement',
 	review: 'review',
@@ -61,12 +63,15 @@ const WORDS = {
 	notes: 'findings and decisions',
 	more: 'more',
 	filed: 'filed',
+	breaking: 'breaking',
+	bug: 'bug',
+	enhancement: 'enhancement',
 	park: 'park',
 	note: 'note',
 	found_during: ' (found during {n})',
 	// joshuafolkken/kit#3437: the session a stopped run waits in, and what closing the board leaves.
 	resume: 'stopped — resume with',
-	keeps_running: 'Closing this keeps the run going. Reopen with `pnpm josh backlogrun`',
+	keeps_running: 'Closing this screen leaves the run going · reopen with `pnpm josh backlogrun`',
 } as const
 
 type Words = typeof WORDS
@@ -102,7 +107,6 @@ const WAITS_ICON = '🔗'
 // A running row's phases as icons (joshuafolkken/kit#3452), chosen on the same rule; the row draws every
 // phase it has passed, so the rightmost icon is what it is doing now (joshuafolkken/kit#3460).
 const PHASE_ICONS: Readonly<Record<Phase, string>> = {
-	dispatched: '🚀',
 	investigate: '🔍',
 	plan: '📝',
 	implement: '🔨',
@@ -115,7 +119,6 @@ const PHASE_ICONS: Readonly<Record<Phase, string>> = {
 
 // The legend's word for each phase — the header's own `plan` and `merged` where the phase shares one.
 const PHASE_WORDS: Readonly<Record<Phase, keyof Words>> = {
-	dispatched: 'dispatched',
 	investigate: 'investigate',
 	plan: 'plan',
 	implement: 'implement',
@@ -128,12 +131,19 @@ const PHASE_WORDS: Readonly<Record<Phase, keyof Words>> = {
 
 // The findings section's rule and each note kind's lead (joshuafolkken/kit#3478), chosen on the same
 // rule and apart from every phase and state icon, so the legend names them and a row needs no word. 🆕
-// rather than 🐞: a filed issue is not always a bug.
+// is a filed issue whose kind is none of `FILED_KIND_ICONS`.
 const NOTES_ICON = '📌'
 const NOTE_ICONS: Readonly<Record<BoardNote['kind'], string>> = {
 	filed: '🆕',
 	park: STATE_ICONS.parked,
 	note: '💬',
+}
+// A filed issue's line leads with its kind in place of 🆕 (joshuafolkken/kit#3494): inside the 📌
+// section a line is already read as a filing, so 🆕 beside the kind would only widen it.
+const FILED_KIND_ICONS: Readonly<Record<FiledKind, string>> = {
+	'breaking-change': '💥',
+	bug: '🐛',
+	enhancement: '✨',
 }
 
 // The header's gauges and marks (joshuafolkken/kit#3450). ⚡ rather than 🔥 (joshuafolkken/kit#3452):
@@ -166,6 +176,14 @@ function clock_of(ms: number): string {
 	return [date.getHours(), date.getMinutes(), date.getSeconds()]
 		.map((value) => two_digits(value))
 		.join(':')
+}
+
+// The local wall-clock `HH:MM` of a moment, for one a person reads to the minute — when a run ended, or
+// when a finding was filed (joshuafolkken/kit#3489).
+function minute_of(ms: number): string {
+	const date = new Date(ms)
+
+	return [date.getHours(), date.getMinutes()].map((value) => two_digits(value)).join(':')
 }
 
 // How long something has run, as `MM:SS` whose minutes never carry into hours (`61:05`), so the header
@@ -228,7 +246,7 @@ function bar_of(
 // The spinner's frame at a moment, from the clock rather than a count of redraws, so the frame a redraw
 // draws needs no state carried between redraws.
 function spinner_of(now_ms: number): string {
-	const step = Math.floor(Math.max(0, now_ms) / SPINNER_FRAME_MS)
+	const step = Math.floor(Math.max(0, now_ms) / SPINNER_INTERVAL_MS)
 
 	return SPINNER_FRAMES[step % SPINNER_FRAMES.length] ?? ''
 }
@@ -236,13 +254,14 @@ function spinner_of(now_ms: number): string {
 const run_board_labels = {
 	BAR_LEFT,
 	BAR_LEFT_COLOR,
+	FILED_KIND_ICONS,
 	GAUGE_SHADES,
 	HEADER_ICONS,
 	NOTES_ICON,
 	NOTE_ICONS,
 	PHASE_ICONS,
 	PHASE_WORDS,
-	SPINNER_FRAME_MS,
+	SPINNER_INTERVAL_MS,
 	STATE_ICONS,
 	WAITS_ICON,
 	WORDS,
@@ -250,6 +269,7 @@ const run_board_labels = {
 	clock_of,
 	elapsed_of,
 	left_of,
+	minute_of,
 	painted,
 	spinner_of,
 }

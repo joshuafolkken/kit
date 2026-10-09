@@ -77,7 +77,7 @@ split is found.
   write `None — the children are independent; any execution order works.` under `Dependencies`. **The
   epic itself is never implemented** — a `backlogrun` takes a named epic and runs its *children*. `pnpm josh
   followup` closes it automatically once every child is closed. **Only when the execution order
-  matters**, record it natively: `pnpm josh epic --ordered` treats the argument order as the dependency
+  matters** — the criterion is `execution-waves.md` → "When a wave may be declared" — record it natively: `pnpm josh epic --ordered` treats the argument order as the dependency
   order; on the manual fallback path, after the child Issues exist, `gh api
   repos/{owner}/{repo}/issues/<N2>/dependencies/blocked_by -F issue_id="$(gh api
   repos/{owner}/{repo}/issues/<N1> --jq .id)"` for each dependent pair (the endpoint takes the blocker's

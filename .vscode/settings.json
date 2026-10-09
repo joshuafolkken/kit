@@ -30,7 +30,6 @@
 	"eslint.nodePath": "./node_modules",
 	"eslint.runtime": "node",
 	"errorLens.gutterIconsEnabled": true,
-	"terminal.integrated.lineHeight": 1.5,
 	"claudeCode.initialPermissionMode": "bypassPermissions",
 	"claudeCode.allowDangerouslySkipPermissions": true,
 	"claudeCode.useCtrlEnterToSend": true,

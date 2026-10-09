@@ -221,14 +221,15 @@ async function place(url: string, target: string): Promise<void> {
 // Every filing lands on the run's event stream (joshuafolkken/kit#3430): this is the one filing path, so
 // one append here reaches `run:board` from every route. A filing outside a run lands too and is left
 // out by the board's own scope to the invocation; the append is best-effort, as every emit is.
-async function record(url: string, filing: Filing): Promise<void> {
+async function record(url: string, filing: Filing, labels: ReadonlyArray<string>): Promise<void> {
 	const number = String(issue_number_of(url))
 	const reference = issue_cite.plain(
 		number,
 		issue_file_fold.reference_prefix(filing.target, filing.current),
 	)
 	const found_during = await issue_file_fold.finder()
-	const text = run_event_filed.text_of({ reference, title: filing.args.title, found_during })
+	const kind = run_event_filed.kind_of(labels)
+	const text = run_event_filed.text_of({ reference, kind, title: filing.args.title, found_during })
 
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.FILED, text)
 }
@@ -247,7 +248,7 @@ async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<numb
 
 	if (url === undefined) return FAILURE_EXIT_CODE
 	console.info(url)
-	await record(url, filing)
+	await record(url, filing, labels)
 	await link_release(url, filing)
 	await place(url, filing.target)
 

@@ -56,7 +56,7 @@ function memory_line(percent: number, pressure: number | undefined): string {
 
 // A colored bar as the board draws it: `filled` cells in `color`, the rest dimmed.
 function bar(filled: number, color: TextColor): string {
-	const done = filled === 0 ? '' : styleText(color, '█'.repeat(filled))
+	const done = filled === 0 ? '' : styleText(color, '■'.repeat(filled))
 	const left = filled === BAR_WIDTH ? '' : styleText('dim', '─'.repeat(BAR_WIDTH - filled))
 
 	return done + left
@@ -69,7 +69,7 @@ function rgb(code: string, text: string): string {
 
 // A bar whose `filled` cells are in a 24-bit color, the rest dimmed.
 function rgb_bar(filled: number, code: string): string {
-	return rgb(code, '█'.repeat(filled)) + styleText('dim', '─'.repeat(BAR_WIDTH - filled))
+	return rgb(code, '■'.repeat(filled)) + styleText('dim', '─'.repeat(BAR_WIDTH - filled))
 }
 
 describe('run_board_machine.gauges_of', () => {
@@ -103,20 +103,21 @@ describe('run_board_machine.gauges_of', () => {
 })
 
 describe('run_board_machine.line_of', () => {
-	it('draws each gauge as icon, right-aligned figure, then bar', () => {
+	// joshuafolkken/kit#3508: two spaces between the gauges, as between the header's parts.
+	it('draws each gauge as icon, right-aligned figure, then bar, two spaces apart', () => {
 		const gauges = { ...UNREAD, cpu_percent: 15, memory_percent: 37, swap_mb_per_s: 3.1 }
 
-		expect(plain(gauges)).toBe('⚡  15% ██────────   🧠  37% ████──────   💾 3.1M/s ██────────')
+		expect(plain(gauges)).toBe('⚡  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────')
 	})
 
 	it('stops the bar full past the gauge’s end, keeping the figure the same width', () => {
 		const gauges = { ...UNREAD, cpu_percent: 100, swap_mb_per_s: 42 }
 
-		expect(plain(gauges)).toBe(`⚡ 100% ${'█'.repeat(10)}   💾  42M/s ${'█'.repeat(10)}`)
+		expect(plain(gauges)).toBe(`⚡ 100% ${'■'.repeat(10)}  💾  42M/s ${'■'.repeat(10)}`)
 	})
 
 	it('leaves out an unread gauge, and the whole line when none was read', () => {
-		expect(plain({ ...UNREAD, memory_percent: 37 })).toBe('🧠  37% ████──────')
+		expect(plain({ ...UNREAD, memory_percent: 37 })).toBe('🧠  37% ■■■■──────')
 		expect(plain({ ...UNREAD, swap_mb_per_s: 0 })).toBe(`💾 0.0M/s ${'─'.repeat(10)}`)
 		expect(line_of(UNREAD)).toBeUndefined()
 		expect(line_of(undefined)).toBeUndefined()
@@ -179,7 +180,7 @@ describe('run_board_machine.line_of in 24-bit color', () => {
 			`⚡ ${rgb(YELLOW_RGB, ' 75%')} ${rgb_bar(8, YELLOW_RGB)}`,
 		)
 		expect(line_of({ ...UNREAD, cpu_percent: 95 })).toBe(
-			`⚡ ${rgb(RED_RGB, ' 95%')} ${rgb(RED_RGB, '█'.repeat(BAR_WIDTH))}`,
+			`⚡ ${rgb(RED_RGB, ' 95%')} ${rgb(RED_RGB, '■'.repeat(BAR_WIDTH))}`,
 		)
 	})
 })

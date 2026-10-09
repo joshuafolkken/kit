@@ -9,7 +9,7 @@ import { run_board_tick } from './run-board-tick'
 // joshuafolkken/kit#3455: a live board draws its first frame from the local reads alone, turns a
 // spinner after ⏳ while the plan read is in flight, and draws the plan on the redraw after it lands.
 
-const { LOCAL, START, WORDS, harness, plan_titled } = run_board_fixture
+const { LOCAL, SPINNING, START, WORDS, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, MACHINE_SAMPLE_MS, tick } = run_board_tick
 const { spinner_of } = run_board_labels
 const LOADING = '⏳'
@@ -102,14 +102,14 @@ describe('run_board_tick.tick in the background, once the read lands', () => {
 
 		expect(loading).not.toMatch(PROGRESS)
 		expect(landed).toMatch(PROGRESS)
-		expect(title_of(landed)).not.toContain(LOADING)
+		expect(title_of(landed)).not.toMatch(SPINNING)
 	})
 
 	it('warns as for a failed read when the read rejects', async () => {
 		const [, landed] = await across_landing(rejecting)
 
 		expect(title_of(landed)).toContain(`⚠ ${WORDS.plan}`)
-		expect(title_of(landed)).not.toContain(LOADING)
+		expect(title_of(landed)).not.toMatch(SPINNING)
 	})
 })
 
@@ -134,6 +134,6 @@ describe('run_board_tick.tick settled', () => {
 		await tick(FRESH_STATE, ports)
 
 		expect(frames[0]).toMatch(PROGRESS)
-		expect(title_of(frames[0])).not.toContain(LOADING)
+		expect(title_of(frames[0])).not.toMatch(SPINNING)
 	})
 })
