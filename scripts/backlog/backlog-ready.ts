@@ -23,11 +23,15 @@ interface ReadyPorts {
 	ready_issues: () => Promise<ReadonlyArray<string>>
 }
 
-async function free_under(limit: number): Promise<number> {
+// The lanes in use: the open worktrees an interruption has not stranded. `josh lane:limit` prints it.
+async function live_lane_count(): Promise<number> {
 	const lanes = await lane_registry.list_lanes()
-	const live = lanes.filter((lane) => !lane.is_stranded).length
 
-	return lane_capacity.free_lanes(limit, live)
+	return lanes.filter((lane) => !lane.is_stranded).length
+}
+
+async function free_under(limit: number): Promise<number> {
+	return lane_capacity.free_lanes(limit, await live_lane_count())
 }
 
 // Free lanes right now: the limit less the live lanes. An unreadable limit reads as no free lane — the
@@ -40,7 +44,7 @@ async function free_under(limit: number): Promise<number> {
 // (`backlog:next`) is gated behind a free lane, so a network read here would defeat that design. The
 // two can diverge, but only toward over-counting live lanes → fewer free lanes, the safe direction.
 async function free_lane_count(): Promise<number> {
-	const limit = lane_capacity.lane_limit()
+	const limit = await lane_capacity.lane_limit()
 
 	if (limit.kind !== 'limit') return NO_FREE
 
@@ -51,7 +55,7 @@ async function free_lane_count(): Promise<number> {
 // more than this count, so the safe-direction zero above would leave it launching nothing and reporting
 // nothing for good; a bad setting is the hard error `lane_capacity` says it is, ending the drive loudly.
 async function drive_free_lane_count(): Promise<number> {
-	const limit = lane_capacity.lane_limit()
+	const limit = await lane_capacity.lane_limit()
 
 	if (limit.kind !== 'limit') throw new Error(limit.problem)
 
@@ -163,6 +167,7 @@ const backlog_ready = {
 	read_backlog_next,
 	print_offer_hint,
 	free_lane_count,
+	live_lane_count,
 	drive_free_lane_count,
 	drains_pool,
 	print_ready_line,
