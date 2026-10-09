@@ -17,6 +17,7 @@ const AT = '2026-09-21T00:00:00.000Z'
 const REVIEW_STAGE = '#3521 review start'
 const GATE_STAGE = '#3521 gate start'
 const OTHER_ISSUE_STAGE = '#3522 gate start'
+const SEED_PHASE = '#3520 implement'
 const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-event-stream-'))
 
 function fresh_target(): string {
@@ -244,9 +245,9 @@ describe('run_event_stream.append — the bound keeps the findings', () => {
 	})
 })
 
-// A stream full of lines the bound may not drop, one lane-phase per slot.
-function fill_with_lane_phases(target: string): void {
-	for (let index = 0; index < run_event_stream.EVENT_CAP; index += 1) {
+// Lines the bound may not drop, one lane-phase per slot — a full stream unless `count` says fewer.
+function fill_with_lane_phases(target: string, count = run_event_stream.EVENT_CAP): void {
+	for (let index = 0; index < count; index += 1) {
 		run_event_stream.append(target, KIND.LANE_PHASE, `#${String(index)} implement`, AT)
 	}
 }
@@ -277,11 +278,14 @@ describe('run_event_stream.append — the bound keeps each issue’s newest ship
 	it('drops an older ship stage of the same issue before its newest', () => {
 		const target = fresh_target()
 
+		// The seed sits before the older stage, so a plain roll-off would take the seed, not the stage.
+		run_event_stream.append(target, KIND.LANE_PHASE, SEED_PHASE, AT)
 		run_event_stream.append(target, KIND.SHIP_STAGE, REVIEW_STAGE, AT)
-		fill_with_lane_phases(target)
+		fill_with_lane_phases(target, run_event_stream.EVENT_CAP - 2)
 		run_event_stream.append(target, KIND.SHIP_STAGE, GATE_STAGE, AT)
 
 		expect(ship_stages_of(target)).toStrictEqual([GATE_STAGE])
+		expect(run_event_stream.read_events(target)[0]?.text).toBe(SEED_PHASE)
 	})
 
 	it('keeps the newest ship stage of every issue, not only the newest overall', () => {
