@@ -76,8 +76,8 @@ interface BacklogInput {
 const AT_BASELINE: DefectRate = {
 	days: defect_rate.DEFAULT_WINDOW_DAYS,
 	since: '2026-09-09',
-	defects: 21,
-	behavior_changes: 50,
+	defects: 73,
+	enhancements: 100,
 	is_capped: false,
 }
 
