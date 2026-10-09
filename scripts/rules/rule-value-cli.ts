@@ -86,8 +86,10 @@ function row(reading: RuleReading): string {
 	const id = reading.id.padEnd(ID_WIDTH)
 	const reached = `reached ${reading.sessions.toString()}`
 	const refused = `refused ${reading.refusals.toString()}`
+	// Only where a rewrite happened, so the rows of rules that can only refuse keep their shape.
+	const rewritten = reading.rewrites > 0 ? [`rewritten ${reading.rewrites.toString()}`] : []
 
-	return [id, reached, rate_text(reading), refused].join(COLUMN_GAP)
+	return [id, reached, rate_text(reading), refused, ...rewritten].join(COLUMN_GAP)
 }
 
 // The reading as text, or `NO_TARGETS` when nothing measurable was found — never an empty output that

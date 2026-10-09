@@ -1,3 +1,6 @@
+import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
+import { json_value } from '#scripts/lib/json-value'
+import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { shell_segments } from './shell-segments'
 
@@ -93,11 +96,14 @@ const PIPED_VERIFICATION_REASON =
 // command chain quoted inside a body is text rather than a call, and this repository's issue bodies
 // quote them constantly — without the blanking the two halves disagree, and
 // `gh issue comment 1 --body "… | pnpm josh gate | …"` reads as a check whose verdict survived.
-function command_pieces(command: string): Array<string> {
+function pipelines_of(command: string): Array<Array<string>> {
 	return shell_segments
 		.segments_of(time_shell.unquoted(command))
-		.flatMap((segment) => segment.split('|'))
-		.map((piece) => piece.trim())
+		.map((segment) => segment.split('|').map((piece) => piece.trim()))
+}
+
+function command_pieces(command: string): Array<string> {
+	return pipelines_of(command).flat()
 }
 
 // **The occasion this rule governs: a check whose result means pass or fail, run at all**
@@ -115,11 +121,63 @@ function keeps_verdict_intact(command: string): boolean {
 	return runs_verification(command) && !is_masked_verification(command)
 }
 
+// **The commonest masking is rewritten rather than refused** (joshuafolkken/kit#3570). Almost every
+// refusal was a check narrowed with `| tail` or `| grep`, and the refusal cost a round trip to arrive at
+// the call `set -o pipefail;` in front would have made. Prefixed, the pipeline carries the check's
+// status, which is the rule's whole outcome — so the hook runs that call instead.
+//
+// **Only a filter that reads its input to the end qualifies.** One that exits early — `head`, or a
+// `grep` stopping at its first match — closes the pipe on a check still writing, and under `pipefail` the
+// check's SIGPIPE turns a passing run into exit 141; `head` also cuts the verdict line josh prints last.
+//
+// **Every command on the line is a josh check or a filter after one.** The rewrite answers `allow`, so
+// anything else chained beside the check — `&& rm -r dist`, or a `git log | head` never written for
+// `pipefail` — would skip the permission prompt it would otherwise meet. Those lines are refused as before.
+const PIPEFAIL_PREFIX = 'set -o pipefail; '
+const FULL_READING_FILTER = /^(?:tail|grep)\b/u
+const EARLY_EXIT_GREP =
+	/^grep\b.*\s(?:-[a-zA-Z]*[lLmq]|--(?:quiet|silent|max-count|files-with(?:out)?-match))/u
+
+const PIPEFAIL_NOTE =
+	'↻ piped verification: the josh check was piped, so `set -o pipefail;` was prefixed and the call ran ' +
+	"with the check's status carried to the exit code. Read the printed verdict, never the exit code " +
+	'alone — `prompts/collaboration-workflow/output-bounds.md` (joshuafolkken/kit#3570).'
+
+function reads_to_the_end(piece: string): boolean {
+	return FULL_READING_FILTER.test(piece) && !EARLY_EXIT_GREP.test(piece)
+}
+
+function is_filtered_check(pipeline: Array<string>): boolean {
+	const [head = '', ...filters] = pipeline
+
+	return is_verification_command(head) && filters.every((piece) => reads_to_the_end(piece))
+}
+
+function is_pipefail_rewritable(command: string): boolean {
+	return (
+		is_masked_verification(command) &&
+		pipelines_of(command).every((pipeline) => is_filtered_check(pipeline))
+	)
+}
+
+// The call's input with the prefix in front, or `undefined` where the call is not a rewritable masking.
+function pipefail_input(call: GuardedCall): Record<string, unknown> | undefined {
+	if (call.name !== cost_blocks.BASH_TOOL || !json_value.is_record(call.input)) return undefined
+
+	const command = time_shell.bash_command(call.input)
+
+	if (!is_pipefail_rewritable(command)) return undefined
+
+	return { ...call.input, command: `${PIPEFAIL_PREFIX}${command}` }
+}
+
 const piped_verification = {
 	PIPED_VERIFICATION_REASON,
+	PIPEFAIL_NOTE,
 	VERIFICATION_COMMANDS,
 	is_masked_verification,
 	keeps_verdict_intact,
+	pipefail_input,
 	runs_verification,
 }
 

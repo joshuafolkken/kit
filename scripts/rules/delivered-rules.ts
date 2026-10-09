@@ -63,6 +63,12 @@ interface DeliveredRule {
 	// The occasion the rule governs, for a row whose trigger is the violation itself (else `is_trigger`
 	// would only count runs that broke it).
 	reaches?: CallTest
+	// The note a hook attaches where it rewrites a violating call instead of refusing it, so
+	// `rule-value.ts` counts the rewrite as this row's delivery.
+	rewrite_note?: string
+	// Openings the reason had before it was reworded, so `rule-value.ts` still credits a refusal
+	// delivered with the old text while those transcripts remain in its window.
+	former_reasons?: ReadonlyArray<string>
 }
 
 // Scored but possibly delivered by its own binary (batching, investigation) — joining `DELIVERED_RULES`
@@ -101,6 +107,8 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		reason: piped_verification.PIPED_VERIFICATION_REASON,
 		keeps: on_bash_command(piped_verification.keeps_verdict_intact),
 		reaches: on_bash_command(piped_verification.runs_verification),
+		// A `| tail` / `| grep` masking is rewritten under `pipefail` by `pretool-guard.ts`, never refused.
+		rewrite_note: piped_verification.PIPEFAIL_NOTE,
 	},
 	{
 		id: 'early-heartbeat',

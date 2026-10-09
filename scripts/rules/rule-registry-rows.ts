@@ -83,7 +83,7 @@ const GUARD_ROWS: ReadonlyArray<RegisteredRule> = [
 		topic: '`output-bounds.md`',
 		entry: RULE_GUARD,
 		fires:
-			'a pass/fail josh check (`gate` / `check` / `lint*` / `cspell*` / `test*` / `eval` / `overrides` / `ranges`) in front of a pipe',
+			'a pass/fail josh check (`gate` / `check` / `lint*` / `cspell*` / `test*` / `eval` / `overrides` / `ranges`) in front of a pipe — rewritten under `set -o pipefail` when every filter is `tail` or a full-reading `grep`, refused otherwise',
 		quiet: 'the exit code reaches the caller — a failure reads as a failure',
 	},
 	{

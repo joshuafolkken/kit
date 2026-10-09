@@ -34,7 +34,7 @@
 - パイプが避けられないなら `set -o pipefail` を前置する
 - **どの形でも、印字された判定行を読む。終了コードだけを答えにしない**
 
-**対象は結果が合否を意味するコマンドだけ** — `gate` ／ `check` ／ `lint*` ／ `cspell*` ／ `test*` ／ `eval`。**`git log | head` や `gh issue list | head` は対象外であり、意図的にそうしている。** `latest:scope` ／ `review:brief` も、判定ではなく答えを印字するので `$(...)` で受けてよい。`pnpm josh rule:guard` がパイプの手前に検証コマンドを置いた `Bash` をその場で拒否する（`rule-delivery.md`）。経緯・却下した案・検査は `docs/maintainers/output-bounds-rationale.md` → "Why the pipe rule is delivered by a trigger"。
+**対象は結果が合否を意味するコマンドだけ** — `gate` ／ `check` ／ `lint*` ／ `cspell*` ／ `test*` ／ `eval`。**`git log | head` や `gh issue list | head` は対象外であり、意図的にそうしている。** `latest:scope` ／ `review:brief` も、判定ではなく答えを印字するので `$(...)` で受けてよい。`pnpm josh pretool:guard` は検証コマンドをパイプした `Bash` を、行が検証と後段の `tail` ／全行読みの `grep` だけなら `pipefail` 前置に書き換え、他は拒否する（`rule-delivery.md`）。経緯・却下した案・検査は `docs/maintainers/output-bounds-rationale.md` → "Why the pipe rule is delivered by a trigger"。
 
 ## 検査
 

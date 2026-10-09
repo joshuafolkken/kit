@@ -593,7 +593,7 @@ pnpm josh lane:limit --reset  # clear the override; JOSH_LANE_LIMIT applies agai
 
 ### `josh rule:value`
 
-Print each delivered rule's **unaided compliance** — how far the carried text alone kept the rule in the window before its trigger fired (`scripts/rules/rule-value.ts`). One row per rule: the runs that reached the situation it governs, the rate kept before the trigger (or `unmeasured` where the rule declares no `keeps` predicate, `unreached` where no run reached it), and the refusals the hook actually delivered.
+Print each delivered rule's **unaided compliance** — how far the carried text alone kept the rule in the window before its trigger fired (`scripts/rules/rule-value.ts`). One row per rule: the runs that reached the situation it governs, the rate kept before the trigger (or `unmeasured` where the rule declares no `keeps` predicate, `unreached` where no run reached it), and the refusals the hook actually delivered — followed by `rewritten N` on a rule whose hook rewrote the call instead of refusing it.
 
 ```bash
 pnpm josh rule:value

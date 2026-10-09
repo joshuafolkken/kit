@@ -1,4 +1,5 @@
 import { read_unwrapped } from '#scripts/document/ai-document-fixture'
+import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { rule_list } from './rule-list'
@@ -80,5 +81,16 @@ describe('the delivered row that makes the step hard to walk past', () => {
 
 	it('pnpm josh rule:list documents the trigger', () => {
 		expect(rule_list.render()).toContain(ISSUE_ROUTE)
+	})
+
+	// joshuafolkken/kit#3570: the refusal leads with the call that fixes it, the reason after, and the
+	// label before the call keeps the guard attributed as itself rather than as `pnpm josh issue`.
+	it('opens with the reissue command on its first line', () => {
+		const [first_line] = delivered_rules.ISSUE_COMMENTS_REASON.split('\n', 1)
+
+		expect(first_line).toBe('⛔ issue comments: pnpm josh issue:read <N>')
+		expect(time_transcript_line.guard_from_refusal(delivered_rules.ISSUE_COMMENTS_REASON)).toBe(
+			'issue comments',
+		)
 	})
 })

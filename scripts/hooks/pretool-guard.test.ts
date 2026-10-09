@@ -2,6 +2,8 @@ import { closeSync, mkdtempSync, openSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { GuardOutcome } from '#scripts/josh/hook-decision'
+import { delivered_rules } from '#scripts/rules/delivered-rules'
+import { piped_verification } from '#scripts/rules/piped-verification'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { pretool_guard, pretool_outcome, pretool_outcome_async } from './pretool-guard'
 import { step_zero_notice } from './step-zero-notice'
@@ -35,6 +37,7 @@ const SHELL_BODY_COMMAND = 'pnpm josh notify --body="hi `date`"'
 const SHELL_BODY_REASON = 'shell-evaluated body'
 const WATCHER_STALE_REASON = 'watcher stale'
 const PARENT_CUT_REASON = 'parent hand-off'
+const ALLOW_DECISION = '"permissionDecision":"allow"'
 
 function outcome(
 	reason: string | undefined,
@@ -251,7 +254,7 @@ describe('pretool_guard.foreground_rewrite', () => {
 	it('allows the call with the background flag cleared in a lane child', () => {
 		const envelope = pretool_guard.foreground_rewrite(clear, ship_payload, in_lane) ?? ''
 
-		expect(envelope).toContain('"permissionDecision":"allow"')
+		expect(envelope).toContain(ALLOW_DECISION)
 		expect(envelope).toContain('"run_in_background":false')
 	})
 
@@ -263,5 +266,90 @@ describe('pretool_guard.foreground_rewrite', () => {
 
 	it('rewrites nothing outside a lane child', () => {
 		expect(pretool_guard.foreground_rewrite(clear, ship_payload, outside_lane)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#3570: a josh check piped to a filter that reads to the end runs under `pipefail`
+// instead of being refused, and the guards judge the call that will actually run.
+const PIPED_LINT = 'pnpm josh lint:related 2>&1 | tail -5'
+const PIPED_HEAD = 'pnpm josh lint:related 2>&1 | head -5'
+const DENY_DECISION = '"permissionDecision":"deny"'
+const { PIPED_VERIFICATION_REASON, PIPEFAIL_NOTE } = piped_verification
+
+function payload_on(transcript_path: string, command: string): string {
+	return JSON.stringify({ tool_name: 'Bash', tool_input: { command }, transcript_path })
+}
+
+async function written(raw_payload: string): Promise<string> {
+	const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+
+	await pretool_guard.respond(raw_payload)
+	const text = write.mock.calls.map((call) => String(call[0])).join('')
+
+	write.mockRestore()
+
+	return text
+}
+
+describe('pretool_guard.respond — the pipefail rewrite', () => {
+	it('allows a `| tail` check with `set -o pipefail;` prefixed and the note attached', async () => {
+		const envelope = await written(payload_with_transcript(PIPED_LINT))
+
+		expect(envelope).toContain(ALLOW_DECISION)
+		expect(envelope).toContain(JSON.stringify(`set -o pipefail; ${PIPED_LINT}`))
+		expect(envelope).toContain(JSON.stringify(PIPEFAIL_NOTE).slice(1, -1))
+	})
+
+	it('still refuses a `| head` check, and the rewrite before it spent no delivery', async () => {
+		const transcript_path = fresh_transcript()
+
+		await written(payload_on(transcript_path, PIPED_LINT))
+		const envelope = await written(payload_on(transcript_path, PIPED_HEAD))
+
+		expect(envelope).toContain(DENY_DECISION)
+		expect(envelope).toContain(JSON.stringify(PIPED_VERIFICATION_REASON).slice(1, 40))
+	})
+
+	it('rewrites nothing while the rule guard is switched off', () => {
+		vi.stubEnv(delivered_rules.SWITCH_ENV_KEY, 'off')
+		const rewrite = pretool_guard.pipefail_rewrite(payload_with_transcript(PIPED_LINT))
+
+		vi.unstubAllEnvs()
+
+		expect(rewrite).toBeUndefined()
+	})
+
+	it('rewrites nothing for a call that runs no check', () => {
+		expect(
+			pretool_guard.pipefail_rewrite(payload_with_transcript('git log | tail')),
+		).toBeUndefined()
+	})
+})
+
+describe('pretool_guard.emit — the pipefail rewrite beside other guards', () => {
+	it("lets another guard's refusal win over the rewrite", () => {
+		const raw_payload = payload_with_transcript(PIPED_LINT)
+		const rewrite = pretool_guard.pipefail_rewrite(raw_payload)
+		const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+
+		pretool_guard.emit(
+			raw_payload,
+			outcome(SHELL_BODY_REASON, undefined, undefined),
+			rewrite?.input,
+		)
+		const envelope = write.mock.calls.map((call) => String(call[0])).join('')
+
+		write.mockRestore()
+
+		expect(rewrite).toBeDefined()
+		expect(envelope).toContain(DENY_DECISION)
+		expect(envelope).not.toContain('pipefail;')
+	})
+
+	it('refuses a check chained beside another command instead of allowing it', async () => {
+		const envelope = await written(payload_with_transcript(`${PIPED_LINT} && rm -r dist`))
+
+		expect(envelope).toContain(DENY_DECISION)
+		expect(envelope).not.toContain(ALLOW_DECISION)
 	})
 })
