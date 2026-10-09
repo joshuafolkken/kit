@@ -1,7 +1,8 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { git_spawn } from '#scripts/git/git-spawn'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger'
 import {
 	FILE_VERDICT,
@@ -12,7 +13,12 @@ import {
 } from './observation-record'
 
 // joshuafolkken/kit#3400: the count, the append and the second-sighting verdict are one command. The
-// scratch checkouts are not git work trees, so every line lands in the date-named file.
+// scratch checkouts stand outside any branch, so every line lands in the date-named file. The branch
+// lookup is stubbed: inside a git hook `GIT_DIR` points at the enclosing repository, and a real
+// `rev-parse` there answers its lane branch instead of failing.
+
+vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
+vi.mocked(git_spawn.read).mockRejectedValue(new Error('not a git repository'))
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'observation-record-test-'))
 const FIRST_DAY = new Date('2026-10-01T09:00:00Z')
