@@ -1,4 +1,5 @@
 import { markdown_section } from '#scripts/issue/markdown-section'
+import { issue_citation } from '#scripts/rules/issue-citation'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 
 // Reading an epic's children against each other.
@@ -159,8 +160,14 @@ function known_repos(
 // The issue numbers a piece of prose refers to *in its own repository*. Kept as the narrower reading
 // of the same parse rather than a second one: `epic:bundle` compares two issues' references by
 // number and has no cross-repository notion to compare with.
+//
+// **Only the body's own prose is read** (joshuafolkken/kit#3425): a number inside a fenced block or on
+// a quote line is pasted material — command output in a reproduction, a quoted comment — not the
+// author naming that issue. Counting it bundled a draft into an unrelated epic because a `lane:list`
+// output in its fence happened to list one of that epic's children. The exclusion is the stop guard's
+// citation reading (`issue_citation.prose_lines`), shared rather than restated.
 function parse_references(text: string, repo = ''): Array<number> {
-	return parse_issue_references(text, repo)
+	return parse_issue_references(issue_citation.prose_lines(text).join('\n'), repo)
 		.filter((reference) => reference.repo === repo)
 		.map((reference) => reference.number)
 }
