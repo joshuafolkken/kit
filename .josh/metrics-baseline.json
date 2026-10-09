@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1015,
-		"code_lines": 84545,
-		"comment_lines": 33749,
+		"files": 1018,
+		"code_lines": 84669,
+		"comment_lines": 33793,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 560565
 	},
 	"accepted": {
-		"reason": "#3504 splits the same-file wave rule into a textual-conflict case (no dependency, lane resolves it) and a same-mechanism case (dependency), merged over #3502's waiting-on-blockers merge path",
+		"reason": "#3517 adds the josh-metrics merge driver that adds each side's change to the baseline totals, so concurrent lanes stop conflicting on this file; the review fix keeps the accepted record of the side that changed it",
 		"date": "2026-10-09"
 	}
 }
