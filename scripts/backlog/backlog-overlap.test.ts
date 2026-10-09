@@ -95,6 +95,16 @@ describe('backlog_overlap.declared_paths', () => {
 	})
 })
 
+describe('backlog_overlap.declared_paths — tokens with no directory', () => {
+	it('ignores a dotted code identifier but reads a root-level file', () => {
+		const body = '`session_cite.issue`, `process.env`, `vi.fn`, `package.json` and `CLAUDE.md`'
+
+		expect(backlog_overlap.declared_paths(body)).toStrictEqual(
+			new Set(['package.json', 'CLAUDE.md']),
+		)
+	})
+})
+
 describe('backlog_overlap.separate', () => {
 	it('offers only the first of two candidates that name one file', () => {
 		const selection = separate([

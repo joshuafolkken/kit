@@ -10,10 +10,13 @@ import { session_cite } from '#scripts/issue/session-cite'
 // `scripts/lines/**`, and the two lanes met a content conflict that stopped the second ship
 // (joshuafolkken/kit#3617). So any overlap now holds the later one back — the same file named by
 // both, or a path inside the other's directory glob. A directory one segment deep (`scripts/`) is
-// too broad to count, and an issue reference (`owner/repo#N`) is not a path.
+// too broad to count, and an issue reference (`owner/repo#N`) is not a path. A dotted token with no
+// `/` is a file only when its extension is one this repository keeps at the root — otherwise
+// `session_cite.issue` or `process.env` would claim a path and serialize unrelated lanes.
 const CODE_SPAN = /`([^`\s]+)`/gu
 const LINE_SUFFIX = /:\d+(?:[-:]\d+)?$/u
 const FILE_EXTENSION = /\.[a-z]\w*$/iu
+const ROOT_FILE_EXTENSION = /\.(?:[cm]?[jt]sx?|svelte|jsonc?|md|ya?ml|css|html|sh|toml|txt)$/u
 const GLOB = '*'
 const ISSUE_MARK = '#'
 const SEPARATOR = '/'
@@ -38,10 +41,14 @@ function is_narrow(directory: string): boolean {
 	return directory.split(SEPARATOR).filter(Boolean).length >= MIN_DIRECTORY_DEPTH
 }
 
+function is_file(path: string): boolean {
+	return (path.includes(SEPARATOR) ? FILE_EXTENSION : ROOT_FILE_EXTENSION).test(path)
+}
+
 function claim_of(path: string): string | undefined {
 	if (path.endsWith(SEPARATOR)) return is_narrow(path) ? path : undefined
 
-	return FILE_EXTENSION.test(path) ? path : undefined
+	return is_file(path) ? path : undefined
 }
 
 // The backticked files and directories `body` declares.
