@@ -97,7 +97,7 @@ describe('run_board_tick.tick machine', () => {
 
 		const [first_machine, second_machine] = frames.map((frame) => frame.split('\n', 2)[1] ?? '')
 
-		expect(first_machine).toMatch(/^🧠 /u)
+		expect(first_machine).toMatch(/⌛ \S+ {2}🧠 /u)
 		expect(first_machine).not.toContain('💾')
 		expect(second_machine).toContain('💾')
 	})

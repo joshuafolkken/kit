@@ -6,7 +6,7 @@ import { run_board_fit, type FrameParts, type PlanLine } from './run-board-fit'
 // the header stays at the top; every line is counted by the rows it takes on screen.
 
 const { fit, height_of, reserve } = run_board_fit
-const HEADER = ['title', 'machine', 'progress']
+const HEADER = ['state', 'clock']
 const LEGEND = ['', 'legend']
 const WIDE = 80
 
@@ -44,31 +44,31 @@ describe('run_board_fit.fit', () => {
 	})
 
 	it('keeps the header and the legend, cutting the plan from its end into one more line', () => {
-		const lines = fit(parts_of([bare(''), ...issues(10)]), { rows: 10, columns: WIDE })
+		const lines = fit(parts_of([bare(''), ...issues(10)]), { rows: 9, columns: WIDE })
 
 		expect(lines).toStrictEqual([...HEADER, '', '  1', '  2', '  3', '  more 7', ...LEGEND])
 	})
 
 	it('counts the issue rows it hides, not the rules and epic lines between them', () => {
 		const plan = [bare(''), issue(1), bare('── 1 ──'), issue(2), bare('  📁 9'), issue(3)]
-		const lines = fit(parts_of(plan), { rows: 9, columns: WIDE })
+		const lines = fit(parts_of(plan), { rows: 8, columns: WIDE })
 
 		expect(lines).toStrictEqual([...HEADER, '', '  1', '  more 2', ...LEGEND])
 	})
 
 	it('counts a wrapped line by the rows it takes, escapes and all', () => {
 		const legend = ['', styleText('dim', 'x'.repeat(25))]
-		const lines = fit(parts_of([bare(''), ...issues(10)], legend), { rows: 12, columns: 10 })
+		const lines = fit(parts_of([bare(''), ...issues(10)], legend), { rows: 11, columns: 10 })
 
-		expect(lines.slice(0, 3)).toStrictEqual(HEADER)
-		expect(rows_of(lines, 10)).toBeLessThanOrEqual(12)
+		expect(lines.slice(0, 2)).toStrictEqual(HEADER)
+		expect(rows_of(lines, 10)).toBeLessThanOrEqual(11)
 		expect(lines).toContain('  more 7')
 	})
 
 	it('keeps the top of a frame when even the parts that stay are taller than the pane', () => {
-		const lines = fit(parts_of([bare(''), ...issues(3)]), { rows: 2, columns: WIDE })
+		const lines = fit(parts_of([bare(''), ...issues(3)]), { rows: 1, columns: WIDE })
 
-		expect(lines).toStrictEqual(['title', 'machine'])
+		expect(lines).toStrictEqual(['state'])
 	})
 })
 

@@ -103,16 +103,17 @@ describe('run_board_machine.gauges_of', () => {
 })
 
 describe('run_board_machine.line_of', () => {
-	it('draws each gauge as icon, right-aligned figure, then bar', () => {
+	// joshuafolkken/kit#3508: two spaces between the gauges, as between the header's parts.
+	it('draws each gauge as icon, right-aligned figure, then bar, two spaces apart', () => {
 		const gauges = { ...UNREAD, cpu_percent: 15, memory_percent: 37, swap_mb_per_s: 3.1 }
 
-		expect(plain(gauges)).toBe('⚡  15% ■■────────   🧠  37% ■■■■──────   💾 3.1M/s ■■────────')
+		expect(plain(gauges)).toBe('⚡  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────')
 	})
 
 	it('stops the bar full past the gauge’s end, keeping the figure the same width', () => {
 		const gauges = { ...UNREAD, cpu_percent: 100, swap_mb_per_s: 42 }
 
-		expect(plain(gauges)).toBe(`⚡ 100% ${'■'.repeat(10)}   💾  42M/s ${'■'.repeat(10)}`)
+		expect(plain(gauges)).toBe(`⚡ 100% ${'■'.repeat(10)}  💾  42M/s ${'■'.repeat(10)}`)
 	})
 
 	it('leaves out an unread gauge, and the whole line when none was read', () => {
