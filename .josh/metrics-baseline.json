@@ -1,7 +1,7 @@
 {
 	"scripts": {
 		"files": 1009,
-		"code_lines": 83574,
+		"code_lines": 83580,
 		"comment_lines": 33566,
 		"comment_ratio": 0.4
 	},
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 558915
 	},
 	"accepted": {
-		"reason": "#3422 adds accepted-value hints to josh error output for review:record, ship, test:declared and report:lint; merged with run:board legend state/word table (#3480) and epic:bundle/issue:scout prose_lines reuse (#3425)",
+		"reason": "#3491 adds an injectable now/sleep seam to lane-await and a virtual test clock so the resume-gap test no longer depends on wall-clock scheduling",
 		"date": "2026-10-09"
 	}
 }
