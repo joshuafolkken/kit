@@ -131,8 +131,11 @@ turn with `pnpm josh run:wake --stop`. **Where the run ends by _stopping_ rather
 in the session language; a clean completion takes the bare `--end` and stays silent
 (`progress-watcher.md` → "Progress while the run is quiet").
 
-**A driver hand-off of `epic #N` is a named epic**: run its children by `backlogrun-progress.md` → "Running a named epic's children", never
-the root as a standalone `fullrun`, and once every child has merged or parked record the root with
+**A driver hand-off of `epic #N` is a named epic**: the driver dispatches its children and hands
+off only when it cannot go on (`docs/maintainers/backlogrun-driver.md` → "Running a named epic's
+children — the loop `backlog:drive` walks"). Settle what you can by `backlogrun-progress.md` → "Running a
+named epic's children", never the root as a standalone `fullrun`, then ask `pnpm josh epic:next <E>`: a
+child number or `complete` continues the invocation; only `stop` or a failure records the root with
 `pnpm josh run:carry --done <E> --owner "$PPID"` so the next driver pass advances.
 
 **A person keeps control of the supervisor** — `pnpm josh run:wake --list` names it and `--stop` ends it

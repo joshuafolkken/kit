@@ -112,6 +112,12 @@ Passing `--output <path>` is what lets the composite tell an API-outage ending f
 **The counters live in the carry record**, and the epic progress comment is generated from it at every
 merge — children run, Issues filed, consecutive failures, and the run's start time.
 
+**The driver reads the epic's current children on every pass** (`scripts/backlog/backlog-drive-epic.ts`),
+so a child filed into the epic mid-run is dispatched without `run:add` and without a parent session. It
+hands `epic #N` back with the original invocation only on `epic:next`'s `stop`, when every child left
+waits on a person, or after `backlog:offer`'s retry limit of consecutive `epic:next` failures (a broken
+graph).
+
 ## Waiting while something is in flight
 
 **The numbers in `backlogrun-progress.md` → "Waiting, and never waiting forever" are floors between

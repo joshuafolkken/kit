@@ -69,6 +69,7 @@ pnpm josh run:add 101 102                 # ahead of the rest of the queue (`#N`
 pnpm josh run:add 101 --no-priority       # at the end of the queue
 ```
 
+- A child filed into an epic the run names needs no `run:add`: `backlog:drive` reads that epic's current children on every pass.
 - Each issue gets `auto-ok` and `run:lane`, plus `priority:high` unless `--no-priority`. A `backlogrun #N --only` run also gets the issue written to its carry record, so its named list includes it; the recorded invocation is never rewritten.
 - A closed issue, one that could not be read, or one a label would not apply to is refused; the others are still added. An issue with open blockers is added and reported as waiting on them.
 - Each added issue is written to the run's event stream as an `add` event, which wakes a `run:progress --wait` so the run offers the issue the next free lane.

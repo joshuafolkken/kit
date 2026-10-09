@@ -34,6 +34,11 @@ const MAIN_BRANCH = '--initial-branch=main'
 // reached the commit is half of proving it was never written into a config file.
 const AUTHOR_NAME = 'Kit Fixture'
 
+// **Auto maintenance is off** (joshuafolkken/kit#3558). After `commit` and `merge` git starts
+// `git maintenance run --auto`, which newer git detaches; it then writes into `.git` while
+// `close_workspace` removes the tree, and the removal fails with `ENOTEMPTY`.
+const NO_AUTO_MAINTENANCE_OPTIONS: ReadonlyArray<string> = ['-c', 'maintenance.auto=false']
+
 // **The identity rides on `-c` rather than being written with `git config`** (joshuafolkken/kit#1530).
 // A `--local` write outlives the test and is shared by every work tree of the repository it lands in;
 // an option is scoped to the one command.
@@ -44,6 +49,7 @@ const IDENTITY_OPTIONS: ReadonlyArray<string> = [
 	`user.name=${AUTHOR_NAME}`,
 	'-c',
 	'commit.gpgsign=false',
+	...NO_AUTO_MAINTENANCE_OPTIONS,
 ]
 
 // **The environment is cleared rather than inherited** (joshuafolkken/kit#1530). Run from a git hook,
