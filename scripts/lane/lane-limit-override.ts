@@ -3,7 +3,7 @@ import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 
-// The live run's lane-limit override (joshuafolkken/kit#3434): where `josh lane:limit` writes it, where
+// The live run's lane-limit override: where `josh lane:limit` writes it, where
 // `lane_capacity.lane_limit` reads it, and how the `--wait` watcher sees a raise.
 //
 // **It lives on the run's carry record**, not in a file of its own. A running parent keeps the

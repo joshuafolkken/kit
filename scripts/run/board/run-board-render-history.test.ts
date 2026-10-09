@@ -44,7 +44,14 @@ const SHIPPED: ReadonlyArray<Phase> = [
 function running(number: number, track: ReadonlyArray<Phase>): BoardRow {
 	const status = { state: 'running' as const, started_ms: NOW - 5 * MINUTE, track }
 
-	return { number, title: `Sample ${String(number)}`, state: 'running', status, waits: [] }
+	return {
+		number,
+		title: `Sample ${String(number)}`,
+		kind: undefined,
+		state: 'running',
+		status,
+		waits: [],
+	}
 }
 
 const ROWS = [running(1, PLANNED), running(2, RETRIED), running(3, FAILED), running(4, SHIPPED)]
@@ -89,7 +96,7 @@ describe('run_board_render.render stage history', () => {
 		const title = 'Sample 2'.padEnd(48)
 
 		expect(row_line(board_lines(), 2)).toBe(
-			`  🚦 2  ${title}  05:00  ⚡  8% 🧠0.5G  🔍📝🔨🚢💥🔨🚢👀🚦`,
+			`  🚦 2    ${title}  05:00  ⚡  8% 🧠0.5G  🔍📝🔨🚢💥🔨🚢👀🚦`,
 		)
 	})
 })
@@ -97,7 +104,7 @@ describe('run_board_render.render stage history', () => {
 // Row 1 settled as `state` after `track`, on a board that still holds a usage reading for its lane.
 function settled_line(state: ItemState, track: ReadonlyArray<Phase>): string {
 	const status = { state, started_ms: NOW - 5 * MINUTE, ended_ms: NOW, track }
-	const row: BoardRow = { number: 1, title: 'Sample 1', state, status, waits: [] }
+	const row: BoardRow = { number: 1, title: 'Sample 1', kind: undefined, state, status, waits: [] }
 
 	return row_line(lines_of(header({ layout: { ...EMPTY_LAYOUT, active: [row] }, usages })), 1)
 }
@@ -115,7 +122,7 @@ describe('run_board_render.render settled history', () => {
 		const finish = `🔚 ${minute_of(NOW)}`
 
 		expect(settled_line(state, FAILED)).toBe(
-			`  ${icon} 1  ${title}  05:00  ${finish}  🔍📝🔨🚢💥${icon}`,
+			`  ${icon} 1    ${title}  05:00  ${finish}  🔍📝🔨🚢💥${icon}`,
 		)
 	})
 
@@ -123,6 +130,6 @@ describe('run_board_render.render settled history', () => {
 		['stopped', '🛑'],
 		['parked', '💤'],
 	])('draws a %s row’s track ended on its state icon right after its time', (state, icon) => {
-		expect(settled_line(state, FAILED)).toBe(`  ${icon} 1  ${title}  05:00  🔍📝🔨🚢💥${icon}`)
+		expect(settled_line(state, FAILED)).toBe(`  ${icon} 1    ${title}  05:00  🔍📝🔨🚢💥${icon}`)
 	})
 })

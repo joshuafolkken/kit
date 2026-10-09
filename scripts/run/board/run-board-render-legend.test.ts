@@ -22,6 +22,7 @@ function row(number: number, extra: Partial<BoardRow> = {}): BoardRow {
 		title: `Issue ${String(number)}`,
 		state: 'waiting',
 		status: undefined,
+		kind: undefined,
 		waits: [],
 		...extra,
 	}
@@ -58,6 +59,16 @@ describe('run_board_render_legend.legend_of', () => {
 
 		expect(legend_of([launched], ['👀'])).toStrictEqual(PHASE_LEGEND)
 		expect(legend_of([launched]).at(-1)).toBe('🔄 running')
+	})
+
+	// joshuafolkken/kit#3577: by their release category, in the release notes' order.
+	it('names only the kinds the rows draw, in the release notes’ order', () => {
+		const kinds = [row(1, { kind: 'bug' }), row(2, { kind: 'breaking-change' }), row(3)]
+		const every = [...kinds, row(4, { kind: 'enhancement' })]
+
+		expect(legend_of(kinds).at(-1)).toBe('⏳ waiting  🧨 breaking  🐛 fix')
+		expect(legend_of(every).at(-1)).toBe('⏳ waiting  🧨 breaking  ✨ feature  🐛 fix')
+		expect(legend_of([row(3)]).at(-1)).toBe('⏳ waiting')
 	})
 
 	it('names 🔗 only while a row draws a wait', () => {

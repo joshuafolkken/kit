@@ -1,4 +1,6 @@
 import { styleText } from 'node:util'
+import type { FiledKind } from '#scripts/run/event/run-event-filed'
+import { run_board_kind } from './run-board-kind'
 import { run_board_labels, type Words } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
@@ -9,7 +11,8 @@ import type { ItemState } from './run-board-status'
 // The legend at the foot of `run:board`: the symbols named once, so a row carries only what differs
 // between rows. Drawn apart from the rows, which tell it the icons they lead with.
 
-const { PHASE_ICONS, PHASE_WORDS, STATE_ICONS, WAITS_ICON, WORDS } = run_board_labels
+const { FILED_KIND_ICONS, KIND_WORDS, PHASE_ICONS, PHASE_WORDS, STATE_ICONS, WAITS_ICON, WORDS } =
+	run_board_labels
 const GAP = '  '
 
 // Every phase a run passes through, in the track's own order and whatever is on screen: a row's phase
@@ -43,6 +46,13 @@ function state_legend(drawn: ReadonlySet<string>): Array<string> {
 	)
 }
 
+// The release kinds the rows draw (joshuafolkken/kit#3577), in the release notes' order.
+function kinds_of(rows: ReadonlyArray<BoardRow>): Array<FiledKind> {
+	const drawn = new Set(rows.map((row) => row.kind))
+
+	return run_board_kind.KIND_ORDER.filter((kind) => drawn.has(kind))
+}
+
 function waits_legend(rows: ReadonlyArray<BoardRow>): Array<string> {
 	return rows.some((row) => row.waits.length > 0) ? [`${WAITS_ICON} ${WORDS.waits}`] : []
 }
@@ -55,8 +65,11 @@ function legend_of(
 	drawn: ReadonlySet<string>,
 	notes: ReadonlyArray<BoardNote>,
 ): Array<string> {
-	const notes_named = run_board_render_notes.notes_legend(notes, drawn)
-	const shown = [...state_legend(drawn), ...waits_legend(rows), ...notes_named]
+	const kinds = kinds_of(rows)
+	const kind_icons = kinds.map((kind) => FILED_KIND_ICONS[kind])
+	const notes_named = run_board_render_notes.notes_legend(notes, new Set([...drawn, ...kind_icons]))
+	const kind_named = kinds.map((kind) => `${FILED_KIND_ICONS[kind]} ${WORDS[KIND_WORDS[kind]]}`)
+	const shown = [...state_legend(drawn), ...kind_named, ...waits_legend(rows), ...notes_named]
 	const lines = shown.length === 0 ? PHASE_LEGEND : [...PHASE_LEGEND, shown.join(GAP)]
 
 	return lines.map((line) => styleText('dim', line))

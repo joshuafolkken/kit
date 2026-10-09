@@ -90,6 +90,7 @@ describe('run_board_render.render findings legend', () => {
 		const parked: BoardRow = {
 			number: 7,
 			title: 'Seven',
+			kind: undefined,
 			state: 'parked',
 			status: undefined,
 			waits: [],
@@ -122,12 +123,35 @@ describe('run_board_render.render filed kinds', () => {
 		}
 	})
 
+	// joshuafolkken/kit#3577: in the release notes' order, by the words the rows' legend names them with.
 	it('names only the kinds drawn, in the legend’s order', () => {
 		const every = lines_of(header(), [filed, enhancement, bug, breaking]).at(-1)
 
-		expect(every).toBe(`${NOTES_LEGEND}  🧨 breaking  🐛 bug  ✨ enhancement  🆕 filed`)
-		expect(lines_of(header(), [enhancement, bug]).at(-1)).toBe(
-			`${NOTES_LEGEND}  🐛 bug  ✨ enhancement`,
+		expect(every).toBe(`${NOTES_LEGEND}  🧨 breaking  ✨ feature  🐛 fix  🆕 filed`)
+		expect(lines_of(header(), [bug, enhancement]).at(-1)).toBe(
+			`${NOTES_LEGEND}  ✨ feature  🐛 fix`,
+		)
+	})
+})
+
+// joshuafolkken/kit#3577: a kind the rows' legend names is not named again among the findings.
+describe('run_board_render.render filed kinds beside row kinds', () => {
+	const bug: BoardNote = { ...filed, filed_kind: 'bug' }
+	const enhancement: BoardNote = { ...filed, filed_kind: 'enhancement' }
+
+	it('does not name a kind again where a row already names it', () => {
+		const row: BoardRow = {
+			number: 7,
+			title: 'Seven',
+			kind: 'bug',
+			state: 'waiting',
+			status: undefined,
+			waits: [],
+		}
+		const layout = { ...EMPTY_LAYOUT, active: [row] }
+
+		expect(lines_of(header({ layout }), [bug, enhancement]).at(-1)).toBe(
+			`⏳ waiting  🐛 fix  ${NOTES_LEGEND}  ✨ feature`,
 		)
 	})
 

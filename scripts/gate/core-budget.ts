@@ -11,20 +11,14 @@ import { z } from 'zod'
 import { core_admission, type Admission, type LedgerEntry, type Overflow } from './core-admission'
 import { machine_capacity, type MachineBudget, type MachineReading } from './machine-capacity'
 
-// A machine-wide weighted core budget with admission control (joshuafolkken/kit#2351).
+// A machine-wide weighted core budget with admission control.
 //
-// **The gate's CPU budget used to be decided once, at the gate's start, and never revisited.**
-// `announce_gate_plan` counted the unit runs alive the instant it began and sized itself against that
-// one reading — so the common case (nothing else in a gate yet) had every gate conclude it was alone
-// and reserve the whole machine, and only a gate that *started* later deferred. Three overlapping gates
-// therefore demanded thirty cores of an eleven-core machine, which is the "usually fine, occasionally
-// saturates" this module removes.
-//
-// **The fix is admission rather than recomputation.** A heavy step declares the cores it needs, claims
-// a place in a machine-wide ledger, and waits while the ledger is full — so the peak cannot exceed the
-// budget by construction, and the asymmetry ("whoever started first took everything") disappears
-// because a place is claimed in claim order rather than seized at start. Waiting is what replaces the
-// recomputation `unit-worker-share.ts` did: a step that could not fit does not shrink, it defers.
+// **Admission rather than a budget sized once at the gate's start.** A budget read once at the start
+// has every gate that sees no sibling conclude it is alone and reserve the whole machine, so
+// overlapping gates oversubscribe it. Instead a heavy step declares the cores it needs, claims a place
+// in a machine-wide ledger, and waits while the ledger is full — so the peak cannot exceed the budget
+// by construction, and a place is claimed in claim order rather than seized at start. A step that
+// could not fit does not shrink, it defers.
 //
 // **A solo run is bit-for-bit unchanged, and that is arithmetic rather than a branch.** The gate's
 // weights are its `reserved_cores` (the static checks) and its `unit_worker_cap` (the unit suite), and
@@ -32,12 +26,12 @@ import { machine_capacity, type MachineBudget, type MachineReading } from './mac
 // to the whole budget and every one is admitted the instant it is made, with no poll and no wait. Under
 // concurrency the same weights sum past the budget and the ledger is what holds the machine down.
 //
-// **Liveness is `process_identity`'s, reused rather than re-invented** (joshuafolkken/kit#1245). A run
+// **Liveness is `process_identity`'s, reused rather than re-invented.** A run
 // killed outright leaves its marker behind, and a ledger that trusted the file alone would fill forever
 // and admit nothing. The pid-and-start-time pair a marker carries is the same identity the unit-run
 // marker keeps, swept on read the moment its process is gone.
 //
-// **The budget is what the machine has free, in cores and in memory** (joshuafolkken/kit#3371). The
+// **The budget is what the machine has free, in cores and in memory.** The
 // core count stays the ceiling, but load from outside the ledger is subtracted from it, and a claim
 // waits while the memory its tool holds is not free — `machine-capacity.ts` reads both. A claim marks
 // its marker admitted once it runs, so the reading's load is split into the ledger's and the rest.
@@ -55,7 +49,7 @@ const WAIT_CAP_MS = 120_000
 const MIN_BUDGET = 1
 
 // **The cores each heavy tool occupies, declared once for both places that reserve them**
-// (joshuafolkken/kit#3345). `gate-plan.ts`'s checks and the `josh` commands that run the same tools
+// `gate-plan.ts`'s checks and the `josh` commands that run the same tools
 // directly read these, so a direct `josh lint` claims what the gate's lint claims. The lint, type check
 // and spell check numbers are `gate-plan.ts`'s measured table, floored. The whole-tree eslint scan
 // behind `josh lines` and `josh refactor:scan` runs in one process: measured cold on the 11-core
@@ -67,7 +61,7 @@ const CORE_WEIGHTS = {
 	eslint_scan: 1,
 } as const
 
-// **The memory each heavy tool holds, declared beside its cores** (joshuafolkken/kit#3371): peak
+// **The memory each heavy tool holds, declared beside its cores**: peak
 // resident size in MB, rounded up. Measured with `/usr/bin/time -l` on the 11-core / 18 GB machine on
 // 2026-10-07: the type check 1,244 MB, the spell check 330 MB, and one unit worker 319 MB over 54 test
 // files. Typed eslint was 1,207 MB over one directory and was observed at 1.6–2.4 GB per whole-tree
@@ -81,7 +75,7 @@ const MEMORY_MB = {
 } as const
 
 // **The environment mark that says a parent already holds this process's cores**
-// (joshuafolkken/kit#3345). `josh gate` reserves per check and then spawns `pnpm josh lint`. Without
+// `josh gate` reserves per check and then spawns `pnpm josh lint`. Without
 // the mark, that child's own dispatch would claim a second place for the cores its parent already
 // holds. Every holder sets it, and every child inherits it through the environment and claims nothing.
 const HELD_KEY = 'JOSH_CORE_RESERVED'
@@ -369,7 +363,7 @@ async function with_held_mark<T>(run: () => Promise<T>): Promise<T> {
 }
 
 // **A command's reservation: the gate's claim, unless a parent already holds the cores**
-// (joshuafolkken/kit#3345). `josh-logic.ts` calls this around every command that declares a weight.
+// `josh-logic.ts` calls this around every command that declares a weight.
 // Each command then only declares its weight, and no command carries a copy of the claim, run and
 // release steps. A solo run is admitted on the first read, so a run with room on the machine starts
 // with no wait. A command inside a unit suite claims nothing either, for the reason `reserved-run.ts`

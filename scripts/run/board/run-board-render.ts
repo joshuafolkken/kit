@@ -32,7 +32,8 @@ import type { LaneUsages } from './run-board-usage'
 // what differs between rows. Every word is English whatever the session language: one set of words
 // reads the same on every board.
 
-const { NOTES_ICON, PHASE_ICONS, STATE_ICONS, WAITS_ICON, WORDS } = run_board_labels
+const { FILED_KIND_ICONS, KIND_BLANK, NOTES_ICON, PHASE_ICONS, STATE_ICONS, WAITS_ICON, WORDS } =
+	run_board_labels
 const { clock_of, elapsed_of } = run_board_labels
 const { NOTE_LIMIT } = run_board_render_notes
 const { cell_of, column_width, slot_of } = run_board_render_slot
@@ -174,12 +175,21 @@ function joined(parts: ReadonlyArray<string | undefined>): string {
 	return parts.filter((part) => part !== undefined && part !== '').join(GAP)
 }
 
+// The release kind's icon between the number and the title, one space either side; a row with no title
+// ends at its icon, so what follows keeps its usual gap.
+function lead_of(row: BoardRow, header: BoardHeader, title: string): string {
+	const kind = row.kind === undefined ? KIND_BLANK : FILED_KIND_ICONS[row.kind]
+	const lead = `${state_icon(row)} ${header.link(String(row.number))} ${kind}`
+
+	return title === '' ? lead : `${lead} ${title}`
+}
+
 // A row up to its usage column — the columns that stay where they are whatever the track's length.
 function head_text(row: BoardRow, frame: RowFrame): string {
-	const lead = `${state_icon(row)} ${frame.header.link(String(row.number))}`
 	const cell = cell_text(row, frame)
+	const [title = '', ...time] = timed_parts(row, frame, cell !== undefined)
 
-	return joined([lead, ...timed_parts(row, frame, cell !== undefined), cell])
+	return joined([lead_of(row, frame.header, title), ...time, cell])
 }
 
 // Every row carries its state's icon, a waiting one ⏳ too; a row with nothing

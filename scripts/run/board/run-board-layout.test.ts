@@ -13,6 +13,7 @@ import type { ItemStatus } from './run-board-status'
 // and every other dependency as a waiting-on note.
 
 const REPO = 'joshuafolkken/kit'
+const BREAKING = 'breaking-change'
 const NO_STATUSES: ReadonlyMap<number, ItemStatus> = new Map()
 
 function child(
@@ -95,6 +96,29 @@ describe('run_board_layout.layout_of wave rows', () => {
 		const states = layout.waves[0]?.map((entry) => (entry.kind === 'row' ? entry.row.state : ''))
 
 		expect(states).toStrictEqual(['waiting', 'human'])
+	})
+})
+
+// joshuafolkken/kit#3577: every row carries the release category its labels place it in.
+describe('run_board_layout.layout_of release kinds', () => {
+	it('gives a plan row the kind its own labels place it in, and none without one', () => {
+		const plan = plan_of([[child(1, [], ['bug']), child(2)]])
+		const layout = run_board_layout.layout_of(plan, NO_STATUSES)
+		const kinds = layout.waves[0]?.map((entry) => (entry.kind === 'row' ? entry.row.kind : ''))
+
+		expect(kinds).toStrictEqual(['bug', undefined])
+	})
+
+	it('gives an active row the kind the read labels place it in', () => {
+		const statuses = new Map<number, ItemStatus>([
+			[1, { state: 'merged', started_ms: 100 }],
+			[2, { state: 'running', started_ms: 200 }],
+		])
+		const plan = { ...plan_of([]), labels: new Map([[1, [BREAKING]]]) }
+		const layout = run_board_layout.layout_of(plan, statuses)
+
+		expect(layout.active.map((row) => row.kind)).toStrictEqual([BREAKING, undefined])
+		expect(run_board_layout.local_layout_of(statuses).active[0]?.kind).toBeUndefined()
 	})
 })
 

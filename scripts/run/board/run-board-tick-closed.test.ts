@@ -30,11 +30,14 @@ const PLAN: BoardPlan = {
 	labels: new Map(),
 }
 
-function merged_closed(issues: ReadonlyArray<number>): ClosedAnswer {
+function merged_closed(
+	issues: ReadonlyArray<number>,
+	labels: ReadonlyArray<string> = [],
+): ClosedAnswer {
 	const closed = new Map(
 		issues.map((issue) => [
 			issue,
-			{ title: `Child ${String(issue)}`, closed_ms: CLOSED_MS, is_merged: true },
+			{ title: `Child ${String(issue)}`, labels, closed_ms: CLOSED_MS, is_merged: true },
 		]),
 	)
 
@@ -55,7 +58,7 @@ describe('run_board_tick.tick — children that closed', () => {
 
 		await tick(FRESH_STATE, ports)
 
-		expect(row_of(frames.at(-1), 3439)?.trim()).toBe('🏁 3439  🔍🏁')
+		expect(row_of(frames.at(-1), 3439)?.trim()).toBe('🏁 3439     🔍🏁')
 	})
 
 	it('draws each child read closed with its title, time and merge', async () => {
@@ -83,6 +86,20 @@ describe('run_board_tick.tick — children that closed', () => {
 		await tick(first, ports)
 
 		expect(read_closed).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#3577: a closed child's labels are read with its title, so its row keeps its kind.
+describe('run_board_tick.tick — the release kind of a closed child', () => {
+	it('draws a closed child with the release kind its labels place it in', async () => {
+		const { ports, frames, read_closed } = harness(LOCAL_CLOSED, [PLAN])
+
+		read_closed.mockImplementation(async (issues) => merged_closed(issues, ['bug']))
+		await tick(FRESH_STATE, ports)
+
+		expect(row_of(frames.at(-1), CHILDREN[0] ?? 0)).toContain(
+			`✅ ${String(CHILDREN[0])} 🐛 Child ${String(CHILDREN[0])}`,
+		)
 	})
 })
 

@@ -72,19 +72,21 @@ function state_for(state: BoardState, local: LocalRead): BoardState {
 	return { ...FRESH_STATE, local: kept, read_ms, run_started_ms: local.started_ms }
 }
 
-// The plan with a closed child's title under the listing's own.
-function titled_closed(plan: BoardPlan, closed: ReadonlyMap<number, ClosedIssue>): BoardPlan {
+// The plan with a closed child's title and labels under the listing's own.
+function with_closed(plan: BoardPlan, closed: ReadonlyMap<number, ClosedIssue>): BoardPlan {
 	const closed_titles = [...closed].map(([issue, { title }]) => [issue, title] as const)
+	const closed_labels = [...closed].map(([issue, { labels }]) => [issue, labels] as const)
 	const titles = new Map([...closed_titles, ...plan.context.titles])
+	const labels = new Map([...closed_labels, ...plan.labels])
 
-	return { ...plan, context: { ...plan.context, titles } }
+	return { ...plan, context: { ...plan.context, titles }, labels }
 }
 
 // The titles the findings name a parked issue by — the rows' own; none before the plan is read.
 function titles_of(state: BoardState): Titles {
 	if (state.plan === undefined) return new Map()
 
-	return titled_closed(state.plan, state.closed).context.titles
+	return with_closed(state.plan, state.closed).context.titles
 }
 
 // The statuses scoped to the run's plan, a running child the plan's listing no longer holds settled.
@@ -106,7 +108,7 @@ function layout_for(state: BoardState, local: LocalRead): BoardLayout {
 	}
 	const statuses = run_board_status.settle_closed(statuses_for(plan, local), read)
 
-	return run_board_layout.layout_of(titled_closed(plan, closed), statuses)
+	return run_board_layout.layout_of(with_closed(plan, closed), statuses)
 }
 
 // What one redraw draws with.

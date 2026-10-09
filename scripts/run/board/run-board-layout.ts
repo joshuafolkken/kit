@@ -4,6 +4,8 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { IssueReference } from '#scripts/epic/epic-reference'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_label_name, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import type { FiledKind } from '#scripts/run/event/run-event-filed'
+import { run_board_kind } from './run-board-kind'
 import type { ItemState, ItemStatus } from './run-board-status'
 
 // The plan with each issue's status laid over it — pure, so the order the board
@@ -28,6 +30,8 @@ interface BoardPlan {
 interface BoardRow {
 	number: number
 	title: string | undefined
+	// The release category its labels place it in (joshuafolkken/kit#3577), none for an Other Change.
+	kind: FiledKind | undefined
 	state: ItemState
 	status: ItemStatus | undefined
 	// The standing blockers this row still waits on, as the plan names them.
@@ -43,6 +47,12 @@ interface BoardLayout {
 	waves: ReadonlyArray<ReadonlyArray<WaveEntry>>
 	people: ReadonlyArray<BoardRow>
 	unreached: ReadonlyArray<BoardRow>
+}
+
+// What an active row is named and classified by — each issue's title and labels.
+interface RowRead {
+	titles: ReadonlyMap<number, string>
+	labels: ReadonlyMap<number, ReadonlyArray<string>>
 }
 
 interface Overlay {
@@ -79,6 +89,7 @@ function plan_row(child: EpicChild, state: ItemState, overlay: Overlay): BoardRo
 	return {
 		number: child.number,
 		title: context.titles.get(child.number),
+		kind: run_board_kind.kind_of(child.labels),
 		state,
 		status: undefined,
 		waits,
@@ -90,13 +101,11 @@ function started_of(row: BoardRow): number {
 }
 
 // Every child the run has touched, in the order each started.
-function active_rows(
-	statuses: ReadonlyMap<number, ItemStatus>,
-	titles: ReadonlyMap<number, string>,
-): Array<BoardRow> {
+function active_rows(statuses: ReadonlyMap<number, ItemStatus>, read: RowRead): Array<BoardRow> {
 	const rows = [...statuses].map(([number, status]) => ({
 		number,
-		title: titles.get(number),
+		title: read.titles.get(number),
+		kind: run_board_kind.kind_of(read.labels.get(number)),
 		state: status.state,
 		status,
 		waits: [],
@@ -167,7 +176,7 @@ function layout_of(plan: BoardPlan, statuses: ReadonlyMap<number, ItemStatus>): 
 	)
 
 	return {
-		active: active_rows(statuses, plan.context.titles),
+		active: active_rows(statuses, { titles: plan.context.titles, labels: plan.labels }),
 		waves: waves.filter((wave) => wave.length > 0),
 		people: unreached_rows(overlay, true),
 		unreached: unreached_rows(overlay, false),
@@ -180,7 +189,10 @@ const EMPTY_LAYOUT: BoardLayout = { active: [], waves: [], people: [], unreached
 // once, so the rows, their states and how long each has run are drawn while GitHub answers; the titles
 // and every issue the run has not touched wait for the plan.
 function local_layout_of(statuses: ReadonlyMap<number, ItemStatus>): BoardLayout {
-	return { ...EMPTY_LAYOUT, active: active_rows(statuses, new Map()) }
+	return {
+		...EMPTY_LAYOUT,
+		active: active_rows(statuses, { titles: new Map(), labels: new Map() }),
+	}
 }
 
 // Every issue the plan holds, wave or unreached — the run's scope a lane is checked against.

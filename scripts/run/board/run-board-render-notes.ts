@@ -1,3 +1,4 @@
+import { run_board_kind } from './run-board-kind'
 import { run_board_labels, type Words } from './run-board-labels'
 import type { BoardNote } from './run-board-notes'
 
@@ -5,7 +6,8 @@ import type { BoardNote } from './run-board-notes'
 // A finding is read to the minute, and the legend names only the kinds the section draws — the rows'
 // legend's rule — so a section of filed Issues alone is not explained with 💬 and 💤.
 
-const { FILED_KIND_ICONS, NOTES_ICON, NOTE_ICONS, STATE_ICONS, WORDS, minute_of } = run_board_labels
+const { FILED_KIND_ICONS, KIND_WORDS, NOTES_ICON, NOTE_ICONS, STATE_ICONS, WORDS, minute_of } =
+	run_board_labels
 const NOTE_LIMIT = 6
 const GAP = '  '
 const INDENT = '  '
@@ -13,11 +15,10 @@ const NUMBER_PLACEHOLDER = '{n}'
 
 type Link = (reference: string) => string
 
-// The icons the legend can name, in its order, each with its word.
+// The icons the legend can name, in its order, each with its word — a filed kind's the rows' own
+// (joshuafolkken/kit#3577), so one icon is never named with two words.
 const NOTE_LEGEND: ReadonlyArray<readonly [string, keyof Words]> = [
-	[FILED_KIND_ICONS['breaking-change'], 'breaking'],
-	[FILED_KIND_ICONS.bug, 'bug'],
-	[FILED_KIND_ICONS.enhancement, 'enhancement'],
+	...run_board_kind.KIND_ORDER.map((kind) => [FILED_KIND_ICONS[kind], KIND_WORDS[kind]] as const),
 	[NOTE_ICONS.filed, 'filed'],
 	[NOTE_ICONS.park, 'parked'],
 	[NOTE_ICONS.note, 'note'],

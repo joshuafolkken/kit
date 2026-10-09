@@ -27,6 +27,7 @@ const usages: LaneUsages = new Map([
 const running: BoardRow = {
 	number: 1,
 	title: 'Issue 1',
+	kind: undefined,
 	state: 'running',
 	status: { state: 'running', started_ms: NOW, track: ['investigate', 'plan', 'implement'] },
 	waits: ['3'],
@@ -34,6 +35,7 @@ const running: BoardRow = {
 const waiting: BoardRow = {
 	number: 2,
 	title: 'Issue 2',
+	kind: undefined,
 	state: 'waiting',
 	status: undefined,
 	waits: [],
@@ -98,7 +100,7 @@ const FINISH = /🔚 (?:\d+\/\d+ )?\d{2}:\d{2}/u
 function tracked(number: number, state: BoardRow['state'], ended_ms?: number): BoardRow {
 	const status = { state, started_ms: NOW - MINUTE, ended_ms, track: TRACK }
 
-	return { number, title: `Issue ${String(number)}`, state, status, waits: [] }
+	return { number, title: `Issue ${String(number)}`, kind: undefined, state, status, waits: [] }
 }
 
 const mixed: ReadonlyArray<BoardRow> = [

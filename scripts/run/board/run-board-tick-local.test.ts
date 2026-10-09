@@ -74,7 +74,7 @@ describe('run_board_tick.tick before the plan is read', () => {
 		expect(lines[0]).toMatch(/ {2}✅ 0\/- ─+ {2}🔄 1 {2}⏳ - {2}💤 0/u)
 		expect(lines[1]).toContain('🧠')
 		expect(lines[2]).toBe('')
-		expect(lines[3]).toMatch(new RegExp(`^. 🔍 ${String(CHILD)}  …`, 'u'))
+		expect(lines[3]).toMatch(new RegExp(`^. 🔍 ${String(CHILD)}    …`, 'u'))
 	})
 
 	// The regression: the running count was the plan's, so a board still loading drew a run as waiting.

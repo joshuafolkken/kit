@@ -67,8 +67,8 @@ const WORDS = {
 	more: 'more',
 	filed: 'filed',
 	breaking: 'breaking',
-	bug: 'bug',
-	enhancement: 'enhancement',
+	feature: 'feature',
+	fix: 'fix',
 	park: 'park',
 	note: 'note',
 	found_during: ' (found during {n})',
@@ -157,6 +157,14 @@ const FILED_KIND_ICONS: Readonly<Record<FiledKind, string>> = {
 	'breaking-change': '🧨',
 	bug: '🐛',
 	enhancement: '✨',
+}
+// A row leads its title with its kind's icon (joshuafolkken/kit#3577), and one with no kind with as many
+// blank columns, so every title starts in one column. The legend names a kind by its release category.
+const KIND_BLANK = '  '
+const KIND_WORDS: Readonly<Record<FiledKind, keyof Words>> = {
+	'breaking-change': 'breaking',
+	enhancement: 'feature',
+	bug: 'fix',
 }
 
 // The header's gauges and marks. ⚡ rather than 🔥: a fire beside a gauge drawn green reads as an
@@ -268,6 +276,8 @@ const run_board_labels = {
 	FILED_KIND_ICONS,
 	GAUGE_SHADES,
 	HEADER_ICONS,
+	KIND_BLANK,
+	KIND_WORDS,
 	NOTES_ICON,
 	NOTE_ICONS,
 	PHASE_ICONS,
