@@ -138,6 +138,28 @@ describe('run_board_render.render filed kinds', () => {
 	})
 })
 
+function bracketed(reference: string): string {
+	return `[${reference}]`
+}
+
+// joshuafolkken/kit#3520: a finding's numbers open their GitHub issue, as the plan's rows do.
+describe('run_board_render.render findings links', () => {
+	const found: BoardNote = { ...filed, issue: 'other/repo#12', found_during: '3415' }
+
+	it('links the finding’s issue and the issue it was found during', () => {
+		const lines = lines_of(header({ link: bracketed }), [found, note(NOW, 'seen')])
+
+		expect(lines).toContain(`  🆕 ${minute_of(NOW)} [other/repo#12]  Lead (found during [3415])`)
+		expect(lines).toContain(`  💬 ${minute_of(NOW)} [3415]  seen`)
+	})
+
+	it('draws the numbers unchanged where the terminal gets no link', () => {
+		expect(lines_of(header(), [found])).toContain(
+			`  🆕 ${minute_of(NOW)} other/repo#12  Lead (found during 3415)`,
+		)
+	})
+})
+
 describe('run_board_render.render findings with no legend', () => {
 	it('keeps the heading and the kind words on a screen with no plan read yet, which draws no legend', () => {
 		const lines = lines_of(header({ layout: undefined }), [filed])
