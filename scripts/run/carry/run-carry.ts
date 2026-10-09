@@ -136,6 +136,11 @@ interface RunCarry {
 	// kept beside `invocation` so the ownership comparison never sees them. Optional and `| undefined`
 	// for the same disk round-trip reason the owner fields carry.
 	added?: ReadonlyArray<CarryAddition> | undefined
+	// The lane limit `josh lane:limit` set on this live run (joshuafolkken/kit#3434). It outranks
+	// `JOSH_LANE_LIMIT` in `lane_capacity.lane_limit`: a running parent keeps the environment it started
+	// with, and the record is the one place both it and a person's shell read. Carried across a hand-off
+	// like `done`; optional and `| undefined` for the same disk round-trip reason.
+	lane_limit?: number | undefined
 }
 
 // The identity of a process, as `process-identity.ts` keeps it: the pid plus an opaque start-time
@@ -222,6 +227,8 @@ const run_carry_schema = z.object({
 	retrospective: z.boolean().optional(),
 	// Optional, so a record written before `run:add` existed still parses (joshuafolkken/kit#3433).
 	added: z.array(carry_addition_schema).optional(),
+	// Optional, so a record written before `lane:limit` existed still parses (joshuafolkken/kit#3434).
+	lane_limit: z.number().int().positive().optional(),
 })
 
 function carry_path(git_directory: string): string {

@@ -123,6 +123,10 @@ const EVENT_KIND = {
 	// ends on it, so the issue takes the next free lane without waiting out the arrival probe's minute. A
 	// trace: it says what the run was handed, not where the run is.
 	ADD: 'add',
+	// `josh lane:limit` raised a live run's lane limit (joshuafolkken/kit#3434). The `--wait` watcher's
+	// arrival probe reads it as a wake: the lanes a raise frees are new room for a pool its baseline
+	// already holds. A trace: it says the run gained room, not where the run is.
+	LANE_LIMIT: 'lane-limit',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -140,6 +144,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.NOTE,
 	EVENT_KIND.LANE_PHASE,
 	EVENT_KIND.ADD,
+	EVENT_KIND.LANE_LIMIT,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or

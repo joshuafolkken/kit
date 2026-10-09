@@ -352,7 +352,7 @@ async function report_epics(
 ): Promise<number> {
 	if (options.repo === undefined) return await report(views, undefined, current_repo)
 
-	const choice = lane_capacity.lane_limit()
+	const choice = await lane_capacity.lane_limit()
 	if (choice.kind === 'problem') return refuse(choice.problem)
 
 	return await report(

@@ -74,6 +74,16 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<issue> [--stash <message>]', 'automation', ['files', 'git', 'processes']],
 	},
+	// A live run's lane limit (joshuafolkken/kit#3434): `.env` is read so the bare form reports the
+	// `JOSH_LANE_LIMIT` a person set there when no override stands.
+	'lane:limit': {
+		script: 'scripts/lane/lane-limit-cli.ts',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			'Change a live backlogrun’s lane limit without stopping it, or print the limit, lanes in use and free lanes',
+		category: 'AI tools',
+		reference: ['[<limit>] [--reset]', 'developer', ['files']],
+	},
 	// The lane-limit measurement (joshuafolkken/kit#3355): `.env` is read so `lane:stats` labels the row
 	// with the `JOSH_LANE_LIMIT` a person set there.
 	'lane:sample': {
