@@ -61,7 +61,7 @@ const PRETTIER_ARGUMENTS: ReadonlyArray<string> = ['--write', '--ignore-unknown'
 // nothing to say about it, and a non-zero exit here would be reported as a failed hook.
 //
 // The cache flags are not here to make the hook faster — they are here to stop it destroying the
-// gate's cache (joshuafolkken/kit#1332). ESLint started *without* `--cache` deletes the file at
+// gate's cache. ESLint started *without* `--cache` deletes the file at
 // `--cache-location`, so this hook wiped `.eslintcache` on every edit and the gate's lint ran cold
 // every time. Passing them points that deletion, and the hook's own reads and writes, at a location
 // of its own — its own rather than the gate's because the two run concurrently, and each eslint run
@@ -81,7 +81,7 @@ const ESLINT_ARGUMENTS: ReadonlyArray<string> = [
 // hope — behind a socket and forwards the same arguments to it, which is why the fixed output is
 // identical rather than merely similar. The config entry file is re-read per request; the modules it
 // imports are not, which `plan_daemon_restart` below is the answer to. The daemon exits after 15
-// minutes of inactivity (joshuafolkken/kit#1259).
+// minutes of inactivity.
 const ESLINT_DAEMON = 'eslint_d'
 const DAEMON_RESTART = 'restart'
 // The two shapes a flat config is built from here and in every consumer of this kit: the root
@@ -90,8 +90,7 @@ const ESLINT_CONFIG_DIR = 'eslint'
 const ESLINT_CONFIG_ENTRY = /^eslint\.config\.[cm]?[jt]s$/u
 
 // The problems eslint could not auto-fix are handed to the model verbatim from eslint's own stdout —
-// its default formatter already prints the file, the `line:col`, and the rule name the issue asks
-// for (joshuafolkken/kit#2275). A header names what the block is, since additionalContext arrives
+// its default formatter already prints the file, the `line:col`, and the rule name. A header names what the block is, since additionalContext arrives
 // with no framing of its own.
 const DIAGNOSTIC_HEADER =
 	'The edit hook could not auto-fix these lint problems; address them now rather than at the gate:'
@@ -129,7 +128,7 @@ interface BinRoutes {
 // on a half-written file. The stdout the spawn captured is what separates the two: eslint prints the
 // problems it is exiting non-zero about, while a daemon that could not start prints its reason to
 // stderr and leaves stdout empty. It is kept whole rather than reduced to a boolean because the
-// problems eslint could not fix are reported to the model from it (joshuafolkken/kit#2275).
+// problems eslint could not fix are reported to the model from it.
 interface CommandOutcome {
 	exit_code: number
 	stdout: string
@@ -352,7 +351,7 @@ function format_diagnostics(unfixed: string | undefined): string | undefined {
 }
 
 // The fixes eslint could apply are applied silently, as before; what it could not fix is returned so
-// the model sees it on this edit rather than at the gate (joshuafolkken/kit#2275). A `PostToolUse`
+// the model sees it on this edit rather than at the gate. A `PostToolUse`
 // hook still reports no failure — the edit already landed, and returning the problems is not the same
 // as failing the write.
 // Runs the planned commands in order, returning the last unfixed eslint output. Empty until eslint
@@ -410,7 +409,7 @@ async function format_edited_payload(
 const HOOK_EVENT_NAME = 'PostToolUse'
 
 // The live round-trip density line, riding this hook rather than one of its own
-// (joshuafolkken/kit#1329) — a `PostToolUse` matcher covering every tool would add a process start to
+//  — a `PostToolUse` matcher covering every tool would add a process start to
 // all ~250 calls of a run.
 //
 // **A `PostToolUse` hook's plain stdout never reaches the model**; only `additionalContext` inside
@@ -458,9 +457,9 @@ function report_no_payload(): void {
 // their processes have run; the density line is joined to them into the single envelope the harness
 // can parse, rather than written first on its own. The rewrite notice is read from the file itself —
 // its content before the formatters ran against its content after — so it too is known only once they
-// have (joshuafolkken/kit#2314). The rewrite, lint and spell blocks are composed together first, then
-// joined to the density line — one envelope, since a `PostToolUse` hook's stdout carries only one
-// (joshuafolkken/kit#2296). A hook killed at its 15s timeout is the one case this loses the density
+// have. The rewrite, lint and spell blocks are composed together first, then
+// joined to the density line — one envelope, since a `PostToolUse` hook's stdout carries only one.
+// A hook killed at its 15s timeout is the one case this loses the density
 // line to — a run already gone pathologically wrong, per HOOK_PROCESS_TIMEOUT_MS.
 async function run_hook(payload: string): Promise<void> {
 	const notice = time_density_hook.density_notice(payload)

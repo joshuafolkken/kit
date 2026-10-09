@@ -1,5 +1,5 @@
-// The single-source check a document-rule test runs to keep one piece of prose in one place
-// (joshuafolkken/kit#2188). Epic #2166 trims the entry read by turning prose a reader interprets into
+// The single-source check a document-rule test runs to keep one piece of prose in one place.
+// Epic #2166 trims the entry read by turning prose a reader interprets into
 // commands and reference-only pointers; that only holds if the body moved to its command's help does
 // not get pasted back into the prose. This is the framework a later child pins each such move with —
 // give it the body marker and the file allowed to carry it, and it names every other document that

@@ -1,7 +1,7 @@
 import { repo_party } from '#scripts/discovery/repo-party'
 import { issue_citation } from './issue-citation'
 
-// The predicates behind the `filing-offer` row of the stop guard (joshuafolkken/kit#2422).
+// The predicates behind the `filing-offer` row of the stop guard.
 //
 // **A first-party filing is Tier A, and an offer to file is that filing deferred to the user.**
 // `observation-filing.md` says a run that judges something worth filing files it without asking, yet a reply

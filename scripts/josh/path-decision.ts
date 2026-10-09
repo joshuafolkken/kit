@@ -1,6 +1,6 @@
 import { changed_paths } from '#scripts/git/changed-paths'
 
-// The shape both path-decided commands share (joshuafolkken/kit#907).
+// The shape both path-decided commands share.
 //
 // `josh review:level` and `josh review:round2` ask different questions of the same tree, and they answer
 // the same way: read the changed paths, decide from them alone, print the answer on stdout and the reason on
@@ -29,8 +29,8 @@ interface DecisionCommand<Answer extends string> {
 	explain: (paths: ReadonlyArray<string>, answer: Answer) => string
 }
 
-// The flag contract every mechanically-decided command shares — the two here and `josh review:round2`
-// (joshuafolkken/kit#1433). An argument that is not a known flag makes the whole invocation
+// The flag contract every mechanically-decided command shares — the two here and `josh review:round2`.
+// An argument that is not a known flag makes the whole invocation
 // unreadable, and an unreadable invocation is never answered with a default. Shared because the
 // *direction* is the load-bearing part rather than the `some` call: a command that guessed would
 // hand the caller the answer they were reaching for instead of the one their tree supports, and two

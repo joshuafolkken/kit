@@ -1,10 +1,8 @@
-// The character cap a Bash result is truncated at, read from the settings file rather than restated
-// (joshuafolkken/kit#1797). Every entry-read document is larger than it, so a `cat` of one hands back
-// a middle-truncated preview and the file is then read a second time — the two wasted requests #1797
-// measured. A number copied into code would be a second declaration of the cap and would drift the
-// first time the settings changed; the harness's own default stands in only where the file declares
-// nothing. Split out of `entry-read-set.ts` in joshuafolkken/kit#2161 to keep that file under its
-// line ceiling.
+// The character cap a Bash result is truncated at, read from the settings file rather than restated.
+// Every entry-read document is larger than it, so a `cat` of one hands back
+// a middle-truncated preview and the file is then read a second time. A number copied into code would
+// be a second declaration of the cap and would drift the first time the settings changed; the
+// harness's own default stands in only where the file declares nothing.
 
 import path from 'node:path'
 import { document_section } from './document-section'

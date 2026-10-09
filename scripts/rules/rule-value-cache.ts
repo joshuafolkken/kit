@@ -3,8 +3,8 @@ import { mkdirSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { file_reader } from '#scripts/lib/read-file'
 
-// The `rule:value` reading at the `backlogrun` loop head, without the loop waiting on it
-// (joshuafolkken/kit#2881). Measuring re-reads every transcript and takes minutes, and `backlog:offer`
+// The `rule:value` reading at the `backlogrun` loop head, without the loop waiting on it.
+// Measuring re-reads every transcript and takes minutes, and `backlog:offer`
 // ran it synchronously on every iteration, so each dispatch waited on it. The loop head now prints the
 // last reading from a cache and, when the last refresh is old enough, starts one in a detached process
 // — `josh rule:value --refresh` — so the next iteration prints the newer reading.
