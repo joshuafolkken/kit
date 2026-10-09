@@ -12,7 +12,7 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12222,
-		"on_demand_bytes": 559222
+		"on_demand_bytes": 559181
 	},
 	"accepted": {
 		"reason": "#3403 adds the same-document section-reference scan (document-scan.ts, its tests and fixture) and rewords skill arrows the scan flagged",
