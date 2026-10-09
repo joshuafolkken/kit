@@ -246,7 +246,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/josh/josh.stdout.test.ts',
 	'scripts/josh/kit-only.test.ts',
 	'scripts/josh/platform-temporary.test.ts',
-	'scripts/josh/process-identity.test.ts',
 	'scripts/lane/lane-capacity.test.ts',
 	'scripts/lane/lane-child-invocation.test.ts',
 	'scripts/lane/lane-child-marker.test.ts',
