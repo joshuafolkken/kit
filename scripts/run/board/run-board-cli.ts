@@ -1,11 +1,14 @@
 #!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
-import { stripVTControlCharacters, styleText } from 'node:util'
+import { styleText } from 'node:util'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
+import { telegram_notify } from '#scripts/notify/telegram-notify'
+import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_read } from '#scripts/run/progress/run-progress-read'
 import terminalLink from 'terminal-link'
 import { run_board_closed } from './run-board-closed'
+import { run_board_every } from './run-board-every'
 import { run_board_labels } from './run-board-labels'
 import { run_board_plan } from './run-board-plan'
 import { run_board_read } from './run-board-read'
@@ -26,10 +29,12 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ONCE_FLAG = '--once'
 const CHAT_FLAG = '--chat'
+const EVERY_FLAG = '--every'
 const FLAGS: ReadonlySet<string> = new Set(['', ONCE_FLAG, CHAT_FLAG])
 const SIGINT_EXIT_CODE = 130
 const SIGTERM_EXIT_CODE = 143
-const USAGE = 'Usage: josh run:board [--once | --chat]'
+const USAGE = 'Usage: josh run:board [--once | --chat | --every <minutes>]'
+const DISABLED_NOTICE = `\`${run_progress.DISABLED_KEY}=${run_progress.DISABLED_VALUE}\` is set, so no progress is pushed.`
 const TRAILING_NEWLINE = /\n$/u
 const { FRESH_STATE, tick } = run_board_tick
 const { WORDS } = run_board_labels
@@ -57,6 +62,9 @@ const LIVE_PORTS: BoardPorts = {
 	form: 'screen',
 	mark: async () => {
 		run_progress_read.mark(await run_progress_read.stamp_target(), Date.now())
+	},
+	push: async (frame) => {
+		await telegram_notify.progress(frame)
 	},
 	on_exit,
 	sleep: async (ms) => {
@@ -124,21 +132,37 @@ async function watch(ports: BoardPorts): Promise<void> {
 }
 
 // The answer to a progress question asked during a `backlogrun` (joshuafolkken/kit#3456): one frame in
-// the chat's form, with every escape stripped because a chat shows them as text, and recorded as the
-// report it is, so the next scheduled one waits a full interval — as `run:progress --once` does.
+// the chat's form, recorded as the report it is, so the next scheduled one waits a full interval — as
+// `run:progress --once` does.
 async function answer(ports: BoardPorts): Promise<void> {
-	const chat_ports: BoardPorts = {
-		...ports,
-		is_tty: false,
-		size: undefined,
-		form: 'chat',
-		write: (frame) => {
-			ports.write(stripVTControlCharacters(frame))
-		},
+	const { text } = await run_board_every.chat_frame(ports)
+
+	ports.write(text)
+	await ports.mark()
+}
+
+function refuse(): number {
+	process.stderr.write(`${USAGE}\n`)
+
+	return FAILURE_EXIT_CODE
+}
+
+// `--every <minutes>` (joshuafolkken/kit#3569): the chat frame pushed off-screen each interval until the
+// run ends — started only because a person asked, so the heartbeat's no-Telegram rule is untouched.
+async function push_every(minutes: string | undefined, ports: BoardPorts): Promise<number> {
+	const interval = run_progress.minutes_from(minutes)
+
+	if (interval === undefined) return refuse()
+
+	if (run_progress.is_disabled()) {
+		process.stderr.write(`${DISABLED_NOTICE}\n`)
+
+		return SUCCESS_EXIT_CODE
 	}
 
-	await tick(FRESH_STATE, chat_ports)
-	await ports.mark()
+	await run_board_every.push_until_ended(ports, interval * run_progress.MS_PER_MINUTE)
+
+	return SUCCESS_EXIT_CODE
 }
 
 async function draw(flag: string, ports: BoardPorts): Promise<void> {
@@ -157,21 +181,26 @@ async function draw(flag: string, ports: BoardPorts): Promise<void> {
 	await (mode === 'live' ? watch(ports) : tick(FRESH_STATE, once_ports))
 }
 
+function is_every(flag: string, rest: ReadonlyArray<string>): boolean {
+	return flag === EVERY_FLAG && rest.length === 1
+}
+
+function is_refused(flag: string, rest: ReadonlyArray<string>): boolean {
+	return rest.length > 0 || !FLAGS.has(flag)
+}
+
 async function run(argv: ReadonlyArray<string>, ports: BoardPorts = LIVE_PORTS): Promise<number> {
 	const [flag = '', ...rest] = argv
 
-	if (rest.length > 0 || !FLAGS.has(flag)) {
-		process.stderr.write(`${USAGE}\n`)
-
-		return FAILURE_EXIT_CODE
-	}
+	if (is_every(flag, rest)) return await push_every(rest[0], ports)
+	if (is_refused(flag, rest)) return refuse()
 
 	await draw(flag, ports)
 
 	return SUCCESS_EXIT_CODE
 }
 
-const run_board_cli = { run }
+const run_board_cli = { DISABLED_NOTICE, USAGE, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run(process.argv.slice(ARGV_OFFSET))

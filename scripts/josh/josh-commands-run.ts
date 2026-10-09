@@ -84,9 +84,12 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'run:board': {
 		script: 'scripts/run/board/run-board-cli.ts',
+		// `--every` pushes its frame as a Telegram, so the credentials come from `.env` as for `run:carry`
+		// (joshuafolkken/kit#3569).
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description: 'Draw a live board of the running backlogrun, redrawn every second',
 		category: 'AI tools',
-		reference: ['[--once | --chat]', 'automation', ['files', 'network']],
+		reference: ['[--once | --chat | --every <minutes>]', 'automation', ['files', 'network']],
 	},
 	'run:prep': {
 		script: 'scripts/run/run-prep-cli.ts',

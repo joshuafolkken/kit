@@ -1359,7 +1359,7 @@ Add issues to a live backlogrun, ahead of the queue unless --no-priority
 
 > **Audience:** automation · **Side effects:** files, network
 
-`[--once | --chat]`
+`[--once | --chat | --every <minutes>]`
 
 Draw a live board of the running backlogrun, redrawn every second
 
