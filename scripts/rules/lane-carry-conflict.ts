@@ -4,7 +4,7 @@ import { bash_triggers } from './bash-triggers'
 import { shell_segments } from './shell-segments'
 
 // A dispatched lane child is stopped from running its parent's budget commands, and told the live
-// carry record is its parent's rather than a competing run (joshuafolkken/kit#2267).
+// carry record is its parent's rather than a competing run.
 //
 // **A child read its own parent as a competitor and refused to implement.** On 2026-09-21, inside
 // `backlogrun #2252`, a lane launched for #2258 stopped before touching a line: the child ran
@@ -34,7 +34,7 @@ import { shell_segments } from './shell-segments'
 const RUN_BUDGET_COMMANDS: ReadonlySet<string> = new Set(['run:merge', 'run:carry'])
 
 // **A `run:carry` call prefixed with a non-empty `JOSH_TEMP_ROOT` cannot reach the parent's record**,
-// because every record it keeps is a `stamp_path` under that root (joshuafolkken/kit#3458). It is how
+// because every record it keeps is a `stamp_path` under that root. It is how
 // live evidence of it is taken, so it is let through rather than refused — refusing it is what sent a
 // child round the guard to the bare CLI, which then ended its parent's record. `run:merge` stays
 // refused under any root: besides its record it syncs main, closes lanes and writes to GitHub, none of

@@ -1,7 +1,7 @@
 import { json_value } from '#scripts/lib/json-value'
 
-// The context a `PreToolUse` hook attached to a call, read off one transcript line
-// (joshuafolkken/kit#3570). The harness writes a hook's `additionalContext` as an `attachment` line of
+// The context a `PreToolUse` hook attached to a call, read off one transcript line.
+// The harness writes a hook's `additionalContext` as an `attachment` line of
 // this type, which is the only trace a rewritten call leaves: the call itself is recorded as it was
 // typed, and no refusal comes back for it. `rule-value.ts` reads a rewrite's note from here so the
 // rewrite is counted as the delivery it is.

@@ -2,8 +2,8 @@ import { readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 // A body — an Issue comment, a PR comment, a notification message — handed to a command as an inline
-// double-quoted shell argument is **evaluated by the shell before the command ever sees it**
-// (joshuafolkken/kit#1198). The observed damage is not a mangled string: a PR comment posted with
+// double-quoted shell argument is **evaluated by the shell before the command ever sees it**.
+// The observed damage is not a mangled string: a PR comment posted with
 // `gh api … -f body="… \`pnpm josh ms\` …"` had part of its own text run as git commands, which
 // switched a lane's work tree onto `main` and stopped the run.
 //

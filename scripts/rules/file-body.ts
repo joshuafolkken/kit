@@ -3,8 +3,8 @@ import { time_shell } from '#scripts/time-runtime/time-shell'
 import { bash_triggers } from './bash-triggers'
 import { shell_segments } from './shell-segments'
 
-// The trigger and the delivered text behind the `file-body` row of `delivered-rules.ts`
-// (joshuafolkken/kit#2120). Group 3 of the three Bash-string gaps: a file's new body carried inline in
+// The trigger and the delivered text behind the `file-body` row of `delivered-rules.ts`.
+// Group 3 of the three Bash-string gaps: a file's new body carried inline in
 // a shell command, the form `prompts/collaboration-workflow/file-edits.md` forbids.
 //
 // **The detector existed for measurement and refused nothing.** `time-writes.ts` already knew a
@@ -38,7 +38,7 @@ function has_heredoc(command: string): boolean {
 // The lines the shell reads as commands — every physical line outside a heredoc body — each paired with
 // the heredoc body it opened. A command, its redirect and its heredoc marker share one of these; the body
 // follows up to the delimiter line. Reading only the first physical line missed the interpreter a run
-// opened after a `cd <lane>` line (joshuafolkken/kit#3155), so every command line is read, a body line is
+// opened after a `cd <lane>` line, so every command line is read, a body line is
 // never mistaken for one, and a write is judged only in the body its own command opened.
 interface CommandLine {
 	text: string
@@ -117,7 +117,7 @@ function body_writes(body: string): boolean {
 
 // A script file for one of the body interpreters. Creating one is a new-file creation, but a script
 // whose body writes is the interpreter rewrite moved one call later — `cat > edit.py <<EOF` then
-// `python3 edit.py` carries the same replacement text (joshuafolkken/kit#3155).
+// `python3 edit.py` carries the same replacement text.
 const SCRIPT_FILE = /\.(?:py|rb|pl|php|js|mjs|cjs)$/u
 
 // Shapes 1 and 4: a heredoc write whose target already exists, or whose target is a script that writes.

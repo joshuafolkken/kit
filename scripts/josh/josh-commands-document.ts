@@ -1,10 +1,10 @@
 import type { CommandEntry } from './josh-command-types'
 
 // The document-reading and -editing command registry, split out of `josh-commands-ai.ts` so that file
-// stays under its 300-code-line limit, exactly as `SPLIT_COMMANDS` was for the same reason
-// (joshuafolkken/kit#2162, joshuafolkken/kit#2218, joshuafolkken/kit#2366). It is spread into
+// stays under its 300-code-line limit, exactly as `SPLIT_COMMANDS` was for the same reason.
+// It is spread into
 // `AI_COMMANDS` so the commands stay grouped under the 'AI tools' category. `read:files` and
-// `edit:files` are the read/write halves of the round-trip fold (joshuafolkken/kit#2202 / #2366).
+// `edit:files` are the read/write halves of the round-trip fold.
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {

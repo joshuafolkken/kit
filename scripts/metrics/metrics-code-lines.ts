@@ -4,8 +4,8 @@ import { line_budget } from '#scripts/lines/line-budget'
 import { ESLint } from 'eslint'
 
 // The code-line count `josh metrics` totals, asked of eslint's own `max-lines` exactly as
-// `line_budget` asks it, but **in process and with every other rule filtered out**
-// (joshuafolkken/kit#3408). The CLI probe `josh lines` spawns runs the project's whole rule set over
+// `line_budget` asks it, but **in process and with every other rule filtered out**.
+// The CLI probe `josh lines` spawns runs the project's whole rule set over
 // the files — about 37 seconds across `scripts/` — because the CLI has no way to run one rule; the
 // API's `ruleFilter` brings the same count to a few seconds, which is what lets the gate run it.
 //
@@ -25,8 +25,7 @@ const UNTYPED_PARSE = { languageOptions: { parserOptions: { project: false } } }
 
 const MAX_LINES_RULE = 'max-lines'
 // The API deletes whatever `cacheLocation` names whenever `cache` is off, and its default is the
-// `.eslintcache` the gate's lint runs beside this step on — the wipe joshuafolkken/kit#1332 records
-// for the CLI. Pointed outside the checkout, it removes a file nothing ever writes.
+// `.eslintcache` the gate's lint runs beside this step on — the same wipe the CLI does. Pointed outside the checkout, it removes a file nothing ever writes.
 const CACHE_PREFIX = 'josh-metrics-eslint-cache-'
 
 function is_max_lines(rule: { ruleId: string }): boolean {

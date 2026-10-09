@@ -6,22 +6,16 @@ import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { gate_tree, type GateTree } from './gate-tree'
 
 // Whether the two scoped checks have been green on *this exact tree* by the time the review is
-// briefed (joshuafolkken/kit#1511).
+// briefed.
 //
-// **The commands were already shipped; what was missing was when they run.** joshuafolkken/kit#1298
-// and joshuafolkken/kit#1257 gave the run `lint:related` and `test:related`, and
-// joshuafolkken/kit#1383 and joshuafolkken/kit#1246 stopped it re-running the whole gate per edit.
-// None of them says the pair has to have answered before the review starts, and `fullrun #1503` is
-// what that costs: the gate and round 1 were started on a tree neither check had ever read, three
-// findings then arrived on three separate round trips with fourteen edits between them, and the
-// rework ran 282 seconds — 31% of a 905-second run. The same run proves the cheap half: the one call
-// that ran both checks together took 13.8 seconds and produced two of the three findings at once.
+// **It fixes when `lint:related` and `test:related` run.** A gate and a review round started on a
+// tree neither check has read return their findings one round trip at a time; one call running both
+// checks first returns most of them at once.
 //
 // **It fixes when the checks run, never whether they run, and never what they check.** Nothing here
 // skips a check, narrows one, or reinterprets its output — a green record buys ordering and nothing
-// else, and `josh gate` still runs its four checks exactly as before. That is the boundary
-// joshuafolkken/kit#1420 sits on the far side of: that issue asked to *reuse* a scoped check's result
-// instead of re-running it and was closed as not needed, and this record does not revive it.
+// else, and `josh gate` still runs its four checks exactly as before. It never *reuses* a scoped
+// check's result in place of re-running it.
 //
 // **The judgement is the gate's own, not a second one.** "There is a record and nothing it covers has
 // moved" is `review_brief.matching_stamp` plus the base equality `gate_skip.reusable_green_gate`
@@ -29,8 +23,8 @@ import { gate_tree, type GateTree } from './gate-tree'
 // definition of "this tree is unchanged" is the clone `CLAUDE.md` prohibits, and it is exactly where
 // two commands would start disagreeing about one working tree.
 //
-// **It refuses `josh review:brief`, and now the local `josh gate` too, but never CI's**
-// (joshuafolkken/kit#2296). The brief was the first refusal point because it is where `review:attest`
+// **It refuses `josh review:brief`, and now the local `josh gate` too, but never CI's**.
+// The brief was the first refusal point because it is where `review:attest`
 // mints the nonce a round is counted against, so no countable review round bypasses it. But the gate
 // itself runs *before* the brief, and a run that reached it on a tree the scoped pair had never read
 // paid for the gap anyway — so `verification-gate.ts` reads this same record one step earlier and
@@ -69,7 +63,7 @@ interface ScopedSources {
 	is_unit_skipped?: boolean
 }
 
-// **`test:related` is required only where it can ever answer** (joshuafolkken/kit#3136). In a project
+// **`test:related` is required only where it can ever answer**. In a project
 // whose unit guard skips — vitest absent, or a basic project with no test file — `test:related` runs
 // nothing and so writes no record, and requiring one refused the gate forever with no way through.
 // The guard's own decision is asked rather than re-derived, so the writer and this reader agree; a
@@ -142,7 +136,7 @@ function missing_checks(
 }
 
 // The same answer as `missing_checks`, as the `josh` script names a caller runs rather than the
-// command lines a refusal prints — so the ship supervisor (joshuafolkken/kit#2500) meets the
+// command lines a refusal prints — so the ship supervisor meets the
 // precondition itself by running exactly what the refusal would have asked for.
 function missing_scripts(
 	tree: Record<string, string>,
@@ -230,8 +224,7 @@ interface GreenRecord {
 	// Where the record lands, defaulted by the stamp itself. It exists for the same reason
 	// `record_green` and `gate_skip.reusable_green_gate` take one: without it this function can only
 	// write the real per-checkout record, so a suite exercising it would vouch for the surrounding
-	// run's own tree — the second-writer trap joshuafolkken/kit#1437 and joshuafolkken/kit#1441
-	// closed for the gate and round-1 records.
+	// run's own tree — the second-writer trap the gate and round-1 records close the same way.
 	target?: string
 }
 

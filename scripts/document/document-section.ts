@@ -1,16 +1,13 @@
 // Reading one **section** of a markdown document, because a section is the unit these documents
-// cross-reference each other in (joshuafolkken/kit#1776).
+// cross-reference each other in.
 //
-// **The reference form was already a section reference, and only the reader was missing.** Every
-// workflow document points at another one as `` `backlogrun-progress.md` → "The hand-off" `` — a file
-// *and* a heading. A reader with no way to fetch a heading has one move left, which is to open the
-// file, so a pointer at 249 lines was costing 2,121. `backlogrun.md` and its point-of-use phase
-// documents are opened for many such references and are among the largest items an entry reads.
+// **The reference form is a section reference.** Every workflow document points at another one as
+// `` `backlogrun-progress.md` → "The hand-off" `` — a file *and* a heading. A reader with no way to
+// fetch a heading has one move left, which is to open the whole file.
 //
 // **Nothing here defers a read.** The section is fetched in the same turn, in the main line, by the
-// run that has to obey it — what changes is the extent of the fetch, never whether it happens. That
-// is the distinction joshuafolkken/kit#1344 and joshuafolkken/kit#1460 were written after: a rule
-// moved to "read it later" is a rule that measurably never fires, and this moves nothing to later.
+// run that has to obey it — what changes is the extent of the fetch, never whether it happens. A rule
+// moved to "read it later" is a rule that never fires, and this moves nothing to later.
 
 import { file_reader } from '#scripts/lib/read-file'
 import { document_scan } from './document-scan'
@@ -54,8 +51,7 @@ function to_heading(line: string, index: number): Heading | undefined {
 	if (groups === undefined) return undefined
 
 	// Destructured rather than read as properties: `noPropertyAccessFromIndexSignature` refuses
-	// `groups.title`. The bracket form was refused too, until joshuafolkken/kit#1783 switched off the
-	// `dot-notation` fix that rewrote it back — so this is a choice now rather than the only spelling.
+	// `groups.title`.
 	const { hashes = '', title = '' } = groups
 
 	return { level: hashes.length, title: title.trim(), line: index }
@@ -109,7 +105,7 @@ function line_of(starts: ReadonlyArray<number>, offset: number): number {
 	return starts.filter((start) => start <= offset).length
 }
 
-// **A bold label is an anchor too** (joshuafolkken/kit#3248). The documents cite
+// **A bold label is an anchor too**. The documents cite
 // `- **Output language follows …**` exactly as they cite a heading, and the reference tests accepted
 // both while this reader found only headings — so a green suite promised a section the command then
 // refused. A label may wrap across lines, so the scan runs over the whole text, not line by line.

@@ -6,7 +6,7 @@ import path from 'node:path'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { PLATFORM_TEMP_ROOT } from './platform-temporary'
 
-// Whether the process a record names is still the one that wrote it (joshuafolkken/kit#1245).
+// Whether the process a record names is still the one that wrote it.
 //
 // **A pid is not a process identity, and every record here was treating it as one.** `process.kill(
 // pid, 0)` answers "alive" for whatever holds that number *now*, so a marker left behind by a gate
@@ -63,7 +63,7 @@ const BEACON_PREFIX = `josh-process-identity-${String(process.getuid?.() ?? '')}
 const BEACON_ID_LENGTH = 36
 const BEACON_ID_PATTERN = /^[\da-f-]+$/u
 const WINDOWS_PLATFORM = 'win32'
-// The probe's three exits (joshuafolkken/kit#3503). Only a refused connection or a missing socket
+// The probe's three exits. Only a refused connection or a missing socket
 // proves the listener gone; any other error, the probe's own socket timeout, and a probe killed by
 // `PROBE_TIMEOUT_MS` or a signal leave the answer unknown, since a loaded machine produces all three
 // for a holder that is still running.
@@ -316,7 +316,7 @@ function is_same_process(
 }
 
 // **Whether a record is the caller's own, which is a different question from whether its writer is
-// alive** (joshuafolkken/kit#1727). `is_same_process` asks about the recorded process; this asks
+// alive**. `is_same_process` asks about the recorded process; this asks
 // whether that process *is this one*. A supervisor that has been replaced reads its successor's
 // record as perfectly live, so liveness alone can never tell a hand-over from an ordinary pass — and
 // a writer deciding by liveness overwrites whatever it finds.

@@ -1,42 +1,32 @@
-// Which documents a workflow entry point names but reads only later — point-of-use, not entry read
-// (joshuafolkken/kit#1776, split out of `entry-read-set.ts` in joshuafolkken/kit#2289 to keep that
-// file under its line ceiling and to keep the point-of-use classification its own concern from the
-// costing that reads it).
+// Which documents a workflow entry point names but reads only later — point-of-use, not entry read.
+// Kept apart from `entry-read-set.ts` so the point-of-use classification is its own concern from the
+// costing that reads it.
 //
-// **Four documents leave the entry read because their first use is a named command, not the entry**
-// (joshuafolkken/kit#1797, joshuafolkken/kit#1856, joshuafolkken/kit#1873). `latest-gate.md` is read
+// **Four documents leave the entry read because their first use is a named command, not the entry**.
+// `latest-gate.md` is read
 // when `pnpm josh latest:scope` answers `required`, `followup.md` in the turn that issues
-// `pnpm josh followup`, `chain-rule.md` before the first `pnpm josh gate` launch it governs
-// (joshuafolkken/kit#2296 — the section is how that gate starts, overlapped with the review), and
-// `background-commands.md` before the first backgroundable command (`pnpm josh gate`). **They are
-// not deferred or summarized** — the named operational section is fetched in the same turn; only
-// `latest-gate.md` remains whole because its result branches across that document.
-// Measured on `fullrun #1783`, `followup.md` rode 55 requests before its first use. **`chain-rule.md`
-// is joshuafolkken/kit#1856's addition**: it governs the `/code-review` → `followup` chain, which in
-// `fullrun` / `queue` / `epicrun` / `backlogrun` runs *after* the first edit, so its 7,396 tokens
-// were resident from the entry for no run that had yet reached a review.
-// **`background-commands.md` is joshuafolkken/kit#1873's**: it was `background-commands.md`'s resident body, governing the
-// background execution of the gate, the push and the merge tail — all after the first edit — so it
-// left `SKILL.md` for the point-of-use list. `SKILL.md` → §1, "Four documents are read at the point
-// of use", is the single source.
-// **`backlogrun`'s own per-child phase documents are point-of-use too** (joshuafolkken/kit#2010):
+// `pnpm josh followup`, `chain-rule.md` before the first `pnpm josh gate` launch it governs (the
+// section is how that gate starts, overlapped with the review), and `background-commands.md` before
+// the first backgroundable command (`pnpm josh gate`). **They are not deferred or summarized** — the
+// named operational section is fetched in the same turn; only `latest-gate.md` remains whole because
+// its result branches across that document. `chain-rule.md` governs the `/code-review` → `followup`
+// chain and `background-commands.md` the background execution of the gate, the push and the merge
+// tail — all *after* the first edit, so neither is resident from the entry. `SKILL.md` → §1, "Four
+// documents are read at the point of use", is the single source.
+// **`backlogrun`'s own per-child phase documents are point-of-use too**:
 // `backlogrun.md` was split so the entry read carries only what binds before the first child, and the
 // four phase documents below are read from it at the step each names — dispatching a child, opening a
 // lane, the progress watcher and the hand-off, a child that cannot finish — never at the entry. Kept
 // out of the count here, exactly as the four above are. `SKILL.md` → §1 is the human source.
-// **`backlogrun-steps.md` joins them** (joshuafolkken/kit#2190): `backlogrun.md` was cut to a manifest
-// and its detailed procedure moved into `backlogrun-steps.md`, read on demand rather than at the
-// entry. Counting the manifest's pointers into it would put that prose straight back into the entry
-// figure under another name, which is exactly what this reduction removes.
-// **`pre-gate-cut.md` joins them** (joshuafolkken/kit#2289): it is the single source of the pre-gate
-// cut, a step every implementing run — and every dispatched lane child — reaches after the entry, so
-// its read is a point-of-use read the count was silently omitting. Measured on the backlogrun of
-// 2026-09-21, the lane children read it 21 times across 13 runs — the largest single document read,
-// and the one the point-of-use list had no row for. Only a lane child reaches it (joshuafolkken/kit#3172):
-// `fullrun.md` no longer names it, so it is charged to the lane child's role alone.
-// **`progress-watcher.md` joins them** (joshuafolkken/kit#3172): the heartbeat every implementing run
-// starts once its hold is claimed, split out of `backlogrun-progress.md` so a single-issue run stops
-// paying for the batch's hand-off and waiting procedure to read it.
+// **`backlogrun-steps.md` joins them**: `backlogrun.md` is a manifest and its detailed procedure
+// lives in `backlogrun-steps.md`, read on demand rather than at the entry. Counting the manifest's
+// pointers into it would put that prose straight back into the entry figure under another name.
+// **`pre-gate-cut.md` joins them**: it is the single source of the pre-gate cut, a step a dispatched
+// lane child reaches after the entry, so its read is a point-of-use read. Only a lane child reaches
+// it: `fullrun.md` does not name it, so it is charged to the lane child's role alone.
+// **`progress-watcher.md` joins them**: the heartbeat every implementing run starts once its hold is
+// claimed, kept apart from `backlogrun-progress.md` so a single-issue run does not pay for the
+// batch's hand-off and waiting procedure to read it.
 const POINT_OF_USE_FILES: ReadonlySet<string> = new Set([
 	'latest-gate.md',
 	'followup.md',
@@ -50,16 +40,16 @@ const POINT_OF_USE_FILES: ReadonlySet<string> = new Set([
 	'backlogrun-park.md',
 	'backlogrun-steps.md',
 	// Read only when a delegated unit goes silent or a lane's pull request conflicts with `main` — a
-	// failure path, so a run in which nothing fails never reads it (joshuafolkken/kit#3175).
+	// failure path, so a run in which nothing fails never reads it.
 	'backlogrun-recovery.md',
 	// Read only when `run:step` prints `pnpm josh retrospective` at a run's stop position — the very
-	// end of a run, never the entry (joshuafolkken/kit#2328). Kept out of every entry's read for the
+	// end of a run, never the entry. Kept out of every entry's read for the
 	// same reason the phase documents above are: no run that never drains its backlog reaches it.
 	'retrospective.md',
 ])
 
 // **A file an entry names but reads only later — point-of-use for that entry, an entry read for
-// another** (joshuafolkken/kit#2161). The global set above cannot express this, because a file
+// another**. The global set above cannot express this, because a file
 // dropped there leaves *every* entry's read. The four ordinary entries read the decision documents
 // only when delegation or filing arises; the lane child omits their SKILL.md sections. `backlogrun`'s
 // parent additionally reads `fullrun.md` and `split-assessment.md` inside a dispatched child, while
@@ -83,8 +73,8 @@ function is_point_of_use(entry: string, file: string): boolean {
 	return (POINT_OF_USE_BY_ENTRY.get(entry) ?? NO_PER_ENTRY_FILES).has(file)
 }
 
-// **Only the global files the entry reaches, plus the ones this entry names in its own row**
-// (joshuafolkken/kit#3078). `cited` is every document the entry's path names; a global file outside it
+// **Only the global files the entry reaches, plus the ones this entry names in its own row**.
+// `cited` is every document the entry's path names; a global file outside it
 // is one this entry never opens — a `kickoff` never issues `followup` — so charging it made every
 // entry's total the same figure and the per-entry ratchet measured nothing.
 function point_of_use_files(entry: string, cited: ReadonlySet<string>): Array<string> {

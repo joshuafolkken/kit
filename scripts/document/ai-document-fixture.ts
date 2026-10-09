@@ -6,11 +6,8 @@ import { document_scan } from './document-scan'
 
 // Where the rules live, for every marker suite that checks one is present.
 //
-// **There is one rule document, not three.** `AGENTS.md` and `GEMINI.md` used to be near-identical
-// copies of `CLAUDE.md`, so every marker suite asserted the same rule three times and every rule
-// change had to be written three times. joshuafolkken/kit#963 single-sourced the rules into
-// `CLAUDE.md` and turned the other two into pointers to it — the clone the rules themselves
-// prohibit, removed from the documents that state the prohibition.
+// **There is one rule document, not three.** The rules are single-sourced in `CLAUDE.md`, and
+// `AGENTS.md` and `GEMINI.md` are pointers to it — so a marker suite asserts each rule once.
 //
 // `AI_DOCS` stays an array rather than becoming a bare string. Twenty suites iterate it with
 // `it.each`, and their case names, their failure messages and the shape of their assertions all
@@ -23,15 +20,14 @@ const AI_DOCS: ReadonlyArray<string> = ['CLAUDE.md']
 const POINTER_DOCS: ReadonlyArray<string> = ['AGENTS.md', 'GEMINI.md', '.cursorrules']
 
 // The page a person lands on first. It routes nobody's session, but it links into `docs/` and names
-// commands, so the corpus-wide scans have to read it (joshuafolkken/kit#3248).
+// commands, so the corpus-wide scans have to read it.
 const README_DOC = 'README.md'
 
 // The document the pointers name. Written once so the pointer suite and the pointers agree.
 const CANONICAL_DOC = 'CLAUDE.md'
-// The canonical workflow document. joshuafolkken/kit#965 split it into one file per topic under
-// `prompts/collaboration-workflow/`, leaving this path as a small index — an agent following a
-// pointer now reads one topic instead of the whole document, and pays for that one topic on every
-// remaining turn of the session rather than all of them.
+// The canonical workflow document: a small index over one file per topic under
+// `prompts/collaboration-workflow/`, so an agent following a pointer reads one topic instead of the
+// whole document.
 //
 // The marker suites read the whole corpus, which is why `read_repo_file(WORKFLOW_PROMPT)` is not
 // what they call: a marker asserting a canonical rule exists does not care which topic file holds
@@ -39,8 +35,8 @@ const CANONICAL_DOC = 'CLAUDE.md'
 // fifteen-file edit. Reading is cheap here — this is a test process, not a session.
 const WORKFLOW_PROMPT = 'prompts/collaboration-workflow.md'
 const WORKFLOW_PROMPT_DIRECTORY = 'prompts/collaboration-workflow'
-// The delivery list names each rule; which suite pins a row is maintainer detail and lives here
-// (joshuafolkken/kit#3186), so every row's marker suite asserts its suite path against this file.
+// The delivery list names each rule; which suite pins a row is maintainer detail and lives here,
+// so every row's marker suite asserts its suite path against this file.
 const RULE_DELIVERY_RATIONALE = 'docs/maintainers/rule-delivery-rationale.md'
 const CLAUDE_SETTINGS = '.claude/settings.json'
 const ENV_EXAMPLE = '.env.example'
@@ -56,7 +52,7 @@ const COMMAND_REFERENCE_DOCS: ReadonlyArray<string> = [
 	'docs/josh-commands-run.md',
 	'docs/josh-commands-backlog.md',
 ]
-// The user-facing label and run-state page (joshuafolkken/kit#3279). It took the label sections out
+// The user-facing label and run-state page. It took the label sections out
 // of the backlog command reference, which an agent is routed to, so it stays under the same budget.
 const LABEL_REFERENCE_DOC = 'docs/labels-and-run-states.md'
 
@@ -71,8 +67,8 @@ function markdown_under(root: string): ReadonlyArray<string> {
 
 // The markdown under the distributed plugin skills only. Every skill directory lives under
 // `.claude/skills/` on disk, but a skill kit no longer ships — `diag`, kit's own run-measurement
-// skill — is not part of the surface a consumer loads, so the distribution guards must not walk it
-// (joshuafolkken/kit#1997). Deriving the set from `PLUGIN_SKILL_DIRECTORIES` keeps it single-sourced
+// skill — is not part of the surface a consumer loads, so the distribution guards must not walk it.
+// Deriving the set from `PLUGIN_SKILL_DIRECTORIES` keeps it single-sourced
 // with what the plugin actually distributes rather than with whatever happens to sit on disk.
 function distributed_skill_markdown(): ReadonlyArray<string> {
 	return PLUGIN_SKILL_DIRECTORIES.flatMap((directory) => markdown_under(directory))
@@ -138,7 +134,7 @@ function read_index(): string {
 
 // Every prose document a reader can be routed to, plus the two pointers. This is the corpus the
 // structural scans walk — the command-name, label-name and link-resolution checks that replaced the
-// per-phrase marker suites (joshuafolkken/kit#1923). The pointers are included because a broken link
+// per-phrase marker suites. The pointers are included because a broken link
 // or a stale command name in `AGENTS.md` / `GEMINI.md` is as wrong as one in the rules.
 function all_documents(): ReadonlyArray<string> {
 	return [...routing_documents(), ...POINTER_DOCS, README_DOC]
@@ -163,22 +159,21 @@ function linked_paths(from: string): Array<string> {
 // Prose is re-wrapped by the formatter, so a marker that happens to span a line break would fail on
 // a reflow that changed nothing. Matching against collapsed whitespace pins the words, not the
 // column they landed in. Every marker suite needs this, which is why it lives here rather than being
-// re-declared once per suite (joshuafolkken/kit#951).
+// re-declared once per suite.
 function read_unwrapped(relative_path: string): string {
 	return read_repo_file(relative_path).replaceAll(/\s+/gu, ' ')
 }
 
 // Every markdown file under the distributed skills, sorted so the concatenation below is stable
 // whatever order the filesystem hands them back in. Derived from `PLUGIN_SKILL_DIRECTORIES`, so a
-// skill kit no longer ships (e.g. `diag`) is left out of the rule surface (joshuafolkken/kit#1997).
+// skill kit no longer ships (e.g. `diag`) is left out of the rule surface.
 function skill_documents(): ReadonlyArray<string> {
 	return distributed_skill_markdown().toSorted((left, right) => left.localeCompare(right))
 }
 
-// joshuafolkken/kit#854 moved the conditional rules — the workflow procedures, the post-update
-// checks — out of the always-loaded documents and into the skills those documents route to. A rule
-// still has to exist exactly once and reach every AI, but "where it is written" is now two places
-// rather than one, so a marker suite reads the surface: the document plus EVERY distributed skill,
+// The conditional rules — the workflow procedures, the post-update checks — live in the skills the
+// always-loaded documents route to. A rule still has to exist exactly once and reach every AI, but
+// "where it is written" is two places rather than one, so a marker suite reads the surface: the document plus EVERY distributed skill,
 // not only the ones that document names. A suite reading the document alone would report the
 // routing itself as the rule going missing.
 //
@@ -202,12 +197,9 @@ function read_rule_surface(document_path: string): string {
 }
 
 // The rule-surface counterpart of `read_unwrapped`, for the same reason: a marker that happens to
-// span a line break would otherwise fail on a reflow that changed nothing. Two suites predate it
-// and still collapse the surface inline (`epic-bundle-` / `epic-audit-document-rule`); migrating
-// them is a change to files no current issue touches, so new suites call this instead of adding a
-// third copy and the two are converted the next time one of them is edited —
-// `epic-plan-document-rule` was the third and converted under joshuafolkken/kit#1189, which rewrote
-// it anyway.
+// span a line break would otherwise fail on a reflow that changed nothing. Two suites still collapse
+// the surface inline (`epic-bundle-` / `epic-audit-document-rule`); new suites call this instead of
+// adding a third copy, and the two are converted the next time one of them is edited.
 function read_unwrapped_rule_surface(document_path: string): string {
 	return read_rule_surface(document_path).replaceAll(/\s+/gu, ' ')
 }

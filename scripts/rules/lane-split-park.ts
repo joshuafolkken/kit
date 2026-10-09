@@ -6,8 +6,7 @@ import { lane_park } from './lane-park'
 import { shell_segments } from './shell-segments'
 import { tail_commands } from './tail-commands'
 
-// A dispatched lane child that split its own Issue is stopped from parking the epic it promoted
-// (joshuafolkken/kit#3296).
+// A dispatched lane child that split its own Issue is stopped from parking the epic it promoted.
 //
 // **A split is not a park.** On 2026-10-06, inside a `backlogrun`, the lane child for #3255 promoted
 // its Issue to an epic with `pnpm josh epic --promote 3255`, filed #3291–#3294, then applied

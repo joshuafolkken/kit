@@ -1,5 +1,5 @@
 // Pulling machine-checkable references out of the distributed documents, so a few structural scans
-// can replace the ~140 per-phrase marker suites the documents used to carry (joshuafolkken/kit#1923).
+// can replace the ~140 per-phrase marker suites the documents used to carry.
 // Every function here is a pure string extractor: it takes document text and returns the references
 // it names, which is what lets the scans that call it be checked on a synthetic string with a
 // deliberately broken reference in it.
@@ -18,7 +18,7 @@ const LABEL_PATTERN = /(?:labels\[\]=|\/labels\/|labels -f name=)([a-z][a-z0-9:_
 // quotes — `` `backlogrun-progress.md` → "The hand-off" ``. The code span is optional and a section
 // number may sit between the arrow and the heading (`` `SKILL.md` → §1, "…" ``): both forms are in
 // the documents, as is a name linked to its file (`` [`residency.md`](./residency.md) →「…」 ``), and a
-// pattern that skipped them let a broken reference of each form through (joshuafolkken/kit#3076).
+// pattern that skipped them would let a broken reference of each form through.
 // The backreference pairs the code span's backticks, and the lookbehind keeps a bare name from
 // starting mid-path — inside a URL or after an unpaired backtick.
 const SECTION_PATTERN =
@@ -26,8 +26,8 @@ const SECTION_PATTERN =
 
 // A reference to a heading of the same document, which names no file: a quoted heading followed by
 // `above` or `below`, or an arrow with no file name before it — `→ "The hand-off"`. A broken one
-// sends the reader after a section that is not there as surely as a cross-document one does
-// (joshuafolkken/kit#3403). A bare arrow is read only once every `file.md →` form is dropped, so a
+// sends the reader after a section that is not there as surely as a cross-document one does.
+// A bare arrow is read only once every `file.md →` form is dropped, so a
 // cross-document reference is never re-read as a reference to the document it sits in.
 const ADJACENT_PATTERN = /["「](?<heading>[^"「」]+)["」]\s+(?:above|below)\b/gu
 const BARE_ARROW_PATTERN = /→\s*(?:§\w+,\s*)?["「](?<heading>[^"「」]+)["」]/gu

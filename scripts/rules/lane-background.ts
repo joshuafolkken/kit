@@ -9,26 +9,24 @@ import {
 } from '#scripts/time-runtime/time-transcript-line'
 import { run_tail_rule } from './run-tail-rule'
 
-// A dispatched lane child is stopped from backgrounding a long-running josh command (joshuafolkken/kit#2704).
+// A dispatched lane child is stopped from backgrounding a long-running josh command.
 //
 // **A headless child's turn-end is its process's end.** A lane child runs as `claude -p`, and there the
 // background Bash tasks die with the turn — so "a background command's exit re-invokes the session"
-// (`background-commands.md`) does not hold. joshuafolkken/kit#2457 refused a non-detached `josh ship`
-// for exactly that reason, but only `ship`: the #2606 child backgrounded `pnpm josh gate && pnpm josh git
-// -y …` directly, ended its turn, and the gate died at `exit code 143` with the implementation, the
-// scoped checks, a review round and the live verification all done — parked instead of merged.
+// (`background-commands.md`) does not hold. A child that backgrounds `pnpm josh gate && pnpm josh git
+// -y …` and ends its turn sees the gate die at `exit code 143` with the implementation, the scoped
+// checks, a review round and the live verification all done — parked instead of merged.
 //
 // **So the refusal is put at the launch, and it names the detached route.** The region from the gate to
 // the merge belongs to `pnpm josh ship --detach` in a child (`chain-rule.md` step 0), whose supervisor
 // outlives the turn.
 //
-// **`ship` is in the set too, `--detach` or not** (joshuafolkken/kit#3027). #2457 detaches it in a child,
-// but only after its preflight — the scoped checks — has passed in the calling process, so a
-// backgrounded `ship` is killed at the turn's end before any supervisor exists: the #3022 child did
-// exactly that and was parked as a failure. Issued in the foreground it returns at `launched` within the
-// tool timeout, and the supervisor carries the rest. A backgrounded `ship` alone is no longer refused but
-// rewritten into that foreground call (`foreground_input`, joshuafolkken/kit#3154); one chained after
-// another long command is still refused.
+// **`ship` is in the set too, `--detach` or not**. It detaches in a child, but only after its
+// preflight — the scoped checks — has passed in the calling process, so a backgrounded `ship` is
+// killed at the turn's end before any supervisor exists. Issued in the foreground it returns at
+// `launched` within the tool timeout, and the supervisor carries the rest. A backgrounded `ship` alone
+// is not refused but rewritten into that foreground call (`foreground_input`); one chained after
+// another long command is refused.
 //
 // **Its stop-time half reads the same fact from the other side.** A backgrounded task the transcript
 // launched but never saw finish is still running, and in a child the stop about to happen kills it —
@@ -60,7 +58,7 @@ function long_commands_of(command: string): Array<string> {
 
 // A call whose long-running work is `ship` alone. In a child a foreground `ship` already detaches
 // itself after its preflight (`run-ship-cli.ts` → `should_detach`), so the only fault in backgrounding
-// it is the flag — and the flag is what the hook rewrites (joshuafolkken/kit#3154).
+// it is the flag — and the flag is what the hook rewrites.
 function ships_alone(command: string): boolean {
 	const names = long_commands_of(command)
 
@@ -103,7 +101,7 @@ function is_background_long_run(
 	return is_candidate(call) && is_lane_child()
 }
 
-// **A backgrounded `ship` in a child is rewritten, not refused** (joshuafolkken/kit#3154). The refusal
+// **A backgrounded `ship` in a child is rewritten, not refused**. The refusal
 // asked for nothing but the same call in the foreground — 14 of 41 lane `ship` refusals in one measured
 // backlogrun were that round trip, paid at the run's largest context. The input with the flag cleared,
 // or `undefined` for every call this does not apply to.
@@ -137,8 +135,8 @@ function unfinished_ids(
 	return launched.filter((id) => id !== '' && !finished.has(id))
 }
 
-// The background tasks the tail launched and never saw finish — commands and subagents alike
-// (joshuafolkken/kit#2774), since a lane child's turn-end kills either.
+// The background tasks the tail launched and never saw finish — commands and subagents alike,
+// since a lane child's turn-end kills either.
 function pending_background_ids(tail: string): ReadonlyArray<string> {
 	return unfinished_ids(tail, (block) => [block.background_id, block.agent_id])
 }

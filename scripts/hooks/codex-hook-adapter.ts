@@ -96,8 +96,8 @@ function pretool_outcome(raw_payload: string): GuardOutcome {
 }
 
 // The formatters apply what eslint could fix silently and return what it could not; each patched
-// file's unfixed block is joined so the whole patch's lint problems reach the model on one edit
-// (joshuafolkken/kit#2275). `undefined` when every file was clean, so the ordinary patch adds nothing.
+// file's unfixed block is joined so the whole patch's lint problems reach the model on one edit.
+// `undefined` when every file was clean, so the ordinary patch adds nothing.
 async function format_posttool_payloads(
 	raw_payload: string,
 	project_root: string,
@@ -124,7 +124,7 @@ async function write_posttool_context(raw_payload: string): Promise<void> {
 }
 
 // The environment file is loaded before the verdict, as `write_outcome` does, so the lane-child marker
-// the phase mark reads is in place; the mark follows the written envelope (joshuafolkken/kit#3444).
+// the phase mark reads is in place; the mark follows the written envelope.
 async function write_pretool_outcome(raw_payload: string): Promise<void> {
 	hook_decision.load_environment_file()
 	const outcome = pretool_outcome(raw_payload)

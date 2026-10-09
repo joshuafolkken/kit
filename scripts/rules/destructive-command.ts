@@ -3,8 +3,8 @@ import { gh_api } from './gh-api'
 import { git_argv } from './git-argv'
 import { shell_segments } from './shell-segments'
 
-// The trigger and the delivered text behind the `destructive-command` row of `delivered-rules.ts`
-// (joshuafolkken/kit#2983): a recursive forced `rm`, and the `gh` calls that delete or close shared
+// The trigger and the delivered text behind the `destructive-command` row of `delivered-rules.ts`:
+// a recursive forced `rm`, and the `gh` calls that delete or close shared
 // state — none of which the deny list stopped, or stopped only in one spelling (`Bash(rm -rf *)`
 // misses `rm -fr`, `rm -r -f` and `rm --recursive --force`). The argv is read through `git-argv.ts`'s
 // wrapper cut, so `sudo rm -fr` and `env gh pr close` are seen too.

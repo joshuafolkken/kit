@@ -5,15 +5,14 @@ import { bash_triggers } from './bash-triggers'
 import { shell_segments } from './shell-segments'
 import { tail_commands } from './tail-commands'
 
-// The trigger and the delivered text behind the `rule-body` row of `delivered-rules.ts`
-// (joshuafolkken/kit#2272). It delivers the residency questions at the one moment they are skipped —
+// The trigger and the delivered text behind the `rule-body` row of `delivered-rules.ts`.
+// It delivers the residency questions at the one moment they are skipped —
 // the edit that writes a rule into prose.
 //
-// **The gap it closes.** joshuafolkken/kit#2117 put question 0 (is the answer computable, so it is a
-// decision oracle) into the residency criterion and built `pnpm josh oracle:list`, but nothing made
-// that question fire: a new computable rule could still be written into prose and no test would fail,
-// so friction ran one way only — toward more prose. The criterion lived in `residency.md`, and
-// whether a run read it before writing a rule was left to judgement. This row is the firing.
+// **The gap it closes.** Question 0 of the residency criterion (is the answer computable, so it is a
+// decision oracle) and `pnpm josh oracle:list` do not fire on their own: a new computable rule could
+// be written into prose and no test would fail, so friction would run one way only — toward more
+// prose. This row is the firing.
 //
 // **The trigger is the append, not the edit.** A rule delivered on *every* edit to these files would
 // speak on typo fixes, link swaps and deletions — the wrong-turn firing `rule-delivery.md` calls worse
@@ -22,13 +21,12 @@ import { tail_commands } from './tail-commands'
 // URL is stripped) all fail. What stays is the case the Issue names — writing rule prose into a rule
 // document.
 //
-// **The stand-down is what turned the reminder into a check** (joshuafolkken/kit#2324). Until now the
-// row only *reminded* — it fired once and let the reissue through unconditionally, so "reissue and it
-// goes" meant a computable rule could still be written into prose with nothing having answered the two
-// questions. Now the pass condition is a *record*: the run has run `pnpm josh oracle:list` (question 0)
+// **The stand-down is what makes the reminder a check**. A row that only *reminded* — fired once and
+// let the reissue through unconditionally — would let a computable rule be written into prose with
+// nothing having answered the two questions. The pass condition is a *record*: the run has run `pnpm josh oracle:list` (question 0)
 // and `pnpm josh run:step` (the ordering question) earlier in the transcript. Both present, the edit is
 // stood down; either missing, it is refused — on the reissue too, since a row with a stand-down
-// refuses until it is met (joshuafolkken/kit#2807). It passes on answering the questions, not on reading the
+// refuses until it is met. It passes on answering the questions, not on reading the
 // reminder. Keeping the rule is therefore running those two commands, which `keeps` names.
 
 // The two edit tools the `PreToolUse` matcher routes here. A `Write` carries the whole new file; an

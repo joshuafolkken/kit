@@ -5,8 +5,7 @@ import { time_transcript_line, type Block } from '#scripts/time-runtime/time-tra
 import { bash_triggers } from './bash-triggers'
 import { tail_commands } from './tail-commands'
 
-// The trigger and the decision behind the `filing-cap` row of `delivered-rules.ts`
-// (joshuafolkken/kit#2119).
+// The trigger and the decision behind the `filing-cap` row of `delivered-rules.ts`.
 //
 // **Automatic filing is capped at 10 Issues per run, refused at the eleventh filing.** `prerequisite.md` and
 // `observation-filing.md` state the ceiling; nothing counted it, so a run that over-filed was held
@@ -15,13 +14,13 @@ import { tail_commands } from './tail-commands'
 // `bash_triggers.is_issue_filing`, reused verbatim.
 //
 // **It fires on every filing past the cap, not once per run.** The subject is a recurring act — one
-// more filing — so `DeliveredRule.decide` is the right disposition (joshuafolkken/kit#1570): refused
+// more filing — so `DeliveredRule.decide` is the right disposition: refused
 // once and free afterwards would put the enforcement back on the self-restraint that failed.
 //
 // **A guard-refused filing does not count.** Claude Code writes a denied call to the transcript as a
 // `tool_use` block with an errored `tool_result`, so the WIP cap's own reissue would otherwise
-// double-count one Issue — the same exclusion `investigation-reads.ts` makes for a refused read
-// (joshuafolkken/kit#1764). **Nor does one `issue:file` held itself** (joshuafolkken/kit#2808): a lint
+// double-count one Issue — the same exclusion `investigation-reads.ts` makes for a refused read.
+// **Nor does one `issue:file` held itself**: a lint
 // problem or an unacknowledged duplicate exits non-zero having filed nothing, and the reissue is the
 // same Issue. The filing is counted only where its result did not fail.
 
@@ -82,8 +81,8 @@ function is_prompt_line(line: string): boolean {
 	return parsed.blocks.every((block) => block.result_id === '')
 }
 
-// The tail from the last prompt on, so a filing an earlier turn made does not answer for this one
-// (joshuafolkken/kit#2422). A tail with no prompt on it is returned whole.
+// The tail from the last prompt on, so a filing an earlier turn made does not answer for this one.
+// A tail with no prompt on it is returned whole.
 function current_turn(tail: string): string {
 	const lines = tail.split('\n')
 	const start = lines.findLastIndex((line) => is_prompt_line(line))

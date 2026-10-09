@@ -9,7 +9,7 @@ import { hook_gate_reuse } from './hook-gate-reuse'
 import { DEFAULT_TYPE_CHECK_ARGS, type_check_step } from './type-check-step'
 
 // The pre-commit hook's type check, which no longer re-runs a project-wide `tsc --noEmit` that a green
-// gate already covers (joshuafolkken/kit#1381).
+// gate already covers.
 //
 // Measured on this repository: `pnpm exec tsc --noEmit` over the whole project takes 3.8–4.4s warm, and
 // `pnpm josh git -y` pays it on every commit — a `fullrun` commits twice — seconds after `pnpm josh
@@ -22,8 +22,8 @@ import { DEFAULT_TYPE_CHECK_ARGS, type_check_step } from './type-check-step'
 // recorded wide one. So they are untouched, and so are `prevent-main-commit` and `secretlint`, which
 // the gate does not run at all and which are therefore duplicates of nothing.
 //
-// **The decision is joshuafolkken/kit#1328's, imported rather than restated** — `hook_gate_reuse`
-// carries what this shares with the pre-push hook (joshuafolkken/kit#1334) and defers the record
+// **The decision is the gate's, imported rather than restated** — `hook_gate_reuse`
+// carries what this shares with the pre-push hook and defers the record
 // comparison itself to `gate_skip.reusable_green_gate`. A hook answering "is this still the recorded
 // tree" differently from the gate beside it would be two commands disagreeing about one tree.
 //
@@ -54,7 +54,7 @@ interface CommitTree extends GateTree {
 }
 
 // **The record says the gate's four checks were green; it does not say *which* type check ran.**
-// `type-check-step.ts` resolves that per project (joshuafolkken/kit#934): a project carrying a
+// `type-check-step.ts` resolves that per project: a project carrying a
 // `josh-app` / `josh-game` shim has the toolkit's `check:ci` as its gate step, and this hook's step is
 // `tsc --noEmit`. Reusing across that difference would skip `tsc --noEmit` on the strength of a
 // different check — a `.ts` file inside the root `tsconfig.json` but outside the one `svelte-check` is

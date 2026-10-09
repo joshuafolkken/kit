@@ -4,11 +4,11 @@ import { time_shell } from '#scripts/time-runtime/time-shell'
 import { shell_segments } from './shell-segments'
 
 // The trigger helpers the enumeration in `delivered-rules.ts` is built from, held here so a rule
-// that lives in its own module can build its own row without importing the enumeration back
-// (joshuafolkken/kit#2119). `is_issue_filing` is the one three rows share — the WIP cap, the per-run
+// that lives in its own module can build its own row without importing the enumeration back.
+// `is_issue_filing` is the one three rows share — the WIP cap, the per-run
 // filing cap and the fold — so it could not stay a private function of the file that spreads their rows.
 
-// **Only `Bash`, and the omission is deliberate** (joshuafolkken/kit#1390): Claude Code denies one
+// **Only `Bash`, and the omission is deliberate**: Claude Code denies one
 // call of a turn and runs the rest, so a refused `Edit` would leave its siblings applied and itself
 // not. Every rule delivered by the enumeration is therefore one whose binding moment is a shell call —
 // so the tool-name guard belongs here rather than to each row, and a row states only what it looks for
@@ -34,7 +34,7 @@ const ISSUES_ENDPOINT = /repos\/[^\s'"]*\/issues(?=$|["'\s])/u
 const TITLE_FIELD = /(?:-f|-F|--field|--raw-field)\s*'?title=/u
 
 // A filing made by hand rather than through `josh issue:file` — the call the `direct-filing` row
-// refuses on every occurrence (joshuafolkken/kit#2808).
+// refuses on every occurrence.
 function is_direct_filing(command: string): boolean {
 	if (ISSUE_CREATE_COMMAND.test(command)) return true
 

@@ -21,15 +21,10 @@ import { gate_tree, type GateTree } from './gate-tree'
 import { project_checks } from './project-checks'
 import { scoped_green, type ScopedSources } from './scoped-green'
 
-// joshuafolkken/kit#914: the completion gate's four checks are independent and share no mutable
-// state, yet every entry point ran them one after another — paid again on every `epicrun` child,
-// every `/code-review` fix and every `halfrun` stop. Worse than the seconds: a serial gate reports
-// one failure at a time, so a tree with a lint error and a type error costs two full round trips to
-// discover.
-//
-// The margin has narrowed as the checks gained caches and is re-measured rather than repeated: on
-// this repository today, 19.1s back to back against 15.1s together (joshuafolkken/kit#1258). How
-// many run at once, and how wide the unit suite fans out, are `gate-plan.ts`'s to decide.
+// The completion gate's four checks are independent and share no mutable state, so they run
+// together. Beyond the seconds: a serial gate reports one failure at a time, so a tree with a lint
+// error and a type error would cost two full round trips to discover. How many run at once, and how
+// wide the unit suite fans out, are `gate-plan.ts`'s to decide.
 //
 // Each step shells out to the `josh` sub-command that already defines it, rather than repeating the
 // underlying tool invocations here — one definition per check, in `josh-commands-development.ts`.
@@ -61,7 +56,7 @@ async function run_gate_step(step: GateStep): Promise<GateStepResult> {
 }
 
 // The record `josh review:brief` reads, written only on a fully green run and only with the tree it
-// was green on (joshuafolkken/kit#1241). `/code-review` runs in a forked process that reads none of
+// was green on. `/code-review` runs in a forked process that reads none of
 // this repository's documents, so "the unit tests already passed" reaches it only if the invocation
 // carries it — and it may only carry it if something wrote down that they did, on **this** tree.
 //
@@ -70,10 +65,10 @@ async function run_gate_step(step: GateStep): Promise<GateStepResult> {
 // project has no tests — must not become "the unit tests all passed": the gate keeps that skip
 // visible on the console, and a record erasing it would have the brief tell a review agent not to
 // re-run tests that never ran. A step that passed **with a checker's warnings** is withheld for the
-// same reason one place further on (joshuafolkken/kit#1328): since the record is now reused instead of
-// the checks being re-run, a warning printed once would never be printed again on that tree, and
-// hiding an eslint or svelte-check finding is the same failure as hiding a skip. It is
-// `has_checker_warning`, not `has_warnings`, that decides this (joshuafolkken/kit#2318): the loose
+// same reason one place further on: since the record is reused instead of the checks being re-run, a
+// warning printed once would never be printed again on that tree, and hiding an eslint or
+// svelte-check finding is the same failure as hiding a skip. It is `has_checker_warning`, not
+// `has_warnings`, that decides this: the loose
 // marker match is right for the print path, where a false positive costs one printed body, but here a
 // false positive withholds the whole record and turns a green gate's `run:review --join` red — so a
 // benign line from another tool (a Vite config deprecation on `test:unit`) must not withhold it. A
@@ -108,7 +103,7 @@ async function record_green_gate(
 	}
 }
 
-// The marker that says a gate is running on this tree right now (joshuafolkken/kit#1242). The gate
+// The marker that says a gate is running on this tree right now. The gate
 // and `/code-review` are started together — neither writes to the working tree — so by the time
 // `josh review:brief` composes the invocation the checks are usually still in flight. Without this
 // record that state reads as "no gate was ever run", and the review agent runs the unit suite the
@@ -117,8 +112,8 @@ async function record_green_gate(
 // **Both halves swallow their failure, and for the same reason `record_green_gate` does**: the
 // marker is a convenience for the next command and nothing about it may reach the gate's verdict. A
 // marker that could not be written costs a brief that says `Not verified`, which is the safe
-// direction; one that could not be cleared costs nothing beyond the file itself, because since
-// joshuafolkken/kit#1245 the record names the writing process by pid **and** start time — so a marker
+// direction; one that could not be cleared costs nothing beyond the file itself, because the record
+// names the writing process by pid **and** start time — so a marker
 // this gate leaves behind reads as not running from the moment the gate exits, however long it sits
 // there and whatever the operating system later does with that pid. The next gate overwrites it.
 function mark_gate_running(before: Record<string, string>, target?: string): void {
@@ -157,8 +152,8 @@ async function with_gate_marker<T>(
 	}
 }
 
-// This gate's share of the machine, resolved once at the gate's entry and carried down as one value
-// (joshuafolkken/kit#2351). `available_cores` is the budget every check reserves against; `is_reserved`
+// This gate's share of the machine, resolved once at the gate's entry and carried down as one value.
+// `available_cores` is the budget every check reserves against; `is_reserved`
 // is false for a gate nested inside another gate's unit suite — this repository's own gate tests — so
 // the outer gate reserves and every gate beneath it does not. Captured before this gate sets
 // `JOSH_UNIT_RUN_MARKED`, which is why it is read at entry rather than re-derived here.
@@ -174,8 +169,8 @@ function default_budget(): BudgetContext {
 	}
 }
 
-// A gate step paired with the cores it reserves from the machine-wide budget while it runs
-// (joshuafolkken/kit#2351). The weight travels with the step so `run_gate_steps` never has to re-pair a
+// A gate step paired with the cores it reserves from the machine-wide budget while it runs.
+// The weight travels with the step so `run_gate_steps` never has to re-pair a
 // step with its check by index.
 interface ReservedStep {
 	step: GateStep
@@ -198,7 +193,7 @@ async function build_reserved_steps(
 }
 
 // **A nested gate takes no reservation, and the budget is what makes that necessary rather than
-// merely tidy** (joshuafolkken/kit#2351). The unit step spawns the suite, which runs this repository's
+// merely tidy**. The unit step spawns the suite, which runs this repository's
 // own gate tests; each of those is a gate inside the outer gate's unit reservation, and a place it
 // claimed would wait for cores the outer gate cannot free until the suite — this test included —
 // finishes.
@@ -219,20 +214,20 @@ async function run_reserved_step(
 }
 
 // `bounded_pool` rather than a bare `Promise.all`, so the plan's `concurrency` is what decides how
-// many run at once (joshuafolkken/kit#1258). **The all-failures-in-one-pass property survives the
+// many run at once. **The all-failures-in-one-pass property survives the
 // change** because no check ever rejects: `buffered_process` reports a non-zero exit as a value, so
 // the pool's first-failure abort — written for callers that spawn real Claude sessions — never
 // fires here and every queued check still runs. Results come back in input order however they
 // finished, which is what keeps the printed sections in declaration order. Each step first claims its
-// place in the machine-wide budget and waits while the budget is full (joshuafolkken/kit#2351).
+// place in the machine-wide budget and waits while the budget is full.
 async function run_gate_steps(
 	plan: GatePlan,
 	budget: BudgetContext = default_budget(),
 ): Promise<ReadonlyArray<GateStepResult>> {
 	const reserved = await build_reserved_steps(process.cwd(), plan, budget.available_cores)
 
-	// **The checks run under the held mark, so a check's own dispatch claims nothing**
-	// (joshuafolkken/kit#3345). Each check is a `pnpm josh <target>` child, and a target that declares
+	// **The checks run under the held mark, so a check's own dispatch claims nothing**.
+	// Each check is a `pnpm josh <target>` child, and a target that declares
 	// a weight would otherwise claim a second place for the cores reserved for it here. A nested gate
 	// sets the mark too, since its checks are covered by the outer gate's reservation.
 	return await core_budget.with_held_mark(
@@ -245,15 +240,15 @@ async function run_gate_steps(
 	)
 }
 
-// **Both markers are claims about the unit suite, so a gate that is not running it makes neither**
-// (joshuafolkken/kit#1226). The in-flight marker tells the next `josh review:brief` that a gate is
+// **Both markers are claims about the unit suite, so a gate that is not running it makes neither**.
+// The in-flight marker tells the next `josh review:brief` that a gate is
 // covering this tree right now, which is what stops a review agent re-running the suite; the
 // unit-run marker tells a sibling lane a vitest run is on the machine, which is what makes that
 // lane divide its own workers. A `--no-unit` gate that wrote either would be answering for a check
 // it never started — the first by telling a review the tests are covered when they are running in a
 // different CI job, the second by throttling a lane on its behalf.
 //
-// **The work the markers cover ends at the green record, not at the last check** (joshuafolkken/kit#2434).
+// **The work the markers cover ends at the green record, not at the last check**.
 // Cleared before `record_green_gate` wrote, the in-flight marker left a gap of tens of milliseconds in
 // which `run:review --join` read neither a running gate nor a green one — and answered RED for a gate
 // that was about to record green. Cleared after it, a reader that sees no marker is reading a gate
@@ -279,8 +274,7 @@ async function run_marked_gate<T>(
 // a core count the plan was not derived from — the one misreading this line exists to prevent.
 // The concurrent-run count is read here rather than inside `gate-plan.ts` for the reason the core
 // count already is: that module stays a pure function of its inputs, and the machine is asked once and
-// handed to both calls. Counted *before* the unit step writes its own marker, so `+ 1` is this gate
-// (joshuafolkken/kit#1515).
+// handed to both calls. Counted *before* the unit step writes its own marker, so `+ 1` is this gate.
 function announce_gate_plan(is_unit_included: boolean, available_cores: number): GatePlan {
 	const concurrent_runs = unit_worker_share.live_run_count() + unit_worker_share.SOLO_RUNS
 	const is_kit_repository = project_checks.is_kit_repository(process.cwd())
@@ -314,20 +308,20 @@ interface GateOptions {
 	// inside `pnpm josh gate`, so a test writing to the shared path would overwrite the live gate's
 	// own log with the output of four checks that never ran.
 	log_path?: string
-	// **The scoped pre-check the CLI entry turns on** (joshuafolkken/kit#2296). Off everywhere else so
+	// **The scoped pre-check the CLI entry turns on**. Off everywhere else so
 	// that a direct `run_verification_gate` call — the whole of `verification-gate.test.ts` — is never
 	// refused by a real checkout's missing scoped record; `run_gate_command` sets it true.
 	is_scoped_enforced?: boolean
 	// The scoped records' paths, overridable so a test can plant a green pair rather than depend on the
 	// surrounding checkout's — the reason `scoped-green.ts` takes a `source` per stamp.
 	scoped_sources?: ScopedSources
-	// The lane ledger a finished gate's duration is appended to (joshuafolkken/kit#3355). Only the CLI
+	// The lane ledger a finished gate's duration is appended to. Only the CLI
 	// entry resolves it, so a suite driving the gate never writes a measurement of checks that never ran.
 	ledger_path?: string | undefined
 }
 
 // **The gate refuses to start when the scoped pair has not been green on this tree**
-// (joshuafolkken/kit#2296) — the same record `josh review:brief` reads, applied one step earlier so the
+//  — the same record `josh review:brief` reads, applied one step earlier so the
 // first gate is the only gate. It is the CLI entry's check alone (`is_scoped_enforced`), and it never
 // fires for CI's `--no-unit` gate or a `--force` run: CI has no scoped record in front of it, and
 // `--force` is the caller saying to run regardless. `scoped_green` owns the record and the `JOSH_SCOPED_GREEN`
@@ -339,12 +333,12 @@ function scoped_precheck_refusal(tree: GateTree, options: GateOptions): string |
 	return scoped_green.refusal_for(tree.files, tree.base, options.scoped_sources)
 }
 
-// **A partial gate records nothing green, and this is the same rule as the skip one layer out**
-// (joshuafolkken/kit#1226). The record's whole meaning to `josh review:brief` and to `gate_skip` is
+// **A partial gate records nothing green, and this is the same rule as the skip one layer out**.
+// The record's whole meaning to `josh review:brief` and to `gate_skip` is
 // "every check this repository gates on passed on exactly this tree"; a `--no-unit` run proves three
 // of the four, so writing it would let the next full `josh gate` be skipped on a tree whose unit
-// suite nobody ran here — a check reporting success without having run, which is the state
-// joshuafolkken/kit#1224 exists to refuse.
+// suite nobody ran here — a check reporting success without having run, which is the state the
+// skip rule exists to refuse.
 async function record_whole_gate(
 	plan: GatePlan,
 	results: ReadonlyArray<GateStepResult>,
@@ -357,7 +351,7 @@ async function record_whole_gate(
 }
 
 // Reports the checks and records a green result — inside the markers, so the in-flight one outlives
-// the record it announces (joshuafolkken/kit#2434).
+// the record it announces.
 async function settle_gate(
 	plan: GatePlan,
 	results: ReadonlyArray<GateStepResult>,
@@ -385,7 +379,7 @@ async function settle_gate(
 // The plan line is printed by the checked path alone. A run that announced a four-way fan-out and
 // then skipped would be describing something that never happened, and the skip's own line already
 // says everything there is to say about a gate that started no process. The reporting itself is
-// `gate-report.ts`'s (joshuafolkken/kit#2296).
+// `gate-report.ts`'s.
 async function run_checked_gate(
 	tree: GateTree,
 	options: GateOptions,
@@ -393,10 +387,10 @@ async function run_checked_gate(
 ): Promise<number> {
 	const is_unit_included = options.is_unit_included ?? true
 	// Read before the concurrent-run count, never between it and the marker below: the reading waits out
-	// a sample window, and a lane counting inside that window would miss this gate (joshuafolkken/kit#1515).
+	// a sample window, and a lane counting inside that window would miss this gate.
 	const ledger = await gate_ledger.start(options.ledger_path)
 	// Resolved at the gate's entry, before this gate sets `JOSH_UNIT_RUN_MARKED`, so a gate nested in the
-	// unit suite reads the flag as set and reserves nothing (joshuafolkken/kit#2351).
+	// unit suite reads the flag as set and reserves nothing.
 	const budget = default_budget()
 	const plan = announce_gate_plan(is_unit_included, budget.available_cores)
 
@@ -405,7 +399,7 @@ async function run_checked_gate(
 	// together — the shape `epicrun` produces — would both read "nothing else is running" and both take
 	// the whole machine. Claimed here, after the count and before any check, it is already there when
 	// the next lane asks; the guard inside the spawned `josh test:unit` sees the handoff and adds no
-	// second marker for the same run (joshuafolkken/kit#1515).
+	// second marker for the same run.
 	async function run_and_settle(): Promise<number> {
 		const results = await run_gate_steps(plan, budget)
 
@@ -425,8 +419,7 @@ function reusable_stamp(tree: GateTree, options: GateOptions): FileMapStamp | un
 
 // The two ways a gate ends before it runs a check: a green record it can reuse (exit 0), and the
 // scoped pre-check refusing a tree the pair has not been green on (exit 1). `undefined` means neither
-// fired and the checks run. **Nothing else stands between the skip and the checks** (joshuafolkken/kit#1486):
-// joshuafolkken/kit#1437's `package.json` refusal was removed once children stopped bumping.
+// fired and the checks run. **Nothing else stands between the skip and the checks.**
 function short_circuit_gate(tree: GateTree, options: GateOptions): number | undefined {
 	const reusable = reusable_stamp(tree, options)
 

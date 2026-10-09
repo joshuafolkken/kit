@@ -2,12 +2,11 @@ import { change_base } from '#scripts/git/change-base'
 import { review_tree } from '#scripts/review/review-tree'
 
 // The two readings a green-gate record is written from and compared against: the digest of every
-// changed file, and the commit that map is a diff against (joshuafolkken/kit#1241,
-// joshuafolkken/kit#1328).
+// changed file, and the commit that map is a diff against.
 //
 // They live here rather than inside `verification-gate.ts` because there are now two readers — the
 // gate, which reuses a green record instead of re-running its four checks, and the pre-push hook,
-// which reuses the same record instead of re-running the unit suite (joshuafolkken/kit#1334). A
+// which reuses the same record instead of re-running the unit suite. A
 // second copy of the pair would be the clone `CLAUDE.md` prohibits, and it would not have stayed
 // identical: what these functions really encode is which failure direction is safe, and a copy is
 // where that decision gets made twice.
@@ -30,7 +29,7 @@ async function read_changed_files(): Promise<Record<string, string>> {
 	}
 }
 
-// The resolver lives in `git/change-base.ts` since joshuafolkken/kit#1537, because the review brief
+// The resolver lives in `git/change-base.ts`, because the review brief
 // needs exactly this reading and a second copy of it is the clone `CLAUDE.md` prohibits.
 async function read_base(): Promise<string | undefined> {
 	return await change_base.resolved()
