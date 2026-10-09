@@ -1,5 +1,5 @@
 // The one reading of a shell segment as a `git` invocation, shared by the two Bash-string rows that
-// judge a git command by its spelling (joshuafolkken/kit#2120): `git-force.ts` refuses a force push or
+// judge a git command by its spelling: `git-force.ts` refuses a force push or
 // a branch delete, and `worktree-guard.ts` refuses an unauthorized working-tree change. Both have to
 // skip the same wrapper and the same git global options before the subcommand is even in hand, so the
 // cut lives here rather than beside whichever row needed it first — two copies of it would be the clone
@@ -14,7 +14,7 @@
 // The wrapper words that may stand in front of `git`, the same ones `run-tail-rule.ts` skips in front of
 // `josh`: environment assignments, the package-manager launchers, `sudo`, `env`, and an opening
 // subshell parenthesis. Left in, `sudo git push --force`, `env git commit` and `(git push -f)` are
-// silently not a git command (joshuafolkken/kit#2983).
+// silently not a git command.
 const ENV_ASSIGNMENT = /^[A-Za-z_]\w*=/u
 const WRAPPER_WORDS: ReadonlySet<string> = new Set([
 	'pnpm',
@@ -95,7 +95,7 @@ function after_globals(words: ReadonlyArray<string>, start: number): number {
 }
 
 // The words after `command` once the wrapper is skipped, or `undefined` when the segment does not
-// invoke it. `gh` and `rm` are judged by the same wrapper cut as `git` (joshuafolkken/kit#2983), so
+// invoke it. `gh` and `rm` are judged by the same wrapper cut as `git`, so
 // `env gh pr close` and `sudo rm -rf` are read as the calls they are.
 function arguments_of(segment: string, command: string): Array<string> | undefined {
 	const words = words_of(segment)

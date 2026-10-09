@@ -1,7 +1,7 @@
 import { bash_triggers } from './bash-triggers'
 
-// The trigger and the delivered text behind the `raw-field-body` row of `delivered-rules.ts`
-// (joshuafolkken/kit#2304). Its sibling `shell-body` refuses a body a run passed *inline* so the shell
+// The trigger and the delivered text behind the `raw-field-body` row of `delivered-rules.ts`.
+// Its sibling `shell-body` refuses a body a run passed *inline* so the shell
 // evaluates it; this one refuses a body a run passed *by path with the wrong flag*, so the path is
 // posted as text.
 //
@@ -9,8 +9,7 @@ import { bash_triggers } from './bash-triggers'
 // reads the file when the value opens with `@`; `-f` / `--raw-field` sends the value verbatim, so
 // `-f body=@<path>` posts the literal string `@<path>`. The two differ by a single character, `gh`
 // exits 0 and returns a comment URL either way, and the break is invisible until a person reads the
-// issue — joshuafolkken/kit#2304 recorded two park comments (`@/tmp/2294-park.md` and a decision
-// record) lost exactly this way, which was the only place the reason for a stopped child was written.
+// issue — a park comment lost this way is the only place the reason for a stopped child was written.
 //
 // **The trigger is the raw-field flag with an `@`-opening body, not `@` alone.** `-F` / `--field
 // body=@<path>` is the spelling the rule *asks* for and stays silent; a `-f body="plain text"` with no

@@ -3,8 +3,8 @@ import { git_argv } from './git-argv'
 import { shell_segments } from './shell-segments'
 import { worktree_guard } from './worktree-guard'
 
-// The trigger and the delivered text behind the `index-mutation` row of `delivered-rules.ts`
-// (joshuafolkken/kit#2983). `CLAUDE.md` → Git Rules forbids staging or otherwise mutating the git index
+// The trigger and the delivered text behind the `index-mutation` row of `delivered-rules.ts`.
+// `CLAUDE.md` → Git Rules forbids staging or otherwise mutating the git index
 // on the run's own judgement, and `.claude/settings.json` backs it with `Bash(git add*)` /
 // `Bash(git commit*)` and their siblings — but those are prefix globs, so `git -C . commit`,
 // `git -c k=v commit` and `env git commit` all pass them. Reading the argv through `git-argv.ts`, the

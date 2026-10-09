@@ -2,8 +2,8 @@ import { bash_triggers } from './bash-triggers'
 import { git_argv } from './git-argv'
 import { shell_segments } from './shell-segments'
 
-// The trigger and the delivered text behind the `git-force` row of `delivered-rules.ts`
-// (joshuafolkken/kit#2120). Group 1 of the three Bash-string gaps: a force push or a branch delete
+// The trigger and the delivered text behind the `git-force` row of `delivered-rules.ts`.
+// Group 1 of the three Bash-string gaps: a force push or a branch delete
 // spelled in a way the `deny` glob cannot express.
 //
 // **The deny list stops the spellings a glob can reach and no others.** `Bash(git push *--force*)` and

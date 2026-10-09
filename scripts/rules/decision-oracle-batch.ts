@@ -3,7 +3,7 @@ import { oracle_tokens } from './decision-oracle-tokens'
 
 // The batch oracles — the lane cut, the backlog budget and offer, the epic and post-merge steps, and
 // `run:step` — kept beside the enumeration rather than inside it because `decision-oracle.ts` reached
-// its file-size limit (joshuafolkken/kit#3264). They are one contiguous run of `DECISION_ORACLES`, so
+// its file-size limit. They are one contiguous run of `DECISION_ORACLES`, so
 // spreading them back in at the same position keeps the printed listing's order unchanged.
 
 const {
@@ -24,11 +24,10 @@ const PRE_GATE_CUT_MD = '.claude/skills/workflow-commands/pre-gate-cut.md'
 const BACKLOGRUN_MD = '.claude/skills/workflow-commands/backlogrun.md'
 
 // The command reference in `docs/josh-commands.md` — one section per command, headed by the command
-// itself. joshuafolkken/kit#2190 cut `backlogrun.md` back to a manifest of pointers, so a decision it
-// used to carry inline (`run:merge`, `epic:next`, `backlog:budget`, `run:liveness`, `auto-ok:next`)
-// now has its verdict contract only in this reference. That makes it the single source and the section
-// a reader is routed to, in the same `file.md → \`josh <command>\`` form the `epic:reconcile` and
-// `lane:list` entries already use. joshuafolkken/kit#2254.
+// itself. `backlogrun.md` is a manifest of pointers, so a decision (`run:merge`, `epic:next`,
+// `backlog:budget`, `run:liveness`, `auto-ok:next`) has its verdict contract only in this reference.
+// That makes it the single source and the section a reader is routed to, in the same
+// `file.md → \`josh <command>\`` form the `epic:reconcile` and `lane:list` entries use.
 const RUN_MERGE_REFERENCE = 'docs/josh-commands-run.md → `josh run:merge`'
 const EPIC_NEXT_REFERENCE = 'docs/josh-commands-backlog.md → `josh epic:next`'
 const BACKLOG_BUDGET_REFERENCE = 'docs/josh-commands-backlog.md → `josh backlog:budget`'

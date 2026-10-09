@@ -86,7 +86,7 @@ const ALIASES: Record<string, string> = {
 }
 
 // The canonical name of a `josh` subcommand: an alias expands, and anything else passes through
-// unchanged (joshuafolkken/kit#1789).
+// unchanged.
 //
 // **The expansion is one rule, so it lives beside the table it reads.** Two readers had each written
 // their own `ALIASES[name] ?? name` — the layer report and the gate-run count — and a third, the run

@@ -1,16 +1,14 @@
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 
-// The verification gate's full output, kept somewhere the console's size limit cannot reach
-// (joshuafolkken/kit#1227).
+// The verification gate's full output, kept somewhere the console's size limit cannot reach.
 //
-// **The problem is that the only copy of a failure's detail was the console.** `josh gate` buffers
-// every check and prints the failing ones whole, and joshuafolkken/kit#1173 then declared
-// `BASH_MAX_OUTPUT_LENGTH` at 8,000 characters — a cap on what a command may carry into an agent's
-// context, with a measured p99 of 15,989 characters for a Bash call. The verdict is the last line and
-// so always survives, which is why a red gate can never read as green; what does not survive is the
-// middle, and the middle is where the failure says what it was. The escape hatch was to re-run one
-// check by hand, which is a judgement the reader has to make about output they cannot see.
+// **The console cannot be the only copy of a failure's detail.** `josh gate` buffers every check and
+// prints the failing ones whole, and `BASH_MAX_OUTPUT_LENGTH` caps what a command may carry into an
+// agent's context. The verdict is the last line and so always survives, which is why a red gate can
+// never read as green; what does not survive is the middle, and the middle is where the failure says
+// what it was. Re-running one check by hand is a judgement the reader would have to make about output
+// they cannot see.
 //
 // So the gate writes every check's output to a file and prints where it is. Nothing about the
 // verdict changes; what changes is that the detail behind it no longer exists only in a window that

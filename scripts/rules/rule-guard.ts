@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { delivered_rules } from './delivered-rules'
 
-// The hook entry point for trigger-delivered rules (joshuafolkken/kit#1524).
+// The hook entry point for trigger-delivered rules.
 //
 // **It is the same shape `batch-guard.ts` and `investigation-guard.ts` already have**, and
 // deliberately so: read the payload on stdin, ask the rule, write the one envelope Claude Code

@@ -2,8 +2,7 @@ import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
 
-// A short reuse window over the transcript-priced verdict `implementation-cut.ts` reads
-// (joshuafolkken/kit#2385).
+// A short reuse window over the transcript-priced verdict `implementation-cut.ts` reads.
 //
 // **The read is a whole-transcript price and its caller is asked of every edit.**
 // `is_over_threshold_edit` reads `cost_cli.session_verdict` — which loads and parses the session

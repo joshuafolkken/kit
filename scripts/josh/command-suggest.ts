@@ -1,6 +1,6 @@
 // A single-token "did you mean" for `josh <typo>`. The command set is small and the input is one
 // word, so a character edit distance is the right measure here — unlike `issue-scout`'s token-set
-// Dice similarity, which compares multi-word issue titles (joshuafolkken/kit#1928).
+// Dice similarity, which compares multi-word issue titles.
 const MAX_SUGGESTION_DISTANCE = 3
 
 // A cell of the matrix, defaulting the out-of-range read to 0. Reading through it keeps the nullish

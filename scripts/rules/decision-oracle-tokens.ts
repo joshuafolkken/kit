@@ -1,6 +1,5 @@
 // Vocabulary tokens and arguments that appear in more than one oracle entry, shared by
-// `decision-oracle.ts` and `decision-oracle-batch.ts` so each string has one source
-// (joshuafolkken/kit#3264).
+// `decision-oracle.ts` and `decision-oracle-batch.ts` so each string has one source.
 
 const oracle_tokens = {
 	REQUIRED: 'required',

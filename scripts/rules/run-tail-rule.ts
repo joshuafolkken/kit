@@ -4,27 +4,23 @@ import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { shell_segments } from './shell-segments'
 
-// The trigger and the decision behind the `run-tail` row of `delivered-rules.ts`
-// (joshuafolkken/kit#1510).
+// The trigger and the decision behind the `run-tail` row of `delivered-rules.ts`.
 //
-// **Two stops, one cause.** `fullrun #1501` ran 45m03s on about 17 minutes of work. Of the 25 idle
-// minutes, 6m28s was a `pnpm josh git -y` issued in the **foreground** with a 900-second tool
-// timeout — above the harness's 600-second cap, so the harness detached it at the cap and nothing
-// read the output file afterwards — and 6m06s was bare CI: the push landed, the turn ended, and the
-// merge started only when the person asked whether it was merging. Both halves handed the deciding
-// of when to look back to something that was never going to decide it.
+// **Two stops, one cause.** A `pnpm josh git -y` issued in the **foreground** with a tool timeout
+// above the harness's 600-second cap is detached at the cap with nothing reading the output file
+// afterwards; and a push that ends the turn leaves the merge waiting until a person asks. Both hand
+// the deciding of when to look back to something that is never going to decide it.
 //
 // **So the refusal is put in front of the foreground call, which is the last call before the seam.**
 // A turn ending between the push and `pnpm josh followup` is an *absence* of a call, and no
 // `PreToolUse` hook can see one; the foreground push is a call, and refusing it delivers both halves
-// at the one moment they still bind. That is the same reading joshuafolkken/kit#1570 took for a wait
-// timer and joshuafolkken/kit#1556 for a verification behind a pipe.
+// at the one moment they still bind. That is the same reading `early-heartbeat.ts` takes for a wait
+// timer and `piped-verification.ts` for a verification behind a pipe.
 //
 // **Backgrounding is what closes the seam, rather than a second rule about turns.** A command issued
 // with `run_in_background` re-invokes the run when it exits, so the completion notification is what
-// resumes the tail — not a person noticing the silence. joshuafolkken/kit#1333 had already
-// established the same end state as a procedure, and symptom 2 is its regression; prose that had to
-// be remembered was what regressed, so this time the moment is named as a call.
+// resumes the tail — not a person noticing the silence. Prose that has to be remembered is what
+// regresses, so the moment is named as a call.
 //
 // **A call already made properly is not a trigger.** Reissued with `run_in_background`, the same
 // command falls through and the run pays nothing — the shape `is_body_only_issue_read` takes for a
@@ -90,7 +86,7 @@ function is_backgrounded(input: unknown): boolean {
 }
 
 /**
- * The occasion this rule governs: the push step, in either spelling (joshuafolkken/kit#1643).
+ * The occasion this rule governs: the push step, in either spelling.
  *
  * It is the denominator `scripts/rules/rule-value.ts` reads for this row, because the trigger below
  * fires only on the foreground spelling — a run that detached every push never trips it, so the rate
@@ -129,7 +125,7 @@ function is_foreground_push_step(call: GuardedCall): boolean {
  * changes what the run *knows*. A push does not work that way: a `queue` or an `epicrun` issues one
  * per child, and a round-2 fix commit issues a second inside a single `fullrun`. Refused once and
  * free afterwards, every push but the first is back to the run's own self-restraint, which is the
- * thing joshuafolkken/kit#1333 already measured failing.
+ * thing that fails.
  *
  * **It also removes the stand-aside this row has no use for.** `is_first_delivery` stays silent for
  * ten seconds after the batching guard stamps any refusal; the push step is never a candidate of that
