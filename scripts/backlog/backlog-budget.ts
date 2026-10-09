@@ -51,8 +51,8 @@ const TRIAGE_VERDICT = 'triage'
 
 // `run` — start what `backlog:next` offered. `watch` — sleep the polling interval and ask again,
 // except while something of the run's own is in flight, where the wake is the progress watcher's exit
-// and the interval is only a floor (`backlogrun.md` → "The wake exists only while something is in
-// flight").
+// and the interval is only a floor (`docs/maintainers/backlogrun-driver.md` → "Waiting while
+// something is in flight").
 // `stop` — report and finish. `triage` — judge the untriaged issues `backlog:next` named, then ask
 // again (joshuafolkken/kit#2779); it is the parent's to act on, so `backlog:drive` hands it back.
 type BudgetVerdict =

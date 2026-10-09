@@ -1,9 +1,6 @@
 # `backlogrun` — recovering a child that went wrong
 
-**Read the section you need at the moment it is needed, never at the entry or before the first child**
-(joshuafolkken/kit#3175). Both sections below are reached only on failure — a unit that went silent, a
-lane whose pull request conflicts with `main` — so a run in which nothing fails never pays for them.
-`backlogrun-child.md`, `backlogrun-lanes.md` and `chain-rule.md` point here at those triggers.
+Point-of-use, read one section at the failure that reaches it (joshuafolkken/kit#3175); the single source of `run:liveness`.
 
 ## A delegated unit that stopped without reporting
 
@@ -26,7 +23,14 @@ the recovery below is taken there too.
 pnpm josh run:liveness <N> --output <path>
 pnpm josh run:liveness <N> --output <path> --window 45 --repo <owner/repo>
 pnpm josh run:liveness <N> --output <path> --process none
+unit_output=$(pnpm josh lane:output <N>) &&
+  pnpm josh run:liveness <N> --output "$unit_output"     # a lane this session never opened
 ```
+
+**The `&&` is load-bearing.** A lane that records nothing prints `none` and exits non-zero; substituted
+straight into `--output`, that `none` is a relative path and `run:liveness` answers `undetermined` for
+ever. A handed-over lane is polled this way by any session, because the command reads the process
+itself.
 
 | Answer | What it found | What the parent does |
 | --- | --- | --- |

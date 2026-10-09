@@ -135,7 +135,7 @@ const INTERRUPT_MARKERS: ReadonlyArray<string> = [
 	'**epic の外にある割り込みでは、まとまりの後半は 4 の報告そのもの**',
 	// How an interrupt is *run* moved to `backlogrun-lanes.md` (joshuafolkken/kit#3181) and is pinned
 	// there by `SOLO_RUN_REACH`; only the pointer stays here.
-	'`.claude/skills/workflow-commands/backlogrun-lanes.md` → "Lanes — running more than one child at a time"',
+	'`.claude/skills/workflow-commands/backlogrun-lanes.md` → "A solo run"',
 	// The blocked-by exemption's enumeration used to be resident and is not any more: `CLAUDE.md` had
 	// 105 bytes of slack under `RESIDENT_CEILING_BYTES`, and the interrupt's three tests had to be
 	// paid for out of it. Moving is only moving if the destination is pinned, so the list is asserted

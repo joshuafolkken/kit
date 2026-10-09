@@ -1,12 +1,6 @@
 # `backlogrun` — running a child (shared mechanics, delegation, liveness, session setup)
 
-**Read this file in full once per session — before the first child is dispatched**, in the turn that
-reaches `pnpm josh delegate epic-child` (or `pnpm josh lane:dispatch`). **A later child does not re-read
-the whole file; it fetches only the section that child needs** — `pnpm josh doc:section backlogrun-child.md
-"<heading>"`. It is a point-of-use document, never an entry read: the entry procedure is `backlogrun.md`,
-which points here at that step. This file is the single source of how one `backlogrun` child — of a
-named epic, a named issue, or the opted-in pool — is run. Rationale:
-`docs/maintainers/backlogrun-child-rationale.md` → "Why the file is read once and then by section".
+Point-of-use, read one section at a time from `backlogrun.md` → "The route table" (rationale: `docs/maintainers/backlogrun-child-rationale.md` → "Why the file is read by section").
 
 ## Running a child — the shared mechanics
 
@@ -182,16 +176,11 @@ in hand.**
 commits it — so that one PR carries the dependency bumps and the other children carry none. Should the
 first child fail CI on a bump, fix it forward before parking it.
 
-**`pnpm josh ms` stays per child** — it brings the previous child's merge into the tree,
-and a child that skips it implements on a stale main. Only the dependency update moves to the run. **In
-lanes it changes hands**: no lane can switch to the default branch, so the parent runs it in the primary
-checkout **before each `lane:open`**. **And in a lane `josh latest` is not even asked** — `latest:scope`
-skips and `latest:guard` refuses. The stash that carries the lock file into the first lane is in
-`backlogrun-lanes.md` → "Once per repository, before the first lane opens": the parent runs the update
-and pushes the stash in the primary checkout before `backlog:drive` starts, and the driver passes it
-to the first lane it launches.
-
-This is the same rule `latest-gate.md` is the single source of.
+**`pnpm josh ms` stays per child** — only the dependency update moves to the run. **`josh latest` is
+never run inside a lane, whatever `latest:scope` answers there** — `latest:scope` answers `skip` in a
+lane and `pnpm josh latest` refuses outright, fronted by `pnpm josh latest:guard`; with lanes the
+parent runs it in the primary checkout, and the stash that carries the lock file into the first lane
+is `backlogrun-lanes.md` → "Once per repository, before the first lane opens".
 
 **A resumed `backlogrun` is a new session**, so it asks once again before its first child.
 

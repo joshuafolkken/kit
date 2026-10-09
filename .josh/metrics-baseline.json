@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1039,
-		"code_lines": 86726,
-		"comment_lines": 34284,
+		"code_lines": 86745,
+		"comment_lines": 34296,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,7 +12,7 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 535366
+		"on_demand_bytes": 501159
 	},
 	"accepted": {
 		"reason": "git fixture runs every command with maintenance.auto=false so a detached auto-maintenance writer no longer races close_workspace (ENOTEMPTY) #3558",

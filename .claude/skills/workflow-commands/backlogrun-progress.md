@@ -1,128 +1,55 @@
 # `backlogrun` — progress, the hand-off, resume and waiting
 
-**Read this file in full before the first child is dispatched** and before the hand-off check at a
-child's merge (`pnpm josh cost --cut`). It is a point-of-use document, never an entry read: the entry
-procedure is `backlogrun.md`, which points here at those steps (joshuafolkken/kit#2010). This file is
-the single source of the session hand-off and cut/resume, waiting without waiting forever, and the
-end-of-run summary and propagate. **The heartbeat is not here** — it binds every implementing run, so
-its single source is `progress-watcher.md` → "Progress while the run is quiet" (joshuafolkken/kit#3172),
-read before the watcher starts.
-
-After a carry hand-off, the detached `run:wake` supervisor runs the deterministic `backlog:drive`
-loop. References below to a parent's mechanical polling and lane collection describe work now done
-by that supervisor; an AI parent is started only for a driver branch that requires judgment.
+Point-of-use, read one section at a time from `backlogrun.md` → "The route table"; the heartbeat is `progress-watcher.md` → "Progress while the run is quiet".
 
 ## Running a named epic's children
 
-`josh epic:next <E> --repo <this repository> --lanes` prints **one issue number per line** on standard
-output — as many as that repository has free lanes — or, when there is no child to run, the verdict as a
-single token. Everything else goes to standard error. Without `--lanes` the answer is a single token
-either way.
+**`backlog:drive` walks this loop on its own; a session runs it when the driver hands back `epic #N`**
+(rationale: `docs/maintainers/backlogrun-progress-rationale.md` → "Why a named epic's children run in
+lanes"; `docs/maintainers/backlogrun-progress-rationale.md` → "Why a child's ending is classified at
+once"; `docs/maintainers/backlogrun-progress-rationale.md` → "Why state lives in records, not the
+conversation"). `josh epic:next <E> --repo <this repository> --lanes` prints one issue number per line
+— as many as that repository has free lanes — or, when there is no child to run, the verdict as a
+single token.
+
+1. **One or more numbers** — in this session's own checkout the child's `fullrun` claim
+   `pnpm josh run:hold <N>` runs the preflight check itself; in a lane the check is skipped and
+   `lane:open`'s own answer replaces it. Each child runs as `fullrun #<N>` in a delegated unit, except
+   that `josh latest` is not run and no progress watcher is started. `pnpm josh ms` runs in the primary
+   checkout immediately before each `lane:open`.
+2. **Start the unit without blocking on it** — `pnpm josh lane:dispatch <N>`, and in the same turn
+   `pnpm josh lane:await <N...> --owner "$PPID"` in the background, which exits when any named child
+   confirms-complete. A `lane:await` wake is a confirmed-gone process, so the ending is classified at
+   once by the command below.
+3. **Act on the token it prints**, and repeat until `epic:next` answers `complete` or `stop` — then
+   record the root as done in the carry record (`backlogrun-steps.md` → "The session cut is inside the
+   invocation").
+
+**`pnpm josh run:merge <N>` is the only reading of how a child ended** (joshuafolkken/kit#2024) — never
+classify `pnpm josh issue:state` by hand, and never ask `epic:next` in its place. Rationale:
+`docs/maintainers/backlogrun-progress-rationale.md` → "Why a child's ending is read by `run:merge` alone".
 
 ```bash
-answers=$(pnpm josh epic:next 858 --repo joshuafolkken/kit --lanes)
-# one issue number per line, up to the number of free lanes; a verdict token when there is none
-answers=$(pnpm josh epic:next 858 909 --repo joshuafolkken/kit --lanes)
-# every named epic, merged into the same pool
+next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --owner "$PPID" --output <path>)
+# a child number (or several, one per free lane) to run next, or a verdict token
 ```
 
-**`--lanes` is the form to use.** Read a line per child, and treat a single non-numeric line as the
-verdict. Rationale: `docs/maintainers/backlogrun-progress-rationale.md` → "Why a named epic's children
-run in lanes".
+**Pass `--output <path>` — the child's transcript** (joshuafolkken/kit#2240); without it an outage
+ending reads as a plain failure. The named-epic flags are dropped for the opted-in backlog.
 
-1. Run the command above.
-2. **One or more numbers** — where the child runs in this session's own checkout, its `fullrun` claim
-   `pnpm josh run:hold <N>` **now runs the preflight check itself** and is obeyed: `reclaim` is
-   recovered and `run:hold` asked again, `park` parks this child and returns to step 1, `unknown` stops
-   the session, `resume` starts the child on the branch that is there with the whole verification gate
-   re-run, and `hold` starts it. **In a lane the check is skipped**, and `lane:open`'s own answer
-   replaces it. **Everything from here on is per child**:
-   with several in flight each is confirmed, counted and closed on its own, and step 1 is asked again
-   once a lane comes free rather than once the last child returns. Either way the child runs as
-   `fullrun #<N>` does, **in a delegated unit where one is available** (`pnpm josh delegate epic-child`
-   → `delegate`) and **in this session's own context where none is**, **except that `josh latest` is
-   not run** and **no progress watcher is started**. `pnpm josh ms` runs per child in
-   whichever context implements it, **and again in this session afterwards** when the child was
-   delegated. **In a lane the child cannot run it at all**, so it is the parent's, immediately before
-   that lane's `lane:open`.
+| It prints | What the child was, or what the run does |
+| --- | --- |
+| numbers | **merged** (counted, `ms`, `lane:close`, epic comment), **parked** (left alone), **outage** (stale `in-progress` dropped, re-dispatchable, uncounted) or **failed** (parked `needs-decision`, counted against the consecutive-failure guard) — then run the numbers it offers next. A kept label answers to `backlogrun-park.md` → "Only a person's judgement carries `needs-decision`" |
+| `wait` / `complete` | `epic:next`'s own verdict: wait for the next wake, or post the epic summary — with nothing in flight, on the polling interval below |
+| `over` | The merge crossed the budget: hand the lanes over and take the cut — "The hand-off" below |
+| `human-review` | The child stopped before its commit (`needs-human-review.md`): stop, leave `in-progress` on, send no second `confirmation` (the unit sent one; where the child ran in this session's own context, it is yours to send) |
+| `stop` | `epic:next` found only parked children left, or the consecutive-failure guard tripped: report the parked children and stop |
+| `environment` | The consecutive-**outage** guard tripped: the API is down, and the run stops as an environment failure |
+| `resumed` | An unadopted cut was relaunched: `lane:await <N>` it again (joshuafolkken/kit#2484) |
+| `retry` / `busy` | The child's state could not be read: re-read it |
 
-   **Start the unit without blocking on it — `pnpm josh lane:dispatch <N>` when the child runs in a
-   lane — and in the same turn start `pnpm josh lane:await <N...> --owner "$PPID"` in the background** (joshuafolkken/kit#2113).
-   `lane:await` watches local process presence and exits when any named child confirms-complete. **The
-   re-confirm delay and poll interval are the command's, not the agent's** — pass only the issue
-   numbers and `--owner` (why: `docs/josh-commands-run.md` → `josh lane:await`). Without that wake (Codex), hand off instead — "A parent without a completion callback".
-
-   **A `lane:await` wake is a confirmed-gone process, so classify the ending at once — do not wait out
-   the silent-unit window** (joshuafolkken/kit#2277). On a `lane:await` wake go straight to `pnpm josh run:merge <N> --output <path>` — the composite reads the child's **exit
-   record**, decisive whether the child merged, died on an outage, or abandoned mid-implementation
-   ("Running a named epic's children" reads its tokens). An outage child is re-dispatched in the same run
-   and a run of them trips the environment guard; nothing waits for a person. Rationale:
-   `docs/maintainers/backlogrun-progress-rationale.md` → "Why a child's ending is classified at once".
-
-   **`run:liveness` stays the fallback for a lane no `lane:await` is watching** — a handed-over lane a
-   resumed session polls ("Picking the lanes up in the fresh session"). Ask
-   `pnpm josh run:liveness <N> --output <path>` where that file has been unchanged for the silent-unit
-   window — it reads the child's process for itself; on `stopped` its own
-   advice routes the child through the same `run:merge --output` classification.
-
-   **When the unit reports back, a merge is one event, and one call of the parent's — `pnpm josh
-   run:merge <N>`** (joshuafolkken/kit#2024). It is the only reading of how the child ended: never
-   classify `pnpm josh issue:state` by hand, and never ask `epic:next` in its place. Rationale:
-   `docs/maintainers/backlogrun-progress-rationale.md` → "Why a child's ending is read by `run:merge` alone".
-   The composite command confirms the child from GitHub, does the post-merge steps, folds in the hand-off check, and prints
-   the next child number — or a control verdict — for the parent to read. Pass the merged child's
-   number and the offer's source — `--epic <E> --repo <owner/repo>` for a named epic,
-   nothing for the opted-in backlog — with `--owner "$PPID"` so it counts into the carry record under
-   the ownership guard.
-
-   ```bash
-   next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --owner "$PPID" --output <path>)
-   # a child number (or several, one per free lane) to run next, or a verdict token
-   ```
-
-   **Pass `--output <path>` — the child's transcript** (joshuafolkken/kit#2240). Without it the
-   composite cannot tell an API-outage ending from a genuine failure: an OPEN, unparked child is a plain
-   failure.
-
-   **What the one call does is decided by what the child turned out to be** — read from its GitHub state
-   (and, for the failed case alone, its exit record), never from a log: a **merged** child (CLOSED) is
-   counted into the carry record (which resets the failure streak), then `pnpm josh ms`,
-   `pnpm josh lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (OPEN,
-   `needs-decision` or `already-done`) is left alone and not counted; an **outage** child (OPEN, neither
-   label, but the exit record shows it could not reach the API) has its stale `in-progress` dropped, is
-   **not** parked and **not** counted against the consecutive-failure guard, and stays re-dispatchable
-   (joshuafolkken/kit#2240); a **failed** child (OPEN, neither label, not an outage) has its stale
-   `in-progress` dropped, is parked with `needs-decision`, and is counted against the consecutive-failure
-   guard. The label stays only once its reason passes `backlogrun-park.md` → "Only a person's judgement
-   carries `needs-decision`".
-
-   **Beyond the offer `epic:next` prints** (`run` becomes numbers; `wait` / `stop` / `complete` /
-   `error` pass through), the composite adds six verdict tokens: `over` — the merge crossed the budget,
-   so hand the lanes over and take the cut ("The hand-off" below); `human-review` — the child stopped
-   before its commit, the run's own ending (needs-human-review.md), so stop — leave `in-progress` on, and send
-   no second `confirmation` Telegram, since the unit already sent one (where the child ran in this
-   session's own context, that first notification is yours to send); `stop` — the consecutive-failure
-   guard tripped; `environment` — the consecutive-**outage** guard tripped, so the API is down and the
-   run stops as an environment failure rather than the children's (joshuafolkken/kit#2240); `resumed` —
-   an unadopted cut was relaunched; `lane:await <N>` it again (joshuafolkken/kit#2484); and `retry` — the child's state could not be read, so re-read it.
-
-   **The counters are the carry record's, and the epic progress comment is generated from it** (see "The
-   counters live in the record" below). **The hand-off check is folded into the merge branch of the one
-   call** — `pnpm josh cost --cut`, run after `pnpm josh ms`; `under` offers the next child,
-   `over` prints `over` so the parent hands its lanes over and takes the cut ("The hand-off" below), and
-   a session that cannot measure is read as `over`. **Never read the condition off `pnpm josh delegate
-   epic-child`** ("The check is asked at every merge" below).
-3. **`wait`** — go back to step 1. **With something of this run's own in flight, that happens on the
-   wake `lane:await` or the progress watcher's arrival exit delivers** and the parent starts no sleep
-   of its own; the 60 s figure bounds how soon the ask may be repeated. **A scheduled report is not one
-   of those wakes** (joshuafolkken/kit#3102). **With nothing in flight neither wake comes, so the parent
-   keeps the interval** — the case for "another repository has work but this one does not", and for a
-   cross-repository publish wait. "The wake exists only while something is in flight" below decides
-   which.
-4. **`stop`** — report the parked children and finish.
-5. **`complete`** — post the epic summary and finish.
-6. **Exit code 1** — `epic:next` refused a cyclic or contradictory graph, or could not read a child.
-   Report and finish.
+**Exit code 1** — `epic:next` refused a cyclic or contradictory graph, or could not read a child: report
+and finish.
 
 ## After a named epic completes
 
@@ -151,37 +78,27 @@ the next turn of this session costs more than the threshold in billed input.
 
 **135,000 is shared by the scheduler entry, scheduler hand-off and lane worker implementation cut.**
 The value is `CONTEXT_CUT_THRESHOLD` in `scripts/cost-runtime/context-cut-threshold.ts`; `cost --cut`,
-`run:merge`, `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` and the parent hand-off guard all read it. The
-output ceiling and the entry-read figure are a separate 150,000, not this threshold.
+`run:merge`, `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` and the parent hand-off guard all read it — the
+lane child's mid-implementation cut is `pre-gate-cut.md` → "The implementation-phase cut". The output
+ceiling and the entry-read figure are a separate 150,000, not this threshold.
 
 ### The check is asked at every merge, and delegation does not excuse it
 
 **A delegating parent reaches the threshold too, so there is no condition: `pnpm josh cost --cut` is
-asked after every child's merge**, delegated or not.
-**Never wire the question to `pnpm josh delegate epic-child`** — a static policy lookup that answers
-`delegate` everywhere.
+asked after every child's merge**, delegated or not — once per child, immediately after its merge and
+`pnpm josh ms`; mid-child, a hook asks (#2947). **Never wire the question to `pnpm josh delegate
+epic-child`** — a static policy lookup that answers `delegate` everywhere.
 
 `over` and `under` are not the only answers: the command **exits 1 with empty standard output** when
 there is no transcript, or no request in it. **Neither is `under`** — report that the check could not
 answer, and take `over`'s branch at that child.
-
-### When to ask, and what to do
-
-**Ask once per child, immediately after its merge and `pnpm josh ms`**; mid-child, a hook asks (#2947).
 
 ### A parent without a completion callback hands off at its first dispatch
 
 **A finished command never re-invokes a Codex parent, so after a dispatch `run:step` prints the `--cut`
 below the cut cap, `wait` at it** (joshuafolkken/kit#2653): dispatch the wave, run it, end the turn.
 
-### The lane child reuses this measurement mid-implementation
-
-**The same `pnpm josh cost --over` measurement bounds a lane child's context _during_ implementation, not
-only the parent's between children**. The child measures its own per-request
-context with **this command** at the shared `CONTEXT_CUT_THRESHOLD`, 135_000, and cuts with
-`pnpm josh run:cut --impl <N> --handoff <path>`. **The measurement and threshold are single-sourced**:
-`cost_verdict.per_request_cost` is what both seams compare, and `cost --cut` selects the same constant
-for both. The boundary and the resume: `pre-gate-cut.md` → "The implementation-phase cut".
+### Reading the lanes at the seam
 
 **A merge is not by itself a safe seam, because another lane may still be running.** **Read the lanes rather than judging them:**
 
@@ -189,38 +106,24 @@ for both. The boundary and the resume: `pre-gate-cut.md` → "The implementation
 pnpm josh lane:list   # `none`, or one line per lane with its state and its recorded output path
 ```
 
-**Every lane in flight is handed over, and the last column is what makes that possible.**
-`pnpm josh lane:output <N>` prints the same path on its own, so the next session polls a lane it never
-opened with two:
+**Every lane in flight is handed over, and the last column is what makes that possible** —
+`pnpm josh lane:output <N>` prints the same path on its own, which is how the next session polls a lane
+it never opened (`backlogrun-recovery.md` → "A delegated unit that stopped without reporting").
 
-```bash
-unit_output=$(pnpm josh lane:output <N>) &&
-  pnpm josh run:liveness <N> --output "$unit_output"
-```
-
-**The process trace is read by the command, not passed in** — it matches the
-child's own command line and a detached ship supervisor, so no `pgrep` is run by hand.
-
-**The `&&` is load-bearing.** A lane that records nothing prints `none` and exits non-zero; substituted
-straight into `--output`, that `none` is a relative path and `run:liveness` answers `undetermined` for
-ever.
-
-- **`under`** — go back to step 1 of the loop and run the next child.
+- **`under`** — go back to the loop and run the next child.
 - **`over`** — **the run hands its lanes over and takes the cut at once.** Open no new lane and take no
   new child. Confirm every lane still in flight records an output path — one missing is filled in with
   `pnpm josh lane:output <N> <path>` — then take one of the next two bullets in the same turn. **There
   is no waiting here at all**: the lanes keep running as processes of their own.
 - **A lane nobody could poll** — `unreadable`, or `open` with no recorded path and none that can be
   supplied — **and the cut does not happen.** Name that lane in the progress comment and go back to
-  step 1 of the loop; the reading is asked again at the next merge.
-- **Every in-flight lane records a path** — **record the cut and hand the session off.** `backlogrun`
-  declares a budget — `--max`, `--idle` and the 8-hour bound — so the cut is an execution detail: count
+  the loop; the reading is asked again at the next merge. **Never assume idle.** A `stranded` lane has
+  no work tree and so no running child — `pnpm josh lane:prune` closes it.
+- **Every in-flight lane records a path** — **record the cut and hand the session off**: count
   everything the session has, then run `pnpm josh run:carry --cut --owner "$PPID"`. **Unless it answers
   `capped`** (below), the `pnpm josh run:wake` driver starts at its next poll even while this session
   lives on, and polls the still-running lanes from `lane:list`. Post the progress comment naming **every lane in flight and the path each
   records**, name `pnpm josh run:board` for a pane, and end the turn — nothing is relayed (#2492).
-  `backlogrun-steps.md` → "The session cut is inside the invocation" is the single source of the
-  carry; this reading is only where the cut is *taken*.
 - **`capped`** — the invocation has taken its `MAX_CUTS` cuts (joshuafolkken/kit#2346), so `--cut`
   refused and left the record un-handed-off. **Do not `run:wake` or hand off.** Carry **this** session on
   uncut and re-ask at the next merge.
@@ -228,60 +131,37 @@ ever.
 Rationale for handing lanes over: `docs/maintainers/backlogrun-progress-rationale.md` → "Why lanes are
 handed over rather than drained".
 
-**A lane is handed over only where the next session can actually poll it.** A lane whose state is
-`open` **and** whose recorded path is not `-` is handed over. A **`stranded`** lane has no work tree and
-so no running child — `pnpm josh lane:prune` closes it. An **`unreadable`** one cannot be told apart
-from a running child, and an `open` lane recording **no path** is the same: **the cut does not happen**,
-the lane is named in the epic progress comment, and the run goes back to step 1. **Never assume idle.**
+**The hand-off report belongs to the stop, not to the reading** — a reading that goes back to the loop
+writes none; the epic progress comment is the record. The report's format is
+`backlogrun-handoff-report.md`. **This is not a failure and not a park**: `needs-decision` is not
+applied, nothing is stashed, and no Issue is filed.
 
-**The hand-off report belongs to the stop, not to the reading.** For the one reading that does not stop —
-an `unreadable` lane, or an `open` one recording no path — the run goes back to step 1 and writes no
-hand-off report; the epic progress comment is the record. The report's format is
-`backlogrun-handoff-report.md`.
+## Resuming after a cut
 
-**This is not a failure and not a park.** No child needs a decision; the run is either handing its lanes
-on or standing at the seam. `needs-decision` is not applied, nothing is stashed, and no Issue is filed.
+**A session woken by the driver's hand-off** — `Driver result:` in its prompt — acts on its branch and
+cuts as its `Next:` line says; the `run:wake` driver watches the lanes, and the watcher guard and the
+headless stop rule stand aside for it. A session resumed by hand reads the three subsections below.
 
 ### Picking the lanes up in the fresh session
 
 **The resumed session does not start a child again, and does not open a lane that is already open.** Its
 first reading is `pnpm josh lane:list`: every line with a recorded path is a child that was handed over,
-polled exactly as the session that dispatched it polled it (the two-line form above, same answer table
-and same two-`undetermined`-in-a-row rule) — `run:liveness` reads the process itself, so a session
-that did not start it reads it just as well. **`pnpm josh lane:open <N>` re-attaches to a lane whose branch is already pushed**, which a handed-over
-lane needs when its child has to be finished by hand.
+polled exactly as the session that dispatched it polled it (`backlogrun-recovery.md` → "A delegated unit
+that stopped without reporting"). **`pnpm josh lane:open <N>` re-attaches to a lane whose branch is
+already pushed**, which a handed-over lane needs when its child has to be finished by hand.
 
 **Restart the progress watcher by name** — `pnpm josh run:progress --wait --output <handed-over paths>`
 in the background, in the same turn as that first `lane:list`. The wired `run:watcher:guard` stops a resume that skips this (joshuafolkken/kit#2353).
 
-**A session woken by the driver's hand-off does neither**: with `Driver
-result:` in its prompt, the `run:wake` driver watches the lanes, so it acts on its branch and cuts as
-its `Next:` line says. The watcher guard and the headless stop rule stand aside for it.
-
 ### A carried-over merge does not stand in front of the next lane
 
-**A carried-over child finishes in its own detached unit, and the resumed parent does not stand in front
-of its merge.** A lane handed over at the cut is still running its own `fullrun` — the foreground
-`pnpm josh followup` and the CI wait included — in a process of its own (`background-commands.md` →
-"Background the gate and push": foreground is *within the unit*, the background from the parent).
-**So the parent never runs a carried-over child's `followup` itself**: it polls the handed-over lane and
-opens new work beside it. **The reads and the dispatches go out together, in one turn** — `pnpm josh lane:list`,
-`pnpm josh run:liveness`, `epic:next --lanes`, and opening a lane for a child it offers take none of each
-other's results (the turn-batching rule this file states for a merge event, applied at the resume).
-**Independence is the offer command's answer**: a new child `blocked-by` a carried-over Issue is
-withheld, one that is not is dispatched into a free lane beside it. **A carried-over child that did not
-survive the cut is re-dispatched, never adopted** — `pnpm josh lane:open <N>` then
-`pnpm josh lane:dispatch <N>`, never picked up into the parent's own context.
-
-### The counters live in the record
-
-**The single source of the run's counters is the carry record (`pnpm josh run:carry`), and the epic
-progress comment is generated from it** (joshuafolkken/kit#2024) — children run, Issues filed,
-**consecutive failures**, and the time the run started. `pnpm josh run:merge` writes the merge into
-the record and mirrors the counters onto the epic comment at every child's merge. **The
-consecutive-failure count is the one that matters**, and a merge resets it. Rationale:
-`docs/maintainers/backlogrun-progress-rationale.md` → "Why state lives in records, not the
-conversation".
+**A carried-over child finishes in its own detached unit, and the resumed parent never runs its
+`followup` itself** (`background-commands.md` → "Background the gate and push"): it polls the
+handed-over lane and opens new work beside it. **The reads and the dispatches go out together, in one
+turn** — `pnpm josh lane:list`, `pnpm josh run:liveness`, `epic:next --lanes`, and opening a lane for a
+child it offers take none of each other's results. **Independence is the offer command's answer**: a
+new child `blocked-by` a carried-over Issue is withheld. **A carried-over child that did not survive
+the cut is re-dispatched, never adopted** — `pnpm josh lane:open <N>` then `pnpm josh lane:dispatch <N>`.
 
 ### What carries over, and where it lives
 
@@ -289,62 +169,27 @@ conversation".
 
 | What the next session needs | Where it reads it |
 | --- | --- |
+| The budget, the counters and the named list | `pnpm josh run:carry --json` |
 | Which children remain, and which is runnable | `pnpm josh epic:next <E>` |
 | The order and the dependencies | the epic body |
 | What each remaining child is | the child Issue body |
 | What already merged | the epic's task list, and the closed children |
 
-**A resumed session is a new session**, so it asks `pnpm josh latest:scope` once before its first child.
-
 ## Waiting, and never waiting forever
 
 | Setting | Value | Meaning |
 | --- | --- | --- |
-| Polling interval | 60 s | **A floor between two asks, never a clock the parent sets.** It bounds a re-ask made while the parent is *already awake*; what wakes it is "The parent keeps no clock of its own" below. |
+| Polling interval | 60 s | **In flight, a floor between two asks, never a clock** — the wake is `lane:await`'s completion or the watcher's arrival exit, never a report. **With nothing in flight no wake comes: it is the parent's own clock.** |
 | `backlogrun` idle-watch poll | 5 min | Not the interval above, and a floor in the same sense. |
-| Silent delegated unit | 30 min | Not the child's duration — the time its output has gone **unchanged**. Past it, run the traces above and book a stopped unit as a failure. |
+| Silent delegated unit | 30 min | Not the child's duration — the time its output has gone **unchanged**. Past it, ask `run:liveness` and book a stopped unit as a failure. |
 | Stale `in-progress` | 90 min | Past it, the other session is gone. |
 | Publish wait | 10 min | `josh propagate`'s own budget. A failed publish never appears. |
 | Whole run | 8 h | Past it, the run needs a person. |
 
 Each timeout **ends the wait and reports** — none is retried indefinitely. Rationale for the figures:
 `docs/maintainers/backlogrun-progress-rationale.md` → "Why the parent waits on classification, not a
-clock". A stale child's label is
-removed first, so the next poll can offer it. **A graph that has deadlocked on a cycle is not this loop's
-to untangle**: `epic:next` detects it and exits with an error.
-
-### The parent keeps no clock of its own — a child's completion or an arrival is the wake
-
-**After hand-off, the supervisor's driver owns the mechanical clock.** `backlog:drive` polls lane
-completion and the backlog inside the detached process, without waking an AI parent; the parent-turn
-instructions below apply only to a returned judgment branch. `run:progress --wait` stays the heartbeat
-source and `run:report` the final report.
-
-**The numbers above are floors between asks, not a timer the parent sets.** Rationale:
-`docs/maintainers/backlogrun-progress-rationale.md` → "Why the parent waits on classification, not a
-clock".
-
-The watcher reports on its own interval to the event stream and exits only on an arrival, so a judgment
-session takes that exit — or a `lane:await` completion — as its prompt to act, never a report.
-
-#### The wake exists only while something is in flight
-
-`lane:await` wakes on a child's completion and `run:progress --wait` on an arrival; its reports wake
-nobody. With no child in flight it may decline; the driver still polls for new work and enforces the
-idle and whole-run bounds. A GitHub
-listing failure stays a retry or unreadable answer from the offer command, never an empty backlog.
-
-`epic:next` prints each holder's label age beside it — `in-progress for <n> min`, marked `stale` past
-the window, or past it already when the label predates what the timeline returns.
-
-Waiting is decided by `epic:next`'s classification, never by reading labels:
-
-| `epic:next` says | `backlogrun` does |
-| --- | --- |
-| Something is runnable | Run it |
-| Nothing runnable, something resolves on its own | **Wait** |
-| Nothing runnable, nothing resolves on its own, children remain | **Stop and report the parked children** |
-| No open child | Post the epic summary and finish |
+clock". A stale child's label is removed first, so the next poll can offer it. **A graph that has
+deadlocked on a cycle is not this loop's to untangle**: `epic:next` detects it and exits with an error.
 
 ## Who sends the summary, and who propagates
 

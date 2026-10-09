@@ -28,6 +28,8 @@ const SKILL_DIRECTORY = path.join('.claude', 'skills', 'workflow-commands')
 const SKILL_FILE = 'SKILL.md'
 const TABLE_SECTION = '1. Which file to read'
 const NOTHING = 0
+// How `read:set` names the union a point-of-use document is charged at: `file → "A" + "B"`.
+const HEADING_JOINER = '" + "'
 
 // The point-of-use classification — which documents an entry names but reads only at a later step —
 // is its own concern, split into `read-set-point-of-use.ts` in joshuafolkken/kit#2289. This file
@@ -327,38 +329,62 @@ function file_costs(root: string, names: ReadonlyArray<string>): Array<FileCost>
 	return names.map((file) => ({ file, cost: cost_of(read_document(root, file)) }))
 }
 
+// **A point-of-use document is charged at the union of the sections its entry's path names, and whole
+// only where nothing names a section** (joshuafolkken/kit#3396). `SKILL.md` → §1 makes a pointer
+// written `` `X.md` → "Heading" `` a read of that section alone, so a route table whose every row names
+// one section reads those sections, never the file — and charging the file anyway made a router that
+// trims its routes measure exactly as heavy as one that reads everything.
 function point_of_use_cost(
 	root: string,
 	file: string,
 	references: ReadonlyArray<SectionReference>,
 ): SectionCost {
-	const reference = references.find((one) => one.file === file)
+	const markdown = read_document(root, file)
+	const headings = unique(references.filter((one) => one.file === file).map((one) => one.heading))
 
-	if (reference !== undefined) return section_cost(root, reference)
+	if (headings.length === NOTHING) {
+		return { file, heading: '', cost: cost_of(markdown), is_resolved: true }
+	}
 
-	return { file, heading: '', cost: cost_of(read_document(root, file)), is_resolved: true }
+	return {
+		file,
+		heading: headings.join(HEADING_JOINER),
+		cost: scoped_file_cost(markdown, headings),
+		is_resolved: headings.every(
+			(heading) => document_section.section(markdown, heading) !== undefined,
+		),
+	}
 }
 
 // **What an entry's path names: its own manifests, and the §1 trigger rows that name the entry**
 // (joshuafolkken/kit#3078). `SKILL.md`'s other text is left out for the reason `sections_for` gives —
 // §2 names every document, so counting it would charge a `kickoff` for `followup.md`. One hop only:
 // the point-of-use documents cite one another, and following them would reach the whole set again.
-// `also` is what a role reaches beside its base entry's path (`read-set-trim.ts`).
-function cited_by(
-	root: string,
-	entry: string,
-	table_text: string,
-	also: ReadonlySet<string>,
-): Set<string> {
+function path_texts(root: string, entry: string, table_text: string): Array<string> {
 	const manifests = files_for(root, entry).filter((file) => file !== SKILL_FILE)
 	const rows = table_text
 		.split('\n')
 		.filter((line) => line.startsWith('|') && line.includes(`\`${entry}\``))
-	const texts = [...manifests.map((file) => read_document(root, file)), ...rows]
 
-	return new Set([...also, ...texts.flatMap((text) => names_in(text))])
+	return [...manifests.map((file) => read_document(root, file)), ...rows]
 }
 
+// The sections a point-of-use document is read by: every pointer in §1's table, and every one the
+// entry's own manifests carry — the route a run follows into that document.
+function point_of_use_references(
+	root: string,
+	entry: string,
+	table_text: string,
+): Array<SectionReference> {
+	const manifests = files_for(root, entry).filter((file) => file !== SKILL_FILE)
+	const texts = [table_text, ...manifests.map((file) => read_document(root, file))]
+
+	return texts.flatMap((text) =>
+		all_matches(text, SECTION_REFERENCE).map((match) => to_reference(match)),
+	)
+}
+
+// `also` is what a role reaches beside its base entry's path (`read-set-trim.ts`).
 function point_of_use_costs(
 	root: string,
 	entry: string,
@@ -366,8 +392,9 @@ function point_of_use_costs(
 ): Array<SectionCost> {
 	const table_text =
 		document_section.section(read_document(root, SKILL_FILE), TABLE_SECTION)?.text ?? ''
-	const references = all_matches(table_text, SECTION_REFERENCE).map((match) => to_reference(match))
-	const cited = cited_by(root, entry, table_text, also)
+	const references = point_of_use_references(root, entry, table_text)
+	const named = path_texts(root, entry, table_text).flatMap((text) => names_in(text))
+	const cited = new Set([...also, ...named])
 
 	return point_of_use_files(entry, cited).map((file) => point_of_use_cost(root, file, references))
 }

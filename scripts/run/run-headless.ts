@@ -6,7 +6,7 @@ import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run
 // The headless `backlogrun` parent (joshuafolkken/kit#2437). `run:wake` starts a cut's successor as
 // `claude -p`, and there a turn that ends is the process that ends: its background `lane:await` and
 // `run:progress --wait` are killed with it, so "a background command's exit re-invokes the session"
-// (`backlogrun-progress.md` → "The parent keeps no clock of its own") does not hold. A successor that
+// (`docs/maintainers/backlogrun-driver.md` → "Waiting while something is in flight") does not hold. A successor that
 // ended its turn on a wait therefore ended the run's driver while its lanes were still working.
 //
 // **The mark is what tells that session apart, and the supervisor is its only writer.** It rides the
