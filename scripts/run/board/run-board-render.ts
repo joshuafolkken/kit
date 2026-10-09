@@ -106,24 +106,18 @@ function time_of(row: BoardRow, now_ms: number): string | undefined {
 	return elapsed === undefined ? undefined : elapsed_of(elapsed)
 }
 
-// The phase a row draws: a running row's, and none for a settled one.
-function shown_phase(row: BoardRow): Phase | undefined {
-	return row.state === 'running' ? row.status?.phase : undefined
+// The phases a row's track draws — every one a running row has passed (joshuafolkken/kit#3460), whose
+// newest leads it — and none for a settled one.
+function drawn_phases(row: BoardRow): ReadonlyArray<Phase> {
+	return row.state === 'running' ? (row.status?.track ?? []) : []
 }
 
-// A running row's phase as its track (joshuafolkken/kit#3460), so every row's phase is one column.
-function phase_of(row: BoardRow): string | undefined {
-	const phase = shown_phase(row)
+// A running row's phases as its track, drawn last (joshuafolkken/kit#3526): it grows with every round,
+// so the columns before it stay where they are whatever its length.
+function track_text(row: BoardRow): string | undefined {
+	const phases = drawn_phases(row)
 
-	return phase === undefined ? undefined : run_board_track.track_of(phase)
-}
-
-// The phases a row's track draws — every one its row has passed (joshuafolkken/kit#3460) — whose newest
-// leads a running row.
-function drawn_phases(row: BoardRow): Array<Phase> {
-	const phase = shown_phase(row)
-
-	return phase === undefined ? [] : run_board_track.passed_of(phase)
+	return phases.length === 0 ? undefined : run_board_track.track_of(phases)
 }
 
 function waits_of(row: BoardRow, header: BoardHeader): string | undefined {
@@ -140,7 +134,7 @@ function timed_parts(row: BoardRow, frame: RowFrame): Array<string | undefined> 
 
 	if (time === undefined) return [title]
 
-	return [title.padEnd(TITLE_LIMIT), time.padStart(frame.time_width), phase_of(row)]
+	return [title.padEnd(TITLE_LIMIT), time.padStart(frame.time_width)]
 }
 
 // A running row leads with the icon of the phase it is in now (joshuafolkken/kit#3471) — the rightmost
@@ -166,14 +160,21 @@ function usage_of(row: BoardRow, usages: LaneUsages | undefined): string | undef
 	return run_board_usage_text.text_of(usages?.get(row.number))
 }
 
+function joined(parts: ReadonlyArray<string | undefined>): string {
+	return parts.filter((part) => part !== undefined && part !== '').join(GAP)
+}
+
+// A row up to its usage column — the columns that stay where they are whatever the track's length
+// (joshuafolkken/kit#3526).
+function head_text(row: BoardRow, frame: RowFrame): string {
+	const lead = `${state_icon(row)} ${frame.header.link(String(row.number))}`
+
+	return joined([lead, ...timed_parts(row, frame), usage_of(row, frame.usages)])
+}
+
 // Every row carries its state's icon, a waiting one ⏳ too (joshuafolkken/kit#3450).
 function row_text(row: BoardRow, frame: RowFrame): string {
-	const { header } = frame
-	const lead = `${state_icon(row)} ${header.link(String(row.number))}`
-	const usage = usage_of(row, frame.usages)
-	const parts = [lead, ...timed_parts(row, frame), usage, waits_of(row, header)]
-
-	return parts.filter((part) => part !== undefined && part !== '').join(GAP)
+	return joined([head_text(row, frame), track_text(row), waits_of(row, frame.header)])
 }
 
 // The stage each state's row gives way in when the pane is short (joshuafolkken/kit#3505).
@@ -262,12 +263,17 @@ function time_width(header: BoardHeader): number {
 	return Math.max(0, ...times.map((time) => time.length))
 }
 
-// Every phase a run passes through, in the phases' own order and whatever is on screen
-// (joshuafolkken/kit#3480): a row's phase moves between redraws, so a fixed line keeps each icon where
-// the eye last found it. `merged` is the states' ✅.
-const PHASE_LEGEND = run_board_phase.PHASES.filter((phase) => phase !== 'merged')
-	.map((phase) => `${PHASE_ICONS[phase]} ${WORDS[PHASE_WORDS[phase]]}`)
-	.join(GAP)
+// Every phase a run passes through, in the track's own order and whatever is on screen
+// (joshuafolkken/kit#3480): a row's phase moves between redraws, so fixed lines keep each icon where
+// the eye last found it — six to a line (joshuafolkken/kit#3526), so the twelve fit a narrow pane.
+const PHASES_PER_LINE = 6
+const PHASE_ENTRIES = run_board_phase.PHASES.map(
+	(phase) => `${PHASE_ICONS[phase]} ${WORDS[PHASE_WORDS[phase]]}`,
+)
+const PHASE_LEGEND = Array.from(
+	{ length: Math.ceil(PHASE_ENTRIES.length / PHASES_PER_LINE) },
+	(_, line) => PHASE_ENTRIES.slice(line * PHASES_PER_LINE, (line + 1) * PHASES_PER_LINE).join(GAP),
+)
 
 // The row states the legend can name, in its order, each with its word.
 const STATE_LEGEND: ReadonlyArray<readonly [ItemState, keyof Words]> = [
@@ -292,20 +298,22 @@ function waits_legend(rows: ReadonlyArray<BoardRow>): Array<string> {
 	return rows.some((row) => row.waits.length > 0) ? [`${WAITS_ICON} ${WORDS.waits}`] : []
 }
 
-// The phases on one line and what the screen draws on a second, drawn only when it names something
+// The phases on their lines and what the screen draws on one more, drawn only when it names something
 // (joshuafolkken/kit#3480). The header's gauges and marks read by their place, so the legend leaves them.
 function legend_of(layout: BoardLayout, notes: ReadonlyArray<BoardNote>): Array<string> {
 	const rows = run_board_layout.rows_of(layout)
 	const drawn = new Set(rows.map((row) => state_icon(row)))
 	const notes_named = run_board_render_notes.notes_legend(notes, drawn)
 	const shown = [...state_legend(drawn), ...waits_legend(rows), ...notes_named]
-	const lines = shown.length === 0 ? [PHASE_LEGEND] : [PHASE_LEGEND, shown.join(GAP)]
+	const lines = shown.length === 0 ? PHASE_LEGEND : [...PHASE_LEGEND, shown.join(GAP)]
 
 	return lines.map((line) => styleText('dim', line))
 }
 
-// Whether every running row still fits one terminal line with its usage column — measured as the
-// deepest, an epic's child — where a frame is kept within a terminal (joshuafolkken/kit#3486).
+// Whether every running row's usage column still fits one terminal line — measured as the deepest, an
+// epic's child — where a frame is kept within a terminal (joshuafolkken/kit#3486). The track after it
+// is left out (joshuafolkken/kit#3526): it grows without bound, so one long history would otherwise
+// take the usage column off every row.
 function is_usage_fitting(
 	layout: BoardLayout,
 	frame: RowFrame,
@@ -316,7 +324,9 @@ function is_usage_fitting(
 	return run_board_layout
 		.rows_of(layout)
 		.filter((row) => row.state === 'running')
-		.every((row) => run_board_fit.height_of(`${BRANCH}${row_text(row, frame)}`, size.columns) === 1)
+		.every(
+			(row) => run_board_fit.height_of(`${BRANCH}${head_text(row, frame)}`, size.columns) === 1,
+		)
 }
 
 // The usage column is drawn on every running row or on none (joshuafolkken/kit#3489): a pane too
