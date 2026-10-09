@@ -20,6 +20,7 @@ const FAILURE_EXIT_CODE = 1
 const DATE_END = 10
 const USAGE =
 	'Usage: josh review:record --issue <N> [<category>:<severity>:<file> ...] | josh review:record --check --issue <N>'
+const FILE_HINT = '  <file>: the cited path, optionally with :line'
 const CHECK_USAGE = 'Usage: josh review:record --check --issue <N>'
 const RECORDED_LINE = 'Recorded: the review round for this issue is in the ledger.'
 const NOT_REQUIRED_LINE =
@@ -92,6 +93,21 @@ function to_request(parsed: Parsed): Request | undefined {
 	return findings === undefined ? undefined : { issue: Number(issue), findings }
 }
 
+// The accepted values are built from the ledger's own vocabulary (joshuafolkken/kit#3422), so a
+// refused spec names what would have been accepted and a new category appears here unedited.
+function accepted_values(placeholder: string, values: ReadonlyArray<string>): string {
+	return `  ${placeholder}: ${values.join(' | ')}`
+}
+
+function usage_text(): string {
+	return [
+		USAGE,
+		accepted_values('<category>', review_finding_ledger.CATEGORIES),
+		accepted_values('<severity>', review_finding_ledger.SEVERITIES),
+		FILE_HINT,
+	].join('\n')
+}
+
 function today(now: Date): string {
 	return now.toISOString().slice(0, DATE_END)
 }
@@ -140,7 +156,7 @@ async function run_record(parsed: Parsed, now: Date, root: string): Promise<numb
 	const request = to_request(parsed)
 
 	if (request === undefined) {
-		console.error(USAGE)
+		console.error(usage_text())
 
 		return FAILURE_EXIT_CODE
 	}
@@ -165,7 +181,7 @@ async function run(
 	const parsed = parse_argv(argv)
 
 	if (parsed === undefined) {
-		console.error(USAGE)
+		console.error(usage_text())
 
 		return FAILURE_EXIT_CODE
 	}
@@ -179,7 +195,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv, new Date())
 }
 
-const review_record_cli = { build_lines, parse_finding, run }
+const review_record_cli = { accepted_values, build_lines, parse_finding, run, usage_text }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

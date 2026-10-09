@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { issue_backlinks } from '#scripts/issue/issue-backlinks'
 import { issue_lint } from '#scripts/issue/issue-lint'
+import { report_format_reference } from '#scripts/report/report-format-reference'
 import { report_lint } from '#scripts/report/report-lint'
 import { describe, expect, it } from 'vitest'
 
@@ -14,7 +15,7 @@ function read_repo_file(relative_path: string): string {
 	return readFileSync(fileURLToPath(new URL(`../../${relative_path}`, import.meta.url)), 'utf8')
 }
 
-const REPORT_FORMAT = 'prompts/collaboration-workflow/report-format.md'
+const REPORT_FORMAT = report_format_reference.REPORT_FORMAT_PATH
 const ISSUE_TEMPLATE = 'prompts/collaboration-workflow/issue-template.md'
 const OBSERVATION_LEDGER = '.claude/skills/workflow-commands/observation-ledger.md'
 
