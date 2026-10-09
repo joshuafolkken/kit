@@ -1,38 +1,32 @@
-// `josh backlog:budget` — whether a `backlogrun` may start more work, keep watching, or finish
-// (joshuafolkken/kit#1632).
+// `josh backlog:budget` — whether a `backlogrun` may start more work, keep watching, or finish.
 //
-// `backlog:next` says what may start; it says nothing about when the run itself should end. Before
-// this existed a `backlogrun` had exactly two endings and neither could be declared in advance: it
-// finished the moment the backlog read empty, so an issue a person opted in three minutes later
-// needed a whole new session, or it ran to the 8-hour whole-run bound, which is a limit on waiting
-// rather than a statement of scale.
+// `backlog:next` says what may start; it says nothing about when the run itself should end. Without
+// this a run would finish the moment the backlog read empty, so an issue a person opted in minutes
+// later would need a whole new session.
 //
-// **The idle watch is on by default and the maximum is not** (joshuafolkken/kit#1676). A
-// `backlogrun` with neither flag given watches an empty backlog for `DEFAULT_IDLE_MINUTES` before it
-// finishes, and takes as many issues as the backlog holds. `--idle 0` is how the watch is turned off.
+// **The idle watch is on by default and the maximum is not.** A `backlogrun` with neither flag given
+// watches an empty backlog for `DEFAULT_IDLE_MINUTES` before it finishes, and takes as many issues as
+// the backlog holds. `--idle 0` is how the watch is turned off.
 //
 // The decision is a command's rather than the loop's own arithmetic, for the reason `josh delegate`
 // and `josh review:level` are commands: a count and an elapsed time kept in an agent's head are a
-// one-shot judgement, and joshuafolkken/kit#1460 measured exactly that failure — a threshold asked
-// once and then never again while the run walked past it eight times.
+// one-shot judgement — a threshold asked once and then never again while the run walks past it.
 
 const MS_PER_MINUTE = 60_000
 const MINUTES_PER_HOUR = 60
-// `backlogrun-progress.md` → "Waiting, and never waiting forever" carried this as prose only. Held here it is
-// the same bound, decided the same way as the two new ones rather than by an agent reading a clock.
+// The whole-run bound, decided here like the idle watch and the maximum rather than by an agent reading
+// a clock.
 const WHOLE_RUN_BUDGET_HOURS = 8
 const WHOLE_RUN_BUDGET_MINUTES = WHOLE_RUN_BUDGET_HOURS * MINUTES_PER_HOUR
 const WHOLE_RUN_BUDGET_MS = WHOLE_RUN_BUDGET_MINUTES * MS_PER_MINUTE
 
-// **The default idle watch, and why it is this number** (joshuafolkken/kit#1676). The documents used
-// 30 as an example, and an example is not a reason; these three are.
+// **The default idle watch, and why it is this number.**
 //
 // - **Below it the watch is a coin flip.** What it waits for is a person noticing the run has gone
 //   quiet, filing an issue and applying `auto-ok`. Ten minutes does not reliably outlast that.
 // - **Above it the run pays for nothing.** At `IDLE_POLL_MINUTES` a 30-minute watch is six asks —
 //   about one child's worth of turns, spent while the run holds no working tree and no lane.
-// - **It is about the length of one child** — 12 to 28 minutes measured on joshuafolkken/kit#1477 —
-//   so a run that has emptied its backlog waits roughly as long as one more issue would have taken.
+// - **It is about the length of one child** — 12 to 28 minutes measured — so a run that has emptied its backlog waits roughly as long as one more issue would have taken.
 const DEFAULT_IDLE_MINUTES = 30
 const DEFAULT_IDLE_MS = DEFAULT_IDLE_MINUTES * MS_PER_MINUTE
 
@@ -54,7 +48,7 @@ const TRIAGE_VERDICT = 'triage'
 // and the interval is only a floor (`docs/maintainers/backlogrun-driver.md` → "Waiting while
 // something is in flight").
 // `stop` — report and finish. `triage` — judge the untriaged issues `backlog:next` named, then ask
-// again (joshuafolkken/kit#2779); it is the parent's to act on, so `backlog:drive` hands it back.
+// again; it is the parent's to act on, so `backlog:drive` hands it back.
 type BudgetVerdict =
 	typeof RUN_VERDICT | typeof WATCH_VERDICT | typeof STOP_VERDICT | typeof TRIAGE_VERDICT
 
@@ -141,8 +135,7 @@ function idle_watch_reason(left_ms: number): string {
 	return `The backlog is empty and the idle watch has about ${to_minutes(left_ms)} minutes left. Release the working tree, ask again in ${next_ask_minutes(left_ms)} minutes, and restart the watch the moment a candidate appears.`
 }
 
-// **A watch that opens while children are still in lanes is not the idle watch's ordinary shape**, and
-// it became reachable the moment the watch was turned on by default (joshuafolkken/kit#1676): the
+// **A watch that opens while children are still in lanes is not the idle watch's ordinary shape**: the
 // backlog can answer `exhausted` while this run's own children are still merging. Two things the
 // sentence above would get wrong there — the working tree is still held, because the hold is released
 // at the *last* child's merge, and a five-minute poll would leave a merge unnoticed for five minutes.
@@ -237,7 +230,7 @@ function idle_decision(input: BudgetInput): BudgetDecision {
 // Whether a `stop` for this input is the run finishing — the idle watch ending on an empty backlog —
 // rather than stopping on something a person must act on: a parked backlog, an unreadable listing, the
 // maximum or the whole-run bound. The two end the carry record differently (`--end` against
-// `--end --stopped`), and `backlog:drive` reads which one from here (joshuafolkken/kit#2508).
+// `--end --stopped`), and `backlog:drive` reads which one from here.
 function is_finish(input: BudgetInput): boolean {
 	return stop_reason(input) === undefined && max_decision(input) === undefined
 }
