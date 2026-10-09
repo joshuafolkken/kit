@@ -157,6 +157,21 @@ async function current_events(): Promise<ReadonlyArray<RunEvent>> {
 	}
 }
 
+// The invocation's events for a writer deciding whether a marker is already there
+// (joshuafolkken/kit#3536): unlike `current_events`, an undetermined scope keeps the whole stream, so a
+// run with no carry record skips a marker it already wrote rather than writing it twice.
+async function invocation_or_all_events(): Promise<ReadonlyArray<RunEvent>> {
+	try {
+		const repository = await run_carry.repository_directory()
+
+		return repository === undefined
+			? []
+			: invocation_events(repository, run_event_stream.target_of(repository))
+	} catch {
+		return []
+	}
+}
+
 // Every event on the stream, across invocations, for a reader that scopes by the event's own text
 // rather than by the carry record (`issue:file`'s fold, joshuafolkken/kit#3423). Fail-quiet like
 // `current_events`.
@@ -178,6 +193,7 @@ const run_event_stream_emit = {
 	emit_heartbeat,
 	emit_once,
 	emit_once_since,
+	invocation_or_all_events,
 	stream_target,
 }
 

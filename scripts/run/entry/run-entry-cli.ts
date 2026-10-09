@@ -4,6 +4,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_cut_report } from '#scripts/run/cut/run-cut-report'
+import { run_event_plan } from '#scripts/run/event/run-event-plan'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
 import { run_label } from '#scripts/run/run-label'
@@ -11,7 +12,12 @@ import { run_next } from '#scripts/run/run-next'
 import { run_prep } from '#scripts/run/run-prep'
 import { run_prep_cli } from '#scripts/run/run-prep-cli'
 import { run_prrun_resume } from '#scripts/run/run-prrun-resume'
-import { run_stage, type StageCommand, type StageDecision } from '#scripts/run/run-stage'
+import {
+	run_stage,
+	type StageCommand,
+	type StageDecision,
+	type StageState,
+} from '#scripts/run/run-stage'
 import { run_stage_read, type StageRead } from '#scripts/run/run-stage-read'
 import { run_step } from '#scripts/run/run-step'
 import { run_entry, type EntryParts } from './run-entry'
@@ -233,6 +239,12 @@ function is_settled(decision: StageDecision): boolean {
 	return decision.is_reached && decision.state !== run_stage.MERGED
 }
 
+// A planned issue was planned by `kickoff`, whose entry claims nothing, so the claim that starts past
+// the plan writes the `plan` event `run:board` draws 📝 from (joshuafolkken/kit#3536).
+async function mark_planned(issue_number: string, state: StageState): Promise<void> {
+	if (state === run_stage.PLANNED) await run_event_plan.emit_plan(issue_number)
+}
+
 // The tree is held and the budget allows the run, so the issue is marked as running before its reads
 // (joshuafolkken/kit#3182) — the label then shows in the `labels:` line the report below carries.
 async function proceed(issue_number: string, hold: string, cost: string): Promise<number> {
@@ -242,7 +254,10 @@ async function proceed(issue_number: string, hold: string, cost: string): Promis
 	return emit({ issue_number, hold, cost, verdict: reads.verdict, report: reads.report })
 }
 
-async function claim_run({ issue_number, command }: EntryRequest): Promise<number> {
+async function claim_run(
+	{ issue_number, command }: EntryRequest,
+	state: StageState,
+): Promise<number> {
 	const hold = await claim_hold(issue_number, command)
 
 	if (hold !== run_hold_cli.HOLD_VERDICT) {
@@ -258,6 +273,8 @@ async function claim_run({ issue_number, command }: EntryRequest): Promise<numbe
 
 		return await stop_run({ parts, command, reason: BUDGET_REASON, should_release: true })
 	}
+
+	await mark_planned(issue_number, state)
 
 	return await proceed(issue_number, hold, cost)
 }
@@ -288,7 +305,7 @@ async function open_run(request: EntryRequest): Promise<number> {
 
 	if (command === run_stage.KICKOFF || is_settled(decision)) return SUCCESS_EXIT_CODE
 
-	return (await resume_any(request, decision, stage)) ?? (await claim_run(request))
+	return (await resume_any(request, decision, stage)) ?? (await claim_run(request, decision.state))
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
