@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1015,
-		"code_lines": 84458,
-		"comment_lines": 33720,
+		"code_lines": 84489,
+		"comment_lines": 33728,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12222,
-		"on_demand_bytes": 559151
+		"on_demand_bytes": 559181
 	},
 	"accepted": {
-		"reason": "#3503: the beacon probe now reports live / gone / unknown so a timed-out probe no longer clears a live lock holder",
+		"reason": "#3403 adds the same-document section-reference scan (document-scan.ts, its tests and fixture) and rewords skill arrows the scan flagged",
 		"date": "2026-10-09"
 	}
 }
