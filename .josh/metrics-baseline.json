@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1030,
-		"code_lines": 85794,
-		"comment_lines": 34080,
+		"code_lines": 85811,
+		"comment_lines": 34087,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -11,11 +11,11 @@
 	},
 	"guards": 8,
 	"ai_cost": {
-		"resident_bytes": 12222,
-		"on_demand_bytes": 560635
+		"resident_bytes": 12281,
+		"on_demand_bytes": 561435
 	},
 	"accepted": {
-		"reason": "run:board lane tracks get the plan phase from a code-written plan event (#3536)",
+		"reason": "#3538 adds the interactive ask-before-filing rule: stop-guard filing check + tests, and the attended/unattended filing split in CLAUDE.md, SKILL.md, observation-filing.md and rule-delivery docs (incl. review round 1 wording)",
 		"date": "2026-10-09"
 	}
 }

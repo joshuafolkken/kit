@@ -318,7 +318,7 @@ test file pins:
   and their entry in `rule-delivery.md`'s enumeration. `scripts/rules/stop-rules.test.ts`,
   `scripts/rules/filing-offer.test.ts` and `scripts/rules/issue-citation.test.ts` pin firing and
   silence (hold × no notice blocks; clean × hold blocks; dirty or notified is silent;
-  `stop_hook_active` is silent; an offer to file × nothing filed blocks, while filed, a third-party
+  `stop_hook_active` is silent; an unattended offer to file × nothing filed blocks, while an interactive session, filed, a third-party
   repository or an unknown owner is silent; a bare `#N` blocks, while one in link form, a code fence,
   inline code, a quoted line or a PR reference is silent), and
   `scripts/claude/claude-settings-hooks.test.ts` pins the `Stop` hook's wiring

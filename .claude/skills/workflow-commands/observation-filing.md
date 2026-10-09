@@ -1,16 +1,23 @@
 # The observation filing procedure
 
 **Read when an observation turns up — not at the entry** (joshuafolkken/kit#1797). `SKILL.md` → §2's
-table keeps the rule itself: file it without asking, apply the depth test, record what the test turns
-away, and carry the run on. This file is the depth table, the `issue:file` flags and what a delegated
-child does instead. **An observation the depth test turns away, and the kind of miss behind a
+table points here for the rule itself: who is asked before a filing, the depth test, what the test
+turns away, and carrying the run on. This file is that rule, the depth table, the `issue:file` flags
+and what a delegated child does instead. **An observation the depth test turns away, and the kind of miss behind a
 user-reported bug, are recorded by `observation-ledger.md` — read it only then**, in the turn that
 appends (joshuafolkken/kit#3176).
 
-**The trigger is the judgement, not the run's progress** — an ended run, a `kickoff` and a mid-talk
-turn all file; an offer to file is sent back by the `Stop` hook (joshuafolkken/kit#2422).
+**An unattended run files without asking; an interactive session asks first.** Unattended is a session kit launched under `claude -p` (a lane child, a woken session), a dispatched
+lane child, or the `backlogrun` parent — nobody is there to answer, so an offer to file is sent back
+by the `Stop` hook (joshuafolkken/kit#2422). In an interactive session, propose the Issue and file it
+once the user confirms; the hook lets the offer through. A current-turn instruction to file, and a
+typed command whose own procedure files (a split, a prerequisite, an upstream interrupt), are that
+confirmation already.
 
-**A run that judges something worth filing files it, and does not ask.** An upstream defect stops the
+**The trigger is the judgement, not the run's progress** — an ended run, a `kickoff` and a mid-talk
+turn all file or propose.
+
+**An unattended run that judges something worth filing files it, and does not ask.** An upstream defect stops the
 run, a split replaces it, and a prerequisite goes in front of it (`prerequisite.md`). An ordinary
 observation changes none of those: it carries no `route:` label, causes no stash or park, and the run
 continues. A first-party target is Tier A, decided by `pnpm josh repo:party`; a third-party target is

@@ -65,6 +65,19 @@ function session_lang(): string {
 	return session_language.resolve_session_lang().lang
 }
 
+// Which session this is — a headless parent, a lane child, a kit-launched agent, the `backlogrun`
+// parent — the facts that say whether a person is there to answer (joshuafolkken/kit#3538).
+async function session_role_facts(): Promise<
+	Pick<StopContext, 'backlog_parent' | 'headless_agent' | 'headless_waiting' | 'lane_child'>
+> {
+	return {
+		headless_waiting: await run_headless.must_keep_waiting(),
+		lane_child: lane_child_marker.is_child_of(process.cwd()),
+		headless_agent: agent_headless.is_headless(),
+		backlog_parent: await run_headless.is_backlog_parent(),
+	}
+}
+
 async function build_context(
 	transcript_path: string,
 	payload_tail: { stop_hook_active: boolean; message: string },
@@ -81,14 +94,12 @@ async function build_context(
 		cut_pending: run_cut.carried_cut_sync() !== undefined,
 		filed: was_filed(tail),
 		session_owner: repo_party.current_owner(),
-		headless_waiting: await run_headless.must_keep_waiting(),
+		...(await session_role_facts()),
 		headless_refusals: stop_rules.count_headless_refusals(tail),
-		lane_child: lane_child_marker.is_child_of(process.cwd()),
 		background_pending: lane_background.pending_background_ids(tail).length > 0,
 		agent_pending: lane_background.pending_agent_ids(tail).length > 0,
 		handed_off: lane_handoff.is_handed_off(process.cwd()),
 		session_lang: session_lang(),
-		headless_agent: agent_headless.is_headless(),
 	}
 }
 
