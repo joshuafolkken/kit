@@ -47,7 +47,6 @@ const WORDS = {
 	waiting: 'waiting',
 	decision: 'decision',
 	waits: 'waits on',
-	dispatched: 'dispatched',
 	investigate: 'investigate',
 	implement: 'implement',
 	review: 'review',
@@ -67,7 +66,7 @@ const WORDS = {
 	found_during: ' (found during {n})',
 	// joshuafolkken/kit#3437: the session a stopped run waits in, and what closing the board leaves.
 	resume: 'stopped — resume with',
-	keeps_running: 'Closing this keeps the run going. Reopen with `pnpm josh backlogrun`',
+	keeps_running: 'Closing this screen leaves the run going · reopen with `pnpm josh backlogrun`',
 } as const
 
 type Words = typeof WORDS
@@ -103,7 +102,6 @@ const WAITS_ICON = '🔗'
 // A running row's phases as icons (joshuafolkken/kit#3452), chosen on the same rule; the row draws every
 // phase it has passed, so the rightmost icon is what it is doing now (joshuafolkken/kit#3460).
 const PHASE_ICONS: Readonly<Record<Phase, string>> = {
-	dispatched: '🚀',
 	investigate: '🔍',
 	plan: '📝',
 	implement: '🔨',
@@ -116,7 +114,6 @@ const PHASE_ICONS: Readonly<Record<Phase, string>> = {
 
 // The legend's word for each phase — the header's own `plan` and `merged` where the phase shares one.
 const PHASE_WORDS: Readonly<Record<Phase, keyof Words>> = {
-	dispatched: 'dispatched',
 	investigate: 'investigate',
 	plan: 'plan',
 	implement: 'implement',
@@ -167,6 +164,14 @@ function clock_of(ms: number): string {
 	return [date.getHours(), date.getMinutes(), date.getSeconds()]
 		.map((value) => two_digits(value))
 		.join(':')
+}
+
+// The local wall-clock `HH:MM` of a moment, for one a person reads to the minute — when a run ended, or
+// when a finding was filed (joshuafolkken/kit#3489).
+function minute_of(ms: number): string {
+	const date = new Date(ms)
+
+	return [date.getHours(), date.getMinutes()].map((value) => two_digits(value)).join(':')
 }
 
 // How long something has run, as `MM:SS` whose minutes never carry into hours (`61:05`), so the header
@@ -251,6 +256,7 @@ const run_board_labels = {
 	clock_of,
 	elapsed_of,
 	left_of,
+	minute_of,
 	painted,
 	spinner_of,
 }

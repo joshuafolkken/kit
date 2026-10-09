@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_labels } from './run-board-labels'
+import type { BoardRow } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
@@ -7,8 +8,8 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 // joshuafolkken/kit#3430: what the board says below its plan — the findings, the resume command and a
 // board with no run.
 
-const { clock_of } = run_board_labels
-const { MINUTE, NOW, WORDS, header, lines_of, note, rule } = run_board_render_fixture
+const { clock_of, minute_of } = run_board_labels
+const { EMPTY_LAYOUT, MINUTE, NOW, WORDS, header, lines_of, note, rule } = run_board_render_fixture
 
 describe('run_board_render findings and no run', () => {
 	it('shows the newest findings and how many more there are', () => {
@@ -25,8 +26,8 @@ describe('run_board_render findings and no run', () => {
 		}
 		const lines = lines_of(header({ layout: undefined }), [filed, ...notes])
 
-		expect(lines).toContain(`  🆕 ${clock_of(NOW)} 3438 filed  Count seats (found during 3415)`)
-		expect(lines).toContain(`  💬 ${clock_of(NOW)} 3415 note  observation 0`)
+		expect(lines).toContain(`  🆕 ${minute_of(NOW)} 3438 filed  Count seats (found during 3415)`)
+		expect(lines).toContain(`  💬 ${minute_of(NOW)} 3415 note  observation 0`)
 		expect(lines.at(-1)).toBe('  more 3')
 	})
 
@@ -44,17 +45,19 @@ const filed: BoardNote = {
 	text: 'Lead',
 	is_decision: false,
 }
+const park: BoardNote = { ...filed, kind: 'park' }
+const NOTES_LEGEND = '📌 findings and decisions'
 
 // joshuafolkken/kit#3478: the findings are named by icons the legend names, and by words in a chat.
 describe('run_board_render.render findings icons', () => {
 	it('draws the findings rule as 📌 and every row led by its icon with no kind word', () => {
-		const lines = lines_of(header(), [filed, { ...filed, kind: 'park' }, note(NOW, 'seen')])
+		const lines = lines_of(header(), [filed, park, note(NOW, 'seen')])
 		const board = lines.slice(0, -1).join('\n')
 
 		expect(lines).toContain(rule('📌'))
-		expect(lines).toContain(`  🆕 ${clock_of(NOW)} 3473  Lead`)
-		expect(lines).toContain(`  💤 ${clock_of(NOW)} 3473  Lead`)
-		expect(lines).toContain(`  💬 ${clock_of(NOW)} 3415  seen`)
+		expect(lines).toContain(`  🆕 ${minute_of(NOW)} 3473  Lead`)
+		expect(lines).toContain(`  💤 ${minute_of(NOW)} 3473  Lead`)
+		expect(lines).toContain(`  💬 ${minute_of(NOW)} 3415  seen`)
 
 		for (const word of [WORDS.notes, 'filed', 'park', ' note ']) {
 			expect(board).not.toContain(word)
@@ -62,9 +65,7 @@ describe('run_board_render.render findings icons', () => {
 	})
 
 	it('names the findings icons in the legend only while a finding is on screen', () => {
-		const legend = '📌 findings and decisions  🆕 filed  💬 note'
-
-		expect(lines_of(header(), [filed]).at(-1)).toBe(legend)
+		expect(lines_of(header(), [filed]).at(-1)).toBe(`${NOTES_LEGEND}  🆕 filed`)
 		expect(lines_of(header()).join('\n')).not.toContain('📌')
 	})
 
@@ -72,7 +73,37 @@ describe('run_board_render.render findings icons', () => {
 		const lines = lines_of(header({ form: 'chat' }), [filed])
 
 		expect(lines).toContain(rule(WORDS.notes))
-		expect(lines.at(-1)).toBe(`  🆕 ${clock_of(NOW)} 3473 filed  Lead`)
+		expect(lines.at(-1)).toBe(`  🆕 ${minute_of(NOW)} 3473 filed  Lead`)
+	})
+})
+
+// joshuafolkken/kit#3489: the legend names only the kinds the findings section draws.
+describe('run_board_render.render findings legend', () => {
+	it('names 💤 and 💬 only while a drawn finding leads with them', () => {
+		const every = lines_of(header(), [filed, park, note(NOW, 'seen')]).at(-1)
+
+		expect(every).toBe(`${NOTES_LEGEND}  🆕 filed  💤 parked  💬 note`)
+		expect(lines_of(header(), [note(NOW, 'seen')]).at(-1)).toBe(`${NOTES_LEGEND}  💬 note`)
+	})
+
+	it('does not name 💤 again where a parked row already names it', () => {
+		const parked: BoardRow = {
+			number: 7,
+			title: 'Seven',
+			state: 'parked',
+			status: undefined,
+			waits: [],
+		}
+		const layout = { ...EMPTY_LAYOUT, active: [parked] }
+
+		expect(lines_of(header({ layout }), [park]).at(-1)).toBe(`💤 parked  ${NOTES_LEGEND}`)
+	})
+
+	it('does not name a kind whose findings are past the limit and not drawn', () => {
+		const shown = Array.from({ length: run_board_render.NOTE_LIMIT }, () => filed)
+		const legend = lines_of(header(), [...shown, note(NOW, 'hidden')]).at(-1)
+
+		expect(legend).toBe(`${NOTES_LEGEND}  🆕 filed`)
 	})
 })
 
@@ -81,7 +112,7 @@ describe('run_board_render.render findings with no legend', () => {
 		const lines = lines_of(header({ layout: undefined }), [filed])
 
 		expect(lines).toContain(rule(WORDS.notes))
-		expect(lines.at(-1)).toBe(`  🆕 ${clock_of(NOW)} 3473 filed  Lead`)
+		expect(lines.at(-1)).toBe(`  🆕 ${minute_of(NOW)} 3473 filed  Lead`)
 	})
 })
 
