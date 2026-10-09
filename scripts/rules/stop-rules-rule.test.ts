@@ -49,6 +49,10 @@ describe('stop_rules — each delivered text names its single source', () => {
 		expect(stop_rules.FILING_OFFER_REASON).toContain('pnpm josh issue:file')
 	})
 
+	it('the filing offer reason says it binds an unattended run', () => {
+		expect(stop_rules.FILING_OFFER_REASON).toContain('this run is unattended')
+	})
+
 	it('the issue citation reason points at issue-citation.md', () => {
 		expect(stop_rules.ISSUE_CITATION_REASON).toContain('issue-citation.md')
 	})

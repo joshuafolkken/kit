@@ -86,6 +86,9 @@ interface StopContext {
 	// This session is an agent kit launched under `claude -p` — `agent_headless.is_headless`
 	// (joshuafolkken/kit#3245). No person reads its reply, so the rules on how a reply is written stand down.
 	headless_agent: boolean
+	// This session drives a live `backlogrun` carry record — `run_headless.is_backlog_parent`
+	// (joshuafolkken/kit#3538). With `headless_agent` and `lane_child`, what makes a run unattended.
+	backlog_parent: boolean
 }
 
 interface StopOutcome {
@@ -140,13 +143,15 @@ function build_citation_reason(references: ReadonlyArray<string>): string {
 	)
 }
 
-// **An offer to file is a Tier A filing deferred to the user** (joshuafolkken/kit#2422). The judgement
-// is already made, so the reason hands over the filing chain rather than a question; the rule itself
-// is resident in `observation-filing.md` and only pointed at.
+// **An offer to file in an unattended run is a Tier A filing deferred to nobody** (joshuafolkken/kit#2422).
+// The judgement is already made, so the reason hands over the filing chain rather than a question; the
+// rule itself is resident in `observation-filing.md` and only pointed at. **An interactive session asks
+// first** (joshuafolkken/kit#3538): there the offer is the correct reply, so `needs_filing` is silent.
 const FILING_OFFER_REASON =
-	'⛔ filing offer: your reply offers to file an Issue instead of filing it. Filing into a ' +
-	'first-party repository is Tier A — the trigger is the judgement that it is worth filing, not the ' +
-	"run's progress (the workflow-commands skill → `observation-filing.md`). Run " +
+	'⛔ filing offer: your reply offers to file an Issue instead of filing it, and this run is ' +
+	'unattended — nobody is there to answer. Filing into a first-party repository there is Tier A — ' +
+	"the trigger is the judgement that it is worth filing, not the run's progress (the " +
+	'workflow-commands skill → `observation-filing.md`). Run ' +
 	'`pnpm josh issue:file "<title>" --body-file <path> --depth <0|1|2>` — it scouts, lints, labels and ' +
 	'runs `epic:bundle` itself — then end with the one-line citation of what was filed; do not repeat ' +
 	'your previous reply. If it is not worth filing ' +
@@ -231,10 +236,19 @@ function language_reason(context: StopContext): string | undefined {
 	return build_language_reason(context.session_lang)
 }
 
-function needs_filing(context: StopContext): boolean {
-	if (context.filed || !filing_offer.offers_filing(context.message)) return false
+// The sessions no person answers: one kit launched under `claude -p` (a lane child, a woken session), a
+// dispatched lane child, or the `backlogrun` parent the user handed the backlog to.
+function is_unattended(context: StopContext): boolean {
+	return context.headless_agent || context.lane_child || context.backlog_parent
+}
 
-	return filing_offer.is_first_party_target(context.message, context.session_owner)
+function needs_filing(context: StopContext): boolean {
+	if (!is_unattended(context) || context.filed) return false
+
+	return (
+		filing_offer.offers_filing(context.message) &&
+		filing_offer.is_first_party_target(context.message, context.session_owner)
+	)
 }
 
 // **A running background subagent stands both hold rules down** (joshuafolkken/kit#2774). Its completion

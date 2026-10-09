@@ -94,8 +94,8 @@
   - 発火点: `pnpm josh stop:guard` — 最後の返信の地の文に裸の `#N` を含む。**停止をブロックする**。引用を直して返信を出し直させる
   - 発火しないとき: リンク形式・コード／引用行の中・`PR` 直後の `#N`・GitHub 向け成果物 ＝ 差し戻す裸の番号が無い
 - **起票の申し出**（`.claude/skills/workflow-commands/observation-filing.md`、joshuafolkken/kit#2422）
-  - 発火点: `pnpm josh stop:guard` — 最後の返信の地の文が起票を申し出る（「起票してよければ」等）のに、起票していない。**停止をブロックする**
-  - 発火しないとき: 起票済み、フェンス／引用行の中、第三者の `owner/repo` を名指す、または owner 不明 ＝ 保留された Tier A 起票が無い
+  - 発火点: `pnpm josh stop:guard` — 無人実行（kit が起動した headless セッション・レーン子・`backlogrun` の親）で、最後の返信の地の文が起票を申し出る（「起票してよければ」等）のに、起票していない。**停止をブロックする**
+  - 発火しないとき: 対話中のセッション（起票前に確認するのが正しい）、起票済み、フェンス／引用行の中、第三者の `owner/repo` を名指す、または owner 不明 ＝ 保留された Tier A 起票が無い
 - **規則本文を散文に書き足す前の第 0 問・順序の問い**（`residency.md`、joshuafolkken/kit#2272・joshuafolkken/kit#2324）
   - 発火点: `pnpm josh rule:guard` — `CLAUDE.md` ／ `prompts/**/*.md` ／ `.claude/skills/**/*.md` への `Edit` ／ `Write` で、正味の追記が閾値以上のもの。`pnpm josh oracle:list` と `pnpm josh run:step` の両方を走らせるまで毎回拒否する
   - 発火しないとき: 規則ドキュメントでない、追記が閾値未満（誤字・リンク張り替え・削除）、または両コマンドを実行済み ＝ 配置の問いに答え済み
