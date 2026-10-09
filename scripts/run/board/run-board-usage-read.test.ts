@@ -1,6 +1,7 @@
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_usage_read, type UsagePorts } from './run-board-usage-read'
+import type { RusageReader } from './run-board-usage-rusage'
 
 // joshuafolkken/kit#3489: how the board reads each process and its lane — `ps` every second, the
 // working directory only for a process not seen before, and nothing where the platform has no way to it.
@@ -15,18 +16,21 @@ afterEach(() => {
 })
 
 describe('run_board_usage_read.parse_ps', () => {
-	it('reads every process’s CPU time and resident memory, and skips a line that is not one', () => {
+	it('reads every process’s parent, CPU time and resident memory, and skips a line that is not one', () => {
 		const output = [
-			'  PID TIME RSS',
-			'  12 1-02:03:04 2048',
-			'13 12:34.50 100',
-			' 14 0:00.01 4',
+			'  PID PPID TIME RSS',
+			'  12 1 1-02:03:04 2048',
+			'13 12 12:34.50 100',
+			' 14 12 0:00.01 4',
 		].join('\n')
-		const readings = parse_ps(output)
+		const listings = parse_ps(output)
 
-		expect([...readings.keys()]).toStrictEqual([12, 13, 14])
-		expect(readings.get(12)).toStrictEqual({ cpu_ms: 93_784_000, rss_bytes: 2048 * KB })
-		expect(readings.get(13)?.cpu_ms).toBe(754_500)
+		expect([...listings.keys()]).toStrictEqual([12, 13, 14])
+		expect(listings.get(12)).toStrictEqual({
+			parent: 1,
+			reading: { cpu_ms: 93_784_000, rss_bytes: 2048 * KB },
+		})
+		expect(listings.get(13)?.reading.cpu_ms).toBe(754_500)
 	})
 })
 
@@ -55,9 +59,14 @@ describe('run_board_usage_read.lane_of', () => {
 	})
 })
 
-function ports_of(listings: Array<string>, directories: ReadonlyMap<number, string>): UsagePorts {
+function ports_of(
+	listings: Array<string>,
+	directories: ReadonlyMap<number, string>,
+	rusage?: RusageReader,
+): UsagePorts {
 	return {
 		list: vi.fn(async () => listings.shift() ?? ''),
+		rusage,
 		directories: vi.fn(async (_pids: ReadonlyArray<number>) => directories),
 		now: () => 0,
 		root: ROOT,
@@ -71,7 +80,7 @@ describe('run_board_usage_read.sample', () => {
 			[2, '/tmp'],
 			[3, `${LANE}/src`],
 		])
-		const ports = ports_of(['1 0:01 4\n2 0:01 4', '1 0:02 4\n3 0:01 4'], directories)
+		const ports = ports_of(['1 0 0:01 4\n2 0 0:01 4', '1 0 0:02 4\n3 1 0:01 4'], directories)
 		const first = await sample(undefined, ports)
 		const second = await sample(first, ports)
 
@@ -92,11 +101,38 @@ describe('run_board_usage_read.sample', () => {
 	})
 
 	it('runs no lookup when every process was seen before', async () => {
-		const ports = ports_of(['1 0:01 4', '1 0:02 4'], new Map([[1, LANE]]))
+		const ports = ports_of(['1 0 0:01 4', '1 0 0:02 4'], new Map([[1, LANE]]))
 
 		await sample(await sample(undefined, ports), ports)
 
 		expect(ports.directories).toHaveBeenCalledTimes(1)
+	})
+})
+
+// joshuafolkken/kit#3529: a child born and gone between two samples lands in its parent's count.
+describe('run_board_usage_read.sample with reaped children', () => {
+	it('reads the CPU time with reaped children where it can, and keeps every process’s parent', async () => {
+		const rusage = vi.fn((pid: number) => (pid === 1 ? 5000 : undefined))
+		const ports = ports_of(['1 7 0:01 4\n2 1 0:01 4'], new Map([[1, LANE]]), rusage)
+		const mark = await sample(undefined, ports)
+
+		expect(mark.processes.get(1)).toStrictEqual({ cpu_ms: 5000, rss_bytes: 4 * KB })
+		expect(mark.processes.get(2)?.cpu_ms).toBe(1000)
+		expect(mark.parents).toStrictEqual(
+			new Map([
+				[1, 7],
+				[2, 1],
+			]),
+		)
+		expect(mark.folded).toStrictEqual(new Set([1]))
+	})
+
+	it('keeps ps’s own time and no parent where there is no reader', async () => {
+		const mark = await sample(undefined, ports_of(['1 7 0:01 4'], new Map([[1, LANE]])))
+
+		expect(mark.processes.get(1)?.cpu_ms).toBe(1000)
+		expect(mark.parents.size).toBe(0)
+		expect(mark.folded.size).toBe(0)
 	})
 })
 
