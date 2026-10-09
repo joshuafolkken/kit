@@ -2,7 +2,7 @@ import { readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// `scripts/` is grouped into domain subdirectories (joshuafolkken/kit#2013). A file placed directly
+// `scripts/` is grouped into domain subdirectories. A file placed directly
 // under `scripts/` is what this guard forbids: flat files are hard to find, coarsen the changed-file
 // scope, and inflate an agent's investigation reads. The scripts root is one level above this rule's
 // own directory.

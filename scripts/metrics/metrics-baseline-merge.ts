@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from 'node:util'
 import { metrics_logic, type Metrics } from './metrics-logic'
 import { metrics_ratchet, type Baseline } from './metrics-ratchet'
 
-// The three-way merge of `.josh/metrics-baseline.json` (joshuafolkken/kit#3517). Nearly every pull
+// The three-way merge of `.josh/metrics-baseline.json`. Nearly every pull
 // request that adds code rewrites every value in the file, so two lanes running side by side always
 // conflicted on it the moment one of them merged: 51 of the 63 content conflicts one backlogrun's
 // ship log recorded were this file.

@@ -23,7 +23,7 @@ import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
 
-// The `Stop` hook entry: one process that delivers the three stop-time rules (joshuafolkken/kit#2121).
+// The `Stop` hook entry: one process that delivers the three stop-time rules.
 // It is the stop-time counterpart of `pretool-guard.ts` — a second entry on the same `hook_decision`
 // foundation, not a second copy of it.
 //
@@ -33,8 +33,8 @@ import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript
 // resolving (send the notify, release the hold) and `stop_hook_active` is the backstop, so failing
 // open here costs at most a missed nudge, never a stuck run.
 
-// The hold record for this working tree is still in place, and whether it is a `prrun` stop's
-// (joshuafolkken/kit#3023). `unreadable` reads as absent: the safe direction for a stop guard is not to
+// The hold record for this working tree is still in place, and whether it is a `prrun` stop's.
+// `unreadable` reads as absent: the safe direction for a stop guard is not to
 // block, and an unreadable record is not proof a run is holding.
 async function hold_facts(): Promise<Pick<StopContext, 'hold_present' | 'prrun_stopped'>> {
 	const directory = await run_hold.worktree_directory()
@@ -66,7 +66,7 @@ function session_lang(): string {
 }
 
 // Which session this is — a headless parent, a lane child, a kit-launched agent, the `backlogrun`
-// parent — the facts that say whether a person is there to answer (joshuafolkken/kit#3538).
+// parent — the facts that say whether a person is there to answer.
 async function session_role_facts(): Promise<
 	Pick<StopContext, 'backlog_parent' | 'headless_agent' | 'headless_waiting' | 'lane_child'>
 > {
@@ -128,7 +128,7 @@ async function outcome_of(raw_payload: string): Promise<StopOutcome> {
 // a carried run: the strand judge reads this very record and returns on anything but `carried`, and a
 // stall needs a backlog driver, which begins one before its plan. A spent (`expired`) or `unreadable`
 // record a crashed run left behind is no run either, so it does not re-arm the stall's backlog probe
-// on every stop (joshuafolkken/kit#2995).
+// on every stop.
 // A failed git read — outside a repository, `git rev-parse` exits non-zero — reads as no run, since this
 // gate sits ahead of the checks' own swallowing and must not throw into the stop decision either.
 async function has_run_record(): Promise<boolean> {
@@ -144,8 +144,8 @@ async function has_run_record(): Promise<boolean> {
 }
 
 // The stall check rides the Stop hook because the stop *is* the loop boundary: a run alive but not
-// advancing ends turns without dispatching (joshuafolkken/kit#2359). The strand check rides the same
-// boundary and is the step before the stall (joshuafolkken/kit#2375): it fires when the driver is gone
+// advancing ends turns without dispatching. The strand check rides the same
+// boundary and is the step before the stall: it fires when the driver is gone
 // — the budget handed off, the owner dead, no supervisor watching. Both only report and swallow their
 // own failures, so neither can change the stop decision. An ordinary stop with no run record skips
 // both, so it pays one directory read rather than their reads and a stale stream's backlog probe.
@@ -157,7 +157,7 @@ async function run_report_checks(): Promise<void> {
 }
 
 // Nothing reaches stdout on an ordinary stop, so what the harness parses stays empty unless the stop
-// is being held — all three rules block, so a bare `#N` is reported the same way (joshuafolkken/kit#2247).
+// is being held — all three rules block, so a bare `#N` is reported the same way.
 async function write_stop_decision(raw_payload: string): Promise<void> {
 	hook_decision.load_environment_file()
 	await run_report_checks()

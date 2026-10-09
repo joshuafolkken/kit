@@ -4,7 +4,7 @@ import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { core_budget } from './core-budget'
 
 // How many of the gate's checks run at once, and how wide the one elastic check may fan out —
-// both derived from the machine rather than fixed at four (joshuafolkken/kit#1258).
+// both derived from the machine rather than fixed at four.
 //
 // **The measurement this table is built from.** Apple M3 Pro, 11 logical cores (5 performance +
 // 6 efficiency, about 9 cores of aggregate throughput on this workload), warm caches, each check
@@ -19,10 +19,8 @@ import { core_budget } from './core-budget'
 //
 // Two things follow. **The concurrent gate is already the faster shape** — 15.1s together against
 // 19.1s back to back, the median of three interleaved runs on the same tree, and the one pair
-// `verification-gate.ts` and `docs/josh-commands.md` quote too — so this is a widening of an
-// existing win, not a repair of the regression joshuafolkken/kit#1258 was filed for: that was
-// real when the type check and the spell check cost 6.9s and 3.6s of CPU, and joshuafolkken/kit#1256
-// removed it by giving both a cache. **And the unit suite is the only check worth sizing**: it
+// `docs/josh-commands.md` quotes too — so this is a widening of an existing win. **And the unit
+// suite is the only check worth sizing**: it
 // alone accounts for 107 of the 122 CPU-seconds, because vitest opens one worker per core while
 // the other three are one or two processes each.
 
@@ -39,10 +37,10 @@ interface GateCheck {
 	// instead of reserved, and counting it here would reserve cores against itself.
 	reserved_cores: number
 	// The memory this check holds while it runs, `core_budget.MEMORY_MB`'s measured peak; none declared is
-	// none waited for (joshuafolkken/kit#3371). The unit suite's is per worker, so it is derived instead.
+	// none waited for. The unit suite's is per worker, so it is derived instead.
 	memory_mb?: number
 	// A check whose `josh` command is kit-only, so a consumer's gate leaves it out rather than running
-	// a command that is not in the published package (joshuafolkken/kit#3408). It restates the command
+	// a command that is not in the published package. It restates the command
 	// entry's own `is_kit_only`, because the command map imports this module; `gate-plan.test.ts` pins
 	// that the two agree.
 	is_kit_only?: boolean
@@ -56,29 +54,29 @@ const METRICS_LABEL = 'metrics'
 
 // The checks whose warnings must survive the green record: eslint (the `lint` step) and svelte-check
 // (the `check` step) both exit 0 while reporting per-tree warnings a developer needs to see again, so
-// reusing a record taken from such a run would hide them (joshuafolkken/kit#1328). Every other step's
+// reusing a record taken from such a run would hide them. Every other step's
 // warning-shaped output — a Vite config deprecation printed by `test:unit`, say — is not a per-tree
-// finding and repeats every run, so it must not withhold the record. This is what `has_checker_warning`
-// narrows the withholding path down to (joshuafolkken/kit#2318).
+// finding and repeats every run, so it must not withhold the record. `has_checker_warning` narrows
+// the withholding path down to these.
 const WARNING_CHECKER_LABELS: ReadonlyArray<string> = [LINT_LABEL, TYPE_CHECK_LABEL]
 
 // The checks that do not fan out across every core, in the order their output is printed. They are
-// named apart from the unit suite because CI runs them on their own runner (joshuafolkken/kit#1226):
+// named apart from the unit suite because CI runs them on their own runner:
 // the unit suite is the only check that fans out across every core, so on a 4-core GitHub runner it
 // and the others spent the whole job taking cores off each other.
 //
-// **The behavior check belongs here, and it reserves no core** (joshuafolkken/kit#2365). It reads one
+// **The behavior check belongs here, and it reserves no core**. It reads one
 // recorded transcript rather than the tree, so it is I/O-bound and a zero reservation leaves
 // `RESERVED_CORES` and the unit worker cap exactly where the other three were measured. Being a static
 // check rather than one appended after the unit suite is what keeps the plan's shape intact: the
 // `--no-unit` set stays "the whole gate minus the unit suite", and a CI runner — which has no recorded
 // transcripts — runs it as a trivial green rather than skipping it.
 //
-// **The three reserving weights are `core_budget.CORE_WEIGHTS`** (joshuafolkken/kit#3345), the same
+// **The three reserving weights are `core_budget.CORE_WEIGHTS`**, the same
 // numbers the `josh lint`, `josh check` and `josh cspell:dot` commands claim when run directly.
 //
-// **The two zero weights were measured again for joshuafolkken/kit#3345, and they stay zero.** These are
-// warm runs on the 11-core machine on 2026-10-06. `behavior` took 0.6s of wall for 0.7s of CPU, which
+// **The two zero weights are measured, and they stay zero.** These are warm runs on the 11-core
+// machine. `behavior` took 0.6s of wall for 0.7s of CPU, which
 // is node starting up. `exports:unused` took 5.5s of wall for 9.0s of CPU, about 1.6 cores. Floored,
 // that would be one core, but a reservation lasts the whole gate's plan, not the check's five seconds.
 // It would lower `RESERVED_CORES` from 4 to 5 and cut the solo unit cap from 7 workers to 6 for the
@@ -104,16 +102,15 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 		memory_mb: core_budget.MEMORY_MB.spell_check,
 	},
 	{ label: BEHAVIOR_LABEL, target: BEHAVIOR_LABEL, reserved_cores: 0 },
-	// **The unused-member check reserves no core** (joshuafolkken/kit#2987): it builds one TypeScript
+	// **The unused-member check reserves no core**: it builds one TypeScript
 	// program and walks it for about 5s, and it is over well before lint and the type check. A
 	// reservation would only take a place from the four-core CI runner's fan-out and a worker from the
 	// unit suite for the whole gate.
 	{ label: 'exports', target: 'exports:unused', reserved_cores: 0 },
-	// **The metrics ratchet is kit's own** (joshuafolkken/kit#3408): it holds kit's repository-wide
+	// **The metrics ratchet is kit's own**: it holds kit's repository-wide
 	// totals to kit's baseline. It is one in-process eslint pass with only `max-lines` enabled, over
 	// in a few seconds, so it reserves no core for the reason the unused-member check above does not.
-	// It times no startup here: beside the unit suite that reads the load, not josh
-	// (joshuafolkken/kit#3409).
+	// It times no startup here: beside the unit suite that reads the load, not josh.
 	{
 		label: METRICS_LABEL,
 		target: METRICS_LABEL,
@@ -197,7 +194,7 @@ interface GatePlan {
 }
 
 // This gate's share of the machine — the cores it may plan against once the other gates in flight
-// have theirs (joshuafolkken/kit#1547).
+// have theirs.
 //
 // **At one run this is the identity, and that is the whole argument that solo behavior is
 // unchanged.** `Math.floor(cores / 1)` is `cores`, so a solo gate and a CI runner hand the admission
@@ -225,8 +222,8 @@ function shared_cores(available_cores: number, concurrent_runs: number): number 
 // difference between two checks sharing a core and four fighting over it.
 //
 // **Under concurrency it is the only lever there is, and that is a measurement rather than a
-// preference** (joshuafolkken/kit#1547). `josh gate` starts four checks at once and joshuafolkken/kit#1515
-// sized only the fourth, so six lanes put 18 unbounded checks on 11 cores: measured on that machine,
+// preference**. `josh gate` starts four checks at once and sizing only the unit suite let six lanes
+// put 18 unbounded checks on 11 cores: measured on that machine,
 // one gate took 254.1s with lint alone at 252.9s against the 5.2s the table above records for it
 // solo. The obvious repair — hand each of the other three a worker count the way the unit suite gets
 // one — **does not exist to be applied**: eslint 10's `--concurrency` defaults to `off` and is
@@ -263,7 +260,7 @@ function resolve_concurrency(
 // 107s). A machine smaller than the measured one is left uncapped; see `MEASURED_CORES`.
 //
 // **The table above is a measurement of one gate on an idle machine, and `concurrent_runs` is what
-// says whether that is the situation** (joshuafolkken/kit#1515). Six lanes each reading "11 cores,
+// says whether that is the situation**. Six lanes each reading "11 cores,
 // take 7" put 42 workers on 11 cores, at a load average of 14.97, and the gate had no way to know the
 // other five existed. Where more than one unit run is in flight the machine is divided between them
 // instead, by `unit-worker-share.ts`, which is the same answer `test-unit-guard.ts` gives the pre-push
@@ -279,11 +276,11 @@ function resolve_concurrency(
 // oversubscription for an unmeasured starvation is not an improvement anyone can defend. What *is*
 // measured is the unit half — six concurrent suites went from ten timeouts to none at this share.
 //
-// **joshuafolkken/kit#1547 narrowed `resolve_concurrency` and deliberately left this number alone.**
-// A narrowed gate no longer runs its three siblings *beside* its unit step, so the paragraph above
-// now over-states what the share is competing with — which is an argument for widening it, and
-// widening it is exactly the unmeasured move that paragraph refuses. The number #1515 measured stays
-// until something measures a better one on this machine.
+// **`resolve_concurrency` narrows the gate and leaves this number alone.** A narrowed gate no longer
+// runs its three siblings *beside* its unit step, so the paragraph above over-states what the share
+// is competing with — which is an argument for widening it, and widening it is exactly the
+// unmeasured move that paragraph refuses. The measured number stays until something measures a
+// better one on this machine.
 //
 // **The count is a parameter rather than a read.** This module stays a pure function of its inputs, so
 // its own assertions are about arithmetic and not about what happened to be running while they ran;
@@ -305,7 +302,7 @@ function solo_unit_weight(available_cores: number): number {
 	return Math.max(0, available_cores - RESERVED_CORES)
 }
 
-// The cores a check reserves from the machine-wide budget while it runs (joshuafolkken/kit#2351). The
+// The cores a check reserves from the machine-wide budget while it runs. The
 // static checks declare their measured reservation; the unit suite declares the pool it will open,
 // which `unit_worker_cap` has already sized against the runs in flight. **This is the same table, read
 // once**: no second set of weights is introduced, so a change to the measured reservation moves the
@@ -326,7 +323,7 @@ function unit_memory(workers: number): number {
 	return workers * core_budget.MEMORY_MB.unit_worker
 }
 
-// The memory a check holds (joshuafolkken/kit#3371): its declared figure, or for the unit suite one
+// The memory a check holds: its declared figure, or for the unit suite one
 // worker's peak for each core it reserves — its weight is its worker count.
 function check_memory(check: GateCheck, plan: GatePlan, available_cores: number): number {
 	if (check.label !== UNIT_LABEL) return check.memory_mb ?? 0
@@ -334,7 +331,7 @@ function check_memory(check: GateCheck, plan: GatePlan, available_cores: number)
 	return unit_memory(check_weight(check, plan, available_cores))
 }
 
-// The cores a unit run started directly reserves (joshuafolkken/kit#3345): the share it will pass to
+// The cores a unit run started directly reserves: the share it will pass to
 // vitest while other runs are live, and otherwise the gate's own solo unit weight. **Not the whole
 // machine**, though a lone vitest sizes its own pool: FIFO admission lets a claim of every core in only
 // once the ledger is empty, so a one-file `josh test:related` would wait out every other lane's gate
@@ -403,14 +400,14 @@ function resolve_gate_plan(
 // Printed once per run, so a gate that was slow on someone else's machine can be read without
 // re-deriving the plan from their core count.
 //
-// **The two fragments come from `josh-verdict.ts` since joshuafolkken/kit#1379.** `josh time` matches
+// **The two fragments come from `josh-verdict.ts`.** `josh time` matches
 // this line to tell where a gate run's output begins — it is the one line the gate prints before any
 // check body exists — so the printer and the detector build it from the same strings, exactly as they
 // already do for the verdict.
 // **The machine is described as shared only when it is.** A solo gate prints exactly the line it
 // always printed — which is what keeps `josh time`'s detector, and every reader used to the old
 // output, unaffected — while a narrowed one says why it is narrow, so a lane owner reading a slow
-// gate is not left deriving the reason from a worker count that looks wrong (joshuafolkken/kit#1515).
+// gate is not left deriving the reason from a worker count that looks wrong.
 function format_machine(available_cores: number, concurrent_runs: number): string {
 	const cores = `${String(available_cores)} cores`
 

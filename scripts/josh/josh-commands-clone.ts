@@ -1,7 +1,7 @@
 import type { CommandEntry } from './josh-command-types'
 
 // The clone-detection commands, kept in their own module so `josh-commands-ai.ts` stays under its
-// line ceiling as the AI-tools set grows (joshuafolkken/kit#2217). Spread into `COMMAND_MAP` in
+// line ceiling as the AI-tools set grows. Spread into `COMMAND_MAP` in
 // `josh-command-map.ts` alongside the other command groups.
 /* eslint-disable @typescript-eslint/naming-convention */
 const CLONE_COMMANDS: Record<string, CommandEntry> = {

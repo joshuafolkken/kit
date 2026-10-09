@@ -6,7 +6,7 @@ import { lane_cache_run } from '#scripts/lane/lane-cache-run'
 import { buffered_process, FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
 
 const ARGV_START = 2
-// `--no-progress` turns off cspell's per-file `N/1607 <path> cached` line (joshuafolkken/kit#2296).
+// `--no-progress` turns off cspell's per-file `N/1607 <path> cached` line.
 // Those lines ran to 1,607 of them — the whole output past the 8,000-character tool cap — so a gate
 // that failed on one unknown word buried the failure under progress and a run could read only the
 // first of several failures. The summary and the issue lines it prints are untouched; only the

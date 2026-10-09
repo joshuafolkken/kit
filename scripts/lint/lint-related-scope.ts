@@ -7,10 +7,8 @@ import {
 } from '#scripts/git/changed-file-scope'
 import { ESLINT_RELATED_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
 
-// joshuafolkken/kit#1298: `josh lint` read the whole repository on every call, and an
-// implementation loop calls it after every few edits. Measured across four runs with
-// `pnpm josh time`, that came to 47–188 seconds per run — 18% of #1292's 1,043-second
-// implementation phase, spent re-reading files the change never touched.
+// `josh lint` reads the whole repository on every call, and an implementation loop calls it after
+// every few edits — re-reading files the change never touched.
 //
 // **This narrowing is added in front of the whole check, never in place of it.** `josh gate` still
 // runs `josh lint` over everything before the commit: a formatting rule can be broken by a file the
@@ -96,17 +94,14 @@ function prettier_arguments(files: ReadonlyArray<string>): ReadonlyArray<string>
 	return [...PRETTIER_ARGS, ...files]
 }
 
-// The cache file is this command's own rather than the gate's, because the two run at the same time
-// (joshuafolkken/kit#1347). `josh gate` lints the whole tree beside the review while an
+// The cache file is this command's own rather than the gate's, because the two run at the same time.
+// `josh gate` lints the whole tree beside the review while an
 // implementation loop calls this command between edits, and each eslint run rewrites its cache file
-// whole from the copy it loaded at start-up — so on one file the run that finished last discarded
-// the other's entries, and a narrowed run finishing during a whole-tree run rolled the cache back to
-// its pre-gate state.
-//
-// **The earlier comment here claimed the opposite and was reasoning about the wrong thing.** It said
-// sharing let a narrowed run warm the gate's cache, since eslint leaves the entries a run did not
-// visit alone; that holds for pruning and says nothing about two writers. It is the same judgement
-// joshuafolkken/kit#1332 made for the edit hook, applied to the second place it was needed.
+// whole from the copy it loaded at start-up — so on one file the run that finished last would
+// discard the other's entries, and a narrowed run finishing during a whole-tree run would roll the
+// cache back to its pre-gate state. Sharing would let a narrowed run warm the gate's cache only for
+// pruning, which says nothing about two writers. It is the same judgement the edit hook's own cache
+// file makes.
 //
 // **What is narrowed is still only the target list, never the gate.** `josh gate` runs `josh lint`
 // over the whole tree before any commit; this file decides which files a repeat call reads.

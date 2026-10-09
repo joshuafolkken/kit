@@ -20,10 +20,8 @@ function segments_of(command: string): Array<string> {
 	return command.split(SEGMENT_SEPARATOR).map((segment) => segment.trim())
 }
 
-// **Both spellings still match, and the expansion is no longer this file's** (joshuafolkken/kit#1643
-// for the reading, joshuafolkken/kit#1789 for where it now happens). A `josh_names` here used to widen
-// each caller's set with every alias standing for one of its names; `josh_command_of` expands the
-// alias in the command it reads, so `pnpm josh ga` arrives as `josh gate` and a caller's canonical set
+// **Both spellings match, and the expansion is not this file's.** `josh_command_of` expands the alias
+// in the command it reads, so `pnpm josh ga` arrives as `josh gate` and a caller's canonical set
 // matches it as it is. Widening as well would be a second copy of one rule, and the caller that
 // forgot it would be the one that stops seeing `pnpm josh ga` at all — which is why each caller's own
 // suite names a call in its alias spelling.

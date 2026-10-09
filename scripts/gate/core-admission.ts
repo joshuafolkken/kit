@@ -1,7 +1,7 @@
 import type { LedgerLoad, MachineBudget } from './machine-capacity'
 
 // The ledger's admission arithmetic, kept apart from the markers `core-budget.ts` reads and writes so
-// that file stays under its line ceiling as the budget grew a memory side (joshuafolkken/kit#3371).
+// that file stays under its line ceiling as the budget grew a memory side.
 // Everything here is a pure function of the ledger it is handed.
 
 const MS_PER_SECOND = 1000
@@ -63,7 +63,7 @@ function exceeds(totals: LedgerLoad, budget: MachineBudget): boolean {
 // cumulative weight ahead of it still fits the budget. The first that does not fit stops the walk, so a
 // place is never jumped: admission is in claim order, which is what removes the start-time asymmetry.
 // Memory is walked the same way, so a claim whose tool would not fit in free memory waits like one whose
-// cores would not fit (joshuafolkken/kit#3371).
+// cores would not fit.
 function admitted_keys(
 	reservations: ReadonlyArray<LedgerEntry>,
 	budget: number,

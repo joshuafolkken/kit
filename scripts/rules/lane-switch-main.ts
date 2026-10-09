@@ -4,24 +4,21 @@ import { bash_triggers } from './bash-triggers'
 import { git_argv } from './git-argv'
 import { shell_segments } from './shell-segments'
 
-// A dispatched lane child is stopped from running `git switch main` — the fifth of the "always fails or
-// answers nothing" misfires joshuafolkken/kit#2297 catalogued (joshuafolkken/kit#2313). A lane is a
-// linked work tree, `main` is checked out by the primary work tree, and git allows one branch in one
-// work tree at a time — so the call is **structurally guaranteed to fail** with `fatal: 'main' is
-// already used by worktree at '<the primary checkout>'`. It was measured 11 times in the 2026-09-21
-// backlogrun, always in a lane child.
+// A dispatched lane child is stopped from running `git switch main` — a call that always fails. A
+// lane is a linked work tree, `main` is checked out by the primary work tree, and git allows one
+// branch in one work tree at a time — so the call is **structurally guaranteed to fail** with
+// `fatal: 'main' is already used by worktree at '<the primary checkout>'`.
 //
 // **The source is the parent's step, not the child's.** The distributed procedures write
 // `pnpm josh ms` as the step before reading the dependency scope, and that is *correct in
 // the primary checkout* (`backlogrun-lanes.md` → "Once per repository, before the first lane opens"). A
 // child that runs the same line verbatim fails every time, and the failure is not free: a refused call
-// drops the independent calls batched beside it (joshuafolkken/kit#2177), so a batching child loses the
+// drops the independent calls batched beside it, so a batching child loses the
 // most. `josh main:sync` (`main-sync.ts`) already refuses inside a linked work tree for the same reason;
 // this is the *raw* form of the same call, refused before it fails rather than after.
 //
 // **It refuses rather than rewrites, because a `PreToolUse` guard can only `allow` / `deny` a command,
-// never substitute a different one** (joshuafolkken/kit#2313 decision comment). So the refusal hands back
-// the next command, exactly as #2297 required of `test:declared`: the lane is already on its own issue
+// never substitute a different one**. So the refusal hands back the next command: the lane is already on its own issue
 // branch, branched from a fresh default before it opened, and the latest default is brought in during the
 // gate by `pnpm josh main:merge` — so skip the step and keep implementing on the current branch.
 //
@@ -30,8 +27,8 @@ import { shell_segments } from './shell-segments'
 // differs per repository — so hardcoding `main` would both miss a renamed default and need an async
 // `get_default_branch`. A lane child belongs on its own `<issue>-lane` branch; a `git switch` to anything
 // else is the misfire. Its own branch is read synchronously from the checkout path
-// (`lane_paths.lane_issue_of`), the weaker-but-synchronous lane test a guard is bound to
-// (joshuafolkken/kit#1864). `git switch` alone is covered — it never means a pathspec, so there is no
+// (`lane_paths.lane_issue_of`), the weaker-but-synchronous lane test a guard is bound to.
+// `git switch` alone is covered — it never means a pathspec, so there is no
 // ambiguity — and `git checkout -- <path>` stays `worktree-guard.ts`'s.
 //
 // **The command test comes first and the world is consulted second**, so the lane read runs only on the

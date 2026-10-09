@@ -3,12 +3,12 @@ import { direct_pr_create } from './direct-pr-create'
 import { index_guard } from './index-guard'
 import { protected_files } from './protected-files'
 
-// The three rows that close the deny-list bypasses (joshuafolkken/kit#2983), gathered so
+// The three rows that close the deny-list bypasses, gathered so
 // `delivered-rules.ts` spreads one entry. Each reads argv or a file path rather than a glob: an index
 // mutation in any git spelling, a recursive forced `rm` or a destructive `gh` call, and a Read of
 // `.env` or an edit of a consumer's `.claude/settings.json`. Their triggers are disjoint from every
 // other row's — `git restore` is split with `worktree-mutation` by `--staged` alone. The fourth row,
-// `direct-pr-create` (joshuafolkken/kit#3183), closes the same kind of gap for `gh pr create`, which
+// `direct-pr-create`, closes the same kind of gap for `gh pr create`, which
 // the deny list never listed: it claims `gh pr create` and a `gh api` write to the pulls collection.
 const ROWS = [
 	index_guard.ROW,

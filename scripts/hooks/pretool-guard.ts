@@ -12,7 +12,7 @@ import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { batch_outcome } from './batch-guard'
 import { step_zero_notice } from './step-zero-notice'
 
-// One PreToolUse process for the three guards that used to be three (joshuafolkken/kit#1930). A Bash
+// One PreToolUse process for the three guards that used to be three. A Bash
 // call used to spawn `batch:guard`, `investigation:guard` and `rule:guard` separately — three pnpm
 // launches on top of the tool call — while consumers paid that thrice on every guarded call. The
 // three share one shell (`hook-decision.ts`): the same payload schema, the same deny envelope, the
@@ -22,10 +22,10 @@ import { step_zero_notice } from './step-zero-notice'
 // **The verdict is identical to running the three in turn**, and that is the whole point. Each guard
 // self-gates on the tool name inside its own `is_candidate` / trigger, so running all three on the
 // union matcher (`Bash|Edit|Read|Write|AskUserQuestion`) refuses exactly what the three separate
-// entries did — `AskUserQuestion` is matched for the rule guard's lane-child interactive-ask row
-// (joshuafolkken/kit#2201), and the batching and investigation guards self-gate away from it. A
+// entries did — `AskUserQuestion` is matched for the rule guard's lane-child interactive-ask row,
+// and the batching and investigation guards self-gate away from it. A
 // refusal from any guard wins first; only when none refuses is the batch guard's non-blocking notice
-// (the whole-file-write notice, joshuafolkken/kit#1848) emitted. Each guard still honours its own
+// (the whole-file-write notice) emitted. Each guard still honours its own
 // switch (`JOSH_BATCH_GUARD` / `JOSH_INVESTIGATION_GUARD` / `JOSH_RULE_GUARD`) internally, so this
 // process needs no switch of its own.
 
@@ -47,7 +47,7 @@ function is_clear(outcome: GuardOutcome): boolean {
 }
 
 // The duplicate-read guard is `notice`-mode in a lane child, so it is the second guard that can raise a
-// non-refusal notice (joshuafolkken/kit#2298). Its notice is surfaced only where nothing else spoke —
+// non-refusal notice. Its notice is surfaced only where nothing else spoke —
 // a refusal from any guard, or the batch guard's own notice, wins first.
 function with_duplicate_notice(combined: GuardOutcome, notice: string | undefined): GuardOutcome {
 	if (notice === undefined || !is_clear(combined)) return combined
@@ -55,7 +55,7 @@ function with_duplicate_notice(combined: GuardOutcome, notice: string | undefine
 	return { reason: undefined, notice, fault: undefined }
 }
 
-// The Step 0 reminder is the last word (joshuafolkken/kit#2994): asked only where every guard stayed
+// The Step 0 reminder is the last word: asked only where every guard stayed
 // clear, so a refusal or another notice never spends its once-per-session stamp unseen.
 function with_step_zero_notice(outcome: GuardOutcome, raw_payload: string): GuardOutcome {
 	if (!is_clear(outcome)) return outcome
@@ -85,21 +85,21 @@ function pretool_outcome(raw_payload: string): GuardOutcome {
 }
 
 // The Step 0 notice fires once, on the first runtime-file edit: the moment a lane child's plan turns
-// into code, which `run:board` draws as its `implement` phase (joshuafolkken/kit#3444). Both the Claude
+// into code, which `run:board` draws as its `implement` phase. Both the Claude
 // path and the Codex adapter call this on their final outcome, so neither runtime skips the phase.
 async function mark_phase(outcome: GuardOutcome): Promise<void> {
 	if (outcome.notice === step_zero_notice.NOTICE) await lane_phase.mark_implement()
 }
 
 // The watcher guard is the one composed rule that cannot answer synchronously — it reads the lane
-// registry and the watcher's life record off disk (joshuafolkken/kit#2353). So it is asked after the
+// registry and the watcher's life record off disk. So it is asked after the
 // synchronous guards and only where they stayed clear: a refusal from any of them wins first, exactly
 // as `combine_outcomes` orders them, and the watcher's refusal fills a clear verdict rather than
 // overriding one. It fires once per run itself (`run-watcher-hook.ts`), so a stale watcher refuses the
 // first call but not the `pnpm josh run:progress --wait` that fixes it.
 //
-// **The parent hand-off guard is the second asynchronous rule, asked after the watcher's**
-// (joshuafolkken/kit#2947). It reads the carry record to tell the `backlogrun` parent apart, so it sits
+// **The parent hand-off guard is the second asynchronous rule, asked after the watcher's**.
+// It reads the carry record to tell the `backlogrun` parent apart, so it sits
 // beside the watcher rather than among the synchronous rows; a stale watcher is the cheaper fix and is
 // surfaced first.
 async function async_reason(raw_payload: string): Promise<string | undefined> {
@@ -141,8 +141,8 @@ function rewrite_context(note: string, outcome: GuardOutcome): string {
 	return [note, outcome.notice ?? outcome.fault].filter(Boolean).join('\n\n')
 }
 
-// The envelope that replaces the outcome's own when a lane child backgrounded `josh ship` alone
-// (joshuafolkken/kit#3154): the call is run in the foreground instead of being refused. A refusal from
+// The envelope that replaces the outcome's own when a lane child backgrounded `josh ship` alone:
+// the call is run in the foreground instead of being refused. A refusal from
 // any guard still wins, and a notice the outcome carried rides along in the same context.
 function foreground_rewrite(
 	outcome: GuardOutcome,
@@ -168,8 +168,8 @@ interface PipefailRewrite {
 	input: Record<string, unknown>
 }
 
-// A piped josh check the hook runs under `set -o pipefail` instead of refusing it
-// (joshuafolkken/kit#3570): the rewritten input, and the payload that carries it. The rewrite is the
+// A piped josh check the hook runs under `set -o pipefail` instead of refusing it:
+// the rewritten input, and the payload that carries it. The rewrite is the
 // rule guard's delivery, so the rule guard's switch turns it off too.
 function pipefail_rewrite(raw_payload: string): PipefailRewrite | undefined {
 	if (!delivered_rules.is_enabled()) return undefined

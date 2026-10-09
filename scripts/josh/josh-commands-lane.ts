@@ -1,7 +1,7 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
 // The `lane:*` command registry, split out of `josh-commands-ai.ts` so that file stays under its line
-// limit (joshuafolkken/kit#2162). One script answers `lane:open` / `lane:close` / `lane:list` /
+// limit. One script answers `lane:open` / `lane:close` / `lane:list` /
 // `lane:prune` / `lane:output` / `lane:dispatch` / `lane:await`, told apart by the verb below;
 // `lane:launch` is the composite that opens, pops-and-installs on the first lane, and dispatches.
 const LANE_SCRIPT = 'scripts/lane/lane-cli.ts'
@@ -74,7 +74,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<issue> [--stash <message>]', 'automation', ['files', 'git', 'processes']],
 	},
-	// A live run's lane limit (joshuafolkken/kit#3434): `.env` is read so the bare form reports the
+	// A live run's lane limit: `.env` is read so the bare form reports the
 	// `JOSH_LANE_LIMIT` a person set there when no override stands.
 	'lane:limit': {
 		script: 'scripts/lane/lane-limit-cli.ts',
@@ -84,7 +84,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[<limit>] [--reset]', 'developer', ['files']],
 	},
-	// The lane-limit measurement (joshuafolkken/kit#3355): `.env` is read so `lane:stats` labels the row
+	// The lane-limit measurement: `.env` is read so `lane:stats` labels the row
 	// with the `JOSH_LANE_LIMIT` a person set there.
 	'lane:sample': {
 		...MEASURE_ARGUMENTS,

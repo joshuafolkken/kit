@@ -6,9 +6,9 @@ import { ENV_FILE_NAME } from '#ports'
 //
 // **There is no mandatory counterpart any more.** `--env-file=.env` aborts before the script's first
 // line when the file is missing, which is wrong for every command kit ships: `doctor` runs from
-// anywhere, including a directory with no project at all (joshuafolkken/kit#869), and `notify` /
+// anywhere, including a directory with no project at all, and `notify` /
 // `followup` run in cloud sessions that carry their credentials as environment variables and keep no
-// `.env` at all (joshuafolkken/kit#1564). A command that needs a value to be present says so itself,
+// `.env` at all. A command that needs a value to be present says so itself,
 // where it can name what is missing.
 const OPTIONAL_ENV_FILE_FLAGS: ReadonlyArray<string> = [`--env-file-if-exists=${ENV_FILE_NAME}`]
 
@@ -17,7 +17,7 @@ type CommandCategory =
 
 // The two vocabularies are runtime tuples the types are derived from, rather than bare unions. A
 // union exists only at compile time, so the completeness test and the generated reference
-// (joshuafolkken/kit#2064) would each have to restate the values to check or render them — two
+//  would each have to restate the values to check or render them — two
 // copies that drift apart silently. Deriving the type from the tuple keeps one definition.
 const COMMAND_AUDIENCES = ['developer', 'maintainer', 'automation'] as const
 const COMMAND_SIDE_EFFECTS = [
@@ -57,21 +57,21 @@ interface CommandEntry {
 	// A command that only makes sense inside the kit repository itself — the rule-compliance eval and
 	// the run measurements that analyze kit's own development. It is dropped from a consumer's
 	// `josh --help` and refused with guidance when run in a consumer project, so a distributed help
-	// listing carries only what a consumer can run (joshuafolkken/kit#1988). The audience in
+	// listing carries only what a consumer can run. The audience in
 	// `reference` separately decides whether the command appears in the default listing.
 	is_kit_only?: boolean
 	// Pre-built to `dist/commands/` so a consumer's `dist/josh.js` imports it in its own process
-	// instead of spawning tsx for it (joshuafolkken/kit#3328, `docs/maintainers/runtime-bundling.md`).
+	// instead of spawning tsx for it (`docs/maintainers/runtime-bundling.md`).
 	is_bundled?: boolean
-	// The cores the command reserves from the machine-wide budget before it starts its heavy tools
-	// (joshuafolkken/kit#3345). `josh-logic.ts` claims them at the one dispatch point every command
+	// The cores the command reserves from the machine-wide budget before it starts its heavy tools.
+	// `josh-logic.ts` claims them at the one dispatch point every command
 	// passes through, so the command only declares the number. A function means the weight is read
 	// when the command starts: the unit suite's share depends on what else is running at that moment.
 	// **The edit hook declares none, on purpose.** It formats one file per edit and finishes in well
 	// under a second, so a wait for room on the machine would stall every edit for the length of
 	// another lane's check.
 	core_weight?: number | (() => number)
-	// The memory the command's tools hold, claimed with its cores (joshuafolkken/kit#3371); read like
+	// The memory the command's tools hold, claimed with its cores; read like
 	// `core_weight`, and none declared is none waited for.
 	memory_mb?: number | (() => number)
 }
@@ -79,23 +79,21 @@ interface CommandEntry {
 // The name `josh gate` registers under. It lives here rather than in `verification-gate.ts` so a
 // consumer of the name — the command map, `propagate` — does not import the script module: that
 // module carries a `process.argv[1] === import.meta.url` main guard, and esbuild bundles every
-// import into one `dist/josh.js` where that guard matches on *any* `josh` invocation
-// (joshuafolkken/kit#914).
+// import into one `dist/josh.js` where that guard matches on *any* `josh` invocation.
 const GATE_COMMAND = 'gate'
 
-// joshuafolkken/kit#1256: three of the gate's four checks keep a content-addressed cache, so a
-// second run reads only what changed. eslint had one from the start; the type check and the spell
-// check rescanned the whole tree every time, which cost 10.5s of CPU against 2.8s cached.
+// Three of the gate's four checks keep a content-addressed cache, so a second run reads only what
+// changed.
 //
-// Neither of those two needs an invalidation rule of its own. `tsc` records the compiler options
-// inside the build-info file and re-checks everything when they differ, and `cspell` records a
-// content hash of every config and dictionary file it loaded as that entry's dependency — so editing
+// Neither the type check nor the spell check needs an invalidation rule of its own. `tsc` records
+// the compiler options inside the build-info file and re-checks everything when they differ, and
+// `cspell` records a content hash of every config and dictionary file it loaded as that entry's dependency — so editing
 // `tsconfig.json` or `cspell.config.yaml` invalidates what it should. CI restores only the eslint
 // cache (`.github/workflows/ci.yml` → "Setup ESLint cache"); the other two start every run cold.
 //
-// **eslint's does need one, and it is not here** (joshuafolkken/kit#1347). ESLint hashes the
-// *serialized* config, which drops every rule's `create`, so editing `eslint/rules/*.js` left every
-// cached entry valid on every cache file below. The fix is a content fingerprint of the rule modules
+// **eslint's does need one, and it is not here**. ESLint hashes the
+// *serialized* config, which drops every rule's `create`, so editing `eslint/rules/*.js` would leave
+// every cached entry valid on every cache file below. The answer is a content fingerprint of the rule modules
 // carried in the shared config's `settings` — `eslint/config-fingerprint.js` — because one value
 // there invalidates the gate's cache, the scoped one and the edit hook's at once, while a rule
 // written per cache file would have to be repeated for each and would go stale one file at a time.
@@ -153,10 +151,9 @@ const SHARED_CACHE_SPECS: ReadonlyArray<GateCacheSpec> = [
 ]
 const GATE_CACHE_FILES: ReadonlyArray<string> = GATE_CACHE_SPECS.map((spec) => spec.cache_file)
 
-// joshuafolkken/kit#1332: the `PostToolUse` edit hook runs eslint too, and ESLint *deletes* the file
-// at `--cache-location` whenever it is started without `--cache` — so every single edit wiped the
-// cache the gate had just filled, and both gates of run joshuafolkken/kit#1326 paid a cold lint
-// (59.4s and 54.5s, against 3.0s warm). The hook is given a location of its own rather than the
+// The `PostToolUse` edit hook runs eslint too, and ESLint *deletes* the file at `--cache-location`
+// whenever it is started without `--cache` — so a shared file would be wiped by every single edit,
+// leaving the gate a cold lint. The hook is given a location of its own rather than the
 // gate's because the two run at the same time: `josh gate` lints the whole tree beside the review
 // while this hook fires on every edit, and each eslint run rewrites its cache file whole from the
 // copy it loaded at start-up — so two writers silently discard each other's entries. A file of its
@@ -165,18 +162,16 @@ const GATE_CACHE_FILES: ReadonlyArray<string> = GATE_CACHE_SPECS.map((spec) => s
 // **Pruning is not the reason**, though it reads like one: `file-entry-cache` defaults `noPrune` to
 // true, and a single-file run against the gate's full cache was measured byte-identical, so a shared
 // file would keep the entries that run never visited.
-// joshuafolkken/kit#1347: the same reasoning, reached a second time. `josh lint:related` is what an
-// implementation loop calls between edits, and `josh gate` lints the whole tree beside the review —
-// so those two run at the same time as readily as the hook and the gate do, and they shared one file
-// until this constant existed. Whichever of the pair wrote last replaced the file with "the copy I
-// loaded at start-up plus what I visited", so a narrowed run finishing during a whole-tree run rolled
-// the cache back to its pre-gate state, and a whole-tree run finishing second discarded the narrowed
-// one's entries.
+// The same reasoning for the scoped lint. `josh lint:related` is what an implementation loop calls
+// between edits, and `josh gate` lints the whole tree beside the review — so those two run at the
+// same time as readily as the hook and the gate do. Whichever of a pair sharing one file wrote last
+// would replace it with "the copy I loaded at start-up plus what I visited", so a narrowed run
+// finishing during a whole-tree run would roll the cache back to its pre-gate state, and a
+// whole-tree run finishing second would discard the narrowed one's entries.
 //
-// **The warming this gives up is worth less than the entries it stops losing.** The comment this
-// replaced argued the shared file let a narrowed run warm the gate's cache, which is true only while
-// the two never overlap; a file of its own is warm from its own second call onwards, and the gate's
-// stays exactly as the gate left it.
+// **The warming this gives up is worth less than the entries it stops losing.** A shared file would
+// let a narrowed run warm the gate's cache only while the two never overlap; a file of its own is
+// warm from its own second call onwards, and the gate's stays exactly as the gate left it.
 //
 // **The lint's target scope is untouched.** This is where a cache is written, not what is read:
 // `josh lint:related` narrows in front of the gate and `josh gate` still runs `josh lint` over the
@@ -212,7 +207,7 @@ const CSPELL_CACHE_FLAGS = content_cache_flags(CSPELL_CACHE_FILE)
 
 export type { CommandCategory, CommandEntry, GateCacheSpec }
 // The three cache files are exported one by one as well as as a list, because `josh bench` clears
-// them per target (joshuafolkken/kit#1314): the lint step writes only the eslint one, so a target
+// them per target: the lint step writes only the eslint one, so a target
 // that cleared the list would report a cold type check as the lint's own cost. The edit hook's cache
 // stays private; the scoped lint cache is exported because #2060 shares its completed file between
 // worktrees, but it still never overlaps the gate's distinct cache location.

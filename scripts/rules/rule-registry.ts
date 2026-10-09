@@ -1,7 +1,7 @@
 import { rule_registry_rows, type RegisteredRule } from './rule-registry-rows'
 
-// The human-readable side of every trigger-delivered rule, keyed by the `id` its guard row carries
-// (joshuafolkken/kit#3399). `prompts/collaboration-workflow/rule-delivery.md` used to hold this list
+// The human-readable side of every trigger-delivered rule, keyed by the `id` its guard row carries.
+// `prompts/collaboration-workflow/rule-delivery.md` used to hold this list
 // as a hand copy of `delivered-rules.ts`; `pnpm josh rule:list` now renders it from here, and
 // `rule-list.test.ts` pins that every row of `MEASURED_RULES` has an entry and no entry is orphaned.
 //

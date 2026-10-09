@@ -7,7 +7,7 @@ import { entry_read_budget } from './entry-read-budget'
 // The byte-ceiling check the gate's `document-byte-budget.test.ts` runs, made reachable on the fast
 // between-edits path — `josh lint:related` calls it over the files it already resolved so a mandated
 // documentation update that grows a document past its ceiling is caught in seconds rather than after
-// the 80–90-second gate (joshuafolkken/kit#2176). The ceiling and its message are
+// the 80–90-second gate. The ceiling and its message are
 // `document-byte-budget.ts`'s alone: this adds no budget of its own, so the fast path can never hold
 // a different line from the gate, and widening one can never loosen the other.
 //
@@ -53,8 +53,8 @@ function over_budget_messages(
 		.filter((message): message is string => message !== undefined)
 }
 
-// The entry-total counterpart: an entry over its recorded ceiling. This is the primary budget
-// (joshuafolkken/kit#2257), so an edit to a covered document — which grows an entry's total, not a
+// The entry-total counterpart: an entry over its recorded ceiling. This is the primary budget,
+// so an edit to a covered document — which grows an entry's total, not a
 // per-document ceiling — is caught here on the same fast path. Stale ceilings are left to the gate's
 // `entry-read-budget.test.ts`, exactly as the per-document staleness is: this path blocks growth.
 function entry_over_budget_message(root: string, entry: string): string | undefined {
@@ -107,7 +107,7 @@ function check_files(root: string, absolute_files: ReadonlyArray<string>): numbe
 // resolved change. `lint:related`'s own fallback lints a superset of the change, so the byte check
 // widens to the whole budget rather than an empty file list — otherwise the fallback would report
 // success on a tree it never read for bytes, and the green record the caller then writes would vouch
-// for a byte dimension it never checked (joshuafolkken/kit#2176).
+// for a byte dimension it never checked.
 function check_all(root: string): number {
 	const absolute_files = document_byte_budget.DOCUMENT_BYTE_BUDGET.map((entry) =>
 		path.join(root, entry.path),

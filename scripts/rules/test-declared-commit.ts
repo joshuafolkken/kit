@@ -2,8 +2,8 @@ import { test_declared_changed } from '#scripts/test/test-declared-changed'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { run_tail_rule } from './run-tail-rule'
 
-// The trigger and the delivered text behind the `test-declared` row of `delivered-rules.ts`
-// (joshuafolkken/kit#2118). It lives beside `run-tail-rule.ts` and the other per-rule modules rather than
+// The trigger and the delivered text behind the `test-declared` row of `delivered-rules.ts`.
+// It lives beside `run-tail-rule.ts` and the other per-rule modules rather than
 // inline in the enumeration, so the enumeration stays a list of rows.
 //
 // **A commit whose code change carries no test, refused at the commit stage `run-tail` already

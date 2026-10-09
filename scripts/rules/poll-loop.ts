@@ -1,23 +1,22 @@
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { bash_triggers } from './bash-triggers'
 
-// The trigger and the delivered text behind the `poll-loop` row of `delivered-rules.ts`
-// (joshuafolkken/kit#2371). The hand-written wait loop a lane child improvises over a backgrounded
+// The trigger and the delivered text behind the `poll-loop` row of `delivered-rules.ts`.
+// The hand-written wait loop a lane child improvises over a backgrounded
 // command's output file.
 //
-// **The gap `early-heartbeat` left, on purpose.** joshuafolkken/kit#1570's rule refuses a bare
+// **The gap `early-heartbeat` left, on purpose.** That rule refuses a bare
 // `sleep` — a clock timer arming a progress report — and it stands down the moment it sees a loop
 // keyword (`early-heartbeat.ts`'s `LOOP_KEYWORD`), because a loop that ends on a condition is waiting
 // on a thing rather than on a clock. This is that thing: a `while`/`until` loop that sleeps between
-// probes of a command's output file. It never appeared in the heartbeat reading, and it is the larger
-// half of the waste — six lanes lost about 45 minutes, 13% of their wall clock, to it.
+// probes of a command's output file.
 //
 // **The loop does not know when the command finished.** A regex over the output file that never
 // matches waits to the harness block limit; one that matches a mid-run line exits too early. Either
 // way the command's *exit* is not what ends the wait, and each pass spends a full-context round trip.
 // A command backgrounded with `run_in_background` re-invokes the run when it exits — the completion
 // notification is what ends the wait on the task itself, which is the mechanism this row hands back,
-// the same reading joshuafolkken/kit#1510 took for the foreground push (`run-tail-rule.ts`).
+// the same reading `run-tail-rule.ts` takes for the foreground push.
 //
 // **It fires on every occurrence**, for the reason `git-force.ts` does: a poll loop wastes the same
 // round trips each time it is armed, so refused-once-and-free-after would put every loop but the first
@@ -31,10 +30,9 @@ const LOOP_KEYWORD = /\b(?:while|until)\s/u
 // a stream reader. Read anywhere in the line rather than at a command position, because the loop body
 // puts it behind a `do` keyword (`; do sleep 30; done`), which no separator precedes. The argument is
 // matched as any non-space rather than a digit, so a variable duration (`sleep "$INTERVAL"`) is caught
-// as a literal one is — a poll with a configurable interval is still a poll (joshuafolkken/kit#2371,
-// review round 1).
+// as a literal one is — a poll with a configurable interval is still a poll.
 const SLEEP_COMMAND = /\bsleep\s+\S/u
-// **A loop with no `sleep` is still a poll — a worse one** (joshuafolkken/kit#2421). A lane child ran
+// **A loop with no `sleep` is still a poll — a worse one**. A lane child ran
 // `until [ -f /tmp/gate-done ]; do if ! kill -0 %1 …; then break; fi; done` for hours: a busy-wait
 // that spun a core on a marker nobody wrote, and slipped through because the rule required the
 // `sleep`. Two headers make a loop a poll with or without one. An `until` header waits for a state to
@@ -59,12 +57,12 @@ function is_state_wait(plain: string): boolean {
 }
 
 // **A `while read … done < file` is a stream reader, not a poll**, even when its body sleeps to
-// throttle processing (joshuafolkken/kit#2371, review round 1). Its condition consumes input rather
+// throttle processing. Its condition consumes input rather
 // than probing for a state — a poll never reads its condition, it *tests* it (grep, wc, a file check)
 // — so the completion notification this rule points to has nothing to do with it. A `while read`
 // header is therefore always a stream reader; a line that also carried a separate `until` poll would
 // go un-refused, which fails safe (under-refusal) and is contrived enough not to warrant the added
-// regex the attempt to catch it needed (joshuafolkken/kit#2371, review round 2).
+// regex the attempt to catch it needs.
 const STREAM_READER = /\bwhile\s+read\b/u
 
 function is_stream_reader(plain: string): boolean {

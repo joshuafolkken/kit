@@ -4,7 +4,7 @@ import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { shell_segments } from './shell-segments'
 
-// The rule delivered at the call that pipes a verification command (joshuafolkken/kit#1556).
+// The rule delivered at the call that pipes a verification command.
 //
 // **A pipeline exits with its last command's status.** `pnpm josh gate 2>&1 | tail -40` therefore
 // answers success on a gate that printed `✗ verification gate failed`, and the failure that was
@@ -57,9 +57,8 @@ const VERIFICATION_COMMANDS: ReadonlySet<string> = new Set([
 ])
 
 // **The canonical name of each check, and both spellings still match**: `pnpm josh ga | tail` masks a
-// gate exactly as the long spelling does, and since joshuafolkken/kit#1789 the alias is expanded where
-// the command is read rather than by widening this set with every alias standing for one of its names
-// (joshuafolkken/kit#1643 for the reading). The suite names `pnpm josh ga` for that reason: an
+// gate exactly as the long spelling does, and the alias is expanded where the command is read rather
+// than by widening this set with every alias standing for one of its names. The suite names `pnpm josh ga` for that reason: an
 // expansion that regressed would show up here rather than as a guard that quietly stopped firing.
 function is_verification_command(segment: string): boolean {
 	return shell_segments.is_josh_command(segment, VERIFICATION_COMMANDS)
@@ -106,8 +105,8 @@ function command_pieces(command: string): Array<string> {
 	return pipelines_of(command).flat()
 }
 
-// **The occasion this rule governs: a check whose result means pass or fail, run at all**
-// (joshuafolkken/kit#1643). The trigger fires only on the masked spelling, so a run that never piped
+// **The occasion this rule governs: a check whose result means pass or fail, run at all**.
+// The trigger fires only on the masked spelling, so a run that never piped
 // one would drop out of the reading entirely and the rate would be taken over runs that masked at
 // least once.
 function runs_verification(command: string): boolean {
@@ -121,7 +120,7 @@ function keeps_verdict_intact(command: string): boolean {
 	return runs_verification(command) && !is_masked_verification(command)
 }
 
-// **The commonest masking is rewritten rather than refused** (joshuafolkken/kit#3570). Almost every
+// **The commonest masking is rewritten rather than refused**. Almost every
 // refusal was a check narrowed with `| tail` or `| grep`, and the refusal cost a round trip to arrive at
 // the call `set -o pipefail;` in front would have made. Prefixed, the pipeline carries the check's
 // status, which is the rule's whole outcome — so the hook runs that call instead.

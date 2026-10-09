@@ -5,8 +5,7 @@ import { issue_citation } from './issue-citation'
 import { lane_background } from './lane-background'
 import { reply_language } from './reply-language'
 
-// The stop-time rules, delivered on the `Stop` hook (joshuafolkken/kit#2121, joshuafolkken/kit#2422,
-// joshuafolkken/kit#2445).
+// The stop-time rules, delivered on the `Stop` hook.
 //
 // **It exists because `.claude/settings.json` wired no `Stop` event.** The four events it did wire
 // (`SessionStart` / `UserPromptSubmit` / `PreToolUse` / `PostToolUse`) can catch the moment a call is
@@ -20,7 +19,7 @@ import { reply_language } from './reply-language'
 // permission envelope. The stop guard is a second *entry* on the one foundation, exactly as
 // `pretool-guard` is one — not a second copy of the plumbing.
 //
-// **Every rule refuses** (joshuafolkken/kit#2247). Missing the stop notification or leaving a hold
+// **Every rule refuses**. Missing the stop notification or leaving a hold
 // on a clean tree costs a person a silent wait or a trampled tree; a bare `#N` in the reply reaches
 // the person watching but not the model that could fix it, so it too blocks — `{"decision":"block"}`
 // is the one channel a `Stop` hook has to the model, and `stop_hook_active` caps a false positive at a
@@ -45,14 +44,14 @@ interface StopContext {
 	hold_present: boolean
 	// `git status --porcelain` came back empty.
 	tree_clean: boolean
-	// That record carries a `prrun` stop mark (joshuafolkken/kit#3023): the run stopped at a green pull
+	// That record carries a `prrun` stop mark: the run stopped at a green pull
 	// request and keeps the hold over a clean tree on purpose, so a person can look before it merges.
 	prrun_stopped: boolean
 	// A `confirmation` notify is on this run's transcript tail.
 	notified: boolean
 	// The turn's session-facing reply text.
 	message: string
-	// The person's last prompt — a `#N` it already carried is quoted, not cited (joshuafolkken/kit#2819).
+	// The person's last prompt — a `#N` it already carried is quoted, not cited.
 	prompt: string
 	// This stop already forced a continuation earlier in the prompt — the loop-breaker Claude Code
 	// documents, so a run that will not comply is not blocked forever.
@@ -66,28 +65,28 @@ interface StopContext {
 	// The owner of the repository the session runs in, or `undefined` when it cannot be read.
 	session_owner: string | undefined
 	// This session is a headless `backlogrun` parent with lanes still in flight and no cut handed its
-	// record off — `run-headless.ts` → `must_keep_waiting` (joshuafolkken/kit#2437).
+	// record off — `run-headless.ts` → `must_keep_waiting`.
 	headless_waiting: boolean
 	// How many headless-wait refusals sit on this run's transcript tail — the spin bound below.
 	headless_refusals: number
 	// This session is a dispatched lane child for this checkout — `lane_child_marker.is_child_of`.
 	lane_child: boolean
 	// A background task this run launched — a command or a subagent — has not finished —
-	// `lane_background.pending_background_ids` over the transcript tail (joshuafolkken/kit#2704).
+	// `lane_background.pending_background_ids` over the transcript tail.
 	background_pending: boolean
-	// A backgrounded subagent this run launched has not finished — `lane_background.pending_agent_ids`
-	// (joshuafolkken/kit#2774). Apart from `background_pending`, since only a subagent is sure to end.
+	// A backgrounded subagent this run launched has not finished — `lane_background.pending_agent_ids`.
+	// Apart from `background_pending`, since only a subagent is sure to end.
 	agent_pending: boolean
-	// This lane child handed its region to a running detached ship — `lane_handoff.is_handed_off`
-	// (joshuafolkken/kit#2962). The supervisor notifies on its own outcome, so nobody waits on this stop.
+	// This lane child handed its region to a running detached ship — `lane_handoff.is_handed_off`.
+	// The supervisor notifies on its own outcome, so nobody waits on this stop.
 	handed_off: boolean
-	// The resolved `JOSH_SESSION_LANG` — `session_language.resolve_session_lang` (joshuafolkken/kit#2470).
+	// The resolved `JOSH_SESSION_LANG` — `session_language.resolve_session_lang`.
 	session_lang: string
-	// This session is an agent kit launched under `claude -p` — `agent_headless.is_headless`
-	// (joshuafolkken/kit#3245). No person reads its reply, so the rules on how a reply is written stand down.
+	// This session is an agent kit launched under `claude -p` — `agent_headless.is_headless`.
+	// No person reads its reply, so the rules on how a reply is written stand down.
 	headless_agent: boolean
-	// This session drives a live `backlogrun` carry record — `run_headless.is_backlog_parent`
-	// (joshuafolkken/kit#3538). With `headless_agent` and `lane_child`, what makes a run unattended.
+	// This session drives a live `backlogrun` carry record — `run_headless.is_backlog_parent`.
+	// With `headless_agent` and `lane_child`, what makes a run unattended.
 	backlog_parent: boolean
 }
 
@@ -121,11 +120,11 @@ const HOLD_RELEASE_REASON =
 	'`prrun` stop keeps it by its stop mark — this row is silent there. Release it, then end with a one-line confirmation that it was released — do ' +
 	'not repeat your previous reply.'
 
-// **A refusal that corrects rather than advises** (joshuafolkken/kit#2247). The bare `#N` is already
+// **A refusal that corrects rather than advises**. The bare `#N` is already
 // on screen and the hook cannot unsay it, so the reason does the one thing that helps the *next* reply:
 // it names the numbers it detected and hands over the exact `issue:cite` call that prints the
-// paste-ready lines, then asks for the corrected citation lines alone — not the whole reply reissued
-// (joshuafolkken/kit#2329). Reprinting the whole reply is what made the correction read as a duplicate;
+// paste-ready lines, then asks for the corrected citation lines alone — not the whole reply reissued.
+// Reprinting the whole reply is what made the correction read as a duplicate;
 // the bare copy already scrolled past stays, and the fix follows it as a short correction. The rule
 // itself is not restated — it is resident in `CLAUDE.md` — only pointed at.
 const ISSUE_CITATION_REASON =
@@ -143,10 +142,10 @@ function build_citation_reason(references: ReadonlyArray<string>): string {
 	)
 }
 
-// **An offer to file in an unattended run is a Tier A filing deferred to nobody** (joshuafolkken/kit#2422).
+// **An offer to file in an unattended run is a Tier A filing deferred to nobody**.
 // The judgement is already made, so the reason hands over the filing chain rather than a question; the
 // rule itself is resident in `observation-filing.md` and only pointed at. **An interactive session asks
-// first** (joshuafolkken/kit#3538): there the offer is the correct reply, so `needs_filing` is silent.
+// first**: there the offer is the correct reply, so `needs_filing` is silent.
 const FILING_OFFER_REASON =
 	'⛔ filing offer: your reply offers to file an Issue instead of filing it, and this run is ' +
 	'unattended — nobody is there to answer. Filing into a first-party repository there is Tier A — ' +
@@ -157,7 +156,7 @@ const FILING_OFFER_REASON =
 	'your previous reply. If it is not worth filing ' +
 	'after all, say so in one line instead.'
 
-// **A headless parent's turn-end is its process's end** (joshuafolkken/kit#2437). Under `claude -p` the
+// **A headless parent's turn-end is its process's end**. Under `claude -p` the
 // background waits die with the turn, so the lanes lose their parent and nothing re-invokes it. The
 // reason hands over the foreground wait rather than a question, because there is nobody to answer one.
 // The refusal's opening, which the transcript tail is counted by.
@@ -171,7 +170,7 @@ const HEADLESS_REFUSAL_CAP = 3
 
 // The foreground waits as they appear in a transcript's tool-call input — the JSON `command` field, so
 // the refusal's own prose, which names the same commands, never matches. `run:progress --wait` is not
-// one (joshuafolkken/kit#3102): it streams its reports and runs until work arrives, so it is started in
+// one: it streams its reports and runs until work arrives, so it is started in
 // the background, where it lives as long as the turn the foreground wait keeps open.
 const HEADLESS_WAIT_CALLS = ['"command":"pnpm josh lane:await']
 
@@ -185,7 +184,7 @@ const HEADLESS_WAIT_BODY =
 
 const HEADLESS_WAIT_REASON = `${HEADLESS_WAIT_MARKER}${HEADLESS_WAIT_BODY}`
 
-// **A lane child never asks a person for the index** (joshuafolkken/kit#2445). The index rule protects
+// **A lane child never asks a person for the index**. The index rule protects
 // a person's own staging, and a lane is a per-run work tree with none to protect; the sanctioned commit
 // flow is already authorized, so the reason hands it over instead of letting the run wait on a person.
 // Both halves must appear — an index command and a request for permission — so a report that merely
@@ -209,8 +208,8 @@ function needs_index_route(context: StopContext): boolean {
 	return context.lane_child && asks_index_permission(context.message)
 }
 
-// **A refusal is the turn's only input, so it names the language the answer is written in**
-// (joshuafolkken/kit#2470). The session-language line reaches a turn only through `UserPromptSubmit`;
+// **A refusal is the turn's only input, so it names the language the answer is written in**.
+// The session-language line reaches a turn only through `UserPromptSubmit`;
 // a turn this hook continues has no prompt, and an English refusal read alone was answered in English.
 function language_note(lang: string): string {
 	return (
@@ -219,8 +218,8 @@ function language_note(lang: string): string {
 	)
 }
 
-// **A reply that drifted out of the session language is sent back once to be rewritten**
-// (joshuafolkken/kit#2470). The drift persists — each turn matches the language of the one before — so
+// **A reply that drifted out of the session language is sent back once to be rewritten**.
+// The drift persists — each turn matches the language of the one before — so
 // the rewrite has to happen on the turn it starts; `stop_hook_active` bounds it to one.
 function build_language_reason(lang: string): string {
 	return (
@@ -251,13 +250,13 @@ function needs_filing(context: StopContext): boolean {
 	)
 }
 
-// **A running background subagent stands both hold rules down** (joshuafolkken/kit#2774). Its completion
+// **A running background subagent stands both hold rules down**. Its completion
 // notice re-invokes the session, so the turn-end is a wait on the run's own work, not on a person — a
 // notify there says "nothing needed" and dilutes the ones that do. A backgrounded command does not
 // count: a dev server never ends, and a stop behind it would leave a person silently waiting. A lane
 // child never reaches this with a task running: `needs_background_wait` answers it first.
 //
-// **A lane handed to the detached ship stands them down too** (joshuafolkken/kit#2962): the hold now
+// **A lane handed to the detached ship stands them down too**: the hold now
 // belongs to the supervisor driving the merge, and the person hears from that supervisor's own notify.
 function is_held_idle(context: StopContext): boolean {
 	return context.hold_present && !context.agent_pending && !context.handed_off
@@ -278,8 +277,8 @@ function citation_reason(context: StopContext): string | undefined {
 	return build_citation_reason(references)
 }
 
-// The two rules on how a reply is written. **A headless agent's reply has no reader**
-// (joshuafolkken/kit#3245): its text lands in a stream-json log, so correcting its citations or its
+// The two rules on how a reply is written. **A headless agent's reply has no reader**:
+// its text lands in a stream-json log, so correcting its citations or its
 // language costs a turn and reaches nobody. The artifacts a person does read — a Telegram, an Issue, a
 // pull request — are held to the same rules by their own guards, not here.
 function wording_reason(context: StopContext): string | undefined {
@@ -312,15 +311,15 @@ function count_headless_refusals(tail: string): number {
 	return tail.slice(Math.max(last_wait, 0)).split(HEADLESS_WAIT_MARKER).length - 1
 }
 
-// **A lane child with a task still running is sent back to wait, not to notify** (joshuafolkken/kit#2704).
+// **A lane child with a task still running is sent back to wait, not to notify**.
 // Its turn-end kills the task, so the notify the hold rules would ask for announces a stop that loses
 // the work; the #2606 child obeyed exactly that and its gate died at `exit code 143`.
 function needs_background_wait(context: StopContext): boolean {
 	return context.lane_child && context.background_pending
 }
 
-// The two hold rules, notify ahead of release — behind the lane index route (joshuafolkken/kit#2445)
-// and the lane background wait (joshuafolkken/kit#2704), since the notify they would ask for announces
+// The two hold rules, notify ahead of release — behind the lane index route
+// and the lane background wait, since the notify they would ask for announces
 // a pause the run has no reason to take.
 function hold_reason(context: StopContext): string | undefined {
 	if (needs_index_route(context)) return LANE_INDEX_REASON
@@ -338,7 +337,7 @@ function hold_reason(context: StopContext): string | undefined {
 // reports the notify first; the filing offer goes ahead of the citation, since the filing it forces
 // produces the citation the reply then needs.
 //
-// **The headless wait comes first and outlasts `stop_hook_active` up to its spin bound** (joshuafolkken/kit#2437).
+// **The headless wait comes first and outlasts `stop_hook_active` up to its spin bound**.
 // The loop-breaker exists so a person is not wedged behind a rule the run will not satisfy; a headless
 // parent has no person, and letting its second stop through is exactly the silent end the rule is for.
 // Each continuation it forces is a foreground wait of minutes, and the rule falls silent by itself once

@@ -5,8 +5,8 @@ import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { bash_triggers } from './bash-triggers'
 import { shell_segments } from './shell-segments'
 
-// The trigger and the delivered text behind the `protected-file` row of `delivered-rules.ts`
-// (joshuafolkken/kit#2983): the two files a run's own file tools must not touch.
+// The trigger and the delivered text behind the `protected-file` row of `delivered-rules.ts`:
+// the two files a run's own file tools must not touch.
 //
 // - **`.env` is never read** — by the `Read` tool or by a shell reader in a `Bash` call. It carries the
 //   Telegram bot token, and either read lands it in the transcript. The scripts that need it load it

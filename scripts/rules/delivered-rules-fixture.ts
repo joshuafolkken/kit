@@ -2,13 +2,10 @@ import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 
 // Command and transcript-tail fixtures shared by the delivery suites — `delivered-rules.test.ts`,
 // `delivered-rules-predicates.test.ts`, `delivered-rules-filing.test.ts` and `filing-cap.test.ts`.
-// The first two were one file until joshuafolkken/kit#1884 split the pure-predicate blocks off to
-// keep the delivery suite under the 300-line limit; the filing rows of joshuafolkken/kit#2119 added
-// the tail builders (`filing_lines`, `filings_tail`).
 // These are used across the suites, so they live here rather than being redeclared in each (no
 // clones — single source).
 
-// The filing act the run-level filing rows trigger on — `josh issue:file` (joshuafolkken/kit#2808) —
+// The filing act the run-level filing rows trigger on — `josh issue:file` —
 // reused wherever a case needs that trigger to match so no case can pass on a spelling the others do
 // not use.
 const FILING_COMMAND = 'pnpm josh issue:file "x" --body-file body.md --depth 1'
@@ -23,12 +20,12 @@ const COMMENTED_READ_COMMAND = 'gh issue view 1319 --comments'
 const BODY_READ_COMMAND = 'gh issue view 1319'
 const BODY_READ_API_COMMAND = 'gh api repos/joshuafolkken/kit/issues/1319'
 // A read that fetches the same Issue only to project its state or labels — a state check, not the body
-// read the rule guards, so it is not a trigger (joshuafolkken/kit#1905).
+// read the rule guards, so it is not a trigger.
 const STATE_CHECK_COMMAND = "gh api repos/joshuafolkken/kit/issues/1319 --jq '{state, labels}'"
 // The `--jq` spelling that still names the body, so it stays a body read.
 const BODY_JQ_COMMAND = "gh api repos/joshuafolkken/kit/issues/1319 --jq '.body'"
 
-// The minute the first fixture filing lands on (joshuafolkken/kit#2119).
+// The minute the first fixture filing lands on.
 const A_FILING_MINUTE = 2
 
 // One filing's two lines: the `issue:file` call, and the result the harness wrote back — a failure

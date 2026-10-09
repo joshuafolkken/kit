@@ -1,7 +1,7 @@
 import type { CommandEntry } from './josh-command-types'
 
 // The issue-reading and issue-citation commands, split out of `josh-commands-ai.ts` when the mandated
-// `issue:cite` section pushed that file past its 300-line ceiling (joshuafolkken/kit#2220) — the same
+// `issue:cite` section pushed that file past its 300-line ceiling — the same
 // group-per-file shape `LANE_COMMANDS` and `SPLIT_COMMANDS` already take. `COMMAND_MAP` spreads this
 // in, so nothing downstream sees where an entry lives.
 

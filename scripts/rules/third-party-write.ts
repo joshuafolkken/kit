@@ -3,8 +3,8 @@ import { bash_triggers } from './bash-triggers'
 import { gh_api } from './gh-api'
 import { shell_segments } from './shell-segments'
 
-// The trigger and the delivered text behind the `third-party-write` row of `delivered-rules.ts`
-// (joshuafolkken/kit#2122). A `gh api` write to a repository whose owner is not this session's — a
+// The trigger and the delivered text behind the `third-party-write` row of `delivered-rules.ts`.
+// A `gh api` write to a repository whose owner is not this session's — a
 // tracker we do not own — is Tier C: `CLAUDE.md` → "Third-party repositories are Tier C" and
 // `upstream-interrupt.md` forbid it without explicit current-turn user instruction, and a correct
 // diagnosis is not that instruction.
@@ -25,7 +25,7 @@ import { shell_segments } from './shell-segments'
 // A third-party write means all three: a `gh api` call, a write, and a repository target whose owner
 // the classification calls third-party. `unknown` (an unreadable session remote, an unparseable path)
 // is not third-party — the rule stays silent rather than refusing a write it cannot prove is external.
-// The `{owner}` placeholder (joshuafolkken/kit#3188) is judged by every owner `gh` could expand it to:
+// The `{owner}` placeholder is judged by every owner `gh` could expand it to:
 // first-party only when all of them are, so a fork checkout whose `upstream` is another owner's still
 // refuses the write `gh` may send there. A candidate whose owner could not be read counts as
 // third-party here — unlike an unreadable session owner, it is a remote `gh` may really write to.

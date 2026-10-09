@@ -2,8 +2,8 @@ import { time_shell } from '#scripts/time-runtime/time-shell'
 import { bash_triggers } from './bash-triggers'
 import { shell_segments } from './shell-segments'
 
-// The trigger and the delivered text behind the `josh-git-bare` row of `delivered-rules.ts`
-// (joshuafolkken/kit#2297): a `pnpm josh git` issued without `-y` / `--yes`.
+// The trigger and the delivered text behind the `josh-git-bare` row of `delivered-rules.ts`:
+// a `pnpm josh git` issued without `-y` / `--yes`.
 //
 // **A bare `pnpm josh git` cannot succeed from an agent, and it wastes the time it takes to fail.** The
 // command prompts to confirm the staging, and with no TTY the prompt falls to its cancel branch —

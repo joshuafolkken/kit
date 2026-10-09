@@ -4,8 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { bash_output_cap_reader } from './bash-output-cap'
 import { document_section } from './document-section'
 
-// `josh read:files <path> [<path> ...]` — read several files in one call
-// (joshuafolkken/kit#2202).
+// `josh read:files <path> [<path> ...]` — read several files in one call.
 //
 // **This is the mid-implementation counterpart of `run:prep`.** `run:prep` folds a run's pre-edit
 // reads into one call at a *pre-determined* point (before implementing), and kit#2165 / kit#2162

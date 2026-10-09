@@ -1,10 +1,9 @@
 // Where each agent-read document sits on the execution path, derived from `read:set` — never
-// hand-listed (joshuafolkken/kit#2257).
+// hand-listed.
 //
-// **The per-document byte ceiling could not tell an entry read from a reference document.** A
+// **The per-document byte ceiling cannot tell an entry read from a reference document.** A
 // document a run reads on every entry costs it every session; one nothing routes to costs it nothing.
-// The per-document ceiling held both to the same rule, so a reference document a human browses was
-// budgeted as tightly as the workflow text a run actually reads. This splits the corpus so the
+// This splits the corpus so the
 // primary budget (`entry-read-budget.ts`) can be the total each entry reads, and the per-document
 // ceiling falls back to the documents no entry reaches.
 //
@@ -13,8 +12,8 @@
 // `CLAUDE.md` every entry loads. A document `read:set` never enumerates is `unreached`, and a
 // hand-written table of which is which would be the clone `CLAUDE.md` prohibits, drifting the first
 // time a trigger table row moved. `CLAUDE.md` is resident by construction rather than by the graph,
-// because it is loaded on every request whatever the entry — the misclassification joshuafolkken/kit#2257
-// singled out (a bare reachability walk drops it to "off-path", which is wrong).
+// because it is loaded on every request whatever the entry (a bare reachability walk would drop it to
+// "off-path", which is wrong).
 //
 // **The corpus is passed in, never imported here.** This module sits on the runtime path
 // (`lint-related` → `document-byte-check` → here), so it may not import `ai-document-fixture` — a test
@@ -26,7 +25,7 @@ import { entry_read_set } from './entry-read-set'
 
 // The always-resident rule document. It is not an entry read — every request carries it — so it is
 // named here rather than derived from a trigger table, and the entry-total budget adds it to every
-// entry's total so its growth is held (joshuafolkken/kit#2257).
+// entry's total so its growth is held.
 const RESIDENT_BASE: ReadonlyArray<string> = ['CLAUDE.md']
 const WORKFLOW_DIRECTORY = '.claude/skills/workflow-commands'
 
@@ -104,7 +103,7 @@ function documents_labelled(
 
 // The documents an entry reads — resident plus point-of-use. The entry-total budget governs these;
 // the per-document ceiling falls back to the unreached rest, so neither holds a document the other
-// does (joshuafolkken/kit#2257). Both sides come from `read:set`, so no corpus is needed — which is
+// does. Both sides come from `read:set`, so no corpus is needed — which is
 // what keeps the runtime caller (`document-byte-check`) free of the fixture the corpus lives in.
 function covered_documents(root: string = process.cwd()): Array<string> {
 	return [...new Set([...resident_documents(root), ...point_of_use_documents()])].toSorted(

@@ -3,7 +3,7 @@ import { review_diff_parts } from '#scripts/review/review-diff-parts'
 import { capped_print_part } from './capped-print-part'
 
 // Reads a `capped_print` result back into the text it stands for, so a test can pin both halves of
-// the contract (joshuafolkken/kit#3143): what was printed fits under the cap, and nothing was lost.
+// the contract: what was printed fits under the cap, and nothing was lost.
 
 const PART_LINE_PREFIX = '  '
 const LINE_BREAK = '\n'

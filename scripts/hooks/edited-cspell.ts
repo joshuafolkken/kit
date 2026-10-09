@@ -3,10 +3,9 @@ import path from 'node:path'
 import { HOOK_PROCESS_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 
-// The spell half of the edit hook (joshuafolkken/kit#2296). joshuafolkken/kit#2275 gave the hook a way
-// to hand the model an edit's lint problems on the spot rather than at the gate; the gate then still
-// ran two extra times on average, and an unregistered word was one of the two things that put it there
-// — a `cspell:dot` failure a run could only read one word at a time under the output cap. Checking the
+// The spell half of the edit hook. The lint half hands the model an edit's lint problems on the spot
+// rather than at the gate; an unregistered word is the other thing that sends a run back to the gate
+// — a `cspell:dot` failure a run can only read one word at a time under the output cap. Checking the
 // one edited file for unknown words the moment it changes closes that the same way the lint half does:
 // a short `additionalContext` block, riding the same `PostToolUse` envelope, and no output at all when
 // there is nothing to say.

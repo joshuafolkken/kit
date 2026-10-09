@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { file_reader } from '#scripts/lib/read-file'
 import { metrics_baseline_merge } from './metrics-baseline-merge'
 
-// The git merge driver `.gitattributes` names for `.josh/metrics-baseline.json`
-// (joshuafolkken/kit#3517). git calls it with the base, ours and theirs versions of the file as
+// The git merge driver `.gitattributes` names for `.josh/metrics-baseline.json`.
+// git calls it with the base, ours and theirs versions of the file as
 // `%O %A %B`; it writes the merged file over ours and exits 0, or exits non-zero to leave the
 // conflict to git. The merge itself is `metrics-baseline-merge.ts`; `scripts/git/merge-drivers.ts`
 // registers this script for `josh main:merge`.

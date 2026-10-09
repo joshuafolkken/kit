@@ -5,13 +5,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
 import { error_text } from '#scripts/lib/error-message'
 
-// The launch of each of kit's own hook commands in kit's checkout (`scripts/hooks/run-hook.sh`,
-// joshuafolkken/kit#2984): `node hook-bundle-ready.ts <name> <josh command> [arguments...]` checks
+// The launch of each of kit's own hook commands in kit's checkout (`scripts/hooks/run-hook.sh`):
+//`node hook-bundle-ready.ts <name> <josh command> [arguments...]` checks
 // that the bundles match the source beside them — already, or after rebuilding them here — and runs
 // `dist/hooks/<name>.js` in this same process; a checkout that cannot build runs its `pnpm josh`
 // fallback, which runs the live source.
 //
-// **One node launch per hook call** (joshuafolkken/kit#3327). The gate and the bundle used to be two
+// **One node launch per hook call**. The gate and the bundle used to be two
 // `node` processes, so every tool call paid the node start-up twice. The bundle is imported here
 // instead, with `process.argv` set to what `node dist/hooks/<name>.js [arguments...]` would have given
 // it, because every hook runs its main from `process.argv[1] === fileURLToPath(import.meta.url)`.

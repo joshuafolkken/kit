@@ -3,7 +3,7 @@ import { time_shell } from '#scripts/time-runtime/time-shell'
 import { time_transcript_line, type Block } from '#scripts/time-runtime/time-transcript-line'
 
 // The `Bash` commands a run's transcript tail already issued, parsed once here rather than in each
-// rule that needs them (joshuafolkken/kit#2119). `prior-comment-read.ts` had this reading first; the
+// rule that needs them. `prior-comment-read.ts` had this reading first; the
 // scout gate needs the same "what did the run already run" question, so a second copy would be the
 // clone `CLAUDE.md` prohibits. The delivery path sees only the raw tail — `delivered-rules.ts` names
 // the reason a run's own calls are not handed to it — so the earlier calls are recovered by parsing

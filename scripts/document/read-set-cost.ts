@@ -2,7 +2,7 @@ import { cost_tokens } from '#scripts/cost-runtime/cost-tokens'
 import { document_section, type Section } from './document-section'
 
 // What a read costs, and the scoped union that charges one file's cited sections once — split out
-// of `entry-read-set.ts` when it reached its line limit (joshuafolkken/kit#3264). `entry_read_set`
+// of `entry-read-set.ts` when it reached its line limit. `entry_read_set`
 // re-exports `cost_of`, `total` and `Cost` under the names they always had, so the move changed no
 // call site.
 
@@ -52,8 +52,8 @@ function charged_lines(markdown: string, headings: ReadonlyArray<string>): Set<n
 // **The union's charged lines are split into contiguous runs, and each run is costed on its own
 // natural text.** Joining non-adjacent lines with `\n` into one string fabricates a token boundary at
 // every gap the union skipped, so the estimate could drift a token *above* the per-reference sum even
-// with no real overlap — a false negative saving the measurement must never print
-// (joshuafolkken/kit#1934). A run is a maximal stretch of consecutive charged lines, which is exactly
+// with no real overlap — a false negative saving the measurement must never print.
+// A run is a maximal stretch of consecutive charged lines, which is exactly
 // the contiguous text a reader of that section actually reads, so summing the runs both mirrors the
 // real read and keeps `scoped` at or below the per-reference sum by construction.
 function extend_or_start(runs: Array<Array<number>>, index: number): void {
@@ -81,7 +81,7 @@ function run_text(lines: ReadonlyArray<string>, run: ReadonlyArray<number>): str
 // unresolved headings each charged at the whole file, and a `##` section cited beside one of its own
 // `###` children, which `section()` already returns inside the parent. Either one could push the
 // scoped figure above the whole one and print a *negative* saving, which is the single direction this
-// measurement must not be able to move (joshuafolkken/kit#1776 review round 1).
+// measurement must not be able to move.
 function scoped_file_cost(markdown: string, headings: ReadonlyArray<string>): Cost {
 	const charged = charged_lines(markdown, headings)
 

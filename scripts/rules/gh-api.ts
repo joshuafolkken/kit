@@ -1,5 +1,5 @@
 // The one reading of a `gh api` segment shared by the rows of `delivered-rules.ts` that judge such a
-// call by its spelling (joshuafolkken/kit#2122): the issue-body-read guard classifies read vs write,
+// call by its spelling: the issue-body-read guard classifies read vs write,
 // and the third-party-write guard needs the same classification plus the target `owner/repo`. Two
 // copies of the flag regexes would be the clone `CLAUDE.md` prohibits, and the copy that forgot `-F`
 // or `--raw-field` would be the one that let a write through.
@@ -31,7 +31,7 @@ const OWNER_GROUP = 1
 const REPO_GROUP = 2
 
 // The placeholders `gh api` expands to its base repository's owner before it sends the request
-// (joshuafolkken/kit#3188) — `{owner}`, and the legacy `:owner` it still accepts. Which owner that is
+//  — `{owner}`, and the legacy `:owner` it still accepts. Which owner that is
 // depends on the checkout's remotes, so the caller resolves it rather than this parser.
 const OWNER_PLACEHOLDERS: ReadonlySet<string> = new Set(['{owner}', ':owner'])
 

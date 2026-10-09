@@ -2,8 +2,8 @@ import { COMMAND_MAP } from './josh-command-map'
 import type { CommandEntry } from './josh-command-types'
 
 // The commands marked `is_kit_only` in the map only make sense inside the kit repository itself, so a
-// consumer never sees them in `josh --help` and is refused with guidance when it runs one
-// (joshuafolkken/kit#1988). The flag lives on the entry; everything a reader needs to act on it is
+// consumer never sees them in `josh --help` and is refused with guidance when it runs one.
+// The flag lives on the entry; everything a reader needs to act on it is
 // here, so the help filter, the dispatch guard and the distributed-doc test read one definition.
 
 // Where a consumer is told to go. A script-emitted string, so it stays English (`CLAUDE.md` →

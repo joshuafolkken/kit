@@ -1,7 +1,7 @@
 import { gate_plan } from './gate-plan'
 import type { GateStepResult } from './gate-report'
 
-// Whether the tree a green gate read back is still the tree its checks ran on (joshuafolkken/kit#3575).
+// Whether the tree a green gate read back is still the tree its checks ran on.
 // The metrics step moves `.josh/metrics-baseline.json` down when a total shrank, which changes the
 // tree mid-gate, and the plain comparison then withheld the green record of a gate whose every check
 // passed — `run:review --join` read that as RED.

@@ -4,8 +4,8 @@ import { josh_environment_file } from './josh-environment-file'
 import { session_language, type Resolution } from './session-language'
 
 // `josh session:lang` — say, on stdout, which language this session writes in, so a
-// `SessionStart` / `UserPromptSubmit` hook injects the resolved value into context every turn
-// (joshuafolkken/kit#1903). Before this, `JOSH_SESSION_LANG` lived only in `.env` — a personal,
+// `SessionStart` / `UserPromptSubmit` hook injects the resolved value into context every turn.
+// Before this, `JOSH_SESSION_LANG` lived only in `.env` — a personal,
 // non-committed file the harness never loads into the process environment — so the value was
 // invisible unless the agent read the file itself, and a one-word prompt like `diag` had nothing to
 // infer a language from and drifted to the surrounding English.
@@ -23,7 +23,7 @@ const { DEFAULT_SESSION_LANG, ENV_KEY, resolve_session_lang } = session_language
 // The file load happens in `main`, on the command path only; the resolver reads the environment.
 // The line carries the value alone: what the language covers is `CLAUDE.md` → "Output language",
 // already in context every turn, so repeating it here only spent context on each prompt. The default
-// prints nothing — that resident line already names `ja` (joshuafolkken/kit#3398).
+// prints nothing — that resident line already names `ja`.
 function format_line(resolution: Resolution): string {
 	if (resolution.is_default) return ''
 

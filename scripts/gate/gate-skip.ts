@@ -2,13 +2,12 @@ import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { review_brief } from '#scripts/review/review-brief'
 import { review_stamps } from '#scripts/review/review-stamps'
 
-// Whether `josh gate` already has the answer it is about to spend 47–50 seconds computing again
-// (joshuafolkken/kit#1328).
+// Whether `josh gate` already has the answer it is about to spend 47–50 seconds computing again.
 //
-// The record has existed since joshuafolkken/kit#1241: `record_green_gate` writes the digest of every
-// changed file the four checks were green on, and `josh review:brief` reads it back to print
-// `Already verified`. The gate itself never read it, so a second run over an unedited tree started
-// four processes to reach a conclusion already on disk. **This is reuse of a result, not a check
+// `record_green_gate` writes the digest of every changed file the four checks were green on, and
+// `josh review:brief` reads it back to print `Already verified`. The gate reads it too, so a second
+// run over an unedited tree does not start four processes to reach a conclusion already on disk.
+// **This is reuse of a result, not a check
 // dropped**: the bytes the skip answers for are the bytes the record was written from, compared one
 // by one.
 //
@@ -17,8 +16,7 @@ import { review_stamps } from '#scripts/review/review-stamps'
 // differently from the brief printed beside it would be two commands disagreeing about the same tree.
 //
 // **A file map does not describe a tree on its own, because it is a diff.** It lists what differs
-// from the commit the branch was cut from — its merge base with the default branch since
-// joshuafolkken/kit#1527 — so everything the record says stays true while that base moves underneath
+// from the commit the branch was cut from — its merge base with the default branch — so everything the record says stays true while that base moves underneath
 // it. Two shapes of that, one obvious and one not:
 //
 // - Straight after `git switch main && git pull` the map is **empty**, and an empty map compares
@@ -29,8 +27,8 @@ import { review_stamps } from '#scripts/review/review-stamps'
 //   every other file has been replaced by code no check has read. The rebase moves `HEAD`, so it
 //   moves the merge base with it, and the base check still catches this.
 //
-// **What no longer refuses a reuse is another lane merging into the shared default branch**
-// (joshuafolkken/kit#1527). In a linked work tree the default branch's ref is shared, but the merge
+// **What no longer refuses a reuse is another lane merging into the shared default branch**.
+// In a linked work tree the default branch's ref is shared, but the merge
 // base is a commit: an advance this branch is an ancestor of does not move it, and nothing this
 // checkout's four checks read has changed — so refusing there would have discarded a record that
 // still describes the tree exactly.
@@ -40,7 +38,7 @@ import { review_stamps } from '#scripts/review/review-stamps'
 // worth the argument: a tree with no changed file is not where a run spends its gate time.
 //
 // Two refusals need no code here. A gate that went red writes no record at all, so the re-verification
-// after a fix finds nothing to reuse; and joshuafolkken/kit#1261's join before the commit follows a
+// after a fix finds nothing to reuse; and the join before the commit follows a
 // `josh bump`, which edits `package.json` into the map.
 //
 // **What is reused is a silent green run.** `record_green_gate` withholds the record from a run that
@@ -61,7 +59,7 @@ const FORCE_FLAG = '--force'
 // A `base` that could not be read is `undefined`, and an older record carries none: both compare
 // unequal to anything, so the gate runs its checks. No base means no reuse, never reuse without one.
 //
-// **A refusal carries its reason** (joshuafolkken/kit#3307): a pre-push hook that fell back to the
+// **A refusal carries its reason**: a pre-push hook that fell back to the
 // whole unit suite said nothing about why, so a merge base moved by ship's main sync and a lock file
 // rewritten by the hook's own install each cost minutes before anyone could tell them apart.
 type GateReuse = { stamp: FileMapStamp } | { miss: string }
@@ -103,7 +101,7 @@ function reusable_green_gate(
 // goes on to a commit on the strength of it. So the line says what passed, on which tree and when,
 // and names the flag or the variable that runs the checks anyway.
 //
-// **One sentence, every reader of the record** (joshuafolkken/kit#1381). The gate says it, the
+// **One sentence, every reader of the record**. The gate says it, the
 // pre-push hook says it and the pre-commit hook says it, and three copies of a claim this load-bearing
 // would not have stayed the same sentence — the clone `CLAUDE.md` prohibits. What differs between them
 // is four fragments and nothing else, so those are the parameters and the shape is not.

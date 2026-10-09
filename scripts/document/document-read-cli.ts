@@ -4,10 +4,10 @@ import { bash_output_cap_reader } from './bash-output-cap'
 import { document_section } from './document-section'
 import { document_section_cli } from './document-section-cli'
 
-// `josh doc:read <file>` — a Bash-cap-safe read path for a whole document (joshuafolkken/kit#2188).
+// `josh doc:read <file>` — a Bash-cap-safe read path for a whole document.
 //
 // **A `cat` of a document larger than the Bash output cap is a truncated preview, then a second read.**
-// `read:set` measured one entry paying for the same five files twice this way (joshuafolkken/kit#1797):
+// `read:set` measured one entry paying for the same five files twice this way:
 // the shell hands back a middle-truncated preview, so the file is read again with the `Read` tool. This
 // command is the path that avoids it — it never emits an over-cap document through the shell at all.
 //

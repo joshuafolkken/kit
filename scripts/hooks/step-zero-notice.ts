@@ -4,7 +4,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
 
 // The Code Change Rules Step 0 reminder, delivered at the moment implementation code is about to be
-// written rather than on every prompt (joshuafolkken/kit#2994). As a `UserPromptSubmit` echo it was
+// written rather than on every prompt. As a `UserPromptSubmit` echo it was
 // injected into every turn — a question that writes nothing included — and re-read as accumulated
 // context on each turn after it. The trigger the rule names is "before writing any implementation
 // code", so the hook that delivers it is the one that sees that write: the first `Edit` / `Write` of a

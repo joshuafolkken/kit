@@ -5,14 +5,11 @@ import { entry_read_set, type ReadSetCost, type SectionCost } from './entry-read
 import { lane_child_read_set } from './lane-child-read-set'
 import { read_set_pricing } from './read-set-pricing'
 
-// `josh read:set` — what this entry point reads before it starts, and what that costs
-// (joshuafolkken/kit#1776).
+// `josh read:set` — what this entry point reads before it starts, and what that costs.
 //
-// **The entry cost had no reading of its own.** It could be inferred after the fact from
-// `josh cost`, which measures a whole session and cannot say which part of it was the mandated read;
-// so the baseline for joshuafolkken/kit#1776 could only be written by hand, once, from one
-// transcript. This prints it per entry point, from the documents themselves, as often as anyone
-// wants to ask.
+// **The entry cost has a reading of its own.** `josh cost` measures a whole session and cannot say
+// which part of it was the mandated read; this prints it per entry point, from the documents
+// themselves, as often as anyone wants to ask.
 //
 // **Two figures under one definition, which is what makes a before and an after comparable.**
 // `whole` is every file in the set read in full — what a run pays with no way to fetch a heading.
@@ -34,7 +31,7 @@ const DOLLAR_WIDTH = 7
 const DOLLAR_DECIMALS = 2
 // The premise the dollar column is read against: each figure is what that read costs *per run of this
 // size*, because an entry-read token rides every request as cached context. Printed rather than
-// assumed, so a reader checks the assumption instead of guessing it (joshuafolkken/kit#2289).
+// assumed, so a reader checks the assumption instead of guessing it.
 const PREMISE = `  $ = cost per run, assuming a ${String(read_set_pricing.ASSUMED_REQUESTS)}-request run (each entry-read token re-read from cache per request)`
 const USAGE = 'Usage: josh read:set [<entry>] [--json]'
 const WHOLE_LABEL = 'whole — every referenced file read in full'
@@ -44,15 +41,15 @@ const SECTION_LABEL = '-- sections referenced out of the set --'
 const POINT_OF_USE_LABEL = '-- read at the point of use, not at the entry --'
 // **The dispatched lane child reads a trimmed `fullrun` set** — the point-of-use documents the parent
 // owns are dropped and the entry-only `SKILL.md` sections are read section by section, so `total read`
-// falls well below a normal `fullrun`'s (joshuafolkken/kit#2021).
+// falls well below a normal `fullrun`'s.
 const LANE_CHILD_NOTE: ReadonlyArray<string> = [
 	'  a dispatched lane child (`JOSH_LANE_CHILD`) reads this trimmed set:',
 	'  - skips the point-of-use documents the parent owns — child dispatch, lane opening, the progress watcher and the hand-off',
 	'  - omits SKILL.md §0/§3 — dispatch already authorized the run and a leaf child edits no rule',
 ]
 // **The `backlogrun` parent reads a trimmed set of its own** — a scheduler that never implements, so
-// the implementer-only `SKILL.md` sections are read section by section rather than whole
-// (joshuafolkken/kit#2256). A *different* trim from the lane child's: the parent keeps §0, which is the
+// the implementer-only `SKILL.md` sections are read section by section rather than whole.
+// A *different* trim from the lane child's: the parent keeps §0, which is the
 // scheduler's own, and drops no point-of-use document.
 const BACKLOGRUN_PARENT_NOTE: ReadonlyArray<string> = [
 	'  the backlogrun parent (scheduler) reads this trimmed set:',
@@ -70,7 +67,7 @@ function to_number(value: number): string {
 
 // The per-run dollar cost of a row, from its token count. Priced by `read-set-pricing`, which reads
 // `cost-pricing.ts`'s rates rather than carrying its own, so this column never becomes a second price
-// list (joshuafolkken/kit#2289).
+// list.
 function to_dollars(tokens: number): string {
 	return `$${read_set_pricing.dollars_per_run(tokens).toFixed(DOLLAR_DECIMALS)}`.padStart(
 		DOLLAR_WIDTH,
@@ -78,8 +75,8 @@ function to_dollars(tokens: number): string {
 }
 
 // The column is sized from the longest label in this report rather than from a constant: the section
-// labels carry a file name *and* a heading, so a fixed width pushed them past it and the `tok` / `B`
-// columns stopped lining up with the file rows above (joshuafolkken/kit#1776 review round 1).
+// labels carry a file name *and* a heading, so a fixed width would push them past it and the `tok` /
+// `B` columns would stop lining up with the file rows above.
 function row(
 	label: string,
 	cost: { tokens: number; bytes: number },
@@ -92,7 +89,7 @@ function row(
 // **The tool is printed per file rather than left to be judged, and it is `Read` on every row.** A
 // file larger than the Bash output cap cannot be delivered by `cat` at all — what comes back is a
 // middle-truncated preview, which is how one measured entry paid for the same five files twice
-// (joshuafolkken/kit#1797) — and a file under the cap is still fetched with `Read`, because the rule
+//  — and a file under the cap is still fetched with `Read`, because the rule
 // beneath the report is one `Read` per file rather than a size judgement made row by row. Printing
 // `cat` as an option for the small rows would have the report contradict its own closing line the
 // first time anyone raised `BASH_MAX_OUTPUT_LENGTH` past the smallest document in the set.
@@ -129,7 +126,7 @@ function labels_of(report: ReadSetCost): Array<string> {
 
 // **The total the entry actually reads**: the scoped entry plus each point-of-use section (or whole
 // file where no section is named). It is the figure a before/after compares — a lane
-// child's set is smaller here, not in `scoped` alone (joshuafolkken/kit#2021).
+// child's set is smaller here, not in `scoped` alone.
 function total_read(report: ReadSetCost): { tokens: number; bytes: number } {
 	return entry_read_set.total([report.scoped, ...report.point_of_use.map((one) => one.cost)])
 }
@@ -230,10 +227,10 @@ function wanted_entries(argv: ReadonlyArray<string>, root: string): Array<string
 	return named.length > NOTHING ? named : known_entries(root)
 }
 
-// **An unrecognized keyword is refused, never reported on.** Left to fall through it produced a
+// **An unrecognized keyword is refused, never reported on.** Left to fall through it would produce a
 // complete, plausible report — the skill file, the gate documents, `whole` equal to `scoped` and a
-// saving of zero — and exited 0, answering "nothing to save" instead of
-// "no such entry" for a mistyped keyword (joshuafolkken/kit#1776 review round 1). That is the silent wrong answer
+// saving of zero — and exit 0, answering "nothing to save" instead of "no such entry" for a mistyped
+// keyword. That is the silent wrong answer
 // `doc:section` refuses for an unresolvable heading, and this is the same refusal.
 function unknown_entries(wanted: ReadonlyArray<string>, root: string): Array<string> {
 	const known = known_entries(root)

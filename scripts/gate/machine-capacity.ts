@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { availableParallelism, cpus, totalmem } from 'node:os'
 import { execa } from 'execa'
 
-// What the machine has free right now, read for the core budget's admission (joshuafolkken/kit#3371).
+// What the machine has free right now, read for the core budget's admission.
 //
 // **The budget used to be the core count, and that count is not what is free.** The ledger in
 // `core-budget.ts` admits against `availableParallelism()`, so the load it never sees — Claude sessions,
@@ -10,8 +10,8 @@ import { execa } from 'execa'
 // spent. On 2026-10-07, three lanes on the 11-core / 18 GB machine reached a load average of 16.8 with
 // 31% of the CPU in the kernel, compressing and swapping 4.4 GB of memory the ledger never counted.
 //
-// **This is a closed loop, not the open-loop formula joshuafolkken/kit#1637 rejected.** That proposal
-// derived a share from the core count up front; this reads what is busy and free at the moment of
+// **This is a closed loop, not an open-loop formula.** An open loop would derive a share from the
+// core count up front; this reads what is busy and free at the moment of
 // admission and subtracts only the part the ledger does not already account for.
 //
 // **The busy cores are the CPU-time difference over a short window, not the load average.** The load
@@ -22,7 +22,7 @@ import { execa } from 'execa'
 // container — where the host's CPU times are not this process's quota — budgets by the core count and
 // admits without looking at memory, exactly as before.
 //
-// **`run:board` draws its machine gauges from the same reading** (joshuafolkken/kit#3450), so what the
+// **`run:board` draws its machine gauges from the same reading**, so what the
 // board shows a person is what the gate admits against. The board takes a sample with no window and
 // draws the difference from its previous one.
 
@@ -44,7 +44,7 @@ const LINUX_AVAILABLE = /^MemAvailable:\s+(?<kb>\d+) kB/mu
 const LINUX_SWAP_IN = /^pswpin (?<pages>\d+)$/mu
 const LINUX_SWAP_OUT = /^pswpout (?<pages>\d+)$/mu
 const PAGE_SIZE_ARGUMENTS = ['PAGESIZE']
-// The whole memory reading in one `sysctl` (joshuafolkken/kit#3450), cheap enough for `run:board` to take
+// The whole memory reading in one `sysctl`, cheap enough for `run:board` to take
 // every second. `kern.memorystatus_level` is the kernel's own memory-pressure figure: the percentage of
 // memory still available, compressible and purgeable pages included — what `os.freemem()` leaves out on
 // macOS, where it reads near zero on a machine with gigabytes to spare. The swapper counters are the
@@ -55,7 +55,7 @@ const SWAP_IN_NAME = 'vm.compressor.swapper.swapins_total'
 const SWAP_OUT_NAME = 'vm.compressor.swapper.swapouts_total'
 const PAGE_SIZE_NAME = 'hw.pagesize'
 // The kernel's memory-pressure verdict — 1 normal, 2 warning, 4 critical — the one Activity Monitor
-// colors its "memory pressure" graph by (joshuafolkken/kit#3452).
+// colors its "memory pressure" graph by.
 const PRESSURE_NAME = 'kern.memorystatus_vm_pressure_level'
 const SYSCTL_ARGUMENTS = [LEVEL_NAME, SWAP_IN_NAME, SWAP_OUT_NAME, PAGE_SIZE_NAME, PRESSURE_NAME]
 const SYSCTL_LINE = /^(?<name>[\w.]+): (?<value>\d+)$/gmu

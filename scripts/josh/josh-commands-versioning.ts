@@ -24,7 +24,7 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Versioning',
 		reference: ['', 'developer', ['network']],
 	},
-	// The one place that decides a version (joshuafolkken/kit#1169). A `script` entry for the same
+	// The one place that decides a version. A `script` entry for the same
 	// reason `ranges` is one: script paths resolve against the kit package root, so it keeps working
 	// from a consumer repository where the file lives under node_modules.
 	release: {
@@ -33,7 +33,7 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Versioning',
 		reference: ['[--dry-run]', 'maintainer', ['git', 'network', 'release']],
 	},
-	// The read-only half of the one above (joshuafolkken/kit#1582). `release --dry-run` cannot
+	// The read-only half of the one above. `release --dry-run` cannot
 	// answer this question: it refuses off the default branch and on a dirty tree, which is every
 	// position a run asks it from. A `script` entry for the same reason `release` is one.
 	'release:scope': {
@@ -42,8 +42,8 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Versioning',
 		reference: ['[--json]', 'automation', ['none']],
 	},
-	// Run by the release workflows, kit's and the one sync distributes, after a tag has published
-	// (joshuafolkken/kit#3007). Settings come from the environment, so the workflow decides them.
+	// Run by the release workflows, kit's and the one sync distributes, after a tag has published.
+	// Settings come from the environment, so the workflow decides them.
 	'release:github': {
 		script: 'scripts/release/github-release-cli.ts',
 		description: 'Create the GitHub Release for a published tag, with generated notes',

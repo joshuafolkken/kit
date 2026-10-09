@@ -1,4 +1,4 @@
-// Trimming a base entry's read set by role (joshuafolkken/kit#2256).
+// Trimming a base entry's read set by role.
 //
 // **A dispatched lane child (the worker) and a `backlogrun` parent (the scheduler) both read a trimmed
 // version of a base entry.** The worker trims `fullrun` (`lane-child-read-set.ts`); the parent trims
@@ -9,8 +9,8 @@
 // skipped point-of-use set.
 //
 // **Deriving off the base entry's own figures keeps each honest** — a row that moves in the base set
-// moves here with it — and leaves the whole of `entry-read-set.ts` untouched (joshuafolkken/kit#2021
-// decided this against reshaping `SKILL.md` itself, which every entry point would have paid for).
+// moves here with it — and leaves the whole of `entry-read-set.ts` and `SKILL.md` untouched, which
+// every entry point would otherwise pay for.
 
 import { document_section } from './document-section'
 import { entry_read_set, type Cost, type FileCost, type ReadSetCost } from './entry-read-set'

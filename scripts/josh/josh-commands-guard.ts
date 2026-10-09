@@ -1,11 +1,11 @@
 import type { CommandEntry } from './josh-command-types'
 
 // The `PreToolUse` guard registry, split out of `josh-commands-ai.ts` so that file stays under its
-// 300-code-line limit, exactly as `LANE_COMMANDS` and `SPLIT_COMMANDS` were for the same reason
-// (joshuafolkken/kit#2162, joshuafolkken/kit#2218, joshuafolkken/kit#2298). It is spread into
+// 300-code-line limit, exactly as `LANE_COMMANDS` and `SPLIT_COMMANDS` were for the same reason.
+// It is spread into
 // `AI_COMMANDS` so the guards stay grouped with the other AI tools.
 //
-// **None declare `tsx_arguments`, for the reason `batch:guard` declares none** (joshuafolkken/kit#1342):
+// **None declare `tsx_arguments`, for the reason `batch:guard` declares none**:
 // declaring any disqualifies a command from in-process dispatch, and these run in front of every read
 // or shell call. Each script calls `process.loadEnvFile` itself instead, through `hook-decision.ts`.
 

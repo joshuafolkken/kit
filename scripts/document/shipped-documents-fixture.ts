@@ -1,14 +1,11 @@
 import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 
-// joshuafolkken/kit#1107: `.claude` is a shipped directory, and Claude Code puts its bridge work
-// trees at `.claude/worktrees/<name>/` — a full checkout of this repository, carrying its own
-// `node_modules`. A flat `readdirSync(recursive: true)` read all of it: the checkout's `docs/`,
-// which the package deliberately does not ship and which is therefore free to quote a command the
-// distribution forbids, and every vendored `CHANGELOG.md` beneath it. `gh-document-guard.test.ts`
-// then failed on files no consumer will ever receive, while its own `scans only what the package
-// ships` assertion still passed — the path that one pins is `docs/sync.md`, and the path being read
-// was `.claude/worktrees/<name>/docs/sync.md`.
+// `.claude` is a shipped directory, and Claude Code puts its bridge work trees at
+// `.claude/worktrees/<name>/` — a full checkout of this repository, carrying its own `node_modules`.
+// A flat `readdirSync(recursive: true)` would read all of it: the checkout's `docs/`, which the
+// package deliberately does not ship and which is therefore free to quote a command the distribution
+// forbids, and every vendored `CHANGELOG.md` beneath it — files no consumer will ever receive.
 //
 // The prune needs a walk of its own, which is why this is not a filter over the flat listing: a
 // recursive listing offers nowhere to stop descending, so a nested checkout is read in full before

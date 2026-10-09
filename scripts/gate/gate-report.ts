@@ -7,7 +7,7 @@ import { gate_log } from './gate-log'
 import { gate_plan } from './gate-plan'
 
 // The gate's console reporting, split out of `verification-gate.ts` so that file stays under its line
-// ceiling while it grows the scoped pre-check and the failure summary (joshuafolkken/kit#2296). Nothing
+// ceiling while it grows the scoped pre-check and the failure summary. Nothing
 // about what is printed changes in the move: the four blocks, the log notice and the verdict come out
 // exactly as before, with one addition — the per-failure action lines below.
 
@@ -25,7 +25,7 @@ interface GateStepResult extends BufferedProcessResult {
 	// What was actually run. The type check's command is resolved per project, so a failure on the
 	// `check` step is only reproducible if the header names the command rather than the label.
 	command: string
-	// Set when the check started past the machine-wide budget at the wait cap (joshuafolkken/kit#3371).
+	// Set when the check started past the machine-wide budget at the wait cap.
 	budget_note?: string | undefined
 }
 
@@ -36,8 +36,7 @@ function is_gate_step_failed(result: GateStepResult): boolean {
 // A passing check's output is not read. What a green gate has to say is "all four passed", and
 // `print_gate_summary` already says it in one line — while the four bodies, vitest's per-file
 // listing among them, run to tens of kilobytes that then sit in the conversation and are re-read on
-// every later turn. The gate runs more than once per Issue, so the cost is per run, not per Issue
-// (joshuafolkken/kit#967).
+// every later turn. The gate runs more than once per Issue, so the cost is per run, not per Issue.
 //
 // A failing check keeps its whole output: that is the one time the body is the answer. So does a
 // check that **passed without running** — `test-unit-guard` exits 0 with a notice when vitest is
@@ -61,8 +60,8 @@ function has_warnings(result: GateStepResult): boolean {
 	return WARNING_MARKERS.some((marker) => result.output.includes(marker))
 }
 
-// The withholding path's counterpart to `has_warnings`, and deliberately narrower than it
-// (joshuafolkken/kit#2318). `has_warnings` is read by `should_print_body`, where a false positive
+// The withholding path's counterpart to `has_warnings`, and deliberately narrower than it.
+// `has_warnings` is read by `should_print_body`, where a false positive
 // costs one printed body — the loose match above is right there. `record_green_gate` reads *this*
 // one, where a false positive is not one printed line but the whole green record withheld, which
 // turns a green gate's `run:review --join` red. So the record is withheld only for a warning from a
@@ -70,7 +69,7 @@ function has_warnings(result: GateStepResult): boolean {
 // from another tool that happens to contain the word — a Vite config deprecation on `test:unit` was
 // the line that stopped a green gate's commit chain.
 //
-// **The safe-chain shim's banner is not the checker's either** (joshuafolkken/kit#2447). Where
+// **The safe-chain shim's banner is not the checker's either**. Where
 // `setup-ci` installed the shims but the binary cannot be reached, every `pnpm` a check spawns prints
 // "Warning: safe-chain is not available …" into that check's output, so a green lint withheld the
 // record on every CI run. The banner's lines are dropped before the match; a real warning on any
@@ -97,7 +96,7 @@ function should_print_body(result: GateStepResult, is_verbose: boolean): boolean
 
 // Seconds to one decimal, which is the resolution the answer is read at: the question a gate's
 // timing answers is "which of the four is the long pole", and no check is ever separated from
-// another by less than a tenth of a second (joshuafolkken/kit#1248).
+// another by less than a tenth of a second.
 const MS_PER_SECOND = 1000
 const SECONDS_DECIMALS = 1
 
@@ -109,8 +108,8 @@ function format_seconds(elapsed_ms: number): string {
 // naming the one command to re-run while fixing (`docs/josh-commands.md` → `josh gate`), and a
 // number spliced in front of it would push that name out of the place a reader scans for it.
 //
-// Built rather than inlined because the log file names each section with the same string
-// (joshuafolkken/kit#1227): a header written twice is a header the two copies can disagree about,
+// Built rather than inlined because the log file names each section with the same string:
+// a header written twice is a header the two copies can disagree about,
 // and the log exists precisely to be read when the console's copy has been elided.
 function gate_step_header(result: GateStepResult): string {
 	const icon = is_gate_step_failed(result) ? FAIL_ICON : PASS_ICON
@@ -127,7 +126,7 @@ function print_gate_step(result: GateStepResult, is_verbose: boolean): void {
 }
 
 // **One line per failed check, naming the command that reproduces it, printed at the tail just above
-// the verdict** (joshuafolkken/kit#2296). A red gate used to report every failing check only in its
+// the verdict**. A red gate used to report every failing check only in its
 // bodies, which is where truncation lands: the run picked one failure at a time across separate gate
 // runs because it could not read the rest. The verdict names *which* checks failed; this names *what
 // to run* for each, and it sits in the same tail window the verdict and the log notice already
@@ -143,8 +142,8 @@ function format_failure_actions(failed: ReadonlyArray<GateStepResult>): string {
 	return `${GATE_COMMAND} — next:\n${lines.join('\n')}\n`
 }
 
-// **A check that started past the core budget is said in the summary, not only in the log**
-// (joshuafolkken/kit#3371). The wait cap admits a check that waited two minutes whatever the budget says,
+// **A check that started past the core budget is said in the summary, not only in the log**.
+// The wait cap admits a check that waited two minutes whatever the budget says,
 // so a gate that ran over-subscribed would otherwise look exactly like one that fitted. The icon is
 // local rather than in `status-icons.ts` because nothing reads this line back.
 const WARN_ICON = '⚠'
@@ -163,7 +162,7 @@ function format_budget_notes(results: ReadonlyArray<GateStepResult>): string {
 // so a sum would report about three times what the caller waited.
 //
 // The failure actions and the log path are printed with the summary and immediately **above** the
-// verdict line, which stays last for the reason `josh-verdict.ts` gives (joshuafolkken/kit#1227).
+// verdict line, which stays last for the reason `josh-verdict.ts` gives.
 function print_gate_summary(
 	results: ReadonlyArray<GateStepResult>,
 	report: GateReport,
@@ -191,7 +190,7 @@ interface GateReport {
 
 // Everything a finished run says, in the order a reader meets it: the four blocks, then the log the
 // blocks may have been elided out of, then the failure actions and the verdict. **Every check's whole
-// output goes into the log, the ones the console dropped included** (joshuafolkken/kit#967).
+// output goes into the log, the ones the console dropped included**.
 function report_gate_steps(
 	results: ReadonlyArray<GateStepResult>,
 	report: GateReport,

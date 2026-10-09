@@ -1,7 +1,6 @@
 import { process_identity, type StartProbes } from './process-identity'
 
-// The pids and start times every suite that exercises a pid-keyed record needs
-// (joshuafolkken/kit#1245).
+// The pids and start times every suite that exercises a pid-keyed record needs.
 //
 // Four suites ask the same three questions of `process_identity` — the in-flight gate marker's two
 // readers, the unit-suite worker share, and the module's own tests — and each had begun spelling the

@@ -5,8 +5,8 @@ import type { CommandEntry } from './josh-command-types'
 
 // `pnpm josh <script command>` started tsx twice — once for this dispatcher, once for the script it
 // spawned. Measured on 2026-09-04, the second start was about 0.16 s of the 0.55 s a
-// `pnpm josh format:edited` took, and the edit/Bash hook pays it 60–90 times in a single run
-// (joshuafolkken/kit#1342). The script is ordinary TypeScript and a TypeScript loader is already
+// `pnpm josh format:edited` took, and the edit/Bash hook pays it 60–90 times in a single run.
+// The script is ordinary TypeScript and a TypeScript loader is already
 // installed by the time this file runs, so the dispatcher evaluates the script itself instead.
 const TYPESCRIPT_EXTENSION = '.ts'
 const JAVASCRIPT_EXTENSION = '.js'
@@ -21,7 +21,7 @@ function is_typescript_dispatcher(dispatcher_url: string): boolean {
 }
 
 // A command marked `is_bundled` is pre-built to `dist/commands/<script basename>.js` by
-// `scripts/build/build-commands.ts` (joshuafolkken/kit#3328). The path is derived here, in a module
+// `scripts/build/build-commands.ts`. The path is derived here, in a module
 // the dispatcher bundle already carries, so the build and the dispatcher cannot name two locations.
 function bundled_script_path(package_directory: string, script: string): string {
 	const name = `${path.basename(script, TYPESCRIPT_EXTENSION)}${JAVASCRIPT_EXTENSION}`

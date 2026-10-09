@@ -1,26 +1,23 @@
 // The environment variables that name the **parent** agent session, and which a child session must
 // not inherit.
 //
-// It lived inside `scripts/eval/eval-session.ts` until `josh run:wake` became a second launcher of a
-// headless session (joshuafolkken/kit#1719). Two copies of this list is the clone `CLAUDE.md`
+// `scripts/eval/eval-session.ts` and `josh run:wake` both launch a headless session. Two copies of
+// this list is the clone `CLAUDE.md`
 // prohibits, and this is the shape of clone that fails silently: the copy that drifts does not throw
 // or lint — the child dials the parent's private socket, is refused, and the session dies as
 // `API Error: Unable to connect to API (ConnectionRefused)` with nothing anywhere naming the cause.
 //
 // `CLAUDE_CODE_MESSAGING_SOCKET` is a UNIX socket only the parent listens on,
 // `CLAUDE_CODE_MESSAGING_TOKEN` is that socket's credential, and the two session identifiers claim
-// the parent's session as the child's own. Measured under joshuafolkken/kit#1158: removing them
-// restored 5/5 held in 54 seconds, and lowering the concurrency — the suspected cause before this one
-// was found — made it worse.
+// the parent's session as the child's own.
 //
 // **`SESSION_ID_KEY` is the name Claude Code exports for the running session's own id** — the base
 // name of that session's transcript file. It is single-sourced here rather than spelled a second time
-// where the cost reader identifies its own transcript by it (joshuafolkken/kit#2403): one env var,
+// where the cost reader identifies its own transcript by it: one env var,
 // one literal, so the list a child must not inherit and the selection that reads it cannot drift.
 const SESSION_ID_KEY = 'CLAUDE_CODE_SESSION_ID'
 
-// The pid of the agent session's own process, which a run hold records as its owner
-// (joshuafolkken/kit#3419).
+// The pid of the agent session's own process, which a run hold records as its owner.
 const AGENT_PID_KEY = 'CLAUDE_PID'
 
 const PARENT_SESSION_KEYS: ReadonlyArray<string> = [
@@ -31,7 +28,7 @@ const PARENT_SESSION_KEYS: ReadonlyArray<string> = [
 ]
 
 // **The second thing a child must not inherit is a proxy that belongs to the invocation which
-// launched it** (joshuafolkken/kit#1760). `pnpm josh run:wake --start` runs under whatever wraps this
+// launched it**. `pnpm josh run:wake --start` runs under whatever wraps this
 // machine's package manager — here a supply-chain scanner, which stands a proxy up on a loopback port
 // and writes `HTTPS_PROXY=http://localhost:<ephemeral>` plus its own CA into the environment of
 // everything that invocation spawns. The supervisor is **detached**, so it outlives that proxy and
@@ -162,7 +159,7 @@ function is_scanner_proxy(source: EnvironmentSource): (value: string | undefined
 	}
 }
 
-// **The proxy half alone, for a spawn that is not a session** (joshuafolkken/kit#2436). kit's `gh`
+// **The proxy half alone, for a spawn that is not a session**. kit's `gh`
 // requests inherited the same loopback proxy, and the scanner behind it tunnels api.github.com
 // without inspecting it — so routing GitHub through it protected nothing and added a failure point:
 // the scanner release installed here marked a host it had once timed out on as dead for the rest of

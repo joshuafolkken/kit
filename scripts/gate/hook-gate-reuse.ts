@@ -4,13 +4,13 @@ import { gate_skip, type GateReuse } from './gate-skip'
 import type { GateTree } from './gate-tree'
 
 // What the two git hooks share when they decline to re-run a check `pnpm josh gate` already passed on
-// this tree (joshuafolkken/kit#1381).
+// this tree.
 //
-// The pre-push hook got this behavior first (joshuafolkken/kit#1334) and the pre-commit type check is
+// The pre-push hook got this behavior first and the pre-commit type check is
 // the second reader of the same record. Everything that is the same in both lives here rather than in
 // each of them: the escape hatch, the pre-filter in front of the record, and the one `git status`
 // reading both narrow themselves from. **The record comparison itself is not here either** — it is
-// `gate_skip.reusable_green_gate`, joshuafolkken/kit#1328's, so a hook cannot answer "is this tree
+// `gate_skip.reusable_green_gate`, so a hook cannot answer "is this tree
 // still the recorded one" differently from the gate printing its answer beside it.
 //
 // **Every condition added here only ever narrows.** The gate's own three — the file map matches, the
@@ -19,7 +19,7 @@ import type { GateTree } from './gate-tree'
 // git operation is about to carry. Where the two can differ, the hook runs the check. Any reading that
 // could not be taken fails the same way: "we could not tell" must never resolve to "no need to check".
 
-// The `josh` targets that decline a check on the strength of this record (joshuafolkken/kit#1786).
+// The `josh` targets that decline a check on the strength of this record.
 //
 // **It is declared beside the mechanism rather than beside the reader.** `josh layers` reports which
 // checks run in more than one layer, and two of the rows it prints are not the repetition they look
@@ -51,13 +51,13 @@ function is_force_requested(force_environment: string): boolean {
 // `undefined` rather than an empty list when the reading failed, so a caller cannot mistake "git said
 // nothing" for "git could not be asked". Every predicate below treats the two differently.
 //
-// **The observation ledger is dropped from the reading, and it is the one line that may be**
-// (joshuafolkken/kit#1756). Lines are appended throughout a run — a review's record lands after its
+// **The observation ledger is dropped from the reading, and it is the one line that may be**.
+// Lines are appended throughout a run — a review's record lands after its
 // gate — and every condition below reads a non-empty status as "this operation carries a tree no
 // check has read". Left in, one ledger line would send every commit and every push in the primary
 // checkout back to the full gate, which is the reuse this module exists to grant. **Dropping it is
 // sound because the ledger is no code any check runs**: `pnpm josh git` stages it with the run's
-// commit only after its grammar has been parsed (joshuafolkken/kit#2763), and the rest of its content
+// commit only after its grammar has been parsed, and the rest of its content
 // is checked by the CI of the pull request that carries it.
 async function read_status_lines(): Promise<ReadonlyArray<string> | undefined> {
 	try {
@@ -93,7 +93,7 @@ interface HookReuse {
 	// The hook-specific narrowing: whether what this git operation carries is the tree the record
 	// describes. `is_worktree_clean` for a push, `is_index_matching_worktree` for a commit.
 	is_tree_carried: boolean
-	// The reason a refusal on that narrowing reports, in the hook's own words (joshuafolkken/kit#3307).
+	// The reason a refusal on that narrowing reports, in the hook's own words.
 	carry_miss: string
 	extra_arguments: ReadonlyArray<string>
 	force_env: string
@@ -105,7 +105,7 @@ interface HookReuse {
 
 // The stamp rather than a boolean, for the same reason `gate_skip.gate_reuse` hands one back: the
 // caller prints `taken_at`, and a record that does not describe this tree has no timestamp worth
-// printing. A refusal carries its reason instead (joshuafolkken/kit#3307).
+// printing. A refusal carries its reason instead.
 //
 // **Any argument at all refuses the reuse**, not only the force flag. A caller who narrowed the run
 // asked for that run rather than for a recorded result about a whole tree, and a hook's own line passes

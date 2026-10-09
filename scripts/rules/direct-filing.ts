@@ -1,11 +1,11 @@
 import { bash_triggers } from './bash-triggers'
 
-// The `direct-filing` row of `delivered-rules.ts` (joshuafolkken/kit#2808). Filing an Issue owes a
+// The `direct-filing` row of `delivered-rules.ts`. Filing an Issue owes a
 // duplicate scout, a body lint, the classification / depth / `route:` labels, a `## Origin` on a
 // cross-repository filing and an `epic:bundle` afterwards — steps spread over as many documents, each
-// with its own guard, and joshuafolkken/kit#2805 ran two of them and skipped the rest. `josh issue:file`
-// runs them all in one command, so a hand-built `gh api …/issues` / `gh issue create` filing is refused
-// outright and pointed there; the step-by-step guards that used to sit on the direct call went with it.
+// with its own guard, so a run can take some and skip the rest. `josh issue:file` runs them all in one
+// command, so a hand-built `gh api …/issues` / `gh issue create` filing is refused outright and
+// pointed there.
 
 const DIRECT_FILING_REASON =
 	'⛔ direct filing: an Issue is filed with `pnpm josh issue:file "<title>" --body-file <path> ' +

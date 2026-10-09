@@ -1,7 +1,7 @@
 import { run_stage } from '#scripts/run/run-stage'
 import type { DecisionOracle } from './decision-oracle'
 
-// The stage-ladder oracle (joshuafolkken/kit#3042), kept beside the enumeration rather than inside it
+// The stage-ladder oracle, kept beside the enumeration rather than inside it
 // because `decision-oracle.ts` sits at its file-size limit. Where a run on an issue starts — and whether
 // the command typed has already been reached — is computed by `run:entry` from the issue and the tree's
 // hold, so the skill's stage table points at the command rather than re-deciding it in prose. The

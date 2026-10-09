@@ -89,7 +89,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// First: a third-party write is stopped before the first-party filing rows count anything.
 	third_party_write.ROW,
 	// The direct call only; `filing-cap` below triggers on `issue:file`. The WIP cap and the fold
-	// question are `issue:file`'s own steps, so no row gates them (joshuafolkken/kit#3423).
+	// question are `issue:file`'s own steps, so no row gates them.
 	direct_filing.ROW,
 	filing_cap.ROW,
 	issue_comments.ROW,

@@ -1,6 +1,6 @@
 import type { CommandEntry } from './josh-command-types'
 
-// The linters for the fixed-shape artifacts a run writes by hand (joshuafolkken/kit#2123). They are
+// The linters for the fixed-shape artifacts a run writes by hand. They are
 // `AI tools` by category, like every other automation command, but live in their own file so
 // `josh-commands-ai.ts` stays under its line ceiling.
 

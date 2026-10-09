@@ -3,16 +3,13 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 
 // A dispatched lane child's interactive ask is refused and routed to the park procedure, delivered at
-// the call it binds on (joshuafolkken/kit#2201).
+// the call it binds on.
 //
-// **This is joshuafolkken/kit#2034's rule, moved one tool-call earlier.** #2034 gave a lane child that
-// stops for a decision the right instruction — park the question on the Issue before it notifies — but
-// wired it to the `confirmation` notify. A child that reaches for `AskUserQuestion` never gets that
-// far: the ask is refused by the harness, the turn ends there, and #2034's guard never fires. Measured
-// on 2026-09-20 inside `backlogrun #2163 --only`: #2178's child hit a Tier B branch, called
-// `AskUserQuestion`, was refused, and died with the question stranded in its exit record's
-// `permission_denials`. So the trigger is the ask itself, not the stop that a routed child would have
-// reached afterward.
+// **This is `lane-park.ts`'s rule, moved one tool-call earlier.** That rule parks the question on the
+// Issue before the `confirmation` notify. A child that reaches for `AskUserQuestion` never gets that
+// far: the ask is refused by the harness, the turn ends there with the question stranded in its exit
+// record's `permission_denials`, and the park guard never fires. So the trigger is the ask itself,
+// not the stop that a routed child would have reached afterward.
 //
 // **A hook denial is guidance, where the harness's own denial is death.** The harness refuses an
 // interactive ask in a headless session by ending the turn; this rule refuses the same call with a

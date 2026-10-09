@@ -4,7 +4,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import type { Change } from './metrics-ratchet'
 
-// The duration half of `josh metrics` (joshuafolkken/kit#3409): the gate, the unit suite, and the
+// The duration half of `josh metrics`: the gate, the unit suite, and the
 // startup of josh and of the guard hook every tool call runs. Performance work waits for a measured
 // problem, so the measurement itself runs on every gate and a slowdown fails it.
 //
@@ -119,7 +119,7 @@ function is_overlapped(span: GateSpan, other: GateSpan): boolean {
 	return other !== span && other.start_ms < span.end_ms && span.start_ms < other.end_ms
 }
 
-// A quiet gate ran beside no whole core of other work at its start or its end (joshuafolkken/kit#3501):
+// A quiet gate ran beside no whole core of other work at its start or its end:
 // another lane's lint, related tests or `ship` are no gate, yet doubled a solo gate's duration. A gate
 // whose load was never read — an older line, a machine that could not be read — is not known quiet.
 function is_quiet(entry: GateEntry): boolean {

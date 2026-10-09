@@ -111,8 +111,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		// **No `tsx_arguments`, deliberately.** `JOSH_BATCH_GUARD` is a per-machine preference kept in
 		// `.env`, which every other command reads through `OPTIONAL_ENV_FILE_FLAGS` — but declaring any
 		// `tsx_arguments` disqualifies a command from in-process dispatch (`josh-in-process.ts`), and
-		// this one runs before every `Bash` call. That is the hot path joshuafolkken/kit#1342 took a
-		// second ~0.16 s tsx start off. The script calls `process.loadEnvFile` itself instead, which is
+		// this one runs before every `Bash` call, where a second ~0.16 s tsx start is not affordable.
+		// The script calls `process.loadEnvFile` itself instead, which is
 		// node's own `--env-file` parser with node's own precedence.
 	},
 	'pretool:guard': {
@@ -153,7 +153,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: ['<pretool|posttool>', 'automation', ['none']],
 		// The live-source fallback `scripts/hooks/run-hook.sh` derives from the `codex-hook-adapter`
-		// bundle name (joshuafolkken/kit#3184). **No `tsx_arguments`**, the same as `pretool:guard`
+		// bundle name. **No `tsx_arguments`**, the same as `pretool:guard`
 		// above: it runs before every guarded Codex call.
 	},
 	'cspell:dot': {

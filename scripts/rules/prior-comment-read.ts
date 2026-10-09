@@ -4,7 +4,7 @@ import { time_shell } from '#scripts/time-runtime/time-shell'
 import { tail_commands } from './tail-commands'
 
 // The stand-down that keeps the `issue-comments` rule from refusing a body read the run has already
-// earned (joshuafolkken/kit#1905). The rule exists so a run reads an Issue's comments before building
+// earned. The rule exists so a run reads an Issue's comments before building
 // on its body — but a run that already read them, and later reads the body again (a post-merge state
 // check, a re-read), was refused a second time for a read it had already made. **The delivery path
 // sees only the raw transcript tail** — `delivered-rules.ts` names the reason the run's own calls are

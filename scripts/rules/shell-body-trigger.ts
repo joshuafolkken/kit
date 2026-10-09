@@ -1,5 +1,5 @@
-// The `shell-body` row's trigger, in a module of its own rather than inside the enumeration
-// (joshuafolkken/kit#1198). Every other row's trigger is already shaped that way — `time_batch_guard`
+// The `shell-body` row's trigger, in a module of its own rather than inside the enumeration.
+// Every other row's trigger is already shaped that way — `time_batch_guard`
 // and `cost_blocks` each hold their own reading of a call — and this one needs a small model of what
 // zsh does inside double quotes, which is more than an enumeration row should carry. The split also
 // gives that model a suite of its own, so a regex change is read beside the cases it has to keep.
@@ -53,8 +53,8 @@ const INLINE_BODY_VALUE = new RegExp(
 	'gu',
 )
 
-// **What zsh evaluates inside double quotes, measured in this harness rather than assumed**
-// (joshuafolkken/kit#1198): a backtick runs as command substitution and a `$` expands. `!` does
+// **What zsh evaluates inside double quotes, measured in this harness rather than assumed**:
+// a backtick runs as command substitution and a `$` expands. `!` does
 // **not** — history expansion is off in a non-interactive zsh, and `"hello!world"` survives intact —
 // so it is deliberately absent: a rule that fired on every exclamation mark would be firing on turns
 // where nothing is wrong, which `prompts/collaboration-workflow/rule-delivery.md` names as worse than
@@ -73,8 +73,8 @@ const WHOLE_VALUE_SUBSTITUTION = new RegExp(`^${SUBSTITUTION}$`, 'u')
 
 // **A backtick inside the substitution voids the exemption.** The exemption's reason is that the
 // *output* is not re-scanned — but the substitution's own command is shell text, and a backtick in it
-// runs exactly as an inline one does. `body="$(echo \`date\`)"` executes `date`, which is the damage
-// joshuafolkken/kit#1198 was filed over, merely written one level in. A nested `$( … )` is the safe
+// runs exactly as an inline one does. `body="$(echo \`date\`)"` executes `date`, which is the inline
+// damage merely written one level in. A nested `$( … )` is the safe
 // spelling of the same composition and stays exempt.
 const BACKTICK = '`'
 
@@ -118,7 +118,7 @@ function is_shell_evaluated_body(command: string): boolean {
 	return false
 }
 
-// **The safe spellings, which is what keeping this rule looks like** (joshuafolkken/kit#1643). They
+// **The safe spellings, which is what keeping this rule looks like**. They
 // are the ones the refusal hands back: the `*-file` flags, a field whose value is a file reference,
 // and `$'…'` quoting. The `*-file` flags cannot reach `INLINE_BODY_VALUE` at all — the note at the top
 // of this file records why — so they are read straight off the command rather than out of a value.

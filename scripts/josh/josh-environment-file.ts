@@ -4,7 +4,7 @@ import { ENV_FILE_NAME } from '#ports'
 //
 // **The flag form is what most commands use, and it is not free.** Declaring any `tsx_arguments`
 // disqualifies a command from in-process dispatch (`josh-in-process.ts`), which puts a second
-// ~0.16 s tsx start in front of every call — the hot path joshuafolkken/kit#1342 took it off. A
+// ~0.16 s tsx start in front of every call. A
 // command a hook fires on every `Bash` call, or one an unattended `epicrun` polls every sixty
 // seconds, cannot pay that, so it reads the file itself instead.
 //

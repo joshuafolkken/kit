@@ -1,7 +1,7 @@
 import path from 'node:path'
 
 // Where `capped-print.ts` writes the parts of an over-cap output, and how a path is recognized as one
-// of them (joshuafolkken/kit#3332). Both halves live here so the writer and the investigation guard,
+// of them. Both halves live here so the writer and the investigation guard,
 // which must not count a read of a part as reading the Issue's subject, share one spelling of the
 // shape — kept free of the writer's own imports, since the guard runs as a hook on every tool call.
 

@@ -20,9 +20,9 @@ function payload_for(file_path: string): string {
 	})
 }
 
-// What Claude Code hands this hook after a shell call, which the matcher covers since
-// joshuafolkken/kit#1337: a command, and no edited path anywhere in the payload. The command edits a
-// file on purpose — an agent working through `sed` is the mode the widening was measured against,
+// What Claude Code hands this hook after a shell call, which the matcher covers: a command, and no
+// edited path anywhere in the payload. The command edits a file on purpose — an agent working
+// through `sed` is the mode the shell matcher exists for,
 // and nothing here may start formatting a path it had to guess at.
 function shell_payload(transcript_path?: string): string {
 	return JSON.stringify({

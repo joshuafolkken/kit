@@ -4,7 +4,7 @@ import { core_budget } from '#scripts/gate/core-budget'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { execa } from 'execa'
 
-// Runs a command while holding a place in the machine-wide core budget (joshuafolkken/kit#2351).
+// Runs a command while holding a place in the machine-wide core budget.
 //
 // **The pre-push hook's `pnpm install` and `pnpm josh audit` are heavy and were outside the ledger.**
 // The gate's checks reserve their cores, but a lefthook `pre-push` fires `pnpm install` on every push
@@ -70,7 +70,7 @@ async function run_reserved(argv: ReadonlyArray<string>): Promise<number> {
 	}
 
 	// **A command already inside a gate's unit suite takes no place, for the reason a nested gate does
-	// not** (joshuafolkken/kit#2351): this repository's own gate tests exercise the wrapper, and a place
+	// not**: this repository's own gate tests exercise the wrapper, and a place
 	// claimed there would wait on cores the outer gate is holding. In its real use — the pre-push hook —
 	// nothing has set the marker, so the reservation is taken.
 	if (unit_worker_share.is_nested_run()) return await run_command(parsed.command)

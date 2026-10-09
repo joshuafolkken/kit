@@ -77,12 +77,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['[options]', 'maintainer', ['none']],
 		// Kit-only: it measures kit's own development runs and its report modules live under the
 		// undistributed `scripts/time/`, so it means nothing in a consumer project and is dropped from a
-		// consumer's help (joshuafolkken/kit#1997). The runtime analysis hooks and guards rely on stays
+		// consumer's help. The runtime analysis hooks and guards rely on stays
 		// distributed under `scripts/time-runtime/`.
 		is_kit_only: true,
 	},
 	// The tool-calls-per-round-trip density the batching guard is measured on, aggregated across the
-	// recent lane sessions (joshuafolkken/kit#2405). Kit-only for the same reason `time` is: it reads
+	// recent lane sessions. Kit-only for the same reason `time` is: it reads
 	// kit's own lane transcripts and means nothing in a consumer project.
 	'time:density': {
 		script: 'scripts/time/time-density-cli.ts',
@@ -99,7 +99,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'maintainer', ['none']],
 		// Kit-only: it reads kit's own development run — the transcript store, the review ledger and the
 		// run event stream — so it means nothing in a consumer project and is dropped from a consumer's
-		// help (joshuafolkken/kit#2328), through the same declaration `josh time` uses for the same reason.
+		// help, through the same declaration `josh time` uses for the same reason.
 		is_kit_only: true,
 	},
 	'review:brief': {
@@ -156,7 +156,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[--join]', 'automation', ['processes', 'files']],
 	},
-	// The post-merge sequence a run closed on, folded into one call (joshuafolkken/kit#2372): commit the
+	// The post-merge sequence a run closed on, folded into one call: commit the
 	// observation ledger, read the completion citations and decide the release scope. `observations:flush`,
 	// `issue:cite` and `release:scope` were three round trips re-billing the run's full context each.
 	'run:tail': {
@@ -166,7 +166,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[<issue> ...]', 'automation', ['git', 'network']],
 	},
-	// The commit-to-report region a run ships a change on, folded into one call (joshuafolkken/kit#2398):
+	// The commit-to-report region a run ships a change on, folded into one call:
 	// the gate, the commit/push/PR (`git -y`), the CI-wait merge (`followup`) and the report bookkeeping
 	// (`run:tail`) were four round trips re-billing the run's full context each. It stops at the first
 	// failed step and names it, so the run reads only the step to fix.
@@ -231,7 +231,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[scenario...]', 'maintainer', ['processes', 'network']],
 		// Kit-only: it replays kit's own distributed rules against real Claude sessions, so it means
-		// nothing in a consumer project and is dropped from a consumer's help (joshuafolkken/kit#1988).
+		// nothing in a consumer project and is dropped from a consumer's help.
 		is_kit_only: true,
 	},
 }

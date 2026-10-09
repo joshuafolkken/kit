@@ -1,17 +1,17 @@
 import { file_reader } from '#scripts/lib/read-file'
 
-// The rewrite half of the edit hook (joshuafolkken/kit#2314). The format hook runs prettier and
+// The rewrite half of the edit hook. The format hook runs prettier and
 // `eslint --fix` in place after every edit, so a file the model just wrote can be rewritten out from
 // under the image the model holds — and the next `Edit` against that stale image misses, then pays for
-// a full re-read that rides every later request. joshuafolkken/kit#2275 built the `additionalContext`
-// path this rides and joshuafolkken/kit#2296 put cspell on it; this returns the fact that the file
+// a full re-read that rides every later request. Riding the same `additionalContext` path as the lint
+// and cspell halves, this returns the fact that the file
 // changed and the region that changed, so the model reissues against current text without re-reading
 // the whole file. Nothing is added when formatting left the file untouched.
 
 // additionalContext rides back on the edit, so the whole notice is cut to this bound rather than let
 // a large reformat balloon the run's context — the notice is a cheaper hint than the full re-read it
 // replaces, and stays cheaper only while it is bounded. The line range leads, so a cut preview still
-// says where to re-read (joshuafolkken/kit#3398).
+// says where to re-read.
 const MAX_REWRITE_CHARS = 600
 const REWRITE_TRUNCATION_NOTICE = '\n…(truncated)'
 // The header names what the block is, since additionalContext arrives with no framing of its own, and

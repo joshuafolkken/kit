@@ -1,8 +1,7 @@
 import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line'
 import { rule_value, type RuleReading } from './rule-value'
 
-// The transcript shapes `rule_value.measure` reads, built once for every suite that scores a rule
-// (joshuafolkken/kit#1867).
+// The transcript shapes `rule_value.measure` reads, built once for every suite that scores a rule.
 //
 // **It exists because a row's own suite needs them as much as the measurement's does.**
 // `rule-value.test.ts` owns how the reading is taken; a rule's own suite owns what that reading says
@@ -32,7 +31,7 @@ function assistant_line(
 // One transcript line carrying one tool call, in the shape `time_transcript_line.parse_line` reads.
 // **It carries no message id, so it is a turn of its own** — the id is what joins lines into one
 // turn, and a fixture sharing one across every call would make every session read as one batched
-// turn (joshuafolkken/kit#1792).
+// turn.
 function call_line(command: string, timestamp: string = TIMESTAMP): string {
 	return assistant_line([tool_use_block(command, 0)], timestamp, time_transcript_line.NO_MESSAGE_ID)
 }

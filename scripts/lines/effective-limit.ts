@@ -3,12 +3,10 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { z } from 'zod'
 
-// joshuafolkken/kit#1454: `pnpm josh lines` asked the project's own eslint how many code lines a file
-// has, and then explained that answer against **kit's** `max-lines` entry. In kit the two are the same
-// object, so nothing showed; in a consumer whose `eslint.config.js` overrides the rule after
-// `create_base_config`, the report and the gate described different limits — and the report was the one
-// that was wrong, while `line-budget.ts` opens by declaring that agreeing with the gate is the whole of
-// its purpose.
+// `pnpm josh lines` asks the project's own eslint how many code lines a file has, and must explain
+// that answer against the same `max-lines` entry. Explained against **kit's** entry, a consumer whose
+// `eslint.config.js` overrides the rule after `create_base_config` would see the report and the gate
+// describe different limits — while agreeing with the gate is the whole of `line-budget.ts`'s purpose.
 //
 // **The limit is therefore asked of the configuration the gate actually applies, per file.** A flat
 // config block can key an override on a `files` pattern, so "the project's limit" is not one number: a
@@ -17,7 +15,7 @@ import { z } from 'zod'
 //
 // **The counting options travel with it, and that is not a widening of the subject.** `skipBlankLines`
 // and `skipComments` decide what a code line *is*, and taking them from kit while taking the count from
-// the consumer's eslint is the same defect wearing a different number. Both now come from the same
+// the consumer's eslint is the same defect wearing a different number. Both come from the same
 // resolved entry, so there is one source rather than two that can disagree.
 //
 // **This is the resolution `eslint --print-config` performs, not a second linter.** `line-budget.ts`
