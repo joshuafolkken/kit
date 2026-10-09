@@ -17,12 +17,13 @@ command:
 next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --owner "$PPID" --output <path>)
 ```
 
-**`pnpm josh run:merge <N>` is the only reading of how a child ended** (joshuafolkken/kit#2024) — never
+**`pnpm josh run:merge <N>` is the only reading of how a child ended** — never
 classify `issue:state` by hand or ask `epic:next` in its place. **Pass `--output <path>`, the child's
 transcript**; the named-epic flags are dropped for the opted-in backlog. It classifies, counts, closes
 the lane and comments itself; act on the token. Rationale:
 `docs/maintainers/backlogrun-progress-rationale.md` → "Why a child's ending is read by `run:merge` alone";
-`docs/maintainers/backlogrun-progress-rationale.md` → "Why a child's ending is classified at once".
+`docs/maintainers/backlogrun-progress-rationale.md` → "Why a child's ending is classified at once";
+provenance of each rule: `docs/maintainers/backlogrun-progress-rationale.md` → "Where each rule came from".
 
 | It prints | What the run does |
 | --- | --- |
@@ -32,7 +33,7 @@ the lane and comments itself; act on the token. Rationale:
 | `over` | Hand the lanes over and take the cut — "The hand-off" below |
 | `human-review` | Stop, leave `in-progress` on; send a `confirmation` only where the child ran in this session's own context (`needs-human-review.md`) |
 | `stop` / `environment` | Report the parked children (or the outage) and stop |
-| `resumed` | `lane:await <N>` it again (joshuafolkken/kit#2484) |
+| `resumed` | `lane:await <N>` it again |
 | `retry` / `busy` | Re-read the child |
 
 **Exit code 1** — a cyclic or unreadable graph: report and finish.
@@ -62,7 +63,7 @@ hand-off check is asked at every merge".
 | exit 1, empty output | Report that the check could not answer, and take `over`'s branch |
 
 **A parent without a completion callback (Codex) dispatches the wave and ends the turn** — `run:step`
-prints the `--cut` (joshuafolkken/kit#2653).
+prints the `--cut`.
 
 **On `over`, read the lanes rather than judging them** — `pnpm josh lane:list` prints each lane's state
 and output path; fill a missing path with `pnpm josh lane:output <N> <path>`:
@@ -72,9 +73,9 @@ and output path; fill a missing path with `pnpm josh lane:output <N> <path>`:
   closed by `pnpm josh lane:prune`.
 - **Every in-flight lane records a path** — count everything, run `pnpm josh run:carry --cut --owner
   "$PPID"`, post the progress comment naming every lane and its path with `pnpm josh run:board`, and end
-  the turn; the `run:wake` driver polls the lanes (#2492). Rationale:
+  the turn; the `run:wake` driver polls the lanes. Rationale:
   `docs/maintainers/backlogrun-progress-rationale.md` → "Why lanes are handed over rather than drained".
-- **`--cut` answers `capped`** (`MAX_CUTS`, joshuafolkken/kit#2346) — **do not `run:wake` or hand off**;
+- **`--cut` answers `capped`** (`MAX_CUTS`) — **do not `run:wake` or hand off**;
   carry this session on and re-ask at the next merge.
 
 The hand-off report's format is `backlogrun-handoff-report.md`. **This is not a failure and not a
@@ -90,7 +91,7 @@ park** — nothing is labelled, stashed or filed.
 **Start no child again and open no lane already open.** In one turn: `pnpm josh lane:list` (every line
 with a path is a handed-over child, polled per `backlogrun-recovery.md` → "A delegated unit that stopped
 without reporting"), `pnpm josh run:progress --wait --output <handed-over paths>` in the background
-(the `run:watcher:guard` enforces it, joshuafolkken/kit#2353), `pnpm josh run:liveness`, and
+(the `run:watcher:guard` enforces it), `pnpm josh run:liveness`, and
 `epic:next --lanes` with a lane for each child it offers. **A carried-over child finishes in its own
 unit — never run its `followup` yourself**; one that did not survive the cut is re-dispatched with
 `pnpm josh lane:open <N>` then `pnpm josh lane:dispatch <N>`, never adopted.
@@ -122,5 +123,5 @@ deadlocked on a cycle is not this loop's to untangle**: `epic:next` detects it a
 **Exactly one session does the end-of-epic work: the one standing in the repository that owns the
 epic** — the start and completion notifications, `josh propagate`, and `pnpm josh release:scope` once
 after the last merge (`followup.md` → "When `pnpm josh release` runs"). **Never compose the summary by
-hand — `pnpm josh run:report` generates it** (joshuafolkken/kit#2249); pass it to `pnpm josh notify
+hand — `pnpm josh run:report` generates it**; pass it to `pnpm josh notify
 --body-file`.

@@ -3,7 +3,8 @@
 Everything between a green CI and a merged PR: the command, the merge it authorizes, the notifications,
 the reviewer scan, the config report and the release ask. `fullrun` and `backlogrun` end here;
 `halfrun` never reaches this file, because it stops before the commit. This file is the single source
-of the rule (joshuafolkken/kit#3176 merged the former post-execution reference into it).
+of the rule. Where each rule came from: `docs/maintainers/followup-rationale.md` → "Where each rule
+came from".
 
 ## Run `pnpm josh followup`
 
@@ -19,10 +20,10 @@ bullets. Use the file option whenever it contains a command or path.
 It waits for required CI, checks CodeRabbit and top-level AI review comments, sends the completion
 Telegram, merges by default, posts the Issue report, closes completed epics, removes `in-progress`,
 and releases the hold. Only `--no-merge` stops the merge; `--merge` is a deprecated no-op. **A pull
-request already merged by hand** (a `prrun` stop, joshuafolkken/kit#3023) skips the CI wait, the AI
-review scan and the merge and runs only the post-merge tail; a completion report already on the Issue
-is not posted or notified twice, so re-running is safe. Keep the default Issue target. Ignore a
-finding only after verifying it is inapplicable; rate-limit text is not a finding.
+request already merged by hand** (a `prrun` stop) skips the CI wait, the AI review scan and the merge
+and runs only the post-merge tail; a completion report already on the Issue is not posted or notified
+twice, so re-running is safe. Keep the default Issue target. Ignore a finding only after verifying it
+is inapplicable; rate-limit text is not a finding.
 
 **A red rate-limited CodeRabbit check is cleared by a retrigger, not a bypass.** Wait out the window
 the rate-limit comment states, post `@coderabbitai review` on the pull request, and rerun `followup`.
@@ -55,7 +56,7 @@ Invoking `fullrun` is itself the explicit authorization to merge; the user adds 
 
 - **Always run `pnpm josh ms` after a successful merge** — it returns the tree to the default branch
   with the merge commit pulled. **In a lane, `pnpm josh lane:close <N>` is the terminal step instead**:
-  git allows one branch per work tree, so `josh ms` refuses there, and the refresh is the parent's.
+  `josh ms` refuses there, and the refresh is the parent's.
 - **Green CI is not authorization to merge while AI review findings are open.** On a blocker
   `followup` sends a `confirmation` Telegram and exits non-zero — fix and re-run. SonarCloud is not
   scanned here; the required `SonarQube` check carries it.
@@ -90,13 +91,12 @@ no longer bumps, so `package.json` names the previous release. What the run does
 ## Reading the stage-timing block
 
 The command closes with one `followup stage: <name> <seconds>` row per stage and a
-`followup stages total:` line (joshuafolkken/kit#1349), so where it spent its time is read, not
-guessed.
+`followup stages total:` line, so where it spent its time is read, not guessed.
 
 - **A failed run prints it too**, up to the stage that threw, named `interrupted` — a short block is
   the run stopping early, not the printer breaking. The `merge` row appears only on a run that merged.
-- **A row named `<a>-and-<b>` is a batch of requests sent together** (joshuafolkken/kit#1446);
-  `checks-wait` is never overlapped, because it is the merge gate.
+- **A row named `<a>-and-<b>` is a batch of requests sent together**; `checks-wait` is never
+  overlapped, because it is the merge gate.
 - **The total is the sum of the stages**, not the wall clock — the post-merge tail (record clears, the
   hold release, the next-issue listing) sits outside it.
 
@@ -116,25 +116,24 @@ posted after CI goes green is not silently shipped.
   N > 0. Rate-limit notices and sign-offs (`All issues resolved ✓`) match nothing.
 - **A standing blocker without `--ai-review-ignore-reason`** sends a `confirmation` Telegram and exits
   non-zero; with it, the reason is posted to the PR and the run proceeds.
-- **A comment listing that could not be read is a standing blocker** (joshuafolkken/kit#973) — never
-  an empty listing that passes.
-- **Temporary (kit#753)**: CodeRabbit is non-blocking end to end — out of the default required checks
+- **A comment listing that could not be read is a standing blocker** — never an empty listing that
+  passes.
+- **Temporary**: CodeRabbit is non-blocking end to end — out of the default required checks
   (restore via `JOSH_REQUIRED_CHECKS`), its actionable count and unreadable line-comment listing are
-  audit notes rather than blockers. Revert together with kit#752.
+  audit notes rather than blockers. When it is reverted:
+  `docs/maintainers/followup-rationale.md` → "The temporary CodeRabbit exemption".
 
 ## Config file reporting
 
 `followup` matches every changed path against what `josh sync` distributes (`AI_COPY_FILES`,
 `AI_COPY_FILE_MAPPINGS`, `AI_COPY_DIRECTORIES`, `SYNCED_PATHS`) and **reports** the claimed paths in the
-completion notification and the Issue report (joshuafolkken/kit#1578). **It stops nothing**
-(joshuafolkken/kit#1592): in kit every skill or prompt change is a distributed path, so a stop here
-only stopped the work its own acceptance criteria ordered. `pnpm josh sync:scope` gives the same
-answer on demand; there is no flag to pass.
+completion notification and the Issue report. **It stops nothing**
+(`docs/maintainers/followup-rationale.md` → "Why config claims are reported, not stopped").
+`pnpm josh sync:scope` gives the same answer on demand; there is no flag to pass.
 
 ## When `pnpm josh release` runs
 
-**The release point is a position plus a command's answer, never a judgement**
-(joshuafolkken/kit#1582).
+**The release point is a position plus a command's answer, never a judgement.**
 
 **The position: once per invocation, after the last merge** — a lone `fullrun`'s only one, a
 `backlogrun`'s **last** child, never once per child. In a lane the parent asks it, in the primary

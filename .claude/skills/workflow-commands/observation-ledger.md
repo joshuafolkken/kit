@@ -1,24 +1,25 @@
 # The observation ledger — grammar, commit path and promotion
 
 **Read only when the depth test in `observation-filing.md` turns an observation away, or a user
-reports a bug** (its kind of miss, below), in the turn that appends the line (joshuafolkken/kit#3176).
+reports a bug** (its kind of miss, below), in the turn that appends the line.
 A run that files outright, or finds nothing, never reads it. This file is the single source of the ledger's grammar, its commit path and the
-second-sighting promotion.
+second-sighting promotion. Provenance: `docs/maintainers/observation-ledger-rationale.md` → "Where
+each rule came from".
 
 ## The ledger — where an observation that cannot cite a blockage goes
 
-**An observation the depth test turns away is recorded in the ledger, not discarded**
-(joshuafolkken/kit#1728). Rationale: `docs/maintainers/observation-ledger-rationale.md` → "Why the
+**An observation the depth test turns away is recorded in the ledger, not discarded.**
+Rationale: `docs/maintainers/observation-ledger-rationale.md` → "Why the
 ledger exists".
 
 - **The destination is the `.josh/observations/` directory in the repository the
   observation is about** — the same repository the Issue would have been filed into — **one file per
-  issue** (joshuafolkken/kit#2919): append to `<N>.md` for the issue the run is executing (the number
+  issue**: append to `<N>.md` for the issue the run is executing (the number
   its branch leads with, a lane's included), or to `<YYYY-MM-DD>.md` for a line written on the
   default branch outside any issue's run. Parallel lanes therefore write different files, and their
   pull requests never conflict on the ledger. **The count and the append are both run in that
   repository's checkout** — in this repository, the work tree the run is in, a lane's inside a lane —
-  resolved the way `target-repository.md` (`target-repository.md`) resolves any cross-repository target, and the
+  resolved the way `target-repository.md` resolves any cross-repository target, and the
   directory is created on the first append where that repository has none. **The subject decides, never the
   working directory**: an observation about this package's own orchestration, seen while a run is
   inside a repository that consumes it, is recorded here rather than there — the append follows the
@@ -87,27 +88,26 @@ could not.
 
 ## The commit path — how an appended line reaches the default branch
 
-**An append nobody commits is an append nobody can count** (joshuafolkken/kit#1756). Rationale:
+**An append nobody commits is an append nobody can count.** Rationale:
 `docs/maintainers/observation-ledger-rationale.md` → "Why the ledger has a commit path".
 
-- **A run's appended lines ride its own commit** (joshuafolkken/kit#2763). `pnpm josh git` stages
+- **A run's appended lines ride its own commit.** `pnpm josh git` stages
   `.josh/observations/` with the run's other changes, in the one staging step every entry
   point goes through (`scripts/git/git-staging.ts`), so the lines are reviewed and merged with the
   pull request of the run that recorded them, and the run's CI is the only wait they cost.
   **Record before the commit, not after the merge:** a finding recorded with `pnpm josh review:record`
   before `pnpm josh git -y` is carried; the time while CI runs is for the records that need no CI
   result — filing an observation Issue, drafting the completion report.
-- **A line that breaks the grammar is not carried** (joshuafolkken/kit#2123). The staging step parses
-  every file of the ledger first — after moving lines still on an old single-file path
-  (joshuafolkken/kit#2724, joshuafolkken/kit#2919) — and on a broken line leaves the ledger out of the
+- **A line that breaks the grammar is not carried.** The staging step parses
+  every file of the ledger first — after moving lines still on an old single-file path — and on a broken line leaves the ledger out of the
   commit and says so; the commit itself goes ahead.
 - **`pnpm josh followup` commits a line appended after the run's commit onto the pull request, before
-  the merge** (joshuafolkken/kit#2919) — a second review round's record is the usual case. After the
+  the merge** — a second review round's record is the usual case. After the
   merge gates and before the CI wait, `followup` reads the tree and, **only when the ledger holds a
   pending append**, stages the ledger paths alone, commits them and pushes the branch; the CI wait
   that follows covers the pushed commit. A broken line refuses the merge, because the line would
   otherwise be lost with the branch. A run whose lines rode its commit pays nothing.
-- **A lane carries its own lines, in its own pull request** (joshuafolkken/kit#2919). Its writers
+- **A lane carries its own lines, in its own pull request.** Its writers
   append to its own tree's `<N>.md`, so the two steps above take them to the default branch exactly as
   they do for a run in the primary checkout. **Nothing is held in the primary checkout for later.**
 - **`pnpm josh observations:flush` is left for a line written outside any issue's run** — the
@@ -118,11 +118,8 @@ could not.
   and refuses a working tree holding anything besides the ledger, so a run in progress cannot be
   flushed out from under. **Nothing is committed to the default branch directly.**
 - **Nothing to flush is an answer, not a failure.** With the ledger matching the commit it sits on
-  the command prints `clean` and exits 0 — most cycles append nothing, and a command that errored
-  there would be one nobody runs.
-- **The count the promotion below reads is a count of the default branch**, which is what this route
-  buys: a ledger line that merged is one every later run, every other machine and every fresh clone
-  can see, and only then can a second sighting be recognized as one.
+  the command prints `clean` and exits 0.
+- **The count the promotion below reads is a count of the default branch.**
 
 ## The second sighting is what files it
 
@@ -148,7 +145,7 @@ Issue, not new ones.
 ## A user-found bug is recorded by its kind of miss (user-found)
 
 **A user-reported bug is fixed or filed as always; this records the *kind of miss* alongside so the
-category never recurs as a first sighting** (joshuafolkken/kit#2246). The key is the **category of
+category never recurs as a first sighting.** The key is the **category of
 oversight** — `k:missed-case-worktree` — so a second bug of the same kind counts against the first.
 **Depth `d1`, never `d0`**: the *kind of miss* is what a run fails to enumerate, which the table puts
 at depth 1. Nothing else changes; the `<what>` field leads with `User-reported:`, and no second

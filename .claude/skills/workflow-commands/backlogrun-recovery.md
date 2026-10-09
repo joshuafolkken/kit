@@ -1,6 +1,6 @@
 # `backlogrun` — recovering a child that went wrong
 
-Point-of-use, read one section at the failure that reaches it (joshuafolkken/kit#3175); the single source of `run:liveness`.
+Point-of-use, read one section at the failure that reaches it; the single source of `run:liveness`.
 
 ## A delegated unit that stopped without reporting
 

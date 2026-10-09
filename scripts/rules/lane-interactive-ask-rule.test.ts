@@ -41,10 +41,9 @@ describe(`${TOPIC_FILE} — the single source for the interactive-ask rule`, () 
 
 	it.each([
 		SECTION,
-		'(joshuafolkken/kit#2201)',
-		// The run the correction rests on, and the earlier rule it completes.
-		'#2178',
-		'joshuafolkken/kit#2034',
+		// Why the ask is refused one call earlier than the notify guard.
+		'the notify guard never fires',
+		'park the question instead',
 		'AskUserQuestion',
 		// The backstop and the shared extractor.
 		'pnpm josh run:ending',

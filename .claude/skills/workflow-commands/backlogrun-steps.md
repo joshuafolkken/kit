@@ -9,16 +9,16 @@ issues, every child of an epic whose root carries it, and a run's own filing onc
 epic:bundle` (Tier A, `observation-filing.md`) has placed it under such a root. **A named issue is
 approved by the keyword and its number, not by `auto-ok`** ("Named issues run first, in order"). What
 runs is stated by the keyword and its arguments, never inferred from a request's shape. **Two repairs
-that would bound this the other way are prohibited** (joshuafolkken/kit#1675) — dropping a run's own
-filings, and requiring a person's `auto-ok` on a child; the brake below bounds it. A Tier C action
-inside a child still stops that child.
+that would bound this the other way are prohibited** — dropping a run's own filings, and requiring a
+person's `auto-ok` on a child; the brake below bounds it. A Tier C action inside a child still stops that child.
 
 **`pnpm josh issue:file` decides the `auto-ok` default and prints it** — `auto-ok: applied` or
 `auto-ok: not applied` with the reason; `scripts/issue/issue-auto-ok.ts` is the single source. **Pass
 `--no-auto-ok` only when the new issue needs a person's judgement** — a Tier B toss-up or a Tier C
 action inside it. The retrospective's filings take the same default and count against the same brake.
 
-Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the authorization boundary is shaped this way"
+Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the authorization boundary is shaped this way";
+provenance of each rule: `docs/maintainers/backlogrun-steps-rationale.md` → "Where each rule came from"
 
 ### The brake that replaces the promise
 
@@ -36,7 +36,7 @@ boundary meet.** `observation-filing.md` points here rather than restating it.
 
 ## Named issues run first, in order
 
-**`backlogrun #N1 #N2 …` runs the named issues before it touches the pool** (joshuafolkken/kit#1984),
+**`backlogrun #N1 #N2 …` runs the named issues before it touches the pool**,
 in the order typed, **one at a time — no lanes**, each as a full `fullrun` in a delegated unit
 (`backlogrun-child.md` → "Each child runs in a delegated unit"); the parent reads each one's state back
 with `pnpm josh issue:state <N>`, never the unit's summary. `pnpm josh backlog:plan #N1 #N2 …` renders
@@ -71,7 +71,7 @@ and `--filed 1`, and **`--cut` is the session's last write**.
 | `began` | Report the plan and run the decision pass |
 | `resumed` | Take the budget from `--json`, report the plan again, read `backlogrun-progress.md` → "Resuming after a cut" |
 | `busy` / `mismatch` / `unreadable` / `unknown` | **Stop; do not open a lane** — report what it printed; never resume into another invocation's record |
-| `over` | **End the conversation**; retype the invocation in a fresh session (joshuafolkken/kit#2760) |
+| `over` | **End the conversation**; retype the invocation in a fresh session |
 | `standing` | **Stop; do not open a lane**: report `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` and `pnpm josh run:carry --end` for the person to choose — a crash from a run-tooling defect this run has since fixed you resume yourself (`upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合") |
 | `expired` | On standard output: report, stop and `--end` it. On standard error ahead of `began`: a new run replaced it |
 
@@ -105,7 +105,7 @@ person, Out of scope) to the person in the session language, with any truncated-
   **Never measure in order to decide**: a question needing a benchmark or a run stays labelled.
 - **A person's judgement** — apply `needs-decision` (`backlogrun-park.md` → "Only a person's judgement
   carries `needs-decision`"); the next plan classifies it by the label alone.
-- **Order and isolate** (joshuafolkken/kit#2776) — a native `blocked-by` where one must land first;
+- **Order and isolate** — a native `blocked-by` where one must land first;
   `run:solo` on all three `backlogrun-lanes.md` → "A solo run" conditions, **every other one `run:lane`**,
   commenting the reason.
 - **`priority:high`** only on a cited ground (a stated deadline, a person's written policy), commented;
