@@ -11,7 +11,6 @@ import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launc
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_liveness } from '#scripts/run/run-liveness'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_output } from './lane-output'
@@ -28,7 +27,6 @@ const ISSUE = '1749'
 const LANE_DIRECTORY = path.join(os.tmpdir(), 'josh-test-lanes', `${ISSUE}-lane`)
 // What the older flow recorded in a lane: the unit's own transcript, a file to read rather than write.
 const RECORDED_TRANSCRIPT = path.join(os.tmpdir(), 'josh-test-session.jsonl')
-const ALIVE_PROCESS = '--process alive'
 // An issue argument carrying a shell injection, refused by both invocation builders before it reaches a
 // command line.
 const INJECTION = '1749; rm -rf /'
@@ -383,12 +381,14 @@ describe('lane_dispatch.describe — what a reader is told to do next', () => {
 		expect(lane_dispatch.describe(no_lane, ISSUE)).toContain(`pnpm josh lane:open ${ISSUE}`)
 	})
 
-	it('matches the child’s command line, not the lane directory its argv omits', async () => {
+	// joshuafolkken/kit#3400: the poll reads the child's process itself, so the parent is no longer
+	// told to run `pgrep` and pass what it saw.
+	it('points the poll at run:liveness without a process trace to pass', async () => {
 		const message = lane_dispatch.describe(await lane_dispatch.dispatch_child(ISSUE), ISSUE)
 
-		expect(message).toContain(`pgrep -laf "${lane_child_invocation.process_pattern(ISSUE)}"`)
-		expect(message).not.toContain(`pgrep -laf ${LANE_DIRECTORY}`)
-		expect(message).toContain(ALIVE_PROCESS)
+		expect(message).toContain(`pnpm josh run:liveness ${ISSUE} --output `)
+		expect(message).not.toContain('pgrep')
+		expect(message).not.toContain('--process')
 	})
 
 	it('never throws, so a warning cannot lose the message it exists to carry', async () => {

@@ -1,4 +1,5 @@
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { run_invocation } from '#scripts/run/run-invocation'
 import { run_issue_number } from '#scripts/run/run-issue-number'
 import { run_carry, type CarryChange, type CarryClaimRequest, type CarryOwner } from './run-carry'
 
@@ -229,12 +230,16 @@ function to_count_request(values: ParsedValues, owner: CarryOwner): Request | un
 // `--begin ""` is a loop whose invocation variable was unset. A record named by nothing is one every
 // other empty `--begin` then reads as its own, which is the cross-run inheritance `classify_claim`
 // exists to refuse — so it is a usage error rather than a record.
+// A `backlogrun` invocation is stored in `run_invocation.rebuild`'s canonical spelling, the one the
+// wake supervisor hands back, so no record is one the wake refuses (joshuafolkken/kit#3400).
 function to_claim_request(
-	invocation: string,
+	typed: string,
 	owner: CarryOwner,
 	is_adoption: boolean,
 ): Request | undefined {
-	if (invocation === EMPTY_INVOCATION) return undefined
+	if (typed === EMPTY_INVOCATION) return undefined
+
+	const invocation = run_invocation.rebuild(typed) ?? typed
 
 	return { kind: 'claim', claim: { invocation, owner, is_adoption } }
 }

@@ -17,7 +17,6 @@ import { review_record, type RecordVerdict } from './review-record'
 
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
-const DATE_END = 10
 const USAGE =
 	'Usage: josh review:record --issue <N> [<category>:<severity>:<file> ...] | josh review:record --check --issue <N>'
 const FILE_HINT = '  <file>: the cited path, optionally with :line'
@@ -108,10 +107,6 @@ function usage_text(): string {
 	].join('\n')
 }
 
-function today(now: Date): string {
-	return now.toISOString().slice(0, DATE_END)
-}
-
 function build_lines(request: Request, date: string): ReadonlyArray<string> {
 	if (request.findings.length === 0) {
 		return [review_finding_ledger.zero_round_line(date, request.issue)]
@@ -161,7 +156,7 @@ async function run_record(parsed: Parsed, now: Date, root: string): Promise<numb
 		return FAILURE_EXIT_CODE
 	}
 
-	const lines = build_lines(request, today(now))
+	const lines = build_lines(request, observation_ledger_home.ledger_date(now))
 	const ledger_path = observation_ledger_home.issue_path(request.issue, root)
 
 	await observation_ledger_home.append(ledger_path, lines)

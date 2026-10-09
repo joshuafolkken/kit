@@ -151,11 +151,10 @@ Lanes work in a cloud container: `pnpm josh lane:open` creates the linked work t
 
 - **Set `JOSH_LANE_LIMIT=2`.** The default of 6 assumes a developer machine.
 - **`pnpm josh run:liveness`'s process detection does not apply** when the thing running a child has
-  no OS process of its own. The command does not look for a process itself — the caller passes
-  `--process alive` or `--process none` after running `pgrep`. Where a child is an execution unit
-  inside one agent process rather than a spawned command, there is nothing for `pgrep` to find, and
-  a `--process none` derived that way says nothing about whether the child is alive. Treat the
-  liveness answer as unavailable there rather than as "no process, therefore dead".
+  no OS process of its own. The command looks for the child's own command line itself; where a
+  child is an execution unit inside one agent process rather than a spawned command, there is
+  nothing for it to find, and the `none` it reads says nothing about whether the child is alive.
+  Treat the liveness answer as unavailable there rather than as "no process, therefore dead".
 
 ## Related
 

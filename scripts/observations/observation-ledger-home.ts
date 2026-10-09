@@ -52,6 +52,12 @@ async function current_branch(cwd: string): Promise<string> {
 	}
 }
 
+// The `<YYYY-MM-DD>` a ledger line carries, and the name of a date file — one spelling for every
+// writer, so a line and the file it lands in never disagree about the day.
+function ledger_date(now: Date): string {
+	return now.toISOString().slice(0, DATE_END)
+}
+
 // **The file a writer that names no issue appends to** — the issue the checked-out branch leads with
 // (`2919-lane`, `2919-store-the-ledger`), so a lane's lines land in its own issue's file; or the date,
 // for a line written on the default branch outside any issue's run, which `pnpm josh
@@ -59,7 +65,7 @@ async function current_branch(cwd: string): Promise<string> {
 async function writer_path(now: Date, cwd: string = process.cwd()): Promise<string> {
 	const issue = git_branch.issue_from_branch(await current_branch(cwd))
 
-	return file_path(issue ?? now.toISOString().slice(0, DATE_END), cwd)
+	return file_path(issue ?? ledger_date(now), cwd)
 }
 
 // A file whose last line has no newline would otherwise run into the next file's first line.
@@ -115,6 +121,7 @@ async function append(target: string, lines: ReadonlyArray<string>): Promise<voi
 const observation_ledger_home = {
 	append,
 	issue_path,
+	ledger_date,
 	ledger_root,
 	read,
 	writer_path,

@@ -156,14 +156,14 @@ The relaunched child is started at the **effort of the phase it resumes into**: 
 Say whether the delegated unit running a child is still working, or stopped without reporting. Two traces decide it: whether the transcript grew, and whether a child process is alive.
 
 ```bash
-pnpm josh run:liveness 1169 --output <path> --process none
-pnpm josh run:liveness 1169 --output <path> --process alive --window 45 --gap 2 --repo joshuafolkken/app-kit
+pnpm josh run:liveness 1169 --output <path>
+pnpm josh run:liveness 1169 --output <path> --window 45 --gap 2 --repo joshuafolkken/app-kit
 ```
 
 **Options:**
 
 - `--output <path>` — absolute, under the home or temp directory; a symlink is followed and size compared as well as mtime.
-- `--process alive | none` — the result of the caller's own `pgrep -laf` against the child's checkout.
+- `--process alive | none` — overrides the process trace, which the command otherwise reads itself: the child's own command line (`fullrun #<N>`) or its detached ship supervisor.
 - `--window <min>` — silent window the file must be frozen for (default 30); `--gap <sec>` — spacing between samples (default 5); `--repo <owner/name>`.
 
 **Output / exit codes:** stdout is one token; stderr explains. `alive`, `stopped`, `settled` exit 0; `undetermined` exits 1. Growth in the transcript answers `alive` on its own. Two `undetermined` answers in a row is a check fault; the caller stops polling rather than escalating to `stopped`.

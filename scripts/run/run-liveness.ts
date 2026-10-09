@@ -52,11 +52,10 @@ type LivenessVerdict =
 	| typeof STOPPED_VERDICT
 	| typeof UNDETERMINED_VERDICT
 
-// The one trace this command cannot read for itself. A process scan that matched too little would
+// The one trace this module does not read for itself. A process scan that matched too little would
 // book a live unit as stopped, and one that matched too much would never detect anything — so the
-// caller runs the `pgrep` the skill specifies against the checkout it handed the unit, and passes
-// what it saw. `unknown` is the default, and a trace nobody gave is an unasked question rather than
-// an answer of "no process".
+// CLI reads it with `lane:await`'s probe, or takes what the caller passed. `unknown` is what a
+// request carries when nobody read it, an unasked question rather than an answer of "no process".
 const PROCESS_ALIVE = 'alive'
 const PROCESS_NONE = 'none'
 const PROCESS_UNKNOWN = 'unknown'
@@ -127,7 +126,7 @@ const STOPPED_CLEAN_ADVICE =
 const STOPPED_DIRTY_ADVICE =
 	'Stash the half-finished work with `git stash push -u -m "backlogrun: stopped unit for #<N>"` and record it on the Issue, then classify how the unit ended with `pnpm josh run:merge <N> --output <path>` (add `--epic <E> --repo <owner/repo> --owner "$PPID"` for a named epic): it re-dispatches an API-outage child (counting the outage; a run of them trips the environment guard) and parks an abandoned child with `needs-decision` against the consecutive-failure guard, without waiting for the unit to return.'
 const UNDETERMINED_ADVICE =
-	'Read the trace that failed and ask again. Where the process trace was never given, run the `pgrep` against the checkout the unit was given and pass `--process alive` or `--process none`. Two of these in a row is a fault in the check itself rather than a slow unit: stop polling and report it.'
+	'Read the trace that failed and ask again. Where the process trace was given as `unknown`, leave `--process` out so the command reads it. Two of these in a row is a fault in the check itself rather than a slow unit: stop polling and report it.'
 
 // Output that moved is a unit that is writing, and it is asked before anything else — it is the one
 // reading that needs no other trace to mean what it says.

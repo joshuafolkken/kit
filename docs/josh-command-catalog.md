@@ -455,6 +455,16 @@ Send Telegram notification
 
 ---
 
+### `josh observation:record`
+
+> **Audience:** automation · **Side effects:** files
+
+`<key> <depth> <where> <what> [--checkout <path>]`
+
+Record an observation sighting and answer whether it is now filed
+
+---
+
 ### `josh observations:flush`
 
 > **Audience:** automation · **Side effects:** git, network

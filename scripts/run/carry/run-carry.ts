@@ -65,8 +65,8 @@ const READ_COMMAND = 'pnpm josh run:carry --json'
 const OWNER_ARGUMENT = '--owner "$PPID"'
 
 interface RunCarry {
-	// The invocation as the person typed it, so a resumed session runs the same command rather than
-	// one it inferred. `CLAUDE.md` → "Explicit invocation required" forbids inferring; naming the
+	// The invocation the person typed — a `backlogrun` one in `run_invocation.rebuild`'s spelling — so
+	// a resumed session runs the same command rather than one it inferred. `CLAUDE.md` → "Explicit invocation required" forbids inferring; naming the
 	// invocation is what leaves nothing to infer. **It is not the ownership test** — that is
 	// `classify_claim` below, for the reason the header gives.
 	invocation: string

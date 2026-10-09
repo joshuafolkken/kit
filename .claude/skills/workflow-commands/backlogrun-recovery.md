@@ -23,9 +23,9 @@ unit was given** — this session's own unless the unit was handed a separate wo
 the recovery below is taken there too.
 
 ```bash
+pnpm josh run:liveness <N> --output <path>
+pnpm josh run:liveness <N> --output <path> --window 45 --repo <owner/repo>
 pnpm josh run:liveness <N> --output <path> --process none
-pnpm josh run:liveness <N> --output <path> --process alive
-pnpm josh run:liveness <N> --output <path> --process none --window 45 --repo <owner/repo>
 ```
 
 | Answer | What it found | What the parent does |
@@ -40,15 +40,16 @@ consecutive `undetermined` on the same child ends the polling: send a `confirmat
 the trace that failed, and stop. **It is never escalated to a `stopped`** — nothing was read.
 
 **Silence and no process together — never either one alone.** **A trace that could not be read answers
-`undetermined`, never `stopped`**, and a process trace nobody gave is an unasked question rather than
-"no process". **Output that moved answers `alive` on its own; a live process is weighed only once every
+`undetermined`, never `stopped`**, and a process the command cannot see is not "no process" — hence
+`--process` for an in-session unit (below). **Output that moved answers `alive` on its own; a live process is weighed only once every
 trace has answered.** Rationale: `docs/maintainers/backlogrun-recovery-rationale.md` → "Why liveness needs
 silence and no process together".
 
 **The path passed to `--output` is absolute** — the command refuses a relative one. **The process
-trace is the one the command does not read for itself**: run it in the unit's checkout and read the
-command lines rather than the names — `pgrep -laf 'josh gate'` etc. — looking for one naming **that
-checkout's path**, since several kit projects may run at once. **Read the file the path points at, not
+trace is read by the command only for a lane child** — its `fullrun #<N>` command line or its detached
+ship; a probe that could not look answers `undetermined`. **A unit delegated inside this session's own
+checkout is no such process: give it `--process`**, from the command lines (not the names) naming
+**that checkout's path**, since several kit projects may run at once. **Read the file the path points at, not
 the link**: a transcript path is a symlink whose own modification time never changes, so a `stat` typed
 by hand needs `-L` (`run:liveness` follows the link itself).
 

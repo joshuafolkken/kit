@@ -2,7 +2,13 @@ import { spawnSync } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
-import { run_liveness } from '#scripts/run/run-liveness'
+import {
+	PROCESS_ALIVE,
+	PROCESS_NONE,
+	PROCESS_UNKNOWN,
+	run_liveness,
+	type ProcessTrace,
+} from '#scripts/run/run-liveness'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_handoff } from './lane-handoff'
 
@@ -24,6 +30,7 @@ const NEVER_APPEARED_TIMEOUT_MS = 600_000
 const MS_PER_SECOND = 1000
 const ISSUE_PATTERN = /^[1-9]\d*$/u
 const PROCESS_FOUND = 0
+const PROCESS_NOT_FOUND = 1
 
 // `is_settled` is read once, when the wait starts: a child that ended between two `lane:await` calls
 // never appears in the second one, and only its settled issue tells it apart from one not yet
@@ -69,16 +76,24 @@ interface RunConfig extends CheckConfig {
 	sleep: (ms: number) => Promise<void>
 }
 
-function is_process_running_default(issue: string): boolean {
+// Three answers, not two: only pgrep's own "no match" exit is `none`. A pgrep that failed or hit its
+// timeout never looked, and `run:liveness` answers `undetermined` for it rather than booking a live
+// child as stopped (joshuafolkken/kit#3400).
+function process_trace_default(issue: string): ProcessTrace {
 	const pattern = lane_child_invocation.process_pattern(issue)
 	const result = spawnSync('pgrep', ['-f', pattern], {
 		encoding: 'utf8',
 		timeout: PROBE_TIMEOUT_MS,
 	})
 
-	if (result.status === PROCESS_FOUND) return true
+	if (result.status === PROCESS_FOUND) return PROCESS_ALIVE
+	if (lane_handoff.is_ship_running(issue, process.cwd())) return PROCESS_ALIVE
 
-	return lane_handoff.is_ship_running(issue, process.cwd())
+	return result.status === PROCESS_NOT_FOUND ? PROCESS_NONE : PROCESS_UNKNOWN
+}
+
+function is_process_running_default(issue: string): boolean {
+	return process_trace_default(issue) === PROCESS_ALIVE
 }
 
 // The same positive evidence `run:liveness` answers `settled` on: the issue closed, or it was parked.
@@ -246,6 +261,7 @@ const lane_await = {
 	check_issue,
 	is_process_running_default,
 	parse_arguments,
+	process_trace_default,
 	wait_for_any,
 }
 

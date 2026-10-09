@@ -93,7 +93,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// `docs/josh-commands-backlog.md`.
 	// joshuafolkken/kit#3278 moved `josh latest` and `josh overrides` — commands a person types — from
 	// the automation page to `docs/josh-commands.md`, which grew one block and the automation page shrank one.
-	{ path: 'docs/josh-commands-automation.md', bytes: 49_152 },
+	// joshuafolkken/kit#3400 raised it: `josh observation:record` replaced the ledger's hand-typed count.
+	{ path: 'docs/josh-commands-automation.md', bytes: 53_248 },
 	// joshuafolkken/kit#3430 raised it: `josh run:board` is a run command and its contract lives here.
 	// joshuafolkken/kit#3433 raised it: `josh run:add` puts an issue into a live run.
 	{ path: 'docs/josh-commands-run.md', bytes: 65_536 },

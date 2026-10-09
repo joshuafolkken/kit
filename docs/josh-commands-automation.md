@@ -331,6 +331,10 @@ pnpm josh measure:rerun 2212
 
 Related: [`josh observations:flush`](#josh-observationsflush), [`josh issue:lint`](josh-commands-backlog.md#josh-issuelint).
 
+### `josh observation:record`
+
+Count a `- k:<key>` sighting across `.josh/observations/`, append it, and print `file` (the second sighting — file it) or `ledger`; earlier sightings go to stderr. A malformed or `k:example` line is refused with exit 1. `--checkout <path>` uses another repository's ledger. The rule: `.claude/skills/workflow-commands/observation-ledger.md`.
+
 ### `josh review:record`
 
 Record a `/code-review` round's findings so they survive the run. It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the issue's own file of the observation ledger (`.josh/observations/<N>.md`, in the work tree the command runs in — a lane's inside a lane) — the same append-only ledger the observation lines use, under a distinct `- rf:` prefix so the `- k:` grammar never treats a finding as its own. It is the one write path for findings.

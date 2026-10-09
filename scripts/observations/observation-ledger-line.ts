@@ -96,6 +96,7 @@ function missing_lines(candidates: ReadonlyArray<string>, ledger: string): Array
 const observation_ledger_line = {
 	broken_ledger_lines,
 	is_ledger_entry_line,
+	line_reason,
 	missing_lines,
 }
 

@@ -52,6 +52,14 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['--task-type <type> --body <text>', 'automation', ['notifications']],
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
+	// One observation-ledger sighting: the key's count, the append and the second-sighting verdict
+	// (joshuafolkken/kit#3400), which a run used to type as a `cat | grep -c` and judge by hand.
+	'observation:record': {
+		script: 'scripts/observations/observation-record-cli.ts',
+		description: 'Record an observation sighting and answer whether it is now filed',
+		category: 'Workflow',
+		reference: ['<key> <depth> <where> <what> [--checkout <path>]', 'automation', ['files']],
+	},
 	// The observation ledger's commit path for the lines no run's own commit carried
 	// (joshuafolkken/kit#1756, joshuafolkken/kit#2763): a lane's lines sit in the primary checkout, which
 	// its commit cannot see, and the recurrence count the promotion rule reads is a count of main.

@@ -62,6 +62,8 @@ const PARKED_LABELS: ReadonlySet<string> = new Set([NEEDS_DECISION_LABEL, ALREAD
 // the rows I was given" is not "no holder". It is grouped with `unreadable` rather than with `idle`
 // because what it authorizes is identical: nothing. It gets its own kind only so the message names
 // the real cause — `unreadable_message` sends a reader to `gh auth status`, which is green here.
+const NO_AGES: ReadonlyMap<number, string> = new Map()
+
 type BusyRead =
 	| { kind: 'idle' }
 	| { kind: 'busy'; issues: ReadonlyArray<OpenIssueData> }
@@ -70,9 +72,25 @@ type BusyRead =
 
 // Named so the reader can go and look at them: the stale-label rule is what keeps an abandoned
 // `in-progress` from holding a repository forever, and it cannot be applied to an issue nobody was
-// told about.
-function format_holders(issues: ReadonlyArray<OpenIssueData>, repo: string): string {
-	return issues.map((issue) => session_cite.issue(issue.number, issue.title, repo)).join(', ')
+// told about. Each holder's label age is printed beside it when the caller read one
+// (joshuafolkken/kit#3400), since the age is what that rule is applied against.
+function format_holder(
+	issue: OpenIssueData,
+	repo: string,
+	ages: ReadonlyMap<number, string>,
+): string {
+	const cite = session_cite.issue(issue.number, issue.title, repo)
+	const age = ages.get(issue.number)
+
+	return age === undefined ? cite : `${cite} (${age})`
+}
+
+function format_holders(
+	issues: ReadonlyArray<OpenIssueData>,
+	repo: string,
+	ages: ReadonlyMap<number, string>,
+): string {
+	return issues.map((issue) => format_holder(issue, repo, ages)).join(', ')
 }
 
 // How many lanes this read shows occupied. Every kind but `busy` is zero, and the two that could not
@@ -88,8 +106,9 @@ function occupancy_message(
 	issues: ReadonlyArray<OpenIssueData>,
 	repo: string,
 	limit: number,
+	ages: ReadonlyMap<number, string> = NO_AGES,
 ): string {
-	return `${String(issues.length)} of ${String(limit)} lanes in use in ${repo}: ${format_holders(issues, repo)}.`
+	return `${String(issues.length)} of ${String(limit)} lanes in use in ${repo}: ${format_holders(issues, repo, ages)}.`
 }
 
 // The occupancy said once, with the consequence appended — rather than a second sentence that
@@ -98,8 +117,9 @@ function lanes_full_message(
 	issues: ReadonlyArray<OpenIssueData>,
 	repo: string,
 	limit: number,
+	ages: ReadonlyMap<number, string> = NO_AGES,
 ): string {
-	return `${occupancy_message(issues, repo, limit)} No lane is free, so nothing is offered here. A lane is released when its child merges or is parked; if a label is stale, remove it and ask again, and \`JOSH_LANE_LIMIT\` is what raises the ceiling.`
+	return `${occupancy_message(issues, repo, limit, ages)} No lane is free, so nothing is offered here. A lane is released when its child merges or is parked; if a label is stale, remove it and ask again, and \`JOSH_LANE_LIMIT\` is what raises the ceiling.`
 }
 
 function unreadable_message(repo: string): string {
@@ -130,8 +150,13 @@ const BUSY_REASONS: Readonly<
 	truncated: truncated_message,
 }
 
-function busy_reason(read: BusyRead, repo: string, limit: number): string {
-	if (read.kind === 'busy') return lanes_full_message(read.issues, repo, limit)
+function busy_reason(
+	read: BusyRead,
+	repo: string,
+	limit: number,
+	ages: ReadonlyMap<number, string> = NO_AGES,
+): string {
+	if (read.kind === 'busy') return lanes_full_message(read.issues, repo, limit, ages)
 	if (read.kind === 'idle') return ''
 
 	return BUSY_REASONS[read.kind](repo)

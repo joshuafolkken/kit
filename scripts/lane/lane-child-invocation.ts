@@ -49,7 +49,8 @@ function resume_invocation(issue: string): string {
 // action if it did not complete.
 //
 // **It ends with `child_invocation` on purpose, not as decoration** — for the same reason
-// `resume_invocation` does: the parent's liveness poll is `pgrep -laf "<invocation>$"`, so the trailing
+// `resume_invocation` does: the parent's liveness read (`run:liveness`, `lane:await`) matches
+// `process_pattern` against the command line, so the trailing
 // `fullrun #<N>` keeps the relaunched process matching, and it is the ordinary run the child carries on.
 function outage_resume_invocation(issue: string): string {
 	const preamble = `Resuming the lane child for issue ${issue_cite.plain(issue)} after an API disconnection — your session was restored with its full context, so do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Continue the run from where it stopped: run \`pnpm josh run:step ${issue}\` to find the next action, redoing only the last step if it did not complete.`

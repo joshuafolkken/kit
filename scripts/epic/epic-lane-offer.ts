@@ -6,6 +6,7 @@ import {
 	type RepoAnswer,
 } from './epic-candidate-confirm'
 import { epic_graph, type EpicChild } from './epic-graph'
+import { epic_label_age } from './epic-label-age'
 import { epic_rank } from './epic-rank'
 import type { EpicVerdict } from './epic-report'
 import { epic_solo } from './epic-solo'
@@ -83,11 +84,24 @@ function offered_notice(
 	children: ReadonlyArray<EpicChild>,
 	read: BusyRead,
 	request: LaneRequest,
+	ages: ReadonlyMap<number, string>,
 ): string {
 	if (children.length === NO_LANES) return withheld_message(request.repo)
 	if (read.kind !== 'busy') return ''
 
-	return epic_busy.occupancy_message(read.issues, request.repo, request.limit)
+	return epic_busy.occupancy_message(read.issues, request.repo, request.limit, ages)
+}
+
+// Each holder's label age, read only when there are holders to print (joshuafolkken/kit#3400) — a
+// timeline request per lane is paid for nothing on a read that names no one.
+async function holder_ages(read: BusyRead, repo: string): Promise<ReadonlyMap<number, string>> {
+	if (read.kind !== 'busy') return new Map()
+
+	return await epic_label_age.read_ages(
+		read.issues.map((issue) => issue.number),
+		repo,
+		new Date(),
+	)
 }
 
 // Two pools that both offered nothing can disagree about why, and the answer has to be the one that
@@ -186,6 +200,7 @@ function solo_offer(
 	answer: { children: ReadonlyArray<EpicChild>; verdict: EpicVerdict },
 	read: BusyRead,
 	request: LaneRequest,
+	ages: ReadonlyMap<number, string>,
 ): LaneOffer {
 	const { offered, notice = '' } = epic_solo.select(answer.children, read, request.repo)
 
@@ -193,7 +208,7 @@ function solo_offer(
 		return { children: [], verdict: WAIT_VERDICT, notice }
 	}
 
-	return { ...answer, children: offered, notice: offered_notice(offered, read, request) }
+	return { ...answer, children: offered, notice: offered_notice(offered, read, request, ages) }
 }
 
 // The repository is asked how full it is **before** any candidate is confirmed, for the reason
@@ -238,18 +253,19 @@ async function offer_for_repo(
 	if (notice !== undefined) console.error(notice)
 
 	const free = free_lanes(read, request.limit)
+	const ages = await holder_ages(read, request.repo)
 
 	if (free === NO_LANES) {
 		return {
 			children: [],
 			verdict: WAIT_VERDICT,
-			notice: epic_busy.busy_reason(read, request.repo, request.limit),
+			notice: epic_busy.busy_reason(read, request.repo, request.limit, ages),
 		}
 	}
 
 	const for_repo = dedupe_pools(pools.map((pool) => ranked_in(pool, request.repo)))
 
-	return solo_offer(await collect(for_repo, wanted_of(request, free)), read, request)
+	return solo_offer(await collect(for_repo, wanted_of(request, free)), read, request, ages)
 }
 
 const epic_lane_offer = {

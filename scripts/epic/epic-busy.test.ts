@@ -199,6 +199,22 @@ describe('epic_busy messages', () => {
 		)
 	})
 
+	// joshuafolkken/kit#3400: the age the stale-label rule is applied against, beside its holder.
+	it('prints a holder with the label age the caller read for it', () => {
+		const ages = new Map([[HOLDER_NUMBER, 'in-progress for 12 min']])
+
+		expect(epic_busy.lanes_full_message([holder()], REPO, LANE_LIMIT, ages)).toContain(
+			`#${String(HOLDER_NUMBER)}`,
+		)
+		expect(
+			epic_busy.busy_reason({ kind: 'busy', issues: [holder()] }, REPO, LANE_LIMIT, ages),
+		).toContain('(in-progress for 12 min)')
+	})
+
+	it('prints a holder alone when no age was read for it', () => {
+		expect(epic_busy.occupancy_message([holder()], REPO, LANE_LIMIT)).not.toContain('in-progress')
+	})
+
 	it('names the repository the read failed for', () => {
 		expect(epic_busy.unreadable_message(REPO)).toContain(REPO)
 	})
