@@ -9,13 +9,12 @@ import { version_targets } from '#scripts/version/version-targets'
 import { z } from 'zod'
 import { release_tag } from './release-tag'
 
-// The stage lines `pnpm josh release` prints, and the two stages it waits for after the tag
-// (joshuafolkken/kit#3193).
+// The stage lines `pnpm josh release` prints, and the two stages it waits for after the tag.
 //
 // **The tag starts the distribution, it does not finish it.** `publish.yml` runs off the tag:
 // `publish-npm` puts the version on npm and `create-release` opens the GitHub Release once the
-// publishing jobs pass. The command used to stop at the tag and call the release published, ahead of
-// both. It now waits for each, prints one line per stage reached, and prints the completion line only
+// publishing jobs pass. Stopping at the tag would call the release published ahead of both, so the
+// command waits for each, prints one line per stage reached, and prints the completion line only
 // when every stage has — a stage that times out is named with ❌ and the run exits non-zero.
 
 const { PACKAGE_JSON } = version_targets

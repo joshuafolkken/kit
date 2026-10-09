@@ -5,12 +5,12 @@ import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { observation_ledger_prepare } from '#scripts/observations/observation-ledger-prepare'
 import { observations_flush } from '#scripts/observations/observations-flush'
 
-// The residual commit path for the observation ledger (joshuafolkken/kit#1810). A run's appended lines
-// ride its own commit (joshuafolkken/kit#2763), so the ledger is usually clean by now and this
+// The residual commit path for the observation ledger. A run's appended lines
+// ride its own commit, so the ledger is usually clean by now and this
 // short-circuits; what it still catches is a line appended after that commit — a second review round's
 // record — which would otherwise stay in the working tree after the merge.
 //
-// **It commits onto the pull request's own branch, before the merge** (joshuafolkken/kit#2919). It used
+// **It commits onto the pull request's own branch, before the merge**. It used
 // to flush after the merge from the default branch, which a lane cannot reach, so a lane's lines
 // waited in the primary checkout for a batch-end flush and were lost there to another run's stash.
 // Committed to the branch instead, the lines merge with the pull request — in a lane as anywhere — and
@@ -24,7 +24,7 @@ function commit_message(issue_number: string | undefined): string {
 		: `${COMMIT_MESSAGE_PREFIX} ${issue_cite.plain(issue_number)}`
 }
 
-// **A broken line refuses the merge rather than riding it** (joshuafolkken/kit#2123): the branch's
+// **A broken line refuses the merge rather than riding it**: the branch's
 // ledger file goes away with the lane, so a line left behind here is a line lost.
 async function assert_grammar(): Promise<void> {
 	const broken = await observation_ledger_prepare.prepare(await git_command.repository_root())

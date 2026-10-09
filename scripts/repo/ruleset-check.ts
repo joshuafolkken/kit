@@ -8,7 +8,7 @@ import { required_checks_logic, type ApiRead, type RequiredSource } from './requ
 import { required_checks_report, type RequiredChecksReport } from './required-checks-report'
 
 // Read a repository's required status checks on its default branch and compare them with the checks
-// kit's distributed workflows report (joshuafolkken/kit#3012). Every read degrades to `unreadable`
+// kit's distributed workflows report. Every read degrades to `unreadable`
 // rather than throwing; the one write, `apply_missing`, runs only on `josh ruleset:check --apply`.
 
 function read_api(api_path: string): string | undefined {

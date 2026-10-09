@@ -2,7 +2,7 @@
 	"scripts": {
 		"files": 1043,
 		"code_lines": 87061,
-		"comment_lines": 33712,
+		"comment_lines": 33535,
 		"comment_ratio": 0.39
 	},
 	"rules": {

@@ -2,8 +2,8 @@
 import { fileURLToPath } from 'node:url'
 import { disposition } from './disposition-logic'
 
-// `josh disposition <path...>` — the machine half of the three-way review disposition
-// (joshuafolkken/kit#2181). It prints `runtime` when any named path reaches a runtime path — a
+// `josh disposition <path...>` — the machine half of the three-way review disposition.
+// It prints `runtime` when any named path reaches a runtime path — a
 // runtime code path, a distributed artifact a consumer reads, or the verification guarding either —
 // and `non-runtime` when every path is inert. `prompts/review.md` → "Three-way disposition after the
 // cap" leaves the run one judgement after this: whether the finding is a confirmed defect.

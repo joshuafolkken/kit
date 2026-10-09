@@ -13,16 +13,16 @@ import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
 // The pull-request writes, through REST.
 //
 // `gh pr create` / `comment` / `merge` / `checkout` all go through GraphQL, which a cloud session is
-// answered 403 for while the REST endpoints are served normally (joshuafolkken/kit#1022). The reads
-// converted first — the ones `gh pr view` served in `git-gh-pr-read.ts` (joshuafolkken/kit#1027) and
-// the merge gate's snapshot in `git-gh-pr-snapshot.ts` (joshuafolkken/kit#1028) — and these are the
+// answered 403 for while the REST endpoints are served normally. The reads
+// converted first — the ones `gh pr view` served in `git-gh-pr-read.ts` and
+// the merge gate's snapshot in `git-gh-pr-snapshot.ts` — and these are the
 // last four calls, plus the one whose API use the epic left unconfirmed.
 //
 // **Every path here was measured against the live API before it was written**, on a throwaway pull
 // request opened between two throwaway branches so that neither `main` nor any real pull request was
 // touched. Two of the four did not behave as reading the documentation would suggest: see
 // `pr_create` for the duplicate-head response. The other, `pr_checkout`, is gone with its one caller,
-// `sync-dependabot-pins` (joshuafolkken/kit#2887).
+// `sync-dependabot-pins`.
 //
 // `pr_checks` — a `gh pr checks <branch>` wrapper — is gone rather than converted. Nothing called it:
 // the merge gate reads the rollup out of the snapshot and `git-pr-checks-watch.ts` runs the watching
@@ -41,7 +41,7 @@ const MERGE_COMMIT_METHOD = 'merge'
 // least idempotent request the layer makes, so the failure the shared 60-second budget produces is
 // the expensive one: a merge that landed while the request was already being abandoned. Three
 // minutes lowers how often that happens without leaving the request unbounded — the recovery below
-// is what actually removes the failure mode, and this only makes it rarer (joshuafolkken/kit#1077).
+// is what actually removes the failure mode, and this only makes it rarer.
 const MERGE_REQUEST_TIMEOUT_MS = 180_000
 // What a failed merge whose outcome could not be read back is reported as. Deliberately neither
 // "merged" nor "not merged": nobody read it.
@@ -102,7 +102,7 @@ async function pr_ensure_classification(
 // `{"message":"Validation Failed","errors":[{"resource":"PullRequest","code":"custom","message":"A
 // pull request already exists for <owner>:<branch>."}]}` — which `gh` writes to **stdout**, putting
 // only `gh: Validation Failed (HTTP 422)` on stderr. The body reaches the thrown Error because
-// `to_gh_error` appends stdout (joshuafolkken/kit#1029); the `already exists` match itself is
+// `to_gh_error` appends stdout; the `already exists` match itself is
 // unchanged, because both wordings contain it and the 422 carries no machine-readable code for the
 // case (`"code":"custom"`).
 async function post_pull_request(title: string, body: string): Promise<string> {
@@ -152,8 +152,8 @@ async function pr_comment(branch_name: string, body: string): Promise<string> {
 
 // Replaces the body of the branch's open pull request. `git -y` opens a pull request once, so a
 // body supplied on a later run — the live-execution evidence `followup` gates the merge on
-// (joshuafolkken/kit#2446) — reaches an already-open one only through this write. The remembered
-// detail read holds the old body, so it is cleared first (joshuafolkken/kit#3263).
+// — reaches an already-open one only through this write. The remembered
+// detail read holds the old body, so it is cleared first.
 async function pr_update_body(branch_name: string, body: string): Promise<void> {
 	const pr_number = await require_pr_number(branch_name)
 
@@ -165,7 +165,7 @@ async function pr_update_body(branch_name: string, body: string): Promise<void> 
 	})
 }
 
-// A merge moves the remembered detail read's state, so it is cleared first (joshuafolkken/kit#3263).
+// A merge moves the remembered detail read's state, so it is cleared first.
 async function put_merge(pr_number: number): Promise<void> {
 	forget_pr_numbers()
 	await git_gh_exec.exec_gh_api({
@@ -177,7 +177,7 @@ async function put_merge(pr_number: number): Promise<void> {
 }
 
 // `undefined` is "nobody read it", kept apart from the `false` that means "the pull request is not
-// merged". Folding the two is the misread joshuafolkken/kit#925 / #950 / #973 / #1048 all refuse.
+// merged". Folding the two would report an unread state as a settled answer.
 async function read_merge_state(pr_number: number): Promise<boolean | undefined> {
 	try {
 		return git_gh_pr_rest.is_merged(await read_pull(pr_number))
@@ -222,13 +222,13 @@ async function has_merge_landed(pr_number: number, merge_error: unknown): Promis
 	throw new Error(MERGE_UNCONFIRMED_MESSAGE, { cause: merge_error })
 }
 
-// **The least idempotent write in this layer, made re-entrant** (joshuafolkken/kit#1077).
+// **The least idempotent write in this layer, made re-entrant**.
 //
-// The request carries a budget like everything else since joshuafolkken/kit#1065, and a merge that
-// lands server-side but overruns it used to throw: `followup` then skipped its completion
-// notification and the epic auto-close, and a re-run answered 405 on a pull request that was already
-// merged. The budget did not create that — before it the same request hung forever, with no
-// notification either and no end to the run — it only turned a silent hang into a loud failure.
+// The request carries a budget like everything else, and a merge that lands server-side but overruns
+// it throws: on its own that would make `followup` skip its completion notification and the epic
+// auto-close, and a re-run answer 405 on a pull request that is already merged. The budget does not
+// create that — without it the same request hangs forever, with no notification either and no end to
+// the run — it only turns a silent hang into a loud failure.
 //
 // **A failed merge request is not proof the merge did not happen**, so the pull request's own state
 // settles it: merged, and this returns as if the request had succeeded, which is what lets

@@ -25,12 +25,12 @@ import { issue_wip } from './issue-wip'
 
 // `josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>]…
 // [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]` — file an Issue
-// with every filing step run in order (joshuafolkken/kit#2808): the third-party refusal, the body
-// lint, the `## Origin` check for another repository, the `auto-ok` decision (joshuafolkken/kit#3213)
-// with the run label it owes (joshuafolkken/kit#3313), the fold question against the run's earlier
-// filings (joshuafolkken/kit#3423), the WIP cap count (joshuafolkken/kit#3181), the
-// duplicate scout, the missing workflow labels created (joshuafolkken/kit#3176), the create call
-// carrying every label, the release link on `--release` (joshuafolkken/kit#3360), and `epic:bundle`.
+// with every filing step run in order: the third-party refusal, the body
+// lint, the `## Origin` check for another repository, the `auto-ok` decision
+// with the run label it owes, the fold question against the run's earlier
+// filings, the WIP cap count, the
+// duplicate scout, the missing workflow labels created, the create call
+// carrying every label, the release link on `--release`, and `epic:bundle`.
 // A direct `gh api …/issues` filing is refused by the `direct-filing` delivered rule and pointed here.
 
 const SUCCESS_EXIT_CODE = 0
@@ -46,7 +46,7 @@ const THIRD_PARTY_MESSAGE =
 // scout and `epic:bundle` make at the target repository rather than at this checkout.
 const GH_REPO_VARIABLE = 'GH_REPO'
 // The open listing `epic:bundle` reads trails the create call, so the issue just filed is looked for
-// again for up to ten seconds before the placement is given up (joshuafolkken/kit#3332).
+// again for up to ten seconds before the placement is given up.
 const FRESH_ISSUE_POLL: PollOptions = { attempts: 6, interval_ms: 2000 }
 
 interface Filing {
@@ -142,8 +142,8 @@ async function is_scout_clear(filing: Filing): Promise<boolean> {
 	return open.length === 0
 }
 
-// Every label the create call carries, or `undefined` when an `auto-ok` filing names neither run label
-// (joshuafolkken/kit#3313). Decided before the WIP count and the scout, so a refusal costs no listing.
+// Every label the create call carries, or `undefined` when an `auto-ok` filing names neither run label.
+// Decided before the WIP count and the scout, so a refusal costs no listing.
 async function labels_of(filing: Filing): Promise<ReadonlyArray<string> | undefined> {
 	const auto_ok = await issue_auto_ok.resolve(
 		filing.args.is_auto_ok_opted_out,
@@ -189,7 +189,7 @@ function issue_number_of(url: string): number {
 	return Number(github_issue_url.parse(url)?.issue_number)
 }
 
-// `--release`: the filed Issue blocks the target's release Issue (joshuafolkken/kit#3360). Reported,
+// `--release`: the filed Issue blocks the target's release Issue. Reported,
 // never failed, for the reason `place` gives. The re-run hint names the target through `GH_REPO`:
 // `issue:release` links in the repository `gh` resolves, which is not the target on a `--repo` filing.
 async function link_release(url: string, filing: Filing): Promise<void> {
@@ -218,7 +218,7 @@ async function place(url: string, target: string): Promise<void> {
 	}
 }
 
-// Every filing lands on the run's event stream (joshuafolkken/kit#3430): this is the one filing path, so
+// Every filing lands on the run's event stream: this is the one filing path, so
 // one append here reaches `run:board` from every route. A filing outside a run lands too and is left
 // out by the board's own scope to the invocation; the append is best-effort, as every emit is.
 async function record(url: string, filing: Filing, labels: ReadonlyArray<string>): Promise<void> {

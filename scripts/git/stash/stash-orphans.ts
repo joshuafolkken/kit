@@ -2,7 +2,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { run_preflight } from '#scripts/run/run-preflight'
 import type { StashEntry } from './git-stash'
 
-// Which stashes nobody is coming back for (joshuafolkken/kit#2505). A parked or paused run pushes its
+// Which stashes nobody is coming back for. A parked or paused run pushes its
 // work with a message `josh stash:pop` later targets, but an issue closed by another route leaves that
 // entry with no run to pop it — the pile #2168 sorted by hand. This reads the owning issue out of each
 // entry's subject so the closed ones, and the ones with no readable owner, can be put in front of a
@@ -72,7 +72,7 @@ function message_issues(subject: string): Array<string | undefined> {
 	return [...hashed, LEADING_PATTERN.exec(subject)?.groups?.['issue']]
 }
 
-// Every issue a subject names, not just its owner (joshuafolkken/kit#2701): `backlogrun: paused #M for
+// Every issue a subject names, not just its owner: `backlogrun: paused #M for
 // prerequisite #N` is tied to both, and the `#N` of a `run:hold reclaimed before #N` entry — which
 // `issue_of` reads as no owner — still names the run the work was found by. A `WIP on` subject is
 // read by its branch alone, for the reason `WIP_PREFIX` records.

@@ -1,8 +1,7 @@
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 
-// When `josh latest` last finished in this checkout, and whether that is recent enough to skip
-// (joshuafolkken/kit#1215).
+// When `josh latest` last finished in this checkout, and whether that is recent enough to skip.
 //
 // `josh latest` is a network-bound chain — pnpm update, every dependency, `ranges`, `pnpm audit` — that
 // took 60–120 seconds at the head of every `fullrun` / `halfrun` and of every child a batch ran, and

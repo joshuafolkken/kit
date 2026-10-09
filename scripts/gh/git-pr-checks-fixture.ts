@@ -9,7 +9,7 @@ import type { PrStateSnapshot, RollupCheck } from './git-pr-checks-parse'
 // default would hide it.
 // Read from the production constant rather than respelled: a fixture that hard-codes the name keeps
 // passing after the name changes, which is the one way these tests could go green over an exemption
-// that no longer matches anything (joshuafolkken/kit#1217).
+// that no longer matches anything.
 const CODE_RABBIT = CODERABBIT_CHECK_NAME
 const SONAR_QUBE = 'SonarQube'
 const MERGE_STATE_CLEAN = 'CLEAN'
@@ -40,7 +40,7 @@ function pending_rollup_snapshot(): PrStateSnapshot {
 
 // Steps through the given snapshots one per poll and reports how many reads were taken, so a test can
 // drive `wait_for_pr_success` through a scripted sequence of poll results. Shared rather than
-// re-declared per suite: a second copy is the clone `CLAUDE.md` prohibits (joshuafolkken/kit#2029).
+// re-declared per suite: a second copy is the clone `CLAUDE.md` prohibits.
 function make_sequence_fetcher(snapshots: ReadonlyArray<PrStateSnapshot>): {
 	count: () => number
 	fetch: () => Promise<PrStateSnapshot>

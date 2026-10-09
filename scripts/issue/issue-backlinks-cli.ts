@@ -7,7 +7,7 @@ import { issue_backlinks, type UpstreamEntry } from './issue-backlinks'
 
 // `josh issue:backlinks <N>` — read origin issue N, then the upstream issues it lists, and print one
 // of `ok` / `missing-origin` / `missing-upstream` / `wrong-heading`, exiting non-zero on anything but
-// `ok` so it works as a gate (joshuafolkken/kit#2123).
+// `ok` so it works as a gate.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1

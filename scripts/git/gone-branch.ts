@@ -1,6 +1,6 @@
 import { git_spawn } from './git-spawn'
 
-// The local branches `josh ms` removes after it syncs (joshuafolkken/kit#2504). The repository
+// The local branches `josh ms` removes after it syncs. The repository
 // deletes a pull request's remote branch at the merge, and nothing removed the local copy: measured on
 // 2026-09-24, 212 of the primary checkout's 244 local branches tracked an upstream that was `[gone]`.
 //
@@ -102,7 +102,7 @@ async function delete_each(names: ReadonlyArray<string>): Promise<PruneResult> {
 
 // `fetch --prune` first, because `[gone]` is read from the remote-tracking refs and those outlive the
 // remote branch until something prunes them. The fetch is the one call here that reaches the remote,
-// so it is the one bounded (joshuafolkken/kit#2942).
+// so it is the one bounded.
 async function prune(default_branch: string): Promise<PruneResult> {
 	await git_spawn.read_remote(['fetch', '--prune'])
 

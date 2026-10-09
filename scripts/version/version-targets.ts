@@ -58,7 +58,7 @@ function read_workspace_version(cwd: string): string | undefined {
 }
 
 // `format_project_version_line` / `project_version_line` lived here and formatted
-// `📦 project version: <v>` for the end of a workflow. Both are gone (joshuafolkken/kit#1486): a
+// `📦 project version: <v>` for the end of a workflow. Both are gone: a
 // child no longer bumps, so the local manifest names the *previous* release rather than what the run
 // ships, and every caller now prints the count of unreleased merges instead
 // (`scripts/followup/git-followup-pending.ts`). Removed rather than left unused, so nothing reaches for
@@ -73,7 +73,7 @@ const version_targets = {
 	project_package_path,
 	read_workspace_version,
 	// The manifest's filename. Exported rather than re-declared in each of `josh release`'s two
-	// halves (joshuafolkken/kit#1169): the module that already owns "where the project's manifest is"
+	// halves: the module that already owns "where the project's manifest is"
 	// is where the name belongs.
 	PACKAGE_JSON,
 }

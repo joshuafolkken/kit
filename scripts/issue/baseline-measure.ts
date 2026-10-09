@@ -1,8 +1,8 @@
 import { markdown_section } from './markdown-section'
 
 // A behavior-change Issue's baseline section is written as `command + value`, never prose, so that
-// `pnpm josh measure:rerun` can re-run the command after merge and print a before/after pair
-// (joshuafolkken/kit#2212). When the value has not moved, the premise the rule rested on is recorded
+// `pnpm josh measure:rerun` can re-run the command after merge and print a before/after pair.
+// When the value has not moved, the premise the rule rested on is recorded
 // as refuted in the observation ledger — reusing that append-only mechanism rather than a second one.
 
 const BASELINE_HEADING = '## ベースライン'

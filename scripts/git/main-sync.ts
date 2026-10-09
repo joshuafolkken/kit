@@ -6,9 +6,9 @@ import { git_command } from './git-command'
 import { gone_branch, type PruneResult } from './gone-branch'
 import { lockfile_sync } from './lockfile-sync'
 
-// `josh main:sync` (`josh ms`) — return this checkout to the default branch and pull
-// (joshuafolkken/kit#1535), then prune the local branches whose merged remote branch is gone
-// (joshuafolkken/kit#2504; the rule for which ones is `gone-branch.ts`).
+// `josh main:sync` (`josh ms`) — return this checkout to the default branch and pull,
+// then prune the local branches whose merged remote branch is gone
+// (the rule for which ones is `gone-branch.ts`).
 //
 // **It refuses inside a linked work tree, and that refusal is the reason this stopped being a
 // one-line `sh -c` entry.** The default branch is a *branch*: advancing it means checking it out
@@ -73,12 +73,12 @@ async function prune_quietly(default_branch: string): Promise<void> {
 	}
 }
 
-// **The local default branch is fast-forwarded before it is checked out** (joshuafolkken/kit#2979).
+// **The local default branch is fast-forwarded before it is checked out**.
 // A run's ledger file is committed on its feature branch and merged; a line appended afterwards leaves
 // it dirty, and git refuses to check out a stale default branch that lacks the file — so `run:tail`'s
-// sync failed exactly when the flush after it had work. Once fast-forwarded, the default branch holds
-// the committed file and the checkout carries the dirty lines over (the same step the flush takes,
-// joshuafolkken/kit#2462). Skipped on the default branch, where `fetch` refuses to update the checked-out
+// sync would fail exactly when the flush after it had work. Once fast-forwarded, the default branch
+// holds the committed file and the checkout carries the dirty lines over (the same step the flush
+// takes). Skipped on the default branch, where `fetch` refuses to update the checked-out
 // ref; a refusal elsewhere — a local default ahead of origin — is left to the checkout and pull to judge.
 async function fast_forward_quietly(default_branch: string): Promise<void> {
 	if ((await git_command.branch()) === default_branch) return
@@ -91,7 +91,7 @@ async function fast_forward_quietly(default_branch: string): Promise<void> {
 }
 
 // A pull that changed the lock leaves `node_modules` behind it, and every `josh` typed in this checkout
-// then fails to load the new dependency (joshuafolkken/kit#3463) — so the install the lock now asks for
+// then fails to load the new dependency — so the install the lock now asks for
 // is part of the sync, and its failure is the sync's. A failed one is retried by the next `ms`.
 async function reinstall(root: string): Promise<number> {
 	const result = await lockfile_sync.reinstall_if_stale(root)
