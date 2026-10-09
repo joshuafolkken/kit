@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1019,
-		"code_lines": 84986,
-		"comment_lines": 33842,
+		"files": 1020,
+		"code_lines": 85068,
+		"comment_lines": 33861,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 560565
 	},
 	"accepted": {
-		"reason": "run:board filed rows lead with the Issue kind (bug, enhancement, breaking change) #3494, merged with #3505 (per-section fit order) and #3489 (per-lane CPU and memory column)",
+		"reason": "run:board filed rows lead with the Issue kind (bug, enhancement, breaking change) #3494, merged with #3495 (spinner-only redraw), #3505 (fixed-order give-way fit) and #3489 (per-lane CPU and memory column)",
 		"date": "2026-10-09"
 	}
 }

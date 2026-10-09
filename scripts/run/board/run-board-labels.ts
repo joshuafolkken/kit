@@ -25,9 +25,10 @@ const BAR_DONE = '■'
 const BAR_LEFT = '─'
 const BAR_DONE_COLOR: TextColor = 'cyan'
 const BAR_LEFT_COLOR: TextColor = 'dim'
-// The spinner a running run and a running row turn (joshuafolkken/kit#3452), four frames a second.
+// The spinner a running run and a running row turn (joshuafolkken/kit#3452), at the package's own
+// interval (joshuafolkken/kit#3495).
 const SPINNER_FRAMES = cli_spinners.dots.frames
-const SPINNER_FRAME_MS = 250
+const SPINNER_INTERVAL_MS = cli_spinners.dots.interval
 // The color depth from which a terminal draws a 24-bit color, and the escapes that draw one.
 const RGB_COLOR_DEPTH = 24
 const ESC = '\u{1B}'
@@ -245,7 +246,7 @@ function bar_of(
 // The spinner's frame at a moment, from the clock rather than a count of redraws, so the frame a redraw
 // draws needs no state carried between redraws.
 function spinner_of(now_ms: number): string {
-	const step = Math.floor(Math.max(0, now_ms) / SPINNER_FRAME_MS)
+	const step = Math.floor(Math.max(0, now_ms) / SPINNER_INTERVAL_MS)
 
 	return SPINNER_FRAMES[step % SPINNER_FRAMES.length] ?? ''
 }
@@ -260,7 +261,7 @@ const run_board_labels = {
 	NOTE_ICONS,
 	PHASE_ICONS,
 	PHASE_WORDS,
-	SPINNER_FRAME_MS,
+	SPINNER_INTERVAL_MS,
 	STATE_ICONS,
 	WAITS_ICON,
 	WORDS,
