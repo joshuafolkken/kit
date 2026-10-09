@@ -10,6 +10,24 @@ and cost pressure resolves it toward "small" exactly when a defect is most likel
 rule an agent applies from memory is a rule an agent can talk itself out of; one it has to run
 answers the same way every time.
 
+What `pnpm josh review:brief --level-only` computes:
+
+| Every changed path is…                                                                   | Level    | Rounds            |
+| ---------------------------------------------------------------------------------------- | -------- | ----------------- |
+| **inert** — `.editorconfig`, `.gitignore`, `LICENSE`, `CHANGELOG.md`, `*.code-workspace` | `low`    | 1                 |
+| anything else                                                                            | `medium` | up to 2 (the cap) |
+
+**One non-inert path decides the whole change.** A review reads the change, not a subset of it, so
+there is no per-file level. An empty diff also takes `medium` — answering `low` to "nothing changed"
+would hand a reduced level to a caller that failed to read the diff.
+
+**Three things that look inert are not.** `.vscode/**`, `.gitattributes` and `.prettierignore` are all
+in `package.json`'s `files` and are written into every consumer project by `josh init` / `josh sync`,
+so a defect in one reaches a consumer and is reviewed at `medium` like any other shipped file.
+
+**Documentation is not inert either.** `CLAUDE.md`, `prompts/**`, `.claude/**` and `docs/**` are all
+reviewed at `medium`, though exempt from _testing_ — the next section.
+
 ## Documentation is reviewed at `medium`
 
 `prompts/review.md` → "Review level"; `prompts/review-rubric.md` → "Severity". The "Non-runtime
@@ -37,6 +55,16 @@ two `skip` arms are the states in which round 1's fix code needs no review — t
 that fix code is otherwise unreviewed (joshuafolkken/kit#1222). A merge-conflict resolution review
 was taken off the count in joshuafolkken/kit#1623: the cap bounds re-reading the change under review,
 and a resolution review reads a different subject.
+
+## The two skip arms
+
+`prompts/review.md` → "When round 2 is skipped entirely, and when it is not". Both `skip` arms are
+states in which round 1's fix code needs no review: **A** — the fix delta is empty, round 1's findings
+closed without an edit; **B** — every path in the fix delta is inert, neither executing, instructing,
+nor shipping. **Neither arm weakens the standard.** A round-1 High/Medium that did not close is not a
+closed finding, so `--round-1-closed` is not passable; the cap is still two rounds; and a confirmed High
+still blocks the merge. A documentation-only fix delta is not inert, so a prompt fix answers
+`required`.
 
 ## The rejected wider skip
 

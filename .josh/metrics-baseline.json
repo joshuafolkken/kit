@@ -1,21 +1,21 @@
 {
 	"scripts": {
 		"files": 1030,
-		"code_lines": 85825,
-		"comment_lines": 34100,
+		"code_lines": 85826,
+		"comment_lines": 34101,
 		"comment_ratio": 0.4
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2344
+		"lines": 2202
 	},
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11121,
-		"on_demand_bytes": 560275
+		"on_demand_bytes": 549458
 	},
 	"accepted": {
-		"reason": "run-event-stream bound orders droppable lines so ship-stage starts and idle lines roll off last, keeping run:board post-ship phases (#3541)",
+		"reason": "#3401 adds the byte-budget entry for the new on-demand document backlogrun-handoff-report.md, split out of report-format.md",
 		"date": "2026-10-09"
 	}
 }

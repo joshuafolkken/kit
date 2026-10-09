@@ -22,6 +22,9 @@ latest 14 days, filings outran closures on every single day. Meanwhile `fullrun`
 about 10 minutes from PR creation to merge, so **throughput was not the problem**. Arrivals kept
 outrunning processing, and with no cap on the open count the growth piled up where nobody saw it.
 
+**The cap is an enforcement device that makes growth visible**, not a goal of fewer Issues. Its only
+job is to make a filing over the cap ask once whether this one Issue is worth adding.
+
 ## Why a filing a run is blocked by is not stopped
 
 Stopping it because of the cap would let a rule meant to reduce production stop execution, leaving

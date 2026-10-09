@@ -94,8 +94,11 @@ const WIP_MARKERS: ReadonlyArray<string> = [
 	'実行が詰まる起票 — 上限が効かない側',
 	'**分割の子がここに入る理由**',
 	'上限を理由に止めない',
-	'**上限は、増加を見えるようにするための強制装置である。**',
 ]
+
+// The cap's purpose is rationale, not procedure, so it is pinned off the read path (joshuafolkken/kit#3401).
+const WIP_RATIONALE = 'docs/maintainers/wip-cap-rationale.md'
+const WIP_RATIONALE_MARKER = '**The cap is an enforcement device that makes growth visible**'
 
 // joshuafolkken/kit#1518 — the third branch. Every marker here pins a load-bearing half of it: the
 // three tests, because without them "is this serious?" is a judgement and the exemption becomes the
@@ -185,6 +188,12 @@ describe(`${WIP_TOPIC} — the WIP cap and all three sides of its procedure`, ()
 	// other stayed pinned.
 	it.each(INTERRUPT_MARKERS)('states the interrupt branch: %j', (marker) => {
 		expect(content).toContain(marker)
+	})
+})
+
+describe(`${WIP_RATIONALE} — why the cap exists`, () => {
+	it('states the cap is an enforcement device, not a goal', () => {
+		expect(read_unwrapped(WIP_RATIONALE)).toContain(WIP_RATIONALE_MARKER)
 	})
 })
 

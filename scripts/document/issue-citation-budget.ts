@@ -66,17 +66,17 @@ const ISSUE_CITATION_BUDGET: ReadonlyArray<CitationBudget> = [
 	{ path: 'prompts/collaboration-workflow/overview.md', citations: 1 },
 	{ path: 'prompts/collaboration-workflow/plan-comment.md', citations: 3 },
 	{ path: 'prompts/collaboration-workflow/principles.md', citations: 1 },
-	{ path: 'prompts/collaboration-workflow/report-format.md', citations: 8 },
+	{ path: 'prompts/collaboration-workflow/report-format.md', citations: 7 },
 	{ path: 'prompts/collaboration-workflow/residency.md', citations: 3 },
 	{ path: 'prompts/collaboration-workflow/rule-delivery.md', citations: 23 },
 	{ path: 'prompts/collaboration-workflow/shell-body.md', citations: 2 },
-	{ path: 'prompts/collaboration-workflow/turn-batching.md', citations: 6 },
+	{ path: 'prompts/collaboration-workflow/turn-batching.md', citations: 4 },
 	{ path: 'prompts/collaboration-workflow/upstream-interrupt.md', citations: 1 },
 	{ path: 'prompts/collaboration-workflow/wip-cap.md', citations: 2 },
 	{ path: 'prompts/refactoring.md', citations: 1 },
 	{ path: 'prompts/review-rubric.md', citations: 1 },
 	{ path: 'prompts/sonar-hotspot-handling.md', citations: 2 },
-	{ path: 'prompts/testing-guide.md', citations: 6 },
+	{ path: 'prompts/testing-guide.md', citations: 3 },
 ]
 
 const BUDGET_FILE = 'scripts/document/issue-citation-budget.ts'
