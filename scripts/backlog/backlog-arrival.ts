@@ -1,5 +1,6 @@
 import { epic_triage } from '#scripts/epic/epic-triage'
 import type { JoshResult } from '#scripts/josh/josh-run'
+import { lane_limit_override } from '#scripts/lane/lane-limit-override'
 import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { run_headless } from '#scripts/run/run-headless'
 import { backlog_next } from './backlog-next'
@@ -73,11 +74,17 @@ interface ArrivalProbe {
 	has_arrived: (now_ms: number) => Promise<boolean>
 }
 
-// Runnable now, not runnable at the start, and a lane free to take it.
-function arrivals(baseline: ReadonlySet<string>, reading: ReadyReading): ReadonlyArray<string> {
+// Runnable now, not runnable at the start, and a lane free to take it. **A raised lane limit makes the
+// whole pool new** (joshuafolkken/kit#3434): the issues the baseline holds were waiting for a lane, and
+// the raise — unlike a merge — wakes nothing else, so the room it made would sit idle until a merge.
+function arrivals(
+	baseline: ReadonlySet<string>,
+	reading: ReadyReading,
+	is_raised: boolean,
+): ReadonlyArray<string> {
 	if (reading.free_lanes <= NO_FREE) return []
 
-	return reading.issues.filter((issue) => !baseline.has(issue))
+	return is_raised ? reading.issues : reading.issues.filter((issue) => !baseline.has(issue))
 }
 
 // The baseline is the whole runnable pool, free lane or not: an issue that was waiting for a lane is not
@@ -136,6 +143,7 @@ function probe_of(
 	initial: ReadonlySet<string> | undefined,
 	first_ms: number,
 	ports: ReadyPorts,
+	is_raised: () => boolean,
 ): ArrivalProbe {
 	let next_ms = first_ms
 	// At most one entry, held in a list so the baseline that answers after an await is added rather than
@@ -153,22 +161,25 @@ function probe_of(
 
 		const reading = await read_reading(ports)
 
-		return reading !== undefined && arrivals(baseline, reading).length > NONE
+		return reading !== undefined && arrivals(baseline, reading, is_raised()).length > NONE
 	}
 
 	return { has_arrived }
 }
 
 // Inert outside a driving `backlogrun` parent — a `fullrun` watcher has no pool to pick from — and there
-// it reads nothing at all.
+// it reads nothing at all. The raise watch starts with the probe, so only a raise after it wakes.
 async function start(
 	now_ms: number,
 	ports: ReadyPorts = ARRIVAL_PORTS,
 	is_parent: () => Promise<boolean> = run_headless.is_backlog_parent,
+	watch_raise: () => Promise<() => boolean> = lane_limit_override.watch_raise,
 ): Promise<ArrivalProbe> {
 	if (!(await is_parent_safely(is_parent))) return INERT
 
-	return probe_of(await read_baseline(ports), now_ms + PROBE_INTERVAL_MS, ports)
+	const is_raised = await watch_raise()
+
+	return probe_of(await read_baseline(ports), now_ms + PROBE_INTERVAL_MS, ports, is_raised)
 }
 
 const backlog_arrival = { PROBE_INTERVAL_MS, answered_issues, arrivals, start }

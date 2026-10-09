@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1009,
-		"code_lines": 83718,
-		"comment_lines": 33576,
+		"files": 1015,
+		"code_lines": 84298,
+		"comment_lines": 33685,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 559397
 	},
 	"accepted": {
-		"reason": "josh output prints session-facing Issue references in the issue:cite form through a single session_cite module routed from every call site, plus its scan test, rationale section and round-1 review fixes (#3424)",
+		"reason": "josh output prints session-facing Issue references in the issue:cite form through a single session_cite module (#3424); merged with #3434 lane:limit override, #3421 guard-friction and investigation-payback retrospective modules, #3422 accepted-value hints, #3480 run:board legend and #3425 prose_lines reuse",
 		"date": "2026-10-09"
 	}
 }

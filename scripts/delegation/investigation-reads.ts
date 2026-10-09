@@ -351,6 +351,7 @@ function should_block(
 }
 
 const investigation_reads = {
+	DELEGATION_TOOLS,
 	INVESTIGATOR_AGENT,
 	READ_TOOLS,
 	REASON,

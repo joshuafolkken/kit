@@ -185,7 +185,7 @@ pnpm josh test:declared --help    # print usage, including the --match stdin for
 
 An unknown flag is refused with the usage rather than ignored, the same convention `josh time` follows.
 
-`--match` checks each `Test: <type> — <path>` declaration on stdin against the change set, printing `match` / `type-mismatch` / `path-missing` / `test-not-created` per line and exiting non-zero on any mismatch.
+`--match` checks each `Test: <type> — <path>` declaration on stdin against the change set, printing `match` / `type-mismatch` / `path-missing` / `test-not-created` per line and exiting non-zero on any mismatch. A path wrapped in a code span, as the template writes it, is read as the path inside it. A `path-missing` line is followed by the changed paths with the same file name, when there are any, and the `report-format.md` section that defines the declaration line's shape.
 
 ### `josh test:red`
 
@@ -573,6 +573,23 @@ pnpm josh backlogrun --agent codex      # start in Codex
 - Closing the board (Ctrl+C) closes only the board; the run goes on, and the board's last line says so. When the run stops for a person, the board prints the `claude --resume <session-id>` that reopens it.
 
 **Output / exit codes:** prints one line naming the started pid, session and log path, then the board's exit code. Bad arguments print the usage and exit 1; an agent that cannot start (a missing or outdated CLI) exits 1 without a board.
+
+### `josh lane:limit`
+
+Change a running `backlogrun`'s lane limit without stopping it. The run keeps the environment it started with, so `JOSH_LANE_LIMIT` cannot change under it; this writes an override onto the run's record, which every lane-limit read takes over the environment.
+
+```bash
+pnpm josh lane:limit 8        # raise or lower the live run's limit to 8
+pnpm josh lane:limit          # print the limit, the lanes in use and the free lanes
+pnpm josh lane:limit --reset  # clear the override; JOSH_LANE_LIMIT applies again
+```
+
+- The next lane allocation uses the new limit. Raising it writes a `lane-limit` event, and the parent's `run:progress --wait` watcher wakes the parent within a minute to fill the freed lanes.
+- Lowering it stops no running child: a lane that finishes is simply not refilled.
+- A limit above the nine port seats is shown and counted at the seats, as `JOSH_LANE_LIMIT` already is. A value that is not a positive integer is refused by the same rule.
+- The override lives and ends with the run (`run:carry --end` removes it). With no run in progress, the command refuses and points at `JOSH_LANE_LIMIT`.
+
+**Output / exit codes:** prints `lane limit <n> (<source>) · in use <n> · free <n>` and exits 0. Bad arguments, an invalid limit or no run in progress exit 1.
 
 ### `josh rule:value`
 

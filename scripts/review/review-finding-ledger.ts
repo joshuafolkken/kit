@@ -160,6 +160,7 @@ const review_finding_ledger = {
 	is_finding_line,
 	is_severity,
 	is_valid_file,
+	SEVERITIES,
 	zero_round_count,
 	zero_round_line,
 }

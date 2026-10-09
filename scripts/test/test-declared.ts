@@ -3,6 +3,7 @@ import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { project_checks } from '#scripts/gate/project-checks'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { report_format_reference } from '#scripts/report/report-format-reference'
 import { test_declared_changed } from './test-declared-changed'
 import { test_declared_logic, type Verdict } from './test-declared-logic'
 import { test_declared_match, type MatchResult } from './test-declared-match'
@@ -21,6 +22,7 @@ import { test_type_logic } from './test-type-logic'
 const CLEAN_EXIT = 0
 const MISMATCH_EXIT = 1
 const MATCH_STATUS = 'match'
+const PATH_MISSING_STATUS = 'path-missing'
 const ARGV_OFFSET = 2
 const NO_DECLARATIONS =
 	'no Test: declarations parsed from stdin — pipe the Step 0 work summary in, e.g. `pnpm josh test:declared --match < summary.md`'
@@ -127,8 +129,23 @@ function run(): void {
 	if (next !== undefined) process.stderr.write(`${next}\n`)
 }
 
-function format_match(result: MatchResult): string {
-	return `${result.status}: ${result.declared_type} — ${result.path}`
+// A `path-missing` line names the changed paths it probably meant and where the declaration's shape is
+// written (joshuafolkken/kit#3422), so the summary is fixed without reading this command's source.
+function path_missing_hints(path: string, changed: ReadonlyArray<string>): ReadonlyArray<string> {
+	const candidates = test_declared_match.path_candidates(path, changed)
+	const shape = `  the declaration line's shape: ${report_format_reference.pointer(report_format_reference.SUMMARY_RULES_HEADING)}`
+
+	if (candidates.length === 0) return [shape]
+
+	return [`  changed with the same file name: ${candidates.join(', ')}`, shape]
+}
+
+function format_match(result: MatchResult, changed: ReadonlyArray<string> = []): string {
+	const line = `${result.status}: ${result.declared_type} — ${result.path}`
+
+	if (result.status !== PATH_MISSING_STATUS) return line
+
+	return [line, ...path_missing_hints(result.path, changed)].join('\n')
 }
 
 // The exit code the match run leaves: clean only when every declaration matched, so it gates. A
@@ -143,7 +160,7 @@ function run_match(summary: string, changed: ReadonlyArray<string>): number {
 		return MISMATCH_EXIT
 	}
 
-	for (const result of results) process.stdout.write(`${format_match(result)}\n`)
+	for (const result of results) process.stdout.write(`${format_match(result, changed)}\n`)
 
 	return results.every((result) => result.status === MATCH_STATUS) ? CLEAN_EXIT : MISMATCH_EXIT
 }
