@@ -4,14 +4,14 @@ import { git_gh_exec } from './git-gh-exec'
 import { read_pull, require_pr_number } from './git-gh-pr-read'
 import { git_gh_pr_rest, type RestPull } from './git-gh-pr-rest'
 
-// Auto-merge for a pull request a josh command opens and would otherwise have to stay alive to land
-// (joshuafolkken/kit#2497). `pnpm josh observations:flush` used to merge its pull request only from
+// Auto-merge for a pull request a josh command opens and would otherwise have to stay alive to land.
+// `pnpm josh observations:flush` used to merge its pull request only from
 // inside its own wait, so a wait that ended early — a session cut, a killed process — left a green
 // pull request open with nobody to merge it.
 //
 // **This is the one GraphQL request in the pull-request layer, because REST has no equivalent.**
 // Enabling auto-merge is `enablePullRequestAutoMerge` and nothing else. A cloud session can be
-// answered 403 for GraphQL (joshuafolkken/kit#1022), so the caller treats a failure here as a lost
+// answered 403 for GraphQL, so the caller treats a failure here as a lost
 // safety net rather than a failed command — the in-process wait still merges as it always did.
 
 const GRAPHQL_PATH = 'graphql'

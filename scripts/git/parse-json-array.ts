@@ -19,8 +19,7 @@ function parse_json_loose(raw_json: string): unknown {
  * Malformed JSON yields undefined, so a caller can tell it apart from an empty listing.
  *
  * `parse_json_array_safe` answers `[]` for both, which reads as "there is nothing" — and a command
- * that acts on that reports a confident absence built on a response it could not parse
- * (joshuafolkken/kit#950).
+ * that acts on that reports a confident absence built on a response it could not parse.
  */
 function parse_json_array_or_undefined<T>(
 	raw_json: string,
@@ -37,7 +36,7 @@ function parse_json_array_or_undefined<T>(
 
 // What one listing read produced. The two gaps are deliberately apart: JSON that is not a listing at
 // all is an access or connectivity problem, while elements the schema rejects mean the tool's fields
-// changed — and those send a reader to two different places (joshuafolkken/kit#996). A caller that
+// changed — and those send a reader to two different places. A caller that
 // treats them the same still reads them from here rather than writing the try/catch again.
 type ListingRead<T> =
 	{ kind: 'read'; rows: Array<T> } | { kind: 'unreadable' } | { kind: 'unexpected_shape' }
@@ -47,7 +46,7 @@ type ListingRead<T> =
  *
  * The rethrow `parse_json_array_or_undefined` performs is the whole point, and every caller that
  * wants both gaps named was catching it itself — the `auto-ok` pickup and `epic:next`'s
- * repository-level busy check wrote the same six lines (joshuafolkken/kit#925).
+ * repository-level busy check wrote the same six lines.
  */
 function read_json_listing<T>(raw_json: string, element_schema: z.ZodType<T>): ListingRead<T> {
 	try {
@@ -66,7 +65,7 @@ function read_json_listing<T>(raw_json: string, element_schema: z.ZodType<T>): L
  * Deliberately **not** `parse_json_array_or_undefined(...) ?? []`, near-identical though the bodies
  * are. The two differ on the branch that matters: valid JSON that is not an array throws here, so a
  * `gh` field that changed shape stays visible, while the variant above reads it as a gap. Folding
- * them together silences that throw for every existing caller (joshuafolkken/kit#950).
+ * them together silences that throw for every existing caller.
  */
 function parse_json_array_safe<T>(raw_json: string, element_schema: z.ZodType<T>): Array<T> {
 	const value = parse_json_loose(raw_json)

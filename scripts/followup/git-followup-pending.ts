@@ -3,13 +3,11 @@ import { release_history, type HistoryReader } from '#scripts/release/release-hi
 import { release_plan } from '#scripts/release/release-plan'
 import { version_targets } from '#scripts/version/version-targets'
 
-// What the completion notification says about versions, now that children do not set one
-// (joshuafolkken/kit#1486).
+// What the completion notification says about versions, now that children do not set one.
 //
-// **It used to read `package.json` and print `📦 project version: <v>`.** While every child ran
-// `pnpm josh bump minor` that value was this run's shipping version. Children no longer bump — the
-// version is decided from main's history by `pnpm josh release` — so the same read now returns the
-// **previous** release, and printing it presents an unconfirmed shipping version as a fact.
+// **It does not print the `package.json` version.** Children do not bump — the version is decided
+// from main's history by `pnpm josh release` — so that read returns the **previous** release, and
+// printing it presents an unconfirmed shipping version as a fact.
 //
 // **What goes out instead is the number a release is made of**: how many merges main has taken since
 // the version last changed. It is the count `pnpm josh release` itself acts on, taken from that
@@ -23,7 +21,7 @@ import { version_targets } from '#scripts/version/version-targets'
 // passes `false` and carries no note, because by then the merge is on the remote and the fetch below
 // brings it in; `git-followup-finish.ts` is that caller, so **both branches of this flag
 // are live**. What a run *does* about the count is `pnpm josh release:scope`, asked after the merge,
-// which reads `read_pending` below rather than this line (joshuafolkken/kit#1582).
+// which reads `read_pending` below rather than this line.
 const MERGE_PENDING_NOTE = "— this run's merge is not counted; it lands next"
 
 interface PendingReadOptions {
@@ -34,7 +32,7 @@ interface PendingReadOptions {
 	tip?: string
 }
 
-// **The note belongs to the line, not to the count** (joshuafolkken/kit#1582). `read_pending`
+// **The note belongs to the line, not to the count**. `read_pending`
 // returns a number and has no sentence to annotate, so `pnpm josh release:scope` — which wants the
 // number alone — would otherwise have to pass a flag about wording it never prints.
 interface PendingLineOptions extends PendingReadOptions {
@@ -46,7 +44,7 @@ interface PendingLineOptions extends PendingReadOptions {
 // merge main took after the branch was cut is not even an ancestor, so the number would be silently
 // low and the line still say "on main". Fetching first is what makes it current, which is also what
 // lets the post-merge console line — and `pnpm josh release:scope`, asked from a lane or a feature
-// branch — count the merge that just landed (joshuafolkken/kit#1582).
+// branch — count the merge that just landed.
 async function read_tip(options: PendingReadOptions): Promise<string> {
 	if (options.tip !== undefined) return options.tip
 

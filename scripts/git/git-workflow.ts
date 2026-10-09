@@ -189,7 +189,7 @@ function build_commit_message(
 }
 
 // The file form exists because the PR body now carries a live-execution evidence section of commands
-// and their output (joshuafolkken/kit#2446) — text an inline double-quoted `--body` would have the shell
+// and their output — text an inline double-quoted `--body` would have the shell
 // evaluate first. Resolved through `cli_body`, the shared reader every `*-file` flag uses.
 function resolve_pr_body(values: CliArguments['values']): string | undefined {
 	return cli_body.resolve({

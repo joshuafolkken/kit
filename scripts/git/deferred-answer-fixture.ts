@@ -1,4 +1,4 @@
-// A promise whose answer is given by the caller (joshuafolkken/kit#1446).
+// A promise whose answer is given by the caller.
 //
 // **What it is for**: asking what a run had *already issued* while one request was still outstanding.
 // Concurrency is not observable from a duration — a lap measured on a mocked call is not a fact about

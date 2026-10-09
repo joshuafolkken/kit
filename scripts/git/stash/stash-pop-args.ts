@@ -3,7 +3,7 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 // `josh stash:pop` turns its `argv` into a single request: the message of the stash to pop. Parsing
 // lives here, acting on the stack lives in `stash-pop-cli.ts`, and a malformed command line is
 // `undefined` rather than a guessed intent — a pop run on a misread argument would take the wrong
-// entry off a stack shared by every lane (joshuafolkken/kit#2050).
+// entry off a stack shared by every lane.
 
 const USAGE = 'Usage: josh stash:pop "<message>" [--dir <path>]'
 

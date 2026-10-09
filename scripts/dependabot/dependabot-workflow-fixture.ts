@@ -7,7 +7,7 @@ import {
 // The two copies of the auto-merge workflow. They diverge on purpose: in kit
 // `.github/workflows/*` IS the source every action pin is resolved from, so a bump merged here is
 // the update every consumer then receives, while in a consumer the same files are rewritten from
-// the installed kit package on the next `josh sync` (joshuafolkken/kit#836).
+// the installed kit package on the next `josh sync`.
 const TEMPLATE = 'templates/workflows/dependabot-auto-merge.yml'
 const RUNTIME = '.github/workflows/dependabot-auto-merge.yml'
 const JOB = 'auto-merge'
@@ -23,15 +23,15 @@ const MERGE_COMMAND = 'gh pr merge --auto --merge'
 const METADATA_STEP_ID = 'metadata'
 const MANAGED_STEP_ID = 'managed'
 // Named for the question it answers: whether some upstream package overwrites one of the workflows
-// in the diff. kit is one such package, but a repository can receive workflows from more than one
-// (joshuafolkken/kit#844), so the decision is not kit's alone.
+// in the diff. kit is one such package, but a repository can receive workflows from more than one,
+// so the decision is not kit's alone.
 const MANAGED_OUTPUT = 'has-upstream-managed'
 const RECONCILE_STEP_ID = 'reconcile'
 
 // The decision, and where it lives. It is an `env` value rather than a step condition because a
 // condition gates a step while this has to be a *value* the reconciling script reads — and it stays
 // an expression rather than shell so that GitHub's own engine evaluates it and these guards can
-// evaluate the very same string (joshuafolkken/kit#845).
+// evaluate the very same string.
 const DECISION_VARIABLE = 'SHOULD_BE_ARMED'
 // The narrower half: whether this *run* may decide at all, as opposed to whether this *bump*
 // qualifies. The withdrawal keys on this one, so a bump that merely falls outside the policy — an
@@ -44,8 +44,8 @@ const EXPRESSION_OPEN = '${{'
 const EXPRESSION_CLOSE = '}}'
 
 // The concurrency both copies declare. `github.ref` is the pull request's own merge ref, so the
-// group is per pull request: a superseded run is cancelled without one bump delaying another's
-// (joshuafolkken/kit#842). Declared once here so the two copies cannot drift into different
+// group is per pull request: a superseded run is cancelled without one bump delaying another's.
+// Declared once here so the two copies cannot drift into different
 // groupings, which would leave one of them running its bumps in parallel while its guard passed.
 const CONCURRENCY_GROUP = '${{ github.workflow }}-${{ github.ref }}'
 
@@ -58,7 +58,7 @@ const HEAD_SHA_EXPRESSION = '${{ github.event.pull_request.head.sha }}'
 const DEPENDABOT_LOGIN = 'dependabot[bot]'
 const MAINTAINER_LOGIN = 'joshuafolkken'
 // The job gate both copies share: who opened the pull request, which a maintainer's push to the
-// branch does not change (joshuafolkken/kit#838, joshuafolkken/kit#3268).
+// branch does not change.
 const AUTHOR_GATE = `${workflow_expression_fixture.GITHUB_CONTEXT}.event.pull_request.user.login == '${DEPENDABOT_LOGIN}'`
 
 // The metadata outputs the conditions address, and the values Dependabot publishes in them. Spelled
@@ -95,7 +95,7 @@ function managed_gate(has_kit_managed: boolean): string {
 
 // The one gate left on a step. Everything about *which* updates may arm now lives in the decision
 // expression; this only decides whether the reconciling step runs at all, and it runs whenever the
-// pull request could still be carrying state to correct (joshuafolkken/kit#845).
+// pull request could still be carrying state to correct.
 const NOT_CANCELLED = '!cancelled()'
 
 // Mirrors the `github.<field>` and `steps.<id>.outputs.<name>` shapes the workflow reads, so every

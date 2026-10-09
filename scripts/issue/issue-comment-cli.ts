@@ -6,7 +6,7 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 
 // `josh issue:comment <N> --body <text> | --body-file <path>` — post one comment to an issue (a PR
-// comment is an issue comment over REST) and print the comment URL (joshuafolkken/kit#2304).
+// comment is an issue comment over REST) and print the comment URL.
 //
 // **The write side had no command, so every park, decision record and plan comment fell to a raw
 // `gh api … body=@<path>`.** The read side already had `issue:read` / `issue:state` / `issue:cite` /
@@ -29,7 +29,7 @@ interface CommentRequest {
 	body: string
 }
 
-// The read is strict (joshuafolkken/kit#3261): an unknown flag refuses the call rather than being
+// The read is strict: an unknown flag refuses the call rather than being
 // ignored. `cli_body.resolve` owns the both-flags-at-once refusal and the file read.
 const OPTIONS = { body: { type: 'string' }, 'body-file': { type: 'string' } } as const
 

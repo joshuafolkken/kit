@@ -1,8 +1,6 @@
-// The change handed to the reviewer as files no larger than the Bash output cap
-// (joshuafolkken/kit#2963). The brief used to name the whole change as one `git diff` and the rubric
-// as one path, and the forked reviewer printed both through Bash: every print past
-// `BASH_MAX_OUTPUT_LENGTH` came back as a truncated preview plus a saved file it then re-read, and both
-// stayed in the cached prefix of every later request — 120 overflows and 68 re-reads in one review.
+// The change handed to the reviewer as files no larger than the Bash output cap.
+// A print past `BASH_MAX_OUTPUT_LENGTH` comes back as a truncated preview plus a saved file the
+// reviewer then re-reads, and both stay in the cached prefix of every later request.
 //
 // **The diff is split, not shortened.** Each changed path gets its own parts, every part fits under the
 // cap, and the parts of one path concatenate back to exactly its diff — so the scope a review covers

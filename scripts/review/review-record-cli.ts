@@ -6,13 +6,13 @@ import { review_finding_ledger, type Finding } from './review-finding-ledger'
 import { review_record, type RecordVerdict } from './review-record'
 
 // `josh review:record --issue <N> [<category>:<severity>:<file> ...]` — the one write path for a
-// `/code-review` round's findings (joshuafolkken/kit#2325). It appends a `- rf:` line per finding to
+// `/code-review` round's findings. It appends a `- rf:` line per finding to
 // the issue's own file of the observation ledger, which the run's commit carries like any other
 // ledger change. **A call with no findings is a zero-finding round, and it still writes one line** — so the
 // round that found nothing is recorded rather than mistaken for a round nobody reviewed.
 //
 // `josh review:record --check --issue <N>` is the read half `pnpm josh followup` runs before it
-// merges (joshuafolkken/kit#2343): `ok` / `not-required` exit zero, `missing` exits non-zero so the
+// merges: `ok` / `not-required` exit zero, `missing` exits non-zero so the
 // merge is refused until the round is recorded. It mirrors `josh review:attest --check`.
 
 const ARGV_OFFSET = 2
@@ -92,7 +92,7 @@ function to_request(parsed: Parsed): Request | undefined {
 	return findings === undefined ? undefined : { issue: Number(issue), findings }
 }
 
-// The accepted values are built from the ledger's own vocabulary (joshuafolkken/kit#3422), so a
+// The accepted values are built from the ledger's own vocabulary, so a
 // refused spec names what would have been accepted and a new category appears here unedited.
 function accepted_values(placeholder: string, values: ReadonlyArray<string>): string {
 	return `  ${placeholder}: ${values.join(' | ')}`
@@ -145,7 +145,7 @@ async function run_check(issue: string | undefined, root: string): Promise<numbe
 	return FAILURE_EXIT_CODE
 }
 
-// The round lands in its own issue's file (joshuafolkken/kit#2919), so two lanes recording at once
+// The round lands in its own issue's file, so two lanes recording at once
 // write two files, and their pull requests never conflict on the ledger.
 async function run_record(parsed: Parsed, now: Date, root: string): Promise<number> {
 	const request = to_request(parsed)
@@ -165,7 +165,7 @@ async function run_record(parsed: Parsed, now: Date, root: string): Promise<numb
 	return 0
 }
 
-// **The default is the work tree the command runs in, a lane's inside a lane** (joshuafolkken/kit#2919).
+// **The default is the work tree the command runs in, a lane's inside a lane**.
 // The line rides that tree's own commit or `pnpm josh followup`'s pre-merge ledger commit, and
 // `--check` reads the same tree, so the two halves can never disagree about where the round is.
 async function run(

@@ -1,9 +1,9 @@
 import { DEPTH_0_LABEL, RELEASE_LABEL } from './issue-labels'
 
-// The decisions behind `josh issue:release` (joshuafolkken/kit#3360), kept apart from the command
+// The decisions behind `josh issue:release`, kept apart from the command
 // that reads the network so each is a pure answer a test can pin. An Issue whose change reaches a
-// consumer only once published used to surface the release only at the end of `followup`'s report;
-// it is now linked to the repository's release Issue, which it blocks until it merges.
+// consumer only once published is linked to the repository's release Issue, which it blocks until it
+// merges.
 
 interface ListingRow {
 	number: number

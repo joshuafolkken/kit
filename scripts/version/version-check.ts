@@ -4,8 +4,7 @@ import { version_check_arguments } from './version-check-arguments'
 import { version_commands } from './version-commands'
 
 // `version` shows the installed versions; `version --upgrade` updates both the global and the project
-// @joshuafolkken/kit install. The upgrade was a separate `version:upgrade` command until
-// joshuafolkken/kit#1928 folded it into this flag, so the version surface is one command again.
+// @joshuafolkken/kit install, so the version surface is one command.
 const UPGRADE_FLAG = '--upgrade'
 const ARGUMENT_OFFSET = 2
 const version_arguments = process.argv.slice(ARGUMENT_OFFSET)

@@ -7,7 +7,7 @@ import { z } from 'zod'
 // `gh` answered a single `statusCheckRollup` whose elements were of two kinds; REST splits them
 // across `commits/{sha}/check-runs` (`status` / `conclusion` / `name`) and `commits/{sha}/status`
 // (`state` / `context`). The merge is pure — given the two responses it decides the answer with
-// nothing else to know — so it lives here rather than beside the requests (joshuafolkken/kit#1028).
+// nothing else to know — so it lives here rather than beside the requests.
 
 // `__typename` is what `git-pr-checks-parse.ts` distinguishes the two kinds by, and only the status
 // contexts carry it: the parser's default branch is the check run, so a check run needs no marker
@@ -45,7 +45,7 @@ const NOT_A_STATUS_LISTING = 'gh api answered something other than a commit stat
 // A response that will not parse throws rather than degrading to an empty rollup. The direction is
 // what makes it worth the throw: an empty rollup reads as "this pull request has no checks", and
 // `git-pr-followup.ts` treats that as a reason to stop watching rather than as a failure — so a rate
-// limit would arrive as a pull request nothing was ever required to pass (joshuafolkken/kit#973).
+// limit would arrive as a pull request nothing was ever required to pass.
 function read_pages<T>(raw_json: string, schema: z.ZodType<T>, message: string): Array<T> {
 	const pages = parse_json_array_or_undefined(raw_json, schema)
 	if (pages === undefined) throw new Error(message)
@@ -85,9 +85,9 @@ function read_rank(run: RollupElement): RunRank | undefined {
 // *within* a suite (a re-run job lands in the suite it re-runs), so what is left is one run per
 // suite. Across suites GitHub takes the one from the newer suite: PR #2717's cancelled suite was the
 // older one and GitHub read the pull request `CLEAN`, while PR #2698's cancelled suite was the newer
-// one and GitHub held it `BLOCKED`. Ranking by run id alone (joshuafolkken/kit#2644) picked #2698's
+// one and GitHub held it `BLOCKED`. Ranking by run id alone picked #2698's
 // older, successful suite — its jobs had queued later — so `followup` read green beside a `BLOCKED`
-// pull request and waited out its whole budget (joshuafolkken/kit#2700).
+// pull request and waited out its whole budget.
 function is_ranked_above(candidate: RunRank, current: RunRank): boolean {
 	if (candidate.suite !== current.suite) return candidate.suite > current.suite
 

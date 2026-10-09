@@ -3,7 +3,7 @@ import { GIT_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execaSync } from 'execa'
 import { git_utilities } from './constants'
 
-// The one place a synchronous git command is spawned from (joshuafolkken/kit#3065) — the sync
+// The one place a synchronous git command is spawned from — the sync
 // counterpart of `git-spawn.ts`. Every caller here wants an answer rather than an exception, so a
 // non-zero exit is returned as a result, and every call is bounded: a git that never answers is an
 // unknown the caller already handles, never a hang.

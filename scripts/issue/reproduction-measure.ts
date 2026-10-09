@@ -1,8 +1,8 @@
 import { markdown_section } from './markdown-section'
 
 // A defect-claiming (behavior-change) Issue's reproduction section is written as `command + actual
-// output`, never prose, so the claim rests on a run that can be repeated rather than on a reading
-// (joshuafolkken/kit#2353). This is the counterpart of `baseline-measure.ts`: the baseline is a
+// output`, never prose, so the claim rests on a run that can be repeated rather than on a reading.
+// This is the counterpart of `baseline-measure.ts`: the baseline is a
 // distilled `command -> value`, the reproduction is the raw command *and* the output block it printed
 // — a prose "I checked it" is refused for the same reason a prose baseline is, it cannot be re-run.
 
@@ -38,7 +38,7 @@ function has_output_block(lines: ReadonlyArray<string>): boolean {
 }
 
 // The heading is a parameter so every `command + actual output` section is read by this one parser —
-// a pull request's live-execution evidence section is the same shape (joshuafolkken/kit#2446).
+// a pull request's live-execution evidence section is the same shape.
 function parse_reproduction(body: string, heading: string = REPRODUCTION_HEADING): Reproduction {
 	const lines = markdown_section.section_lines(body, heading)
 

@@ -10,23 +10,19 @@ import { CHECK_STATUS_PASS, type PrStateSnapshot } from '#scripts/gh/git-pr-chec
 import { json_value } from '#scripts/lib/json-value'
 
 // The check wait and the notes read off its snapshot — split out of `git-pr-followup.ts` when it
-// reached its line limit (joshuafolkken/kit#3264). `git-pr-followup` re-exports each name it always
+// reached its line limit. `git-pr-followup` re-exports each name it always
 // exported, so the move changed no call site and no suite that imports from it.
 
-// Named so a test can pin the note without restating it (joshuafolkken/kit#999).
+// Named so a test can pin the note without restating it.
 const WATCH_FAILED_NOTE = 'pr checks --watch failed; falling through to polling'
 
 // The watch is a look ahead, not a gate. It fails when **any** check has failed — CodeRabbit
-// included — and letting that escape ended the run before `evaluate_pr_state` could apply kit#753's
-// CodeRabbit exemption at all. It only ever bit where every check finished inside the two-minute
-// window, so a repository with a slow E2E never saw it and a fast one always would
-// (joshuafolkken/kit#999). What the watch is has since changed — `gh pr checks --watch` went through
-// GraphQL, so joshuafolkken/kit#1028 replaced it with the same poll loop bounded to two minutes —
-// but its place here has not.
+// included — and letting that escape would end the run before `evaluate_pr_state` could apply the
+// CodeRabbit exemption at all, wherever every check finishes inside the two-minute window.
 //
 // Falling through costs nothing: whether the merge may proceed is decided in one place below, and a
-// genuinely failing non-CodeRabbit check still ends the wait on the first poll by kit#990's
-// fast-fail rather than by that failure.
+// genuinely failing non-CodeRabbit check still ends the wait on the first poll by the fast-fail
+// rather than by that failure.
 // The watch fails for two different reasons — "a check failed" and "no checks reported on this
 // branch" — and its own error does not say which. The pull request itself can: a failed check leaves
 // a rollup, and a branch with no checks leaves it empty. Falling through on the empty case would
@@ -53,8 +49,7 @@ function reads_as_empty_rollup(raw_json: string): boolean {
 // The read throws rather than answering `undefined`, so the `catch` is its only failure path.
 //
 // The **checks** half, not the whole snapshot: the question here is about `statusCheckRollup` alone,
-// and reading the review listing to answer it paged a whole conversation for nothing
-// (joshuafolkken/kit#1043).
+// and reading the review listing to answer it paged a whole conversation for nothing.
 async function has_no_checks(branch_name: string): Promise<boolean> {
 	try {
 		const checks = await git_gh_command.pr_get_checks_snapshot(branch_name)
@@ -70,12 +65,11 @@ async function has_no_checks(branch_name: string): Promise<boolean> {
 async function handle_watch_failure(branch_name: string, error: unknown): Promise<void> {
 	if (await has_no_checks(branch_name)) throw error
 
-	// Swallowed, but never silently: the reason a run stopped early used to be this line, so it
-	// stays visible even though it no longer decides anything.
+	// Swallowed, but never silently: the line stays visible even though it decides nothing.
 	console.info(`⚠️ ${WATCH_FAILED_NOTE}: ${git_gh_helpers.get_error_message_with_stderr(error)}`)
 }
 
-// **Returns whether the watch confirmed completion** (joshuafolkken/kit#2029): `true` only when
+// **Returns whether the watch confirmed completion**: `true` only when
 // `pr_checks_watch` saw every check finish, `false` when it timed out with checks still pending or
 // fell through to polling on a swallowed failure. `run_checks` reads it to decide how many stable poll
 // reads the wait still needs. A timed-out watch (`timed_out: true`) never spanned the pending→settled
@@ -96,7 +90,7 @@ async function watch_before_polling(branch_name: string): Promise<boolean> {
 	}
 }
 
-// **A confirmed watch lowers the poll's stable-read requirement to one** (joshuafolkken/kit#2029). The
+// **A confirmed watch lowers the poll's stable-read requirement to one**. The
 // watch is the first confirmation that every check settled, so the poll that follows need only agree
 // once rather than twice — which removes the extra interval `followup` spent re-proving a settled run.
 // A skipped or fallen-through watch keeps `DEFAULT_STABLE_READS`, and a check that turned red is still
@@ -111,7 +105,7 @@ async function run_checks(input: {
 	return await git_pr_checks.wait_for_pr_success(input.branch_name, stable_reads)
 }
 
-// Temporary (kit#753): record every CodeRabbit check that was not passing when the merge gate
+// Temporary: record every CodeRabbit check that was not passing when the merge gate
 // opened, so a merge shipped without CodeRabbit review stays auditable.
 function read_coderabbit_skip_notes(snapshot: PrStateSnapshot): Array<string> {
 	return snapshot.rollup
@@ -124,9 +118,8 @@ function read_coderabbit_skip_notes(snapshot: PrStateSnapshot): Array<string> {
 }
 
 // The skip is printed where the run is being watched, not only carried into the Telegram body it
-// ends up in. A merge that went ahead while CodeRabbit had not come back is the one thing kit#753's
-// exemption trades away, and it used to be invisible in `followup`'s own output
-// (joshuafolkken/kit#1217).
+// ends up in. A merge that went ahead while CodeRabbit had not come back is the one thing the
+// CodeRabbit exemption trades away, so it must be visible in `followup`'s own output.
 function log_skip_notes(notes: ReadonlyArray<string>): void {
 	for (const note of notes) {
 		console.info(`⏭ ${note}`)

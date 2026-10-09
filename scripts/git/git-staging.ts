@@ -68,17 +68,16 @@ async function stage_untracked_files(files: ReadonlyArray<string>): Promise<void
 	for (const file of files) console.info(`   + ${file}`)
 }
 
-// **The observation ledger rides the run's own commit** (joshuafolkken/kit#2763). It used to be
-// excluded here (joshuafolkken/kit#1756) and committed afterwards by `pnpm josh observations:flush` as
-// a pull request of its own — a second branch, CI wait and merge behind every run that appended a
-// line, 144 of them in one month. Staged with the run instead, the lines are reviewed and merged with
-// the pull request whose run recorded them, while CI for that pull request is the only wait.
+// **The observation ledger rides the run's own commit**. Committing it separately would cost a
+// second branch, CI wait and merge behind every run that appended a line. Staged with the run, the
+// lines are reviewed and merged with the pull request whose run recorded them, while CI for that pull
+// request is the only wait.
 //
-// **A line that breaks the grammar keeps the old exclusion** (joshuafolkken/kit#2123): the commit
+// **A line that breaks the grammar keeps the old exclusion**: the commit
 // goes ahead without the ledger, and `pnpm josh observations:flush` — which refuses the same line and
 // names it — is where it is repaired. The migration is run first, as the flush runs it, so a line
-// still on an old path (joshuafolkken/kit#2724) is committed in the directory. **A lane carries its
-// own lines** (joshuafolkken/kit#2919): its writers append to its own tree's issue file, so this is
+// still on an old path is committed in the directory. **A lane carries its
+// own lines**: its writers append to its own tree's issue file, so this is
 // the step that takes them to the default branch.
 const LEDGER_PATHSPECS: ReadonlyArray<string> = [
 	...LEDGER_DIRECTORIES,

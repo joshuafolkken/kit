@@ -1,7 +1,6 @@
 import { git_worktree } from './git-worktree'
 
-// Does origin still have this branch, and could we even tell? (joshuafolkken/kit#1641; lifted out of
-// `scripts/lane/lane-start-point.ts`, which asked the question first.)
+// Does origin still have this branch, and could we even tell?
 //
 // **The remote-tracking ref is not evidence that the remote still has the branch.** Nothing here
 // prunes it — `lane:close` removes the work tree and the local branch, GitHub deletes the remote

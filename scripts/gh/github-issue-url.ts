@@ -1,10 +1,9 @@
 // Reading a GitHub issue or pull-request URL as an identity: which repository it is in, and which
 // number. `josh notify` resolves the repository a notification is *about* this way, because the
 // working directory answers a different question — which repository the session happens to be
-// running in. A notification filed about another repository used to carry that repository's URL
-// under this repository's name (joshuafolkken/kit#903), and the same mismatch survived for a
-// notification carrying only a pull-request URL until joshuafolkken/kit#994 added the second form
-// here rather than beside it.
+// running in; reading it instead would file a notification about another repository under this
+// repository's name. Both the issue and the pull-request form live here, so a notification carrying
+// only a pull-request URL resolves the same way.
 //
 // Two other modules read a URL for something narrower and keep their own patterns. `epic-parse`
 // scans an epic body for task-list rows, so its regex is anchored to the row marker and runs
@@ -21,9 +20,9 @@ const REPOSITORY_SOURCE = `^${GITHUB_URL_PREFIX_SOURCE}([^/]+)/([^/]+)`
 // caller's fallback is the working directory, which is a visibly wrong answer rather than a
 // plausible one. A trailing `#anchor` or `?query` still parses, since neither is a word character.
 const ISSUE_URL_PATTERN = new RegExp(String.raw`${REPOSITORY_SOURCE}/issues/(\d+)\b`, 'u')
-// The same shape for a pull request. `git-pr-followup` used to carry its own copy of this, anchored
-// to the end of the string; reading `.../pull/12/files` now yields the repository it names instead
-// of nothing, which is the better answer for every caller (joshuafolkken/kit#994).
+// The same shape for a pull request, not anchored to the end of the string: reading
+// `.../pull/12/files` yields the repository it names instead of nothing, which is the better answer
+// for every caller.
 const PULL_URL_PATTERN = new RegExp(String.raw`${REPOSITORY_SOURCE}/pull/(\d+)\b`, 'u')
 
 // What both forms answer: which repository the URL names.
@@ -40,7 +39,7 @@ interface RepoIdentity {
 // The two forms carry their number under different names on purpose. A pull target is then not
 // assignable where an issue target is expected, so handing a PR number to a reader that asks the
 // issue endpoint is a compile error rather than a notification carrying an unrelated issue's title
-// — the joshuafolkken/kit#903 mismatch class, which this module exists to close.
+// — the mismatch class this module exists to close.
 interface IssueUrlTarget extends RepoIdentity {
 	issue_number: string
 }
@@ -91,7 +90,7 @@ function parse(issue_url: string | undefined): IssueUrlTarget | undefined {
 
 // A pull-request URL names the same repository an issue URL does. `josh notify` reads it when it was
 // given no `--issue-url`, so a completion notification carrying only a PR link stops being filed
-// under the working directory's repository (joshuafolkken/kit#994).
+// under the working directory's repository.
 function parse_pull(pull_url: string | undefined): PullUrlTarget | undefined {
 	const parsed = parse_with(PULL_URL_PATTERN, pull_url)
 	if (parsed === undefined) return undefined

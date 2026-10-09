@@ -7,10 +7,10 @@ import { git_branch } from './git-branch'
 import { git_command } from './git-command'
 import { git_issue, type IssueInfo } from './git-issue'
 
-// joshuafolkken/kit#2817. A first `josh git -y` was refused once per unmet precondition — the title's
-// issue number, the branch name, the issue's release classification — each only after the stage
-// before it had already staged, switched or pushed. **Every precondition decidable at the start is
-// asked here, before anything changes, and all of them are reported at once.** No rule is new: each
+// A later stage of `josh git -y` refuses on an unmet precondition — the title's issue number, the
+// branch name, the issue's release classification — only after the stage before it has already
+// staged, switched or pushed. **Every precondition decidable at the start is asked here, before
+// anything changes, and all of them are reported at once.** No rule is new: each
 // answer comes from the function the later stage refuses with, so the two cannot drift apart.
 
 interface PreflightInput {
@@ -131,7 +131,7 @@ async function answer(input: PreflightInput): Promise<PreflightAnswer> {
 	return { pr_target, problems: [...problems, ...pr_problems] }
 }
 
-// joshuafolkken/kit#2946: the unmet preconditions as a list, so `josh ship` can ask them before its
+// The unmet preconditions as a list, so `josh ship` can ask them before its
 // review and gate start instead of meeting the refusal at the commit stage.
 async function problems_of(input: PreflightInput): Promise<Array<string>> {
 	const { problems } = await answer(input)

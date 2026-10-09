@@ -4,25 +4,22 @@ import { fileURLToPath } from 'node:url'
 import { file_reader } from '#scripts/lib/read-file'
 import ts from 'typescript'
 
-// joshuafolkken/kit#1063: nothing stopped a new `gh <noun> <verb>` spawn from being added.
+// Stops a new `gh <noun> <verb>` spawn from being added.
 //
-// joshuafolkken/kit#1022 moved kit's GitHub calls to REST because `gh issue …` / `gh label …` /
-// `gh pr …` / `gh repo …` all go through GraphQL, which a cloud session is answered 403 for. That
-// epic's survey counted `exec_gh_command` call sites, so a direct `execa` / `execaSync` spawn was
-// never counted at all — three were found mid-run and one file (`scripts-ai/issue-prep.ts`) was
-// missed entirely, which is why joshuafolkken/kit#1042 could report the migration finished while
-// `josh issue <N>` still 403'd.
+// kit's GitHub calls go through REST because `gh issue …` / `gh label …` / `gh pr …` /
+// `gh repo …` all go through GraphQL, which a cloud session is answered 403 for. Counting
+// `exec_gh_command` call sites misses a direct `execa` / `execaSync` spawn entirely, so a
+// migration can look finished while `josh issue <N>` still 403s.
 //
-// This scanner is the mechanical check that survey did not have. It reads **every** `.ts` file
+// This scanner is the mechanical check a call-site count lacks. It reads **every** `.ts` file
 // under `scripts/`, and anything it finds whose first argument is not `api` fails
 // unless it is named in `ALLOWED_SPAWNS` below.
 //
 // **It parses rather than greps.** A regex over the text has to decide for itself what is code and
 // what is a comment or a string, and it gets that wrong in both directions: a `/*` inside a string
 // literal opens a comment that never closes, blanking real code for hundreds of lines, while a
-// command quoted in prose is reported as a spawn. Both were measured on the first draft of this
-// file. The TypeScript parser already knows the difference, so the scan walks its syntax tree and
-// no heuristic is left to be wrong.
+// command quoted in prose is reported as a spawn. The TypeScript parser already knows the
+// difference, so the scan walks its syntax tree and no heuristic is left to be wrong.
 //
 // What counts as launching `gh`:
 //
@@ -35,14 +32,13 @@ import ts from 'typescript'
 // A binary name is resolved through a string literal, a template literal with no substitution, and
 // a `const` or `let` bound to either **anywhere in the same file** — `const GH = 'gh'` then
 // `execa(GH, […])` is the evasion a literal-only scan misses. So is the spawn function's own name:
-// `const exec_file_async = promisify(execFile)` is how a real `gh repo view` call hid in
-// `scripts-ai/telegram-test.ts` from joshuafolkken/kit#1022's survey and from this guard's own
-// first draft.
+// `const exec_file_async = promisify(execFile)` hides a real `gh` spawn from a scan that only knows
+// the spawn functions by their own names.
 //
-// **A name imported from another module resolves too** (joshuafolkken/kit#1073). `import { GH_BIN }
-// from './constants'` then `execa(GH_BIN, […])` is the same evasion one file further out, and the
-// import is followed by reading that module's source and taking its own string `const` — the pass
-// above, applied to the imported file. The alternative was `ts.createProgram` with a `TypeChecker`,
+// **A name imported from another module resolves too.** `import { GH_BIN } from './constants'`
+// then `execa(GH_BIN, […])` is the same evasion one file further out, and the import is followed
+// by reading that module's source and taking its own string `const` — the pass above, applied to
+// the imported file. The alternative was `ts.createProgram` with a `TypeChecker`,
 // which follows any indirection but builds a program over every file under `scripts/` on a scan
 // that runs in the unit suite; nothing else in this repository does that,
 // and the shape it would buy beyond this one is not a shape kit writes.
@@ -62,7 +58,7 @@ import ts from 'typescript'
 // only by its own test and imports `typescript`, a devDependency.
 //
 // **Scope is code spawns only.** A distributed document that *instructs* an agent to type a `gh`
-// command is joshuafolkken/kit#1064's problem; widening this guard to `prompts/` or `.claude/`
+// command is a separate concern; widening this guard to `prompts/` or `.claude/`
 // would couple two deliverables that were deliberately kept independent.
 
 const SCRIPTS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -95,8 +91,8 @@ const GH_BINARY = 'gh'
 const GH_COMMAND_PREFIX = `${GH_BINARY} `
 const API_SUBCOMMAND = 'api'
 // Stands for an argument list built somewhere else — `to_gh_api_args(request)`, a spread, a
-// variable. It is reported rather than ignored: "I could not tell" is the answer that let
-// joshuafolkken/kit#1022's survey pass, so it needs an allowlist entry naming why it is safe.
+// variable. It is reported rather than ignored: "I could not tell" is the answer that lets a spawn
+// slip past a survey, so it needs an allowlist entry naming why it is safe.
 const DYNAMIC_SUBCOMMAND = '<dynamic>'
 
 // The functions that launch a binary by name. `execa` / `execaSync` are what kit uses; the node
@@ -223,9 +219,8 @@ function names_spawn_function(node: ts.Node): boolean {
 }
 
 // `const exec_file_async = promisify(execFile)` and `const run = execaSync` both launch a binary
-// under a name the set above does not contain. The first of those was a real `gh repo view` spawn
-// that joshuafolkken/kit#1022's survey never counted, and that the first draft of this guard did
-// not see either (joshuafolkken/kit#1063).
+// under a name the set above does not contain, so a scan of that set alone misses a real `gh`
+// spawn written either way.
 function is_spawn_alias(initializer: ts.Expression): boolean {
 	if (!ts.isCallExpression(initializer)) return names_spawn_function(initializer)
 
@@ -331,8 +326,7 @@ function imported_value(binding: ImportBinding, from_file: string): string | und
 // inside a function resolves a spawn anywhere in the file — which is the point, since the evasion
 // this guard was written for can be written at any depth. The cost is the mirror case: a nested
 // declaration of a name that is *also* imported wins over the import, so a spawn using the imported
-// one is left unresolved. That is the pre-existing limit rather than a new hole — the import
-// resolved to nothing at all before joshuafolkken/kit#1073.
+// one is left unresolved — the same limit the same-file resolution has, not a new hole.
 function identifier_value(name: string, scope: Scope): string | undefined {
 	const local = scope.values.get(name)
 	if (local !== undefined) return local

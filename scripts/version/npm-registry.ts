@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { release_age } from './release-age'
 
 // The public npm registry, read without credentials so a consumer who installed from public npm
-// can see the latest release without a `read:packages` GitHub token (joshuafolkken/kit#2882). The
+// can see the latest release without a `read:packages` GitHub token. The
 // GitHub Packages versions API stays the source for a scope routed there, and the fallback for a
 // package public npm does not carry.
 const PUBLIC_REGISTRY = 'https://registry.npmjs.org'
@@ -99,7 +99,7 @@ function read_release_times(package_name: string): Record<string, string> | unde
 // Whether public npm already carries `<name>@<version>`. **Asked of public npm regardless of how this
 // checkout routes the scope**, unlike the two readers above: `josh release` waits for `publish.yml`'s
 // `publish-npm` job and links the npmjs.com page, so GitHub Packages answering would not be the
-// question it asks (joshuafolkken/kit#3193).
+// question it asks.
 function has_public_version(package_name: string, version: string): boolean {
 	const parsed = times_schema.safeParse(read_packument(package_name, FULL_ACCEPT))
 

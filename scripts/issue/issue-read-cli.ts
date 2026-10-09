@@ -5,8 +5,7 @@ import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { issue_read, type IssueComment, type IssueFields } from './issue-read'
 import { issue_report_failures, type ReadFailureKind } from './issue-report-failures'
 
-// `josh issue:read <N> [<N> ...]` — the body *and* the comments of every issue named, in one call
-// (joshuafolkken/kit#1715).
+// `josh issue:read <N> [<N> ...]` — the body *and* the comments of every issue named, in one call.
 //
 // It replaces the two `gh api` reads `.claude/skills/workflow-commands/issue-comments.md` tells an agent
 // to type per issue. Measured over four recorded `backlogrun` parents, `issue bookkeeping` was the
@@ -45,7 +44,7 @@ interface IssueContent {
 type NumberResult = { kind: 'issue'; content: IssueContent } | { kind: ReadFailureKind }
 
 // The formatted block for one issue, or the failure kind — what `run:prep` bundles beside the state
-// and the dependency-update scope (joshuafolkken/kit#1978). It reuses this file's read and the shared
+// and the dependency-update scope. It reuses this file's read and the shared
 // `format_issue` rather than reproducing either, so the two `gh` reads and the block shape stay
 // single-sourced here.
 type BlockRead = { kind: 'ok'; block: string } | { kind: ReadFailureKind }

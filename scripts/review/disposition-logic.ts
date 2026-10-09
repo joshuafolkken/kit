@@ -1,7 +1,7 @@
 import { review_level } from './review-level'
 
 // Whether a review finding reaches a runtime path — the half of the three-way disposition a machine
-// can answer (joshuafolkken/kit#2181). `prompts/review.md` → "Three-way disposition after the cap"
+// can answer. `prompts/review.md` → "Three-way disposition after the cap"
 // routes a non-High finding to branch 2 (file it) only when it is a **confirmed defect that reaches a
 // runtime code path**. "Reaches" is read exactly as the review-level rubric reads it — a runtime code
 // path, a distributed artifact a consumer reads, or the verification guarding either — which is the

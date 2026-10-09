@@ -7,7 +7,7 @@ import { required_checks_report, type RequiredChecksReport } from './required-ch
 import { ruleset_check } from './ruleset-check'
 
 // `josh ruleset:check [--apply]` — say whether the default branch requires every status check kit's
-// distributed workflows report, and with `--apply` add the missing ones (joshuafolkken/kit#3012).
+// distributed workflows report, and with `--apply` add the missing ones.
 // Changing a repository setting is outward-facing, so the write happens only on the flag a person
 // typed; `josh sync` and `josh doctor` never pass it. Exits non-zero while anything is left to do.
 

@@ -2,8 +2,8 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { resolve_tsx_runner } from '#scripts/josh/josh-logic'
 
-// The git merge drivers `.gitattributes` names, as the `-c` options that register them for one merge
-// (joshuafolkken/kit#3517). `josh main:merge` — the merge every lane and `josh ship` run — passes
+// The git merge drivers `.gitattributes` names, as the `-c` options that register them for one merge.
+// `josh main:merge` — the merge every lane and `josh ship` run — passes
 // them, so a driver is in force wherever the merge it exists for runs; a merge typed by hand finds
 // no driver of that name and falls back to git's own text merge.
 //

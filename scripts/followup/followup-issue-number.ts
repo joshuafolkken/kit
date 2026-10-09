@@ -5,8 +5,7 @@
 // and the run's tail cannot disagree about what "the completed issue" is.
 //
 // It sits in a module of its own because both consumers need it and neither may import the other:
-// the tail reads it to record a run, and the entry point reads it to build one
-// (joshuafolkken/kit#1539).
+// the tail reads it to record a run, and the entry point reads it to build one.
 function parse_issue_number_from_text(input: string | undefined): string | undefined {
 	if (input === undefined) return undefined
 	const trimmed = input.trim()
