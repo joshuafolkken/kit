@@ -2,7 +2,7 @@
 	"scripts": {
 		"files": 1015,
 		"code_lines": 84545,
-		"comment_lines": 33746,
+		"comment_lines": 33749,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12222,
-		"on_demand_bytes": 560076
+		"on_demand_bytes": 560565
 	},
 	"accepted": {
-		"reason": "#3502 adds the waiting-on-blockers merge path (open_blockers, do_waiting, on_waiting, waiting_comment) and documents it in backlogrun-park.md / prerequisite.md",
+		"reason": "#3504 splits the same-file wave rule into a textual-conflict case (no dependency, lane resolves it) and a same-mechanism case (dependency), merged over #3502's waiting-on-blockers merge path",
 		"date": "2026-10-09"
 	}
 }
