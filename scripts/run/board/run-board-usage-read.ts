@@ -1,0 +1,180 @@
+import { cpus, totalmem } from 'node:os'
+import path from 'node:path'
+import { lane_paths } from '#scripts/lane/lane-paths'
+import { lane_registry } from '#scripts/lane/lane-registry'
+import { execa } from 'execa'
+import type { ProcessReading, UsageMark } from './run-board-usage'
+
+// How `run:board` reads which lane each process belongs to and what it uses (joshuafolkken/kit#3489).
+// **One `ps` a second, and `lsof` only for a process not seen before.** `ps` lists every process's
+// cumulative CPU time and resident memory in about 15 ms; a process is put in the lane its working
+// directory sits under (`.kit-lanes/<N>`), looked up once and remembered, so a full `lsof` (about
+// 220 ms) is paid on the first sample alone. The working directory rather than the parent chain: a
+// process detached with `josh ship --detach` is re-parented and no longer traceable to its lane.
+// **Only this repository's lanes root counts** — another repository's lane of the same number is a
+// different lane. **macOS alone:** Linux's `ps` prints `time` in whole seconds, too coarse for a
+// one-second difference, so there the board draws no column rather than a figure flickering to 0.
+
+const PS_ARGUMENTS = ['-A', '-o', 'pid=,time=,rss=']
+const LSOF_ARGUMENTS = ['-a', '-d', 'cwd', '-Fn', '-p']
+const PID_SEPARATOR = ','
+const PS_FIELDS = 3
+const DAY_SEPARATOR = '-'
+const CLOCK_SEPARATOR = ':'
+const SECONDS_PER_DAY = 86_400
+const SECONDS_PER_CLOCK_PART = 60
+const MS_PER_SECOND = 1000
+const BYTES_PER_KB = 1024
+// `lsof -F`'s field lines: `p<pid>` opens a process, `n<path>` names its directory.
+const LSOF_PROCESS = /^(?=p)/mu
+const LSOF_NAME = 'n'
+
+interface UsagePorts {
+	// `ps`'s listing.
+	list: () => Promise<string>
+	// The working directory of each process that answered.
+	directories: (pids: ReadonlyArray<number>) => Promise<ReadonlyMap<number, string>>
+	now: () => number
+	// The board's own lanes root.
+	root: string
+}
+
+// `ps`'s `time`, `[DD-][HH:]MM:SS[.ss]`, in milliseconds.
+function cpu_ms_of(text: string): number {
+	const [days, clock = ''] = text.includes(DAY_SEPARATOR) ? text.split(DAY_SEPARATOR) : ['0', text]
+	const seconds = clock
+		.split(CLOCK_SEPARATOR)
+		.reduce((sum, part) => sum * SECONDS_PER_CLOCK_PART + Number(part), 0)
+
+	return (Number(days) * SECONDS_PER_DAY + seconds) * MS_PER_SECOND
+}
+
+function reading_of(line: string): [number, ProcessReading] | undefined {
+	const fields = line.trim().split(/\s+/u)
+	const [pid, time = '', rss] = fields
+	const reading = { cpu_ms: cpu_ms_of(time), rss_bytes: Number(rss) * BYTES_PER_KB }
+	const is_number = !Number.isNaN(reading.cpu_ms + reading.rss_bytes)
+
+	return is_number && fields.length === PS_FIELDS ? [Number(pid), reading] : undefined
+}
+
+function parse_ps(output: string): Map<number, ProcessReading> {
+	const readings = output.split('\n').map((line) => reading_of(line))
+
+	return new Map(readings.filter((reading) => reading !== undefined))
+}
+
+function lsof_block(block: string): [number, string] | undefined {
+	const [process_line = '', ...rest] = block.trim().split('\n')
+	const name = rest.find((line) => line.startsWith(LSOF_NAME))
+
+	return name === undefined ? undefined : [Number(process_line.slice(1)), name.slice(1)]
+}
+
+function parse_lsof(output: string): Map<number, string> {
+	const blocks = output.split(LSOF_PROCESS).map((block) => lsof_block(block))
+
+	return new Map(blocks.filter((block) => block !== undefined))
+}
+
+// The lane of `root` a directory sits under — itself or a directory above it, the outermost first.
+function lane_of(directory: string, root: string): string | undefined {
+	const parts = directory.split(path.sep)
+	const ancestors = parts.map((_, index) => parts.slice(0, index + 1).join(path.sep)).slice(1)
+	const environment = { [lane_paths.LANE_ROOT_KEY]: root }
+
+	return ancestors.map((ancestor) => lane_paths.lane_issue_of(ancestor, environment)).find(Boolean)
+}
+
+function directory_lane(directory: string | undefined, root: string): string | undefined {
+	return directory === undefined ? undefined : lane_of(directory, root)
+}
+
+// The lanes of the processes still listed: a gone one dropped, and one not seen before looked up.
+async function lanes_for(
+	known: ReadonlyMap<number, string | undefined>,
+	processes: ReadonlyMap<number, ProcessReading>,
+	ports: UsagePorts,
+): Promise<Map<number, string | undefined>> {
+	const kept = new Map([...known].filter(([pid]) => processes.has(pid)))
+	const fresh = [...processes.keys()].filter((pid) => !kept.has(pid))
+
+	if (fresh.length === 0) return kept
+
+	const directories = await ports.directories(fresh)
+	const found = fresh.map((pid) => [pid, directory_lane(directories.get(pid), ports.root)] as const)
+
+	return new Map([...kept, ...found])
+}
+
+async function sample(before: UsageMark | undefined, ports: UsagePorts): Promise<UsageMark> {
+	const at_ms = ports.now()
+	const processes = parse_ps(await ports.list())
+	const lanes = await lanes_for(before?.lanes ?? new Map(), processes, ports)
+
+	return { at_ms, processes, lanes, cores: cpus().length, total_bytes: totalmem() }
+}
+
+async function darwin_directories(
+	pids: ReadonlyArray<number>,
+): Promise<ReadonlyMap<number, string>> {
+	// `lsof` exits non-zero when any one process is gone, and still lists the rest.
+	const lsof_arguments = [...LSOF_ARGUMENTS, pids.join(PID_SEPARATOR)]
+	const { stdout } = await execa('lsof', lsof_arguments, { reject: false })
+
+	return parse_lsof(stdout)
+}
+
+const PLATFORM_DIRECTORIES: Readonly<Partial<Record<NodeJS.Platform, UsagePorts['directories']>>> =
+	{ darwin: darwin_directories }
+
+async function list_live(): Promise<string> {
+	const { stdout } = await execa('ps', PS_ARGUMENTS)
+
+	return stdout
+}
+
+async function board_lane_root(): Promise<string> {
+	return lane_paths.lane_root(await lane_registry.main_repository_root())
+}
+
+// `undefined` where the processes cannot be read — no `ps`, no way to a working directory, no
+// repository — so the board draws no column rather than failing.
+async function read_usage(
+	before: UsageMark | undefined,
+	root: Promise<string>,
+	platform: NodeJS.Platform,
+): Promise<UsageMark | undefined> {
+	const directories = PLATFORM_DIRECTORIES[platform]
+
+	if (directories === undefined) return undefined
+
+	try {
+		const ports = { list: list_live, directories, now: Date.now, root: await root }
+
+		return await sample(before, ports)
+	} catch {
+		return undefined
+	}
+}
+
+// One board's reader: the lanes root is resolved on the first sample and kept, since it does not move
+// while the board is open.
+function usage_reader(
+	platform: NodeJS.Platform = process.platform,
+): (before: UsageMark | undefined) => Promise<UsageMark | undefined> {
+	const resolved: { root?: Promise<string> } = {}
+
+	async function read(before: UsageMark | undefined): Promise<UsageMark | undefined> {
+		resolved.root ??= board_lane_root()
+
+		return await read_usage(before, resolved.root, platform)
+	}
+
+	return read
+}
+
+const run_board_usage_read = { lane_of, parse_lsof, parse_ps, sample, usage_reader }
+
+export { run_board_usage_read }
+export type { UsagePorts }

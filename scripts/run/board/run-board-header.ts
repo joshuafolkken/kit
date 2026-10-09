@@ -5,6 +5,7 @@ import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
 import type { RunActivity } from './run-board-status'
+import type { LaneUsages } from './run-board-usage'
 
 // The top of `run:board` (joshuafolkken/kit#3430): whether the run is moving, how long it has run, how
 // long it has left, how fresh its last event is, and how far through the plan it is — and, while it
@@ -16,7 +17,8 @@ import type { RunActivity } from './run-board-status'
 // (joshuafolkken/kit#3486): a value not read yet is drawn `-`, never `0`, so a header still loading
 // reads as unknown rather than as an empty run.
 
-const { HEADER_ICONS, STATE_ICONS, WORDS, bar_of, clock_of, elapsed_of, left_of } = run_board_labels
+const { HEADER_ICONS, STATE_ICONS, WORDS, bar_of, clock_of, elapsed_of, left_of, minute_of } =
+	run_board_labels
 const UNKNOWN = '-'
 const COUNT_GAP = '  '
 // The parts of the title line sit one space further apart than the counts, so the groups read apart.
@@ -29,7 +31,6 @@ const ALARM_FACTOR = 2
 const ALARM_MS = STALE_MS * ALARM_FACTOR
 const INDENT = '  '
 const RUN_NAME = 'backlogrun'
-const CLOCK_MINUTES_END = 5
 
 // Who reads the frame: a person on a screen, or a chat a session answers a progress question in
 // (joshuafolkken/kit#3456), where a title is never cut, no legend is drawn and the machine is its memory
@@ -51,6 +52,8 @@ interface BoardHeader {
 	is_plan_loading: boolean
 	// The machine's gauges, `undefined` before the first sample.
 	machine: MachineGauges | undefined
+	// Each running lane's CPU and memory (joshuafolkken/kit#3489), `undefined` where none could be read.
+	usages?: LaneUsages | undefined
 	// The spinner's frame a running run and a running row turn, `undefined` where the output is not a
 	// terminal and they draw their still icons (joshuafolkken/kit#3452).
 	spinner: string | undefined
@@ -140,7 +143,7 @@ function plan_warning(header: BoardHeader): string | undefined {
 
 	if (failed === undefined) return undefined
 
-	return styleText('yellow', `⚠ ${WORDS.plan} ${clock_of(failed).slice(0, CLOCK_MINUTES_END)}`)
+	return styleText('yellow', `⚠ ${WORDS.plan} ${minute_of(failed)}`)
 }
 
 // A plan read in flight turns the spinner after ⏳ and says nothing more (joshuafolkken/kit#3455); a
@@ -157,9 +160,10 @@ function time_parts(header: BoardHeader): Array<string> {
 	const { now_ms, started_ms, ended_ms } = header
 
 	if (ended_ms !== undefined) {
-		const ended = clock_of(ended_ms).slice(0, CLOCK_MINUTES_END)
-
-		return [`⏱ ${elapsed_of(ended_ms - started_ms)}`, `${HEADER_ICONS.ended} ${ended}`]
+		return [
+			`⏱ ${elapsed_of(ended_ms - started_ms)}`,
+			`${HEADER_ICONS.ended} ${minute_of(ended_ms)}`,
+		]
 	}
 
 	const cutoff = started_ms + backlog_budget.WHOLE_RUN_BUDGET_MS

@@ -124,8 +124,9 @@ describe('run_board_render.render sections', () => {
 	})
 })
 
+// joshuafolkken/kit#3489: seven phases from 🔍, the 🚀 no row ever drew gone.
 const PHASE_LEGEND =
-	'🚀 dispatched  🔍 investigate  📝 plan  🔨 implement  👀 review  🚦 gate  📦 commit  🔁 followup'
+	'🔍 investigate  📝 plan  🔨 implement  👀 review  🚦 gate  📦 commit  🔁 followup'
 
 function legend_of(rows: ReadonlyArray<BoardRow>): Array<string> {
 	const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: [...rows] } }))
@@ -150,10 +151,10 @@ describe('run_board_render.render legend', () => {
 	})
 
 	it('names 🔄 only while a row draws it, not for a row led by its phase', () => {
-		const dispatched = row(1, { state: 'running' })
+		const launched = row(1, { state: 'running' })
 
 		expect(legend_of([running(2, NOW, 'review')])).toStrictEqual([PHASE_LEGEND])
-		expect(legend_of([dispatched]).at(-1)).toBe('🔄 running')
+		expect(legend_of([launched]).at(-1)).toBe('🔄 running')
 	})
 
 	it('names 🔗 only while a row draws a wait', () => {
@@ -237,7 +238,7 @@ describe('run_board_render.render running row lead', () => {
 	})
 
 	it('leads a running row with its newest phase’s icon, and 🔄 before its track draws one', () => {
-		const active = [running(1, NOW, 'commit'), running(2, NOW, 'dispatched')]
+		const active = [running(1, NOW, 'commit'), running(2, NOW, undefined)]
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active } }))
 
 		expect(lines.some((line) => line.startsWith('  📦 1  Issue 1'))).toBe(true)

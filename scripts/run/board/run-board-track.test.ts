@@ -33,10 +33,6 @@ describe('run_board_track.track_of', () => {
 		expect(stripVTControlCharacters(track_of(phase))).toBe(expected)
 	})
 
-	it('draws a dispatched child as the line alone', () => {
-		expect(stripVTControlCharacters(track_of('dispatched'))).toBe(AHEAD.repeat(TRACK_COLUMNS))
-	})
-
 	it('is fourteen columns at every phase', () => {
 		const tracked: ReadonlyArray<Phase> = run_board_phase.PHASES.filter(
 			(phase) => phase !== 'merged',
@@ -54,7 +50,7 @@ describe('run_board_track.track_of', () => {
 	})
 
 	it('names the phases passed, its own included', () => {
+		expect(run_board_track.passed_of('investigate')).toStrictEqual(['investigate'])
 		expect(run_board_track.passed_of('plan')).toStrictEqual(['investigate', 'plan'])
-		expect(run_board_track.passed_of('dispatched')).toStrictEqual([])
 	})
 })

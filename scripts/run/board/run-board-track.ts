@@ -9,10 +9,10 @@ import { run_board_phase, type Phase } from './run-board-phase'
 const { BAR_LEFT, BAR_LEFT_COLOR, PHASE_ICONS, painted } = run_board_labels
 const AHEAD = `${BAR_LEFT}${BAR_LEFT}`
 
-// The phases a track has a cell for: a dispatched child has passed none, and a merged one draws as a
-// closed row (joshuafolkken/kit#3451), never as a track.
+// The phases a track has a cell for: a merged child draws as a closed row (joshuafolkken/kit#3451),
+// never as a track.
 const TRACK_PHASES: ReadonlyArray<Phase> = run_board_phase.PHASES.filter(
-	(phase) => phase !== 'dispatched' && phase !== 'merged',
+	(phase) => phase !== 'merged',
 )
 
 // The track's phases a child at `phase` has reached, its own included.

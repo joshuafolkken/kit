@@ -6,7 +6,7 @@ import { run_board_phase } from './run-board-phase'
 // joshuafolkken/kit#3430: every time the board draws is an `HH:MM:SS` clock or a short span.
 // joshuafolkken/kit#3486: its words are English whatever the session language.
 
-const { WORDS, bar_of, clock_of, elapsed_of, left_of, spinner_of } = run_board_labels
+const { WORDS, bar_of, clock_of, elapsed_of, left_of, minute_of, spinner_of } = run_board_labels
 const { GAUGE_SHADES, PHASE_ICONS, PHASE_WORDS, SPINNER_FRAME_MS, painted } = run_board_labels
 const SECOND = 1000
 const MINUTE = 60 * SECOND
@@ -142,5 +142,14 @@ describe('run_board_labels.clock_of', () => {
 		const moment = new Date(2026, 9, 8, 7, 4, 9).getTime()
 
 		expect(clock_of(moment)).toBe('07:04:09')
+	})
+})
+
+// joshuafolkken/kit#3489: a moment read to the minute drops its seconds.
+describe('run_board_labels.minute_of', () => {
+	it('draws the local wall clock of a moment to the minute', () => {
+		const moment = new Date(2026, 9, 8, 7, 4, 59).getTime()
+
+		expect(minute_of(moment)).toBe('07:04')
 	})
 })

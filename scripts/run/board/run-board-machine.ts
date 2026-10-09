@@ -154,7 +154,7 @@ function gauges_of(before: MachineMark | undefined, after: MachineMark): Machine
 	}
 }
 
-function threshold_alert(value: number, spec: GaugeSpec): Alert {
+function threshold_alert(value: number, spec: Pick<GaugeSpec, 'red' | 'yellow'>): Alert {
 	if (value >= spec.red) return 'red'
 
 	return value >= spec.yellow ? 'yellow' : 'normal'
@@ -194,7 +194,7 @@ function line_of(gauges: MachineGauges | undefined): string | undefined {
 	return parts.length === 0 ? undefined : parts.join(GAUGE_GAP)
 }
 
-const run_board_machine = { gauges_of, line_of }
+const run_board_machine = { gauges_of, line_of, percent_text, threshold_alert }
 
 export { run_board_machine }
-export type { MachineGauges, MachineMark }
+export type { Alert, MachineGauges, MachineMark }

@@ -9,7 +9,7 @@ import type { BoardLayout, BoardRow } from './run-board-layout'
 // fetch has failed, and how the progress counts are drawn from the layout. joshuafolkken/kit#3444: two
 // lines of symbols, no `updated` line, and a heartbeat colored by how stale the stream is.
 
-const { clock_of } = run_board_labels
+const { minute_of } = run_board_labels
 const { WORDS } = run_board_labels
 const MACHINE_UNKNOWN = '⚡ -   🧠 -   💾 -'
 const RUNNING_TITLE = '▶ backlogrun   ⏱ 30:00   ⌛ 7h30m'
@@ -79,7 +79,7 @@ describe('run_board_header.header_lines state', () => {
 		const activity = { last_event_ms: ended_ms, idle: undefined, is_stopped: true }
 		const title = title_of(header({ activity, ended_ms, now_ms: ended_ms + 10 * MINUTE }))
 
-		expect(title).toBe(`■ backlogrun   ⏱ 90:00   🔚 ${clock_of(ended_ms).slice(0, 5)}`)
+		expect(title).toBe(`■ backlogrun   ⏱ 90:00   🔚 ${minute_of(ended_ms)}`)
 	})
 
 	it('leaves out the heartbeat before the stream has one', () => {
@@ -171,7 +171,7 @@ describe('run_board_header.header_lines plan warning', () => {
 	it('warns with the minute of a failed plan read', () => {
 		const board = header({ plan_fetched_ms: NOW - MINUTE, plan_failed_ms: NOW })
 
-		expect(title_of(board)).toContain(`⚠ ${WORDS.plan} ${clock_of(NOW).slice(0, 5)}`)
+		expect(title_of(board)).toContain(`⚠ ${WORDS.plan} ${minute_of(NOW)}`)
 	})
 })
 

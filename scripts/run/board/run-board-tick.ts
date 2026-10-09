@@ -11,6 +11,7 @@ import type { LocalRead } from './run-board-read'
 import { run_board_render } from './run-board-render'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
 import { run_board_status } from './run-board-status'
+import { run_board_usage } from './run-board-usage'
 
 // One `run:board` redraw (joshuafolkken/kit#3430). **Three speeds** (joshuafolkken/kit#3444): the frame
 // is redrawn every second so the elapsed times move; the run's own stream and lanes are re-read no more
@@ -37,6 +38,18 @@ async function reread(state: BoardState, ports: BoardPorts, now_ms: number): Pro
 	return { ...state, local: await ports.read_local(), read_ms: now_ms }
 }
 
+// Each lane's usage, read on the machine's second (joshuafolkken/kit#3489). A chat draws none, so it
+// reads none; a reading that failed draws no column.
+async function read_usages(
+	state: BoardState,
+	ports: BoardPorts,
+): Promise<Pick<BoardState, 'usage' | 'usages'>> {
+	const usage = ports.form === 'chat' ? undefined : await ports.read_usage(state.usage)
+	const usages = usage === undefined ? undefined : run_board_usage.usage_of(state.usage, usage)
+
+	return { usage, usages }
+}
+
 // The sample is timed when it is taken, not when the tick began: a plan read between the two would put
 // its seconds on the wrong side of the rate's interval. It is due by the tick's clock, so a sample
 // taken a few milliseconds into its tick does not slip to the redraw after the second.
@@ -47,7 +60,7 @@ async function resample(state: BoardState, ports: BoardPorts, now_ms: number): P
 	const machine = { sample: await ports.read_machine(), at_ms }
 	const gauges = run_board_machine.gauges_of(state.machine, machine)
 
-	return { ...state, machine, gauges, sampled_ms: now_ms }
+	return { ...state, ...(await read_usages(state, ports)), machine, gauges, sampled_ms: now_ms }
 }
 
 // The state of the run on screen; a different run starts its plan state from nothing, so no row, count
@@ -113,6 +126,7 @@ function header_of(
 		plan_failed_ms: state.failed_ms,
 		is_plan_loading: state.plan_fetch !== undefined,
 		machine: state.gauges,
+		usages: state.usages,
 		form: redraw.ports.form,
 		spinner: redraw.ports.is_tty ? run_board_labels.spinner_of(redraw.now_ms) : undefined,
 		link: run_board_link.linker(state.plan?.context.repo, redraw.ports.link),
