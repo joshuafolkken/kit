@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1039,
-		"code_lines": 86745,
-		"comment_lines": 34297,
+		"code_lines": 86751,
+		"comment_lines": 34303,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 474432
 	},
 	"accepted": {
-		"reason": "git fixture runs every command with maintenance.auto=false so a detached auto-maintenance writer no longer races close_workspace (ENOTEMPTY) #3558",
+		"reason": "defect:rate counts defects by the bug / bugfix / route:interrupt labels over enhancement-labelled completions (#3560): the label imports and the defect label set add 6 code lines",
 		"date": "2026-10-09"
 	}
 }
