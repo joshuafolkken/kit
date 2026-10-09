@@ -138,6 +138,7 @@ function baseline_text(metrics: Metrics): string {
 const metrics_logic = {
 	ai_cost_totals,
 	baseline_text,
+	comment_ratio,
 	guard_count,
 	is_measured_script,
 	physical_lines,
