@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1041,
-		"code_lines": 87003,
-		"comment_lines": 34392,
+		"files": 1042,
+		"code_lines": 87032,
+		"comment_lines": 34406,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 475208
 	},
 	"accepted": {
-		"reason": "#3570 round-2 security fix: refuse the pipefail rewrite beside lone &, redirection, backtick or $( and cover it with regression cases",
+		"reason": "#3575 let the gate record green when its own metrics step rewrote a shrunk baseline mid-gate",
 		"date": "2026-10-09"
 	}
 }
