@@ -10,10 +10,10 @@ import {
 	type SupervisorLiveness,
 } from './run-stranded'
 
-// The I/O half of the strand detector (joshuafolkken/kit#2375): it gathers the three facts the pure
+// The I/O half of the strand detector: it gathers the three facts the pure
 // judge in `run-stranded.ts` weighs, then — on a strand — leaves the marker and sends the one
 // notification. `stop-guard.ts` wires it into the Stop hook, so it runs at each loop boundary beside the
-// stall detector it mirrors (joshuafolkken/kit#2359); the CLI exposes the same call for a person to run
+// stall detector it mirrors; the CLI exposes the same call for a person to run
 // by hand.
 //
 // **Cheap and local.** Every read is a file on disk — the carry record, the wake record — and a process
@@ -23,8 +23,8 @@ import {
 
 // The recovery line names the command that hands the run to a fresh supervisor — the same one the pure
 // judge holds, so the notification and the recovery can never drift. It is deliberately not
-// `run:carry --resume`: the cutting session is refused `busy` and must stay refused
-// (joshuafolkken/kit#1935), so recovery is another actor's.
+// `run:carry --resume`: the cutting session is refused `busy` and must stay refused,
+// so recovery is another actor's.
 const STRAND_RECOVERY = `Restart supervision with \`${run_stranded.RECOVERY_COMMAND}\` — it wakes a fresh successor to claim the budget; the cutting session must not resume it itself.`
 
 // The seams a test replaces: the two record targets, the two record reads, the owner and supervisor

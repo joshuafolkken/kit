@@ -8,7 +8,7 @@ import {
 } from './run-wake'
 import type { LaunchResult } from './run-wake-session'
 
-// The supervisor's body: read the carry record, decide, act, sleep, repeat (joshuafolkken/kit#1719).
+// The supervisor's body: read the carry record, decide, act, sleep, repeat.
 //
 // **Everything it touches is a port**, so the loop is testable without a real process, a real clock or
 // a real Telegram. What is left here is the sequencing, which is the part worth pinning: a run that
@@ -24,7 +24,7 @@ const STOPPED_REASON: WakeStopReason = 'stopped'
 const FAILED_REASON: WakeStopReason = 'failed'
 const NO_ATTEMPTS = 0
 const STOPPED_BY_PERSON: LoopStop = { reason: STOPPED_REASON, note: undefined }
-// **The back-off after repeated whiffs, and its ceiling** (joshuafolkken/kit#2417). While a launch is
+// **The back-off after repeated whiffs, and its ceiling.** While a launch is
 // deferred for want of work, each wait is as long as the idle stretch so far — so the polling interval
 // doubles pass by pass — capped at this multiple of the configured one. Eight times the one-minute
 // default is eight minutes: far fewer backlog reads over a long empty stretch, and still well inside
@@ -41,7 +41,7 @@ interface LoopPorts {
 	// A compatibility probe for the wake decision. Production lets the resident driver inspect work,
 	// including an empty idle watch, without starting an AI session.
 	has_work: (read: CarryRead) => Promise<boolean | undefined>
-	// **The forced transcript id is generated here and handed to `wake`** (joshuafolkken/kit#2407), so
+	// **The forced transcript id is generated here and handed to `wake`**, so
 	// the loop stays deterministic under test — a fixture returns a known id — while production draws a
 	// fresh UUID. The same id is recorded on the wake record, which is how `josh time --run` later knows
 	// the session was one this supervisor started.
@@ -107,8 +107,8 @@ async function wake_step(wake: RunWake, ports: LoopPorts): Promise<StepOutcome> 
 }
 
 // A `wait` means the woken session has claimed the carry record, so the wake mark is cleared and the
-// next cut starts the grace window afresh — **and it is the only pass on which `woke` may grow**
-// (joshuafolkken/kit#1746), because arriving here is the supervisor observing that a record it was
+// next cut starts the grace window afresh — **and it is the only pass on which `woke` may grow**,
+// because arriving here is the supervisor observing that a record it was
 // waiting on has been taken over. A `pending` keeps what is there, because the window it is measured
 // from is still open.
 function continue_step(wake: RunWake, decision: WakeDecision, ports: LoopPorts): StepOutcome {
@@ -145,9 +145,9 @@ function decision_input(wake: RunWake, ports: LoopPorts): WakeDecisionInput {
 	}
 }
 
-// **Work is asked about only where the answer could change the decision** (joshuafolkken/kit#2417):
-// on a pass the record alone would launch from. Every other pass — the in-flight wait, the pending
-// grace window — decides from the record as before and costs no backlog read.
+// **Work is asked about only where the answer could change the decision**: on a pass the record alone
+// would launch from. Every other pass — the in-flight wait, the pending grace window — decides from
+// the record alone and costs no backlog read.
 async function decide_pass(wake: RunWake, ports: LoopPorts): Promise<WakeDecision> {
 	const input = decision_input(wake, ports)
 	const decision = run_wake.decide(input)
@@ -187,7 +187,7 @@ async function run_pass(
 // The record is re-read at the top of every pass rather than carried in a variable, so a `--stop` that
 // removed it ends the loop at the next interval and a `--list` reads what the loop actually wrote.
 //
-// **`read_own_wake` rather than `read_wake`, and the difference is a whole pass** (joshuafolkken/kit#1727).
+// **`read_own_wake` rather than `read_wake`, and the difference is a whole pass.**
 // A record that has become a *successor's* is not this loop's to act on, and reading it back would
 // have this pass decide from another supervisor's counters — spawning a session for a cut that
 // supervisor is already serving, and only then finding the write-back refused. Read as owned or not

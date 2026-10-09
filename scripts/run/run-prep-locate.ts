@@ -1,11 +1,10 @@
 import { get_exit_code } from '#scripts/git/git-execa-error'
 import { git_spawn } from '#scripts/git/git-spawn'
 
-// The code locations an issue names, bundled into `run:prep` (joshuafolkken/kit#2761). Across the 90
-// runs `.time-history.jsonl` split by contributor, 53% of round trips were investigation, and most of
-// it opened the files an issue names one read at a time. This finds each path, identifier and command
-// the body puts in backticks and hands back where it occurs in code — `file:line` and a short excerpt,
-// never a whole file — so the first read lands on the right place.
+// The code locations an issue names, bundled into `run:prep`. Investigation is most of a run's
+// round trips, and most of it opens the files an issue names one read at a time. This finds each
+// path, identifier and command the body puts in backticks and hands back where it occurs in code —
+// `file:line` and a short excerpt, never a whole file — so the first read lands on the right place.
 //
 // **Only a backticked span is a target.** A prose word is not a name, and a span holding a space is a
 // command line or a sentence rather than one thing to look up; the one exception is a `josh` command,

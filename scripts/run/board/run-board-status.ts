@@ -9,10 +9,10 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 import type { ClosedIssue } from './run-board-closed'
 import { run_board_phase, type Phase } from './run-board-phase'
 
-// What each issue of a run is doing now, read from the run's own event stream and its open lanes
-// (joshuafolkken/kit#3430). Local reads only — no `gh` call — so `run:board` can redraw it every few
-// seconds; the plan these statuses are laid over is the slow GitHub half, and so is what a child that
-// left the open listing answers when read closed (joshuafolkken/kit#3451).
+// What each issue of a run is doing now, read from the run's own event stream and its open lanes.
+// Local reads only — no `gh` call — so `run:board` can redraw it every few seconds; the plan these
+// statuses are laid over is the slow GitHub half, and so is what a child that left the open listing
+// answers when read closed.
 
 type ItemState = 'running' | 'merged' | 'parked' | 'done' | 'waiting' | 'human' | 'stopped'
 
@@ -21,10 +21,9 @@ interface ItemStatus {
 	started_ms?: number | undefined
 	ended_ms?: number | undefined
 	// The seat-free lane label (`lane <N>`) of a running child, when it holds one — the running test reads
-	// it; the board no longer draws it (joshuafolkken/kit#3444).
+	// it; the board does not draw it.
 	lane?: string | undefined
-	// Every phase the child passed while running, in order (`run-board-phase.ts`) — kept once it settles
-	// (joshuafolkken/kit#3535).
+	// Every phase the child passed while running, in order (`run-board-phase.ts`) — kept once it settles.
 	track?: ReadonlyArray<Phase> | undefined
 }
 
@@ -56,7 +55,7 @@ function launched(event: RunEvent): ItemStatus {
 }
 
 // The status a child settles into: its start and the track it had reached, so a settled row still
-// draws how it got there (joshuafolkken/kit#3535).
+// draws how it got there.
 function settled_as(previous: ItemStatus | undefined, state: ItemState): ItemStatus {
 	const track = previous?.track
 
@@ -72,8 +71,8 @@ function continued(previous: ItemStatus | undefined): ItemStatus {
 }
 
 // A stage line carrying its attempt redraws the track of any child launched on this stream — a settled
-// one too, since the line that survived a full stream is often the `report` after the merge
-// (joshuafolkken/kit#3552) — and starts one for a running child whose launch has rolled off.
+// one too, since the line that survived a full stream is often the `report` after the merge — and
+// starts one for a running child whose launch has rolled off.
 function replayed(
 	previous: ItemStatus | undefined,
 	attempt: ReadonlyArray<Phase>,
@@ -124,9 +123,8 @@ function fold_events(events: ReadonlyArray<RunEvent>): Map<number, ItemStatus> {
 	return statuses
 }
 
-// A lane is this run's only when its issue is on the run's stream or in the run's plan
-// (joshuafolkken/kit#3442): every lane on the machine read as running, so a lane left over from an
-// earlier day was drawn as this run's child.
+// A lane is this run's only when its issue is on the run's stream or in the run's plan, so a lane left
+// over from an earlier day is not drawn as this run's child.
 function is_running_lane(
 	issue: number,
 	status: ItemStatus | undefined,
@@ -186,7 +184,7 @@ function is_closed_running(issue: number, status: ItemStatus, read: OpenRead): b
 
 // What a running child's labels say it is doing, `undefined` where they agree it is running: the child
 // applies `needs-decision` and drops `in-progress` itself when it stops, while the stream's park is
-// written by a parent that may no longer be there (joshuafolkken/kit#3459).
+// written by a parent that may no longer be there.
 function labelled_state(labels: ReadonlyArray<string> | undefined): ItemState | undefined {
 	if (labels === undefined) return undefined
 	if (has_label_name(labels, NEEDS_DECISION_LABEL)) return 'human'
@@ -209,7 +207,7 @@ function is_closed_before_launch(status: ItemStatus, closed: ClosedIssue): boole
 	return closed.closed_ms < status.started_ms
 }
 
-// A running child read closed ends when GitHub says it closed, merged or not (joshuafolkken/kit#3451).
+// A running child read closed ends when GitHub says it closed, merged or not.
 function closed_status(
 	status: ItemStatus,
 	closed: ClosedIssue | undefined,
@@ -233,12 +231,11 @@ function settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus 
 	return labelled(issue, status, read)
 }
 
-// **The stream stays the source of truth; the listing only unsticks it** (joshuafolkken/kit#3442). A child
-// whose merge never reached the stream read as running forever, so a running child the plan's open
-// listing no longer holds is drawn finished instead — merged and timed once GitHub was read for it
-// (joshuafolkken/kit#3451), finished without a time while that read has not answered. One the listing
-// still holds is drawn as its labels say, so a child that stopped with no parent to record it does not
-// read as running (joshuafolkken/kit#3459).
+// **The stream stays the source of truth; the listing only unsticks it.** A child whose merge never
+// reached the stream would read as running forever, so a running child the plan's open listing no
+// longer holds is drawn finished instead — merged and timed once GitHub was read for it, finished
+// without a time while that read has not answered. One the listing still holds is drawn as its labels
+// say, so a child that stopped with no parent to record it does not read as running.
 function settle_closed(
 	statuses: ReadonlyMap<number, ItemStatus>,
 	read: OpenRead,
@@ -263,8 +260,8 @@ function is_run_stop(event: RunEvent | undefined): boolean {
 	return event?.kind === KIND.STOP && run_event_scope.issue_named(event) === undefined
 }
 
-// `is_ended` is a run `run:carry --end` closed (joshuafolkken/kit#3439): its record says it stopped,
-// whatever its last event was.
+// `is_ended` is a run `run:carry --end` closed: its record says it stopped, whatever its last event
+// was.
 function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActivity {
 	const last = events.at(-1)
 	const position = events.findLast((event) => !run_event_stream.TRACE_KINDS.has(event.kind))

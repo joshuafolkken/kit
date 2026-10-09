@@ -3,44 +3,39 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_issue_number } from './run-issue-number'
 
 // The grammar of an invocation that can be carried across a session cut, and the only place it is
-// written down (joshuafolkken/kit#1774, folded into `backlogrun` by joshuafolkken/kit#1984). It sat
-// inside `run-wake-session.ts` while that supervisor was its one reader; two now need the same answer
-// — the supervisor, to rebuild the text it wakes with, and `run-carry.ts`, to say which of a
-// `backlogrun`'s named issues are still outstanding. A grammar copied into two files is a grammar
-// kept correct in one, which is the clone `CLAUDE.md` prohibits.
+// written down. Two readers need the same answer — the supervisor, to rebuild the text it wakes with,
+// and `run-carry.ts`, to say which of a `backlogrun`'s named issues are still outstanding. A grammar
+// copied into two files is a grammar kept correct in one, which is the clone `CLAUDE.md` prohibits.
 //
 // **`backlogrun` is the one command that survives a cut, and its invocation is a named-issue list, a
 // budget, or both.** `backlogrun #N1 #N2 …` runs the named issues in the order they were typed and
 // then drains the opted-in backlog; `backlogrun --max 5 --idle 30` names only a budget; the two
-// combine as `backlogrun #N1 #N2 --max 5`. The named list is what `queue` used to be its own keyword
-// for (joshuafolkken/kit#1984 removed that keyword).
+// combine as `backlogrun #N1 #N2 --max 5`.
 //
 // **The invocation is taken apart and rebuilt, rather than inspected and handed on.** Everything that
 // may reach the operating system is enumerable: one command word, two flag names, and an integer for
 // each argument. Reading the record as tokens and composing a fresh string out of constants and
 // validated integers means the text the record held never reaches `spawn` at all.
 //
-// **A stricter check is not a break in the flow, and that is why three of them changed nothing.**
-// Validating the characters, fixing the binary as a constant and matching against a pattern all left
-// the recorded string flowing into the call; taint tracking follows where a value goes, not how hard
-// it was looked at on the way. Composing the argument from constants is what actually severs it
-// (joshuafolkken/kit#1719).
+// **A stricter check is not a break in the flow.** Validating the characters, fixing the binary as a
+// constant and matching against a pattern all leave the recorded string flowing into the call; taint
+// tracking follows where a value goes, not how hard it was looked at on the way. Composing the
+// argument from constants is what actually severs it.
 const BACKLOG_COMMAND = 'backlogrun'
 // **The named list is pinned to what was typed.** The record keeps the opening list unchanged across
-// every cut, so `classify_claim`'s character-for-character comparison is untouched and
-// joshuafolkken/kit#1722's single-writer guarantee is not weakened. What shrinks is the *outstanding*
-// set, and that lives in the record's `done` field rather than in the string — the alternative,
-// loosening the comparison to the keyword, is what joshuafolkken/kit#1774 rejected.
+// every cut, so `classify_claim`'s character-for-character comparison is untouched and the
+// single-writer guarantee is not weakened. What shrinks is the *outstanding* set, and that lives in
+// the record's `done` field rather than in the string.
 //
 // The flags this grammar knows how to carry across a session cut. A token is compared against these
 // and the **constant that matched** is what goes into the rebuilt invocation, never the token itself:
 // the two are equal as text and differ in where they came from, and here the origin is the whole point.
 const KNOWN_FLAGS: ReadonlyArray<string> = ['--max', '--idle']
 // `--only` is the one flag that takes no value — it says "run the named list and stop, do not drain the
-// pool" (joshuafolkken/kit#1984). It is carried across a cut like any other part of the invocation, so
+// pool". It is carried across a cut like any other part of the invocation, so
 // a resumed session that reads it back does not silently start draining the backlog the person excluded.
 const ONLY_FLAG = '--only'
-// The read itself is `cli_flags`'s (joshuafolkken/kit#3261): strict, so an unknown flag, a flag with
+// The read itself is `cli_flags`'s: strict, so an unknown flag, a flag with
 // no value, `--only=<x>` and a value that is itself a flag are all refused before this file looks.
 const OPTIONS = {
 	max: { type: 'string' },

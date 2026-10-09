@@ -1,11 +1,9 @@
 import { issue_state, type IssueState } from '#scripts/issue/issue-state'
 
-// `josh run:prep <N>` — the reads a `fullrun` makes before its first edit, assembled into one report
-// (joshuafolkken/kit#1978). Two earlier passes at the setup phase were a documentation rule
-// (joshuafolkken/kit#1847) and a measurement (joshuafolkken/kit#1868); neither was an execution-side
-// change, and the `setup` median did not move. This joins the issue body and comments, the state and
-// `human_review` line, and the dependency-update scope that `issue:read`, `issue:state` and
-// `latest:scope` answered in three separate calls — reusing each rather than reproducing it.
+// `josh run:prep <N>` — the reads a `fullrun` makes before its first edit, assembled into one report.
+// This joins the issue body and comments, the state and `human_review` line, and the dependency-update
+// scope that `issue:read`, `issue:state` and `latest:scope` answer in three separate calls — reusing
+// each rather than reproducing it.
 //
 // The leading summary line carries the three facts a run branches on — the state, whether the issue
 // stops before its commit, and whether a dependency update is owed — so the decision is read off the
@@ -40,13 +38,12 @@ interface PrepParts {
 	state_failure: string
 	latest_scope: string
 	latest_reason: string
-	// Where the paths and identifiers the issue names occur in code (joshuafolkken/kit#2761).
+	// Where the paths and identifiers the issue names occur in code.
 	locations: string
 	// Whether a lane child's tree holds uncommitted work — read for the verdict, not printed in the
-	// report (joshuafolkken/kit#2476).
+	// report.
 	has_changes: boolean
-	// What `josh ship` would refuse on as the tree stands — `run_ship_preflight.ahead`
-	// (joshuafolkken/kit#3154).
+	// What `josh ship` would refuse on as the tree stands — `run_ship_preflight.ahead`.
 	ship_problems: ReadonlyArray<string>
 }
 

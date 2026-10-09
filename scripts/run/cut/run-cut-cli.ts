@@ -16,7 +16,7 @@ import { run_cut_handoff } from './run-cut-handoff'
 import { run_cut_report } from './run-cut-report'
 
 // `josh run:cut` — the record that lets a lane child end its process before the gate and a fresh one
-// resume from it (joshuafolkken/kit#1839). `run:cut <N>` writes the record and relaunches a fresh
+// resume from it. `run:cut <N>` writes the record and relaunches a fresh
 // `fullrun #<N>`; the fresh process runs `run:cut --resume <N>` at its entry, which verifies the tree
 // against the record and hands the run on to the gate. **Turning `argv` into a request is
 // `run-cut-args.ts`'s**; what is here acts on the record and relaunches.
@@ -61,11 +61,10 @@ const {
 	report_unreadable,
 } = run_cut_report
 
-// **The pre-gate cut is conditional on the same statistic the implementation-phase cut reads**
-// (joshuafolkken/kit#2312). `cost_cli.session_verdict` prices the newest request
-// against `CONTEXT_CUT_THRESHOLD`, so no second threshold is introduced — an `under` session skips the
-// cut, and an unmeasurable one keeps the old unconditional cut as the safety net joshuafolkken/kit#1933
-// relies on. Only the pre-gate phase is checked here; the implementation-phase caller gates its own
+// **The pre-gate cut is conditional on the same statistic the implementation-phase cut reads**.
+// `cost_cli.session_verdict` prices the newest request against `CONTEXT_CUT_THRESHOLD`, so no second
+// threshold is introduced — an `under` session skips the cut, and an unmeasurable one still cuts as
+// the safety net. Only the pre-gate phase is checked here; the implementation-phase caller gates its own
 // `--impl` cut on `pnpm josh cost --cut` before it is ever issued.
 function skips_pre_gate_cut(phase: string): boolean {
 	if (phase !== run_cut.PRE_GATE_PHASE) return false
@@ -104,8 +103,8 @@ function report_missing_supervisor(issue: string): number {
 	return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
 }
 
-// **The relaunched child is started at the effort of the phase it is resuming into**
-// (joshuafolkken/kit#2382). A pre-gate resume drives the gate, commit, PR and merge — the mechanical
+// **The relaunched child is started at the effort of the phase it is resuming into**.
+// A pre-gate resume drives the gate, commit, PR and merge — the mechanical
 // ship/bookkeeping region, lowered — while an implementation resume keeps the role default. The
 // phase-aware profile is `agent_argv.resume_argv`'s; a person's `JOSH_WORKER_EFFORT` still wins over it.
 function relaunch(target: string, lane: LaneInfo, phase: string): number {
@@ -144,11 +143,11 @@ interface CutRequest {
 	issue: string
 	phase: string
 	// The `--handoff` path whose instruction and work state the record carries, absent for a pre-gate
-	// cut that resumes into the gate rather than into implementation (joshuafolkken/kit#2354).
+	// cut that resumes into the gate rather than into implementation.
 	handoff_path?: string | undefined
 }
 
-// **Every cut appends a `cut` event to the run's stream** (joshuafolkken/kit#2346). It is what advances
+// **Every cut appends a `cut` event to the run's stream**. It is what advances
 // `run:step` past the phase boundary — a cut emitted here is why the run's next position reads as
 // `run:cut --resume`. Best-effort by the stream's contract, so a failed append never fails the cut it
 // reports.
@@ -210,10 +209,10 @@ function report_held_cut(issue: string): number {
 	return report(CUT_VERDICT, SUCCESS_EXIT_CODE)
 }
 
-// **A `fullrun` held in its own checkout takes the implementation cut too** (joshuafolkken/kit#2760).
-// The cut was lane-only, so a run a person started had no bound on its context mid-implementation. The
-// hold naming this issue is what marks the run — a tree nobody holds for it, and the pre-gate phase
-// (which a held run's gate reaches in the same session), stay `not-a-lane` exactly as before.
+// **A `fullrun` held in its own checkout takes the implementation cut too**, so a run a person started
+// has a bound on its context mid-implementation. The hold naming this issue is what marks the run — a
+// tree nobody holds for it, and the pre-gate phase (which a held run's gate reaches in the same
+// session), stay `not-a-lane`.
 async function cut_outside_lane(
 	target: string,
 	request: Omit<CutRequest, 'branch'>,
@@ -258,18 +257,16 @@ async function cut(
 // **The adoption is the resume-uniqueness guarantee**: it removes and creates exclusively, so of two
 // racing resumes only one wins the create and the loser is answered `busy`.
 // An implementation cut resumes back into implementation; a pre-gate one into the gate. The resuming
-// child is told which by the verdict rather than reconstructing it from the record
-// (joshuafolkken/kit#1933).
+// child is told which by the verdict rather than reconstructing it from the record.
 function resume_verdict_for(cut_record: RunCut): string {
 	return run_cut.resumes_into_implementation(cut_record.phase)
 		? RESUME_IMPL_VERDICT
 		: RESUME_VERDICT
 }
 
-// **An implementation resume removes the record; a pre-gate one marks it handed off**
-// (joshuafolkken/kit#2310). The cuts have different multiplicities sharing one
-// record: the pre-gate cut fires once per lane, so its record must survive to answer a second resume
-// `handed-off` (joshuafolkken/kit#1935); the implementation cut is guarded by the run's
+// **An implementation resume removes the record; a pre-gate one marks it handed off**.
+// The cuts have different multiplicities sharing one record: the pre-gate cut fires once per lane, so
+// its record must survive to answer a second resume `handed-off`; the implementation cut is guarded by the run's
 // event stream rather than the cut record, so its record is cleared on resume — a lingering record
 // would keep the pre-gate guard, which reads `carried_cut_sync`, silent for the rest of the run. A double
 // cut stays impossible either way: `begin_cut`'s exclusive create is what prevents it.
@@ -284,15 +281,15 @@ function take_over(target: string, cut_record: RunCut): RunCut | undefined {
 }
 
 // The carried instruction and work state, printed to standard error so the resumed session continues
-// on what the run was told to do rather than on the tree alone (joshuafolkken/kit#2354). The record is
-// cleared on adoption, so this is where it reaches the fresh process.
+// on what the run was told to do rather than on the tree alone. The record is cleared
+// on adoption, so this is where it reaches the fresh process.
 function announce_handoff(cut_record: RunCut): void {
 	if (cut_record.handoff !== undefined) {
 		console.error(run_cut_handoff.describe_handoff(cut_record.handoff))
 	}
 }
 
-// **An implementation resume appends a `resume` event** (joshuafolkken/kit#3375). It clears the record
+// **An implementation resume appends a `resume` event**. It clears the record
 // the `cut` event stood for, so the stream is what moves `run:step` back to implementation; a pre-gate
 // resume keeps its record and appends nothing. Best-effort, as the cut's own append is.
 async function emit_resume_event(issue: string, verdict: string): Promise<void> {
@@ -319,7 +316,7 @@ async function adopt(target: string, cut_record: RunCut): Promise<number> {
 }
 
 // A relaunched lane child and a fresh session both measure `under`, so only the session that took an
-// implementation cut resumes over the threshold (joshuafolkken/kit#2760); unmeasurable is not refused.
+// implementation cut resumes over the threshold; unmeasurable is not refused.
 function is_over_threshold_resume(cut_record: RunCut): boolean {
 	if (!run_cut.resumes_into_implementation(cut_record.phase)) return false
 
@@ -377,7 +374,7 @@ function end(target: string): number {
 	return report(ENDED_VERDICT, SUCCESS_EXIT_CODE)
 }
 
-// A bare cut is the pre-gate boundary and `--impl` the implementation-phase one (joshuafolkken/kit#1933).
+// A bare cut is the pre-gate boundary and `--impl` the implementation-phase one.
 function cut_phase(request: { is_implementation: boolean }): string {
 	return request.is_implementation ? run_cut.IMPLEMENTATION_PHASE : run_cut.PRE_GATE_PHASE
 }

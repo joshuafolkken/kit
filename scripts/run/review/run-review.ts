@@ -1,15 +1,13 @@
 // The pure decisions `josh run:review` makes, kept apart from the side effects the same way
-// `run-merge.ts` is kept apart from `run-merge-steps.ts` (joshuafolkken/kit#2179).
+// `run-merge.ts` is kept apart from `run-merge-steps.ts`.
 //
 // `run:review` starts the gate in the background and prints the `/code-review` brief in one call, so a
 // lane child launches both from a single command and the two overlap rather than running one after the
 // other. Two facts have to be decided from what the stamps say, and both are decided here so a test can
 // pin them without a gate ever running:
 //
-// - **whether the review verdict may be adopted** — only over a green gate. Before this command the
-//   ordering guaranteed it: the child read the gate, saw green, and only then launched the review, so
-//   there was no path to adopting a review over a red gate. Started together, that guarantee is no
-//   longer a side effect of the order and has to be a decision (`adopt_verdict`).
+// - **whether the review verdict may be adopted** — only over a green gate. Started together, the two
+//   no longer guarantee that by their order, so it has to be a decision (`adopt_verdict`).
 // - **how far the gate and the review overlapped** — the measurement the parallel start exists to
 //   produce, computed from the four timestamps `run-review-steps.ts` records.
 
@@ -18,10 +16,10 @@ const BLOCKED = 'blocked'
 
 type AdoptVerdict = typeof ADOPT | typeof BLOCKED
 
-// A red gate blocks the review verdict outright, whatever the review concluded — the same rule the
-// serial order used to enforce implicitly (joshuafolkken/kit#1242's gate-beside-review is only safe
-// while a red gate can still stop the commit). `--join` exits non-zero on `blocked`, so the guard is
-// the command's exit code rather than a sentence a child has to read and obey.
+// A red gate blocks the review verdict outright, whatever the review concluded: running the gate
+// beside the review is only safe while a red gate can still stop the commit. `--join` exits non-zero
+// on `blocked`, so the guard is the command's exit code rather than a sentence a child has to read
+// and obey.
 function adopt_verdict(is_gate_green: boolean): AdoptVerdict {
 	return is_gate_green ? ADOPT : BLOCKED
 }
@@ -85,8 +83,8 @@ function overlap_seconds(timing: ReviewTiming): number {
 	return Math.max(NO_OVERLAP, (end - start) / MS_PER_SECOND)
 }
 
-// The three lines a `--join` prints so a reader — issue #2179 and `chain-rule.md`'s overlap check —
-// can see the gate ran inside the review rather than in front of it.
+// The three lines a `--join` prints so a reader — `chain-rule.md`'s overlap check — can
+// see the gate ran inside the review rather than in front of it.
 function format_timing(timing: ReviewTiming): string {
 	const gate = span_seconds(timing.gate_started_at, timing.gate_ended_at)
 	const review = span_seconds(timing.review_started_at, timing.review_ended_at)

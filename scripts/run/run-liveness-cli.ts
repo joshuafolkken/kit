@@ -18,7 +18,7 @@ import {
 } from './run-liveness'
 
 // `josh run:liveness <N> --output <path> [--process <alive|none>]` — one verdict about the delegated
-// unit running child `<N>` (joshuafolkken/kit#1485).
+// unit running child `<N>`.
 //
 // The stdout/stderr split is the contract, as it is for `run:hold`: exactly one
 // verdict token on stdout on every path, the reason and the advice on stderr. `undetermined` exits
@@ -122,7 +122,7 @@ function to_optional_fields(values: ParsedValues): Partial<LivenessRequest> {
 }
 
 // Left out, the process trace is read here with the probe `lane:await` polls on — the child's
-// invocation or its detached ship — so no caller runs `pgrep` by hand (joshuafolkken/kit#3400); a
+// invocation or its detached ship — so no caller runs `pgrep` by hand; a
 // probe that could not look answers `unknown`, never `none`. A given `--process` still wins: it is
 // the answer for a unit this probe does not know, such as one whose checkout the caller scanned itself.
 function process_trace_of(values: ParsedValues, issue: string): ProcessTrace {

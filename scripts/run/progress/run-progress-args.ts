@@ -2,18 +2,18 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_progress_config } from './run-progress-config'
 
 // The argument half of `josh run:progress`, kept apart from the watcher so the CLI stays inside the file
-// limit (joshuafolkken/kit#2503). Everything here is pure: argv in, values out.
+// limit. Everything here is pure: argv in, values out.
 
 // A watcher outlives the turn that started it, so something has to end it. One hour is three of the
 // default twenty-minute intervals: long enough that the bound never truncates a report, short enough
 // that a watcher left waiting on a run that has already merged is gone within the hour. It is
 // deliberately **not** `run:hold`'s eight-hour expiry — that holds an uncommitted working tree across
-// a person's latency and is trampled by being short (joshuafolkken/kit#1091), while a watcher holds
+// a person's latency and is trampled by being short, while a watcher holds
 // only a heartbeat the caller restarts on the next interval, so the two guard different things and
 // only one has anything to lose by being short.
 const DEFAULT_MAX_HOURS = 1
-// **`--wait` is bounded by a run, not by three intervals** (joshuafolkken/kit#3102). It no longer exits
-// at its first report — the reports go to the event stream — so its one-hour bound would be the last
+// **`--wait` is bounded by a run, not by three intervals.** It does not exit at
+// its first report — the reports go to the event stream — so its one-hour bound would be the last
 // wake that asks the parent for no judgement, a restart an hour. Eight hours is `run:hold`'s expiry;
 // what ends a finished run's watcher sooner is `josh followup` removing its life record, and a stop
 // tearing it down in the same turn.

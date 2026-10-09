@@ -5,9 +5,9 @@ import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_preflight } from '#scripts/run/run-preflight'
 import { run_ship_stage, type ShipState } from './run-ship-stage'
 
-// The read side of a resumed `josh ship` (joshuafolkken/kit#2426): the repository's actual state, asked
-// before any stage runs, and where the stage record lives. `run-ship-stage.ts` decides from what this
-// reads; this module only reads.
+// The read side of a resumed `josh ship`: the repository's actual state, asked before any stage runs,
+// and where the stage record lives. `run-ship-stage.ts` decides from what this reads; this module
+// only reads.
 //
 // **Every read that cannot complete answers `false`** — "not done yet" — so the stage runs and its own
 // guard answers instead: `git -y` refuses an empty commit, a push of a commit origin already holds
@@ -82,7 +82,7 @@ async function read_state(): Promise<ShipState> {
 }
 
 // The common git directory every lane of the repository shares — what the stage record, the detached
-// supervisor's log and its pid are keyed on (joshuafolkken/kit#2428) — or `undefined` outside one.
+// supervisor's log and its pid are keyed on — or `undefined` outside one.
 async function repository_directory(): Promise<string | undefined> {
 	try {
 		const directories = await git_command.git_directories()

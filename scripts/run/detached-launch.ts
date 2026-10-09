@@ -7,13 +7,11 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 
 // Starting a process that outlives this one, and keeping what it writes.
 //
-// **It was `run-wake-session.ts`'s until a second caller needed it** (joshuafolkken/kit#1749). The
-// supervisor was the only thing launching a detached session, so the launcher and the
-// `backlogrun`-specific invocation parsing sat in one file; a delegated child launched into a lane
-// needs exactly the launcher and none of the parsing. Copying it across would be the clone
-// `CLAUDE.md` prohibits — and this is the shape of clone that fails silently, because the copy that
-// drifts is the one that forgets to strip the parent session's environment and dies at its first API
-// request with nothing naming the cause (joshuafolkken/kit#1760).
+// **It is its own module because two callers need the launcher and only one the parsing.** The
+// supervisor and a delegated child launched into a lane both launch detached sessions. A copy would be
+// the clone `CLAUDE.md` prohibits — and this is the shape of clone that fails silently, because the
+// copy that drifts is the one that forgets to strip the parent session's environment and dies at its
+// first API request with nothing naming the cause.
 //
 // **What is shared is the mechanism, never the argument vector.** Each caller composes its own
 // `LaunchArgv` out of its own constants and validated values — `run-wake-session.ts` rebuilds a
@@ -52,13 +50,13 @@ type AttachedLaunchResult =
 interface LaunchRequest {
 	argv: LaunchArgv
 	cwd: string
-	// Where to keep what the child writes. **Absent means the output is discarded**, which is what every
-	// launch did before joshuafolkken/kit#1746 and what a caller with nowhere to write still gets — the
-	// log is an improvement on the diagnosis, never a precondition for starting a session.
+	// Where to keep what the child writes. **Absent means the output is discarded**, which is what a
+	// caller with nowhere to write gets — the log is an improvement on the diagnosis, never a
+	// precondition for starting a session.
 	log_path?: string | undefined
 	// Extra variables to set on the child, spread **after** the parent-session strip below, so a caller
 	// can hand the child a fact the inherited environment does not carry — a dispatched lane child's mark
-	// among them (joshuafolkken/kit#1904). Setting it here rather than mutating `process.env` keeps the
+	// among them. Setting it here rather than mutating `process.env` keeps the
 	// launcher's own environment untouched, and spreading it last means an explicit value wins over an
 	// inherited one of the same name.
 	env?: Readonly<Record<string, string | undefined>>
@@ -127,16 +125,13 @@ function opened_log(log_path: string, on_error: (note: string) => void): number 
 }
 
 // **The header is written by the launch and by nothing else.** Opening the file and announcing a
-// launch into it were one function until joshuafolkken/kit#1759, which is what made the file's
-// existence a side effect of launching: there was no way to obtain the descriptor without also
-// claiming a session had started. Split, `ensure_log` below can create the file the moment its path
-// is named, and a log nothing has launched into stays empty rather than carrying a header for a
-// session that never ran.
+// launch into it are separate, so `ensure_log` below can create the file the moment its path is named,
+// and a log nothing has launched into stays empty rather than carrying a header for a session that
+// never ran.
 //
-// **It swallows its own failure, because a log failure is never a failed launch.** In `opened_log`
-// this write sat inside `open_log`'s `try`, so a full disk lost the header and started the session
-// anyway; reached from `launch`'s `try` it would answer `failed` instead and leave a cut
-// `backlogrun` asleep — the one outcome `open_log`'s comment below rules out.
+// **It swallows its own failure, because a log failure is never a failed launch.** Reached from
+// `launch`'s `try` it would answer `failed` instead and leave a cut `backlogrun` asleep — the one
+// outcome `open_log`'s comment below rules out.
 function stamped(
 	descriptor: number | undefined,
 	argv: LaunchArgv,
@@ -154,13 +149,10 @@ function stamped(
 
 // **Opening the log is allowed to fail, and a failure is not a failed launch.** A temp directory that
 // cannot be written to is a reason to lose the diagnosis, never a reason to leave the run asleep — so
-// this answers `undefined` and the spawn goes ahead discarding output, exactly as it did before
-// joshuafolkken/kit#1746.
+// this answers `undefined` and the spawn goes ahead discarding output.
 //
 // **It says so rather than failing quietly, though.** `--list` and every warning name this path
-// unconditionally, so a silent failure would send a person at three in the morning to a file holding
-// nothing of this run — the silent diagnosis joshuafolkken/kit#1746 was filed about, arrived at from
-// the other side.
+// unconditionally, so a silent failure would send a person to a file holding nothing of this run.
 function open_log(
 	log_path: string | undefined,
 	on_error: (note: string) => void,
@@ -176,15 +168,11 @@ function open_log(
 	}
 }
 
-// **The file exists because its path was resolved, not because something launched into it**
-// (joshuafolkken/kit#1759). `--list`, the already-running branch of `--start` and every warning name
-// this path unconditionally, and until this existed none of the three created anything: the file was
-// written only by the process that launched, at the moment it launched. So a supervisor started
-// before the log existed — detached, and alive for the hours a `backlogrun` takes — left the path
-// named for the whole run with nothing ever at it, and the one report a failure could make went to
-// that same absent file. Creating it where it is named is what makes the name a promise the reader
-// can check: an empty log says "this supervisor started nothing", which is an answer, where a
-// missing one said nothing at all.
+// **The file exists because its path was resolved, not because something launched into it.**
+// `--list`, the already-running branch of `--start` and every warning name this path unconditionally,
+// so creating it where it is named is what makes the name a promise the reader can check: an empty
+// log says "this supervisor started nothing", which is an answer, where a missing one says nothing at
+// all.
 //
 // **No header is written here**, because nothing has been launched — see `stamped` above.
 function ensure_log(log_path: string, on_error: (note: string) => void): void {
@@ -193,17 +181,16 @@ function ensure_log(log_path: string, on_error: (note: string) => void): void {
 	if (descriptor !== undefined) closeSync(descriptor)
 }
 
-// **`detached` is what puts the child outside the conversation, and discarding its output was never
-// part of that** (joshuafolkken/kit#1746). A process left attached is a child of the agent session,
+// **`detached` is what puts the child outside the conversation, and discarding its output is no part
+// of that.** A process left attached is a child of the agent session,
 // and the session cut is exactly the moment this has to survive — so a supervisor that the harness
 // backgrounds, the way `run:progress` is backgrounded, would die at the one event it exists to handle.
-// That argument is about the parent link alone. `stdio: 'ignore'` rode along with it and threw away
-// the one record that could say why a woken session exited without claiming the carry record, which is
-// the whole of what joshuafolkken/kit#1746 could not diagnose. Pointed at a file, the child is just as
-// detached and the output survives it.
+// That argument is about the parent link alone. `stdio: 'ignore'` would throw away the one record that
+// can say why a woken session exited without claiming the carry record; pointed at a file, the child is
+// just as detached and the output survives it.
 //
 // **The parent session's environment is removed here, and that is why it is here rather than at each
-// call site** (joshuafolkken/kit#1760). A detached child outlives the invocation that spawned it, so a
+// call site**. A detached child outlives the invocation that spawned it, so a
 // loopback proxy exported into that invocation is a dead address by the time the child dials it —
 // `ConnectionRefused` at the first API request, with nothing anywhere naming the cause. A second
 // launcher that composed its own `SpawnOptions` would be one edit away from that failure.
@@ -279,16 +266,14 @@ function ignore_spawn(_pid: number): void {
 // that array is a constant or an integer the caller composed, because each caller takes the text it was
 // handed apart and rebuilds it rather than passing it on.
 //
-// **It is what was left after the flow was actually broken, not something used instead of breaking
-// it.** Three earlier rounds tried to satisfy the rule by inspecting the string harder and moved it not
-// at all; the rebuild is what severed the flow, and the same change retired the pattern CodeQL had
-// found an exponential backtrack in — **`js/redos` is gone from this file rather than suppressed, and
-// this marker covers nothing of it.** What the rule still sees is the shape of a `spawn` reached from a
-// file that was read, and that shape is the design: starting a process from a record is the whole of
-// what a supervisor does.
+// **It is what is left after the flow is actually broken, not something used instead of breaking it.**
+// Inspecting the string harder does not satisfy the rule; the rebuild is what severs the flow —
+// **`js/redos` is absent from this file rather than suppressed, and this marker covers nothing of
+// it.** What the rule still sees is the shape of a `spawn` reached from a file that was read, and that
+// shape is the design: starting a process from a record is the whole of what a supervisor does.
 //
-// Scoped to that one line on the user's explicit instruction of 2026-09-10 (joshuafolkken/kit#1719).
-// No project-wide exclusion and no change to the Sonar configuration.
+// Scoped to that one line on the user's explicit instruction. No project-wide exclusion and no change
+// to the Sonar configuration.
 function spawned(
 	request: LaunchRequest,
 	log: number | undefined,

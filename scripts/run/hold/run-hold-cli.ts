@@ -8,32 +8,28 @@ import { run_tidy_cli } from '#scripts/run/tidy/run-tidy-cli'
 import { run_hold, type HoldRead, type RunHold } from './run-hold'
 
 // `josh run:hold [<N>]` and `josh run:release [<N> | --force]` — the working-tree guard the typed
-// entry points ask before they start (joshuafolkken/kit#1091).
+// entry points ask before they start.
 //
-// **A numbered claim asks the preflight question first** (joshuafolkken/kit#1965). `run:preflight`
-// was a separate command a run had to ask before this one; the two-step "preflight, then hold" was
-// one call too many, so the claim now runs the check itself and hands back a hold only on a `clean`
-// tree. A `reclaim` / `resume` / `park` tree is returned as that verdict without a record being
-// written, and the read-only check stays re-askable — clean up what it named, ask `run:hold` again.
-// The decision logic itself lives on in `run-preflight.ts` for `run:progress` to reuse; only its CLI
-// went away.
+// **A numbered claim asks the preflight question first**: the claim runs the check itself and hands
+// back a hold only on a `clean` tree. A `reclaim` / `resume` / `park` tree is returned as that verdict
+// without a record being written, and the read-only check stays re-askable — clean up what it named,
+// ask `run:hold` again. The decision logic lives in `run-preflight.ts` for `run:progress` to reuse.
 //
-// **A release names the run it belongs to, exactly as the claim did** (joshuafolkken/kit#1799). The
-// record carries no owner until then, so `run:release` removed whatever was there — and the `busy`
-// stop message tells a person to type it when they judge a record stale, which is a judgement made
-// from outside the run that wrote it. That made the guard's own recovery instruction a way to free a
-// live run's tree: the incident of 2026-08-30, reached through the guard meant to prevent it.
+// **A release names the run it belongs to, exactly as the claim did.** The `busy` stop message tells
+// a person to release when they judge a record stale — a judgement made from outside the run that
+// wrote it — so an unowned release would make the guard's own recovery instruction a way to free a
+// live run's tree.
 //
 // **It answers, so the entry point does not judge.** "This one is a small change, it will be fine" is
-// the judgement made under time pressure that produced the incident, and it is the same shape
-// `delegation-policy.ts` refuses to leave to an agent. A token on standard output is what the entry
+// a judgement made under time pressure, and it is the same shape `delegation-policy.ts` refuses to
+// leave to an agent. A token on standard output is what the entry
 // point obeys.
 //
 // The contract is `epic:next`'s: **standard output carries exactly one token** — `hold`, `busy` or
 // `unknown` — and every explanation goes to standard error, so `answer=$(pnpm josh run:hold 1091)`
 // captures something a loop can branch on.
 //
-// **A successful claim then sweeps merged residue** — `run:tidy` (joshuafolkken/kit#2701). After the
+// **A successful claim then sweeps merged residue** — `run:tidy`. After the
 // claim rather than before it: the sweep may append to the primary checkout's observation ledger, and
 // doing that ahead of the preflight would turn a clean primary checkout into a `reclaim`.
 
@@ -41,16 +37,15 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const RELEASE_FLAG = '--release'
-// What removes a record this run did not write. **The deliberate friction of the whole change**
-// (joshuafolkken/kit#1799): every release now names the run it belongs to, and the one act that
-// cannot — clearing a record somebody else left behind — is spelled out rather than reached by
-// typing the ordinary command.
+// What removes a record this run did not write. **Deliberate friction**: every release names the run
+// it belongs to, and the one act that cannot — clearing a record somebody else left behind — is
+// spelled out rather than reached by typing the ordinary command.
 const FORCE_FLAG = '--force'
 // What `fullrun #N`'s entry claims with, so the record says the run is a `fullrun` — the one run whose
-// implementation cut outside a lane resumes as `fullrun #N` (joshuafolkken/kit#2760).
+// implementation cut outside a lane resumes as `fullrun #N`.
 const FULLRUN_FLAG = '--fullrun'
 const HALFRUN_STOP_FLAG = '--halfrun-stop'
-// A `prrun`'s stop before merge (joshuafolkken/kit#3023): its record keeps the commit it stopped on.
+// A `prrun`'s stop before merge: its record keeps the commit it stopped on.
 const PRRUN_STOP_FLAG = '--prrun-stop'
 // The most a claim reads: the issue number and the one flag after it.
 const MAX_CLAIM_ARGUMENTS = 2
@@ -171,7 +166,7 @@ function report_hold(): number {
 // that wrote it is the one whose uncommitted work would be trampled, so a record that cannot be
 // parsed is never read as an idle tree. **And an expired record still stops it while the tree is
 // dirty** — that is a run which stopped for a person, and the work is right there in the tree.
-// **A live record stops every claim but its own run's** (joshuafolkken/kit#3419).
+// **A live record stops every claim but its own run's.**
 function held_block(hold: RunHold, issue: string): string | undefined {
 	return run_hold.is_reentry(hold, issue) ? undefined : run_hold.held_message(hold)
 }
@@ -198,7 +193,7 @@ function take_free_tree(target: string, request: ClaimRequest): number {
 
 // **The stale path takes the tree the same exclusive way the free path does.** Replacing an expired
 // record with a plain write would tell two sessions that both found it expired that they both won —
-// the race the free path was just fixed for, reintroduced one branch over. Removing it first is what
+// the race the free path guards against. Removing it first is what
 // turns the expired record into a free tree; the create is what decides between the two claimants.
 function replace_stale(target: string, request: ClaimRequest, hold: RunHold): number {
 	console.error(run_hold.stale_message(hold))
@@ -207,8 +202,8 @@ function replace_stale(target: string, request: ClaimRequest, hold: RunHold): nu
 	return take_free_tree(target, request)
 }
 
-// The claim on a tree nothing blocks. A `held` record that got this far is the run's own
-// (joshuafolkken/kit#3419), so it is kept as written — its stop marks included — and answered `hold`.
+// The claim on a tree nothing blocks. A `held` record that got this far is the run's own, so it is
+// kept as written — its stop marks included — and answered `hold`.
 function take_tree(target: string, request: ClaimRequest, read: HoldRead): number {
 	if (read.kind === 'held') return report_hold()
 
@@ -219,7 +214,7 @@ function take_tree(target: string, request: ClaimRequest, read: HoldRead): numbe
 
 // A non-clean preflight verdict is not an error: it is an answer a loop branches on, exactly as
 // `busy` is, so it prints the reason and advice the check composed and exits zero. Only an unreadable
-// tree is `unknown`, and that reaches `report_unknown` through `run`'s catch, as it always did.
+// tree is `unknown`, and that reaches `report_unknown` through `run`'s catch.
 function report_preflight(decision: PreflightDecision): number {
 	console.error(`${decision.reason}\n${decision.advice}`)
 	console.info(decision.verdict)
@@ -276,10 +271,8 @@ function report_unreadable_release(): number {
 	return report(run_hold.unreadable_message(), UNKNOWN_VERDICT, FAILURE_EXIT_CODE)
 }
 
-// **A release removes the record only where the record names the run asking** (joshuafolkken/kit#1799).
-// Until then this removed whatever was there, and the `busy` stop message sent a person here to clear
-// a record they had judged stale from outside the run that wrote it — so the guard's own recovery
-// instruction was a way to free a live run's tree, which is the incident it was written after.
+// **A release removes the record only where the record names the run asking**, so the `busy` stop
+// message's recovery instruction cannot free a live run's tree.
 function release_record(target: string, claimant: string): number {
 	const read = run_hold.read_hold(target)
 
@@ -292,7 +285,7 @@ function release_record(target: string, claimant: string): number {
 	return remove_record(target, true)
 }
 
-// **A numbered run's own release takes its `in-progress` marker back off** (joshuafolkken/kit#3182),
+// **A numbered run's own release takes its `in-progress` marker back off**,
 // whether or not a record was still there — the stop that releases is the run ending its hold on the
 // issue. A refused release (another run's record, an unreadable one) touches no label, and an
 // unnumbered run names no issue to touch.
@@ -338,9 +331,9 @@ async function read_worktree(): Promise<string | undefined> {
 	}
 }
 
-// **A `halfrun` stop marks its own record** (joshuafolkken/kit#2796) — the positive "this run has ended
-// over its verified diff" that `run:entry` adopts on `fullrun #N`. Another run's record is left alone.
-// A `prrun` stop marks its record the same way, with the commit it stopped on (joshuafolkken/kit#3023).
+// **A `halfrun` stop marks its own record** — the positive "this run has ended over its verified diff"
+// that `run:entry` adopts on `fullrun #N`. Another run's record is left alone. A `prrun` stop marks
+// its record the same way, with the commit it stopped on.
 async function mark_stop(target: string, request: StopRequest): Promise<number> {
 	const mark =
 		request.kind === PRRUN_STOP_KIND
@@ -374,10 +367,9 @@ async function answer(request: HoldRequest): Promise<number> {
 	return await dispatch(request, run_hold.hold_path(directory), is_linked)
 }
 
-// **Every path out of here prints exactly one token**, including the ones nobody planned: a permission
-// error on the record, or a git binary that is not there, used to leave standard output empty — and an
-// empty `$answer` matches none of the three tokens, which an entry point reads as "not busy" before
-// walking straight past the guard.
+// **Every path out of here prints exactly one token**, including the ones nobody planned — a
+// permission error on the record, or a git binary that is not there: an empty `$answer` matches none
+// of the three tokens, which an entry point would read as "not busy" and walk straight past the guard.
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const request = parse_request(argv)
 

@@ -3,14 +3,11 @@ import { josh_command } from '#scripts/josh/josh-run'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { lane_park } from '#scripts/rules/lane-park'
 
-// What `run:entry` does on the way out of a stop it decided itself (joshuafolkken/kit#3099).
+// What `run:entry` does on the way out of a stop it decided itself.
 //
-// **The stop's chores used to be the agent's to remember, and the `Stop` hook was what reminded it.**
-// `fullrun.md` step 3 asked the agent, on an `over` budget, to send the `confirmation` Telegram and then
-// run `pnpm josh run:release` — two calls after a command had already decided the run was over. Across
-// eleven measured sessions the hook sent a reply back five times for exactly those two calls, each one a
-// further turn re-reading the whole context. The command that decides the stop knows everything the
-// chores need, so it does them, and the hook stays a safety net that a normal run never trips.
+// **The command that decides the stop does its chores** — the `confirmation` Telegram and the hold
+// release — because it knows everything they need, and leaving them to the agent costs further turns
+// re-reading the whole context. The `Stop` hook stays a safety net that a normal run never trips.
 //
 // **The release is the claim's own undo, and only where this call made the claim.** A resume over a
 // stopped `halfrun` / `prrun` stops on the budget before adopting anything, and the hold there is the

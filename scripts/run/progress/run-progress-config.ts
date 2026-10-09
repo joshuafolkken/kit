@@ -4,14 +4,11 @@ import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { z } from 'zod'
 import { run_progress } from './run-progress'
 
-// Where the silence interval comes from, and in what order (joshuafolkken/kit#1576).
+// Where the silence interval comes from, and in what order.
 //
-// **The setting existed and could not leave the machine.** `JOSH_PROGRESS_INTERVAL_MINUTES` is read
-// from `.env`, which is deliberately never committed — so a person who set fifteen minutes here got
-// twenty on every other machine and in every cloud session, and the guard that enforces the floor got
-// twenty with them. Reporting still happened there, at a cadence nobody asked for.
-//
-// **So the repository carries one of its own.** `josh.progress_interval_minutes` in `package.json` is
+// **The repository carries a setting of its own.** `JOSH_PROGRESS_INTERVAL_MINUTES` is read from
+// `.env`, which is never committed, so it cannot reach other machines or cloud sessions.
+// `josh.progress_interval_minutes` in `package.json` is
 // committed, is per repository rather than per toolkit, and is read through the same reader both
 // halves of the mechanism already share — the watcher before it prints, and the `early-heartbeat` row
 // before it allows an arm. A guard that could disagree with the watcher it guards is worse than no

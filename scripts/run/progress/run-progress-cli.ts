@@ -13,11 +13,10 @@ import { run_progress_clock } from './run-progress-clock'
 import { run_progress_read, type ObservationRead } from './run-progress-read'
 
 // `josh run:progress` — the background watcher that breaks a long silence with one line of
-// observations, and `--mark`, which tells its clock that a real report just happened
-// (joshuafolkken/kit#1520).
+// observations, and `--mark`, which tells its clock that a real report just happened.
 //
 // **This is the one josh command that is meant to be started and left running.** Every other one
-// answers once and the parent's own loop drives it; that shape was rejected here on purpose, because
+// answers once and the parent's own loop drives it; that shape does not fit here, because
 // a parent that waits and reports spends one of its own turns per heartbeat — 36 of them in a
 // three-hour run, taken at the point its context is largest. So the loop lives here, the parent
 // starts it in the background, and all the parent does is relay what appears.
@@ -31,7 +30,7 @@ import { run_progress_read, type ObservationRead } from './run-progress-read'
 // `scripts/notify/telegram-notify`, which is the only egress there is. A heartbeat every twenty minutes on
 // a phone is notification fatigue, and it would cheapen the `confirmation` and `completion` messages
 // that do need to interrupt someone. Only an explicit `run:board --every <minutes>`, started because a
-// person asked for periodic progress off-screen, sends one (joshuafolkken/kit#3569).
+// person asked for periodic progress off-screen, sends one.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -55,17 +54,17 @@ const NO_RETRY = 0
 const { DEFAULT_WAIT_MAX_HOURS } = run_progress_args
 const { DISABLED_KEY, DISABLED_VALUE, is_disabled } = run_progress
 
-// joshuafolkken/kit#2480: a malformed `--wait` exits at once, and read as "started" it left a person
-// without progress until someone looked at the exit — so the refusal says the relay is down.
+// A malformed `--wait` exits at once, and read as "started" it would leave a person without progress
+// until someone looked at the exit — so the refusal says the relay is down.
 const USAGE =
 	'Usage: josh run:progress [--repo <owner/repo>] [--interval <minutes>] [--output <path>] [--once | --wait] [--hours <hours>] | josh run:progress --mark | josh run:progress --path\nThe progress watcher did not start, so nothing is relaying progress to this session — fix the arguments (one flag and one value per argument) and start it again.'
 const DISABLED_NOTICE = `\`${DISABLED_KEY}=${DISABLED_VALUE}\` is set, so no progress is reported.`
 const MARKED_NOTICE =
 	'Recorded a report at this moment. The next progress line waits a full interval from here, so a heartbeat cannot land immediately behind a real report.'
 // A dispatched lane child carries `JOSH_LANE_CHILD`, and only the outermost run reports progress — a
-// child that started a watcher of its own would be the second one this command's whole design refuses
-// (joshuafolkken/kit#1947). The decision used to live in prose the child read as "start none"; the mark
-// makes it mechanical, so a bare `fullrun #N` handed to a lane no longer reads itself as outermost.
+// child that started a watcher of its own would be the second one this command's whole design refuses.
+// The mark makes that mechanical, so a bare `fullrun #N` handed to a lane does not read itself as
+// outermost.
 const LANE_CHILD_NOTICE =
 	'This session is a dispatched lane child (`JOSH_LANE_CHILD`), so no progress watcher is started — the outermost run reports for every child.'
 const IDLE_NOTICE =
@@ -81,8 +80,7 @@ const WAIT_EXPIRED_NOTICE = `The watch bound (\`--hours\`, ${String(DEFAULT_WAIT
 const REPO_LOOKUP_TIMEOUT_SECONDS = 10
 const REPO_LOOKUP_TIMEOUT_MS = REPO_LOOKUP_TIMEOUT_SECONDS * run_progress.MS_PER_SECOND
 // A lookup that timed out or failed is not an argument the caller got wrong, so it is told apart from
-// the usage error — read as one, it sent a person to fix arguments that were correct
-// (joshuafolkken/kit#2859).
+// the usage error — read as one, it would send a person to fix arguments that were correct.
 const REPO_UNRESOLVED_NOTICE = `The repository could not be resolved (\`gh\` did not answer within ${String(REPO_LOOKUP_TIMEOUT_SECONDS)}s or failed), so the progress watcher did not start. Pass \`--repo <owner/repo>\` and start it again.`
 
 const DECLINE_NOTICES: Readonly<Record<'idle' | 'unreadable', string>> = {
@@ -105,8 +103,7 @@ interface WatchOptions {
 	repo: string
 	tick_ms: number
 	// `--wait` alone: the line goes to the run's event stream and the ambient log, never to standard
-	// output, because a background command's output reaches the session only as a wake
-	// (joshuafolkken/kit#3102).
+	// output, because a background command's output reaches the session only as a wake.
 	is_stream_only?: boolean
 }
 
@@ -120,8 +117,7 @@ type DeclineKind = Exclude<ObservationRead['kind'], 'observed'>
 
 // A union rather than an optional field, so a caller that wants the reason has to establish that
 // there is one — the reason exists exactly when no line went out. `line` is the exact string printed,
-// handed back so the caller can persist it verbatim for `josh run:wake --list` to relay
-// (joshuafolkken/kit#1910).
+// handed back so the caller can persist it verbatim for `josh run:wake --list` to relay.
 type EmitResult = { kind: DeclineKind } | { kind: 'observed'; state: ProgressState; line: string }
 
 interface WatchLoop {
@@ -193,7 +189,7 @@ async function emit(options: WatchOptions, context: EmitContext): Promise<EmitRe
 	const state = run_progress.next_state(context.state, key, context.now_ms)
 
 	// The interval reaches the line from the options rather than being resolved a second time, so the
-	// schedule printed and the clock `step` consults are one number (joshuafolkken/kit#1726). Both
+	// schedule printed and the clock `step` consults are one number. Both
 	// reporting forms come through here, which is what puts the field on `--wait` and `--once` alike.
 	const line = run_progress.format_line(read.observations, {
 		interval_ms: options.interval_ms,
@@ -257,7 +253,7 @@ async function attempt(
  * print one straight after the run's real report — which is the single thing this command is built
  * not to do.
  *
- * **A tick that printed nothing does not move the report clock.** A decline now means no run has
+ * **A tick that printed nothing does not move the report clock.** A decline means no run has
  * started here at all, so the silence has not been broken and the first report is emitted at once
  * instead of waiting out an interval spent idle; what a decline moves instead is the read cooldown.
  */
@@ -288,9 +284,9 @@ async function step(options: WatchOptions, target: string, loop: WatchLoop): Pro
  * The loop both reporting forms are, with one difference between them.
  *
  * `watch` runs until `--hours` expires; `--wait` stops at the first arrival and keeps its lines off
- * standard output (joshuafolkken/kit#3102). Everything else — where the clock is seeded from, the tick, the decline
- * cooldown `step` keeps — is one implementation on purpose: two copies would let a fix to the bound or
- * to the initial silence reach one form and not the other, and `--wait` is the form a run starts.
+ * standard output. Everything else — where the clock is seeded from, the tick, the decline cooldown
+ * `step` keeps — is one implementation on purpose: two copies would let a fix to the bound or to the
+ * initial silence reach one form and not the other, and `--wait` is the form a run starts.
  */
 // The silence this loop starts from: the record where there is one, and otherwise the moment it began
 // watching, so a first line on a tree with no record reports the wait it actually did.
@@ -300,11 +296,11 @@ function seed_loop(target: string, started_ms: number): WatchLoop {
 
 // Why the loop stopped, so `drive` prints the bound-expired notice only when the bound is what
 // expired — not when `josh followup` ended the watcher, which is a clean stop with nothing to report.
-// `arrived` is a `--wait` ended early by newly runnable work (joshuafolkken/kit#2503).
+// `arrived` is a `--wait` ended early by newly runnable work.
 type WatchExit = 'arrived' | 'ended' | 'bound'
 
 // `wait` is present for `--wait` alone, which ends at the first arrival its probe sees. **A report is
-// not an exit** (joshuafolkken/kit#3102): every exit wakes the session that started it, and a wake
+// not an exit**: every exit wakes the session that started it, and a wake
 // spent relaying a line the event stream already carries is the most expensive turn a run takes, so
 // only what the parent has to act on ends the wait.
 async function wait_exit(wait: ArrivalProbe | undefined): Promise<WatchExit | undefined> {
@@ -330,10 +326,9 @@ function final_exit(life: string): WatchExit {
 }
 
 // The loop both reporting forms share, reading its own liveness record at the top of each pass — the
-// `run-wake-loop.ts` `run_loop` shape (joshuafolkken/kit#1727). A record gone means `josh followup`
-// removed it at the merge, so the watcher stops at once instead of waiting out its bound
-// (joshuafolkken/kit#1821); `--wait` also stops at the first arrival, and otherwise the loop runs
-// until `--hours` expires.
+// `run-wake-loop.ts` `run_loop` shape. A record gone means `josh followup` removed it at the merge,
+// so the watcher stops at once instead of waiting out its bound; `--wait` also stops at the first
+// arrival, and otherwise the loop runs until `--hours` expires.
 async function run_ticks(
 	options: WatchOptions,
 	target: string,
@@ -366,8 +361,8 @@ async function drive(options: WatchOptions, is_wait: boolean): Promise<number> {
 	const exit = await run_ticks(options, target, life, wait)
 
 	if (exit === 'bound' && is_wait) console.error(WAIT_EXPIRED_NOTICE)
-	// Every `--wait` exit is a wake, so it carries the pick-up reading with it (joshuafolkken/kit#2452) —
-	// the reading an `arrived` exit was woken for.
+	// Every `--wait` exit is a wake, so it carries the pick-up reading with it — the reading an
+	// `arrived` exit was woken for.
 	if (is_wait) await backlog_ready.print_ready_line()
 
 	return SUCCESS_EXIT_CODE
@@ -394,31 +389,28 @@ async function once(options: WatchOptions): Promise<number> {
 }
 
 /**
- * The form a run starts in the background: it reports on its own and wakes the caller only for work
- * (joshuafolkken/kit#3102).
+ * The form a run starts in the background: it reports on its own and wakes the caller only for work.
  *
- * **A report is not a wake.** It once ended at its first line so a harness that delivers a background
- * command's output only on exit would relay it (joshuafolkken/kit#1576) — which cost the orchestrating
- * session one turn per heartbeat, re-reading a hundred thousand tokens of context to pass on a line it
- * was forbidden to change. Every line already reaches the run's event stream as a `heartbeat` and the
- * ambient log, which a person's `run:board` pane reads with no model in between, so this form
- * keeps its lines off standard output and exits only on an arrival, on `josh followup` ending its life
- * record, or on its bound. The caller starts it once and restarts it only after one of those.
+ * **A report is not a wake.** Ending at each line would cost the orchestrating session one turn per
+ * heartbeat, re-reading its whole context to pass on a line it may not change. Every line already
+ * reaches the run's event stream as a `heartbeat` and the ambient log, which a person's `run:board`
+ * pane reads with no model in between, so this form keeps its lines off standard output and exits
+ * only on an arrival, on `josh followup` ending its life record, or on its bound. The caller starts it
+ * once and restarts it only after one of those.
  *
  * **The clock is still this command's, not the caller's.** It is the watch loop itself, a tick at a
  * time, rather than a second reading of the same record — so a real report elsewhere pushes the next
- * line out and a declined reading takes the same cooldown. That is what keeps joshuafolkken/kit#1570
- * intact: the caller arms no timer of its own.
+ * line out and a declined reading takes the same cooldown, and the caller arms no timer of its own.
  *
  * **One at a time is the caller's part rather than this loop's.** The record is read before the `gh`
  * reads and written after them, so two of these running at once could both find the same silence due
  * and both print; `backlogrun.md` starts exactly one, which is where that is guaranteed.
  *
- * **A decline is not an exit.** A decline now means no run has started here at all — no hold, no
+ * **A decline is not an exit.** A decline means no run has started here at all — no hold, no
  * carried budget, no lane, and no `in-progress` child — so a genuinely idle repository keeps the loop
  * waiting instead of ending it; returning there would hand the caller an instant answer to restart,
  * and the documented restart makes that a poll rather than a heartbeat. Once a run has started the
- * loop reports even before the first child carries `in-progress` (joshuafolkken/kit#1900).
+ * loop reports even before the first child carries `in-progress`.
  */
 async function wait_once(options: WatchOptions): Promise<number> {
 	return await drive({ ...options, is_stream_only: true }, true)
@@ -432,7 +424,7 @@ async function mark_now(): Promise<number> {
 }
 
 // The ambient log's path on standard output, so a person can `tail -F` the surface the heartbeat keeps
-// across a session cut (joshuafolkken/kit#2156). It reads no run state, so it answers even before one
+// across a session cut. It reads no run state, so it answers even before one
 // has started and in a lane child alike — the path is a function of the checkout, not of a live run.
 async function report_path(): Promise<number> {
 	console.info(await run_progress_read.log_target())

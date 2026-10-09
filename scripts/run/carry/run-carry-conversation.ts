@@ -4,13 +4,12 @@ import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { own_session } from '#scripts/cost-runtime/own-session'
 import type { CarryOwner, RunCarry } from './run-carry'
 
-// **A conversation outlives its process, so an owner named by a pid alone dies too early**
-// (joshuafolkken/kit#3137). The carry record names the agent process spending the budget, and that is
-// right while the process lives — but an interactive conversation is not its process. On 2026-10-04 a
-// VS Code extension-host restart ended the session's process at 15:17:34 UTC, and the same
-// conversation resumed eighteen seconds later in a new process (`--resume=<id>`), writing on into the
-// same transcript. `run:wake` read the old pid as dead, recovered the record as a crash, and dispatched
-// a second lane child for the issue the conversation was still running.
+// **A conversation outlives its process, so an owner named by a pid alone dies too early.** The carry
+// record names the agent process spending the budget, and that is right while the process lives — but
+// an interactive conversation is not its process. An extension-host restart ends the process and the
+// same conversation resumes seconds later in a new one (`--resume=<id>`), writing on into the same
+// transcript; read by pid alone, `run:wake` would recover the record as a crash and dispatch a second
+// lane child for the issue the conversation is still running.
 //
 // **The transcript is what persists across the restart, so it is the second half of the identity.**
 // Every resume path — the extension's `--resume=<id>`, a person's `claude -c` — appends to the one

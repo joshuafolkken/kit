@@ -2,10 +2,10 @@ import { gate_tree } from '#scripts/gate/gate-tree'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 
-// The scoped pair `josh ship` meets itself rather than stops on (joshuafolkken/kit#2500), shared by
-// every stage that needs a green record for this tree (joshuafolkken/kit#2946): the preflight stage at
-// the start, the review rounds, and the gate stage — a reviewer may have edited the tree after round
-// 1's pair ran, and `josh gate` refuses a tree with no green record.
+// The scoped pair `josh ship` meets itself rather than stops on, shared by every stage that needs a
+// green record for this tree: the preflight stage at the start, the review rounds, and the gate
+// stage — a reviewer may have edited the tree after round 1's pair ran, and `josh gate` refuses a
+// tree with no green record.
 
 const SUCCESS_EXIT_CODE = 0
 const should_forward_stderr = true
@@ -40,7 +40,7 @@ async function scoped_pair(): Promise<JoshResult> {
 }
 
 // The scoped pair and then `josh gate` — the gate stage, and the followup's gate over a merged tree
-// before its push (joshuafolkken/kit#3307), so both leave the record the pre-push hook reuses.
+// before its push, so both leave the record the pre-push hook reuses.
 async function scoped_gate(): Promise<JoshResult> {
 	return await run_phases([
 		scoped_pair,

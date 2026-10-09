@@ -16,10 +16,9 @@ import { run_issue_number } from '#scripts/run/run-issue-number'
 import { run_merge, type ChildOutcome, type EndingSignals } from './run-merge'
 import { run_merge_steps, type FailedResult, type MergeContext } from './run-merge-steps'
 
-// `josh run:merge <N>` — one composite command for a `backlogrun` merge event (joshuafolkken/kit#2024).
-// The parent's context is the largest and its per-turn cost the highest, and the event was two turns:
-// a reading turn and an acting turn. This collapses them — the parent calls this once at a child's
-// return and reads back the next child number, or a control verdict.
+// `josh run:merge <N>` — one composite command for a `backlogrun` merge event. The parent's context is
+// the largest and its per-turn cost the highest, so it calls this once at a child's return and reads
+// back the next child number, or a control verdict.
 //
 // The contract is `run:carry`'s: **standard output carries one token** (or the newline-separated
 // offer `epic:next --lanes` prints), and everything else is a captured subprocess or a quiet
@@ -38,12 +37,12 @@ const HUMAN_REVIEW_TOKEN = 'human-review'
 const BUSY_TOKEN = 'busy'
 const STOP_TOKEN = 'stop'
 // The consecutive-outage guard tripped: the environment is down, so the run stops rather than
-// re-dispatching into a dead API (joshuafolkken/kit#2240). Distinct from `stop` so the parent's report
-// can say the environment failed rather than the children.
+// re-dispatching into a dead API. Distinct from `stop` so the parent's report can say the environment
+// failed rather than the children.
 const ENVIRONMENT_TOKEN = 'environment'
 const RETRY_TOKEN = 'retry'
-// The child's cut was resumed in its own lane (joshuafolkken/kit#2484): the parent awaits that lane
-// again, and offers no child in its place.
+// The child's cut was resumed in its own lane: the parent awaits that lane again, and offers no child
+// in its place.
 const RESUMED_TOKEN = 'resumed'
 const PARK_FAILURE_NOTE = 'The failed child could not be parked with needs-decision; stopping.'
 // The same digit shape `run-carry-args.ts` reads an owner pid under; a count is a bare run of digits.
@@ -124,8 +123,8 @@ function has_invalid_offer(values: ParsedArguments['values']): boolean {
 	)
 }
 
-// Old parents may still pass the numeric threshold they started with. Its shape remains strict, but
-// its value is ignored so an in-flight caller cannot restore a second threshold source.
+// A caller may still pass a numeric threshold. Its shape remains strict, but its value is ignored so
+// a caller cannot introduce a second threshold source.
 function has_invalid_legacy_over(raw: string | undefined): boolean {
 	if (raw === undefined) return false
 
@@ -170,7 +169,7 @@ function parse(argv: ReadonlyArray<string>): MergeContext | undefined {
 }
 
 // One handled return: the stdout token and the exit code. Returned rather than printed, so the
-// in-process caller (`backlog:drive`, joshuafolkken/kit#2508) reads the same verdict the CLI prints.
+// in-process caller (`backlog:drive`) reads the same verdict the CLI prints.
 interface MergeVerdict {
 	token: string
 	code: number
@@ -187,7 +186,7 @@ function emit(token: string, code: number): MergeVerdict {
 }
 
 // Whether the child's exit record shows it could not reach the API — read only when `--output` named
-// the transcript, off otherwise (joshuafolkken/kit#2240). The path is validated inside
+// the transcript, off otherwise. The path is validated inside
 // `run_ending.read_exit`, which returns `undefined` for an unreadable or missing record, so a missing
 // output is simply "not an outage".
 function read_is_outage(output: string | undefined): boolean {
@@ -200,7 +199,7 @@ type IssueRead = Awaited<ReturnType<typeof issue_state_cli.read_issue>>
 
 // The timeline is read only for an OPEN, unparked child — the one classification a merged closing pull
 // request changes. A CLOSED child was closed by GitHub, so it must carry no `merged_pr` for
-// `do_merged` to close again (joshuafolkken/kit#2769).
+// `do_merged` to close again.
 async function read_merged_pr(child: string, read: IssueRead): Promise<string | undefined> {
 	if (read.kind !== 'state' || run_merge.classify_child(read.state) !== 'failed') return undefined
 
@@ -221,7 +220,7 @@ function outcome_of(read: IssueRead, signals: EndingSignals): ChildOutcome {
 }
 
 // A refused count means this session is not the carry record's owner, so the whole operation is
-// rejected — the lane is not closed and no next child is offered (joshuafolkken/kit#2114).
+// rejected — the lane is not closed and no next child is offered.
 function report_count_refused(carry: RunCarry | undefined): MergeVerdict {
 	if (carry !== undefined) console.error(run_carry.count_refused_message(carry))
 
@@ -230,7 +229,7 @@ function report_count_refused(carry: RunCarry | undefined): MergeVerdict {
 
 // A merged child counted and its lane closed, the merge put on the stream and in the ledger. Returns the
 // carry when the ownership check refused it, `undefined` once recorded. `run:carry --end` records the
-// merges a run ended with through it too (`run-merge-collect.ts`, joshuafolkken/kit#3451).
+// merges a run ended with through it too (`run-merge-collect.ts`).
 async function record_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
 	const refused = await run_merge_steps.do_merged(ctx)
 
@@ -257,9 +256,9 @@ async function on_merged(ctx: MergeContext): Promise<MergeVerdict> {
 	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
 }
 
-// A child released to wait on its open blockers (joshuafolkken/kit#3502): settled for this run like a
-// parked one, so it goes on the stream the same way, but nothing was counted — the failure guard is not
-// read, and the next child is offered.
+// A child released to wait on its open blockers: settled for this run like a parked one, so it goes on
+// the stream the same way, but nothing was counted — the failure guard is not read, and the next child
+// is offered.
 async function on_waiting(
 	ctx: MergeContext,
 	blockers: ReadonlyArray<string>,
@@ -301,9 +300,9 @@ async function on_failed(ctx: MergeContext, cause?: string): Promise<MergeVerdic
 	return await on_parked_failure(ctx, result)
 }
 
-// An API-outage child: counted into its own streak and left re-dispatchable, not parked
-// (joshuafolkken/kit#2240). Below the outage guard it offers the next child — which may be this same
-// one again; at the guard it emits `environment` so the parent stops, the environment being down.
+// An API-outage child: counted into its own streak and left re-dispatchable, not parked. Below the
+// outage guard it offers the next child — which may be this same one again; at the guard it emits
+// `environment` so the parent stops, the environment being down.
 async function on_outage(ctx: MergeContext): Promise<MergeVerdict> {
 	const result = await run_merge_steps.do_outage(ctx)
 
@@ -321,9 +320,9 @@ async function on_outage(ctx: MergeContext): Promise<MergeVerdict> {
 	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
 }
 
-// A child that ended its session with a cut no successor adopted (joshuafolkken/kit#2484): its successor
-// is relaunched, nothing is counted and nothing is parked, and `resumed` tells the parent to await the
-// same lane again rather than dispatch into it. A successor that could not be started — or a cut the
+// A child that ended its session with a cut no successor adopted: its successor is relaunched,
+// nothing is counted and nothing is parked, and `resumed` tells the parent to await the same lane
+// again rather than dispatch into it. A successor that could not be started — or a cut the
 // fallback already relaunched once — is the failed child it would otherwise have been. A session that
 // does not own the carry record is refused `busy` before anything is relaunched or marked.
 async function on_cut(ctx: MergeContext): Promise<MergeVerdict> {
@@ -344,9 +343,9 @@ async function on_cut(ctx: MergeContext): Promise<MergeVerdict> {
 }
 
 // A child that parked itself: nothing is counted, but the park is written to the stream as a failed
-// child's is, so a reader restoring the run from its events sees the child settled (joshuafolkken/kit#2508).
-// Its `in-progress` is dropped as a failed child's is: left on, it outlived the `needs-decision` a
-// person later lifted, and a `run:solo` child then held the whole backlog (joshuafolkken/kit#3017).
+// child's is, so a reader restoring the run from its events sees the child settled. Its `in-progress`
+// is dropped as a failed child's is: left on, it would outlive the `needs-decision` a person later
+// lifts, and a `run:solo` child would then hold the whole backlog.
 async function on_parked(ctx: MergeContext): Promise<MergeVerdict> {
 	await run_merge_steps.remove_in_progress(ctx.child)
 	await run_event_stream_emit.emit(
@@ -358,7 +357,7 @@ async function on_parked(ctx: MergeContext): Promise<MergeVerdict> {
 }
 
 // A split child: nothing is counted, and its lane is closed when it holds nothing, so the promoted
-// epic does not keep a seat the next child needs (joshuafolkken/kit#3334).
+// epic does not keep a seat the next child needs.
 async function on_skipped(ctx: MergeContext): Promise<MergeVerdict> {
 	await run_merge_steps.close_split_lane(ctx.child)
 	await run_event_stream_emit.emit(
@@ -397,7 +396,7 @@ const HANDLERS: Readonly<Record<ChildOutcome, (ctx: MergeContext) => Promise<Mer
 }
 
 // The whole merge event for one returned child, in-process: read its state, classify it, and run the
-// handler. The CLI prints the token; `backlog:drive` branches on the outcome (joshuafolkken/kit#2508).
+// handler. The CLI prints the token; `backlog:drive` branches on the outcome.
 async function merge_child(ctx: MergeContext): Promise<MergeResult> {
 	if (lane_handoff.is_ship_running(ctx.child, process.cwd())) {
 		return { outcome: 'shipping', ...(await on_shipping()) }

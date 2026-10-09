@@ -5,7 +5,7 @@ import { run_board_fit, type TerminalSize } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPorts } from './run-board-state'
 
-// The spinners of a live `run:board` frame turned between redraws (joshuafolkken/kit#3495). The frame
+// The spinners of a live `run:board` frame turned between redraws. The frame
 // is redrawn once a second, on the second, and between redraws only the spinners' own cells are written
 // at the package's interval: a cursor move and one character each, with no read, layout or render. The
 // renderer draws a placeholder where a spinner goes, and each placeholder's place on screen — its row

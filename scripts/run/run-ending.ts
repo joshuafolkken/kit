@@ -9,26 +9,22 @@ import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_issue_number } from './run-issue-number'
 import { run_liveness } from './run-liveness'
 
-// `josh run:ending <N>` — how a dispatched lane child *ended*, not whether it is still moving
-// (joshuafolkken/kit#2139). `run:liveness` answers "still working, or stopped?"; a normally-exited
-// child that stopped mid-implementation is invisible to it — the output freezes exactly as a
-// completed child's does, and `is_error: false` looks like success. Measured on 2026-09-19: the child
-// for joshuafolkken/kit#2118 ended `subtype: success`, left three uncommitted files, opened no PR, and
-// `run:cut --resume` answered `fresh` — a mid-implementation exit that read as a clean finish, and the
-// cause took a person opening 875KB of JSONL to find.
+// `josh run:ending <N>` — how a dispatched lane child *ended*, not whether it is still moving.
+// `run:liveness` answers "still working, or stopped?"; a normally-exited child that stopped
+// mid-implementation is invisible to it — the output freezes exactly as a completed child's does, and
+// `is_error: false` looks like success.
 //
 // **The verdict is read from three traces the child leaves behind, never from `is_error`.** A cut
 // record for this issue means it handed off; a CLOSED Issue means it completed and merged; an OPEN
 // Issue with no cut means it ended in the middle. The exit record's own `is_error: false` is *not* a
-// completion — completion is the CLOSED Issue — which is the one distinction that was missing. The exit
-// record is read for the *basis* the park comment carries: which fields said so, and how many tool
-// calls the harness refused (`permission_denials`, the direct cause of the 2118 stop).
+// completion — completion is the CLOSED Issue. The exit record is read for the *basis* the park comment
+// carries: which fields said so, and how many tool calls the harness refused (`permission_denials`).
 //
 // **The words are a different question from `run:liveness`'s four**, deliberately non-overlapping:
 // `merged` / `cut` / `outage` / `abandoned` / `unreadable` answer "how did it end", where `alive` /
 // `stopped` / `settled` / `undetermined` answer "is it still going".
 //
-// **`outage` splits the mid-implementation ending in two** (joshuafolkken/kit#2240). A child that ended
+// **`outage` splits the mid-implementation ending in two**. A child that ended
 // mid-implementation because it could not reach the API is not a child that stalled on its own: the
 // exit record carries a transport-failure signature, read mechanically by `api-outage.ts`. The parent
 // reads it to leave the outage child re-dispatchable rather than parking it and counting it against
@@ -112,7 +108,7 @@ function describe_exit(record: ClaudeResultEvent): string {
 }
 
 // The refused interactive ask, as a clause the park comment can carry the question and options in — or
-// empty when the child asked nothing (joshuafolkken/kit#2201). This is the backstop for a child that
+// empty when the child asked nothing. This is the backstop for a child that
 // slipped past the `PreToolUse` refusal: the question is stranded in the exit record's
 // `permission_denials`, and lifting it here spares the parent opening the JSONL by hand.
 function refused_ask_clause(record: ClaudeResultEvent | undefined): string {

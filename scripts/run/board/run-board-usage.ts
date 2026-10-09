@@ -1,7 +1,6 @@
-// Each lane's CPU and memory on its `run:board` row (joshuafolkken/kit#3489): which lane is loading the
-// machine the header's ⚡ and 🧠 show. On 2026-10-09 two of seven lanes held most of the CPU, and the
-// board could not say which. How the processes are read is `run-board-usage-read.ts`'s; this file turns
-// two readings into each lane's figures.
+// Each lane's CPU and memory on its `run:board` row: which lane is loading the machine the header's ⚡
+// and 🧠 show. How the processes are read is `run-board-usage-read.ts`'s; this file turns two readings
+// into each lane's figures.
 //
 // A lane's CPU is its processes' CPU time between two samples as a share of the whole machine — the
 // header's ⚡ scale, so the two read side by side, never Activity Monitor's one-core-is-100% — and its
@@ -20,8 +19,8 @@ interface UsageMark {
 	processes: ReadonlyMap<number, ProcessReading>
 	// Every listed process's lane, `undefined` for one under none — kept so each is looked up once.
 	lanes: ReadonlyMap<number, string | undefined>
-	// Each process's parent, kept only where the counts fold in the children each reaped
-	// (joshuafolkken/kit#3529) — empty on the `ps` path, so nothing is deducted there.
+	// Each process's parent, kept only where the counts fold in the children each reaped — empty on the
+	// `ps` path, so nothing is deducted there.
 	parents: ReadonlyMap<number, number>
 	// The processes whose count was read with its reaped children folded in — one whose own read failed
 	// keeps the larger of `ps`'s own time and its last reading, so nothing reaped is taken off it.

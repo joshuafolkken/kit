@@ -7,17 +7,14 @@ import { z } from 'zod'
 import { run_issue_number } from './run-issue-number'
 
 // The preflight check — what an interrupted run left in this working tree, and what the rule says to
-// do about it before the next child starts (joshuafolkken/kit#926). It once had its own
-// `josh run:preflight` CLI; joshuafolkken/kit#1965 folded the check into `run:hold`, which now runs it
-// before it claims the tree, so this module is the shared logic behind that claim and behind
-// `run:progress`, and no longer a command of its own.
+// do about it before the next child starts. `run:hold` runs it before it claims the tree, so this
+// module is the shared logic behind that claim and behind `run:progress`, not a command of its own.
 //
-// joshuafolkken/kit#1091 gave a run a way to say "this tree is mine". This is the sibling question,
-// and it is about the run that never said anything again: an unattended run ends abnormally — a
-// crash, a Ctrl-C, a laptop asleep, an expired token — and leaves its feature branch, its open pull
-// request and its uncommitted changes behind. Every child of an `epicrun` starts with
-// `pnpm josh ms`, whose checkout refuses over a dirty tree, and an agent may not reach for
-// `git stash` on its own judgement, so the batch could not recover without a person.
+// It is about the run that never said anything again: an unattended run ends abnormally — a crash, a
+// Ctrl-C, a laptop asleep, an expired token — and leaves its feature branch, its open pull request and
+// its uncommitted changes behind. The next child's checkout refuses over a dirty tree, and an agent
+// may not reach for `git stash` on its own judgement, so without this check the batch cannot
+// recover unattended.
 //
 // **The rule answers, so the run does not judge.** "There is a branch already, I will carry on from
 // it" and "there is a branch already, I had better stop" are both defensible in the moment, which is
@@ -25,7 +22,7 @@ import { run_issue_number } from './run-issue-number'
 // `josh review:level` refuse to leave their answers to an agent.
 //
 // **The check is re-askable, and so is the claim it now gates — but only by the same run.** A claim
-// asked again for the issue the record names answers `hold` (joshuafolkken/kit#3419); for any other
+// asked again for the issue the record names answers `hold`; for any other
 // issue it answers `busy`, because that ask is a second run. This check reads state and writes nothing,
 // so the reclaim recovery ends by asking `run:hold` again on the tree it just cleaned.
 
@@ -90,7 +87,7 @@ const STASH_LABEL_PREFIX = 'run:hold reclaimed before #'
 // The issue number reaches the advice inside a double-quoted shell command a caller is told to paste,
 // so the shape it may take is pinned beside the interpolation rather than only in the CLI that
 // happens to be today's single caller. `run:liveness` interpolates it the same way, so the pattern
-// and the refusal live in one module both read (joshuafolkken/kit#1485).
+// and the refusal live in one module both read.
 const { require_issue_number } = run_issue_number
 const UNREADABLE_PR_MESSAGE = 'The pull request could not be read for branch '
 
@@ -229,11 +226,11 @@ async function read_tree_state(): Promise<TreeState> {
 
 // **An unreadable `gh` is not an absent pull request.** `pr_view` folds both into `''` and cannot tell
 // them apart, so the existence question is asked through `pr_exists`, which throws on a lookup it
-// could not complete (joshuafolkken/kit#1048). That throw reaches the CLI as `unknown`; without it a
+// could not complete. That throw reaches the CLI as `unknown`; without it a
 // rate-limited or logged-out `gh` turns a **merged** pull request into `resume`, and the run commits
 // on top of work somebody already landed — the exact hazard `park` exists for.
-// **The second half of the same guard.** `pr_view` throws on a read it could not complete
-// (joshuafolkken/kit#3263), but the two are separate round trips, so a lookup that answers empty
+// **The second half of the same guard.** `pr_view` throws on a read it could not complete,
+// but the two are separate round trips, so a lookup that answers empty
 // between them would still put a **merged** pull request back through `NO_PR` and out as `resume`.
 // An empty answer for a branch `pr_exists` has just confirmed is therefore a failed read by
 // construction, and it throws rather than answering.
@@ -337,9 +334,9 @@ interface CandidateContext {
 }
 
 // **A branch with no pull request, no commit beyond the default branch and no uncommitted change in
-// its lane holds no work** (joshuafolkken/kit#2855). A lane that ended before implementing — an
-// operational issue with no code change — leaves exactly that behind, and reading its mere existence
-// as a partial implementation sent the next `fullrun #N` to `resume` over nothing. A branch with a
+// its lane holds no work**. A lane that ended before implementing — an operational issue with no code
+// change — leaves exactly that behind, and reading its mere existence as a partial implementation
+// would send the next `fullrun #N` to `resume` over nothing. A branch with a
 // pull request is never counted: whatever its commits, the pull request is the state the verdict is
 // decided on.
 async function read_candidate(

@@ -3,11 +3,11 @@ import { lane_reap } from '#scripts/lane/lane-reap'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 
-// The headless `backlogrun` parent (joshuafolkken/kit#2437). `run:wake` starts a cut's successor as
+// The headless `backlogrun` parent. `run:wake` starts a cut's successor as
 // `claude -p`, and there a turn that ends is the process that ends: its background `lane:await` and
 // `run:progress --wait` are killed with it, so "a background command's exit re-invokes the session"
 // (`docs/maintainers/backlogrun-driver.md` → "Waiting while something is in flight") does not hold. A successor that
-// ended its turn on a wait therefore ended the run's driver while its lanes were still working.
+// ends its turn on a wait therefore ends the run's driver while its lanes are still working.
 //
 // **The mark is what tells that session apart, and the supervisor is its only writer.** It rides the
 // launch's environment (`run-wake-cli.ts`), so an attached session never carries it, and a lane child
@@ -33,12 +33,12 @@ function is_headless_parent(source: EnvironmentSource): boolean {
 	return is_headless(source) && lane_child_marker.marked_issue(source) === undefined
 }
 
-// **The cut cap binds a session cut, never the hand-back to the driver** (joshuafolkken/kit#3454). A
-// headless parent is a judgment session the `run:wake` driver woke for one branch, and its `--cut` is
-// how it returns the loop — the driver holds the run between wakes, so the session has no accumulated
-// context for the cap to weigh against a cold preamble. Capping it left the session unable to cut
-// while the headless stop rule refused its turn-end until it did. Every reader of the cap asks here,
-// so the `--cut` refusal, `run:step` and the parent-cut hook never disagree about it.
+// **The cut cap binds a session cut, never the hand-back to the driver.** A headless parent is a
+// judgment session the `run:wake` driver woke for one branch, and its `--cut` is how it returns the
+// loop — the driver holds the run between wakes, so the session has no accumulated context for the
+// cap to weigh against a cold preamble. Capping it would leave the session unable to cut while the
+// headless stop rule refuses its turn-end until it does. Every reader of the cap asks here, so the
+// `--cut` refusal, `run:step` and the parent-cut hook never disagree about it.
 function is_cut_capped(carry: RunCarry, source: EnvironmentSource = process.env): boolean {
 	return !is_headless_parent(source) && run_carry.is_at_cut_cap(carry)
 }
@@ -77,9 +77,9 @@ async function current_carry(): Promise<RunCarry | undefined> {
 	return read?.kind === 'carried' ? read.carry : undefined
 }
 
-// **A live record binds only the session that declared it** (joshuafolkken/kit#2472). A cut's
-// successor adopts the record and rewrites its owner, and every session in this checkout reads that
-// same file — so without this test the session that cut, still attached, read as a second parent. The
+// **A live record binds only the session that declared it**. A cut's successor adopts the
+// record and rewrites its owner, and every session in this checkout reads that same file — so without
+// this test the session that cut, still attached, would read as a second parent. The
 // owner is `--owner "$PPID"`, the session process, which is an ancestor of every hook it runs; a
 // record that declared no owner proves no one is its parent.
 function is_owned_here(carry: RunCarry, ancestry: () => ReadonlySet<number>): boolean {
@@ -98,7 +98,7 @@ function driven_here(
 /**
  * The live, un-handed-off carry record this session drives as the `backlogrun` parent, or `undefined`
  * for a lane child or any session that does not own one. Returned rather than tested so a caller that
- * also needs the record's counters (the parent cut's cap, joshuafolkken/kit#2947) reads it once.
+ * also needs the record's counters (the parent cut's cap) reads it once.
  */
 async function driving_carry(
 	source: EnvironmentSource = process.env,
@@ -111,8 +111,7 @@ async function driving_carry(
 
 /**
  * Whether this session is the driving `backlogrun` parent, attached or headless: not a lane child, and
- * the declared owner of a live, un-handed-off carry record — the record only a `backlogrun` writes
- * (joshuafolkken/kit#2452, joshuafolkken/kit#2472).
+ * the declared owner of a live, un-handed-off carry record — the record only a `backlogrun` writes.
  */
 async function is_backlog_parent(
 	source: EnvironmentSource = process.env,

@@ -4,7 +4,7 @@ import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { session_cite } from '#scripts/issue/session-cite'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 
-// The stash check a `backlogrun` makes at its end (joshuafolkken/kit#2505): the entries whose issue has
+// The stash check a `backlogrun` makes at its end: the entries whose issue has
 // closed, and those with no readable owner, printed for a person to revive or discard. It rides
 // `run:carry --end` for the ledger flush's reason — `--end` is the invocation's one end across every
 // session cut, where `--begin` repeats on each resume. Standard output is `run:carry`'s one-token

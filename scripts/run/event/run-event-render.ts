@@ -1,9 +1,8 @@
 import type { EventKind, RunEvent } from './run-event-stream'
 
-// One run event as the line a person reads in the watch pane (joshuafolkken/kit#2492). The ambient tier
-// used to be a session relaying `run:event --follow`, and every relay re-read that session's whole
-// history; the pane is a script, so the wording a relaying session supplied is supplied here instead —
-// one label per event kind, in the session language, beside the local clock time.
+// One run event as the line a person reads in the watch pane. The pane is a script, not a session, so
+// the wording is supplied here — one label per event kind, in the session language, beside the local
+// clock time.
 //
 // **The kinds are a fixed enumeration** (`run-event-stream.ts` → `EVENT_KIND`), so a template table is
 // the whole renderer; a kind the table does not name — a stream written by a newer kit — prints its raw

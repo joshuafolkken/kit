@@ -5,11 +5,10 @@ import {
 	type StopMarkFields,
 } from '#scripts/run/hold/run-hold'
 
-// joshuafolkken/kit#2796: a `halfrun` stops before its commit and **keeps** its hold, because the
-// uncommitted, hand-verified work is exactly what a second run would trample. The person then types
-// `fullrun #N` to ship it — and `run:entry`'s claim answered `busy` against that very hold, or, once the
-// hold had been cleared, the preflight advised stashing the verified diff away. The hand-off the
-// `halfrun` stop promised could not land, and each run improvised its own way past the guard.
+// A `halfrun` stops before its commit and **keeps** its hold, because the uncommitted, hand-verified
+// work is exactly what a second run would trample. The person then types `fullrun #N` to ship it, and
+// that run adopts the hold here rather than meeting `busy` from `run:entry`'s claim or being advised
+// to stash the verified diff away.
 //
 // **The stop is recorded, never inferred.** A hold naming #N over a dirty tree is also what a `halfrun`
 // still implementing and a `backlogrun` child leave, and adopting either hands a half-written diff to
@@ -43,7 +42,7 @@ function is_own_record(read: HoldRead, issue: string): boolean {
 	return hold === undefined || hold.issue === issue || hold.issue === run_hold.UNNUMBERED_ISSUE
 }
 
-// `mark` is the `halfrun` stop's by default; a `prrun` stop passes its own (joshuafolkken/kit#3023), so
+// `mark` is the `halfrun` stop's by default; a `prrun` stop passes its own, so
 // the own-record check is one check whichever run is stopping.
 function mark_stop_at(
 	target: string,
@@ -68,8 +67,7 @@ function take_over(target: string, issue: string): boolean {
 	return run_hold.create_hold(target, issue, new Date(), true)
 }
 
-// `false` leaves the record untouched, so the ordinary claim that follows decides the tree exactly as
-// it did before this resume existed.
+// `false` leaves the record untouched, so the ordinary claim that follows decides the tree.
 function adopt_at(target: string, issue: string, is_dirty: boolean): boolean {
 	if (!is_halfrun_stop(run_hold.read_hold(target), issue, is_dirty)) return false
 

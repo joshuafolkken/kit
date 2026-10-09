@@ -7,18 +7,18 @@ import { observation_ledger_home } from '#scripts/observations/observation-ledge
 import { run_tidy, type Outcome, type Verdict } from './run-tidy'
 import type { IsMerged } from './run-tidy-lanes'
 
-// The stash half of `josh run:tidy` (joshuafolkken/kit#2701): each entry whose named issues are all
-// merged is dropped, and one that touches the observation ledger has its lines carried into the ledger
-// first. The ledger is append-only and the digest counts repeats across it, so an entry's lines are
-// never discarded with the entry.
+// The stash half of `josh run:tidy`: each entry whose named issues are all merged is dropped, and one
+// that touches the observation ledger has its lines carried into the ledger first. The ledger is
+// append-only and the digest counts repeats across it, so an entry's lines are never discarded with
+// the entry.
 
 // The same width `run-carry-stash.ts` reads issue states at.
 const READ_CONCURRENCY = 8
 const GONE_REASON = 'already dropped by another run'
 const BUSY_REASON = 'another run held the stash sweep lock'
 
-// An entry cut before joshuafolkken/kit#2919 holds its lines at an old single-file path, so the lines
-// of every ledger path it touches are carried to the current ledger. The reads are independent, and the
+// An older entry may hold its lines at an old single-file path, so the lines of every ledger path it
+// touches are carried to the current ledger. The reads are independent, and the
 // lines come back in path order however the reads finish.
 async function added_ledger_lines(
 	hash: string,
@@ -34,8 +34,8 @@ async function added_ledger_lines(
 }
 
 // How many ledger lines went into the running work tree's ledger before the drop. The duplicate check
-// reads every issue's file, and the lines land in the file this tree writes (joshuafolkken/kit#2919),
-// so the run's own commit takes them to the default branch.
+// reads every issue's file, and the lines land in the file this tree writes, so
+// the run's own commit takes them to the default branch.
 async function carry_ledger(hash: string): Promise<number> {
 	const changed = await git_stash.changed_paths(hash)
 	const ledger_paths = changed.filter((file_path) => observation_ledger.is_ledger_path(file_path))

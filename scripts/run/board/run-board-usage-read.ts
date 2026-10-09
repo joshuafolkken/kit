@@ -6,7 +6,7 @@ import { execa } from 'execa'
 import type { ProcessReading, UsageMark } from './run-board-usage'
 import { run_board_usage_rusage, type RusageReader } from './run-board-usage-rusage'
 
-// How `run:board` reads which lane each process belongs to and what it uses (joshuafolkken/kit#3489).
+// How `run:board` reads which lane each process belongs to and what it uses.
 // **One `ps` a second, and `lsof` only for a process not seen before.** `ps` lists every process's
 // cumulative CPU time and resident memory in about 15 ms; a process is put in the lane its working
 // directory sits under (`.kit-lanes/<N>`), looked up once and remembered, so a full `lsof` (about
@@ -16,11 +16,10 @@ import { run_board_usage_rusage, type RusageReader } from './run-board-usage-rus
 // different lane. **macOS alone:** Linux's `ps` prints `time` in whole seconds, too coarse for a
 // one-second difference, so there the board draws no column rather than a figure flickering to 0.
 // **A process born and gone between two samples** — a vitest worker, a gate's eslint / tsc / cspell —
-// is never seen by `ps`, and macOS's `ps -S` does not fold a reaped child's time into its parent's
-// (joshuafolkken/kit#3523). Where `node:ffi` reaches the kernel's reaped-children times
-// (`run-board-usage-rusage.ts`, joshuafolkken/kit#3529), each process's CPU time is read with them
-// folded in and its parent is kept, so such a child lands in its parent's lane; elsewhere the figure
-// stays `ps`'s own time, a lower bound.
+// is never seen by `ps`, and macOS's `ps -S` does not fold a reaped child's time into its parent's.
+// Where `node:ffi` reaches the kernel's reaped-children times (`run-board-usage-rusage.ts`), each
+// process's CPU time is read with them folded in and its parent is kept, so such a child lands in its
+// parent's lane; elsewhere the figure stays `ps`'s own time, a lower bound.
 
 const PS_ARGUMENTS = ['-A', '-o', 'pid=,ppid=,time=,rss=']
 const LSOF_ARGUMENTS = ['-a', '-d', 'cwd', '-Fn', '-p']

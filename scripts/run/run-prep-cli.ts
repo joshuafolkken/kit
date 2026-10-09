@@ -11,8 +11,8 @@ import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
 import { run_prep, type PrepParts } from './run-prep'
 import { run_prep_locate } from './run-prep-locate'
 
-// `josh run:prep <N>` — one call for the reads a `fullrun` makes before its first edit
-// (joshuafolkken/kit#1978): the issue body and comments (`issue:read`), the state, labels and
+// `josh run:prep <N>` — one call for the reads a `fullrun` makes before its first edit:
+// the issue body and comments (`issue:read`), the state, labels and
 // `human_review` line (`issue:state`), the dependency-update scope (`latest:scope`), and where the
 // paths and identifiers the body names occur in code (`run-prep-locate.ts`). Each is
 // reused rather than reproduced, and the two body reads run concurrently, so three round trips become
@@ -76,11 +76,10 @@ function latest_decision(): LatestDecision {
 	return latest_scope_cli.decide()
 }
 
-// Whether a dispatched lane child's tree holds uncommitted work (joshuafolkken/kit#2476). A lane child
-// that popped its parked work back and then found its issue closed is the one position that work is
-// lost from — the lane is removed by force — so only a lane is asked; a person's own checkout keeps its
-// unrelated edits out of the verdict. A status that cannot be read reports none, leaving the verdict
-// printed before this read existed.
+// Whether a dispatched lane child's tree holds uncommitted work. A lane child that popped
+// its parked work back and then found its issue closed is the one position that work is lost from —
+// the lane is removed by force — so only a lane is asked; a person's own checkout keeps its unrelated
+// edits out of the verdict. A status that cannot be read reports none, leaving the verdict unchanged.
 async function lane_has_changes(): Promise<boolean> {
 	if (!lane_child_marker.is_child_of(process.cwd())) return false
 
@@ -157,8 +156,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 // `gather` and `to_parts` are exported so `run:next` reads the same state from the same three reads
-// rather than growing a second copy of the gather (joshuafolkken/kit#2188) — `run:next` is the
-// consumer of `run:prep` the epic #2166 wanted.
+// rather than growing a second copy of the gather.
 const run_prep_cli = { gather, parse_number, run, to_parts }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))

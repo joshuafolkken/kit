@@ -1,18 +1,18 @@
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 
-// How far a running lane child has got (joshuafolkken/kit#3444), read from the events that name its
-// issue. **Each phase comes from a record a step already writes**: the launch, the `plan` event
-// `run-event-plan.ts` writes (joshuafolkken/kit#3536), the `lane-phase` the PreToolUse hook writes at the first
-// implementation edit of each session, the ship supervisor's launch, `josh ship`'s own stage trace and
-// its stop. Nothing is guessed from the clock, so a child that never reaches a record stays on the
-// phase before it rather than being drawn further on.
+// How far a running lane child has got, read from the events that name its issue. **Each phase comes
+// from a record a step already writes**: the launch, the `plan` event `run-event-plan.ts` writes, the
+// `lane-phase` the PreToolUse hook writes at the first implementation edit of each session, the ship
+// supervisor's launch, `josh ship`'s own stage trace and its stop. Nothing is guessed from the clock,
+// so a child that never reaches a record stays on the phase before it rather than being drawn further
+// on.
 //
-// **A child's phases are a history, not a high-water mark** (joshuafolkken/kit#3526): a ship that stops
-// sends the child back to implement, so a furthest phase that never went back held a row on 👀 while it
-// was coding again. Each phase is written after the last, and a failed ship's own stages fold into the
-// `ship`, `failed` pair, so the retries read as the count of 🔨 and of 🚢💥. A stage line that lists
-// its attempt redraws that attempt whole (`replayed`, joshuafolkken/kit#3552).
+// **A child's phases are a history, not a high-water mark**: a ship that stops sends the child back to
+// implement, so a furthest phase that never went back would hold a row on 👀 while it codes again.
+// Each phase is written after the last, and a failed ship's own stages fold into the `ship`, `failed`
+// pair, so the retries read as the count of 🔨 and of 🚢💥. A stage line that lists its attempt
+// redraws that attempt whole (`replayed`).
 
 const PHASES = [
 	'investigate',
@@ -118,7 +118,7 @@ function attempt_start(track: ReadonlyArray<Phase>): number {
 	return ship === -1 ? track.length : ship
 }
 
-// **The newest line restores what the bound dropped** (joshuafolkken/kit#3552): on a stream full of
+// **The newest line restores what the bound dropped**: on a stream full of
 // positions only each issue's newest stage line survives, so the current attempt is redrawn from it, in
 // the order the line lists. A line that misses a phase the track holds — a restarted supervisor's, which
 // lists none of the stages it passed over — is added after them rather than replacing them.

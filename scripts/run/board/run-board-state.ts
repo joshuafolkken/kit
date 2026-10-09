@@ -11,7 +11,7 @@ import type { LocalRead } from './run-board-read'
 import type { Spot } from './run-board-spin'
 import type { LaneUsages, UsageMark } from './run-board-usage'
 
-// What a `run:board` redraw reads through and folds forward (joshuafolkken/kit#3430), shared by the
+// What a `run:board` redraw reads through and folds forward, shared by the
 // redraw (`run-board-tick.ts`) and its GitHub reads (`run-board-github.ts`).
 
 interface BoardPorts {
@@ -30,15 +30,15 @@ interface BoardPorts {
 	// Whether stdout is a terminal — only a terminal gets the alternate screen and the spinner.
 	is_tty: boolean
 	// The terminal a live frame is kept within, read at every redraw so a resized pane is fitted on the
-	// next one (joshuafolkken/kit#3486); none where the frame is drawn whole — one frame, a pipe, a chat.
+	// next one; none where the frame is drawn whole — one frame, a pipe, a chat.
 	size?: (() => TerminalSize) | undefined
-	// The lines a live frame ends on, the first to give way to a short pane (joshuafolkken/kit#3505).
+	// The lines a live frame ends on, the first to give way to a short pane.
 	footer?: ReadonlyArray<string> | undefined
 	form: BoardForm
 	// Records that a progress report was just given, as `run:progress --mark` does, so the next scheduled
-	// one waits a full interval from here (joshuafolkken/kit#3456).
+	// one waits a full interval from here.
 	mark: () => Promise<void>
-	// Sends one chat frame off-screen, for `--every` alone (joshuafolkken/kit#3569).
+	// Sends one chat frame off-screen, for `--every` alone.
 	push: (frame: string) => Promise<void>
 	// Runs `leave` however the process ends: a normal exit, Ctrl+C or SIGTERM.
 	on_exit: (leave: () => void) => void
@@ -46,7 +46,7 @@ interface BoardPorts {
 }
 
 // `background` launches the GitHub reads and draws without them; `settled` waits for them before
-// drawing (joshuafolkken/kit#3455).
+// drawing.
 type Pace = 'background' | 'settled'
 
 interface BoardState {
@@ -73,10 +73,10 @@ interface BoardState {
 	gauges: MachineGauges | undefined
 	// The redraw the last sample was taken on, which the next sample is due a second after.
 	sampled_ms: number | undefined
-	// Where the last frame drew its spinners, turned between redraws (joshuafolkken/kit#3495).
+	// Where the last frame drew its spinners, turned between redraws.
 	spots: ReadonlyArray<Spot>
 	// The last process reading, which the next one is compared against, and each lane's usage drawn from
-	// them (joshuafolkken/kit#3489).
+	// them.
 	usage: UsageMark | undefined
 	usages: LaneUsages | undefined
 }

@@ -23,11 +23,10 @@ import { run_step } from '#scripts/run/run-step'
 import { run_entry, type EntryParts } from './run-entry'
 import { run_entry_stop } from './run-entry-stop'
 
-// `josh run:entry <N>` — one call for the fixed entry sequence a lane opens on (joshuafolkken/kit#2372).
-// The loop used to spend a round trip on `run:hold`, one on `cost --cut`, one on `run:prep` and one on
-// `run:step`, re-billing a lane's full context each time; this runs all four internally and prints one
-// composite report, the same way `backlog:offer` folds `backlog:next` → `backlog:budget` and `run:prep`
-// folds three reads.
+// `josh run:entry <N>` — one call for the fixed entry sequence a lane opens on. Rather than a round
+// trip each on `run:hold`, `cost --cut`, `run:prep` and `run:step`, re-billing a lane's full context
+// each time, this runs all four internally and prints one composite report, the same way
+// `backlog:offer` folds `backlog:next` → `backlog:budget` and `run:prep` folds three reads.
 //
 // **The stops short-circuit.** A `busy` / `unknown` hold and an `over` budget both end the run, so the
 // composite reports them without reading the issue — the gate `fullrun.md` steps 1 and 3 stop on stays a
@@ -69,7 +68,7 @@ interface EntryRequest {
 	command: StageCommand
 }
 
-// `--to <command>` names how far the run goes (joshuafolkken/kit#3042); absent, it is `fullrun`.
+// `--to <command>` names how far the run goes; absent, it is `fullrun`.
 // Anything else is refused.
 function parse_command(rest: ReadonlyArray<string>): StageCommand | undefined {
 	if (rest.length === 0) return run_stage.DEFAULT_COMMAND
@@ -94,7 +93,7 @@ function first_line(out: string): string {
 
 // `run:hold <N>` prints one token — `hold`, `busy` or `unknown` — and forwards its explanation to
 // stderr, so the composite branches on the token and the reader still sees why. `--fullrun` marks the
-// hold as a run whose implementation cut resumes as `fullrun #N` (joshuafolkken/kit#2760) — a
+// hold as a run whose implementation cut resumes as `fullrun #N` — a
 // `fullrun`'s, and a `prrun`'s, which runs `fullrun`'s steps; a `halfrun`'s hold is never marked.
 async function claim_hold(issue_number: string, command: StageCommand): Promise<string> {
 	const mark = command === run_stage.HALFRUN ? [] : ['--fullrun']
@@ -123,7 +122,7 @@ interface Reads {
 }
 
 // The issue reads and the pre-implementation verdict, from the one gather `run:prep` and `run:next`
-// already share (joshuafolkken/kit#2188) rather than a second copy — the report is `run:prep`'s
+// already share rather than a second copy — the report is `run:prep`'s
 // formatter, the verdict is `run:step`'s `pre_verdict` over the same parts.
 async function gather_reads(issue_number: string): Promise<Reads> {
 	const reads = await run_prep_cli.gather(issue_number)
@@ -145,7 +144,7 @@ function stop_report(issue_number: string, hold: string, cost: string, report: s
 	return emit({ issue_number, hold, cost, verdict: run_entry.NO_VERDICT, report })
 }
 
-// A stop this command decided carries its own chores (joshuafolkken/kit#3099): the `confirmation`
+// A stop this command decided carries its own chores: the `confirmation`
 // Telegram always, and the release where this call claimed the hold — `run_entry_stop` says why.
 interface StopCall {
 	parts: Pick<EntryParts, 'issue_number' | 'hold' | 'cost' | 'report'>
@@ -167,9 +166,9 @@ interface Resume {
 	code: number
 }
 
-// **A resume is asked before the hold is claimed** (joshuafolkken/kit#2760). An implementation cut
-// outside a lane keeps its hold, so the fresh session's `fullrun #N` would be refused `busy` by its own
-// run's hold before it ever reached `run:cut --resume` — the hand-off the cut promised could not land.
+// **A resume is asked before the hold is claimed.** An implementation cut outside a lane keeps its
+// hold, so the fresh session's `fullrun #N` would otherwise be refused `busy` by its own run's hold
+// before it ever reached `run:cut --resume` — the hand-off the cut promised could not land.
 async function ask_resume(issue_number: string): Promise<Resume> {
 	const asked = await josh_command.josh_run(
 		['run:cut', '--resume', issue_number],
@@ -187,11 +186,11 @@ function resume_report(issue_number: string, resume: Resume): number {
 	return resume.code
 }
 
-// **A `halfrun` stopped before its commit is resumed, not claimed** (joshuafolkken/kit#2796): its hold
+// **A `halfrun` stopped before its commit is resumed, not claimed**: its hold
 // is kept over the verified diff, so the claim below would answer `busy` against it. The budget is asked
 // first, as for any run; then the hold is adopted and the run goes to the gate, skipping everything up
-// to and including implementation. **A `prrun` stopped before its merge is resumed the same way**
-// (joshuafolkken/kit#3023), under the token that says what is left of it.
+// to and including implementation. **A `prrun` stopped before its merge is resumed the same way**,
+// under the token that says what is left of it.
 async function resume_stopped(
 	{ issue_number, command }: EntryRequest,
 	token: string,
@@ -232,21 +231,21 @@ async function resume_any(
 		: await resume_stopped(request, stage.prrun_token, run_prrun_resume)
 }
 
-// **A command whose stopping point the issue has already reached redoes nothing** (joshuafolkken/kit#3042)
-// — the stage line is the whole report. A merged issue is the exception: the ordinary entry already
+// **A command whose stopping point the issue has already reached redoes nothing** — the stage line is
+// the whole report. A merged issue is the exception: the ordinary entry already
 // answers it (`already-done`, or `keep-work` over a lane's uncommitted work), so it is left to that.
 function is_settled(decision: StageDecision): boolean {
 	return decision.is_reached && decision.state !== run_stage.MERGED
 }
 
 // A planned issue was planned by `kickoff`, whose entry claims nothing, so the claim that starts past
-// the plan writes the `plan` event `run:board` draws 📝 from (joshuafolkken/kit#3536).
+// the plan writes the `plan` event `run:board` draws 📝 from.
 async function mark_planned(issue_number: string, state: StageState): Promise<void> {
 	if (state === run_stage.PLANNED) await run_event_plan.emit_plan(issue_number)
 }
 
 // The tree is held and the budget allows the run, so the issue is marked as running before its reads
-// (joshuafolkken/kit#3182) — the label then shows in the `labels:` line the report below carries.
+// — the label then shows in the `labels:` line the report below carries.
 async function proceed(issue_number: string, hold: string, cost: string): Promise<number> {
 	await run_label.mark(issue_number)
 	const reads = await gather_reads(issue_number)

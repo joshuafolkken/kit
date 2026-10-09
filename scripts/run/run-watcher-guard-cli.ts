@@ -4,10 +4,9 @@ import { run_progress_read } from '#scripts/run/progress/run-progress-read'
 import { run_watcher_guard } from './run-watcher-guard'
 
 // `josh run:watcher:guard` — refuses when lane children are in-flight but the progress watcher has not
-// pinged its life record recently (joshuafolkken/kit#2113). This is the hand-run form, kept for a run
-// that calls it before a loop iteration; the *automatic* wiring is in `pretool-guard.ts`, which
-// composes the same guard through `run-watcher-hook.ts` so every tool call is checked
-// (joshuafolkken/kit#2353).
+// pinged its life record recently. This is the hand-run form, kept for a run that calls it before a
+// loop iteration; the *automatic* wiring is in `pretool-guard.ts`, which composes the same guard
+// through `run-watcher-hook.ts` so every tool call is checked.
 //
 // **Exits 0 (ok) or 1 (stale).** A non-zero exit is what the hook mechanism treats as a refusal —
 // the same contract `batch:guard` and `rule:guard` hold.

@@ -2,18 +2,15 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
 import { run_event_stream, type RunEvent } from './run-event-stream'
 
-// The one place a stream consumer scopes the event stream to a single invocation (joshuafolkken/kit#2395).
-// The stream is the repository's event log, not this run's — it outlives every invocation by design — so a
-// consumer handed every event treats a previous invocation's merges, parks and cuts as its own. #2393 built
-// the fix (the carry record's `started_at` as the lower bound, filtered by each event's own time) but left
-// it private inside `run-report.ts`; every other consumer of the stream carried the same defect. This is that
-// mechanism, published once, so `run:report`, the retrospective digest and `run:step` share one time filter
-// rather than each writing it again — the second copy `CLAUDE.md` forbids as a clone.
+// The one place a stream consumer scopes the event stream to a single invocation. The stream is the
+// repository's event log, not this run's — it outlives every invocation by design — so a consumer handed
+// every event treats a previous invocation's merges, parks and cuts as its own. The carry record's
+// `started_at` is the lower bound, filtered by each event's own time, published once so `run:report`, the
+// retrospective digest and `run:step` share one time filter rather than each writing it again.
 //
 // **It never rounds an undetermined scope back to the whole stream.** A scope that cannot be determined — no
 // carry record, an unreadable one, or a start time that is not a time — answers `undefined`, and each
-// consumer falls to the "could not determine" side rather than showing every invocation's events, which is
-// exactly the rounding #2308 and #2393 named.
+// consumer falls to the "could not determine" side rather than showing every invocation's events.
 
 const SINCE_SCOPE = 'since'
 const UNKNOWN_SCOPE = 'unknown'
@@ -72,19 +69,19 @@ function scope_of(read: CarryRead): EventScope {
 
 // The newest event within scope, or `undefined` when the scope could not be determined or nothing falls
 // inside it. The "last line" consumers read this rather than the raw newest event, so a stale event a
-// previous invocation left on the stream is never read as this run's position (joshuafolkken/kit#2395).
+// previous invocation left on the stream is never read as this run's position.
 function last_scoped_event(
 	events: ReadonlyArray<RunEvent>,
 	scope: EventScope,
 ): RunEvent | undefined {
-	// Trace events (a `josh ship` stage line, joshuafolkken/kit#2426) are skipped, as `read_last` skips
+	// Trace events (a `josh ship` stage line) are skipped, as `read_last` skips
 	// them, so `run:step` reads the run's position rather than an unknown `ship-stage`.
 	return scoped_events(events, scope)?.findLast(
 		(event) => !run_event_stream.TRACE_KINDS.has(event.kind),
 	)
 }
 
-// The positions a detached `josh ship` supervisor leaves (joshuafolkken/kit#2428). Each names its issue
+// The positions a detached `josh ship` supervisor leaves. Each names its issue
 // (`#<N> …`), so they are self-scoping where the carry scope is not: the stream is shared by every lane,
 // and another lane's supervisor must never be read as this run's position.
 const SHIP_POSITION_KINDS: ReadonlySet<string> = new Set([
@@ -123,10 +120,10 @@ function issue_named(event: RunEvent): string | undefined {
 	return ISSUE_REFERENCE.exec(event.text)?.[1]
 }
 
-// **A lane child's position is read only from events that name its own issue** (joshuafolkken/kit#3039).
-// The parent and every lane append to one stream under one carry scope, so anything else on it is another
-// run's: another lane's merge told a planned child to stop, the parent's stall (which names no issue)
-// pointed it at `backlog:next`, and another lane's cut at `run:cut --resume`. The child's own merge and
+// **A lane child's position is read only from events that name its own issue.** The parent and every
+// lane append to one stream under one carry scope, so anything else on it is another run's: another
+// lane's merge, the parent's stall (which names no issue) or another lane's cut would misdirect the
+// child. The child's own merge and
 // outage stay, so the parent-only stop in `run-step.ts` still holds; the parent keeps reading everything.
 function names_issue(event: RunEvent, issue: string): boolean {
 	return issue_named(event) === issue
@@ -181,7 +178,7 @@ const LAUNCH_OR_SETTLE_KINDS: ReadonlySet<string> = new Set([
 	KIND.SPLIT,
 ])
 
-// Whether this invocation's newest launch of the issue has not yet been settled (joshuafolkken/kit#3442).
+// Whether this invocation's newest launch of the issue has not yet been settled.
 // `run:merge` is the merge event's one writer, so a child that closed without it stays running on
 // `run:board`; `run:step` reads this to point the parent at the merge. An undetermined scope owes nothing.
 function is_merge_owed(events: ReadonlyArray<RunEvent>, scope: EventScope, issue: string): boolean {

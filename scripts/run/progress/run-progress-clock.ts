@@ -3,10 +3,9 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
 import { z } from 'zod'
 
-// The report clock `josh run:progress` keeps, in the one form both of its readers can use
-// (joshuafolkken/kit#1570).
+// The report clock `josh run:progress` keeps, in the one form both of its readers can use.
 //
-// **It exists because a second reader arrived, and that one cannot await.** The watcher reads the
+// **One of its two readers cannot await.** The watcher reads the
 // record between ticks, where an `async` call costs nothing; the trigger-delivered rule that refuses
 // an early heartbeat (`scripts/rules/early-heartbeat.ts`) reads it inside a `PreToolUse` hook, whose
 // decision is synchronous from payload to envelope. Copying the record's shape into the hook would be
@@ -26,17 +25,17 @@ const PROGRESS_PREFIX = 'josh-run-progress-'
 // run last reported and is written on every heartbeat, so it can never double as "should this watcher
 // still be running". This one is presence-only — the watcher writes it once when it begins, reads it
 // every tick, and ends the moment it is gone, which is how `josh followup` stops a watcher at the
-// merge instead of leaving it to wait out its whole bound (joshuafolkken/kit#1821). It reuses the same
-// key as the report clock — the work tree's own git directory — so both name one file per run.
+// merge instead of leaving it to wait out its whole bound. It reuses the same key as the report clock
+// — the work tree's own git directory — so both name one file per run.
 //
 // **The loop that reads its own record and exits when it is gone is `run-wake-loop.ts`'s `run_loop`
-// pattern (joshuafolkken/kit#1727), and the read/write is `stamp_file`.** Neither is re-implemented
+// pattern, and the read/write is `stamp_file`.** Neither is re-implemented
 // here: this module only names the record, exactly as it names the report clock. Unlike `run-hold`'s
 // and `run-carry`'s records it needs no expiry, because it is read only by the one watcher that wrote
 // it — never by another run deciding whether a resource is free — so a fresh watcher always overwrites
 // a stale one and there is no cross-run read to fall open.
 const LIFE_PREFIX = 'josh-run-progress-life-'
-// **The ambient surface the heartbeat keeps across a session cut** (joshuafolkken/kit#2156). The report
+// **The ambient surface the heartbeat keeps across a session cut.** The report
 // clock holds only the *last* line, which `josh run:wake --list` relays on demand — a person has to
 // type for it, so after a cut the heartbeat sits at the *requested* tier. This log mirrors every
 // heartbeat line into a plain-text file beside the clock, so a person who keeps `tail -F` open on it
@@ -59,7 +58,7 @@ const BLOCK_SEPARATOR = '\n\n'
 
 // `line` is the last heartbeat the watcher printed, kept verbatim beside the clock so a reader that
 // cannot see the watcher's transcript — a person checking a woken headless `backlogrun` through
-// `josh run:wake --list` — still reads the exact line it emitted (joshuafolkken/kit#1910). It is
+// `josh run:wake --list` — still reads the exact line it emitted. It is
 // optional because a bare `--mark` moves the clock without producing one, and because a record written
 // before this field existed carries only `reported_at`.
 const report_stamp_schema = z.object({ reported_at: z.string(), line: z.string().optional() })
@@ -78,7 +77,7 @@ function parse_stamp(raw: string): number | undefined {
  * The last heartbeat line the watcher persisted, or `undefined` for an absent, unparsable, or
  * pre-`line` record. This is what `josh run:wake --list` relays to a person who is no longer the parent
  * session — the headless parent woken after a cut prints its progress only to its own transcript, and
- * this record is the one place that line survives (joshuafolkken/kit#1910).
+ * this record is the one place that line survives.
  */
 function read_last_line(target: string): string | undefined {
 	const raw = stamp_file.read_stamp_text(target)
@@ -112,13 +111,13 @@ function read_last_report(target: string): number | undefined {
 }
 
 // The ambient log's path, a sibling of the report clock so one directory names both and the CLI can
-// derive it from the clock target alone (joshuafolkken/kit#2156).
+// derive it from the clock target alone.
 function log_path_of(target: string): string {
 	return `${target}${LOG_SUFFIX}`
 }
 
-// **Staleness is read from the report clock's own last timestamp, not the log file's mtime**
-// (joshuafolkken/kit#2156). The clock's `reported_at` is the run's own clock — a copy or a backup can
+// **Staleness is read from the report clock's own last timestamp, not the log file's mtime.** The
+// clock's `reported_at` is the run's own clock — a copy or a backup can
 // move a file's mtime, and a fresh run whose first heartbeat found a previous run's log would then
 // append to it. It is read before `mark` overwrites the clock, so it sees the *previous* report.
 function is_log_stale(target: string, now_ms: number): boolean {
@@ -162,10 +161,9 @@ function append_line(
 
 // A heartbeat carries its line; a bare `--mark` (a real report resetting the clock) carries none and
 // **preserves the line already there** rather than blanking it — so `josh run:wake --list` keeps
-// showing the most recent heartbeat between a run's real reports rather than going empty on every one
-// (joshuafolkken/kit#1910). A carried line is also mirrored into the ambient log — the surface a person
-// keeps open across a cut — before the clock is overwritten, so staleness sees the previous report
-// (joshuafolkken/kit#2156).
+// showing the most recent heartbeat between a run's real reports rather than going empty on every one.
+// A carried line is also mirrored into the ambient log — the surface a person keeps open across a cut
+// — before the clock is overwritten, so staleness sees the previous report.
 function mark(target: string, now_ms: number, line?: string): void {
 	const reported_at = new Date(now_ms).toISOString()
 	const kept = line ?? read_last_line(target)
@@ -177,9 +175,8 @@ function mark(target: string, now_ms: number, line?: string): void {
 	stamp_file.write_stamp(target, kept === undefined ? { reported_at } : { reported_at, line: kept })
 }
 
-// `undefined` is passed straight through so `stamp_file`'s own default root stands, which is what the
-// caller got before this function existed. Hashing an empty string instead would key the record on a
-// path no other code path produces.
+// `undefined` is passed straight through so `stamp_file`'s own default root stands. Hashing an empty
+// string instead would key the record on a path no other code path produces.
 function stamp_target_of(git_directory: string | undefined): string {
 	return stamp_file.stamp_path(PROGRESS_PREFIX, git_directory)
 }
@@ -193,10 +190,9 @@ function life_target_of(git_directory: string | undefined): string {
 
 // **`pinged_at` is written by every tick and checked by `is_life_fresh`.** Without it the life record
 // is presence-only — existence is the only signal, and a record from a watcher that stopped an hour
-// ago is indistinguishable from one whose watcher is live. Adding `pinged_at` to the payload lets a
-// guard detect "children in-flight but watcher stale" without a second file (joshuafolkken/kit#2113).
-// Old records carrying only `{ alive: true }` parse successfully; `pinged_at` is optional on read,
-// which is what makes this backward-compatible.
+// ago is indistinguishable from one whose watcher is live. `pinged_at` in the payload lets a guard
+// detect "children in-flight but watcher stale" without a second file. It is optional on read, so a
+// record carrying only `{ alive: true }` still parses.
 const life_schema = z.object({ alive: z.literal(true), pinged_at: z.string().optional() })
 
 // The watcher declares itself alive. `write_stamp` unlinks first, so a fresh `--wait` cleanly replaces
@@ -221,9 +217,9 @@ function parse_pinged_at(raw: string): number | undefined {
 	return Number.isNaN(pinged_ms) ? undefined : pinged_ms
 }
 
-// Returns `false` for any absent, unreadable or un-timestamped record — both "no watcher" and "old
-// watcher that predates joshuafolkken/kit#2113" produce `false`, which is the safe direction for a
-// guard: it speaks up rather than staying silent.
+// Returns `false` for any absent, unreadable or un-timestamped record — both "no watcher" and a record
+// without `pinged_at` produce `false`, which is the safe direction for a guard: it speaks up rather
+// than staying silent.
 function is_life_fresh(target: string, threshold_ms: number): boolean {
 	const raw = stamp_file.read_stamp_text(target)
 
@@ -243,7 +239,7 @@ function is_life_fresh(target: string, threshold_ms: number): boolean {
 // **Gone means ended.** `read_stamp_text` answers `undefined` for an absent or unowned record, and the
 // only writer is the watcher itself, so absence means `josh followup` removed it — or nobody began
 // one. Either way the watcher stops, which is the fail-quiet direction: a watcher that kept running on
-// a missing record would be the lingering process joshuafolkken/kit#1821 exists to end.
+// a missing record would be the lingering process the liveness record exists to end.
 function is_life_ended(target: string): boolean {
 	return stamp_file.read_stamp_text(target) === undefined
 }

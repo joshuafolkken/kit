@@ -4,7 +4,7 @@ import { stripVTControlCharacters } from 'node:util'
 import { buffered_process } from '#scripts/lib/buffered-process'
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 
-// A lock file that no longer matches its inputs, asked before the gate (joshuafolkken/kit#3307).
+// A lock file that no longer matches its inputs, asked before the gate.
 //
 // The pre-push hook's setup runs `pnpm install`, which rewrites a lock that has drifted — a
 // `.pnpmfile.mjs` edit moves `pnpmfileChecksum` — and so leaves the working tree dirty under the push.

@@ -7,7 +7,7 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { run_status, type StatusParts } from './run-status'
 
-// `josh run:status <N>` — one call for the read-only status a run glances at (joshuafolkken/kit#2165):
+// `josh run:status <N>` — one call for the read-only status a run glances at:
 // the issue's state and labels (`issue:state`), the session's hand-off verdict (`cost --cut`), and the
 // invocation's carry counters (`run:carry`). Each is reused rather than reproduced, and the two async
 // reads run concurrently, so three round trips become one.

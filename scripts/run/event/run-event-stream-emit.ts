@@ -3,7 +3,7 @@ import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_scope } from './run-event-scope'
 import { run_event_stream, type RunEvent } from './run-event-stream'
 
-// The write side of the run's event stream (joshuafolkken/kit#2205). It resolves the run's identity and
+// The write side of the run's event stream. It resolves the run's identity and
 // appends, and it is where the "reporting must not break the work it reports on" contract is kept: every
 // failure — a git call that hangs, a temp directory that cannot be written — is swallowed, so a lane
 // child's own work never fails because an append did.
@@ -29,8 +29,7 @@ async function stream_target(): Promise<string | undefined> {
 
 /**
  * Append one session-facing event, best-effort. A kind outside the enumeration is refused by `append`;
- * every error is swallowed, because the reporting path must never fail the work it reports on
- * (joshuafolkken/kit#2205).
+ * every error is swallowed, because the reporting path must never fail the work it reports on.
  */
 async function emit(kind: string, text: string): Promise<void> {
 	try {
@@ -46,13 +45,13 @@ async function emit(kind: string, text: string): Promise<void> {
 
 /**
  * Append one event unless the newest event on the stream already carries this kind — so a marker a loop
- * re-checks every poll is written once per episode rather than once per poll (joshuafolkken/kit#2335).
+ * re-checks every poll is written once per episode rather than once per poll.
  * The drain marker is the caller: `backlog:offer` runs every iteration of a watching loop, and one drain
  * event per drain is what `run:step` reads to fire the retrospective a single time. Best-effort like
  * `emit`: a failed resolve or read is swallowed rather than raised into the loop's work.
  *
  * **Returns whether it appended**, so a caller that pairs the marker with its own once-per-episode side
- * effect — the stall detector sends one notification per stall (joshuafolkken/kit#2359) — fires that
+ * effect — the stall detector sends one notification per stall — fires that
  * effect exactly when the marker was fresh. A skipped duplicate and a swallowed failure both read
  * `false`: neither is a fresh episode.
  */
@@ -73,7 +72,7 @@ async function emit_once(kind: string, text: string): Promise<boolean> {
 
 /**
  * Append one event unless the newest event of this kind already carries this text — for a marker whose
- * value, not its presence, is the news (joshuafolkken/kit#3430). The idle window is re-derived on every
+ * value, not its presence, is the news. The idle window is re-derived on every
  * offer of a watching loop; only a window that moved is worth a line. Returns whether it appended.
  */
 async function emit_changed(kind: string, text: string): Promise<boolean> {
@@ -108,9 +107,9 @@ function invocation_events(repository: string, target: string): ReadonlyArray<Ru
 
 /**
  * Append one event unless this kind is already on the stream since the newest `reset_kind` — the
- * episode marker for a condition that holds across other events (joshuafolkken/kit#2464). `emit_once`'s
- * newest-event test re-fired the stall notification each time a parallel lane appended a merge or a
- * park; this ends the episode only at `reset_kind`. Returns whether it appended, as `emit_once` does.
+ * episode marker for a condition that holds across other events. `emit_once`'s newest-event test would
+ * re-fire each time a parallel lane appended a merge or a park; this ends the episode only at
+ * `reset_kind`. Returns whether it appended, as `emit_once` does.
  */
 async function emit_once_since(kind: string, text: string, reset_kind: string): Promise<boolean> {
 	try {
@@ -133,14 +132,14 @@ async function emit_once_since(kind: string, text: string, reset_kind: string): 
 	}
 }
 
-// One progress heartbeat line onto the stream, so a relay reaches it across a cut (joshuafolkken/kit#2437).
+// One progress heartbeat line onto the stream, so a relay reaches it across a cut.
 async function emit_heartbeat(line: string): Promise<void> {
 	await emit(run_event_stream.EVENT_KIND.HEARTBEAT, line)
 }
 
 // The events of the invocation now running, for a reader restoring the run from its stream
-// (`backlog:drive`, joshuafolkken/kit#2508). Fail-quiet like the writers: no repository or an unreadable
-// stream is an empty invocation.
+// (`backlog:drive`). Fail-quiet like the writers: no repository or an unreadable stream is an empty
+// invocation.
 async function current_events(): Promise<ReadonlyArray<RunEvent>> {
 	try {
 		const repository = await run_carry.repository_directory()
@@ -157,9 +156,9 @@ async function current_events(): Promise<ReadonlyArray<RunEvent>> {
 	}
 }
 
-// The invocation's events for a writer deciding whether a marker is already there
-// (joshuafolkken/kit#3536): unlike `current_events`, an undetermined scope keeps the whole stream, so a
-// run with no carry record skips a marker it already wrote rather than writing it twice.
+// The invocation's events for a writer deciding whether a marker is already there: unlike
+// `current_events`, an undetermined scope keeps the whole stream, so a run with no carry record skips a
+// marker it already wrote rather than writing it twice.
 async function invocation_or_all_events(): Promise<ReadonlyArray<RunEvent>> {
 	try {
 		const repository = await run_carry.repository_directory()
@@ -173,8 +172,7 @@ async function invocation_or_all_events(): Promise<ReadonlyArray<RunEvent>> {
 }
 
 // Every event on the stream, across invocations, for a reader that scopes by the event's own text
-// rather than by the carry record (`issue:file`'s fold, joshuafolkken/kit#3423). Fail-quiet like
-// `current_events`.
+// rather than by the carry record (`issue:file`'s fold). Fail-quiet like `current_events`.
 async function all_events(): Promise<ReadonlyArray<RunEvent>> {
 	try {
 		const target = await stream_target()

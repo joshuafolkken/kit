@@ -6,21 +6,19 @@ import type { JoshResult } from '#scripts/josh/josh-run'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 
 // The fast checks a detached `josh ship` runs in the agent's own turn, after the preflight and before
-// the hand-off (joshuafolkken/kit#3222). In one measured backlogrun about 7 of 31 lane resumes were a
-// gate failure first seen after the detach — a type error in a file the related-only checks never
-// touched, or a document test (a SKILL.md pointer, a byte budget, the command list) that only the full
-// suite runs — each paid for with a relaunched session. These two answer in seconds, so the same
-// session fixes what they find and ships again. **Nothing moves out of the gate**: the supervised gate
-// stage still runs every check, these included.
+// the hand-off: a type error in a file the related-only checks never touched, or a document test (a
+// SKILL.md pointer, a byte budget, the command list) that only the full suite runs, would otherwise
+// first surface after the detach and cost a relaunched session. These two answer in seconds, so the
+// same session fixes what they find and ships again. **Nothing moves out of the gate**: the
+// supervised gate stage still runs every check, these included.
 //
-// The test targets are the directories those resumes failed in. A consumer has none of them, so only
+// The test targets are the directories such failures land in. A consumer has none of them, so only
 // the ones present run, and a consumer meets the type check alone.
 //
-// In kit the metrics ratchet's totals join them (joshuafolkken/kit#3568): a feature grows a total
-// almost every time, and 47 of 61 measured gate-failure resumes were that ratchet — a relaunched
-// session reading its preamble again only to run `--accept`. Here the session that grew the total
-// writes the reason itself. The durations are left out: they read the gate ledger, stale before the
-// detach, so they stay with the supervised gate.
+// In kit the metrics ratchet's totals join them: a feature grows a total almost every time, and here
+// the session that grew the total writes the reason itself rather than a relaunched one. The
+// durations are left out: they read the gate ledger, stale before the detach, so they stay with the
+// supervised gate.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1

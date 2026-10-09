@@ -1,9 +1,9 @@
-// `josh ship "<title> #<N>"` — the one call that ships a finished change (joshuafolkken/kit#2398). It
-// folds the fixed commit-to-report region a run spent a dozen round trips on — the gate, the
-// commit/push/PR (`git -y`), the CI-wait merge (`followup`) and the report bookkeeping (`run:tail`) —
-// into one composite, extending the post-merge fold of `run:tail` (joshuafolkken/kit#2372) into the
-// body of the region. The region is fixed procedure; the one decision it carried — disposing of a
-// review finding — stays in front of this command, so nothing a reader had to judge is folded away.
+// `josh ship "<title> #<N>"` — the one call that ships a finished change. It folds the fixed
+// commit-to-report region — the gate, the commit/push/PR (`git -y`), the CI-wait merge (`followup`)
+// and the report bookkeeping (`run:tail`) — into one composite, extending the post-merge fold of
+// `run:tail` into the body of the region. The region is fixed procedure; the one decision it
+// carried — disposing of a review finding — stays in front of this command, so nothing a reader had
+// to judge is folded away.
 //
 // **This module is the pure half**, kept apart from the chaining CLI the way `run-tail.ts` is. Unlike
 // `run:tail`, ship stops at the first failed step: a red gate must never reach the commit, so the
@@ -20,7 +20,7 @@ const FOLLOWUP_HEADER = '=== followup ==='
 const REPORT_HEADER = '=== report ==='
 const SECTION_SEPARATOR = '\n\n'
 const STOPPED_PREFIX = 'stopped at: '
-// The body of a stage a resumed ship passed over (joshuafolkken/kit#2426) — a success, so the report
+// The body of a stage a resumed ship passed over — a success, so the report
 // still shows every stage under its header and the reader sees which ones this call did not repeat.
 const SKIPPED_BODY = 'skipped — already done'
 
@@ -31,7 +31,7 @@ interface ShipSection {
 	header: string
 	body: string
 	code: number
-	// The paths a stopped merge left unmerged (joshuafolkken/kit#3221), handed to the stop prompt.
+	// The paths a stopped merge left unmerged, handed to the stop prompt.
 	conflicts?: ReadonlyArray<string>
 }
 

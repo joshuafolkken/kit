@@ -1,10 +1,9 @@
 import { AUTO_OK_LABEL, PRIORITY_HIGH_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import type { CarryAddition } from '#scripts/run/carry/run-carry-added'
 
-// `josh run:add` — put an issue into a live `backlogrun` (joshuafolkken/kit#3433). A pool run picks an
-// issue up only once it carries `auto-ok` and `run:lane`, and takes a `priority:high` one first; a
-// `--only` run reads its named list off the carry record. Typing those labels by hand was the one way
-// in, and nothing told a person so. **A running child is never interrupted**: an added issue takes the
+// `josh run:add` — put an issue into a live `backlogrun`. A pool run picks an issue up only once it
+// carries `auto-ok` and `run:lane`, and takes a `priority:high` one first; a `--only` run reads its
+// named list off the carry record. **A running child is never interrupted**: an added issue takes the
 // next lane that frees, ahead of the rest unless `--no-priority` puts it at the end.
 //
 // What is decided here is per issue and pure over its ports, so a suite drives every outcome without

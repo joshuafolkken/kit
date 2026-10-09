@@ -1,13 +1,13 @@
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_carry } from '#scripts/run/carry/run-carry'
 
-// The supervisor's recovery hand-off (joshuafolkken/kit#2437). A session that claimed the carry record
-// and then died without `run:carry --cut` leaves it `carried`, owned by a gone process, with no
-// hand-off. `run-wake.ts` → `decide_not_handed_off` already re-wakes on that record (#2336), but the
-// successor it woke then ran `--begin` over a record no cut handed off and was answered `standing` —
-// "stop for a person" — so the recovery ended the run it existed to continue.
+// The supervisor's recovery hand-off. A session that claimed the carry record and then died without
+// `run:carry --cut` leaves it `carried`, owned by a gone process, with no hand-off. `run-wake.ts` →
+// `decide_not_handed_off` re-wakes on that record, and a successor running `--begin` over a record no
+// cut handed off would be answered `standing` — "stop for a person" — ending the run the recovery
+// exists to continue.
 //
-// **The fix is to make the recovery a cut, not to teach the successor a second answer.** Before it
+// **The recovery is made a cut, rather than teaching the successor a second answer.** Before it
 // launches, the supervisor writes the same `is_handed_off` a `--cut` writes, so the successor's
 // `--begin` classifies `resume` through the one path a declared cut already takes, and `standing` is
 // left meaning what `backlogrun-steps.md` says it means: a record nobody is watching.

@@ -38,7 +38,7 @@ function has_other_change(change: CarryChange): boolean {
 	return has_amount || change.done !== undefined || change.retrospective === true
 }
 
-// **A duplicate merge drops only the merge** (joshuafolkken/kit#3296): `--merged <issue>` may ride
+// **A duplicate merge drops only the merge**: `--merged <issue>` may ride
 // beside `--filed` or `--done` in one call, and those are still increments the record has not seen.
 // Only a duplicate carrying nothing else leaves the record untouched, which is `undefined` here.
 function effective_change(carry: RunCarry, change: CarryChange): CarryChange | undefined {

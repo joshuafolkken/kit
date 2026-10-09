@@ -2,7 +2,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_carry, type CarryOwner } from './run-carry'
 import { run_carry_conversation } from './run-carry-conversation'
 
-// **A resumed conversation has to take its record back before it falls quiet** (joshuafolkken/kit#3137).
+// **A resumed conversation has to take its record back before it falls quiet**.
 // A count moves the owner to the conversation's new process, but a parent waiting on a lane child
 // counts nothing — `lane:await` blocks in the background and the transcript stays unwritten — so a
 // restart followed by a long wait outlasts the quiet window with the record still naming the dead

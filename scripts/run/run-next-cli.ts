@@ -3,15 +3,11 @@ import { fileURLToPath } from 'node:url'
 import { run_next } from './run-next'
 import { run_prep_cli } from './run-prep-cli'
 
-// `josh run:next <N>` — print the next step a `fullrun` takes, from the run's state
-// (joshuafolkken/kit#2188). It reads exactly what `run:prep` reads — the issue state, the
-// `human_review` line and the dependency scope — by calling `run:prep`'s own gather, so the two never
-// answer from different facts, and hands the assembled parts to the state → step mapping in
-// `run-next.ts`.
-//
-// **It is the consumer `run:prep` was built to have.** joshuafolkken/kit#1978 bundled the reads;
-// joshuafolkken/kit#2165 added the read-only glance; this one prints the decision those reads support,
-// which is the trim epic #2166 is after — prose a reader interprets replaced by a computed answer.
+// `josh run:next <N>` — print the next step a `fullrun` takes, from the run's state.
+// It reads exactly what `run:prep` reads — the issue state, the `human_review` line and the dependency
+// scope — by calling `run:prep`'s own gather, so the two never answer from different facts, and hands
+// the assembled parts to the state → step mapping in `run-next.ts`. It prints the decision those reads
+// support — prose a reader interprets replaced by a computed answer.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1

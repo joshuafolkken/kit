@@ -13,28 +13,27 @@ import { run_ship_return } from './run-ship-return'
 import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-ship-stage'
 import { run_ship_steps, type ShipArguments, type Step } from './run-ship-steps'
 
-// `josh ship "<title> #<N>"` — one call for the fixed commit-to-report region a run ships a change on
-// (joshuafolkken/kit#2398). The loop used to spend a round trip each on `gate`, `git -y`, `followup`
-// and `run:tail`, re-billing a lane's full context every time; this runs the four internally and
-// prints one composite report, the same way `run:tail` folds the post-merge bookkeeping. Each step's
-// stderr is forwarded, so the reader still sees every explanation — a red check, a CI wait, a refusal —
-// the four would have printed on their own.
+// `josh ship "<title> #<N>"` — one call for the fixed commit-to-report region a run ships a change on.
+// It runs `gate`, `git -y`, `followup` and `run:tail` internally, so no round trip re-bills a lane's
+// full context, and prints one composite report, the same way `run:tail` folds the post-merge
+// bookkeeping. Each step's stderr is forwarded, so the reader still sees every explanation — a red
+// check, a CI wait, a refusal — the four would have printed on their own.
 //
 // It stops at the first failed step: the gate must be green before the commit, the commit before the
 // merge. The report ends at the failure and names the stopped step, so the run reads only that one.
 //
-// **Re-running it resumes rather than restarts** (joshuafolkken/kit#2426). Each stage's completion is
+// **Re-running it resumes rather than restarts**. Each stage's completion is
 // kept in a per-issue record, and the repository's actual state — committed, pushed, merged — is read
 // before the first stage, so a ship that died mid-way passes over what already happened and never
 // commits, pushes or merges twice. Each stage's start, success, failure or skip goes onto the run's
 // event stream. `run-ship-stage.ts` carries which stage may be passed over, and why the gate never is
 // on the record's word alone.
 //
-// **`--review` owns the round-1 review too** (joshuafolkken/kit#2427): a `review` stage in front of the
+// **`--review` owns the round-1 review too**: a `review` stage in front of the
 // gate launches the same-strength reviewer beside it and joins, attests and records the round without
 // an agent turn (`run-ship-review-steps.ts`); a High or Medium finding, or any failed join, stops there.
 //
-// **`--detach` hands the whole region to a supervisor that outlives the agent** (joshuafolkken/kit#2428):
+// **`--detach` hands the whole region to a supervisor that outlives the agent**:
 // the agent ends at the hand-off instead of relaunching itself for the gate, a supervised ship that stops
 // hands the stage back (`run-ship-return.ts`), and `--log <N>` prints the report it stopped on.
 //
@@ -60,7 +59,7 @@ const CITE_PATTERN = /^[1-9]\d*$/u
 // Both body forms `followup` documents, forwarded verbatim: the inline `--notify-message` and the
 // shell-body-safe `--notify-message-file` a body naming a command or path must use (`followup.md`).
 const NOTIFY_OPTIONS = ['notify-message', 'notify-message-file'] as const
-// joshuafolkken/kit#2446: the PR body carrying the live-execution evidence `followup` gates the merge
+// The PR body carrying the live-execution evidence `followup` gates the merge
 // on, forwarded to `git -y` as a path because it holds commands and their output.
 const BODY_FILE_OPTION = 'body-file'
 const USAGE =
@@ -76,7 +75,7 @@ const OPTIONS = {
 	[NOTIFY_OPTIONS[1]]: { type: 'string' },
 	[BODY_FILE_OPTION]: { type: 'string' },
 	review: { type: 'boolean' },
-	// joshuafolkken/kit#2428: hand the region to a detached supervisor (`run-ship-detach.ts`), print the
+	// Hand the region to a detached supervisor (`run-ship-detach.ts`), print the
 	// report a stopped supervisor left, and carry follow-up citations as options so the supervisor's
 	// command line still ends with its title.
 	detach: { type: 'boolean' },
@@ -89,8 +88,7 @@ type ShipCommand = { kind: 'ship'; args: ShipArguments } | { kind: 'log'; number
 // What a resumed ship knows before its first stage: the record's path (absent outside a repository),
 // the stages it says completed, and the repository's actual state (`run-ship-stage.ts` decides from it).
 // `started` opens with the stages the record says this attempt started — a supervisor that ended
-// without a stop leaves them — and grows as each stage starts; every stage line carries it
-// (joshuafolkken/kit#3552).
+// without a stop leaves them — and grows as each stage starts; every stage line carries it.
 interface ShipContext {
 	target: string | undefined
 	done: ReadonlySet<string>
@@ -257,9 +255,9 @@ async function open_context(args: ShipArguments): Promise<ShipContext> {
 	return { target, done, state, started }
 }
 
-// A detached supervisor hands the stopped stage back (`run-ship-return.ts`, joshuafolkken/kit#2428); a
+// A detached supervisor hands the stopped stage back (`run-ship-return.ts`); a
 // ship in an agent's own turn has its report in front of that agent already. The `ship-stop` ends the
-// attempt, so the record's started stages go with it (joshuafolkken/kit#3552).
+// attempt, so the record's started stages go with it.
 async function stopped(
 	sections: ReadonlyArray<ShipSection>,
 	args: ShipArguments,
@@ -338,7 +336,7 @@ async function detach(args: ShipArguments): Promise<number> {
 	return result.verdict === run_ship_detach.LAUNCHED ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
 }
 
-// joshuafolkken/kit#2457: a headless lane child's turn ending kills a ship it left in its own process,
+// A headless lane child's turn ending kills a ship it left in its own process,
 // so inside a lane child the region always goes to the supervisor, flag or not. The supervisor itself
 // inherits the lane mark, and is the one ship that must run the stages here.
 function should_detach(args: ShipArguments): boolean {
@@ -347,11 +345,11 @@ function should_detach(args: ShipArguments): boolean {
 	return !run_ship_detach.is_supervised() && lane_child_marker.is_child_of(process.cwd())
 }
 
-// joshuafolkken/kit#2966: the preflight is deterministic and fast, so it runs here, in the agent's own
-// turn, before the hand-off — a stop it finds is fixed by the same session instead of relaunching one
-// from the supervisor. Only the slow stages go to the supervisor, which re-asks the preflight itself.
-// joshuafolkken/kit#3222: the type check and the document tests follow it here for the same reason; they
-// are not a stage, so the supervisor's gate runs them again rather than passing over them.
+// The preflight is deterministic and fast, so it runs here, in the agent's own turn, before the
+// hand-off — a stop it finds is fixed by the same session instead of relaunching one from the
+// supervisor. Only the slow stages go to the supervisor, which re-asks the preflight itself. The type
+// check and the document tests follow it here for the same reason; they are not a stage, so the
+// supervisor's gate runs them again rather than passing over them.
 async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 	const preflight = await run_stage(run_ship_steps.PREFLIGHT_STEP, args, await open_context(args))
 	if (preflight.code !== SUCCESS_EXIT_CODE) return [preflight]

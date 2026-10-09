@@ -1,12 +1,11 @@
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { vi } from 'vitest'
 
-// What the `josh run:carry` CLI suites share. **Every claim prices the asking session first**
-// (joshuafolkken/kit#2760), and the real `cost_cli.session_verdict` reads the machine's whole
-// transcript corpus — 11 to 20 seconds against a 1.3 GB home, so the same suite timed out on a
-// developer's machine and passed in CI, where there is no transcript (joshuafolkken/kit#2772). A suite
-// holds the verdict at CI's answer, `unmeasurable`, with `hold_verdict` in its `beforeEach` instead;
-// the `over` refusal itself is pinned in `run-carry-cli-over.test.ts`.
+// What the `josh run:carry` CLI suites share. **Every claim prices the asking session first**, and
+// the real `cost_cli.session_verdict` reads the machine's whole transcript corpus — slow on a
+// developer's machine, instant in CI, where there is no transcript. A suite holds the verdict at CI's
+// answer, `unmeasurable`, with `hold_verdict` in its `beforeEach` instead; the `over` refusal itself
+// is pinned in `run-carry-cli-over.test.ts`.
 
 const UNMEASURABLE: CostVerdict = 'unmeasurable'
 

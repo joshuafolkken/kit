@@ -3,13 +3,10 @@ import { run_event_scope, type EventScope } from '#scripts/run/event/run-event-s
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 
 // The session-facing report generated *from* the run's event stream, rather than composed by hand each
-// time (joshuafolkken/kit#2249). #2205 gave the run a typed, ordered stream of what happened — a plan, a
-// launch, a merge, a park, a cut — and `format_event` already single-sources what one of those reads as.
-// What was never single-sourced is the report a person receives: `backlogrun-progress.md` defined the
-// epic completion summary in prose ("naming what was merged, what was parked and why, and what was
-// filed"), so the AI reassembled the wording every run and two runs' summaries never lined up.
+// time, so two runs' summaries line up. The run has a typed, ordered stream of what happened — a plan,
+// a launch, a merge, a park, a cut — and `format_event` single-sources what one of those reads as.
 //
-// **This is that generator, and it owns nothing `format_event` owns.** Each event line is `format_event`'s
+// **This generator owns nothing `format_event` owns.** Each event line is `format_event`'s
 // verbatim — the merges, the parks with their reason in the text, the cuts — so the enumeration is the
 // stream rendered, not a second rendering of it. The only thing this adds is the release tail, which is
 // not on the stream: whether a release is owed is `release:scope`'s answer, appended once at the end.
@@ -18,15 +15,13 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 // exactly what was printed, so the body a person reads off-screen and the summary a session shows are one
 // text with one generator — the "no second format" the acceptance criteria pin.
 //
-// **And it covers one invocation, not the whole stream** (joshuafolkken/kit#2393, reported a second time
-// after #2308 was closed with no fix behind it). The stream outlives an invocation by design — it is the
-// repository's event log, not this run's — so a generator handed every event renders every run that ever
-// appended one. Two days of merges arrived in one completion summary, and the Telegram body built from that
-// output was rejected for length, which is the failure the generated report exists to prevent. The scope is
+// **And it covers one invocation, not the whole stream.** The stream outlives an invocation by design —
+// it is the repository's event log, not this run's — so a generator handed every event renders every
+// run that ever appended one, and a Telegram body built from that is rejected for length. The scope is
 // therefore an **input**: the caller answers which invocation this is, from the run record that already
 // holds the start time, and a scope nobody could determine prints a notice rather than everything. **The
-// scoping itself is `run-event-scope.ts`'s** (joshuafolkken/kit#2395), shared with every other stream
-// consumer rather than kept private here.
+// scoping itself is `run-event-scope.ts`'s**, shared with every other stream consumer rather than kept
+// private here.
 
 const LINE_SEPARATOR = '\n'
 
@@ -56,7 +51,7 @@ function release_tail(release: Decision): string | undefined {
 // The report: this invocation's events as `format_event`'s lines, then the release tail when there is one.
 // Handed the same events, scope and verdict it returns the same string, which is what the determinism test
 // pins — nothing here reads a clock or the environment. The scoping is `run-event-scope.ts`'s, shared with
-// every other stream consumer (joshuafolkken/kit#2395).
+// every other stream consumer.
 function build_report(input: ReportInput): string {
 	const scoped = run_event_scope.scoped_events(input.events, input.scope)
 	const lines =

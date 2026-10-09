@@ -10,20 +10,19 @@ import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_event_watch } from './run-event-watch'
 
 // `josh run:event` — the command a run's step calls to append to, or read back, the append-only event
-// stream (joshuafolkken/kit#2205). The in-process seams (`run:merge`) append directly; the steps with no
+// stream. The in-process seams (`run:merge`) append directly; the steps with no
 // josh command at the point the event happens — a plan posted, a child launched, a PR opened, a stop —
 // call `--append` here, so parent and lane child alike write to the one stream. `--from` is the woken
 // reader's "everything since the position I last read"; `--last` is the degenerate single-event read.
 //
-// **`--follow` is one bounded read that waits** (joshuafolkken/kit#2207). It is `--from` that returns
+// **`--follow` is one bounded read that waits.** It is `--from` that returns
 // the moment an event is past the given position, and otherwise at the interval. The lines go to
 // standard output and the position to read from next goes to standard error — the same before and after
 // a session cut, because the stream is the run's and the position is the caller's.
 //
-// **`--watch` is the ambient surface: the same pass in a loop that never exits** (joshuafolkken/kit#2492),
-// each event rendered in the session language (`run-event-render.ts`), for a person to keep open in a
-// pane of their own. No conversation relays the stream any more — a session woken per event re-read its
-// whole history each time, and outspent every lane of the run doing it.
+// **`--watch` is the ambient surface: the same pass in a loop that never exits**, each event rendered
+// in the session language (`run-event-render.ts`), for a person to keep open in a pane of their own. No
+// conversation relays the stream — a session woken per event would re-read its whole history each time.
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0

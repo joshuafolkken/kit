@@ -3,7 +3,7 @@ import { run_event_filed, type FiledKind } from '#scripts/run/event/run-event-fi
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 
-// The board's findings section (joshuafolkken/kit#3430): what a run filed, what it parked and the
+// The board's findings section: what a run filed, what it parked and the
 // one-line observations it left, read off the event stream alone. A run started from the command line
 // says these in no chat a person reads, so the board is where they surface. Nothing is inferred from a
 // conversation log — an event that is not on the stream is not on the board.
@@ -18,7 +18,7 @@ interface BoardNote {
 	text: string
 	// Whose work turned up a filed Issue: the lane child, else the Issue the branch names.
 	found_during?: string | undefined
-	// A filed Issue's classification, which its line leads with (joshuafolkken/kit#3494).
+	// A filed Issue's classification, which its line leads with.
 	filed_kind?: FiledKind | undefined
 	// A park waiting on a person's decision, drawn apart from an ordinary park.
 	is_decision: boolean
@@ -56,8 +56,8 @@ function reason_of(event: RunEvent): string {
 	return PARENTHESES.exec(rest)?.groups?.['inner'] ?? rest
 }
 
-// The parked issue's title with its reason after it (joshuafolkken/kit#3531); before the plan is read
-// there is no title, and the reason alone is drawn.
+// The parked issue's title with its reason after it; before the plan is read there is no title, and
+// the reason alone is drawn.
 function park_text(title: string | undefined, reason: string): string {
 	if (title === undefined) return reason
 

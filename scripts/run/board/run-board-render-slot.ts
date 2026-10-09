@@ -4,9 +4,9 @@ import type { ItemState } from './run-board-status'
 import type { LaneUsages } from './run-board-usage'
 import { run_board_usage_text } from './run-board-usage-text'
 
-// The column between a row's time and its track, one width on every row it is drawn on
-// (joshuafolkken/kit#3554), so every track starts in one column: a running row's CPU and memory
-// (joshuafolkken/kit#3489), a finished row's finish time, and blanks on any other row.
+// The column between a row's time and its track, one width on every row it is drawn on, so every
+// track starts in one column: a running row's CPU and memory, a finished row's finish time, and
+// blanks on any other row.
 
 const { finish_of, text_of } = run_board_usage_text
 const FINISHED: ReadonlySet<ItemState> = new Set(['merged', 'done'])

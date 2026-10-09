@@ -1,9 +1,8 @@
 import { machine_capacity, type MachineSample } from '#scripts/gate/machine-capacity'
 import { run_board_labels, type Paint } from './run-board-labels'
 
-// The machine line of `run:board` (joshuafolkken/kit#3450): whether a quiet run is stuck or only slow
-// on a machine that has run out of room. On 2026-10-07 three lanes reached a load average of 16.8 and
-// swapped 4.4 GB, and the board showed none of it.
+// The machine line of `run:board`: whether a quiet run is stuck or only slow on a machine that has
+// run out of room.
 //
 // **The reading is the gate's own** (`machine-capacity.ts`), so the board shows what the core budget
 // admits against. 🔥 is the busy share of the CPU between two samples; 🧠 the kernel's memory pressure,
@@ -11,12 +10,11 @@ import { run_board_labels, type Paint } from './run-board-labels'
 // swapped, never how much swap is held — macOS grows its swap files, so a usage share reads near 100%
 // and the amount itself does no harm. A figure that needs two samples is not drawn on the first, and a
 // figure that could not be read is not drawn at all.
-
 //
-// **Each gauge is green, yellow or red** (joshuafolkken/kit#3452), the three Activity Monitor draws. 🧠
-// takes its color from the kernel's pressure verdict, as Activity Monitor does, and from its thresholds
-// only where no verdict was read; 💾 keeps its old colors, none until it swaps. The three are
-// `GAUGE_SHADES`, so no terminal palette draws them blue or orange (joshuafolkken/kit#3464).
+// **Each gauge is green, yellow or red**, the three Activity Monitor draws. 🧠 takes its color from
+// the kernel's pressure verdict, as Activity Monitor does, and from its thresholds only where no
+// verdict was read; 💾 takes no color until it swaps. The three are `GAUGE_SHADES`, so no terminal
+// palette draws them blue or orange.
 
 const { GAUGE_SHADES, HEADER_ICONS, bar_of, painted } = run_board_labels
 const PERCENT = 100
@@ -25,11 +23,11 @@ const PERCENT_WIDTH = '100%'.length
 const RATE_WIDTH = '3.1M/s'.length
 // Below this a rate keeps one decimal, so `0.4M/s` is not drawn as `0M/s`.
 const RATE_DECIMAL_BELOW = 10
-// The header's gap between its parts, the gauges' as well (joshuafolkken/kit#3508).
+// The header's gap between its parts, the gauges' as well.
 const GAP = '  '
 
-// Where each gauge is full and where it turns yellow and red. **Provisional, not yet measured**: set
-// from the 2026-10-07 incident and to be tuned against a heavy run's readings.
+// Where each gauge is full and where it turns yellow and red. **Provisional, not yet measured**: to
+// be tuned against a heavy run's readings.
 const CPU_YELLOW = 70
 const CPU_RED = 90
 const MEMORY_YELLOW = 70
@@ -166,7 +164,7 @@ function alert_of(spec: GaugeSpec, value: number, pressure: number | undefined):
 	return verdict ?? threshold_alert(value, spec)
 }
 
-// Icon, figure, then bar (joshuafolkken/kit#3452): the figure is what a person reads, and its fixed
+// Icon, figure, then bar: the figure is what a person reads, and its fixed
 // width keeps every bar starting in one column. The bar stops full past `spec.full`; the figure still
 // says how far past, and takes the warning colors only, so a quiet machine's figures stay the terminal's
 // own.

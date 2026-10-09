@@ -11,12 +11,12 @@ import { run_merge_cli } from './run-merge-cli'
 
 type IssueRead = Awaited<ReturnType<typeof issue_state_cli.read_issue>>
 
-// The merges a run ends with, recorded at `run:carry --end` (joshuafolkken/kit#3451). `backlog:drive`
-// collects only the lanes it holds in memory, and a restarted driver reseeds them from the open lanes,
-// so a lane that merged while no driver watched it never reached `run:merge`: no `merge` event, no
-// ledger line, no merged count. Each lane still open on a child the run launched and never settled is
-// read once more, and **only a merged one is collected** — closed by a merged pull request, or left open
-// behind one — through the same `run:merge` recording a driver would have made.
+// The merges a run ends with, recorded at `run:carry --end`. `backlog:drive` collects only the lanes
+// it holds in memory, and a restarted driver reseeds them from the open lanes, so a lane that merged
+// while no driver watched it never reached `run:merge`: no `merge` event, no ledger line, no merged
+// count. Each lane still open on a child the run launched and never settled is read once more, and
+// **only a merged one is collected** — closed by a merged pull request, or left open behind one —
+// through the same `run:merge` recording a driver would have made.
 
 interface Merge {
 	// The merged pull request GitHub left the child open behind, which `run:merge` still closes it for.

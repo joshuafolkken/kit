@@ -10,7 +10,7 @@ import { run_invocation } from '#scripts/run/run-invocation'
 import { run_issue_number } from '#scripts/run/run-issue-number'
 import { run_add, type AddOutcome, type AddPorts, type IssueView } from './run-add'
 
-// `josh run:add <issue...> [--no-priority]` — the wiring around `run-add.ts` (joshuafolkken/kit#3433).
+// `josh run:add <issue...> [--no-priority]` — the wiring around `run-add.ts`.
 // It refuses unless a `backlogrun` holds the carry record here: an issue labelled with no run to take
 // it would be picked up by whichever run starts next, which is not what was asked. A run that named
 // issues reads its list off the record — with `--only` or without, since a named run drains the pool

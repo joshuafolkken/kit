@@ -7,16 +7,15 @@ import { run_board_machine, type MachineGauges } from './run-board-machine'
 import type { RunActivity } from './run-board-status'
 import type { LaneUsages } from './run-board-usage'
 
-// The top of `run:board` (joshuafolkken/kit#3430): whether the run is moving, how long it has run, how
-// long it has left, how fresh its last event is, and how far through the plan it is — and, while it
-// waits on an empty backlog, until when it waits and what ends the wait. Every time comes from a record
-// (the carry's start, the stream's events, the `idle` window); nothing here guesses one. Lines of
-// symbols rather than sentences (joshuafolkken/kit#3444): the `⏱` that moves every second is the proof
-// the board is live, so no `updated` line is drawn. Beside the time, the machine the run is on
-// (joshuafolkken/kit#3450), so a slow run reads apart from a stuck one. **Always two lines**
-// (joshuafolkken/kit#3486, joshuafolkken/kit#3508): the run's state with its progress, then the time
-// with the machine. A value not read yet is drawn `-`, never `0`, so a header still loading reads as
-// unknown rather than as an empty run.
+// The top of `run:board`: whether the run is moving, how long it has run, how long it has left, how
+// fresh its last event is, and how far through the plan it is — and, while it waits on an empty
+// backlog, until when it waits and what ends the wait. Every time comes from a record (the carry's
+// start, the stream's events, the `idle` window); nothing here guesses one. Lines of symbols rather
+// than sentences: the `⏱` that moves every second is the proof the board is live, so no `updated`
+// line is drawn. Beside the time, the machine the run is on, so a slow run reads apart from a stuck
+// one. **Always two lines**: the run's state with its progress, then the time with the machine. A
+// value not read yet is drawn `-`, never `0`, so a header still loading reads as unknown rather than
+// as an empty run.
 
 const { HEADER_ICONS, STATE_ICONS, WORDS, bar_of, clock_of, elapsed_of, left_of, minute_of } =
 	run_board_labels
@@ -31,15 +30,15 @@ const ALARM_MS = STALE_MS * ALARM_FACTOR
 const INDENT = '  '
 const RUN_NAME = 'backlogrun'
 
-// Who reads the frame: a person on a screen, or a chat a session answers a progress question in
-// (joshuafolkken/kit#3456), where a title is never cut, no legend is drawn and the machine is its memory
-// alone — a CPU or swap figure read once means nothing.
+// Who reads the frame: a person on a screen, or a chat a session answers a progress question in, where
+// a title is never cut, no legend is drawn and the machine is its memory alone — a CPU or swap figure
+// read once means nothing.
 type BoardForm = 'screen' | 'chat'
 
 interface BoardHeader {
 	now_ms: number
 	started_ms: number
-	// Set once the run has ended (joshuafolkken/kit#3439): the title then says when, and how long it took.
+	// Set once the run has ended: the title then says when, and how long it took.
 	ended_ms: number | undefined
 	activity: RunActivity
 	layout: BoardLayout | undefined
@@ -47,14 +46,14 @@ interface BoardHeader {
 	baseline_total: number | undefined
 	plan_fetched_ms: number | undefined
 	plan_failed_ms: number | undefined
-	// Whether a plan read is in flight (joshuafolkken/kit#3455).
+	// Whether a plan read is in flight.
 	is_plan_loading: boolean
 	// The machine's gauges, `undefined` before the first sample.
 	machine: MachineGauges | undefined
-	// Each running lane's CPU and memory (joshuafolkken/kit#3489), `undefined` where none could be read.
+	// Each running lane's CPU and memory, `undefined` where none could be read.
 	usages?: LaneUsages | undefined
 	// The spinner's frame a running run and a running row turn, `undefined` where the output is not a
-	// terminal and they draw their still icons (joshuafolkken/kit#3452).
+	// terminal and they draw their still icons.
 	spinner: string | undefined
 	form: BoardForm
 	// An issue reference as the board draws it — `3450` or `owner/repo#12` — made a link where the
@@ -124,7 +123,7 @@ function aged(part: string, age_ms: number): string {
 }
 
 // How long ago the stream last moved; only a running run can be stale, so only it is colored. An ended
-// run has no heartbeat to keep (joshuafolkken/kit#3450): one counting on would read as a hang.
+// run has no heartbeat to keep: one counting on would read as a hang.
 function heartbeat_part(header: BoardHeader, mark: RunMark): string | undefined {
 	const last = header.activity.last_event_ms
 
@@ -145,7 +144,7 @@ function plan_warning(header: BoardHeader): string | undefined {
 	return styleText('yellow', `⚠ ${WORDS.plan} ${minute_of(failed)}`)
 }
 
-// A plan read in flight turns the spinner after ⏳ and says nothing more (joshuafolkken/kit#3455); a
+// A plan read in flight turns the spinner after ⏳ and says nothing more; a
 // frame that is not a terminal's has no spinner, and draws nothing for it.
 function loading_part(header: BoardHeader): string | undefined {
 	const { is_plan_loading, spinner } = header
@@ -154,7 +153,7 @@ function loading_part(header: BoardHeader): string | undefined {
 }
 
 // A running run's age and time left before the cut-off, or an ended run's frozen duration and the
-// minute it ended — an ended run has no cut-off left (joshuafolkken/kit#3439, joshuafolkken/kit#3450).
+// minute it ended — an ended run has no cut-off left.
 function time_parts(header: BoardHeader): Array<string> {
 	const { now_ms, started_ms, ended_ms } = header
 
@@ -175,7 +174,7 @@ function layout_of(header: BoardHeader): BoardLayout {
 }
 
 // Whether the plan has been read: until it has, the board draws the run's own children alone, and the
-// counts only the plan knows — the total and what waits — are unknown (joshuafolkken/kit#3486).
+// counts only the plan knows — the total and what waits — are unknown.
 function is_plan_read(header: BoardHeader): boolean {
 	return header.plan_fetched_ms !== undefined
 }
@@ -187,9 +186,9 @@ function plus_of(counts: BoardCounts, header: BoardHeader): string {
 	return added > 0 ? ` (+${String(added)})` : ''
 }
 
-// Icon, figure, then bar, as the machine gauges (joshuafolkken/kit#3473): the settled count is
-// right-aligned to the total's width, so the bar starts in one column as the count grows. Arrivals since
-// the board first looked follow the bar, where they cannot move it.
+// Icon, figure, then bar, as the machine gauges: the settled count is right-aligned to the total's
+// width, so the bar starts in one column as the count grows. Arrivals since the board first looked
+// follow the bar, where they cannot move it.
 function tally_part(counts: BoardCounts, is_read: boolean): string {
 	const { settled } = counts
 	const total = is_read ? String(counts.total) : UNKNOWN
@@ -233,8 +232,8 @@ function idle_line(idle: IdleWindow, now_ms: number): string {
 	return `${INDENT}${RUN_MARKS.idle.glyph} ${until} · ${next_check}`
 }
 
-// The wait, under the header's blank line (joshuafolkken/kit#3486), drawn only while it is what the run
-// is doing: no child running and the run not ended. The children running are the run's own, read
+// The wait, under the header's blank line, drawn only while it is what the run is doing: no child
+// running and the run not ended. The children running are the run's own, read
 // locally, so a board still waiting on GitHub never draws a running run as waiting.
 function idle_lines(header: BoardHeader): Array<string> {
 	const { idle, is_stopped } = header.activity

@@ -9,7 +9,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_report } from './run-report'
 
 // `josh run:report` — the session-facing report, generated from the run's event stream rather than
-// composed by hand (joshuafolkken/kit#2249). It reads the events the run appended, asks `release:scope`
+// composed by hand. It reads the events the run appended, asks `release:scope`
 // the same question `josh followup` already asks, and prints `run_report.build_report` of the two. The AI
 // writes only Step 0's three lines (Now / Change / Check), which `report-format.md` names as the half a
 // machine cannot answer; this owns the mechanical half — what merged, what parked and why, what was cut,
@@ -31,9 +31,9 @@ async function read_stream(): Promise<ReadonlyArray<RunEvent>> {
 	return run_event_stream.read_events(target)
 }
 
-// The invocation this report covers, taken from the run record that already holds the start time
-// (joshuafolkken/kit#2393). A checkout whose git directory cannot be resolved has no record to read, which is
-// the same undetermined answer an absent record gives — and neither one falls back to the whole stream.
+// The invocation this report covers, taken from the run record that already holds the start time.
+// A checkout whose git directory cannot be resolved has no record to read, which is the same
+// undetermined answer an absent record gives — and neither one falls back to the whole stream.
 async function read_scope(): Promise<EventScope> {
 	const directory = await run_carry.repository_directory()
 
