@@ -11,7 +11,7 @@ import { run_board_track } from './run-board-track'
 
 // joshuafolkken/kit#3430: the board as a person reads it. Expected clocks are built with the board's own
 // `clock_of`, so the assertions hold in any time zone. joshuafolkken/kit#3444: a row carries its number,
-// title, elapsed `MM:SS` and — while running — its phase track; sections are rules, symbols a legend.
+// title, elapsed `MM:SS` and its phase track; sections are rules, symbols a legend.
 
 const { clock_of } = run_board_labels
 const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, WORDS, header, lines_of, rule } =
@@ -75,7 +75,7 @@ describe('run_board_render.render rows', () => {
 		expect(ends[0]).toBe(ends[1])
 	})
 
-	it('draws a settled row with its whole span and no phase bar', () => {
+	it('draws a settled row with no track with its whole span and nothing after it', () => {
 		const status = {
 			state: 'merged' as const,
 			started_ms: STARTED,

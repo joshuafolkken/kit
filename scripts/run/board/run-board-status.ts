@@ -23,7 +23,8 @@ interface ItemStatus {
 	// The seat-free lane label (`lane <N>`) of a running child, when it holds one — the running test reads
 	// it; the board no longer draws it (joshuafolkken/kit#3444).
 	lane?: string | undefined
-	// Every phase a running child has passed, in order (`run-board-phase.ts`).
+	// Every phase the child passed while running, in order (`run-board-phase.ts`) — kept once it settles
+	// (joshuafolkken/kit#3535).
 	track?: ReadonlyArray<Phase> | undefined
 }
 
@@ -54,8 +55,16 @@ function launched(event: RunEvent): ItemStatus {
 	return { state: 'running', started_ms: moment(event), track: [run_board_phase.LAUNCHED_PHASE] }
 }
 
+// The status a child settles into: its start and the track it had reached, so a settled row still
+// draws how it got there (joshuafolkken/kit#3535).
+function settled_as(previous: ItemStatus | undefined, state: ItemState): ItemStatus {
+	const track = previous?.track
+
+	return { state, started_ms: previous?.started_ms, ...(track !== undefined && { track }) }
+}
+
 function ended(previous: ItemStatus | undefined, state: ItemState, event: RunEvent): ItemStatus {
-	return { state, started_ms: previous?.started_ms, ended_ms: moment(event) }
+	return { ...settled_as(previous, state), ended_ms: moment(event) }
 }
 
 function continued(previous: ItemStatus | undefined): ItemStatus {
@@ -171,7 +180,7 @@ function labelled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus
 		? labelled_state(read.labels.get(issue))
 		: undefined
 
-	return state === undefined ? status : { state, started_ms: status.started_ms }
+	return state === undefined ? status : settled_as(status, state)
 }
 
 // A close dated before the launch is an earlier life of the issue, not how this run's child ended.
@@ -190,7 +199,7 @@ function closed_status(
 
 	const state = closed.is_merged ? 'merged' : 'done'
 
-	return { state, started_ms: status.started_ms, ended_ms: closed.closed_ms }
+	return { ...settled_as(status, state), ended_ms: closed.closed_ms }
 }
 
 function settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
@@ -200,9 +209,7 @@ function settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus 
 
 	if (from_closed !== undefined) return from_closed
 
-	if (is_closed_running(issue, status, read)) {
-		return { state: 'done', started_ms: status.started_ms }
-	}
+	if (is_closed_running(issue, status, read)) return settled_as(status, 'done')
 
 	return labelled(issue, status, read)
 }

@@ -4,7 +4,7 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { describe, expect, it } from 'vitest'
 import type { ClosedIssue } from './run-board-closed'
-import { run_board_notes } from './run-board-notes'
+import type { Phase } from './run-board-phase'
 import { run_board_status, type ItemStatus, type OpenRead } from './run-board-status'
 
 // joshuafolkken/kit#3430: what each child of a run is doing, and the run's own activity, read off the
@@ -17,6 +17,7 @@ const T2 = '2026-10-08T09:10:00.000Z'
 const T3 = '2026-10-08T09:15:00.000Z'
 const LAUNCH_3409 = '#3409 launched'
 const MERGE_3409 = '#3409 merged'
+const PARK_3409 = '#3409 parked'
 const PLAN_3415 = 'planned #3415'
 const DECISION_PARK = '#3433 parked (needs-decision)'
 const NONE: ReadonlySet<number> = new Set()
@@ -72,6 +73,7 @@ describe('run_board_status.statuses_of', () => {
 			state: 'merged',
 			started_ms: Date.parse(T0),
 			ended_ms: Date.parse(T2),
+			track: ['investigate'],
 		})
 		expect(statuses.get(3415)).toMatchObject({ state: 'running', track: ['investigate', 'plan'] })
 		expect(statuses.get(3433)?.state).toBe('parked')
@@ -182,6 +184,13 @@ const RUNNING: ReadonlyMap<number, ItemStatus> = new Map([
 const NOT_READ: ReadonlyMap<number, ClosedIssue> = new Map()
 
 const NO_LABELS: ReadonlyMap<number, ReadonlyArray<string>> = new Map()
+// An open listing read after the launch that no longer holds #3409, with no closed read for it yet.
+const GONE: OpenRead = {
+	open_numbers: NONE,
+	read_ms: Date.parse(T1),
+	closed: NOT_READ,
+	labels: NO_LABELS,
+}
 
 function read_closed(closed: ClosedIssue): OpenRead {
 	return {
@@ -194,12 +203,7 @@ function read_closed(closed: ClosedIssue): OpenRead {
 
 describe('run_board_status.settle_closed', () => {
 	it('draws a running child the open listing no longer holds as done', () => {
-		const settled = run_board_status.settle_closed(RUNNING, {
-			open_numbers: NONE,
-			read_ms: Date.parse(T1),
-			closed: NOT_READ,
-			labels: NO_LABELS,
-		})
+		const settled = run_board_status.settle_closed(RUNNING, GONE)
 
 		expect(settled.get(3409)).toStrictEqual({ state: 'done', started_ms: Date.parse(T0) })
 	})
@@ -282,6 +286,36 @@ describe('run_board_status.settle_closed with a closed read', () => {
 	})
 })
 
+// joshuafolkken/kit#3535: a settled child keeps the track it had reached, and takes no phase after it.
+describe('run_board_status settled tracks', () => {
+	const reached: ReadonlyArray<Phase> = ['investigate', 'plan']
+
+	it.each<[string, Step]>([
+		['merge', [KIND.MERGE, MERGE_3409]],
+		['park', [KIND.PARK, PARK_3409]],
+		['split', [KIND.SPLIT, '#3409 split']],
+		['stop', [KIND.STOP, '#3409 stopped']],
+	])('keeps the track through a %s', (_label, ending) => {
+		expect(track_after(PLAN_3409, ending, ship_3409(STAGE.REPORT))).toStrictEqual(reached)
+	})
+
+	const tracked: ReadonlyMap<number, ItemStatus> = new Map([
+		[3409, { state: 'running', started_ms: Date.parse(T0), track: reached }],
+	])
+
+	it.each<[string, OpenRead]>([
+		['read closed', read_closed({ title: 'Fix', closed_ms: Date.parse(T2), is_merged: true })],
+		['gone from the listing', GONE],
+		['labelled stopped', read_labelled(['bug'])],
+		['labelled needs-decision', read_labelled([NEEDS_DECISION_LABEL])],
+	])('keeps the track of a child %s', (_label, read) => {
+		const settled = run_board_status.settle_closed(tracked, read).get(3409)
+
+		expect(settled?.state).not.toBe('running')
+		expect(settled?.track).toStrictEqual(reached)
+	})
+})
+
 describe('run_board_status.activity_of', () => {
 	it('reads the newest idle window opened after the newest launch', () => {
 		const events = [
@@ -313,35 +347,5 @@ describe('run_board_status.activity_of', () => {
 
 		expect(run_board_status.activity_of(events).is_stopped).toBe(true)
 		expect(run_board_status.activity_of([]).last_event_ms).toBeUndefined()
-	})
-})
-
-describe('run_board_notes.notes_of', () => {
-	it('lists filings, parks and notes newest first, telling a needs-decision park apart', () => {
-		const events = [
-			event_at(1, T0, KIND.FILED, '#3438 Count the seats again (found during #3415)'),
-			event_at(2, T1, KIND.PARK, DECISION_PARK),
-			event_at(3, T2, KIND.NOTE, '#3415 gate took 40% longer'),
-			event_at(4, T3, KIND.PARK, '#3409 parked'),
-			event_at(5, T3, KIND.MERGE, '#3420 merged'),
-		]
-		const notes = run_board_notes.notes_of(events, new Map())
-
-		expect(notes.map((note) => [note.kind, note.issue, note.is_decision])).toStrictEqual([
-			['park', '3409', false],
-			['note', '3415', false],
-			['park', '3433', true],
-			['filed', '3438', false],
-		])
-		expect(notes.at(-1)).toMatchObject({ text: 'Count the seats again', found_during: '3415' })
-	})
-
-	it('keeps an Issue filed elsewhere qualified', () => {
-		const [note] = run_board_notes.notes_of(
-			[event_at(1, T0, KIND.FILED, 'joshuafolkken/app-kit#12 Fix the port')],
-			new Map(),
-		)
-
-		expect(note?.issue).toBe('joshuafolkken/app-kit#12')
 	})
 })
