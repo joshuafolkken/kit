@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1029,
-		"code_lines": 85747,
-		"comment_lines": 34064,
+		"files": 1030,
+		"code_lines": 85794,
+		"comment_lines": 34080,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12222,
-		"on_demand_bytes": 560565
+		"on_demand_bytes": 560635
 	},
 	"accepted": {
-		"reason": "run:board keeps a settled row's phase track and closes it with the row's state icon (#3535)",
+		"reason": "run:board lane tracks get the plan phase from a code-written plan event (#3536)",
 		"date": "2026-10-09"
 	}
 }

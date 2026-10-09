@@ -15,10 +15,10 @@ budget allowed the run, and `run:release <N>` takes it back off → Read Issue #
 derive a better English title and `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"`)
 → post the agreed plan only if the Issue body is blank (`gh api -X PATCH
 repos/{owner}/{repo}/issues/<N> -f body="<plan>"`); if the body already has content, skip the
-plan-posting step → **emit the plan event**: `pnpm josh run:event --append plan "planned #<N>"` (a no-op
-outside a run; no cut follows it — a lane child's context is bounded by the threshold-gated
-implementation cut alone, joshuafolkken/kit#2489)
-→ implement → run the **verification gate** (the full procedure is `chain-rule.md`;
+plan-posting step → implement (the `plan` event `run:board` draws 📝 from is written by code — by
+`run:entry` for a `run:planned` issue, else at the first implementation edit — never by hand; no cut
+follows the plan — a lane child's context is bounded by the
+threshold-gated implementation cut alone, joshuafolkken/kit#2489) → run the **verification gate** (the full procedure is `chain-rule.md`;
 in outline: refactor → `pnpm josh main:merge` → **a dispatched lane child hands the rest to
 `pnpm josh ship --detach --review "<title> #<N>"` and ends its turn** (`chain-rule.md` step 0,
 joshuafolkken/kit#2428) → otherwise `pnpm josh run:cut <N>` (the pre-gate cut, before the gate; a no-op

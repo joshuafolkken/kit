@@ -201,6 +201,7 @@ const run_event_scope = {
 	moment_of,
 	scope_of,
 	scoped_events,
+	since_own_launch,
 }
 
 export type { EventScope }
