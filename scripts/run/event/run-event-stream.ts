@@ -36,6 +36,7 @@ const EVENT_CAP = 500
 const FIRST_POSITION = 0
 const POSITION_INCREMENT = 1
 const LINE_SEPARATOR = '\n'
+const WORD_SEPARATOR = ' '
 // The lock sits beside the stream it guards, so every writer of one stream contends for one record.
 const LOCK_SUFFIX = '.lock'
 // An append holds the lock for one read and one rename; a wait this long means a holder is stuck.
@@ -216,19 +217,40 @@ function last_position(events: ReadonlyArray<RunEvent>): number {
 	return events[events.length - POSITION_INCREMENT]?.pos ?? FIRST_POSITION
 }
 
+// The issue a ship-stage names — `#<N> <stage> <phase>` carries it first.
+function issue_of(event: RunEvent): string {
+	return event.text.split(WORD_SEPARATOR)[FIRST_POSITION] ?? ''
+}
+
+// Each issue's newest ship-stage, the one the board reads its furthest phase from.
+function newest_stages(events: ReadonlyArray<RunEvent>): ReadonlySet<RunEvent> {
+	const newest = new Map<string, RunEvent>()
+
+	for (const event of events) {
+		if (event.kind === EVENT_KIND.SHIP_STAGE) newest.set(issue_of(event), event)
+	}
+
+	return new Set(newest.values())
+}
+
 // The bounded stream serialized back to JSONL. The newest `EVENT_CAP` are kept and the oldest roll off;
 // each survivor keeps its original `pos`, so the bound never renumbers a position a reader is holding.
 // The stream held to `EVENT_CAP`, dropping the oldest trace events before any position
 // (joshuafolkken/kit#3245). A long run's ship-stage and heartbeat lines once filled 396 of the 500 slots
 // and pushed its cuts off, so the retrospective counted `cut 0` for a run with thirteen; a trace says only
 // that the run was alive, so it is the first to go. Only a stream of positions alone rolls them off.
+//
+// **Each issue's newest ship-stage is not disposable** (joshuafolkken/kit#3521): it is the only record
+// `run:board` draws a lane's review-and-later phase from. On a stream full of positions the stage just
+// written was the one disposable line and rolled off in its own append, so the board never left implement.
 function bounded(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEvent> {
 	const excess = events.length - EVENT_CAP
 
 	if (excess <= 0) return events
 
+	const kept = newest_stages(events)
 	const dropped = new Set(
-		events.filter((event) => DISPOSABLE_KINDS.has(event.kind)).slice(0, excess),
+		events.filter((event) => DISPOSABLE_KINDS.has(event.kind) && !kept.has(event)).slice(0, excess),
 	)
 
 	return events.filter((event) => !dropped.has(event)).slice(-EVENT_CAP)
