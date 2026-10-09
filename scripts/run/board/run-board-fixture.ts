@@ -6,11 +6,12 @@ import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
 import type { BoardPorts } from './run-board-state'
+import type { UsageMark } from './run-board-usage'
 
 // What the `run:board` redraw suites share (joshuafolkken/kit#3444): the ports a test drives the board
 // through — a clock it moves by hand, the frames it wrote, and counted reads.
 
-const WORDS = run_board_labels.words_of('en')
+const { WORDS } = run_board_labels
 const START = Date.parse('2026-10-08T09:00:00.000Z')
 const ALL: NamedPlan = { issues: [], only: false }
 const LOCAL: LocalRead = {
@@ -34,6 +35,10 @@ interface Reads {
 	read_plan: ReturnType<typeof vi.fn<(scope: NamedPlan) => Promise<BoardPlan | undefined>>>
 	read_local: ReturnType<typeof vi.fn<() => Promise<LocalRead | undefined>>>
 	read_machine: ReturnType<typeof vi.fn<() => Promise<MachineSample>>>
+	// No process is read unless a test answers otherwise.
+	read_usage: ReturnType<
+		typeof vi.fn<(before: UsageMark | undefined) => Promise<UsageMark | undefined>>
+	>
 	// Nothing reads closed unless a test answers otherwise.
 	read_closed: ReturnType<typeof vi.fn<(issues: ReadonlyArray<number>) => Promise<ClosedAnswer>>>
 }
@@ -71,6 +76,7 @@ function reads_of(local: LocalRead | undefined, plans: Array<BoardPlan | undefin
 		read_plan: vi.fn(async (_scope: NamedPlan) => plans.shift()),
 		read_local: vi.fn(async () => local),
 		read_machine: vi.fn(async () => SAMPLE),
+		read_usage: vi.fn<(before: UsageMark | undefined) => Promise<UsageMark | undefined>>(),
 		read_closed: vi.fn(async (_issues: ReadonlyArray<number>): Promise<ClosedAnswer> => ({
 			closed: new Map(),
 			is_whole: true,
@@ -105,7 +111,11 @@ function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefine
 	return { ...reads, ports, frames, clock, leaves, marks }
 }
 
-const run_board_fixture = { LOCAL, START, STOPPED, WORDS, harness, plan_titled }
+// The plan read's loading spinner after its ⏳, not the waiting count the same line draws after its own
+// ⏳ (joshuafolkken/kit#3508).
+const SPINNING = /⏳ [^\d-]/u
+
+const run_board_fixture = { LOCAL, SPINNING, START, STOPPED, WORDS, harness, plan_titled }
 
 export { run_board_fixture }
 export type { Harness }

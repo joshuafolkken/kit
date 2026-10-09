@@ -2,6 +2,8 @@
 import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_read } from '#scripts/issue/issue-read'
+import { session_cite } from '#scripts/issue/session-cite'
+import { issue_citation } from '#scripts/rules/issue-citation'
 import { epic_audit_logic, type AuditFinding, type ReferenceState } from './epic-audit'
 import { epic_audit_checks, type AuditChild } from './epic-audit-checks'
 import { epic_audit_orphans, type ClaimingSearch } from './epic-audit-orphans'
@@ -247,13 +249,13 @@ async function read_order_comments(
 // without this the audit reported an epic it never read as one tracking no children — and sent the
 // reader to fill in a task list that is already there.
 function no_children_reason(snapshot: EpicSnapshot, epic_number: number): string | undefined {
+	const epic = session_cite.issue(epic_number, undefined, snapshot.repo)
+
 	if (snapshot.body_failure !== undefined) {
-		return `Could not read the body of #${String(epic_number)}. Its task list is what names the children — check \`gh auth status\` and the connection.`
+		return `Could not read the body of ${epic}. Its task list is what names the children — check \`gh auth status\` and the connection.`
 	}
 
-	if (snapshot.child_numbers.length === 0) {
-		return `#${String(epic_number)} tracks no children in a task list.`
-	}
+	if (snapshot.child_numbers.length === 0) return `${epic} tracks no children in a task list.`
 
 	return undefined
 }
@@ -322,7 +324,7 @@ async function report_audit(epic_number: number, repo: string): Promise<number> 
 	if (input === undefined) return FAILURE_EXIT_CODE
 	const result = audit(input)
 
-	console.info(epic_audit_report.format_report(result))
+	console.info(issue_citation.linkify(epic_audit_report.format_report(result), repo))
 
 	return result.exit_code
 }

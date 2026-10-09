@@ -1,5 +1,6 @@
 import { cost_format } from '#scripts/cost-runtime/cost-format'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import { session_cite } from '#scripts/issue/session-cite'
 import { cost_run_issues, type IssueTotals } from './cost-run-issues'
 import type { RunNode } from './cost-run-nodes'
 import { cost_run_roles, type RoleTotals, type SessionRow } from './cost-run-roles'
@@ -93,7 +94,7 @@ function role_lines(report: RunCostReport): Array<string> {
 }
 
 function session_issue(issue: number | undefined): string {
-	return issue === undefined ? '—' : `#${String(issue)}`
+	return issue === undefined ? '—' : session_cite.issue(issue)
 }
 
 function session_parent(parent_id: string | undefined): string {

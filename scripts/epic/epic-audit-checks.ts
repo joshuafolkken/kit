@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import {
 	epic_audit_logic,
 	type AuditFinding,
@@ -349,7 +350,7 @@ function find_orphans(
 		.map((issue_number) => ({
 			level: 'warning' as const,
 			check: ORPHAN_CHILD,
-			message: `#${String(issue_number)} names this epic as its parent but is not in its task list.`,
+			message: `${issue_cite.plain(issue_number)} names this epic as its parent but is not in its task list.`,
 		}))
 }
 

@@ -60,11 +60,24 @@ describe('lane_ledger.record', () => {
 	it('records a gate with its elapsed time and verdict', async () => {
 		const target = ledger('gate')
 
-		await lane_ledger.record_gate(target, GATE_MS, false)
+		await lane_ledger.record_gate(target, { elapsed_ms: GATE_MS, is_passed: false })
 
 		expect(lane_ledger.read_entries(target)).toMatchObject([
 			{ kind: 'gate', elapsed_ms: GATE_MS, is_passed: false },
 		])
+	})
+
+	// joshuafolkken/kit#3501: the external load a gate ran beside is read back with its duration.
+	it('records the external cores a gate ran beside', async () => {
+		const target = ledger('gate-external')
+
+		await lane_ledger.record_gate(target, {
+			elapsed_ms: GATE_MS,
+			is_passed: true,
+			external_cores: 3,
+		})
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'gate', external_cores: 3 }])
 	})
 })
 

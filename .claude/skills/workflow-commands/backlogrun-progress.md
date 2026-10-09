@@ -23,7 +23,7 @@ either way.
 answers=$(pnpm josh epic:next 858 --repo joshuafolkken/kit --lanes)
 # one issue number per line, up to the number of free lanes; a verdict token when there is none
 answers=$(pnpm josh epic:next 858 909 --repo joshuafolkken/kit --lanes)
-# every named epic, merged into the same pool — "Several epics in one run" above
+# every named epic, merged into the same pool
 ```
 
 **`--lanes` is the form to use.** Read a line per child, and treat a single non-numeric line as the

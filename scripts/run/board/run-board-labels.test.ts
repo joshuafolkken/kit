@@ -3,40 +3,23 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_labels } from './run-board-labels'
 import { run_board_phase } from './run-board-phase'
 
-// joshuafolkken/kit#3430: the board's words follow the session language, and every time it draws is an
-// `HH:MM:SS` clock or span.
+// joshuafolkken/kit#3430: every time the board draws is an `HH:MM:SS` clock or a short span.
+// joshuafolkken/kit#3486: its words are English whatever the session language.
 
-const { bar_of, clock_of, elapsed_of, left_of, span_of, spinner_of, words_of } = run_board_labels
-const { GAUGE_SHADES, PHASE_ICONS, PHASE_WORDS, SPINNER_FRAME_MS, painted } = run_board_labels
+const { WORDS, bar_of, clock_of, elapsed_of, left_of, minute_of, spinner_of } = run_board_labels
+const { GAUGE_SHADES, PHASE_ICONS, PHASE_WORDS, SPINNER_INTERVAL_MS, painted } = run_board_labels
 const SECOND = 1000
 const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
+const JAPANESE = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u
 
-describe('run_board_labels.words_of', () => {
-	it('answers Japanese for ja and English for any other language', () => {
-		expect(words_of('ja').no_run).toBe('ランなし')
-		expect(words_of('en').no_run).toBe('no run')
-		expect(words_of('fr').no_run).toBe('no run')
-	})
+describe('run_board_labels.WORDS', () => {
+	it('carries one non-empty English word per key and no Japanese', () => {
+		const words: Array<string> = Object.values(WORDS)
 
-	it('carries the same non-empty words in both languages', () => {
-		const ja = words_of('ja')
-		const en = words_of('en')
-
-		expect(Object.keys(ja)).toStrictEqual(Object.keys(en))
-		expect(Object.values(ja).every((word) => word.length > 0)).toBe(true)
-		expect(Object.values(en).every((word) => word.length > 0)).toBe(true)
-	})
-})
-
-describe('run_board_labels.span_of', () => {
-	it('draws a span as zero-padded hours, minutes and seconds', () => {
-		expect(span_of(2 * HOUR + 5 * MINUTE + 7 * SECOND + 999)).toBe('02:05:07')
-		expect(span_of(26 * HOUR)).toBe('26:00:00')
-	})
-
-	it('reads a negative span as zero', () => {
-		expect(span_of(-MINUTE)).toBe('00:00:00')
+		expect(WORDS.no_run).toBe('no run')
+		expect(words.every((word) => word.length > 0)).toBe(true)
+		expect(words.filter((word) => JAPANESE.test(word))).toStrictEqual([])
 	})
 })
 
@@ -70,18 +53,18 @@ describe('run_board_labels.bar_of', () => {
 	it('fills the bar in proportion, empty for nothing to do and full when done', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
-		expect(bar_of(1, 4, 8)).toBe('██──────')
+		expect(bar_of(1, 4, 8)).toBe('■■──────')
 		expect(bar_of(0, 0, 4)).toBe('────')
-		expect(bar_of(5, 4, 4)).toBe('████')
+		expect(bar_of(5, 4, 4)).toBe('■■■■')
 		expect(bar_of(0, 1)).toHaveLength(10)
 	})
 
-	// joshuafolkken/kit#3452: a full block done, a dimmed thin line left where the output has color.
+	// joshuafolkken/kit#3452: a centered square done (joshuafolkken/kit#3498), a dimmed thin line left where the output has color.
 	it('draws the done part in its color and the left part dimmed where the output is colored', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(bar_of(1, 4, 4)).toBe(`${styleText('cyan', '█')}${styleText('dim', '───')}`)
-		expect(bar_of(4, 4, 4, 'green')).toBe(styleText('green', '████'))
+		expect(bar_of(1, 4, 4)).toBe(`${styleText('cyan', '■')}${styleText('dim', '───')}`)
+		expect(bar_of(4, 4, 4, 'green')).toBe(styleText('green', '■■■■'))
 	})
 })
 
@@ -95,24 +78,24 @@ describe('run_board_labels.painted with a gauge shade', () => {
 	it('draws the green, yellow and red shades as 24-bit colors where the output has them', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 
-		expect(painted(GAUGE_SHADES.normal, '█')).toBe('\u{1B}[38;2;48;209;88m█\u{1B}[39m')
-		expect(painted(GAUGE_SHADES.yellow, '█')).toBe('\u{1B}[38;2;255;214;10m█\u{1B}[39m')
-		expect(painted(GAUGE_SHADES.red, '█')).toBe('\u{1B}[38;2;255;69;58m█\u{1B}[39m')
+		expect(painted(GAUGE_SHADES.normal, '■')).toBe('\u{1B}[38;2;48;209;88m■\u{1B}[39m')
+		expect(painted(GAUGE_SHADES.yellow, '■')).toBe('\u{1B}[38;2;255;214;10m■\u{1B}[39m')
+		expect(painted(GAUGE_SHADES.red, '■')).toBe('\u{1B}[38;2;255;69;58m■\u{1B}[39m')
 	})
 
 	it('falls back to the 16 palette colors where the output has no 24-bit color', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(painted(GAUGE_SHADES.normal, '█')).toBe(styleText('green', '█'))
-		expect(painted(GAUGE_SHADES.yellow, '█')).toBe(styleText('yellow', '█'))
-		expect(painted(GAUGE_SHADES.red, '█')).toBe(styleText('red', '█'))
+		expect(painted(GAUGE_SHADES.normal, '■')).toBe(styleText('green', '■'))
+		expect(painted(GAUGE_SHADES.yellow, '■')).toBe(styleText('yellow', '■'))
+		expect(painted(GAUGE_SHADES.red, '■')).toBe(styleText('red', '■'))
 	})
 
 	it('draws no escape where the output has no color', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
-		expect(painted(GAUGE_SHADES.red, '█')).toBe('█')
-		expect(bar_of(1, 2, 2, GAUGE_SHADES.normal)).toBe('█─')
+		expect(painted(GAUGE_SHADES.red, '■')).toBe('■')
+		expect(bar_of(1, 2, 2, GAUGE_SHADES.normal)).toBe('■─')
 	})
 
 	it('draws no 24-bit escape into an output that is not a terminal, though the environment has 24-bit color', () => {
@@ -122,8 +105,8 @@ describe('run_board_labels.painted with a gauge shade', () => {
 		vi.stubEnv('TERM', 'xterm-256color')
 		vi.stubEnv('TMUX', '1')
 
-		expect(styleText('green', '█')).toBe('█')
-		expect(painted(GAUGE_SHADES.normal, '█')).toBe('█')
+		expect(styleText('green', '■')).toBe('■')
+		expect(painted(GAUGE_SHADES.normal, '■')).toBe('■')
 	})
 })
 
@@ -136,21 +119,21 @@ describe('run_board_labels.PHASE_ICONS', () => {
 		expect(PHASE_ICONS.gate).toBe('🚦')
 	})
 
-	it('names every phase with a word of the legend in both languages', () => {
-		const words = run_board_phase.PHASES.map((phase) => words_of('ja')[PHASE_WORDS[phase]])
+	it('names every phase with a word of the legend', () => {
+		const words = run_board_phase.PHASES.map((phase) => WORDS[PHASE_WORDS[phase]])
 
 		expect(words.every((word) => word.length > 0)).toBe(true)
-		expect(words_of('ja')[PHASE_WORDS.investigate]).toBe('調査')
+		expect(WORDS[PHASE_WORDS.investigate]).toBe('investigate')
 	})
 })
 
 describe('run_board_labels.spinner_of', () => {
 	it('turns one braille frame every quarter second and wraps after the last', () => {
 		expect(spinner_of(0)).toBe('⠋')
-		expect(spinner_of(SPINNER_FRAME_MS - 1)).toBe('⠋')
-		expect(spinner_of(SPINNER_FRAME_MS)).toBe('⠙')
-		expect(spinner_of(10 * SPINNER_FRAME_MS)).toBe('⠋')
-		expect(SPINNER_FRAME_MS).toBe(250)
+		expect(spinner_of(SPINNER_INTERVAL_MS - 1)).toBe('⠋')
+		expect(spinner_of(SPINNER_INTERVAL_MS)).toBe('⠙')
+		expect(spinner_of(10 * SPINNER_INTERVAL_MS)).toBe('⠋')
+		expect(SPINNER_INTERVAL_MS).toBe(80)
 	})
 })
 
@@ -159,5 +142,14 @@ describe('run_board_labels.clock_of', () => {
 		const moment = new Date(2026, 9, 8, 7, 4, 9).getTime()
 
 		expect(clock_of(moment)).toBe('07:04:09')
+	})
+})
+
+// joshuafolkken/kit#3489: a moment read to the minute drops its seconds.
+describe('run_board_labels.minute_of', () => {
+	it('draws the local wall clock of a moment to the minute', () => {
+		const moment = new Date(2026, 9, 8, 7, 4, 59).getTime()
+
+		expect(minute_of(moment)).toBe('07:04')
 	})
 })

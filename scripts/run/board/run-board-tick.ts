@@ -1,30 +1,31 @@
 import { run_progress } from '#scripts/run/progress/run-progress'
 import type { ClosedIssue } from './run-board-closed'
 import { run_board_github } from './run-board-github'
-import { run_board_header } from './run-board-header'
-import { run_board_labels, type Words } from './run-board-labels'
+import { run_board_header, type BoardHeader } from './run-board-header'
+import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
 import { run_board_link } from './run-board-link'
 import { run_board_machine } from './run-board-machine'
 import { run_board_notes } from './run-board-notes'
 import type { LocalRead } from './run-board-read'
-import { run_board_render } from './run-board-render'
+import { run_board_render, type FrameBounds } from './run-board-render'
+import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
 import { run_board_status } from './run-board-status'
+import { run_board_usage } from './run-board-usage'
 
 // One `run:board` redraw (joshuafolkken/kit#3430). **Three speeds** (joshuafolkken/kit#3444): the frame
-// is redrawn every second so the elapsed times move; the run's own stream and lanes are re-read no more
-// often than `LOCAL_READ_MS`, because each read parses the whole stream and asks git twice, and a board
+// is redrawn once a second, on the second, so every elapsed time moves by one, its spinners turned
+// between redraws by `run-board-spin.ts` (joshuafolkken/kit#3495); the run's own stream and lanes are
+// re-read no more often than `LOCAL_READ_MS`, because each read parses the whole stream and asks git twice, and a board
 // left open all night would otherwise grow heavier as the run grew longer; the GitHub reads they are
 // laid over are `run-board-github.ts`'s, which a live board never waits on (joshuafolkken/kit#3455).
 // Between reads the last one is kept and drawn against the current time. A run that ended stays on
 // screen until the next one starts (joshuafolkken/kit#3439). With no run in this checkout it reads
 // nothing from GitHub. The machine is sampled once a second (joshuafolkken/kit#3450): one `sysctl`
-// takes a few milliseconds, and its gauges are the differences between consecutive samples. **The
-// redraw is four times faster than every read** (joshuafolkken/kit#3452), so the spinner turns while
-// nothing is read any more often than it was.
+// takes a few milliseconds, and its gauges are the differences between consecutive samples.
 
-const REDRAW_MS = run_board_labels.SPINNER_FRAME_MS
+const { REDRAW_MS, SPOT } = run_board_spin
 const MACHINE_SAMPLE_MS = run_progress.MS_PER_SECOND
 const LOCAL_READ_SECONDS = 5
 const LOCAL_READ_MS = LOCAL_READ_SECONDS * run_progress.MS_PER_SECOND
@@ -37,6 +38,18 @@ async function reread(state: BoardState, ports: BoardPorts, now_ms: number): Pro
 	return { ...state, local: await ports.read_local(), read_ms: now_ms }
 }
 
+// Each lane's usage, read on the machine's second (joshuafolkken/kit#3489). A chat draws none, so it
+// reads none; a reading that failed draws no column.
+async function read_usages(
+	state: BoardState,
+	ports: BoardPorts,
+): Promise<Pick<BoardState, 'usage' | 'usages'>> {
+	const usage = ports.form === 'chat' ? undefined : await ports.read_usage(state.usage)
+	const usages = usage === undefined ? undefined : run_board_usage.usage_of(state.usage, usage)
+
+	return { usage, usages }
+}
+
 // The sample is timed when it is taken, not when the tick began: a plan read between the two would put
 // its seconds on the wrong side of the rate's interval. It is due by the tick's clock, so a sample
 // taken a few milliseconds into its tick does not slip to the redraw after the second.
@@ -47,7 +60,7 @@ async function resample(state: BoardState, ports: BoardPorts, now_ms: number): P
 	const machine = { sample: await ports.read_machine(), at_ms }
 	const gauges = run_board_machine.gauges_of(state.machine, machine)
 
-	return { ...state, machine, gauges, sampled_ms: now_ms }
+	return { ...state, ...(await read_usages(state, ports)), machine, gauges, sampled_ms: now_ms }
 }
 
 // The state of the run on screen; a different run starts its plan state from nothing, so no row, count
@@ -69,10 +82,15 @@ function titled_closed(plan: BoardPlan, closed: ReadonlyMap<number, ClosedIssue>
 }
 
 // The statuses scoped to the run's plan, a running child the plan's listing no longer holds settled.
-function layout_for(state: BoardState, local: LocalRead): BoardLayout | undefined {
+// Before the plan is read, the run's own children alone (joshuafolkken/kit#3486).
+function layout_for(state: BoardState, local: LocalRead): BoardLayout {
 	const { plan, closed } = state
 
-	if (plan === undefined) return undefined
+	if (plan === undefined) {
+		return run_board_layout.local_layout_of(
+			run_board_status.statuses_of(local.events, local.lanes, new Set()),
+		)
+	}
 
 	const read = {
 		open_numbers: plan.context.open_numbers,
@@ -88,19 +106,17 @@ function layout_for(state: BoardState, local: LocalRead): BoardLayout | undefine
 // What one redraw draws with.
 interface Redraw {
 	ports: BoardPorts
-	words: Words
 	now_ms: number
 }
 
-function frame_of(
+function header_of(
 	state: BoardState,
 	local: LocalRead,
-	layout: BoardLayout | undefined,
+	layout: BoardLayout,
 	redraw: Redraw,
-): Array<string> {
-	const header = {
+): BoardHeader {
+	return {
 		now_ms: redraw.now_ms,
-		words: redraw.words,
 		started_ms: local.started_ms,
 		ended_ms: local.ended_ms,
 		activity: run_board_status.activity_of(local.events, local.ended_ms !== undefined),
@@ -110,29 +126,47 @@ function frame_of(
 		plan_failed_ms: state.failed_ms,
 		is_plan_loading: state.plan_fetch !== undefined,
 		machine: state.gauges,
+		usages: state.usages,
 		form: redraw.ports.form,
-		spinner: redraw.ports.is_tty ? run_board_labels.spinner_of(redraw.now_ms) : undefined,
+		spinner: redraw.ports.is_tty ? SPOT : undefined,
 		link: run_board_link.linker(state.plan?.context.repo, redraw.ports.link),
 	}
+}
 
-	const notes = run_board_notes.notes_of(local.events)
+// The pane a live frame is kept within and the footer it ends on, read at every redraw.
+function bounds_of(ports: BoardPorts): FrameBounds {
+	return { size: ports.size?.(), footer: ports.footer }
+}
 
-	return run_board_render.render({ header, notes, resume: local.resume })
+// The frame with its spinners drawn at this moment's frame, and where they are on screen.
+function frame_of(state: BoardState, local: LocalRead, layout: BoardLayout, redraw: Redraw): Spun {
+	const bounds = bounds_of(redraw.ports)
+	const lines = run_board_render.render({
+		header: header_of(state, local, layout, redraw),
+		notes: run_board_notes.notes_of(local.events),
+		resume: local.resume,
+		...bounds,
+	})
+
+	return run_board_spin.spun(lines, run_board_labels.spinner_of(redraw.now_ms), bounds.size)
 }
 
 function draw(ports: BoardPorts, lines: ReadonlyArray<string>): void {
 	ports.write(`${lines.join('\n')}\n`)
 }
 
-// The first total the board sees is the baseline every later arrival is counted against.
+// The first total the plan gives is the baseline every later arrival is counted against; the run's own
+// children before it are no total.
 function draw_run(state: BoardState, local: LocalRead, redraw: Redraw): BoardState {
 	const layout = layout_for(state, local)
-	const first_total = layout === undefined ? undefined : run_board_header.counts_of(layout).total
+	const first_total =
+		state.plan === undefined ? undefined : run_board_header.counts_of(layout).total
 	const settled = { ...state, baseline_total: state.baseline_total ?? first_total }
+	const { lines, spots } = frame_of(settled, local, layout, redraw)
 
-	draw(redraw.ports, frame_of(settled, local, layout, redraw))
+	draw(redraw.ports, lines)
 
-	return settled
+	return { ...settled, spots }
 }
 
 // One redraw. No run reads nothing from GitHub and keeps the plan it had for when one starts. A live
@@ -140,7 +174,6 @@ function draw_run(state: BoardState, local: LocalRead, redraw: Redraw): BoardSta
 async function tick(
 	state: BoardState,
 	ports: BoardPorts,
-	words: Words,
 	pace: Pace = 'settled',
 ): Promise<BoardState> {
 	const now_ms = ports.now()
@@ -148,14 +181,14 @@ async function tick(
 	const { local } = read
 
 	if (local === undefined) {
-		draw(ports, run_board_render.render_no_run(now_ms, words))
+		draw(ports, run_board_render.render_no_run(now_ms, bounds_of(ports)))
 
-		return read
+		return { ...read, spots: [] }
 	}
 
 	const gathered = await gather_github(state_for(read, local), { ports, local, now_ms, pace })
 
-	return draw_run(await resample(gathered, ports, now_ms), local, { ports, words, now_ms })
+	return draw_run(await resample(gathered, ports, now_ms), local, { ports, now_ms })
 }
 
 const run_board_tick = {

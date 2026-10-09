@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_finding_ledger } from './review-finding-ledger'
 
@@ -51,7 +52,7 @@ const REMEDY =
 	'Record the round with `pnpm josh review:record --issue <N> [<category>:<severity>:<file> ...]` — a clean round is a call with no findings, which records one zero-finding line — then reissue the merge.'
 
 function refusal_message(issue: number): string {
-	return [MISSING_REASON, `Issue: #${String(issue)}`, REMEDY].join('\n')
+	return [MISSING_REASON, `Issue: ${session_cite.issue(issue)}`, REMEDY].join('\n')
 }
 
 const review_record = {

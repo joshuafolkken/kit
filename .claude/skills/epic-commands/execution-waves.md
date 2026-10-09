@@ -88,9 +88,13 @@ condition, and it is narrower than it sounds:
   task-list row and declare nothing; `--before` / `--after` are for an order that really is a
   dependency. Neither of the order-only flags helps at a **wave boundary**, which is a dependency by
   definition — the hub case below stays what it is.
-- **Two children that would edit the same file** are the case with no better answer today: separating
-  them into different waves is how it is done, and the price — a fixed order, plus the stall — is
-  accepted knowingly rather than by default.
+- **Two children that merely edit the same file are not a dependency.** A textual conflict resolves
+  inside the lane: every run merges `origin/main` before its gate (`pnpm josh main:merge`), and an
+  overlap that lands after it is resolved where it surfaces (`backlogrun-recovery.md` → "Conflicts are
+  not predicted"). Run them in parallel; the per-conflict price is `backlogrun-lanes.md` → "Lanes —
+  running more than one child at a time".
+- **Two children that would each build the same mechanism are a dependency.** No merge reconciles two
+  implementations of one thing — the later child must build on the earlier one's, so the boundary stays.
 - **No reason to wait means no declaration.** An epic whose children are mostly independent says so in
   prose and leaves the graph empty.
 

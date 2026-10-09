@@ -1,6 +1,7 @@
 import { epic_parse } from '#scripts/epic/epic-parse'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
+import { session_cite } from '#scripts/issue/session-cite'
 import { poll, type PollOptions } from '#scripts/lib/poll'
 import { z } from 'zod'
 
@@ -58,11 +59,13 @@ async function ensure_issue_closed(
 		(await poll.poll_until(async () => await is_issue_closed(issue_number), wait))
 	if (is_done) return
 
-	console.warn(`⚠️  Issue #${issue_number} is still open after the merge — closing it.`)
+	console.warn(
+		`⚠️  Issue ${session_cite.issue(issue_number)} is still open after the merge — closing it.`,
+	)
 	const comment = build_close_comment(input.pr_url, input.closer)
 
 	if (!(await git_gh_command.issue_close(issue_number, comment))) {
-		throw new Error(`gh api could not close issue #${issue_number}`)
+		throw new Error(`gh api could not close issue ${session_cite.issue(issue_number)}`)
 	}
 }
 

@@ -1,6 +1,7 @@
 import { git_followup_label } from '#scripts/followup/git-followup-label'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
+import { session_cite } from '#scripts/issue/session-cite'
 
 // **The `in-progress` marker belongs to the commands that open and release a run**
 // (joshuafolkken/kit#3182). Every manifest used to spell the label's create, apply and removal as raw
@@ -15,7 +16,9 @@ const MARK_RECOVERY = "gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[
 const UNMARK_RECOVERY = 'gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress'
 
 function warn(action: string, issue: string, recovery: string): void {
-	console.warn(`⚠ could not ${action} \`in-progress\` on #${issue} — run by hand: ${recovery}`)
+	console.warn(
+		`⚠ could not ${action} \`in-progress\` on ${session_cite.issue(issue)} — run by hand: ${recovery}`,
+	)
 }
 
 // `issue_add_label` creates the label when the repository lacks it (`lane-dispatch.ts`), so no

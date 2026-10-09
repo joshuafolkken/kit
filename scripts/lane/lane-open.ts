@@ -2,6 +2,7 @@ import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
 import { git_worktree } from '#scripts/git/git-worktree'
+import { session_cite } from '#scripts/issue/session-cite'
 import { file_reader } from '#scripts/lib/read-file'
 import { lane_cache } from './lane-cache'
 import { lane_environment } from './lane-environment'
@@ -145,7 +146,9 @@ function guard_unreadable(root: string, lanes: ReadonlyArray<LaneInfo>): void {
 
 	if (unreadable.length <= open_in_flight_count(root)) return
 
-	const named = unreadable.map((lane) => `#${lane.issue} (${lane.directory})`).join(', ')
+	const named = unreadable
+		.map((lane) => `${session_cite.issue(lane.issue)} (${lane.directory})`)
+		.join(', ')
 
 	throw new Error(
 		`Cannot read the port seed of these open lanes, so a free seat cannot be chosen: ${named}. Restore each lane's ${ENV_FILE_NAME}, or close the lane with \`pnpm josh lane:close <issue-number>\`.`,
@@ -166,7 +169,7 @@ function guard_install(lane: LaneInfo, result: InstallResult): void {
 	if (result.is_installed) return
 
 	throw new Error(
-		`Opened a lane for #${lane.issue} at ${lane.directory}, but installing its dependencies failed, so no \`pnpm josh …\` will run there. Finish it with \`pnpm --dir ${lane.directory} install --frozen-lockfile\`, or take it away with \`pnpm josh lane:close ${lane.issue}\`.\n${result.output}`,
+		`Opened a lane for ${session_cite.issue(lane.issue)} at ${lane.directory}, but installing its dependencies failed, so no \`pnpm josh …\` will run there. Finish it with \`pnpm --dir ${lane.directory} install --frozen-lockfile\`, or take it away with \`pnpm josh lane:close ${lane.issue}\`.\n${result.output}`,
 	)
 }
 

@@ -1,10 +1,12 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { extract_issue_number } from '#scripts/hooks/check-commit-message'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
 import { error_text } from '#scripts/lib/error-message'
 import { git_command } from './git-command'
 import { main_merge_guard } from './main-merge-guard'
+import { merge_drivers } from './merge-drivers'
 
 // `josh main:merge` (`josh mm`) — bring the default branch into the branch this checkout is on
 // (joshuafolkken/kit#1659).
@@ -41,7 +43,7 @@ function merge_message(default_branch: string, current_branch: string): string |
 
 	if (issue_number === undefined) return undefined
 
-	return `Merge ${default_branch} into ${current_branch} #${issue_number}`
+	return `Merge ${default_branch} into ${current_branch} ${issue_cite.plain(issue_number)}`
 }
 
 // What one merge of the default branch came to (joshuafolkken/kit#3221). `josh ship` merges it again
@@ -67,7 +69,11 @@ async function merge_into(target: MergeTarget): Promise<MergeOutcome> {
 	const { default_branch, current_branch } = target
 
 	try {
-		await git_command.merge_branch(default_branch, merge_message(default_branch, current_branch))
+		await git_command.merge_branch(
+			default_branch,
+			merge_message(default_branch, current_branch),
+			merge_drivers.git_options(),
+		)
 	} catch (error) {
 		const files = main_merge_guard.unmerged_paths(await git_command.status())
 

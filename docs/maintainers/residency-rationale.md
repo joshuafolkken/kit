@@ -103,9 +103,10 @@ Every rule in scope that stays resident is below, and a marker test asserts each
 `CLAUDE.md` (most in `scripts/claude/workflow-skills.test.ts`; **the UI verification gate in
 `scripts/claude/verify-ui-skill.test.ts`**; the follow-up filing in
 `scripts/document/document-markers.test.ts`). **A rule moved to triggered delivery is pinned by firing,
-not by residency** — turn batching by `scripts/rules/turn-batching-rule.test.ts`, the WIP cap by
-`scripts/backlog/backlog-manufacturing-rule.test.ts`, the mechanism itself by
-`scripts/rules/delivered-rules.test.ts`. **No trigger line stays resident**: `CLAUDE.md` keeps one route
+not by residency** — turn batching by `scripts/rules/turn-batching-rule.test.ts`, the mechanism itself by
+`scripts/rules/delivered-rules.test.ts`. The WIP cap left delivery: `pnpm josh issue:file` holds it
+itself, and `scripts/backlog/backlog-manufacturing-rule.test.ts` pins that no resident copy returns
+(joshuafolkken/kit#3423). **No trigger line stays resident**: `CLAUDE.md` keeps one route
 to the enumeration, which a session that runs no hook applies as a self-check list (`principles.md` →
 "Claude Code 以外のエージェントでの読み替え", joshuafolkken/kit#3079, #3395).
 
@@ -145,12 +146,13 @@ places always drifts (joshuafolkken/kit#1525).
   condition never to weaken a gate are in `prompts/collaboration-workflow/turn-batching.md` and
   `docs/maintainers/turn-batching-rationale.md`; `scripts/rules/turn-batching-rule.test.ts` pins it
   (joshuafolkken/kit#1304, #1390, #1524; `Edit` joined in #1762, `Read` in #1798).
-- **The backlog WIP cap** — the trigger is `pnpm josh rule:guard` (a `Bash` that creates an Issue). The
-  delivered text carries how to count, the decision not to file, the two exemptions and **the three
-  interrupt tests** as they are; dropping the three would put "is it serious" back into judgement, so
-  they were not cut from the delivered text either (joshuafolkken/kit#1518). Posting a comment is not
+- **The backlog WIP cap** — delivered by `pnpm josh rule:guard` from joshuafolkken/kit#1524 until
+  joshuafolkken/kit#3423, which retired the row: `pnpm josh issue:file` counts the cap and holds the
+  filing itself, so the pre-refusal was a pure round trip. Its hold message still carries how to count,
+  the decision not to file, the two exemptions and **the three interrupt tests**; dropping the three
+  would put "is it serious" back into judgement (joshuafolkken/kit#1518). Posting a comment is not
   filing and is out of scope. The procedure and the conditions for moving the numbers are in
-  `prompts/collaboration-workflow/wip-cap.md` (joshuafolkken/kit#1469, #1524).
+  `prompts/collaboration-workflow/wip-cap.md` (joshuafolkken/kit#1469).
 - **Reading Issue comments** — the trigger is `pnpm josh rule:guard` (a `Bash` that reads only an Issue
   body). The refusal hands over the re-read with comments and how to treat a comment that contradicts
   the body. It refuses every time until the precondition is met, so it refuses even on a turn where

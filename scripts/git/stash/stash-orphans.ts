@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { run_preflight } from '#scripts/run/run-preflight'
 import type { StashEntry } from './git-stash'
 
@@ -95,7 +96,8 @@ function orphans(
 }
 
 function format_line(orphan: OrphanStash): string {
-	const owner = orphan.issue === undefined ? UNKNOWN_OWNER : `#${orphan.issue} closed`
+	const owner =
+		orphan.issue === undefined ? UNKNOWN_OWNER : `${session_cite.issue(orphan.issue)} closed`
 
 	return `  ${[orphan.selector, owner, orphan.subject].join(COLUMN_SEPARATOR)}`
 }

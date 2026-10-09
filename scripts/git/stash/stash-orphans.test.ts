@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { describe, expect, it } from 'vitest'
 import { stash_orphans } from './stash-orphans'
 
@@ -69,7 +70,7 @@ describe('stash_orphans.format_report — what a person reads', () => {
 			stash_orphans.orphans([WORK, OWNERLESS], new Set(['2370'])),
 		)
 
-		expect(report).toContain(`stash@{1}  #2370 closed  ${WORK.subject}`)
+		expect(report).toContain(`stash@{1}  ${session_cite.issue(2370)} closed  ${WORK.subject}`)
 		expect(report).toContain(`stash@{4}  owner unknown  ${OWNERLESS.subject}`)
 		expect(report).toContain('none is dropped automatically')
 		expect(report).toContain('pnpm josh stash:pop')

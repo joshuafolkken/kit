@@ -1,3 +1,4 @@
+import { git_command } from '#scripts/git/git-command'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -14,6 +15,7 @@ const URL = `https://github.com/${HERE}/issues/3438`
 const FINDER = '3415'
 
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
+const branch = vi.spyOn(git_command, 'branch')
 
 function filing_to(target: string): Filing {
 	const args = {
@@ -34,6 +36,7 @@ function filing_to(target: string): Filing {
 
 beforeEach(() => {
 	emit.mockResolvedValue()
+	branch.mockResolvedValue('main')
 	vi.stubEnv(lane_child_marker.KEY, undefined)
 })
 
@@ -46,17 +49,37 @@ describe('issue_file_cli.record', () => {
 	it('names this repository’s Issue by number and the lane child that found it', async () => {
 		vi.stubEnv(lane_child_marker.KEY, FINDER)
 
-		await issue_file_cli.record(URL, filing_to(HERE))
+		await issue_file_cli.record(URL, filing_to(HERE), [])
 
 		expect(emit).toHaveBeenCalledWith(
 			run_event_stream.EVENT_KIND.FILED,
-			`#3438 ${TITLE} (found during #${FINDER})`,
+			`#3438[] ${TITLE} (found during #${FINDER})`,
 		)
 	})
 
-	it('qualifies an Issue filed in another repository and names no child outside a lane', async () => {
-		await issue_file_cli.record(URL, filing_to(THERE))
+	// joshuafolkken/kit#3494: the filing's classification label rides on the event, for the board's icon.
+	it('writes the kind the filing’s labels classify it as', async () => {
+		await issue_file_cli.record(URL, filing_to(HERE), ['auto-ok', 'bug'])
 
-		expect(emit).toHaveBeenCalledWith(run_event_stream.EVENT_KIND.FILED, `${THERE}#3438 ${TITLE}`)
+		expect(emit).toHaveBeenCalledWith(run_event_stream.EVENT_KIND.FILED, `#3438[bug] ${TITLE}`)
+	})
+
+	it('qualifies an Issue filed in another repository and names no child outside a lane', async () => {
+		await issue_file_cli.record(URL, filing_to(THERE), [])
+
+		expect(emit).toHaveBeenCalledWith(run_event_stream.EVENT_KIND.FILED, `${THERE}#3438[] ${TITLE}`)
+	})
+
+	// joshuafolkken/kit#3423: a person's run outside a lane is found by the Issue its branch names, so
+	// the fold reads its earlier filings with no carry record to scope by.
+	it('names the Issue the branch carries as the finder outside a lane', async () => {
+		branch.mockResolvedValue(`${FINDER}-count-the-seats`)
+
+		await issue_file_cli.record(URL, filing_to(HERE), [])
+
+		expect(emit).toHaveBeenCalledWith(
+			run_event_stream.EVENT_KIND.FILED,
+			`#3438[] ${TITLE} (found during #${FINDER})`,
+		)
 	})
 })

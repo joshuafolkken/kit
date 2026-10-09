@@ -4,6 +4,7 @@ import { epic_busy } from '#scripts/epic/epic-busy'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { issue_cite, type IssueCiter } from '#scripts/issue/issue-cite'
+import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_carry_reclaim } from '#scripts/run/carry/run-carry-reclaim'
@@ -89,7 +90,7 @@ function refusal_message(outcome: Exclude<OpenOutcome, { kind: 'opened' }>): str
 		return `All ${String(lane_seed_policy.LAST_LANE_SEAT)} lane seats are taken. Run \`pnpm josh lane:list\` to see them and \`pnpm josh lane:close <issue-number>\` to free one.`
 	}
 
-	return `A lane for #${outcome.lane.issue} is already open at ${outcome.lane.directory}. Run \`pnpm josh lane:close ${outcome.lane.issue}\` before opening it again.`
+	return `A lane for ${session_cite.issue(outcome.lane.issue)} is already open at ${outcome.lane.directory}. Run \`pnpm josh lane:close ${outcome.lane.issue}\` before opening it again.`
 }
 
 function report_open(outcome: OpenOutcome): number {
@@ -119,7 +120,7 @@ function report_issues(issues: ReadonlyArray<string>): number {
 function report_close(outcome: CloseOutcome): number {
 	if (outcome.reaped.length > 0) {
 		console.error(
-			`Terminated the lane child for #${outcome.issue} that had not ended by itself: process ${outcome.reaped.join(', ')}.`,
+			`Terminated the lane child for ${session_cite.issue(outcome.issue)} that had not ended by itself: process ${outcome.reaped.join(', ')}.`,
 		)
 	}
 
@@ -128,7 +129,7 @@ function report_close(outcome: CloseOutcome): number {
 	}
 
 	console.error(
-		`Closing the lane for #${outcome.issue} left this behind: ${outcome.left_behind.join(', ')}. Remove it and run \`pnpm josh lane:close ${outcome.issue}\` again.`,
+		`Closing the lane for ${session_cite.issue(outcome.issue)} left this behind: ${outcome.left_behind.join(', ')}. Remove it and run \`pnpm josh lane:close ${outcome.issue}\` again.`,
 	)
 
 	return FAILURE_EXIT_CODE
@@ -141,7 +142,7 @@ function report_sweep(outcome: SweepOutcome): number {
 
 	if (outcome.failed.length === 0) return code
 
-	const named = outcome.failed.map((issue) => `#${issue}`).join(', ')
+	const named = outcome.failed.map((issue) => session_cite.issue(issue)).join(', ')
 
 	// `lane:list` reads git's work trees, and the usual survivor is a branch whose work tree is
 	// already gone — which that listing cannot show. Closing each one again is what names it.

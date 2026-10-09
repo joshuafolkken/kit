@@ -27,6 +27,7 @@ const RETIRED_PHRASES: ReadonlyArray<string> = [
 	'2 件以上に分割したら常に epic を作る。件数の閾値も、実行順序の有無による分岐も無い',
 	'3-6 line work summary',
 	'3–6 line work summary',
+	"A child appends only to its own issue's file",
 	'Artifact languages are unaffected',
 	'Ask the user to run `pnpm josh test` and share the output',
 	'CI only runs the suite it can find, so specs stay under',

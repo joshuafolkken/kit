@@ -157,7 +157,21 @@ async function current_events(): Promise<ReadonlyArray<RunEvent>> {
 	}
 }
 
+// Every event on the stream, across invocations, for a reader that scopes by the event's own text
+// rather than by the carry record (`issue:file`'s fold, joshuafolkken/kit#3423). Fail-quiet like
+// `current_events`.
+async function all_events(): Promise<ReadonlyArray<RunEvent>> {
+	try {
+		const target = await stream_target()
+
+		return target === undefined ? [] : run_event_stream.read_events(target)
+	} catch {
+		return []
+	}
+}
+
 const run_event_stream_emit = {
+	all_events,
 	current_events,
 	emit,
 	emit_changed,

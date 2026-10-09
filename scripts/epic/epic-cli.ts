@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { cli_body } from '#scripts/josh/cli-body'
 import type { InsertKind, InsertPosition } from './epic-chains'
 import { epic_cli_argv, ISSUE_NUMBER_PATTERN, type EpicArgv, type FormFlags } from './epic-cli-argv'
@@ -342,7 +343,7 @@ function resolve_local_add(
 // What to type instead. `josh doctor` prints the checkout for each repository, which is the part a
 // run cannot guess.
 function format_cross_repo_refusal(found: CrossRepoAddTarget): string {
-	const reference = `${found.epic.repo}#${String(found.epic.number)}`
+	const reference = session_cite.issue(found.epic.number, undefined, found.epic.repo)
 
 	return [
 		`✖ ${reference} is an epic in another repository; this command reads and writes issues in the repository it runs from.`,

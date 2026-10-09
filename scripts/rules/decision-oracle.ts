@@ -131,7 +131,7 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		name: 'issue:fold',
 		decision: 'Whether findings filed from one session fold into one issue or stay separate',
 		args: '<title...>',
-		vocabulary: ['fold', 'separate', 'no-fold-needed'],
+		vocabulary: ['fold', 'separate', 'no-fold-needed', 'undetermined'],
 		single_source: SPLIT_ASSESSMENT_QUESTION,
 	},
 	{

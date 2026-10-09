@@ -8,7 +8,6 @@ import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 // that never reaches a record stays on the phase before it rather than being drawn further on.
 
 const PHASES = [
-	'dispatched',
 	'investigate',
 	'plan',
 	'implement',

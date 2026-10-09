@@ -34,6 +34,23 @@ function make_state(overrides: Partial<AwaitState> = {}): AwaitState {
 	return { appeared: false, disappeared_at: undefined, first_polled_at: undefined, ...overrides }
 }
 
+// joshuafolkken/kit#3491. A clock that moves only when the wait sleeps, so a loaded machine cannot
+// stretch one poll past the re-confirm window.
+function virtual_clock(): { now: () => number; sleep: (ms: number) => Promise<void> } {
+	let time = NOW
+
+	function now(): number {
+		return time
+	}
+
+	async function sleep(ms: number): Promise<void> {
+		time += ms
+		await Promise.resolve()
+	}
+
+	return { now, sleep }
+}
+
 // Helper: builds a minimal CheckConfig for tests that do not exercise the never-appeared timeout.
 function config(is_running: () => boolean): CheckConfig {
 	return {
@@ -193,6 +210,7 @@ describe('wait_for_any -- exits when a child confirms-complete', () => {
 		const result = await lane_await.wait_for_any([ISSUE], {
 			is_running,
 			poll_ms: POLL_MS,
+			...virtual_clock(),
 			reconfirm_ms: SHORT_RECONFIRM_MS,
 		})
 
@@ -218,12 +236,43 @@ describe('wait_for_any -- pre-gate boundary does not trigger early return', () =
 		const result = await lane_await.wait_for_any([ISSUE], {
 			is_running,
 			poll_ms: POLL_MS,
+			...virtual_clock(),
 			reconfirm_ms: SHORT_RECONFIRM_MS,
 		})
 
 		expect(result).toBe(ISSUE)
 		// Tick count > 5 proves we went through the resume phase before returning.
 		expect(tick).toBeGreaterThan(5)
+	})
+})
+
+describe('wait_for_any -- injected clock', () => {
+	it('measures the gap on the injected clock, one poll interval per sleep', async () => {
+		const clock = virtual_clock()
+		const slept: Array<number> = []
+		let tick = 0
+
+		function is_running(): boolean {
+			tick += 1
+
+			return tick === 1
+		}
+
+		async function sleep(ms: number): Promise<void> {
+			slept.push(ms)
+			await clock.sleep(ms)
+		}
+
+		await lane_await.wait_for_any([ISSUE], {
+			is_running,
+			poll_ms: POLL_MS,
+			reconfirm_ms: SHORT_RECONFIRM_MS,
+			now: clock.now,
+			sleep,
+		})
+
+		expect(clock.now() - NOW).toBe(SHORT_RECONFIRM_MS + POLL_MS)
+		expect(new Set(slept)).toStrictEqual(new Set([POLL_MS]))
 	})
 })
 
@@ -242,6 +291,7 @@ describe('wait_for_any -- first to complete wins', () => {
 		const result = await lane_await.wait_for_any([ISSUE, OTHER], {
 			is_running,
 			poll_ms: POLL_MS,
+			...virtual_clock(),
 			reconfirm_ms: SHORT_RECONFIRM_MS,
 		})
 
@@ -258,6 +308,7 @@ describe('wait_for_any -- a child that ended before the call', () => {
 		const result = await lane_await.wait_for_any([ISSUE], {
 			is_running: () => false,
 			poll_ms: POLL_MS,
+			...virtual_clock(),
 			never_appeared_timeout_ms: SHORT_RECONFIRM_MS,
 		})
 
@@ -271,6 +322,7 @@ describe('wait_for_any -- a child that ended before the call', () => {
 				is_running: () => false,
 				is_settled: async () => false,
 				poll_ms: POLL_MS,
+				...virtual_clock(),
 				never_appeared_timeout_ms: SHORT_RECONFIRM_MS,
 			}),
 		).rejects.toThrow(NEVER_APPEARED_MESSAGE)
@@ -281,6 +333,7 @@ describe('wait_for_any -- a child that ended before the call', () => {
 			is_running: (issue: string) => issue === ISSUE,
 			is_settled: async (issue: string) => issue === OTHER,
 			poll_ms: POLL_MS,
+			...virtual_clock(),
 		})
 
 		expect(result).toBe(OTHER)

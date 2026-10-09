@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
@@ -165,7 +166,7 @@ async function open_lanes(): Promise<ReadonlyArray<string>> {
 
 function end_line(end: DriveEnd): string {
 	const token = end.token === undefined || end.token === end.reason ? [] : [end.token]
-	const issue = end.issue === undefined ? [] : [`#${end.issue}`]
+	const issue = end.issue === undefined ? [] : [issue_cite.plain(end.issue)]
 	const base = [end.reason, ...token, ...issue].join(' ')
 
 	return end.detail === undefined ? base : `${base} ${end.detail}`

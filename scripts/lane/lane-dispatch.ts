@@ -2,7 +2,9 @@ import { agent_argv, type AgentArgv, type AgentArgvResult } from '#scripts/agent
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { LabelWrite } from '#scripts/gh/git-gh-issue-write'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
+import { session_cite } from '#scripts/issue/session-cite'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
@@ -190,7 +192,7 @@ function existing_dispatch(request: StartRequest): DispatchOutcome | undefined {
 	if (!openai_lane_supervisor.approve(request.lane.directory, active.nonce)) {
 		return failed_start(
 			request,
-			`the OpenAI supervisor for lane #${request.lane.issue} was cancelled`,
+			`the OpenAI supervisor for lane ${session_cite.issue(request.lane.issue)} was cancelled`,
 			[],
 		)
 	}
@@ -216,13 +218,17 @@ async function openai_dispatched_start(
 	if (owner?.issue !== lane.issue) {
 		if (nonce !== undefined) openai_lane_supervisor.cancel(lane.directory, nonce)
 
-		return failed_start(request, `the OpenAI supervisor did not claim lane #${lane.issue}`, notes)
+		return failed_start(
+			request,
+			`the OpenAI supervisor did not claim lane ${session_cite.issue(lane.issue)}`,
+			notes,
+		)
 	}
 
 	if (!openai_lane_supervisor.approve(lane.directory, owner.nonce)) {
 		return failed_start(
 			request,
-			`the OpenAI supervisor for lane #${lane.issue} was cancelled`,
+			`the OpenAI supervisor for lane ${session_cite.issue(lane.issue)} was cancelled`,
 			notes,
 		)
 	}
@@ -338,7 +344,10 @@ async function finish_dispatch(issue: string, request: StartRequest): Promise<Di
 
 	await (is_failed
 		? unmark_in_progress(issue)
-		: run_event_stream_emit.emit(run_event_stream.EVENT_KIND.CHILD_LAUNCH, `#${issue} dispatched`))
+		: run_event_stream_emit.emit(
+				run_event_stream.EVENT_KIND.CHILD_LAUNCH,
+				`${issue_cite.plain(issue)} dispatched`,
+			))
 
 	return outcome
 }
@@ -408,17 +417,17 @@ function resume_sentence(outcome: Dispatched): string {
 // message the warning exists to carry — the pid among it, with the child already running.
 function describe(outcome: DispatchOutcome, issue: string): string {
 	if (outcome.kind === 'no-lane') {
-		return `No lane is open for #${issue}. Run \`pnpm josh lane:open ${issue}\` first, then dispatch into it.`
+		return `No lane is open for ${session_cite.issue(issue)}. Run \`pnpm josh lane:open ${issue}\` first, then dispatch into it.`
 	}
 
 	if (outcome.kind === 'unrecordable') return outcome.reason
 
 	if (outcome.kind === LABEL_UNSET_KIND) {
-		return `The child for #${issue} was not started: the \`${IN_PROGRESS_LABEL}\` label could not be applied (${outcome.reason}), so the lane would be counted as empty. Nothing was launched.`
+		return `The child for ${session_cite.issue(issue)} was not started: the \`${IN_PROGRESS_LABEL}\` label could not be applied (${outcome.reason}), so the lane would be counted as empty. Nothing was launched.`
 	}
 
 	if (outcome.kind === 'failed') {
-		return `The child for #${issue} did not start: ${outcome.note}. Its log is at ${outcome.log_path}.`
+		return `The child for ${session_cite.issue(issue)} did not start: ${outcome.note}. Its log is at ${outcome.log_path}.`
 	}
 
 	return `Dispatched \`${outcome.invocation}\` as process ${String(outcome.pid)} in ${outcome.lane.directory} with ${agent_role_profile.describe(outcome.profile)}.${resume_sentence(outcome)}${log_sentence(outcome, issue)}`
@@ -441,7 +450,7 @@ function is_worth_warning(outcome: DispatchOutcome): boolean {
 // own failures to standard error and never throws, so this cannot turn a refusal into an exception.
 async function warn_of_problem(outcome: DispatchOutcome, issue: string): Promise<void> {
 	await telegram_notify.warn({
-		issue_title: `${WARNING_TITLE} #${issue}`,
+		issue_title: `${WARNING_TITLE} ${issue_cite.plain(issue)}`,
 		body: describe(outcome, issue),
 		recovery: WARNING_RECOVERY,
 	})

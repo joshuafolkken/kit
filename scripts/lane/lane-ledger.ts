@@ -37,6 +37,9 @@ const gate_schema = z.object({
 	// The unit suite's own duration, present when this gate ran it (joshuafolkken/kit#3409) — the one
 	// record of a full vitest run `josh metrics` reads, so the suite is never timed twice.
 	unit_ms: z.number().optional(),
+	// The whole cores busy outside this gate, beyond the machine's baseline, at its start or its end —
+	// whichever was higher (joshuafolkken/kit#3501). Absent when the machine could not be read.
+	external_cores: z.number().optional(),
 })
 // `swap_mb` and `lanes` are optional because either read can fail on its own — a platform with no
 // swap reading, a `git worktree` call that did not answer — and a sample is still worth its load.
@@ -54,6 +57,8 @@ type LedgerEntry = z.infer<typeof entry_schema>
 type MergeEntry = z.infer<typeof merge_schema>
 type GateEntry = z.infer<typeof gate_schema>
 type LoadEntry = z.infer<typeof load_schema>
+// What a finished gate reports; the ledger stamps the kind and the time.
+type GateRecord = Omit<GateEntry, 'kind' | 'at'>
 
 function target_of(repository: string): string {
 	return stamp_file.stamp_path(LEDGER_PREFIX, repository, LEDGER_SUFFIX)
@@ -104,13 +109,8 @@ function now_iso(): string {
 }
 
 // One finished `josh gate`, whether it passed or not — a failing gate cost the lane its time as well.
-async function record_gate(
-	path: string,
-	elapsed_ms: number,
-	is_passed: boolean,
-	unit_ms?: number,
-): Promise<void> {
-	await record({ kind: KIND.GATE, at: now_iso(), elapsed_ms, is_passed, unit_ms }, path)
+async function record_gate(path: string, gate: GateRecord): Promise<void> {
+	await record({ kind: KIND.GATE, at: now_iso(), ...gate }, path)
 }
 
 async function record_merge(issue: number): Promise<void> {

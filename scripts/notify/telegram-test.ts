@@ -5,6 +5,7 @@ import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { github_issue_url, type IssueUrlTarget } from '#scripts/gh/github-issue-url'
 import { git_error } from '#scripts/git/git-error'
+import { session_cite } from '#scripts/issue/session-cite'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { telegram_notify } from './telegram-notify'
@@ -65,7 +66,9 @@ async function fetch_issue_title(target: IssueUrlTarget | undefined): Promise<st
 	const title = await git_gh_issue_read.issue_get_title(target.issue_number, target.name_with_owner)
 
 	if (title === undefined) {
-		console.warn(`⚠️  Could not read ${target.name_with_owner}#${target.issue_number}.`)
+		console.warn(
+			`⚠️  Could not read ${session_cite.issue(target.issue_number, undefined, target.name_with_owner)}.`,
+		)
 	}
 
 	return title

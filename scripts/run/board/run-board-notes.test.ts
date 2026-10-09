@@ -20,6 +20,7 @@ describe('run_board_notes.notes_of filings', () => {
 	it('reads a filing with the child that found it', () => {
 		const text = run_event_filed.text_of({
 			reference: '#3438',
+			kind: 'enhancement',
 			title: TITLE,
 			found_during: FOUND_DURING,
 		})
@@ -31,6 +32,7 @@ describe('run_board_notes.notes_of filings', () => {
 				issue: '3438',
 				text: TITLE,
 				found_during: FOUND_DURING,
+				filed_kind: 'enhancement',
 				is_decision: false,
 			},
 		])

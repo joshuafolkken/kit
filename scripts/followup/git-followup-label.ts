@@ -2,6 +2,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_label_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
 import { IN_PROGRESS_LABEL, label_name_of } from '#scripts/issue/issue-labels'
+import { session_cite } from '#scripts/issue/session-cite'
 import { z } from 'zod'
 
 // **`in-progress` means "a run is holding this issue right now", and a merged run is not holding
@@ -30,7 +31,9 @@ const labels_read_schema = z.object({ labels: z.array(issue_label_schema).option
 // the one joshuafolkken/kit#1132 was filed about. The comparison is `label_name_of`'s, the same one
 // every other membership test in this codebase goes through.
 function unreadable_error(issue_number: string): Error {
-	return new Error(`gh api answered no readable labels for issue #${issue_number}`)
+	return new Error(
+		`gh api answered no readable labels for issue ${session_cite.issue(issue_number)}`,
+	)
 }
 
 async function read_label_names(issue_number: string): Promise<ReadonlyArray<string>> {

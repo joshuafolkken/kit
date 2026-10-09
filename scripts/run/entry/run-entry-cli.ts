@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_cut_report } from '#scripts/run/cut/run-cut-report'
@@ -127,7 +128,7 @@ async function gather_reads(issue_number: string): Promise<Reads> {
 }
 
 function emit(parts: EntryParts): number {
-	console.info(run_entry.format_report(parts))
+	console.info(session_cite.text(run_entry.format_report(parts)))
 
 	return run_entry.exit_code(parts)
 }
@@ -175,7 +176,7 @@ async function ask_resume(issue_number: string): Promise<Resume> {
 // Anything but `fresh` is `run:cut --resume`'s answer to act on (`pre-gate-cut.md`), not a new run: the
 // token and its exit code are passed through, and nothing is claimed or read.
 function resume_report(issue_number: string, resume: Resume): number {
-	console.info(`entry #${issue_number} — resume: ${resume.token}`)
+	console.info(`entry ${session_cite.issue(issue_number)} — resume: ${resume.token}`)
 
 	return resume.code
 }
@@ -204,7 +205,7 @@ async function resume_stopped(
 		return await stop_run({ parts, command, reason: HOLD_REASON, should_release: false })
 	}
 
-	console.info(`entry #${issue_number} — resume: ${token}`)
+	console.info(`entry ${session_cite.issue(issue_number)} — resume: ${token}`)
 
 	return SUCCESS_EXIT_CODE
 }
@@ -283,7 +284,7 @@ async function open_run(request: EntryRequest): Promise<number> {
 	const stage = await run_stage_read.read_stage(issue_number)
 	const decision = run_stage.decide(stage.state, command)
 
-	console.info(run_stage.format_decision(issue_number, decision))
+	console.info(session_cite.text(run_stage.format_decision(issue_number, decision)))
 
 	if (command === run_stage.KICKOFF || is_settled(decision)) return SUCCESS_EXIT_CODE
 

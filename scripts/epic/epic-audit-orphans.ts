@@ -1,6 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { cutoff_of, PAGE_CEILING_CAUSE, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_safe } from '#scripts/git/parse-json-array'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { z } from 'zod'
 import { epic_audit_logic, type AuditFinding, type FindingLevel } from './epic-audit'
 import type { EpicSnapshot } from './epic-fetch'
@@ -77,7 +78,7 @@ type ClaimingSearch =
 // answer is now carried out and reported instead (joshuafolkken/kit#1033).
 async function find_claiming_issues(epic_number: number, repo: string): Promise<ClaimingSearch> {
 	const { json, is_capped } = await git_gh_command.issue_search_body(
-		`#${String(epic_number)}`,
+		issue_cite.plain(epic_number),
 		SEARCH_LIMIT,
 	)
 	if (json === undefined) return { kind: 'unreadable' }

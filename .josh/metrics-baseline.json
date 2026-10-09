@@ -1,21 +1,21 @@
 {
 	"scripts": {
-		"files": 1018,
-		"code_lines": 84387,
-		"comment_lines": 33713,
+		"files": 1028,
+		"code_lines": 85525,
+		"comment_lines": 33987,
 		"comment_ratio": 0.4
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2347
+		"lines": 2344
 	},
 	"guards": 8,
 	"ai_cost": {
-		"resident_bytes": 12231,
-		"on_demand_bytes": 558915
+		"resident_bytes": 12222,
+		"on_demand_bytes": 560565
 	},
 	"accepted": {
-		"reason": "#3433 adds run:add (scripts/run/add) and the backlog arrival/carry handling for issues injected into a live backlogrun; merged with #3434 lane:limit carry-record override, #3421 guard-friction / investigation-payback retrospective modules, #3422 accepted-value hints, #3480 run:board legend and #3425 prose_lines reuse",
+		"reason": "#3433 adds run:add (scripts/run/add) and the backlog arrival/carry handling for issues injected into a live backlogrun; merged with #3434 lane:limit carry-record override, #3421 guard-friction / investigation-payback retrospective modules, #3422 accepted-value hints, #3480 run:board legend, #3425 prose_lines reuse and #3501 quiet-gate external-load recording",
 		"date": "2026-10-09"
 	}
 }

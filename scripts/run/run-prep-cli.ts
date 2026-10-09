@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_read_cli, type BlockRead } from '#scripts/issue/issue-read-cli'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
+import { session_cite } from '#scripts/issue/session-cite'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
 import { run_ship_preflight } from '#scripts/run/ship/run-ship-preflight'
@@ -60,7 +61,7 @@ function parse_number(argv: ReadonlyArray<string>): string | undefined {
 // One note for a read that produced nothing, naming which of the two it was — the same distinction
 // `issue:read` and `issue:state` keep, so a bundled failure still tells a retry from an answer.
 function failure_note(issue_number: string, kind: string): string {
-	return `(issue #${issue_number} not bundled: ${kind})`
+	return `(issue ${session_cite.issue(issue_number)} not bundled: ${kind})`
 }
 
 // A dispatched lane child never runs `josh latest` — the parent does it once per session
@@ -144,8 +145,9 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	}
 
 	const reads = await gather(issue_number)
+	const report = run_prep.format_report(to_parts(issue_number, reads))
 
-	console.info(run_prep.format_report(to_parts(issue_number, reads)))
+	console.info(session_cite.text(report))
 
 	return exit_code(reads)
 }

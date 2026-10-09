@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import {
 	ALREADY_DONE_LABEL,
 	EPIC_LABEL,
@@ -185,7 +186,18 @@ function park_comment(reason: ParkReason): string {
 		`- Why: ${reason.cause}`,
 		'- Read: the issue is OPEN, carries none of `needs-decision`, `already-done`, `needs-human-review` or `epic`, and no merged pull request’s `closes #N` names it.',
 		streak_line(reason.carry),
-		`- Next: read the child’s transcript${transcript}, then either resume it with \`fullrun #${reason.child}\`, or record the decision here and remove \`needs-decision\`.`,
+		`- Next: read the child’s transcript${transcript}, then either resume it with \`fullrun ${issue_cite.plain(reason.child)}\`, or record the decision here and remove \`needs-decision\`.`,
+	].join('\n')
+}
+
+// Why the run released a child it would otherwise have parked (joshuafolkken/kit#3502): the child
+// records open blockers, so its order is already decided and it waits rather than asking a person.
+// Script-emitted, so English.
+function waiting_comment(blockers: ReadonlyArray<string>): string {
+	return [
+		'Released to wait by `pnpm josh run:merge`, the `backlogrun` driver — not parked, and not counted as a failure.',
+		`- Why: the child’s session ended unfinished while it records open blockers: ${blockers.join(', ')}.`,
+		'- Next: its order is already recorded — it becomes runnable again once its blockers merge; a blocker outside the backlog still needs a person to land it.',
 	].join('\n')
 }
 
@@ -196,6 +208,7 @@ const run_merge = {
 	classify_child,
 	counters_comment,
 	park_comment,
+	waiting_comment,
 	is_guard_tripped,
 	is_outage_guard_tripped,
 }

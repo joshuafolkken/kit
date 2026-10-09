@@ -124,7 +124,6 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/rules/rule-guard.ts',
 	'scripts/rules/tail-commands.ts',
 	'scripts/rules/test-declared-commit.ts',
-	'scripts/rules/wip-cap.ts',
 	'scripts/run/run-issue-number.ts',
 	'scripts/run/run-stranded-cli.ts',
 	'scripts/run/run-watcher-guard-cli.ts',

@@ -1,24 +1,27 @@
 import { styleText } from 'node:util'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { backlog_idle, type IdleWindow } from '#scripts/backlog/backlog-idle'
-import { run_board_labels, type Words } from './run-board-labels'
+import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
 import type { RunActivity } from './run-board-status'
+import type { LaneUsages } from './run-board-usage'
 
 // The top of `run:board` (joshuafolkken/kit#3430): whether the run is moving, how long it has run, how
 // long it has left, how fresh its last event is, and how far through the plan it is — and, while it
 // waits on an empty backlog, until when it waits and what ends the wait. Every time comes from a record
-// (the carry's start, the stream's events, the `idle` window); nothing here guesses one. Two lines of
+// (the carry's start, the stream's events, the `idle` window); nothing here guesses one. Lines of
 // symbols rather than sentences (joshuafolkken/kit#3444): the `⏱` that moves every second is the proof
-// the board is live, so no `updated` line is drawn. Under the title, the machine the run is on
-// (joshuafolkken/kit#3450), so a slow run reads apart from a stuck one.
+// the board is live, so no `updated` line is drawn. Beside the time, the machine the run is on
+// (joshuafolkken/kit#3450), so a slow run reads apart from a stuck one. **Always two lines**
+// (joshuafolkken/kit#3486, joshuafolkken/kit#3508): the run's state with its progress, then the time
+// with the machine. A value not read yet is drawn `-`, never `0`, so a header still loading reads as
+// unknown rather than as an empty run.
 
-const { HEADER_ICONS, STATE_ICONS, bar_of, clock_of, elapsed_of, left_of, span_of } =
+const { HEADER_ICONS, STATE_ICONS, WORDS, bar_of, clock_of, elapsed_of, left_of, minute_of } =
 	run_board_labels
-const COUNT_GAP = '  '
-// The parts of the title line sit one space further apart than the counts, so the groups read apart.
-const GAP = `${COUNT_GAP} `
+const UNKNOWN = '-'
+const { GAP } = run_board_machine
 // A running run whose newest event is older than this is drawn as stale, so a hang stands out; past
 // twice that it is drawn as alarming.
 const STALE_MINUTES = 15
@@ -27,7 +30,6 @@ const ALARM_FACTOR = 2
 const ALARM_MS = STALE_MS * ALARM_FACTOR
 const INDENT = '  '
 const RUN_NAME = 'backlogrun'
-const CLOCK_MINUTES_END = 5
 
 // Who reads the frame: a person on a screen, or a chat a session answers a progress question in
 // (joshuafolkken/kit#3456), where a title is never cut, no legend is drawn and the machine is its memory
@@ -36,7 +38,6 @@ type BoardForm = 'screen' | 'chat'
 
 interface BoardHeader {
 	now_ms: number
-	words: Words
 	started_ms: number
 	// Set once the run has ended (joshuafolkken/kit#3439): the title then says when, and how long it took.
 	ended_ms: number | undefined
@@ -50,6 +51,8 @@ interface BoardHeader {
 	is_plan_loading: boolean
 	// The machine's gauges, `undefined` before the first sample.
 	machine: MachineGauges | undefined
+	// Each running lane's CPU and memory (joshuafolkken/kit#3489), `undefined` where none could be read.
+	usages?: LaneUsages | undefined
 	// The spinner's frame a running run and a running row turn, `undefined` where the output is not a
 	// terminal and they draw their still icons (joshuafolkken/kit#3452).
 	spinner: string | undefined
@@ -139,10 +142,7 @@ function plan_warning(header: BoardHeader): string | undefined {
 
 	if (failed === undefined) return undefined
 
-	return styleText(
-		'yellow',
-		`⚠ ${header.words.plan} ${clock_of(failed).slice(0, CLOCK_MINUTES_END)}`,
-	)
+	return styleText('yellow', `⚠ ${WORDS.plan} ${minute_of(failed)}`)
 }
 
 // A plan read in flight turns the spinner after ⏳ and says nothing more (joshuafolkken/kit#3455); a
@@ -159,9 +159,10 @@ function time_parts(header: BoardHeader): Array<string> {
 	const { now_ms, started_ms, ended_ms } = header
 
 	if (ended_ms !== undefined) {
-		const ended = clock_of(ended_ms).slice(0, CLOCK_MINUTES_END)
-
-		return [`⏱ ${elapsed_of(ended_ms - started_ms)}`, `${HEADER_ICONS.ended} ${ended}`]
+		return [
+			`⏱ ${elapsed_of(ended_ms - started_ms)}`,
+			`${HEADER_ICONS.ended} ${minute_of(ended_ms)}`,
+		]
 	}
 
 	const cutoff = started_ms + backlog_budget.WHOLE_RUN_BUDGET_MS
@@ -169,11 +170,52 @@ function time_parts(header: BoardHeader): Array<string> {
 	return [`⏱ ${elapsed_of(now_ms - started_ms)}`, `⌛ ${left_of(cutoff - now_ms)}`]
 }
 
-function title_line(header: BoardHeader, running: number): string {
-	const mark = mark_of(header, running)
+function layout_of(header: BoardHeader): BoardLayout {
+	return header.layout ?? run_board_layout.EMPTY_LAYOUT
+}
+
+// Whether the plan has been read: until it has, the board draws the run's own children alone, and the
+// counts only the plan knows — the total and what waits — are unknown (joshuafolkken/kit#3486).
+function is_plan_read(header: BoardHeader): boolean {
+	return header.plan_fetched_ms !== undefined
+}
+
+// Arrivals since the board first looked, as `(+N)`.
+function plus_of(counts: BoardCounts, header: BoardHeader): string {
+	const added = counts.total - (header.baseline_total ?? counts.total)
+
+	return added > 0 ? ` (+${String(added)})` : ''
+}
+
+// Icon, figure, then bar, as the machine gauges (joshuafolkken/kit#3473): the settled count is
+// right-aligned to the total's width, so the bar starts in one column as the count grows. Arrivals since
+// the board first looked follow the bar, where they cannot move it.
+function tally_part(counts: BoardCounts, is_read: boolean): string {
+	const { settled } = counts
+	const total = is_read ? String(counts.total) : UNKNOWN
+	const tally = `${String(settled)}/${total}`.padStart(`${total}/${total}`.length)
+	const bar = is_read ? bar_of(settled, counts.total) : bar_of(0, 0)
+
+	return `${STATE_ICONS.merged} ${tally} ${bar}`
+}
+
+function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string> {
+	const is_read = is_plan_read(header)
+
+	return [
+		`${tally_part(counts, is_read)}${is_read ? plus_of(counts, header) : ''}`,
+		`${STATE_ICONS.running} ${String(counts.running)}`,
+		`${STATE_ICONS.waiting} ${is_read ? String(counts.remaining) : UNKNOWN}`,
+		`${STATE_ICONS.parked} ${String(counts.parked)}`,
+	]
+}
+
+// The run's mark and its progress, then how fresh its stream is and what its plan read is doing.
+function state_line(counts: BoardCounts, header: BoardHeader): string {
+	const mark = mark_of(header, counts.running)
 	const parts = [
 		run_part(mark, header.spinner),
-		...time_parts(header),
+		...progress_parts(counts, header),
 		heartbeat_part(header, mark),
 		loading_part(header),
 		plan_warning(header),
@@ -182,43 +224,24 @@ function title_line(header: BoardHeader, running: number): string {
 	return parts.filter((part) => part !== undefined).join(GAP)
 }
 
-// Icon, figure, then bar, as the machine gauges above it (joshuafolkken/kit#3473): the settled count is
-// right-aligned to the total's width, so the bar starts in one column as the count grows. Arrivals since
-// the board first looked follow the bar, where they cannot move it.
-function progress_line(counts: BoardCounts, header: BoardHeader): string {
-	const { settled, total } = counts
-	const added = total - (header.baseline_total ?? total)
-	const plus = added > 0 ? ` (+${String(added)})` : ''
-	const widest = `${String(total)}/${String(total)}`
-	const tally = `${String(settled)}/${String(total)}`.padStart(widest.length)
-	const breakdown = [
-		`${STATE_ICONS.running} ${String(counts.running)}`,
-		`${STATE_ICONS.waiting} ${String(counts.remaining)}`,
-		`${STATE_ICONS.parked} ${String(counts.parked)}`,
-	].join(COUNT_GAP)
+function idle_line(idle: IdleWindow, now_ms: number): string {
+	const ending = idle.bound === 'idle' ? WORDS.idle_end_idle : WORDS.idle_end_run
+	const left = `${elapsed_of(idle.until_ms - now_ms)} ${WORDS.idle_left}`
+	const until = `${WORDS.idle_until} ${clock_of(idle.until_ms)} (${left}) → ${ending}`
+	const next_check = `${WORDS.next_check} ${clock_of(backlog_idle.next_check_ms(idle))}`
 
-	return `${STATE_ICONS.merged} ${tally} ${bar_of(settled, total)}${plus}${GAP}${breakdown}`
+	return `${INDENT}${RUN_MARKS.idle.glyph} ${until} · ${next_check}`
 }
 
-function idle_lines(idle: IdleWindow, header: BoardHeader): Array<string> {
-	const { words, now_ms } = header
-	const ending = idle.bound === 'idle' ? words.idle_end_idle : words.idle_end_run
-	const left = `${words.idle_left} ${span_of(idle.until_ms - now_ms)}`
-	const next_check = clock_of(backlog_idle.next_check_ms(idle))
-
-	return [
-		`${INDENT}${words.idle_until} ${clock_of(idle.until_ms)} (${left}) → ${ending}`,
-		`${INDENT}${words.next_check} ${next_check}`,
-	]
-}
-
-// The wait is drawn only while it is what the run is doing: nothing running and the run not ended.
-function idle_block(header: BoardHeader, running: number): Array<string> {
+// The wait, under the header's blank line (joshuafolkken/kit#3486), drawn only while it is what the run
+// is doing: no child running and the run not ended. The children running are the run's own, read
+// locally, so a board still waiting on GitHub never draws a running run as waiting.
+function idle_lines(header: BoardHeader): Array<string> {
 	const { idle, is_stopped } = header.activity
 
-	if (is_stopped || idle === undefined || running > 0) return []
+	if (is_stopped || idle === undefined || counts_of(layout_of(header)).running > 0) return []
 
-	return idle_lines(idle, header)
+	return ['', idle_line(idle, header.now_ms)]
 }
 
 // The gauges the machine line draws: every one on a screen, the memory alone in a chat.
@@ -230,20 +253,24 @@ function machine_of(header: BoardHeader): MachineGauges | undefined {
 	return { ...machine, cpu_percent: undefined, swap_mb_per_s: undefined }
 }
 
-function header_lines(header: BoardHeader): Array<string> {
-	const counts = header.layout === undefined ? undefined : counts_of(header.layout)
-	const running = counts?.running ?? 0
-	const progress = counts === undefined ? undefined : progress_line(counts, header)
-	const machine = run_board_machine.line_of(machine_of(header))
+// The machine before a gauge could be read: each gauge's icon, its figure unknown, apart as the gauges.
+const MACHINE_UNKNOWN = [HEADER_ICONS.cpu, HEADER_ICONS.memory, HEADER_ICONS.swap]
+	.map((icon) => `${icon} ${UNKNOWN}`)
+	.join(GAP)
 
-	return [
-		title_line(header, running),
-		...[machine, progress].filter((line) => line !== undefined),
-		...idle_block(header, running),
-	]
+// The time, then the machine the run is on.
+function clock_line(header: BoardHeader): string {
+	const machine = run_board_machine.line_of(machine_of(header)) ?? MACHINE_UNKNOWN
+
+	return [...time_parts(header), machine].join(GAP)
 }
 
-const run_board_header = { counts_of, header_lines }
+// The run's state with its progress, then the time with the machine, in every state the board can be in.
+function header_lines(header: BoardHeader): Array<string> {
+	return [state_line(counts_of(layout_of(header)), header), clock_line(header)]
+}
+
+const run_board_header = { counts_of, header_lines, idle_lines, is_plan_read }
 
 export { run_board_header }
 export type { BoardCounts, BoardForm, BoardHeader }

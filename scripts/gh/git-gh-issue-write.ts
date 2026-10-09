@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
@@ -278,7 +279,7 @@ async function read_issue_id(issue_number: string): Promise<number> {
 	const issue_id = Number(raw.trim())
 
 	if (!Number.isSafeInteger(issue_id) || issue_id <= 0) {
-		throw new Error(`gh api answered no database id for issue #${issue_number}`)
+		throw new Error(`gh api answered no database id for issue ${session_cite.issue(issue_number)}`)
 	}
 
 	return issue_id

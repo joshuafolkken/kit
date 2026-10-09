@@ -7,6 +7,7 @@ import {
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
 } from '#scripts/issue/issue-labels'
+import { session_cite } from '#scripts/issue/session-cite'
 
 // How much of a repository's parallelism is already spoken for — asked of the *repository*, never of
 // the epic (joshuafolkken/kit#925), and counted rather than treated as a yes/no since
@@ -70,8 +71,8 @@ type BusyRead =
 // Named so the reader can go and look at them: the stale-label rule is what keeps an abandoned
 // `in-progress` from holding a repository forever, and it cannot be applied to an issue nobody was
 // told about.
-function format_holders(issues: ReadonlyArray<OpenIssueData>): string {
-	return issues.map((issue) => `#${String(issue.number)} ${issue.title}`).join(', ')
+function format_holders(issues: ReadonlyArray<OpenIssueData>, repo: string): string {
+	return issues.map((issue) => session_cite.issue(issue.number, issue.title, repo)).join(', ')
 }
 
 // How many lanes this read shows occupied. Every kind but `busy` is zero, and the two that could not
@@ -88,7 +89,7 @@ function occupancy_message(
 	repo: string,
 	limit: number,
 ): string {
-	return `${String(issues.length)} of ${String(limit)} lanes in use in ${repo}: ${format_holders(issues)}.`
+	return `${String(issues.length)} of ${String(limit)} lanes in use in ${repo}: ${format_holders(issues, repo)}.`
 }
 
 // The occupancy said once, with the consequence appended — rather than a second sentence that

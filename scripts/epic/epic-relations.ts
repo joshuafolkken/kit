@@ -1,4 +1,5 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { session_cite } from '#scripts/issue/session-cite'
 import type { DependencyLink } from './epic-parse'
 import { format_dependency_links } from './epic-reference'
 
@@ -63,7 +64,9 @@ function format_relation_report(input: {
 	if (input.links.length === 0) return `🔗 No blocked-by relation was ${verb}.`
 
 	if (input.failures === 0) {
-		return `🔗 ${total} blocked-by relation(s) ${verb}: ${format_dependency_links(input.links)}.`
+		return session_cite.text(
+			`🔗 ${total} blocked-by relation(s) ${verb}: ${format_dependency_links(input.links)}.`,
+		)
 	}
 
 	return `⚠️  ${String(input.failures)} of ${total} blocked-by relation(s) could not be ${verb}; the epic body is intact.`

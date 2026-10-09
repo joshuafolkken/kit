@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
 
@@ -139,7 +140,7 @@ function commit_flags(state: ShipState): ReadonlyArray<string> {
 }
 
 function event_text(issue: string, stage: Stage, phase: Phase): string {
-	return `#${issue} ${stage} ${phase}`
+	return `${issue_cite.plain(issue)} ${stage} ${phase}`
 }
 
 // A stop on a merge git could not finish is named `conflict` rather than by the stage it happened in

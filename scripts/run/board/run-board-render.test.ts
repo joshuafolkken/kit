@@ -49,7 +49,7 @@ describe('run_board_render.render rows', () => {
 		const row_line = `  🔨 1  ${padded('Issue 1')}  90:00  ${plain_track('implement')}`
 
 		expect(lines).toContain(row_line)
-		expect(row_line).not.toContain('█')
+		expect(row_line).not.toContain('■')
 		expect(lines.slice(0, -1).join('\n')).not.toContain('implement')
 		expect(lines.join('\n')).not.toContain('lane')
 	})
@@ -124,8 +124,9 @@ describe('run_board_render.render sections', () => {
 	})
 })
 
+// joshuafolkken/kit#3489: seven phases from 🔍, the 🚀 no row ever drew gone.
 const PHASE_LEGEND =
-	'🚀 dispatched  🔍 investigate  📝 plan  🔨 implement  👀 review  🚦 gate  📦 commit  🔁 followup'
+	'🔍 investigate  📝 plan  🔨 implement  👀 review  🚦 gate  📦 commit  🔁 followup'
 
 function legend_of(rows: ReadonlyArray<BoardRow>): Array<string> {
 	const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: [...rows] } }))
@@ -150,10 +151,10 @@ describe('run_board_render.render legend', () => {
 	})
 
 	it('names 🔄 only while a row draws it, not for a row led by its phase', () => {
-		const dispatched = row(1, { state: 'running' })
+		const launched = row(1, { state: 'running' })
 
 		expect(legend_of([running(2, NOW, 'review')])).toStrictEqual([PHASE_LEGEND])
-		expect(legend_of([dispatched]).at(-1)).toBe('🔄 running')
+		expect(legend_of([launched]).at(-1)).toBe('🔄 running')
 	})
 
 	it('names 🔗 only while a row draws a wait', () => {
@@ -237,7 +238,7 @@ describe('run_board_render.render running row lead', () => {
 	})
 
 	it('leads a running row with its newest phase’s icon, and 🔄 before its track draws one', () => {
-		const active = [running(1, NOW, 'commit'), running(2, NOW, 'dispatched')]
+		const active = [running(1, NOW, 'commit'), running(2, NOW, undefined)]
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active } }))
 
 		expect(lines.some((line) => line.startsWith('  📦 1  Issue 1'))).toBe(true)
@@ -277,10 +278,10 @@ describe('run_board_render.render header', () => {
 	it('counts the progress with the arrivals since the board first looked', () => {
 		const active = [row(1, { state: 'merged' }), row(2, { state: 'running' })]
 		const layout = { ...EMPTY_LAYOUT, active, unreached: [row(3)] }
-		const [, progress] = lines_of(header({ layout, baseline_total: 2 }))
+		const progress = lines_of(header({ layout, baseline_total: 2 }))[0] ?? ''
 
-		expect(progress).toMatch(/^✅ 1\/3 \S+ \(\+1\)/u)
-		expect(progress).toContain('(+1)   🔄 1  ⏳ 1  💤 0')
+		expect(progress).toMatch(/ {2}✅ 1\/3 \S+ \(\+1\)/u)
+		expect(progress).toContain('(+1)  🔄 1  ⏳ 1  💤 0')
 	})
 
 	it('says until when an idle run waits, what ends the wait and when it next looks', () => {
@@ -293,10 +294,12 @@ describe('run_board_render.render header', () => {
 		const activity = { last_event_ms: NOW, idle, is_stopped: false }
 		const lines = lines_of(header({ activity, layout: undefined }))
 
+		const until = `wait ends ${clock_of(idle.until_ms)} (20:00 left) → ${WORDS.idle_end_idle}`
+
 		expect(lines[0]).toMatch(/^⏸ backlogrun/u)
-		expect(lines[1]).toBe(
-			`  待機終了 ${clock_of(idle.until_ms)} (残り 00:20:00) → ${WORDS.idle_end_idle}`,
-		)
-		expect(lines[2]).toBe(`  次の確認 ${clock_of(NOW + 2 * MINUTE)}`)
+		expect(lines.slice(2, 4)).toStrictEqual([
+			'',
+			`  ⏸ ${until} · next check ${clock_of(NOW + 2 * MINUTE)}`,
+		])
 	})
 })

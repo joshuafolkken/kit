@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import type { ConfirmContext } from './epic-candidate-confirm'
 import { epic_cross_repo } from './epic-cross-repo'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
@@ -45,7 +46,7 @@ interface EpicView {
 // Written exactly as it was typed. A bare number stays bare, because qualifying it here would name
 // this repository in an answer about an epic the caller referred to without one.
 function format_reference(reference: EpicReference): string {
-	return `${reference.repo ?? ''}#${String(reference.number)}`
+	return issue_cite.plain(reference.number, reference.repo)
 }
 
 // What the candidate confirmation reads with. The blockers come from `epic_fetch`'s own reader, so

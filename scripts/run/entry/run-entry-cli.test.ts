@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
@@ -43,6 +44,7 @@ const HELD = { code: OK, out: 'hold' }
 const UNDER = { code: OK, out: 'under\n43630 billed input tokens' }
 const PREP_BODY = '=== issue ===\nbody'
 const ISSUE = '2372'
+const CITED = session_cite.issue(ISSUE)
 const PRRUN_TOKEN = 'prrun-merge'
 const RELEASE_CALL = ['run:release', ISSUE]
 
@@ -57,7 +59,7 @@ function issue_read(state: string, labels: ReadonlyArray<string> = []): unknown 
 }
 
 function stage_line(state: string, command: string, start: string): string {
-	return `stage #${ISSUE} — at: ${state} · to: ${command} · start: ${start}`
+	return `stage ${CITED} — at: ${state} · to: ${command} · start: ${start}`
 }
 
 function last_line(): string {
@@ -111,7 +113,7 @@ describe('run_entry_cli.run — a held tree in budget folds hold, cost, prep and
 		expect(mark_mock).toHaveBeenCalledExactlyOnceWith(ISSUE)
 		expect(info_lines).toStrictEqual([
 			stage_line('fresh', 'fullrun', 'plan'),
-			`entry #${ISSUE} — hold: hold · cost: under · verdict: implement\n\n${PREP_BODY}`,
+			`entry ${CITED} — hold: hold · cost: under · verdict: implement\n\n${PREP_BODY}`,
 		])
 	})
 })
@@ -133,7 +135,7 @@ describe('run_entry_cli.run — a halfrun stop is resumed rather than claimed (j
 		expect(gather_mock).not.toHaveBeenCalled()
 		expect(info_lines).toStrictEqual([
 			stage_line(run_stage.HALFRUN_STOPPED, 'fullrun', 'gate'),
-			`entry #${ISSUE} — resume: ${run_entry_cli.HALFRUN_RESUME_TOKEN}`,
+			`entry ${CITED} — resume: ${run_entry_cli.HALFRUN_RESUME_TOKEN}`,
 		])
 	})
 
@@ -164,7 +166,7 @@ describe('run_entry_cli.run — a prrun stop is resumed rather than claimed (jos
 		expect(gather_mock).not.toHaveBeenCalled()
 		expect(info_lines).toStrictEqual([
 			stage_line(run_stage.PRRUN_STOPPED, 'fullrun', 'followup'),
-			`entry #${ISSUE} — resume: ${PRRUN_TOKEN}`,
+			`entry ${CITED} — resume: ${PRRUN_TOKEN}`,
 		])
 	})
 
@@ -198,7 +200,7 @@ describe('run_entry_cli.run — a stop short-circuits before the reads it would 
 		expect(code).not.toBe(OK)
 		expect(josh_run_mock).toHaveBeenCalledTimes(2)
 		expect(gather_mock).not.toHaveBeenCalled()
-		expect(info_lines[1]).toContain(`entry #${ISSUE} — hold: busy · cost: skipped · verdict: -`)
+		expect(info_lines[1]).toContain(`entry ${CITED} — hold: busy · cost: skipped · verdict: -`)
 		expect(mark_mock).not.toHaveBeenCalled()
 		expect(confirm_mock).toHaveBeenCalledTimes(1)
 	})
@@ -237,7 +239,7 @@ describe('run_entry_cli.run — a carried cut is resumed before the hold is clai
 		expect(calls()).toStrictEqual([['run:cut', '--resume', ISSUE]])
 		expect(read_issue_mock).not.toHaveBeenCalled()
 		expect(gather_mock).not.toHaveBeenCalled()
-		expect(info_lines).toStrictEqual([`entry #${ISSUE} — resume: ${token}`])
+		expect(info_lines).toStrictEqual([`entry ${CITED} — resume: ${token}`])
 	})
 })
 
@@ -267,7 +269,7 @@ describe('run_entry_cli.run — a stop already made is resumed or reported (josh
 		expect(code).toBe(OK)
 		expect(info_lines).toStrictEqual([
 			stage_line(run_stage.HALFRUN_STOPPED, 'prrun', 'gate'),
-			`entry #${ISSUE} — resume: ${run_entry_cli.HALFRUN_RESUME_TOKEN}`,
+			`entry ${CITED} — resume: ${run_entry_cli.HALFRUN_RESUME_TOKEN}`,
 		])
 	})
 
@@ -339,7 +341,7 @@ describe('run_entry_cli.run — a closed issue keeps its prrun hand-off (joshuaf
 			])
 			expect(info_lines).toStrictEqual([
 				stage_line(run_stage.MERGED, command, run_stage.REACHED),
-				`entry #${ISSUE} — resume: prrun-merged`,
+				`entry ${CITED} — resume: prrun-merged`,
 			])
 		},
 	)

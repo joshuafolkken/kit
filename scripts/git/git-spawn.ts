@@ -101,14 +101,21 @@ async function with_output_remote(command: string, arguments_list: Array<string>
 	})
 }
 
-async function with_output(command: string, arguments_list: Array<string>): Promise<void> {
+// `config_options` are `-c <key>=<value>` pairs, which git reads only ahead of the command name and
+// which last for this one call — nothing is written into anyone's git configuration.
+async function with_output(
+	command: string,
+	arguments_list: Array<string>,
+	config_options: ReadonlyArray<string> = [],
+): Promise<void> {
 	const git_command_bin = git_utilities.get_git_command_for_spawn()
+	const spawn_arguments = [...config_options, command, ...arguments_list]
 
 	try {
 		// execa runs the binary directly with an argument array and no `shell` option, so CLI
 		// args cannot break out of a shell sandbox; the git command and args are internally
 		// controlled, never untrusted input. tssecurity:S8705 is a false positive here.
-		await execa(git_command_bin, [command, ...arguments_list], { stdio: 'inherit' }) // NOSONAR
+		await execa(git_command_bin, spawn_arguments, { stdio: 'inherit' }) // NOSONAR
 	} catch (error) {
 		throw create_spawn_error(command, get_exit_code(error))
 	}

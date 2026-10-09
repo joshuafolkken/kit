@@ -27,8 +27,8 @@ not file (`prompts/collaboration-workflow/wip-cap.md`). File it with `pnpm josh 
 (`issue-scout.md`), which lints the body against `prompts/collaboration-workflow/issue-template.md`,
 applies the classification labels it declares, runs the duplicate scan, and runs `epic:bundle` on the
 new Issue so it is offered by its epic; an `auto-ok` epic adds it to the backlog pool
-(`backlogrun-steps.md` → "What one invocation approves"). When it is the second filing of the run, run
-`pnpm josh issue:fold` first; the guard refuses that filing without the fold
+(`backlogrun-steps.md` → "What one invocation approves"). When it is the second filing of the run, the
+command asks the fold question itself and holds a `fold`
 (`split-assessment.md` → "The same two questions decide the filing-time fold").
 
 The marker suite pins the rules below.
@@ -151,9 +151,11 @@ could bite later" line (`backlogrun-child.md` → "What the summary carries, and
 parent files what survives — under the depth test above, and inside the run's ceiling.
 
 **A delegated child does not append to the ledger either — the parent collapses the duplicates and
-appends what is left.** The child's route is unchanged and is the only one it has —
-the summary's "Observations that could bite later" line — and the parent chooses the key, checks the
-count and writes the line. **The 10-per-run ceiling for this route is the parent's to count.**
+appends what is left.** The child's only route is the summary's "Observations that could bite later"
+line; the parent chooses the key, checks the count and writes the line. **The 10-per-run ceiling for this route is the parent's to
+count.** **Lines its own `review:record` and `measure:rerun` write are not this route** — they go to
+its issue's file in its lane (`observation-ledger.md` → "The ledger — where an observation that
+cannot cite a blockage goes").
 
 Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why a delegated child neither files
 nor appends".

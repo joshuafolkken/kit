@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import type { DependencyLink } from './epic-parse'
 
 // How an issue and a dependency between two of them are written down.
@@ -14,7 +15,7 @@ const DEPENDENCY_ARROW = ' -> '
 const REFERENCE_SEPARATOR = ', '
 
 function to_issue_reference(issue_number: number): string {
-	return `#${String(issue_number)}`
+	return issue_cite.plain(issue_number)
 }
 
 function format_dependency_link(link: DependencyLink): string {

@@ -2,6 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
+import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { repository_lock } from './repository-lock'
@@ -205,6 +206,22 @@ describe('repository_lock.clear_stale', () => {
 			repository_lock.clear_stale(state.lock)
 		}).not.toThrow()
 		expect(existsSync(state.lock)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#3503: an unanswered beacon probe cleared a live holder's lock under load.
+describe('repository_lock.clear_stale on a holder the default judge cannot place', () => {
+	it('keeps the record', () => {
+		writeFileSync(state.lock, live_record())
+		const probe = vi.spyOn(process_identity, 'is_same_process').mockReturnValue(undefined)
+
+		try {
+			repository_lock.clear_stale(state.lock)
+		} finally {
+			probe.mockRestore()
+		}
+
+		expect(readFileSync(state.lock, 'utf8')).toBe(live_record())
 	})
 })
 

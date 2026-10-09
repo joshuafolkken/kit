@@ -1,91 +1,80 @@
 import { WriteStream } from 'node:tty'
 import { styleText } from 'node:util'
+import type { FiledKind } from '#scripts/run/event/run-event-filed'
 import cli_spinners from 'cli-spinners'
 import type { BoardNote } from './run-board-notes'
 import type { Phase } from './run-board-phase'
 import type { ItemState } from './run-board-status'
 
-// The words and the clock `run:board` draws with (joshuafolkken/kit#3430), in the session language as
-// `run:event --watch`'s labels are. A moment on the board is a local `HH:MM:SS` clock; how long
-// something has run is a short `MM:SS` (joshuafolkken/kit#3444), so a person reads the board against
-// the clock on their own screen.
+// The words and the clock `run:board` draws with (joshuafolkken/kit#3430). A moment on the board is a
+// local `HH:MM:SS` clock; how long something has run is a short `MM:SS` (joshuafolkken/kit#3444), so a
+// person reads the board against the clock on their own screen.
 
-const JA = 'ja'
 const CLOCK_WIDTH = 2
 const CLOCK_PAD = '0'
 const MS_PER_SECOND = 1000
 const SECONDS_PER_MINUTE = 60
 const MINUTES_PER_HOUR = 60
-const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR
 const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE
 // Every gauge is this wide — the plan, the machine and a row's phase (joshuafolkken/kit#3450).
 const BAR_WIDTH = 10
-// A full block done and a thin line left (joshuafolkken/kit#3452): the shapes alone tell the two apart
-// where no color is drawn, and a terminal dims the line so the gauge does not read heavy.
-const BAR_DONE = '█'
+// A centered square done and a thin line left (joshuafolkken/kit#3452): the shapes alone tell the two
+// apart where no color is drawn, and a terminal dims the line so the gauge does not read heavy. The
+// square, not a full block, leaves a gap between stacked bars at line height 1 (joshuafolkken/kit#3498).
+const BAR_DONE = '■'
 const BAR_LEFT = '─'
 const BAR_DONE_COLOR: TextColor = 'cyan'
 const BAR_LEFT_COLOR: TextColor = 'dim'
-// The spinner a running run and a running row turn (joshuafolkken/kit#3452), four frames a second.
+// The spinner a running run and a running row turn (joshuafolkken/kit#3452), at the package's own
+// interval (joshuafolkken/kit#3495).
 const SPINNER_FRAMES = cli_spinners.dots.frames
-const SPINNER_FRAME_MS = 250
+const SPINNER_INTERVAL_MS = cli_spinners.dots.interval
 // The color depth from which a terminal draws a 24-bit color, and the escapes that draw one.
 const RGB_COLOR_DEPTH = 24
 const ESC = '\u{1B}'
 const DEFAULT_FOREGROUND = `${ESC}[39m`
 
-interface WordPair {
-	ja: string
-	en: string
-}
-
-// One pair per word, as `run-event-render.ts` keeps its labels, so a word cannot be added in one
-// language without the other. The board draws most of what it says as a symbol (joshuafolkken/kit#3444);
-// the words left are the ones a symbol cannot carry, and the legend that names the symbols.
-const WORD_PAIRS = {
-	no_run: { ja: 'ランなし', en: 'no run' },
-	plan: { ja: '計画', en: 'plan' },
-	merged: { ja: 'マージ', en: 'merged' },
-	parked: { ja: 'park', en: 'parked' },
-	done: { ja: '終了', en: 'done' },
-	in_progress: { ja: '実行中', en: 'running' },
-	stopped: { ja: '停止', en: 'stopped' },
-	waiting: { ja: '待ち', en: 'waiting' },
-	decision: { ja: '判断待ち', en: 'decision' },
-	waits: { ja: '待ち先', en: 'waits on' },
-	dispatched: { ja: '起動', en: 'dispatched' },
-	investigate: { ja: '調査', en: 'investigate' },
-	implement: { ja: '実装', en: 'implement' },
-	review: { ja: 'レビュー', en: 'review' },
-	gate: { ja: 'gate', en: 'gate' },
-	commit: { ja: 'コミット', en: 'commit' },
-	followup: { ja: 'followup', en: 'followup' },
-	idle_until: { ja: '待機終了', en: 'wait ends' },
-	idle_left: { ja: '残り', en: 'left' },
-	idle_end_idle: {
-		ja: '新着がなければ終了してレポート送信',
-		en: 'ends and reports unless a new issue arrives',
-	},
-	idle_end_run: {
-		ja: '全体の打ち切りで終了してレポート送信',
-		en: 'ends at the whole-run cut-off and reports',
-	},
-	next_check: { ja: '次の確認', en: 'next check' },
-	notes: { ja: '気づき・判断待ち', en: 'findings and decisions' },
-	more: { ja: 'ほか', en: 'more' },
-	filed: { ja: '起票', en: 'filed' },
-	park: { ja: 'park', en: 'park' },
-	note: { ja: '意見', en: 'note' },
-	found_during: { ja: '（{n} の実装中に発見）', en: ' (found during {n})' },
+// The words the board draws, English whatever the session language (joshuafolkken/kit#3486): one set
+// of words reads the same on every board. The board draws most of what it says as a symbol
+// (joshuafolkken/kit#3444); the words left are the ones a symbol cannot carry, and the legend that
+// names the symbols.
+const WORDS = {
+	no_run: 'no run',
+	plan: 'plan',
+	merged: 'merged',
+	parked: 'parked',
+	done: 'done',
+	in_progress: 'running',
+	stopped: 'stopped',
+	waiting: 'waiting',
+	decision: 'decision',
+	waits: 'waits on',
+	investigate: 'investigate',
+	implement: 'implement',
+	review: 'review',
+	gate: 'gate',
+	commit: 'commit',
+	followup: 'followup',
+	idle_until: 'wait ends',
+	idle_left: 'left',
+	idle_end_idle: 'ends and reports if nothing new',
+	idle_end_run: 'ends at the whole-run cut-off and reports',
+	next_check: 'next check',
+	notes: 'findings and decisions',
+	more: 'more',
+	filed: 'filed',
+	breaking: 'breaking',
+	bug: 'bug',
+	enhancement: 'enhancement',
+	park: 'park',
+	note: 'note',
+	found_during: ' (found during {n})',
 	// joshuafolkken/kit#3437: the session a stopped run waits in, and what closing the board leaves.
-	resume: { ja: '停止中。再開', en: 'stopped — resume with' },
-	keeps_running: {
-		ja: '閉じてもランは続きます。再表示は `pnpm josh backlogrun`',
-		en: 'Closing this keeps the run going. Reopen with `pnpm josh backlogrun`',
-	},
-} as const satisfies Readonly<Record<string, WordPair>>
+	resume: 'stopped — resume with',
+	keeps_running: 'Closing this screen leaves the run going · reopen with `pnpm josh backlogrun`',
+} as const
 
-type Words = Readonly<Record<keyof typeof WORD_PAIRS, string>>
+type Words = typeof WORDS
 
 type TextColor = Parameters<typeof styleText>[0]
 
@@ -98,15 +87,6 @@ interface Shade {
 }
 
 type Paint = TextColor | Shade
-
-function words_in(lang: keyof WordPair): Words {
-	const entries = Object.entries(WORD_PAIRS).map(([key, pair]) => [key, pair[lang]])
-
-	return Object.fromEntries(entries) as Words
-}
-
-const JA_WORDS = words_in('ja')
-const EN_WORDS = words_in('en')
 
 // Every row icon is an emoji a terminal draws two columns wide by default (Emoji_Presentation), so the
 // number after it lines up whichever state a row is in (joshuafolkken/kit#3444): 🅿 and ☑ are text
@@ -127,7 +107,6 @@ const WAITS_ICON = '🔗'
 // A running row's phases as icons (joshuafolkken/kit#3452), chosen on the same rule; the row draws every
 // phase it has passed, so the rightmost icon is what it is doing now (joshuafolkken/kit#3460).
 const PHASE_ICONS: Readonly<Record<Phase, string>> = {
-	dispatched: '🚀',
 	investigate: '🔍',
 	plan: '📝',
 	implement: '🔨',
@@ -140,7 +119,6 @@ const PHASE_ICONS: Readonly<Record<Phase, string>> = {
 
 // The legend's word for each phase — the header's own `plan` and `merged` where the phase shares one.
 const PHASE_WORDS: Readonly<Record<Phase, keyof Words>> = {
-	dispatched: 'dispatched',
 	investigate: 'investigate',
 	plan: 'plan',
 	implement: 'implement',
@@ -153,12 +131,19 @@ const PHASE_WORDS: Readonly<Record<Phase, keyof Words>> = {
 
 // The findings section's rule and each note kind's lead (joshuafolkken/kit#3478), chosen on the same
 // rule and apart from every phase and state icon, so the legend names them and a row needs no word. 🆕
-// rather than 🐞: a filed issue is not always a bug.
+// is a filed issue whose kind is none of `FILED_KIND_ICONS`.
 const NOTES_ICON = '📌'
 const NOTE_ICONS: Readonly<Record<BoardNote['kind'], string>> = {
 	filed: '🆕',
 	park: STATE_ICONS.parked,
 	note: '💬',
+}
+// A filed issue's line leads with its kind in place of 🆕 (joshuafolkken/kit#3494): inside the 📌
+// section a line is already read as a filing, so 🆕 beside the kind would only widen it.
+const FILED_KIND_ICONS: Readonly<Record<FiledKind, string>> = {
+	'breaking-change': '💥',
+	bug: '🐛',
+	enhancement: '✨',
 }
 
 // The header's gauges and marks (joshuafolkken/kit#3450). ⚡ rather than 🔥 (joshuafolkken/kit#3452):
@@ -180,10 +165,6 @@ const GAUGE_SHADES = {
 	red: { rgb: '255;69;58', named: 'red' },
 } as const satisfies Readonly<Record<string, Shade>>
 
-function words_of(lang: string): Words {
-	return lang === JA ? JA_WORDS : EN_WORDS
-}
-
 function two_digits(value: number): string {
 	return String(value).padStart(CLOCK_WIDTH, CLOCK_PAD)
 }
@@ -197,13 +178,12 @@ function clock_of(ms: number): string {
 		.join(':')
 }
 
-// A span as `HH:MM:SS`; a negative span — a clock that moved back — reads as zero.
-function span_of(ms: number): string {
-	const seconds = Math.floor(Math.max(0, ms) / MS_PER_SECOND)
-	const hours = Math.floor(seconds / SECONDS_PER_HOUR)
-	const minutes = Math.floor(seconds / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR
+// The local wall-clock `HH:MM` of a moment, for one a person reads to the minute — when a run ended, or
+// when a finding was filed (joshuafolkken/kit#3489).
+function minute_of(ms: number): string {
+	const date = new Date(ms)
 
-	return [hours, minutes, seconds % SECONDS_PER_MINUTE].map((value) => two_digits(value)).join(':')
+	return [date.getHours(), date.getMinutes()].map((value) => two_digits(value)).join(':')
 }
 
 // How long something has run, as `MM:SS` whose minutes never carry into hours (`61:05`), so the header
@@ -266,7 +246,7 @@ function bar_of(
 // The spinner's frame at a moment, from the clock rather than a count of redraws, so the frame a redraw
 // draws needs no state carried between redraws.
 function spinner_of(now_ms: number): string {
-	const step = Math.floor(Math.max(0, now_ms) / SPINNER_FRAME_MS)
+	const step = Math.floor(Math.max(0, now_ms) / SPINNER_INTERVAL_MS)
 
 	return SPINNER_FRAMES[step % SPINNER_FRAMES.length] ?? ''
 }
@@ -274,23 +254,24 @@ function spinner_of(now_ms: number): string {
 const run_board_labels = {
 	BAR_LEFT,
 	BAR_LEFT_COLOR,
+	FILED_KIND_ICONS,
 	GAUGE_SHADES,
 	HEADER_ICONS,
 	NOTES_ICON,
 	NOTE_ICONS,
 	PHASE_ICONS,
 	PHASE_WORDS,
-	SPINNER_FRAME_MS,
+	SPINNER_INTERVAL_MS,
 	STATE_ICONS,
 	WAITS_ICON,
+	WORDS,
 	bar_of,
 	clock_of,
 	elapsed_of,
 	left_of,
+	minute_of,
 	painted,
-	span_of,
 	spinner_of,
-	words_of,
 }
 
 export { run_board_labels }
