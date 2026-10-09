@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1008,
-		"code_lines": 83513,
-		"comment_lines": 33530,
+		"code_lines": 83514,
+		"comment_lines": 33536,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 558915
 	},
 	"accepted": {
-		"reason": "run:board names its notes section with an icon and leads filed rows with icons named in the legend (#3478), with a notes test and shared render fixture",
+		"reason": "epic:bundle/issue:scout reuse issue_citation.prose_lines to skip fenced and quoted numbers (#3425): one import line",
 		"date": "2026-10-09"
 	}
 }
