@@ -7,10 +7,10 @@ import { observation_ledger_migrate } from './observation-ledger-migrate'
 
 // Where the observation ledger is read and written, whichever work tree a command runs in.
 //
-// **The ledger lives in the work tree the command runs in — a lane's in a lane** (joshuafolkken/kit#2919).
-// It used to resolve to the primary checkout from every lane (joshuafolkken/kit#2419), so a lane's
-// lines waited there for a batch-end flush; another run's stash of that checkout took them, the flush
-// read `git status` and found nothing, and the lines were lost. Each run now appends to its own
+// **The ledger lives in the work tree the command runs in — a lane's in a lane**.
+// Resolved to the primary checkout from every lane, a lane's lines would wait there for a batch-end
+// flush; another run's stash of that checkout would take them, the flush would read `git status` and
+// find nothing, and the lines would be lost. Each run appends to its own
 // issue's file in its own tree, `git-staging.ts` commits it with the run, and `pnpm josh followup`
 // commits whatever was appended after that commit before it merges — so a lane's lines reach the
 // default branch with the lane's own pull request, and the primary checkout holds none of them.
@@ -21,8 +21,7 @@ function ledger_root(cwd: string = process.cwd()): string {
 	return cwd
 }
 
-// **Resolving the directory migrates the single-file ledgers first** (joshuafolkken/kit#2724,
-// joshuafolkken/kit#2919). Every reader and writer asks here — `review:record --check`,
+// **Resolving the directory migrates the single-file ledgers first**. Every reader and writer asks here — `review:record --check`,
 // `review:findings`, the retrospective, the stash carry's duplicate check — so none of them can read a
 // directory without the lines that still sit at an old path, which for the review-record check would
 // answer `missing` for a round recorded before the move.
@@ -110,7 +109,7 @@ async function read(cwd: string = process.cwd()): Promise<string | undefined> {
 
 // The one append every ledger writer goes through. A consumer that does not keep the ledger has no
 // `docs/` at its root, so the parent is created first — the one write path that can bring the ledger
-// into existence there (joshuafolkken/kit#2402).
+// into existence there.
 async function append(target: string, lines: ReadonlyArray<string>): Promise<void> {
 	if (lines.length === 0) return
 

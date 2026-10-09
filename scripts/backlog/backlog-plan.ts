@@ -7,7 +7,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_label_name, IN_PROGRESS_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import type { OutOfScopeRow } from './backlog-scope'
 
-// The plan a person reads before a `backlogrun` starts (joshuafolkken/kit#1652).
+// The plan a person reads before a `backlogrun` starts.
 //
 // `backlog:next` answers the **next** question — which numbers may start now — and its report is
 // shaped for the loop that consumes it. This renders the **whole** picture from the same classified
@@ -20,11 +20,11 @@ const ROW_INDENT_WIDTH = 4
 const ROW_INDENT = ' '.repeat(ROW_INDENT_WIDTH)
 const NOTHING = `${ROW_INDENT}(none)`
 
-// The named-issue prefix of a `backlogrun #N1 #N2 …` (joshuafolkken/kit#1984): these run one at a
+// The named-issue prefix of a `backlogrun #N1 #N2 …`: these run one at a
 // time, in the order they were typed, before anything in the pool below is picked up.
 const NAMED_HEADING = 'Named issues — run in order first, one at a time, then the backlog:'
-// `--only` runs the named list and stops, so its heading says the pool is not drained
-// (joshuafolkken/kit#1984). The plan then shows the named section alone.
+// `--only` runs the named list and stops, so its heading says the pool is not drained.
+// The plan then shows the named section alone.
 const ONLY_NAMED_HEADING =
 	'Named issues — run in order, one at a time, then stop (`--only`; the opted-in backlog is not run):'
 const READY_HEADING =
@@ -57,9 +57,9 @@ interface PlanContext {
 }
 
 // A child elsewhere is qualified, because a bare number would name *this* repository's issue of that
-// number — a different issue (joshuafolkken/kit#1016). Takes the reference rather than the child, so
-// a `blocked_by` edge is named by the same rule the child itself is. This repository's issue is cited
-// (joshuafolkken/kit#3099): the plan is copied into a report verbatim, so the line it prints is the
+// number — a different issue. Takes the reference rather than the child, so
+// a `blocked_by` edge is named by the same rule the child itself is. This repository's issue is cited:
+// the plan is copied into a report verbatim, so the line it prints is the
 // citation the report carries.
 function cite_of(reference: IssueReference, repo: string, title: string | undefined): string {
 	const number = String(reference.number)
@@ -84,10 +84,10 @@ function join_row(reference: string, note: string): string {
 }
 
 // A `run:solo` child is marked beside its number, so a person reading the plan sees which issues
-// `backlog:next` will start alone before the run starts (joshuafolkken/kit#2776).
+// `backlog:next` will start alone before the run starts.
 const SOLO_MARK = `[${RUN_SOLO_LABEL}]`
 // A child with neither `run:solo` nor `run:lane` is one `backlog:next` withholds everything for until
-// it is judged (joshuafolkken/kit#2779), so the plan says which ones before the run asks.
+// it is judged, so the plan says which ones before the run asks.
 const UNTRIAGED_MARK = '[untriaged]'
 
 function mark_of(child: EpicChild): string | undefined {

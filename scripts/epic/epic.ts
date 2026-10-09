@@ -64,7 +64,7 @@ function to_add_input(parsed: AddArguments): AddChildrenInput {
 
 // A qualified target — `owner/repo#N`. Naming this repository it is the same insertion written
 // longer, so it is performed; naming another it is refused with the command to run there, because
-// this command reads and writes only the repository it runs from (joshuafolkken/kit#985).
+// this command reads and writes only the repository it runs from.
 async function run_qualified_addition(found: CrossRepoAddTarget): Promise<number> {
 	const local = epic_cli.resolve_local_add(found, await git_gh_command.repo_get_name_with_owner())
 
@@ -78,7 +78,7 @@ async function run_qualified_addition(found: CrossRepoAddTarget): Promise<number
 // Why an insertion could not be read. A qualified target is answered on its own terms; an unusable
 // `--decision-file` path is named, because the generic line below would send the person after the epic
 // number and the positioning flag when what went missing is the record path a shell expanded to
-// nothing (joshuafolkken/kit#1350); anything else gets the requirements and the usage line.
+// nothing; anything else gets the requirements and the usage line.
 async function refuse_addition(argv: ReadonlyArray<string>): Promise<number> {
 	const qualified = epic_cli.find_cross_repo_add_target(argv)
 
@@ -104,7 +104,7 @@ async function refuse_addition(argv: ReadonlyArray<string>): Promise<number> {
 //
 // `--decision-file` is the one text an insertion does carry, and it is a *decision* rather than the
 // epic's rationale: it says why this child was placed here, and it goes to the epic's `## Decisions`
-// and to each child (joshuafolkken/kit#1350).
+// and to each child.
 async function run_addition(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = epic_cli.parse_add_arguments(argv)
 
@@ -115,7 +115,7 @@ async function run_addition(argv: ReadonlyArray<string>): Promise<number> {
 
 // Deleting a declared order. No position and no `--ordered`: the path itself says which orders go,
 // and what is deleted is only ever what it names — the ends are never reconnected, since a removal
-// that wrote an order would be declaring one nobody stated (joshuafolkken/kit#1712).
+// that wrote an order would be declaring one nobody stated.
 async function run_removal(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = epic_cli.parse_remove_arguments(argv)
 
@@ -135,7 +135,7 @@ async function run_removal(argv: ReadonlyArray<string>): Promise<number> {
 }
 
 // Reconcile an epic's declaration with its recorded relations. No decision file and no children: the
-// repair reads what the epic already records rather than being told an order (joshuafolkken/kit#2235).
+// repair reads what the epic already records rather than being told an order.
 async function run_reconciliation(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = epic_cli.parse_reconcile_arguments(argv)
 

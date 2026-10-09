@@ -2,7 +2,7 @@ import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 
-// How long each lane holder has carried `in-progress` (joshuafolkken/kit#3400). The stale-label rule
+// How long each lane holder has carried `in-progress`. The stale-label rule
 // in `backlogrun-progress.md` is applied by age, and until this read the age was a hand-written
 // `gh api …/timeline` query a parent ran per holder. `epic:next` now prints it beside each holder, so
 // the number the rule is applied against is the one the scheduler already showed.

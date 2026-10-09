@@ -9,8 +9,7 @@ import { backlog_plan_read, type OpenListing, type Plan } from './backlog-plan-r
 import { backlog_scope } from './backlog-scope'
 import { backlog_waves } from './backlog-waves'
 
-// `josh backlog:plan` — the whole backlog as a plan a person reads before a run starts
-// (joshuafolkken/kit#1652).
+// `josh backlog:plan` — the whole backlog as a plan a person reads before a run starts.
 //
 // `backlog:next` already answers what may start, and a `backlogrun` acted on that answer one ask at a
 // time, so nothing ever showed the shape of the run: the order, which issue waits on which, what is
@@ -28,13 +27,12 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 
 // The keyword `run_invocation` parses a named-issue prefix behind, reused rather than parsing `#N`
-// again here so the `0` / leading-zero / safe-integer rules stay single-sourced (joshuafolkken/kit#1984).
+// again here so the `0` / leading-zero / safe-integer rules stay single-sourced.
 const NAMED_COMMAND = 'backlogrun'
 // The flag that runs the named list and stops, mirrored here so the plan the person reads before the
-// run shows the same scope the run will take (joshuafolkken/kit#1984).
+// run shows the same scope the run will take.
 const ONLY_FLAG = '--only'
-// The flag that renders the run's order wave by wave instead of the pool's sections
-// (joshuafolkken/kit#2778).
+// The flag that renders the run's order wave by wave instead of the pool's sections.
 const WAVES_FLAG = '--waves'
 
 const USAGE =
@@ -71,7 +69,7 @@ function without_flags(argv: ReadonlyArray<string>): ReadonlyArray<string> {
 // The one start-time refusal: `--only` with no named issues has nothing to run. `backlog_named` is the
 // single source of that decision, so the plan and the run refuse it alike. The refusal turns only on
 // whether anything was named, so the items are built with `is_epic: false` — which item is an epic is
-// decided by the run at dispatch time, not here (joshuafolkken/kit#1985).
+// decided by the run at dispatch time, not here.
 function only_refusal(named: ReadonlyArray<number>, is_only: boolean): string | undefined {
 	const items = named.map((issue) => ({ issue, is_epic: false }))
 	const startup = backlog_named.startup(items, is_only)
@@ -79,9 +77,8 @@ function only_refusal(named: ReadonlyArray<number>, is_only: boolean): string | 
 	return startup.kind === 'refused' ? startup.reason : undefined
 }
 
-// A failed open listing is not "nothing is out of scope". Reported rather than rendered around, for
-// the reason joshuafolkken/kit#950 records: a confident absence built on a read that failed is worse
-// than no answer.
+// A failed open listing is not "nothing is out of scope". Reported rather than rendered around,
+// because a confident absence built on a read that failed is worse than no answer.
 const OPEN_UNREADABLE_MESSAGE =
 	"Could not read this repository's open issues, so the out-of-scope half of the plan cannot be told from an empty one. Check `gh auth status` and ask again."
 
@@ -169,7 +166,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const rest = without_flags(argv)
 	// Read the named block from the *original* argv, so `--only` placed before the `#N` block breaks the
 	// leading block exactly as the run grammar does — the plan then refuses an ordering the run refuses,
-	// rather than promising a scope the resumed invocation would stop on (joshuafolkken/kit#1984).
+	// rather than promising a scope the resumed invocation would stop on.
 	const named = named_of(argv)
 	const refusal = refusal_of(named, rest, is_only, is_waves)
 

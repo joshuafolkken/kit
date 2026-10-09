@@ -5,7 +5,7 @@ import { ENV_FILE_NAME } from '#ports'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { IGNORED_CACHE_FILES } from '#scripts/josh/josh-command-types'
 
-// A lane directory git no longer registers as a work tree (joshuafolkken/kit#2857).
+// A lane directory git no longer registers as a work tree.
 //
 // **Nothing else can see it.** `lane:list` and `lane:prune` read `git worktree list`, so a directory
 // whose registration is gone is invisible to both, and `git worktree add` refuses its path for good —
@@ -15,7 +15,7 @@ import { IGNORED_CACHE_FILES } from '#scripts/josh/josh-command-types'
 // **The test for removing it is that removing it loses nothing**, not a list of names. Every file in
 // it has to hold content the repository's history already stores — a blob some ref reaches — so git
 // can write it again; the one exception is the `.git` file, a pointer to the registration that is
-// gone. **Any commit's content, not only `HEAD`'s at the same path** (joshuafolkken/kit#3370): a
+// gone. **Any commit's content, not only `HEAD`'s at the same path**: a
 // leftover is a checkout of whatever commit its lane was on, and measured against `HEAD` the
 // leftovers that issue found differed in 167 to 1,431 files each while every one of them was in the
 // history. A list of generated names would break the next time a file is generated, and would delete

@@ -8,7 +8,7 @@ import { lane_environment } from './lane-environment'
 import { lane_registry, type LaneInfo } from './lane-registry'
 
 // Where the delegated unit running a lane's child writes, recorded in the lane and read back from
-// anywhere (joshuafolkken/kit#1713).
+// anywhere.
 //
 // **This is the one fact about an in-flight lane that only the dispatching session held.** The
 // harness names a unit's output file after that session's own id and the unit's, and neither is

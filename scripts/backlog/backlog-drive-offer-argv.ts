@@ -3,7 +3,7 @@ import type { DriveState } from './backlog-drive'
 
 const LIST_SEPARATOR = ','
 
-// **A child in flight is never offered** (joshuafolkken/kit#3156). A lane child merges its own PR and
+// **A child in flight is never offered**. A lane child merges its own PR and
 // drops `in-progress` before GitHub closes the issue and before the loop collects it, so `backlog:next`
 // can offer it again; launching it then is refused by its still-open lane and handed to an AI session.
 function excluded(state: DriveState): ReadonlyArray<string> {

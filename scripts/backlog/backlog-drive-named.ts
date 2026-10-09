@@ -12,13 +12,13 @@ const NO_RETRIES = 0
 const FIRST = 0
 const TERMINAL_OUTCOMES: ReadonlySet<string> = new Set(['merged', 'parked', 'split'])
 
-// The skip follows the declared order alone (joshuafolkken/kit#3433): an issue `run:add` put in was
+// The skip follows the declared order alone: an issue `run:add` put in was
 // asked for on its own, so its failure skips nothing and a declared failure does not skip it.
 function is_declared(carry: RunCarry, issue: string): boolean {
 	return run_invocation.issue_numbers(carry.invocation)?.includes(Number(issue)) === true
 }
 
-// An issue `run:add` put in that is already in flight holds nothing up (joshuafolkken/kit#3558): it was
+// An issue `run:add` put in that is already in flight holds nothing up: it was
 // asked for on its own, so the declared item behind it — an epic whose children fill the free lanes —
 // is offered beside it. A declared issue in flight still holds the ones declared after it.
 function is_held(carry: RunCarry, state: DriveState, issue: number): boolean {

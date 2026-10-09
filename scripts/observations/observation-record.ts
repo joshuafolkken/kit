@@ -1,8 +1,8 @@
 import { observation_ledger_home } from './observation-ledger-home'
 import { observation_ledger_line } from './observation-ledger-line'
 
-// The count, the append and the promotion verdict of one observation-ledger sighting, as one command
-// (joshuafolkken/kit#3400). They were a `cat | grep -c … || true` a run typed by hand, an append it
+// The count, the append and the promotion verdict of one observation-ledger sighting, as one command.
+// They were a `cat | grep -c … || true` a run typed by hand, an append it
 // wrote itself, and a "does the count answer exactly 1" it judged — three steps whose answers are
 // fixed, now read off the ledger rather than re-derived in every run. The grammar and the promotion
 // rule are `.claude/skills/workflow-commands/observation-ledger.md`'s.

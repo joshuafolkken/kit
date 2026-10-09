@@ -62,7 +62,7 @@ function build_promoted_body(input: PromoteInput): string {
 // the children: a declaration-shaped line already present in the issue being promoted is carried
 // into the epic verbatim, and an unordered promotion then adds the `None — ...` literal beside it,
 // so the body would declare an order and declare that there is none. Reported as "does not track
-// every child", that state left nothing to act on (joshuafolkken/kit#1155).
+// every child", that state left nothing to act on.
 function declaration_error(body: string): string | undefined {
 	const state = epic_parse.read_declaration(body)
 	if (epic_parse.is_declaration_readable(state)) return undefined

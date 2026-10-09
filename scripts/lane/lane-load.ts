@@ -5,7 +5,7 @@ import { lane_await } from './lane-await'
 import type { LoadEntry } from './lane-ledger'
 import { lane_registry, type LaneInfo } from './lane-registry'
 
-// One machine-load sample for the lane-limit measurement (joshuafolkken/kit#3355): the one-minute load
+// One machine-load sample for the lane-limit measurement: the one-minute load
 // average, free memory, swap in use and how many lanes have a child working, read at one instant so
 // `josh lane:stats` can set the load beside the lane count that produced it.
 //

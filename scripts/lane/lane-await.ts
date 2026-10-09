@@ -14,8 +14,7 @@ import { lane_handoff } from './lane-handoff'
 
 // Detached lane children are not harness-tracked processes, so their completion fires no
 // re-invocation event in the parent's session. Without a blocking wait the parent notices only
-// on the next heartbeat interval -- up to 15 minutes after the fact in the measured case
-// (joshuafolkken/kit#2113).
+// on the next heartbeat interval -- up to 15 minutes after the fact.
 //
 // **The re-confirm delay is the one value the caller must not be left to choose.** A process that
 // disappears briefly and reappears (the pre-gate boundary cut, where one process exits and a
@@ -34,7 +33,7 @@ const PROCESS_NOT_FOUND = 1
 
 // `is_settled` is read once, when the wait starts: a child that ended between two `lane:await` calls
 // never appears in the second one, and only its settled issue tells it apart from one not yet
-// launched (joshuafolkken/kit#3133).
+// launched.
 interface AwaitState {
 	appeared: boolean
 	disappeared_at: number | undefined
@@ -78,7 +77,7 @@ interface RunConfig extends CheckConfig {
 
 // Three answers, not two: only pgrep's own "no match" exit is `none`. A pgrep that failed or hit its
 // timeout never looked, and `run:liveness` answers `undetermined` for it rather than booking a live
-// child as stopped (joshuafolkken/kit#3400).
+// child as stopped.
 function process_trace_default(issue: string): ProcessTrace {
 	const pattern = lane_child_invocation.process_pattern(issue)
 	const result = spawnSync('pgrep', ['-f', pattern], {

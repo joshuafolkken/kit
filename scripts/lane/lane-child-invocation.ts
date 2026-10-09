@@ -9,7 +9,7 @@ interface ShipStop extends ShipResume {
 
 const CHILD_INVOCATION = 'fullrun'
 const RESUME_GUIDE = '.claude/skills/workflow-commands/pre-gate-cut.md'
-// What a detached `josh ship --detach` supervisor's command line carries (joshuafolkken/kit#2428). It ends
+// What a detached `josh ship --detach` supervisor's command line carries. It ends
 // with the `"<title> #<N>"` title on purpose, so the liveness pattern below finds it by the same trailing
 // anchor it finds a child by. **The script path alone is not enough**: where the dispatcher is TypeScript
 // (kit itself) `josh ship` runs in-process, so no process ever carries `run-ship-cli.ts` — the `pnpm josh
@@ -24,9 +24,9 @@ function child_invocation(issue: string): string {
 
 // The `pgrep -f` pattern that finds a running child: the invocation is always the last argument of
 // its command line — the resume prompts below end with it on purpose — so the anchor matches every
-// launch of `#<N>` and never `#<N>0` (joshuafolkken/kit#2421).
+// launch of `#<N>` and never `#<N>0`.
 //
-// **A detached ship supervisor counts as the child** (joshuafolkken/kit#2428). The agent ends once it has
+// **A detached ship supervisor counts as the child**. The agent ends once it has
 // handed the post-implementation region to `josh ship --detach`, and the parent books a lane whose
 // pattern stopped matching as finished — parking an issue that was still shipping. The supervisor's
 // command line ends with its `#<N>` title, so the one extended pattern covers both, and the wait, the
@@ -43,7 +43,7 @@ function resume_invocation(issue: string): string {
 	return `${preamble} ${child_invocation(issue)}`
 }
 
-// The prompt an `outage` re-dispatch gives a resumed child (joshuafolkken/kit#2317). Its session was
+// The prompt an `outage` re-dispatch gives a resumed child. Its session was
 // relaunched with `--resume`, so its full context is already loaded — the preamble tells it not to
 // re-read the entry documents and to find where it stopped with `run:step`, redoing only the last
 // action if it did not complete.
@@ -59,12 +59,12 @@ function outage_resume_invocation(issue: string): string {
 }
 
 // The prompt a lane child is relaunched with when its detached ship supervisor stopped at a failed
-// stage (joshuafolkken/kit#2428) — a red gate, a High/Medium review, a failed push or red CI. The agent
+// stage — a red gate, a High/Medium review, a failed push or red CI. The agent
 // ended at the hand-off, so this is how control comes back to one: it reads the stopped report, fixes it
 // and hands the region back. It ends with `child_invocation` for the reason `resume_invocation` does —
 // the parent's poll keeps matching the relaunched process.
 //
-// **A known stage puts the next command in the prompt** (joshuafolkken/kit#2964), so the relaunched
+// **A known stage puts the next command in the prompt**, so the relaunched
 // session runs it rather than re-deriving it from `chain-rule.md`. An OpenAI lane's supervisor sees only
 // that the ship failed, not where, so without a stage the prompt points at `run:step` as before.
 function ship_stop_invocation(issue: string, stop?: ShipStop): string {

@@ -1,7 +1,7 @@
 import { session_cite } from '#scripts/issue/session-cite'
 
 // The difference between the issues an `in-progress` label says are running and the lanes that are
-// actually open (joshuafolkken/kit#2235).
+// actually open.
 //
 // `epic:next` counts lane occupancy from the `in-progress` label list; `lane:list` reads the work
 // trees that are actually open. Nothing named the difference, so a session read hand-made signals —

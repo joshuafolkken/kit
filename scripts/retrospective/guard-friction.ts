@@ -4,8 +4,7 @@ import type { UsageRecord } from '#scripts/cost-runtime/cost-usage'
 import type { RunNode } from '#scripts/cost/cost-run-nodes'
 import type { TranscriptLine } from '#scripts/time-runtime/time-transcript-line'
 
-// Guard refusals and Stop re-entries counted per guard, and what their round trips cost
-// (joshuafolkken/kit#3421).
+// Guard refusals and Stop re-entries counted per guard, and what their round trips cost.
 //
 // **A refusal or a Stop block costs the run one more request**: the model re-reads its whole context
 // to answer the reason. That request — the session's first at or after the hit, shared among every

@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { lane_child_invocation } from './lane-child-invocation'
 
-// Ending a lane child that did not end itself (joshuafolkken/kit#2421).
+// Ending a lane child that did not end itself.
 //
 // **A detached child is kept alive on purpose and was never ended by anything.** `detached_launch`
 // lets a child outlive its parent's session, and every reader of it — `run:liveness`, the 30-minute
@@ -89,7 +89,7 @@ function ancestry_of(pid: number, probes: ReapProbes): Set<number> {
 }
 
 // This process and every process above it. The Stop hook reads it to tell whether the session that
-// declared a carry record's `--owner "$PPID"` is the one it runs under (joshuafolkken/kit#2472).
+// declared a carry record's `--owner "$PPID"` is the one it runs under.
 function own_ancestry(probes: ReapProbes = SYSTEM_PROBES): Set<number> {
 	return ancestry_of(process.pid, probes)
 }

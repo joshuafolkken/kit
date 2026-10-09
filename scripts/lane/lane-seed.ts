@@ -1,13 +1,13 @@
-// Which seat a lane gets (joshuafolkken/kit#1490, joshuafolkken/kit#1494).
+// Which seat a lane gets.
 
 // **The main work tree is seat 0, and nothing here can move it.** Lanes take seats 1..9, so a
 // project that has never opened one stays on exactly the ports `ports/index.js` already gives it —
 // `seed × 10` for its seed, the bases themselves for an unset seed, which is what CI runs on.
 const FIRST_LANE_SEAT = 1
-// **Nine seats, because the seat is the units digit of the offset `seed × 10 + lane`.** The seat no
-// longer carries the whole port band — the seed does, multiplied by ten — so a lane holds a single
-// seat number rather than an absolute seed, and there is no ceiling to check and no "multiple of
-// ten" convention for anyone to break (joshuafolkken/kit#1494 removed the band mechanism).
+// **Nine seats, because the seat is the units digit of the offset `seed × 10 + lane`.** The seed,
+// multiplied by ten, carries the port band rather than the seat, so a lane holds a single seat number
+// rather than an absolute seed, and there is no ceiling to check and no "multiple of ten" convention
+// for anyone to break.
 const LAST_LANE_SEAT = 9
 
 /**
@@ -20,8 +20,8 @@ const LAST_LANE_SEAT = 9
  * wrapped, because wrapping is that same collision under a friendlier name.
  *
  * The whole ascending list is returned rather than only the lowest, because the caller claims each
- * seat atomically and steps to the next when a concurrent `lane:open` claimed it first
- * (joshuafolkken/kit#1494): reading a free set and picking from it are two moments, and the gap
+ * seat atomically and steps to the next when a concurrent `lane:open` claimed it first:
+ * reading a free set and picking from it are two moments, and the gap
  * between them is where two opens once chose the same seat.
  */
 function free_seats(used: ReadonlyArray<number>): Array<number> {

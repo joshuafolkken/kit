@@ -3,9 +3,9 @@ import { has_label_name, RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/i
 import { issue_citation } from '#scripts/rules/issue-citation'
 import type { EpicChild } from './epic-graph'
 
-// The triage gate on what a run is offered (joshuafolkken/kit#2779).
+// The triage gate on what a run is offered.
 //
-// `run:solo` (joshuafolkken/kit#2776) records that an issue runs alone, but its absence said nothing:
+// `run:solo` records that an issue runs alone, but its absence said nothing:
 // "judged safe beside others" and "never judged" looked the same, and an issue opted in mid-run reached
 // `backlog:drive` without any agent reading it. `run:lane` records the other answer, so an issue with
 // neither label is one nobody has judged — and such an issue may be one that must run alone.
@@ -22,7 +22,7 @@ type TriageVerdict = 'triage'
 const TRIAGE_VERDICT: TriageVerdict = 'triage'
 
 // Read off a bare label list too, so `josh issue:file` refuses an untriaged `auto-ok` filing by the
-// same answer the offer paths withhold it by (joshuafolkken/kit#3313).
+// same answer the offer paths withhold it by.
 function has_triage_label(labels: ReadonlyArray<string>): boolean {
 	return has_label_name(labels, RUN_SOLO_LABEL) || has_label_name(labels, RUN_LANE_LABEL)
 }

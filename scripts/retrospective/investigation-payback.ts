@@ -11,7 +11,7 @@ import {
 } from '#scripts/time-runtime/time-transcript-line'
 import { guard_friction, type SessionTranscript } from './guard-friction'
 
-// Whether the investigation guard's forced delegation pays its way (joshuafolkken/kit#3421).
+// Whether the investigation guard's forced delegation pays its way.
 //
 // The run's main-line sessions — parent, wakes, lane children — are split by whether they dispatched
 // an investigator. Each group reports the context its requests carried, which delegating is meant to

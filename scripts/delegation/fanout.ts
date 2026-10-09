@@ -1,5 +1,5 @@
 // Whether the Step 0 change list can be cut into file-disjoint units and dispatched in one fan-out
-// turn, or must stay serial because two proposed units would edit the same file (joshuafolkken/kit#2345).
+// turn, or must stay serial because two proposed units would edit the same file.
 //
 // **File-disjointness is the necessary condition, and it is mechanical.** Two subagents editing the
 // same file in parallel race on that file — the later write lands on top of the earlier, or the gate

@@ -1,7 +1,7 @@
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 
-// Whether `pnpm josh run:add` handed the run an issue since the watcher started (joshuafolkken/kit#3433).
+// Whether `pnpm josh run:add` handed the run an issue since the watcher started.
 // The arrival probe reads the backlog once a minute, and a `--only` run's pool is empty by definition, so
 // an added issue would otherwise wait for the minute — or never wake a `--only` parent at all. The event
 // stream is a local file, so this is read on every tick rather than on the probe's interval.

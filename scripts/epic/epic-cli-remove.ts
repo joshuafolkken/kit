@@ -1,6 +1,6 @@
 import { epic_cli_argv, ISSUE_NUMBER_PATTERN, type EpicArgv, type FormFlags } from './epic-cli-argv'
 
-// `josh epic --remove <E> <M> <N> …`'s argument rules (joshuafolkken/kit#1712).
+// `josh epic --remove <E> <M> <N> …`'s argument rules.
 //
 // Its own module rather than a fourth parser inside `epic-cli.ts`, which sits at its line ceiling —
 // and because the rules read as one thing: the arguments after the epic are a **path**, which is the

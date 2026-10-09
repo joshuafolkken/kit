@@ -8,23 +8,23 @@ import { backlog_next } from './backlog-next'
 import { backlog_ready, type ReadyPorts, type ReadyReading } from './backlog-ready'
 import { backlog_stalled } from './backlog-stalled'
 
-// The arrival probe a `backlogrun` parent's `--wait` watcher runs while children are in flight
-// (joshuafolkken/kit#2503). An issue opted in with `auto-ok` mid-run was picked up only when the parent
-// next woke — a child's merge, or the progress interval — and in practice the ten-minute stall detector
-// became the pick-up: #2493 waited 10.5 minutes, and the person got a ⏳ notification for it.
+// The arrival probe a `backlogrun` parent's `--wait` watcher runs while children are in flight.
+// Without it, an issue opted in with `auto-ok` mid-run is picked up only when the parent
+// next wakes — a child's merge, or the progress interval — so in practice the ten-minute stall detector
+// becomes the pick-up, and the person gets a ⏳ notification for the wait.
 //
 // **The watcher's exit is the only thing that wakes a live parent**, so the probe rides it: once a
 // minute it reads the backlog the pick-up line reads (`backlog_ready.read_ready`, cheap first — a full
 // pool answers without the network read), and an issue runnable now that was not runnable when the
 // watcher started ends the wait. The exit prints the `ready #N` line as every exit does, and that line
-// is what sends the parent to `backlog:offer`. The stall detector goes back to being the safety net.
+// is what sends the parent to `backlog:offer`. The stall detector stays the safety net.
 //
 // **"New" is measured against the watcher's own start**, so one issue wakes the parent once: the next
 // `--wait` the parent starts takes the pool as it stands then — the woken issue included, dispatched or
 // not — as its baseline. A reading that fails is not an arrival; the probe says nothing and reads again
 // a minute later. A baseline that cannot be read is never read as empty — an empty one would wake the
 // parent for the whole pool — but it is not given up on either: the scheduled report no longer ends the
-// wait (joshuafolkken/kit#3102), so an inert probe would leave the parent without a wake until `--hours`. The
+// wait, so an inert probe would leave the parent without a wake until `--hours`. The
 // probe reads the baseline again each minute until one answers.
 //
 // **Every read is bounded.** The probe is awaited inside the watcher's tick loop, so a `gh` call that
@@ -56,7 +56,7 @@ function answered_issues(result: JoshResult | undefined): ReadonlyArray<string> 
 	}
 
 	// `triage` names no number, yet the parent has work — so it is read as one token, which a reading
-	// sees as an arrival (joshuafolkken/kit#2779).
+	// sees as an arrival.
 	if (backlog_stalled.needs_triage(result.out)) return [epic_triage.TRIAGE_VERDICT]
 
 	return backlog_stalled.ready_tokens(result.out)
@@ -66,8 +66,7 @@ async function bounded_ready_issues(): Promise<ReadonlyArray<string>> {
 	return answered_issues(await backlog_ready.read_backlog_next(COMMAND_TIMEOUT_MS))
 }
 
-// The backlog reads, plus whether `run:add` handed the run an issue since a given instant
-// (joshuafolkken/kit#3433).
+// The backlog reads, plus whether `run:add` handed the run an issue since a given instant.
 interface ArrivalPorts extends ReadyPorts {
 	is_added_since: (since_ms: number) => Promise<boolean>
 }
@@ -83,7 +82,7 @@ interface ArrivalProbe {
 }
 
 // Runnable now, not runnable at the start, and a lane free to take it. **A raised lane limit makes the
-// whole pool new** (joshuafolkken/kit#3434): the issues the baseline holds were waiting for a lane, and
+// whole pool new**: the issues the baseline holds were waiting for a lane, and
 // the raise — unlike a merge — wakes nothing else, so the room it made would sit idle until a merge.
 function arrivals(
 	baseline: ReadonlySet<string>,
@@ -176,7 +175,7 @@ function pool_probe_of(
 }
 
 // An issue `run:add` handed the run since the watcher started wakes the parent at the next tick, ahead
-// of the pool probe's minute (joshuafolkken/kit#3433).
+// of the pool probe's minute.
 function probe_of(
 	initial: ReadonlySet<string> | undefined,
 	started_ms: number,

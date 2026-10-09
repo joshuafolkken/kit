@@ -3,7 +3,7 @@ import path from 'node:path'
 import { buffered_process } from '#scripts/lib/buffered-process'
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 
-// Filling the lane, which is the other half of opening one (joshuafolkken/kit#1554).
+// Filling the lane, which is the other half of opening one.
 //
 // **A work tree with no `node_modules` is not a lane yet.** A linked work tree starts as a checkout
 // and nothing else, and the lane root is a hidden *sibling* of the repository, so nothing above it
@@ -19,7 +19,7 @@ import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 // The child is spawned through `buffered_process` rather than through `execa` here. What this needs
 // is exactly that module's contract — output buffered rather than inherited, a non-zero exit
 // reported rather than thrown, and a bound on how long the child may hang — and a second copy of it
-// is how a fix to one missed the other before (joshuafolkken/kit#914).
+// is how a fix to one missed the other before.
 
 // `--frozen-lockfile` because a lane is cut from `refs/remotes/origin/<default>` and has to build
 // exactly the lock committed there. A lock the install would rather rewrite is a finding, not
@@ -27,8 +27,8 @@ import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 const INSTALL_ARGUMENTS = ['install', '--frozen-lockfile']
 // The manifest whose absence is the whole skip condition. A lane cut from a repository that has no
 // `package.json` has nothing to install, so running `pnpm install` there could only fail on a
-// manifest that was never there — which is exactly the fixture a cross-process lane test needs
-// (joshuafolkken/kit#2148). The condition is strictly "the file does not exist": a manifest that is
+// manifest that was never there — which is exactly the fixture a cross-process lane test needs.
+// The condition is strictly "the file does not exist": a manifest that is
 // present but unreadable or broken still runs the install and still fails as before, so a genuinely
 // broken repository is never passed silently.
 const MANIFEST_FILE_NAME = 'package.json'
@@ -46,10 +46,9 @@ interface InstallResult {
 
 // A lane with no manifest has nothing to install, so the install is skipped rather than run — the
 // seam a cross-process lane test needs, and a root-cause fix rather than a switch, because running
-// an install with no install target was the defect (joshuafolkken/kit#2148). The condition is
-// strictly the file's absence: `existsSync` answers only whether the path is there, never whether
-// its contents parse, so a present-but-broken manifest falls through to the real install and fails
-// exactly as before.
+// an install with no install target is the defect. The condition is strictly the file's absence:
+// `existsSync` answers only whether the path is there, never whether its contents parse, so a
+// present-but-broken manifest falls through to the real install and fails there.
 function has_manifest(directory: string): boolean {
 	return existsSync(path.join(directory, MANIFEST_FILE_NAME))
 }
@@ -58,12 +57,12 @@ function has_manifest(directory: string): boolean {
  * Install the lane's dependencies, and report whether it worked rather than throwing.
  *
  * **A lane with no `package.json` skips the install** — there is nothing to install, so the reported
- * state is installed rather than failed, and no child is spawned (joshuafolkken/kit#2148). This is
+ * state is installed rather than failed, and no child is spawned. This is
  * the only seam: the production call path, its arguments and its environment are all unchanged.
  *
  * **The verdict is the exit code and only the exit code.** `pnpm install` runs `prepare`, which runs
  * the lefthook installer, and in a linked work tree the hooks are shared with the primary repository
- * — so a warning from it is expected and correct (joshuafolkken/kit#1503, #1507). Reading the child's
+ * — so a warning from it is expected and correct. Reading the child's
  * text for a word like "failed" would turn that correct warning into a refusal to open a lane.
  */
 async function install_dependencies(directory: string): Promise<InstallResult> {

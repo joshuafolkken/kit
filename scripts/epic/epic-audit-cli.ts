@@ -18,15 +18,14 @@ import { epic_next } from './epic-next'
 import { epic_parse, type DependencyLink } from './epic-parse'
 
 // `josh epic:audit <E>` — read an epic's children against each other and report what contradicts
-// what (joshuafolkken/kit#870).
+// what.
 
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh epic:audit <epic-number>'
 // Check 3 filters the issues the children cite down to this owner's repositories, so a repository
 // name it could not read silently dropped every qualified reference and reported nothing. A check
-// that disables itself without saying so is worse than one that fails: the report reads clean
-// (joshuafolkken/kit#1016).
+// that disables itself without saying so is worse than one that fails: the report reads clean.
 const UNREADABLE_REPO =
 	'Could not read this repository as `owner/name`, so a reference could not be resolved against it — check `gh auth status` and that this checkout has a GitHub remote.'
 
@@ -37,7 +36,7 @@ const UNREADABLE_REPO =
 // The scope comes from `epic_fetch.scope_for`, the same convention the state and relation reads
 // follow, rather than a second spelling here. Without it a cross-repository child's body was read
 // from *this* repository's issue of that number, and all four body-reading checks then ran against
-// the wrong text (joshuafolkken/kit#1012).
+// the wrong text.
 async function attach_bodies(
 	children: ReadonlyArray<AuditChild>,
 	repo: string,
@@ -61,7 +60,7 @@ async function attach_bodies(
 // Each one is asked of the repository whose body named it, through the same `epic_fetch.scope_for`
 // every other read goes through, and the answers are keyed by that repository and number both. Asked
 // unqualified, a cross-repository child's `#40` was answered by *this* repository's issue 40 — a
-// different issue, whose state then decided the warning (joshuafolkken/kit#1014).
+// different issue, whose state then decided the warning.
 async function resolve_reference_states(
 	referenced: ReadonlyArray<IssueReference>,
 	current_repo: string,
@@ -87,8 +86,8 @@ async function resolve_reference_states(
 
 // The issues the children cite that are not children themselves — the ones check 3 resolves.
 //
-// A reference in a repository this owner does not own is left out rather than probed, inheriting
-// joshuafolkken/kit#869's restriction exactly as `fetch_external_children` does: a body mentioning a
+// A reference in a repository this owner does not own is left out rather than probed, exactly as
+// `fetch_external_children` does: a body mentioning a
 // third party's issue must not send this command to their tracker.
 function outside_references(
 	children: ReadonlyArray<AuditChild>,
@@ -112,14 +111,14 @@ interface AuditInput {
 	epic_number: number
 	// The `owner/repo` the command runs in. A reference is written bare when it names an issue here
 	// and `owner/repo#N` when it does not, so the reader is never handed a number that resolves
-	// somewhere else (joshuafolkken/kit#1014).
+	// somewhere else.
 	repo: string
 	children: ReadonlyArray<AuditChild>
 	tracked: ReadonlyArray<number>
 	reference_states: ReadonlyMap<string, ReferenceState>
 	// The orphan search's whole outcome, not just what it found: a listing that failed and a listing
 	// the page ceiling cut short are both reported, because `[]` here is indistinguishable from
-	// "nothing claims this epic" (joshuafolkken/kit#1033).
+	// "nothing claims this epic".
 	claiming: ClaimingSearch
 	anomalies: ReadonlyArray<AuditFinding>
 	// Computed before the implicit-dependency check so that check can skip the pairs already reported
@@ -127,15 +126,14 @@ interface AuditInput {
 	// arrive twice.
 	contradictions: ReadonlyArray<AuditFinding>
 	// The declared orders check 6 may speak about, already resolved to children and narrowed to the
-	// open, local pairs (joshuafolkken/kit#1712).
+	// open, local pairs.
 	order_pairs: ReadonlyArray<OrderPair>
 	// The epic's `## Decisions` section, and the comments on those pairs' ends — the two places a
 	// placement decision is recorded, and therefore the whole of what check 6 reads.
 	decisions: string
 	order_comments: ReadonlyMap<string, ReadonlyArray<string>>
 	// Whether the epic's own state is confirmed closed. An unreadable state is `false`, so the
-	// closed-epic-with-open-children check never fires on a lookup that did not answer
-	// (joshuafolkken/kit#2337).
+	// closed-epic-with-open-children check never fires on a lookup that did not answer.
 	is_epic_closed: boolean
 }
 
@@ -188,7 +186,7 @@ function audit(input: AuditInput): AuditResult {
 	])
 }
 
-// The graph anomalies, taken from joshuafolkken/kit#860's detection rather than re-derived here —
+// The graph anomalies, taken from the graph's own detection rather than re-derived here —
 // including its rule for whether the body declares an order at all, which is imported rather than
 // restated for exactly the drift this comment warns about.
 function graph_anomalies(
@@ -244,7 +242,7 @@ async function read_order_comments(
 	)
 }
 
-// Why a snapshot yields nothing to audit, with the two reasons told apart (joshuafolkken/kit#1690).
+// Why a snapshot yields nothing to audit, with the two reasons told apart.
 // A body nobody could read parses to zero children exactly as an unpopulated task list does, so
 // without this the audit reported an epic it never read as one tracking no children — and sent the
 // reader to fill in a task list that is already there.
@@ -263,8 +261,7 @@ function no_children_reason(snapshot: EpicSnapshot, epic_number: number): string
 // Whether the epic's own state is confirmed closed. Read through the same `scope_for` every other
 // read goes through, so a cross-repository epic is asked of its own repository rather than this one.
 // A read that came back shaped wrong, or a state that is not `CLOSED`, both answer `false`: the
-// finding it feeds is an error, and one must never be manufactured from a lookup that did not answer
-// (joshuafolkken/kit#2337).
+// finding it feeds is an error, and one must never be manufactured from a lookup that did not answer.
 async function read_epic_closed(epic_number: number, scope?: string): Promise<boolean> {
 	const raw = await git_gh_command.issue_get_state_and_relations(String(epic_number), scope)
 	const parsed = epic_issue.parse_epic_issue(raw)
@@ -352,7 +349,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 // `process.exitCode` rather than `process.exit()`: the answer goes to standard output and a write to
 // a pipe is asynchronous on macOS, so exiting can tear the process down before it drains. This
 // command's answer is what a workflow reads and acts on, which is exactly that pipe. The same shape
-// is in `scripts/cost-runtime/cost-cli.ts`, which met the truncation first (joshuafolkken/kit#1005).
+// is in `scripts/cost-runtime/cost-cli.ts`, which met the truncation first.
 async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }

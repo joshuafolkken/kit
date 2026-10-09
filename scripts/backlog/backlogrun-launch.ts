@@ -13,7 +13,7 @@ import { detached_launch, type LaunchResult } from '#scripts/run/detached-launch
 import { run_headless } from '#scripts/run/run-headless'
 import { z } from 'zod'
 
-// How `josh backlogrun` starts a `backlogrun` parent in the background (joshuafolkken/kit#3437), and how
+// How `josh backlogrun` starts a `backlogrun` parent in the background, and how
 // it tells one is already running so a second is never started beside it.
 //
 // **Running is two records, not one.** A parent claims the carry record a little after it starts, so

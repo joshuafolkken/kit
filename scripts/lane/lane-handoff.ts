@@ -2,12 +2,12 @@ import { git_common_directory } from '#scripts/git/git-common-directory'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { lane_child_marker, type MarkerSource } from './lane-child-marker'
 
-// Whether a lane has handed its post-implementation region to the detached ship (joshuafolkken/kit#2962).
+// Whether a lane has handed its post-implementation region to the detached ship.
 //
 // **A child that ran `pnpm josh ship --detach` waits on nobody when it ends.** The supervisor drives the
 // gate, the review and the merge, and notifies on its own outcome, so the `Stop` hook's demand for a
 // `confirmation` notify and `lane-park`'s refusal of that notify only bought a "nothing needed"
-// Telegram and a wasted turn — measured on 2026-10-02 as 43 demands, 21 refusals and ~94 extra turns.
+// Telegram and a wasted turn.
 // Both hooks read this one predicate, so they cannot disagree about whether the lane was handed off.
 //
 // **Running, never merely recorded.** A ship that failed hands its region back to the child, whose

@@ -1,8 +1,8 @@
 import { epic_triage } from '#scripts/epic/epic-triage'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 
-// When ready backlog work sits undispatched while lanes are free, nobody notices until a person asks
-// (joshuafolkken/kit#2359). This is the mechanical judge of that state: three facts read, never
+// When ready backlog work sits undispatched while lanes are free, nobody notices until a person asks.
+// This is the mechanical judge of that state: three facts read, never
 // weighed — is there runnable work, is there a free lane, and has nothing been dispatched for a while.
 // The verdict is a report, not a stop: a false positive costs one notification, never a halted run.
 //
@@ -102,7 +102,7 @@ function count_ready_tokens(out: string): number {
 	return ready_tokens(out).length
 }
 
-// Whether `backlog:next` answered `triage` (joshuafolkken/kit#2779): no number is runnable, yet a session
+// Whether `backlog:next` answered `triage`: no number is runnable, yet a session
 // has work — judging the untriaged issues — so a reader of the numeric lines alone would take it for an
 // empty pool.
 function needs_triage(out: string): boolean {

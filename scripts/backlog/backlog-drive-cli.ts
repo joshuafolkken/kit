@@ -30,7 +30,7 @@ import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_offer_cli } from './backlog-offer-cli'
 import { backlog_ready } from './backlog-ready'
 
-// `josh backlog:drive` — the backlogrun parent's loop as one resident wait (joshuafolkken/kit#2499).
+// `josh backlog:drive` — the backlogrun parent's loop as one resident wait.
 // The parent issues it once, in the background, and is woken only when it exits — with a token the model
 // has to read. The loop itself is `backlog-drive.ts`; this file is its ports onto the commands it reuses.
 //
@@ -111,7 +111,7 @@ function merge_token(out: string, code: number): string {
 
 // The child's transcript, where its lane recorded one, so `run:merge` can tell an API outage from a
 // failure exactly as it does for the parent that passes `--output` by hand. No hand-off threshold: the
-// supervisor runs this loop, and a process has no context to cut (joshuafolkken/kit#3156).
+// supervisor runs this loop, and a process has no context to cut.
 async function merge(issue: string, owner: string): Promise<MergeResult> {
 	await backlog_drive_owner.assert_current(owner)
 	const lane = await lane_registry.find_open_lane(issue)

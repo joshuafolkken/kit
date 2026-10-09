@@ -7,13 +7,12 @@ import type { EpicReference } from './epic-issue'
 import { epic_lane_offer, type RepoPool } from './epic-lane-offer'
 import { epic_report, type EpicNextResult, type EpicVerdict } from './epic-report'
 
-// Several epics, answered as one (joshuafolkken/kit#1493).
+// Several epics, answered as one.
 //
-// joshuafolkken/kit#1491 built the lane pool epic-agnostic on purpose: `epic-lane-offer.ts` takes an
-// array of `RepoPool`s and nothing below it knows what an epic is. What was still fixed at one was
-// the *caller* — `epic:next` read a single reference and built a single pool — so a repository with
-// six free lanes could only ever fill them from one graph. This module is that caller's other half:
-// one view per named epic, merged into one pool list and one verdict.
+// The lane pool is epic-agnostic on purpose: `epic-lane-offer.ts` takes an array of `RepoPool`s and
+// nothing below it knows what an epic is. A *caller* that read a single reference and built a single
+// pool would still leave a repository with six free lanes filling them from one graph. This module is
+// that caller's other half: one view per named epic, merged into one pool list and one verdict.
 //
 // **The priority order is the order the epics were named**, and it is a decision rather than a
 // fallback. Dependency depth was the alternative and it does not compare across graphs: depth is
@@ -38,8 +37,8 @@ interface EpicView {
 	snapshot: EpicSnapshot
 	result: EpicNextResult
 	// Every issue this invocation may run — the children of all the named epics, plus a backlog's
-	// standalone issues — which a candidate's blockers are re-weighed against at confirmation
-	// (joshuafolkken/kit#1943). Absent, a view confirms against its own epic's children alone.
+	// standalone issues — which a candidate's blockers are re-weighed against at confirmation.
+	// Absent, a view confirms against its own epic's children alone.
 	running?: ReadonlySet<string>
 }
 
@@ -51,7 +50,7 @@ function format_reference(reference: EpicReference): string {
 
 // What the candidate confirmation reads with. The blockers come from `epic_fetch`'s own reader, so
 // a candidate is addressed exactly as every other read of a child is — a cross-repository child
-// through its own repository, and a local one bare (joshuafolkken/kit#1012).
+// through its own repository, and a local one bare.
 function confirm_context(snapshot: EpicSnapshot, running?: ReadonlySet<string>): ConfirmContext {
 	return {
 		children: snapshot.children,
@@ -109,8 +108,8 @@ function aggregate_text(views: ReadonlyArray<EpicView>, current_repo: string): s
 	return views.map((view) => format_view(view, is_many, current_repo)).join(BLOCK_SEPARATOR)
 }
 
-// The running set with every issue that waits on a person taken out, and the views built from it
-// (joshuafolkken/kit#1943). A blocker in another named epic only waits when that blocker itself can
+// The running set with every issue that waits on a person taken out, and the views built from it.
+// A blocker in another named epic only waits when that blocker itself can
 // finish: one parked, or one that is itself blocked from outside, holds its dependants for a person
 // exactly as a parked blocker inside one epic does. Each pass removes what the previous one sent to a
 // person, so the set only shrinks, and the walk ends at the first pass that removes nothing.

@@ -4,14 +4,14 @@ import { epic_fetch, type EpicSnapshot } from './epic-fetch'
 import { epic_graph } from './epic-graph'
 import type { EpicReference } from './epic-issue'
 
-// Reading the epics `josh epic:next` was given, before anything is classified (joshuafolkken/kit#1493).
+// Reading the epics `josh epic:next` was given, before anything is classified.
 //
 // Split from the command itself because naming several epics turned one read into a walk, and a walk
 // has answers a single read did not: an epic that was skipped, and one that stopped everything.
 
 // A qualified epic is read by naming its repository in the read's REST path, so naming one we do
-// not own would send this command to a third party's tracker — which joshuafolkken/kit#869 forbids
-// for a child and forbids here for the same reason (joshuafolkken/kit#1016).
+// not own would send this command to a third party's tracker — forbidden for a child, and forbidden
+// here for the same reason.
 const FOREIGN_EPIC = 'That epic belongs to another owner; this command only reads our own.'
 const NO_CHILDREN = 0
 
@@ -77,8 +77,7 @@ function unique_references(
 // **An epic whose body could not be read is not a childless epic.** The two are indistinguishable
 // downstream — a body that never arrived parses to zero children exactly as an unpopulated task list
 // does — and skipping it drops the epic from the views with no anomaly anywhere, so the run reports
-// the backlog empty and ends. Kept as a read instead, so `epic:next` sees the failed body and says so
-// (joshuafolkken/kit#1690).
+// the backlog empty and ends. Kept as a read instead, so `epic:next` sees the failed body and says so.
 function is_childless(snapshot: EpicSnapshot): boolean {
 	if (snapshot.body_failure !== undefined) return false
 
@@ -90,7 +89,7 @@ function is_childless(snapshot: EpicSnapshot): boolean {
 // stops the command. An epic that is simply not populated yet is a valid, readable epic of ours — an
 // epic whose task list has not been filled in is the ordinary case — and refusing the
 // whole command for it would stop every *other* named epic's children being offered, on every
-// polling round, until a person noticed (joshuafolkken/kit#1493).
+// polling round, until a person noticed.
 async function read_one(reference: EpicReference, current_repo: string): Promise<ReadOutcome> {
 	const epic_repo = epic_repo_of(reference, current_repo)
 	if (epic_repo === undefined) return { refusal: FOREIGN_EPIC }
@@ -108,7 +107,7 @@ function collect(outcome: ReadOutcome, reads: Array<EpicRead>, notices: Array<st
 
 // **The reads are serial on purpose.** A reference naming another owner has to stop the command
 // before that repository is asked anything, and issuing them together would send every fetch before
-// the first refusal was seen — the read joshuafolkken/kit#1016 exists to prevent. The latency is the
+// the first refusal was seen — the very read the refusal exists to prevent. The latency is the
 // price of that guarantee, and `unique_references` above is what keeps it from being paid twice for
 // one epic.
 async function read_snapshots(

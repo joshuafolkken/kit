@@ -6,17 +6,16 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 //
 // The source is shared by the whole-body scan and the single-line test rather than written twice: a
 // rewriter has to recognize exactly the rows the reader counts, and two copies of this pattern would
-// be two chances to disagree about what a tracked row is (joshuafolkken/kit#890).
+// be two chances to disagree about what a tracked row is.
 const TASK_LIST_ISSUE_SOURCE = String.raw`^[ \t]*[-*+][ \t]+\[[ xX]\][ \t]+#(\d+)\b`
 const TASK_LIST_ISSUE_PATTERN = new RegExp(TASK_LIST_ISSUE_SOURCE, 'gmu')
 const TASK_LIST_LINE_PATTERN = new RegExp(TASK_LIST_ISSUE_SOURCE, 'u')
 
 // A task list may also reference an Issue in another repository (`owner/repo#101`, or a full URL).
-// Detecting one is what the auto-close used to bail on; joshuafolkken/kit#864 reads them instead,
-// against their own repository, and the pattern below extracts which repository and which issue.
+// Such a reference is read against its own repository, and the pattern below extracts which repository and which issue.
 // `owner/repo#101` on its own. The row patterns below are built from this source, so what counts as
 // a cross-repository reference has one definition — a second copy would let a form the task list
-// accepts be refused where a person types it, or the reverse (joshuafolkken/kit#985).
+// accepts be refused where a person types it, or the reverse.
 const EXTERNAL_REFERENCE_SOURCE = String.raw`([\w.-]+)\/([\w.-]+)#(\d+)`
 const EXTERNAL_REFERENCE_PATTERN = new RegExp(`^${EXTERNAL_REFERENCE_SOURCE}$`, 'u')
 const TASK_LIST_ROW_SOURCE = String.raw`^[ \t]*[-*+][ \t]+\[[ xX]\][ \t]+`
@@ -41,12 +40,12 @@ const FENCE_LINE_PATTERN = /^[ \t]*(?:`{3,}|~{3,})/u
 // A chain between two Issue references (`#101 -> #102`, or the arrow written as `→`), read for its
 // links. `epic:next` compares what the body declares against the `blocked-by` relations actually
 // recorded, and a body that says one order while the relations say another must stop the run rather
-// than silently follow either (joshuafolkken/kit#860).
+// than silently follow either.
 //
-// Only a line that is *nothing but* a chain counts, optionally behind a list marker. Measured
-// against joshuafolkken/kit#858, whose Dependencies section is followed by a prose line recommending
-// an execution order — e.g. `recommended order: #869 -> #863 -> …`. Those arrows are a suggestion, not a
-// declaration, and reading them as one reported four disagreements that did not exist.
+// Only a line that is *nothing but* a chain counts, optionally behind a list marker. A Dependencies
+// section may be followed by a prose line recommending an execution order — e.g.
+// `recommended order: #869 -> #863 -> …`. Those arrows are a suggestion, not a declaration, and
+// reading them as one reports disagreements that do not exist.
 const DECLARED_CHAIN_LINE = /^(?:[-*+][ \t]+)?#\d+(?:[ \t]*(?:->|→)[ \t]*#\d+)+$/u
 const CHAIN_REFERENCE_PATTERN = /#(\d+)/gu
 
@@ -61,7 +60,7 @@ const CLOSED_STATE = 'CLOSED'
 // Which lines a body predicate is allowed to read: `false` for a fence line and for everything
 // between a pair of them. Returned as a mask rather than a filtered string because a rewriter has to
 // put lines back where it found them, and it must skip exactly the lines the readers skip — two
-// separate fence walks would be two chances to disagree (joshuafolkken/kit#890).
+// separate fence walks would be two chances to disagree.
 //
 // Toggling on each fence line keeps this linear — a single regex spanning the block would backtrack.
 // An unterminated fence swallows the rest of the body, which fails safe: fewer children means the
@@ -143,7 +142,7 @@ function to_external_child(match: RegExpMatchArray): ExternalChild | undefined {
 
 // A bare `owner/repo#101`, as a person types it — the same shape the task-list rows carry, read
 // from a command argument rather than from a body. It reuses `to_external_child` so the two cannot
-// disagree about which owner and repository names are acceptable (joshuafolkken/kit#985).
+// disagree about which owner and repository names are acceptable.
 function parse_external_reference(text: string): ExternalChild | undefined {
 	const match = EXTERNAL_REFERENCE_PATTERN.exec(text.trim())
 	if (match === null) return undefined
@@ -159,7 +158,7 @@ function match_external(body: string, pattern: RegExp): Array<ExternalChild> {
 
 // Every cross-repository child the task list tracks, in both spellings. Reported as `owner/repo`
 // plus a number rather than a URL, which is the form the repository map takes and the form the
-// read's REST path is built from (joshuafolkken/kit#864).
+// read's REST path is built from.
 function parse_external_task_list_children(body: string | undefined): Array<ExternalChild> {
 	if (body === undefined) return []
 	const stripped = strip_fenced_blocks(body)
@@ -196,7 +195,7 @@ function has_unordered_declaration(body: string | undefined): boolean {
 // Whether one line, on its own, is part of a machine-readable `Dependencies` declaration — a chain or
 // the unordered sentence. It lives here beside the two patterns it tests rather than in either of the
 // modules that rewrite a body, because both of them need it and a second copy is where one comes to
-// disagree with the parser about what counts as a declaration (joshuafolkken/kit#1350).
+// disagree with the parser about what counts as a declaration.
 function is_declaration_line(line: string): boolean {
 	const trimmed = line.trim()
 
@@ -229,7 +228,7 @@ function chain_links(references: ReadonlyArray<number>): Array<DependencyLink> {
 // Every declared chain, one entry per chain line, each holding its references in the order written.
 // Read at this granularity rather than as a flat link list because an insertion has to know *which*
 // chain a target sits in: two disjoint chains and one branching chain produce the same links, and
-// only the line structure tells them apart (joshuafolkken/kit#890).
+// only the line structure tells them apart.
 //
 // Fenced blocks are stripped first for the reason they are everywhere else: a quoted template's
 // sample chain is an illustration.
@@ -253,13 +252,11 @@ function parse_dependency_links(body: string | undefined): Array<DependencyLink>
 // warning, which need to tell "the order was never recorded" from "there is no order".
 //
 // Answered from the chains above rather than from a pattern of its own, because a second pattern is
-// a second answer: until joshuafolkken/kit#1155 this scanned the whole body for a bare `#N -> #M`,
-// so a rationale paragraph recommending an execution order made an epic declared
-// `None — the children are independent` report as ordered, and `josh followup` then said the batch
-// order was never recorded on every child's merge. The narrowing joshuafolkken/kit#858 applied to
-// the link reader was the same judgement, and `epic --add` writes on that judgement too
-// (`epic-add-body.ts` protects an arrow outside the `Dependencies` section as prose) — so the
-// three readers of one body now recognize the same lines, instead of two patterns that could
+// a second answer: scanning the whole body for a bare `#N -> #M` would let a rationale paragraph
+// recommending an execution order make an epic declared `None — the children are independent`
+// report as ordered. The link reader applies the same narrowing, and `epic --add` writes on that
+// judgement too (`epic-add-body.ts` protects an arrow outside the `Dependencies` section as prose) —
+// so the three readers of one body recognize the same lines, instead of two patterns that could
 // disagree about which line is a declaration. They still answer different questions of those lines:
 // a self-loop (`#101 -> #101`) is a declaration here and yields no link, since `chain_links` drops
 // an edge from an issue to itself.
@@ -285,8 +282,7 @@ function read_declaration(body: string | undefined): DeclarationState {
 
 // Whether that declaration says something a machine can act on: exactly one of the two forms, never
 // both. A body carrying a chain *and* the `None — ...` literal declares an order and declares that
-// there is none, and `epic:check` used to pass it while reporting only the half that contradicts the
-// other (joshuafolkken/kit#1155). Single-sourced here because `epic:check`, `epic --add` and
+// there is none, so `epic:check` must not pass it. Single-sourced here because `epic:check`, `epic --add` and
 // `epic --promote` all mean this same question, and three copies of the disjunction were three
 // chances to accept a body the check rejects.
 function is_declaration_readable(state: DeclarationState): boolean {

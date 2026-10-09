@@ -19,8 +19,7 @@ import { lane_report } from './lane-report'
 import { lane_seed_policy } from './lane-seed'
 import { lane_stray } from './lane-stray'
 
-// `josh lane:open` / `lane:close` / `lane:list` / `lane:prune` — the lane's whole lifecycle
-// (joshuafolkken/kit#1490).
+// `josh lane:open` / `lane:close` / `lane:list` / `lane:prune` — the lane's whole lifecycle.
 //
 // **`lane:open` prints the lane's directory on standard output and nothing else**, so
 // `dir=$(pnpm josh lane:open 1490)` is what a caller needs and a refusal is an empty capture beside
@@ -55,8 +54,7 @@ function report_usage(): number {
 }
 
 // Read the carry record and refuse if this session has already handed off its budget via `--cut`.
-// A cut session must not open new lanes or dispatch new children — the successor owns the budget
-// (joshuafolkken/kit#2114).
+// A cut session must not open new lanes or dispatch new children — the successor owns the budget.
 async function guard_cut_session(): Promise<string | undefined> {
 	const directory = await run_carry.repository_directory()
 
@@ -195,7 +193,7 @@ const OCCUPANCY_UNREADABLE =
 	'Could not read the `in-progress` listing, so the lane/label difference was not checked — that is not "everything agrees"; check `gh auth status`.'
 
 // The `in-progress` issues this repository shows running, read the way `epic:next` reads lane
-// occupancy — never rebuilt (joshuafolkken/kit#2235). A read that could not see the whole listing is
+// occupancy — never rebuilt. A read that could not see the whole listing is
 // `undefined`, so the difference is skipped rather than computed against a set known to be partial.
 async function to_holders(repo: string): Promise<ReadonlyArray<OpenIssueData> | undefined> {
 	const read = await epic_busy.read_repository(repo)
@@ -205,7 +203,7 @@ async function to_holders(repo: string): Promise<ReadonlyArray<OpenIssueData> | 
 }
 
 // The repository and its running issues, read once: the listing cites each lane from the titles here
-// (joshuafolkken/kit#2943) and the occupancy check compares against the same set.
+// and the occupancy check compares against the same set.
 interface InProgress {
 	repo: string | undefined
 	holders: ReadonlyArray<OpenIssueData> | undefined
@@ -274,7 +272,7 @@ async function prune_command(rest: ReadonlyArray<string>): Promise<number> {
 
 	// After the closes, so a lane whose close left its directory behind is swept in the same run. A
 	// kept stray is reported, never a failure: it waits on a person, and a non-zero exit would stop
-	// every `backlogrun` preparation until one came (joshuafolkken/kit#3370).
+	// every `backlogrun` preparation until one came.
 	await lane_stray.sweep_and_report()
 
 	return code

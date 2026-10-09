@@ -13,7 +13,7 @@ import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line
 import type { SessionTranscript } from './guard-friction'
 import { retrospective, type RetrospectiveInputs } from './retrospective'
 
-// `josh retrospective` — the end-of-run retrospective (joshuafolkken/kit#2328). It is the aggregation
+// `josh retrospective` — the end-of-run retrospective. It is the aggregation
 // half: it gathers the four measurements that already exist and prints the digest `retrospective.ts`
 // composes, so the retrospective step has one place to read the run it just finished. **When to run it
 // is the run driver's** — `run:step` prints it at the stop position, once per invocation — and **what to
@@ -55,7 +55,7 @@ function read_tree(cwd: string): TreeRead {
 	}
 }
 
-// Every issue's file of the ledger directory, read as one (joshuafolkken/kit#2919).
+// Every issue's file of the ledger directory, read as one.
 async function read_ledger(cwd: string): Promise<string> {
 	return (await observation_ledger_home.read(cwd)) ?? ''
 }
@@ -70,7 +70,7 @@ interface RunRead {
 }
 
 // The stream and the scope that bounds it, read from the one directory the carry record and the event stream
-// share (joshuafolkken/kit#2395). The whole stream is read — `scoped_events` filters it to this invocation —
+// share. The whole stream is read — `scoped_events` filters it to this invocation —
 // and an unresolvable directory has no record to scope with, which is the undetermined answer an absent
 // record gives.
 async function read_run(): Promise<RunRead> {

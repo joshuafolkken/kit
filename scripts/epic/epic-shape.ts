@@ -8,7 +8,7 @@ import { to_issue_reference } from './epic-reference'
 // label, a task list to place rows in, and a declaration
 // their edit can be relative to. It lives in one module rather than in each of them, because the two
 // commands must refuse the same inputs for the same reasons — a second copy is where one comes to
-// accept an epic the other refuses (joshuafolkken/kit#1712).
+// accept an epic the other refuses.
 
 // The part of an epic these refusals read. Narrower than either command's own input on purpose: a
 // shape check that could see the children being placed would invite conditions that belong to the
@@ -30,7 +30,7 @@ function missing_declaration_error(epic_number: number): string {
 // choice between promoting and creating a new epic depends on what the target *is*, which only a
 // reader of it knows (`.claude/skills/workflow-commands/split-assessment.md` → promote-or-create).
 // Naming both arms is what keeps the refusal one command away from being actionable rather than a
-// dead end, which is the whole point of `into <target>` (joshuafolkken/kit#985).
+// dead end, which is the whole point of `into <target>`.
 function promote_remedy(epic_number: number): string {
 	const promote = `josh epic --promote ${String(epic_number)} <N...>`
 
@@ -41,7 +41,7 @@ function promote_remedy(epic_number: number): string {
 // differently: without rows there is nowhere to put a new one, and without a declaration there is
 // nothing for an edit to be relative to.
 //
-// **A child in another repository is not a refusal** (joshuafolkken/kit#3161). The declaration names
+// **A child in another repository is not a refusal**. The declaration names
 // bare numbers only, so neither command can write an order across repositories — such an order lives
 // in the native relations alone (`epic_graph.child_links`), which these edits never read or drop — and
 // the rewrite leaves a row it does not recognize exactly where it stood.

@@ -2,14 +2,14 @@ import { run_issue_number } from '#scripts/run/run-issue-number'
 import { lane_paths } from './lane-paths'
 
 // The mark a dispatched lane child carries, so the pre-gate cut and a resume are decided from the
-// environment rather than from the model's reading of the prompt (joshuafolkken/kit#1904).
+// environment rather than from the model's reading of the prompt.
 //
-// **A dispatched child used to be indistinguishable from a person's own session.** `lane:dispatch`
-// and the `run:cut` relaunch both start the child with `claude -p "fullrun #<N>"` and a copied
-// environment, and nothing in the argv, the environment or a file said "this session was launched, not
-// typed". So `pre-gate-cut.ts` left the human-or-child question to the model, which read its own prompt
-// and — across the six children joshuafolkken/kit#1850 measured — decided "person" every time and
-// declined the cut. This variable is that missing fact, made mechanical.
+// **Without this mark a dispatched child is indistinguishable from a person's own session.**
+// `lane:dispatch` and the `run:cut` relaunch both start the child with `claude -p "fullrun #<N>"` and
+// a copied environment, and nothing in the argv, the environment or a file says "this session was
+// launched, not typed". Left to the model, the human-or-child question is answered by reading its own
+// prompt, which decides "person" and declines the cut. This variable is that missing fact, made
+// mechanical.
 //
 // **Its value is the issue number, because a mark that only said "a child" could not be told from one
 // that leaked.** A person's shell, or a parent session that was itself a dispatched child, can carry
@@ -19,7 +19,7 @@ import { lane_paths } from './lane-paths'
 // `.claude/skills/workflow-commands/pre-gate-cut.md`.
 const KEY = 'JOSH_LANE_CHILD'
 
-// **A dispatched child also asks for the five-minute prompt-cache TTL** (joshuafolkken/kit#2944). A
+// **A dispatched child also asks for the five-minute prompt-cache TTL**. A
 // headless `claude -p` session on a subscription defaults to the one-hour TTL, whose writes bill at 2x
 // the input rate against 1.25x for five minutes. A replay of 1,953 lane transcripts (about 57,000
 // requests) found 0.3% of request gaps over five minutes, so the shorter TTL — re-writing the prefix on
@@ -54,7 +54,7 @@ function marked_issue(source: MarkerSource = process.env): string | undefined {
 // present and names this lane's own issue, read from the checkout path. A numeric mark naming a
 // *different* issue leaked in from a parent session into a checkout it does not belong to, so it is
 // read as a person's run — the trust condition the header describes, applied the same way
-// `pre-gate-cut.ts` applies it to the resume decision (joshuafolkken/kit#1947).
+// `pre-gate-cut.ts` applies it to the resume decision.
 function is_child_of(directory: string, source: MarkerSource = process.env): boolean {
 	const marked = marked_issue(source)
 

@@ -1,9 +1,9 @@
 import { backlog_budget, type BudgetInput } from './backlog-budget'
 
-// The idle watch as a window a person can read (joshuafolkken/kit#3430): when the run began waiting on
-// an empty backlog, when the wait ends, and which bound ends it. `backlog:budget` measured the watch but
-// kept it to itself, and the moment it began lived only in `backlog:drive`'s memory as `--active`, so a
-// reader of the event stream could tell the run was waiting but not until when. The budget names the
+// The idle watch as a window a person can read: when the run began waiting on
+// an empty backlog, when the wait ends, and which bound ends it. Without it the moment the wait began
+// would live only in `backlog:drive`'s memory as `--active`, so a reader of the event stream could
+// tell the run was waiting but not until when. The budget names the
 // window, `backlog:offer` records it as an `idle` event, and `run:board` reads it back — all through the
 // text written and parsed here, so the three never spell it differently.
 

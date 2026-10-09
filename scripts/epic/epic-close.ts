@@ -13,13 +13,11 @@ import { epic_parse, type ExternalChild } from './epic-parse'
 
 // How many open epics the auto-close will look at. `git-gh-issue-list.ts` pages until `limit` rows
 // have been selected or the backlog runs out, so this is what keeps the ordinary case at exactly one
-// request — 100 is `PER_PAGE`. Since joshuafolkken/kit#1067 the paging's own page ceiling bounds
-// this listing too, but as a backstop rather than as this number's replacement: it stops the request
-// count, not the row count.
+// request — 100 is `PER_PAGE`. The paging's own page ceiling bounds this listing too, but as a
+// backstop rather than as this number's replacement: it stops the request count, not the row count.
 //
 // The listing is newest-first and the surplus is cut off the tail, so a repository holding more open
-// epics than this loses the oldest. It no longer loses them silently: since joshuafolkken/kit#1067
-// both cutoffs are reported, because an epic past the cut is never checked for completion and stays
+// epics than this loses the oldest. It does not lose them silently: both cutoffs are reported, because an epic past the cut is never checked for completion and stays
 // open with nothing saying why — the same silence this file's `undefined`-not-`[]` handling exists
 // to remove. The value still sits well above the number of epics ever open at once, so the report is
 // the exception rather than a line on every merge.
@@ -61,8 +59,7 @@ function to_epic_issue(raw: { number: number; body?: string | undefined }): Epic
 // `parse_json_array_safe` returns `[]` for both, and the auto-close then decides there is no epic to
 // close: it stops for a reason that never reaches a log, and the epic stays open with nothing saying
 // why. The failure leans safe — the other direction, taken by `epic:bundle`, invented a second epic
-// (joshuafolkken/kit#950) — but silence is the same defect, so the two are told apart here as well
-// (joshuafolkken/kit#959).
+// — but silence is the same defect, so the two are told apart here as well.
 //
 // The two ways of failing are folded into one answer deliberately. Which one occurred does not
 // change what the auto-close may do — in neither case does it know what the open epics are — and
@@ -107,8 +104,7 @@ async function inspect_sibling(sibling: number, repo?: string): Promise<SiblingS
 
 // A cross-repository child, read by naming its repository in the read's REST path. `is_readable`
 // is what decides whether the epic may close at all: closing while a child's state is unknown is
-// exactly what the old refusal prevented, and reading them is the only thing that changed
-// (joshuafolkken/kit#864).
+// exactly what the old refusal prevented, and reading them is the only thing that changed.
 async function inspect_external(
 	child: ExternalChild,
 ): Promise<SiblingState & { is_readable: boolean }> {
@@ -129,13 +125,12 @@ async function inspect_siblings(
 }
 
 // `pnpm josh epic --ordered` and `--add` record the declared chain themselves, through the REST
-// dependencies endpoint (`epic-relations.ts`, joshuafolkken/kit#1026), so the default route
+// dependencies endpoint (`epic-relations.ts`), so the default route
 // arrives here with the relations already in place. Three routes still reach a declared order with
 // none recorded: an epic body written by hand, the manual fallback in `issue-template.md`, and
 // `apply_relations` failing — it counts the refusals, reports that the body is intact and lets the
 // batch finish. Each is otherwise symptomless, which is what this warning is for. The epic body's
-// declared chain is the trigger: since #713 every split gets an epic, so its existence no longer
-// implies an order, and warning on that alone would fire on every unordered batch. Only a total
+// declared chain is the trigger: every split gets an epic, so its existence does not imply an order, and warning on that alone would fire on every unordered batch. Only a total
 // absence of relations is reported — checking each dependent pair would mean inferring the chain
 // from task-list order, which need not match.
 function warn_when_order_unrecorded(epic: EpicIssue, states: ReadonlyArray<SiblingState>): void {
@@ -154,12 +149,12 @@ function warn_when_order_unrecorded(epic: EpicIssue, states: ReadonlyArray<Sibli
 }
 
 // The one thing the two refusals below ask for, written once — a child state that could not be read,
-// and a close the API refused (joshuafolkken/kit#1039).
+// and a close the API refused.
 const CLOSE_MANUALLY = 'close it manually.'
 
 // The nesting cascade's safety valve. A closed child epic is itself a completed child, so the same
-// completion check is re-run for the epics that list *it*, closing a nested parent in the same pass
-// (joshuafolkken/kit#2008). `evaluated` already terminates a cycle or a shared child; this is the
+// completion check is re-run for the epics that list *it*, closing a nested parent in the same pass.
+// `evaluated` already terminates a cycle or a shared child; this is the
 // backstop for a nesting so deep it is likelier a mistake than a plan. On reaching it the cascade
 // stops and asks for a manual close, exactly as an unreadable or refused child close does.
 const MAX_CASCADE_DEPTH = 10
@@ -175,20 +170,19 @@ const CASCADE_DEPTH_NOTE = `⚠️  Epic auto-close cascade reached its ${String
 // would leave a finished epic open until somebody noticed.
 //
 // The direction is chosen on what each mistake costs, and they are not symmetric. Announcing twice
-// costs one redundant comment and nothing else, because the epic *closes* — which is what ends the
-// loop joshuafolkken/kit#1039 is about, where the comment repeated once per attempt for as long as
-// the close kept failing. Refusing costs a manual close on every transient failure.
+// costs one redundant comment and nothing else, because the epic *closes* — which is what ends a loop
+// where the comment would repeat once per attempt for as long as the close kept failing. Refusing costs a manual close on every transient failure.
 const UNREADABLE_COMMENTS_NOTE =
 	"'s comments could not be read; announcing again rather than leaving it open."
 
 // The write, once the announcement has been decided. `comment` is `undefined` when the epic already
 // carries one — which is what stops a run whose comment landed and whose close was refused from
 // posting the same comment again on the next attempt, and again for as long as the close keeps
-// failing (joshuafolkken/kit#1039).
+// failing.
 //
 // The comment-first ordering inside `issue_close` is what produces that half-succeeded state, and it
 // is left exactly as it is: it is what keeps a `false` meaning "the epic is still open" in every
-// branch, which is the answer the second message here is written against (joshuafolkken/kit#1026).
+// branch, which is the answer the second message here is written against.
 async function close_epic_with(epic_number: string, comment: string | undefined): Promise<boolean> {
 	const is_closed = await git_gh_command.issue_close(epic_number, comment)
 
@@ -257,7 +251,7 @@ async function close_epic_when_complete(epic: EpicIssue, merged_number: number):
 // Each epic is isolated: one that cannot be read or closed must not stop the others from being
 // evaluated, since they are independent batches that merely share this child. `false` — the epic did
 // not close, whether because a sibling is still open, a read failed or the close was refused — is
-// what stops the cascade from walking past it to a parent (joshuafolkken/kit#2008).
+// what stops the cascade from walking past it to a parent.
 async function close_epic_isolated(epic: EpicIssue, merged_number: number): Promise<boolean> {
 	try {
 		return await close_epic_when_complete(epic, merged_number)

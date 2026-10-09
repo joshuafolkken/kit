@@ -5,7 +5,7 @@ import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_offer } from './backlog-offer'
 
-// A named epic is driven from the epic itself (joshuafolkken/kit#3558). The work list is the epic's
+// A named epic is driven from the epic itself. The work list is the epic's
 // current children as `epic:next` derives them, never a copy in the carry record — so a child filed
 // into the epic mid-run, by any route (`issue:file`, `epic --add`, a hand edit), is dispatched once it
 // is runnable, without `run:add` and without waking a parent session.
@@ -43,7 +43,7 @@ function failed_offer(epic: string, state: DriveState): OfferRead {
 }
 
 // A child the loop already launched, or merged and excluded, can still read as runnable while GitHub
-// catches up (joshuafolkken/kit#3156), so it is skipped rather than launched twice. One child per offer
+// catches up, so it is skipped rather than launched twice. One child per offer
 // keeps the carried maximum checked before each launch.
 function child_offer(children: ReadonlyArray<string>, state: DriveState): OfferRead {
 	const child = children.find(

@@ -13,20 +13,16 @@ import { epic_solo } from './epic-solo'
 import { epic_solo_stale } from './epic-solo-stale'
 import { epic_triage, type TriageVerdict } from './epic-triage'
 
-// Which children a repository has room to start right now (joshuafolkken/kit#1491).
+// Which children a repository has room to start right now.
 //
-// Until joshuafolkken/kit#1490 the answer was one or none: the contended resource was one working
-// tree, so a single `in-progress` issue excluded everything else in that repository. A lane is its
-// own checkout, so the question became how many are free — the repository's occupancy counted from
-// GitHub, compared against `lane_capacity`'s limit.
+// A lane is its own checkout, so the question is how many are free — the repository's occupancy
+// counted from GitHub, compared against `lane_capacity`'s limit.
 //
 // **The pool takes several sources, and none of them is an epic.** `RepoPool` is a candidate list
-// with the context needed to confirm it. Since joshuafolkken/kit#1493 `epic:next` builds one per
-// named epic and passes them all, which cost the caller change this design predicted and no rewrite
-// of the scheduler: the signatures never learned what an epic is, because once the guarded resource
-// is the lane rather than the repository, which epic a child came from stops mattering. The one
-// thing several sources did add is `dedupe_pools` below — two epics can name the same child, and one
-// child is one lane.
+// with the context needed to confirm it. `epic:next` builds one per named epic and passes them all;
+// the signatures never learn what an epic is, because once the guarded resource is the lane rather
+// than the repository, which epic a child came from stops mattering. The one thing several sources
+// add is `dedupe_pools` below — two epics can name the same child, and one child is one lane.
 
 const WAIT_VERDICT: EpicVerdict = 'wait'
 const RUN_VERDICT: EpicVerdict = 'run'
@@ -92,7 +88,7 @@ function offered_notice(
 	return epic_busy.occupancy_message(read.issues, request.repo, request.limit, ages)
 }
 
-// Each holder's label age, read only when there are holders to print (joshuafolkken/kit#3400) — a
+// Each holder's label age, read only when there are holders to print — a
 // timeline request per lane is paid for nothing on a read that names no one.
 async function holder_ages(read: BusyRead, repo: string): Promise<ReadonlyMap<number, string>> {
 	if (read.kind !== 'busy') return new Map()
@@ -116,7 +112,7 @@ function combine_verdicts(left: EpicVerdict, right: EpicVerdict): EpicVerdict {
 
 // Every pool is a source of candidates **for the repository the request names**. The free-lane count
 // was read for that one repository, so spending it on a child that lives somewhere else would
-// allocate a lane nobody counted — the double-allocation joshuafolkken/kit#925 exists to prevent.
+// allocate a lane nobody counted.
 // Dropped rather than offered: a caller with children in two repositories asks twice, once per
 // repository, exactly as `--repo` already makes it.
 function candidates_in(pool: RepoPool, repo: string): RepoPool {
@@ -124,7 +120,7 @@ function candidates_in(pool: RepoPool, repo: string): RepoPool {
 }
 
 // A pool's candidates for the repository in `epic_rank.rank` order — the ranking `backlog:next` offers
-// in (joshuafolkken/kit#2928), counted against the pool's own graph. **Within a pool, not across
+// in, counted against the pool's own graph. **Within a pool, not across
 // pools**: the pool order is the order a person named the epics in, and that stays the outer key.
 function ranked_in(pool: RepoPool, repo: string): RepoPool {
 	const scoped = candidates_in(pool, repo)
@@ -149,8 +145,8 @@ function unseen_candidates(pool: RepoPool, seen: Set<string>): RepoPool {
 }
 
 // A child two epics both track is still one child, and entering it twice would open two lanes on one
-// issue — two branches, two pull requests, and the second one merging over the first
-// (joshuafolkken/kit#1493). Keyed through `epic_graph.key_of`, the one spelling of an issue's
+// issue — two branches, two pull requests, and the second one merging over the first.
+// Keyed through `epic_graph.key_of`, the one spelling of an issue's
 // identity in this package: a bare number names a different issue in another repository.
 //
 // **The earlier pool keeps it**, and that is a decision rather than an accident of iteration order.
@@ -193,8 +189,8 @@ async function collect(
 	return { children, verdict: children.length > NO_LANES ? RUN_VERDICT : verdict }
 }
 
-// The `run:solo` gate `backlog:next` applies, applied to a named epic's lanes too
-// (joshuafolkken/kit#2776): the confirmed children are cut where `epic_solo.select` says, so a
+// The `run:solo` gate `backlog:next` applies, applied to a named epic's lanes too:
+// the confirmed children are cut where `epic_solo.select` says, so a
 // `run:solo` child never opens a lane beside another one on either path.
 function solo_offer(
 	answer: { children: ReadonlyArray<EpicChild>; verdict: EpicVerdict },
@@ -211,12 +207,11 @@ function solo_offer(
 	return { ...answer, children: offered, notice: offered_notice(offered, read, request, ages) }
 }
 
-// The repository is asked how full it is **before** any candidate is confirmed, for the reason
-// joshuafolkken/kit#1121 records: a repository with no free lane is handed nothing, so the relations
+// The repository is asked how full it is **before** any candidate is confirmed: a repository with no free lane is handed nothing, so the relations
 // request that would confirm a candidate there buys an answer nobody reads — and a polling `epicrun`
 // would pay it every round.
 //
-// **Triage is asked before even that** (joshuafolkken/kit#2779): an untriaged candidate withholds every
+// **Triage is asked before even that**: an untriaged candidate withholds every
 // candidate whatever the occupancy, and it needs only the labels already read. Only a `--lanes` ask
 // is gated — it is the one that opens children beside each other; the single-child form starts one.
 function triage_offer(pools: ReadonlyArray<RepoPool>, request: LaneRequest): LaneOffer | undefined {

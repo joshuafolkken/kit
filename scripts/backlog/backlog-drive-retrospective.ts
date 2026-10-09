@@ -4,8 +4,8 @@ import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_retrospective } from '#scripts/run/run-retrospective'
 
 // Whether a drain owes the retrospective, read through the owed rule `run:step` reads, so a drain it
-// owes nothing at keeps the idle watch rather than waking a session with nothing to run
-// (joshuafolkken/kit#2750). The drive is the parent's loop, never a lane child's.
+// owes nothing at keeps the idle watch rather than waking a session with nothing to run.
+// The drive is the parent's loop, never a lane child's.
 function is_owed(carry: RunCarry): boolean {
 	const root = find_package_directory(process.cwd())
 

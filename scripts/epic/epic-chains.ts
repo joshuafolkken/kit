@@ -6,8 +6,7 @@ import { DEPENDENCY_ARROW, format_dependency_link, to_issue_reference } from './
 // `epic:next` reads the declaration as a flat list of links, which is all a comparison against the
 // native relations requires. An insertion cannot work from that: two disjoint chains and one
 // branching chain produce the same links, and only the line structure says which chain a target sits
-// in. So this module works in chains — one per declared line — and derives the links from them
-// (joshuafolkken/kit#890).
+// in. So this module works in chains — one per declared line — and derives the links from them.
 //
 // Every relation the caller applies comes from diffing the links before against the links after.
 // That is what makes `--before` need no special case: inserting `#N` between `#B` and `#M` drops
@@ -104,7 +103,7 @@ function start_chain(additions: ReadonlyArray<number>, position: InsertPosition)
 // A second declaration alongside the existing ones. Every other chain is copied through untouched,
 // so nothing that was declared about anything else changes. Two callers reach it: a target that no
 // chain names yet, and a `--after` whose target already has a successor — a branch rather than a
-// splice (joshuafolkken/kit#1080).
+// splice.
 function add_chain(
 	chains: Chains,
 	additions: ReadonlyArray<number>,
@@ -116,9 +115,9 @@ function add_chain(
 // No declared chain names the target. Two states look identical from the chains alone, and they are
 // not the same thing: a child the epic tracks simply has no order yet — legitimate in an epic mixing
 // ordered and unordered children — and gets the first order anyone declared for it, as a new line.
-// A number that is not a child at all is still refused (joshuafolkken/kit#949).
-// The only reason left to refuse a position. "Not named in the declared order" used to be it, and is
-// now a legitimate state — a child with no order constraint (joshuafolkken/kit#949). The wording
+// A number that is not a child at all is still refused.
+// The only reason left to refuse a position. "Not named in the declared order" is not one — it is a
+// legitimate state, a child with no order constraint. The wording
 // matches `find_addition_error`'s, which is what the workflow docs tell the operator to expect.
 function not_a_child_error(target: number): InsertOutcome {
 	return {
@@ -145,7 +144,7 @@ function has_successor(chain: Chain, target: number): boolean {
 
 // `--after <M>` where the declaration already names something after `#M`. Splicing there puts the
 // additions between `#M` and that successor, which records `#N -> #<successor>` — an order nobody
-// declared, and the second of joshuafolkken/kit#1080's two paths. What `--after <M>` states is that
+// declared. What `--after <M>` states is that
 // `#M` must finish first, and a fan-out (`#A -> #B` beside `#A -> #C`) already expresses exactly
 // that, so the addition becomes a chain line of its own and the existing one is left as it stood.
 // Appending after the tail is not a branch: with no successor to displace it keeps extending the
@@ -178,8 +177,7 @@ function to_ambiguous_position_error(position: InsertPosition): string {
 // an ambiguity rather than resolve it: with `#890 -> #891` beside `#892 -> #891`, moving `#892` before
 // `#891` leaves one chain naming `#891`, and the insertion then splices into a place nobody
 // identified — recording `#890 -> #892`, an order the caller never asked for, and dropping
-// `#890 -> #891`, one they never asked to lose. So the plan asks this of the declaration as it stands
-// (joshuafolkken/kit#1701).
+// `#890 -> #891`, one they never asked to lose. So the plan asks this of the declaration as it stands.
 //
 // **`before` is the only kind that can do it, and asking it of `after` too refuses the very case this
 // Issue is about.** A `before` splices its child in *front* of the target, so the child inherits
@@ -237,12 +235,10 @@ function insert_at_position(
 // No position given: nothing was declared about the additions, so the declaration is copied through
 // exactly as it stood. An order is recorded only where `--before` / `--after` names one.
 //
-// The additions used to extend the **last declared chain**, and that invented a dependency
-// (joshuafolkken/kit#1253). An epic mixing ordered and unordered children is the normal state
-// (joshuafolkken/kit#949), so an unrelated child added to one came out blocked by whatever issue
-// happened to sit at that chain's tail — and `epic:next` then withheld it as blocked, with neither a
-// park nor a `needs-decision` label to show that it was stuck. An epic with no chain at all was
-// already left alone, which is the same answer this gives for every epic.
+// Extending the **last declared chain** instead would invent a dependency. An epic mixing ordered
+// and unordered children is the normal state, so an unrelated child added to one would come out
+// blocked by whatever issue happened to sit at that chain's tail — and `epic:next` would withhold it
+// as blocked, with neither a park nor a `needs-decision` label to show that it was stuck.
 function keep_declaration(chains: Chains): InsertOutcome {
 	return { chains: chains.map((chain) => [...chain]) }
 }
@@ -292,20 +288,19 @@ function already_declared_error(issue_number: number): string {
 // Checked on the way in *and* on the way out. The result matters more than the input: a child the
 // task list has lost but the declaration still names would otherwise be written into a chain a second
 // time — `--after #892` on `#890 -> #891 -> #892 -> #891` produces a cycle, whose verdict is `error`,
-// which halts the very run this command exists to keep going (joshuafolkken/kit#890). The example was
-// a no-position add until joshuafolkken/kit#1253 stopped that path touching the declaration at all;
-// the guard still matters, because a positioned insert writes into a chain.
+// which halts the very run this command exists to keep going. A no-position add never touches the
+// declaration; the guard matters because a positioned insert writes into a chain.
 //
 // The two guards cover different things, and both are needed since `add_chain` can write into a
 // chain the addition is not in. The in-guard refuses an addition the declaration already names
 // **anywhere**; the out-guard catches a repeat **within one chain**. The out-guard deliberately does
 // not scan across chains: one issue named by two of them is a fan-out — `#A -> #B` and `#A -> #C` —
-// which is a legitimate declaration, not a duplicate (joshuafolkken/kit#949).
+// which is a legitimate declaration, not a duplicate.
 // `tracked` is the epic's task list, and it is required rather than defaulted. It separates "this
 // child has no order yet" from "this number is not a child at all": the first gets a new chain, the
 // second is refused. A default would make one path refuse everything and the other check nothing, so
 // the same input would be accepted or refused depending only on whether anything happened to be
-// declared yet (joshuafolkken/kit#949).
+// declared yet.
 // Everything that can refuse the input, before anything is built from it.
 function find_insertion_error(
 	chains: Chains,
@@ -325,7 +320,7 @@ function find_insertion_error(
 // A reorder expressed as a removal followed by the ordinary insertion. Splicing the child out of
 // every chain that names it closes the chain around it — `#A -> #N -> #B` becomes `#A -> #B` — so the
 // re-insertion goes through `insert_children` unchanged, and the relations to drop still fall out of
-// diffing the declaration before against the declaration after (joshuafolkken/kit#1701).
+// diffing the declaration before against the declaration after.
 //
 // A chain left with one reference declares nothing and is dropped rather than rendered as a bare
 // `#N`, which the parser would read as prose. Its remaining child simply has no order any more,
@@ -358,7 +353,7 @@ function split_chain(chain: Chain, dropped: ReadonlySet<string>): Array<Array<nu
 }
 
 // A declared order removed: every chain is cut at each named link, and **the ends are never
-// reconnected** (joshuafolkken/kit#1712). `#A -> #B -> #C` minus `#B -> #C` leaves `#A -> #B`, and
+// reconnected**. `#A -> #B -> #C` minus `#B -> #C` leaves `#A -> #B`, and
 // removing a middle child's two links leaves `#A` and `#C` with no order rather than `#A -> #C`.
 //
 // Reconnecting would declare an order nobody stated, which is exactly what the audit shipped beside
@@ -397,7 +392,7 @@ const epic_chains = {
 	links_of,
 	diff_links,
 	find_position_ambiguity,
-	// Exported since joshuafolkken/kit#1738 so `--order-before` / `--order-after` can pass the
+	// Exported so `--order-before` / `--order-after` can pass the
 	// declaration through by the same function `--add` without a position uses. An order-only move is
 	// "leave the declaration exactly as it stood" applied to a call that *does* name a position, so a
 	// second copy of the passthrough would be the clone `CLAUDE.md` prohibits.

@@ -1,7 +1,7 @@
 import { LANE_SEAT_KEY, PORT_SEED_KEY, ports } from '#ports'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 
-// The lane's `.env`, built from the root's (joshuafolkken/kit#1490, joshuafolkken/kit#1494).
+// The lane's `.env`, built from the root's.
 //
 // **Port separation is required here, not optional.** `ports/index.js` resolves the project root as
 // the nearest ancestor holding a `package.json` — which, inside a linked work tree, is the lane's
@@ -9,8 +9,8 @@ import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role
 // root's runs on the root's exact offset; either way every lane lands on one pair of ports, and a
 // busy port fails without retrying on another. At the default six lanes that turns E2E from "fails
 // sometimes" into "fails nearly always". So the lane's `.env` keeps the project's `PORT_SEED`
-// unchanged and adds `JOSH_LANE_SEAT`, and `ports/index.js` combines them as `seed × 10 + seat`
-// (joshuafolkken/kit#1494): the file plainly shows which number is the project's and which is the
+// unchanged and adds `JOSH_LANE_SEAT`, and `ports/index.js` combines them as `seed × 10 + seat`:
+// the file plainly shows which number is the project's and which is the
 // seat, and the multiplication that separates the bands lives in one place rather than here.
 //
 // **Everything else in the file is carried across verbatim**, comments and blank lines included:
@@ -18,7 +18,7 @@ import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role
 // are as necessary inside a lane as outside one, and a lane that had to have them re-entered would
 // not be a place a run could start unattended.
 
-// Where the delegated unit running this lane's child writes (joshuafolkken/kit#1713). It goes in the
+// Where the delegated unit running this lane's child writes. It goes in the
 // lane's own `.env` — the store `lane-registry.ts` already reads — rather than in a ledger beside the
 // trees, so `git worktree remove` erases the record along with the lane it described and there is
 // nothing left to go stale. `.env` is gitignored in kit and in every consumer `josh sync` reaches,
@@ -149,7 +149,7 @@ function read_lane_ports(content: string): { development: number; preview: numbe
 /**
  * The output path a lane's `.env` records, or `undefined` where it records none.
  *
- * **A blank assignment is `undefined` rather than an empty path** (joshuafolkken/kit#1713). A lane
+ * **A blank assignment is `undefined` rather than an empty path**. A lane
  * whose record was cleared has nothing to poll, and an empty string handed to
  * `pnpm josh run:liveness --output` is a relative path — refused by its own root check, so the
  * child would come back `undetermined` for ever rather than saying the record is missing.
