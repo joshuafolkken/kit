@@ -311,6 +311,8 @@ pnpm josh epic:next 858 --repo joshuafolkken/kit --lanes   # one child per free 
 - `--repo <owner/repo>` — answer for one repository; stdout carries one token (an issue number, or `wait`/`stop`/`complete`), everything else on stderr.
 - `--lanes` — print one issue number per free lane (requires `--repo`); `JOSH_LANE_LIMIT` sets the ceiling, default 6. Prints `triage` instead while any candidate carries neither `run:solo` nor `run:lane` (the triage gate in [`josh backlog:next`](#josh-backlognext)).
 
+With `--repo`, the occupancy line names each `in-progress` holder with its label age read from the issue timeline — `in-progress for <n> min`, marked `stale` past 90 minutes or when the label predates the timeline, `label age unread` when the timeline could not be read.
+
 Several leading epic arguments merge into one candidate pool per repository. A cross-repository dependency resolves only when the blocker is closed **and** its declared version has published. `run`/`wait`/`stop`/`complete` exit `0`; an unusable graph (cycle, or body/relations disagreement) exits `1`.
 
 ### `josh epic:bundle`

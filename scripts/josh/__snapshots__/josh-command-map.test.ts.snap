@@ -662,6 +662,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "notifications",
       ],
     ],
+    "observation:record": [
+      "<key> <depth> <where> <what> [--checkout <path>]",
+      "automation",
+      [
+        "files",
+      ],
+    ],
     "observations:flush": [
       "",
       "automation",

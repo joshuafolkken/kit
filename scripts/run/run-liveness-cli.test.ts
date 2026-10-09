@@ -1,13 +1,16 @@
+import { lane_await } from '#scripts/lane/lane-await'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
 	ALIVE_VERDICT,
 	MS_PER_MINUTE,
 	MS_PER_SECOND,
+	PROCESS_ALIVE,
 	PROCESS_NONE,
 	PROCESS_UNKNOWN,
 	run_liveness,
 	UNDETERMINED_VERDICT,
 	type LivenessVerdict,
+	type ProcessTrace,
 } from './run-liveness'
 import { run_liveness_cli } from './run-liveness-cli'
 
@@ -45,6 +48,14 @@ function arrange_verdict(verdict: LivenessVerdict, reason: string): void {
 }
 
 describe('the request the flags describe', () => {
+	beforeEach(() => {
+		vi.spyOn(lane_await, 'process_trace_default').mockReturnValue(PROCESS_NONE)
+	})
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
 	it('reads the issue number, the output path and the process trace', () => {
 		const request = run_liveness_cli.parse_request([...TARGET, PROCESS_FLAG, PROCESS_NONE])
 
@@ -55,10 +66,10 @@ describe('the request the flags describe', () => {
 		})
 	})
 
-	// Left out, the process trace is unread rather than absent — which the decision turns into
-	// `undetermined` rather than a stop.
-	it('defaults the process trace to unknown', () => {
-		expect(run_liveness_cli.parse_request(TARGET)?.process_trace).toBe(PROCESS_UNKNOWN)
+	it('keeps an explicit unknown process trace as given', () => {
+		const request = run_liveness_cli.parse_request([...TARGET, PROCESS_FLAG, PROCESS_UNKNOWN])
+
+		expect(request?.process_trace).toBe(PROCESS_UNKNOWN)
 	})
 
 	it('converts the two durations into milliseconds', () => {
@@ -74,6 +85,32 @@ describe('the request the flags describe', () => {
 		const request = run_liveness_cli.parse_request([...TARGET, '--repo', REPO])
 
 		expect(request?.repo).toBe(REPO)
+	})
+})
+
+// Left out, the process trace is read with the probe `lane:await` polls on, for the issue named —
+// never a default a caller has to replace by running `pgrep` itself.
+describe('the process trace it reads for itself', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it.each<ProcessTrace>([PROCESS_ALIVE, PROCESS_NONE, PROCESS_UNKNOWN])(
+		'passes the probe answer %s through',
+		(trace) => {
+			const probe = vi.spyOn(lane_await, 'process_trace_default').mockReturnValue(trace)
+
+			expect(run_liveness_cli.parse_request(TARGET)?.process_trace).toBe(trace)
+			expect(probe).toHaveBeenCalledWith(ISSUE)
+		},
+	)
+
+	it('does not probe when the trace is given', () => {
+		const probe = vi.spyOn(lane_await, 'process_trace_default')
+
+		run_liveness_cli.parse_request([...TARGET, PROCESS_FLAG, PROCESS_NONE])
+
+		expect(probe).not.toHaveBeenCalled()
 	})
 })
 

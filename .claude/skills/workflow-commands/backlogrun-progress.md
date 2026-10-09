@@ -61,10 +61,9 @@ run in lanes".
 
    **`run:liveness` stays the fallback for a lane no `lane:await` is watching** — a handed-over lane a
    resumed session polls ("Picking the lanes up in the fresh session"). Ask
-   `pnpm josh run:liveness <N> --output <path> --process <what `pgrep -laf "(fullrun|run-ship-cli\.ts .*) #<N>$"` found>` where
-   that file has been unchanged for the silent-unit window; on `stopped` its own advice routes the child
-   through the same `run:merge --output` classification. **The flag is what you saw, never what kind of
-   child it is.**
+   `pnpm josh run:liveness <N> --output <path>` where that file has been unchanged for the silent-unit
+   window — it reads the child's process for itself; on `stopped` its own
+   advice routes the child through the same `run:merge --output` classification.
 
    **When the unit reports back, a merge is one event, and one call of the parent's — `pnpm josh
    run:merge <N>`** (joshuafolkken/kit#2024). It is the only reading of how the child ended: never
@@ -196,12 +195,11 @@ opened with two:
 
 ```bash
 unit_output=$(pnpm josh lane:output <N>) &&
-  pnpm josh run:liveness <N> --output "$unit_output" --process alive
+  pnpm josh run:liveness <N> --output "$unit_output"
 ```
 
-**`--process` carries what `pgrep` found, and with a dispatched child that is the whole answer.** Run
-`pgrep -laf "(fullrun|run-ship-cli\.ts .*) #<N>$"` first and pass `alive` where it found the child and `none` where it did not
-— **never `alive` because the child was dispatched**, and never from a `pgrep` on the lane's directory.
+**The process trace is read by the command, not passed in** — it matches the
+child's own command line and a detached ship supervisor, so no `pgrep` is run by hand.
 
 **The `&&` is load-bearing.** A lane that records nothing prints `none` and exits non-zero; substituted
 straight into `--output`, that `none` is a relative path and `run:liveness` answers `undetermined` for
@@ -249,9 +247,8 @@ on or standing at the seam. `needs-decision` is not applied, nothing is stashed,
 **The resumed session does not start a child again, and does not open a lane that is already open.** Its
 first reading is `pnpm josh lane:list`: every line with a recorded path is a child that was handed over,
 polled exactly as the session that dispatched it polled it (the two-line form above, same answer table
-and same two-`undetermined`-in-a-row rule). **The `--process` argument is the one thing that changes** —
-a fresh session did not start those processes, so it reports `none` unless it has looked itself.
-**`pnpm josh lane:open <N>` re-attaches to a lane whose branch is already pushed**, which a handed-over
+and same two-`undetermined`-in-a-row rule) — `run:liveness` reads the process itself, so a session
+that did not start it reads it just as well. **`pnpm josh lane:open <N>` re-attaches to a lane whose branch is already pushed**, which a handed-over
 lane needs when its child has to be finished by hand.
 
 **Restart the progress watcher by name** — `pnpm josh run:progress --wait --output <handed-over paths>`
@@ -337,15 +334,8 @@ nobody. With no child in flight it may decline; the driver still polls for new w
 idle and whole-run bounds. A GitHub
 listing failure stays a retry or unreadable answer from the offer command, never an empty backlog.
 
-`epic:next` does not report when a label was applied, so read that from the issue's timeline:
-
-```bash
-gh api "repos/{owner}/{repo}/issues/<N>/timeline" \
-  --jq '[.[] | select(.event == "labeled" and .label.name == "in-progress") | .created_at] | last'
-```
-
-An empty answer means the label predates what the timeline returns, which is itself past the window —
-treat it as stale.
+`epic:next` prints each holder's label age beside it — `in-progress for <n> min`, marked `stale` past
+the window, or past it already when the label predates what the timeline returns.
 
 Waiting is decided by `epic:next`'s classification, never by reading labels:
 

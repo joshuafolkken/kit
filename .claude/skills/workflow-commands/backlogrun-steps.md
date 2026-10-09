@@ -468,10 +468,9 @@ All of these are this file's, and are reached here in the same order and for the
 `pnpm josh run:wake --start` and `pnpm josh run:wake --stop` — the supervisor that continues the run
 across a cut. Both pairs are "The session cut is inside the invocation" above.
 
-**Record the invocation in the form the supervisor can rebuild: one space between tokens, and a plain
-integer for each budget value** — `backlogrun --max 3`, never `backlogrun  --max 03`. The supervisor
-refuses to wake on a record its own rebuild would rewrite: the first cut ends the run with a `warning`
-Telegram, so write the canonical form rather than the keystrokes.
+**`run:carry --begin` records the invocation in the form the supervisor rebuilds** — one space between
+tokens and a plain integer for each budget value, whatever was typed — so
+the record and the supervisor's rebuild agree.
 
 **`pnpm josh epic:audit` is not run.** There is no epic to audit — the run began from the backlog, the
 same reason this file skips it when it began from a bare Issue. `backlog:next` reuses `epic:next`'s

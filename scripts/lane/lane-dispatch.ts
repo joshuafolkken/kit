@@ -119,7 +119,7 @@ function child_invocation(issue: string): string {
  * `run:cut --resume` and the stage that answers.
  *
  * **It ends with `child_invocation` on purpose, not as decoration.** The parent's liveness poll is
- * `pgrep -laf "<child_invocation>$"` (built at dispatch — see `log_sentence`), so a relaunched process
+ * `lane_child_invocation.process_pattern` (read by `run:liveness` — see `log_sentence`), so a relaunched process
  * whose command line did not end with `fullrun #<N>` would be booked stopped while it ran. The trailing
  * invocation keeps that poll matching and is also the ordinary run a `fresh` verdict falls back to.
  */
@@ -375,25 +375,13 @@ async function dispatch_child(issue: string): Promise<DispatchOutcome> {
 // The child is running — saying otherwise would send the caller to dispatch a second one into the same
 // lane — but its output is going nowhere, so a message naming the path would point at a file that will
 // never grow, and a poll of that file would book a working child as stopped.
-// The liveness pattern the parent polls with — the shared one, which also finds a detached ship
-// supervisor (joshuafolkken/kit#2428). `describe` never throws, so an issue that is not a number falls
-// back to the launched invocation rather than raising from the validator.
-function poll_pattern(outcome: Dispatched, issue: string): string {
-	if (!run_issue_number.ISSUE_NUMBER_PATTERN.test(issue)) return `${outcome.invocation}$`
-
-	return lane_child_invocation.process_pattern(issue)
-}
-
 function log_sentence(outcome: Dispatched, issue: string): string {
-	// **The pattern matches the child's own command line, not the lane it runs in**
-	// (joshuafolkken/kit#1948). The child is `claude … ${outcome.invocation}` and its argv carries no
-	// path, so `pgrep -laf <lane directory>` found nothing for a living child and a poll booked it
-	// stopped. The invocation is the last argument, so it sits at the end of the command line; the `$`
-	// anchor is what keeps `fullrun #12` from matching a running `fullrun #123`. `run:liveness` takes
-	// `--process` as what the caller *saw*, never as a property of the child's kind — told to pass
-	// `alive`, a parent that never ran `pgrep` would answer `alive` for a child that crashed an hour ago
-	// and poll it for ever.
-	const poll = `run \`pgrep -laf "${poll_pattern(outcome, issue)}"\` and pass what it found to \`pnpm josh run:liveness ${issue} --output ${outcome.log_path} --process alive\` — or \`--process none\` where it found nothing`
+	// **`run:liveness` reads the child's process for itself** (joshuafolkken/kit#3400), with the shared
+	// pattern that matches the child's own command line and a detached ship supervisor
+	// (joshuafolkken/kit#1948, joshuafolkken/kit#2428). Until then the parent ran `pgrep` and passed
+	// `--process` by hand — and a parent told to pass `alive` without running it answered `alive` for a
+	// child that crashed an hour ago.
+	const poll = `run \`pnpm josh run:liveness ${issue} --output ${outcome.log_path}\` — it reads the child's process for itself`
 
 	if (outcome.notes.length > 0) {
 		return ` Its output is NOT being kept — ${outcome.notes.join(NOTE_SEPARATOR)} — so ${outcome.log_path} will not grow and the process trace is the only answer: ${poll}.`

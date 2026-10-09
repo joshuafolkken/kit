@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1034,
-		"code_lines": 86376,
-		"comment_lines": 34197,
+		"files": 1037,
+		"code_lines": 86597,
+		"comment_lines": 34237,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 535660
+		"on_demand_bytes": 535097
 	},
 	"accepted": {
-		"reason": "#3552 adds the attempt replay that keeps a ship attempt's started stages on run:board tracks when the event stream is saturated (run-board-phase, run-ship-stage, run-ship-cli); the gate duration rose machine-wide before this lane shipped (other lanes' solo gates at 57-68s since 13:28), not from this diff, which touches only scripts/run",
+		"reason": "observation:record and epic label-age commands replace hand procedures in the backlogrun documents, plus review-round fixes (#3400)",
 		"date": "2026-10-09"
 	}
 }

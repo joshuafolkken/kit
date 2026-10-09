@@ -61,17 +61,21 @@ here rather than in the ledger** (`docs/maintainers/observation-ledger-rationale
 ledger exists").
 
 **The identity key is the whole of the repeat test — never a similarity judgement about the prose.**
-Choose the key from the phenomenon rather than from the run, then count what the ledger already holds
-for it, in that repository's checkout rather than the working directory. **Every file of the
-directory is counted**, because a recurrence is a recurrence whichever issue's file each sighting
-sits in. **The `|| true` is not decoration**: `grep -c` exits non-zero on a count of zero, which is
-the first-sighting branch and the common one, so without it the step reads as a failed command
-wherever an exit status is being watched. **A missing directory is still a first sighting** — `cat`
-complains on standard error and the count is zero; the append below creates the directory.
+Choose the key from the phenomenon rather than from the run, then record the sighting with one
+command — it counts what the ledger already holds for the key, appends the line and prints the
+verdict:
 
 ```bash
-cat <that repository's checkout>/.josh/observations/*.md | grep -c '^- k:<slug> |' || true
+pnpm josh observation:record <slug> d<n> '<where>' '<what>' [--checkout <that repository's checkout>]
 ```
+
+Standard output is one token: `file` (this is the second sighting — file it, below) or `ledger` (the
+line is the record, nothing to file); standard error lists the earlier sightings and the file
+appended to. A line that breaks the grammar, or uses `k:example`, is refused with exit 1 and nothing
+appended. **Every
+file of the directory is counted**, in the named checkout rather than the working directory, because
+a recurrence is a recurrence whichever issue's file each sighting sits in; a missing directory is a
+first sighting, and the append creates it.
 
 Free-text comparison is what the key exists to replace, so two lines that read alike under different
 keys are two observations, and a mis-keyed entry is corrected by appending a correctly-keyed line
@@ -126,12 +130,13 @@ could not.
 judged (rationale: `docs/maintainers/observation-ledger-rationale.md` → "Why a second sighting
 files"):
 
-- **On the count answering exactly `1`, the observation is filed**, at depth 1 or deeper, with no
-  depth-0 citation — `1` and not "1 or more", because a higher count means the Issue was already
-  opened by the sighting that answered `1`. The ledger line is appended as well, because the ledger
-  stays append-only.
-- **The Issue quotes the ledger's own dates — the first sighting's and this one's** — so the reader
-  can check the promotion against the file instead of taking the run's word for it.
+- **On `observation:record` answering `file`, the observation is filed**, at depth 1 or deeper, with
+  no depth-0 citation. It answers `file` only when exactly one earlier sighting exists — a higher
+  count means the Issue was already opened by the sighting before. The line is appended either way,
+  because the ledger stays append-only.
+- **The Issue quotes the ledger's own dates — the first sighting's and this one's**, both on the
+  command's standard error — so the reader can check the promotion against the file instead of
+  taking the run's word for it.
 - **Both ceilings still apply**, exactly as `observation-filing.md` states them: the 10-per-run cap counts a promoted
   filing, and the WIP cap still bites, since a promoted observation blocks nothing and is therefore
   still discretionary.

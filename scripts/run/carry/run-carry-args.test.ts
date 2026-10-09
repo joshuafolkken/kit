@@ -92,6 +92,30 @@ describe('run_carry_args.to_request read and claim', () => {
 	})
 })
 
+describe('run_carry_args.to_request invocation spelling', () => {
+	const typed = 'backlogrun  #2989 --max 05'
+	const canonical = 'backlogrun #2989 --max 5'
+	const other_command = 'fullrun #2989'
+
+	it('stores a backlogrun invocation in its canonical spelling on --begin and --resume', () => {
+		expect(request_for(['--begin', typed])).toStrictEqual({
+			kind: 'claim',
+			claim: { invocation: canonical, owner: run_carry.NO_OWNER, is_adoption: false },
+		})
+		expect(request_for(['--resume', typed])).toStrictEqual({
+			kind: 'claim',
+			claim: { invocation: canonical, owner: run_carry.NO_OWNER, is_adoption: true },
+		})
+	})
+
+	it('keeps an invocation the backlogrun grammar does not read as typed', () => {
+		expect(request_for(['--begin', other_command])).toStrictEqual({
+			kind: 'claim',
+			claim: { invocation: other_command, owner: run_carry.NO_OWNER, is_adoption: false },
+		})
+	})
+})
+
 describe('run_carry_args.to_request end', () => {
 	it('ends with and without a stop reason', () => {
 		expect(request_for(['--end'])).toStrictEqual({ kind: 'end', stopped: undefined })

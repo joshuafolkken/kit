@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { lane_await } from '#scripts/lane/lane-await'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 import { run_issue_number } from './run-issue-number'
@@ -16,7 +17,7 @@ import {
 	type ProcessTrace,
 } from './run-liveness'
 
-// `josh run:liveness <N> --output <path> --process <alive|none>` — one verdict about the delegated
+// `josh run:liveness <N> --output <path> [--process <alive|none>]` — one verdict about the delegated
 // unit running child `<N>` (joshuafolkken/kit#1485).
 //
 // The stdout/stderr split is the contract, as it is for `run:hold`: exactly one
@@ -120,13 +121,25 @@ function to_optional_fields(values: ParsedValues): Partial<LivenessRequest> {
 	}
 }
 
+// Left out, the process trace is read here with the probe `lane:await` polls on — the child's
+// invocation or its detached ship — so no caller runs `pgrep` by hand (joshuafolkken/kit#3400); a
+// probe that could not look answers `unknown`, never `none`. A given `--process` still wins: it is
+// the answer for a unit this probe does not know, such as one whose checkout the caller scanned itself.
+function process_trace_of(values: ParsedValues, issue: string): ProcessTrace {
+	if (values.process !== undefined) return to_process_trace(values.process) ?? PROCESS_UNKNOWN
+
+	return lane_await.process_trace_default(issue)
+}
+
 // Reached only through `is_valid`, so the fallbacks below are unreachable defaults rather than
 // behavior: the alternative is a type assertion, which this codebase restricts.
 function to_request(parsed: ParsedArguments): LivenessRequest {
+	const issue = parsed.positionals[0] ?? ''
+
 	return {
-		issue: parsed.positionals[0] ?? '',
+		issue,
 		output_path: parsed.values.output ?? '',
-		process_trace: to_process_trace(parsed.values.process) ?? PROCESS_UNKNOWN,
+		process_trace: process_trace_of(parsed.values, issue),
 		...to_optional_fields(parsed.values),
 	}
 }

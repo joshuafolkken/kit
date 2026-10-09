@@ -27,7 +27,7 @@ const ISSUE_CITATION_BUDGET: ReadonlyArray<CitationBudget> = [
 	{ path: '.claude/skills/epic-commands/SKILL.md', citations: 22 },
 	{ path: '.claude/skills/verify-ui/SKILL.md', citations: 1 },
 	{ path: '.claude/skills/workflow-commands/background-commands.md', citations: 2 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-lanes.md', citations: 3 },
+	{ path: '.claude/skills/workflow-commands/backlogrun-lanes.md', citations: 2 },
 	{ path: '.claude/skills/workflow-commands/backlogrun-park.md', citations: 2 },
 	{ path: '.claude/skills/workflow-commands/backlogrun-progress.md', citations: 18 },
 	{ path: '.claude/skills/workflow-commands/backlogrun-recovery.md', citations: 1 },

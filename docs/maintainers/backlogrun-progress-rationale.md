@@ -85,9 +85,10 @@ owner into a fresh cold session — the churn the `MAX_CUTS` cap prevents (joshu
 
 **Why the resumed session restarts the watcher by name.** The cut session's watcher exited with it.
 
-**Why `--process` comes from `pgrep` on the command line.** The child's command line holds no path, so a
-`pgrep` on the lane's directory never matches a live child; the trace is the deciding input, because a
-log that has stopped moving is a session thinking rather than one that died.
+**Why `run:liveness` reads the process trace from the command line.** The child's command line holds no
+path, so a probe on the lane's directory never matches a live child; it matches `fullrun #<N>` and the
+detached ship instead (joshuafolkken/kit#3400). The trace is the deciding input, because a log that has
+stopped moving is a session thinking rather than one that died.
 
 **Why the resumed parent does not finish carried-over merges first.** Each carried-over child runs its
 own foreground `followup` in its own process, so finishing them one after another before a single new
