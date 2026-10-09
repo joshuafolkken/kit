@@ -7,15 +7,15 @@
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2344
+		"lines": 2325
 	},
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12281,
-		"on_demand_bytes": 561435
+		"on_demand_bytes": 561153
 	},
 	"accepted": {
-		"reason": "run-event-stream bound orders droppable lines so ship-stage starts and idle lines roll off last, keeping run:board post-ship phases (#3541)",
+		"reason": "review round 1 restored the '2. ...' Assumptions-audit sample line so the sample matches §8 'List 2–3'; net rules size still shrinks vs main (#3405)",
 		"date": "2026-10-09"
 	}
 }
