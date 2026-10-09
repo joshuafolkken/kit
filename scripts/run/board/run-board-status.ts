@@ -23,8 +23,8 @@ interface ItemStatus {
 	// The seat-free lane label (`lane <N>`) of a running child, when it holds one — the running test reads
 	// it; the board no longer draws it (joshuafolkken/kit#3444).
 	lane?: string | undefined
-	// The furthest phase a running child has reached (`run-board-phase.ts`).
-	phase?: Phase | undefined
+	// Every phase a running child has passed, in order (`run-board-phase.ts`).
+	track?: ReadonlyArray<Phase> | undefined
 }
 
 // The run as a whole, read off the same stream.
@@ -51,7 +51,7 @@ function moment(event: RunEvent): number {
 }
 
 function launched(event: RunEvent): ItemStatus {
-	return { state: 'running', started_ms: moment(event), phase: run_board_phase.LAUNCHED_PHASE }
+	return { state: 'running', started_ms: moment(event), track: [run_board_phase.LAUNCHED_PHASE] }
 }
 
 function ended(previous: ItemStatus | undefined, state: ItemState, event: RunEvent): ItemStatus {
@@ -59,7 +59,7 @@ function ended(previous: ItemStatus | undefined, state: ItemState, event: RunEve
 }
 
 function continued(previous: ItemStatus | undefined): ItemStatus {
-	return { state: 'running', started_ms: previous?.started_ms, phase: previous?.phase }
+	return { state: 'running', started_ms: previous?.started_ms, track: previous?.track }
 }
 
 // A phase moves only a running child, so a ship's `report` stage after its merge — or a `plan` event
@@ -69,7 +69,7 @@ function advanced(previous: ItemStatus | undefined, event: RunEvent): ItemStatus
 
 	if (phase === undefined || previous?.state !== 'running') return previous
 
-	return { ...previous, phase: run_board_phase.later_of(previous.phase, phase) }
+	return { ...previous, track: run_board_phase.history_after(previous.track ?? [], phase) }
 }
 
 // One event folded into the status of the child it names; an event the board does not track keeps it.

@@ -125,6 +125,14 @@ describe('run_board_labels.PHASE_ICONS', () => {
 		expect(words.every((word) => word.length > 0)).toBe(true)
 		expect(WORDS[PHASE_WORDS.investigate]).toBe('investigate')
 	})
+
+	// joshuafolkken/kit#3526: one legend names both, so a shared icon would explain one as the other.
+	it('shares no icon with a filed issue’s kind', () => {
+		const phases = new Set(Object.values(PHASE_ICONS))
+		const kinds: Array<string> = Object.values(run_board_labels.FILED_KIND_ICONS)
+
+		expect(kinds.filter((icon) => phases.has(icon))).toStrictEqual([])
+	})
 })
 
 describe('run_board_labels.spinner_of', () => {
