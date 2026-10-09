@@ -61,16 +61,14 @@ describe('run_board_render.render findings icons', () => {
 		}
 	})
 
-	it('names the findings icons in the legend only while a finding is on screen, in both languages', () => {
+	// joshuafolkken/kit#3480: in English whatever the session language.
+	it('names the findings icons in the legend only while a finding is on screen, in English', () => {
+		const legend = '📌 findings and decisions  🆕 filed  💬 note'
 		const english = header({ words: run_board_labels.words_of('en') })
 
-		expect(lines_of(header(), [filed]).at(-1)).toContain(
-			'🔚 終了  📌 気づき・判断待ち  🆕 起票  💬 意見',
-		)
-		expect(lines_of(english, [filed]).at(-1)).toContain(
-			'🔚 ended  📌 findings and decisions  🆕 filed  💬 note',
-		)
-		expect(lines_of(header()).at(-1)).not.toContain('📌')
+		expect(lines_of(header(), [filed]).at(-1)).toBe(legend)
+		expect(lines_of(english, [filed]).at(-1)).toBe(legend)
+		expect(lines_of(header()).join('\n')).not.toContain('📌')
 	})
 
 	it('keeps the heading and the kind words in a chat, which draws no legend', () => {

@@ -50,7 +50,7 @@ describe('run_board_render.render rows', () => {
 
 		expect(lines).toContain(row_line)
 		expect(row_line).not.toContain('█')
-		expect(lines.join('\n')).not.toContain('implement')
+		expect(lines.slice(0, -1).join('\n')).not.toContain('implement')
 		expect(lines.join('\n')).not.toContain('lane')
 	})
 
@@ -96,7 +96,7 @@ describe('run_board_render.render sections', () => {
 		const lines = lines_of(header({ layout }))
 		const wave_rule = rule('1')
 
-		expect(lines.slice(lines.indexOf(wave_rule), -2)).toStrictEqual([
+		expect(lines.slice(lines.indexOf(wave_rule), -3)).toStrictEqual([
 			wave_rule,
 			'  📁 10  Epic ten',
 			'     ├ ⏳ 11  Issue 11',
@@ -120,9 +120,55 @@ describe('run_board_render.render sections', () => {
 		const start = lines.indexOf(people_rule)
 
 		expect(lines.slice(start, start + 2)).toStrictEqual([people_rule, '  🙋 6  Issue 6'])
-		expect(lines.at(-1)).toBe(
-			'✅ マージ  💤 park  🔄 実行中  🛑 停止  ⏳ 待ち  🙋 判断待ち  🔗 待ち先  ⚡ cpu  🧠 mem  💾 swap  🔚 終了',
-		)
+		expect(lines.at(-1)).toBe('🙋 decision')
+	})
+})
+
+const PHASE_LEGEND =
+	'🚀 dispatched  🔍 investigate  📝 plan  🔨 implement  👀 review  🚦 gate  📦 commit  🔁 followup'
+
+function legend_of(rows: ReadonlyArray<BoardRow>): Array<string> {
+	const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: [...rows] } }))
+
+	return lines.slice(lines.lastIndexOf('') + 1)
+}
+
+// joshuafolkken/kit#3480: every phase on one line, the states the rows draw on a second, in English.
+describe('run_board_render.render legend', () => {
+	it('names every phase but merged in order on the first line, though no row draws a phase', () => {
+		expect(legend_of([row(1)])).toStrictEqual([PHASE_LEGEND, '⏳ waiting'])
+	})
+
+	it('names only the states the rows draw, in the legend’s order', () => {
+		const merged = row(1, { state: 'merged' })
+		const parked = row(2, { state: 'parked' })
+		const done = row(5, { state: 'done' })
+		const mixed = [row(3, { state: 'human' }), row(4, { state: 'stopped' }), done, parked, merged]
+
+		expect(legend_of([parked, merged]).at(-1)).toBe('✅ merged  💤 parked')
+		expect(legend_of(mixed).at(-1)).toBe('✅ merged  💤 parked  🏁 done  🛑 stopped  🙋 decision')
+	})
+
+	it('names 🔄 only while a row draws it, not for a row led by its phase', () => {
+		const dispatched = row(1, { state: 'running' })
+
+		expect(legend_of([running(2, NOW, 'review')])).toStrictEqual([PHASE_LEGEND])
+		expect(legend_of([dispatched]).at(-1)).toBe('🔄 running')
+	})
+
+	it('names 🔗 only while a row draws a wait', () => {
+		expect(legend_of([row(1), row(2, { waits: ['1'] })]).at(-1)).toBe('⏳ waiting  🔗 waits on')
+		expect(legend_of([row(1)]).at(-1)).not.toContain('🔗')
+	})
+
+	it('draws the phase line alone on a screen with no rows, and none of the header’s marks', () => {
+		const legend = legend_of([])
+
+		expect(legend).toStrictEqual([PHASE_LEGEND])
+
+		for (const icon of ['⚡', '🧠', '💾', '🔚']) {
+			expect(legend.join('\n')).not.toContain(icon)
+		}
 	})
 })
 
@@ -146,21 +192,6 @@ describe('run_board_render.render chat', () => {
 describe('run_board_render.render phase icons and spinner', () => {
 	afterEach(() => {
 		vi.unstubAllEnvs()
-	})
-
-	it('names in the legend only the phases a row on screen draws, in the phases’ order', () => {
-		const active = [running(1, NOW, 'implement'), running(2, NOW, 'investigate')]
-		const legend = lines_of(header({ layout: { ...EMPTY_LAYOUT, active } })).at(-1) ?? ''
-
-		expect(legend).toContain('🔗 待ち先  🔍 調査  📝 計画  🔨 実装  ⚡ cpu')
-		expect(legend).not.toContain('👀')
-	})
-
-	it('names no phase in the legend for a dispatched child, whose track draws no icon', () => {
-		const active = [running(1, NOW, 'dispatched')]
-		const legend = lines_of(header({ layout: { ...EMPTY_LAYOUT, active } })).at(-1) ?? ''
-
-		expect(legend).toContain('🔗 待ち先  ⚡ cpu')
 	})
 
 	// joshuafolkken/kit#3471: and the indent a running row turns its spinner in stays blank.
