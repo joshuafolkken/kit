@@ -1,3 +1,5 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
+
 // The review-finding line's grammar, its category vocabulary and the aggregation over it — the single
 // place all three are defined (joshuafolkken/kit#2325). A `/code-review` round's findings evaporated
 // the moment they were fixed, so no one could say which category recurred. They now land in the same
@@ -60,7 +62,7 @@ function is_valid_file(file: string): boolean {
 }
 
 function issue_field(issue: number): string {
-	return `#${String(issue)}`
+	return issue_cite.plain(issue)
 }
 
 function line_of(fields: ReadonlyArray<string>): string {

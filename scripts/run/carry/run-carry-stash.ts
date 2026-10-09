@@ -1,6 +1,7 @@
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { stash_orphans } from '#scripts/git/stash/stash-orphans'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
+import { session_cite } from '#scripts/issue/session-cite'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 
 // The stash check a `backlogrun` makes at its end (joshuafolkken/kit#2505): the entries whose issue has
@@ -47,7 +48,7 @@ async function read_closed(issues: ReadonlyArray<string>): Promise<ClosedRead> {
 // `read_issue` answers a failed `gh` call as `unreadable` rather than throwing, so a missing `gh` or a
 // rate limit would otherwise empty the closed set and print a report that looks complete.
 function unreadable_note(unreadable: ReadonlyArray<string>): string {
-	const issues = unreadable.map((issue) => `#${issue}`).join(', ')
+	const issues = unreadable.map((issue) => session_cite.issue(issue)).join(', ')
 
 	return `Could not read ${issues}, so a stash of theirs may be missing above; ${FAILURE_NOTE}`
 }

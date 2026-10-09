@@ -7,6 +7,7 @@ import { error_text } from '#scripts/lib/error-message'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { z } from 'zod'
 import { baseline_measure, type Baseline } from './baseline-measure'
+import { session_cite } from './session-cite'
 
 // `josh measure:rerun <N>` — read a behavior-change Issue body after merge, re-run each baseline
 // command, and print the before/after pair (joshuafolkken/kit#2212). A value that did not move means
@@ -94,7 +95,7 @@ async function read_trusted_body(issue_number: string): Promise<BodyRead> {
 	const issue = await read_issue(issue_number)
 
 	if (issue === undefined) {
-		return { kind: 'refused', reason: `could not read issue #${issue_number}` }
+		return { kind: 'refused', reason: `could not read issue ${session_cite.issue(issue_number)}` }
 	}
 
 	const association = issue.author_association ?? UNKNOWN_ASSOCIATION
@@ -102,7 +103,7 @@ async function read_trusted_body(issue_number: string): Promise<BodyRead> {
 	if (!TRUSTED_ASSOCIATIONS.has(association)) {
 		return {
 			kind: 'refused',
-			reason: `refusing to run the baseline of #${issue_number}: its author is ${association}, not ${TRUSTED_LIST}`,
+			reason: `refusing to run the baseline of ${session_cite.issue(issue_number)}: its author is ${association}, not ${TRUSTED_LIST}`,
 		}
 	}
 

@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { issue_cite } from '#scripts/issue/issue-cite'
+import { session_cite } from '#scripts/issue/session-cite'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
@@ -311,7 +313,10 @@ function launch(request: DetachRequest): DetachResult {
 
 async function detach(request: DetachRequest): Promise<DetachResult> {
 	if (read_result(request.repository, request.number)?.result === 'running') {
-		return { verdict: BUSY, note: `a ship supervisor for #${request.number} is already running` }
+		return {
+			verdict: BUSY,
+			note: `a ship supervisor for ${session_cite.issue(request.number)} is already running`,
+		}
 	}
 
 	const result = launch(request)
@@ -319,7 +324,7 @@ async function detach(request: DetachRequest): Promise<DetachResult> {
 	if (result.verdict === LAUNCHED) {
 		await run_event_stream_emit.emit(
 			run_event_stream.EVENT_KIND.SHIP_LAUNCH,
-			`#${request.number} ship supervisor launched`,
+			`${issue_cite.plain(request.number)} ship supervisor launched`,
 		)
 	}
 

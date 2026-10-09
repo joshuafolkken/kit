@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
+import { issue_cite } from '#scripts/issue/issue-cite'
+import { session_cite } from '#scripts/issue/session-cite'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import type { PollOptions } from '#scripts/lib/poll'
 import { issue_citation } from '#scripts/rules/issue-citation'
@@ -19,7 +21,7 @@ import { epic_bundle_poll } from './epic-bundle-poll'
 import { epic_bundle_referenced, type ReferencedContext } from './epic-bundle-referenced'
 import { epic_index, epic_schema, type FetchedEpics } from './epic-index'
 import { epic_issue } from './epic-issue'
-import type { IssueReference } from './epic-reference'
+import { format_dependency_links, type IssueReference } from './epic-reference'
 
 // `josh epic:bundle <N>` — after an issue is filed, look at the open backlog and say whether it
 // belongs with something already there (joshuafolkken/kit#873).
@@ -229,16 +231,15 @@ async function fetch_epics(): Promise<FetchedEpics | undefined> {
 }
 
 function format_numbers(numbers: ReadonlyArray<number>): string {
-	return numbers.map((issue_number) => `#${String(issue_number)}`).join(', ')
+	return numbers.map((issue_number) => issue_cite.plain(issue_number)).join(', ')
 }
 
 // The order to record alongside the bundle. Bundling without it records the batch and loses the
 // reason it is a batch, so the recommendation carries it rather than leaving it to be remembered.
 function format_links(links: ReadonlyArray<{ blocker: number; blocked: number }>): string {
 	if (links.length === 0) return '  Order: none declared — do not invent one'
-	const arrows = links.map((link) => `#${String(link.blocker)} -> #${String(link.blocked)}`)
 
-	return `  Order: ${arrows.join(', ')}`
+	return `  Order: ${format_dependency_links(links)}`
 }
 
 function format_order(
@@ -360,7 +361,9 @@ function warn_cutoff(message: string | undefined): void {
 // wording of each gap is `epic-bundle-gaps.ts`'s; what stays here is which gaps this command has.
 function warn_about_gaps(backlog: FetchedBacklog): void {
 	if (backlog.unreadable.length > 0) {
-		console.error(`⚠ Could not read ${format_numbers(backlog.unreadable)}.`)
+		const unreadable = backlog.unreadable.map((issue_number) => session_cite.issue(issue_number))
+
+		console.error(`⚠ Could not read ${unreadable.join(', ')}.`)
 	}
 
 	warn_cutoff(epic_bundle_gaps.backlog_gap(backlog.cutoff ?? NO_CUTOFF, BACKLOG_LIMIT))
@@ -417,7 +420,9 @@ async function report_for(
 	const subject = backlog.issues.find((issue) => issue.number === issue_number)
 
 	if (subject === undefined) {
-		console.error(`#${String(issue_number)} is not an open issue in ${repo}.`)
+		console.error(
+			`${session_cite.issue(issue_number, undefined, repo)} is not an open issue in ${repo}.`,
+		)
 
 		return FAILURE_EXIT_CODE
 	}

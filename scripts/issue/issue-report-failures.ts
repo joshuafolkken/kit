@@ -1,4 +1,5 @@
 import { capped_output } from '#scripts/document/capped-print'
+import { session_cite } from './session-cite'
 
 // The failure report `issue:read` and `issue:state` share (joshuafolkken/kit#3046). Both read a batch
 // of numbers, print a block for each one that answered, and name every one that did not; only the
@@ -37,10 +38,12 @@ function print_blocks(blocks: ReadonlyArray<string>, separator: string, label: s
 // caller's next move differs: a gap is retried, an answer is not.
 function report_failure(kind: ReadFailureKind, issue_number: string, misreading: string): void {
 	if (kind === 'missing') {
-		console.error(`✖ issue #${issue_number} does not resolve — check the number and the repository`)
+		console.error(
+			`✖ issue ${session_cite.issue(issue_number)} does not resolve — check the number and the repository`,
+		)
 	} else {
 		console.error(
-			`✖ could not read issue #${issue_number} — a rate limit, expired auth, or a dropped connection. This is not "${misreading}"`,
+			`✖ could not read issue ${session_cite.issue(issue_number)} — a rate limit, expired auth, or a dropped connection. This is not "${misreading}"`,
 		)
 	}
 }

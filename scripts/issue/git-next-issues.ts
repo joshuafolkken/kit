@@ -3,6 +3,7 @@ import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { parse_json_array_safe } from '#scripts/git/parse-json-array'
 import { has_any_label, NOT_DIRECTLY_RUNNABLE_LABELS } from './issue-labels'
 import { issue_rank, type DependencyRow } from './issue-rank'
+import { session_cite } from './session-cite'
 
 // The next-issues display printed when a workflow completes (#821): up to five open issues in
 // priority order, so the user picks the next run from the completion output instead of opening the
@@ -87,7 +88,7 @@ function prioritize(
 function format_lines(issues: ReadonlyArray<OpenIssueData>): Array<string> {
 	if (issues.length === 0) return []
 	const rows = issues.map(
-		(issue, index) => `  ${String(index + 1)}. #${String(issue.number)} ${issue.title}`,
+		(issue, index) => `  ${String(index + 1)}. ${session_cite.issue(issue.number, issue.title)}`,
 	)
 
 	return [HEADER, ...rows]

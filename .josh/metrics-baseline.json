@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1008,
-		"code_lines": 83516,
-		"comment_lines": 33545,
+		"files": 1009,
+		"code_lines": 83718,
+		"comment_lines": 33576,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 12231,
-		"on_demand_bytes": 558915
+		"on_demand_bytes": 559397
 	},
 	"accepted": {
-		"reason": "run:board legend split into a fixed phase line and an on-screen state line needs an explicit state/word table (#3480); merged with epic:bundle/issue:scout prose_lines reuse (#3425): one import line",
+		"reason": "josh output prints session-facing Issue references in the issue:cite form through a single session_cite module routed from every call site, plus its scan test, rationale section and round-1 review fixes (#3424)",
 		"date": "2026-10-09"
 	}
 }

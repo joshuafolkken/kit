@@ -1,6 +1,8 @@
 import { pr_classification, type ReleaseClassification } from '#scripts/ci/pr-classification'
 import type { IssueInfo } from '#scripts/git/git-issue'
 import { pr_info_schema } from '#scripts/git/git-schemas'
+import { issue_cite } from '#scripts/issue/issue-cite'
+import { session_cite } from '#scripts/issue/session-cite'
 import { animation_helpers, type AnimationOptions } from '#scripts/lib/animation-helpers'
 import { git_gh_command } from './git-gh-command'
 import { git_pr_error } from './git-pr-error'
@@ -164,11 +166,11 @@ async function create(
 }
 
 function build_title(issue_info: IssueInfo): string {
-	return `${issue_info.title} #${issue_info.number}`
+	return `${issue_info.title} ${issue_cite.plain(issue_info.number)}`
 }
 
 function build_body(issue_info: IssueInfo, extra_body?: string): string {
-	const closes = `closes #${issue_info.number}`
+	const closes = `closes ${issue_cite.plain(issue_info.number)}`
 
 	if (extra_body === undefined) return closes
 
@@ -211,7 +213,9 @@ async function release_classification(
 	const issue_json = await git_gh_command.issue_view_json(issue_number, 'labels,body')
 
 	if (issue_json === undefined) {
-		throw new Error(`Could not read issue #${issue_number} for release classification`)
+		throw new Error(
+			`Could not read issue ${session_cite.issue(issue_number)} for release classification`,
+		)
 	}
 
 	return pr_classification.select_issue_classification(issue_json)

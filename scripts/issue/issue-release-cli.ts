@@ -10,6 +10,7 @@ import { error_text } from '#scripts/lib/error-message'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { RELEASE_LABEL } from './issue-labels'
 import { issue_release } from './issue-release'
+import { session_cite } from './session-cite'
 
 // `josh issue:release <N>` — link Issue `<N>` to its repository's release Issue as a `blocked_by`
 // blocker, filing the release Issue when none is open (joshuafolkken/kit#3360). `josh issue:file
@@ -90,10 +91,17 @@ async function release_of(target: string): Promise<ReleaseIssue | undefined> {
 	return filed === undefined ? undefined : { issue_number: filed, is_filed: true }
 }
 
-function linked_line(release: ReleaseIssue, issue_number: number): string {
+function linked_line(release: ReleaseIssue, issue_number: number, target: string): string {
 	const how = release.is_filed ? 'filed' : 'open'
+	const release_cite = session_cite.issue(release.issue_number, undefined, target)
 
-	return `release: #${String(release.issue_number)} (${how}) is blocked by #${String(issue_number)}`
+	return `release: ${release_cite} (${how}) is blocked by ${session_cite.issue(issue_number, undefined, target)}`
+}
+
+function unlinked_line(issue_number: number, blocked: string, target: string): string {
+	const blocker = session_cite.issue(issue_number, undefined, target)
+
+	return `✖ ${blocker} could not be recorded as a blocker of ${session_cite.issue(blocked, undefined, target)}`
 }
 
 // Whether Issue `issue_number` of `target` now blocks the release Issue. Every outcome is printed.
@@ -104,8 +112,8 @@ async function link(issue_number: number, target: string): Promise<boolean> {
 	const blocked = String(release.issue_number)
 	const is_linked = await git_gh_issue_write.issue_add_blocked_by(blocked, String(issue_number))
 
-	if (is_linked) console.info(linked_line(release, issue_number))
-	else console.error(`✖ #${String(issue_number)} could not be recorded as a blocker of #${blocked}`)
+	if (is_linked) console.info(linked_line(release, issue_number, target))
+	else console.error(unlinked_line(issue_number, blocked, target))
 
 	return is_linked
 }

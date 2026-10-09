@@ -1,5 +1,6 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { EPIC_LABEL } from '#scripts/issue/issue-labels'
+import { session_cite } from '#scripts/issue/session-cite'
 import { epic_body } from './epic-body'
 import { epic_promote } from './epic-promote'
 import { epic_relations } from './epic-relations'
@@ -128,7 +129,7 @@ async function read_promotion_subject(epic_number: number): Promise<EpicSubject 
 	)
 
 	if (subject === undefined) {
-		console.error(`✖ Could not read issue #${String(epic_number)}.`)
+		console.error(`✖ Could not read issue ${session_cite.issue(epic_number)}.`)
 
 		return undefined
 	}
@@ -136,7 +137,7 @@ async function read_promotion_subject(epic_number: number): Promise<EpicSubject 
 	if (epic_promote.has_conflicting_tracking(subject.body)) {
 		const reason = epic_promote.conflict_reason(subject.body)
 
-		console.error(`✖ Cannot promote #${String(epic_number)}: ${reason}.`)
+		console.error(`✖ Cannot promote ${session_cite.issue(epic_number)}: ${reason}.`)
 
 		return undefined
 	}
@@ -168,7 +169,7 @@ async function write_promotion(
 	}
 
 	console.error(
-		`✖ Wrote the epic sections to #${String(input.epic_number)} but could not apply the \`${EPIC_LABEL}\` label; apply it by hand.`,
+		`✖ Wrote the epic sections to ${session_cite.issue(input.epic_number)} but could not apply the \`${EPIC_LABEL}\` label; apply it by hand.`,
 	)
 
 	return FAILURE_EXIT_CODE
@@ -188,7 +189,7 @@ async function promote_epic(input: PromoteEpicInput): Promise<number> {
 	const written = await write_promotion(input, subject.body)
 	if (written !== SUCCESS_EXIT_CODE) return written
 
-	console.info(`📋 Promoted #${String(input.epic_number)} to an epic.`)
+	console.info(`📋 Promoted ${session_cite.issue(input.epic_number)} to an epic.`)
 	await apply_dependencies({ children: input.children, is_ordered: input.is_ordered })
 	console.info(`▶ Run the children with: ${epic_body.format_run_command(input.epic_number)}`)
 
@@ -200,7 +201,7 @@ async function check_epic(epic_number: number): Promise<number> {
 	const subject = epic_validate.parse_epic_subject(raw)
 
 	if (subject === undefined) {
-		console.error(`✖ Could not read issue #${String(epic_number)}.`)
+		console.error(`✖ Could not read issue ${session_cite.issue(epic_number)}.`)
 
 		return FAILURE_EXIT_CODE
 	}

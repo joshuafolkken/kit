@@ -1,4 +1,5 @@
 import { git_command } from '#scripts/git/git-command'
+import { session_cite } from '#scripts/issue/session-cite'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -254,7 +255,8 @@ function release_hold(target: string): void {
 // nothing. Age or an ended session is what expires a record; `pnpm josh run:release --force` is what
 // clears somebody else's early, and `pnpm josh run:release <N>` what the run that wrote it types.
 function describe_holder(hold: RunHold): string {
-	const holder = hold.issue === UNNUMBERED_ISSUE ? 'an unnumbered run' : `#${hold.issue}`
+	const holder =
+		hold.issue === UNNUMBERED_ISSUE ? 'an unnumbered run' : session_cite.issue(hold.issue)
 
 	return `${holder}, recorded ${hold.taken_at} (pid ${String(hold.owner_pid ?? hold.pid)})`
 }

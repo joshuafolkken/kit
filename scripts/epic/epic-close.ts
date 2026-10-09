@@ -6,6 +6,7 @@ import {
 	parse_json_object_safe,
 } from '#scripts/git/parse-json-array'
 import { EPIC_LABEL } from '#scripts/issue/issue-labels'
+import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
 import { epic_close_comment } from './epic-close-comment'
 import { epic_parse, type ExternalChild } from './epic-parse'
@@ -147,7 +148,7 @@ function warn_when_order_unrecorded(epic: EpicIssue, states: ReadonlyArray<Sibli
 	}
 
 	console.info(
-		`ℹ️  Epic #${String(epic.number)} has no blocked-by relation on any child; ` +
+		`ℹ️  Epic ${session_cite.issue(epic.number)} has no blocked-by relation on any child; ` +
 			'the batch order was never recorded natively (see the epic creation procedure).',
 	)
 }
@@ -193,8 +194,8 @@ async function close_epic_with(epic_number: string, comment: string | undefined)
 
 	console.info(
 		is_closed
-			? `🏁 Closed epic #${epic_number} — every child issue is complete.`
-			: `⚠️  Could not close epic #${epic_number}; ${CLOSE_MANUALLY}`,
+			? `🏁 Closed epic ${session_cite.issue(epic_number)} — every child issue is complete.`
+			: `⚠️  Could not close epic ${session_cite.issue(epic_number)}; ${CLOSE_MANUALLY}`,
 	)
 
 	return is_closed
@@ -205,8 +206,9 @@ async function close_epic_with(epic_number: string, comment: string | undefined)
 async function close_epic(epic: EpicIssue): Promise<boolean> {
 	const epic_number = String(epic.number)
 	const state = await epic_close_comment.read_close_comment_state(epic_number, epic)
+	const note = `ℹ️  Epic ${session_cite.issue(epic_number)}${UNREADABLE_COMMENTS_NOTE}`
 
-	if (state === 'unreadable') console.info(`ℹ️  Epic #${epic_number}${UNREADABLE_COMMENTS_NOTE}`)
+	if (state === 'unreadable') console.info(note)
 
 	const comment = state === 'present' ? undefined : epic_close_comment.build_close_comment(epic)
 
@@ -237,7 +239,7 @@ async function close_epic_when_complete(epic: EpicIssue, merged_number: number):
 
 	if (!external.is_complete) {
 		console.info(
-			`ℹ️  Epic #${String(epic.number)} has a child in another repository whose state could not be read; ${CLOSE_MANUALLY}`,
+			`ℹ️  Epic ${session_cite.issue(epic.number)} has a child in another repository whose state could not be read; ${CLOSE_MANUALLY}`,
 		)
 
 		return false
@@ -262,7 +264,7 @@ async function close_epic_isolated(epic: EpicIssue, merged_number: number): Prom
 	} catch (error) {
 		const message = error_text.message_of(error)
 
-		console.info(`⚠️  Skipped epic #${String(epic.number)}: ${message}`)
+		console.info(`⚠️  Skipped epic ${session_cite.issue(epic.number)}: ${message}`)
 
 		return false
 	}

@@ -1,6 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { OpenPull } from '#scripts/gh/git-gh-pr-auto-merge'
 import { git_pr_checks } from '#scripts/gh/git-pr-checks'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { error_text } from '#scripts/lib/error-message'
 
 // **A flush pull request lands whether or not the flush that opened it is still alive**
@@ -49,7 +50,7 @@ async function wait_for_landing(branch_name: string, is_auto_merge: boolean): Pr
 }
 
 function describe_pull(pull: OpenPull): string {
-	return `#${String(pull.number)} (\`${pull.head_ref}\`)`
+	return `${issue_cite.plain(pull.number)} (\`${pull.head_ref}\`)`
 }
 
 // **Landing means GitHub will merge it with nobody watching**: auto-merge is on and the merge gate has

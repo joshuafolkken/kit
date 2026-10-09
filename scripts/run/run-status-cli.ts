@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
+import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { run_status, type StatusParts } from './run-status'
@@ -88,7 +89,7 @@ async function gather(request: StatusRequest): Promise<StatusReads> {
 // One note for a read that produced nothing, naming which of the two it was — the same distinction
 // `issue:state` keeps, so a bundled failure still tells a retry from an answer.
 function failure_note(issue_number: string, kind: string): string {
-	return `(issue #${issue_number} not bundled: ${kind})`
+	return `(issue ${session_cite.issue(issue_number)} not bundled: ${kind})`
 }
 
 function carry_summary(carry: CarryRead): string {
@@ -145,8 +146,9 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	}
 
 	const reads = await gather(request)
+	const report = run_status.format_report(to_parts(request.issue_number, reads))
 
-	console.info(run_status.format_report(to_parts(request.issue_number, reads)))
+	console.info(session_cite.text(report))
 
 	return exit_code(reads)
 }

@@ -1,6 +1,7 @@
 import type { BusyRead } from '#scripts/epic/epic-busy'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { SoloSelection } from '#scripts/epic/epic-solo'
+import { session_cite } from '#scripts/issue/session-cite'
 
 // Which candidates may not run side by side because both restructure the same file
 // (joshuafolkken/kit#3221). The condition is deliberately narrow: plain overlap is not serialized,
@@ -91,7 +92,9 @@ function paths_of(child: EpicChild, declared: Declared, repo: string): ReadonlyS
 }
 
 function clash_note(child: EpicChild, path: string, holder: number): string {
-	return `#${String(child.number)} waits: it and #${String(holder)} both restructure \`${path}\`.`
+	const waiting = session_cite.issue(child.number, undefined, child.repo)
+
+	return `${waiting} waits: it and ${session_cite.issue(holder, undefined, child.repo)} both restructure \`${path}\`.`
 }
 
 interface Walk {

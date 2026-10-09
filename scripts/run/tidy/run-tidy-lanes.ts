@@ -1,5 +1,6 @@
 import { git_spawn } from '#scripts/git/git-spawn'
 import { git_stash } from '#scripts/git/stash/git-stash'
+import { session_cite } from '#scripts/issue/session-cite'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { error_text } from '#scripts/lib/error-message'
@@ -97,7 +98,7 @@ async function tidy_lane(
 	if (in_flight.has(lane.issue)) return undefined
 	if (lane.is_stranded || !(await is_merged(lane.issue))) return undefined
 
-	return { target: `lane #${lane.issue}`, verdict: await settle(lane) }
+	return { target: `lane ${session_cite.issue(lane.issue)}`, verdict: await settle(lane) }
 }
 
 // One lane at a time: a close removes a work tree and prunes the worktree list the next read uses.

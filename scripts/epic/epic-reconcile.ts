@@ -1,4 +1,5 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { session_cite } from '#scripts/issue/session-cite'
 import { epic_add_body } from './epic-add-body'
 import { epic_chains } from './epic-chains'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
@@ -161,7 +162,7 @@ function build_reconcile_plan(input: ReconcilePlanInput): ReconcilePlan {
 // refused the mismatched epic agree on its order.
 function report_agreement(epic_number: number): void {
 	console.info(
-		`${RECONCILED} #${String(epic_number)} — epic:audit and backlog:next now agree on this epic's order.`,
+		`${RECONCILED} ${session_cite.issue(epic_number)} — epic:audit and backlog:next now agree on this epic's order.`,
 	)
 }
 
@@ -169,7 +170,9 @@ function report_declared(epic_number: number, declare: ReadonlyArray<DependencyL
 	if (declare.length === 0) return
 
 	console.info(
-		`📋 Declared ${format_dependency_links(declare)} in epic #${String(epic_number)} to match the recorded relations.`,
+		session_cite.text(
+			`📋 Declared ${format_dependency_links(declare)} in epic ${session_cite.issue(epic_number)} to match the recorded relations.`,
+		),
 	)
 }
 

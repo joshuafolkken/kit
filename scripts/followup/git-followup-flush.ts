@@ -1,5 +1,6 @@
 import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { observation_ledger_prepare } from '#scripts/observations/observation-ledger-prepare'
 import { observations_flush } from '#scripts/observations/observations-flush'
@@ -20,7 +21,7 @@ const COMMIT_MESSAGE_PREFIX = 'Record observation ledger entries'
 function commit_message(issue_number: string | undefined): string {
 	return issue_number === undefined
 		? COMMIT_MESSAGE_PREFIX
-		: `${COMMIT_MESSAGE_PREFIX} #${issue_number}`
+		: `${COMMIT_MESSAGE_PREFIX} ${issue_cite.plain(issue_number)}`
 }
 
 // **A broken line refuses the merge rather than riding it** (joshuafolkken/kit#2123): the branch's

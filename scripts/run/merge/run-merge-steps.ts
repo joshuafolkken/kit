@@ -4,6 +4,7 @@ import { git_followup_issue_close } from '#scripts/followup/git-followup-issue-c
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_reap } from '#scripts/lane/lane-reap'
@@ -191,7 +192,9 @@ async function preserve_uncommitted(child: string): Promise<boolean> {
 
 		return true
 	} catch {
-		console.error(`#${child}: uncommitted work could not be stashed — lane left at ${directory}`)
+		console.error(
+			`${session_cite.issue(child)}: uncommitted work could not be stashed — lane left at ${directory}`,
+		)
 
 		return false
 	}
@@ -239,7 +242,9 @@ async function close_merged_open(ctx: MergeContext): Promise<void> {
 			SINGLE_READ,
 		)
 	} catch {
-		console.error(`#${ctx.child}: could not be closed — ${git_followup_issue_close.CLOSE_RECOVERY}`)
+		console.error(
+			`${session_cite.issue(ctx.child)}: could not be closed — ${git_followup_issue_close.CLOSE_RECOVERY}`,
+		)
 	}
 }
 

@@ -16,6 +16,7 @@
 // **Everything it touches is a port**, the pattern `run-wake-loop.ts` set, so the sequencing is pinned
 // without a process, a network or a clock.
 
+import { issue_cite } from '#scripts/issue/issue-cite'
 import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 
@@ -160,7 +161,7 @@ function merge_stopped(issue: string, state: DriveState): DriveState {
 	return {
 		...state,
 		is_stopping: true,
-		stop_reason: `run:merge #${issue} answered stop`,
+		stop_reason: `run:merge ${issue_cite.plain(issue)} answered stop`,
 		stopped_by: issue,
 	}
 }

@@ -1,5 +1,6 @@
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { session_cite } from '#scripts/issue/session-cite'
 import { epic_add_plan, type AddPlan } from './epic-add-plan'
 import type { InsertPosition } from './epic-chains'
 import { epic_decision } from './epic-decision'
@@ -45,7 +46,7 @@ function is_closed_epic(state: string | undefined): boolean {
 }
 
 function closed_epic_error(epic_number: number): string {
-	return `Epic #${String(epic_number)} is closed — a completed epic takes no new children. Reopen it if it is not actually done, or run \`pnpm josh epic:bundle <child>\` to place the child in an open epic instead.`
+	return `Epic ${session_cite.issue(epic_number)} is closed — a completed epic takes no new children. Reopen it if it is not actually done, or run \`pnpm josh epic:bundle <child>\` to place the child in an open epic instead.`
 }
 
 interface AddChildrenInput {
@@ -105,7 +106,9 @@ function report_contradiction(plan: AddPlan): void {
 	if (plan.contradicted.length === 0) return
 
 	console.info(
-		`⚠️ ${format_issue_references(plan.contradicted)} is still held by a declared order, so \`epic:next\` will not offer it any earlier until that order is changed — \`--remove\` deletes one.`,
+		session_cite.text(
+			`⚠️ ${format_issue_references(plan.contradicted)} is still held by a declared order, so \`epic:next\` will not offer it any earlier until that order is changed — \`--remove\` deletes one.`,
+		),
 	)
 }
 
@@ -122,7 +125,9 @@ function report_order(input: AddChildrenInput, plan: AddPlan): void {
 	const target = to_issue_reference(position.target)
 
 	console.info(
-		`📋 Placed ${placed} ${position.kind} ${target} in epic #${String(input.epic_number)} — order only, no dependency written.`,
+		session_cite.text(
+			`📋 Placed ${placed} ${position.kind} ${target} in epic ${session_cite.issue(input.epic_number)} — order only, no dependency written.`,
+		),
 	)
 	report_contradiction(plan)
 }
@@ -134,14 +139,18 @@ function report_placements(input: AddChildrenInput, plan: AddPlan): void {
 		return
 	}
 
-	const epic = `epic #${String(input.epic_number)}`
+	const epic = `epic ${session_cite.issue(input.epic_number)}`
 
 	if (plan.additions.length > 0) {
-		console.info(`📋 Added ${format_issue_references(plan.additions)} to ${epic}.`)
+		console.info(
+			session_cite.text(`📋 Added ${format_issue_references(plan.additions)} to ${epic}.`),
+		)
 	}
 
 	if (plan.relocations.length > 0) {
-		console.info(`📋 Moved ${format_issue_references(plan.relocations)} within ${epic}.`)
+		console.info(
+			session_cite.text(`📋 Moved ${format_issue_references(plan.relocations)} within ${epic}.`),
+		)
 	}
 }
 

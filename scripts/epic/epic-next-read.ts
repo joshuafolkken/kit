@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { epic_cross_repo } from './epic-cross-repo'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
 import { epic_graph } from './epic-graph'
@@ -46,7 +47,7 @@ function epic_repo_of(reference: EpicReference, current_repo: string): string | 
 }
 
 function childless(reference: EpicReference): string {
-	return `#${String(reference.number)} tracks no children in a task list.`
+	return `${session_cite.issue(reference.number, undefined, reference.repo)} tracks no children in a task list.`
 }
 
 // The same epic named twice is one epic. Removed here rather than left to

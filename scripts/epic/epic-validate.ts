@@ -1,6 +1,7 @@
 import { epic_subject_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
 import { EPIC_LABEL, has_label_name } from '#scripts/issue/issue-labels'
+import { session_cite } from '#scripts/issue/session-cite'
 import { epic_parse, type DeclarationState } from './epic-parse'
 
 // The four requirements an epic has to satisfy are otherwise enforced only by an agent reading the
@@ -61,7 +62,7 @@ function check_label(subject: EpicSubject): CheckResult {
 }
 
 function format_children(children: ReadonlyArray<number>): string {
-	return children.map((child) => `#${String(child)}`).join(', ')
+	return children.map((child) => session_cite.issue(child)).join(', ')
 }
 
 function check_task_list(subject: EpicSubject): CheckResult {
@@ -138,8 +139,8 @@ function format_check_line(result: CheckResult): string {
 function format_check_report(epic_number: number, results: ReadonlyArray<CheckResult>): string {
 	const lines = results.map((result) => format_check_line(result))
 	const summary = is_epic_valid(results)
-		? `✅ Epic #${String(epic_number)} satisfies every requirement.`
-		: `❌ Epic #${String(epic_number)} does not satisfy every requirement.`
+		? `✅ Epic ${session_cite.issue(epic_number)} satisfies every requirement.`
+		: `❌ Epic ${session_cite.issue(epic_number)} does not satisfy every requirement.`
 
 	return [...lines, '', summary].join('\n')
 }

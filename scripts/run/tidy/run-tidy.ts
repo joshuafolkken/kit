@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { observation_ledger_line } from '#scripts/observations/observation-ledger-line'
 
 // The decisions behind `josh run:tidy` (joshuafolkken/kit#2701), kept apart from the git and GitHub
@@ -52,7 +53,7 @@ function lane_verdict(facts: LaneFacts): Verdict | undefined {
 }
 
 function unmerged_reason(unmerged: ReadonlyArray<string>): string {
-	const named = unmerged.map((issue) => `#${issue}`).join(', ')
+	const named = unmerged.map((issue) => session_cite.issue(issue)).join(', ')
 
 	return `${named} not merged`
 }

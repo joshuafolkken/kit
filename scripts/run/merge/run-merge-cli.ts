@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { api_outage } from '#scripts/agent/api-outage'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_closing_pr } from '#scripts/issue/issue-closing-pr'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
@@ -235,7 +236,10 @@ async function record_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
 
 	if (refused !== undefined) return refused
 
-	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.MERGE, `#${ctx.child} merged`)
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.MERGE,
+		`${issue_cite.plain(ctx.child)} merged`,
+	)
 	await lane_ledger.record_merge(Number(ctx.child))
 
 	return undefined
@@ -266,7 +270,7 @@ async function on_failed(ctx: MergeContext, cause?: string): Promise<MergeVerdic
 
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.PARK,
-		`#${ctx.child} parked (needs-decision)`,
+		`${issue_cite.plain(ctx.child)} parked (needs-decision)`,
 	)
 
 	if (result.carry !== undefined && run_merge.is_guard_tripped(result.carry.failures)) {
@@ -286,7 +290,7 @@ async function on_outage(ctx: MergeContext): Promise<MergeVerdict> {
 
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.OUTAGE,
-		`#${ctx.child} outage (re-dispatchable)`,
+		`${issue_cite.plain(ctx.child)} outage (re-dispatchable)`,
 	)
 
 	if (result.carry !== undefined && run_merge.is_outage_guard_tripped(result.carry.outages)) {
@@ -312,7 +316,7 @@ async function on_cut(ctx: MergeContext): Promise<MergeVerdict> {
 
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.CHILD_LAUNCH,
-		`#${ctx.child} resumed from its cut`,
+		`${issue_cite.plain(ctx.child)} resumed from its cut`,
 	)
 
 	return emit(RESUMED_TOKEN, SUCCESS_EXIT_CODE)
@@ -324,7 +328,10 @@ async function on_cut(ctx: MergeContext): Promise<MergeVerdict> {
 // person later lifted, and a `run:solo` child then held the whole backlog (joshuafolkken/kit#3017).
 async function on_parked(ctx: MergeContext): Promise<MergeVerdict> {
 	await run_merge_steps.remove_in_progress(ctx.child)
-	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.PARK, `#${ctx.child} parked`)
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.PARK,
+		`${issue_cite.plain(ctx.child)} parked`,
+	)
 
 	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
 }
@@ -333,7 +340,10 @@ async function on_parked(ctx: MergeContext): Promise<MergeVerdict> {
 // epic does not keep a seat the next child needs (joshuafolkken/kit#3334).
 async function on_skipped(ctx: MergeContext): Promise<MergeVerdict> {
 	await run_merge_steps.close_split_lane(ctx.child)
-	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.SPLIT, `#${ctx.child} split`)
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.SPLIT,
+		`${issue_cite.plain(ctx.child)} split`,
+	)
 
 	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
 }

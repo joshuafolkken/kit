@@ -1,5 +1,6 @@
 import { issue_merged } from '#scripts/issue/issue-merged'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
+import { session_cite } from '#scripts/issue/session-cite'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
@@ -130,6 +131,8 @@ describe('run_merge_collect.collect_merged — what it leaves alone', () => {
 		vi.mocked(run_merge_cli.record_merged).mockRejectedValueOnce(new Error('main:sync failed'))
 
 		expect(await collected()).toHaveLength(2)
-		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('lane #1 was not collected'))
+		expect(console.error).toHaveBeenCalledWith(
+			expect.stringContaining(`lane ${session_cite.issue(1)} was not collected`),
+		)
 	})
 })

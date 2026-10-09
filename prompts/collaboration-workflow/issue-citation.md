@@ -13,7 +13,7 @@
 
 - `[#<N>](https://github.com/<owner>/<repo>/issues/<N>) — <その Issue が何をするものかの短い要約>`
 
-**この引用行は手で組み立てるものではなく、`pnpm josh issue:cite <N> [<N> ...]` が出す。** 番号を並べて渡すと、貼れる引用行を 1 呼び出しでまとめて出す（複数 Issue に 1 回、他リポジトリは `--repo <owner/repo>` あるいは `owner/repo#N` 表記。`docs/maintainers/issue-citation-rationale.md` → "Why issue:cite prints the line"）。要約はその Issue のタイトルをそのまま用いる。詳細は [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md) の `josh issue:cite` を参照。
+**この引用行は手で組み立てるものではなく、`pnpm josh issue:cite <N> [<N> ...]` が出す。** 番号を並べて渡すと、貼れる引用行を 1 呼び出しでまとめて出す（複数 Issue に 1 回、他リポジトリは `--repo <owner/repo>` あるいは `owner/repo#N` 表記。`docs/maintainers/issue-citation-rationale.md` → "Why issue:cite prints the line"）。要約はその Issue のタイトルをそのまま用いる。詳細は [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md) の `josh issue:cite` を参照。josh がセッション向けに出す警告・進捗行・要約行の Issue 番号は、はじめからリンク形で出るので、転記するときに組み直さなくてよい。コミットメッセージ・PR 本文・イベント行・Telegram 本文など GitHub やプログラムが読むために素の `#N` のまま出る行を写すときは、引用形に直す（`docs/maintainers/issue-citation-rationale.md` → "Why josh prints the citation form itself"）。
 
 **要約タイトルは全訳ではなく要約でよい。** 何をするものか分かれば足りる。長い訳を作ることが目的ではない。`issue:cite` が出すタイトルを、必要ならセッション言語に言い換えて使う。
 

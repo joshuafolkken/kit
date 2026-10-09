@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_child_marker, type MarkerSource } from './lane-child-marker'
@@ -18,7 +19,10 @@ async function mark_implement(
 
 	if (issue === undefined || !lane_child_marker.is_child_of(directory, source)) return
 
-	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.LANE_PHASE, `#${issue} implement`)
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.LANE_PHASE,
+		`${issue_cite.plain(issue)} implement`,
+	)
 }
 
 const lane_phase = { mark_implement }

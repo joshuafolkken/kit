@@ -1,6 +1,7 @@
 import type { EpicNextResult } from '#scripts/epic/epic-report'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { AUTO_OK_LABEL, EPIC_LABEL, has_any_label } from '#scripts/issue/issue-labels'
+import { session_cite } from '#scripts/issue/session-cite'
 
 // Which open issues the backlog will not run, and why (joshuafolkken/kit#1652).
 //
@@ -37,7 +38,7 @@ const OPTED_IN_UNPLACED_REASON = 'opted in, but past the listing cap this ask co
 // place it either, the epic is the fact worth naming and the cap is a misreport a reader acts on:
 // "past the cap" reads as "the next ask will offer it", and the next ask never does.
 function epic_tracked_reason(epic: number): string {
-	return `tracked by epic #${String(epic)}, which offers it instead of the standalone half`
+	return `tracked by epic ${session_cite.issue(epic)}, which offers it instead of the standalone half`
 }
 
 // `--exclude` drops an issue from every bucket, so an excluded one lands here. Named for what it is,

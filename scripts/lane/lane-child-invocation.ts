@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { run_issue_number } from '#scripts/run/run-issue-number'
 import { run_ship_next, type ShipResume } from '#scripts/run/ship/run-ship-next'
 import type { Stage } from '#scripts/run/ship/run-ship-stage'
@@ -18,7 +19,7 @@ const SHIP_PROCESS = String.raw`(josh(\.[jt]s)? ship|run-ship-cli\.ts)`
 function child_invocation(issue: string): string {
 	run_issue_number.require_issue_number(issue)
 
-	return `${CHILD_INVOCATION} #${issue}`
+	return `${CHILD_INVOCATION} ${issue_cite.plain(issue)}`
 }
 
 // The `pgrep -f` pattern that finds a running child: the invocation is always the last argument of
@@ -33,11 +34,11 @@ function child_invocation(issue: string): string {
 function process_pattern(issue: string): string {
 	run_issue_number.require_issue_number(issue)
 
-	return `(${CHILD_INVOCATION}|${SHIP_PROCESS} .*) #${issue}$`
+	return `(${CHILD_INVOCATION}|${SHIP_PROCESS} .*) ${issue_cite.plain(issue)}$`
 }
 
 function resume_invocation(issue: string): string {
-	const preamble = `Resuming the lane child for issue #${issue} — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Run \`pnpm josh run:cut --resume ${issue}\` before anything else and follow the matching verdict in ${RESUME_GUIDE}: \`resume\` goes to the gate, \`resume-impl\` continues implementation. Only on \`fresh\` proceed as an ordinary`
+	const preamble = `Resuming the lane child for issue ${issue_cite.plain(issue)} — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Run \`pnpm josh run:cut --resume ${issue}\` before anything else and follow the matching verdict in ${RESUME_GUIDE}: \`resume\` goes to the gate, \`resume-impl\` continues implementation. Only on \`fresh\` proceed as an ordinary`
 
 	return `${preamble} ${child_invocation(issue)}`
 }
@@ -51,7 +52,7 @@ function resume_invocation(issue: string): string {
 // `resume_invocation` does: the parent's liveness poll is `pgrep -laf "<invocation>$"`, so the trailing
 // `fullrun #<N>` keeps the relaunched process matching, and it is the ordinary run the child carries on.
 function outage_resume_invocation(issue: string): string {
-	const preamble = `Resuming the lane child for issue #${issue} after an API disconnection — your session was restored with its full context, so do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Continue the run from where it stopped: run \`pnpm josh run:step ${issue}\` to find the next action, redoing only the last step if it did not complete.`
+	const preamble = `Resuming the lane child for issue ${issue_cite.plain(issue)} after an API disconnection — your session was restored with its full context, so do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Continue the run from where it stopped: run \`pnpm josh run:step ${issue}\` to find the next action, redoing only the last step if it did not complete.`
 
 	return `${preamble} ${child_invocation(issue)}`
 }
@@ -66,7 +67,7 @@ function outage_resume_invocation(issue: string): string {
 // session runs it rather than re-deriving it from `chain-rule.md`. An OpenAI lane's supervisor sees only
 // that the ship failed, not where, so without a stage the prompt points at `run:step` as before.
 function ship_stop_invocation(issue: string, stop?: ShipStop): string {
-	const opening = `Resuming the lane child for issue #${issue} after its detached ship supervisor stopped at a failed stage — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md).`
+	const opening = `Resuming the lane child for issue ${issue_cite.plain(issue)} after its detached ship supervisor stopped at a failed stage — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md).`
 	const next =
 		stop === undefined
 			? `Run \`pnpm josh run:step ${issue}\` and read the stopped report it names, fix what stopped the ship, then hand the region back per chain-rule.md.`
