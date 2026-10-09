@@ -315,7 +315,7 @@ test file pins:
   and that the single source is `residency.md`
 - `scripts/rules/stop-rules-rule.test.ts` — pins the single sources of the four stop rules (the stop
   notification in `CLAUDE.md`, `working-tree-hold.md`, `observation-filing.md`, `issue-citation.md`)
-  and their entry in `rule-delivery.md`'s enumeration. `scripts/rules/stop-rules.test.ts`,
+  and their entry in `pnpm josh rule:list`. `scripts/rules/stop-rules.test.ts`,
   `scripts/rules/filing-offer.test.ts` and `scripts/rules/issue-citation.test.ts` pin firing and
   silence (hold × no notice blocks; clean × hold blocks; dirty or notified is silent;
   `stop_hook_active` is silent; an unattended offer to file × nothing filed blocks, while an interactive session, filed, a third-party

@@ -1,6 +1,6 @@
 // A behavior-change Issue names its **firing point** — the tool call first invoked at the moment
 // the rule it changes would break (`prompts/collaboration-workflow/issue-template.md`). This
-// classifies that name against the rule-delivery table (joshuafolkken/kit#2212).
+// classifies that name against the delivered-rule list (joshuafolkken/kit#2212).
 //
 // **Why the name matters.** joshuafolkken/kit#2201 placed a correct rule whose named tool call was
 // one call behind the one that actually broke it: the lane child's turn ended at `AskUserQuestion`,
@@ -8,7 +8,7 @@
 // a firing point naming a tool outside that set is a rule no hook can enforce, and saying so at filing
 // time is the whole point of the check.
 
-// **The hook-deliverable set — the single source is `rule-delivery.md`'s delivery table.** The
+// **The hook-deliverable set — the single source is the list `pnpm josh rule:list` renders.** The
 // `PreToolUse` guard is wired to `Bash|Edit|Read|Write` (`scripts/hooks/pretool-guard.ts`), and the
 // lane-child interactive-ask row triggers on `AskUserQuestion`. A firing point naming one of these can
 // be delivered at the moment it binds; anything else cannot.
