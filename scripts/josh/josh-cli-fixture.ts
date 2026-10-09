@@ -12,6 +12,7 @@ const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const JOSH_ENTRY = path.join(REPO_ROOT, 'scripts', 'josh', 'josh.ts')
 const TSX_RUNNER = resolve_tsx_runner()
 const PORT_SEED_KEY = 'PORT_SEED'
+const LANE_SEAT_KEY = 'JOSH_LANE_SEAT'
 
 interface JoshLauncher {
 	executable: string
@@ -34,8 +35,9 @@ interface CliOptions {
 	cwd?: string | undefined
 }
 
-// The seed is always written, `undefined` included: the child inherits this process's environment,
-// so a developer who exports `PORT_SEED` would otherwise decide what these assertions see.
+// The seed and the lane seat are always written, `undefined` included: the child inherits this
+// process's environment, so a developer who exports `PORT_SEED`, or a lane whose supervisor exports
+// `JOSH_LANE_SEAT`, would otherwise decide what these assertions see.
 function run_josh(cli_arguments: ReadonlyArray<string>, options: CliOptions = {}): CliResult {
 	const result = execaSync(
 		SOURCE_JOSH.executable,
@@ -43,7 +45,7 @@ function run_josh(cli_arguments: ReadonlyArray<string>, options: CliOptions = {}
 		{
 			cwd: options.cwd ?? REPO_ROOT,
 			reject: false,
-			env: { [PORT_SEED_KEY]: options.seed },
+			env: { [PORT_SEED_KEY]: options.seed, [LANE_SEAT_KEY]: undefined },
 		},
 	)
 

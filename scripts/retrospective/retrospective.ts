@@ -5,6 +5,8 @@ import type { CategoryCount } from '#scripts/review/review-finding-ledger'
 import { run_event_scope, type EventScope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stop_text } from '#scripts/run/ship/run-ship-stop-text'
+import { guard_friction, type SessionTranscript } from './guard-friction'
+import { investigation_payback } from './investigation-payback'
 
 // The composition half of `josh retrospective` — the end-of-run retrospective's aggregation
 // (joshuafolkken/kit#2328). A run that drains its backlog has spent time and money that nobody reads;
@@ -12,7 +14,9 @@ import { run_ship_stop_text } from '#scripts/run/ship/run-ship-stop-text'
 // (`cost-run-report.ts`), the recurring review findings (`review-finding-ledger.ts`), the observation
 // ledger and the run's own event stream — into one digest, so the retrospective step has something to
 // weigh. It adds no new measurement, per the observation-filing rule against readerless numbers; every
-// input here is read from a command that was already keeping it.
+// input here is read from a command that was already keeping it. The run's transcripts are the one
+// input read for this digest alone — the guard refusals and Stop re-entries no other command tallied
+// (joshuafolkken/kit#3421), counted by `guard-friction.ts` and `investigation-payback.ts`.
 //
 // **It is a pure function of the four inputs.** The gathering — loading the run tree, reading the
 // ledger, opening the stream — is the CLI's; this shapes what they return and nothing else, so the
@@ -42,6 +46,8 @@ interface RetrospectiveInputs {
 	// cut and park as this run's friction — the very numbers the retrospective weighs to file improvement
 	// issues. The scope is `run-event-scope.ts`'s, shared with `run:report` and `run:step`.
 	scope: EventScope
+	// The selected run's sessions with their parsed transcripts.
+	sessions: ReadonlyArray<SessionTranscript>
 }
 
 const CLOSING =
@@ -146,6 +152,9 @@ function compose(inputs: RetrospectiveInputs): string {
 		'',
 		...friction_lines(inputs.events, inputs.scope),
 		...ship_stop_lines(inputs.events, inputs.scope),
+		'',
+		...guard_friction.report_lines(guard_friction.guard_rows(inputs.sessions)),
+		...investigation_payback.report_lines(inputs.sessions),
 		'',
 		CLOSING,
 	].join('\n')
