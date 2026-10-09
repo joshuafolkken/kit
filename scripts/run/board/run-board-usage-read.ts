@@ -14,6 +14,11 @@ import type { ProcessReading, UsageMark } from './run-board-usage'
 // **Only this repository's lanes root counts** — another repository's lane of the same number is a
 // different lane. **macOS alone:** Linux's `ps` prints `time` in whole seconds, too coarse for a
 // one-second difference, so there the board draws no column rather than a figure flickering to 0.
+// **The CPU figure is a lower bound** (joshuafolkken/kit#3523): a process born and gone between two
+// samples — a vitest worker, a gate's eslint / tsc / cspell — is never seen, and a process that ended
+// loses what it spent after its last sample. Neither reaches its parent either: macOS's `ps -S` does
+// not fold a reaped child's time into the parent's, and the child times the kernel does keep are
+// out of Node's reach without a native helper, which one board column does not justify.
 
 const PS_ARGUMENTS = ['-A', '-o', 'pid=,time=,rss=']
 const LSOF_ARGUMENTS = ['-a', '-d', 'cwd', '-Fn', '-p']
