@@ -36,15 +36,12 @@ describe('the delivered text — what the refusal states', () => {
 	})
 })
 
-describe(`${TOPIC_FILE} — the single source for the rule and the measurement behind it`, () => {
+describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 	const content = read_unwrapped(TOPIC_FILE)
 
 	it.each([
 		'## A lane child records its park before it stops',
-		'(joshuafolkken/kit#2034)',
-		// The two runs the enforcement rests on.
-		'#2012',
-		'#2011',
+		'`pnpm josh run:liveness` reads it `settled`',
 		STOP_NOTIFY,
 	])('states %j', (marker) => {
 		expect(content).toContain(marker)

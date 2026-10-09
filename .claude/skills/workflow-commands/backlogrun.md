@@ -1,7 +1,9 @@
 # `backlogrun` — the manifest (named issues, epics and the opted-in backlog)
 
-**This file is the manifest, not the procedure** (joshuafolkken/kit#2190): the ordered flow as terse
-triggers, and the route table naming the one section each moment reads.
+**This file is the manifest, not the procedure**: the ordered flow as terse triggers, and the route
+table naming the one section each moment reads. Rationale and provenance:
+`docs/maintainers/backlogrun-rationale.md` → "Why the loop's position is computed";
+`docs/maintainers/backlogrun-rationale.md` → "Where each rule came from".
 
 **`backlogrun` names either nothing, or the issues and epics to run first.** With no argument it runs
 whatever `pnpm josh backlog:next` offers — the whole opted-in backlog, every issue carrying `auto-ok`
@@ -11,12 +13,9 @@ that same backlog. **`--only` stops it after the named list**, draining nothing.
 
 **The loop's current position is computed, not carried in the conversation.** `pnpm josh run:step <N>`
 reads where the run is from the event stream, the carry record and the issue state, and prints the next
-single action — a runnable command, or the one point a person has to judge — so a session cut, a
-compaction or a fresh resume reaches the same next step from the same three inputs
-(joshuafolkken/kit#2248).
+single action — a runnable command, or the one point a person has to judge.
 
-**A named item may be a single issue or an epic** (joshuafolkken/kit#1985, folding in the old
-`epicrun` keyword). A single-issue item is one `fullrun`; **a named epic runs its children in
+**A named item may be a single issue or an epic.** A single-issue item is one `fullrun`; **a named epic runs its children in
 dependency order across the free lanes, and the run does not advance to the next named item until
 every one of that epic's children has been processed — merged or parked.** `backlogrun #E --only`
 therefore runs exactly one epic's children and stops.

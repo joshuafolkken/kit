@@ -30,7 +30,21 @@ skill.
 joshuafolkken/kit#908 at the first step of every resume while `epic:next` happily returned its next
 child — the error's reason (the child can run first) and what actually blocked the run had come apart
 (joshuafolkken/kit#1010). Dropping the finding would not shorten the output: the same pair would
-reappear one line lower as an `implicit dependency`, minus the one detail worth reading.
+reappear one line lower as an `implicit dependency`, minus the one detail worth reading. What makes
+an undeclared order a contradiction is that the criteria's child _can run first_, and one end closing
+is enough to make that false: a closed naming child has already run, and a closed named child has
+already delivered what the criteria ask for. The demotion was widened from both-closed to
+either-closed by joshuafolkken/kit#1597, after a closed child citing an open sibling **as evidence**
+held an epic red at step one.
+
+**Why the first check is only a warning.** It fires on a legitimate forward reference as readily as
+on a real missing dependency; failing on both would make design notes unwritable, so the reader
+judges and the machine only keeps it from being missed. Acceptance criteria that require what a
+child free to run later produces cannot be met however anyone decides, which is why that check is
+an error.
+
+**Why a cross-repository pair is a warning** (joshuafolkken/kit#1128). Such an order only became
+recordable with joshuafolkken/kit#1126, so an error would stop every epic written before it.
 
 ## Cross-repository epics
 
@@ -47,7 +61,13 @@ change.
 
 **Why a repository that publishes nothing does not wait** (joshuafolkken/kit#1129). Waiting for a
 release that can never exist held the run until its eight-hour limit, with nothing an operator could
-edit to clear it.
+edit to clear it. The answer comes from the blocker's manifest rather than the registry because a
+registry 404 also means "this token may not see it", so resolving on one would start a consumer
+child before its blocker's release existed.
+
+**Why the target is not the default branch's version** (joshuafolkken/kit#1486). Once a child stopped
+bumping the version, the default branch's version just after the blocker's merge is the previous
+release, which would satisfy the wait at once.
 
 ## `epic:bundle` — why issues filed apart are bundled afterwards
 
@@ -153,3 +173,124 @@ procedure uses them — everything goes through the REST endpoint via `gh api`. 
 a child shows what it waits for in the UI and API, though they only display and never block, so order
 is still enforced by `--ordered` and `backlogrun`. Sub-issues are not: they express containment, not
 order, and are limited to one repository owner — neither reason depends on CLI support.
+
+## `epic:next` — why it answers as it does
+
+**Why several epics rank by argument order** (joshuafolkken/kit#1493). Dependency depth does not
+compare across graphs: depth is measured inside one epic and there is no relation between two epics
+to normalize against, while argument order is the one ranking a person typed and can change.
+
+**Why task-list order inside one epic** (joshuafolkken/kit#1583). The order was the lowest issue
+number until then, on the premise that number order is split order — false for any epic that gains
+children as work is found. `--order-before` / `--order-after` (joshuafolkken/kit#1738) made moving
+the row a command rather than a hand edit.
+
+**Why lane occupancy is read from the listing.** Two sessions counting to the limit in their own
+memory would double it. It is an advisory guard rather than a mutex: the label is applied after the
+read, so what it closes is the window that actually occurs — a lane holding the label for minutes.
+
+**Why an epic child is never offered** (joshuafolkken/kit#1476). Before this the row fell through to
+the dependency reading, which makes anything unblocked runnable, and `backlogrun` passed the epic to
+`fullrun` as an ordinary issue — a run with nothing to implement.
+
+**Why the buckets ignore labels.** Reading labels fails in an ordinary state: when one repository's
+child has closed and another's is waiting for a release to publish, nothing carries `in-progress` or
+`needs-decision` — and a label-based reading calls that "done" in the one moment it must wait.
+
+## `epic:bundle` — why each answer reads as it does
+
+**Why closed references are read** (joshuafolkken/kit#947). Without it the command answers correctly
+only in the minutes between a follow-up issue being filed and its parent closing.
+
+**Why the nonexistent-number probe is cheap and narrow.** GitHub answers 404 for an issue the token
+may not see as well, so as not to leak its existence — which does not reach this command, because it
+probes the repository whose open issues it has just listed. The probe costs one REST request and
+runs only when a read has already failed, and only on the path that needs the distinction: the
+backlog's own relation reads, up to two hundred of them, never pay it. Only the subject's own body is
+followed because the reverse direction would scan every closed issue, and a follow-up already names
+its parent. The reference parsing is the same implementation as `epic:audit`'s implicit-dependency
+check, applied to the backlog instead of one epic; the open backlog is small enough to scan whole, so
+there is no index or cache.
+
+**Why a cut listing withholds every placing row** (joshuafolkken/kit#1697). The cut was already on
+standard error (`⚠ The epic listing …`) while standard output went on printing an executable
+instruction such as `Create an epic for these (Tier A — do it).` — and the rule that reads a warning
+as "could not answer" (`prompts/review.md` → "Three-way disposition after the cap") is written for
+one above `Nothing to bundle.`, so it never reached this verdict. Acted on as Tier A, that is a
+second epic over an already-tracked issue, which the auto-close and `epic:next` cannot both be right
+about (joshuafolkken/kit#943).
+
+**Why choosing between epics is Tier A.** Reading a placement as a merge of epics is what used to
+stop runs; bundling is reversible, merging is not.
+
+**Why an epic and its parent are narrowed** (joshuafolkken/kit#1079). They were never two peers to
+choose between. The verdict had recorded three such false positives, one of which stopped a whole
+batch over an issue whose implementation was finished and whose pull request was mergeable.
+
+**Why `--decision-file` writes both halves** (joshuafolkken/kit#1350). The epic half costs no round
+trip inside the body edit the insertion already makes. Paying for the entry with a hand edit of the
+epic body is why it got skipped; skipping it is not a shortcut past a formality but the half that
+makes an unattended choice auditable. Leaving the entry unwritten is how two of the four most recent
+placements in joshuafolkken/kit#1262 ended up with a child comment and nothing on the epic — the
+already-tracked case still waits for an entry point (joshuafolkken/kit#1162).
+
+**Why `issue:scout` is a separate command** (joshuafolkken/kit#1252). Whether the work was already
+filed is a title comparison, which `epic:bundle` deliberately refuses as a signal.
+
+## Execution waves — why a wave is not a mechanism
+
+Wanting waves only became common once parallel lanes (joshuafolkken/kit#1170) let several children
+run at once. What was missing was never the mechanism — it was that nobody had written down how to
+build one, or when not to (joshuafolkken/kit#1584). `epic --remove` (joshuafolkken/kit#1712) is the
+deletion counterpart of `--add`.
+
+**Why `--before` / `--after <hub>` are refused.** `chains_containing` finds several indices;
+`is_branching_after` does not hold, because it requires a successor in every chain naming the target
+and a hub has none in any of them; so `ambiguous_position_error` is raised
+(`scripts/epic/epic-chains.ts`).
+
+**Why fan-in and fan-out are allowed.** `DECLARED_CHAIN_LINE` in `scripts/epic/epic-parse.ts` asks
+only that a line be nothing but a chain, and `parse_dependency_links` expands each line independently
+and flattens the result, dropping only self-loops. `find_anomalies` in `scripts/epic/epic-graph.ts`
+rejects only a cycle and a declaration / `blocked-by` disagreement.
+
+**Why there is no `solo` mechanism or exclusivity label.** A third axis — an exclusivity label, an
+`## Exclusive` section — would put a second way to say what the dependency declaration already says,
+and a second consistency check to keep the two agreeing. The answer to "how do I build waves" is
+therefore a paragraph rather than a feature, and the cost of a declared boundary arriving at the end
+of a wave rather than at the park is what makes one easy to declare and expensive to have declared.
+
+**The worked example — joshuafolkken/kit#1474.** That epic has grown to 46 children while its
+declared chains have stayed at three, and its body says why:
+
+> **Not declared as a chain.** The 19 are nearly independent; declaring an order as a dependency
+> would stop all the rest the moment one gets stuck. What follows is a recommendation, not a
+> constraint. (translated)
+
+The nineteen that paragraph was written about are ordered in prose — a group, not a graph — so a
+reader gets the intent and no run is stopped by it, and none of the children added since has needed
+a chain either. joshuafolkken/kit#1262 is the same lesson from the other side: 24 false dependencies
+invented by `epic --add` have been removed from it, each one an order nobody needed that could have
+stopped everything behind it.
+
+## Where each rule came from
+
+- The skill as the single source of these commands, with this file holding the history —
+  joshuafolkken/kit#2892
+- `epic:audit` closed-pair demotion — joshuafolkken/kit#1010, widened by joshuafolkken/kit#1597
+- `epic:audit` cross-repository pair as a warning — joshuafolkken/kit#1128
+- `epic:audit` epic-row finding, and `epic:next` never offering an epic child —
+  joshuafolkken/kit#1476
+- `epic:audit` orphan-search findings — joshuafolkken/kit#1033
+- `epic:next --lanes` — joshuafolkken/kit#1491; several epics in one call — joshuafolkken/kit#1493
+- Task-list order inside an epic — joshuafolkken/kit#1583; `--order-before` / `--order-after` —
+  joshuafolkken/kit#1738
+- A blocker outside every named epic — joshuafolkken/kit#1943
+- Cross-repository checkout map and owner restriction — joshuafolkken/kit#869; non-publishing
+  repositories — joshuafolkken/kit#1129; no child version bump — joshuafolkken/kit#1486
+- `epic:bundle` reading closed references — joshuafolkken/kit#947; dropping nonexistent numbers —
+  joshuafolkken/kit#957; cut listing — joshuafolkken/kit#1697; parent narrowing —
+  joshuafolkken/kit#1079; `--decision-file` — joshuafolkken/kit#1350; `issue:scout` —
+  joshuafolkken/kit#1252
+- Entry point for decisions on already-tracked children (pending) — joshuafolkken/kit#1162
+- Execution waves — joshuafolkken/kit#1584; `epic --remove` — joshuafolkken/kit#1712

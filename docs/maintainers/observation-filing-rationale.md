@@ -15,6 +15,10 @@ orchestration or the tools that measure it, with not one change a consumer of th
 creates something new to measure. So the condition comes from outside, and **depth is what supplies
 it — read off the subject rather than judged**.
 
+**This is not the count cap that was rejected.** A cap is rationing — past the number the finding is
+lost, and nothing about it says which findings were worth having. The depth test changes what counts
+as a finding at all, so what it excludes is excluded for a reason a reader can check.
+
 **Why depth 2 carries a further requirement** (joshuafolkken/kit#1975). The citation the depth-0 gate
 asks for is one a slow run can always produce, so it barely bites on a measurement Issue: "runs are
 slow" and "the diff is large" both name depth-0 work, while the number the Issue proposes to produce
@@ -74,3 +78,18 @@ filings of 2026-09-09 were collapsed to 12 within that same day, which means the
 at the moment they were made. And **the 10-per-run ceiling for this route is the parent's to
 count**: six children counting two or three filings each never reach it, which is why it did not
 fire once on the run that filed fifteen.
+
+## Where each rule came from
+
+- The procedure moved out of the entry into its own file, read when an observation turns up —
+  joshuafolkken/kit#1797; nothing under `prompts/collaboration-workflow/` restates it —
+  joshuafolkken/kit#1649, joshuafolkken/kit#1797.
+- The ledger and the user-reported-bug record split out to `observation-ledger.md`, and `issue:file`
+  provisions missing depth labels itself — joshuafolkken/kit#3176.
+- The `Stop` hook sends an unattended run's filing offer back — joshuafolkken/kit#2422.
+- The depth table and the depth-0 share as a target — joshuafolkken/kit#1698.
+- The depth label applied at filing, and the fixed depth-0 denominator — joshuafolkken/kit#1729.
+  Changing what `backlog:next` offers on the share, and setting a target value, were recorded as out
+  of scope there.
+- The further requirement on a depth-2 filing — joshuafolkken/kit#1975.
+- A PR that adds a measurement names its reader — joshuafolkken/kit#2012.

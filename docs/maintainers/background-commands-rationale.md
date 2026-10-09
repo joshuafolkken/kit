@@ -11,6 +11,12 @@ reaches the first backgroundable command (`pnpm josh gate`), by the run that has
 → §1, "Four documents are read at the point of use"). `background-commands.md` is the resident
 pointer to it, and carries the one thing it does not: the same rule at a batch's scale.
 
+## Where each rule came from
+
+- The clean path folding the gate-to-merge region into one backgrounded `pnpm josh ship` —
+  joshuafolkken/kit#2398.
+- Recording before the CI wait ends, never after the merge — joshuafolkken/kit#2763.
+
 ## Why a poll loop is refused
 
 Either way a hand-written `sleep` loop ends — a regex that never matches, or one that matches a mid-run

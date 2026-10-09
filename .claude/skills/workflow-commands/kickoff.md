@@ -24,27 +24,21 @@
   / `failure` ❌ / `kickoff_retry` 🔄 / `confirmation` ⏸️). `--repo-name` and `--issue-title` are
   auto-fetched from `gh` when not supplied. The Issue URL must be included.
 
-**`kickoff` does not claim the working-tree hold, and does not release one.** What that guard protects
-is one branch, one index and one uncommitted diff; this command reads the Issue, normalizes the title,
-posts the plan, notifies and stops — every one of those against GitHub, none against the tree. So a
-`fullrun` running in this checkout never stops a `kickoff`, and a `kickoff` never touches the record
-that run is holding. It claims nothing, so it must not release anything either. `working-tree-hold.md` is the
-single source.
+**`kickoff` does not claim the working-tree hold, and does not release one** — it touches GitHub, never
+the tree. `working-tree-hold.md` is the single source.
 
 **The target repository is named in front of the Issue reference** — `kickoff kit#new`,
-`kickoff joshuafolkken/kit#412`. The definition is `target-repository.md`, whose body is `target-repository.md`. `kickoff` is the entry that needs
+`kickoff joshuafolkken/kit#<N>`. The definition is `target-repository.md`. `kickoff` is the entry that needs
 no checkout: name the target repository in the path of every `gh api` call — reads included — and never
 clone. The one exception is the split path's epic, since `pnpm josh epic` writes only the repository it
 runs in — and the promote arm has no remote fallback at all, so it stops when that repository is not
 checked out here. A target whose owner is not this session's is third-party: Tier C, so it stops rather
 than filing.
 
-**Read `split-assessment.md` → "The question" first.** It is the split decision every entry point
-applies, including this one — `kickoff #N` assesses scope exactly as `kickoff new` does. Its default is
-not to split: separability and a scope that clearly exceeds what one verification gate can confirm in
-one pass (the size guide is stated there) have to hold **together**.
-The rest of `split-assessment.md` — what each entry does with the answer — is read on demand when a
-split is found.
+**Read `split-assessment.md` → "The question" first** — `kickoff #N` assesses scope exactly as
+`kickoff new` does. Its default is not to split: separability and a scope that clearly exceeds what one
+verification gate can confirm in one pass have to hold **together**. The rest of `split-assessment.md`
+is read on demand when a split is found.
 
 - `kickoff new` or `kickoff new "<title>"`: No Issue exists yet. Steps: (0) **Scope assessment** per
   `split-assessment.md`. If multiple → the **multi-issue split path**; if single → the **single-issue

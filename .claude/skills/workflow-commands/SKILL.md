@@ -7,7 +7,8 @@ description: Procedures for `kickoff`, `fullrun`, `halfrun`, `prrun` and `backlo
 
 `kickoff`, `fullrun`, `halfrun`, `prrun` and `backlogrun` are the shorthand commands this
 package's collaboration workflow is built on. **This file is their manifest — triggers and pointers,
-never a procedure** (joshuafolkken/kit#3174): each rule is stated once, in the file its row names.
+never a procedure**: each rule is stated once, in the file its row names. History:
+`docs/maintainers/workflow-commands-rationale.md` → "Where each rule came from".
 
 ## 0. The rule that fires before any of them — explicit invocation
 
@@ -54,7 +55,7 @@ Each is fetched at its named scope, in the same turn, by the named command that 
 A `skip` answer from `latest:scope` reads nothing. **A lane child that parks reads
 `backlogrun-park.md` → "park and continue" at that point of use**, and **every implementing run reads
 `progress-watcher.md` → "Progress while the run is quiet"** before starting `pnpm josh run:progress
---wait` once its hold is claimed (joshuafolkken/kit#3172).
+--wait` once its hold is claimed.
 
 ### A section reference is read as a section
 
@@ -65,8 +66,7 @@ pnpm josh doc:section <file.md> "<heading>"   # the section, verbatim
 pnpm josh read:set [<keyword>]                # what an entry reads, and what it costs
 ```
 
-A heading that does not resolve is refused, with the file's own headings listed. The set is derived
-from the table above and the documents themselves, never transcribed.
+A heading that does not resolve is refused, with the file's own headings listed.
 
 ## 2. What every one of them shares
 

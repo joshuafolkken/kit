@@ -1,7 +1,7 @@
 {
 	"scripts": {
 		"files": 1043,
-		"code_lines": 87093,
+		"code_lines": 87061,
 		"comment_lines": 34420,
 		"comment_ratio": 0.4
 	},
@@ -12,7 +12,7 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 475208
+		"on_demand_bytes": 457500
 	},
 	"accepted": {
 		"reason": "#3577 review fix: a title-less row keeps its usual gap (lead_of takes the title)",

@@ -1,12 +1,12 @@
 # The entry sequence and the stop branches — shared by `fullrun`, `halfrun` and `prrun`
 
-**This file is the part of the three implementing manifests that is one procedure**
-(joshuafolkken/kit#3174). `fullrun.md`, `halfrun.md` and `prrun.md` name only how their own run
-differs from it; `pnpm josh run:step <N>` prints the run's next single action.
+`fullrun.md`, `halfrun.md` and `prrun.md` name only how their own run differs from this shared
+procedure; `pnpm josh run:step <N>` prints the run's next single action. History:
+`docs/maintainers/entry-sequence-rationale.md` → "Where each rule came from".
 
 ## The ordered entry sequence
 
-**One call folds the mechanical steps** (joshuafolkken/kit#2372): `pnpm josh run:entry <N> --to
+**One call folds the mechanical steps**: `pnpm josh run:entry <N> --to
 <command>` claims the tree, reads the budget, bundles the reads and decides the pre-implementation
 step — steps 1, 3, 4 and 5 below in one round trip. Its `stage #<N>` line says where the run starts
 (`start: reached` redoes nothing — stop), and its `entry #<N> — hold: … · cost: … · verdict: …` line
