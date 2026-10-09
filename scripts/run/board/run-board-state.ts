@@ -28,6 +28,8 @@ interface BoardPorts {
 	// The terminal a live frame is kept within, read at every redraw so a resized pane is fitted on the
 	// next one (joshuafolkken/kit#3486); none where the frame is drawn whole — one frame, a pipe, a chat.
 	size?: (() => TerminalSize) | undefined
+	// The lines a live frame ends on, the first to give way to a short pane (joshuafolkken/kit#3505).
+	footer?: ReadonlyArray<string> | undefined
 	form: BoardForm
 	// Records that a progress report was just given, as `run:progress --mark` does, so the next scheduled
 	// one waits a full interval from here (joshuafolkken/kit#3456).

@@ -1,5 +1,14 @@
 import { styleText } from 'node:util'
-import { run_board_fit, type PlanLine, type TerminalSize } from './run-board-fit'
+import {
+	run_board_fit,
+	type FrameParts,
+	type NotesPart,
+	type PlanLine,
+	type PlanSection,
+	type RowYield,
+	type TerminalSize,
+	type YieldStage,
+} from './run-board-fit'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels, type Words } from './run-board-labels'
 import {
@@ -37,13 +46,18 @@ const RULE_LEAD = `${RULE}${RULE}`
 const RULE_WIDTH = 50
 const NUMBER_PLACEHOLDER = '{n}'
 
-interface BoardView {
+// The live terminal a frame is kept within, and the footer the frame ends on and gives way first
+// (joshuafolkken/kit#3505); neither for a frame that is not redrawn in place.
+interface FrameBounds {
+	size?: TerminalSize | undefined
+	footer?: ReadonlyArray<string> | undefined
+}
+
+interface BoardView extends FrameBounds {
 	header: BoardHeader
 	notes: ReadonlyArray<BoardNote>
 	// The session a stopped run resumes from (joshuafolkken/kit#3437).
 	resume?: string | undefined
-	// The live terminal the frame is kept within; none for a frame that is not redrawn in place.
-	size?: TerminalSize | undefined
 }
 
 // What every row of one frame is drawn with: the header, and how wide the time column is, so a
@@ -151,13 +165,37 @@ function row_text(row: BoardRow, frame: RowFrame): string {
 	return parts.filter((part) => part !== undefined && part !== '').join(GAP)
 }
 
+// The stage each state's row gives way in when the pane is short (joshuafolkken/kit#3505).
+const YIELD_STAGES: Readonly<Record<ItemState, YieldStage>> = {
+	merged: 'finished',
+	done: 'finished',
+	waiting: 'pending',
+	human: 'pending',
+	parked: 'parked',
+	stopped: 'parked',
+	running: 'running',
+}
+
+// A running row is as old as its start; a settled one as its end, or its start where it has none.
+function aged_ms(row: BoardRow): number | undefined {
+	const started = row.status?.started_ms
+
+	return row.state === 'running' ? started : (row.status?.ended_ms ?? started)
+}
+
+function yield_of(row: BoardRow): RowYield {
+	return { stage: YIELD_STAGES[row.state], at_ms: aged_ms(row) }
+}
+
 // A plan line that draws one issue row, and one that draws none — a blank, a rule, an epic's own line.
 function row_line(prefix: string, row: BoardRow, frame: RowFrame): PlanLine {
-	return { text: `${indent_of(prefix, row, frame.header)}${row_text(row, frame)}`, rows: 1 }
+	const text = `${indent_of(prefix, row, frame.header)}${row_text(row, frame)}`
+
+	return { text, row: yield_of(row) }
 }
 
 function bare(text: string): PlanLine {
-	return { text, rows: 0 }
+	return { text, row: undefined }
 }
 
 function epic_lines(entry: Extract<WaveEntry, { kind: 'epic' }>, frame: RowFrame): Array<PlanLine> {
@@ -186,26 +224,20 @@ function heading_lines(heading: string | undefined): Array<string> {
 	return heading === undefined ? [''] : ['', rule_of(heading)]
 }
 
-function section(heading: string | undefined, lines: ReadonlyArray<string>): Array<string> {
-	if (lines.length === 0) return []
-
-	return [...heading_lines(heading), ...lines]
-}
-
 function plan_section(
 	heading: string | undefined,
 	lines: ReadonlyArray<PlanLine>,
-): Array<PlanLine> {
+): Array<PlanSection> {
 	if (lines.length === 0) return []
 
-	return [...heading_lines(heading).map((line) => bare(line)), ...lines]
+	return [{ head: heading_lines(heading), lines }]
 }
 
 function rows_section(
 	heading: string | undefined,
 	rows: ReadonlyArray<BoardRow>,
 	frame: RowFrame,
-): Array<PlanLine> {
+): Array<PlanSection> {
 	return plan_section(
 		heading,
 		rows.map((row) => row_line(INDENT, row, frame)),
@@ -273,7 +305,7 @@ function legend_of(layout: BoardLayout, notes: ReadonlyArray<BoardNote>): Array<
 	return lines.map((line) => styleText('dim', line))
 }
 
-function plan_sections(header: BoardHeader): Array<PlanLine> {
+function plan_sections(header: BoardHeader): Array<PlanSection> {
 	const { layout } = header
 
 	if (layout === undefined) return []
@@ -321,13 +353,11 @@ function note_text(note: BoardNote, header: BoardHeader): string {
 }
 
 // The newest few, and how many more there are, so the section never pushes the plan off the screen.
-function notes_section(notes: ReadonlyArray<BoardNote>, header: BoardHeader): Array<string> {
-	const shown = notes.slice(0, NOTE_LIMIT).map((note) => note_text(note, header))
-	const hidden = notes.length - shown.length
-	const more = hidden > 0 ? [`${INDENT}${WORDS.more} ${String(hidden)}`] : []
+function notes_part(notes: ReadonlyArray<BoardNote>, header: BoardHeader): NotesPart {
+	const lines = notes.slice(0, NOTE_LIMIT).map((note) => note_text(note, header))
 	const label = legend_layout(header) === undefined ? WORDS.notes : NOTES_ICON
 
-	return section(label, [...shown, ...more])
+	return { head: heading_lines(label), lines, hidden: notes.length - lines.length }
 }
 
 // The command that resumes a stopped run's session, under the header where the person looks first.
@@ -347,8 +377,14 @@ function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Arr
 }
 
 // A live frame is kept within its terminal (joshuafolkken/kit#3486); any other is drawn whole.
+function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
+	const { size } = bounds
+
+	return size === undefined ? run_board_fit.whole(parts) : run_board_fit.fit(parts, size)
+}
+
 function render(view: BoardView): Array<string> {
-	const { header, notes, size } = view
+	const { header, notes } = view
 	const above = [
 		...run_board_header.header_lines(header),
 		...resume_lines(view.resume),
@@ -357,16 +393,19 @@ function render(view: BoardView): Array<string> {
 	const parts = {
 		above,
 		plan: plan_sections(header),
-		below: [...notes_section(notes, header), ...legend_lines(header, notes)],
+		notes: notes_part(notes, header),
+		legend: legend_lines(header, notes),
+		footer: view.footer ?? [],
 	}
 
-	if (size === undefined) return [...above, ...parts.plan.map((line) => line.text), ...parts.below]
-
-	return run_board_fit.fit(parts, size)
+	return bounded(parts, view)
 }
 
-function render_no_run(now_ms: number): Array<string> {
-	return [`■ backlogrun${GAP}${WORDS.no_run}${GAP}${clock_of(now_ms)}`]
+function render_no_run(now_ms: number, bounds: FrameBounds = {}): Array<string> {
+	const above = [`■ backlogrun${GAP}${WORDS.no_run}${GAP}${clock_of(now_ms)}`]
+	const notes = { head: [], lines: [], hidden: 0 }
+
+	return bounded({ above, plan: [], notes, legend: [], footer: bounds.footer ?? [] }, bounds)
 }
 
 const run_board_render = {
@@ -377,4 +416,4 @@ const run_board_render = {
 }
 
 export { run_board_render }
-export type { BoardView }
+export type { BoardView, FrameBounds }

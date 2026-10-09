@@ -201,3 +201,23 @@ describe('run_board_cli.run terminal size', () => {
 		},
 	)
 })
+
+async function live_lines(rows: number): Promise<Array<string>> {
+	const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
+
+	await expect(
+		run_board_cli.run([], { ...ports, size: () => ({ rows, columns: 200 }) }),
+	).rejects.toBe(STOPPED)
+
+	return stripVTControlCharacters(frames[1] ?? '').split('\n')
+}
+
+// joshuafolkken/kit#3505: the footer is the first line a short pane gives up, before any row.
+describe('run_board_cli.run footer in a short pane', () => {
+	it('drops the footer first when the pane is one row short', async () => {
+		const tall = await live_lines(100)
+
+		expect(tall.at(-1)).toMatch(/pnpm josh backlogrun`$/u)
+		expect(await live_lines(tall.length - 1)).toEqual(tall.slice(0, -2))
+	})
+})
