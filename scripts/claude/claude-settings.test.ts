@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { AI_DOCS, read_repo_file, WORKFLOW_PROMPT } from '#scripts/document/ai-document-fixture'
+import { rule_list } from '#scripts/rules/rule-list'
 import { describe, expect, it } from 'vitest'
 import { claude_settings_fixture } from './claude-settings-fixture'
 
@@ -370,16 +371,16 @@ const WORKFLOW_MARKERS: ReadonlyArray<string> = [
 
 // The guard rows the workflow prompt names by id alone must each keep an entry in the delivery list
 // its pointer sends readers to, or what they refuse is written nowhere (joshuafolkken/kit#3179).
-const RULE_DELIVERY = 'prompts/collaboration-workflow/rule-delivery.md'
+// joshuafolkken/kit#3399 moved that list to `pnpm josh rule:list`.
 const GUARD_ROW_ENTRIES: ReadonlyArray<string> = [
-	'強制 `git clean -f`',
-	'**index の書き換え**',
-	'**破壊的コマンド**',
-	'**保護ファイル**',
+	'forced `git clean -f`',
+	'**Index mutation**',
+	'**Destructive command**',
+	'**Protected file**',
 ]
 
-describe(`${RULE_DELIVERY} — guard rows the workflow prompt points at`, () => {
-	const content = read_repo_file(RULE_DELIVERY)
+describe('pnpm josh rule:list — guard rows the workflow prompt points at', () => {
+	const content = rule_list.render()
 
 	it.each(GUARD_ROW_ENTRIES)('lists %j', (entry) => {
 		expect(content).toContain(entry)

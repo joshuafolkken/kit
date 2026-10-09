@@ -7,6 +7,7 @@ import {
 } from '#scripts/document/ai-document-fixture'
 import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
 import { describe, expect, it } from 'vitest'
+import { rule_list } from './rule-list'
 
 // joshuafolkken/kit#1304: measured on four merged runs, a `fullrun` issued between 1.00 and 1.13 tool
 // calls per round trip — independent reads and edits went out one per turn. On #1295 the 34 `Edit`
@@ -183,8 +184,8 @@ describe.each([RESIDENCY_RATIONALE])('%s — lists the rule as delivered', (list
 	})
 })
 
-describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, () => {
-	const content = read_unwrapped(DELIVERY)
+describe(`pnpm josh rule:list — the enumeration names this rule and its silent turn`, () => {
+	const content = rule_list.render()
 
 	it.each([TOPIC_FILE, GUARD_COMMAND])('states %j', (marker) => {
 		expect(content).toContain(marker)

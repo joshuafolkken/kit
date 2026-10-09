@@ -1315,6 +1315,16 @@ Claude Code hook: deliver a trigger-delivered rule at the call that binds it (re
 
 ---
 
+### `josh rule:list`
+
+> **Audience:** automation · **Side effects:** none
+
+_No arguments._
+
+Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows
+
+---
+
 ### `josh rule:value` · `josh ruv`
 
 > **Audience:** developer · **Side effects:** files
