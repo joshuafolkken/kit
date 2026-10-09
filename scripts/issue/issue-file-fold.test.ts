@@ -18,6 +18,7 @@ const FINDER = '3415'
 const EARLIER = 3501
 const HERE = ''
 const THERE = 'owner/dep'
+const CURRENT = 'joshuafolkken/kit'
 const NONE: ReadonlyArray<number> = []
 const PLAIN = { route: undefined, distinct: NONE }
 
@@ -86,6 +87,16 @@ describe('issue_file_fold.prior_filings — the run’s earlier filings by the s
 
 	it('leaves out a filing the caller declared distinct', () => {
 		expect(issue_file_fold.prior_filings(events, FINDER, HERE, [EARLIER])).toStrictEqual([])
+	})
+})
+
+describe('issue_file_fold.reference_prefix — what a filed reference carries before #N', () => {
+	it('is empty for this repository named in another case, as the Origin check reads it', () => {
+		expect(issue_file_fold.reference_prefix('JoshuaFolkken/kit', CURRENT)).toBe(HERE)
+	})
+
+	it('is the target for another repository', () => {
+		expect(issue_file_fold.reference_prefix(THERE, CURRENT)).toBe(THERE)
 	})
 })
 

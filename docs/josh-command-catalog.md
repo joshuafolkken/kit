@@ -1135,6 +1135,16 @@ Collapse a backlogrun lane-start event into one call: open the lane, pop and re-
 
 ---
 
+### `josh lane:limit` · `josh lli`
+
+> **Audience:** developer · **Side effects:** files
+
+`[<limit>] [--reset]`
+
+Change a live backlogrun’s lane limit without stopping it, or print the limit, lanes in use and free lanes
+
+---
+
 ### `josh lane:list`
 
 > **Audience:** automation · **Side effects:** none

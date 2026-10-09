@@ -389,7 +389,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/test/test-declared-document-rule.test.ts',
 	'scripts/test/test-declared-logic.test.ts',
 	'scripts/test/test-declared-match.test.ts',
-	'scripts/test/test-declared.test.ts',
 	'scripts/test/test-red-commit.test.ts',
 	'scripts/test/test-red-logic.test.ts',
 	'scripts/test/test-related-scope.test.ts',

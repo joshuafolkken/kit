@@ -217,7 +217,7 @@ Check a two-layer work summary (`CLAUDE.md` Step 0, single-sourced in `prompts/c
 pnpm josh report:lint < summary.md
 ```
 
-Prints `ok` (exit 0), or the violations one per line (exit 1). The judgement half — whether the overview names a concrete subject — is left to the writer, because a machine cannot answer it.
+Prints `ok` (exit 0), or the violations one per line followed by one line naming the template's section in `report-format.md` (exit 1). The judgement half — whether the overview names a concrete subject — is left to the writer, because a machine cannot answer it.
 
 ### `josh stash:pop`
 

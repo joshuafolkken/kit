@@ -167,7 +167,15 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const issue_state_cli = { STATE_FIELDS, USAGE, main, parse_request, read_issue, run }
+const issue_state_cli = {
+	READ_CONCURRENCY,
+	STATE_FIELDS,
+	USAGE,
+	main,
+	parse_request,
+	read_issue,
+	run,
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

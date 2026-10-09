@@ -1,9 +1,11 @@
 import { git_branch } from '#scripts/git/git-branch'
 import { git_command } from '#scripts/git/git-command'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { run_event_filed, type Filed } from '#scripts/run/event/run-event-filed'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { issue_file } from './issue-file'
 import { issue_fold, type FoldVerdict } from './issue-fold'
 import { issue_fold_cli } from './issue-fold-cli'
 import { SPLIT_ROUTE_LABEL } from './issue-labels'
@@ -35,9 +37,10 @@ function number_of(reference: string): number {
 
 // What a filed reference carries before `#<N>`: nothing for this repository's Issue, `<owner>/<repo>`
 // for one filed elsewhere. `issue:file` writes its references with it and the fold compares by it, so
-// a finding is never folded into another repository's Issue.
+// a finding is never folded into another repository's Issue. Compared as the Origin check compares,
+// case-insensitively, so `--repo JoshuaFolkken/kit` and no `--repo` name one repository here too.
 function reference_prefix(target: string, current: string): string {
-	return target === current ? '' : target
+	return issue_file.is_same_repository(target, current) ? '' : target
 }
 
 function prefix_of(reference: string): string {
@@ -100,11 +103,17 @@ async function is_open(filed: Filed, prefix: string): Promise<boolean> {
 	return read.kind !== 'state' || read.state.state !== CLOSED_STATE
 }
 
+// Through the shared pool at `issue:state`'s bound rather than a raw `Promise.all`, so a finder's
+// filings never draw the secondary rate limiting that reads back as `unreadable`.
 async function open_filings(
 	priors: ReadonlyArray<Filed>,
 	prefix: string,
 ): Promise<ReadonlyArray<Filed>> {
-	const verdicts = await Promise.all(priors.map(async (filed) => await is_open(filed, prefix)))
+	const verdicts = await bounded_pool.bounded_map(
+		priors,
+		issue_state_cli.READ_CONCURRENCY,
+		async (filed) => await is_open(filed, prefix),
+	)
 
 	return priors.filter((_filed, index) => verdicts[index])
 }
