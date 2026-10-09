@@ -4,7 +4,7 @@
 
 **この規則は常駐しておらず、配送もされない — 起票するコマンドそのものが守らせる**（joshuafolkken/kit#1524 で常駐を外し、その後 `rule:guard` の配送行も外した）。`pnpm josh issue:file` が起票の前に件数を数え、上限を超えて免除が無ければ何も送らずに保留し、そこで拒否・2 つの免除・免除を決める 3 条件を印字する（`gh issue create` や `…/issues` への `title` 付き POST による直接起票は `direct-filing` が毎回拒否するので、起票は必ずこのコマンドを通る）。事前の拒否と出し直しの往復は無い。保留文の実体は `scripts/issue/issue-wip.ts` の `HELD_MESSAGE` にある（固定するテストは `docs/maintainers/wip-cap-rationale.md` → "Tests that pin the wording"）。
 
-背景・測定・経緯は保守者向けの `docs/maintainers/wip-cap-rationale.md` にあり、ラン中に読む必要はない。
+背景・測定・経緯は保守者向けの文書にあり（上限が要る理由は `docs/maintainers/wip-cap-rationale.md` → "Why a cap is needed — the measurement"）、ラン中に読む必要はない。
 
 ## 規則
 
@@ -15,12 +15,6 @@
 - **上限は 30。** これを超える 1 件を作る前に 1 件閉じる。エージェントが読む文書（`CLAUDE.md`・`prompts/`・配布 skill）がこの数字を書くのはこの行だけで、一次情報は `scripts/issue/issue-wip.ts` の `WIP_CAP` である（一致はテストが固定する）。
 - コマンドは起票先（`--repo` を付ければそのリポジトリ）のオープン Issue を epic も含めて数え、`wip:` 行に件数・上限・判定を印字する。上限を超えて免除が宣言されていなければ**何も送らずに保留し、免除の問いを印字する**。
 - **免除を宣言するのはこのファイルの判断である** — `--route interrupt`（下の 3 条件）、`--route split` / `--route tier-a`（実行が詰まる起票）はルートそのものが宣言になる。ルートの無い実行が詰まる起票（利用者が `new` と打った入口など）は `--over-cap` を付けて出し直す。裁量起票（`--route review-cap` を含む）に `--over-cap` を付けてはならない。
-
-## なぜ上限が要るのか
-
-測定は `docs/maintainers/wip-cap-rationale.md` → "Why a cap is needed — the measurement"。
-
-**上限は、増加を見えるようにするための強制装置である。** 数を減らすこと自体が目的ではない。上限を超えた状態で起票しようとしたときに「本当にこれは 1 件増やす価値があるか」を必ず 1 回考えさせる、そこだけが役割である。
 
 ## 超過時の手順
 
@@ -46,7 +40,7 @@
 
 ### 割り込み起票 — 上限が効かない側（3 条件で機械的に決める）
 
-**重大な欠陥の発見は、それが現在のランを止めていなくても捨ててはならない。** 上限の目的は増加を見えるようにすることであって、**発見を捨てることではない**（上の「なぜ上限が要るのか」）。由来は `docs/maintainers/wip-cap-rationale.md` → "Where the interrupt category comes from"。
+**重大な欠陥の発見は、それが現在のランを止めていなくても捨ててはならない。** 上限の目的は増加を見えるようにすることであって、**発見を捨てることではない**（`docs/maintainers/wip-cap-rationale.md` → "Why a cap is needed — the measurement"）。由来は `docs/maintainers/wip-cap-rationale.md` → "Where the interrupt category comes from"。
 
 **別パッケージ起因の割り込みとは別の区分である。** あちらは上流リポジトリへ起票して停止する手順（`upstream-interrupt.md`、`route:tier-a`）で、実行が詰まる側に属する。ここで言う割り込みは、**このリポジトリの欠陥で、発見したランをブロックしていないもの**を指す。
 

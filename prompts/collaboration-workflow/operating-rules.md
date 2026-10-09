@@ -15,13 +15,7 @@
 
 ### ほかの単一ソースにある規則
 
-このファイルにかつて書き直されていた規則は、次の単一ソースにある。ここには繰り返さない。単一ソース化の経緯は `docs/maintainers/operating-rules-rationale.md` → "Rules that moved to their single source" にある。
-
-- **auto-merge と `completion` 通知** — `.claude/skills/workflow-commands/followup.md` → "`auto-merge` — Default `fullrun` behavior" と `.claude/skills/workflow-commands/followup.md` → "Completion notifications: always via `pnpm josh followup`"
-- **明示的な起動が必須** — `CLAUDE.md` → "Explicit invocation required (MANDATORY)"（常駐）と `.claude/skills/workflow-commands/SKILL.md` → "0. The rule that fires before any of them — explicit invocation"（スキル側の単一ソース）
-- **確認待ちで停止するときの Telegram 通知** — `CLAUDE.md` → "Mid-workflow stop notification (`confirmation`)"
-- **作業ツリーは 1 本のランが保持する（`josh run:hold`）** — `.claude/skills/workflow-commands/working-tree-hold.md` → "The working-tree hold — one run per tree"
-- **overrides の保護** — `.claude/skills/dependency-update/SKILL.md` → "1. Effective overrides live in the workspace — inspect both files"
+auto-merge と `completion` 通知・明示的な起動・`confirmation` 通知・作業ツリーの保持・overrides の保護は、それぞれの単一ソースにあり、ここには繰り返さない。移動先の一覧は `docs/maintainers/operating-rules-rationale.md` → "Rules that moved to their single source"。
 
 ### 指示されていない行動は取らない
 
