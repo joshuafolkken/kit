@@ -24,6 +24,7 @@ function row(number: number, extra: Partial<BoardRow> = {}): BoardRow {
 		title: `Issue ${String(number)}`,
 		state: 'waiting',
 		status: undefined,
+		kind: undefined,
 		waits: [],
 		...extra,
 	}
@@ -54,7 +55,7 @@ describe('run_board_render.render rows', () => {
 	it('draws a running row with its number, title, elapsed time and phase track, and no lane', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [running(1, STARTED + 40 * MINUTE, 'implement')] }
 		const lines = lines_of(header({ layout }))
-		const row_line = `  🔨 1  ${padded('Issue 1')}  90:00  ${plain_track('implement')}`
+		const row_line = `  🔨 1    ${padded('Issue 1')}  90:00  ${plain_track('implement')}`
 
 		expect(lines).toContain(row_line)
 		expect(row_line).not.toContain('■')
@@ -83,14 +84,47 @@ describe('run_board_render.render rows', () => {
 		}
 		const layout = { ...EMPTY_LAYOUT, active: [row(2, { state: 'merged', status })] }
 
-		expect(lines_of(header({ layout }))).toContain(`  ✅ 2  ${padded('Issue 2')}  30:00`)
+		expect(lines_of(header({ layout }))).toContain(`  ✅ 2    ${padded('Issue 2')}  30:00`)
 	})
 
 	it('draws no time for a child settled without a recorded end', () => {
 		const status = { state: 'done' as const, started_ms: STARTED }
 		const layout = { ...EMPTY_LAYOUT, active: [row(3, { state: 'done', status })] }
 
-		expect(lines_of(header({ layout }))).toContain('  🏁 3  Issue 3')
+		expect(lines_of(header({ layout }))).toContain('  🏁 3    Issue 3')
+	})
+})
+
+// joshuafolkken/kit#3577: the release kind's icon between the number and the title, one space either
+// side; a row with no kind draws two blank columns, so every title starts in one column.
+describe('run_board_render.render release kinds', () => {
+	it('draws each kind’s icon after the number, and a blank of its width where none is', () => {
+		const status = { state: 'merged' as const, started_ms: STARTED, ended_ms: STARTED + MINUTE }
+		const kinds = [
+			row(1, { kind: 'breaking-change', state: 'merged', status }),
+			row(2, { kind: 'enhancement', state: 'merged', status }),
+			row(3, { kind: 'bug', state: 'merged', status }),
+			row(4, { state: 'merged', status }),
+		]
+		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: kinds } }))
+
+		expect(lines).toContain(`  ✅ 1 🧨 ${padded('Issue 1')}  01:00`)
+		expect(lines).toContain(`  ✅ 2 ✨ ${padded('Issue 2')}  01:00`)
+		expect(lines).toContain(`  ✅ 3 🐛 ${padded('Issue 3')}  01:00`)
+		expect(lines).toContain(`  ✅ 4    ${padded('Issue 4')}  01:00`)
+	})
+
+	it('keeps the usual gap before the waits of a row with no title', () => {
+		const untitled = row(12, { kind: 'enhancement', title: undefined, waits: ['3'] })
+		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: [untitled] } }))
+
+		expect(lines).toContain('  ⏳ 12 ✨  🔗 3')
+	})
+
+	it('names the drawn kinds in the legend', () => {
+		const layout = { ...EMPTY_LAYOUT, active: [row(1, { kind: 'bug' }), row(2)] }
+
+		expect(lines_of(header({ layout })).at(-1)).toBe('⏳ waiting  🐛 fix')
 	})
 })
 
@@ -107,9 +141,9 @@ describe('run_board_render.render sections', () => {
 		expect(lines.slice(lines.indexOf(wave_rule), -4)).toStrictEqual([
 			wave_rule,
 			'  📁 10  Epic ten',
-			'     ├ ⏳ 11  Issue 11',
-			'     └ ⏳ 12  Issue 12',
-			`  ⏳ 5  ${'x'.repeat(run_board_render.TITLE_LIMIT - 1)}…  🔗 3409`,
+			'     ├ ⏳ 11    Issue 11',
+			'     └ ⏳ 12    Issue 12',
+			`  ⏳ 5    ${'x'.repeat(run_board_render.TITLE_LIMIT - 1)}…  🔗 3409`,
 		])
 	})
 
@@ -118,7 +152,7 @@ describe('run_board_render.render sections', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [row(7, { title })] }
 
 		expect(run_board_render.TITLE_LIMIT).toBe(48)
-		expect(lines_of(header({ layout }))).toContain(`  ⏳ 7  ${title}`)
+		expect(lines_of(header({ layout }))).toContain(`  ⏳ 7    ${title}`)
 	})
 
 	it('draws a decision row under the people rule and the legend at the foot', () => {
@@ -127,7 +161,7 @@ describe('run_board_render.render sections', () => {
 		const people_rule = rule('🙋')
 		const start = lines.indexOf(people_rule)
 
-		expect(lines.slice(start, start + 2)).toStrictEqual([people_rule, '  🙋 6  Issue 6'])
+		expect(lines.slice(start, start + 2)).toStrictEqual([people_rule, '  🙋 6    Issue 6'])
 		expect(lines.at(-1)).toBe('🙋 decision')
 	})
 })
@@ -142,7 +176,7 @@ describe('run_board_render.render chat', () => {
 		const lines = lines_of(header({ layout, form: 'chat' }))
 
 		expect(lines).toContain(`  📁 10  ${long_title}`)
-		expect(lines.at(-1)).toBe(`  🙋 6  ${long_title}`)
+		expect(lines.at(-1)).toBe(`  🙋 6    ${long_title}`)
 		expect(lines.join('\n')).not.toContain('🔚')
 	})
 
@@ -165,9 +199,9 @@ describe('run_board_render.render chat', () => {
 		})
 
 		expect(starts[0]).toBe(starts[1])
-		expect(lines).toContain(`  👀 1  ${long_title}  01:38  ${plain_track('review')}`)
+		expect(lines).toContain(`  👀 1    ${long_title}  01:38  ${plain_track('review')}`)
 		expect(lines).toContain(
-			`  👀 2  ${'Issue 2'.padEnd(long_title.length)}  01:00  ${plain_track('review')}`,
+			`  👀 2    ${'Issue 2'.padEnd(long_title.length)}  01:00  ${plain_track('review')}`,
 		)
 	})
 })
@@ -187,7 +221,7 @@ describe('run_board_render.render phase icons and spinner', () => {
 		const text = run_board_render.render({ header: board, notes: [] }).join('\n')
 
 		expect(text).not.toContain('\u{1B}')
-		expect(text).toContain('\n  👀 1  Issue 1')
+		expect(text).toContain('\n  👀 1    Issue 1')
 		expect(text).toContain('▶ backlogrun')
 	})
 })
@@ -207,8 +241,8 @@ describe('run_board_render.render running row lead', () => {
 		const spun = lines.find((line) => line.includes('Issue 1')) ?? ''
 		const still = lines.find((line) => line.includes('Issue 2')) ?? ''
 
-		expect(spun.startsWith('⠋ 👀 1  Issue 1')).toBe(true)
-		expect(still).toBe('  ⏳ 2  Issue 2')
+		expect(spun.startsWith('⠋ 👀 1    Issue 1')).toBe(true)
+		expect(still).toBe('  ⏳ 2    Issue 2')
 		expect(column_of(spun, 'Issue 1')).toBe(column_of(still, 'Issue 2'))
 	})
 
@@ -217,16 +251,16 @@ describe('run_board_render.render running row lead', () => {
 		const waves = [[{ kind: 'epic' as const, epic: 9, title: 'Epic', rows }]]
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, waves }, spinner: '⠙' }))
 
-		expect(lines.some((line) => line.startsWith('⠙    ├ 🚦 4  Issue 4'))).toBe(true)
-		expect(lines).toContain('     └ ⏳ 5  Issue 5')
+		expect(lines.some((line) => line.startsWith('⠙    ├ 🚦 4    Issue 4'))).toBe(true)
+		expect(lines).toContain('     └ ⏳ 5    Issue 5')
 	})
 
 	it('leads a running row with its newest phase’s icon, and 🔄 before its track draws one', () => {
 		const active = [running(1, NOW, 'commit'), running(2, NOW, undefined)]
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active } }))
 
-		expect(lines.some((line) => line.startsWith('  📦 1  Issue 1'))).toBe(true)
-		expect(lines.some((line) => line.startsWith('  🔄 2  Issue 2'))).toBe(true)
+		expect(lines.some((line) => line.startsWith('  📦 1    Issue 1'))).toBe(true)
+		expect(lines.some((line) => line.startsWith('  🔄 2    Issue 2'))).toBe(true)
 	})
 
 	// joshuafolkken/kit#3480: the legend is told the icon each row leads with, not its state's.
@@ -258,7 +292,7 @@ describe('run_board_render.render links', () => {
 		const lines = lines_of(header({ layout, link: bracketed }))
 
 		expect(lines).toContain('  📁 [10]')
-		expect(lines).toContain('     └ ⏳ [11]  Issue 11')
+		expect(lines).toContain('     └ ⏳ [11]    Issue 11')
 		expect(lines.join('\n')).toContain('🔗 [other/repo#7]')
 	})
 
@@ -266,8 +300,8 @@ describe('run_board_render.render links', () => {
 		const linked = lines_of(header({ layout, link: bracketed }))
 		const plain = lines_of(header({ layout }))
 
-		expect(linked).toContain(`  ✅ [2]  ${padded('Issue 2')}  01:00  🔗 [other/repo#7]`)
-		expect(plain).toContain(`  ✅ 2  ${padded('Issue 2')}  01:00  🔗 other/repo#7`)
+		expect(linked).toContain(`  ✅ [2]    ${padded('Issue 2')}  01:00  🔗 [other/repo#7]`)
+		expect(plain).toContain(`  ✅ 2    ${padded('Issue 2')}  01:00  🔗 other/repo#7`)
 	})
 })
 

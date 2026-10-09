@@ -17,7 +17,7 @@ const FINISH = /^🔚 \d{2}:\d{2}$/u
 function row(number: number, state: BoardRow['state'], ended_ms?: number): BoardRow {
 	const status = { state, started_ms: NOW - MINUTE, ended_ms, track: [] }
 
-	return { number, title: `Issue ${String(number)}`, state, status, waits: [] }
+	return { number, title: `Issue ${String(number)}`, kind: undefined, state, status, waits: [] }
 }
 
 const usages: LaneUsages = new Map([

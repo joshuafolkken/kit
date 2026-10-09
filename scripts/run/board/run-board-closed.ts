@@ -1,4 +1,5 @@
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
+import { issue_label_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
 import { issue_merged } from '#scripts/issue/issue-merged'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
@@ -12,12 +13,14 @@ import { z } from 'zod'
 
 interface ClosedIssue {
 	title: string
+	// Its label names, so a closed row still draws its release category (joshuafolkken/kit#3577).
+	labels: ReadonlyArray<string>
 	closed_ms: number | undefined
 	// Closed by a merged pull request, rather than closed by hand.
 	is_merged: boolean
 }
 
-const CLOSED_FIELDS = 'title,state,closedAt'
+const CLOSED_FIELDS = 'title,state,closedAt,labels'
 const CLOSED_STATE = 'CLOSED'
 const STILL_OPEN = 'open' as const
 
@@ -39,6 +42,7 @@ const closed_schema = z.looseObject({
 	title: z.string(),
 	state: z.string(),
 	closedAt: z.string().nullish(),
+	labels: z.array(issue_label_schema).default([]),
 })
 
 type ClosedView = z.infer<typeof closed_schema>
@@ -63,7 +67,9 @@ async function read_closed(issue: number): Promise<ClosedRead> {
 
 	if (is_merged === undefined) return undefined
 
-	return { title: view.title, closed_ms: closed_ms_of(view), is_merged }
+	const labels = view.labels.map((label) => label.name)
+
+	return { title: view.title, labels, closed_ms: closed_ms_of(view), is_merged }
 }
 
 async function read_all(
