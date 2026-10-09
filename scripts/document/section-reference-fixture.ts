@@ -56,6 +56,28 @@ function broken_section_references(text: string): Array<string> {
 		.map((reference) => `${reference.file} → "${reference.heading}"`)
 }
 
-const section_reference_resolution = { broken_section_references, exists }
+// A reference that names no file — `"Heading" above` or a bare `→ "Heading"` — has only the
+// document it sits in to resolve against (joshuafolkken/kit#3403).
+function broken_in_document(text: string, headings: ReadonlyArray<string>): Array<string> {
+	return headings
+		.filter((heading) => !EXAMPLE_HEADINGS.has(heading))
+		.filter((heading) => document_section.section(text, heading) === undefined)
+		.map((heading) => `"${heading}"`)
+}
+
+function broken_adjacent_references(text: string): Array<string> {
+	return broken_in_document(text, document_scan.adjacent_references(text))
+}
+
+function broken_bare_arrow_references(text: string): Array<string> {
+	return broken_in_document(text, document_scan.bare_arrow_references(text))
+}
+
+const section_reference_resolution = {
+	broken_adjacent_references,
+	broken_bare_arrow_references,
+	broken_section_references,
+	exists,
+}
 
 export { section_reference_resolution }
