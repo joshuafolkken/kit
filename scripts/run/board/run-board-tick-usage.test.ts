@@ -15,6 +15,8 @@ function reading(at_ms: number, cpu_ms: number): UsageMark {
 		at_ms,
 		processes: new Map([[1, { cpu_ms, rss_bytes: 100 }]]),
 		lanes: new Map([[1, String(LANE)]]),
+		parents: new Map(),
+		folded: new Set(),
 		cores: 1,
 		total_bytes: 1000,
 	}
