@@ -156,12 +156,50 @@ describe('backlog_arrival.arrivals', () => {
 	it('names only the issues absent from the baseline', () => {
 		const reading = { issues: ['2445', '2493'], free_lanes: FREE }
 
-		expect(backlog_arrival.arrivals(new Set(['2445']), reading)).toEqual(['2493'])
+		expect(backlog_arrival.arrivals(new Set(['2445']), reading, false)).toEqual(['2493'])
 	})
 
 	it('names none without a free lane', () => {
-		expect(backlog_arrival.arrivals(new Set(), { issues: ['2493'], free_lanes: NO_FREE })).toEqual(
-			[],
+		const reading = { issues: ['2493'], free_lanes: NO_FREE }
+
+		expect(backlog_arrival.arrivals(new Set(), reading, false)).toEqual([])
+		expect(backlog_arrival.arrivals(new Set(), reading, true)).toEqual([])
+	})
+
+	// joshuafolkken/kit#3434: the baseline's issues were waiting for a lane a raise has now made.
+	it('names the whole pool once the lane limit was raised', () => {
+		const reading = { issues: ['2445'], free_lanes: FREE }
+
+		expect(backlog_arrival.arrivals(new Set(['2445']), reading, true)).toEqual(['2445'])
+	})
+})
+
+function watch_of(raised: { is_raised: boolean }): () => Promise<() => boolean> {
+	return async () => () => raised.is_raised
+}
+
+describe('backlog_arrival.start — a raised lane limit wakes the parent', () => {
+	it('wakes for a pool the baseline already holds once the limit is raised', async () => {
+		const pool = { issues: ['2445'], free: FREE }
+		const raised = { is_raised: false }
+		const probe = await backlog_arrival.start(START_MS, ports_of(pool), parent, watch_of(raised))
+
+		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
+
+		raised.is_raised = true
+
+		await expect(probe.has_arrived(START_MS + MINUTE_MS + MINUTE_MS)).resolves.toBe(true)
+	})
+
+	it('does not wake on a raise that freed no lane', async () => {
+		const pool = { issues: ['2445'], free: NO_FREE }
+		const probe = await backlog_arrival.start(
+			START_MS,
+			ports_of(pool),
+			parent,
+			watch_of({ is_raised: true }),
 		)
+
+		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
 	})
 })
