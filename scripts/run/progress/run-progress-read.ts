@@ -12,22 +12,22 @@ import type { ChildObservation, LaneObservation, Observations } from './run-prog
 import { run_progress_clock } from './run-progress-clock'
 
 // Everything `josh run:progress` reads: the last-report record that makes the clock a silence clock,
-// and the observations one tick puts on the line (joshuafolkken/kit#1520).
+// and the observations one tick puts on the line.
 //
 // **Every reader here is one that already exists.** The children in flight come from
 // `epic_busy.read_repository`, which is the same `in-progress` listing `epicrun` sizes its lanes
 // from — a second definition of "running" would let the progress line disagree with the loop that
 // printed the child. The pull request comes from `run_preflight`, the lanes from `lane_registry`, and
-// the transcript sample from `run_liveness.sample_output`, whose symlink-following `statSync` is the
-// whole of joshuafolkken/kit#1485; re-`stat`ing the path here would reintroduce that bug.
+// the transcript sample from `run_liveness.sample_output`, whose symlink-following `statSync` is
+// load-bearing; re-`stat`ing the path here would risk losing it.
 //
 // **The record is kept per work tree**, keyed the way `run_hold` keys its own: two lanes of one
 // repository are two runs, and one lane's report must not silence the other's clock.
 
 // The record itself — its name, its shape, and how it is read and written — lives in
 // `run-progress-clock.ts`, because the trigger-delivered rule that refuses an early heartbeat reads
-// the same record from inside a `PreToolUse` hook and cannot await the git call this file makes
-// (joshuafolkken/kit#1570). What stays here is the asynchronous way of naming the work tree.
+// the same record from inside a `PreToolUse` hook and cannot await the git call this file makes.
+// What stays here is the asynchronous way of naming the work tree.
 const { mark, parse_stamp, read_last_report } = run_progress_clock
 
 const FIRST_LOAD_AVERAGE = 0
@@ -37,7 +37,7 @@ const FIRST_LOAD_AVERAGE = 0
 // can mean "there is nothing to report", and saying so for the third would be a confident absence
 // built on a read nobody completed. **The middle one is `idle` only when no run has started** — a run
 // underway with no `in-progress` child yet is `observed` with an empty `children`, which is the
-// heartbeat this file emits before the first label appears (joshuafolkken/kit#1900).
+// heartbeat this file emits before the first label appears.
 type ObservationRead =
 	{ kind: 'idle' } | { kind: 'observed'; observations: Observations } | { kind: 'unreadable' }
 
@@ -59,13 +59,13 @@ async function stamp_target(): Promise<string> {
 }
 
 // The ambient log's path, a sibling of the report clock — the surface `josh run:progress --path` names
-// so a person can keep it open across a session cut (joshuafolkken/kit#2156).
+// so a person can keep it open across a session cut.
 async function log_target(): Promise<string> {
 	return run_progress_clock.log_path_of(await stamp_target())
 }
 
 // The watcher's liveness record, resolved through the same resolver as `stamp_target`, so the file the
-// watcher begins is the file `josh followup` removes at the merge (joshuafolkken/kit#1821).
+// watcher begins is the file `josh followup` removes at the merge.
 async function live_target(): Promise<string> {
 	return run_progress_clock.life_target_of(await worktree_git_directory())
 }
@@ -146,8 +146,7 @@ async function has_run_record(): Promise<boolean> {
 
 /**
  * Whether a run has started in this checkout, read from a mechanical record rather than from the
- * `in-progress` label — the label is exactly what is missing in the window this bridges
- * (joshuafolkken/kit#1900).
+ * `in-progress` label — the label is exactly what is missing in the window this bridges.
  *
  * A registered lane covers an `epicrun` / `backlogrun` parent whose child has not labelled yet — and
  * it is the one signal already read for the line, so it is asked first and short-circuits the git

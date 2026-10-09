@@ -3,12 +3,12 @@ import { run_event_scope } from './run-event-scope'
 import { run_event_stream, type RunEvent } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
 
-// The `plan` event `run:board` draws 📝 from, written by code rather than by a step a child runs by hand
-// (joshuafolkken/kit#3536). The hand-run emit was skipped by most children — and by every `run:planned`
-// issue, whose entry starts past the plan — so the track went 🔍🔨. Two callers write it: `run:entry`
-// when a planned issue is claimed, and the first implementation edit of a lane child, which is where the
-// Step 0 work summary falls due. **Once per launch of the issue**, so the second of the two adds nothing,
-// while a re-dispatched child — whose launch restarts its `run:board` track — writes its own.
+// The `plan` event `run:board` draws 📝 from, written by code rather than by a step a child runs by hand,
+// which children skip — and every `run:planned` issue's entry starts past the plan. Two callers write
+// it: `run:entry` when a planned issue is claimed, and the first implementation edit of a lane child,
+// which is where the Step 0 work summary falls due. **Once per launch of the issue**, so the second
+// of the two adds nothing, while a re-dispatched child — whose launch restarts its `run:board` track —
+// writes its own.
 
 const KIND = run_event_stream.EVENT_KIND.PLAN
 const PLAN_VERB = 'planned'

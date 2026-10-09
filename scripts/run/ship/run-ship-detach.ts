@@ -10,11 +10,9 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { z } from 'zod'
 
-// `josh ship --detach` — hand the post-implementation region to a supervisor that outlives the agent
-// (joshuafolkken/kit#2428). A lane child used to take the pre-gate cut and relaunch a fresh agent session
-// to drive the gate, the review and the merge; that session re-read the issue to run fixed procedure,
-// and the wake role it billed was 59.8% of a run's wall time. This starts `josh ship` itself as a
-// detached process instead, so the agent ends at the hand-off and nothing but the mechanical region runs.
+// `josh ship --detach` — hand the post-implementation region to a supervisor that outlives the agent.
+// This starts `josh ship` itself as a detached process, so the agent ends at the hand-off and nothing
+// but the mechanical region runs.
 //
 // **The supervisor's command line ends with the `"<title> #<N>"` title**, which is what the parent's
 // liveness pattern (`lane-child-invocation.ts`) anchors on — so a lane whose agent has ended is still
@@ -26,7 +24,7 @@ import { z } from 'zod'
 // while that process is alive is refused `busy`: two supervisors would race each other's commit and
 // merge, which the resume record (`run-ship-stage.ts`) orders but cannot serialize.
 //
-// **The supervisor names itself once it starts** (joshuafolkken/kit#2642). The launcher reads the child's
+// **The supervisor names itself once it starts**. The launcher reads the child's
 // start time from outside, which a sandbox that refuses `ps` cannot answer; a pid with no start time
 // would then be believed for as long as any process holds that number. The supervisor therefore claims
 // the record with its own identity — whose socket beacon answers where `ps` cannot — and a record still
@@ -293,7 +291,7 @@ function launch(request: DetachRequest): DetachResult {
 			cwd: request.cwd,
 			log_path: log,
 			// The provider travels as a mark because the launch strips the session keys that name it, and
-			// `ship --review` resolves its reviewer from it (joshuafolkken/kit#2456).
+			// `ship --review` resolves its reviewer from it.
 			env: supervisor_environment(launch_id),
 		},
 		(note) => {

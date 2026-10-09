@@ -1,5 +1,5 @@
 // The shape an issue number may take where a `run:*` command interpolates it, and the refusal when
-// it does not (joshuafolkken/kit#1485).
+// it does not.
 //
 // It sits in its own module because two commands need the same answer and a rule copied into two
 // files is a rule kept correct in one. `run:hold`'s preflight check interpolates the number into a

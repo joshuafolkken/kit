@@ -8,12 +8,10 @@ import { run_carry_added, type CarryAddition } from './run-carry-added'
 import { run_carry_change } from './run-carry-change'
 import { run_carry_conversation } from './run-carry-conversation'
 
-// joshuafolkken/kit#1714: a `backlogrun` declares a budget — `--max`, `--idle` and the 8-hour
-// whole-run bound — and then loses all of it at the session cut, because the cut ends the session and
-// the next one starts from nothing. The decision recorded on that issue is that **the cut is an
-// execution detail of the same authorization**, so the budget has to survive it. Nothing in this
-// repository persisted a run across sessions before: `backlogrun-progress.md` → "What carries over" reads its
-// state back off GitHub, and there is no epic to read it off when the run began from the backlog.
+// A `backlogrun` declares a budget — `--max`, `--idle` and the 8-hour whole-run bound — and the session
+// cut ends the session, so the next one would start from nothing. **The cut is an execution detail of
+// the same authorization**, so the budget has to survive it: this record carries it across sessions,
+// where there is no epic to read progress back off when the run began from the backlog.
 //
 // **The unit is the repository, not the working tree.** `run-hold.ts` keys on the work tree's own git
 // directory because what it guards is one branch, one index and one diff. What this record guards is
@@ -25,10 +23,10 @@ import { run_carry_conversation } from './run-carry-conversation'
 // obeys. A run that reads `expired` has spent the bound whatever any count says.
 //
 // **Whose record it is, is decided by liveness and by a declared hand-off — never by the invocation
-// text** (joshuafolkken/kit#1722). Comparing the `invocation` string was the first answer, and it
-// walks straight through the case that happens most: a run dies, a person retypes the same command,
-// and the string matches, so the fresh session inherits the dead run's counters and a `started_at`
-// hours old. Two things replace it. The record names the **long-lived process spending the budget**
+// text**. Comparing the `invocation` string alone walks straight through the case that happens most: a
+// run dies, a person retypes the same command, and the string matches, so the fresh session would
+// inherit the dead run's counters and a `started_at` hours old. Two things decide instead. The record
+// names the **long-lived process spending the budget**
 // — `owner_pid` with the start time that tells a reused pid apart, the identity pair
 // `process-identity.ts` already keeps for every other record — so a second parent asking for a
 // record whose owner is still running is refused rather than told it may count into it. And a
@@ -42,19 +40,19 @@ const REPOSITORY_DIRECTORY_INDEX = 1
 // "Waiting, and never waiting forever" states the figure and that module applies it; a second copy
 // here would drift, and the drift is silent in exactly the direction that matters — raised there and
 // still 8 here, this record answers `expired`, `--begin` replaces it, and the budget restarts at
-// zero, which is the defect joshuafolkken/kit#1714 exists to prevent.
+// zero — the loss this record exists to prevent.
 const CARRY_MAX_AGE_HOURS = backlog_budget.WHOLE_RUN_BUDGET_HOURS
 const CARRY_MAX_AGE_MS = backlog_budget.WHOLE_RUN_BUDGET_MS
 const NO_INCREMENT = 0
 
-// The most session cuts one invocation may take (joshuafolkken/kit#2346). This bounds `cuts`, which
+// The most session cuts one invocation may take. This bounds `cuts`, which
 // only `run:carry --cut` increments — a `backlogrun`'s session hand-off at a child's merge (~one per
 // 50 minutes over the 8-hour whole-run budget), not the `run:cut` phase cuts a lane child takes. Each
 // cut drops the context it accumulated but pays a cold preamble to resume, so past a point the
 // re-establishment costs more than the accumulation it sheds; six sits well under the ~10 an 8-hour run
 // could otherwise take and refuses a run that has begun to churn. `is_at_cut_cap` reads it, and the
 // `--cut` count is refused at it rather than incrementing past it — except a headless judgment
-// session's hand-back to the driver, which `run_headless.is_cut_capped` exempts (joshuafolkken/kit#3454).
+// session's hand-back to the driver, which `run_headless.is_cut_capped` exempts.
 const MAX_CUTS = 6
 
 const END_COMMAND = 'pnpm josh run:carry --end'
@@ -77,22 +75,21 @@ interface RunCarry {
 	merged_issues?: ReadonlyArray<number> | undefined
 	filed: number
 	cuts: number
-	// The consecutive-failure streak (joshuafolkken/kit#2024). It is the count the stopped-unit guard
-	// leans on to notice the environment is at fault, and it lived only in the epic progress comment
-	// before this — the second place a counter was kept. Folded into the record so the record is the
-	// single source and the comment is generated from it. **A merge resets it to zero**: three failures
+	// The consecutive-failure streak. It is the count the stopped-unit guard leans on to notice the
+	// environment is at fault, kept in the record so the record is the single source and the epic
+	// progress comment is generated from it. **A merge resets it to zero**: three failures
 	// in a row stop the run, and a child that merged in between breaks the streak. Read through
 	// `apply_change`, never bumped from outside, so the reset stays with the increment.
 	failures: number
-	// The consecutive-API-outage streak (joshuafolkken/kit#2240). It is kept apart from `failures`
+	// The consecutive-API-outage streak. It is kept apart from `failures`
 	// because a child that could not reach the API is not a child that failed: an outage is not counted
 	// against the consecutive-failure guard, and this streak is its own environment-broken guard — a run
 	// of outages stops the run rather than re-dispatching into a dead API forever. **A merge or a genuine
 	// child failure resets it**, because both prove the API was reachable; only a further outage adds to
-	// it. Defaulted to zero so a record written before this field existed still parses.
+	// it.
 	outages: number
 	// When the last *counted* outage was booked, so a burst of outages from one network event folds into
-	// a single streak step rather than several (joshuafolkken/kit#2317). Read by `run-carry-streak.ts`
+	// a single streak step rather than several. Read by `run-carry-streak.ts`
 	// against its fold window; set only when an outage counts, cleared when the API proves reachable.
 	// Optional and `| undefined` for the same disk round-trip reason the owner fields carry.
 	last_outage_at?: string | undefined
@@ -100,8 +97,7 @@ interface RunCarry {
 	// a pid it explicitly does not read back, because the process that claims a work tree is the
 	// short-lived `josh run:hold` itself; here the owner is the parent loop's own session, which
 	// outlives every command it issues, so the pid is what a second parent is refused against. Both
-	// halves are optional: a record written before this field existed, or by a caller that named no
-	// owner, is simply not provably live.
+	// halves are optional: a record by a caller that named no owner is simply not provably live.
 	//
 	// **`| undefined` explicitly, rather than the bare optional `exactOptionalPropertyTypes` prefers.**
 	// The record round-trips through `JSON.stringify`, which drops a property whose value is
@@ -110,33 +106,31 @@ interface RunCarry {
 	owner_pid?: number | undefined
 	owner_start?: string | undefined
 	// The owner conversation's transcript, which outlives a restart of its process
-	// (`run-carry-conversation.ts`, joshuafolkken/kit#3137). Optional for the same reason as the pid.
+	// (`run-carry-conversation.ts`). Optional for the same reason as the pid.
 	owner_transcript?: string | undefined
 	// Set by `--cut`, and by nothing else. A crash never reaches `--cut`, which is what makes a
 	// declared cut the only standing record carried without a person deciding.
 	is_handed_off?: boolean | undefined
-	// The issues this invocation has already finished, as `--done <N>` recorded them
-	// (joshuafolkken/kit#1774; folded into `backlogrun` by joshuafolkken/kit#1984). **It exists because
-	// a named-issue invocation must not shrink.** The obvious way to resume
-	// `backlogrun #1762 #1749 #1759` after #1762 merged is to begin again as `backlogrun #1749 #1759` —
-	// and `classify_claim` compares the invocation character for character, so that answers `mismatch`
-	// and the run stops. Pinning the string to the opening list and keeping the progress here leaves
-	// that comparison, and joshuafolkken/kit#1722's single-writer guarantee with it, exactly as it was.
+	// The issues this invocation has already finished, as `--done <N>` recorded them. **It exists
+	// because a named-issue invocation must not shrink.** Resuming `backlogrun #1 #2 #3` after #1 merged
+	// as `backlogrun #2 #3` would answer `mismatch`, because `classify_claim` compares the invocation
+	// character for character. Pinning the string to the opening list and keeping the progress here
+	// leaves that comparison, and the single-writer guarantee with it, intact.
 	// `merged` cannot serve: it is a count of merges rather than a set of issues, so a child that ended
 	// without one — `already-done`, or a park — would shift every remaining position by one.
 	done?: ReadonlyArray<number> | undefined
-	// Whether this invocation's end-of-run retrospective has already run (joshuafolkken/kit#2328). It
+	// Whether this invocation's end-of-run retrospective has already run. It
 	// is the state the two run-ending points hold so `run:step` prints the retrospective exactly once:
 	// the record is one per invocation and survives every session cut, so a run cannot repeat it after a
 	// resume, and `--end` removes the record so it cannot leak into the next invocation. Set by
 	// `--retrospective`, and carried across a hand-off like `done`. Optional and `| undefined` for the
 	// same disk round-trip reason the owner fields carry.
 	retrospective?: boolean | undefined
-	// The issues `pnpm josh run:add` put into a named run after it began (joshuafolkken/kit#3433),
+	// The issues `pnpm josh run:add` put into a named run after it began,
 	// kept beside `invocation` so the ownership comparison never sees them. Optional and `| undefined`
 	// for the same disk round-trip reason the owner fields carry.
 	added?: ReadonlyArray<CarryAddition> | undefined
-	// The lane limit `josh lane:limit` set on this live run (joshuafolkken/kit#3434). It outranks
+	// The lane limit `josh lane:limit` set on this live run. It outranks
 	// `JOSH_LANE_LIMIT` in `lane_capacity.lane_limit`: a running parent keeps the environment it started
 	// with, and the record is the one place both it and a person's shell read. Carried across a hand-off
 	// like `done`; optional and `| undefined` for the same disk round-trip reason.
@@ -166,18 +160,17 @@ interface CarryClaimRequest {
 }
 
 // Every counter is an increment rather than a total: a run that sent a total would be sending an
-// arithmetic it had done in its head, which is the one-shot judgement joshuafolkken/kit#1460
-// measured a run walking past.
+// arithmetic it had done in its head, a one-shot judgement a run can walk past.
 interface CarryChange {
 	merged?: number
 	merged_issue?: number
 	filed?: number
 	cuts?: number
-	// One failed child to add to the streak (joshuafolkken/kit#2024). It is never sent in the same
+	// One failed child to add to the streak. It is never sent in the same
 	// change as `merged` — a child either merged or it did not — and a change that carries `merged`
 	// resets the streak regardless of this field.
 	failures?: number
-	// One API-outage child to add to the outage streak (joshuafolkken/kit#2240). Never sent with
+	// One API-outage child to add to the outage streak. Never sent with
 	// `merged` or `failures` — a child either merged, failed, or could not reach the API — and both of
 	// those reset this streak.
 	outages?: number
@@ -185,7 +178,7 @@ interface CarryChange {
 	// thing rather than an amount, because what a resumed named-issue run needs is *which* issues are
 	// finished.
 	done?: number
-	// Marks the end-of-run retrospective as run (joshuafolkken/kit#2328). It only ever sets the flag,
+	// Marks the end-of-run retrospective as run. It only ever sets the flag,
 	// never clears it: a retrospective that has run stays run for the rest of the invocation.
 	retrospective?: boolean
 }
@@ -209,25 +202,19 @@ const run_carry_schema = z.object({
 	merged_issues: z.array(z.number()).optional(),
 	filed: z.number(),
 	cuts: z.number(),
-	// Defaulted, so a record written before this field existed parses with a zero streak rather than
-	// failing to read — the same backward-compatibility the optional owner fields below carry.
+	// Defaulted, so a record that lacks the streak parses with a zero streak rather than failing to read.
 	failures: z.number().default(0),
-	// Defaulted for the same backward-compatibility as `failures` (joshuafolkken/kit#2240).
 	outages: z.number().default(0),
-	// Optional, so a record written before the outage fold existed still parses (joshuafolkken/kit#2317).
 	last_outage_at: z.string().optional(),
-	// Optional, so a record written by the previous shape still parses. Read as "no owner declared",
-	// which is the not-provably-live answer rather than a live one.
+	// An absent owner reads as "no owner declared", which is the not-provably-live answer rather than a
+	// live one.
 	owner_pid: z.number().optional(),
 	owner_start: z.string().optional(),
 	owner_transcript: z.string().optional(),
 	is_handed_off: z.boolean().optional(),
 	done: z.array(z.number()).optional(),
-	// Optional, so a record written before the retrospective existed still parses (joshuafolkken/kit#2328).
 	retrospective: z.boolean().optional(),
-	// Optional, so a record written before `run:add` existed still parses (joshuafolkken/kit#3433).
 	added: z.array(carry_addition_schema).optional(),
-	// Optional, so a record written before `lane:limit` existed still parses (joshuafolkken/kit#3434).
 	lane_limit: z.number().int().positive().optional(),
 })
 
@@ -347,8 +334,7 @@ function adopt_carry(
 	carry: RunCarry,
 	owner: CarryOwner = NO_OWNER,
 ): RunCarry | undefined {
-	// The run's own fields carry across untouched — the counters, the outage fold timestamp
-	// (joshuafolkken/kit#2317), `done` so the successor does not re-run what the cut session finished,
+	// The run's own fields carry across untouched — the counters, the outage fold timestamp, `done` so the successor does not re-run what the cut session finished,
 	// and `retrospective` so a run resumed after a cut does not repeat its retrospective. Only the three
 	// ownership fields are overridden: the new owner replaces the old — a caller that declared none
 	// writes `undefined`, so the previous owner cannot survive — and the declared hand-off is spent.
@@ -383,7 +369,7 @@ function is_owned_by(carry: RunCarry, owner: CarryOwner): boolean {
 
 // The one case that is not this caller's to touch: the record's owner is still running and it is
 // somebody else. **The invocation text is not consulted** — a live owner holds the budget whatever
-// either command line says, which is the whole of joshuafolkken/kit#1722.
+// either command line says.
 function is_foreign_live_owner(carry: RunCarry, owner: CarryOwner): boolean {
 	return is_owner_live(carry) && !is_owned_by(carry, owner)
 }
@@ -392,21 +378,19 @@ function is_handed_off_to(carry: RunCarry, invocation: string): boolean {
 	return carry.is_handed_off === true && carry.invocation === invocation
 }
 
-// **The order is the rule, and a declared hand-off comes first** (joshuafolkken/kit#1935). Liveness
-// used to be checked ahead of it, on the assumption that the cutting process dies right after `--cut`,
-// so a live owner over a handed-off record could only be a second parent racing in. That assumption
-// fails twice: a `backlogrun` cut from an interactive session never ends its process, and a lane child
-// cut before the gate can be woken again by a background task's notification — and in both the live
-// owner *is* the session that cut, so liveness-first answered `busy` forever and no successor could
-// ever take over. Reading the hand-off first hands the record to exactly one successor regardless of
-// whether the cutting process is still alive, and it is safe because a hand-off requires the explicit
-// `--cut` flag a crash never reaches, so the cross-run inheritance joshuafolkken/kit#1722 removes still
-// cannot arise: a retyped command over a crashed record has no hand-off to match. Uniqueness is
+// **The order is the rule, and a declared hand-off comes first.** The cutting process does not always
+// die after `--cut`: a `backlogrun` cut from an interactive session never ends its process, and a lane
+// child cut before the gate can be woken again by a background task's notification — in both the live
+// owner *is* the session that cut, so checking liveness first would answer `busy` forever and no
+// successor could take over. Reading the hand-off first hands the record to exactly one successor
+// regardless of whether the cutting process is still alive, and it is safe because a hand-off requires
+// the explicit `--cut` flag a crash never reaches, so cross-run inheritance cannot arise: a retyped
+// command over a crashed record has no hand-off to match. Uniqueness is
 // `adopt_carry`'s — it spends `is_handed_off` and rewrites the owner, so the *second* would-be
 // successor reads a record no longer handed off, owned by a live foreign process, and is answered
 // `busy`. Then: a live foreign owner over a record no cut handed off is refused, a different invocation
 // is named as such, and what is left — the same command retyped over a record no cut handed off — is
-// `standing`, which is the one answer that used to read `resumed`.
+// `standing`.
 function classify_claim(carry: RunCarry, request: CarryClaimRequest): CarryClaim {
 	if (is_handed_off_to(carry, request.invocation)) return 'resume'
 
@@ -417,19 +401,18 @@ function classify_claim(carry: RunCarry, request: CarryClaimRequest): CarryClaim
 	return request.is_adoption ? 'resume' : 'standing'
 }
 
-// **A budget count is refused unless this session is the record's live owner**
-// (joshuafolkken/kit#1935). Two records reach here that are not this session's to advance: one the
+// **A budget count is refused unless this session is the record's live owner.** Two records reach here that are not this session's to advance: one the
 // cutting session handed off but no successor has adopted yet — `is_handed_off` still set, so a stray
 // count from the cutting session would spend the hand-off back to `false` and strand the successor —
 // and one a successor has already adopted, now owned by a live foreign process, whose budget is that
-// successor's. Both keep joshuafolkken/kit#1722's single writer: only the owner advances the counters.
+// successor's. Both keep a single writer: only the owner advances the counters.
 // The hand-off is read first because a cut does not change the owner, so the cutting session is still
 // its *own* owner between the cut and the adoption, and the foreign check would let it through.
 function is_count_refused(carry: RunCarry, owner: CarryOwner): boolean {
 	return carry.is_handed_off === true || is_foreign_live_owner(carry, owner)
 }
 
-// Whether the invocation has already taken its maximum cuts (joshuafolkken/kit#2346). Read by the CLI
+// Whether the invocation has already taken its maximum cuts. Read by the CLI
 // before a `--cut` count so a run that has begun to churn is refused another cut rather than paying a
 // cold preamble the accumulation it sheds no longer covers.
 function is_at_cut_cap(carry: RunCarry): boolean {
@@ -440,7 +423,7 @@ function end_carry(target: string): void {
 	stamp_file.remove_stamp(target)
 }
 
-// Whether the read record marks its retrospective as already run (joshuafolkken/kit#2328). A read with
+// Whether the read record marks its retrospective as already run. A read with
 // no record — `none` or `unreadable` — is not a run whose retrospective has run, so it answers `false`;
 // `run:step` reads it to decide whether the stop position still owes a retrospective.
 function retrospective_done_of(read: CarryRead): boolean {
@@ -453,8 +436,7 @@ function retrospective_done_of(read: CarryRead): boolean {
 // be a second copy of a subtraction the record already determines, free to disagree with it; computed
 // here, `--json` answers the successor's one question — which issues are left, in the order they were
 // declared — so nothing downstream has to subtract two lists by hand. An invocation that named no
-// issues answers `undefined`, which `JSON.stringify` drops: a budget-only `backlogrun` record is
-// unchanged by this. The issues `run:add` put in are folded in by `run_carry_added.ordered`.
+// issues answers `undefined`, which `JSON.stringify` drops. The issues `run:add` put in are folded in by `run_carry_added.ordered`.
 function remaining_of(carry: RunCarry | undefined): ReadonlyArray<number> | undefined {
 	if (carry === undefined) return undefined
 
@@ -515,7 +497,7 @@ function standing_message(carry: RunCarry): string {
 
 // The count refusal reads differently by cause: a record awaiting its successor, or one a successor
 // already holds. Both say nothing was counted, so a loop that believed it was advancing a budget stops
-// rather than keeping its own tally over a record it does not own (joshuafolkken/kit#1935).
+// rather than keeping its own tally over a record it does not own.
 function count_refused_message(carry: RunCarry): string {
 	if (carry.is_handed_off === true) {
 		return `This budget was handed off at a cut and is waiting for its successor — ${describe_carry(carry)}. Nothing was counted; the cutting session must not advance a handed-off budget.`

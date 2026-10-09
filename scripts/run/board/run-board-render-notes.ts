@@ -2,10 +2,9 @@ import { run_board_kind } from './run-board-kind'
 import { run_board_labels, type Words } from './run-board-labels'
 import type { BoardNote } from './run-board-notes'
 
-// The findings section at the foot of `run:board` (joshuafolkken/kit#3430) and the part of the legend
-// that names its symbols. A finding is read to the minute (joshuafolkken/kit#3489), and the legend names
-// only the kinds the section draws — the rows' legend's rule (joshuafolkken/kit#3480) — so a section of
-// filed Issues alone is not explained with 💬 and 💤.
+// The findings section at the foot of `run:board` and the part of the legend that names its symbols.
+// A finding is read to the minute, and the legend names only the kinds the section draws — the rows'
+// legend's rule — so a section of filed Issues alone is not explained with 💬 and 💤.
 
 const { FILED_KIND_ICONS, KIND_WORDS, NOTES_ICON, NOTE_ICONS, STATE_ICONS, WORDS, minute_of } =
 	run_board_labels
@@ -38,7 +37,7 @@ function found_of(note: BoardNote, link: Link): string {
 }
 
 // Where the legend names the symbols a note leads with its icon alone; where no legend is drawn it
-// keeps the kind's word (joshuafolkken/kit#3478).
+// keeps the kind's word.
 function note_text(note: BoardNote, has_legend: boolean, link: Link): string {
 	const kind = has_legend ? undefined : WORDS[note.kind]
 	const issue = note.issue === undefined ? undefined : link(note.issue)
@@ -50,8 +49,8 @@ function note_text(note: BoardNote, has_legend: boolean, link: Link): string {
 }
 
 // The newest few, so the section never pushes the plan off the screen; the frame counts the rest
-// together with any it cuts to fit (joshuafolkken/kit#3505). Their numbers go through the board's
-// `header.link`, so they open their GitHub issue as the plan's rows do (joshuafolkken/kit#3520).
+// together with any it cuts to fit. Their numbers go through the board's `header.link`, so they open
+// their GitHub issue as the plan's rows do.
 function note_lines(
 	notes: ReadonlyArray<BoardNote>,
 	has_legend: boolean,
@@ -60,7 +59,7 @@ function note_lines(
 	return notes.slice(0, NOTE_LIMIT).map((note) => note_text(note, has_legend, link))
 }
 
-// 📌 while the section is on screen (joshuafolkken/kit#3478), then each kind a drawn line leads with —
+// 📌 while the section is on screen, then each kind a drawn line leads with —
 // one the rows' legend already names (`named`) is not named twice.
 function notes_legend(notes: ReadonlyArray<BoardNote>, named: ReadonlySet<string>): Array<string> {
 	if (notes.length === 0) return []

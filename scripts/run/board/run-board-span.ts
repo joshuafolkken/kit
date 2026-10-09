@@ -3,7 +3,7 @@ import type { EndedRun } from '#scripts/run/carry/run-carry-ended'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 
-// Which run `run:board` draws (joshuafolkken/kit#3439): the running one while its carry record is here,
+// Which run `run:board` draws: the running one while its carry record is here,
 // else the one `run:carry --end` last ended, kept on screen until the next run begins. Both ends of the
 // span come from a record — the carry's start, the ended run's start and end — never from the screen.
 
@@ -39,7 +39,7 @@ function span_of(read: CarryRead, ended: EndedRun | undefined): BoardSpan | unde
 	return { invocation: read.carry.invocation, started_ms, ended_ms: undefined }
 }
 
-// The session a person resumes a stopped run from (joshuafolkken/kit#3437): only while the ended run is
+// The session a person resumes a stopped run from: only while the ended run is
 // the one drawn, and only when it stopped rather than finished. A run that begins hides it at once.
 function resume_of(read: CarryRead, ended: EndedRun | undefined): string | undefined {
 	if (read.kind !== 'none' || ended?.stopped === undefined) return undefined

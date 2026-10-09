@@ -1,11 +1,10 @@
 import { stamp_file } from '#scripts/josh/stamp-file'
 import type { RunCarry } from './run-carry'
 
-// joshuafolkken/kit#3433: a named `backlogrun #N` run, with or without `--only`, derives its named list
-// from the `invocation` string, so an issue a person wants to add mid-run had nowhere to go. **The
-// invocation is not
-// rewritten** — `classify_claim` compares it character for character to decide who owns the record, so
-// an edited invocation would answer `mismatch` at the next resume. The additions are kept beside it,
+// A named `backlogrun #N` run, with or without `--only`, derives its named list from the `invocation`
+// string. **The invocation is not rewritten** to add an issue mid-run — `classify_claim` compares it
+// character for character to decide who owns the record, so an edited invocation would answer
+// `mismatch` at the next resume. The additions are kept beside it,
 // each marked with whether it jumps the queue (`pnpm josh run:add`) or joins its end
 // (`--no-priority`), and `remaining_of` folds them into the one ordered list the run reads.
 interface CarryAddition {

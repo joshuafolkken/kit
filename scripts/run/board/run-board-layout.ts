@@ -8,7 +8,7 @@ import type { FiledKind } from '#scripts/run/event/run-event-filed'
 import { run_board_kind } from './run-board-kind'
 import type { ItemState, ItemStatus } from './run-board-status'
 
-// The plan with each issue's status laid over it (joshuafolkken/kit#3430) — pure, so the order the board
+// The plan with each issue's status laid over it — pure, so the order the board
 // draws is tested apart from the screen. **The order is the plan's**: the waves are `backlog_waves.build`'s,
 // the same play-forward `backlog:plan --waves` prints, so a merge, a park or a new arrival that changes the
 // plan changes the board with it. The plan leaves out what a run already holds or has closed, so those
@@ -22,8 +22,8 @@ interface BoardPlan {
 	// Which opted-in epic tracks which child (`Plan.tracked`).
 	tracked: ReadonlyMap<number, number>
 	context: PlanContext
-	// Each issue's label names as the open listing read them (joshuafolkken/kit#3459), so a running row
-	// is drawn as its labels say it stopped.
+	// Each issue's label names as the open listing read them, so a running row is drawn as its labels
+	// say it stopped.
 	labels: ReadonlyMap<number, ReadonlyArray<string>>
 }
 
@@ -114,8 +114,8 @@ function active_rows(statuses: ReadonlyMap<number, ItemStatus>, read: RowRead): 
 	return rows.toSorted((left, right) => started_of(left) - started_of(right))
 }
 
-// The epic row carries its own title (joshuafolkken/kit#3444), read from the same open listing as its
-// children's — an opted-in epic is an open issue.
+// The epic row carries its own title, read from the same open listing as its children's — an opted-in
+// epic is an open issue.
 function place_in_epic(
 	entries: Array<WaveEntry>,
 	epic: number,
@@ -185,9 +185,9 @@ function layout_of(plan: BoardPlan, statuses: ReadonlyMap<number, ItemStatus>): 
 
 const EMPTY_LAYOUT: BoardLayout = { active: [], waves: [], people: [], unreached: [] }
 
-// The run's own children before the plan is read (joshuafolkken/kit#3486): the stream and the lanes are
-// local and read at once, so the rows, their states and how long each has run are drawn while GitHub
-// answers; the titles and every issue the run has not touched wait for the plan.
+// The run's own children before the plan is read: the stream and the lanes are local and read at
+// once, so the rows, their states and how long each has run are drawn while GitHub answers; the titles
+// and every issue the run has not touched wait for the plan.
 function local_layout_of(statuses: ReadonlyMap<number, ItemStatus>): BoardLayout {
 	return {
 		...EMPTY_LAYOUT,

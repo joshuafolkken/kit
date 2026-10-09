@@ -3,14 +3,13 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
 import type { CarryRead } from './run-carry'
 
-// The run `run:carry --end` last ended (joshuafolkken/kit#3439). `--end` removes the carry record, and
-// the carry's `started_at` was the only mark of where an invocation began on the shared event stream, so
-// `run:board` lost the finished run the moment it ended and fell back to "no run". Nothing wrote a
-// whole-run `stop` either. This keeps the three facts the board needs to redraw that run — what it was
-// asked to do, when it began and when it ended — read from a record rather than guessed on screen.
+// The run `run:carry --end` last ended. `--end` removes the carry record, whose `started_at` is the only
+// mark of where an invocation began on the shared event stream, so without this `run:board` would lose
+// the finished run the moment it ended. This keeps the three facts the board needs to redraw that run —
+// what it was asked to do, when it began and when it ended — read from a record rather than guessed on
+// screen.
 //
-// **A stopped run also keeps why it stopped and the session that ran it** (joshuafolkken/kit#3437), so
-// the board can offer the command that resumes that session to the person the stop waits on. The
+// **A stopped run also keeps why it stopped and the session that ran it**, so the board can offer the command that resumes that session to the person the stop waits on. The
 // session is the owner's transcript name, which is the Claude session id; a run with no transcript —
 // a Codex parent — keeps none.
 //

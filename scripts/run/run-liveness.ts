@@ -11,22 +11,15 @@ import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_issue_number } from './run-issue-number'
 
 // `josh run:liveness <N>` — whether the delegated unit running child `<N>` is still working, or
-// stopped without reporting (joshuafolkken/kit#1485).
-//
-// joshuafolkken/kit#1212 wrote the detection as a conjunction of four traces an agent read by hand,
-// and it could not fire for the stop that actually happened. Its second trace required a **dirty**
-// checkout, justified by "a unit that died mid-implementation leaves exactly this" — so a unit that
-// died *before* implementing, while it was still reading the skill and the issue, left a clean tree
-// and the conjunction stayed false forever. Measured on 2026-09-06: the unit for
-// joshuafolkken/kit#1169 stopped seven minutes in, three of the four traces held, and the parent
-// went on calling the child in progress for 42 minutes until a person asked.
+// stopped without reporting.
 //
 // **Two traces decide it, and neither depends on whether implementation started**: the unit's output
-// has stopped growing, and no process of the child's is alive in that checkout. The dirty tree is
-// demoted from the test to an input of the recovery — it says whether there is anything to stash,
-// which is a different question from whether the unit is alive. "Nothing was ever opened for the
-// child" is dropped outright: it is also the normal state of a unit that has not reached its commit
-// yet, and the branch-and-pull-request question already has an owner in `josh run:hold`'s preflight check.
+// has stopped growing, and no process of the child's is alive in that checkout. A unit can die before
+// implementing and leave a clean tree, so the dirty tree is an input of the recovery, not of the test
+// — it says whether there is anything to stash, which is a different question from whether the unit
+// is alive. "Nothing was ever opened for the child" is not a trace either: it is also the normal
+// state of a unit that has not reached its commit yet, and the branch-and-pull-request question
+// already has an owner in `josh run:hold`'s preflight check.
 //
 // **The binding constraint is the direction of the error.** A live unit booked as stopped has its
 // working work killed; a stopped unit booked as alive costs waiting. So the ladder reads the one
@@ -37,9 +30,8 @@ import { run_issue_number } from './run-issue-number'
 // **The output read follows the link.** The path a unit writes its transcript to is a symbolic link, and
 // the link's own modification time never changes after it is created — read with the shell's `stat`,
 // which does not follow by default on macOS, the file looks frozen whether the unit is alive or
-// dead. That is the second half of joshuafolkken/kit#1485: the same parent reported a dead unit as
-// alive twice on such a read. `statSync` follows the link, and the size is compared as well as the
-// modification time, because it is the two-sample size comparison that actually proved liveness.
+// dead. `statSync` follows the link, and the size is compared as well as the modification time,
+// because it is the two-sample size comparison that actually proves liveness.
 
 const ALIVE_VERDICT = 'alive'
 const SETTLED_VERDICT = 'settled'
@@ -115,8 +107,8 @@ const ALIVE_ADVICE = 'Keep polling; do not touch the child.'
 const SETTLED_ADVICE =
 	'Read the child with `pnpm josh issue:state <N>` and take the branch its state says.'
 // The unit stopped, but *why* it stopped — abandoned mid-implementation, or dead because it could not
-// reach the API — is `run:ending`'s question, not this one's (joshuafolkken/kit#2277). Booking every
-// stop as a failure parked an API-outage child that should have been re-dispatched, so the recovery is
+// reach the API — is `run:ending`'s question, not this one's. Booking every stop as a failure would
+// park an API-outage child that should be re-dispatched, so the recovery is
 // routed through `run:merge --output`, the same composite a returned child takes: it reads the exit
 // record without waiting for the unit to return, re-dispatches an outage child (counting the outage,
 // and stopping the run on the environment guard once a run of them trips it), and parks an abandoned
@@ -152,8 +144,8 @@ function definitive_verdict(traces: Traces): LivenessVerdict | undefined {
 
 // A live process is a unit inside a long check — a `pnpm josh followup` waiting on CI writes
 // nothing for up to 32 minutes, which is longer than the silent window and is exactly the false
-// positive this trace exists to stop. **It is asked after the unreadable check rather than before it**
-// (joshuafolkken/kit#1485, review round 2): a `pgrep` scoped a shade too wide answers `alive` on a
+// positive this trace exists to stop. **It is asked after the unreadable check rather than before it**:
+// a `pgrep` scoped a shade too wide answers `alive` on a
 // machine running several kit projects at once, and read ahead of an output path that resolves to
 // nothing it would answer `alive` on every poll forever — the unbounded stall this command exists to
 // remove, reappearing where nothing would ever count it.
@@ -219,9 +211,8 @@ function to_resolved_root(root: string): string {
 // **Every root is listed in both spellings, and that is load-bearing rather than defensive.** `/tmp`
 // is a symbolic link to `/private/tmp` on macOS and `/var` one to `/private/var`, so a containment
 // test against one spelling rejects a transcript whose path was written as the other — `path.relative`
-// resolves no link. Measured on 2026-09-07: a transcript at `/private/tmp/claude-501/…` was refused,
-// every poll answered `undetermined`, and the parent could not detect a stopped unit at all — the
-// unbounded stall this command exists to remove, reappearing inside its own path check. Resolving the
+// resolves no link — and a refused transcript makes every poll answer `undetermined`, the unbounded
+// stall this command exists to remove, reappearing inside its own path check. Resolving the
 // *candidate* would not do instead: it does not exist yet in the "resolves to nothing" case, which has
 // to stay unreadable rather than throw.
 const ALLOWED_ROOTS: ReadonlyArray<string> = [
@@ -250,9 +241,8 @@ function to_safe_path(output_path: string): string | undefined {
 }
 
 // `statSync` follows a symbolic link; `lstatSync` and the shell's bare `stat` do not. That difference is
-// the whole of joshuafolkken/kit#1485's second symptom, so it is stated here rather than left to a
-// reader to know. A path that resolves to nothing, or to something that is not a regular file, is
-// unreadable rather than frozen.
+// load-bearing, so it is stated here rather than left to a reader to know. A path that resolves to
+// nothing, or to something that is not a regular file, is unreadable rather than frozen.
 function sample_output(output_path: string): OutputSample | undefined {
 	const safe_path = to_safe_path(output_path)
 
@@ -323,7 +313,7 @@ function carries_label(labels: ReadonlyArray<string>, wanted: string): boolean {
 
 // The labels that say a unit stopped on purpose. `needs-decision` is the park branch; `already-done`
 // is the exit a child takes when it verifies its Issue's work is already merged
-// (joshuafolkken/kit#1679) — it comments the evidence, applies the label and stops with the checkout
+// — it comments the evidence, applies the label and stops with the checkout
 // clean, which is settled by the same reasoning. Left out, this command reports a child that
 // finished correctly as `stopped` and a supervisor restarts the investigation it just completed.
 const SETTLED_LABELS: ReadonlyArray<string> = [NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL]
@@ -335,8 +325,8 @@ function carries_settled_label(labels: ReadonlyArray<string>): boolean {
 // Settled needs positive evidence that the child is done with: it closed, or the unit parked it and
 // then stopped, which the loop's park branch already owns. **An open child that is not parked is not settled
 // even without `in-progress`** — that label is applied by the unit itself, after it reads the issue,
-// so a unit that died before applying it would otherwise be reported as a child needing nothing
-// (joshuafolkken/kit#1485, review round 1). Read that way, the stop this command exists for goes
+// so a unit that died before applying it would otherwise be reported as a child needing nothing.
+// Read that way, the stop this command exists for goes
 // undetected.
 async function read_child_settled(issue: string, repo?: string): Promise<boolean | undefined> {
 	const json = await git_gh_issue_read.issue_view_json(issue, STATE_FIELDS, repo)
@@ -393,7 +383,7 @@ async function check(request: LivenessRequest): Promise<LivenessDecision> {
 // The constants are exported by name rather than through the namespace: read back off a namespace
 // object their literal types widen to `string`, and `ProcessTrace` would then admit anything.
 // `to_safe_path` is on the namespace because `josh lane:output` refuses a path this command could
-// not read (joshuafolkken/kit#1713). Recorded, such a path makes every poll answer `undetermined`
+// not read. Recorded, such a path makes every poll answer `undetermined`
 // for ever — so the two have to agree, and agreeing means one function rather than two.
 const run_liveness = {
 	check,

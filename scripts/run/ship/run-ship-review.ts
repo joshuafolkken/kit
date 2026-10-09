@@ -1,18 +1,17 @@
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
 import { review_record_cli } from '#scripts/review/review-record-cli'
 
-// The pure half of `josh ship --review` (joshuafolkken/kit#2427): the one-line prompts the supervised
-// reviewers are launched with, the verdict read back off the findings file each writes, and where that
-// verdict routes the ship. Kept apart from the launch and the joins (`run-ship-review-steps.ts`) the way
-// `run-review.ts` is kept apart from `run-review-steps.ts`, so every branch is pinned without a session
-// ever starting.
+// The pure half of `josh ship --review`: the one-line prompts the supervised reviewers are launched
+// with, the verdict read back off the findings file each writes, and where that verdict routes the
+// ship. Kept apart from the launch and the joins (`run-ship-review-steps.ts`) the way `run-review.ts`
+// is kept apart from `run-review-steps.ts`, so every branch is pinned without a session ever starting.
 //
 // **The reviewer is the one the chain already runs.** Its prompt hands it the brief `run:review`
 // printed — the same level, rubric, checkout and `review:attest` nonce a `/code-review` subagent was
 // given — and asks only that the findings also be written in the `review:record` grammar, so the
 // supervisor records and routes them without an agent reading the prose.
 //
-// **Round 1 fixes what is local; round 2 only reads** (joshuafolkken/kit#2489). The round-1 reviewer
+// **Round 1 fixes what is local; round 2 only reads**. The round-1 reviewer
 // applies a Medium whose fix is small and local — the "small, local asks" `chain-rule.md` names — and
 // marks that finding `fixed`, so the supervisor carries the ship through the gate, the commit and a
 // round-2 verification pass instead of handing a lane child back for a fix it could not make. A High is
@@ -24,7 +23,7 @@ const HIGH = 'high'
 const MEDIUM = 'medium'
 const FIXED_PREFIX = 'fixed '
 // What a finding line carries after its spec: one sentence saying what is wrong, so a stopped ship's
-// log tells the resumed lane child the defect rather than only its location (joshuafolkken/kit#3159).
+// log tells the resumed lane child the defect rather than only its location.
 const DESCRIPTION_SEPARATOR = ' — '
 // Where the spec ends on read: a reviewer that types the dash as `-`, `--` or `–` still ends it there,
 // so its sentence never lands in the ledger's file field.
@@ -175,18 +174,17 @@ function round_one_outcome(verdict: ScoredVerdict): RoundOutcome {
 	return { is_passing: true, note: verdict.kind === VERDICT.FIXED ? FIXED_NOTE : CLEAN_NOTE }
 }
 
-// Whether a findings file records a clean round 1 (joshuafolkken/kit#2945). A resumed round 1 narrows to
-// the delta only past a review that found nothing to fix. A blocking one has a finding in a file the
-// delta may not touch. A fixed one approved its own edits, not the briefed tree the delta is measured
-// from, so a file reverted to that tree would drop out of the delta with its finding back in it.
+// Whether a findings file records a clean round 1. A resumed round 1 narrows to the delta only past a
+// review that found nothing to fix. A blocking one has a finding in a file the delta may not touch. A
+// fixed one approved its own edits, not the briefed tree the delta is measured from, so a file
+// reverted to that tree would drop out of the delta with its finding back in it.
 function is_clean_round_one(text: string | undefined): boolean {
 	return read_verdict(text).kind === VERDICT.CLEAN
 }
 
 // Whether the reviewer edited the tree — any finding marked fixed, whether or not another one still
-// blocks (joshuafolkken/kit#2961). A partial fix moves the tree the background gate read as surely as a
-// full one, so the join reads it red either way; keyed off the verdict kind instead, a round that fixed
-// one Medium and left another stopped at a misleading `Gate RED` before its own blocking note.
+// blocks. A partial fix moves the tree the background gate read as surely as a full one, so the join
+// reads it red either way.
 function has_fixes(text: string | undefined): boolean {
 	if (text === undefined) return false
 

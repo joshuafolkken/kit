@@ -2,12 +2,10 @@ import { process_identity } from '#scripts/josh/process-identity'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 import type { RunWake } from '#scripts/run/wake/run-wake'
 
-// The mechanical judge of a *stranded* run (joshuafolkken/kit#2375). On 2026-09-22 a `backlogrun`'s
-// cost hand-off left the record carried and handed off, the session that cut it died, no successor ever
-// claimed the budget, and no supervisor was watching — so five lanes ran on with nobody driving, and the
-// only way forward was a person noticing and running the recovery by hand. Three facts, read and never
-// weighed, are what say that state has been reached: the budget was handed off, its owner is gone, and
-// no supervisor is alive to wake a successor.
+// The mechanical judge of a *stranded* run: a handed-off budget whose cutting session died, with no
+// successor claiming it and no supervisor watching, so lanes run on with nobody driving. Three facts,
+// read and never weighed, are what say that state has been reached: the budget was handed off, its
+// owner is gone, and no supervisor is alive to wake a successor.
 //
 // **Pure by design, exactly as `backlog-stalled.ts` is.** The carry read, the owner's liveness and the
 // supervisor's are handed in, so the four acceptance cases — all three holding, a live owner, a claimed
@@ -18,7 +16,7 @@ import type { RunWake } from '#scripts/run/wake/run-wake'
 // **It is a report, never a stop.** A false positive costs one notification, never a halted run or a
 // torn-down lane — so every axis is read toward *not* stranded when it cannot be proven: an unreadable
 // carry record is not stranded, and a supervisor whose liveness cannot be established counts as watching.
-// **And recovery is another actor's, not the reader's** (joshuafolkken/kit#1935): the cutting session is
+// **And recovery is another actor's, not the reader's**: the cutting session is
 // refused `busy` and must stay refused, so what the notification names is `run:wake --start`, which
 // starts a supervisor that wakes a *fresh* successor rather than driving the run itself.
 
@@ -27,7 +25,7 @@ import type { RunWake } from '#scripts/run/wake/run-wake'
 // which is the `busy` refusal `run-carry.ts` → `is_count_refused` exists to keep.
 const RECOVERY_COMMAND = 'pnpm josh run:wake --start'
 
-// The three answers a supervisor's liveness probe gives, named (joshuafolkken/kit#2375). `live` is a
+// The three answers a supervisor's liveness probe gives, named. `live` is a
 // supervisor still watching, `gone` is one whose process has died or a record that was never there at
 // all, and `unknown` is the platform answering for nobody — a pid that is alive paired with a start
 // token this machine could not read. The three are kept apart because the strand judge resolves
@@ -53,11 +51,11 @@ interface StrandedInput {
 	supervisor: SupervisorLiveness
 }
 
-// **The supervisor's liveness, three-valued** (joshuafolkken/kit#2375). An absent wake record is `gone`:
-// `run:wake --list` reported `none` in the run this fixes, and nothing watching is the very state a
-// strand needs. A present record is read through `process_identity.is_same_process`, whose own three
-// answers this passes straight through — `true` is `live`, `false` is `gone`, and the platform's "cannot
-// tell" is `unknown`. The prober is injected so the three cases are tested without a real process.
+// **The supervisor's liveness, three-valued.** An absent wake record is `gone`: nothing watching is
+// the very state a strand needs. A present record is read through `process_identity.is_same_process`,
+// whose own three answers this passes straight through — `true` is `live`, `false` is `gone`, and the
+// platform's "cannot tell" is `unknown`. The prober is injected so the three cases are tested without
+// a real process.
 function supervisor_liveness(
 	wake: RunWake | undefined,
 	same_process: (

@@ -1,4 +1,4 @@
-// The issue numbers on `run:board` open their GitHub issue (joshuafolkken/kit#3450): each is wrapped in
+// The issue numbers on `run:board` open their GitHub issue: each is wrapped in
 // an OSC 8 terminal hyperlink, so VSCode's terminal opens it on Cmd+click while the visible text stays
 // the number. A reference is drawn the way the plan names it — `3450` for this repository's issue,
 // `owner/repo#12` for one elsewhere — and links to the repository it names.

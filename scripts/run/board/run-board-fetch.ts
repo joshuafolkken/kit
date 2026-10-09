@@ -1,4 +1,4 @@
-// A GitHub read in flight (joshuafolkken/kit#3455). The plan and the closed children are queries that
+// A GitHub read in flight. The plan and the closed children are queries that
 // take seconds, so a live board launches each and goes on redrawing; the read keeps its answer once it
 // lands, and the next redraw folds it in. A rejected read answers with the value given for a failed one
 // — nothing awaits a background read to see it throw.

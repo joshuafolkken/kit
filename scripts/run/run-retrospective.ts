@@ -1,10 +1,10 @@
 import { hook_decision } from '#scripts/josh/hook-decision'
 
 // Whether a run owes its end-of-run retrospective, single-sourced so `run:step` and `backlog:drive`
-// never disagree on it (joshuafolkken/kit#2750): a drive that read "owed" where `run:step` read "not
-// owed" handed back at every drain to a session that had nothing to run.
+// never disagree on it: a drive that read "owed" where `run:step` read "not owed" would hand back at
+// every drain to a session that had nothing to run.
 
-// The opt-in switch that gates the retrospective (joshuafolkken/kit#2370). It defaults off, so an unset
+// The opt-in switch that gates the retrospective. It defaults off, so an unset
 // variable owes no retrospective.
 const RETROSPECTIVE_ENV_KEY = 'JOSH_RETROSPECTIVE'
 

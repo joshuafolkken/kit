@@ -14,16 +14,15 @@ import { run_board_state, type BoardPorts, type BoardState, type Pace } from './
 import { run_board_status } from './run-board-status'
 import { run_board_usage } from './run-board-usage'
 
-// One `run:board` redraw (joshuafolkken/kit#3430). **Three speeds** (joshuafolkken/kit#3444): the frame
-// is redrawn once a second, on the second, so every elapsed time moves by one, its spinners turned
-// between redraws by `run-board-spin.ts` (joshuafolkken/kit#3495); the run's own stream and lanes are
-// re-read no more often than `LOCAL_READ_MS`, because each read parses the whole stream and asks git twice, and a board
-// left open all night would otherwise grow heavier as the run grew longer; the GitHub reads they are
-// laid over are `run-board-github.ts`'s, which a live board never waits on (joshuafolkken/kit#3455).
-// Between reads the last one is kept and drawn against the current time. A run that ended stays on
-// screen until the next one starts (joshuafolkken/kit#3439). With no run in this checkout it reads
-// nothing from GitHub. The machine is sampled once a second (joshuafolkken/kit#3450): one `sysctl`
-// takes a few milliseconds, and its gauges are the differences between consecutive samples.
+// One `run:board` redraw. **Three speeds**: the frame is redrawn once a second, on the second, so
+// every elapsed time moves by one, its spinners turned between redraws by `run-board-spin.ts`; the
+// run's own stream and lanes are re-read no more often than `LOCAL_READ_MS`, because each read parses
+// the whole stream and asks git twice, and a board left open all night would otherwise grow heavier
+// as the run grew longer; the GitHub reads they are laid over are `run-board-github.ts`'s, which a
+// live board never waits on. Between reads the last one is kept and drawn against the current time.
+// A run that ended stays on screen until the next one starts. With no run in this checkout it reads
+// nothing from GitHub. The machine is sampled once a second: one `sysctl` takes a few milliseconds,
+// and its gauges are the differences between consecutive samples.
 
 const { REDRAW_MS, SPOT } = run_board_spin
 const MACHINE_SAMPLE_MS = run_progress.MS_PER_SECOND
@@ -38,8 +37,8 @@ async function reread(state: BoardState, ports: BoardPorts, now_ms: number): Pro
 	return { ...state, local: await ports.read_local(), read_ms: now_ms }
 }
 
-// Each lane's usage, read on the machine's second (joshuafolkken/kit#3489). A chat draws none, so it
-// reads none; a reading that failed draws no column.
+// Each lane's usage, read on the machine's second. A chat draws none, so it reads none; a reading
+// that failed draws no column.
 async function read_usages(
 	state: BoardState,
 	ports: BoardPorts,
@@ -64,7 +63,7 @@ async function resample(state: BoardState, ports: BoardPorts, now_ms: number): P
 }
 
 // The state of the run on screen; a different run starts its plan state from nothing, so no row, count
-// or baseline of the previous run is drawn over the new one (joshuafolkken/kit#3439).
+// or baseline of the previous run is drawn over the new one.
 function state_for(state: BoardState, local: LocalRead): BoardState {
 	if (state.run_started_ms === local.started_ms) return state
 
@@ -91,7 +90,7 @@ function titles_of(state: BoardState): Titles {
 }
 
 // The statuses scoped to the run's plan, a running child the plan's listing no longer holds settled.
-// Before the plan is read, the run's own children alone (joshuafolkken/kit#3486).
+// Before the plan is read, the run's own children alone.
 function layout_for(state: BoardState, local: LocalRead): BoardLayout {
 	const { plan, closed } = state
 

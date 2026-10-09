@@ -16,7 +16,7 @@ import { run_retrospective } from './run-retrospective'
 import { run_step, type StepInput } from './run-step'
 
 // `josh run:step <N>` — print the run's next single action, computed from the event stream, the carry
-// record and the issue state (joshuafolkken/kit#2248). It reads exactly those three, never the
+// record and the issue state. It reads exactly those three, never the
 // conversation: the issue facts through `run:prep`'s own gather (so this and `run:next` never answer
 // from different reads), the newest event off the stream, and the carry record's kind. The reader runs
 // the printed line, returns the result through `run:event`, and asks again — the loop `run:step`
@@ -36,7 +36,7 @@ interface RunReads {
 	last_event: string | undefined
 }
 
-// **A hand-off stops only the session that declared the record** (joshuafolkken/kit#2760). The record is
+// **A hand-off stops only the session that declared the record**. The record is
 // one per repository, so a `fullrun #M` a person starts in a fresh conversation beside a `backlogrun`
 // waiting for its successor reads the same handed-off mark — and would be told to stop on every step.
 // The owner is `--owner "$PPID"`, an ancestor of this process only in the session that took the cut.
@@ -67,11 +67,9 @@ function read_run(
 	const carry = run_carry.read_carry(run_carry.carry_path(directory))
 	const events = run_event_stream.read_events(run_event_stream.target_of(directory))
 	// The last event *within this invocation's scope*, not the raw newest one: a stale event a previous
-	// invocation left on the stream must not be read as this run's position (joshuafolkken/kit#2395). The
-	// observed defect was a `run:step` that printed `wait` on a fresh run because an old `child-launch` was
-	// still the stream's tail. Another issue's detached ship supervisor is left out the same way
-	// (joshuafolkken/kit#2428), and so — for a lane child — is every event that does not name its own issue
-	// (joshuafolkken/kit#3039).
+	// invocation left on the stream — an old `child-launch`, say — must not be read as this run's
+	// position. Another issue's detached ship supervisor is left out the same way, and so — for a lane
+	// child — is every event that does not name its own issue.
 	const scope = run_event_scope.scope_of(carry)
 	const last = run_event_scope.last_issue_event(events, scope, issue_number, is_lane_child)
 
@@ -132,7 +130,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const { input, ship_problems } = await gather(issue_number)
 
 	console.info(run_step.next_action(input).line)
-	// On stderr, so stdout stays the one action line (joshuafolkken/kit#3154): what `josh ship` would
+	// On stderr, so stdout stays the one action line: what `josh ship` would
 	// refuse on is said at every step, while it is still cheap to meet.
 	if (ship_problems.length > 0) console.error(run_prep.ship_body(ship_problems))
 

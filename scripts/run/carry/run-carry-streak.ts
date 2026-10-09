@@ -1,6 +1,5 @@
-// The pure streak arithmetic behind `run-carry.ts` → `apply_change`, relocated here so the record's
-// file stays under its line bound and the outage fold has a test of its own (joshuafolkken/kit#2317).
-// It owns the two consecutive-streak counters — the failure streak and the API-outage streak — and the
+// The pure streak arithmetic behind `run-carry.ts` → `apply_change`, kept apart so the record's file
+// stays under its line bound and the outage fold has a test of its own. It owns the two consecutive-streak counters — the failure streak and the API-outage streak — and the
 // one timestamp the outage fold reads. Nothing here touches disk: it is arithmetic over the values a
 // change carries and the counters already on the record.
 //
@@ -15,8 +14,8 @@ const NO_INCREMENT = 0
 // two minutes covers that burst with room to spare. **A genuinely dead API is different**: an outage
 // child is re-dispatched and spends its ten connection retries before the next child returns, so two
 // consecutive *real* outages land minutes apart — outside this window — and still accumulate toward the
-// environment guard. Measured on 2026-09-22 (joshuafolkken/kit#2317): one network event booked four
-// outages within seconds, tripping the limit of three in a single stroke though the API was alive.
+// environment guard, while one network event booking several outages within seconds cannot trip the
+// limit in a single stroke though the API is alive.
 const OUTAGE_FOLD_WINDOW_MS = 120_000
 
 interface StreakCarry {
@@ -48,7 +47,7 @@ function has_increment(value: number | undefined): boolean {
 
 // **A merge resets the streak; every other change adds to it.** The consecutive-failure guard trips on
 // children failing one after another, so a child that merged in between is what breaks the run — the
-// reset lives with the increment rather than in a caller that could forget it (joshuafolkken/kit#2024).
+// reset lives with the increment rather than in a caller that could forget it.
 function next_failures(carry: StreakCarry, change: StreakChange): number {
 	if (has_increment(change.merged)) return NO_INCREMENT
 
@@ -81,10 +80,9 @@ function counted_outage(carry: StreakCarry, change: StreakChange, now: Date): Ou
 	return { outages, last_outage_at: now.toISOString() }
 }
 
-// **An outage adds to the streak unless it folds; a merge or a genuine child failure resets it**
-// (joshuafolkken/kit#2240, fold added by joshuafolkken/kit#2317). Anything that proves the API *was*
-// reachable — a merge, or a child that failed on its own after reaching it — breaks the run and clears
-// the fold timestamp. A change that touches none of the three leaves the streak untouched.
+// **An outage adds to the streak unless it folds; a merge or a genuine child failure resets it**.
+// Anything that proves the API *was* reachable — a merge, or a child that failed on its own after
+// reaching it — breaks the run and clears the fold timestamp. A change that touches none of the three leaves the streak untouched.
 function next_outage(carry: StreakCarry, change: StreakChange, now: Date): OutageState {
 	if (has_increment(change.outages)) {
 		return is_within_fold_window(carry.last_outage_at, now)

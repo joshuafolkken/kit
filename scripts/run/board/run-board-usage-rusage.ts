@@ -1,10 +1,9 @@
 import type { dlopen } from 'node:ffi'
 
-// A process's CPU time with the children it has reaped folded in (joshuafolkken/kit#3529), so a vitest
-// worker or a gate's eslint born and gone between two `run:board` samples still reaches its lane
-// through its parent. macOS's `ps -S` does not fold them (joshuafolkken/kit#3523); the kernel keeps
-// them in `proc_pid_rusage`'s `ri_child_user_time` / `ri_child_system_time`, reached here through
-// `node:ffi`.
+// A process's CPU time with the children it has reaped folded in, so a vitest worker or a gate's
+// eslint born and gone between two `run:board` samples still reaches its lane through its parent.
+// macOS's `ps -S` does not fold them; the kernel keeps them in `proc_pid_rusage`'s
+// `ri_child_user_time` / `ri_child_system_time`, reached here through `node:ffi`.
 //
 // **`node:ffi` is experimental** — added in Node 26 (kit's `engines` is `^22.19.0 || ^24.0.0 ||
 // >=26.0.0`) and liable to change. Where it is missing, or the platform is not macOS, or a call

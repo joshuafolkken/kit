@@ -8,7 +8,7 @@ import type { LocalRead } from './run-board-read'
 import type { BoardPorts } from './run-board-state'
 import type { UsageMark } from './run-board-usage'
 
-// What the `run:board` redraw suites share (joshuafolkken/kit#3444): the ports a test drives the board
+// What the `run:board` redraw suites share: the ports a test drives the board
 // through — a clock it moves by hand, the frames it wrote, and counted reads.
 
 const { WORDS } = run_board_labels
@@ -127,7 +127,7 @@ function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefine
 }
 
 // The plan read's loading spinner after its ⏳, not the waiting count the same line draws after its own
-// ⏳ (joshuafolkken/kit#3508).
+// ⏳.
 const SPINNING = /⏳ [^\d-]/u
 
 const run_board_fixture = { LOCAL, SPINNING, START, STOPPED, WORDS, harness, plan_titled }

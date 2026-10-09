@@ -11,7 +11,7 @@ import {
 import { run_issue_number } from './run-issue-number'
 
 // `josh run:ending <N> --output <path> [--repo <owner/repo>]` — one verdict about how the dispatched
-// lane child running `<N>` ended (joshuafolkken/kit#2139).
+// lane child running `<N>` ended.
 //
 // The stdout/stderr split is the contract `run:liveness` and `run:hold` keep: exactly one verdict
 // token on stdout on every path, the reason and the basis on stderr. `unreadable` exits non-zero,

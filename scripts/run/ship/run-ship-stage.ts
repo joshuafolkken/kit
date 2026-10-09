@@ -2,10 +2,9 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
 
-// `josh ship`'s durable stage record, and the decision of which stage a resumed ship may pass over
-// (joshuafolkken/kit#2426). The composite used to be a straight line with no memory: a ship that died
-// after its push re-ran the gate, and nothing checked whether the commit, the push or the merge had
-// already happened.
+// `josh ship`'s durable stage record, and the decision of which stage a resumed ship may pass over,
+// so a ship that died mid-way neither re-runs what already happened nor commits, pushes or merges
+// twice.
 //
 // **The record is a hint; the repository's actual state is the authority.** A record can be lost — a
 // temp directory wiped — or outlived by the tree it describes, when new work was committed after it
@@ -56,7 +55,7 @@ const STARTED_INDEX = 3
 const WORD_COUNT = STARTED_INDEX + 1
 
 // `started` lists the stages the current attempt started, kept across a supervisor that ended without a
-// stop so its successor's lines still carry them (joshuafolkken/kit#3552).
+// stop so its successor's lines still carry them.
 const record_schema = z.object({
 	done: z.array(z.string()),
 	started: z.array(z.string()).default([]),
@@ -128,19 +127,19 @@ function is_shipped(state: ShipState): boolean {
 }
 
 const DONE_BY: Record<Stage, (done: ReadonlySet<string>, state: ShipState) => boolean> = {
-	// The preflight (joshuafolkken/kit#2946) asks what the commit stage would refuse on, so a commit is
+	// The preflight asks what the commit stage would refuse on, so a commit is
 	// its output as it is the gate's; a resumed commit stage still asks `git -y`'s own preflight.
 	[STAGE.PREFLIGHT]: (_done, state) => state.is_merged || state.is_committed,
-	// The `--review` round (joshuafolkken/kit#2427) precedes the commit, so a commit is its output as it
+	// The `--review` round precedes the commit, so a commit is its output as it
 	// is the gate's. A record alone is not honored: before a commit the tree may have been edited since
 	// the recorded round, and only a commit pins the tree that round read.
 	[STAGE.REVIEW]: (_done, state) => state.is_merged || state.is_committed,
 	[STAGE.GATE]: (_done, state) => state.is_merged || state.is_committed,
-	// The merge of the default branch before the commit (joshuafolkken/kit#3221): once committed, a
+	// The merge of the default branch before the commit: once committed, a
 	// conflicting pull request is the followup's to merge again.
 	[STAGE.SYNC]: (_done, state) => state.is_merged || state.is_committed,
 	[STAGE.COMMIT]: (done, state) => state.is_merged || (done.has(STAGE.COMMIT) && is_shipped(state)),
-	// The round-2 pass (joshuafolkken/kit#2489) reads the pushed fix delta, so its record is honored only
+	// The round-2 pass reads the pushed fix delta, so its record is honored only
 	// while that push still stands — new work pushed on top reruns it.
 	[STAGE.ROUND_TWO]: (done, state) =>
 		state.is_merged || (done.has(STAGE.ROUND_TWO) && is_shipped(state)),
@@ -151,7 +150,7 @@ const DONE_BY: Record<Stage, (done: ReadonlySet<string>, state: ShipState) => bo
 	[STAGE.REPORT]: (done) => done.has(STAGE.REPORT),
 }
 
-// A supplied PR body is work only the commit stage delivers (joshuafolkken/kit#2446): a rerun carrying
+// A supplied PR body is work only the commit stage delivers: a rerun carrying
 // the live-execution evidence a refused `followup` asked for reruns `git -y`, whose skip flags leave the
 // commit and push alone while the body reaches the already-open pull request.
 function is_done(
@@ -174,7 +173,7 @@ function commit_flags(state: ShipState): ReadonlyArray<string> {
 	return state.is_pushed ? [SKIP_COMMIT_FLAG, SKIP_PUSH_FLAG] : [SKIP_COMMIT_FLAG]
 }
 
-// **The newest line carries the attempt's history** (joshuafolkken/kit#3552): a fourth word lists every
+// **The newest line carries the attempt's history**: a fourth word lists every
 // stage the attempt has started, so the one line per issue a stream full of positions keeps still
 // draws the whole track. A line with no started stage keeps the three-word form.
 function event_text(
@@ -196,8 +195,8 @@ function started_of(text: string): ReadonlyArray<string> | undefined {
 	return text.split(WORD_SEPARATOR, WORD_COUNT)[STARTED_INDEX]?.split(STARTED_SEPARATOR)
 }
 
-// A stop on a merge git could not finish is named `conflict` rather than by the stage it happened in
-// (joshuafolkken/kit#3221), so the event stream reads the cause without anyone opening the report.
+// A stop on a merge git could not finish is named `conflict` rather than by the stage it happened in,
+// so the event stream reads the cause without anyone opening the report.
 const CONFLICT = 'conflict'
 
 function stop_reason(stage: Stage, conflicts: ReadonlyArray<string> = []): string {

@@ -1,6 +1,6 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 
-// joshuafolkken/kit#3042: the workflow commands form a ladder — `kickoff` → `halfrun` → `prrun` →
+// The workflow commands form a ladder — `kickoff` → `halfrun` → `prrun` →
 // `fullrun` — and **the command typed decides only how far a run goes; where it starts is read off the
 // issue**. A run that finds work already done resumes after it rather than redoing it, and a command
 // whose stopping point the issue has already reached reports that and stops.
@@ -21,7 +21,7 @@ const COMMANDS = [KICKOFF, HALFRUN, PRRUN, FULLRUN] as const
 
 type StageCommand = (typeof COMMANDS)[number]
 
-// What `run:entry` serves when no command is named — the one it served alone before the ladder existed.
+// What `run:entry` serves when no command is named.
 const DEFAULT_COMMAND: StageCommand = FULLRUN
 
 const FRESH = 'fresh'
