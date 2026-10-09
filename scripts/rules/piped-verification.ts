@@ -133,10 +133,18 @@ function keeps_verdict_intact(command: string): boolean {
 // **Every command on the line is a josh check or a filter after one.** The rewrite answers `allow`, so
 // anything else chained beside the check — `&& rm -r dist`, or a `git log | head` never written for
 // `pipefail` — would skip the permission prompt it would otherwise meet. Those lines are refused as before.
+//
+// **The raw line is read for what the cut cannot see.** `segments_of` does not split on a lone `&`, and
+// `time_shell.unquoted` blanks a double-quoted `$(…)`, so `| tail & curl …`, `| tail > ~/.zshrc` and
+// `| grep "$(cmd)"` all look like a filter after a check. Any `&`, redirection, backtick or `$(` beyond
+// the `&&` chain and the check's own `2>&1` leaves the line to the refusal.
 const PIPEFAIL_PREFIX = 'set -o pipefail; '
 const FULL_READING_FILTER = /^(?:tail|grep)\b/u
 const EARLY_EXIT_GREP =
 	/^grep\b.*\s(?:-[a-zA-Z]*[lLmq]|--(?:quiet|silent|max-count|files-with(?:out)?-match))/u
+
+const ALLOWED_OPERATORS = /2>&1|&&/gu
+const SIDE_EFFECT_SYNTAX = /[&<>`]|\$\(/u
 
 const PIPEFAIL_NOTE =
 	'↻ piped verification: the josh check was piped, so `set -o pipefail;` was prefixed and the call ran ' +
@@ -153,9 +161,14 @@ function is_filtered_check(pipeline: Array<string>): boolean {
 	return is_verification_command(head) && filters.every((piece) => reads_to_the_end(piece))
 }
 
+function has_side_effect_syntax(command: string): boolean {
+	return SIDE_EFFECT_SYNTAX.test(command.replaceAll(ALLOWED_OPERATORS, ' '))
+}
+
 function is_pipefail_rewritable(command: string): boolean {
 	return (
 		is_masked_verification(command) &&
+		!has_side_effect_syntax(command) &&
 		pipelines_of(command).every((pipeline) => is_filtered_check(pipeline))
 	)
 }

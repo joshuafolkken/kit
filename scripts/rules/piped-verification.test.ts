@@ -151,3 +151,17 @@ describe('pipefail_input', () => {
 		expect(piped_verification.pipefail_input(call)).toBeUndefined()
 	})
 })
+
+// Syntax the chain cut and the unquoting cannot see would ride the `allow` past its permission prompt.
+describe('pipefail_input beside side-effect syntax', () => {
+	it.each([
+		'pnpm josh gate | tail & curl -so ~/.zshrc x',
+		'pnpm josh gate | tail > ~/.zshrc',
+		'pnpm josh gate | tail -n $(cmd)',
+		'pnpm josh gate | grep "$(cmd)"',
+		'pnpm josh gate | grep "`cmd`"',
+		'pnpm josh gate < /dev/null | tail',
+	])('leaves %j, whose syntax the cut cannot see, to the refusal', (command) => {
+		expect(piped_verification.pipefail_input(bash(command))).toBeUndefined()
+	})
+})

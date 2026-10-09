@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1040,
-		"code_lines": 86909,
-		"comment_lines": 34360,
+		"code_lines": 86915,
+		"comment_lines": 34365,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 501723
 	},
 	"accepted": {
-		"reason": "#3570 adds the pipefail rewrite path for piped josh verifications and the shared hook-context-line module, plus their rationale docs",
+		"reason": "#3570 round-2 security fix: refuse the pipefail rewrite beside lone &, redirection, backtick or $( and cover it with regression cases",
 		"date": "2026-10-09"
 	}
 }
