@@ -17,8 +17,9 @@ function event_of(kind: string, text: string): RunEvent {
 function ship(
 	stage: (typeof STAGE)[keyof typeof STAGE],
 	phase: (typeof PHASE)[keyof typeof PHASE] = PHASE.START,
+	started: ReadonlyArray<(typeof STAGE)[keyof typeof STAGE]> = [],
 ): RunEvent {
-	return event_of(KIND.SHIP_STAGE, run_ship_stage.event_text('3444', stage, phase))
+	return event_of(KIND.SHIP_STAGE, run_ship_stage.event_text('3444', stage, phase, started))
 }
 
 function history_of(...phases: ReadonlyArray<Phase>): Array<Phase> {
@@ -96,5 +97,60 @@ describe('run_board_phase.history_after', () => {
 
 	it('writes failed alone where no ship launch was recorded', () => {
 		expect(history_of('implement', 'failed')).toStrictEqual(['failed'])
+	})
+})
+
+// joshuafolkken/kit#3552: a stage line that carries its attempt redraws that attempt on the track.
+describe('run_board_phase.attempt_of', () => {
+	const { attempt_of } = run_board_phase
+
+	it('reads the phases a stage line lists, led by the ship’s own start', () => {
+		const line = ship(STAGE.GATE, PHASE.DONE, [STAGE.PREFLIGHT, STAGE.GATE])
+
+		expect(attempt_of(line)).toStrictEqual(['ship', 'gate'])
+		expect(attempt_of(ship(STAGE.REPORT, PHASE.DONE, [STAGE.REPORT]))).toStrictEqual([
+			'ship',
+			'report',
+		])
+	})
+
+	it('reads none off a three-word line or another kind', () => {
+		expect(attempt_of(ship(STAGE.GATE))).toBeUndefined()
+		expect(attempt_of(event_of(KIND.LANE_PHASE, '#3444 implement a,b'))).toBeUndefined()
+	})
+})
+
+describe('run_board_phase.replayed', () => {
+	const { replayed } = run_board_phase
+
+	it('redraws the current attempt in the order the line lists', () => {
+		expect(
+			replayed(['implement', 'ship', 'gate'], ['ship', 'sync', 'gate', 'commit']),
+		).toStrictEqual(['implement', 'ship', 'sync', 'gate', 'commit'])
+	})
+
+	it('adds a restarted ship’s stages after the ones it passed over', () => {
+		expect(replayed(['ship', 'review', 'gate'], ['ship', 'commit'])).toStrictEqual([
+			'ship',
+			'review',
+			'gate',
+			'commit',
+		])
+	})
+
+	it('redraws a supervisor restarted with no stop between as one attempt', () => {
+		expect(
+			replayed(['implement', 'ship', 'review', 'gate', 'ship'], ['ship', 'review', 'gate', 'sync']),
+		).toStrictEqual(['implement', 'ship', 'review', 'gate', 'sync'])
+	})
+
+	it('starts a new attempt after a failed one, leaving the failed one as it was', () => {
+		expect(replayed(['ship', 'failed', 'implement'], ['ship', 'review'])).toStrictEqual([
+			'ship',
+			'failed',
+			'implement',
+			'ship',
+			'review',
+		])
 	})
 })

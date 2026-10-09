@@ -187,6 +187,52 @@ describe('run_ship_stage record — read, mark and clear', () => {
 	})
 })
 
+describe('run_ship_stage record — the attempt’s started stages (joshuafolkken/kit#3552)', () => {
+	it('keeps the started stages beside the done ones until the attempt ends', () => {
+		const target = fresh_target()
+
+		run_ship_stage.mark_started(target, STAGE.GATE)
+		run_ship_stage.mark_done(target, STAGE.GATE)
+		run_ship_stage.mark_started(target, STAGE.GATE)
+		run_ship_stage.mark_started(target, STAGE.COMMIT)
+
+		expect(run_ship_stage.read_started(target)).toStrictEqual([STAGE.GATE, STAGE.COMMIT])
+
+		run_ship_stage.end_attempt(target)
+
+		expect(run_ship_stage.read_started(target)).toStrictEqual([])
+		expect([...run_ship_stage.read_done(target)]).toStrictEqual([STAGE.GATE])
+	})
+
+	it('reads a record written before the field as no stage started', () => {
+		const target = fresh_target()
+
+		writeFileSync(target, JSON.stringify({ done: [STAGE.GATE] }))
+
+		expect(run_ship_stage.read_started(target)).toStrictEqual([])
+		expect([...run_ship_stage.read_done(target)]).toStrictEqual([STAGE.GATE])
+	})
+})
+
+describe('run_ship_stage.started_of — the attempt a line carries (joshuafolkken/kit#3552)', () => {
+	const { PHASE } = run_ship_stage
+
+	it('round-trips the stages written as the fourth word', () => {
+		const text = run_ship_stage.event_text('7', STAGE.GATE, PHASE.START, [
+			STAGE.PREFLIGHT,
+			STAGE.REVIEW,
+			STAGE.GATE,
+		])
+
+		expect(text).toBe('#7 gate start preflight,review,gate')
+		expect(run_ship_stage.started_of(text)).toStrictEqual(['preflight', 'review', 'gate'])
+	})
+
+	it('reads no attempt off a three-word line', () => {
+		expect(run_ship_stage.started_of('#7 gate start')).toBeUndefined()
+	})
+})
+
 describe('run_ship_stage.is_done — the --review round (joshuafolkken/kit#2427)', () => {
 	it('runs on a fresh tree with no record', () => {
 		expect(run_ship_stage.is_done(STAGE.REVIEW, NONE, NOTHING)).toBe(false)

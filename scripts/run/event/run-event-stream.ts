@@ -278,6 +278,10 @@ function droppable(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEvent> {
 // phase on the lane's track, so dropping them oldest-first with the `done` lines and the heartbeats left
 // a shipped child's track ending at 🚢 with nothing after it. An `idle` line goes with them, oldest first,
 // so a run's newest wait is not the first line a stream of starts and positions gives up.
+//
+// **The kept line carries the history** (joshuafolkken/kit#3552): on a stream the positions fill, every
+// append still rolls off the issue's previous stage line, so the newest one lists every stage its
+// attempt has started (`run-ship-stage.ts` → `event_text`) and the track is redrawn from it alone.
 function bounded(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEvent> {
 	const excess = events.length - EVENT_CAP
 
