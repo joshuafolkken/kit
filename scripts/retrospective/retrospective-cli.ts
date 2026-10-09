@@ -1,13 +1,16 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { cost_run_report, type RunCostReport } from '#scripts/cost/cost-run-report'
-import { cost_run_tree } from '#scripts/cost/cost-run-tree'
+import { cost_run_tree, type RunTree } from '#scripts/cost/cost-run-tree'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { observation_ledger_line } from '#scripts/observations/observation-ledger-line'
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_scope, type EventScope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line'
+import type { SessionTranscript } from './guard-friction'
 import { retrospective, type RetrospectiveInputs } from './retrospective'
 
 // `josh retrospective` — the end-of-run retrospective (joshuafolkken/kit#2328). It is the aggregation
@@ -24,12 +27,32 @@ const SUCCESS_EXIT_CODE = 0
 // `read_from` returns every event past the given position, so zero is "the whole stream from the start".
 const STREAM_START = 0
 
-function read_cost(cwd: string): RunCostReport | undefined {
+interface TreeRead {
+	cost: RunCostReport | undefined
+	sessions: ReadonlyArray<SessionTranscript>
+}
+
+// Each node paired with its own transcript's lines, read once here so the composer stays pure.
+function sessions_of(tree: RunTree): Array<SessionTranscript> {
+	const paths = new Map(tree.files.map((file) => [file.session_id, file]))
+
+	return tree.nodes.map((node) => {
+		const file = paths.get(node.session_id)
+		const text = file === undefined ? '' : cost_transcript.read_raw(file)
+
+		return { node, lines: time_transcript_line.parse_text(text) }
+	})
+}
+
+function read_tree(cwd: string): TreeRead {
 	const tree = cost_run_tree.load(cwd, undefined)
 
-	if (tree === undefined) return undefined
+	if (tree === undefined) return { cost: undefined, sessions: [] }
 
-	return cost_run_report.build(tree.run_count, tree.unattributed_count, tree.nodes)
+	return {
+		cost: cost_run_report.build(tree.run_count, tree.unattributed_count, tree.nodes),
+		sessions: sessions_of(tree),
+	}
 }
 
 // Every issue's file of the ledger directory, read as one (joshuafolkken/kit#2919).
@@ -65,9 +88,11 @@ async function read_run(): Promise<RunRead> {
 async function gather(cwd: string): Promise<RetrospectiveInputs> {
 	const ledger = await read_ledger(cwd)
 	const run_read = await read_run()
+	const tree = read_tree(cwd)
 
 	return {
-		cost: read_cost(cwd),
+		cost: tree.cost,
+		sessions: tree.sessions,
 		findings: review_finding_ledger.category_counts(ledger),
 		zero_rounds: review_finding_ledger.zero_round_count(ledger),
 		observations: ledger_entries(ledger),

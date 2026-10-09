@@ -50,3 +50,39 @@ describe('time_transcript_line.guard_from_refusal', () => {
 		expect(time_transcript_line.guard_from_refusal(body)).toBe('')
 	})
 })
+
+function stop_guard_of(content: string): string | undefined {
+	const line = JSON.stringify({
+		type: 'user',
+		timestamp: '2026-10-09T00:00:00.000Z',
+		message: { role: 'user', content },
+	})
+
+	return time_transcript_line.parse_line(line)?.stop_guard
+}
+
+describe('time_transcript_line stop guard', () => {
+	it('reads the guard off the feedback line a Stop-hook block writes back', () => {
+		const content = 'Stop hook feedback:\n⛔ lane background stop: wait for the gate'
+
+		expect(stop_guard_of(content)).toBe('lane background stop')
+	})
+
+	it('reads no guard from a prompt that only quotes a refusal', () => {
+		expect(stop_guard_of('why did ⛔ batching: fire?')).toBe('')
+	})
+
+	it('reads no guard from feedback that is not a refusal', () => {
+		expect(stop_guard_of('Stop hook feedback:\nplease continue')).toBe('')
+	})
+})
+
+describe('time_transcript_line.parse_text', () => {
+	it('reads every parseable line of a transcript and drops the rest', () => {
+		const text = [time_transcript_fixture.result_line(1, BRANCH, 'a', 'ok'), 'not json', ''].join(
+			'\n',
+		)
+
+		expect(time_transcript_line.parse_text(text)).toHaveLength(1)
+	})
+})
