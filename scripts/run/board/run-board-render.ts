@@ -106,18 +106,18 @@ function time_of(row: BoardRow, now_ms: number): string | undefined {
 	return elapsed === undefined ? undefined : elapsed_of(elapsed)
 }
 
-// The phases a row's track draws — every one a running row has passed (joshuafolkken/kit#3460), whose
-// newest leads it — and none for a settled one.
+// The phases a row's track draws — every one the child passed while running (joshuafolkken/kit#3460),
+// kept once it settles (joshuafolkken/kit#3535).
 function drawn_phases(row: BoardRow): ReadonlyArray<Phase> {
-	return row.state === 'running' ? (row.status?.track ?? []) : []
+	return row.status?.track ?? []
 }
 
-// A running row's phases as its track, drawn last (joshuafolkken/kit#3526): it grows with every round,
-// so the columns before it stay where they are whatever its length.
+// A row's phases as its track, drawn last (joshuafolkken/kit#3526): it grows with every round, so the
+// columns before it stay where they are whatever its length. A settled row's ends on its state icon.
 function track_text(row: BoardRow): string | undefined {
 	const phases = drawn_phases(row)
 
-	return phases.length === 0 ? undefined : run_board_track.track_of(phases)
+	return phases.length === 0 ? undefined : run_board_track.track_of(phases, row.state)
 }
 
 function waits_of(row: BoardRow, header: BoardHeader): string | undefined {
@@ -140,7 +140,7 @@ function timed_parts(row: BoardRow, frame: RowFrame): Array<string | undefined> 
 // A running row leads with the icon of the phase it is in now (joshuafolkken/kit#3471) — the rightmost
 // icon of its track — and with 🔄 while its track draws none yet.
 function state_icon(row: BoardRow): string {
-	const current = drawn_phases(row).at(-1)
+	const current = row.state === 'running' ? drawn_phases(row).at(-1) : undefined
 
 	return current === undefined ? STATE_ICONS[row.state] : PHASE_ICONS[current]
 }
@@ -153,7 +153,8 @@ function indent_of(prefix: string, row: BoardRow, header: BoardHeader): string {
 	return `${header.spinner}${prefix.slice(1)}`
 }
 
-// A running row's CPU and memory (joshuafolkken/kit#3489); a settled lane runs no process.
+// A running row's CPU and memory (joshuafolkken/kit#3489); a settled lane runs no process, so its track
+// follows its time column (joshuafolkken/kit#3535).
 function usage_of(row: BoardRow, usages: LaneUsages | undefined): string | undefined {
 	if (row.state !== 'running') return undefined
 

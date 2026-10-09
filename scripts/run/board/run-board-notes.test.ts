@@ -103,3 +103,33 @@ describe('run_board_notes.notes_of parks and order', () => {
 		])
 	})
 })
+
+describe('run_board_notes.notes_of', () => {
+	it('lists filings, parks and notes newest first, telling a needs-decision park apart', () => {
+		const events = [
+			event(KIND.FILED, '#3438 Count the seats again (found during #3415)', 1),
+			event(KIND.PARK, '#3433 parked (needs-decision)', 2),
+			event(KIND.NOTE, '#3415 gate took 40% longer', 3),
+			event(KIND.PARK, '#3409 parked', 4),
+			event(KIND.MERGE, '#3420 merged', 5),
+		]
+		const notes = run_board_notes.notes_of(events, NO_TITLES)
+
+		expect(notes.map((note) => [note.kind, note.issue, note.is_decision])).toStrictEqual([
+			['park', '3409', false],
+			['note', '3415', false],
+			['park', '3433', true],
+			['filed', '3438', false],
+		])
+		expect(notes.at(-1)).toMatchObject({ text: 'Count the seats again', found_during: '3415' })
+	})
+
+	it('keeps an Issue filed elsewhere qualified', () => {
+		const [note] = run_board_notes.notes_of(
+			[event(KIND.FILED, 'joshuafolkken/app-kit#12 Fix the port')],
+			NO_TITLES,
+		)
+
+		expect(note?.issue).toBe('joshuafolkken/app-kit#12')
+	})
+})

@@ -49,12 +49,13 @@ function row_of(frame: string | undefined, issue: number): string | undefined {
 }
 
 describe('run_board_tick.tick — children that closed', () => {
+	// joshuafolkken/kit#3535: its track is kept, ended on its state icon.
 	it('draws a closed child nameless and timeless while GitHub has not answered', async () => {
 		const { ports, frames } = harness(LOCAL_CLOSED, [PLAN])
 
 		await tick(FRESH_STATE, ports)
 
-		expect(row_of(frames.at(-1), 3439)?.trim()).toBe('🏁 3439')
+		expect(row_of(frames.at(-1), 3439)?.trim()).toBe('🏁 3439  🔍🏁')
 	})
 
 	it('draws each child read closed with its title, time and merge', async () => {
