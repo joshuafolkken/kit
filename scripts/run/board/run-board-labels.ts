@@ -44,10 +44,10 @@ interface WordPair {
 // the words left are the ones a symbol cannot carry, and the legend that names the symbols.
 const WORD_PAIRS = {
 	no_run: { ja: 'ランなし', en: 'no run' },
-	ended: { ja: '終了', en: 'ended' },
 	plan: { ja: '計画', en: 'plan' },
 	merged: { ja: 'マージ', en: 'merged' },
 	parked: { ja: 'park', en: 'parked' },
+	done: { ja: '終了', en: 'done' },
 	in_progress: { ja: '実行中', en: 'running' },
 	stopped: { ja: '停止', en: 'stopped' },
 	waiting: { ja: '待ち', en: 'waiting' },
@@ -60,9 +60,6 @@ const WORD_PAIRS = {
 	gate: { ja: 'gate', en: 'gate' },
 	commit: { ja: 'コミット', en: 'commit' },
 	followup: { ja: 'followup', en: 'followup' },
-	cpu: { ja: 'cpu', en: 'cpu' },
-	memory: { ja: 'mem', en: 'mem' },
-	swap: { ja: 'swap', en: 'swap' },
 	idle_until: { ja: '待機終了', en: 'wait ends' },
 	idle_left: { ja: '残り', en: 'left' },
 	idle_end_idle: {
