@@ -14,6 +14,7 @@ import { run_board_screen, type Screen } from './run-board-screen'
 import { run_board_spin } from './run-board-spin'
 import type { BoardPorts } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
+import { run_board_usage_read } from './run-board-usage-read'
 
 // `josh run:board` — a full-screen board of the running `backlogrun` (joshuafolkken/kit#3430), redrawn
 // once a second, its spinners turned between redraws, for a person to keep open beside the run. What one redraw reads, and how often each read
@@ -44,6 +45,7 @@ const LIVE_PORTS: BoardPorts = {
 	read_plan: async (scope) => await run_board_plan.read_plan(scope),
 	read_local: run_board_read.read_local,
 	read_machine: machine_capacity.read_sample,
+	read_usage: run_board_usage_read.usage_reader(),
 	read_closed: async (issues) => await run_board_closed.read_all(issues),
 	now: () => Date.now(),
 	write: (frame) => process.stdout.write(frame),

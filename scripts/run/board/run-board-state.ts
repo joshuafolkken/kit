@@ -9,6 +9,7 @@ import type { Link } from './run-board-link'
 import type { MachineGauges, MachineMark } from './run-board-machine'
 import type { LocalRead } from './run-board-read'
 import type { Spot } from './run-board-spin'
+import type { LaneUsages, UsageMark } from './run-board-usage'
 
 // What a `run:board` redraw reads through and folds forward (joshuafolkken/kit#3430), shared by the
 // redraw (`run-board-tick.ts`) and its GitHub reads (`run-board-github.ts`).
@@ -18,6 +19,8 @@ interface BoardPorts {
 	// `undefined` when no run has started here.
 	read_local: () => Promise<LocalRead | undefined>
 	read_machine: () => Promise<MachineSample>
+	// Every process and its lane, the last reading's lanes reused (`run-board-usage-read.ts`).
+	read_usage: (before: UsageMark | undefined) => Promise<UsageMark | undefined>
 	// The issues that answered as closed, and whether every issue answered (`run-board-closed.ts`).
 	read_closed: (issues: ReadonlyArray<number>) => Promise<ClosedAnswer>
 	now: () => number
@@ -68,6 +71,10 @@ interface BoardState {
 	sampled_ms: number | undefined
 	// Where the last frame drew its spinners, turned between redraws (joshuafolkken/kit#3495).
 	spots: ReadonlyArray<Spot>
+	// The last process reading, which the next one is compared against, and each lane's usage drawn from
+	// them (joshuafolkken/kit#3489).
+	usage: UsageMark | undefined
+	usages: LaneUsages | undefined
 }
 
 const FRESH_STATE: BoardState = {
@@ -88,6 +95,8 @@ const FRESH_STATE: BoardState = {
 	gauges: undefined,
 	sampled_ms: undefined,
 	spots: [],
+	usage: undefined,
+	usages: undefined,
 }
 
 function is_due(last_ms: number | undefined, interval_ms: number, now_ms: number): boolean {
