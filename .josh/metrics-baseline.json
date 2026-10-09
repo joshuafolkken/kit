@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1028,
-		"code_lines": 85543,
-		"comment_lines": 33994,
+		"code_lines": 85562,
+		"comment_lines": 34005,
 		"comment_ratio": 0.4
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 560565
 	},
 	"accepted": {
-		"reason": "#3521 keeps each issue's newest ship-stage event when the run event stream is full (issue_of / newest_stages in run-event-stream.ts)",
+		"reason": "#3531 names a parked issue by its plan title in run:board's findings (titles_of in run-board-tick.ts, park_text/reason_of in run-board-notes.ts)",
 		"date": "2026-10-09"
 	}
 }

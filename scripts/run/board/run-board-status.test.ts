@@ -293,7 +293,7 @@ describe('run_board_notes.notes_of', () => {
 			event_at(4, T3, KIND.PARK, '#3409 parked'),
 			event_at(5, T3, KIND.MERGE, '#3420 merged'),
 		]
-		const notes = run_board_notes.notes_of(events)
+		const notes = run_board_notes.notes_of(events, new Map())
 
 		expect(notes.map((note) => [note.kind, note.issue, note.is_decision])).toStrictEqual([
 			['park', '3409', false],
@@ -305,9 +305,10 @@ describe('run_board_notes.notes_of', () => {
 	})
 
 	it('keeps an Issue filed elsewhere qualified', () => {
-		const [note] = run_board_notes.notes_of([
-			event_at(1, T0, KIND.FILED, 'joshuafolkken/app-kit#12 Fix the port'),
-		])
+		const [note] = run_board_notes.notes_of(
+			[event_at(1, T0, KIND.FILED, 'joshuafolkken/app-kit#12 Fix the port')],
+			new Map(),
+		)
 
 		expect(note?.issue).toBe('joshuafolkken/app-kit#12')
 	})

@@ -6,7 +6,7 @@ import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
 import { run_board_link } from './run-board-link'
 import { run_board_machine } from './run-board-machine'
-import { run_board_notes } from './run-board-notes'
+import { run_board_notes, type Titles } from './run-board-notes'
 import type { LocalRead } from './run-board-read'
 import { run_board_render, type FrameBounds } from './run-board-render'
 import { run_board_spin, type Spun } from './run-board-spin'
@@ -81,6 +81,13 @@ function titled_closed(plan: BoardPlan, closed: ReadonlyMap<number, ClosedIssue>
 	return { ...plan, context: { ...plan.context, titles } }
 }
 
+// The titles the findings name a parked issue by — the rows' own; none before the plan is read.
+function titles_of(state: BoardState): Titles {
+	if (state.plan === undefined) return new Map()
+
+	return titled_closed(state.plan, state.closed).context.titles
+}
+
 // The statuses scoped to the run's plan, a running child the plan's listing no longer holds settled.
 // Before the plan is read, the run's own children alone (joshuafolkken/kit#3486).
 function layout_for(state: BoardState, local: LocalRead): BoardLayout {
@@ -143,7 +150,7 @@ function frame_of(state: BoardState, local: LocalRead, layout: BoardLayout, redr
 	const bounds = bounds_of(redraw.ports)
 	const lines = run_board_render.render({
 		header: header_of(state, local, layout, redraw),
-		notes: run_board_notes.notes_of(local.events),
+		notes: run_board_notes.notes_of(local.events, titles_of(state)),
 		resume: local.resume,
 		...bounds,
 	})

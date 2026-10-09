@@ -108,3 +108,26 @@ describe('run_board_tick.tick in a short terminal', () => {
 		expect(lines).toContainEqual(expect.stringMatching(/^ {2}more \d+$/u))
 	})
 })
+
+// joshuafolkken/kit#3531: the findings name a parked child by the plan's title once the plan is read.
+describe('run_board_tick.tick park titles', () => {
+	const PARK = { pos: 1, at: LAUNCH.at, kind: 'park', text: '#1 waiting on #7' }
+
+	it('draws the reason alone before the plan is read', async () => {
+		const lines = await loading([PARK])
+
+		expect(lines).toContainEqual(expect.stringMatching(/ 1 {2}waiting on #7$/u))
+	})
+
+	it('names the parked child by the plan’s title once the plan is read', async () => {
+		const { ports, frames } = harness({ ...LOCAL, events: [PARK] }, [
+			run_board_fixture.plan_titled('Lead the lanes'),
+		])
+
+		await tick(FRESH_STATE, ports)
+
+		expect(lines_of(frames.at(-1))).toContainEqual(
+			expect.stringMatching(/ 1 {2}Lead the lanes \(waiting on #7\)$/u),
+		)
+	})
+})
