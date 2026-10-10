@@ -4,6 +4,7 @@ import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-thresho
 import { git_command } from '#scripts/git/git-command'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { stamp_record, type StampRecordSpec } from '#scripts/josh/stamp-record'
 import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { json_value } from '#scripts/lib/json-value'
 import { run_hold, type RunHold } from '#scripts/run/hold/run-hold'
@@ -144,9 +145,6 @@ type CutRead =
 	| { kind: 'expired'; cut: RunCut }
 	| { kind: 'unreadable' }
 
-const NONE_READ: CutRead = { kind: 'none' }
-const UNREADABLE_READ: CutRead = { kind: 'unreadable' }
-
 const run_cut_schema = z.object({
 	invocation: z.string(),
 	issue: z.string(),
@@ -176,25 +174,28 @@ function parse_cut(raw: string): RunCut | undefined {
 	return json_value.parse_with(raw, run_cut_schema)
 }
 
-// A `cut_at` that is not a date is read as expired, for the reason `run-carry.ts` reads an unparsable
-// `started_at` that way: a record nothing can ever expire is the one state the bound exists to
-// prevent.
+function cut_at_of(cut: RunCut): string {
+	return cut.cut_at
+}
+
+// The expiry and the classification are `stamp-record.ts`'s, shared with `run-carry.ts` and
+// `run-hold.ts`; what a `cut_at` that is not a date means is decided there.
+const CUT_SPEC: StampRecordSpec<RunCut> = {
+	parse: parse_cut,
+	timestamp_of: cut_at_of,
+	max_age_ms: CUT_MAX_AGE_MS,
+}
+
 function is_expired(cut: RunCut, now: Date): boolean {
-	const started = Date.parse(cut.cut_at)
-
-	if (Number.isNaN(started)) return true
-
-	return now.getTime() - started > CUT_MAX_AGE_MS
+	return stamp_record.is_older_than(cut_at_of(cut), CUT_MAX_AGE_MS, now)
 }
 
 function classify(raw: string | undefined, now: Date): CutRead {
-	if (raw === undefined) return NONE_READ
+	const read = stamp_record.classify(raw, CUT_SPEC, now)
 
-	const cut = parse_cut(raw)
+	if (!('record' in read)) return read
 
-	if (cut === undefined) return UNREADABLE_READ
-
-	return { kind: is_expired(cut, now) ? 'expired' : 'carried', cut }
+	return { kind: read.kind, cut: read.record }
 }
 
 function read_cut(target: string, now: Date = new Date()): CutRead {

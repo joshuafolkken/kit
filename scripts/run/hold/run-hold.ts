@@ -3,6 +3,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { stamp_record } from '#scripts/josh/stamp-record'
 import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
@@ -120,11 +121,7 @@ function parse_hold(raw: string): RunHold | undefined {
 // record only lets a claim through once `run-hold-cli.ts`'s `blocking_message` has also found the
 // tree clean.
 function is_expired(hold: RunHold, now: Date): boolean {
-	const taken = Date.parse(hold.taken_at)
-
-	if (Number.isNaN(taken)) return true
-
-	return now.getTime() - taken > HOLD_MAX_AGE_MS
+	return stamp_record.is_older_than(hold.taken_at, HOLD_MAX_AGE_MS, now)
 }
 
 // **A record whose session has ended is stale before its age says so**: the run
