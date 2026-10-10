@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { file_reader } from '#scripts/lib/read-file'
 import { cost_usage, type UsageRecord } from './cost-usage'
@@ -114,19 +115,21 @@ function read_directory(directory: string): Array<string> {
 // store by the slug prefix every lane of this repository shares — `lane_paths.lane_root` slugged, which
 // honors `JOSH_LANE_ROOT` — rather than any directory that may no longer exist.
 //
-// **A lane's directory is its issue number**, so a lane project slug is exactly `<root-slug>-<digits>`:
+// **A lane's directory is its issue number**, so a lane project slug is exactly `<root-slug>-<issue>`:
 // `lane_paths.lane_directory` joins the root with the issue and the registry sorts lanes by
 // `Number(issue)`. Matching the digits rather than the bare prefix keeps out a coincidental sibling
 // such as `.kit-lanes-backup` and a slug filed under a nested cwd — both share the prefix but are not a
 // lane.
-const LANE_ISSUE_SLUG = /^\d+$/u
-
 function lane_transcript_directories(main_cwd: string, home: string): Array<string> {
 	const projects = path.join(home, TRANSCRIPT_ROOT)
 	const prefix = `${project_slug(lane_paths.lane_root(main_cwd))}-`
 
 	return read_directory(projects)
-		.filter((name) => name.startsWith(prefix) && LANE_ISSUE_SLUG.test(name.slice(prefix.length)))
+		.filter(
+			(name) =>
+				name.startsWith(prefix) &&
+				issue_number_shape.ISSUE_NUMBER_PATTERN.test(name.slice(prefix.length)),
+		)
 		.map((name) => path.join(projects, name))
 }
 

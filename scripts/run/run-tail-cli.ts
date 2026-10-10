@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_tail, type TailSection } from './run-tail'
@@ -23,7 +24,6 @@ import { run_tail, type TailSection } from './run-tail'
 
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = 'Usage: josh run:tail [<issue-number> ...]'
 const should_forward_stderr = true
 
@@ -57,7 +57,7 @@ function steps_for(is_lane_child: boolean): ReadonlyArray<Step> {
 // Numbers only — a target `issue:cite` reads as an issue, so a stray flag is refused rather than
 // forwarded to the wrong step.
 function parse_issues(argv: ReadonlyArray<string>): ReadonlyArray<string> | undefined {
-	if (argv.every((token) => ISSUE_NUMBER_PATTERN.test(token))) return argv
+	if (argv.every((token) => issue_number_shape.is_issue_number(token))) return argv
 
 	return undefined
 }

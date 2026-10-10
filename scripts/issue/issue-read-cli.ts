@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { issue_read, type IssueComment, type IssueFields } from './issue-read'
 import { issue_report_failures, type ReadFailureKind } from './issue-report-failures'
@@ -27,7 +28,6 @@ import { issue_report_failures, type ReadFailureKind } from './issue-report-fail
 
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = 'Usage: josh issue:read <issue-number> [<issue-number> ...]'
 const BLOCK_SEPARATOR = '\n\n---\n\n'
 // The same bound `issue:state` puts on its batch read, for the same reason: every read is a `gh`
@@ -58,7 +58,7 @@ interface IssueReport {
 // Dropping it answers fewer numbers than were asked for and still exits zero — and nothing in the
 // output then says a number went unanswered. `#1262` copied out of a table is exactly that token.
 function parse_numbers(argv: ReadonlyArray<string>): ReadonlyArray<string> | undefined {
-	const numbers = argv.filter((argument) => ISSUE_NUMBER_PATTERN.test(argument))
+	const numbers = argv.filter((argument) => issue_number_shape.is_issue_number(argument))
 
 	if (numbers.length === 0 || numbers.length !== argv.length) return undefined
 

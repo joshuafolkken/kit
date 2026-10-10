@@ -2,6 +2,7 @@
 import { parseArgs } from 'node:util'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_error } from '#scripts/git/git-error'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_body } from '#scripts/josh/cli-body'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { git_notify, type GitNotifyConfig } from '#scripts/notify/git-notify'
@@ -141,10 +142,8 @@ function is_merge_permitted(status: string): boolean {
 	return status === 'ok' || status === 'not-required'
 }
 
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
-
 function is_valid_issue(issue_number: string | undefined): boolean {
-	return issue_number !== undefined && ISSUE_NUMBER_PATTERN.test(issue_number)
+	return issue_number !== undefined && issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue_number)
 }
 
 async function assert_review_attested(should_merge: boolean): Promise<void> {

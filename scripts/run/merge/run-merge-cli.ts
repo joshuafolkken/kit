@@ -4,6 +4,7 @@ import { api_outage } from '#scripts/agent/api-outage'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_closing_pr } from '#scripts/issue/issue-closing-pr'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
@@ -12,7 +13,6 @@ import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/ru
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ending } from '#scripts/run/run-ending'
-import { run_issue_number } from '#scripts/run/run-issue-number'
 import { run_label } from '#scripts/run/run-label'
 import { run_merge, type ChildOutcome, type EndingSignals } from './run-merge'
 import { run_merge_steps, type FailedResult, type MergeContext } from './run-merge-steps'
@@ -96,7 +96,7 @@ function is_epic_without_repo(values: ParsedArguments['values']): boolean {
 function valid_epic(raw: string | undefined): string | undefined {
 	if (raw === undefined) return undefined
 
-	return run_issue_number.ISSUE_NUMBER_PATTERN.test(raw) ? raw : undefined
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(raw) ? raw : undefined
 }
 
 // The repository counterpart, testing its own named pattern directly for the same reason.
@@ -137,7 +137,7 @@ function valid_child(parsed: ParsedArguments): string | undefined {
 
 	if (child === undefined) return undefined
 
-	return run_issue_number.ISSUE_NUMBER_PATTERN.test(child) ? child : undefined
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(child) ? child : undefined
 }
 
 function to_context(parsed: ParsedArguments): MergeContext | undefined {

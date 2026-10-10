@@ -1,5 +1,6 @@
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { josh_command } from '#scripts/josh/josh-run'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_named } from './backlog-drive-named'
@@ -19,7 +20,6 @@ import { backlog_offer } from './backlog-offer'
 const NO_RETRIES = 0
 const SUCCESS_EXIT_CODE = 0
 const FIRST_LINE = 0
-const ISSUE_TOKEN = /^\d+$/u
 const WAIT: OfferRead = { verdict: 'wait', issues: [], retries: NO_RETRIES }
 
 // `--lanes` lists every child a free lane could take, so one the loop already knows about is passed
@@ -61,7 +61,10 @@ async function answered_offer(
 ): Promise<OfferRead> {
 	const token = answers[FIRST_LINE]
 
-	if (token !== undefined && ISSUE_TOKEN.test(token)) return child_offer(answers, state)
+	if (token !== undefined && issue_number_shape.ISSUE_NUMBER_PATTERN.test(token)) {
+		return child_offer(answers, state)
+	}
+
 	if (token === 'stop') return handed_back(epic)
 
 	if (token === 'complete') {

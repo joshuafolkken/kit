@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
@@ -37,7 +38,6 @@ import { run_entry_stop } from './run-entry-stop'
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = 'Usage: josh run:entry <issue-number> [--to kickoff|halfrun|prrun|fullrun]'
 const TO_FLAG = '--to'
 // The flag and its command.
@@ -56,7 +56,11 @@ const HALFRUN_RESUME_TOKEN = 'halfrun'
 function parse_number(argv: ReadonlyArray<string>): string | undefined {
 	const [first] = argv
 
-	if (first === undefined || argv.length !== 1 || !ISSUE_NUMBER_PATTERN.test(first)) {
+	if (
+		first === undefined ||
+		argv.length !== 1 ||
+		!issue_number_shape.ISSUE_NUMBER_PATTERN.test(first)
+	) {
 		return undefined
 	}
 
