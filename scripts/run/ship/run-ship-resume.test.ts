@@ -8,7 +8,11 @@ import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 import type { ShipState } from './run-ship-stage'
 
 const josh_run_mock = vi.hoisted(() => vi.fn<typeof josh_command.josh_run>())
-const probe = vi.hoisted(() => ({ read_state: vi.fn(), record_target: vi.fn() }))
+const probe = vi.hoisted(() => ({
+	read_state: vi.fn(),
+	record_target: vi.fn(),
+	repository_directory: vi.fn(),
+}))
 const emit_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
@@ -73,6 +77,20 @@ function commands(): ReadonlyArray<string> {
 	return josh_run_mock.mock.calls.map((call) => call[0].join(' '))
 }
 
+// The gate passes and the commit is refused, so the ship stops with its record kept.
+function refuse_the_push(): void {
+	josh_run_mock.mockResolvedValueOnce({ code: OK, out: '' }).mockResolvedValueOnce({
+		code: FAILED,
+		out: 'push rejected',
+	})
+}
+
+async function ship_to_a_refused_push(): Promise<void> {
+	refuse_the_push()
+	await run_ship_cli.run([TITLE])
+	emit_mock.mockClear()
+}
+
 function events(): ReadonlyArray<string> {
 	return emit_mock.mock.calls.map((call) => `${String(call[0])} ${String(call[1])}`)
 }
@@ -119,10 +137,7 @@ describe('josh ship — a restart with a record', () => {
 	})
 
 	it('keeps the record when a stage fails, naming the stopped step', async () => {
-		josh_run_mock.mockResolvedValueOnce({ code: OK, out: '' }).mockResolvedValueOnce({
-			code: FAILED,
-			out: 'push rejected',
-		})
+		refuse_the_push()
 
 		expect(await run_ship_cli.run([TITLE])).toBe(FAILED)
 		expect([...run_ship_stage.read_done(current.target)]).toStrictEqual([
@@ -177,8 +192,8 @@ describe('josh ship — the stage trace on the event stream', () => {
 			'ship-stage #2426 gate skipped',
 			'ship-stage #2426 commit skipped',
 			'ship-stage #2426 followup skipped',
-			'ship-stage #2426 report start',
-			'ship-stage #2426 report done',
+			'ship-stage #2426 report start report',
+			'ship-stage #2426 report done report',
 		])
 	})
 
@@ -188,15 +203,53 @@ describe('josh ship — the stage trace on the event stream', () => {
 		await run_ship_cli.run([TITLE])
 
 		expect(events()).toStrictEqual([
-			'ship-stage #2426 preflight start',
-			'ship-stage #2426 preflight done',
-			'ship-stage #2426 sync start',
-			'ship-stage #2426 sync done',
-			'ship-stage #2426 gate start',
-			'ship-stage #2426 gate failed',
+			'ship-stage #2426 preflight start preflight',
+			'ship-stage #2426 preflight done preflight',
+			'ship-stage #2426 sync start preflight,sync',
+			'ship-stage #2426 sync done preflight,sync',
+			'ship-stage #2426 gate start preflight,sync,gate',
+			'ship-stage #2426 gate failed preflight,sync,gate',
 		])
 	})
+})
 
+// joshuafolkken/kit#3552: every line carries the stages this attempt has started, never a passed-over one;
+// the attempt outlives a supervisor that ended without a stop, and a stop ends it.
+describe('josh ship — the attempt each stage line carries', () => {
+	const resumed_only = 'ship-stage #2426 report done commit,followup,report'
+
+	it('lists only the stages a resumed ship started', async () => {
+		probe.read_state.mockResolvedValue(SHIPPED)
+
+		await run_ship_cli.run([TITLE])
+
+		expect(events().at(-1)).toBe(resumed_only)
+	})
+
+	it('keeps the stages a ship that ended without a stop started', async () => {
+		await ship_to_a_refused_push()
+		probe.read_state.mockResolvedValue(SHIPPED)
+
+		await run_ship_cli.run([TITLE])
+
+		expect(events().at(-1)).toBe(
+			'ship-stage #2426 report done preflight,sync,gate,commit,followup,report',
+		)
+	})
+
+	it('lists afresh after a supervised stop', async () => {
+		vi.stubEnv(run_ship_detach.SUPERVISED_KEY, '1')
+		await ship_to_a_refused_push()
+		vi.stubEnv(run_ship_detach.SUPERVISED_KEY, undefined)
+		probe.read_state.mockResolvedValue(SHIPPED)
+
+		await run_ship_cli.run([TITLE])
+
+		expect(events().at(-1)).toBe(resumed_only)
+	})
+})
+
+describe('josh ship — the report', () => {
 	it('shows a skipped stage under its header in the report', async () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 

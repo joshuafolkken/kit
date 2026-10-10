@@ -28,8 +28,8 @@ function is_final_stop(verdict: string | undefined, read: CarryRead): boolean {
 	return verdict?.startsWith('stop') === true && read.kind === 'none'
 }
 
-// **The details are the driver's whole stderr, so only their tail is handed on, and it goes last**
-// (joshuafolkken/kit#2931). The stderr carries every command the driver ran since it started, which
+// **The details are the driver's whole stderr, so only their tail is handed on, and it goes last.**
+// The stderr carries every command the driver ran since it started, which
 // after a long run is tens of kilobytes — far past what `is_safe_value` lets into an argv element. Its
 // tail is where the reason for stopping is; placing it last means the cap `wake_argv` applies to the
 // whole prompt can only ever cut into the details, never the verdict, the resume line or the epic note.
@@ -39,11 +39,11 @@ function details_tail(details: string): string {
 		: details
 }
 
-// **The hand-off names its next move, so the woken session never searches the procedure for it**
-// (joshuafolkken/kit#3156). Whatever the branch, the session acts on it and hands the loop back to the
-// supervisor with a cut; only a person's stop ends the run instead.
+// **The hand-off names its next move, so the woken session never searches the procedure for it.**
+// Whatever the branch, the session acts on it and hands the loop back to the supervisor with a cut;
+// only a person's stop ends the run instead.
 //
-// **The claim comes first** (joshuafolkken/kit#3238). The supervisor hands the record off before the
+// **The claim comes first.** The supervisor hands the record off before the
 // wake, so until the session adopts it with `--resume` every count it writes — `--merged`, `--done`,
 // the closing `--cut` — is refused as advancing a handed-off budget, and the supervisor, seeing no
 // claim, ends the run as a failed wake.
@@ -100,9 +100,9 @@ function driver_result(
 	return { kind: 'judgment', material: handoff_material(verdict, resume, invocation, details) }
 }
 
-// **The cause is the driver's stdout `error …` line, so it leads the note** (joshuafolkken/kit#3242).
-// `backlog:drive` prints an exception only to stdout, and its stderr is never empty — every command it
-// ran is there — so reading `err ?? out` dropped the one line that said why. The stderr follows as its
+// **The cause is the driver's stdout `error …` line, so it leads the note.** `backlog:drive` prints an
+// exception only to stdout, and its stderr is never empty — every command it ran is there — so reading
+// `err ?? out` would drop the one line that says why. The stderr follows as its
 // tail, for the same reason `details_tail` cuts a judgment's details.
 function cause_of(out: string): string {
 	const errors = out.split('\n').filter((line) => line.startsWith(ERROR_PREFIX))
@@ -133,11 +133,11 @@ function claim_record(target: string, invocation: string): boolean {
 	return run_carry.adopt_carry(target, current.carry, run_carry.owner_of(process.pid)) !== undefined
 }
 
-// **A verdict with nothing to judge is re-driven here, never handed to a session** (joshuafolkken/kit#3245).
-// A woken session met with `window`, `merge busy` or `merge retry` only cut and handed the loop back, and
-// the supervisor then ran the very same driver again — a model round trip, at a cache write each, that
-// decided nothing. The record is already this process's, so the rerun needs no fresh claim; the limit
-// keeps a driver that never settles from holding the supervisor past its own checks.
+// **A verdict with nothing to judge is re-driven here, never handed to a session.** A woken session
+// met with `window`, `merge busy` or `merge retry` could only cut and hand the loop back for the same
+// driver to run again — a model round trip, at a cache write each, that decides nothing. The record
+// is already this process's, so the rerun needs no fresh claim; the limit keeps a driver that never
+// settles from holding the supervisor past its own checks.
 const RERUN_VERDICTS: ReadonlyArray<string> = ['window', 'merge busy', 'merge retry']
 const RERUN_LIMIT = 10
 const RERUN_PAUSE_MS = 60_000

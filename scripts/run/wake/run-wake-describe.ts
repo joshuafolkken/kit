@@ -6,9 +6,8 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_liveness } from '#scripts/run/run-liveness'
 import { run_wake, type RunWake, type WakeDecision, type WakeDecisionInput } from './run-wake'
 
-// The `--list` presentation of a wake record (joshuafolkken/kit#2407 split it out of `run-wake-cli.ts`,
-// which had reached its line limit). What the command *does* stays in the CLI; how a supervisor's
-// record reads back to a person lives here, one cohesive block.
+// The `--list` presentation of a wake record. What the command *does* stays in `run-wake-cli.ts`; how
+// a supervisor's record reads back to a person lives here, one cohesive block.
 
 const UNKNOWN_CUTS = 'an unreadable number of'
 const REPO_LOOKUP_TIMEOUT_MS = 10_000
@@ -21,14 +20,13 @@ const UNREADABLE_TIME = 'an unreadable time'
 interface WakeContext {
 	carry_target: string
 	wake_target: string
-	// Where everything this supervisor starts writes its output (joshuafolkken/kit#1746). It is named
+	// Where everything this supervisor starts writes its output. It is named
 	// in `--list` and in every warning, because a path nobody is told is a file nobody reads.
 	log_target: string
 	// The run's event stream, keyed on the primary checkout's git directory — the one the resumed
 	// `backlogrun` parent runs in, so its own git directory is this common one, exactly the key the emit
 	// side uses. `--list` relays the newest event from here: the report surface belongs to the run, and
-	// `--list` is the degenerate last-event read of the same stream the attached session follows
-	// (joshuafolkken/kit#2207).
+	// `--list` is the degenerate last-event read of the same stream the attached session follows.
 	event_target: string
 	worktree: string
 }
@@ -39,10 +37,9 @@ function carry_cuts(read: CarryRead): string {
 	return UNKNOWN_CUTS
 }
 
-// **A wake that has gone out and has not been answered is said out loud** (joshuafolkken/kit#1746).
-// Read from `woke` and `cuts` alone, the forty minutes a supervisor spends retrying one lost cut look
-// exactly like the second before its first launch — so a person checking on a stalled backlog was
-// shown nothing to check. `attempts` is present only while a cut is unserved, which is why its
+// **A wake that has gone out and has not been answered is said out loud.** Read from `woke` and `cuts`
+// alone, the forty minutes a supervisor spends retrying one lost cut look exactly like the second
+// before its first launch. `attempts` is present only while a cut is unserved, which is why its
 // absence is what prints nothing.
 function outstanding_line(wake: RunWake): string | undefined {
 	if (wake.attempts === undefined) return undefined
@@ -50,10 +47,10 @@ function outstanding_line(wake: RunWake): string | undefined {
 	return `${String(wake.attempts)} launch(es) outstanding for the current cut, none claimed yet`
 }
 
-// **Why the supervisor is not launching, and until when** (joshuafolkken/kit#3363). A supervisor that
-// waits writes nothing to its log, so before this `--list` showed a stalled run and a waiting one
-// alike. The state is `run_wake.decide`'s own answer rather than a second reading of the record: an
-// `idle_since` mark is the last pass having found no work, so it is fed back in as `has_work: false`.
+// **Why the supervisor is not launching, and until when.** A supervisor that waits writes nothing to
+// its log, so without this `--list` would show a stalled run and a waiting one alike. The state is
+// `run_wake.decide`'s own answer rather than a second reading of the record: an `idle_since` mark is
+// the last pass having found no work, so it is fed back in as `has_work: false`.
 function wait_input(wake: RunWake, read: CarryRead, now: Date): WakeDecisionInput {
 	return {
 		read,
@@ -100,26 +97,25 @@ function wait_line(wake: RunWake, read: CarryRead, now: Date): string | undefine
 }
 
 // The run's stream, read here because a headless parent's progress reaches its own transcript alone —
-// after a cut, `--list` is the person's one window onto it (joshuafolkken/kit#1910). Two lines: the
-// newest event (the degenerate last-event read of the stream the watch pane follows, so `--list` and
-// the pane read one stream rather than two paths), and how to watch on from here in a pane of its own —
-// the same surface before and after the cut, with `tail -F` on the raw stream named as a recovery path
-// rather than the ambient one (joshuafolkken/kit#2207, joshuafolkken/kit#2492). The event line is
-// omitted before the first event, the way `outstanding_line` omits a count of zero; the watch line is
-// always shown.
+// after a cut, `--list` is the person's one window onto it. Two lines: the newest event (the
+// degenerate last-event read of the stream the board pane draws, so `--list` and the pane read one
+// stream rather than two paths), and how to watch on from here in a pane of its own — `run:board`, the
+// same surface before and after the cut, with `tail -F` on the raw stream named as a recovery path
+// rather than the ambient one. The event line is omitted before the first event, the way
+// `outstanding_line` omits a count of zero; the watch line is always shown.
 function stream_lines(context: WakeContext): Array<string> {
 	const event = run_event_stream.read_last(context.event_target)
 	const progress = event === undefined ? [] : [`progress: ${run_event_stream.format_event(event)}`]
-	const follow = `watch: \`pnpm josh run:event --watch ${String(event?.pos ?? 0)}\` in a pane of its own (recover with \`tail -F ${context.event_target}\`)`
+	const follow = `watch: \`pnpm josh run:board\` in a pane of its own (recover with \`tail -F ${context.event_target}\`)`
 
 	return [...progress, follow]
 }
 
 // The wake count is printed beside the carry record's `cuts` rather than alone, because their relation
 // is the property worth being able to check — one wake per cut, plus one per crashed session the
-// supervisor recovered (joshuafolkken/kit#2336), so `woke >= cuts` and the gap is the recoveries.
-// `woke < cuts` is the shortfall that says a cut went unserved, and since joshuafolkken/kit#1746 `woke`
-// counts records actually claimed rather than sessions started.
+// supervisor recovered, so `woke >= cuts` and the gap is the recoveries. `woke < cuts` is the
+// shortfall that says a cut went unserved; `woke` counts records actually claimed rather than sessions
+// started.
 // **The outstanding line beside it is what makes a shortfall readable**: the count is observed at a
 // poll, so it lags a claim by up to one interval, and launches still outstanding are what say whether
 // a missing wake is one not yet seen or one that never arrived.
@@ -136,8 +132,8 @@ function describe_wake(wake: RunWake, context: WakeContext, now: Date = new Date
 		wait_line(wake, read, now),
 		run_liveness.describe_agent_state(context.log_target),
 		`output: ${context.log_target}`,
-		// How progress is seen without asking after the cut: the run's stream, followed from here
-		// (joshuafolkken/kit#2207). `--list` is that reader's one-shot last-event form.
+		// How progress is seen without asking after the cut: the run's stream, followed from here.
+		// `--list` is that reader's one-shot last-event form.
 		...stream_lines(context),
 		`stop it with \`${STOP_COMMAND}\``,
 	]
@@ -145,7 +141,7 @@ function describe_wake(wake: RunWake, context: WakeContext, now: Date = new Date
 		.join('\n')
 }
 
-// The description as a person reads it, every issue on it a number-link (joshuafolkken/kit#2943). The
+// The description as a person reads it, every issue on it a number-link. The
 // invocation and the newest event both name issues (`backlogrun #1 #2`, `#1904 merged`), and a report
 // that copies them bare is what the Stop guard sends back. The repository is asked here, bounded, rather
 // than in the context every verb resolves: only the two describing verbs print it, and a lookup that

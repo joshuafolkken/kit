@@ -1,11 +1,11 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_command } from '#scripts/git/git-command'
 import { reproduction_measure } from '#scripts/issue/reproduction-measure'
+import { report_format_reference } from '#scripts/report/report-format-reference'
 import { test_declared_logic, type Verdict } from '#scripts/test/test-declared-logic'
 
-// joshuafolkken/kit#2446. "Done" meant lint, types and unit tests were green and the review found
-// nothing — proof the code is right in isolation, never that the feature works where it runs. The
-// recent defects (#2402, #2419, #2393) all came through that gap. **This is the seam where it closes**:
+// Lint, types and unit tests green and a review that found nothing prove the code is right in
+// isolation, never that the feature works where it runs. **This is the seam where that gap closes**:
 // a runtime change merges only once its pull request carries the acceptance criteria run for real —
 // the command and the output it actually printed, in the evidence section `EVIDENCE_HEADING` names.
 //
@@ -15,6 +15,9 @@ import { test_declared_logic, type Verdict } from '#scripts/test/test-declared-l
 // reproduction-section parser, so a prose "confirmed it works" is refused here exactly as it is there.
 
 const EVIDENCE_HEADING = '## 実機証跡'
+// The shape the section needs and where it is written down, so a refusal
+// names the format instead of leaving the reader to search for it.
+const EVIDENCE_FORMAT = `under ${EVIDENCE_HEADING}, a backticked command followed by a fenced block holding the output it actually printed (prose such as "confirmed" is not accepted) — format: ${report_format_reference.pointer(report_format_reference.COMPLETION_REPORT_HEADING)}`
 
 function verdict_for(paths: ReadonlyArray<string>, body: string | undefined = ''): Verdict {
 	if (test_declared_logic.runtime_files(paths).length === 0) return 'exempt'
@@ -49,12 +52,12 @@ async function check(branch_name: string): Promise<Verdict> {
 function refusal_message(): string {
 	return [
 		`Merge refused: this pull request changes runtime code but its body has no ${EVIDENCE_HEADING} section.`,
-		'Run the acceptance criteria for real, then add the section: a backticked command followed by a',
-		'fenced block holding the output it actually printed (prose such as "confirmed" is not accepted).',
+		'Run the acceptance criteria for real, then add the section:',
+		EVIDENCE_FORMAT,
 		'Update the body with `gh api -X PATCH repos/{owner}/{repo}/pulls/<N> -F body=@<path>`, then re-run.',
 	].join('\n')
 }
 
-const live_evidence = { EVIDENCE_HEADING, check, refusal_message, verdict_for }
+const live_evidence = { EVIDENCE_FORMAT, EVIDENCE_HEADING, check, refusal_message, verdict_for }
 
 export { live_evidence }

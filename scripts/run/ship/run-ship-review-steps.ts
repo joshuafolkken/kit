@@ -9,10 +9,11 @@ import { review_record } from '#scripts/review/review-record'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
 import { run_ship_scoped, type Phase } from './run-ship-scoped'
+import type { StepResult } from './run-ship-sync'
 
-// The side effects of `josh ship --review` (joshuafolkken/kit#2427): the round-1 review the chain used
-// to open, launch, join, attest and record across five agent turns, run by the supervisor beside the
-// gate. Each step is the existing command or mechanism, composed rather than cloned:
+// The side effects of `josh ship --review`: the round-1 review — open, launch, join, attest and
+// record — run by the supervisor beside the gate rather than across agent turns. Each step is the
+// existing command or mechanism, composed rather than cloned:
 //
 // 1. `run:review` starts the gate detached and mints the brief — the nonce `review:attest` checks.
 // 2. the reviewer is launched the way `run:wake` launches a session — `agent_argv` under the reviewer
@@ -20,14 +21,14 @@ import { run_ship_scoped, type Phase } from './run-ship-scoped'
 // 3. `run:review --join` blocks a verdict over a red gate; `review:attest --check` refuses a review
 //    that read another checkout; `review:record` writes the round the merge gate reads.
 //
-// **Round 1's local fixes and round 2 stay inside the supervisor** (joshuafolkken/kit#2489). A round-1
+// **Round 1's local fixes and round 2 stay inside the supervisor**. A round-1
 // reviewer that fixed its local Mediums in place changed the tree the background gate read, so that
 // join drains the gate rather than judging it — the ship's gate stage re-runs on the fixed tree. After
 // the commit, `round_two_stage` asks `review:round2 --round-1-closed` whether the fix delta owes a
 // second round, and on `required` runs it through the same commands the chain does: the scoped pair
 // `review:brief` requires, `review:brief --round 2`, a fresh reviewer session, attest and record.
 //
-// **A precondition the supervisor can meet itself is met, not stopped on** (joshuafolkken/kit#2500).
+// **A precondition the supervisor can meet itself is met, not stopped on**.
 // The scoped pair `run:review` and the local gate refuse without is run in place when this tree has no
 // green record, and a round-1 fix is counted only once that pair is green on the fixed tree.
 //
@@ -43,14 +44,19 @@ const ATTEST_CHECK = ['review:attest', '--check']
 const ROUND_TWO_DECISION = ['review:round2', '--round-1-closed']
 const ROUND_TWO_BRIEF = ['review:brief', '--round', '2']
 const ROUND_TWO_REQUIRED = 'required'
+const ROUND_ONE = '1'
+const ROUND_TWO = '2'
+const COMMENT_FLAG = '--comment'
+
+type Round = typeof ROUND_ONE | typeof ROUND_TWO
 const FIXED_JOIN_NOTE =
 	'the round-1 gate read the tree before the review fixes — drained, not judged; the gate re-runs once the tree is fixed.'
 const ROUND_TWO_SKIPPED_NOTE = 'round 2 not due — nothing left to verify; shipping on.'
 const ROUND_ONE_RECORDED_NOTE =
 	'round 1 already recorded for this issue — not reviewed again; the gate reads the fixed tree and round 2 decides after the commit.'
 
-// The scoped pair's precondition, met by the supervisor itself rather than stopped on
-// (joshuafolkken/kit#2500), single-sourced with the preflight and gate stages (joshuafolkken/kit#2946).
+// The scoped pair's precondition, met by the supervisor itself rather than stopped on,
+// single-sourced with the preflight and gate stages.
 const { run_phases, scoped_pair } = run_ship_scoped
 
 type PromptOf = (brief_path: string, findings_path: string) => string
@@ -92,7 +98,7 @@ async function run_session(
 	prompt: string,
 	log_path: string,
 	issue: string,
-	round: '1' | '2',
+	round: Round,
 ): Promise<JoshResult> {
 	const built = agent_argv.resolve_in(prompt, agent_role_profile.REVIEWER, PROJECT_ROOT)
 	if (built.kind === 'rejected') return failure(`reviewer profile rejected: ${built.note}`)
@@ -112,7 +118,7 @@ async function launch_reviewer(
 	brief: string,
 	prompt_of: PromptOf,
 	issue: string,
-	round: '1' | '2',
+	round: Round,
 ): Promise<JoshResult> {
 	const target = paths()
 
@@ -130,7 +136,7 @@ function current_verdict(): ReturnType<typeof run_ship_review.read_verdict> {
 // tree before the fixes, so its verdict describes a tree that no longer exists. The join still ran to
 // its end, so the gate stage that follows never races it. Any fix drains it, not only a round whose
 // every finding was fixed — a partial fix moved the tree just the same, and the round then stops on its
-// unfixed finding at the record rather than on a `Gate RED` the gate never earned (joshuafolkken/kit#2961).
+// unfixed finding at the record rather than on a `Gate RED` the gate never earned.
 async function join_gate(): Promise<JoshResult> {
 	const joined = await josh([RUN_REVIEW, '--join'])
 
@@ -142,19 +148,29 @@ async function join_gate(): Promise<JoshResult> {
 	return { code: SUCCESS_EXIT_CODE, out: joined.out }
 }
 
+// **A passing round 2 is recorded on the issue, not in the tree**: it ran after the commit and reads
+// only, so no commit of the run's follows it, and a line appended now would be pushed onto the open
+// pull request by `pnpm josh followup` — restarting the CI the round ran beside. A blocking round 2
+// keeps the tree: the fix it stops for is pushed anyway, and carries the lines.
+function record_flags(round: Round, outcome: RoundOutcome): ReadonlyArray<string> {
+	return round === ROUND_TWO && outcome.is_passing ? [COMMENT_FLAG] : []
+}
+
 async function record_and_route(
 	issue: string,
+	round: Round,
 	outcome_of: (verdict: ScoredVerdict) => RoundOutcome,
 ): Promise<JoshResult> {
 	const verdict = current_verdict()
 
 	if (verdict.kind === run_ship_review.VERDICT.INVALID) return failure(verdict.note)
 
-	const recorded = await josh(['review:record', '--issue', issue, ...verdict.specs])
+	const outcome = outcome_of(verdict)
+	const flags = record_flags(round, outcome)
+	const recorded = await josh(['review:record', '--issue', issue, ...flags, ...verdict.specs])
 
 	if (recorded.code !== SUCCESS_EXIT_CODE) return recorded
 
-	const outcome = outcome_of(verdict)
 	const out = [...verdict.report, outcome.note].join('\n')
 
 	return outcome.is_passing ? { code: SUCCESS_EXIT_CODE, out } : failure(out)
@@ -165,7 +181,7 @@ function reviewed(
 	open: ReadonlyArray<string>,
 	prompt_of: PromptOf,
 	issue: string,
-	round: '1' | '2',
+	round: Round,
 ): ReadonlyArray<Phase> {
 	const opened = { brief: '' }
 
@@ -189,26 +205,31 @@ async function round_one_record(issue: string): Promise<JoshResult> {
 	const checked = is_fixed ? await scoped_pair() : undefined
 	const is_verified = checked === undefined || checked.code === SUCCESS_EXIT_CODE
 
-	return await record_and_route(issue, (verdict) =>
+	return await record_and_route(issue, ROUND_ONE, (verdict) =>
 		is_verified ? run_ship_review.round_one_outcome(verdict) : run_ship_review.UNVERIFIED_OUTCOME,
 	)
+}
+
+// A round that had nothing to review: it passes, and the ship does not time it as a review that ran.
+function skipped(out: string): StepResult {
+	return { code: SUCCESS_EXIT_CODE, out, is_skipped: true }
 }
 
 // The round-1 review, beside the gate: scoped pair → open → review → join → attest → record, stopping
 // at the first that did not pass.
 //
-// **A recorded round 1 is not run again** (joshuafolkken/kit#2964). A ship relaunched with `--review`
+// **A recorded round 1 is not run again**. A ship relaunched with `--review`
 // after a round-1 stop would otherwise review the whole change a second time as round 1 — a new Medium
 // there stops it again, and round 2 after the commit makes a third. The fix delta is round 2's to
 // verify, and `round_two_stage` asks whether it is due after the commit.
-async function review_stage(issue: string): Promise<JoshResult> {
+async function review_stage(issue: string): Promise<StepResult> {
 	const recorded = await review_record.check(Number(issue))
 
-	if (recorded.status === 'ok') return { code: SUCCESS_EXIT_CODE, out: ROUND_ONE_RECORDED_NOTE }
+	if (recorded.status === 'ok') return skipped(ROUND_ONE_RECORDED_NOTE)
 
 	return await run_phases([
 		scoped_pair,
-		...reviewed([RUN_REVIEW], run_ship_review.reviewer_prompt, issue, '1'),
+		...reviewed([RUN_REVIEW], run_ship_review.reviewer_prompt, issue, ROUND_ONE),
 		join_gate,
 		async () => await josh(ATTEST_CHECK),
 		async () => await round_one_record(issue),
@@ -217,21 +238,19 @@ async function review_stage(issue: string): Promise<JoshResult> {
 
 // The round-2 verification pass, after the commit so it runs beside CI: due only when the round-1 fix
 // delta says so, then scoped pair → brief → fresh reviewer → attest → record.
-async function round_two_stage(issue: string): Promise<JoshResult> {
+async function round_two_stage(issue: string): Promise<StepResult> {
 	const decision = await josh(ROUND_TWO_DECISION)
 	const answer = decision.out.trim()
 
 	if (decision.code !== SUCCESS_EXIT_CODE) return decision
 
-	if (answer !== ROUND_TWO_REQUIRED) {
-		return { code: SUCCESS_EXIT_CODE, out: `${answer}\n${ROUND_TWO_SKIPPED_NOTE}` }
-	}
+	if (answer !== ROUND_TWO_REQUIRED) return skipped(`${answer}\n${ROUND_TWO_SKIPPED_NOTE}`)
 
 	return await run_phases([
 		scoped_pair,
-		...reviewed(ROUND_TWO_BRIEF, run_ship_review.verification_prompt, issue, '2'),
+		...reviewed(ROUND_TWO_BRIEF, run_ship_review.verification_prompt, issue, ROUND_TWO),
 		async () => await josh(ATTEST_CHECK),
-		async () => await record_and_route(issue, run_ship_review.round_two_outcome),
+		async () => await record_and_route(issue, ROUND_TWO, run_ship_review.round_two_outcome),
 	])
 }
 

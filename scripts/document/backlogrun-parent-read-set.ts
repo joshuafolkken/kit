@@ -1,4 +1,4 @@
-// What a `backlogrun` parent reads, and what that trims from a full read (joshuafolkken/kit#2256).
+// What a `backlogrun` parent reads, and what that trims from a full read.
 //
 // **The parent is the scheduler, and it never implements.** It reads `backlog:next`, dispatches each
 // child in its own delegated `fullrun` unit, opens lanes, runs the progress watcher and the hand-off,
@@ -17,9 +17,8 @@ import { read_set_trim } from './read-set-trim'
 const BACKLOGRUN = 'backlogrun'
 
 // **The `SKILL.md` sections the `backlogrun` parent never uses.** It edits no rule mid-run (§3, read
-// only on an editing turn). The implementer-only rules it used to skip — the `into` target, the
-// working-tree hold, the Issue's comments — are single rows of §2's table since joshuafolkken/kit#3174,
-// so there is no section of them left to trim.
+// only on an editing turn). The implementer-only rules — the `into` target, the working-tree hold,
+// the Issue's comments — are single rows of §2's table, so there is no section of them to trim.
 const UNUSED_SKILL_SECTIONS: ReadonlyArray<string> = [
 	'3. What stays resident, and what is read from here',
 ]
@@ -30,9 +29,9 @@ const SKIPPED_POINT_OF_USE: ReadonlySet<string> = new Set<string>()
 
 // **The parent runs the end-of-run retrospective** (`retrospective.md`) when `run:step` prints it, but its
 // manifest names `retrospective.md` only through `backlogrun-steps.md` — one hop further than the
-// derivation follows — so the parent's reach names it (joshuafolkken/kit#3078). **It polls a
+// derivation follows — so the parent's reach names it. **It polls a
 // delegated unit that went silent** through `backlogrun-recovery.md`, named only from
-// `backlogrun-child.md`, so the reach names that too (joshuafolkken/kit#3175).
+// `backlogrun-child.md`, so the reach names that too.
 const REACHED_POINT_OF_USE: ReadonlySet<string> = new Set([
 	'retrospective.md',
 	'backlogrun-recovery.md',

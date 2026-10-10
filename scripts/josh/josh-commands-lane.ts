@@ -1,7 +1,7 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
 // The `lane:*` command registry, split out of `josh-commands-ai.ts` so that file stays under its line
-// limit (joshuafolkken/kit#2162). One script answers `lane:open` / `lane:close` / `lane:list` /
+// limit. One script answers `lane:open` / `lane:close` / `lane:list` /
 // `lane:prune` / `lane:output` / `lane:dispatch` / `lane:await`, told apart by the verb below;
 // `lane:launch` is the composite that opens, pops-and-installs on the first lane, and dispatches.
 const LANE_SCRIPT = 'scripts/lane/lane-cli.ts'
@@ -74,12 +74,22 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<issue> [--stash <message>]', 'automation', ['files', 'git', 'processes']],
 	},
-	// The lane-limit measurement (joshuafolkken/kit#3355): `.env` is read so `lane:stats` labels the row
+	// A live run's lane limit: `.env` is read so the bare form reports the
+	// `JOSH_LANE_LIMIT` a person set there when no override stands.
+	'lane:limit': {
+		script: 'scripts/lane/lane-limit-cli.ts',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			'Change a live backlogrun’s lane limit without stopping it, or print the limit, lanes in use and free lanes',
+		category: 'AI tools',
+		reference: ['[<limit>] [--reset]', 'developer', ['files']],
+	},
+	// The lane-limit measurement: `.env` is read so `lane:stats` labels the row
 	// with the `JOSH_LANE_LIMIT` a person set there.
 	'lane:sample': {
 		...MEASURE_ARGUMENTS,
 		description:
-			'Record the machine load (load average, swap, free memory, working lanes) to the lane ledger',
+			'Record the machine load (load average, swap, free memory, working lanes) to the lane ledger — a backlogrun samples itself, this is for a reading outside one',
 		category: 'AI tools',
 		reference: ['[--every <seconds>]', 'maintainer', ['files']],
 		default_script_arguments: ['sample'],
@@ -87,7 +97,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 	'lane:stats': {
 		...MEASURE_ARGUMENTS,
 		description:
-			'Print one table row of lane throughput, gate duration and machine load over a period',
+			'Print one table row of lane throughput, gate duration and machine load over a period, and the per-stage durations of a lane under it',
 		category: 'AI tools',
 		reference: ['--period <days> [--limit <lane-limit>]', 'maintainer', ['none']],
 		default_script_arguments: ['stats'],

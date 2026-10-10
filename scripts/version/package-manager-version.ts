@@ -14,6 +14,12 @@ const PNPM_PIN_REGEX = /^pnpm@(.+)$/u
 const DEV_ENGINES_NAME_FIRST_REGEX = /("name":\s*"pnpm"\s*,\s*"version":\s*")[^"]+(")/u
 const DEV_ENGINES_VERSION_FIRST_REGEX = /("version":\s*")[^"]+("\s*,\s*"name":\s*"pnpm")/u
 
+// An `onFail: "error"` inside a `"packageManager": { … }` object — in a manifest that is only
+// `devEngines.packageManager`, since the top-level `packageManager` is a string — and never
+// `devEngines.runtime`, because `[^{}]` cannot cross into another block.
+const DEV_ENGINES_ON_FAIL_ERROR_REGEX = /("packageManager":\s*\{[^{}]*"onFail":\s*")error(")/u
+const ON_FAIL_DOWNLOAD = 'download'
+
 const optional_version_schema = z.object({ version: z.string().optional() }).optional()
 
 const alignment_read_schema = z.object({
@@ -86,10 +92,22 @@ function align_development_engines_version(content: string): string {
 	return set_development_engines_version(content, target)
 }
 
+// `onFail: "error"` rejects any pnpm that is not byte-for-byte the pin, so a machine that left
+// Corepack for a standalone pnpm cannot run pnpm at all; `"download"` fetches the pinned version
+// instead. Only `"error"` is rewritten — a `"warn"` / `"ignore"` the
+// project chose itself is kept, and the rest of the file is preserved byte-for-byte.
+function upgrade_development_engines_on_fail(content: string): string {
+	return content.replace(
+		DEV_ENGINES_ON_FAIL_ERROR_REGEX,
+		(_match: string, prefix: string, suffix: string) => `${prefix}${ON_FAIL_DOWNLOAD}${suffix}`,
+	)
+}
+
 const package_manager_version = {
 	extract_pnpm_pin,
 	align_development_engines_version,
 	set_development_engines_version,
+	upgrade_development_engines_on_fail,
 }
 
 export { package_manager_version }

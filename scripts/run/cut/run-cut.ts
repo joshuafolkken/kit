@@ -4,18 +4,19 @@ import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-thresho
 import { git_command } from '#scripts/git/git-command'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { stamp_record, type StampRecordSpec } from '#scripts/josh/stamp-record'
 import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
+import { json_value } from '#scripts/lib/json-value'
 import { run_hold, type RunHold } from '#scripts/run/hold/run-hold'
 import { z } from 'zod'
 import { run_cut_handoff, type Handoff } from './run-cut-handoff'
 
-// joshuafolkken/kit#1839: a lane child is a detached `fullrun #<N>` process, and the thinking it
-// accumulates while implementing rides on every later API call in the same session — measured at 176K
-// of 204K output on joshuafolkken/kit#1837. This record lets that child **end its process before the
-// gate** and have a fresh one resume from the gate onward, so the accumulated thinking is dropped
-// rather than carried. The conversation is not persisted: joshuafolkken/kit#1567 found a compaction
-// does not reduce billing, so the fresh session reads the plan and the recorded decisions back off
-// GitHub and finds the implementation still sitting in the lane's own working tree.
+// A lane child is a detached `fullrun #<N>` process, and the thinking it accumulates while
+// implementing rides on every later API call in the same session. This record lets that child **end
+// its process before the gate** and have a fresh one resume from the gate onward, so the accumulated
+// thinking is dropped rather than carried. The conversation is not persisted — a compaction does not
+// reduce billing — so the fresh session reads the plan and the recorded decisions back off GitHub and
+// finds the implementation still sitting in the lane's own working tree.
 //
 // **The unit is the working tree, exactly as `run-hold.ts` keys itself** — one branch and one
 // uncommitted diff, a single lane — so the key is the work tree's own git directory (index 0), reused
@@ -28,7 +29,7 @@ import { run_cut_handoff, type Handoff } from './run-cut-handoff'
 // recover on its own — which issue, which branch, and that a declared cut (not a crash) put it here —
 // and the resume *verifies* the tree against it rather than restoring it.
 //
-// **No owner is recorded, and that is deliberate** (joshuafolkken/kit#1839 review). A cut relaunches
+// **No owner is recorded, and that is deliberate.** A cut relaunches
 // exactly one fresh process — `begin_cut`'s exclusive create refuses a second cut — so there is no
 // live owner a resume must be blocked against, and recording the cutting session's pid would only
 // stall the resume against a process that is on its way out. **Resume uniqueness rests on the
@@ -37,17 +38,15 @@ import { run_cut_handoff, type Handoff } from './run-cut-handoff'
 // adopter.
 
 const CUT_PREFIX = 'josh-run-cut-'
-// **The two phase names are `agent-role-profile.ts`'s** (joshuafolkken/kit#2382): a lane child resumes
-// into a phase, and that module resolves the effort the resumed child runs at from the same name. Reading
-// them from there rather than restating the literals here is what keeps the phase a cut records and the
-// phase the effort table is keyed on from drifting. `PRE_GATE_PHASE` is the boundary before the gate;
-// `IMPLEMENTATION_PHASE` (joshuafolkken/kit#1933) drops the thinking accumulated *during* implementation
-// and resumes back into implementation (`resumes_into_implementation`); only the pre-gate cut resumes
-// into the gate. The setup-phase cut (joshuafolkken/kit#2346) was retired by joshuafolkken/kit#2489.
+// **The two phase names are `agent-role-profile.ts`'s**: a lane child resumes into a phase, and that
+// module resolves the effort the resumed child runs at from the same name. Reading them from there
+// rather than restating the literals here is what keeps the phase a cut records and the phase the
+// effort table is keyed on from drifting. `PRE_GATE_PHASE` is the boundary before the gate;
+// `IMPLEMENTATION_PHASE` drops the thinking accumulated *during* implementation and resumes back into
+// implementation (`resumes_into_implementation`); only the pre-gate cut resumes into the gate.
 const { PRE_GATE_PHASE, IMPLEMENTATION_PHASE } = agent_role_profile
-// **The measurement is the parent hand-off's, never a second one** (joshuafolkken/kit#1933). The lane
-// child decides whether to take this cut with `pnpm josh cost --cut`
-// — the same per-request billed-input measurement (`cost_verdict.per_request_cost`) the parent's
+// **The measurement is the parent hand-off's, never a second one.** The lane child decides whether
+// to take this cut with `pnpm josh cost --cut` — the same per-request billed-input measurement (`cost_verdict.per_request_cost`) the parent's
 // `pnpm josh cost --cut` hand-off uses (`backlogrun-progress.md` → "The hand-off"). The shared
 // threshold prevents the scheduler and worker boundaries from drifting apart.
 const IMPLEMENTATION_CONTEXT_THRESHOLD = CONTEXT_CUT_THRESHOLD
@@ -61,12 +60,11 @@ const CUT_MAX_AGE_HOURS = backlog_budget.WHOLE_RUN_BUDGET_HOURS
 const END_COMMAND = 'pnpm josh run:cut --end'
 const READ_COMMAND = 'pnpm josh run:cut --json'
 
-// The mechanical bound on the hand-off record's serialized size (joshuafolkken/kit#2346,
-// joshuafolkken/kit#2354). The cut is only worth its resume while the record a fresh process reads back
-// stays small — a record that grew to carry the conversation would defeat the whole point,
-// re-establishing at the resume the context the cut dropped. The scalar fields are each tiny (an issue
-// number, a branch name, a phase, an ISO timestamp, a flag); the `handoff` (joshuafolkken/kit#2354)
-// carries the user's instruction and a curated list of what is done, left and untouched — the
+// The mechanical bound on the hand-off record's serialized size. The cut is only worth its resume
+// while the record a fresh process reads back stays small — a record that grew to carry the
+// conversation would defeat the whole point, re-establishing at the resume the context the cut
+// dropped. The scalar fields are each tiny (an issue number, a branch name, a phase, an ISO timestamp,
+// a flag); the `handoff` carries the user's instruction and a curated list of what is done, left and untouched — the
 // irreducible intent, not the conversation, so it stays a few short lines. The cap is set to hold that
 // and refuse a field that ever grew unbounded at the write rather than carrying it. `begin_cut`
 // enforces it.
@@ -75,7 +73,7 @@ const MAX_HANDOFF_BYTES = 8192
 interface RunCut {
 	// The identity of the run this cut belongs to — `fullrun #<N>`, built through
 	// `lane_child_invocation.child_invocation` so it is single-sourced with the dispatch that first launched the
-	// child. **It is the resume-matching key, not the relaunch prompt** (joshuafolkken/kit#2022): the
+	// child. **It is the resume-matching key, not the relaunch prompt**: the
 	// relaunch gives the fresh process `lane_child_invocation.resume_invocation` instead, while
 	// `is_declared_cut` / `is_adopted_cut` still compare this field against `invocation_for(issue)` to
 	// confirm the record belongs to the resuming issue.
@@ -84,20 +82,18 @@ interface RunCut {
 	// The branch the implementation sits on. The resume refuses to continue on any other branch, so a
 	// fresh process that started in the wrong tree is caught rather than gating someone else's work.
 	branch: string
-	// Where in the run the cut happened. One boundary exists today (`pre-gate`); the field is here so a
-	// second one can be told apart rather than guessed.
+	// Where in the run the cut happened — `PRE_GATE_PHASE` or `IMPLEMENTATION_PHASE`.
 	phase: string
 	cut_at: string
 	// Set by the cut, and spent by the adoption. A crash never sets it, which is what makes a declared
 	// cut the only state that resumes, and spending it is what makes a resume unique.
 	is_handed_off?: boolean | undefined
-	// The instruction and work state the run was told to carry across the cut (joshuafolkken/kit#2354).
-	// Optional so a record written by the six scalar fields alone still parses — the backward-compatible
-	// legacy shape — while a resume into implementation refuses to continue without it (`classify_resume`
+	// The instruction and work state the run was told to carry across the cut. Optional so a pre-gate
+	// record of the scalar fields alone parses, while a resume into implementation refuses to continue without it (`classify_resume`
 	// → `incomplete`), so a session is never silently continued lacking the instruction it needs.
 	handoff?: Handoff | undefined
 	// Set when `run:merge` found this cut still unadopted after every process of the lane had gone and
-	// relaunched its successor itself (joshuafolkken/kit#2484). The fallback fires once per cut: a
+	// relaunched its successor itself. The fallback fires once per cut: a
 	// successor that dies again before adopting is not relaunched a second time, so a lane that keeps
 	// failing its resume is parked rather than relaunched forever.
 	is_merge_relaunched?: boolean | undefined
@@ -108,20 +104,20 @@ interface CutState {
 	branch: string
 	is_dirty: boolean
 	is_held: boolean
-	// The issue a `fullrun` hold names, absent when the tree is not held by one (joshuafolkken/kit#2760).
+	// The issue a `fullrun` hold names, absent when the tree is not held by one.
 	held_issue?: string | undefined
 }
 
 // The fields a cut is written from, bundled so `begin_cut` stays within the parameter limit. `phase`
 // is which boundary the cut was taken at — `PRE_GATE_PHASE` or `IMPLEMENTATION_PHASE` — and it is what
 // the resume reads to decide whether the fresh process continues to the gate or back into
-// implementation (joshuafolkken/kit#1933).
+// implementation.
 interface CutSpec {
 	issue: string
 	branch: string
 	phase: string
 	// The instruction and work state to carry, absent for a pre-gate cut that resumes into the gate
-	// rather than into implementation (joshuafolkken/kit#2354).
+	// rather than into implementation.
 	handoff?: Handoff | undefined
 }
 
@@ -138,9 +134,9 @@ interface CutResumeRequest {
 // resume failure — wrong branch, a clean tree, an expired record, no declared cut, or a tree no longer
 // under its hold — is `stale`. A record a successor has already adopted — `is_handed_off` spent back to
 // `false` — is `handed-off`, so a process woken after its own cut is told to stop rather than sent to
-// investigate a tree that is not wrong (joshuafolkken/kit#1935). A record that matches the tree but
-// resumes into implementation without an instruction is `incomplete` — the run is not silently
-// continued lacking what it was told to do (joshuafolkken/kit#2354).
+// investigate a tree that is not wrong. A record that matches the tree but resumes into implementation
+// without an instruction is `incomplete` — the run is not silently continued lacking what it was told
+// to do.
 type CutResume = 'resume' | 'stale' | 'handed-off' | 'incomplete'
 
 type CutRead =
@@ -148,9 +144,6 @@ type CutRead =
 	| { kind: 'carried'; cut: RunCut }
 	| { kind: 'expired'; cut: RunCut }
 	| { kind: 'unreadable' }
-
-const NONE_READ: CutRead = { kind: 'none' }
-const UNREADABLE_READ: CutRead = { kind: 'unreadable' }
 
 const run_cut_schema = z.object({
 	invocation: z.string(),
@@ -178,42 +171,39 @@ function invocation_for(issue: string): string {
 }
 
 function parse_cut(raw: string): RunCut | undefined {
-	try {
-		const parsed = run_cut_schema.safeParse(JSON.parse(raw))
-
-		return parsed.success ? parsed.data : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw, run_cut_schema)
 }
 
-// A `cut_at` that is not a date is read as expired, for the reason `run-carry.ts` reads an unparsable
-// `started_at` that way: a record nothing can ever expire is the one state the bound exists to
-// prevent.
+function cut_at_of(cut: RunCut): string {
+	return cut.cut_at
+}
+
+// The expiry and the classification are `stamp-record.ts`'s, shared with `run-carry.ts` and
+// `run-hold.ts`; what a `cut_at` that is not a date means is decided there.
+const CUT_SPEC: StampRecordSpec<RunCut> = {
+	parse: parse_cut,
+	timestamp_of: cut_at_of,
+	max_age_ms: CUT_MAX_AGE_MS,
+}
+
 function is_expired(cut: RunCut, now: Date): boolean {
-	const started = Date.parse(cut.cut_at)
-
-	if (Number.isNaN(started)) return true
-
-	return now.getTime() - started > CUT_MAX_AGE_MS
+	return stamp_record.is_older_than(cut_at_of(cut), CUT_MAX_AGE_MS, now)
 }
 
 function classify(raw: string | undefined, now: Date): CutRead {
-	if (raw === undefined) return NONE_READ
+	const read = stamp_record.classify(raw, CUT_SPEC, now)
 
-	const cut = parse_cut(raw)
+	if (!('record' in read)) return read
 
-	if (cut === undefined) return UNREADABLE_READ
-
-	return { kind: is_expired(cut, now) ? 'expired' : 'carried', cut }
+	return { kind: read.kind, cut: read.record }
 }
 
 function read_cut(target: string, now: Date = new Date()): CutRead {
 	return classify(stamp_file.read_stamp_text(target), now)
 }
 
-// **The same read as `read_cut(cut_path(await worktree_directory()))`, taken synchronously**
-// (joshuafolkken/kit#1864). The pre-gate cut is enforced from a `PreToolUse` guard, and a guard
+// **The same read as `read_cut(cut_path(await worktree_directory()))`, taken synchronously**.
+// The pre-gate cut is enforced from a `PreToolUse` guard, and a guard
 // answers synchronously or not at all — so the one git call the path derivation needs is
 // `git_common_directory.own()`, the synchronous twin of the asynchronous reader, rather than a second
 // spelling of it. Everything after the path is already shared: `cut_path` keys the record and
@@ -247,7 +237,7 @@ function carried_cut_sync(
 	return read.kind === 'carried' ? read.cut : undefined
 }
 
-// A lane's carried cut, read from outside the lane (joshuafolkken/kit#2484). The record is keyed to the
+// A lane's carried cut, read from outside the lane. The record is keyed to the
 // lane's own git directory, so the parent — standing in the main checkout — resolves that directory
 // from the lane's path rather than its own, and gets the record path back to mark it.
 function lane_cut_sync(lane_directory: string): { target: string; cut: RunCut } | undefined {
@@ -272,15 +262,15 @@ function fresh_cut(spec: CutSpec, now: Date): RunCut {
 	}
 }
 
-// **The implementation cut resumes back into implementation; the pre-gate cut resumes into the gate**
-// (joshuafolkken/kit#1933). The resume shape — the `resume-impl` verdict and the record cleared on
+// **The implementation cut resumes back into implementation; the pre-gate cut resumes into the gate**.
+// The resume shape — the `resume-impl` verdict and the record cleared on
 // adoption — is named once here rather than spelled as a phase comparison at each call site.
 function resumes_into_implementation(phase: string): boolean {
 	return phase === IMPLEMENTATION_PHASE
 }
 
 // Whether a record serializes within the hand-off bound. The record a fresh process reads back must
-// stay small, or the resume re-establishes the very context the cut dropped (joshuafolkken/kit#2346).
+// stay small, or the resume re-establishes the very context the cut dropped.
 function within_handoff_bound(cut: RunCut): boolean {
 	return Buffer.byteLength(JSON.stringify(cut), 'utf8') <= MAX_HANDOFF_BYTES
 }
@@ -288,7 +278,7 @@ function within_handoff_bound(cut: RunCut): boolean {
 // Whether the record a spec would write fits the bound. `load_handoff` bounds the handoff alone, but the
 // record also carries the scalar fields, so a handoff just under the cap can still overflow once
 // assembled — the caller checks this before `begin_cut` so that case reports `bad-handoff` rather than
-// the exclusive-create's `busy` (joshuafolkken/kit#2354).
+// the exclusive-create's `busy`.
 function record_within_bound(spec: CutSpec, now: Date = new Date()): boolean {
 	return within_handoff_bound(fresh_cut(spec, now))
 }
@@ -327,22 +317,19 @@ function matches_state(cut: RunCut, request: CutResumeRequest): boolean {
 
 // A record a successor already adopted — the hand-off spent back to `false` for this issue's
 // invocation. It is told apart from a crash record (`is_handed_off` never set) so a process woken after
-// its own cut learns the run was carried on rather than being sent to investigate
-// (joshuafolkken/kit#1935).
+// its own cut learns the run was carried on rather than being sent to investigate.
 function is_adopted_cut(cut: RunCut, issue: string): boolean {
 	return cut.is_handed_off === false && cut.invocation === invocation_for(issue)
 }
 
 // A cut that resumes into implementation must carry the instruction; a pre-gate cut resumes into the
-// gate and needs none, so it always passes (joshuafolkken/kit#2354).
-// It reads a spec as well as a record, so `run:cut` refuses to write the cut its resume would refuse
-// (joshuafolkken/kit#2484) with the same predicate the resume answers `incomplete` on.
+// gate and needs none, so it always passes. It reads a spec as well as a record, so `run:cut` refuses
+// to write the cut its resume would refuse with the same predicate the resume answers `incomplete` on.
 function has_required_handoff(cut: Pick<RunCut, 'phase' | 'handoff'>): boolean {
 	return !resumes_into_implementation(cut.phase) || run_cut_handoff.is_complete_handoff(cut.handoff)
 }
 
-// Whether `run:merge` may relaunch the successor of a lane whose processes have all gone
-// (joshuafolkken/kit#2484): a cut this issue declared and no successor adopted, carrying what its resume
+// Whether `run:merge` may relaunch the successor of a lane whose processes have all gone: a cut this issue declared and no successor adopted, carrying what its resume
 // needs, and not relaunched by the fallback before. The tree itself is verified by the resume.
 function is_relaunchable(cut: RunCut, issue: string): boolean {
 	return (
@@ -399,7 +386,7 @@ function hold_of(directory: string | undefined): RunHold | undefined {
 }
 
 // The issue a `fullrun` holds this tree for — what tells a `fullrun` held in its own checkout apart from
-// a person's tree (joshuafolkken/kit#2760). A `halfrun` or an in-session `backlogrun` child holds it
+// a person's tree. A `halfrun` or an in-session `backlogrun` child holds it
 // too, but its cut would be resumed as `fullrun #N`, so only a hold `run:entry` marked names an issue.
 function fullrun_issue(hold: RunHold | undefined): string | undefined {
 	return hold?.is_fullrun === true ? hold.issue : undefined
@@ -429,7 +416,7 @@ function busy_message(cut: RunCut): string {
 }
 
 // A successor already resumed this cut, so a process that reaches `--resume` after its own hand-off is
-// told to stop quietly rather than to investigate a tree that is not wrong (joshuafolkken/kit#1935).
+// told to stop quietly rather than to investigate a tree that is not wrong.
 function handed_off_message(cut: RunCut): string {
 	return `This cut was already handed off to a successor — ${describe_cut(cut)}. Nothing was resumed here; the run is being carried on by the process that adopted it, so this one has nothing to do.`
 }
@@ -442,8 +429,7 @@ function stale_message(cut: RunCut): string {
 }
 
 // The record matches the tree but resumes into implementation without an instruction, so the run would
-// be continued blind to what it was told to do — the failure mode joshuafolkken/kit#2354 exists to stop.
-// It is reported as a failure rather than a success, so the fresh process recovers the instruction
+// be continued blind to what it was told to do. It is reported as a failure rather than a success, so the fresh process recovers the instruction
 // rather than restructuring a tree it does not understand.
 function incomplete_message(cut: RunCut): string {
 	return `This cut carries no instruction to resume on — ${describe_cut(cut)}. Resume was refused rather than continuing without it; recover the run's instruction and work state before implementing, and clear the record with \`${END_COMMAND}\` if the run is over.`

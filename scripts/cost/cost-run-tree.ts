@@ -1,10 +1,11 @@
 import path from 'node:path'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { cost_run_cut } from './cost-run-cut'
 import { cost_run_nodes, type NodeContext, type RunNode } from './cost-run-nodes'
 
-// Grouping a transcript store into runs and selecting one (joshuafolkken/kit#1937).
+// Grouping a transcript store into runs and selecting one.
 //
 // A run is rooted at a main-checkout parent session; the wakes that resumed it cluster with it by
 // time, and the lane children and subagents that ran inside its window hang off it. The no-argument
@@ -24,6 +25,9 @@ const NONE = -1
 interface RunTree {
 	// The classified sessions of the selected run.
 	nodes: ReadonlyArray<RunNode>
+	// The selected run's transcript files, one per node, for a reader that needs more of a session than
+	// its priced records — the retrospective's guard tally.
+	files: ReadonlyArray<SessionFile>
 	// How many runs the store held, so a reader knows the selected one was chosen from several.
 	run_count: number
 	// Transcripts in the store that the selected run did not claim — reported as a count, never folded
@@ -157,7 +161,12 @@ function to_tree(
 ): RunTree {
 	const nodes = cost_run_nodes.build_nodes(chosen.files, context)
 
-	return { nodes, run_count, unattributed_count: files.length - chosen.files.length }
+	return {
+		nodes,
+		files: chosen.files,
+		run_count,
+		unattributed_count: files.length - chosen.files.length,
+	}
 }
 
 // The whole store grouped into runs, with one selected. Pure over its inputs so a test drives it with
@@ -174,8 +183,6 @@ function build_tree(
 
 	return to_tree(files, chosen, context, clusters.length)
 }
-
-const LANE_ISSUE = /^\d+$/u
 
 function lane_prefix(cwd: string): string {
 	return `${cost_transcript.project_slug(lane_paths.lane_root(cwd))}-`
@@ -199,7 +206,7 @@ function lane_issue_of(
 
 	const rest = slug.slice(prefix.length)
 
-	return LANE_ISSUE.test(rest) ? Number(rest) : undefined
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(rest) ? Number(rest) : undefined
 }
 
 function to_context(

@@ -5,12 +5,12 @@ import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { execa } from 'execa'
 import { josh_harness_environment, type JoshEnvironment } from './josh-harness-environment'
 
-// The runner half of the integration harness (joshuafolkken/kit#2447): josh spawned as a subprocess
+// The runner half of the integration harness: josh spawned as a subprocess
 // into one of the environments `josh-harness-environment.ts` assembles. `run` returns a promise, so two
 // commands launched back to back overlap when the caller awaits neither — the shape a race like #2434
 // needs — and `wait_for` holds the second launch until the first has reached the point the race is about.
 //
-// **Every spawn is asynchronous, bounded and stopped as a whole tree** (joshuafolkken/kit#3309). A
+// **Every spawn is asynchronous, bounded and stopped as a whole tree**. A
 // synchronous spawn froze the event loop, so vitest's own timeout could not fire, and a timeout that
 // killed only the direct child left the gate it had started writing into a workspace already removed —
 // one saturated run took 935 s. Each child leads a process group of its own, the group is killed once
@@ -45,9 +45,9 @@ const PROBE_SIGNAL = 0
 // another repository, a lane mark would make it a dispatched child, and `PORT_SEED` would decide what
 // a port assertion sees. Blanked here so every scenario starts from the same place. The guard's `git`
 // binary is blanked too: the environment has no `origin`, so a fetch the real command makes there reaches
-// nothing, and the shim would record it as a network call (joshuafolkken/kit#3234).
+// nothing, and the shim would record it as a network call.
 //
-// **A gate the harness starts is always a nested gate** (joshuafolkken/kit#3309). It runs inside a unit
+// **A gate the harness starts is always a nested gate**. It runs inside a unit
 // suite whatever launched that suite; without the mark, a direct `vitest` run let it reserve cores and
 // two such gates queued behind each other, while under `josh gate` neither did.
 const CHILD_ENVIRONMENT: Record<string, string | undefined> = {

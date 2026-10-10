@@ -1,19 +1,20 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { IssueRead } from '#scripts/gh/git-gh-issue-read'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { cli_flags } from '#scripts/lib/cli-flags'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { issue_cite, type CiteTarget } from './issue-cite'
 
 // `josh issue:cite <N> [<N> ...] [--repo <owner/repo>]` — the paste-ready citation line for every
-// Issue named, in one call (joshuafolkken/kit#2220).
+// Issue named, in one call.
 //
-// It answers the cost that made the bare `#N` cheaper than the correct citation: the title each line
-// needs used to be a per-Issue `gh api` read, and naming several Issues at once — a backlog listing, a
-// lane status report — meant several round trips before a single correct line could be written. The
-// numbers go in together and the titles come back together, so the correct form is now the cheap one.
+// It answers the cost that makes the bare `#N` cheaper than the correct citation: a per-Issue
+// `gh api` read for each title means several round trips before a single correct line of a backlog
+// listing or lane status report can be written. The numbers go in together and the titles come back
+// together, so the correct form is the cheap one.
 //
 // **A token that is not a number refuses the whole invocation**, exactly as `issue:read` does: an
 // argument the parser cannot read is a mistake, and dropping it answers fewer Issues than were asked
@@ -30,6 +31,7 @@ const READ_CONCURRENCY = 8
 const TITLE_FIELD = 'title'
 const LINE_SEPARATOR = '\n'
 const USAGE = 'Usage: josh issue:cite <issue-number|owner/repo#N> [ ... ] [--repo <owner/repo>]'
+const OPTIONS = { repo: { type: 'string' } } as const
 
 const title_schema = z.looseObject({ title: z.string() })
 
@@ -38,13 +40,9 @@ type LineResult = { kind: 'ok'; line: string } | { kind: 'fail'; line: string }
 // The title out of the one-field read, or `undefined` for an empty or unparseable one — an empty title
 // is not a summary, so it is reported as a read that produced nothing rather than cited as a blank.
 function parse_title(json: string): string | undefined {
-	try {
-		const title = title_schema.parse(JSON.parse(json)).title.trim()
+	const title = json_value.parse_with(json, title_schema)?.title.trim()
 
-		return title === '' ? undefined : title
-	} catch {
-		return undefined
-	}
+	return title === '' ? undefined : title
 }
 
 // A read's outcome as one line: the citation on success, the matching failure line otherwise. The
@@ -115,13 +113,17 @@ function report(results: ReadonlyArray<LineResult>): number {
 	return failures.length === 0 ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
 }
 
+// The targets the command line names, or `undefined` for a line nobody can read — an unknown flag and
+// a `--repo` given no value are refused with the same usage a non-numeric token is.
+function read_targets(args: ReadonlyArray<string>): ReadonlyArray<CiteTarget> | undefined {
+	const parsed = cli_flags.arguments_of(args, OPTIONS)
+	if (parsed === undefined) return undefined
+
+	return parse_targets(parsed.positionals, parsed.values.repo)
+}
+
 async function run(args: ReadonlyArray<string>): Promise<number> {
-	const parsed = parseArgs({
-		args: [...args],
-		options: { repo: { type: 'string' } },
-		allowPositionals: true,
-	})
-	const targets = parse_targets(parsed.positionals, parsed.values.repo)
+	const targets = read_targets(args)
 
 	if (targets === undefined) {
 		console.error(USAGE)

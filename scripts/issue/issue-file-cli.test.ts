@@ -7,12 +7,14 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { repository_labels } from '#scripts/repo/repository-labels'
-import { delivered_rules } from '#scripts/rules/delivered-rules'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_file_cli } from './issue-file-cli'
+import { issue_file_fold } from './issue-file-fold'
 import { issue_release_cli } from './issue-release-cli'
 import { issue_scout_cli } from './issue-scout-cli'
+import { issue_wip } from './issue-wip'
 
 // joshuafolkken/kit#2808: `josh issue:file` runs every filing step in order, and each refusal stops
 // the filing before anything is sent. The network reads are stubbed at the namespaces the command
@@ -27,6 +29,7 @@ const ISSUE_NUMBER = 2900
 const ISSUE_URL = `https://github.com/${HERE}/issues/${String(ISSUE_NUMBER)}`
 const DUPLICATE = 2801
 const HELD_SCOUT = { report: 'Duplicates: 1', candidates: [DUPLICATE] }
+const DISTINCT_HINT = `--distinct ${String(DUPLICATE)}`
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const VALID_BODY = [
@@ -64,7 +67,14 @@ const ensure_labels = vi.spyOn(repository_labels, 'ensure_labels')
 const issue_list = vi.spyOn(git_gh_issue_list, 'issue_list')
 const resolve_auto_ok = vi.spyOn(issue_auto_ok, 'resolve')
 const link_release = vi.spyOn(issue_release_cli, 'link')
+
+// The filing's `filed` event is asserted in `issue-file-cli-record.test.ts`; here it is only kept off
+// the real stream. The fold question's answers are `issue-file-fold.test.ts`'s; here it only clears.
+vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
+const fold_clear = vi.spyOn(issue_file_fold, 'is_fold_clear').mockResolvedValue(true)
 const NOT_APPLIED = { is_applied: false, reason: 'stubbed' }
+const UNDECLARED = { is_opted_out: false, is_requested: false }
+const REQUESTED_FLAG = '--requested'
 
 // A listing of `count` open Issues, in the JSON shape `issue_list` answers with.
 function listing_of(count: number): { json: string; is_capped: boolean } {
@@ -73,7 +83,7 @@ function listing_of(count: number): { json: string; is_capped: boolean } {
 	return { json: JSON.stringify(rows), is_capped: false }
 }
 
-const OVER_CAP_LISTING = listing_of(delivered_rules.WIP_CAP + 1)
+const OVER_CAP_LISTING = listing_of(issue_wip.WIP_CAP + 1)
 const OVER_CAP_FLAG = '--over-cap'
 
 function argv_of(body_path: string, ...extra: ReadonlyArray<string>): Array<string> {
@@ -129,11 +139,14 @@ describe('issue_file_cli.run — a filing that clears every step', () => {
 		expect(issue_file_cli.FRESH_ISSUE_POLL.attempts).toBeGreaterThan(1)
 	})
 
+	// joshuafolkken/kit#3423: the one `--distinct` declaration answers both the scout and the fold
+	// question, so the filing needs no `issue:fold` call in front of it.
 	it('files past a candidate declared separate', async () => {
 		scout.mockResolvedValue(HELD_SCOUT)
 		const argv = argv_of(valid_path, '--distinct', String(DUPLICATE))
 
 		expect(await issue_file_cli.run(argv)).toBe(SUCCESS_EXIT_CODE)
+		expect(fold_clear.mock.calls[0]?.[1].distinct).toStrictEqual([DUPLICATE])
 		expect(exec_gh_api).toHaveBeenCalledTimes(1)
 	})
 
@@ -166,14 +179,11 @@ describe('issue_file_cli.run — the labels it applies exist first', () => {
 
 // joshuafolkken/kit#3213: the create call carries `auto-ok` when the filing opted in, unless
 // `--no-auto-ok` is declared, and the decision is printed with its reason.
+const CARRIED = { is_release: false, is_carried: true, branch_labels: undefined }
+
 function stub_carried(): void {
-	resolve_auto_ok.mockImplementation(async (is_opted_out) => {
-		return issue_auto_ok.decide({
-			is_opted_out,
-			is_release: false,
-			is_carried: true,
-			branch_labels: undefined,
-		})
+	resolve_auto_ok.mockImplementation(async (declared) => {
+		return issue_auto_ok.decide({ ...declared, ...CARRIED })
 	})
 }
 
@@ -216,27 +226,30 @@ describe('issue_file_cli.run — the run label an auto-ok filing owes', () => {
 	})
 })
 
+// joshuafolkken/kit#3614: `--requested` (a person asked for the filing) withholds it like the opt-out.
 describe('issue_file_cli.run — the auto-ok opt-out and the repositories it reads', () => {
-	it('leaves auto-ok off with --no-auto-ok, printing why', async () => {
+	it.each([
+		['--no-auto-ok', { ...UNDECLARED, is_opted_out: true }],
+		[REQUESTED_FLAG, { ...UNDECLARED, is_requested: true }],
+	])('leaves auto-ok off with %s, printing why', async (flag, declared) => {
 		stub_carried()
 
-		expect(await issue_file_cli.run(argv_of(valid_path, '--no-auto-ok'))).toBe(SUCCESS_EXIT_CODE)
-		expect(resolve_auto_ok).toHaveBeenCalledWith(true, HERE, HERE, [])
+		expect(await issue_file_cli.run(argv_of(valid_path, flag))).toBe(SUCCESS_EXIT_CODE)
+		expect(resolve_auto_ok).toHaveBeenCalledWith(declared, HERE, HERE, [])
 		expect(create_body()).toMatchObject({ labels: ['depth:1', 'bug'] })
 		expect(vi.mocked(console.info).mock.calls.join('\n')).toContain('auto-ok: not applied — ')
 	})
 
 	it('decides auto-ok with both the target and the current repository', async () => {
 		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', THERE))).toBe(SUCCESS_EXIT_CODE)
-		expect(resolve_auto_ok).toHaveBeenCalledWith(false, THERE, HERE, [])
+		expect(resolve_auto_ok).toHaveBeenCalledWith(UNDECLARED, THERE, HERE, [])
 	})
 
-	it('does not repeat an auto-ok already named with --label', async () => {
+	it.each([[[]], [[REQUESTED_FLAG]]])('keeps a named auto-ok once (%j)', async (extra) => {
 		stub_carried()
+		const argv = argv_of(valid_path, ...extra, '--label', 'auto-ok', '--label', 'run:lane')
 
-		expect(
-			await issue_file_cli.run(argv_of(valid_path, '--label', 'auto-ok', '--label', 'run:lane')),
-		).toBe(SUCCESS_EXIT_CODE)
+		expect(await issue_file_cli.run(argv)).toBe(SUCCESS_EXIT_CODE)
 		expect(create_body()).toMatchObject({ labels: ['depth:1', 'auto-ok', 'run:lane', 'bug'] })
 	})
 })
@@ -281,8 +294,7 @@ describe('issue_file_cli.run — the WIP cap count', () => {
 
 		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(OVER_CAP_FLAG)
-		expect(scout).not.toHaveBeenCalled()
-		expect(exec_gh_api).not.toHaveBeenCalled()
+		for (const step of [scout, exec_gh_api]) expect(step).not.toHaveBeenCalled()
 	})
 
 	it.each([
@@ -327,13 +339,19 @@ describe('issue_file_cli.run — a refused filing sends nothing', () => {
 })
 
 describe('issue_file_cli.run — a filing held at the scout or the create sends nothing more', () => {
+	// joshuafolkken/kit#3423: the fold question is the command's first step, ahead of the count.
+	it('holds a filing that folds before anything is listed or sent', async () => {
+		fold_clear.mockResolvedValueOnce(false)
+
+		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(FAILURE_EXIT_CODE)
+		for (const step of [issue_list, scout, exec_gh_api]) expect(step).not.toHaveBeenCalled()
+	})
+
 	it('holds a filing whose duplicate candidate is not declared separate', async () => {
 		scout.mockResolvedValue(HELD_SCOUT)
 
 		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(FAILURE_EXIT_CODE)
-		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(
-			`--distinct ${String(DUPLICATE)}`,
-		)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(DISTINCT_HINT)
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 

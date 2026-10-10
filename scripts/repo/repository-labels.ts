@@ -2,7 +2,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { REPOSITORY_LABELS, type LabelDefinition } from '#scripts/issue/issue-labels'
 
 // Creates the labels kit's workflow and the distributed `pr-classification.yml` rely on, and only
-// those the repository is missing (joshuafolkken/kit#2797). The one place labels are created: `josh
+// those the repository is missing. The one place labels are created: `josh
 // start` provisions a new repository through it and `josh sync` brings every existing one up to date.
 //
 // Labels already present are left as they are, so a repository that recolored one keeps its choice

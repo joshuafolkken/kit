@@ -1,5 +1,5 @@
 // The enumeration of decision oracles — commands that answer a rule question from mechanically
-// readable inputs, making prose reasoning unnecessary (joshuafolkken/kit#2117).
+// readable inputs, making prose reasoning unnecessary.
 //
 // **Question 0 of the rule-placement criterion**: "Can the rule's answer be computed from
 // mechanically readable inputs alone?" A yes means the rule is answered by a command on this list,
@@ -131,7 +131,7 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		name: 'issue:fold',
 		decision: 'Whether findings filed from one session fold into one issue or stay separate',
 		args: '<title...>',
-		vocabulary: ['fold', 'separate', 'no-fold-needed'],
+		vocabulary: ['fold', 'separate', 'no-fold-needed', 'undetermined'],
 		single_source: SPLIT_ASSESSMENT_QUESTION,
 	},
 	{

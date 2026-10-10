@@ -1,15 +1,14 @@
 import { git_command } from '#scripts/git/git-command'
 import { git_remote_branch } from '#scripts/git/git-remote-branch'
 
-// Where a lane is cut from (joshuafolkken/kit#1535).
+// Where a lane is cut from.
 //
 // **The bare default-branch name is the wrong start point, because git resolves it to the *local*
 // `refs/heads/<default>` — a ref nothing in this workflow ever advances.** Merges happen on GitHub
 // through `pnpm josh followup`, and this repository's main work tree does not have the
 // default branch checked out, so there is no fast-forward for it to receive. It falls one commit
 // further behind on every merge, and a lane opened from it starts without the work that was just
-// merged. Measured on 2026-09-07: `refs/heads/main` was `e3a68c04` while `refs/remotes/origin/main`
-// was `78f746f9`.
+// merged.
 //
 // **The remote-tracking ref is the one that is current**, because a fetch updates it without anyone
 // checking anything out — which is exactly the property the local branch lacks. It is named in full
@@ -20,9 +19,9 @@ const REFS_REMOTES_ORIGIN_PREFIX = 'refs/remotes/origin/'
 
 // A fetch *failure* is reported and stepped over rather than raised. `lane:open` has to keep working
 // with no network at all — offline, and on a clone with no `origin` — and what it degrades to is
-// whatever `origin/<default>` already holds, which is still never *behind* the local branch. Note
-// what this does not cover: `fetch_branch` runs through `git_spawn.read`, which sets no
-// timeout, so a connection that hangs rather than failing blocks here instead of degrading.
+// whatever `origin/<default>` already holds, which is still never *behind* the local branch. A
+// connection that hangs rather than failing degrades the same way: `fetch_branch` runs through
+// `git_spawn.read_remote`, whose budget ends the wait as a failure.
 async function refresh_default_branch(default_branch: string): Promise<void> {
 	try {
 		await git_command.fetch_branch(default_branch)
@@ -65,7 +64,7 @@ async function resolve(): Promise<string> {
 	return start_point
 }
 
-// **A branch that already exists is attached to, never cut afresh** (joshuafolkken/kit#1627). Its
+// **A branch that already exists is attached to, never cut afresh**. Its
 // commits are a child's finished work: `epicrun` leaves a lane's branch behind whenever a child is
 // parked after pushing, and `lane:close` deletes the local branch while the remote one and the pull
 // request stay. Cutting a new `<N>-lane` from the default branch there orphans both — and it did so
@@ -130,8 +129,7 @@ async function present_reference(branch_name: string): Promise<string> {
 
 // `absent` is the one answer that refuses the ref: the branch is gone from origin, so a ref still
 // pointing at it is stale and the lane is cut from the default branch as any new one is. Why origin
-// itself is asked rather than the remote-tracking ref is `git_remote_branch`'s own comment
-// (joshuafolkken/kit#1641 moved the asking there, so `pnpm josh release` could reuse it).
+// itself is asked rather than the remote-tracking ref is `git_remote_branch`'s own comment.
 async function remote_reference_for(branch_name: string): Promise<string | undefined> {
 	const answer = await git_remote_branch.ask(branch_name)
 
@@ -148,8 +146,7 @@ async function remote_reference_for(branch_name: string): Promise<string | undef
  *
  * `undefined` means **attach**: the branch is already here, so the work tree is put on it and no
  * branch is created. Every other answer is a commit-ish a new branch is cut from — the remote-tracking
- * ref of the lane branch when only the remote has it, and the default branch's when neither does,
- * which is the behavior every lane had before joshuafolkken/kit#1627.
+ * ref of the lane branch when only the remote has it, and the default branch's when neither does.
  *
  * **Nothing here deletes a branch to simplify the call.** That is what would lose the commits this
  * function exists to keep.

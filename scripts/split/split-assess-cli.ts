@@ -5,7 +5,7 @@ import { path_decision } from '#scripts/josh/path-decision'
 import { split_assess } from './split-assess'
 
 // `josh split:assess` — measure a branch's change size, tests excluded, and answer the size question
-// of the split assessment (joshuafolkken/kit#2218).
+// of the split assessment.
 //
 // A command rather than a paragraph for the reason every decision oracle is one: the "about 10 files /
 // 400 lines" guide is a number, but the size behind it was estimated by eye, so no data ever

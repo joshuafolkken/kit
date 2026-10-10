@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { prettier_format_json } from '#scripts/config-merge/prettier-json-fixture'
 import { describe, expect, it } from 'vitest'
 import { init_logic } from './init-logic'
@@ -6,6 +7,8 @@ const FORMAT_ON_SAVE_KEY = 'editor.formatOnSave'
 const ESLINT_ENABLE_KEY = 'eslint.enable'
 const SONARLINT_KEY = 'sonarlint.connectedMode.project'
 const ESLINT_VALIDATE_KEY = 'eslint.validate'
+const TERMINAL_LINE_HEIGHT_KEY = 'terminal.integrated.lineHeight'
+const KIT_VSCODE_SETTINGS_PATH = '.vscode/settings.json'
 
 describe('strip_kit_only_vscode_settings', () => {
 	it('removes kit-only keys while preserving other settings', () => {
@@ -22,6 +25,15 @@ describe('strip_kit_only_vscode_settings', () => {
 		const settings = { [FORMAT_ON_SAVE_KEY]: true, [ESLINT_ENABLE_KEY]: true }
 
 		expect(init_logic.strip_kit_only_vscode_settings(settings)).toEqual(settings)
+	})
+
+	// joshuafolkken/kit#3498: run:board's gauges draw a centered square that leaves a gap between
+	// stacked bars at VS Code's default line height of 1, so no line height reaches consumers.
+	it('distributes no terminal line height to consumers', () => {
+		const raw = readFileSync(KIT_VSCODE_SETTINGS_PATH, 'utf8')
+		const result = init_logic.strip_kit_only_vscode_settings_content(raw)
+
+		expect(result).not.toContain(TERMINAL_LINE_HEIGHT_KEY)
 	})
 })
 

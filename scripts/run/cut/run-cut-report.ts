@@ -1,8 +1,9 @@
 import { run_cut, type CutState, type RunCut } from './run-cut'
+import { run_cut_handoff } from './run-cut-handoff'
 
-// The verdict tokens `josh run:cut` answers with and the reports that print them, split out of
-// `run-cut-cli.ts` so the CLI keeps to acting on the record. The contract is unchanged: **standard
-// output carries exactly one token** and every explanation goes to standard error.
+// The verdict tokens `josh run:cut` answers with and the reports that print them, kept apart from
+// `run-cut-cli.ts` so the CLI keeps to acting on the record. **Standard output carries exactly one
+// token** and every explanation goes to standard error.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -10,17 +11,16 @@ const FAILURE_EXIT_CODE = 1
 const CUT_VERDICT = 'cut'
 const RESUME_VERDICT = 'resume'
 // An implementation-phase resume: the fresh process continues implementing rather than going to the
-// gate (joshuafolkken/kit#1933). It is a distinct token so the resuming child branches on it without
-// re-reading the record.
+// gate. It is a distinct token so the resuming child branches on it without re-reading the record.
 const RESUME_IMPL_VERDICT = 'resume-impl'
 const FRESH_VERDICT = 'fresh'
 // The current context is under the shared cut threshold, so the pre-gate cut was not worth its
-// resume and nothing was cut (joshuafolkken/kit#2312). A benign, non-failing answer: the run carries
+// resume and nothing was cut. A benign, non-failing answer: the run carries
 // on to the gate itself, exactly as `not-a-lane` does.
 const UNDER_THRESHOLD_VERDICT = 'under-threshold'
 const STALE_VERDICT = 'stale'
 // The record matched the tree but carried no instruction to resume on, so the run was refused rather
-// than continued blind to what it was told to do (joshuafolkken/kit#2354).
+// than continued blind to what it was told to do.
 const INCOMPLETE_VERDICT = 'incomplete'
 // The `--handoff` path was given but could not be read as a handoff, or was too large for the record;
 // the cut is refused rather than taken without the instruction it was meant to carry.
@@ -34,7 +34,7 @@ const ENDED_VERDICT = 'ended'
 const UNREADABLE_VERDICT = 'unreadable'
 const UNKNOWN_VERDICT = 'unknown'
 // The asking session is over the shared context-cut threshold, so an implementation cut was not
-// resumed into it (joshuafolkken/kit#2760) — the same refusal `run:carry` answers `over` with.
+// resumed into it — the same refusal `run:carry` answers `over` with.
 const OVER_VERDICT = 'over'
 
 function report(verdict: string, code: number): number {
@@ -56,7 +56,7 @@ function report_busy(cut_record: RunCut): number {
 }
 
 // The record matched the tree but carried no instruction; the run is refused rather than continued
-// without what it was told to do (joshuafolkken/kit#2354).
+// without what it was told to do.
 function report_incomplete(cut_record: RunCut): number {
 	console.error(run_cut.incomplete_message(cut_record))
 
@@ -64,21 +64,23 @@ function report_incomplete(cut_record: RunCut): number {
 }
 
 // The `--handoff` file parsed but the assembled record would not fit the byte bound — the scalar fields
-// carry a handoff that fit alone past the cap (joshuafolkken/kit#2354).
+// carry a handoff that fit alone past the cap.
 const HANDOFF_OVERFLOW_NOTE = '--handoff <path> would grow the cut record past its byte bound'
 // An implementation cut resumes into implementation, and that resume refuses a record with no
 // instruction (`incomplete`) — so the cut is refused here instead of relaunching a successor that can
-// only stop (joshuafolkken/kit#2484).
+// only stop.
 const HANDOFF_MISSING_NOTE = 'this cut resumes into implementation and needs --handoff <path>'
 
 function report_bad_handoff(note: string): number {
-	console.error(`${note}. Nothing was cut; write the handoff file and reissue.`)
+	console.error(
+		`${note}. Nothing was cut; write the handoff file at ${run_cut_handoff.HANDOFF_PATH} and reissue.`,
+	)
 
 	return report(BAD_HANDOFF_VERDICT, FAILURE_EXIT_CODE)
 }
 
 // A successor already resumed this cut; a process woken after its own hand-off is told to stop rather
-// than to investigate (joshuafolkken/kit#1935). It is a benign, non-failing stop.
+// than to investigate. It is a benign, non-failing stop.
 function report_handed_off(cut_record: RunCut): number {
 	console.error(run_cut.handed_off_message(cut_record))
 
@@ -91,10 +93,15 @@ function report_unreadable(): number {
 	return report(UNREADABLE_VERDICT, FAILURE_EXIT_CODE)
 }
 
-function report_unknown(): number {
-	console.error(run_cut.unknown_message())
+// `unknown` with the reason it was answered: nothing was established, so nothing may be concluded.
+function report_fault(message: string): number {
+	console.error(message)
 
 	return report(UNKNOWN_VERDICT, FAILURE_EXIT_CODE)
+}
+
+function report_unknown(): number {
+	return report_fault(run_cut.unknown_message())
 }
 
 // A cut is only meaningful on a lane branch whose implementation is uncommitted. On the default
@@ -117,7 +124,19 @@ function report_under_threshold(): number {
 	return report(UNDER_THRESHOLD_VERDICT, SUCCESS_EXIT_CODE)
 }
 
-// **An implementation cut is never resumed by a session over the threshold** (joshuafolkken/kit#2760).
+// **A ship reviewer takes no cut, of either phase** (joshuafolkken/kit#3623). Its supervisor is waiting
+// on the findings file it has yet to write, so a relaunch would stand a second child in the lane beside
+// the one the supervisor repairs with. Answered `not-a-lane`, the verdict that already means "nothing
+// was cut and this process carries on".
+function report_reviewer(): number {
+	console.error(
+		'This session is a ship reviewer, which its supervisor is waiting on, so nothing was cut and nothing was relaunched. Write the findings file and finish the review in this process.',
+	)
+
+	return report(NOT_A_LANE_VERDICT, SUCCESS_EXIT_CODE)
+}
+
+// **An implementation cut is never resumed by a session over the threshold**.
 // The cut outside a lane leaves the session that took it open, so a person retyping `fullrun #N` there
 // would be answered `resume-impl`, keep implementing over the threshold, and be cut again on the next
 // edit — a loop that sheds no context. The record is left intact for a fresh session.
@@ -155,9 +174,11 @@ const run_cut_report = {
 	report,
 	report_bad_handoff,
 	report_busy,
+	report_fault,
 	report_handed_off,
 	report_incomplete,
 	report_over,
+	report_reviewer,
 	report_stale,
 	report_under_threshold,
 	report_unknown,

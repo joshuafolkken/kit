@@ -1,9 +1,9 @@
 import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
-// A short reuse window over the transcript-priced verdict `implementation-cut.ts` reads
-// (joshuafolkken/kit#2385).
+// A short reuse window over the transcript-priced verdict `implementation-cut.ts` reads.
 //
 // **The read is a whole-transcript price and its caller is asked of every edit.**
 // `is_over_threshold_edit` reads `cost_cli.session_verdict` — which loads and parses the session
@@ -46,13 +46,10 @@ function cached_verdict(target: string, now_ms: number): CostVerdict | undefined
 
 	if (raw === undefined) return undefined
 
-	try {
-		const { read_at_ms, verdict } = cache_schema.parse(JSON.parse(raw))
+	const cached = json_value.parse_with(raw, cache_schema)
+	if (cached === undefined) return undefined
 
-		return now_ms - read_at_ms < VERDICT_REUSE_MS ? verdict : undefined
-	} catch {
-		return undefined
-	}
+	return now_ms - cached.read_at_ms < VERDICT_REUSE_MS ? cached.verdict : undefined
 }
 
 // The verdict, read through the window: the stored value inside it, a fresh `read()` past it. The

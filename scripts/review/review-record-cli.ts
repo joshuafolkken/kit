@@ -1,31 +1,45 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_finding_ledger, type Finding } from './review-finding-ledger'
 import { review_record, type RecordVerdict } from './review-record'
 
 // `josh review:record --issue <N> [<category>:<severity>:<file> ...]` — the one write path for a
-// `/code-review` round's findings (joshuafolkken/kit#2325). It appends a `- rf:` line per finding to
+// `/code-review` round's findings. It appends a `- rf:` line per finding to
 // the issue's own file of the observation ledger, which the run's commit carries like any other
 // ledger change. **A call with no findings is a zero-finding round, and it still writes one line** — so the
 // round that found nothing is recorded rather than mistaken for a round nobody reviewed.
 //
+// **`--comment` records a round that ran after the pull request opened**: the same lines go to the
+// issue as a comment and nothing is appended. A line written to the tree then has no commit of the
+// run's left to ride, so `pnpm josh followup` would push it onto the open pull request and its CI
+// would start over.
+//
 // `josh review:record --check --issue <N>` is the read half `pnpm josh followup` runs before it
-// merges (joshuafolkken/kit#2343): `ok` / `not-required` exit zero, `missing` exits non-zero so the
+// merges: `ok` / `not-required` exit zero, `missing` exits non-zero so the
 // merge is refused until the round is recorded. It mirrors `josh review:attest --check`.
 
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
-const DATE_END = 10
 const USAGE =
-	'Usage: josh review:record --issue <N> [<category>:<severity>:<file> ...] | josh review:record --check --issue <N>'
+	'Usage: josh review:record --issue <N> [--comment] [<category>:<severity>:<file> ...] | josh review:record --check --issue <N>'
+const FILE_HINT = '  <file>: the cited path, optionally with :line'
 const CHECK_USAGE = 'Usage: josh review:record --check --issue <N>'
 const RECORDED_LINE = 'Recorded: the review round for this issue is in the ledger.'
 const NOT_REQUIRED_LINE =
 	'No review-finding ledger is kept in this checkout, so there is nothing to check.'
-const ISSUE_PATTERN = /^[1-9]\d*$/u
-const OPTIONS = { issue: { type: 'string' }, check: { type: 'boolean' } } as const
+const COMMENT_HEADING = '### Review round recorded after the pull request opened'
+const COMMENT_NOTE =
+	'Kept here rather than in the observation ledger: a line appended after the commit would be pushed onto the open pull request and restart its CI.'
+const CODE_FENCE = '```'
+const OPTIONS = {
+	issue: { type: 'string' },
+	check: { type: 'boolean' },
+	comment: { type: 'boolean' },
+} as const
 
 interface Request {
 	issue: number
@@ -34,6 +48,7 @@ interface Request {
 
 interface Parsed {
 	check: boolean
+	comment: boolean
 	issue: string | undefined
 	positionals: ReadonlyArray<string>
 }
@@ -77,6 +92,7 @@ function parse_argv(argv: ReadonlyArray<string>): Parsed | undefined {
 
 	return {
 		check: parsed.values.check === true,
+		comment: parsed.values.comment === true,
 		issue: parsed.values.issue,
 		positionals: parsed.positionals,
 	}
@@ -85,15 +101,26 @@ function parse_argv(argv: ReadonlyArray<string>): Parsed | undefined {
 function to_request(parsed: Parsed): Request | undefined {
 	const { issue } = parsed
 
-	if (issue === undefined || !ISSUE_PATTERN.test(issue)) return undefined
+	if (issue === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue)) return undefined
 
 	const findings = parse_findings(parsed.positionals)
 
 	return findings === undefined ? undefined : { issue: Number(issue), findings }
 }
 
-function today(now: Date): string {
-	return now.toISOString().slice(0, DATE_END)
+// The accepted values are built from the ledger's own vocabulary, so a
+// refused spec names what would have been accepted and a new category appears here unedited.
+function accepted_values(placeholder: string, values: ReadonlyArray<string>): string {
+	return `  ${placeholder}: ${values.join(' | ')}`
+}
+
+function usage_text(): string {
+	return [
+		USAGE,
+		accepted_values('<category>', review_finding_ledger.CATEGORIES),
+		accepted_values('<severity>', review_finding_ledger.SEVERITIES),
+		FILE_HINT,
+	].join('\n')
 }
 
 function build_lines(request: Request, date: string): ReadonlyArray<string> {
@@ -115,7 +142,7 @@ function check_line(verdict: RecordVerdict): string {
 }
 
 async function run_check(issue: string | undefined, root: string): Promise<number> {
-	if (issue === undefined || !ISSUE_PATTERN.test(issue)) {
+	if (issue === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue)) {
 		console.error(CHECK_USAGE)
 
 		return FAILURE_EXIT_CODE
@@ -134,18 +161,41 @@ async function run_check(issue: string | undefined, root: string): Promise<numbe
 	return FAILURE_EXIT_CODE
 }
 
-// The round lands in its own issue's file (joshuafolkken/kit#2919), so two lanes recording at once
+function comment_body(lines: ReadonlyArray<string>): string {
+	return [COMMENT_HEADING, '', COMMENT_NOTE, '', CODE_FENCE, ...lines, CODE_FENCE].join('\n')
+}
+
+// **A comment that could not be posted fails the record**: it is the round's only copy, so a
+// swallowed refusal would read as a recorded round that exists nowhere.
+async function post_comment(issue: number, lines: ReadonlyArray<string>): Promise<number> {
+	try {
+		const url = await git_gh_issue_write.issue_comment(String(issue), comment_body(lines))
+
+		console.info(`Recorded ${String(lines.length)} review-finding line(s) in ${url.trim()}.`)
+
+		return 0
+	} catch (error) {
+		console.error(error instanceof Error ? error.message : String(error))
+
+		return FAILURE_EXIT_CODE
+	}
+}
+
+// The round lands in its own issue's file, so two lanes recording at once
 // write two files, and their pull requests never conflict on the ledger.
 async function run_record(parsed: Parsed, now: Date, root: string): Promise<number> {
 	const request = to_request(parsed)
 
 	if (request === undefined) {
-		console.error(USAGE)
+		console.error(usage_text())
 
 		return FAILURE_EXIT_CODE
 	}
 
-	const lines = build_lines(request, today(now))
+	const lines = build_lines(request, observation_ledger_home.ledger_date(now))
+
+	if (parsed.comment) return await post_comment(request.issue, lines)
+
 	const ledger_path = observation_ledger_home.issue_path(request.issue, root)
 
 	await observation_ledger_home.append(ledger_path, lines)
@@ -154,7 +204,7 @@ async function run_record(parsed: Parsed, now: Date, root: string): Promise<numb
 	return 0
 }
 
-// **The default is the work tree the command runs in, a lane's inside a lane** (joshuafolkken/kit#2919).
+// **The default is the work tree the command runs in, a lane's inside a lane**.
 // The line rides that tree's own commit or `pnpm josh followup`'s pre-merge ledger commit, and
 // `--check` reads the same tree, so the two halves can never disagree about where the round is.
 async function run(
@@ -165,7 +215,7 @@ async function run(
 	const parsed = parse_argv(argv)
 
 	if (parsed === undefined) {
-		console.error(USAGE)
+		console.error(usage_text())
 
 		return FAILURE_EXIT_CODE
 	}
@@ -179,7 +229,14 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv, new Date())
 }
 
-const review_record_cli = { build_lines, parse_finding, run }
+const review_record_cli = {
+	accepted_values,
+	build_lines,
+	comment_body,
+	parse_finding,
+	run,
+	usage_text,
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

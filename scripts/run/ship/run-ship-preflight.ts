@@ -10,11 +10,10 @@ import { live_evidence } from '#scripts/review/live-evidence'
 import { run_ship_lock } from './run-ship-lock'
 import { run_ship_scoped } from './run-ship-scoped'
 
-// `josh ship`'s first stage (joshuafolkken/kit#2946). A detached ship used to meet the pull request's
-// preconditions only at the commit stage — `git -y`'s preflight — or at the merge — `followup`'s
-// live-evidence refusal — each after the review and the gate had already run, so every such stop
-// relaunched a session to repeat them. **Every precondition decidable before the review is asked here,
-// and all of them are reported at once.** No check is new: the classification, issue and branch answers
+// `josh ship`'s first stage. The commit stage (`git -y`'s preflight) and the merge (`followup`'s
+// live-evidence refusal) run after the review and the gate, so a stop there would repeat them.
+// **Every precondition decidable before the review is asked here, and all of them are reported at
+// once.** No check is new: the classification, issue and branch answers
 // are `git_preflight.problems_of`, and the evidence answer is `live_evidence.verdict_for` over the same
 // changed paths and the body this ship will deliver — `--body-file` when given, else the open PR's.
 //
@@ -23,8 +22,8 @@ import { run_ship_scoped } from './run-ship-scoped'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const EVIDENCE_PROBLEM = `This change touches runtime code, but the PR body has no ${live_evidence.EVIDENCE_HEADING} section: run the acceptance criteria for real and pass the body with --body-file <path>.`
-const EVIDENCE_PENDING = `This change touches runtime code and no PR is open yet: write the ${live_evidence.EVIDENCE_HEADING} section to a file and hand it to josh ship with --body-file <path>, or the ship refuses.`
+const EVIDENCE_PROBLEM = `This change touches runtime code, but the PR body has no ${live_evidence.EVIDENCE_HEADING} section: run the acceptance criteria for real and pass the body with --body-file <path>. Write it ${live_evidence.EVIDENCE_FORMAT}`
+const EVIDENCE_PENDING = `This change touches runtime code and no PR is open yet: write the ${live_evidence.EVIDENCE_HEADING} section to a file and hand it to josh ship with --body-file <path>, or the ship refuses. Write it ${live_evidence.EVIDENCE_FORMAT}`
 
 interface PreflightRequest {
 	title: string
@@ -72,7 +71,7 @@ async function caught(problems: Promise<Array<string>>): Promise<Array<string>> 
 	}
 }
 
-// The lock file is asked here too (joshuafolkken/kit#3307), so a drift stops the ship before the gate
+// The lock file is asked here too, so a drift stops the ship before the gate
 // rather than being rewritten by the pre-push hook's install under the push.
 async function asked_problems(request: PreflightRequest): Promise<Array<string>> {
 	const [preflight, evidence, lock] = await Promise.all([
@@ -100,9 +99,9 @@ async function classification_problems(issue_number: string): Promise<Array<stri
 	return []
 }
 
-// **The same two refusals, asked before the ship rather than by it** (joshuafolkken/kit#3154). In one
-// measured backlogrun 20 of 41 lane `ship` refusals were a missing classification or missing evidence —
-// facts fixed long before the ship, refused at the run's largest context. `run:prep` (and so `run:entry`)
+// **The same two refusals, asked before the ship rather than by it**: a missing
+// classification or missing evidence is known long before the ship, yet refused there at the run's
+// largest context. `run:prep` (and so `run:entry`)
 // and `run:step` print this, so the Issue body and the evidence are met while they are cheap. Nothing
 // here replaces `stage`: the ship and `followup` still refuse on both. Before the PR exists the evidence
 // can only live in the file the ship will be handed, so it is asked for as that file, not reported as a

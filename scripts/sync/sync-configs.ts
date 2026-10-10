@@ -1,7 +1,8 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
+import { vscode_tasks } from '#scripts/init/vscode-tasks'
 import { string_array_schema, vscode_settings_schema } from '#scripts/lib/schemas'
 
 type MergeFunction = (existing: string) => string
@@ -30,10 +31,10 @@ function sync_with_merge(
 }
 
 // Removes only the exact settings lines earlier kit releases wrote, which pnpm 12 ignores in
-// `.npmrc` (joshuafolkken/kit#3267); every other line, a `_authToken` line included, is left alone.
+// `.npmrc`; every other line, a `_authToken` line included, is left alone.
 // Sync used to remove the env-var form, which broke every project that had opted its project
 // .npmrc in via `npmrcAuthFile` — there the line is the live credential, and the opt-in itself
-// can live in a deploy platform's dashboard where sync cannot see it (joshuafolkken/kit#759).
+// can live in a deploy platform's dashboard where sync cannot see it.
 function sync_npmrc(destination_path: string): void {
 	sync_with_merge(destination_path, '.npmrc', init_logic.merge_npmrc)
 }
@@ -142,6 +143,31 @@ function sync_vscode_settings_json(destination_path: string): void {
 	)
 }
 
+// Creates the file when absent, unlike the other `.vscode` syncs: the folder-open board task is the
+// whole point of distributing it, and a consumer
+// without a tasks.json has nothing of its own to protect. An existing file keeps every task whose
+// label kit does not ship.
+function sync_vscode_tasks_json(destination_path: string): void {
+	const kit_content = readFileSync(
+		path.join(PACKAGE_DIR, '.vscode', vscode_tasks.VSCODE_TASKS_FILENAME),
+		'utf8',
+	)
+
+	if (existsSync(destination_path)) {
+		const kit_tasks = vscode_tasks.read_kit_tasks(kit_content)
+
+		sync_with_merge(destination_path, '.vscode/tasks.json', (existing) =>
+			vscode_tasks.merge_tasks(existing, kit_tasks),
+		)
+
+		return
+	}
+
+	mkdirSync(path.dirname(destination_path), { recursive: true })
+	writeFileSync(destination_path, kit_content)
+	console.info('  ✔ created   .vscode/tasks.json')
+}
+
 const sync_configs = {
 	sync_npmrc,
 	sync_gitignore,
@@ -152,6 +178,7 @@ const sync_configs = {
 	sync_secretlint_config,
 	sync_vscode_extensions_json,
 	sync_vscode_settings_json,
+	sync_vscode_tasks_json,
 }
 
 export { sync_configs }

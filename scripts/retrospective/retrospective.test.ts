@@ -6,6 +6,7 @@ import { run_event_scope, type EventScope } from '#scripts/run/event/run-event-s
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stop_text } from '#scripts/run/ship/run-ship-stop-text'
 import { describe, expect, it } from 'vitest'
+import { guard_friction_fixture } from './guard-friction-fixture'
 import { retrospective, type RetrospectiveInputs } from './retrospective'
 
 const MINUTES = 12
@@ -79,9 +80,28 @@ function inputs(overrides: Partial<RetrospectiveInputs>): RetrospectiveInputs {
 		observations: ['- k:one | d1 | 2026-09-22 | where | what'],
 		events: [event('park'), event('park'), event('outage')],
 		scope: since(RUN_START),
+		sessions: [],
 		...overrides,
 	}
 }
+
+describe('retrospective.compose — guard friction', () => {
+	const refused = guard_friction_fixture.session(guard_friction_fixture.node('lane'), [
+		guard_friction_fixture.refusal_line(1, 'a', '⛔ batching: issue these together'),
+		guard_friction_fixture.stop_line(2, '⛔ lane background stop: wait'),
+	])
+
+	it("tallies the run's guard refusals and Stop re-entries", () => {
+		const digest = retrospective.compose(inputs({ sessions: [refused] }))
+
+		expect(digest).toContain('Guard friction: 1 refusal(s), 1 Stop re-entry(ies)')
+		expect(digest).toContain('Investigation guard payback (main-line sessions):')
+	})
+
+	it('says none when no guard fired', () => {
+		expect(retrospective.compose(inputs({}))).toContain('Guard friction: none')
+	})
+})
 
 describe('retrospective.compose — the four sections are aggregated', () => {
 	it('leads with the run cost and time, folding in every role', () => {

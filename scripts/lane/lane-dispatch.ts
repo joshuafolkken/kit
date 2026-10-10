@@ -2,45 +2,44 @@ import { agent_argv, type AgentArgv, type AgentArgvResult } from '#scripts/agent
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { LabelWrite } from '#scripts/gh/git-gh-issue-write'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { session_cite } from '#scripts/issue/session-cite'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ending } from '#scripts/run/run-ending'
-import { run_issue_number } from '#scripts/run/run-issue-number'
+import { run_label } from '#scripts/run/run-label'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch_log } from './lane-dispatch-log'
+import { lane_ledger } from './lane-ledger'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_resume, type ResumePlan } from './lane-resume'
 import { openai_lane_supervisor } from './openai-lane-supervisor'
 
-// `josh lane:dispatch <issue-number>` — start a lane's child as an operating-system process of its own
-// (joshuafolkken/kit#1749).
+// `josh lane:dispatch <issue-number>` — start a lane's child as an operating-system process of its own.
 //
-// **The premise the session cut rests on was not true, and this is what makes it true.** A delegated
-// child used to be an in-process subagent of the parent session, so cutting the parent killed every
-// child still implementing: `backlogrun-progress.md` → "The hand-off" says "nothing has to finish, because nothing
-// is being abandoned", and what actually happened was that the next session polled a file whose writer
-// was dead, waited out the silent-unit window, booked each lane `stopped`, and aborted the whole run on
-// the third one. Launched detached, the child survives the cut and the sentence holds as written.
+// **This is what makes the premise the session cut rests on true.** `backlogrun-progress.md` → "The
+// hand-off" says "nothing has to finish, because nothing is being abandoned"; an in-process child
+// would die with the parent it was cut from. Launched detached, the child survives the cut and the
+// sentence holds as written.
 //
 // **Nothing here is new machinery.** The lane is already a linked work tree with its own branch and
 // ports (`lane-open.ts`), the detached launcher is already `run:wake`'s (`detached-launch.ts`), and the
 // recorded output path is already how a session that never opened a lane polls it (`lane-output.ts`).
-// What was missing was the one command that puts the three together.
+// This is the one command that puts the three together.
 //
-// **The recording happens inside the dispatch, so "the lane records no path" stops being a state.**
-// `backlogrun.md`'s hand-off has an exception for a lane nobody could poll, and it exists because the
-// recording used to be a separate step a run could forget. A lane dispatched through here is recorded
-// by the same call that starts it.
+// **The recording happens inside the dispatch, so "the lane records no path" is not a state.** A
+// lane dispatched through here is recorded by the same call that starts it, so no run can forget it.
 
 // The invocation the child is given. Composed from this constant and a digits-only issue number, never
 // from text that was read from anywhere — the same discipline `run-wake-session.ts` applies to the
 // invocation it rebuilds out of the carry record.
-// The resume guide a relaunched child is pointed at (joshuafolkken/kit#2022). It carries the resume
+// The resume guide a relaunched child is pointed at. It carries the resume
 // procedure a `run:cut` successor follows, so naming it lets the child read one section rather than the
 // workflow-commands entry documents it would otherwise read to learn it is a resume at all.
 const NOTE_SEPARATOR = '; '
@@ -60,7 +59,7 @@ interface Dispatched {
 	log_path: string
 	pid: number
 	profile: AgentProfile
-	// The session id this dispatch resumed, or `undefined` when it started fresh (joshuafolkken/kit#2317).
+	// The session id this dispatch resumed, or `undefined` when it started fresh.
 	// `describe` reports which path was taken, so an `outage` re-dispatch says whether it recovered the
 	// disconnected child's context or fell back to a fresh run.
 	resumed_from: string | undefined
@@ -110,14 +109,13 @@ function child_invocation(issue: string): string {
 
 /**
  * The prompt a relaunched child is given after a `run:cut` — a resume-specific instruction followed by
- * the bare `child_invocation` (joshuafolkken/kit#2022). A relaunched child used to be given the plain
- * `fullrun #<N>`, so it read the workflow-commands entry documents (SKILL.md, fullrun.md, ~29k tokens)
- * every resume before it could learn it was a resume at all — the "do not re-read" exception lives
- * inside the very skill it had to open. This preamble tells it up front, so it goes straight to
- * `run:cut --resume` and the stage that answers.
+ * the bare `child_invocation`. Given the plain `fullrun #<N>`, a relaunched child would read the
+ * workflow-commands entry documents every resume before it could learn it was a resume at all — the
+ * "do not re-read" exception lives inside the very skill it would have to open. This preamble tells
+ * it up front, so it goes straight to `run:cut --resume` and the stage that answers.
  *
  * **It ends with `child_invocation` on purpose, not as decoration.** The parent's liveness poll is
- * `pgrep -laf "<child_invocation>$"` (built at dispatch — see `log_sentence`), so a relaunched process
+ * `lane_child_invocation.process_pattern` (read by `run:liveness` — see `log_sentence`), so a relaunched process
  * whose command line did not end with `fullrun #<N>` would be booked stopped while it ran. The trailing
  * invocation keeps that poll matching and is also the ordinary run a `fresh` verdict falls back to.
  */
@@ -171,7 +169,7 @@ function failed_start(
 
 // The `dispatched` outcome, built from the request the launch was composed from — one place so the
 // three launch paths cannot drift on which fields a dispatched child carries (the resume flag among
-// them, joshuafolkken/kit#2317). The request's `argv` rides along harmlessly, as it did before.
+// them). The request's `argv` rides along harmlessly.
 // **`kind` is written last on purpose**: the request was spread from a `Prepared`, so it still carries
 // `kind: 'prepared'` at runtime, and letting the spread win would mislabel the outcome.
 function dispatched_of(
@@ -190,7 +188,7 @@ function existing_dispatch(request: StartRequest): DispatchOutcome | undefined {
 	if (!openai_lane_supervisor.approve(request.lane.directory, active.nonce)) {
 		return failed_start(
 			request,
-			`the OpenAI supervisor for lane #${request.lane.issue} was cancelled`,
+			`the OpenAI supervisor for lane ${session_cite.issue(request.lane.issue)} was cancelled`,
 			[],
 		)
 	}
@@ -216,13 +214,17 @@ async function openai_dispatched_start(
 	if (owner?.issue !== lane.issue) {
 		if (nonce !== undefined) openai_lane_supervisor.cancel(lane.directory, nonce)
 
-		return failed_start(request, `the OpenAI supervisor did not claim lane #${lane.issue}`, notes)
+		return failed_start(
+			request,
+			`the OpenAI supervisor did not claim lane ${session_cite.issue(lane.issue)}`,
+			notes,
+		)
 	}
 
 	if (!openai_lane_supervisor.approve(lane.directory, owner.nonce)) {
 		return failed_start(
 			request,
-			`the OpenAI supervisor for lane #${lane.issue} was cancelled`,
+			`the OpenAI supervisor for lane ${session_cite.issue(lane.issue)} was cancelled`,
 			notes,
 		)
 	}
@@ -267,7 +269,7 @@ async function started(request: StartRequest): Promise<DispatchOutcome> {
 
 // Build the argv the plan calls for: a resume carries the stored session id, a fresh start does not.
 // Both run the same profile diagnostics under the already-resolved profile, so a resume is refused for
-// exactly the reasons a fresh dispatch is (joshuafolkken/kit#2317).
+// exactly the reasons a fresh dispatch is.
 function built_for(plan: ResumePlan, profile: AgentProfile, lane: LaneInfo): AgentArgvResult {
 	if (plan.kind === 'resume') {
 		return agent_argv.with_resume_in(plan.invocation, profile, plan.session_id, lane.directory)
@@ -276,7 +278,7 @@ function built_for(plan: ResumePlan, profile: AgentProfile, lane: LaneInfo): Age
 	return agent_argv.with_profile_in(plan.invocation, profile, lane.directory)
 }
 
-// **The re-dispatch decides resume-or-fresh from the lane's own exit record** (joshuafolkken/kit#2317).
+// **The re-dispatch decides resume-or-fresh from the lane's own exit record**.
 // The record is read from the log the previous dispatch of this lane wrote — a first dispatch finds
 // none and starts fresh, an `outage` ending with a session id resumes it. The provider is resolved
 // first because the resume mechanism is Claude Code's, and an OpenAI lane falls back to fresh.
@@ -304,30 +306,33 @@ function prepared(lane: LaneInfo): Prepared {
 // **The parent claims the marker before it starts the child**, so the window in which a running child
 // is uncounted closes at dispatch rather than tens of minutes later once the child's own `fullrun` gets
 // to its (idempotent) apply. `issue_add_label` creates the label if the repository lacks it — a
-// `POST /issues/{N}/labels` provisions a missing label with a generated color (measured on
-// joshuafolkken/kit#1026, `git-gh-issue-write.ts`) — so no separate `label_ensure` is needed here, and
+// `POST /issues/{N}/labels` provisions a missing label with a generated color
+// (`git-gh-issue-write.ts`) — so no separate `label_ensure` is needed here, and
 // its unapplied answer is a real refusal to launch rather than a note — confirmed by a read-back, so
-// a write that landed but answered with an error still launches (joshuafolkken/kit#3312).
+// a write that landed but answered with an error still launches.
 async function mark_in_progress(issue: string): Promise<LabelWrite> {
 	return await git_gh_command.issue_apply_label(issue, IN_PROGRESS_LABEL)
 }
 
-// The dispatch owns both halves of the marker: it applied it, so a launch that never started takes it
-// back off, leaving no `in-progress` on an issue nothing is running. A removal that itself fails is
-// swallowed — the failed launch is already warned about, and `lane:list` / `run:progress` surface a
-// stuck marker — so this never turns a launch failure into a thrown error.
-async function unmark_in_progress(issue: string): Promise<void> {
-	try {
-		await git_gh_command.issue_remove_label(issue, IN_PROGRESS_LABEL)
-	} catch {
-		/* the launch already failed and is warned about; a stuck marker is reported by lane:list */
-	}
-}
-
 // A started child is recorded on the run's stream, which is where the stall detector ages the last
-// dispatch from (joshuafolkken/kit#2464) — unrecorded, every stall read "hours since the last dispatch"
+// dispatch from — unrecorded, every stall read "hours since the last dispatch"
 // minutes after a launch. A failed start records nothing: no child is running. The marker is claimed
 // first, so a refused one starts nothing.
+//
+// The dispatch owns both halves of the marker: it applied it, so a launch that never started takes it
+// back off through `run_label.unmark`, leaving no `in-progress` on an issue nothing is running. That
+// removal warns and never throws, so it cannot turn a launch failure into a thrown error.
+//
+// The lane ledger takes the same instant: `lane:stats` times a lane's implementation from it, and the
+// stream is capped, so a period's earlier dispatches would be gone from there.
+async function record_started(issue: string): Promise<void> {
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.CHILD_LAUNCH,
+		`${issue_cite.plain(issue)} dispatched`,
+	)
+	await lane_ledger.record_dispatch(Number(issue))
+}
+
 async function finish_dispatch(issue: string, request: StartRequest): Promise<DispatchOutcome> {
 	const mark = await mark_in_progress(issue)
 
@@ -336,16 +341,14 @@ async function finish_dispatch(issue: string, request: StartRequest): Promise<Di
 
 	const is_failed = outcome.kind === 'failed'
 
-	await (is_failed
-		? unmark_in_progress(issue)
-		: run_event_stream_emit.emit(run_event_stream.EVENT_KIND.CHILD_LAUNCH, `#${issue} dispatched`))
+	await (is_failed ? run_label.unmark(issue) : record_started(issue))
 
 	return outcome
 }
 
 /** Start `fullrun #<N>` detached in the lane for `#<N>`, recording where it writes as it does so. */
 async function dispatch_child(issue: string): Promise<DispatchOutcome> {
-	run_issue_number.require_issue_number(issue)
+	issue_number_shape.require_issue_number(issue)
 
 	const lane = await lane_registry.find_open_lane(issue)
 
@@ -366,25 +369,11 @@ async function dispatch_child(issue: string): Promise<DispatchOutcome> {
 // The child is running — saying otherwise would send the caller to dispatch a second one into the same
 // lane — but its output is going nowhere, so a message naming the path would point at a file that will
 // never grow, and a poll of that file would book a working child as stopped.
-// The liveness pattern the parent polls with — the shared one, which also finds a detached ship
-// supervisor (joshuafolkken/kit#2428). `describe` never throws, so an issue that is not a number falls
-// back to the launched invocation rather than raising from the validator.
-function poll_pattern(outcome: Dispatched, issue: string): string {
-	if (!run_issue_number.ISSUE_NUMBER_PATTERN.test(issue)) return `${outcome.invocation}$`
-
-	return lane_child_invocation.process_pattern(issue)
-}
-
 function log_sentence(outcome: Dispatched, issue: string): string {
-	// **The pattern matches the child's own command line, not the lane it runs in**
-	// (joshuafolkken/kit#1948). The child is `claude … ${outcome.invocation}` and its argv carries no
-	// path, so `pgrep -laf <lane directory>` found nothing for a living child and a poll booked it
-	// stopped. The invocation is the last argument, so it sits at the end of the command line; the `$`
-	// anchor is what keeps `fullrun #12` from matching a running `fullrun #123`. `run:liveness` takes
-	// `--process` as what the caller *saw*, never as a property of the child's kind — told to pass
-	// `alive`, a parent that never ran `pgrep` would answer `alive` for a child that crashed an hour ago
-	// and poll it for ever.
-	const poll = `run \`pgrep -laf "${poll_pattern(outcome, issue)}"\` and pass what it found to \`pnpm josh run:liveness ${issue} --output ${outcome.log_path} --process alive\` — or \`--process none\` where it found nothing`
+	// **`run:liveness` reads the child's process for itself**, with the shared
+	// pattern that matches the child's own command line and a detached ship supervisor, so no parent
+	// passes `alive` by hand for a child that crashed an hour ago.
+	const poll = `run \`pnpm josh run:liveness ${issue} --output ${outcome.log_path}\` — it reads the child's process for itself`
 
 	if (outcome.notes.length > 0) {
 		return ` Its output is NOT being kept — ${outcome.notes.join(NOTE_SEPARATOR)} — so ${outcome.log_path} will not grow and the process trace is the only answer: ${poll}.`
@@ -394,7 +383,7 @@ function log_sentence(outcome: Dispatched, issue: string): string {
 }
 
 // Whether this dispatch resumed the disconnected child's session or started fresh — the report the
-// `outage` re-dispatch owes (joshuafolkken/kit#2317). A fresh start says so too, so the absence of a
+// `outage` re-dispatch owes. A fresh start says so too, so the absence of a
 // resume is never silent when an outage record was present.
 function resume_sentence(outcome: Dispatched): string {
 	if (outcome.resumed_from === undefined) {
@@ -408,20 +397,20 @@ function resume_sentence(outcome: Dispatched): string {
 // message the warning exists to carry — the pid among it, with the child already running.
 function describe(outcome: DispatchOutcome, issue: string): string {
 	if (outcome.kind === 'no-lane') {
-		return `No lane is open for #${issue}. Run \`pnpm josh lane:open ${issue}\` first, then dispatch into it.`
+		return `No lane is open for ${session_cite.issue(issue)}. Run \`pnpm josh lane:open ${issue}\` first, then dispatch into it.`
 	}
 
 	if (outcome.kind === 'unrecordable') return outcome.reason
 
 	if (outcome.kind === LABEL_UNSET_KIND) {
-		return `The child for #${issue} was not started: the \`${IN_PROGRESS_LABEL}\` label could not be applied (${outcome.reason}), so the lane would be counted as empty. Nothing was launched.`
+		return `The child for ${session_cite.issue(issue)} was not started: the \`${IN_PROGRESS_LABEL}\` label could not be applied (${outcome.reason}), so the lane would be counted as empty. Nothing was launched.`
 	}
 
 	if (outcome.kind === 'failed') {
-		return `The child for #${issue} did not start: ${outcome.note}. Its log is at ${outcome.log_path}.`
+		return `The child for ${session_cite.issue(issue)} did not start: ${outcome.note}.${agent_role_profile.default_notice()} Its log is at ${outcome.log_path}.`
 	}
 
-	return `Dispatched \`${outcome.invocation}\` as process ${String(outcome.pid)} in ${outcome.lane.directory} with ${agent_role_profile.describe(outcome.profile)}.${resume_sentence(outcome)}${log_sentence(outcome, issue)}`
+	return `Dispatched \`${outcome.invocation}\` as process ${String(outcome.pid)} in ${outcome.lane.directory} with ${agent_role_profile.describe(outcome.profile)}.${agent_role_profile.default_notice()}${resume_sentence(outcome)}${log_sentence(outcome, issue)}`
 }
 
 /**
@@ -441,7 +430,7 @@ function is_worth_warning(outcome: DispatchOutcome): boolean {
 // own failures to standard error and never throws, so this cannot turn a refusal into an exception.
 async function warn_of_problem(outcome: DispatchOutcome, issue: string): Promise<void> {
 	await telegram_notify.warn({
-		issue_title: `${WARNING_TITLE} #${issue}`,
+		issue_title: `${WARNING_TITLE} ${issue_cite.plain(issue)}`,
 		body: describe(outcome, issue),
 		recovery: WARNING_RECOVERY,
 	})

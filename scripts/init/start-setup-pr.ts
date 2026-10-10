@@ -4,6 +4,7 @@ import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { git_pr } from '#scripts/gh/git-pr'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
 import { git_issue, type IssueInfo } from '#scripts/git/git-issue'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { IGNORE_FOR_RELEASE_LABEL } from '#scripts/issue/issue-labels'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { kit_written_paths } from './kit-written-paths'
@@ -31,7 +32,7 @@ function listing(args: ReadonlyArray<string>, root: string): Array<string> {
 }
 
 function setup_issue(issue_number: string): IssueInfo {
-	return git_issue.parse(`${SETUP_TITLE} #${issue_number}`)
+	return git_issue.parse(`${SETUP_TITLE} ${issue_cite.plain(issue_number)}`)
 }
 
 // The Issue number when `branch` is the branch an earlier `josh start` created for the setup pull
@@ -64,7 +65,7 @@ function carried_paths(root: string, current: string | undefined): Array<string>
 }
 
 // The Issue carries the release classification the pull request is opened with, so the PR step finds
-// one without a person adding it (joshuafolkken/kit#2816).
+// one without a person adding it.
 function file_setup_issue(): string {
 	const request = git_gh_issue_write.issue_create_request({
 		title: SETUP_TITLE,

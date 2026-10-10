@@ -38,13 +38,11 @@ const ENTRY_DIRECTORY = process.cwd()
 const LANE_ROOT = path.join(WORK_DIRECTORY, '.kit-lanes')
 const LANE_ISSUE = '2138'
 const LANE_DIRECTORY = path.join(LANE_ROOT, LANE_ISSUE)
-const WIP_CAP = 'wip-cap'
 const ISSUE_COMMENTS = 'issue-comments'
 const DIRECT_FILING = 'direct-filing'
 const FILING_CAP_ID = 'filing-cap'
-// An `issue:file` filing is claimed by three rows: WIP, cap and fold. A hand-built filing whose body
-// carries a backtick is claimed by `direct-filing` and `shell-body` (joshuafolkken/kit#2808).
-const FILING_RULE_COUNT = 3
+// A hand-built filing whose body carries a backtick is claimed by `direct-filing` and `shell-body`
+// (joshuafolkken/kit#2808).
 const DIRECT_FILING_WITH_BODY_RULE_COUNT = 2
 const NOW_MS = 1_700_000_000_000
 // Later than any turn the transcript fixture can carry, so the batching guard's recorded refusal
@@ -152,7 +150,7 @@ describe('rule_delivery — the comments at the call that reads the body', () =>
 	// comments are required rather than present, and without the conflict rule the deciding goes back
 	// to judgement at the moment nothing else is open to read — joshuafolkken/kit#1518's failure.
 	it.each([
-		'read them before implementing, not only the body',
+		'pnpm josh issue:read <N>',
 		'gh issue view <N> --comments',
 		'gh api repos/{owner}/{repo}/issues/<N>/comments',
 		'the later text is the agreement in force',
@@ -214,44 +212,11 @@ describe('rule_delivery — the comments rule stands down when it should', () =>
 	})
 })
 
-describe('rule_delivery — the WIP cap at the call that files', () => {
-	it('delivers the rule on the call that creates an Issue', () => {
-		const reason = rule_delivery(payload_of('filing', FILING_COMMAND), NOW_MS)
-
-		expect(reason).toBe(delivered_rules.WIP_CAP_REASON)
-	})
-
-	// Each half of the rule, because dropping any one of them changes what an agent does: without the
-	// count there is nothing to compare, without the refusal the cap is advisory, and without the three
-	// tests the interrupt exemption is decided by judgement — the failure joshuafolkken/kit#1518 named.
-	it.each([
-		"`pnpm josh issue:file` counts the target repository's open Issues",
-		`With more than ${String(delivered_rules.WIP_CAP)} open, close one first`,
-		'nothing honestly closable means do not file',
-		'one the run is blocked by',
-		'a verification answers wrongly',
-		'a documented workflow cannot complete',
-		'data is lost or written outside the repository',
-		'`prompts/collaboration-workflow/wip-cap.md`',
-		'`--over-cap`',
-		'`--route interrupt`',
-	])(CARRIES_MARKER, (marker) => {
-		expect(delivered_rules.WIP_CAP_REASON).toContain(marker)
-	})
-
-	// A delivery that repeated would wedge the very call it asked for, so the reason has to say that
-	// reissuing is the expected next move.
-	it('tells the reader the call may be reissued', () => {
-		expect(delivered_rules.WIP_CAP_REASON).toContain('Reissue this call and let the command count')
-	})
-
-	// A first filing, so neither the cap nor the fold claims the second call — this block is about the
-	// WIP cap alone (joshuafolkken/kit#2119).
-	it(ONCE_PER_RUN, () => {
-		const payload = payload_of('repeat', FILING_COMMAND)
-
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
-		expect(rule_delivery(payload, NOW_MS + 1)).not.toBe(delivered_rules.WIP_CAP_REASON)
+// joshuafolkken/kit#3423: the WIP cap and the fold question are `issue:file`'s own steps, so a run's
+// first filing reaches the command on its first call rather than after a refusal and a reissue.
+describe('rule_delivery — the call that files', () => {
+	it('lets a first filing through to the command', () => {
+		expect(rule_delivery(payload_of('filing', FILING_COMMAND), NOW_MS)).toBeUndefined()
 	})
 })
 
@@ -316,8 +281,8 @@ describe('rule_delivery — silent where nothing binds', () => {
 // `pnpm josh batch:guard` is wired to `Bash` too, and the shared shell records its stamp *before*
 // returning a reason — so a call both hooks refused would lose one of the two reasons with both
 // records already written, and the losing rule could never fire again in that run. It cannot happen
-// for `wip-cap` because the batching guard does not treat a filing call as a candidate at all. **It
-// does treat an Issue read as one**, but `issue-comments` now refuses until the comments are read
+// for the filing rows because the batching guard does not treat a filing call as a candidate at all.
+// **It does treat an Issue read as one**, but `issue-comments` now refuses until the comments are read
 // (joshuafolkken/kit#2807), so it has no once-per-run record to lose and no longer stands aside. The
 // stand-aside in `is_first_delivery` remains for a once-per-run row whose trigger the batching guard
 // also claims — the table below pins both halves, and **any row added to the enumeration has to be
@@ -353,17 +318,6 @@ describe('rule_delivery — the two Bash guards never answer about the same call
 		BATCH_STAMP.record(BATCH_STAMP.path(transcript), BATCH_REFUSED_AT_MS)
 
 		expect(rule_delivery(call, BATCH_REFUSED_AT_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
-	})
-
-	// **The stand-aside cannot be exercised end to end through this rule, and that is the invariant
-	// above restated.** A run whose history is the shape the batching guard refuses still gets the
-	// delivery here, because the second half of that guard's own test — is this call one it may refuse
-	// at all — is false for every filing call. So the assertion is the delivery *happening* on that
-	// history: a fixture that stood aside would mean the invariant had broken.
-	it('still delivers on a history the batching guard would otherwise refuse', () => {
-		const payload = payload_of('collision', FILING_COMMAND, 'Bash', unbatched_text())
-
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
 	})
 })
 
@@ -402,17 +356,12 @@ describe('DELIVERED_RULES — the enumeration', () => {
 		expect(new Set(ids).size).toBe(ids.length)
 	})
 
-	it.each([
-		WIP_CAP,
-		DIRECT_FILING,
-		FILING_CAP_ID,
-		ISSUE_COMMENTS,
-		SHELL_BODY,
-		PIPED_VERIFICATION,
-		RUN_TAIL,
-	])('names %j', (id) => {
-		expect(delivered_rules.DELIVERED_RULES.map((rule) => rule.id)).toContain(id)
-	})
+	it.each([DIRECT_FILING, FILING_CAP_ID, ISSUE_COMMENTS, SHELL_BODY, PIPED_VERIFICATION, RUN_TAIL])(
+		'names %j',
+		(id) => {
+			expect(delivered_rules.DELIVERED_RULES.map((rule) => rule.id)).toContain(id)
+		},
+	)
 
 	it('is on by default', () => {
 		expect(delivered_rules.is_enabled()).toBe(true)
@@ -420,7 +369,10 @@ describe('DELIVERED_RULES — the enumeration', () => {
 })
 
 describe('DELIVERED_RULES — trigger overlap', () => {
+	// An `issue:file` filing is among them since joshuafolkken/kit#3423 took the WIP cap and the fold
+	// question into the command: only the per-run cap still claims it.
 	it.each([
+		FILING_COMMAND,
 		BODY_READ_COMMAND,
 		BODY_READ_API_COMMAND,
 		EVALUATED_BODY_COMMAND,
@@ -430,14 +382,6 @@ describe('DELIVERED_RULES — trigger overlap', () => {
 		DIRECT_FILING_API_COMMAND,
 	])('is claimed by exactly one rule: %j', (command) => {
 		expect(rules_claiming(command)).toBe(1)
-	})
-
-	// **An `issue:file` filing is the deliberate overlap: three rows claim it** (joshuafolkken/kit#2119,
-	// joshuafolkken/kit#2213, joshuafolkken/kit#2808) — the WIP cap, the per-run cap and the fold gate —
-	// resolved by the reissue chain rather than by a single winner, so the claim count is asserted rather
-	// than the exactly-one invariant above.
-	it('is claimed by the three filing rules', () => {
-		expect(rules_claiming(FILING_COMMAND)).toBe(FILING_RULE_COUNT)
 	})
 
 	// **The overlap order, asserted rather than assumed** (joshuafolkken/kit#1198,

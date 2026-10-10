@@ -2,6 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
+import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { repository_lock } from './repository-lock'
@@ -128,6 +129,42 @@ describe('repository_lock stale and unreadable records', () => {
 	})
 })
 
+// joshuafolkken/kit#3446: the same lock for a caller that cannot await — the run event stream's append.
+describe('repository_lock.with_lock_sync', () => {
+	it('runs synchronous work and removes the lock afterwards', () => {
+		expect(repository_lock.with_lock_sync(() => DONE, state.lock, NO_WAIT_MS)).toBe(DONE)
+		expect(existsSync(state.lock)).toBe(false)
+	})
+
+	it('releases the lock when the synchronous work throws', () => {
+		expect(() => {
+			repository_lock.with_lock_sync(
+				() => {
+					throw new Error('boom')
+				},
+				state.lock,
+				NO_WAIT_MS,
+			)
+		}).toThrow('boom')
+		expect(existsSync(state.lock)).toBe(false)
+	})
+
+	it('does not run the work while a live process holds the lock past the wait', () => {
+		writeFileSync(state.lock, live_record())
+		const spy = vi.fn(() => DONE)
+
+		expect(repository_lock.with_lock_sync(spy, state.lock, RELEASE_DELAY_MS)).toBeUndefined()
+		expect(spy).not.toHaveBeenCalled()
+		expect(readFileSync(state.lock, 'utf8')).toBe(live_record())
+	})
+
+	it('reclaims the lock of an owner that is gone without waiting', () => {
+		writeFileSync(state.lock, JSON.stringify({ pid: DEAD_PID }))
+
+		expect(repository_lock.with_lock_sync(() => DONE, state.lock, NO_WAIT_MS)).toBe(DONE)
+	})
+})
+
 describe('repository_lock.clear_stale', () => {
 	it('removes a record the judge reports as gone', () => {
 		writeFileSync(state.lock, live_record())
@@ -169,6 +206,22 @@ describe('repository_lock.clear_stale', () => {
 			repository_lock.clear_stale(state.lock)
 		}).not.toThrow()
 		expect(existsSync(state.lock)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#3503: an unanswered beacon probe cleared a live holder's lock under load.
+describe('repository_lock.clear_stale on a holder the default judge cannot place', () => {
+	it('keeps the record', () => {
+		writeFileSync(state.lock, live_record())
+		const probe = vi.spyOn(process_identity, 'is_same_process').mockReturnValue(undefined)
+
+		try {
+			repository_lock.clear_stale(state.lock)
+		} finally {
+			probe.mockRestore()
+		}
+
+		expect(readFileSync(state.lock, 'utf8')).toBe(live_record())
 	})
 })
 

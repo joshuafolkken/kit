@@ -47,7 +47,11 @@ vi.mock('./run-ship-scoped', async (import_original) => {
 		])
 	}
 
-	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_gate, scoped_pair } }
+	// No green record: the gate stage runs its checks, so no test reads this checkout's own record.
+	const gate_green = vi.fn<typeof real_scoped.is_gate_green>().mockResolvedValue(false)
+	const mocked = { scoped_gate, scoped_pair, is_gate_green: gate_green }
+
+	return { run_ship_scoped: { ...actual.run_ship_scoped, ...mocked } }
 })
 vi.mock('./run-ship-detach', () => ({
 	run_ship_detach: {

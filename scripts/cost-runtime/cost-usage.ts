@@ -2,8 +2,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { time_instant } from '#scripts/time-runtime/time-instant'
 import { z } from 'zod'
 
-// Reading Claude Code's own session transcripts for what a run actually cost
-// (joshuafolkken/kit#962).
+// Reading Claude Code's own session transcripts for what a run actually cost.
 //
 // **One API response is written to the transcript as several lines.** Every content block —
 // thinking, text, each `tool_use` — becomes its own `assistant` line, and all of them carry the
@@ -65,7 +64,7 @@ interface UsageTotals {
 	thinking_tokens: number
 	// Whether the API actually reported a thinking-token count, kept apart from the count itself
 	// because `thinking_tokens: 0` cannot tell "the model did no thinking" from "the field was
-	// absent" (joshuafolkken/kit#1969). A session row prints "not measured" for the second rather
+	// absent". A session row prints "not measured" for the second rather
 	// than a confident 0%, so the distinction has to survive `sum_totals`; it is OR-combined, so a
 	// session is measured once any one of its requests carried a count.
 	thinking_measured: boolean
@@ -76,9 +75,9 @@ interface UsageRecord {
 	model: string
 	branch: string
 	// The request's instant, as epoch milliseconds — `undefined` where no line of the request carried
-	// a readable timestamp (joshuafolkken/kit#1606). On a single line it is that line's timestamp;
+	// a readable timestamp. On a single line it is that line's timestamp;
 	// after `dedupe` folds the request's several lines into one record it is the *latest* of them,
-	// which is the response-completion instant a cost window is keyed to (joshuafolkken/kit#1899).
+	// which is the response-completion instant a cost window is keyed to.
 	//
 	// **`undefined` rather than a sentinel, for the reason `time_instant` exists**: a request whose
 	// instant cannot be read belongs in the unattributed bucket, and a `0` would place it at the
@@ -210,7 +209,7 @@ function parse_line(line: string): LineOutcome {
 
 // The later of two request instants, treating `undefined` as no reading rather than as an early one:
 // a line that carried no timestamp must not pull a request's instant back to nothing when a sibling
-// line of the same request does carry one (joshuafolkken/kit#1899).
+// line of the same request does carry one.
 function later_instant(left: number | undefined, right: number | undefined): number | undefined {
 	if (left === undefined) return right
 	if (right === undefined) return left
@@ -222,7 +221,7 @@ function later_instant(left: number | undefined, right: number | undefined): num
 // the branch sequence, so a Map (which preserves insertion order) is the right container and a Set
 // of ids plus a filter would be the same thing written twice.
 //
-// **`at_ms` is folded to the request's latest line, not its first (joshuafolkken/kit#1899).** One
+// **`at_ms` is folded to the request's latest line, not its first.** One
 // response is written thinking → text → `tool_use` (see the file header), all sharing one request id,
 // and a round trip's cost window opens at the `tool_use` line — the last of them. Keeping the first
 // line's instant put every tool-issuing request *before* its own window, where it fell to the

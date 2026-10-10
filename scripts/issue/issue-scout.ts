@@ -4,7 +4,7 @@
 // strong signals: the two issues citing each other in prose, or a `blocked-by` recorded between them.
 // Neither reaches a draft — it has no number, so nothing can cite it and nothing can be recorded
 // against it — and the question a filing entry actually asks first is a different one: has somebody
-// already filed this? (joshuafolkken/kit#1252)
+// already filed this?
 //
 // So this is a second signal rather than a change to that threshold. `epic:bundle` deliberately
 // refuses title resemblance as grounds for *bundling*, because "related" expands without limit; the
@@ -95,8 +95,8 @@ interface ScoutIssue {
 	// already filed as #<E>", and the caller is sent to run an epic that has no implementation of its
 	// own. `epic_bundle.is_strong_signal` excludes them from the other half for the same reason.
 	is_epic?: boolean
-	// A closed issue is a candidate, and the two are not interchangeable to whoever reads the list
-	// (joshuafolkken/kit#1679): an open one says "somebody is already tracking this", a closed one
+	// A closed issue is a candidate, and the two are not interchangeable to whoever reads the list:
+	// an open one says "somebody is already tracking this", a closed one
 	// says "this may already be done". So the state travels with the row rather than being inferred
 	// from which listing it came out of, which the ranking mixes together.
 	is_closed?: boolean
@@ -210,8 +210,7 @@ function compare_candidates(left: DuplicateCandidate, right: DuplicateCandidate)
 //
 // Every row is scored — no prefix, no early exit. The issue this search exists to catch is the one
 // another session filed minutes ago, and where that one sits in the listing is the single thing
-// nobody controls (joshuafolkken/kit#1252). Since joshuafolkken/kit#1679 the rows may be closed as
-// well as open, and the two rank together: a run about to file has to be shown the strongest match
+// nobody controls. The rows may be closed as well as open, and the two rank together: a run about to file has to be shown the strongest match
 // there is, and which listing it came out of says nothing about how well it matches.
 function find_duplicates(
 	title: string,

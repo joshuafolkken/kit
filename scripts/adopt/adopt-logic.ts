@@ -6,7 +6,7 @@ import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 
 // The decisions `josh adopt` makes before any step runs: whether this repository may adopt at all,
-// which repository the issue is opened in, and what the run is carrying (joshuafolkken/kit#1085).
+// which repository the issue is opened in, and what the run is carrying.
 
 const ADOPT_ORIGIN = 'Opened by `josh adopt` in this repository.'
 const INCOMPLETE_HEADLINE =
@@ -18,8 +18,8 @@ const MISPLACED_CAUSE =
 const ABSENT_CAUSE =
 	'no runnable CLI here; the package or its `node_modules/.bin` shim is missing. Run `pnpm install`.'
 
-// Adoption never runs inside kit's own repository — the same boundary `josh sync` draws
-// (joshuafolkken/kit#868), and for the same reason: the sync would overwrite the distribution source
+// Adoption never runs inside kit's own repository — the same boundary `josh sync` draws,
+// and for the same reason: the sync would overwrite the distribution source
 // with its own derived templates. Refused here, before anything writes, rather than left for the
 // sync to fail on halfway through the sequence.
 //
@@ -58,8 +58,8 @@ function name_causes(package_names: ReadonlyArray<string>, cause: string): Array
 	return package_names.map((package_name) => `  ${package_name} — ${cause}`)
 }
 
-// A declared toolkit that falls out of the plan is a refusal rather than a warning
-// (joshuafolkken/kit#1540). kit distributes the base files and every other toolkit overlays files
+// A declared toolkit that falls out of the plan is a refusal rather than a warning.
+// kit distributes the base files and every other toolkit overlays files
 // *derived* from them (`docs/maintainers/sync-rationale.md` → "The managed-workflow stamp"), so a run that syncs kit without the
 // overlay does not merely do less — it writes the overlay's paths back to kit's originals. That diff
 // then wears kit's own face in the pull request, which is exactly what a reviewer cannot spot.

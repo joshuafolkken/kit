@@ -29,34 +29,17 @@ is a verification pass over the fixes, not the first review again
 
 ## Review level (decided by `pnpm josh review:brief --level-only`, never by judgement)
 
-**Run `pnpm josh review:brief --level-only` and use what it prints.** It reads the changed paths and
-answers `low` or `medium`; `--staged` classifies the staged diff instead of the branch diff, and
-`--json` adds the reason. Inside a workflow, `pnpm josh review:brief` prints the same level on its first
-line and the rest of the brief with it.
+**Run `pnpm josh review:brief --level-only` and use what it prints** — `low` or `medium`, from the
+changed paths and nothing else, never "this one is small". `--staged` classifies the staged diff,
+`--json` adds the reason; inside a workflow `pnpm josh review:brief` prints the same level on its first
+line. A `low` change gets 1 round, a `medium` one up to 2 (the cap below). How the answer is derived —
+the inert paths, documentation at `medium`: `docs/maintainers/review-history.md` → "The level is
+decided from the changed paths".
 
 ```bash
 pnpm josh review:brief --level-only            # the branch diff
 pnpm josh review:brief --level-only --staged   # the staged diff
 ```
-
-**The level is decided from the changed paths and nothing else** — never "this one is small"
-(`docs/maintainers/review-history.md`).
-
-| Every changed path is…                                                                   | Level    | Rounds                  |
-| ---------------------------------------------------------------------------------------- | -------- | ----------------------- |
-| **inert** — `.editorconfig`, `.gitignore`, `LICENSE`, `CHANGELOG.md`, `*.code-workspace` | `low`    | 1                       |
-| anything else                                                                            | `medium` | up to 2 (the cap below) |
-
-**One non-inert path decides the whole change.** A review reads the change, not a subset of it, so
-there is no per-file level. An empty diff also takes `medium` — answering `low` to "nothing changed"
-would hand a reduced level to a caller that failed to read the diff.
-
-**Three things that look inert are not.** `.vscode/**`, `.gitattributes` and `.prettierignore` are all
-in `package.json`'s `files` and are written into every consumer project by `josh init` / `josh sync`,
-so a defect in one reaches a consumer and is reviewed at `medium` like any other shipped file.
-
-**Documentation is not inert either.** `CLAUDE.md`, `prompts/**`, `.claude/**` and `docs/**` are all
-reviewed at `medium`, though exempt from _testing_: a reader is the only detector a prose defect has.
 
 **A confirmed High blocks regardless of round count**, and the round cap below does not change that.
 
@@ -95,16 +78,10 @@ round-1 High/Medium finding actually closed — by a fix in this working tree, o
 positive — and none was filed or deferred. **Without the flag the answer is `required`**, which is also
 what the command answers to every uncertainty it meets, a missing round-1 snapshot included.
 
-**`skip` has exactly two arms, and both are states in which round 1's fix code needs no review**:
-
-| Arm                    | What it is                                                                                                                   |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| **A — no fix code**    | The fix delta is empty: round 1's findings closed without an edit, so there is no unreviewed fix code                        |
-| **B — inert fix code** | Every path in the fix delta is inert by the review-level classification above — neither executing, instructing, nor shipping |
-
-**Neither arm weakens the standard.** A round-1 High/Medium that did not close is not a closed finding,
-so the flag is not passable; the cap is still two rounds; and a confirmed High still blocks the merge.
-A documentation-only fix delta is not inert, so a prompt fix answers `required`.
+**`skip` has exactly two arms** — **A** (no fix code: the fix delta is empty) and **B** (inert fix
+code: every path in the fix delta is inert by the review-level classification above); the reason line
+names which fired. Why neither weakens the standard: `docs/maintainers/review-history.md` → "The two
+skip arms".
 
 **A skipped round is recorded on the Issue**, so the condition stays auditable and can be withdrawn if
 a defect is later traced to a skipped delta:
@@ -158,11 +135,11 @@ Only branch 2 files an Issue. What follows applies to that branch.
   `pnpm josh git -y` and before `pnpm josh followup`; where it does not — `halfrun`, or a standalone
   pre-commit self-review — they run as soon as the disposition is decided. **The chain may run in a
   delegated unit** — `pnpm josh delegate followup-filing`.
-- **When the round files a second follow-up, run `pnpm josh issue:fold` first.** Several findings from
-  one review fold into one Issue by default — the filing-time counterpart to the split assessment,
-  reading the same two questions (`.claude/skills/workflow-commands/split-assessment.md` → "The same
-  two questions decide the filing-time fold"). `pnpm josh rule:guard` refuses the second
-  `pnpm josh issue:file` call until it is folded; the first filing asks nothing.
+- **A second follow-up from one round folds into the first by default.** Several findings from one
+  review fold into one Issue — the filing-time counterpart to the split assessment, reading the same
+  two questions (`.claude/skills/workflow-commands/split-assessment.md` → "The same two questions
+  decide the filing-time fold"). `pnpm josh issue:file` asks the fold question itself on the run's
+  second filing and holds a `fold`; the first filing asks nothing.
 
   1. File the follow-up Issue referencing the current one, tagged `route:review-cap` — **before the current Issue closes.**
      `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --route review-cap`.

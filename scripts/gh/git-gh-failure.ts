@@ -1,12 +1,10 @@
 import { parse_json } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 
-// Why one `gh api` request failed, taken from **that request** rather than from a later probe
-// (joshuafolkken/kit#1690).
+// Why one `gh api` request failed, taken from **that request** rather than from a later probe.
 //
-// joshuafolkken/kit#957 asked the same question by issuing a second request — `exec_gh_api_status`
-// against the same path — and joshuafolkken/kit#1663 asked it again with a reachability probe fired
-// after the answer was otherwise final. Both are inferences about a request that is already over: a
+// A second request — `exec_gh_api_status` against the same path, or a reachability probe fired
+// after the answer is otherwise final — is only an inference about a request that is already over: a
 // connection that dropped for three hundred milliseconds fails the read and answers the probe
 // `reachable`, so the failure keeps the meaning the probe gave it and not the one it had.
 //
@@ -14,7 +12,7 @@ import { z } from 'zod'
 // `gh api` writes the **response body** to stdout, and GitHub's REST error document carries its own
 // status — `{"message":"Not Found","documentation_url":…,"status":"404"}`. A request that never
 // reached GitHub has no response body at all, so stdout is empty. That is the whole classification,
-// and neither half reads gh's stderr prose, which is what joshuafolkken/kit#1024 refused to key on.
+// and neither half reads gh's stderr prose, which is wording rather than protocol.
 
 // GitHub's REST error document. Only the status is read: `message` and `documentation_url` are prose
 // for a person, and every other field varies by endpoint.
@@ -41,8 +39,7 @@ interface GhFailure {
 	// for a related resource, reached only because the first answered. Such a request fails about
 	// itself, so its 404 says nothing about whether the subject exists: an issue read whose blocker
 	// relations then 404 on a host without that endpoint is a readable issue, not a missing one. Only
-	// the caller knows which of its requests was which, so it is the caller that sets this
-	// (joshuafolkken/kit#1690).
+	// the caller knows which of its requests was which, so it is the caller that sets this.
 	is_followup?: boolean
 }
 
@@ -62,7 +59,7 @@ function has_gh_failure(error: unknown): error is Error & { gh_failure: GhFailur
 // nothing in it says what the status was, and guessing one would be the inference this module
 // exists to remove.
 function parse_response_status(stdout: string): number | undefined {
-	const document = parse_json.parse_json_object_safe(stdout, error_document_schema)
+	const document = parse_json.parse_json_object_or_undefined(stdout, error_document_schema)
 	if (document?.status === undefined) return undefined
 	const status = Number(document.status)
 

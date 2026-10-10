@@ -67,6 +67,7 @@ the behavior. joshuafolkken/kit#3277 moved these commands out of the automation 
 | `josh run:report`                    | #2249, #2393                                                         |
 | `josh run:event`                     | #2205, #2207, #2492                                                  |
 | `josh run:progress`                  | #2156, #3102                                                         |
+| `josh run:board`                     | #3430                                                                |
 | `josh cost`                          | #2406                                                                |
 | `josh read:set`                      | #2021, #2256, #2280, #2289                                           |
 | `josh doc:read`                      | #1797, #2188                                                         |

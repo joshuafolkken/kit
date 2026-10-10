@@ -1,5 +1,5 @@
 // Enforce the Content rule that comments and test titles are English only (Issue #2124). Every other
-// convention in CLAUDE.md's Content-rules block — naming, complexity limits, magic numbers, early
+// convention in prompts/coding-standards.md → Conventions and CLAUDE.md — naming, complexity limits, magic numbers, early
 // return, test filenames, the `../` import ban — is machine-enforced; this one alone stayed prose, so
 // a stray Japanese comment or test title linted green and could only be caught by review. The decision
 // is an AST-and-codepoint one: look at comment tokens and the title/message string literals of
@@ -95,9 +95,9 @@ const english_only_prose_rule = {
 		},
 		messages: {
 			comment:
-				'Write this comment in English. CJK codepoints are not allowed in comments (CLAUDE.md Content rules); the only exception is eslint/rules/.',
+				'Write this comment in English. CJK codepoints are not allowed in comments (prompts/coding-standards.md → Conventions); the only exception is eslint/rules/.',
 			prose:
-				'Write this test title/message in English. CJK codepoints are not allowed in describe/it/test titles or expect messages (CLAUDE.md Content rules).',
+				'Write this test title/message in English. CJK codepoints are not allowed in describe/it/test titles or expect messages (prompts/coding-standards.md → Conventions).',
 		},
 		schema: [],
 	},

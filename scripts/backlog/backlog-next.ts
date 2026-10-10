@@ -15,18 +15,17 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { backlog_defect_priority } from './backlog-defect-priority'
+import { backlog_overlap } from './backlog-overlap'
 import { backlog_pool } from './backlog-pool'
 import { backlog_rank, type GateScope } from './backlog-rank'
-import { backlog_restructure } from './backlog-restructure'
 
-// `josh backlog:next` — what the whole opted-in backlog may run next (joshuafolkken/kit#1630).
+// `josh backlog:next` — what the whole opted-in backlog may run next.
 //
-// The answer used to be split in two, and neither half could give it. `epic:next` has the dependency
-// graph and the execution wave, but its input is **one epic's task list**. `auto-ok:next` sees the
-// whole backlog, but it orders by the display's newest-first ranking and reads no dependency at all.
-// So there was no route that asked the backlog itself what may start.
+// Neither half alone can give the answer. `epic:next` has the dependency graph and the execution
+// wave, but its input is **one epic's task list**. `auto-ok:next` sees the whole backlog, but it
+// orders by the display's newest-first ranking and reads no dependency at all.
 //
-// This command is that route, and it is glue rather than a third implementation: the epic half runs
+// This command is the route that asks the backlog itself what may start, and it is glue rather than a third implementation: the epic half runs
 // through `epic:next`'s own read → classify → report pipeline unchanged, the standalone half through
 // `auto-ok:next`'s own listing and runnability rules, and the verdict comes from
 // `epic_report.decide_verdict` so it cannot drift from what `epic:next` means by the same word.
@@ -48,7 +47,7 @@ const READ_FAILURES: Readonly<Record<Exclude<OptedInRead['kind'], 'read'>, strin
 	unreadable: auto_ok_cli.UNREADABLE_MESSAGE,
 }
 
-// What `retry` says that `error` cannot (joshuafolkken/kit#1663).
+// What `retry` says that `error` cannot.
 //
 // The anomaly `epic:next` raises for a child it could not read tells the reader to check
 // `gh auth status` and that the issue exists — correct for the failure it was written for, and
@@ -68,7 +67,7 @@ const RETRY_MESSAGE =
 // member none of them can produce — and `VERDICT_LINES` a line nothing ever prints. The token is a
 // backlog-level answer about the transport, not a reading of one epic's graph.
 //
-// `triage` is `epic:next`'s word as well as this command's (joshuafolkken/kit#2779), but it is decided
+// `triage` is `epic:next`'s word as well as this command's, but it is decided
 // after the graph is read rather than from it, so it stays `epic_triage`'s type too.
 type BacklogVerdict = EpicVerdict | 'retry' | TriageVerdict
 
@@ -100,7 +99,7 @@ interface PoolContext {
 //
 // **The tokens are scoped to this repository, which is `epic:next --repo`'s shape exactly.** An epic
 // may track a child elsewhere, and a bare number would send the loop reading this to *this*
-// repository's issue of that number — a different issue (joshuafolkken/kit#1016). Qualifying it
+// repository's issue of that number — a different issue. Qualifying it
 // instead was tried and is worse: `--exclude` parses bare integers, so a loop feeding a qualified
 // token back would be answered with a usage error rather than an exclusion. So a child elsewhere
 // stays out of the tokens, and `run` becomes `wait` when this repository has none — the same mapping
@@ -134,7 +133,7 @@ function warn_gaps(context: PoolContext, has_answer: boolean): void {
 function report(result: EpicNextResult, context: PoolContext): number {
 	warn_gaps(context, result.verdict === 'run')
 	// The explanation names epics and children as `#N` (`tracked by epic #N`); linkified so the text a
-	// run reads carries clickable references rather than bare ones (joshuafolkken/kit#2329). The stdout
+	// run reads carries clickable references rather than bare ones. The stdout
 	// tokens below are bare numbers by contract — a loop feeds them back to `--exclude` — so they are
 	// left untouched.
 	const explanation = epic_report.format_result(result, context.repo)
@@ -178,8 +177,7 @@ function combine(views: ReadonlyArray<EpicView>, context: PoolContext): EpicNext
 	})
 
 	// The same checkout map `epic:next` hands `build_result`. Without it every bundle heading reads
-	// `(no local checkout)`, including this repository's own — the misreport joshuafolkken/kit#864
-	// fixed on that path.
+	// `(no local checkout)`, including this repository's own.
 	return epic_report.build_result(
 		backlog_pool.merge_classifications(from_epics, from_standalone),
 		[
@@ -192,8 +190,7 @@ function combine(views: ReadonlyArray<EpicView>, context: PoolContext): EpicNext
 
 // The epic half and the standalone half settled against each other: an epic child a person has to
 // resolve can make a standalone row wait on that person, and that row can in turn hold an epic child.
-// Each pass only shrinks the set, so the walk ends at the first pass that removes nothing
-// (joshuafolkken/kit#1943).
+// Each pass only shrinks the set, so the walk ends at the first pass that removes nothing.
 function settled_views(
 	reads: ReadonlyArray<EpicRead>,
 	running: ReadonlySet<string>,
@@ -215,7 +212,7 @@ function settled_views(
 // walk rather than the only one.
 //
 // The running set covers the standalone rows as well as every read graph, so an epic child waiting on
-// an opted-in standalone issue waits rather than stops (joshuafolkken/kit#1943).
+// an opted-in standalone issue waits rather than stops.
 function views_from(reads: ReadonlyArray<EpicRead>, context: PoolContext): ReadonlyArray<EpicView> {
 	if (reads.length === 0) return []
 
@@ -230,8 +227,8 @@ function views_from(reads: ReadonlyArray<EpicRead>, context: PoolContext): Reado
 
 // The reads and the classification, with none of the printing `backlog:next` then does with them.
 //
-// `backlog:plan` renders this same pool as a plan a person reads before the run starts
-// (joshuafolkken/kit#1652), so the seam is cut here rather than a second read-and-classify path
+// `backlog:plan` renders this same pool as a plan a person reads before the run starts,
+// so the seam is cut here rather than a second read-and-classify path
 // being written beside it: the plan and the run cannot disagree about what may start, because there
 // is one answer and two renderings of it. `undefined` is the refusal — already reported.
 async function resolve(context: PoolContext): Promise<EpicNextResult | undefined> {
@@ -249,7 +246,7 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 	}
 
 	// The defect priority and the ranking keys are applied here rather than when printing, so
-	// `backlog:plan` shows the order the run takes (joshuafolkken/kit#2455, joshuafolkken/kit#2928). The
+	// `backlog:plan` shows the order the run takes. The
 	// ranking goes last: its sort is stable, so the defect order survives as its final key.
 	const ordered = await backlog_defect_priority.prioritize(
 		combine(views_from(reads, context), context),
@@ -261,11 +258,10 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 
 // Whether the `error` verdict is really a transport failure wearing the graph's clothes.
 //
-// **The answer comes from the reads that failed, not from a request made afterwards**
-// (joshuafolkken/kit#1690). joshuafolkken/kit#1663 asked a reachability probe here, once the answer
-// was otherwise final — and a connection that dropped for a few hundred milliseconds failed the read
-// at t=0 and answered that probe `reachable`, leaving the verdict `error` for a fault that had
-// already healed. Judging one request from a different one cannot be made reliable, so the failed
+// **The answer comes from the reads that failed, not from a request made afterwards**. A later
+// reachability probe can answer `reachable` after a connection that dropped for a few hundred
+// milliseconds already failed the read, leaving the verdict `error` for a fault that had already
+// healed. Judging one request from a different one cannot be made reliable, so the failed
 // request carries its own nature instead: `epic:next` marks the anomaly from the status GitHub wrote
 // on the failed response, and this reads the mark.
 function is_transport_failure(result: EpicNextResult): boolean {
@@ -300,19 +296,19 @@ function standalone_keys(context: PoolContext): ReadonlySet<string> {
 }
 
 // The running lanes still carry the pickup label, so the opted-in listing holds their bodies too —
-// which is what lets a candidate be held back from a restructure a running lane already makes
-// (joshuafolkken/kit#3221). `backlog:plan --waves` reads the same scope, so its first wave is this offer.
+// which is what lets a candidate be held back from a path a running lane already declares.
+// `backlog:plan --waves` reads the same scope, so its first wave is this offer.
 function gate_scope(context: PoolContext): GateScope {
 	return {
 		standalone: standalone_keys(context),
-		declared: backlog_restructure.declared_of(context.opted_in.issues),
+		declared: backlog_overlap.declared_of(context.opted_in.issues),
 	}
 }
 
 // The `run:solo` gate is applied here rather than in `resolve`, because `backlog:plan` shares
-// `resolve` and a plan made before the run lists everything (joshuafolkken/kit#2776). The holders are
+// `resolve` and a plan made before the run lists everything. The holders are
 // read only on a `run` answer — the one answer the gate can change. The cap follows the gate
-// (`backlog-rank.ts`, joshuafolkken/kit#2928).
+// (`backlog-rank.ts`).
 async function gate_solo(result: EpicNextResult, context: PoolContext): Promise<EpicNextResult> {
 	if (result.verdict !== 'run') return result
 
@@ -331,7 +327,7 @@ async function gate_solo(result: EpicNextResult, context: PoolContext): Promise<
 	return gated.result
 }
 
-// An untriaged candidate withholds every candidate (joshuafolkken/kit#2779). Checked before the
+// An untriaged candidate withholds every candidate. Checked before the
 // `run:solo` gate, which cannot be applied to an issue whose label is not recorded yet; the numbers go
 // to standard error, the one token to standard output.
 function report_triage(context: PoolContext, untriaged: ReadonlyArray<EpicChild>): number {

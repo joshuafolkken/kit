@@ -1,5 +1,7 @@
+import { session_cite } from '#scripts/issue/session-cite'
+
 // The difference between the issues an `in-progress` label says are running and the lanes that are
-// actually open (joshuafolkken/kit#2235).
+// actually open.
 //
 // `epic:next` counts lane occupancy from the `in-progress` label list; `lane:list` reads the work
 // trees that are actually open. Nothing named the difference, so a session read hand-made signals —
@@ -69,15 +71,15 @@ function classify(in_progress: ReadonlyArray<number>, lanes: LaneRead): Occupanc
 }
 
 function stopped_line(issue: number): string {
-	return `⚠ ${STOPPED} #${String(issue)} — carries \`in-progress\` but no lane is open — a stale label. Remove it if the run is done (labels are a person's to change), or reopen the lane.`
+	return `⚠ ${STOPPED} ${session_cite.issue(issue)} — carries \`in-progress\` but no lane is open — a stale label. Remove it if the run is done (labels are a person's to change), or reopen the lane.`
 }
 
 function unknown_line(issue: number): string {
-	return `⚠ ${UNKNOWN} #${String(issue)} — carries \`in-progress\` but the lane listing could not be read, so whether its lane is live is unknown — do not treat it as stopped.`
+	return `⚠ ${UNKNOWN} ${session_cite.issue(issue)} — carries \`in-progress\` but the lane listing could not be read, so whether its lane is live is unknown — do not treat it as stopped.`
 }
 
 function without_label_line(issue: number): string {
-	return `⚠ a lane is open for #${String(issue)} but it carries no \`in-progress\` label — another session could claim the same issue. Apply the label or close the lane (a person's, never this command's).`
+	return `⚠ a lane is open for ${session_cite.issue(issue)} but it carries no \`in-progress\` label — another session could claim the same issue. Apply the label or close the lane (a person's, never this command's).`
 }
 
 function labelled_lines(labelled: ReadonlyArray<LabelledIssue>): Array<string> {

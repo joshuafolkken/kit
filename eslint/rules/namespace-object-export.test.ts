@@ -1,9 +1,15 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { Linter } from 'eslint'
 import { describe, expect, it } from 'vitest'
 import { namespace_object_export_rule } from './namespace-object-export.js'
 
 const ECMA_VERSION = 2024
 const RULE_ID = 'local/namespace-object-export'
+const CODING_STANDARDS_PATH = fileURLToPath(
+	new URL('../../prompts/coding-standards.md', import.meta.url),
+)
+const TWO_FUNCTION_EXPORTS = 'export function a() {}\nexport function b() {}\n'
 
 // Wire the rule as the `local` plugin, exactly as `eslint/base.js` does, and lint an in-memory
 // module. Linting a source string exercises the AST logic without needing a real file or tsconfig.
@@ -22,9 +28,7 @@ function rule_messages(source: string): Array<Linter.LintMessage> {
 
 describe('namespace-object-export — flags individual function exports', () => {
 	it('flags two exported function declarations', () => {
-		const source = 'export function a() {}\nexport function b() {}\n'
-
-		expect(rule_messages(source)).toHaveLength(2)
+		expect(rule_messages(TWO_FUNCTION_EXPORTS)).toHaveLength(2)
 	})
 
 	it('flags a declaration and an arrow-const export together', () => {
@@ -63,5 +67,16 @@ describe('namespace-object-export — ignores non-function exports', () => {
 		const source = 'export const A = 1\nexport function only() {}\n'
 
 		expect(rule_messages(source)).toHaveLength(0)
+	})
+})
+
+// The message is read by every consumer that trips the rule, so the section it cites has to exist —
+// joshuafolkken/kit#3395 moved the conventions out of `CLAUDE.md`.
+describe('namespace-object-export — the message', () => {
+	it('cites the conventions section that carries the rule', () => {
+		const [flagged] = rule_messages(TWO_FUNCTION_EXPORTS)
+
+		expect(flagged?.message).toContain('See prompts/coding-standards.md → Conventions.')
+		expect(readFileSync(CODING_STANDARDS_PATH, 'utf8')).toContain('\n## Conventions\n')
 	})
 })

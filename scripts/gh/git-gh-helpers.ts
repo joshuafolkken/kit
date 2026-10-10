@@ -4,7 +4,7 @@ import { has_stderr_field } from './git-gh-exec'
 // string itself, so the value arrives raw and there is nothing to unquote — this used to strip a
 // leading and trailing `"` anyway, which ate real characters from any answer that legitimately
 // carried them. A title of `"queue" should stop at the first failure` reached Telegram as
-// `queue" should stop at the first failure` (joshuafolkken/kit#993). Trimming and the empty answer
+// `queue" should stop at the first failure`. Trimming and the empty answer
 // are the whole contract.
 function parse_pr_state_string(result: string): string | undefined {
 	const trimmed = result.trim()

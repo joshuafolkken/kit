@@ -1,4 +1,6 @@
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
+import { issue_cite } from '#scripts/issue/issue-cite'
+import { session_cite } from '#scripts/issue/session-cite'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { SEPARATOR_LINE } from './constants'
 import { git_prompt } from './git-prompt'
@@ -52,7 +54,7 @@ function parse_issue_input(input: string): IssueInfo {
 	const issue_number = extract_issue_number(trimmed_input)
 	const title = extract_issue_title(trimmed_input)
 	const branch_name = create_branch_name(issue_number, title)
-	const commit_message = `${title} #${issue_number}`
+	const commit_message = `${title} ${issue_cite.plain(issue_number)}`
 
 	return {
 		title,
@@ -64,10 +66,10 @@ function parse_issue_input(input: string): IssueInfo {
 
 const BRANCH_NUMBER_PATTERN = /^(\d+)-(.+)$/u
 
-// A lane's branch is `<N>-lane` (joshuafolkken/kit#1490), so its second segment is the fixed word
-// `lane` rather than a slug of the title — de-slugging it produced commit messages like `lane #1465`
-// on joshuafolkken/kit#1586. The shape is recognized through `lane_paths.lane_branch` rather than a
-// second copy of the suffix, so the two ends cannot drift apart (joshuafolkken/kit#1590).
+// A lane's branch is `<N>-lane`, so its second segment is the fixed word
+// `lane` rather than a slug of the title — de-slugging it would produce commit messages like
+// `lane #1465`. The shape is recognized through `lane_paths.lane_branch` rather than a
+// second copy of the suffix, so the two ends cannot drift apart.
 function is_lane_branch(branch_name: string, issue_number: string): boolean {
 	return branch_name === lane_paths.lane_branch(issue_number)
 }
@@ -75,7 +77,7 @@ function is_lane_branch(branch_name: string, issue_number: string): boolean {
 const EXAMPLE_ISSUE_NUMBER = '42'
 
 function argument_hint(issue_number: string): string {
-	return `Provide an issue argument like "title #${issue_number}".`
+	return `Provide an issue argument like "title ${issue_cite.plain(issue_number)}".`
 }
 
 // Never falls back to the branch's own word: `lane` is not a title, and a commit message cannot be
@@ -85,7 +87,7 @@ async function lane_issue_title(branch_name: string, issue_number: string): Prom
 
 	if (title === undefined) {
 		throw new Error(
-			`Cannot read the title of issue #${issue_number} for lane branch "${branch_name}". ${argument_hint(issue_number)}`,
+			`Cannot read the title of issue ${session_cite.issue(issue_number)} for lane branch "${branch_name}". ${argument_hint(issue_number)}`,
 		)
 	}
 
@@ -110,7 +112,7 @@ async function derive_issue_input_from_branch(branch_name: string): Promise<stri
 		? await lane_issue_title(branch_name, number)
 		: slug.replaceAll('-', ' ').trim()
 
-	return `${title} #${number}`
+	return `${title} ${issue_cite.plain(number)}`
 }
 
 async function derive_from_branch(branch_name: string): Promise<IssueInfo> {

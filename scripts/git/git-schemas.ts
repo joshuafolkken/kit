@@ -42,17 +42,16 @@ const epic_issue_schema = z.object({
 })
 
 // One blocker as `gh` reports it inside the `blockedBy` connection. `state` comes back with the
-// number, so telling a resolved blocker from a standing one costs no extra request
-// (joshuafolkken/kit#996).
+// number, so telling a resolved blocker from a standing one costs no extra request.
 // `number` is **required**. Relaxing it looks harmless and is not: `epic_issue.blockers_of` maps the
 // nodes to their numbers, so an optional one turns a `blockedBy` shape change from a failed parse —
 // which marks the child unreadable — into an empty blocker list, and `epic:next` then hands a
 // dependent to an unattended run before its prerequisite. Fail-safe is the direction that matters
-// here (joshuafolkken/kit#1005).
+// here.
 //
 // `repository_url` is the repository the blocker lives in, as REST names it
-// (`https://api.github.com/repos/<owner>/<repo>`). Carried since joshuafolkken/kit#1126: a
-// `blocked-by` relation may cross a repository, and a reader that keeps only the number resolves it
+// (`https://api.github.com/repos/<owner>/<repo>`). Carried because a `blocked-by` relation may
+// cross a repository, and a reader that keeps only the number resolves it
 // against the blocked child's own repository — a different issue, or none. Optional because a
 // caller that only wants numbers must not be made to fail on a response shape it never reads.
 const blocking_issue_schema = z.object({
@@ -62,16 +61,11 @@ const blocking_issue_schema = z.object({
 })
 
 // The blocker relations arrive as a connection — `{ nodes, totalCount }` — not a bare array.
-// Measured against a real issue rather than assumed (joshuafolkken/kit#860). `gh issue view`
-// answered the connection itself; since joshuafolkken/kit#1024 REST serves a bare array from the
-// issue's own `dependencies/blocked_by` endpoint and `git-gh-issue-rest.ts` maps it back into this
-// shape, so every reader below is unchanged.
+// REST serves a bare array from the issue's own `dependencies/blocked_by` endpoint and
+// `git-gh-issue-rest.ts` maps it back into this shape.
 //
-// **One definition, every reader.** The same connection was written out three times — twice here and
-// once in `scripts/epic/epic-issue.ts` — each naming only the fields its own caller happened to want,
-// so a shape change had three places to reach and one of them would not be noticed. That is the
-// duplication joshuafolkken/kit#862 removed from the epic commands, reintroduced by the readers that
-// came after (joshuafolkken/kit#1005).
+// **One definition, every reader.** A copy per reader, each naming only the fields its own caller
+// wants, would give a shape change several places to reach, one of which would not be noticed.
 //
 // `nodes` is a page — `blockedBy(first:50)` under GraphQL, one unpaged `per_page=100` request under
 // REST — while `totalCount` is exact, read from the issue's own dependency summary. A reader that
@@ -80,8 +74,7 @@ const blocking_issue_schema = z.object({
 // reads as complete. Every issue the reads go through carries one, so that is a guard rather than
 // a case. **Only the `auto-ok` pickup compares them**; the epic readers judge from the page they
 // were given, so an epic child declaring more blockers than one page holds is read from the first
-// page. Carried here so the field is available, not because every reader consults it
-// (joshuafolkken/kit#1005).
+// page. Carried here so the field is available, not because every reader consults it.
 const blocked_by_schema = z
 	.object({
 		nodes: z.array(blocking_issue_schema).default([]),
@@ -99,7 +92,7 @@ const epic_child_schema = z.object({
 //
 // Carried here rather than beside either reader: the pull request's conversation comments and an
 // epic's are the *same endpoint* answering the same objects, so a second declaration of this shape
-// would be the clone `CLAUDE.md` prohibits (joshuafolkken/kit#1039). `ai_review_pull_comment_schema`
+// would be the clone `CLAUDE.md` prohibits. `ai_review_pull_comment_schema`
 // above is the `gh --json` spelling the scan reads after the mapping, not this one.
 const rest_comment_schema = z.looseObject({
 	body: z.string().nullish(),
@@ -112,7 +105,7 @@ const rest_comment_schema = z.looseObject({
 const issue_label_schema = z.object({ name: z.string() })
 
 // `state` is optional because most readers ignore it — only `epic-add.ts` consults it, to refuse
-// adding a child to a closed epic (joshuafolkken/kit#2337). A reader that never asks the state field
+// adding a child to a closed epic. A reader that never asks the state field
 // still parses cleanly.
 const epic_subject_schema = z.object({
 	number: z.number(),
@@ -123,11 +116,11 @@ const epic_subject_schema = z.object({
 
 // One row of an open-issue listing, under the field names `gh issue list --json` answered with.
 // Three readers parse a listing through this shape: the next-issues display printed when a workflow
-// completes (#821), the `auto-ok` pickup (joshuafolkken/kit#906), and the per-repository busy check
-// `epic:next` makes before it offers a child (joshuafolkken/kit#925).
+// completes, the `auto-ok` pickup, and the per-repository busy check
+// `epic:next` makes before it offers a child.
 //
-// The row is *assembled* under those names rather than returned under them. Since
-// joshuafolkken/kit#1025 the listing is REST, and `blockedBy` is not part of a listing response at
+// The row is *assembled* under those names rather than returned under them. The listing is REST,
+// and `blockedBy` is not part of a listing response at
 // all: `git-gh-issue-list.ts` reads the relations from each row's own dependencies endpoint, and
 // only for the pickup, which is the one caller whose field list names `blockedBy` at all.
 //
@@ -140,7 +133,7 @@ const open_issue_schema = z.object({
 	labels: z.array(issue_label_schema).optional(),
 	createdAt: z.string(),
 	blockedBy: blocked_by_schema,
-	// Present only on the pickup listing, which reads it for the restructures each issue declares.
+	// Present only on the pickup listing, which reads it for the paths each issue declares.
 	body: z.string().optional(),
 })
 

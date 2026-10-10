@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_report_failures } from './issue-report-failures'
+import { session_cite } from './session-cite'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -36,8 +37,14 @@ describe('issue_report_failures.report_failures', () => {
 
 		expect(issue_report_failures.report_failures(reports, TERMS)).toBe(FAILURE_EXIT_CODE)
 		expect(error_spy).toHaveBeenCalledTimes(2)
-		expect(error_spy).toHaveBeenNthCalledWith(1, expect.stringContaining('#1 does not resolve'))
-		expect(error_spy).toHaveBeenNthCalledWith(2, expect.stringContaining('could not read issue #3'))
+		expect(error_spy).toHaveBeenNthCalledWith(
+			1,
+			expect.stringContaining(`${session_cite.issue(1)} does not resolve`),
+		)
+		expect(error_spy).toHaveBeenNthCalledWith(
+			2,
+			expect.stringContaining(`could not read issue ${session_cite.issue(3)}`),
+		)
 	})
 
 	it('says what an unreadable number must not be mistaken for', () => {

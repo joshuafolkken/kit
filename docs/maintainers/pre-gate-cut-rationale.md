@@ -122,3 +122,13 @@ A stopped child used to reconstruct its entry on every resume — 2.6 minutes an
 compaction does not reduce billing; the plan and auto-decisions are on GitHub already. The hold is kept
 because the uncommitted work is what a second run would trample. The ending checks are batched because
 every check is a request too (joshuafolkken/kit#1383).
+
+## Where each rule came from
+
+- A `handed-off` resume, and the spent hand-off that makes a second resume answer it —
+  joshuafolkken/kit#1935.
+- `pnpm josh run:ending` detecting a child that ended without cutting — joshuafolkken/kit#2139.
+- A lane child recording its own park so `run:liveness` reads it `settled` — joshuafolkken/kit#2034,
+  after the stops measured on #2012 and #2011.
+- The interactive ask refused one call earlier — joshuafolkken/kit#2201, completing
+  joshuafolkken/kit#2034, after the ask lost on #2178.

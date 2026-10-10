@@ -1,11 +1,14 @@
 #!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
 import { lane_registry } from '#scripts/lane/lane-registry'
+import { lane_sampler } from '#scripts/lane/lane-sampler'
 import { error_text } from '#scripts/lib/error-message'
+import { json_value } from '#scripts/lib/json-value'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_merge_cli, type MergeResult } from '#scripts/run/merge/run-merge-cli'
@@ -29,7 +32,7 @@ import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_offer_cli } from './backlog-offer-cli'
 import { backlog_ready } from './backlog-ready'
 
-// `josh backlog:drive` — the backlogrun parent's loop as one resident wait (joshuafolkken/kit#2499).
+// `josh backlog:drive` — the backlogrun parent's loop as one resident wait.
 // The parent issues it once, in the background, and is woken only when it exits — with a token the model
 // has to read. The loop itself is `backlog-drive.ts`; this file is its ports onto the commands it reuses.
 //
@@ -58,13 +61,7 @@ const offer_read_schema = z.object({
 const offer_schema = z.object({ [backlog_offer_cli.JSON_KEY]: offer_read_schema })
 
 function to_offer(out: string): OfferRead | undefined {
-	try {
-		const parsed = offer_schema.safeParse(JSON.parse(out))
-
-		return parsed.success ? parsed.data[backlog_offer_cli.JSON_KEY] : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(out, offer_schema)?.[backlog_offer_cli.JSON_KEY]
 }
 
 async function read_record(): Promise<RunCarry | undefined> {
@@ -110,7 +107,7 @@ function merge_token(out: string, code: number): string {
 
 // The child's transcript, where its lane recorded one, so `run:merge` can tell an API outage from a
 // failure exactly as it does for the parent that passes `--output` by hand. No hand-off threshold: the
-// supervisor runs this loop, and a process has no context to cut (joshuafolkken/kit#3156).
+// supervisor runs this loop, and a process has no context to cut.
 async function merge(issue: string, owner: string): Promise<MergeResult> {
 	await backlog_drive_owner.assert_current(owner)
 	const lane = await lane_registry.find_open_lane(issue)
@@ -165,7 +162,7 @@ async function open_lanes(): Promise<ReadonlyArray<string>> {
 
 function end_line(end: DriveEnd): string {
 	const token = end.token === undefined || end.token === end.reason ? [] : [end.token]
-	const issue = end.issue === undefined ? [] : [`#${end.issue}`]
+	const issue = end.issue === undefined ? [] : [issue_cite.plain(end.issue)]
 	const base = [end.reason, ...token, ...issue].join(' ')
 
 	return end.detail === undefined ? base : `${base} ${end.detail}`
@@ -224,13 +221,19 @@ async function drive(context: DriveContext): Promise<number> {
 	return SUCCESS_EXIT_CODE
 }
 
+// The machine load is sampled for exactly as long as the drive runs, so a `backlogrun` leaves its own
+// load in the lane ledger without a sampler anyone has to start or stop (`lane-sampler.ts`).
 async function run_safe(context: DriveContext): Promise<number> {
+	const stop_sampling = lane_sampler.start()
+
 	try {
 		return await drive(context)
 	} catch (error) {
 		console.info(`error ${error_text.message_of(error)}`)
 
 		return FAILURE_EXIT_CODE
+	} finally {
+		stop_sampling()
 	}
 }
 
@@ -260,6 +263,7 @@ const backlog_drive_cli = {
 	offer_argv: backlog_drive_offer_argv.offer_argv,
 	parse: backlog_drive_args.parse,
 	resume_line: backlog_drive_args.resume_line,
+	run,
 	to_offer,
 }
 

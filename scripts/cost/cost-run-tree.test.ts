@@ -70,6 +70,12 @@ describe('cost_run_tree.build_tree default', () => {
 	it('claims every transcript, so none is left unattributed', () => {
 		expect(cost_run_tree.build_tree(files, ctx, undefined)?.unattributed_count).toBe(0)
 	})
+
+	it("carries the selected run's transcript files for a reader of their lines", () => {
+		const tree = cost_run_tree.build_tree(files, ctx, undefined)
+
+		expect(tree?.files.map((file) => file.session_id)).toEqual(['p', 'L1', 'L2'])
+	})
 })
 
 describe('cost_run_tree.build_tree run grouping', () => {

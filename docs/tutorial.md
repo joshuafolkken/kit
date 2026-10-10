@@ -4,6 +4,8 @@ For anyone who has installed kit and wants to see the Issue-driven loop once, en
 
 `kickoff`, `halfrun`, `prrun`, `fullrun` and `backlogrun` are keywords you type to the agent, not `josh` commands; the agent drives `josh` and `gh` for you. [Run Issues with the workflow keywords](./how-to/run-issues.md) explains each one.
 
+Not using GitHub? Both patterns need it — go to [Without GitHub: one change, checked locally](#without-github-one-change-checked-locally).
+
 ## Before you start
 
 - kit is set up with `josh start`, and its setup is on `main` — merge the setup pull request it opened, if it opened one ([init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start)). The profile guides walk through it: [Set up the basic profile](./setup/basic.md) for `basic`, [Set up the full profile](./setup/full.md) for `full`.
@@ -45,7 +47,7 @@ The agent writes the plan on the Issue if it has none (the one `kickoff new` fil
 
 To merge the pull request by hand instead, type `prrun #N`: it goes as far as a green, mergeable pull request and stops there ([Run Issues with the workflow keywords](./how-to/run-issues.md)).
 
-If you ran `halfrun` in step 2, its changes are still uncommitted in the working tree, and `fullrun` will not start on a tree with uncommitted changes. Finish that run with the commit command its stop notification gives instead — it opens the pull request and merges it the same way ([Recover a stopped run](./how-to/recover-a-run.md)).
+If you ran `halfrun` in step 2, its changes are still uncommitted in the working tree. Type `fullrun #N` all the same: it picks the stopped `halfrun` up from the gate, skipping the plan and the implementation, and ships the change you checked. Without an agent, the commit command in the stop notification finishes that run instead of `fullrun #N` or `prrun #N` ([Recover a stopped run](./how-to/recover-a-run.md)).
 
 ## Pattern B: many Issues at once
 
@@ -70,6 +72,22 @@ The agent runs every opted-in Issue in dependency order, each one from implement
 ## Separately: pull in kit's updates with `josh sync`
 
 Not part of the loop above. After upgrading `@joshuafolkken/kit`, run `pnpm josh sync` to refresh the rules and files kit manages; it writes only the file set of the project's profile. [Update kit](./how-to/update-kit.md) has the steps, and [sync.md](./sync.md) lists what it overwrites.
+
+## Without GitHub: one change, checked locally
+
+For a project set up with `josh init` and no GitHub. The workflow keywords above need GitHub, so do not type them — ask in plain words. What `josh init` set up: [TypeScript projects](./setup/full.md#2-install-and-initialize-with-josh-init) · [other projects](./setup/basic.md).
+
+1. Open an agent that reads the project's `CLAUDE.md`, such as Claude Code, in the project directory.
+2. Ask for one small change:
+
+   ```text
+   Change the page title to "Hello", then tell me what you checked.
+   ```
+
+3. The agent reads the file before changing it, makes the change, checks it and reports what it saw. In a `full` profile project it also adds a test where one fits, runs `pnpm josh gate`, and reports which checks passed and which did not.
+4. Check it yourself: run `pnpm josh gate` ([what it checks and skips](./setup/basic.md#3-verify)), and open the page in a browser when the change is visible.
+
+Want Issues, pull requests and merges handled too? Run `pnpm exec josh start` ([init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start)), then follow Pattern A.
 
 ## Where next
 

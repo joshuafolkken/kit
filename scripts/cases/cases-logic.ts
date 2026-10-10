@@ -1,6 +1,6 @@
 import { file_reader } from '#scripts/lib/read-file'
 
-// `josh cases <path...>` (joshuafolkken/kit#2246): read the changed paths and answer which I/O
+// `josh cases <path...>`: read the changed paths and answer which I/O
 // boundaries the code crosses — network, process start, filesystem — then name the abnormal cases
 // that boundary always owes. The unit suite blocks network by construction
 // (`scripts/test/test-network-guard.ts`), so a boundary's abnormal cases never run there; this makes
@@ -50,7 +50,7 @@ const BOUNDARIES: ReadonlyArray<BoundaryDefinition> = [
 		boundary: 'time',
 		// The absence boundary: a change that coordinates over time — timers, schedules, retries,
 		// heartbeats — owes the cases where the awaited thing never happens, which no diff of an I/O
-		// call can surface (joshuafolkken/kit#2356). Same over-firing discipline as process and fs: the
+		// call can surface. Same over-firing discipline as process and fs: the
 		// verbs (`setInterval`, `schedule`, `retry`) require a call paren so prose like "schedule the
 		// release" no longer fires, while the domain nouns (`cron`, `heartbeat`, `watchdog`, `liveness`)
 		// are unambiguous enough in source to match bare.

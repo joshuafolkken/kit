@@ -10,7 +10,6 @@ import { filing_cap } from './filing-cap'
 import { git_force } from './git-force'
 import { implementation_cut } from './implementation-cut'
 import { issue_comments } from './issue-comments'
-import { issue_fold_rule } from './issue-fold-rule'
 import { josh_git_bare } from './josh-git-bare'
 import { lane_background } from './lane-background'
 import { lane_carry_conflict } from './lane-carry-conflict'
@@ -29,151 +28,70 @@ import { run_tail_rule } from './run-tail-rule'
 import { shell_body_trigger } from './shell-body-trigger'
 import { test_declared_commit } from './test-declared-commit'
 import { third_party_write } from './third-party-write'
-import { wip_cap } from './wip-cap'
 import { worktree_guard } from './worktree-guard'
 
-// The enumeration of rules delivered at the moment they bind, rather than carried resident in
-// `CLAUDE.md` on every turn (joshuafolkken/kit#1524).
-//
-// **It exists because residency ran out and delivery did not.** `CLAUDE.md` sits 6 tokens under the
-// ceiling `scripts/claude/workflow-skills.test.ts` enforces, while `prompts/` and `.claude/skills/` hold
-// fifteen times as much on demand — so the pressure is on the one channel that costs every turn.
-// joshuafolkken/kit#1344 measured three consecutive runs in which resident prose about batching moved
-// the number not at all, and joshuafolkken/kit#1460 measured the same for the investigation
-// threshold; in both, a `PreToolUse` refusal was what finally moved it. A rule whose trigger can be
-// named is therefore cheaper **and** stronger delivered than carried.
-//
-// **No new machinery.** `hook_decision.create_transcript_guard` is the shell both existing guards
-// already share (joshuafolkken/kit#1460) — the payload schema, the deny envelope, the switch, the
-// `.env` load and the once-per-run stamp — and every entry below is one of its specs. Building a
-// second delivery path would be the clone `CLAUDE.md` prohibits, in the one place where two paths
-// would disagree about whether a rule was delivered at all.
-//
-// **What this file is not.** It holds no rule *text* that exists nowhere else: each entry's reason is
-// the trigger plus the instruction that must be obeyed before anything else is read, and names the
-// topic file that carries the procedure — the same "trigger plus pointer" shape a resident rule takes
-// (`prompts/collaboration-workflow/residency.md`).
+// The rules delivered by a `PreToolUse` refusal at the moment they bind, rather than carried resident
+// in `CLAUDE.md` — a nameable trigger is cheaper and stronger delivered than carried. Every entry is a
+// `hook_decision.create_transcript_guard` spec; each reason is a trigger plus a pointer to its topic
+// file (`prompts/collaboration-workflow/residency.md`).
 
-// The escape hatch, on by default like the other two guards. A distributed convention nobody enabled
-// would leave this Issue where it started.
+// The escape hatch, on by default like the other two guards.
 const SWITCH_ENV_KEY = 'JOSH_RULE_GUARD'
 
-// **What a compliance test is asked of: the call, the turn it went out in, and the run it belongs
-// to** — the calls the same assistant message issued, and every call the run made
-// (joshuafolkken/kit#1792 for the turn, joshuafolkken/kit#1867 for the run). Every row but two answers
-// from the call alone and simply ignores the rest, which is why widening the one signature costs them
-// nothing. **The batching rule cannot be written without the turn**: its subject is *how many calls a
-// turn carried*, and no field of a single call says that. **The pre-gate cut cannot be written without
-// the run**: a cut relaunches a second process that issues the identical entry check, so the two
-// halves are separable only by a call one of them makes elsewhere in the run. In both cases the
-// alternative was a second predicate slot beside this one, i.e. two ways to declare the same thing.
+// A compliance test sees the call, its turn and its run: batching needs the turn, the pre-gate cut
+// needs the run; every other row reads the call alone.
 type CallTest = (
 	call: GuardedCall,
 	turn: ReadonlyArray<GuardedCall>,
 	run: ReadonlyArray<GuardedCall>,
 ) => boolean
 
-// One rule delivered by trigger. `id` keys its own refusal record, so one rule firing never spends
-// another's budget.
+// `id` keys the rule's own refusal record, so one rule firing never spends another's budget.
 interface DeliveredRule {
 	id: string
-	// Whether this call is the moment the rule binds, judged from the call alone.
 	is_trigger: (call: GuardedCall) => boolean
-	// What the model is told. The deny reason is the only text that reaches it, so it carries the
-	// instruction and the pointer rather than a summary of either.
+	// The only text that reaches the model: the instruction and the pointer.
 	reason: string
-	// **A stand-down read from the transcript tail, not the call** (joshuafolkken/kit#1905). A rule
-	// whose subject a run can *satisfy earlier in the run* — the comments read on the first open, so a
-	// later body read of the same Issue asks for nothing new — supplies this so the delivery is
-	// suppressed once that earlier act is on the tail. It is checked before `is_first_delivery`, so a
-	// satisfied call neither refuses nor spends the once-per-run record. Absent, delivery is unchanged.
+	// A stand-down when an earlier act on the tail already satisfied the rule; checked first, so a
+	// satisfied call spends no record.
 	already_satisfied?: (tail: string, call: GuardedCall) => boolean
-	// **A rule that has to bind on every occurrence supplies this, and once-per-run stops applying to
-	// it** (joshuafolkken/kit#1570). Once per run is right for a rule a run then obeys — read the
-	// comments, count the Issues, put the body in a file — because the refusal changes what the run
-	// knows. It is wrong for one whose subject is a *recurring* act: refused once and free
-	// afterwards, the enforcement is back to the parent's self-restraint, which is the thing that
-	// failed. A row with this field is asked it instead, and it is asked on every candidate call —
-	// `can_record` is what the batching stand-aside becomes for such a row (see `delivery_decision`).
-	// **`delivered_at_ms` is this row's own last refusal instant** (joshuafolkken/kit#2385) — `fire_once`
-	// writes the stamp only when a refusal actually fired, so a row that fires per crossing but must let
-	// an immediate reissue through (the implementation-phase cut) can tell a fresh crossing from a
-	// reissue of the edit it just refused. Rows that refuse unconditionally ignore it.
+	// For a rule that binds on every occurrence instead of once per run. `at_ms` is this row's own last
+	// refusal, so an immediate reissue can be let through.
 	decide?: (call: GuardedCall, run: GuardRun, can_record: boolean, at_ms: number) => boolean
-	// **What keeping this rule looks like, as a call** (joshuafolkken/kit#1525). It names the act the
-	// rule asks for, so a run that made it *before* the trigger fired can be told apart from one that
-	// complied only because the refusal made it. `scripts/rules/rule-value.ts` reads that difference
-	// off recorded sessions to score what the rule's carried text earns unaided; a row that declares
-	// none is reported unmeasured rather than scored, because "never kept" and "always kept" are both
-	// claims the absence of a predicate does not support. It lives here rather than in the
-	// measurement so a rule's trigger and its compliance test stay one definition.
+	// What keeping the rule looks like, for `rule-value.ts`; absent reads as unmeasured, not as a score.
 	keeps?: CallTest
-	// **The occasion the rule governs, read in either spelling** (joshuafolkken/kit#1643).
-	// `is_trigger` is the right denominator for a rule whose trigger is a *neutral* act — filing an
-	// Issue, reading one — because a run that keeps the rule makes that call too. It is the wrong one
-	// for a rule whose trigger is the violation itself: a run that backgrounded every push never trips
-	// `run-tail`, so it drops out of the reading altogether and the rate is taken over runs that broke
-	// the rule at least once. Such a row declares this instead, and `scripts/rules/rule-value.ts`
-	// counts a run that reached it whether or not the trigger fired. Absent, the denominator stays
-	// `is_trigger` and the row's reading is exactly what it was.
+	// The occasion the rule governs, for a row whose trigger is the violation itself (else `is_trigger`
+	// would only count runs that broke it).
 	reaches?: CallTest
+	// The note a hook attaches where it rewrites a violating call instead of refusing it, so
+	// `rule-value.ts` counts the rewrite as this row's delivery.
+	rewrite_note?: string
+	// Openings the reason had before it was reworded, so `rule-value.ts` still credits a refusal
+	// delivered with the old text while those transcripts remain in its window.
+	former_reasons?: ReadonlyArray<string>
 }
 
-// **A rule the measurement scores, whether or not `pnpm josh rule:guard` is what delivers it**
-// (joshuafolkken/kit#1792). `DELIVERED_RULES` is the *delivery* registry — every row in it becomes a
-// live `PreToolUse` guard through `GUARDS` below — so a rule already delivered by a binary of its own
-// cannot join it without being refused twice for one violation, each refusal spending a record the
-// other cannot see. The batching guard is that rule: `pnpm josh batch:guard` has delivered it since
-// joshuafolkken/kit#1344, and until now it was the one delivered rule `pnpm josh rule:value` could
-// not read. So the two registries are separated rather than merged, and `is_trigger` — the field
-// that only a *delivered* row needs, because it is what `guard_of` makes the candidate test from —
-// becomes the one optional field here.
+// Scored but possibly delivered by its own binary (batching, investigation) — joining `DELIVERED_RULES`
+// would refuse one violation twice — so `is_trigger` is optional here.
 type MeasuredRule = Omit<DeliveredRule, 'is_trigger'> & {
 	is_trigger?: DeliveredRule['is_trigger']
 }
 
 const STAMP_PREFIX = 'josh-rule-guard-'
 
-// **`is_issue_filing` and `on_bash_command` moved to `bash-triggers.ts`** (joshuafolkken/kit#2119):
-// three rows share the filing trigger — the WIP cap, the per-run filing cap and the fold — and the
-// last two live in their own modules, which could not import the enumeration back to reach a private
-// function of it. `on_bash_command` went with it because those modules build their own rows.
 const { is_issue_filing, on_bash_command } = bash_triggers
 
-// The reading of the call itself — which spellings carry a body inline, and what the shell does to
-// the value — is `shell-body-trigger.ts`, beside its own cases, as is the refusal text. A row states
-// its trigger and its text; a model of zsh quoting is more than a row.
 const { SHELL_BODY_REASON, carries_a_body, is_shell_evaluated_body, keeps_body_safe } =
 	shell_body_trigger
 
-// **The occasion the pre-gate cut governs, in the one shape that separates a cut run's two halves**
-// (joshuafolkken/kit#1867). Asking about the cut is what a lane child does whatever it goes on to do;
-// claiming the working tree is what only the process on the near side of the boundary does, because
-// the `resume` verdict tells its counterpart to skip that claim. A run doing both reached the
-// boundary; a run that asked without claiming is the session the cut produced, which had no cut of
+// Order matters only where triggers overlap (see `delivery`); the notes below name each overlap.
 const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
-	// **Listed first, ahead of the filing trigger it overlaps** (joshuafolkken/kit#2122). A `gh api`
-	// that files an Issue into a repository we do not own trips both this row and `wip-cap` /
-	// `issue-scout` / `filing-cap` — but the backlog count, the scout and the per-run cap are all about
-	// filing into *our own* backlog, so on a third-party target the right answer is to stop the write
-	// entirely rather than to count anything. Placing it first means a third-party write is refused
-	// before any of those speak; on a first-party filing it is silent (the owners match), so `wip-cap`
-	// still speaks first, exactly as before. It fires on every occurrence (`git-force.ts`).
+	// First: a third-party write is stopped before the first-party filing rows count anything.
 	third_party_write.ROW,
-	// **A hand-built filing is refused on every occurrence** (joshuafolkken/kit#2808) and pointed at
-	// `josh issue:file`, which runs the scout, the lint, the labels, the `## Origin` check and
-	// `epic:bundle` itself. It claims the direct call only, so the rows below — which trigger on the
-	// `issue:file` call — never overlap it.
+	// The direct call only; `filing-cap` below triggers on `issue:file`. The WIP cap and the fold
+	// question are `issue:file`'s own steps, so no row gates them.
 	direct_filing.ROW,
-	wip_cap.ROW,
-	// **Two more rows share the filing trigger** (joshuafolkken/kit#2119, joshuafolkken/kit#2213), listed
-	// after `wip-cap` so the backlog count still speaks first: `filing-cap` refuses every filing past
-	// the per-run ceiling, and `issue-fold` refuses a *second* filing the run has not folded. Each is a
-	// real instance of the admissible overlap the comment on `delivery` describes — the losing rule's
-	// delivery is still correct one reissue later — so an unfolded, over-cap second filing is delivered
-	// `wip-cap`, then `filing-cap`, then `issue-fold` across its reissues.
 	filing_cap.ROW,
-	issue_fold_rule.ROW,
 	issue_comments.ROW,
 	{
 		id: 'shell-body',
@@ -182,12 +100,6 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		keeps: on_bash_command(keeps_body_safe),
 		reaches: on_bash_command(carries_a_body),
 	},
-	// **The sibling of `shell-body`, one call further along** (joshuafolkken/kit#2304). `shell-body`
-	// refuses a body passed inline so the shell evaluates it; this refuses a body passed by path with
-	// the raw field flag (`-f` / `--raw-field body=@<path>`), which posts the literal `@<path>`. It
-	// claims no command any row above does — `shell-body` triggers on a backtick or `$`, which the
-	// `@<path>` misfire carries neither, and `is_issue_filing` leaves the comment endpoint alone — so
-	// the exactly-one-rule invariant over its fixtures holds. It fires on every occurrence (`git-force.ts`).
 	raw_field_body.ROW,
 	{
 		id: 'piped-verification',
@@ -195,6 +107,8 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		reason: piped_verification.PIPED_VERIFICATION_REASON,
 		keeps: on_bash_command(piped_verification.keeps_verdict_intact),
 		reaches: on_bash_command(piped_verification.runs_verification),
+		// A `| tail` / `| grep` masking is rewritten under `pipefail` by `pretool-guard.ts`, never refused.
+		rewrite_note: piped_verification.PIPEFAIL_NOTE,
 	},
 	{
 		id: 'early-heartbeat',
@@ -204,29 +118,11 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		keeps: on_bash_command(early_heartbeat.is_progress_watch),
 		reaches: on_bash_command(early_heartbeat.waits_for_progress),
 	},
-	// **Listed before `run-tail`, the one row it deliberately overlaps** (joshuafolkken/kit#2118). A
-	// foreground `pnpm josh git -y` with no test beside the change is claimed by both: `test-declared`
-	// decides whether the commit should happen at all, so it is listed first, exactly as `wip-cap`
-	// precedes `shell-body` for deciding whether an Issue should exist. Nothing is lost by `run-tail`
-	// losing the race — the stamps are keyed per `id`, so the reissued push is delivered `run-tail`,
-	// which is asserted rather than assumed. The overlap only arises in a real checkout where the
-	// verdict is `required`; in the hermetic non-repo suite the git read fails to `exempt`, so
-	// `test-declared` claims nothing and the "exactly one rule" invariant over `run-tail`'s fixture holds.
+	// Before `run-tail`: whether to commit at all is decided before how to push.
 	test_declared_commit.ROW,
-	// **The long-running josh command a lane child backgrounds and loses** (joshuafolkken/kit#2704). A
-	// headless child's background tasks die with its turn, so a backgrounded `josh gate` / `git` /
-	// `followup` is killed before it reports; this refuses the launch and hands back `josh ship
-	// --detach`, whose supervisor outlives the turn. **Listed before `run-tail`, whose push it claims in
-	// a child**: that row answers a foreground push with "reissue it backgrounded", the reissue this row
-	// refuses, so a child is sent to the detached ship on its first refusal instead of through both.
-	// Outside a child it claims nothing. A backgrounded bare `josh git` also trips `josh-git-bare`
-	// below; this row wins, and `ship --detach` satisfies both. It fires on every occurrence.
+	// Before `run-tail`, so a lane child goes straight to `ship --detach` instead of through both.
 	lane_background.ROW,
-	// **The one row whose trigger reads a field of the input beside the command**, so it supplies its
-	// own tool-name check rather than going through `on_bash_command`: a push step already issued with
-	// `run_in_background` is the rule obeyed, and refusing it would charge a run for doing the right
-	// thing. It supplies `decide` because a push is a recurring act — one per child in a batch, and a
-	// second inside one `fullrun` when round 2 fixes a finding in place.
+	// Reads `run_in_background` beside the command; `decide`, since a push recurs.
 	{
 		id: 'run-tail',
 		is_trigger: run_tail_rule.is_foreground_push_step,
@@ -235,36 +131,10 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		keeps: run_tail_rule.is_backgrounded_push_step,
 		reaches: run_tail_rule.is_push_step_call,
 	},
-	// **The one row whose trigger consults the world beside the command**, because "is this a lane that
-	// has not cut" is not readable from the call: it is the working directory's own name and the cut
-	// record on disk. Both reads are synchronous, and the command match runs first, so a run that never
-	// types `pnpm josh gate` pays nothing for it.
-	//
-	// **Once per run rather than `decide`, and the direction of the error is why.** Taking the cut ends
-	// the process, so this is not the recurring act joshuafolkken/kit#1570 wrote `decide` for — and the
-	// five verdicts that legitimately leave a run at the gate (`not-a-lane`, `unready`, `busy`,
-	// `failed`, `unknown`) all need the reissue to go through. A row that refused every time would wedge exactly
-	// those runs; a row that refuses once cannot.
-	//
-	// **`pnpm josh rule:value` read this row with a ceiling of about 50%, and joshuafolkken/kit#1867 is
-	// what removed it** (the ceiling was recorded here by joshuafolkken/kit#1864's review round 2). A
-	// cut relaunches a *new session*, which the measurement groups as a run of its own, and that
-	// resumed run issues the entry check — so scored on the asking alone it joined the denominator
-	// while never being able to satisfy `keeps`, which only the cutting run can, and ten perfectly
-	// obedient children read as ten kept out of twenty. **The two halves are separable, just not from
-	// one call**: both processes issue byte-identical `--resume` strings, but the `fresh` verdict sends
-	// a run on to claim the working-tree hold while the `resume` verdict tells its counterpart to skip
-	// that claim. `reaches_the_pre_gate_boundary` is that conjunction, and it is why `CallTest` is
-	// handed the run's calls beside the turn's rather than a second predicate slot of its own.
-	// Dropping `reaches` altogether is still strictly worse — the trigger evaluates against the
-	// *measuring* process's working directory, so it is always false from the main checkout and the row
-	// would read as no runs at all.
-	//
-	// **It overlaps `piped-verification` on a piped gate call, and the order is safe in both
-	// directions.** `pnpm josh gate | tail` in an uncut lane is a real instance of both defects; the
-	// earlier row speaks, its own reason says to reissue, and this one delivers on the reissue — the
-	// reading "the losing rule's delivery is still correct one call later" that the comment below
-	// requires of any admissible overlap.
+	// Reads the lane name and the cut record. Once per run, not `decide`: taking the cut ends the
+	// process, and the verdicts that leave a run at the gate all need the reissue through. `reaches`
+	// tells the cutting run from the resumed one by the run's calls. Overlaps `piped-verification`
+	// safely: that row speaks first and this one delivers on the reissue.
 	{
 		id: 'pre-gate-cut',
 		is_trigger: on_bash_command(pre_gate_cut.is_uncut_gate),
@@ -272,158 +142,36 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		keeps: on_bash_command(pre_gate_cut.takes_the_cut),
 		reaches: pre_gate_cut.reaches_the_pre_gate_boundary,
 	},
-	// **The second row whose trigger consults the world beside the command** (joshuafolkken/kit#2034):
-	// "is this a dispatched lane child" is the dispatch mark against this checkout's own issue, read
-	// synchronously by `lane_child_marker.is_child_of`, and the command match runs first so an ordinary
-	// run pays nothing for it.
-	// Its once-per-run disposition is stated beside the row in `lane-park.ts`.
-	//
-	// **A split child's park is refused first** (joshuafolkken/kit#3296): a lane child that promoted its
-	// own Issue to an epic this run has nothing to park, so `lane-split-park` refuses the label write
-	// and the confirmation notify onto that epic on every occurrence. It shares the notify with
-	// `lane-park` and is listed first; a run that promoted nothing falls through to `lane-park`.
+	// A split child's park is refused before `lane-park` sees it.
 	lane_split_park.ROW,
 	lane_park.ROW,
-	// **joshuafolkken/kit#2034's rule, one tool-call earlier** (joshuafolkken/kit#2201). `lane-park`
-	// fires on the `confirmation` notify a routed child reaches; a child that reaches for
-	// `AskUserQuestion` never gets there, because the harness ends its turn at the refused ask. This
-	// row's trigger is that ask, so the refusal becomes an instruction — park the question — instead of
-	// the child's death. Its trigger reads the input's tool name and consults the dispatch mark, like
-	// `lane-park`, and shares no command with any Bash row, so it claims no `gh` / `git` / `josh` call.
-	// It fires on every occurrence (`decide` returns true), the disposition `git-force.ts` takes: an
-	// interactive ask must never succeed in a child, and the route is always the park, never a reissue.
 	lane_interactive_ask.ROW,
-	// **The parent budget commands a lane child must never run** (joshuafolkken/kit#2267). A dispatched
-	// child that ran `pnpm josh run:merge` read its `busy` as a competing session and parked its Issue
-	// unimplemented — but the live carry record is the parent that launched it, never a competitor. This
-	// row refuses `run:merge` / `run:carry` in a lane child and hands back the mechanical branch: the
-	// record is the parent's, so continue implementing rather than park or ask. Its trigger claims a
-	// `josh` subcommand no other row does (the filing rows are `gh`, `run-tail` is `git push`), so it
-	// overlaps nothing. It fires on every occurrence (`decide` returns true): a child must never run
-	// these, and the route is always "continue", never a reissue (`git-force.ts`).
 	lane_carry_conflict.ROW,
-	// **The `git switch main` a lane child can never succeed at** (joshuafolkken/kit#2313), the fifth of
-	// the "always fails" misfires joshuafolkken/kit#2297 catalogued. A lane is a linked work tree and the
-	// primary checkout holds the default branch, so a child's `git switch main` fails structurally
-	// (`already used by worktree`); this refuses it before it fails and hands back the next command —
-	// skip the step, `pnpm josh main:merge` brings the default in during the gate. Its trigger reads the
-	// dispatch mark and the lane branch like `lane-carry-conflict`, and claims a `git switch` no row
-	// above matches — `git-force` is `git push` / `git branch`, `worktree-mutation` is `git checkout --`
-	// / `restore` / `stash` — so no two rows claim one command. It fires on every occurrence (`decide`
-	// returns true): a child must never run this, and the route is always "continue" (`git-force.ts`).
 	lane_switch_main.ROW,
-	// **A `pnpm josh git` with no `-y` cannot succeed from an agent** (joshuafolkken/kit#2297). It
-	// prompts to confirm the staging, the no-TTY prompt cancels, and the run reissues with `-y` after
-	// throwing away the time it took to fail. This row refuses the bare call and hands back the `-y`
-	// form. It is disjoint from `run-tail` by the flag — that row requires `-y`, this refuses its
-	// absence — so no two rows claim one command. It fires on every occurrence (`decide` returns true):
-	// a bare call wastes the same time each time, so the route is always the `-y` reissue
-	// (`git-force.ts`).
+	// Disjoint from `run-tail` by the `-y` flag.
 	josh_git_bare.ROW,
-	// **The three Bash-string gaps the deny glob cannot express** (joshuafolkken/kit#2120), each reading
-	// the command's argv rather than a literal a glob keys on. They share no trigger with any row above —
-	// force/delete is `git push` / `git branch`, the worktree change is `git checkout` / `restore` /
-	// `stash`, and the file body is a heredoc / `node -e` / `perl -i` — so no two rows claim one command,
-	// which `delivered-rules-bash.test.ts` pins. Each declares `decide` returning true: a destructive or
-	// billed act is refused on every occurrence, never once per run (`git-force.ts`).
+	// The Bash-string gaps the deny glob cannot express, read by argv; `delivered-rules-bash.test.ts`
+	// pins that no two rows claim one command.
 	git_force.ROW,
 	worktree_guard.ROW,
 	file_body.ROW,
-	// **The deny-list bypasses closed by argv and path rather than glob** (joshuafolkken/kit#2983) — an
-	// index mutation, a recursive forced `rm` or destructive `gh` call, and a protected file. Each
-	// claims a command or file no row above does and refuses every occurrence (`permission-guards.ts`).
 	...permission_guards.ROWS,
-	// **The hand-written wait loop a lane child improvises over a backgrounded command's output**
-	// (joshuafolkken/kit#2371). `early-heartbeat` refuses a bare `sleep` and stands down on any loop
-	// keyword; this is the loop it left — a `while`/`until` that sleeps between probes of an output
-	// file. Its trigger claims a command no row above matches: the loop-plus-`sleep` shape carries no
-	// `gh` / `git` / `josh` subcommand any other trigger keys on, and a poll loop is never a bare
-	// `sleep` (the loop keyword makes `early-heartbeat.is_wait_timer` false), so the Bash
-	// `rules_claiming` invariant holds. It fires on every occurrence (`decide` returns true): a poll
-	// loop wastes the same round trips each time, so the route is always "background it and end the
-	// turn", never a reissue (`git-force.ts`).
 	poll_loop.ROW,
-	// **The second row whose trigger is an `Edit` / `Write` rather than a shell call**
-	// (joshuafolkken/kit#2310), and the third that consults the world beside the call: "is this a lane
-	// child whose recent-context cost has crossed the threshold" reads the dispatch mark, the cut record
-	// on disk and the synchronous `pnpm josh cost --cut` verdict — the same measurement the parent
-	// hand-off uses, never a second one (joshuafolkken/kit#1933). The `Edit` / `Write` name match runs
-	// first, then the lane read, then the transcript-priced verdict, so a run that is not a dispatched
-	// child in an uncut lane pays nothing for it. It self-gates on the tool name, so it claims no `Bash`
-	// command any row above matches — the Bash `rules_claiming` invariant is untouched.
-	//
-	// **Listed before `rule-body`, the one row it can overlap.** Both trigger on an `Edit` / `Write`; a
-	// rule-document edit made in a lane child that is already over threshold trips both. The cut is the
-	// right thing to do first — end the process and drop the accumulated context — and on the reissue in
-	// the fresh, under-threshold process this row is silent and `rule-body` delivers, the "losing rule's
-	// delivery still correct one reissue later" reading any admissible overlap needs.
-	//
-	// **It carries `decide`, and the inversion of the pre-gate cut's reasoning is why** (joshuafolkken/kit#2385).
-	// `pre-gate-cut` and `lane-park` are once per run because taking the cut, or the park, *ends the
-	// process* — the one act is not a recurring one, and the five verdicts that leave a run holding it
-	// all need the one reissue to go through. This cut ends the process too, but its *trigger* does not:
-	// crossing the threshold mid-implementation is a recurring state that once-per-run silenced for the
-	// rest of a process the moment its first refusal landed — so a `busy` / `failed` / `unready` verdict,
-	// or an edit the model reissued unchanged, left the context to grow unwatched (joshuafolkken/kit#2382
-	// ran to 282,747 tokens with the cut never taken). `decide` re-asks on every over-threshold edit, and
-	// its `delivered_at_ms` lets an edit reissued right after a refusal through, so `busy` / `failed`
-	// cannot wedge the run edit after edit — the reissue path once-per-run gave for free, now made
-	// explicit. The fresh process after a successful cut reads its own transcript under threshold, so it
-	// is silent without needing a carried record to quiet it.
-	//
-	// **No `reaches`, because the occasion is live-only.** `pre-gate-cut` gives a `reaches` because both
-	// its halves leave a command-string trace (`run:cut --resume` at entry); this row's occasion —
-	// crossing the threshold mid-implementation — is the working directory, the cut record and the cost
-	// verdict, none of which a transcript records. `pnpm josh rule:value` therefore reads it as no runs
-	// rather than as 0% kept (`keeps` stays, so the compliance act is named for a future measurement
-	// redesign), the same honest-unmeasured stance the batching and investigation rows take for the same
-	// reason: a trigger no transcript can reconstruct. The row itself lives in `implementation-cut.ts`.
+	// Before `rule-body`, its one overlap: the cut is the right first act, and `rule-body` delivers on
+	// the reissue in the fresh process.
 	implementation_cut.ROW,
-	// **The first row whose trigger is an `Edit` / `Write` rather than a shell call**
-	// (joshuafolkken/kit#2272). It delivers the residency questions at the edit that writes a rule into
-	// prose, and self-gates on the tool name and the file path, so it claims no `Bash` command any row
-	// above matches — the `rules_claiming` invariant over Bash fixtures is untouched. It carries no
-	// `decide`, so it is once per run and takes the batching stand-aside `is_first_delivery` gives every
-	// default row: the batching guard treats an `Edit` as a candidate, exactly as it treats an Issue
-	// read, so this row stands aside on a batched turn and delivers on the reissue.
 	rule_body_guard.ROW,
-	// **The generic oracle-consulted rows, one per oracle that declared a firing point**
-	// (joshuafolkken/kit#2324). Each refuses the action the oracle governs when the run has not run that
-	// oracle's command first, stood down once it has. Listed last; the one firing point left
-	// (`pkg:scout` on a package add) claims a command no row above matches.
 	...oracle_consulted.ROWS,
 ]
 
-// A turn that issued more than this many calls is a turn that batched. The guard counts turns that
-// issued a *single* tool call, so the boundary is the same one `SEQUENCE_BEFORE_LIMIT` is counted in.
 const ALONE_IN_TURN = 1
 
-// **Keeping the batching rule is a refusable call that went out beside siblings** — the one
-// compliance test of the seven that cannot be read off the call alone (joshuafolkken/kit#1792). The
-// guard's whole subject is the run of turns that each issued one call, so the act it asks for is a
-// turn carrying more than one, and `is_guarded_call` is what keeps the credit to calls the guard
-// could actually have refused: a turn of two `Write`s is not the rule being kept, because neither
-// call was ever at risk.
+// Kept: a call the guard could refuse went out beside siblings.
 function batches_the_turn(call: GuardedCall, turn: ReadonlyArray<GuardedCall>): boolean {
 	return time_batch_guard.is_guarded_call(call) && turn.length > ALONE_IN_TURN
 }
 
-// **The row `pnpm josh rule:value` scores the batching guard from** (joshuafolkken/kit#1792). It is
-// measured but not delivered, for the reason `MeasuredRule` states.
-//
-// **It declares no `is_trigger`, and that is the honest answer rather than a gap.** Whether a call
-// would be refused depends on the turns *behind* it — `time_batch_guard.should_block` reads the
-// transcript tail for exactly that — and `scripts/rules/rule-value.ts` hands a predicate one call at
-// a time, so a call-shaped trigger here could only ever be a guess. What the transcript does record
-// is the refusal itself, and the measurement takes that as the trigger: compliance credited after a
-// refusal is the delivery's contribution, which is the same line every other row is scored on.
-//
-// **The `reaches` half is what keeps the reading off zero**, the failure joshuafolkken/kit#1643
-// named. The batching guard fires only on the violation, so scored against its trigger the rate
-// would be taken over runs that broke the rule at least once and would read near zero by
-// construction — a manufactured retirement candidate for the most-cited resident rule there is. The
-// occasion it governs is issuing a call the guard could refuse, in *either* spelling: alone in its
-// turn, or beside the calls that did not need its result.
+// No `is_trigger`: a refusal depends on the turns behind a call, so the recorded refusal is the trigger.
 const BATCHING_RULE: MeasuredRule = {
 	id: 'batching',
 	reason: time_batch_guard.REASON,
@@ -431,94 +179,32 @@ const BATCHING_RULE: MeasuredRule = {
 	reaches: time_batch_guard.is_guarded_call,
 }
 
-// **The row `pnpm josh rule:value` scores the investigation guard from** (joshuafolkken/kit#1764).
-// It is measured but not delivered, for exactly the reason the batching row is: `josh
-// investigation:guard` has delivered it since joshuafolkken/kit#1460, and a row in `DELIVERED_RULES`
-// would refuse the same violation a second time, each refusal spending a record the other cannot
-// see. Until now it was the second delivered rule the measurement could not read at all — and the
-// one whose subject, `investigation` at 35.9% of a run's turns, is the largest contributor any
-// mechanism here addresses.
-//
-// **It declares no `is_trigger`, and that is honest rather than a gap.** Whether a read would be
-// refused depends on the reads *behind* it — `investigation_reads.should_block` reads the transcript
-// tail for exactly that — and the measurement hands a predicate one call at a time, so a call-shaped
-// trigger could only be a guess. The refusal itself is what the transcript records, and
-// `observe_error` takes that as the trigger.
-//
-// **`reaches` is the read the guard could have refused, not the refusal**, the distinction
-// joshuafolkken/kit#1643 drew: scored against a trigger that fires only on the violation, the rate
-// would be taken over runs that broke the rule at least once and would read near zero by
-// construction.
-//
-// **It declares no `keeps` either, and the unmeasured cell is the honest answer rather than a gap.**
-// The obvious predicate — a subagent dispatch — credits *any* dispatch, because that is what the
-// guard's own reset does; a run that read twenty files in the main line, was never refused and sent
-// one review agent at the end would score as full compliance. That row would sit near 100% for the
-// rule this very Issue measures as let through on a third of all reads, and `pnpm josh rule:value` is
-// what retirement decisions are read from. The module's own doctrine settles it: a rule with no
-// `keeps` is reported unmeasured, because 0 and 1 are both claims the data does not make. **The
-// compliance reading exists elsewhere and is better**: `pnpm josh time`'s `Investigation reads:`
-// block, built from this same guard's predicates, says per run how much reading was refused, let
-// through, or main-line by design. What this row adds is the reach and the delivery count, which is
-// the continuous reading the guard had none of.
+// No `is_trigger`, as for batching. No `keeps`: any dispatch would read as compliance, so it is left
+// unmeasured — `pnpm josh time`'s `Investigation reads:` block is the compliance reading.
 const INVESTIGATION_RULE: MeasuredRule = {
 	id: 'investigation',
 	reason: investigation_reads.REASON,
 	reaches: investigation_reads.is_refusable_call,
 }
 
-// Every rule the measurement can score, delivery registry first so a printed table reads in
-// enumeration order with the rows delivered from here at the top.
 const MEASURED_RULES: ReadonlyArray<MeasuredRule> = [
 	...DELIVERED_RULES,
 	BATCHING_RULE,
 	INVESTIGATION_RULE,
 ]
 
-// **Once per run, never once per call.** A rule delivered again on the next call would wedge a run
-// that had already obeyed it, which is the failure `hook_decision`'s stamp exists to prevent; the
-// reason text says so, so a reader knows reissuing is the expected next move.
-//
-// **The tail read is what keeps two `Bash` guards off the same call.** `pnpm josh batch:guard` is
-// wired to `Bash` as well, and the shared shell records the stamp *before* returning a reason. Claude
-// Code surfaces one permission decision per call, so a call both hooks refused would lose one of the
-// two reasons while both records were already written — and a rule whose record is set can never fire
-// again in that run. That is a silent deletion, of exactly the kind this enumeration exists to
-// prevent. So a call the batching guard may refuse is **stepped aside from rather than delivered
-// on**: nothing is recorded (the shared shell stamps only after `should_block` answers true), the
-// batching guard's own reason says to reissue the call, and this rule delivers on the reissue.
-//
-// **Inert for `wip-cap` and live for `issue-comments`, which is why it was written before either
-// needed it.** The batching guard does not treat a filing call as a candidate at all, so the branch
-// never fires for `wip-cap`; it *does* treat `gh issue view` as one, so the second row genuinely
-// stands aside on a turn the batching guard is about to refuse and delivers on the reissue.
-// `delivered-rules.test.ts` pins both halves, and it is what any new row has to be re-checked
-// against. Erring toward standing aside costs at most one call's delay, while erring the other way
-// costs the rule for the whole run.
-// The batching guard's own record for this run, read through the same shell that writes it.
+// Once per run, so a run that obeyed is never wedged. A call the batching guard may refuse is stepped
+// aside from: only one hook's reason surfaces per call, and a stamp written for a lost reason would
+// silence the rule for the run. The rule delivers on the reissue instead.
 const BATCH_STAMP = hook_decision.create_refusal_stamp(time_batch_guard.STAMP_PREFIX)
 
-// **A record this young is the batching guard speaking about the call in hand.** The two hooks are
-// separate processes started for the same `PreToolUse` event with no ordering between them, and the
-// shared shell writes its stamp *before* it returns a reason — so presence alone cannot answer "has
-// it refused?" without making the stand-aside depend on which process won the race. A record older
-// than this window is a refusal about an earlier call, which that guard will not repeat on the same
-// open sequence, and this rule is free to speak.
+// The two hooks race on one event and the stamp is written before the reason, so a record this young
+// is the batching guard speaking about the call in hand.
 const BATCH_REFUSAL_WINDOW_MS = 10_000
 
-// **The question is what the batching guard will do on this call, not what it would do from a clean
-// slate.** Asked with `NEVER_MS` in place of its record, the answer stayed `true` for the whole of an
-// open sequence it had *already* refused — and since that guard will not refuse the same sequence
-// twice, a run that kept single-calling after being refused had neither hook speak, and this rule was
-// lost for the run with nothing recorded to say so. That is the silent deletion the stand-aside
-// exists to prevent, arrived at from the other side.
+// Asked with its real record, not `NEVER_MS`: that guard never refuses one sequence twice.
 function will_batch_guard_refuse(tail: string, call: GuardedCall, run: GuardRun): boolean {
-	// In a dispatched lane child the batching guard no longer refuses (joshuafolkken/kit#2138,
-	// joshuafolkken/kit#2164, joshuafolkken/kit#2178, joshuafolkken/kit#2276): its mode is `notice`, so it
-	// speaks but never denies. It will *refuse* nothing there, and the stand-aside must agree — or a lone
-	// rule trigger (`shell-body`) would be stepped aside from for a batching refusal that can no longer
-	// come and lost for the run. The test is therefore "will it refuse", i.e. mode `refuse`, not "is it
-	// notice or off".
+	// In a lane child the batching guard only notices, so there is nothing to stand aside for.
 	if (lane_guard_policy.mode_here('batching') !== 'refuse') return false
 
 	const refused_at_ms = BATCH_STAMP.last_ms(BATCH_STAMP.path(run.transcript))
@@ -537,23 +223,9 @@ function is_first_delivery(
 	return delivered_at_ms === hook_decision.NEVER_MS && !will_batch_guard_refuse(tail, call, run)
 }
 
-// **For a row that decides for itself, the stand-aside changes what it protects.** For a once-per-run
-// row it protects the *record*, because a lost race spends the one delivery the run gets. A recurring
-// row cannot be silently deleted that way — it fires again — and standing aside from the refusal would
-// instead make it silent on precisely the lone `Bash` call the batching guard also claims, which is
-// what an armed timer always is, for the whole ten-second window and the reissue inside it. So the
-// refusal is asked unconditionally and the stand-aside is handed to the row as `can_record`: what must
-// not happen on a call another hook may stop is the *write*, which would record a timer that never ran.
-// **It is a trade, and the other side is named rather than hidden**: an arm allowed inside that window
-// that really does run is not recorded either, so a second one before it fires goes uncaught. A missing
-// record loses one detection; a wrong one blocks every arm until it expires.
-// **Both extras replace `is_first_delivery`, and a row declares at most one.** `decide` is for a
-// recurring rule (joshuafolkken/kit#1570); `already_satisfied` is for a precondition the run satisfies
-// with an earlier act (joshuafolkken/kit#1905), and that act is the only way past it: the row refuses
-// every candidate call until the act is on the tail (joshuafolkken/kit#2807). Once per run, the
-// reissue went through with the precondition still unmet — a guard that passed precisely the run that
-// skipped the procedure. Repeating cannot wedge a run that obeys, because the stand-down answers first.
-// A row with neither takes `is_first_delivery` unchanged.
+// `decide` and `already_satisfied` each replace `is_first_delivery`. A recurring row is always asked;
+// the stand-aside reaches it as `can_record`, since what must not happen is recording a refused act.
+// An `already_satisfied` row refuses every call until the satisfying act is on the tail.
 function delivery_decision(rule: DeliveredRule): TranscriptGuardSpec['should_block'] {
 	const { decide, already_satisfied } = rule
 
@@ -584,27 +256,13 @@ function guard_of(rule: DeliveredRule): ReturnType<typeof hook_decision.create_t
 
 const GUARDS = new Map(DELIVERED_RULES.map((rule) => [rule.id, guard_of(rule)]))
 
-// Where one rule's once-per-run record lives, so a caller can clear it. Exposed for the suite: the
-// records land in the shared temp directory rather than under any directory a test owns, and a record
-// left behind would silence the next case exactly as it silences the next call.
+// Exposed for the suite, whose records land in the shared temp directory and must be cleared.
 function delivery_path(rule_id: string, transcript_path: string): string {
 	return GUARDS.get(rule_id)?.refusal_path(transcript_path) ?? ''
 }
 
-// **The first entry whose delivery actually fires wins — not the first whose trigger matches.** Only
-// one refusal can leave a `PreToolUse` hook, so a rule that matched but has already been delivered
-// this run falls through and a later rule may speak on the same call. **A rule added here whose
-// trigger another row also matches is admissible only when the overlap is safe** — the losing rule's
-// delivery still correct one reissue later — and the enumeration's own suite asserts, per fixture,
-// that every command is claimed by exactly the rows meant to overlap on it.
-//
-// **The filing trigger is shared by three rows, and the order is what makes the overlap safe**
-// (joshuafolkken/kit#2119). `wip-cap`, `issue-scout` and `filing-cap` all match a filing; a
-// scout-less, over-cap filing is delivered `wip-cap`, then `issue-scout`, then `filing-cap` across its
-// reissues, each still the right thing to say when it is reached. `wip-cap` is listed first because it
-// decides whether the backlog has room at all — the same reason it precedes `shell-body`, which claims
-// a filing whose body carries a backtick (joshuafolkken/kit#1198). Nothing is lost by losing a race:
-// the stamps are keyed per `id`, so the reissued call is delivered the next rule.
+// The first entry whose delivery fires wins. An overlap is admissible only when the losing rule is
+// still right one reissue later; stamps are keyed per id, so it is delivered then.
 function delivery(raw_payload: string, now_ms: number = Date.now()): string | undefined {
 	for (const guard of GUARDS.values()) {
 		const reason = guard.refusal(raw_payload, now_ms)
@@ -627,7 +285,6 @@ const delivered_rules = {
 	FILING_CAP_REASON: filing_cap.FILING_CAP_REASON,
 	GIT_FORCE_REASON: git_force.GIT_FORCE_REASON,
 	ISSUE_COMMENTS_REASON: issue_comments.ISSUE_COMMENTS_REASON,
-	ISSUE_FOLD_REASON: issue_fold_rule.ISSUE_FOLD_REASON,
 	LANE_INTERACTIVE_ASK_REASON: lane_interactive_ask.LANE_INTERACTIVE_ASK_REASON,
 	LANE_PARK_REASON: lane_park.LANE_PARK_REASON,
 	MEASURED_RULES,
@@ -639,8 +296,6 @@ const delivered_rules = {
 	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,
 	THIRD_PARTY_WRITE_REASON: third_party_write.THIRD_PARTY_WRITE_REASON,
-	WIP_CAP: wip_cap.WIP_CAP,
-	WIP_CAP_REASON: wip_cap.WIP_CAP_REASON,
 	WORKTREE_MUTATION_REASON: worktree_guard.WORKTREE_MUTATION_REASON,
 	delivery,
 	delivery_path,

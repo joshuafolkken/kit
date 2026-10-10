@@ -1,4 +1,5 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { session_cite } from '#scripts/issue/session-cite'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_followup_issue_close } from './git-followup-issue-close'
 
@@ -74,7 +75,7 @@ describe('ensure_issue_closed — the merge left the issue open (joshuafolkken/k
 		await ensure(ISSUE_NUMBER)
 
 		expect(vi.mocked(console.warn)).toHaveBeenCalledWith(
-			expect.stringContaining(`#${ISSUE_NUMBER} is still open`),
+			expect.stringContaining(`${session_cite.issue(ISSUE_NUMBER)} is still open`),
 		)
 	})
 
@@ -90,6 +91,8 @@ describe('ensure_issue_closed — the merge left the issue open (joshuafolkken/k
 		mocked_read.mockResolvedValue(OPEN)
 		mocked_close.mockResolvedValue(false)
 
-		await expect(ensure(ISSUE_NUMBER)).rejects.toThrow(`could not close issue #${ISSUE_NUMBER}`)
+		await expect(ensure(ISSUE_NUMBER)).rejects.toThrow(
+			`could not close issue ${session_cite.issue(ISSUE_NUMBER)}`,
+		)
 	})
 })

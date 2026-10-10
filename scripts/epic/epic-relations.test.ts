@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { describe, expect, it } from 'vitest'
 import { epic_relations } from './epic-relations'
 
@@ -9,6 +10,11 @@ const LINKS = [
 	{ blocker: 1228, blocked: 1248 },
 	{ blocker: 1248, blocked: 1249 },
 ]
+// joshuafolkken/kit#3424: the report is printed to the session, so the numbers it names are linked.
+const RECORDED = session_cite.text(
+	'🔗 2 blocked-by relation(s) recorded: #1228 -> #1248, #1248 -> #1249.',
+)
+const REMOVED = session_cite.text('🔗 1 blocked-by relation(s) removed: #1228 -> #1248.')
 
 describe('epic_relations.format_relation_report — what it names', () => {
 	it('names every relation it recorded', () => {
@@ -18,7 +24,7 @@ describe('epic_relations.format_relation_report — what it names', () => {
 			action: 'record',
 		})
 
-		expect(report).toBe('🔗 2 blocked-by relation(s) recorded: #1228 -> #1248, #1248 -> #1249.')
+		expect(report).toBe(RECORDED)
 	})
 
 	it('names every relation it removed', () => {
@@ -28,7 +34,7 @@ describe('epic_relations.format_relation_report — what it names', () => {
 			action: 'drop',
 		})
 
-		expect(report).toBe('🔗 1 blocked-by relation(s) removed: #1228 -> #1248.')
+		expect(report).toBe(REMOVED)
 	})
 
 	it('says so plainly when there was nothing to name', () => {

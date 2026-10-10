@@ -1,3 +1,4 @@
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import { core_budget } from './core-budget'
 import { gate_plan, type GateCheck } from './gate-plan'
@@ -274,7 +275,7 @@ describe('gate_plan.format_gate_plan', () => {
 		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
 
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES)).toBe(
-			'plan: 6 of 6 checks at once, test:unit at 7 workers (11 cores)',
+			'plan: 7 of 7 checks at once, test:unit at 7 workers (11 cores)',
 		)
 	})
 
@@ -297,7 +298,7 @@ describe('gate_plan.format_gate_plan', () => {
 		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES, LANE_COUNT)
 
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES, LANE_COUNT)).toBe(
-			'plan: 1 of 6 checks at once, test:unit at 1 workers (11 cores, 6 unit runs)',
+			'plan: 1 of 7 checks at once, test:unit at 1 workers (11 cores, 6 unit runs)',
 		)
 	})
 
@@ -335,15 +336,33 @@ describe('gate_plan without the unit suite', () => {
 
 		expect(plan.unit_worker_cap).toBeUndefined()
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES)).toBe(
-			'plan: 5 of 5 checks at once, test:unit elsewhere (11 cores)',
+			'plan: 6 of 6 checks at once, test:unit elsewhere (11 cores)',
 		)
 	})
 
 	// The default is the full gate on every entry point that does not ask otherwise, and it is
 	// asserted rather than assumed: a flipped default would silently stop running the unit suite
 	// everywhere, which is the one regression this flag must not be able to cause.
-	it('leaves every other caller with all four checks', () => {
+	it('leaves every other caller with every check', () => {
 		expect(gate_plan.resolve_gate_plan(MEASURED_CORES).checks).toEqual(gate_plan.GATE_CHECKS)
 		expect(gate_plan.has_unit_check(gate_plan.resolve_gate_plan(CI_CORES).checks)).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#3408: the metrics ratchet's command is not in the published package, so a
+// consumer's gate must not start it — and must still run everything else.
+describe('gate_plan in a consumer repository', () => {
+	it('drops only the kit-only checks', () => {
+		const checks = gate_plan.select_gate_checks(true, false)
+
+		expect(checks.map((check) => check.label)).not.toContain('metrics')
+		expect(checks).toEqual(gate_plan.GATE_CHECKS.filter((check) => check.is_kit_only !== true))
+		expect(gate_plan.resolve_gate_plan(MEASURED_CORES, 1, true, false).checks).toEqual(checks)
+	})
+
+	it('marks a check kit-only exactly when its josh command is', () => {
+		for (const check of gate_plan.STATIC_CHECKS) {
+			expect(check.is_kit_only === true).toBe(COMMAND_MAP[check.target]?.is_kit_only === true)
+		}
 	})
 })

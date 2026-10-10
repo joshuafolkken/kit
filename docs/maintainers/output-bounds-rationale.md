@@ -71,6 +71,20 @@ would have committed a red tree.
 **Triggered delivery was adopted** (`rule-delivery.md`): `pnpm josh rule:guard` refuses, on the spot, a
 `Bash` call where a pass/fail josh check stands before a pipe. **A refusal cannot be skimmed past.**
 
+**The commonest shape is rewritten instead of refused** (joshuafolkken/kit#3570). Almost every
+refusal was a check narrowed with `| tail` or `| grep`, and each one cost a round trip only to arrive at
+the call `set -o pipefail;` in front would have made — the prefix _is_ the rule's outcome. So when every
+pipeline on the line is a check followed only by filters that read their input to the end, the hook returns that call as
+`updatedInput` and attaches a note. **An early-exit filter stays refused**: `head`, or a `grep` that
+stops at its first match (`-q` / `-m` / `-l` / `-L`), closes the pipe on a check still writing, and
+under `pipefail` the check's SIGPIPE turns a passing run into exit 141 — and `head` also cuts the
+verdict line josh prints last. **A line that runs anything besides checks is refused too** — a listing
+(`git log | head`) would be put under a `pipefail` it was not written for, and since the rewrite
+answers `allow`, a command chained beside the check (`&& rm -r dist`) would skip its own permission
+prompt. The Codex adapter cannot apply a
+rewritten input, so it keeps refusing. Every other guard judges the rewritten call, so another rule's
+refusal still wins and the piped-verification row spends no delivery on a call it rewrote.
+
 **The detector stays**. `scripts/time-runtime/time-reported-failure.ts` reads the gate's
 own `✗ verification gate failed:` line on top of `is_error`. A hook reaches Claude Code alone — not a
 session with the stop switch set, not another harness — so the detector covers the outside and is **the

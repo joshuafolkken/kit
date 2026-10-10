@@ -1,6 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { rest_comment_schema, type RestCommentData } from '#scripts/git/git-schemas'
 import { read_json_listing } from '#scripts/git/parse-json-array'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { epic_parse, type ExternalChild } from './epic-parse'
 
 // The comment the epic auto-close announces itself with, and how a run recognizes the one a previous
@@ -9,7 +10,7 @@ import { epic_parse, type ExternalChild } from './epic-parse'
 // Kept apart from `epic-close.ts` because the two answer different questions — that file decides
 // *whether* an epic may close, this one decides what the announcement says and whether it is already
 // there — and because the file it was split from is within twenty lines of the three hundred a file
-// may hold (joshuafolkken/kit#1039).
+// may hold.
 
 // The epic's children, near and far. Named structurally rather than by importing `EpicIssue`: the
 // dependency runs one way, from the auto-close to here, and a type import back would put a cycle
@@ -20,31 +21,30 @@ interface EpicChildren {
 }
 
 // The fixed sentence the announcement's prose ends with. It is what a person reads, and it is no
-// longer what the retry check matches on (joshuafolkken/kit#1068): people and agents quote the
+// longer what the retry check matches on: people and agents quote the
 // auto-close output in ordinary issue comments, and matching prose made any such quote answer
 // "already announced" — the epic then closed with no comment, losing the record of which children it
 // closed against.
 const CLOSE_ANNOUNCEMENT = 'Closing this epic automatically.'
 
-// The marker, which GitHub renders as nothing at all. Quoting the sentence above therefore no longer
-// suppresses anything: what is quoted is the rendered text, and the marker is not in it.
+// The marker, which GitHub renders as nothing at all. Quoting the sentence above therefore does not
+// suppress anything: what is quoted is the rendered text, and the marker is not in it.
 //
 // **It carries the child set the announcement named.** That is what makes an epic which was
 // reopened, gained a child and completed again announce a *second* time instead of closing silently
-// against a stale list. joshuafolkken/kit#1039 rejected matching the whole composed body for a
-// neighboring reason — the visible child list varies, so an unchanged epic would have been read as
-// "not posted yet" whenever the wording drifted — and the marker keeps that failure out by being
+// against a stale list. Matching the whole composed body instead would read an unchanged epic as
+// "not posted yet" whenever the wording drifted, and the marker keeps that failure out by being
 // built from the child set alone: the prose can be rephrased without moving it, and the set is
 // compared as a set, so reordering the epic's task list does not move it either.
 const MARKER_OPEN = '<!-- josh:epic-auto-close children='
 const MARKER_CLOSE = ' -->'
 
 // Every child, near and far. Listing only the local ones left an all-external epic announcing "All
-// child issues are closed ()" (joshuafolkken/kit#864).
+// child issues are closed ()".
 function child_references(epic: EpicChildren): Array<string> {
 	return [
-		...epic.children.map((child) => `#${String(child)}`),
-		...epic.external_children.map((child) => `${child.repo}#${String(child.number)}`),
+		...epic.children.map((child) => issue_cite.plain(child)),
+		...epic.external_children.map((child) => issue_cite.plain(child.number, child.repo)),
 	]
 }
 
@@ -91,11 +91,11 @@ function build_close_comment(epic: EpicChildren): string {
 	return `All child issues are closed (${child_references(epic).join(', ')}). ${CLOSE_ANNOUNCEMENT}\n\n${build_marker(epic)}`
 }
 
-// MIGRATION ONLY (joshuafolkken/kit#1068) — remove together with `is_legacy_announcement`.
+// MIGRATION ONLY — remove together with `is_legacy_announcement`.
 //
 // Announcements posted by v1.179.0 through the release before this one carry no marker, so an epic
 // sitting in the half-succeeded state right now would be read as "not announced" and receive the
-// second comment joshuafolkken/kit#1039 removed. This matches those.
+// second comment. This matches those.
 //
 // **The wording here is a frozen copy of what was released, not a second spelling of the constants
 // above.** Deriving it from them would make a future rephrasing of the announcement silently stop
@@ -129,8 +129,7 @@ function is_legacy_announcement(body: string): boolean {
 //
 // `unreadable` is deliberately not folded into `absent`, though the caller acts the same way on
 // both: a listing that could not be read says nothing about what is on the issue, and reporting it
-// as "nothing is there" would have the run state a fact it never established — the misread
-// joshuafolkken/kit#973 and joshuafolkken/kit#959 were each about. Keeping it apart is what lets
+// as "nothing is there" would have the run state a fact it never established. Keeping it apart is what lets
 // `epic-close.ts` say out loud that the duplicate check did not run, which is the whole
 // difference between the two answers there.
 //
@@ -145,7 +144,7 @@ type CloseCommentState = 'present' | 'absent' | 'unreadable'
 // announcement carry the raw marker along with everything else: GitHub's "Quote reply" puts every
 // line behind `> `, which the line comparison rejects, and a code block reproduces the marker line
 // verbatim — a fenced one caught by the mask, an indented one by the indent check. `fence_mask` is the same walk every other body predicate
-// in this codebase reads through, rather than a second one written here (joshuafolkken/kit#890).
+// in this codebase reads through, rather than a second one written here.
 function has_marker(body: string, children: ReadonlyArray<string>): boolean {
 	const mask = epic_parse.fence_mask(body)
 

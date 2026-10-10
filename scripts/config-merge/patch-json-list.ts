@@ -20,7 +20,7 @@ function normalize_list(value: unknown): ReadonlyArray<string> {
 // Ensure/remove the entries of one JSON list field, preserving every other key. A present field
 // keeps its position; a new field is appended last. Returns the input unchanged when nothing is
 // added or removed, so re-runs are idempotent. Only the field's own value is rewritten, so comments
-// and formatting elsewhere in the document survive (joshuafolkken/kit#798).
+// and formatting elsewhere in the document survive.
 function patch_json_list_field(content: string, options: PatchJsonListOptions): string {
 	const parsed = parse_jsonc(content)
 	const existing = normalize_list(parsed[options.field])

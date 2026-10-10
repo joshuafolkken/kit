@@ -4,6 +4,8 @@ import { epic_busy } from '#scripts/epic/epic-busy'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { issue_cite, type IssueCiter } from '#scripts/issue/issue-cite'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_carry_reclaim } from '#scripts/run/carry/run-carry-reclaim'
@@ -18,8 +20,7 @@ import { lane_report } from './lane-report'
 import { lane_seed_policy } from './lane-seed'
 import { lane_stray } from './lane-stray'
 
-// `josh lane:open` / `lane:close` / `lane:list` / `lane:prune` — the lane's whole lifecycle
-// (joshuafolkken/kit#1490).
+// `josh lane:open` / `lane:close` / `lane:list` / `lane:prune` — the lane's whole lifecycle.
 //
 // **`lane:open` prints the lane's directory on standard output and nothing else**, so
 // `dir=$(pnpm josh lane:open 1490)` is what a caller needs and a refusal is an empty capture beside
@@ -33,7 +34,6 @@ const SINGLE_ARGUMENT = 1
 const ISSUE_AND_PATH_ARGUMENTS = 2
 const ALL_FLAG = '--all'
 const NONE_TOKEN = 'none'
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 
 const USAGE = [
 	'Usage: josh lane:open <issue-number>',
@@ -54,8 +54,7 @@ function report_usage(): number {
 }
 
 // Read the carry record and refuse if this session has already handed off its budget via `--cut`.
-// A cut session must not open new lanes or dispatch new children — the successor owns the budget
-// (joshuafolkken/kit#2114).
+// A cut session must not open new lanes or dispatch new children — the successor owns the budget.
 async function guard_cut_session(): Promise<string | undefined> {
 	const directory = await run_carry.repository_directory()
 
@@ -73,7 +72,7 @@ async function guard_cut_session(): Promise<string | undefined> {
 function parse_lane_issue(value: string | undefined): string | undefined {
 	if (value === undefined) return undefined
 
-	return ISSUE_NUMBER_PATTERN.test(value) ? value : undefined
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(value) ? value : undefined
 }
 
 function parse_issue(rest: ReadonlyArray<string>): string | undefined {
@@ -89,7 +88,7 @@ function refusal_message(outcome: Exclude<OpenOutcome, { kind: 'opened' }>): str
 		return `All ${String(lane_seed_policy.LAST_LANE_SEAT)} lane seats are taken. Run \`pnpm josh lane:list\` to see them and \`pnpm josh lane:close <issue-number>\` to free one.`
 	}
 
-	return `A lane for #${outcome.lane.issue} is already open at ${outcome.lane.directory}. Run \`pnpm josh lane:close ${outcome.lane.issue}\` before opening it again.`
+	return `A lane for ${session_cite.issue(outcome.lane.issue)} is already open at ${outcome.lane.directory}. Run \`pnpm josh lane:close ${outcome.lane.issue}\` before opening it again.`
 }
 
 function report_open(outcome: OpenOutcome): number {
@@ -119,7 +118,7 @@ function report_issues(issues: ReadonlyArray<string>): number {
 function report_close(outcome: CloseOutcome): number {
 	if (outcome.reaped.length > 0) {
 		console.error(
-			`Terminated the lane child for #${outcome.issue} that had not ended by itself: process ${outcome.reaped.join(', ')}.`,
+			`Terminated the lane child for ${session_cite.issue(outcome.issue)} that had not ended by itself: process ${outcome.reaped.join(', ')}.`,
 		)
 	}
 
@@ -128,7 +127,7 @@ function report_close(outcome: CloseOutcome): number {
 	}
 
 	console.error(
-		`Closing the lane for #${outcome.issue} left this behind: ${outcome.left_behind.join(', ')}. Remove it and run \`pnpm josh lane:close ${outcome.issue}\` again.`,
+		`Closing the lane for ${session_cite.issue(outcome.issue)} left this behind: ${outcome.left_behind.join(', ')}. Remove it and run \`pnpm josh lane:close ${outcome.issue}\` again.`,
 	)
 
 	return FAILURE_EXIT_CODE
@@ -141,7 +140,7 @@ function report_sweep(outcome: SweepOutcome): number {
 
 	if (outcome.failed.length === 0) return code
 
-	const named = outcome.failed.map((issue) => `#${issue}`).join(', ')
+	const named = outcome.failed.map((issue) => session_cite.issue(issue)).join(', ')
 
 	// `lane:list` reads git's work trees, and the usual survivor is a branch whose work tree is
 	// already gone — which that listing cannot show. Closing each one again is what names it.
@@ -194,7 +193,7 @@ const OCCUPANCY_UNREADABLE =
 	'Could not read the `in-progress` listing, so the lane/label difference was not checked — that is not "everything agrees"; check `gh auth status`.'
 
 // The `in-progress` issues this repository shows running, read the way `epic:next` reads lane
-// occupancy — never rebuilt (joshuafolkken/kit#2235). A read that could not see the whole listing is
+// occupancy — never rebuilt. A read that could not see the whole listing is
 // `undefined`, so the difference is skipped rather than computed against a set known to be partial.
 async function to_holders(repo: string): Promise<ReadonlyArray<OpenIssueData> | undefined> {
 	const read = await epic_busy.read_repository(repo)
@@ -204,7 +203,7 @@ async function to_holders(repo: string): Promise<ReadonlyArray<OpenIssueData> | 
 }
 
 // The repository and its running issues, read once: the listing cites each lane from the titles here
-// (joshuafolkken/kit#2943) and the occupancy check compares against the same set.
+// and the occupancy check compares against the same set.
 interface InProgress {
 	repo: string | undefined
 	holders: ReadonlyArray<OpenIssueData> | undefined
@@ -273,7 +272,7 @@ async function prune_command(rest: ReadonlyArray<string>): Promise<number> {
 
 	// After the closes, so a lane whose close left its directory behind is swept in the same run. A
 	// kept stray is reported, never a failure: it waits on a person, and a non-zero exit would stop
-	// every `backlogrun` preparation until one came (joshuafolkken/kit#3370).
+	// every `backlogrun` preparation until one came.
 	await lane_stray.sweep_and_report()
 
 	return code

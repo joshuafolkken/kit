@@ -1,14 +1,17 @@
 import { pr_classification, type ReleaseClassification } from '#scripts/ci/pr-classification'
 import type { IssueInfo } from '#scripts/git/git-issue'
 import { pr_info_schema } from '#scripts/git/git-schemas'
+import { issue_cite } from '#scripts/issue/issue-cite'
+import { session_cite } from '#scripts/issue/session-cite'
 import { animation_helpers, type AnimationOptions } from '#scripts/lib/animation-helpers'
+import { json_value } from '#scripts/lib/json-value'
 import { git_gh_command } from './git-gh-command'
 import { git_pr_error } from './git-pr-error'
 import { git_pr_messages } from './git-pr-messages'
 
 // **Answers the new pull request's URL, and `undefined` when one already existed.** `pr_create`
 // filters its REST response to `.html_url`, so the address is in hand the moment the call returns —
-// which matters now that nothing waits before reporting it (joshuafolkken/kit#1232). `pr_get_url`
+// which matters now that nothing waits before reporting it. `pr_get_url`
 // resolves the branch through the `?head=…` listing, and that listing is eventually consistent: read
 // in the same instant the pull request was created it can answer nothing, and `pr_get_url` folds
 // "not there yet" and "the read failed" into the same `undefined`. The five-second sleep used to
@@ -49,8 +52,8 @@ async function display_pr_url_if_available(branch_name: string): Promise<void> {
 	}
 }
 
-// **This command stops at "the pull request is open"; it does not wait for the checks**
-// (joshuafolkken/kit#1232). It used to sleep five seconds and then watch the rollup on a two-minute
+// **This command stops at "the pull request is open"; it does not wait for the checks**.
+// It used to sleep five seconds and then watch the rollup on a two-minute
 // budget — measured at 119.8 seconds of one 1555-second run, 7.7% of it — and the answer decided
 // nothing: only `timed_out` was read, and only to pick which message to print. What actually blocks
 // a merge is `pnpm josh followup`, whose `wait_for_pr_success` asks a stricter question (CLEAN merge
@@ -89,17 +92,11 @@ async function create_and_report(
 }
 
 function parse_pr_state(pr_info_json: string): string | undefined {
-	try {
-		const result = pr_info_schema.safeParse(JSON.parse(pr_info_json))
-
-		return result.success ? result.data.state : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(pr_info_json, pr_info_schema)?.state
 }
 
 // A read that failed throws rather than answering `undefined`: "no state" is read as "not merged",
-// which would write onto a pull request that already merged (joshuafolkken/kit#3263).
+// which would write onto a pull request that already merged.
 async function get_pr_state(branch_name: string): Promise<string | undefined> {
 	const pr_info_json = await git_gh_command.pr_view(branch_name)
 
@@ -113,7 +110,7 @@ function is_pr_state_merged(pr_state: string | undefined): boolean {
 }
 
 // A body the caller supplied is written onto the pull request that is already open, rather than
-// dropped with the create that did not happen (joshuafolkken/kit#2446): a rerun carrying the
+// dropped with the create that did not happen: a rerun carrying the
 // live-execution evidence is how a merge `followup` refused for lacking it is recovered.
 async function report_existing_pr(
 	body: string,
@@ -164,11 +161,11 @@ async function create(
 }
 
 function build_title(issue_info: IssueInfo): string {
-	return `${issue_info.title} #${issue_info.number}`
+	return `${issue_info.title} ${issue_cite.plain(issue_info.number)}`
 }
 
 function build_body(issue_info: IssueInfo, extra_body?: string): string {
-	const closes = `closes #${issue_info.number}`
+	const closes = `closes ${issue_cite.plain(issue_info.number)}`
 
 	if (extra_body === undefined) return closes
 
@@ -199,7 +196,7 @@ async function create_for_issue(
 }
 
 // The label the pull request is opened with — also asked by `git-preflight.ts` before the commit, so
-// a missing classification is reported beside the other unmet preconditions (joshuafolkken/kit#2817).
+// a missing classification is reported beside the other unmet preconditions.
 async function release_classification(
 	issue_number: string,
 	branch_name: string,
@@ -211,7 +208,9 @@ async function release_classification(
 	const issue_json = await git_gh_command.issue_view_json(issue_number, 'labels,body')
 
 	if (issue_json === undefined) {
-		throw new Error(`Could not read issue #${issue_number} for release classification`)
+		throw new Error(
+			`Could not read issue ${session_cite.issue(issue_number)} for release classification`,
+		)
 	}
 
 	return pr_classification.select_issue_classification(issue_json)

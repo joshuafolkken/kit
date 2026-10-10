@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { AI_DOCS, read_repo_file, WORKFLOW_PROMPT } from '#scripts/document/ai-document-fixture'
+import { rule_list } from '#scripts/rules/rule-list'
 import { describe, expect, it } from 'vitest'
 import { claude_settings_fixture } from './claude-settings-fixture'
 
@@ -85,6 +86,21 @@ const DESTRUCTIVE_DENY_PATTERNS: ReadonlyArray<string> = [
 	'Bash(gh repo archive*)',
 	'Bash(gh pr close*)',
 ]
+
+// Under `bypassPermissions` and `Bash(*)` the deny list is the only thing between the Read tool and
+// a secret file, so the dotenv variants and wrangler's `.dev.vars` are named beside `.env` itself.
+const ENV_VARIANT_DENY = 'Read(./.env.*)'
+const SECRET_READ_DENY_PATTERNS: ReadonlyArray<string> = [
+	'Read(./.env)',
+	ENV_VARIANT_DENY,
+	'Read(./.dev.vars)',
+]
+
+// `.gitignore` un-ignores these two: they are tracked placeholders, so the variant deny must not take
+// the Read tool away from them. A `!` rule carves out of the rules listed before it only, and it is
+// spelled as a bare name: measured on Claude Code 2.1.289, `Read(!./.env.example)` carved nothing out
+// while `Read(!.env.example)` made the file readable again.
+const TRACKED_ENV_CARVE_OUTS: ReadonlyArray<string> = ['Read(!.env.example)', 'Read(!.env.test)']
 
 const REQUIRED_DENY_PATTERNS: ReadonlyArray<string> = [
 	'Bash(rm -rf *)',
@@ -248,6 +264,18 @@ describe('.claude/settings.json — permissions', () => {
 		expect(settings.permissions.deny).toContain(pattern)
 	})
 
+	it.each(SECRET_READ_DENY_PATTERNS)('denies reading the secret file %s', (pattern) => {
+		const settings = load_settings()
+
+		expect(settings.permissions.deny).toContain(pattern)
+	})
+
+	it.each(TRACKED_ENV_CARVE_OUTS)('carves %s out after the variant deny', (pattern) => {
+		const { deny } = load_settings().permissions
+
+		expect(deny.indexOf(pattern)).toBeGreaterThan(deny.indexOf(ENV_VARIANT_DENY))
+	})
+
 	// Measured against the running harness rather than read out of the documentation: `Bash(zzp4 *
 	// =*)` refused `zzp4 aaa =bbb`, while `Bash(zzp1 * :*)` and `Bash(zzp2 *:*)` let `zzp1 aaa :bbb`
 	// and `zzp2 aaa:bbb` through. A `:` is grammar in a rule — the `:*` suffix form — so an entry
@@ -370,16 +398,16 @@ const WORKFLOW_MARKERS: ReadonlyArray<string> = [
 
 // The guard rows the workflow prompt names by id alone must each keep an entry in the delivery list
 // its pointer sends readers to, or what they refuse is written nowhere (joshuafolkken/kit#3179).
-const RULE_DELIVERY = 'prompts/collaboration-workflow/rule-delivery.md'
+// joshuafolkken/kit#3399 moved that list to `pnpm josh rule:list`.
 const GUARD_ROW_ENTRIES: ReadonlyArray<string> = [
-	'強制 `git clean -f`',
-	'**index の書き換え**',
-	'**破壊的コマンド**',
-	'**保護ファイル**',
+	'forced `git clean -f`',
+	'**Index mutation**',
+	'**Destructive command**',
+	'**Protected file**',
 ]
 
-describe(`${RULE_DELIVERY} — guard rows the workflow prompt points at`, () => {
-	const content = read_repo_file(RULE_DELIVERY)
+describe('pnpm josh rule:list — guard rows the workflow prompt points at', () => {
+	const content = rule_list.render()
 
 	it.each(GUARD_ROW_ENTRIES)('lists %j', (entry) => {
 		expect(content).toContain(entry)

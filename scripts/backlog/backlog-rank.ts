@@ -4,18 +4,18 @@ import { epic_rank } from '#scripts/epic/epic-rank'
 import type { EpicNextResult } from '#scripts/epic/epic-report'
 import { epic_solo, type SoloGate, type SoloSelection } from '#scripts/epic/epic-solo'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
-import { backlog_restructure, type Declared } from './backlog-restructure'
+import { backlog_overlap, type Declared } from './backlog-overlap'
 
-// What the backlog offers, in the order it is decided (joshuafolkken/kit#2928): rank, then the
+// What the backlog offers, in the order it is decided: rank, then the
 // `run:solo` gate, then the cap. `backlog:next` and `backlog:plan --waves` both call `select`, so the
 // plan's first wave is what the run starts into an idle repository rather than an order the run never
 // takes.
 //
-// **The cap comes last.** It used to be applied while the standalone half was classified, before the
-// gate, so a `run:solo` issue ranked sixth or lower was cut before the gate could see it — and the
-// issues below it were offered past it. Cut after the gate, the cap only ever removes what the gate
-// would have offered, so it cannot hide a waiting `run:solo` issue from it. It still bounds only the
-// standalone rows, as it always has; an epic's children were never capped.
+// **The cap comes last.** Applied while the standalone half is classified, before the gate, it would
+// cut a `run:solo` issue ranked sixth or lower before the gate could see it — and offer the issues
+// below it past it. Cut after the gate, the cap only ever removes what the gate would have offered,
+// so it cannot hide a waiting `run:solo` issue from it. It bounds only the standalone rows; an epic's
+// children are never capped.
 
 // Every child the classification placed, in the order it placed them: the ranked candidates first,
 // then the waiting ones, then the ones waiting on a person.
@@ -79,18 +79,18 @@ interface OfferInput {
 	repo: string
 	// The keys of the standalone rows — the ones the cap bounds.
 	standalone: ReadonlySet<string>
-	// The paths each issue restructures; two candidates claiming one are not offered together
-	// (joshuafolkken/kit#3221). Absent, nothing is separated.
+	// The paths each issue declares; two candidates whose paths overlap are not offered together.
+	// Absent, nothing is separated.
 	declared?: Declared
 }
 
-// The restructure separation runs before the cap, for the reason the gate does: the cap only ever
+// The overlap separation runs before the cap, for the reason the gate does: the cap only ever
 // removes what would otherwise be offered.
 function select(input: OfferInput): SoloSelection {
 	const ranked = rank(input.candidates, input.pool)
 	const { read, repo } = input
 	const gated = epic_solo.select(ranked, read, repo)
-	const separated = backlog_restructure.separate(gated, input.declared ?? new Map(), { read, repo })
+	const separated = backlog_overlap.separate(gated, input.declared ?? new Map(), { read, repo })
 
 	return cap(separated, input.standalone)
 }

@@ -145,6 +145,16 @@ Check only the changed files with prettier and eslint (whole tree on fallback)
 
 ---
 
+### `josh metrics` · `josh mt`
+
+> **Audience:** developer · **Side effects:** files · **kit only**
+
+`[--no-startup | --totals-only | --accept --reason "<why>"]`
+
+Print repository-wide quality totals and durations, and fail when a total grew past the merge-base or a duration past its baseline
+
+---
+
 ### `josh port` · `josh pt`
 
 > **Audience:** developer · **Side effects:** none
@@ -191,7 +201,7 @@ List refactoring candidates in the changed scope by category and answer clear/ca
 
 _No arguments._
 
-Claude Code hook: print the resolved JOSH_SESSION_LANG (defaults to ja) for the session context
+Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, and the run:board reply rule while a backlogrun is live (otherwise nothing)
 
 ---
 
@@ -439,9 +449,19 @@ Re-run a merged issue’s baseline command and print the before/after pair
 
 > **Audience:** automation · **Side effects:** notifications
 
-`--task-type <type> --body <text>`
+`[--task-type <type>] [--body <text> | --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>]`
 
 Send Telegram notification
+
+---
+
+### `josh observation:record`
+
+> **Audience:** automation · **Side effects:** files
+
+`<key> <depth> <where> <what> [--checkout <path>]`
+
+Record an observation sighting and answer whether it is now filed
 
 ---
 
@@ -477,9 +497,9 @@ Count review findings by category from the observation ledger
 
 ### `josh review:record`
 
-> **Audience:** automation · **Side effects:** files
+> **Audience:** automation · **Side effects:** files, network
 
-`--issue <N> [<category>:<severity>:<file> ...] | --check --issue <N>`
+`--issue <N> [--comment] [<category>:<severity>:<file> ...] | --check --issue <N>`
 
 Record a review round’s findings, or check a round was recorded
 
@@ -509,7 +529,7 @@ Check that every published dependency range still resolves for a consumer
 
 > **Audience:** maintainer · **Side effects:** git, network, release
 
-`[version]`
+`[--dry-run]`
 
 Release the merges main has taken since the version last changed
 
@@ -785,6 +805,16 @@ Report whether ready backlog work is sitting undispatched with a free lane and n
 
 ---
 
+### `josh backlogrun` · `josh blr`
+
+> **Audience:** developer · **Side effects:** files, network, processes
+
+`[#<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex]`
+
+Start a backlogrun in the background and show its board; with one already running, only show the board
+
+---
+
 ### `josh cases`
 
 > **Audience:** automation · **Side effects:** files
@@ -821,7 +851,7 @@ Say whether the next turn of a run crosses the context-cut threshold (--cut) or 
 
 `[--days <n>]`
 
-Print the defect rate of merged work: defects filed per behavior change completed
+Print the defect rate of merged work: defects filed per enhancement completed
 
 ---
 
@@ -999,9 +1029,9 @@ Post one comment to an issue from a file, so no shell expands the body
 
 > **Audience:** automation · **Side effects:** network
 
-`<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]`
+`<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--requested] [--release]`
 
-File an Issue with every filing step: lint, Origin, WIP cap, duplicate scout, labels, then epic:bundle
+File an Issue with every filing step: lint, Origin, fold, WIP cap, duplicate scout, labels, then epic:bundle
 
 ---
 
@@ -1115,6 +1145,16 @@ Collapse a backlogrun lane-start event into one call: open the lane, pop and re-
 
 ---
 
+### `josh lane:limit` · `josh lli`
+
+> **Audience:** developer · **Side effects:** files
+
+`[<limit>] [--reset]`
+
+Change a live backlogrun’s lane limit without stopping it, or print the limit, lanes in use and free lanes
+
+---
+
 ### `josh lane:list`
 
 > **Audience:** automation · **Side effects:** none
@@ -1161,7 +1201,7 @@ Close every lane an interruption left without its work tree, then sweep unregist
 
 `[--every <seconds>]`
 
-Record the machine load (load average, swap, free memory, working lanes) to the lane ledger
+Record the machine load (load average, swap, free memory, working lanes) to the lane ledger — a backlogrun samples itself, this is for a reading outside one
 
 ---
 
@@ -1171,7 +1211,7 @@ Record the machine load (load average, swap, free memory, working lanes) to the 
 
 `--period <days> [--limit <lane-limit>]`
 
-Print one table row of lane throughput, gate duration and machine load over a period
+Print one table row of lane throughput, gate duration and machine load over a period, and the per-stage durations of a lane under it
 
 ---
 
@@ -1285,6 +1325,16 @@ Claude Code hook: deliver a trigger-delivered rule at the call that binds it (re
 
 ---
 
+### `josh rule:list`
+
+> **Audience:** automation · **Side effects:** none
+
+_No arguments._
+
+Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows
+
+---
+
 ### `josh rule:value` · `josh ruv`
 
 > **Audience:** developer · **Side effects:** files
@@ -1292,6 +1342,26 @@ Claude Code hook: deliver a trigger-delivered rule at the call that binds it (re
 `[--refresh]`
 
 Print each delivered rule's unaided compliance — runs reached, kept rate, refusals
+
+---
+
+### `josh run:add`
+
+> **Audience:** automation · **Side effects:** network, files
+
+`<issue...> [--no-priority]`
+
+Add issues to a live backlogrun, ahead of the queue unless --no-priority
+
+---
+
+### `josh run:board`
+
+> **Audience:** automation · **Side effects:** files, network
+
+`[--once | --chat | --every <minutes>]`
+
+Draw a live board of the running backlogrun, redrawn every second
 
 ---
 

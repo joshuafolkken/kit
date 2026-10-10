@@ -16,8 +16,8 @@ function with_cache_directory(
 
 // A cached metadata file written through safe-chain lacks every version that was under 24 hours old
 // at the time, and with `minimumReleaseAge` set pnpm reuses a cache file younger than that age
-// instead of refetching it — so a version that has since aged in stays invisible for up to a day
-// (joshuafolkken/kit#2805). A fresh directory per run means nothing filtered earlier is ever read.
+// instead of refetching it — so a version that has since aged in stays invisible for up to a day.
+// A fresh directory per run means nothing filtered earlier is ever read.
 function run_in_fresh_cache<T>(
 	stages: ReadonlyArray<ReadonlyArray<string>>,
 	run_stages: (stages: Array<Array<string>>) => T,

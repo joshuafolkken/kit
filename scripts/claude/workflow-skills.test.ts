@@ -77,11 +77,12 @@ const ANTI_PATTERN_MARKER = '**Anti-pattern catalog**'
 // one is already pinned marker by marker, and without the headings a rename would go unnoticed.
 const ROUTING_HEADING = '### Shorthand Commands'
 const ROUTING_END_HEADING = '#### Explicit invocation required (MANDATORY)'
+// joshuafolkken/kit#3395 retired the overrides section: its two prohibitions are one Tier C entry in
+// "Decision autonomy", and the procedure is the `dependency-update` skill.
 const OVERRIDES_HEADING = '### Dependency overrides (`pnpm-workspace.yaml` / `package.json`)'
-// What follows the overrides section. Pinned in its own right rather than as a slice boundary: it
-// was only ever asserted as the end of that slice, so deleting the slice comparison took the one
-// assertion that `## Package-First Development` still exists with it.
-const OVERRIDES_END_HEADING = '## Package-First Development'
+// Pinned in its own right: it was only ever asserted as the end of the overrides slice, so deleting
+// the slice comparison took the one assertion that `## Package-First Development` still exists.
+const PACKAGE_FIRST_HEADING = '## Package-First Development'
 
 const SUPPORTING_FILES: ReadonlyArray<string> = [
 	KICKOFF_FILE,
@@ -181,6 +182,8 @@ describe(`${DEPENDENCY_SKILL} — carries the post-update verification`, () => {
 		'**pnpm 11 and 12 read effective overrides only from `pnpm-workspace.yaml`.**',
 		'**quote what one printed.**',
 		'the `josh latest` lockstep pnpm bump is expected, NOT a violation',
+		'never touch `overrides`',
+		'never touch `devEngines`',
 	])('states %j', (marker) => {
 		expect(content).toContain(marker)
 	})
@@ -216,11 +219,12 @@ describe('the residency list says what it covers', () => {
 		// own suites, and a maintainer who looks only in this one concludes they are unguarded.
 		'the UI verification gate in `scripts/claude/verify-ui-skill.test.ts`',
 		'Absence from the list is not an omission',
-		// The six worked examples §3 used to carry (joshuafolkken/kit#1797).
+		// The worked examples §3 used to carry (joshuafolkken/kit#1797); joshuafolkken/kit#3395 moved the
+		// `epic:*` rules off residency, and the list records where they went.
 		'**Explicit invocation required**',
 		'**The `confirmation` notification on a stop**',
 		'**`overrides` protection**',
-		'**The three `josh epic:*` rules that bind outside the commands**',
+		'**Moved off residency by joshuafolkken/kit#3395.**',
 		NOT_ASPIRATIONAL_MARKER,
 	])('scopes the claim at the single source: %j', (marker) => {
 		expect(read_unwrapped(RESIDENCY_RATIONALE)).toContain(marker)
@@ -359,16 +363,12 @@ describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (
 		expect(content).toContain(marker)
 	})
 
-	// joshuafolkken/kit#1985: `epicrun` was removed and its job folded into `backlogrun`. A person who
-	// types the old keyword must be pointed at the command that runs the same scope, so the guidance is
-	// pinned resident — the mid-workflow turn that mistypes it loads no skill. The history moved to
-	// docs/maintainers/claude-md-rationale.md (joshuafolkken/kit#2889); the redirect stays.
-	it.each(['**`queue` and `epicrun` were removed**', '`epicrun` to `backlogrun #E --only`'])(
-		'guides a typed `epicrun` to `backlogrun #E --only` with %j',
-		(marker) => {
-			expect(content).toContain(marker)
-		},
-	)
+	// joshuafolkken/kit#1985 removed `epicrun` and kept a resident redirect for a typed old keyword.
+	// joshuafolkken/kit#3395 retired the redirect with the rest of the per-task prose; the history keeps
+	// it in docs/maintainers/claude-md-history.md.
+	it('no longer carries the retired-keyword redirect', () => {
+		expect(content).not.toContain('**`queue` and `epicrun` were removed**')
+	})
 })
 
 // The rules that pass the residency criterion: each one binds on a turn where the workflow skill was
@@ -380,22 +380,22 @@ describe.each(AI_DOCS)('%s — keeps what cannot move', (document_path) => {
 	it.each([
 		ROUTING_HEADING,
 		ROUTING_END_HEADING,
-		OVERRIDES_HEADING,
-		OVERRIDES_END_HEADING,
+		PACKAGE_FIRST_HEADING,
 		'Please run \\`<command>\\` to start this task.',
 		'pnpm josh notify --task-type confirmation',
-		'**NEVER** remove or modify entries in **either** location without explicit user approval.',
-		'**NEVER** modify the `devEngines` field in `package.json` without explicit user confirmation',
-		// joshuafolkken/kit#3249: the one sanctioned change is named where the prohibition is, so a
-		// turn that never loads the skill does not revert a correct `josh latest` bump.
-		'except the `josh latest` lockstep pnpm bump, kept per the `dependency-update` skill',
-		// The three `epic:*` rules the criterion's list names. They fire the moment an issue is filed
-		// or a decision is written, on turns where no `epic:*` command was run.
-		"Recording a decision removes that child's `needs-decision` label",
-		'**Fixing what the audit finds is Tier A**',
-		'**An epic in another repository is referenced as `owner/repo#N`**',
+		// joshuafolkken/kit#3395: both prohibitions of the retired overrides section, as one Tier C
+		// entry. The sanctioned `josh latest` bump is named by the `dependency-update` skill, and the
+		// `epic:*` rules by the `epic-commands` skill, whose description carries their trigger.
+		'`devEngines` / overrides edits): explicit user instruction only',
+		// Clearing `needs-decision` moved into that skill, so recording a decision has to load it, or
+		// the label stays and the child is parked out of the backlog pool.
+		'when recording a decision on a `needs-decision` child',
 	])('keeps %j resident', (marker) => {
 		expect(content).toContain(marker)
+	})
+
+	it('no longer carries the overrides section', () => {
+		expect(content).not.toContain(OVERRIDES_HEADING)
 	})
 
 	// joshuafolkken/kit#3077: the merge exception named `fullrun` alone, though a `backlogrun` merges

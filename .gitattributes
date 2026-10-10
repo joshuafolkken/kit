@@ -5,3 +5,4 @@
 eslint/rules/** linguist-vendored
 
 scripts/*.ts linguist-language=TypeScript
+

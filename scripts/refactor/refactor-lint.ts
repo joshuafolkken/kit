@@ -1,10 +1,11 @@
 import path from 'node:path'
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
+import { json_value } from '#scripts/lib/json-value'
 import { LINT_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import { z } from 'zod'
 
-// The mechanical half of `prompts/refactoring.md` (joshuafolkken/kit#2255): the refactoring
+// The mechanical half of `prompts/refactoring.md`: the refactoring
 // priorities ESLint already decides. Rather than read the checklist and grep by hand, the project's
 // own eslint is asked in JSON and its findings are bucketed into the checklist's items.
 //
@@ -186,16 +187,9 @@ function eslint_command(root: string, files: ReadonlyArray<string>): ReadonlyArr
 }
 
 // `undefined` means the run did not produce parseable eslint JSON — a failure, kept distinct from a
-// valid empty array (a clean scope), so a scan that could not run is never reported as `clear`
-// (joshuafolkken/kit#2180).
+// valid empty array (a clean scope), so a scan that could not run is never reported as `clear`.
 function parse_results(raw: string | undefined = 'null'): Array<LintResult> | undefined {
-	try {
-		const parsed = results_schema.safeParse(JSON.parse(raw))
-
-		return parsed.success ? parsed.data : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw, results_schema)
 }
 
 // The project's own eslint over the scope, in JSON. `reject: false` because eslint exits non-zero when

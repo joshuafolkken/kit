@@ -1,10 +1,11 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 
-// A blocker no graph in this invocation tracks, weighed rather than ignored (joshuafolkken/kit#1943).
+// A blocker no graph in this invocation tracks, weighed rather than ignored.
 //
-// Until this, a relation pointing outside the epic was announced and dropped, so a child waiting on
-// another epic's open issue was offered as runnable — `backlogrun` would start joshuafolkken/kit#1936's
-// children before joshuafolkken/kit#1921 had restored CI, whatever `blocked-by` said. What decides the
+// A relation pointing outside the epic is weighed rather than announced and dropped, so a child
+// waiting on another epic's open issue is not offered as runnable, whatever `blocked-by` says. What
+// decides the
 // answer is whether *this run* can finish the blocker: an open blocker the run also runs is `time`
 // (waiting resolves it), one it does not is `human` (only a person can), and a blocker whose state was
 // never read is `time` rather than runnable, because an unknown is never read as finished.
@@ -15,12 +16,12 @@ import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 //
 // `inherit` is the ordinary answer: the blocker is not finished, so this child's fate is the
 // blocker's fate. `time` and `human` are for a dependency that is unresolved for a reason the
-// blocker's own state does not show — joshuafolkken/kit#864's case, where a blocker is closed but
-// its package has not been published yet, is `time`.
+// blocker's own state does not show — a blocker that is closed but whose package has not been
+// published yet is `time`.
 type DependencyVerdict = 'resolved' | 'time' | 'human' | 'inherit'
 
-// The extension point. Replaced wholesale by joshuafolkken/kit#864 to add the publish condition;
-// the default knows only that a closed blocker is a finished one.
+// The extension point, replaced wholesale to add the publish condition; the default knows only that
+// a closed blocker is a finished one.
 type ResolveDependency = (blocker: EpicChild, blocked: EpicChild) => DependencyVerdict
 
 type OutsideCategory = 'time' | 'human'
@@ -39,11 +40,11 @@ interface OutsideAnswer {
 const CLOSED = 'CLOSED'
 
 function name_of(child: EpicChild): string {
-	return `#${String(child.number)}`
+	return session_cite.issue(child.number, undefined, child.repo)
 }
 
 // A closed reference as the child record a resolver takes, so a closed blocker in another repository
-// still waits for its release exactly as a tracked one does (joshuafolkken/kit#864).
+// still waits for its release exactly as a tracked one does.
 function as_closed_child(reference: IssueReference): EpicChild {
 	return {
 		number: reference.number,

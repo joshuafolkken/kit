@@ -6,7 +6,7 @@ import { bash_output_cap_reader } from './bash-output-cap'
 import { capped_print_part } from './capped-print-part'
 
 // Prints a command's output whole when it fits under the Bash output cap, and as part files when it
-// does not (joshuafolkken/kit#3143). Past `BASH_MAX_OUTPUT_LENGTH` Claude Code saves the output and
+// does not. Past `BASH_MAX_OUTPUT_LENGTH` Claude Code saves the output and
 // hands back a 2 KB preview, and the run spends a turn reading the saved file — 224 overflows and 132
 // re-reads over one day's sessions, `doc:section` and `issue:read` the two most frequent `josh` sources.
 //

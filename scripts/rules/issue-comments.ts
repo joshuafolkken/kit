@@ -4,7 +4,7 @@ import { prior_comment_read } from './prior-comment-read'
 import { shell_segments } from './shell-segments'
 
 // The trigger and the delivered text behind the `issue-comments` row of `delivered-rules.ts`, moved
-// out of the enumeration so the list stays a list (joshuafolkken/kit#3264).
+// out of the enumeration so the list stays a list.
 
 // **A shell line carries several commands, and the subcommand has to be the one being invoked.**
 // Each segment is judged on its own, anchored at its start, so `gh issue comment <N> -b "… gh issue
@@ -29,7 +29,7 @@ const ISSUES_PATH = /repos\/[^\s'"]*\/issues\//u
 
 // A field projection — `--jq` for `gh api`, `--json` for `gh issue view` — whose value never names the
 // body. `gh api …/issues/<N> --jq '{state, labels}'` fetches the Issue only to read its state or its
-// labels, which is a state check and not the body read this rule guards (joshuafolkken/kit#1905); a
+// labels, which is a state check and not the body read this rule guards; a
 // `--jq '.body'` still names the body and stays a body read. The value is taken quoted or bare, so the
 // comma list `--json state,labels` and the expression `'{state, labels}'` are read the same way.
 const FIELD_PROJECTION = /(?:--jq|--json)[= ]\s*('[^']*'|"[^"]*"|\S+)/u
@@ -78,20 +78,26 @@ function reads_issue_comments(command: string): boolean {
 }
 
 // **The refusal hands over the command that fixes it**, because reading is not the same as
-// obeying: a sentence saying "also read the comments" is prose of exactly the kind
-// joshuafolkken/kit#1344 measured as moving nothing, while a refused body read leaves the run
-// holding the reissue that makes the comments *present*. The conflict rule ships with it — a
-// delivery that said only "read them" would hand back the deciding at the moment nothing else is
-// open to read, the mistake joshuafolkken/kit#1518 corrected for the WIP cap.
+// obeying: a sentence saying "also read the comments" is prose that moves nothing, while a refused
+// body read leaves the run holding the reissue that makes the comments *present*. The conflict rule
+// ships with it — a delivery that said only "read them" would hand back the deciding at the moment
+// nothing else is open to read.
+//
+// **The command comes first, the reason after**. The first line is the guard's
+// label and then the call itself — `issue:read` prints the body and every comment in one read, `<N>`
+// being the Issue the refused call named — so a run that reads only the opening still leaves holding
+// the fix. The label keeps `time_transcript_line.guard_from_refusal` naming this guard, not the command.
 const ISSUE_COMMENTS_REASON =
-	"⛔ an Issue's comments are part of the Issue: read them before implementing, not only the body. " +
-	'A decision recorded after the body was written lives only in a comment — a corrected diagnosis ' +
-	'(joshuafolkken/kit#1537), a changed default and an added acceptance criterion ' +
+	'⛔ issue comments: pnpm josh issue:read <N>\n' +
+	"Run that in place of this read: <N> is the Issue it names, and an Issue's comments are part of " +
+	'the Issue, so the body and every comment come back together. Without josh, add ' +
+	"`gh api repos/{owner}/{repo}/issues/<N>/comments --jq '.[] | {user: .user.login, created_at, " +
+	"body}'` beside the body read, or `gh issue view <N> --comments` where GraphQL is reachable.\n" +
+	'Why: a decision recorded after the body was written lives only in a comment — a corrected ' +
+	'diagnosis (joshuafolkken/kit#1537), a changed default and an added acceptance criterion ' +
 	'(joshuafolkken/kit#1520), a scope handed to another Issue (joshuafolkken/kit#1304) — and ' +
 	'nothing in the body says it was superseded, so a body-only reader builds the wrong thing and ' +
-	'sees no contradiction. Reissue this read with the comments included: ' +
-	"`gh api repos/{owner}/{repo}/issues/<N>/comments --jq '.[] | {user: .user.login, created_at, " +
-	"body}'` beside the body read, or `gh issue view <N> --comments` where GraphQL is reachable. " +
+	'sees no contradiction. ' +
 	'Then the later text is the agreement in force — a comment supersedes the body it contradicts — ' +
 	"except for two answers that are not the run's to make: work a comment reassigns to another " +
 	'Issue is out of scope and is not implemented, and a comment saying the Issue no longer has a ' +
@@ -107,6 +113,8 @@ const ROW = {
 	reason: ISSUE_COMMENTS_REASON,
 	already_satisfied: prior_comment_read.already_read_for_call,
 	keeps: bash_triggers.on_bash_command(reads_issue_comments),
+	// The opening the reason carried before it led with the command.
+	former_reasons: ["⛔ an Issue's comments are part of the Issue: read them before implementing"],
 }
 
 const issue_comments = {

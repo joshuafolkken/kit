@@ -1,10 +1,10 @@
 # `prrun` — the manifest (plan → implement → PR → green → stop, a person merges)
 
 `prrun` sits between `halfrun` (stop before commit) and `fullrun` (auto-merge). It runs `fullrun`
-up to a green, mergeable pull request and **stops before the merge**, so a person merges by hand
-(joshuafolkken/kit#3023). **Read `fullrun.md` and `entry-sequence.md` for every step** — the entry
+up to a green, mergeable pull request and **stops before the merge**, so a person merges by hand.
+**Read `fullrun.md` and `entry-sequence.md` for every step** — the entry
 sequence, the step lists, the gate, the review and the stop branches are `fullrun`'s, unchanged. This
-file names only the difference, never a second copy of the procedure.
+file names only the difference.
 
 ## The difference — the entry
 

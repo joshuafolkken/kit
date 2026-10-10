@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_carry_added } from '#scripts/run/carry/run-carry-added'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { expect, test, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
@@ -28,6 +29,21 @@ test('dispatches named issues in order and waits for the first one in flight', (
 		issues: ['1'],
 	})
 	expect(backlog_drive_named.offer(CARRY, running, true)?.verdict).toBe('wait')
+})
+
+// joshuafolkken/kit#3558: a `run:add`ed issue in flight at the head held the named epic behind it, so
+// a child filed into the epic waited for a parent session.
+test('offers the declared item past an added issue already in flight', () => {
+	const carry = { ...CARRY, added: [{ issue: 9, is_priority: true }] }
+	const running = backlog_drive.initial_state(['9'], ACTIVE)
+	const declared = backlog_drive.initial_state(['1'], ACTIVE)
+
+	expect(backlog_drive_named.offer(carry, running, true)).toMatchObject({
+		verdict: 'run',
+		issues: ['1'],
+	})
+	expect(backlog_drive_named.offer(carry, declared, true)?.verdict).toBe('run')
+	expect(backlog_drive_named.offer(CARRY, declared, true)?.verdict).toBe('wait')
 })
 
 test('stops after all named issues when only mode is declared', () => {
@@ -90,4 +106,32 @@ test('skips later named issues after a failed first issue', async () => {
 	expect(run_carry.read_carry(target)).toMatchObject({ kind: 'carried', carry: { done: [1, 2] } })
 	read_directory.mockRestore()
 	rmSync(directory, { recursive: true, force: true })
+})
+
+async function done_after_failure(failed: string, is_priority: boolean): Promise<unknown> {
+	const directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-added-'))
+	const target = run_carry.carry_path(directory)
+	const read_directory = vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(directory)
+	const carry = run_carry.begin_carry(target, CARRY.invocation, run_carry.owner_of(process.pid))
+
+	if (carry !== undefined) run_carry_added.add_issues(target, carry, [{ issue: 5, is_priority }])
+	await backlog_drive_named.mark_done(
+		failed,
+		{ outcome: 'failed', code: 0, token: 'none' },
+		String(process.pid),
+	)
+	const read = run_carry.read_carry(target)
+
+	read_directory.mockRestore()
+	rmSync(directory, { recursive: true, force: true })
+
+	return read.kind === 'carried' ? read.carry.done : undefined
+}
+
+test('a failed added issue skips none of the declared list', async () => {
+	expect(await done_after_failure('5', true)).toStrictEqual([5])
+})
+
+test('a failed declared issue skips the declared issues after it but not an added one', async () => {
+	expect(await done_after_failure('1', false)).toStrictEqual([1, 2])
 })

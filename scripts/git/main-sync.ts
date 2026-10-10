@@ -4,10 +4,11 @@ import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-c
 import { error_text } from '#scripts/lib/error-message'
 import { git_command } from './git-command'
 import { gone_branch, type PruneResult } from './gone-branch'
+import { lockfile_sync } from './lockfile-sync'
 
-// `josh main:sync` (`josh ms`) — return this checkout to the default branch and pull
-// (joshuafolkken/kit#1535), then prune the local branches whose merged remote branch is gone
-// (joshuafolkken/kit#2504; the rule for which ones is `gone-branch.ts`).
+// `josh main:sync` (`josh ms`) — return this checkout to the default branch and pull,
+// then prune the local branches whose merged remote branch is gone
+// (the rule for which ones is `gone-branch.ts`).
 //
 // **It refuses inside a linked work tree, and that refusal is the reason this stopped being a
 // one-line `sh -c` entry.** The default branch is a *branch*: advancing it means checking it out
@@ -28,6 +29,8 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const COMMAND_NAME = 'main:sync'
+const INSTALL_FAILURE =
+	'node_modules is behind pnpm-lock.yaml and `pnpm install --frozen-lockfile` failed; run `pnpm josh ms` again, or the install here by hand.'
 
 // `git_directories()` returns `[--absolute-git-dir, --git-common-dir]`. They are the same path in the
 // main work tree and differ in a linked one, which is git's own definition of the distinction rather
@@ -70,12 +73,12 @@ async function prune_quietly(default_branch: string): Promise<void> {
 	}
 }
 
-// **The local default branch is fast-forwarded before it is checked out** (joshuafolkken/kit#2979).
+// **The local default branch is fast-forwarded before it is checked out**.
 // A run's ledger file is committed on its feature branch and merged; a line appended afterwards leaves
 // it dirty, and git refuses to check out a stale default branch that lacks the file — so `run:tail`'s
-// sync failed exactly when the flush after it had work. Once fast-forwarded, the default branch holds
-// the committed file and the checkout carries the dirty lines over (the same step the flush takes,
-// joshuafolkken/kit#2462). Skipped on the default branch, where `fetch` refuses to update the checked-out
+// sync would fail exactly when the flush after it had work. Once fast-forwarded, the default branch
+// holds the committed file and the checkout carries the dirty lines over (the same step the flush
+// takes). Skipped on the default branch, where `fetch` refuses to update the checked-out
 // ref; a refusal elsewhere — a local default ahead of origin — is left to the checkout and pull to judge.
 async function fast_forward_quietly(default_branch: string): Promise<void> {
 	if ((await git_command.branch()) === default_branch) return
@@ -87,6 +90,18 @@ async function fast_forward_quietly(default_branch: string): Promise<void> {
 	}
 }
 
+// A pull that changed the lock leaves `node_modules` behind it, and every `josh` typed in this checkout
+// then fails to load the new dependency — so the install the lock now asks for
+// is part of the sync, and its failure is the sync's. A failed one is retried by the next `ms`.
+async function reinstall(root: string): Promise<number> {
+	const result = await lockfile_sync.reinstall_if_stale(root)
+
+	if (result.is_installed) return SUCCESS_EXIT_CODE
+	console.error(`${INSTALL_FAILURE}\n${result.output}`)
+
+	return FAILURE_EXIT_CODE
+}
+
 async function synchronize(): Promise<number> {
 	const default_branch = await git_command.get_default_branch()
 
@@ -96,7 +111,7 @@ async function synchronize(): Promise<number> {
 	await prune_quietly(default_branch)
 	console.info(default_branch)
 
-	return SUCCESS_EXIT_CODE
+	return await reinstall(await git_command.repository_root())
 }
 
 // The argument refusal is kept even though this is no longer an `sh -c` entry: the message is the

@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry_stash } from './run-carry-stash'
 
@@ -48,8 +49,8 @@ describe('run_carry_stash.report_orphans — closed-issue stashes at the end of 
 
 		await run_carry_stash.report_orphans()
 
-		expect(printed()).toContain('stash@{1}  #2370 closed')
-		expect(printed()).toContain('stash@{2}  #2346 closed')
+		expect(printed()).toContain(`stash@{1}  ${session_cite.issue(2370)} closed`)
+		expect(printed()).toContain(`stash@{2}  ${session_cite.issue(2346)} closed`)
 		expect(printed()).not.toContain('stash@{0}')
 	})
 
@@ -59,7 +60,7 @@ describe('run_carry_stash.report_orphans — closed-issue stashes at the end of 
 		await run_carry_stash.report_orphans()
 
 		expect(printed()).not.toContain('stash@{0}')
-		expect(printed()).toContain('Could not read #9999')
+		expect(printed()).toContain(`Could not read ${session_cite.issue(9999)}`)
 		expect(printed()).toContain(run_carry_stash.FAILURE_NOTE)
 	})
 

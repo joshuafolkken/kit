@@ -1,12 +1,12 @@
 # The entry sequence and the stop branches — shared by `fullrun`, `halfrun` and `prrun`
 
-**This file is the part of the three implementing manifests that is one procedure**
-(joshuafolkken/kit#3174). `fullrun.md`, `halfrun.md` and `prrun.md` name only how their own run
-differs from it; `pnpm josh run:step <N>` prints the run's next single action.
+`fullrun.md`, `halfrun.md` and `prrun.md` name only how their own run differs from this shared
+procedure; `pnpm josh run:step <N>` prints the run's next single action. History:
+`docs/maintainers/entry-sequence-rationale.md` → "Where each rule came from".
 
 ## The ordered entry sequence
 
-**One call folds the mechanical steps** (joshuafolkken/kit#2372): `pnpm josh run:entry <N> --to
+**One call folds the mechanical steps**: `pnpm josh run:entry <N> --to
 <command>` claims the tree, reads the budget, bundles the reads and decides the pre-implementation
 step — steps 1, 3, 4 and 5 below in one round trip. Its `stage #<N>` line says where the run starts
 (`start: reached` redoes nothing — stop), and its `entry #<N> — hold: … · cost: … · verdict: …` line
@@ -33,7 +33,7 @@ short-circuits with a non-zero exit. The numbered steps are the detail behind ea
    dependency scope in one report; a `new` entry runs it once filed. The comment stops, the
    `human_review` stop (`needs-human-review.md`) and the dependency decision are read off it.
 5. **Print the next action — `pnpm josh run:step <N>`** — and follow it into the command's step list.
-   Before implementing, `git switch main && git pull`, then `pnpm josh latest:scope` — update
+   Before implementing, `pnpm josh ms`, then `pnpm josh latest:scope` — update
    dependencies only on `required` (`latest-gate.md`), never on every run. `run:step` names every later
    action in order, each read at the point-of-use document `SKILL.md` lists, never re-narrated here
    (`residency.md` → "順序の問い").
@@ -54,7 +54,7 @@ lane child starts none and never reads that document (`pnpm josh read:set lane-c
 - **A prerequisite** — file it (`route:tier-a`), stash, record the dependency, and **STOP** with
   "Please run `backlogrun #<E> --only` to execute this epic"; `prerequisite.md` is the single source of
   the filing, the `-u` stash and the epic:bundle branch.
-- **An observation** — file it without asking and carry on; `observation-filing.md`.
+- **An observation** — `observation-filing.md` (ask first if interactive).
 
 **Automatic filing is capped at 10 Issues per run.** On reaching it, stop and report.
 

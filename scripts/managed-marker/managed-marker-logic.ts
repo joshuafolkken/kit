@@ -4,8 +4,7 @@ import { is_workflow_destination } from '#scripts/claude/workflow-destination'
 // answer has to survive being copied on: a consumer of a consumer receives `ci.yml` from kit and
 // `dast.yml` from app-kit, and neither distributor knows what the other manages. So the answer is
 // written into the artifact rather than kept in a list beside it — every distributor stamps its own
-// output, and the auto-merge workflow reads the stamp off the very file it is asking about
-// (joshuafolkken/kit#844).
+// output, and the auto-merge workflow reads the stamp off the very file it is asking about.
 //
 // A list cannot reach that far. kit's write time is the only moment kit controls, and at that moment
 // it knows nothing of what app-kit distributes; whichever sync ran last would decide the list, and

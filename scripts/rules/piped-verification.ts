@@ -1,7 +1,10 @@
+import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
+import { json_value } from '#scripts/lib/json-value'
+import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { shell_segments } from './shell-segments'
 
-// The rule delivered at the call that pipes a verification command (joshuafolkken/kit#1556).
+// The rule delivered at the call that pipes a verification command.
 //
 // **A pipeline exits with its last command's status.** `pnpm josh gate 2>&1 | tail -40` therefore
 // answers success on a gate that printed `✗ verification gate failed`, and the failure that was
@@ -54,9 +57,8 @@ const VERIFICATION_COMMANDS: ReadonlySet<string> = new Set([
 ])
 
 // **The canonical name of each check, and both spellings still match**: `pnpm josh ga | tail` masks a
-// gate exactly as the long spelling does, and since joshuafolkken/kit#1789 the alias is expanded where
-// the command is read rather than by widening this set with every alias standing for one of its names
-// (joshuafolkken/kit#1643 for the reading). The suite names `pnpm josh ga` for that reason: an
+// gate exactly as the long spelling does, and the alias is expanded where the command is read rather
+// than by widening this set with every alias standing for one of its names. The suite names `pnpm josh ga` for that reason: an
 // expansion that regressed would show up here rather than as a guard that quietly stopped firing.
 function is_verification_command(segment: string): boolean {
 	return shell_segments.is_josh_command(segment, VERIFICATION_COMMANDS)
@@ -93,15 +95,18 @@ const PIPED_VERIFICATION_REASON =
 // command chain quoted inside a body is text rather than a call, and this repository's issue bodies
 // quote them constantly — without the blanking the two halves disagree, and
 // `gh issue comment 1 --body "… | pnpm josh gate | …"` reads as a check whose verdict survived.
-function command_pieces(command: string): Array<string> {
+function pipelines_of(command: string): Array<Array<string>> {
 	return shell_segments
 		.segments_of(time_shell.unquoted(command))
-		.flatMap((segment) => segment.split('|'))
-		.map((piece) => piece.trim())
+		.map((segment) => segment.split('|').map((piece) => piece.trim()))
 }
 
-// **The occasion this rule governs: a check whose result means pass or fail, run at all**
-// (joshuafolkken/kit#1643). The trigger fires only on the masked spelling, so a run that never piped
+function command_pieces(command: string): Array<string> {
+	return pipelines_of(command).flat()
+}
+
+// **The occasion this rule governs: a check whose result means pass or fail, run at all**.
+// The trigger fires only on the masked spelling, so a run that never piped
 // one would drop out of the reading entirely and the rate would be taken over runs that masked at
 // least once.
 function runs_verification(command: string): boolean {
@@ -115,11 +120,76 @@ function keeps_verdict_intact(command: string): boolean {
 	return runs_verification(command) && !is_masked_verification(command)
 }
 
+// **The commonest masking is rewritten rather than refused**. Almost every
+// refusal was a check narrowed with `| tail` or `| grep`, and the refusal cost a round trip to arrive at
+// the call `set -o pipefail;` in front would have made. Prefixed, the pipeline carries the check's
+// status, which is the rule's whole outcome — so the hook runs that call instead.
+//
+// **Only a filter that reads its input to the end qualifies.** One that exits early — `head`, or a
+// `grep` stopping at its first match — closes the pipe on a check still writing, and under `pipefail` the
+// check's SIGPIPE turns a passing run into exit 141; `head` also cuts the verdict line josh prints last.
+//
+// **Every command on the line is a josh check or a filter after one.** The rewrite answers `allow`, so
+// anything else chained beside the check — `&& rm -r dist`, or a `git log | head` never written for
+// `pipefail` — would skip the permission prompt it would otherwise meet. Those lines are refused as before.
+//
+// **The raw line is read for what the cut cannot see.** `segments_of` does not split on a lone `&`, and
+// `time_shell.unquoted` blanks a double-quoted `$(…)`, so `| tail & curl …`, `| tail > ~/.zshrc` and
+// `| grep "$(cmd)"` all look like a filter after a check. Any `&`, redirection, backtick or `$(` beyond
+// the `&&` chain and the check's own `2>&1` leaves the line to the refusal.
+const PIPEFAIL_PREFIX = 'set -o pipefail; '
+const FULL_READING_FILTER = /^(?:tail|grep)\b/u
+const EARLY_EXIT_GREP =
+	/^grep\b.*\s(?:-[a-zA-Z]*[lLmq]|--(?:quiet|silent|max-count|files-with(?:out)?-match))/u
+
+const ALLOWED_OPERATORS = /2>&1|&&/gu
+const SIDE_EFFECT_SYNTAX = /[&<>`]|\$\(/u
+
+const PIPEFAIL_NOTE =
+	'↻ piped verification: the josh check was piped, so `set -o pipefail;` was prefixed and the call ran ' +
+	"with the check's status carried to the exit code. Read the printed verdict, never the exit code " +
+	'alone — `prompts/collaboration-workflow/output-bounds.md` (joshuafolkken/kit#3570).'
+
+function reads_to_the_end(piece: string): boolean {
+	return FULL_READING_FILTER.test(piece) && !EARLY_EXIT_GREP.test(piece)
+}
+
+function is_filtered_check(pipeline: Array<string>): boolean {
+	const [head = '', ...filters] = pipeline
+
+	return is_verification_command(head) && filters.every((piece) => reads_to_the_end(piece))
+}
+
+function has_side_effect_syntax(command: string): boolean {
+	return SIDE_EFFECT_SYNTAX.test(command.replaceAll(ALLOWED_OPERATORS, ' '))
+}
+
+function is_pipefail_rewritable(command: string): boolean {
+	return (
+		is_masked_verification(command) &&
+		!has_side_effect_syntax(command) &&
+		pipelines_of(command).every((pipeline) => is_filtered_check(pipeline))
+	)
+}
+
+// The call's input with the prefix in front, or `undefined` where the call is not a rewritable masking.
+function pipefail_input(call: GuardedCall): Record<string, unknown> | undefined {
+	if (call.name !== cost_blocks.BASH_TOOL || !json_value.is_record(call.input)) return undefined
+
+	const command = time_shell.bash_command(call.input)
+
+	if (!is_pipefail_rewritable(command)) return undefined
+
+	return { ...call.input, command: `${PIPEFAIL_PREFIX}${command}` }
+}
+
 const piped_verification = {
 	PIPED_VERIFICATION_REASON,
+	PIPEFAIL_NOTE,
 	VERIFICATION_COMMANDS,
 	is_masked_verification,
 	keeps_verdict_intact,
+	pipefail_input,
 	runs_verification,
 }
 

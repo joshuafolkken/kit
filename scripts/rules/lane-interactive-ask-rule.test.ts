@@ -1,17 +1,13 @@
-import {
-	read_unwrapped,
-	RULE_DELIVERY_RATIONALE,
-	WORKFLOW_PROMPT_DIRECTORY,
-} from '#scripts/document/ai-document-fixture'
+import { read_unwrapped, RULE_DELIVERY_RATIONALE } from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
+import { rule_list } from './rule-list'
 
 // joshuafolkken/kit#2201: a dispatched lane child's interactive ask must be refused one call before the
 // stop notify #2034 wired the park to. What this suite pins is that correction as a documented rule:
 // the delivery names the procedure rather than restating it, the single source carries the story, and
 // the enumeration a reader reaches for names the trigger.
 const TOPIC_FILE = '.claude/skills/workflow-commands/pre-gate-cut.md'
-const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
 const FIRING_SUITE = 'scripts/rules/lane-interactive-ask.test.ts'
 const SECTION = '### The interactive ask is refused one call earlier'
 const SHARED_EXTRACTOR = 'scripts/agent/interactive-ask.ts'
@@ -45,10 +41,9 @@ describe(`${TOPIC_FILE} — the single source for the interactive-ask rule`, () 
 
 	it.each([
 		SECTION,
-		'(joshuafolkken/kit#2201)',
-		// The run the correction rests on, and the earlier rule it completes.
-		'#2178',
-		'joshuafolkken/kit#2034',
+		// Why the ask is refused one call earlier than the notify guard.
+		'the notify guard never fires',
+		'park the question instead',
 		'AskUserQuestion',
 		// The backstop and the shared extractor.
 		'pnpm josh run:ending',
@@ -58,8 +53,8 @@ describe(`${TOPIC_FILE} — the single source for the interactive-ask rule`, () 
 	})
 })
 
-describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, () => {
-	const content = read_unwrapped(DELIVERY)
+describe(`pnpm josh rule:list — the enumeration names this rule and its silent turn`, () => {
+	const content = rule_list.render()
 
 	it('states the tool it fires on', () => {
 		expect(content).toContain('AskUserQuestion')
@@ -72,6 +67,6 @@ describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, 
 	// The non-firing state that means the rule is kept, or the trigger has not been reached: a checkout
 	// that is not a lane child, or a call that is not an interactive tool.
 	it('says what a turn with no trigger means', () => {
-		expect(content).toContain('レーンの子でない')
+		expect(content).toContain('not a lane child')
 	})
 })

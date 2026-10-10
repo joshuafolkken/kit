@@ -3,7 +3,7 @@ import { PURE_FILES } from '#scripts/test/pure-files'
 import { VITEST_INCLUDE_GLOBS } from '#scripts/test/vitest-include-globs'
 
 // The unit suite runs as two Vitest projects so the isolation-safe files can skip per-file worker
-// isolation, which re-evaluates every shared module once per file (joshuafolkken/kit#2170). Measured
+// isolation, which re-evaluates every shared module once per file. Measured
 // back to back on the pure set, isolate:false ran it in 27.5s against 64.7s isolated — a 57% cut,
 // because module evaluation is about half of a run's wall clock.
 //
@@ -21,21 +21,31 @@ const TEST_TIMEOUT_MS = 10_000
 // before release with: pnpm vitest run --config vitest.harness.config.ts
 const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test.ts']
 
-// **`JOSH_LANE_CHILD` is blanked so the unit suite never inherits the lane it happens to run in**
-// (joshuafolkken/kit#2310). The gate runs inside a dispatched lane child, whose mark and lane cwd would
+// **`JOSH_LANE_CHILD` is blanked so the unit suite never inherits the lane it happens to run in**.
+// The gate runs inside a dispatched lane child, whose mark and lane cwd would
 // otherwise make every world-consulting rule guard (`pre-gate-cut`, `implementation-cut`, `lane-park`)
 // read a delivery fixture as a real lane-child call and fire on it. A suite that wants to test
 // lane-child behavior sets the mark itself in its own `beforeEach`, exactly as it always has; blank is
 // the "no dispatch mark" a person's session carries, which `marked_issue` reads as absent.
 //
-// **The proxy spellings are blanked for the same reason** (joshuafolkken/kit#2436): a package-manager
+// **The proxy spellings are blanked for the same reason**: a package-manager
 // wrapper writes its loopback proxy and CA into everything `pnpm` spawns, so a suite asserting what a
 // `gh` spawn receives would pass in CI and fail on a machine with the wrapper. A suite about proxies
 // declares the one it is testing in its own `beforeEach`.
 //
-// **The detached ship supervisor's marks are blanked too** (joshuafolkken/kit#2456): the pre-push unit
+// **The detached ship supervisor's marks are blanked too**: the pre-push unit
 // run inherits `JOSH_SHIP_SUPERVISED` and `JOSH_AGENT_PROVIDER` from the supervisor that pushes, so a
 // ship fixture would take the supervised stop path — and try to relaunch a real lane child — only there.
+//
+// **The agent session's pid is blanked as well**: a claim records it as the
+// hold's owner, and the supervisor inherits it from a session that has usually ended by the time the
+// gate runs, so every hold a fixture writes would read back as `stale` there and nowhere else. A suite
+// about the owner stubs the pid it is testing.
+//
+// **The agent session role is blanked for the lane mark's reason**: a ship reviewer runs the related
+// tests after a fix it applies, and its `JOSH_AGENT_ROLE` would make both cut guards stand down on a
+// delivery fixture that sets the lane mark and expects the refusal. A suite about the reviewer passes
+// the role itself.
 const PROXY_ENV: Record<string, string> = Object.fromEntries(
 	[...agent_session_environment.PROXY_KEYS, agent_session_environment.PROXY_CERTIFICATE_KEY].map(
 		(key) => [key, ''],
@@ -44,9 +54,11 @@ const PROXY_ENV: Record<string, string> = Object.fromEntries(
 
 const ENV: Record<string, string> = {
 	...PROXY_ENV,
+	[agent_session_environment.AGENT_PID_KEY]: '',
 	CLAUDE_CODE_SESSION_ID: 'vitest-session',
 	CODEX_THREAD_ID: '',
 	JOSH_AGENT_PROVIDER: '',
+	JOSH_AGENT_ROLE: '',
 	JOSH_LANE_CHILD: '',
 	JOSH_SHIP_SUPERVISED: '',
 }
@@ -62,21 +74,24 @@ const ISOLATED_PROJECT = 'isolated'
 const STATE_GUARD: ReadonlyArray<string> = ['./scripts/test/test-state-guard.ts']
 
 // Runs in every worker of both projects, before each test, and silences the real streams for the test
-// body so a fixture's direct `process.stdout` write cannot leak into `pnpm josh test:unit`'s output
-// (joshuafolkken/kit#2296). `setupFiles` rather than `globalSetup` because it must run inside the
+// body so a fixture's direct `process.stdout` write cannot leak into `pnpm josh test:unit`'s output.
+// `setupFiles` rather than `globalSetup` because it must run inside the
 // worker where the test's writes happen, not once in the main process.
 const STDOUT_GUARD: ReadonlyArray<string> = ['./scripts/test/test-stdout-guard.ts']
 
 // Runs in every worker for the same reason: it wraps that worker's own `fetch`, refusing a real
-// Telegram send and recording which test tried (joshuafolkken/kit#2494).
+// Telegram send and recording which test tried.
 const TELEGRAM_GUARD: ReadonlyArray<string> = ['./scripts/test/test-telegram-guard.ts']
 
+// Runs in every worker too: it replaces that worker's machine reading, so a suite that drives the gate
+// admits the same way on every platform and every load.
+const MACHINE_GUARD: ReadonlyArray<string> = ['./scripts/test/test-machine-guard.ts']
+
 // The guards every run of the suite arms, whichever config starts it: the network guard once in the
-// main process, the stdout and Telegram guards in every worker. Named here so `vitest.config.ts` and
-// `vitest.harness.config.ts` read one definition — the harness once ran with none of them
-// (joshuafolkken/kit#3253).
+// main process, the stdout, Telegram and machine guards in every worker. Named here so `vitest.config.ts` and
+// `vitest.harness.config.ts` read one definition — the harness once ran with none of them.
 const NETWORK_GUARD: ReadonlyArray<string> = ['./scripts/test/test-network-guard.ts']
-const WORKER_GUARDS: ReadonlyArray<string> = [...STDOUT_GUARD, ...TELEGRAM_GUARD]
+const WORKER_GUARDS: ReadonlyArray<string> = [...STDOUT_GUARD, ...TELEGRAM_GUARD, ...MACHINE_GUARD]
 
 interface UnitProjectTest {
 	name: string
@@ -134,6 +149,7 @@ const UNIT_PROJECTS: ReadonlyArray<UnitProject> = [
 const unit_projects = {
 	ENV,
 	ISOLATED_PROJECT,
+	MACHINE_GUARD,
 	MAIN_EXCLUDE,
 	NETWORK_GUARD,
 	PURE_PROJECT,

@@ -36,6 +36,7 @@ const DO_NOT_COPY = 'Do not copy rules back into this file'
 // a hand-written copy in a pointer, which drifted from the table the moment a rule was added.
 const READING_DOC = 'prompts/collaboration-workflow/principles.md'
 const READING_SECTION = 'Claude Code 以外のエージェントでの読み替え'
+const ARRANGEMENT_SECTION = 'エージェント規則の単一ソースは `CLAUDE.md`'
 const DELIVERY_TABLE_DOC = 'rule-delivery.md'
 const DELIVERY_TABLE_SECTION = '配送されている規則'
 const OFF_TABLE_HOOK_MARKERS: ReadonlyArray<string> = [
@@ -161,16 +162,11 @@ describe('the reading section is the single home of the shared readings', () => 
 	})
 })
 
-describe('the canonical document explains the arrangement', () => {
-	const content = read_repo_file(CANONICAL_DOC)
+describe('the canonical document carries the rules', () => {
 	const unwrapped = read_unwrapped(CANONICAL_DOC)
 
 	it('still carries the rule bodies', () => {
 		for (const marker of RULE_BODY_MARKERS) expect(unwrapped).toContain(marker)
-	})
-
-	it('names every pointer document so the arrangement is discoverable', () => {
-		for (const pointer of POINTER_DOCS) expect(content).toContain(pointer)
 	})
 
 	// The old rule said to write every change three times. Leaving it in place would send the next
@@ -178,8 +174,18 @@ describe('the canonical document explains the arrangement', () => {
 	it('no longer calls the three documents paired', () => {
 		expect(unwrapped).not.toContain('are paired documents')
 	})
+})
 
-	it('says a rule change lands in one place', () => {
-		expect(unwrapped).toContain('single source')
+// joshuafolkken/kit#3395 dropped the resident blockquote that restated the arrangement; it is
+// explained once, in the principles section a reader of any pointer reaches.
+describe(`${READING_DOC} explains the arrangement`, () => {
+	const found = document_section.section(read_repo_file(READING_DOC), ARRANGEMENT_SECTION)
+
+	it('names every pointer document so the arrangement is discoverable', () => {
+		for (const pointer of POINTER_DOCS) expect(found?.text).toContain(pointer)
+	})
+
+	it('says the rules live in one place', () => {
+		expect(found?.text).toContain('規則の本体は `CLAUDE.md` にしか無い')
 	})
 })

@@ -1,10 +1,11 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_finding_ledger } from './review-finding-ledger'
 
-// The gate that refuses a merge until the `/code-review` round was recorded (joshuafolkken/kit#2343).
+// The gate that refuses a merge until the `/code-review` round was recorded.
 //
 // **The instruction was prose, and prose failed.** `review:record` is the one write path for a
-// round's findings (joshuafolkken/kit#2325), but nothing enforced the call — so across eleven merges
+// round's findings, but nothing enforced the call — so across eleven merges
 // after the instruction landed, it was never run once, and the recurrence ledger stayed blind. This
 // module is the mechanical counterpart to `review-attest`'s `--check`, keyed on the issue rather than
 // on a checkout: a round that left no `- rf:` line for its issue is treated as no review at all.
@@ -29,7 +30,7 @@ interface RecordVerdict {
 }
 
 // The default is the work tree the check runs in — the one `review:record` wrote to, a lane's in a
-// lane (joshuafolkken/kit#2919). Every file of the directory is read, so the round is found whichever
+// lane. Every file of the directory is read, so the round is found whichever
 // file holds it; a directory that is not there answers `undefined`, a ledger this checkout does not
 // keep, which becomes `not-required`.
 async function check(
@@ -51,7 +52,7 @@ const REMEDY =
 	'Record the round with `pnpm josh review:record --issue <N> [<category>:<severity>:<file> ...]` — a clean round is a call with no findings, which records one zero-finding line — then reissue the merge.'
 
 function refusal_message(issue: number): string {
-	return [MISSING_REASON, `Issue: #${String(issue)}`, REMEDY].join('\n')
+	return [MISSING_REASON, `Issue: ${session_cite.issue(issue)}`, REMEDY].join('\n')
 }
 
 const review_record = {

@@ -1,5 +1,5 @@
 {
-	"version": "1.1240.0",
+	"version": "1.1370.0",
 	"name": "@joshuafolkken/kit",
 	"description": "Development toolkit for AI-assisted projects: formatting, AI assistant rules and a Git/GitHub Issue workflow for any repository, plus lint, type check, tests and hooks for Node projects",
 	"keywords": [
@@ -19,7 +19,7 @@
 		"type": "git",
 		"url": "git+https://github.com/joshuafolkken/kit.git"
 	},
-	"packageManager": "pnpm@12.6.0+sha512.3ef68f951cb111ac204b4a5a16f0b2ddf0da56a96e0413e81d855d9f0b55ef926714709028e1cd00c405c2c5fb7b9e8ec4dc46777c805d0373c2f2ff00fd20ec",
+	"packageManager": "pnpm@12.10.1+sha512.ba40a37eb1a370d60fea8c4cf1d364c13bcccef518e98ad2bcee954f539d38da37458e58261a3fa55e06523450ea0ffff9f497b135be41f2c15c1642bacace6c",
 	"engines": {
 		"node": "^22.19.0 || ^24.0.0 || >=26.0.0"
 	},
@@ -82,10 +82,13 @@
 		"!scripts/cost",
 		"!scripts/retrospective",
 		"!scripts/dogfood",
+		"!scripts/metrics",
 		"!scripts/test/classify-isolation.ts",
+		"!scripts/test/hanging-execa.ts",
 		"!scripts/test/http-fault-injection.ts",
 		"!scripts/test/josh-harness*.ts",
 		"!scripts/test/pure-files.ts",
+		"!scripts/test/test-machine-guard.ts",
 		"!scripts/test/test-network-guard.ts",
 		"!scripts/test/test-repository-guard.ts",
 		"!scripts/test/test-state-guard.ts",
@@ -177,7 +180,7 @@
 		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
 		"@playwright/test": ">=1.0.0",
 		"@stylistic/eslint-plugin": "^5.10.0",
-		"eslint": "^10.0.0",
+		"eslint": "^10.4.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-import-resolver-typescript": "^4.4.5",
 		"eslint-plugin-import-x": "^4.17.1",
@@ -252,7 +255,7 @@
 		"@eslint/compat": "^2.1.1",
 		"@eslint/js": "^10.0.1",
 		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
-		"@playwright/test": "^1.63.0",
+		"@playwright/test": "^1.64.0",
 		"@secretlint/secretlint-rule-preset-recommend": "^13.0.7",
 		"@stylistic/eslint-plugin": "^5.10.0",
 		"@types/node": "^26.6.4",
@@ -268,31 +271,34 @@
 		"eslint-plugin-unicorn": "^77.0.0",
 		"eslint_d": "^15.0.3",
 		"globals": "^17.13.0",
-		"lefthook": "^2.1.16",
+		"lefthook": "^2.2.1",
 		"prettier": "^3.9.9",
 		"prettier-plugin-svelte": "^4.1.1",
 		"prettier-plugin-tailwindcss": "^0.8.1",
-		"rollup": "^4.64.0",
+		"rollup": "^4.64.3",
 		"rollup-plugin-dts": "^6.5.1",
 		"secretlint": "^13.0.7",
 		"typescript": "^6.0.3",
-		"typescript-eslint": "^8.71.0",
+		"typescript-eslint": "^8.71.1",
 		"vitest": "^5.0.3"
 	},
 	"dependencies": {
-		"execa": "^10.0.1",
-		"js-yaml": "^5.4.2",
+		"cli-spinners": "^3.4.0",
+		"execa": "^10.1.0",
+		"js-yaml": "^5.4.3",
 		"jsonc-parser": "^3.3.1",
 		"ora": "^9.4.1",
 		"semver": "^7.8.5",
+		"string-width": "^8.3.0",
+		"terminal-link": "^5.0.0",
 		"tsx": "^4.23.15",
 		"zod": "^4.6.5"
 	},
 	"devEngines": {
 		"packageManager": {
 			"name": "pnpm",
-			"version": "12.6.0+sha512.3ef68f951cb111ac204b4a5a16f0b2ddf0da56a96e0413e81d855d9f0b55ef926714709028e1cd00c405c2c5fb7b9e8ec4dc46777c805d0373c2f2ff00fd20ec",
-			"onFail": "error"
+			"version": "12.10.1+sha512.ba40a37eb1a370d60fea8c4cf1d364c13bcccef518e98ad2bcee954f539d38da37458e58261a3fa55e06523450ea0ffff9f497b135be41f2c15c1642bacace6c",
+			"onFail": "download"
 		}
 	}
 }

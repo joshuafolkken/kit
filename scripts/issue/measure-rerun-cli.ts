@@ -2,18 +2,20 @@
 import { execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
-import { parse_json_object_safe } from '#scripts/git/parse-json-array'
+import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { error_text } from '#scripts/lib/error-message'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { z } from 'zod'
 import { baseline_measure, type Baseline } from './baseline-measure'
+import { session_cite } from './session-cite'
 
 // `josh measure:rerun <N>` — read a behavior-change Issue body after merge, re-run each baseline
-// command, and print the before/after pair (joshuafolkken/kit#2212). A value that did not move means
+// command, and print the before/after pair. A value that did not move means
 // the premise the rule rested on is refuted, so a line is appended to the observation ledger — reusing
 // that append-only, same-key mechanism rather than a second one.
 //
-// **The baseline is shell, and the body is written by whoever filed the Issue** (joshuafolkken/kit#3064).
+// **The baseline is shell, and the body is written by whoever filed the Issue**.
 // A baseline needs pipes and loops (`git log … | wc -l`, `for d in $(ls …)`), so an allow-list of
 // commands cannot make it safe; what can is who wrote it. The input is therefore the Issue number, not
 // a file, so the author's `author_association` arrives with the body from the same REST read, and only
@@ -21,7 +23,6 @@ import { baseline_measure, type Baseline } from './baseline-measure'
 
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const ISSUE_FIELDS = 'body,author_association'
 const TRUSTED_ASSOCIATIONS: ReadonlySet<string> = new Set(['OWNER', 'MEMBER', 'COLLABORATOR'])
 const TRUSTED_LIST = [...TRUSTED_ASSOCIATIONS].join(' / ')
@@ -71,7 +72,7 @@ async function append_ledger(lines: ReadonlyArray<string>, now: Date): Promise<v
 	if (lines.length === 0) return
 
 	// The running work tree's file for the checked-out issue, a lane's inside a lane — the run's own
-	// commit carries it (joshuafolkken/kit#2919).
+	// commit carries it.
 	const ledger_path = await observation_ledger_home.writer_path(now)
 
 	await observation_ledger_home.append(ledger_path, lines)
@@ -85,7 +86,7 @@ function today(now: Date): string {
 async function read_issue(issue_number: string): Promise<IssueFields | undefined> {
 	const json = await git_gh_issue_read.issue_view_json(issue_number, ISSUE_FIELDS)
 
-	return json === undefined ? undefined : parse_json_object_safe(json, issue_schema)
+	return json === undefined ? undefined : parse_json_object_or_undefined(json, issue_schema)
 }
 
 // The body, only when its author can write to the repository. A read that fails is refused as well:
@@ -94,7 +95,7 @@ async function read_trusted_body(issue_number: string): Promise<BodyRead> {
 	const issue = await read_issue(issue_number)
 
 	if (issue === undefined) {
-		return { kind: 'refused', reason: `could not read issue #${issue_number}` }
+		return { kind: 'refused', reason: `could not read issue ${session_cite.issue(issue_number)}` }
 	}
 
 	const association = issue.author_association ?? UNKNOWN_ASSOCIATION
@@ -102,7 +103,7 @@ async function read_trusted_body(issue_number: string): Promise<BodyRead> {
 	if (!TRUSTED_ASSOCIATIONS.has(association)) {
 		return {
 			kind: 'refused',
-			reason: `refusing to run the baseline of #${issue_number}: its author is ${association}, not ${TRUSTED_LIST}`,
+			reason: `refusing to run the baseline of ${session_cite.issue(issue_number)}: its author is ${association}, not ${TRUSTED_LIST}`,
 		}
 	}
 
@@ -130,7 +131,7 @@ async function rerun(body: string, now: Date): Promise<number> {
 }
 
 async function run(issue_number: string | undefined, now: Date): Promise<number> {
-	if (issue_number === undefined || !ISSUE_NUMBER_PATTERN.test(issue_number)) {
+	if (issue_number === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue_number)) {
 		console.error(USAGE)
 
 		return FAILURE_EXIT_CODE

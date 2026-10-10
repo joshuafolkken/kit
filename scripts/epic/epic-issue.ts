@@ -1,19 +1,17 @@
 import { git_gh_issue_rest } from '#scripts/gh/git-gh-issue-rest'
 import { blocked_by_schema } from '#scripts/git/git-schemas'
-import { parse_json_object_safe } from '#scripts/git/parse-json-array'
+import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 import type { IssueReference } from './epic-reference'
 
 // The shapes one issue is read as, and the argument every epic command takes.
 //
-// The read goes through `gh api` (REST) since joshuafolkken/kit#1024; `git-gh-issue-rest.ts` maps
-// the response back into the field names `gh issue view --json …` used, so the shapes below are
-// the ones they always were.
+// The read goes through `gh api` (REST); `git-gh-issue-rest.ts` maps the response back into the
+// field names `gh issue view --json …` uses, so the shapes below are those.
 //
 // Single-sourced because three commands read the same JSON and take the same argument. Each had its
 // own copy of the schema, the `blockedBy` unwrapping and the number parser, which is three places to
-// fix the next time `gh` changes shape — and the one place a divergence would not be noticed
-// (joshuafolkken/kit#862).
+// fix the next time `gh` changes shape — and the one place a divergence would not be noticed.
 
 const label_schema = z.object({ name: z.string() })
 
@@ -33,7 +31,7 @@ const epic_issue_schema = z.object({
 	state: z.string().default(UNKNOWN_STATE),
 	// The issue endpoint answers for a pull request as readily as for an issue, and nothing in the
 	// other fields separates them — an open PR reports `state: OPEN`, a merged one `MERGED`. The URL
-	// is what says which it is: `/pull/<n>` against `/issues/<n>` (joshuafolkken/kit#947).
+	// is what says which it is: `/pull/<n>` against `/issues/<n>`.
 	url: z.string().default(''),
 	labels: z.array(label_schema).default([]),
 	blockedBy: blocked_by_schema,
@@ -47,14 +45,14 @@ function parse_epic_issue(raw: string | undefined): EpicIssue | undefined {
 	if (raw === undefined) return undefined
 
 	try {
-		return parse_json_object_safe(raw, epic_issue_schema)
+		return parse_json_object_or_undefined(raw, epic_issue_schema)
 	} catch {
 		return undefined
 	}
 }
 
 // The blockers an issue declares, unwrapped from the connection and carrying the repository each one
-// lives in (joshuafolkken/kit#1126).
+// lives in.
 //
 // `fallback_repo` is what an unqualified relation has always meant: the repository the issue itself is
 // read in. REST names the blocker's repository in `repository_url`, and a relation may cross one — so
@@ -63,7 +61,7 @@ function parse_epic_issue(raw: string | undefined): EpicIssue | undefined {
 //
 // The parameter is narrowed to the one field this reads, so a caller holding a differently-shaped
 // issue — `backlog-pool.ts`'s standalone rows arrive as `OpenIssueData` — resolves through this same
-// function instead of repeating the `repository_url` unwrapping (joshuafolkken/kit#1654).
+// function instead of repeating the `repository_url` unwrapping.
 function blocker_references_of(
 	issue: Pick<EpicIssue, 'blockedBy'>,
 	fallback_repo = '',
@@ -112,7 +110,7 @@ function parse_epic_number(raw = ''): number | undefined {
 //
 // A cross-repository epic must be qualified. A bare `#858` resolves to *this* repository's issue 858
 // — a different issue entirely — so reading it as the other repository's would silently point at the
-// wrong thing (joshuafolkken/kit#864).
+// wrong thing.
 interface EpicReference {
 	repo?: string
 	number: number

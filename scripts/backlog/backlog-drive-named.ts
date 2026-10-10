@@ -3,16 +3,39 @@ import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
+import { run_merge_token } from '#scripts/run/merge/run-merge-token'
+import { run_invocation } from '#scripts/run/run-invocation'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_named } from './backlog-named'
+
+const { MERGE_TOKEN } = run_merge_token
 
 const NO_RETRIES = 0
 const FIRST = 0
 const TERMINAL_OUTCOMES: ReadonlySet<string> = new Set(['merged', 'parked', 'split'])
 
+// The skip follows the declared order alone: an issue `run:add` put in was
+// asked for on its own, so its failure skips nothing and a declared failure does not skip it.
+function is_declared(carry: RunCarry, issue: string): boolean {
+	return run_invocation.issue_numbers(carry.invocation)?.includes(Number(issue)) === true
+}
+
+// An issue `run:add` put in that is already in flight holds nothing up: it was
+// asked for on its own, so the declared item behind it — an epic whose children fill the free lanes —
+// is offered beside it. A declared issue in flight still holds the ones declared after it.
+function is_held(carry: RunCarry, state: DriveState, issue: number): boolean {
+	return !state.in_flight.includes(String(issue)) || is_declared(carry, String(issue))
+}
+
+function next_of(carry: RunCarry, state: DriveState): number | undefined {
+	const remaining = run_carry.remaining_of(carry) ?? []
+
+	return remaining.find((issue) => is_held(carry, state, issue)) ?? remaining[FIRST]
+}
+
 function offer(carry: RunCarry, state: DriveState, is_only: boolean): OfferRead | undefined {
-	const next = run_carry.remaining_of(carry)?.[FIRST]
+	const next = next_of(carry, state)
 
 	if (next !== undefined) {
 		const issue = String(next)
@@ -28,9 +51,11 @@ function offer(carry: RunCarry, state: DriveState, is_only: boolean): OfferRead 
 }
 
 function is_done(result: MergeResult): boolean {
-	if (TERMINAL_OUTCOMES.has(result.outcome)) return result.code === 0 && result.token !== 'busy'
+	if (TERMINAL_OUTCOMES.has(result.outcome)) {
+		return result.code === 0 && result.token !== MERGE_TOKEN.BUSY
+	}
 
-	return result.outcome === 'failed' && result.code === 0 && result.token !== 'stop'
+	return result.outcome === 'failed' && result.code === 0 && result.token !== MERGE_TOKEN.STOP
 }
 
 function can_mark(carry: RunCarry, issue: string, owner: string): boolean {
@@ -48,17 +73,22 @@ function mark_one(target: string, issue: string, owner: string): boolean {
 	return true
 }
 
-function skip_after_failure(target: string, issue: string, owner: string): void {
-	const read = run_carry.read_carry(target)
-	if (read.kind !== 'carried') return
-	const remaining = run_carry.remaining_of(read.carry) ?? []
+function skipped_of(carry: RunCarry, issue: string): ReadonlyArray<number> {
+	if (!is_declared(carry, issue)) return []
+	const remaining = run_carry.remaining_of({ ...carry, added: undefined }) ?? []
 	const named = [
 		{ issue: Number(issue), is_epic: false },
 		...remaining.map((number) => ({ issue: number, is_epic: false })),
 	]
-	const { skipped } = backlog_named.after_failure(named, Number(issue))
 
-	for (const number of skipped) {
+	return backlog_named.after_failure(named, Number(issue)).skipped
+}
+
+function skip_after_failure(target: string, issue: string, owner: string): void {
+	const read = run_carry.read_carry(target)
+	if (read.kind !== 'carried') return
+
+	for (const number of skipped_of(read.carry, issue)) {
 		if (!mark_one(target, String(number), owner)) return
 	}
 }

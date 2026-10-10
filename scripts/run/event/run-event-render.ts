@@ -1,9 +1,8 @@
 import type { EventKind, RunEvent } from './run-event-stream'
 
-// One run event as the line a person reads in the watch pane (joshuafolkken/kit#2492). The ambient tier
-// used to be a session relaying `run:event --follow`, and every relay re-read that session's whole
-// history; the pane is a script, so the wording a relaying session supplied is supplied here instead —
-// one label per event kind, in the session language, beside the local clock time.
+// One run event as the line a person reads in the watch pane. The pane is a script, not a session, so
+// the wording is supplied here — one label per event kind, in the session language, beside the local
+// clock time.
 //
 // **The kinds are a fixed enumeration** (`run-event-stream.ts` → `EVENT_KIND`), so a template table is
 // the whole renderer; a kind the table does not name — a stream written by a newer kit — prints its raw
@@ -40,6 +39,12 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	heartbeat: { ja: '生存確認', en: 'heartbeat' },
 	'ship-launch': { ja: '出荷を開始', en: 'ship launched' },
 	'ship-stop': { ja: '出荷が停止', en: 'ship stopped' },
+	idle: { ja: '新着待ち', en: 'idle watch' },
+	filed: { ja: '起票', en: 'filed' },
+	note: { ja: '意見', en: 'note' },
+	'lane-phase': { ja: 'レーンの段階', en: 'lane phase' },
+	add: { ja: '割り込み', en: 'added' },
+	'lane-limit': { ja: 'レーン上限', en: 'lane limit' },
 }
 
 const LABELS_BY_KIND: ReadonlyMap<string, KindLabel> = new Map(Object.entries(KIND_LABELS))

@@ -41,8 +41,34 @@ after its own — 144 ledger-only pull requests in one month.
 (joshuafolkken/kit#2492); another run's stash of that checkout took the lines before the flush saw
 them, so neither route remains.
 
+**Why a passing second review round is recorded on the Issue.** That round runs after the commit,
+beside CI, and reads only, so its line had no commit left to ride: `pnpm josh followup` pushed it onto
+the open pull request and the CI started over — six of the fourteen lanes merged on 2026-10-10. Having
+the parent collect such lines in the primary checkout was the other candidate, and it needs both
+routes the paragraph above removed, so the record leaves the tree instead (joshuafolkken/kit#3645).
+
+**Why an empty flush exits 0.** Most cycles append nothing, and a command that errored there would be
+one nobody runs.
+
+**Why the promotion counts the default branch.** That is what the commit path buys: a ledger line
+that merged is one every later run, every other machine and every fresh clone can see, and only then
+can a second sighting be recognized as one.
+
 ## Why a second sighting files
 
 **A repeat is the citation.** joshuafolkken/kit#1698 asked a discretionary filing to be pulled by a
 blockage rather than pushed by a sighting; an observation recorded twice has been pulled — it came
 back on its own, which no single sighting can demonstrate.
+
+## Where each rule came from
+
+- The procedure split out of `observation-filing.md`, read only in the turn that appends —
+  joshuafolkken/kit#3176.
+- An observation the depth test turns away is recorded rather than discarded — joshuafolkken/kit#1728.
+- One file per issue under `.josh/observations/`, a later append committed onto the pull request by
+  `followup`, and a lane carrying its own lines — joshuafolkken/kit#2919.
+- The ledger's commit path — joshuafolkken/kit#1756; a run's lines ride its own commit —
+  joshuafolkken/kit#2763.
+- A line that breaks the grammar is not carried — joshuafolkken/kit#2123; lines on an old
+  single-file path are moved first — joshuafolkken/kit#2724, joshuafolkken/kit#2919.
+- A user-found bug is recorded by its kind of miss — joshuafolkken/kit#2246.

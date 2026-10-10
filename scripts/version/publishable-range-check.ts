@@ -24,7 +24,8 @@ const FAILURE_EXIT_CODE = 1
 // consumer can resolve — the exact blind spot this guard exists to close.
 //
 // `pnpm view` rather than `npm view` because npm refuses to run at all inside a project whose
-// `devEngines.packageManager` names pnpm with `onFail: "error"`, failing every probe with
+// `devEngines.packageManager` names pnpm with an `onFail` other than `"warn"` / `"ignore"` (kit
+// ships `"download"`, which npm refuses on just the same), failing every probe with
 // EBADDEVENGINES instead of answering. Both are shimmed, so the filtered view is preserved.
 function probe_range(name: string, range: string): ProbeResult {
 	const result = execaSync('pnpm', ['view', `${name}@${range}`, 'version'], {

@@ -1,13 +1,14 @@
+import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { includeIgnoreFile } from '@eslint/compat'
 import js from '@eslint/js'
 import stylistic from '@stylistic/eslint-plugin'
 import prettier from 'eslint-config-prettier'
-import importPlugin from 'eslint-plugin-import-x'
+import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript'
+import importPlugin, { createNodeResolver } from 'eslint-plugin-import-x'
 import promise from 'eslint-plugin-promise'
 import sonarjs from 'eslint-plugin-sonarjs'
 import unicorn from 'eslint-plugin-unicorn'
-import { defineConfig } from 'eslint/config'
+import { defineConfig, includeIgnoreFile } from 'eslint/config'
 import globals from 'globals'
 import ts from 'typescript-eslint'
 import { checkout_rooted_parser } from './checkout-rooted-parser.js'
@@ -84,9 +85,20 @@ function create_test_filename_ban_block(files, ban_entry) {
 	}
 }
 
+// joshuafolkken/kit#3653: a project `josh init` set up without Git has no `.gitignore` — init
+// leaves the Git files out there — while the generated `eslint.config.js` still names one.
+// `includeIgnoreFile` reads the file eagerly and throws ENOENT, so lint failed before it read a
+// line of the project's code. A missing file carries no patterns, which is what it means here.
+function create_gitignore_blocks(gitignore_path) {
+	const file_path = fileURLToPath(gitignore_path)
+	if (!existsSync(file_path)) return []
+
+	return [includeIgnoreFile(file_path)]
+}
+
 export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 	return defineConfig(
-		includeIgnoreFile(fileURLToPath(gitignore_path)),
+		create_gitignore_blocks(gitignore_path),
 		{
 			// joshuafolkken/kit#1112: `.claude/worktrees/` is where Claude Code puts its bridge work
 			// trees — a full checkout of the project, carrying its own repository root. Linted, every
@@ -125,7 +137,23 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 		{
 			plugins: { import: importPlugin },
 			settings: {
-				'import/resolver': { typescript: { alwaysTryTypes: true }, node: true },
+				// joshuafolkken/kit#3599: `import-x/resolver-next` is the key eslint-plugin-import-x
+				// reads. The resolvers used to sit under `import/resolver`, which the plugin ignores —
+				// the rules are only *named* `import/` here, the settings namespace stays the plugin's
+				// own — so every import fell back to the default node resolver, which does not follow
+				// an extensionless `.ts` specifier, and `no-cycle` was green over cycles it never saw.
+				'import-x/resolver-next': [
+					// `project` roots the resolver's tsconfig where the parser's is. Left out, the
+					// resolver reads the one in `process.cwd()`, so a run started anywhere else resolves
+					// no `paths` alias — the same silent miss, for every cycle that goes through one.
+					createTypeScriptImportResolver({ alwaysTryTypes: true, project: tsconfig_root_dir }),
+					createNodeResolver(),
+				],
+				// The other half of the same defect: the plugin reads the exports only of files whose
+				// extension is listed here, and its default list is JavaScript-only. A `.ts` import
+				// that resolves but is not listed is skipped just as silently as one that never
+				// resolved. The list is the plugin's own TypeScript preset's.
+				'import-x/extensions': importPlugin.flatConfigs.typescript.settings['import-x/extensions'],
 				'import-x/ignore': ['node_modules'],
 			},
 		},
@@ -228,6 +256,16 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 				// the annotation (JSDoc does not satisfy them), making them unsatisfiable there.
 				'@typescript-eslint/explicit-function-return-type': 'off',
 				'@typescript-eslint/explicit-module-boundary-types': 'off',
+				// joshuafolkken/kit#3599: `rules/import.js` switches these off because the compiler runs
+				// the same checks — which holds only for a file the compiler checks. Nothing else reads
+				// a hand-authored module's imports against the exports they name, so here they stay at
+				// the severities of the plugin's recommended preset.
+				'import-x/named': 'error',
+				'import-x/namespace': 'error',
+				'import-x/default': 'error',
+				'import-x/export': 'error',
+				'import-x/no-named-as-default': 'warn',
+				'import-x/no-named-as-default-member': 'warn',
 			},
 		},
 		// joshuafolkken/kit#1233: the test-filename bans are wired into the shared base config

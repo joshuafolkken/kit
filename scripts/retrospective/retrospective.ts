@@ -5,14 +5,18 @@ import type { CategoryCount } from '#scripts/review/review-finding-ledger'
 import { run_event_scope, type EventScope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stop_text } from '#scripts/run/ship/run-ship-stop-text'
+import { guard_friction, type SessionTranscript } from './guard-friction'
+import { investigation_payback } from './investigation-payback'
 
-// The composition half of `josh retrospective` — the end-of-run retrospective's aggregation
-// (joshuafolkken/kit#2328). A run that drains its backlog has spent time and money that nobody reads;
+// The composition half of `josh retrospective` — the end-of-run retrospective's aggregation.
+// A run that drains its backlog has spent time and money that nobody reads;
 // this folds the four measurements that already exist — the run tree's cost and time
 // (`cost-run-report.ts`), the recurring review findings (`review-finding-ledger.ts`), the observation
 // ledger and the run's own event stream — into one digest, so the retrospective step has something to
 // weigh. It adds no new measurement, per the observation-filing rule against readerless numbers; every
-// input here is read from a command that was already keeping it.
+// input here is read from a command that was already keeping it. The run's transcripts are the one
+// input read for this digest alone — the guard refusals and Stop re-entries no other command tallied,
+// counted by `guard-friction.ts` and `investigation-payback.ts`.
 //
 // **It is a pure function of the four inputs.** The gathering — loading the run tree, reading the
 // ledger, opening the stream — is the CLI's; this shapes what they return and nothing else, so the
@@ -37,11 +41,13 @@ interface RetrospectiveInputs {
 	// The observation ledger's entry lines, already filtered to entries by the caller.
 	observations: ReadonlyArray<string>
 	events: ReadonlyArray<RunEvent>
-	// Which invocation the friction count covers (joshuafolkken/kit#2395). The stream is the repository's
+	// Which invocation the friction count covers. The stream is the repository's
 	// event log, not this run's, so a digest handed the whole of it would report a previous invocation's
 	// cut and park as this run's friction — the very numbers the retrospective weighs to file improvement
 	// issues. The scope is `run-event-scope.ts`'s, shared with `run:report` and `run:step`.
 	scope: EventScope
+	// The selected run's sessions with their parsed transcripts.
+	sessions: ReadonlyArray<SessionTranscript>
 }
 
 const CLOSING =
@@ -97,7 +103,7 @@ function friction_count(events: ReadonlyArray<RunEvent>, kind: string): number {
 }
 
 // This invocation's friction, counted over its own events only. An undetermined scope falls to an empty
-// list rather than the whole stream (joshuafolkken/kit#2395): counting every invocation's friction as this
+// list rather than the whole stream: counting every invocation's friction as this
 // run's is the defect, so the safe fall is to attribute nothing that cannot be attributed.
 function friction_lines(events: ReadonlyArray<RunEvent>, scope: EventScope): Array<string> {
 	const scoped = run_event_scope.scoped_events(events, scope) ?? []
@@ -122,7 +128,7 @@ function tally(reasons: ReadonlyArray<string>): Map<string, number> {
 	return counts
 }
 
-// Where this invocation's `josh ship` supervisors stopped, by stage (joshuafolkken/kit#3245) — the count
+// Where this invocation's `josh ship` supervisors stopped, by stage — the count
 // that otherwise took a hand tally of resume prompts. Scoped exactly as the friction count is.
 function ship_stop_lines(events: ReadonlyArray<RunEvent>, scope: EventScope): Array<string> {
 	const counts = tally(stop_reasons(run_event_scope.scoped_events(events, scope) ?? []))
@@ -146,6 +152,9 @@ function compose(inputs: RetrospectiveInputs): string {
 		'',
 		...friction_lines(inputs.events, inputs.scope),
 		...ship_stop_lines(inputs.events, inputs.scope),
+		'',
+		...guard_friction.report_lines(guard_friction.guard_rows(inputs.sessions)),
+		...investigation_payback.report_lines(inputs.sessions),
 		'',
 		CLOSING,
 	].join('\n')

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { stop_rules, type StopContext } from './stop-rules'
+import { stop_rules } from './stop-rules'
 import { stop_rules_fixture } from './stop-rules-fixture'
 
 const { context } = stop_rules_fixture
@@ -169,69 +169,6 @@ describe('stop_rules.stop_outcome — issue citation quoted from the prompt', ()
 
 		expect(reason).toContain('pnpm josh issue:cite 8')
 		expect(reason).not.toContain('issue:cite 7')
-	})
-})
-
-// joshuafolkken/kit#2422: an offer to file is a Tier A filing deferred to the user, so it blocks.
-const OFFER_MESSAGE = '起票するのが妥当だと考えます。起票してよければ言ってください。'
-
-// The offer messages are Japanese, so they are judged in a Japanese session.
-function ja_context(overrides: Partial<StopContext>): StopContext {
-	return context({ session_lang: 'ja', ...overrides })
-}
-
-describe('stop_rules.stop_outcome — filing offer', () => {
-	it('blocks a reply that offers to file on a turn that filed nothing', () => {
-		const { reason } = stop_rules.stop_outcome(ja_context({ message: OFFER_MESSAGE }))
-
-		expect(reason).toBe(stop_rules.FILING_OFFER_REASON)
-	})
-
-	it('is silent on a reply reporting a filing already made', () => {
-		const message = '起票しました: [#9](https://github.com/joshuafolkken/kit/issues/9) — 所見'
-
-		expect(stop_rules.stop_outcome(ja_context({ message, filed: true })).reason).toBeUndefined()
-	})
-
-	it('is silent when a filing is on the tail even if the reply still reads as an offer', () => {
-		const outcome = stop_rules.stop_outcome(ja_context({ message: OFFER_MESSAGE, filed: true }))
-
-		expect(outcome.reason).toBeUndefined()
-	})
-
-	it('is silent when the offer targets a third-party repository', () => {
-		const message = `https://github.com/sveltejs/kit に${OFFER_MESSAGE}`
-
-		expect(stop_rules.stop_outcome(ja_context({ message })).reason).toBeUndefined()
-	})
-
-	it('is silent when the session owner cannot be read', () => {
-		const outcome = stop_rules.stop_outcome(
-			ja_context({ message: OFFER_MESSAGE, session_owner: undefined }),
-		)
-
-		expect(outcome.reason).toBeUndefined()
-	})
-})
-
-describe('stop_rules.stop_outcome — filing offer stands down and ordering', () => {
-	it('does not block once stop_hook_active is set', () => {
-		const outcome = stop_rules.stop_outcome(
-			ja_context({ message: OFFER_MESSAGE, stop_hook_active: true }),
-		)
-
-		expect(outcome.reason).toBeUndefined()
-	})
-
-	it('goes ahead of the citation rule and behind the hold rules', () => {
-		const offer_with_bare = `${OFFER_MESSAGE} #7`
-
-		expect(stop_rules.stop_outcome(ja_context({ message: offer_with_bare })).reason).toBe(
-			stop_rules.FILING_OFFER_REASON,
-		)
-		expect(
-			stop_rules.stop_outcome(ja_context({ hold_present: true, message: offer_with_bare })).reason,
-		).toBe(stop_rules.STOP_NOTIFY_REASON)
 	})
 })
 

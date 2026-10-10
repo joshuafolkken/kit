@@ -6,7 +6,7 @@ import {
 	type ScopeVocabulary,
 } from '#scripts/git/changed-file-scope'
 
-// joshuafolkken/kit#1257: the unit suite always ran whole. Measured warm on kit, that is 384 files
+// The whole unit suite is expensive. Measured warm on kit, that is 384 files
 // and 6,616 tests — 13.9s wall and 110s of CPU, 84% of everything the four gate checks spend, and
 // an implementation loop paid it again on every re-check. The same tree narrowed to one changed
 // file runs 31 files and 566 tests in 2.4s (7.9s of CPU, −93%).
@@ -19,8 +19,7 @@ import {
 // The decision this file makes is which extensions vitest can walk a module graph back from, and
 // what to print about it. Everything the decision shares with `josh lint:related` — reading the
 // change, dropping what the tree no longer holds, and the two fallbacks — is
-// `changed-file-scope.ts`, so the two commands cannot drift apart about what "changed" means
-// (joshuafolkken/kit#1298).
+// `changed-file-scope.ts`, so the two commands cannot drift apart about what "changed" means.
 
 type RelatedScope = ChangedFileScope
 

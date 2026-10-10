@@ -7,7 +7,7 @@ import { split_assess, type SplitVerdict } from '#scripts/split/split-assess'
 import { issue_fold, type FoldVerdict } from './issue-fold'
 
 // `josh issue:fold "<title>" "<title>" …` — before a run files a second finding, answer whether the
-// findings this session holds fold into one Issue (joshuafolkken/kit#2213).
+// findings this session holds fold into one Issue.
 //
 // It is the filing-time counterpart to `split:assess`: the size half is that command's own verdict,
 // called rather than recomputed (the counting and the guide live in `split-assess.ts`), and
@@ -25,6 +25,8 @@ const REASONS: Record<FoldVerdict, string> = {
 	separate:
 		'separate — file these apart; they are separable and their combined size clears the split guide',
 	'no-fold-needed': 'no fold needed — a single candidate is filed on its own',
+	undetermined:
+		'undetermined — the diff measures no size, so the whole request\'s estimate decides (`split-assessment.md` → "The question")',
 }
 
 interface FoldArguments {
@@ -50,20 +52,23 @@ function read_arguments(argv: ReadonlyArray<string>): FoldArguments | undefined 
 	}
 }
 
-// The size half, single-sourced from `split:assess` (joshuafolkken/kit#2183): the same counting, the
-// same guide. A diff that cannot be read — no base, not a checkout — measures as empty, which
-// `split_assess` reads as `single`, so an unanswerable size folds rather than tipping to `separate`.
-async function size_verdict(): Promise<SplitVerdict> {
+// The size half, single-sourced from `split:assess`: the same counting, the
+// same guide. `undefined` when the diff says nothing about size — no changed non-test file, or a diff
+// that cannot be read (no base, not a checkout) — which `fold_verdict` answers as `undetermined`
+// rather than folding on no evidence. `issue:file` asks it too.
+async function size_verdict(): Promise<SplitVerdict | undefined> {
 	try {
-		return split_assess.assess(await git_command.diff_main_numstat()).verdict
+		const measurement = split_assess.assess(await git_command.diff_main_numstat())
+
+		return measurement.files === 0 ? undefined : measurement.verdict
 	} catch {
-		return split_assess.SINGLE_VERDICT
+		return undefined
 	}
 }
 
 // The size question is only asked once there is something to fold; a lone candidate is answered
 // without measuring anything.
-async function size_for(args: FoldArguments): Promise<SplitVerdict> {
+async function size_for(args: FoldArguments): Promise<SplitVerdict | undefined> {
 	if (args.titles.length < issue_fold.MIN_CANDIDATES) return split_assess.SINGLE_VERDICT
 
 	return await size_verdict()
@@ -90,7 +95,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const issue_fold_cli = { read_arguments, size_verdict, run }
+const issue_fold_cli = { REASONS, read_arguments, size_verdict, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

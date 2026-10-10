@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_issue } from './git-issue'
 
@@ -164,7 +165,7 @@ describe('git_issue.derive_from_branch — lane branch guards', () => {
 		issue_get_title_mock.mockResolvedValue(undefined)
 
 		await expect(git_issue.derive_from_branch(LANE_BRANCH)).rejects.toThrow(
-			`Cannot read the title of issue #${LANE_NUMBER}`,
+			`Cannot read the title of issue ${session_cite.issue(LANE_NUMBER)}`,
 		)
 	})
 })

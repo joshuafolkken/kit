@@ -5,19 +5,18 @@ import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { error_text } from '#scripts/lib/error-message'
 import { implementation_cut_verdict } from '#scripts/rules/implementation-cut-verdict'
-import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
+import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_headless } from './run-headless'
 import { run_watcher_hook } from './run-watcher-hook'
 
-// The `backlogrun` parent's hand-off, delivered at the call it binds on (joshuafolkken/kit#2947).
+// The `backlogrun` parent's hand-off, delivered at the call it binds on.
 //
-// **The parent's hand-off was asked only at a merge, and the context grew between merges.** The
-// orchestrator never implements, yet on 2026-10-02 parent 259fb6d5 sent 111 of its 170 requests past
-// the shared threshold, peaking at 207,081 tokens: `pnpm josh cost --cut` is read after each child's
-// merge (`backlogrun-progress.md` → "The hand-off"), and a long wait or a lane-failure investigation
-// between two merges is exactly where it went unread. This is the lesson `implementation-cut.ts` records
-// for a lane child, one session up — a check carried as a step is taken late, a `PreToolUse` refusal is
-// taken at the next call.
+// **A hand-off asked only at a merge goes unread while the context grows between merges.** The
+// orchestrator never implements, but `pnpm josh cost --cut` is read after each child's merge
+// (`backlogrun-progress.md` → "The hand-off"), and a long wait or a lane-failure investigation between
+// two merges is where the context grows past the shared threshold. This is the lesson
+// `implementation-cut.ts` records for a lane child, one session up — a check carried as a step is
+// taken late, a `PreToolUse` refusal is taken at the next call.
 //
 // **The same statistic and the same threshold, never a second measurement.** The verdict is
 // `cost_cli.session_verdict` — what `pnpm josh cost --cut` prints — read through the implementation cut's
@@ -33,8 +32,7 @@ const STAMP_PREFIX = 'josh-parent-cut-guard-'
 // **One refusal, then a quiet window long enough to finish the hand-off in.** The hand-off is several
 // calls — `lane:list`, `lane:output`, `run:carry --cut`, `run:wake`, the progress comment — and a guard
 // refusing each of them would wedge the very procedure it asks for. A parent that could not cut (a lane
-// nobody can poll) is asked again once the window has passed, which is the "next opportunity" the merge
-// seam used to be.
+// nobody can poll) is asked again once the window has passed.
 const QUIET_WINDOW_MS = 600_000
 
 // What the decision has to know about the world, passed in so it is testable without a carry record or
@@ -73,7 +71,7 @@ const PARENT_CUT_REASON =
 async function is_due(state: ParentCutState): Promise<boolean> {
 	const carry = await state.carry()
 
-	if (carry === undefined || run_carry.is_at_cut_cap(carry)) return false
+	if (carry === undefined || run_headless.is_cut_capped(carry)) return false
 
 	return state.verdict() === cost_verdict.OVER_VERDICT
 }

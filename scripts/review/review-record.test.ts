@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { session_cite } from '#scripts/issue/session-cite'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
@@ -74,7 +75,7 @@ describe('review_record.refusal_message', () => {
 	it('names the issue and points at the record command', () => {
 		const message = review_record.refusal_message(ISSUE)
 
-		expect(message).toContain('Issue: #2343')
+		expect(message).toContain(`Issue: ${session_cite.issue(ISSUE)}`)
 		expect(message).toContain('pnpm josh review:record --issue')
 	})
 })

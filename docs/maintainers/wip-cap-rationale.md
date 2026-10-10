@@ -7,8 +7,9 @@ change to this file changes no rule.
 
 ## Tests that pin the wording
 
-`scripts/backlog/backlog-manufacturing-rule.test.ts` pins what the delivery message `WIP_CAP_REASON`
-(`scripts/rules/wip-cap.ts`) carries.
+`scripts/backlog/backlog-manufacturing-rule.test.ts` pins what the hold message `HELD_MESSAGE`
+(`scripts/issue/issue-wip.ts`) carries. Since joshuafolkken/kit#3423 there is no delivered row: the
+command counts and holds on the first call, so a refusal ahead of it was a pure round trip.
 
 `scripts/gh/gh-document-guard.test.ts` pins why `gh issue list` is not used: the only `gh` a
 distributed document may put in an executable block is REST, and `gh issue list` goes through GraphQL,
@@ -20,6 +21,9 @@ In the 7 days up to 2026-09-06, 257 Issues were filed and 163 closed — **+13.4
 latest 14 days, filings outran closures on every single day. Meanwhile `fullrun` took a median of
 about 10 minutes from PR creation to merge, so **throughput was not the problem**. Arrivals kept
 outrunning processing, and with no cap on the open count the growth piled up where nobody saw it.
+
+**The cap is an enforcement device that makes growth visible**, not a goal of fewer Issues. Its only
+job is to make a filing over the cap ask once whether this one Issue is worth adding.
 
 ## Why a filing a run is blocked by is not stopped
 

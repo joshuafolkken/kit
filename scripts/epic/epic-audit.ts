@@ -1,11 +1,11 @@
 import { markdown_section } from '#scripts/issue/markdown-section'
+import { issue_citation } from '#scripts/rules/issue-citation'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 
 // Reading an epic's children against each other.
 //
-// `epic:check` verifies one epic's *format*; nothing verified that the children agree. A hand audit
-// of joshuafolkken/kit#858 found two contradictions that would have stalled the implementation, and
-// `epic:check` reported all four of its requirements as passing throughout (joshuafolkken/kit#870).
+// `epic:check` verifies one epic's *format*, not that the children agree: an epic can pass every
+// format requirement while carrying contradictions that would stall the implementation.
 //
 // The graph's own properties — a cycle, and a body that declares one order while the relations
 // record another — are already detected by `epic:next` for its own purposes. This module is a
@@ -21,11 +21,11 @@ const REFERENCE_PATTERN = /#(\d+)\b/gu
 // What may appear in the `owner/repo` written in front of a `#`: exactly the set the previous
 // lookbehind refused a bare reference after, plus the `.` a repository name may legitimately contain.
 //
-// The dot is where this parse and the task-list parse used to disagree. `epic_parse`'s
+// The dot is where this parse and the task-list parse could disagree. `epic_parse`'s
 // `EXTERNAL_REFERENCE_SOURCE` allows one, so `- [ ] owner/site.com#40` is tracked as a genuine
-// cross-repository child; this one excluded it, so a sibling quoting `owner/site.com#40` was read
-// back as `com` — no repository — and every check skipped it in silence. A child that can be tracked
-// but never cited is the gap joshuafolkken/kit#1016 closes.
+// cross-repository child; excluded here, a sibling quoting `owner/site.com#40` would read back as
+// `com` — no repository — and every check would skip it in silence: a child that can be tracked but
+// never cited.
 //
 // Nothing in the syntax separates `owner/site.com` from a path written in prose: `prompts/review.md`
 // has the same shape, and reading it as a repository is the misread the exclusion was there to
@@ -81,8 +81,7 @@ function is_repo_shape(parts: ReadonlyArray<string>): boolean {
 // repositories this epic actually spans. `owner/site.com#40` is read when the epic tracks a child
 // there, and `prompts/review.md#5` is not read at all, because no epic tracks a repository by that
 // name. That makes the set of children that can be *tracked* and the set that can be *cited* the same
-// set, which is what joshuafolkken/kit#1016 asked for, without admitting the path misread that
-// widening the pattern outright would have brought back.
+// set, without admitting the path misread that widening the pattern outright would bring back.
 function reference_repo(
 	prefix: string,
 	repo: string,
@@ -127,8 +126,7 @@ function unique_references(references: ReadonlyArray<IssueReference>): Array<Iss
 // `owner/name` whose body this is: an unqualified `#N` there names that repository's issue N.
 //
 // `known` names the repositories the epic in hand spans, and only a dotted name consults it —
-// see `reference_repo`. A caller with no epic in view passes nothing and gets the dotless reading,
-// which is what every caller got before joshuafolkken/kit#1016.
+// see `reference_repo`. A caller with no epic in view passes nothing and gets the dotless reading.
 function parse_issue_references(
 	text: string,
 	repo: string,
@@ -148,7 +146,7 @@ function parse_issue_references(
 // The repositories an epic actually spans, which is what settles a dotted name written in prose:
 // `owner/site.com#40` is a reference when a child lives there and a path otherwise. Built from the
 // children rather than supplied, so a caller cannot hand the parse a set that disagrees with the
-// epic being read (joshuafolkken/kit#1016).
+// epic being read.
 function known_repos(
 	children: ReadonlyArray<IssueReference>,
 	current_repo: string,
@@ -159,8 +157,14 @@ function known_repos(
 // The issue numbers a piece of prose refers to *in its own repository*. Kept as the narrower reading
 // of the same parse rather than a second one: `epic:bundle` compares two issues' references by
 // number and has no cross-repository notion to compare with.
+//
+// **Only the body's own prose is read**: a number inside a fenced block or on
+// a quote line is pasted material — command output in a reproduction, a quoted comment — not the
+// author naming that issue. Counting it bundled a draft into an unrelated epic because a `lane:list`
+// output in its fence happened to list one of that epic's children. The exclusion is the stop guard's
+// citation reading (`issue_citation.prose_lines`), shared rather than restated.
 function parse_references(text: string, repo = ''): Array<number> {
-	return parse_issue_references(text, repo)
+	return parse_issue_references(issue_citation.prose_lines(text).join('\n'), repo)
 		.filter((reference) => reference.repo === repo)
 		.map((reference) => reference.number)
 }
@@ -201,7 +205,7 @@ function collect_blockers(
 }
 
 // Both ends are named by identity — repository plus number — because an epic can track two children
-// whose numbers collide across repositories (joshuafolkken/kit#864).
+// whose numbers collide across repositories.
 function depends_on(
 	index: ReadonlyMap<string, EpicChild>,
 	node: EpicChild,

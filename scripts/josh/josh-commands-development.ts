@@ -46,6 +46,20 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
 		memory_mb: core_budget.MEMORY_MB.eslint_scan,
 	},
+	metrics: {
+		script: 'scripts/metrics/metrics-command.ts',
+		description:
+			'Print repository-wide quality totals and durations, and fail when a total grew past the merge-base or a duration past its baseline',
+		category: 'Development',
+		reference: [
+			'[--no-startup | --totals-only | --accept --reason "<why>"]',
+			'developer',
+			['files'],
+		],
+		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
+		memory_mb: core_budget.MEMORY_MB.eslint_scan,
+		is_kit_only: true,
+	},
 	'refactor:scan': {
 		script: 'scripts/refactor/refactor-scan-cli.ts',
 		description:
@@ -69,6 +83,13 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[--refresh]', 'developer', ['files']],
 	},
+	'rule:list': {
+		script: 'scripts/rules/rule-list.ts',
+		description:
+			"Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows",
+		category: 'AI tools',
+		reference: ['', 'automation', ['none']],
+	},
 	format: {
 		script: 'scripts/lint/format.ts',
 		description: 'Format code with prettier and eslint (skips a tool a basic project lacks)',
@@ -90,8 +111,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		// **No `tsx_arguments`, deliberately.** `JOSH_BATCH_GUARD` is a per-machine preference kept in
 		// `.env`, which every other command reads through `OPTIONAL_ENV_FILE_FLAGS` — but declaring any
 		// `tsx_arguments` disqualifies a command from in-process dispatch (`josh-in-process.ts`), and
-		// this one runs before every `Bash` call. That is the hot path joshuafolkken/kit#1342 took a
-		// second ~0.16 s tsx start off. The script calls `process.loadEnvFile` itself instead, which is
+		// this one runs before every `Bash` call, where a second ~0.16 s tsx start is not affordable.
+		// The script calls `process.loadEnvFile` itself instead, which is
 		// node's own `--env-file` parser with node's own precedence.
 	},
 	'pretool:guard': {
@@ -118,7 +139,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	'session:lang': {
 		script: 'scripts/josh/session-language-cli.ts',
 		description:
-			'Claude Code hook: print the resolved JOSH_SESSION_LANG (defaults to ja) for the session context',
+			'Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, and the run:board reply rule while a backlogrun is live (otherwise nothing)',
 		category: 'Development',
 		reference: ['', 'automation', ['none']],
 		// **No `tsx_arguments`, deliberately**, the same as `batch:guard` above: this runs on every
@@ -132,7 +153,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: ['<pretool|posttool>', 'automation', ['none']],
 		// The live-source fallback `scripts/hooks/run-hook.sh` derives from the `codex-hook-adapter`
-		// bundle name (joshuafolkken/kit#3184). **No `tsx_arguments`**, the same as `pretool:guard`
+		// bundle name. **No `tsx_arguments`**, the same as `pretool:guard`
 		// above: it runs before every guarded Codex call.
 	},
 	'cspell:dot': {

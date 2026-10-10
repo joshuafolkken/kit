@@ -1,3 +1,4 @@
+import { SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const execa_mock = vi.hoisted(() => {
@@ -230,6 +231,52 @@ describe('git_command.fetch_branch', () => {
 
 		expect(execa_mock.state.last_arguments).toStrictEqual(['fetch', 'origin', 'main:main'])
 	})
+
+	// joshuafolkken/kit#3590: a plain read is bounded as a local command, far too short for a transfer.
+	it('bounds both fetches with the remote budget', async () => {
+		const { git_command } = await import('./git-command')
+		const { PUSH_TIMEOUT_MS } = await import('./git-push-transport')
+
+		await git_command.fetch_branch(PR_HEAD_BRANCH)
+		const fetch_options = execa_mock.state.last_options
+
+		await git_command.fast_forward_local('main')
+
+		expect(fetch_options).toMatchObject({ timeout: PUSH_TIMEOUT_MS })
+		expect(execa_mock.state.last_options).toMatchObject({ timeout: PUSH_TIMEOUT_MS })
+	})
+})
+
+// joshuafolkken/kit#3590: `git_spawn.with_output` defaults to a local command's budget, which would
+// end a commit or a merge inside the hooks it runs — `pre-commit`'s type check among them.
+describe('the git commands that run hooks', () => {
+	it('gives a commit the budget of a suite', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.commit('Bound the probes #3590')
+
+		expect(execa_mock.state.last_options).toMatchObject({ timeout: SUITE_TIMEOUT_MS })
+	})
+
+	it('gives a merge the budget of a suite', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.merge_branch('main')
+
+		expect(execa_mock.state.last_options).toMatchObject({ timeout: SUITE_TIMEOUT_MS })
+	})
+
+	// `post-checkout` and `post-merge` are a consumer's to fill — with a `pnpm install`, often.
+	it.each(['checkout', 'checkout_b', 'merge_fast_forward'] as const)(
+		'gives %s the budget of a suite',
+		async (command) => {
+			const { git_command } = await import('./git-command')
+
+			await git_command[command]('3590-lane')
+
+			expect(execa_mock.state.last_options).toMatchObject({ timeout: SUITE_TIMEOUT_MS })
+		},
+	)
 })
 
 // joshuafolkken/kit#1659: `josh main:merge` needs the opposite of `merge_fast_forward`. `--ff-only`

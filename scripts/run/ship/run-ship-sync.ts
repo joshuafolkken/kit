@@ -6,13 +6,11 @@ import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { error_text } from '#scripts/lib/error-message'
 import { run_ship_scoped } from './run-ship-scoped'
 
-// `josh ship` keeps the branch current with the default branch itself (joshuafolkken/kit#3221). The
-// lane merged it once, before the hand-off, and nothing merged it again while the pull request opened
-// and CI ran — so a default branch that moved meanwhile stopped the followup as `interrupted`, and a
-// relaunched session spent its first turns finding out that the cause was a conflict. Most of those
-// conflicts were not conflicts at all to git: merging the default branch again resolved them.
+// `josh ship` keeps the branch current with the default branch itself: a default branch that moves
+// while the pull request opens and CI runs would otherwise stop the followup as `interrupted`, though
+// merging the default branch again usually resolves it.
 //
-// So the merge happens twice more, mechanically: once before the commit (`sync_stage`), and once when
+// So the merge happens mechanically: once before the commit (`sync_stage`), and once when
 // the followup fails on a pull request GitHub reports `DIRTY` (`followup_stage`). Only a merge git
 // itself cannot finish stops the ship, and it stops as `conflict`, naming the unmerged paths so the
 // resumed session goes straight to them.
@@ -29,7 +27,10 @@ const CURRENT_SUFFIX = ' brings nothing in'
 const MERGED_PREFIX = 'merged '
 
 // A stage's result, plus the paths a stopped merge left unmerged — carried to the stop prompt.
+// `is_skipped` marks a stage that found nothing to do — a review round with nothing to review, a gate
+// that reused a green record — so its few seconds are not timed as a run of it.
 interface StepResult extends JoshResult {
+	is_skipped?: boolean
 	conflicts?: ReadonlyArray<string>
 }
 
@@ -63,7 +64,7 @@ function sync_note(outcome: Exclude<MergeOutcome, { kind: 'conflict' }>): string
 
 // A refusal does not stop the commit: the guard refuses only uncommitted work the default branch also
 // touches, and once that work is committed the followup merges again on a clean tree. A merge that changed
-// the tree is checked by the gate stage that follows (joshuafolkken/kit#3307), so the commit never carries
+// the tree is checked by the gate stage that follows, so the commit never carries
 // an unchecked merge and the gate's record names the merge base the push carries.
 async function sync_stage(): Promise<StepResult> {
 	const outcome = await merge_outcome()
@@ -84,7 +85,7 @@ async function is_conflicting(): Promise<boolean> {
 	}
 }
 
-// The merged tree is gated before it is pushed (joshuafolkken/kit#3307): the push then carries the tree
+// The merged tree is gated before it is pushed: the push then carries the tree
 // the gate's record describes, so the pre-push hook reuses it rather than re-running the unit suite.
 async function push_merged(title: string): Promise<StepResult | undefined> {
 	const gate = await run_ship_scoped.scoped_gate()

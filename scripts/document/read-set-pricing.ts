@@ -1,4 +1,4 @@
-// What a document read at a workflow entry costs, in dollars, for one run (joshuafolkken/kit#2289).
+// What a document read at a workflow entry costs, in dollars, for one run.
 //
 // **The dollars are not "tokens x one rate".** A token read at the entry is not paid once — it rides
 // every later request of the run as cached context, so its cost is the per-token cache-read rate

@@ -1,3 +1,4 @@
+import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
@@ -5,10 +6,10 @@ import { z } from 'zod'
 import { josh_environment_file } from './josh-environment-file'
 import { stamp_file } from './stamp-file'
 
-// The parts every refusing `PreToolUse` hook needs, held once (joshuafolkken/kit#1460).
+// The parts every refusing `PreToolUse` hook needs, held once.
 //
 // **It exists because the second such hook arrived.** `batch-guard.ts` was the first
-// (joshuafolkken/kit#1390) and carried the whole shell itself: the payload schema, the envelope
+//  and carried the whole shell itself: the payload schema, the envelope
 // Claude Code understands, the environment switch, and the stamp that makes a refusal
 // unrepeatable. The investigation guard needs all four unchanged and only its *rule* differs, so
 // copying them across would be the clone `CLAUDE.md` prohibits — and a rule fixed in one copy and
@@ -20,7 +21,7 @@ import { stamp_file } from './stamp-file'
 // Only the four fields a `PreToolUse` hook is handed and reads. Claude Code names the tool it is
 // about to run beside a transcript path, so nothing is searched for.
 //
-// **`agent_id` is what makes a delegated unit answerable with its own file** (joshuafolkken/kit#1424).
+// **`agent_id` is what makes a delegated unit answerable with its own file**.
 // The path in the payload is the *parent* session's whichever agent issued the call, so without this
 // field a guard judges the parent's frozen timeline and refuses nothing at all inside a fork.
 const payload_schema = z.object({
@@ -58,7 +59,7 @@ function is_switch_enabled(key: string): boolean {
 // The opt-in counterpart of `DISABLED_VALUES`: an unset variable stays off, and only one of these
 // spellings turns the switch on. A switch that must default off cannot be read with `is_switch_enabled`
 // — that one defaults on — so the value list is spelled out here rather than inverted at the call site,
-// keeping a typo from silently enabling what was meant to stay disabled (joshuafolkken/kit#2370).
+// keeping a typo from silently enabling what was meant to stay disabled.
 const ENABLED_VALUES: ReadonlyArray<string> = ['on', '1', 'true', 'yes']
 
 // Read at call time for the same reason as `is_switch_enabled`, so a suite that switches the variable
@@ -85,7 +86,7 @@ function deny_envelope(reason: string): string {
 	})
 }
 
-// **A rewrite, not a refusal** (joshuafolkken/kit#3154): the call proceeds with `updated_input` merged
+// **A rewrite, not a refusal**: the call proceeds with `updated_input` merged
 // over its own. `allow` is the decision the harness applies an `updatedInput` under; a settings `deny`
 // rule still wins over it, so this never widens what the call may do.
 function rewrite_envelope(updated_input: Record<string, unknown>, context: string): string {
@@ -126,7 +127,7 @@ function stamp_fault(switch_key: string): string {
 // anything is written under it, so a fork's first guarded calls read a path with no file behind it —
 // `time-hook-transcript.ts` states that "no history" is the honest verdict there. Reported as a fault
 // it would print on every early call of every fork, which is the routine case drowning the signal this
-// exists to raise (joshuafolkken/kit#1509).
+// exists to raise.
 function is_missing_file(error: unknown): boolean {
 	if (!(error instanceof Error) || !('code' in error)) return false
 
@@ -168,11 +169,7 @@ function last_refusal_ms(target: string): number {
 
 	if (raw === undefined) return NEVER_MS
 
-	try {
-		return refusal_schema.parse(JSON.parse(raw)).refused_at_ms
-	} catch {
-		return NEVER_MS
-	}
+	return json_value.parse_with(raw, refusal_schema)?.refused_at_ms ?? NEVER_MS
 }
 
 function record_refusal(target: string, now_ms: number): boolean {
@@ -199,7 +196,7 @@ function create_refusal_stamp(prefix: string): RefusalStamp {
 // **`.env` is loaded here rather than through the dispatcher's `tsx_arguments`**, and the reason —
 // declaring any `tsx_arguments` disqualifies a command from in-process dispatch — is now shared with
 // every other command that has to stay in-process, so the loader lives in `josh-environment-file.ts` rather
-// than here (joshuafolkken/kit#1491). Re-exported under this namespace because that is where the
+// than here. Re-exported under this namespace because that is where the
 // hooks reach for it.
 //
 // **Call it only on the real hook path**, never inside the pure refusal function, so a developer's
@@ -217,7 +214,7 @@ interface GuardRun {
 }
 
 // The notice half of a guard's rule, kept optional so a guard that only refuses supplies nothing and is
-// untouched (joshuafolkken/kit#1848). The investigation guard omits it; the batching guard supplies one
+// untouched. The investigation guard omits it; the batching guard supplies one
 // for the whole-file write, which it cannot refuse but can advise.
 interface NotifySpec {
 	// This disposition's record prefix, distinct from the refusal's so the two dedupe independently and
@@ -226,8 +223,8 @@ interface NotifySpec {
 	// The same shape as `should_block`, asked of the tail for a notify-only call. `notified_at_ms` is
 	// this disposition's own last-fired instant, never the refusal's.
 	should_notify: (tail: string, call: GuardedCall, notified_at_ms: number, run: GuardRun) => boolean
-	// The non-blocking text handed to `notice_envelope`, chosen from the call and the tail
-	// (joshuafolkken/kit#2164, joshuafolkken/kit#2276). A guard now notifies about more than one kind of
+	// The non-blocking text handed to `notice_envelope`, chosen from the call and the tail.
+	// A guard now notifies about more than one kind of
 	// call — the whole-file write it cannot refuse, and, in a lane child, a refusable call whose refusal
 	// is downgraded to a notice — and the two want different wording, so the text is a function of the
 	// call. It is handed the tail as well so a notice can name the concrete calls the run just issued
@@ -252,18 +249,18 @@ interface TranscriptGuardSpec {
 	should_block: (tail: string, call: GuardedCall, refused_at_ms: number, run: GuardRun) => boolean
 	// What the model is told. The deny reason is the only text that reaches it.
 	reason: string
-	// **The optional notice disposition** (joshuafolkken/kit#1848). Supplied, it lets a guard emit a
+	// **The optional notice disposition**. Supplied, it lets a guard emit a
 	// non-blocking notice for a call it does not refuse. Its record lives under a prefix of its own.
 	notify?: NotifySpec
 }
 
-// What one hook invocation decided. **`fault` is the half that did not exist** (joshuafolkken/kit#1509):
+// What one hook invocation decided. **`fault` is the half that did not exist**:
 // every failure still allows the call, but a failure that nobody can see is indistinguishable from a
 // run that was batching properly — so the guard could be dead for two hours and read as satisfied.
 // `reason` refuses; `fault` allows and says so.
 interface GuardOutcome {
 	reason: string | undefined
-	// **A notice, not a refusal** (joshuafolkken/kit#1848). Set where a notify-only call — a whole-file
+	// **A notice, not a refusal**. Set where a notify-only call — a whole-file
 	// write — reached the limit; the call still proceeds, and `notice_envelope` carries this to the
 	// model and the person with no `permissionDecision`. Never set together with `reason`: the block
 	// path decides first and returns before the notice path is asked.
@@ -287,7 +284,7 @@ interface FireResult {
 
 // The three the guard closes over: the spec, and one record per disposition. Bundled so the functions
 // below stay within the parameter limit, and so a further disposition adds a field rather than a
-// parameter to every one of them (joshuafolkken/kit#1848).
+// parameter to every one of them.
 interface GuardParts {
 	spec: TranscriptGuardSpec
 	stamp: RefusalStamp
@@ -306,7 +303,7 @@ interface GuardContext extends GuardParts {
 // cannot repeat on the call in hand. **Recording before firing is what makes a refusal unrepeatable**,
 // so a disposition that cannot record does not fire — it reports the fault instead of risking the
 // wedge, which is the half `scripts/hooks/batch-guard.ts` names. Shared by the refusal and the notice so the
-// arm-then-fire order is written once (joshuafolkken/kit#1848).
+// arm-then-fire order is written once.
 function fire_once(
 	stamp: RefusalStamp,
 	run: GuardRun,
@@ -367,7 +364,7 @@ function guard_reason_for_payload(
 	if (!parts.spec.is_candidate(call)) return NO_OUTCOME
 
 	// A hook firing inside a delegated unit is handed the *parent's* path, so the fork's own file is
-	// derived here rather than judged from the parent's frozen timeline (joshuafolkken/kit#1424).
+	// derived here rather than judged from the parent's frozen timeline.
 	const transcript = time_hook_transcript.transcript_of(payload.transcript_path, payload.agent_id)
 	const tail = time_density_hook.read_tail(transcript)
 	const context = { ...parts, tail, call, run: { transcript, now_ms } }
@@ -393,7 +390,7 @@ function guard_outcome(parts: GuardParts, raw_payload: string, now_ms: number): 
 function create_transcript_guard(spec: TranscriptGuardSpec): TranscriptGuard {
 	const stamp = create_refusal_stamp(spec.prefix)
 	// A record of its own for the notice, only where a notify spec is supplied. Keyed on its own prefix
-	// so a notice never spends the refusal's stamp (joshuafolkken/kit#1848).
+	// so a notice never spends the refusal's stamp.
 	const notify_stamp = spec.notify ? create_refusal_stamp(spec.notify.prefix) : undefined
 	const parts = { spec, stamp, notify_stamp }
 
@@ -410,7 +407,7 @@ function create_transcript_guard(spec: TranscriptGuardSpec): TranscriptGuard {
 	// same reason `format-edited-file.ts` swallows a formatter it could not start: a hook that failed
 	// closed would stop a run over its own plumbing.
 	//
-	// **What changed is that it no longer does so in silence** (joshuafolkken/kit#1509). The call still
+	// **What changed is that it no longer does so in silence**. The call still
 	// goes through — failing open is the right call and is not being revisited — but the fault comes
 	// back as text the run can see, so "the guard said nothing" and "the guard could not look" stop
 	// being the same observation.
@@ -430,8 +427,8 @@ function create_transcript_guard(spec: TranscriptGuardSpec): TranscriptGuard {
 }
 
 // Write one already-resolved outcome, so a caller that has to await its rule (the watcher guard reads
-// the lane registry and the life record) can compute the outcome first and hand it here
-// (joshuafolkken/kit#2353). Nothing reaches stdout on the ordinary call, so what the harness parses
+// the lane registry and the life record) can compute the outcome first and hand it here.
+// Nothing reaches stdout on the ordinary call, so what the harness parses
 // stays empty unless the call is being refused.
 function emit_outcome(outcome: GuardOutcome): void {
 	const { reason, notice, fault } = outcome
@@ -453,9 +450,8 @@ function write_outcome(raw_payload: string, outcome: (raw: string) => GuardOutco
 // wrapper rather than a second implementation, so both paths write the same envelopes.
 //
 // **A guard still calling this discards any fault it raised** — `investigation-guard.ts` is the one
-// that does, so a stamp it could not write there is still silent. That is the same gap
-// joshuafolkken/kit#1509 closed for the batching guard, left standing deliberately: this Issue's
-// subject is the batching guard, and moving another hook across belongs with its own test.
+// that does, so a stamp it could not write there is still silent — the gap the batching guard no
+// longer has. Moving another hook across belongs with its own test.
 function write_decision(raw_payload: string, refusal: (raw: string) => string | undefined): void {
 	write_outcome(raw_payload, (raw) => ({
 		reason: refusal(raw),

@@ -1,5 +1,4 @@
-// What a workflow entry point reads before it does anything, and what that costs
-// (joshuafolkken/kit#1776).
+// What a workflow entry point reads before it does anything, and what that costs.
 //
 // **The entry read was the largest fixed cost a run had, and nothing measured it.** Measured on the
 // `queue` parent of 2026-09-11: 159,323 billed input tokens per request at 16 requests, with the
@@ -28,13 +27,15 @@ const SKILL_DIRECTORY = path.join('.claude', 'skills', 'workflow-commands')
 const SKILL_FILE = 'SKILL.md'
 const TABLE_SECTION = '1. Which file to read'
 const NOTHING = 0
+// How `read:set` names the union a point-of-use document is charged at: `file → "A" + "B"`.
+const HEADING_JOINER = '" + "'
 
 // The point-of-use classification — which documents an entry names but reads only at a later step —
-// is its own concern, split into `read-set-point-of-use.ts` in joshuafolkken/kit#2289. This file
+// is its own concern, held in `read-set-point-of-use.ts`. This file
 // reads that classification to drop those files from the entry read and to cost them separately.
 
 // The fetch cap a `cat` truncates at, and the harness default it falls back to, are read from
-// `bash-output-cap.ts` — split out in joshuafolkken/kit#2161 to keep this file under its line ceiling.
+// `bash-output-cap.ts`.
 // `section()` hands back a `##` heading's `###` children with it, so the table parse has to say
 // where it stops — see `table_rows`.
 const SUBSECTION_PREFIX = '### '
@@ -120,12 +121,6 @@ function unique(names: ReadonlyArray<string>): Array<string> {
 
 // **Scanned with `exec` rather than collected from `matchAll`.** A fresh `RegExp` rather than the
 // shared one, so the caller's `lastIndex` is never carried between two scans of different documents.
-//
-// This spelling used to be forced rather than chosen: `unicorn/prefer-iterator-to-array` rejected
-// the spread while the `--fix` for a `for…of` push loop put the spread straight back, so neither
-// form was green. joshuafolkken/kit#1783 removed that contradiction — the spread is accepted now —
-// and rewriting this helper was left outside that Issue's scope, so the loop stands on the
-// `lastIndex` isolation above alone.
 function all_matches(text: string, pattern: RegExp): Array<RegExpExecArray> {
 	const scanner = new RegExp(pattern.source, pattern.flags)
 	const found: Array<RegExpExecArray> = []
@@ -153,8 +148,7 @@ function columns_of(line: string): { entry: string; files: string } | undefined 
 	if (groups === undefined) return undefined
 
 	// Destructured rather than read as properties: `noPropertyAccessFromIndexSignature` refuses
-	// `groups.entry`. The bracket form was refused too, until joshuafolkken/kit#1783 switched off the
-	// `dot-notation` fix that rewrote it back — so this is a choice now rather than the only spelling.
+	// `groups.entry`.
 	const { entry = '', files = '' } = groups
 
 	return { entry, files }
@@ -181,11 +175,9 @@ function push_row(rows: Map<string, ReadonlyArray<string>>, line: string): void 
 // section: every other table in the document would otherwise contribute rows of its own.
 //
 // **And it stops at the section's first subsection.** `section()` returns a `##` heading's `###`
-// children with it, and joshuafolkken/kit#1797 put a second two-column table under one of them — the
-// point-of-use triggers. Its rows parse as entry rows, and only the "no `.md` in the second column"
-// guard kept `latest`, `eval` and `followup` out of the keyword set; one edit adding a document name
-// to a trigger cell would have registered them as entry points. The stop makes that explicit rather
-// than incidental.
+// children with it, and one of them holds a second two-column table — the point-of-use triggers.
+// Its rows would parse as entry rows, and one edit adding a document name to a trigger cell would
+// register them as entry points. The stop makes that explicit rather than incidental.
 function table_rows(root: string): Map<string, ReadonlyArray<string>> {
 	const rows = new Map<string, ReadonlyArray<string>>()
 	const found = document_section.section(read_document(root, SKILL_FILE), TABLE_SECTION)
@@ -226,7 +218,7 @@ function is_sibling_document(root: string, name: string): boolean {
 // resident on every request already, and one at a `prompts/` topic names a file reached on its own
 // step rather than at the entry.
 //
-// **A pointer into a point-of-use document is not an entry cost either** (joshuafolkken/kit#1797).
+// **A pointer into a point-of-use document is not an entry cost either**.
 // Counting one would put `followup.md` straight back into the entry figure under another name, when
 // the whole point is that the run reaches it half an hour later — and then only by fetching it whole
 // at that moment, which is a cost of that step rather than of the entry.
@@ -327,38 +319,62 @@ function file_costs(root: string, names: ReadonlyArray<string>): Array<FileCost>
 	return names.map((file) => ({ file, cost: cost_of(read_document(root, file)) }))
 }
 
+// **A point-of-use document is charged at the union of the sections its entry's path names, and whole
+// only where nothing names a section**. `SKILL.md` → §1 makes a pointer
+// written `` `X.md` → "Heading" `` a read of that section alone, so a route table whose every row names
+// one section reads those sections, never the file — and charging the file anyway made a router that
+// trims its routes measure exactly as heavy as one that reads everything.
 function point_of_use_cost(
 	root: string,
 	file: string,
 	references: ReadonlyArray<SectionReference>,
 ): SectionCost {
-	const reference = references.find((one) => one.file === file)
+	const markdown = read_document(root, file)
+	const headings = unique(references.filter((one) => one.file === file).map((one) => one.heading))
 
-	if (reference !== undefined) return section_cost(root, reference)
+	if (headings.length === NOTHING) {
+		return { file, heading: '', cost: cost_of(markdown), is_resolved: true }
+	}
 
-	return { file, heading: '', cost: cost_of(read_document(root, file)), is_resolved: true }
+	return {
+		file,
+		heading: headings.join(HEADING_JOINER),
+		cost: scoped_file_cost(markdown, headings),
+		is_resolved: headings.every(
+			(heading) => document_section.section(markdown, heading) !== undefined,
+		),
+	}
 }
 
-// **What an entry's path names: its own manifests, and the §1 trigger rows that name the entry**
-// (joshuafolkken/kit#3078). `SKILL.md`'s other text is left out for the reason `sections_for` gives —
+// **What an entry's path names: its own manifests, and the §1 trigger rows that name the entry**.
+// `SKILL.md`'s other text is left out for the reason `sections_for` gives —
 // §2 names every document, so counting it would charge a `kickoff` for `followup.md`. One hop only:
 // the point-of-use documents cite one another, and following them would reach the whole set again.
-// `also` is what a role reaches beside its base entry's path (`read-set-trim.ts`).
-function cited_by(
-	root: string,
-	entry: string,
-	table_text: string,
-	also: ReadonlySet<string>,
-): Set<string> {
+function path_texts(root: string, entry: string, table_text: string): Array<string> {
 	const manifests = files_for(root, entry).filter((file) => file !== SKILL_FILE)
 	const rows = table_text
 		.split('\n')
 		.filter((line) => line.startsWith('|') && line.includes(`\`${entry}\``))
-	const texts = [...manifests.map((file) => read_document(root, file)), ...rows]
 
-	return new Set([...also, ...texts.flatMap((text) => names_in(text))])
+	return [...manifests.map((file) => read_document(root, file)), ...rows]
 }
 
+// The sections a point-of-use document is read by: every pointer in §1's table, and every one the
+// entry's own manifests carry — the route a run follows into that document.
+function point_of_use_references(
+	root: string,
+	entry: string,
+	table_text: string,
+): Array<SectionReference> {
+	const manifests = files_for(root, entry).filter((file) => file !== SKILL_FILE)
+	const texts = [table_text, ...manifests.map((file) => read_document(root, file))]
+
+	return texts.flatMap((text) =>
+		all_matches(text, SECTION_REFERENCE).map((match) => to_reference(match)),
+	)
+}
+
+// `also` is what a role reaches beside its base entry's path (`read-set-trim.ts`).
 function point_of_use_costs(
 	root: string,
 	entry: string,
@@ -366,8 +382,9 @@ function point_of_use_costs(
 ): Array<SectionCost> {
 	const table_text =
 		document_section.section(read_document(root, SKILL_FILE), TABLE_SECTION)?.text ?? ''
-	const references = all_matches(table_text, SECTION_REFERENCE).map((match) => to_reference(match))
-	const cited = cited_by(root, entry, table_text, also)
+	const references = point_of_use_references(root, entry, table_text)
+	const named = path_texts(root, entry, table_text).flatMap((text) => names_in(text))
+	const cited = new Set([...also, ...named])
 
 	return point_of_use_files(entry, cited).map((file) => point_of_use_cost(root, file, references))
 }

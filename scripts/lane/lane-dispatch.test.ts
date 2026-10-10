@@ -9,9 +9,9 @@ import { agent_session_environment } from '#scripts/josh/agent-session-environme
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_label } from '#scripts/run/run-label'
 import { run_liveness } from '#scripts/run/run-liveness'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_output } from './lane-output'
@@ -28,7 +28,6 @@ const ISSUE = '1749'
 const LANE_DIRECTORY = path.join(os.tmpdir(), 'josh-test-lanes', `${ISSUE}-lane`)
 // What the older flow recorded in a lane: the unit's own transcript, a file to read rather than write.
 const RECORDED_TRANSCRIPT = path.join(os.tmpdir(), 'josh-test-session.jsonl')
-const ALIVE_PROCESS = '--process alive'
 // An issue argument carrying a shell injection, refused by both invocation builders before it reaches a
 // command line.
 const INJECTION = '1749; rm -rf /'
@@ -42,7 +41,8 @@ const launch = vi.spyOn(detached_launch, 'launch')
 const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
 const record_output = vi.spyOn(lane_output, 'record_output')
 const apply_label = vi.spyOn(git_gh_command, 'issue_apply_label')
-const remove_label = vi.spyOn(git_gh_command, 'issue_remove_label')
+// The removal itself — read first, stored casing, warned failure — is `lane-dispatch-unmark.test.ts`'s.
+const unmark = vi.spyOn(run_label, 'unmark')
 const check_diagnostics = vi.spyOn(agent_diagnostics, 'check')
 const active_supervisor = vi.spyOn(openai_lane_supervisor, 'active')
 const wait_for_supervisor = vi.spyOn(openai_lane_supervisor, 'wait_for_active')
@@ -94,7 +94,7 @@ beforeEach(() => {
 		output: DERIVED_LOG,
 	})
 	apply_label.mockResolvedValue({ is_applied: true })
-	remove_label.mockResolvedValue(undefined)
+	unmark.mockResolvedValue(true)
 	mock_supervisor()
 })
 
@@ -196,7 +196,7 @@ describe('lane_dispatch.dispatch_child — provider selection', () => {
 
 		expect(launch).toHaveBeenCalledOnce()
 		expect(outcome.kind).toBe('failed')
-		expect(remove_label).toHaveBeenCalledWith(ISSUE, IN_PROGRESS_LABEL)
+		expect(unmark).toHaveBeenCalledWith(ISSUE)
 	})
 
 	it('reports failure when the spawned OpenAI supervisor never claims the lane', async () => {
@@ -209,7 +209,7 @@ describe('lane_dispatch.dispatch_child — provider selection', () => {
 		expect(outcome.kind).toBe('failed')
 		expect(outcome.kind === 'failed' && outcome.note).toContain('did not claim')
 		expect(cancel_supervisor).toHaveBeenCalledOnce()
-		expect(remove_label).toHaveBeenCalledWith(ISSUE, IN_PROGRESS_LABEL)
+		expect(unmark).toHaveBeenCalledWith(ISSUE)
 	})
 })
 
@@ -366,13 +366,13 @@ describe('lane_dispatch.dispatch_child — the in-progress marker the parent cla
 
 		await lane_dispatch.dispatch_child(ISSUE)
 
-		expect(remove_label).toHaveBeenCalledWith(ISSUE, IN_PROGRESS_LABEL)
+		expect(unmark).toHaveBeenCalledWith(ISSUE)
 	})
 
 	it('leaves the marker in place on a dispatch that started the child', async () => {
 		await lane_dispatch.dispatch_child(ISSUE)
 
-		expect(remove_label).not.toHaveBeenCalled()
+		expect(unmark).not.toHaveBeenCalled()
 	})
 })
 
@@ -383,12 +383,14 @@ describe('lane_dispatch.describe — what a reader is told to do next', () => {
 		expect(lane_dispatch.describe(no_lane, ISSUE)).toContain(`pnpm josh lane:open ${ISSUE}`)
 	})
 
-	it('matches the child’s command line, not the lane directory its argv omits', async () => {
+	// joshuafolkken/kit#3400: the poll reads the child's process itself, so the parent is no longer
+	// told to run `pgrep` and pass what it saw.
+	it('points the poll at run:liveness without a process trace to pass', async () => {
 		const message = lane_dispatch.describe(await lane_dispatch.dispatch_child(ISSUE), ISSUE)
 
-		expect(message).toContain(`pgrep -laf "${lane_child_invocation.process_pattern(ISSUE)}"`)
-		expect(message).not.toContain(`pgrep -laf ${LANE_DIRECTORY}`)
-		expect(message).toContain(ALIVE_PROCESS)
+		expect(message).toContain(`pnpm josh run:liveness ${ISSUE} --output `)
+		expect(message).not.toContain('pgrep')
+		expect(message).not.toContain('--process')
 	})
 
 	it('never throws, so a warning cannot lose the message it exists to carry', async () => {

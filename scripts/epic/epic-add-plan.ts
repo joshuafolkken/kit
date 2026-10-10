@@ -11,7 +11,7 @@ import { epic_shape } from './epic-shape'
 // Kept apart from the GitHub calls so the whole decision — which rows to add, which declaration to
 // write, which relations to record and which to drop — is asserted without a network. That
 // separation is the point: the command's value is that it refuses rather than half-applies, and a
-// refusal path only reachable through `gh` is a refusal path nobody tests (joshuafolkken/kit#890).
+// refusal path only reachable through `gh` is a refusal path nobody tests.
 
 interface PlanInput {
 	epic_number: number
@@ -20,18 +20,18 @@ interface PlanInput {
 	children: ReadonlyArray<number>
 	position?: InsertPosition | undefined
 	// `--order-before` / `--order-after`: move the task-list row to `position` and write nothing else —
-	// no declaration, no `blocked-by` (joshuafolkken/kit#1738). The position is carried in the field
+	// no declaration, no `blocked-by`. The position is carried in the field
 	// above rather than in one of its own, because where the row goes is the same question either way;
 	// what this flag decides is whether a dependency is recorded behind it.
 	is_order_only?: boolean | undefined
 	// The epic's current children with their native relations, as `epic:next` reads them.
 	recorded: ReadonlyArray<EpicChild>
-	// The epic's own repository — what a declared bare number names. Needed since
-	// joshuafolkken/kit#1126 made a recorded relation carry the repository it lives in.
+	// The epic's own repository — what a declared bare number names. Needed because a recorded
+	// relation carries the repository it lives in.
 	repo: string
 	// The decision record `--decision-file` supplied, or `undefined` for an insertion that records
 	// none. It reaches the body rewrite rather than being posted separately, so the epic half of the
-	// record rides on the body edit the insertion already makes (joshuafolkken/kit#1350).
+	// record rides on the body edit the insertion already makes.
 	decision?: string | undefined
 }
 
@@ -40,20 +40,20 @@ interface AddPlan {
 	additions: ReadonlyArray<number>
 	// The children the epic already tracked, moved to the position the caller named. Kept apart from
 	// `additions` because the two write different things: an addition gains a task-list row, while a
-	// relocation only moves the row it already had (joshuafolkken/kit#1701).
+	// relocation only moves the row it already had.
 	relocations: ReadonlyArray<number>
 	added: ReadonlyArray<DependencyLink>
 	removed: ReadonlyArray<DependencyLink>
 	// Every link the declaration dropped, whether or not GitHub had recorded it natively — which is what
-	// separates it from `removed` above (joshuafolkken/kit#1711). `removed` is a work list for `gh` and
+	// separates it from `removed` above. `removed` is a work list for `gh` and
 	// is therefore filtered down to relations that exist to be removed; this is the *report*, and a
 	// declared-but-unrecorded order the caller re-pointed is exactly as much a replacement as a recorded
 	// one. Reporting from `removed` let those vanish without a word.
 	replaced: ReadonlyArray<DependencyLink>
 	// The placed children an order-only move puts on the wrong side of an order the declaration already
-	// states — ahead of an issue declared to block them, or behind one they are declared to block
-	// (joshuafolkken/kit#1738). **The wrong side is judged against the whole resulting row order, not
-	// against the move target alone** (joshuafolkken/kit#1753): a relocation can seat a row on the wrong
+	// states — ahead of an issue declared to block them, or behind one they are declared to block.
+	// **The wrong side is judged against the whole resulting row order, not
+	// against the move target alone**: a relocation can seat a row on the wrong
 	// side of a *third* child the target never named, and a check that only compared the target missed
 	// it. `epic:next` filters by `blocked_by` **before** it applies task-list
 	// order, so such a row cannot take effect until the declaration itself changes, and a run that only
@@ -92,12 +92,12 @@ function declared_numbers(chains: ReadonlyArray<ReadonlyArray<number>>): Array<n
 	return [...new Set(chains.flat())]
 }
 
-// The children the epic already tracks, given a position: what used to be filtered out as "nothing to
-// do" is a reorder the moment `--before` / `--after` says where they go. Without a position there is
-// still nothing to do, so the refusal below stands for that case (joshuafolkken/kit#1701).
+// The children the epic already tracks, given a position: what would be "nothing to do" without one
+// is a reorder the moment `--before` / `--after` says where they go. Without a position there is
+// still nothing to do, so the refusal below stands for that case.
 //
 // **The task list decides, not the declaration.** An issue a chain names while no row tracks it is
-// what joshuafolkken/kit#890's cycle came out of, and a move that re-rendered its missing row would
+// what a declaration cycle comes out of, and a move that re-rendered its missing row would
 // repair a body somebody has to reconcile by hand — so it stays outside a move and keeps the refusal
 // it already had.
 function to_relocations(input: PlanInput, tracked: ReadonlyArray<number>): Array<number> {
@@ -108,8 +108,7 @@ function to_relocations(input: PlanInput, tracked: ReadonlyArray<number>): Array
 
 // The issues to place, in the order the caller gave them. Additions and relocations enter one chain
 // segment together, so which comes first is the caller's word rather than which bucket it fell into
-// — and the task list is written from this same list, which is what keeps the two agreeing
-// (joshuafolkken/kit#1704).
+// — and the task list is written from this same list, which is what keeps the two agreeing.
 function to_placed(
 	children: ReadonlyArray<number>,
 	additions: ReadonlyArray<number>,
@@ -183,7 +182,7 @@ interface PlanContext {
 	additions: ReadonlyArray<number>
 	relocations: ReadonlyArray<number>
 	// The two above as one list, in the order the caller named them — what both the chain segment and
-	// the task list are written from (joshuafolkken/kit#1704).
+	// the task list are written from.
 	placed: ReadonlyArray<number>
 	chains_before: ReadonlyArray<ReadonlyArray<number>>
 	chains_after: ReadonlyArray<ReadonlyArray<number>>
@@ -203,13 +202,13 @@ function to_rewrite_input(context: PlanContext, decision: string | undefined): R
 // checks rather than a function that both checks and composes.
 //
 // **The replacements are folded into the decision record before the body is rewritten**, because the
-// epic's `## Decisions` half rides on that same edit (joshuafolkken/kit#1350) — composing it afterwards
+// epic's `## Decisions` half rides on that same edit — composing it afterwards
 // would put the line on the child comments and leave the epic without it. The caller-supplied record
 // has already been validated by `find_decision_error`; what is appended here is generated, not read
 // from a file.
 // An ordinary insertion records every link the declaration names that GitHub does not, which repairs a
-// declared-but-unrecorded order in passing. **An order-only move records nothing at all**
-// (joshuafolkken/kit#1738): `--order-*` exists so a row can move with no dependency appearing behind
+// declared-but-unrecorded order in passing. **An order-only move records nothing at all**:
+// `--order-*` exists so a row can move with no dependency appearing behind
 // it, and a repair made under it would put back exactly the `blocked-by` the caller asked not to have.
 // The declaration is unchanged either way, so the repair is still there for the next insertion to make.
 function to_added_links(
@@ -239,8 +238,7 @@ function does_declare_order(
 // Whether the resulting row order puts `child` on the wrong side of any issue the declaration orders
 // it against — ahead of one declared to block it, or behind one it is declared to block. The move
 // target is not privileged: a relocation can seat a row on the wrong side of a *third* child the
-// target never named, so the whole resulting order is cross-checked rather than the target alone
-// (joshuafolkken/kit#1753).
+// target never named, so the whole resulting order is cross-checked rather than the target alone.
 function does_row_contradict_order(
 	chains: ReadonlyArray<ReadonlyArray<number>>,
 	rows: ReadonlyArray<number>,
@@ -299,15 +297,15 @@ function to_plan(context: PlanContext): PlanOutcome {
 
 // A decision record that cannot be written is refused here rather than dropped: `--decision-file` was
 // given because the record has to exist, so writing the insertion without it would report success for
-// half the job (joshuafolkken/kit#1350). `undefined` is "none was asked for", which is not a refusal.
+// half the job. `undefined` is "none was asked for", which is not a refusal.
 function find_decision_error(decision: string | undefined): string | undefined {
 	return decision === undefined ? undefined : epic_decision.find_decision_error(decision)
 }
 
 // Asked of the declaration as it stands, because a relocation's removal can collapse the very
-// ambiguity this refuses (joshuafolkken/kit#1701).
+// ambiguity this refuses.
 //
-// **An order-only move is not asked at all** (joshuafolkken/kit#1738). The ambiguity is about where a
+// **An order-only move is not asked at all**. The ambiguity is about where a
 // *dependency* would attach — `--before <hub>` cannot say which of the chains running through the hub
 // the new link joins — and `--order-*` attaches no link, so the question has no subject. Asking it
 // anyway would refuse a row move on the strength of a declaration the move never touches.
@@ -361,9 +359,9 @@ function find_input_error(
 
 // The declaration the body will carry. A relocation is a removal followed by the ordinary insertion,
 // so `--before` re-points the chain it lands in and the vacated chain closes around it — both by
-// construction rather than by a second code path (joshuafolkken/kit#1701).
+// construction rather than by a second code path.
 //
-// **An order-only move takes neither step** (joshuafolkken/kit#1738): the declaration it started with
+// **An order-only move takes neither step**: the declaration it started with
 // is the declaration it ends with, which is `keep_declaration` — the same passthrough `--add` with no
 // position already uses. Because the chains come back identical, `diff_links` finds nothing replaced
 // and the body rewrite leaves the `## Dependencies` section byte-identical, so "writes no dependency"
@@ -393,7 +391,7 @@ function build_plan(input: PlanInput): PlanOutcome {
 	const additions = to_additions(input, tracked, declared_numbers(chains_before))
 	const relocations = to_relocations(input, tracked)
 	// `tracked` reaches the chain builder so it can tell a child with no order yet from a number that is
-	// not a child at all; `find_movement_error` has already refused the second (joshuafolkken/kit#949).
+	// not a child at all; `find_movement_error` has already refused the second.
 	// What the builder does with a relocation, and what an order-only move does instead, is on
 	// `to_chains_after` above.
 	const placed = to_placed(input.children, additions, relocations)

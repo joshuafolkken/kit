@@ -1,8 +1,10 @@
+import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import { git_utilities } from './constants'
+import { has_timed_out } from './git-execa-error'
 
-// The ssh environment every git network call runs under (joshuafolkken/kit#2942). It began inside
-// `git-push-transport.ts` as the push's own (joshuafolkken/kit#1251), and moved here when the fetch
+// The ssh environment every git network call runs under. It began inside
+// `git-push-transport.ts` as the push's own, and moved here when the fetch
 // and pull of `josh main:sync` turned out to need the same thing: a dead connection under a `git
 // fetch` was waited on for 37 minutes, stalling the unattended backlog driver behind it.
 //
@@ -16,6 +18,8 @@ const SSH_COMMAND_VARIABLE = 'GIT_SSH_COMMAND'
 const SSH_LEGACY_VARIABLE = 'GIT_SSH'
 const KEEPALIVE_SSH_COMMAND = `ssh ${SSH_KEEPALIVE_OPTIONS}`
 const SSH_COMMAND_CONFIG_KEY = 'core.sshCommand'
+const CONFIG_PROBE_ARGUMENTS = ['config', '--get', SSH_COMMAND_CONFIG_KEY]
+const PROBE_OPTIONS = { timeout: PROBE_TIMEOUT_MS }
 
 // Whatever already decides how ssh is invoked, or an empty string when nothing does. git reads three
 // sources in this order — `GIT_SSH_COMMAND`, `core.sshCommand`, then the legacy `GIT_SSH` — and the
@@ -50,12 +54,15 @@ async function has_configured_ssh_command(): Promise<boolean> {
 		// execa runs the binary directly with an argument array and no `shell` option, so CLI
 		// args cannot break out of a shell sandbox; the git command and args are internally
 		// controlled, never untrusted input. tssecurity:S8705 is a false positive here.
-		const { stdout } = await execa(git_command_bin, ['config', '--get', SSH_COMMAND_CONFIG_KEY]) // NOSONAR
+		const { stdout } = await execa(git_command_bin, CONFIG_PROBE_ARGUMENTS, PROBE_OPTIONS) // NOSONAR
 
 		return stdout.trim() !== ''
-	} catch {
+	} catch (error) {
 		// `git config --get` exits 1 when the key is unset, which is the answer rather than a failure.
-		return false
+		// A probe that never answers lands here as well: the remote call awaits this before its own
+		// budget starts, so a wait here is one that budget cannot end. It did not say the key is unset,
+		// so it reads as configured — guessing "unset" would put a plain `ssh` over a per-repository key.
+		return has_timed_out(error)
 	}
 }
 

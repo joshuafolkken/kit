@@ -3,154 +3,63 @@ import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_owner_schema } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
 import { z } from 'zod'
 
-// joshuafolkken/kit#1719. joshuafolkken/kit#1714 made a `backlogrun`'s budget survive the session cut
-// and left out the one thing that starts the next session, so the record was carried and the
-// keystroke stayed: a cut still ended with a `confirmation` Telegram and a resume line, and a run
-// measured to cut about every 50 minutes did nothing at all until a person came back to it. Overnight
-// that is the whole night.
-//
-// This is that starter — a process outside the conversation, which the cut does not end.
-//
-// **Whether to wake is the record's answer, never a judgement.** `carried` *and* handed off is the one
-// state that wakes; `none`, `expired` and `unreadable` stop the supervisor. So the 8-hour whole-run
-// bound needs no check of its own here: it **is** the carry record's expiry, so a run past it reads
-// `expired` and the supervisor stops (`run-carry.ts` → `CARRY_MAX_AGE_MS`, itself imported from
-// `backlog-budget.ts` rather than restated). A bound re-derived here is one that drifts, and it drifts
-// silently in the direction that matters — the supervisor would go on waking past a budget the record
-// already calls spent.
-//
-// **A hand-off is what separates a cut from a session that is simply working.** `is_handed_off` is set
-// by `run:carry --cut`, and by this supervisor only when it recovers a record whose owner has *died*
-// (`run-wake-handoff.ts`, joshuafolkken/kit#2437) — so a live session's record never reads as waiting to
-// be woken, and a crash is carried on as if the dead session had cut rather than left standing.
-//
-// **The supervisor owns the record while its deterministic driver spends the budget.** After a cut or
-// dead-owner recovery it adopts the record as this process, so `run:merge` has one live owner to
-// count against. A judgment branch first hands the record off; `classify_claim` reads that explicit
-// handoff before liveness, allowing one AI session to adopt it even while the supervisor is alive.
-// The supervisor does not keep running the driver while that session owns the record.
+// The process outside the conversation that starts the next session after a `backlogrun` cut.
+// Whether to wake is the carry record's answer, never a judgement: `carried` and handed off wakes;
+// `none`, `expired` (the whole-run bound) and `unreadable` stop. A hand-off is set by `run:carry --cut`,
+// or by this supervisor when it recovers a record whose owner died, so a live session never reads as
+// waiting. The supervisor owns the record while its deterministic driver spends the budget; a judgment
+// branch hands it off so one AI session can adopt it.
 
 const WAKE_PREFIX = 'josh-run-wake-'
-// **Where the output of everything this supervisor starts is kept** (joshuafolkken/kit#1746).
-// `detached` is what puts a child outside the conversation; discarding its output was a second choice
-// riding along with it, and the two are separate requirements. Discarded, a session that exits without
-// claiming the carry record leaves nothing at all to diagnose it by — which is the state
-// joshuafolkken/kit#1746 was filed from, where three sessions died silently and the record could say
-// only that none of them had arrived.
-//
-// One file per repository, appended to, so every attempt of every cut is in one place; keyed exactly
-// as the wake and carry records are, so the three are found together. `.log` rather than `.json`
-// because it holds another process's output verbatim — the distinction `stamp_file.stamp_path`'s
-// `suffix` argument exists for.
+// The output of every session this starts, appended per repository so a silent death is diagnosable.
 const WAKE_LOG_PREFIX = 'josh-run-wake-log-'
 const WAKE_LOG_SUFFIX = '.log'
-// How long a woken session has to claim the carry record before that wake is treated as lost.
-//
-// **The window is measured from the spawn, so it has to cover everything before the session's first
-// `run:carry --begin`** — the agent CLI's cold start, the resident preamble, and reading `SKILL.md`,
-// `backlogrun.md`, `backlogrun.md` and the `fullrun` set. Ten minutes is several times the observed cost
-// of that and still far inside the roughly 50-minute cut interval this exists to bridge. It was two
-// minutes first, which is inside the range a merely *slow* start occupies — and a slow start booked as
-// a failure ends the whole overnight run.
-//
-// **This one window is the only launch-failure detector, deliberately.** Reading the spawned process's
-// exit code would catch a missing binary and miss the two failures that actually recur — a session
-// that starts and dies during boot, and one that runs but never picks the run up. Asking instead
-// whether the record was claimed catches all three, because it tests the thing that was wanted rather
-// than the thing that was easy to observe.
+// How long a woken session has to claim the carry record — the only launch-failure detector, since a
+// claim also catches a session that dies in boot or never picks the run up. It covers a slow cold start.
 const WAKE_GRACE_MS = 600_000
-// **A lost wake is retried before it is called a failure**, because stopping is the expensive answer:
-// it ends a run nobody is watching, for the night. Three attempts against a ten-minute window is
-// half an hour of trying, which outlasts every transient cause worth surviving; past that the cause
-// is not transient and a person has to see it.
+// Retried before failing: stopping ends a run nobody is watching.
 const MAX_WAKE_ATTEMPTS = 3
-// **How long a launch may be deferred for want of work before one is woken anyway**
-// (joshuafolkken/kit#2417). A run whose backlog stays empty still needs one session to finish it — the
-// drain, the retrospective and `run:carry --end` are a session's to do, not this process's — so a
-// deferral without a ceiling would leave the record carried until its 8-hour expiry and end on a
-// warning instead of a report. The ceiling is the `backlogrun` idle watch's own default, imported
-// rather than restated: the supervisor watches the empty backlog for exactly as long as a woken session
-// would have, only without paying a session to do it.
+// An empty backlog still needs one session to finish the run, so a deferral is bounded by the
+// `backlogrun` idle watch's own default.
 const IDLE_CEILING_MS = backlog_budget.DEFAULT_IDLE_MS
 const NO_WAKES = 0
 const ONE_WAKE = 1
 
-// The supervisor's own record: which invocation it is watching, which process it is, and how many
-// times it has woken a session.
 interface RunWake {
-	// Copied from the carry record at `--start`, so the two cannot disagree about what is being
-	// continued. It is what the woken session is handed as its prompt.
+	// Copied from the carry record at `--start`; it is the woken session's prompt.
 	invocation: string
 	profile?: AgentProfile | undefined
 	started_at: string
-	// The supervisor process. Unlike `run-hold.ts`, which records a pid it explicitly never reads back,
-	// this one is read: `--list` reports whether the supervisor is still running and `--stop` needs
-	// something to signal. The start-time token is what tells a reissued pid from the original.
+	// Read back by `--list` and `--stop`; the start-time token tells a reissued pid from the original.
 	pid: number
 	process_start?: string | undefined
-	// Criterion: the number of wakes tracks the carry record's `cuts`. Counting them here is what makes
-	// that checkable rather than merely argued from the structure. **It counts cuts served, not
-	// launches**, so a retry of the same cut does not inflate it — `attempts` is what counts those.
-	//
-	// **A recovery is a wake without a cut, so `woke` may run ahead of `cuts`** (joshuafolkken/kit#2336).
-	// When a session claims the record and then dies without cutting, the supervisor re-wakes and the
-	// replacement's claim is counted here too — so `woke == cuts` becomes `woke >= cuts`, the gap being
-	// the recoveries whose replacement claim a poll observed. `woke < cuts` still means a cut went
-	// unserved, and `outstanding_line` remains the authoritative signal of a launch not yet claimed.
-	//
-	// **A cut is served when the woken session claims the carry record, not when a process starts**
-	// (joshuafolkken/kit#1746). Counted at the spawn, the number asserted the very thing the supervisor
-	// had not yet checked: on 2026-09-10 three sessions were launched for one cut and none of them ever
-	// claimed the record, while `--list` went on reporting `woke 1 session(s) across 1 cut(s)` for forty
-	// minutes — the published invariant reading as held throughout the failure it exists to expose. So
-	// the increment moved to the one pass that observes a claim, and a wake nobody claimed now leaves
-	// `woke` behind `cuts`, which is what the invariant was always meant to say.
-	//
-	// **It is observed at a poll, so it lags a claim by up to one polling interval** — a minute by
-	// default. A shortfall read within that window is a claim not yet seen rather than one that never
-	// happened, and the two are told apart by `attempts`: a cut still being retried has launches
-	// outstanding, and one already claimed has none.
+	// Cuts served, counted when a woken session claims the record (not at the spawn), so an unclaimed
+	// wake leaves `woke` behind `cuts`. A dead-owner recovery is a wake without a cut, so `woke >= cuts`.
+	// Observed at a poll, so it lags a claim by up to one interval.
 	woke: number
-	// When the last wake happened, cleared as soon as the woken session claims the carry record. Its
-	// presence is what the grace window above is measured from.
+	// The grace window is measured from this; cleared when the woken session claims the record.
 	woke_at?: string | undefined
-	// Launches for the cut currently being served, reset when a session claims the record. Separate
-	// from `woke` so a retried cut still reports as one wake against one cut — and, since
-	// joshuafolkken/kit#1746, so the two say different things: this counts what was started and `woke`
-	// counts what arrived, which is the gap a silent failure lives in.
+	// Launches for the current cut: what was started, against `woke`'s what arrived.
 	attempts?: number | undefined
-	// The process the last launch produced. It is named in the failure warning rather than killed: a
-	// session that is merely slow is still doing the run's work, and a supervisor that killed what it
-	// could not account for would destroy exactly the work it exists to keep going.
+	// Named in the failure warning, never killed — a slow session is still doing the run's work.
 	woke_pid?: number | undefined
-	// The transcript ids of every session this supervisor forced with `--session-id`
-	// (joshuafolkken/kit#2407). `josh time --run` attributes a whiff only to a session in this list, so
-	// an unrelated read-only session that moved while the supervisor was alive is no longer counted
-	// against the wake role — the $7.68 the Issue read as a ceiling becomes the real figure. Appended
-	// once per launch, retries included, since each retry is a real session that woke and may have done
-	// nothing, and carried across a supervisor restart exactly like the counters beside it.
+	// Every `--session-id` this forced, so `josh time --run` attributes whiffs only to its own sessions.
 	spawned?: ReadonlyArray<string> | undefined
-	// When the supervisor first deferred a launch because there was no work (joshuafolkken/kit#2417).
-	// Marked once and cleared by the next launch or claim, so it measures one unbroken idle stretch: it
-	// bounds the deferral at `IDLE_CEILING_MS`, and `run-wake-loop.ts` stretches the polling interval
-	// by it, which is the back-off after repeated whiffs.
+	// Start of one unbroken idle stretch: bounds the deferral and backs off the polling interval.
 	idle_since?: string | undefined
 }
 
 type WakeStopReason = 'ended' | 'expired' | 'unreadable' | 'failed' | 'stopped'
 
-// What the loop's tidy-up found at its own target (joshuafolkken/kit#1727). `absent` is the ordinary
-// `--stop`, `removed` the ordinary end of a loop, and `superseded` the one that has to be said out
-// loud: another supervisor holds the record and this process is the replaced one.
+// `superseded`: another supervisor holds the record and this process is the replaced one.
 type WakeTidyResult = 'absent' | 'removed' | 'superseded'
 
-// `wait` and `pending` are two states rather than one because the wake mark is cleared in the first
-// and must survive the second — collapsed into one answer, a supervisor inside its grace window would
-// forget it had already woken and wake again every interval. `idle` is a launch the record called for
-// and the work did not: nothing is started, and the stretch is marked so it can be bounded.
+// `wait` clears the wake mark and `pending` keeps it, or a supervisor would re-wake every interval.
+// `idle` is a launch the record called for and the work did not.
 type WakeDecision =
 	| { kind: 'wake' }
 	| { kind: 'idle' }
@@ -163,24 +72,11 @@ interface WakeDecisionInput {
 	read: CarryRead
 	woke_at: string | undefined
 	attempts: number
-	// Whether the process named on the carry record is still running — read only for a record no cut
-	// handed off, where it tells a session at work from a crashed one (`decide_not_handed_off`).
-	//
-	// **A handed-off record is launched from whether its cutting process lives or not**
-	// (joshuafolkken/kit#3363). The supervisor used to wait that process out, for up to the grace
-	// window, because `run-carry.ts` → `classify_claim` once tested liveness before the hand-off and
-	// would have answered the successor `busy`. joshuafolkken/kit#1935 put the hand-off first, so the
-	// wait guarded nothing — and an interactive session outlives its own cut, so every cut paid the
-	// whole ten minutes before the driver started.
+	// Read only for a record no cut handed off; a handed-off record launches whether its cutter lives or not.
 	is_owner_live: boolean
-	// **Whether a woken session would find anything to do** (joshuafolkken/kit#2417). Before this the
-	// decision read the carry record alone, so a session was launched whether or not the backlog held a
-	// runnable issue or a lane was free — and a session that found nothing ended without touching
-	// anything, which is the whiff. `undefined` is "cannot tell", and it wakes: a failed read is not an
-	// empty backlog, and the error that costs a whiff is cheaper than the one that stalls the run.
-	// Optional for that reason: an input that does not say reads exactly as the record-only decision did.
+	// Whether a woken session would find work. `undefined` ("cannot tell") wakes: a whiff is cheaper
+	// than a stalled run.
 	has_work?: boolean | undefined
-	// When the current idle stretch began, so the deferral can be bounded.
 	idle_since?: string | undefined
 	now: Date
 }
@@ -191,9 +87,6 @@ const WAIT_DECISION: WakeDecision = { kind: 'wait' }
 const PENDING_DECISION: WakeDecision = { kind: 'pending' }
 const FAILED_DECISION: WakeDecision = { kind: 'failed' }
 
-// The three carry reads that are not `carried`, each mapped to why the supervisor stops. `none` is the
-// run having ended normally (`run:carry --end`); `expired` is the whole-run bound; `unreadable` is a
-// record that cannot be trusted to say anything, which is a reason to stop rather than to guess.
 const STOP_REASONS: Record<'none' | 'expired' | 'unreadable', WakeStopReason> = {
 	none: 'ended',
 	expired: 'expired',
@@ -205,9 +98,7 @@ const run_wake_schema = process_owner_schema.extend({
 	started_at: z.string(),
 	woke: z.number(),
 	woke_at: z.string().optional(),
-	// **Every optional field of `RunWake` has to be listed here.** `z.object` strips what it does not
-	// declare, so a field added to the interface alone round-trips through disk as `undefined` — which
-	// reads as "no attempt has been made yet" and would restart the retry count on every pass.
+	// Every optional `RunWake` field must be listed: `z.object` strips undeclared ones on the round trip.
 	attempts: z.number().optional(),
 	woke_pid: z.number().optional(),
 	spawned: z.array(z.string()).optional(),
@@ -215,8 +106,7 @@ const run_wake_schema = process_owner_schema.extend({
 	profile: agent_role_profile.PROFILE_SCHEMA.optional(),
 })
 
-// An unparsable stamp reads as overdue rather than as fresh: a mark whose time cannot be established
-// is one that cannot be confirmed to have worked, and the safe direction is to report the failure.
+// An unparsable stamp is overdue: a mark that cannot be confirmed is reported as a failure.
 function is_overdue(marked_at: string, now: Date, limit_ms: number = WAKE_GRACE_MS): boolean {
 	const marked = Date.parse(marked_at)
 
@@ -225,10 +115,8 @@ function is_overdue(marked_at: string, now: Date, limit_ms: number = WAKE_GRACE_
 	return now.getTime() - marked > limit_ms
 }
 
-// **A launch goes out only where there is work, or where the idle stretch has run past its ceiling**
-// (joshuafolkken/kit#2417). This is the one gate every launch passes — the first wake of a cut, the
-// recovery of a dead owner and a retry alike — because a retry into an empty backlog is the same whiff
-// as a first wake into one. Past the ceiling the session is woken anyway, to finish the run.
+// The one gate every launch (first wake, recovery, retry) passes: launch only where there is work, or
+// once the idle stretch passes its ceiling.
 function launch_or_idle(input: WakeDecisionInput): WakeDecision {
 	if (input.has_work !== false) return WAKE_DECISION
 	if (input.idle_since === undefined) return IDLE_DECISION
@@ -236,12 +124,7 @@ function launch_or_idle(input: WakeDecisionInput): WakeDecision {
 	return is_overdue(input.idle_since, input.now, IDLE_CEILING_MS) ? WAKE_DECISION : IDLE_DECISION
 }
 
-// **Whether to launch, pend, retry or give up, read from the wake mark alone.** It is reached from two
-// places — a record a cut handed off whose predecessor has gone, and a record no cut handed off whose
-// owner has *died* (the recovery below) — because both ask the same question once the decision to press
-// on has been made: is a wake already out, is it still inside its grace window, and are there retries
-// left. `woke_at === undefined` is "nothing outstanding, launch"; inside the window is `pending`; past
-// it, a retry while attempts remain and otherwise `failed`.
+// Launch, pend, retry or give up, read from the wake mark alone.
 function decide_launch(input: WakeDecisionInput): WakeDecision {
 	if (input.woke_at === undefined) return launch_or_idle(input)
 	if (!is_overdue(input.woke_at, input.now)) return PENDING_DECISION
@@ -249,26 +132,14 @@ function decide_launch(input: WakeDecisionInput): WakeDecision {
 	return input.attempts < MAX_WAKE_ATTEMPTS ? launch_or_idle(input) : FAILED_DECISION
 }
 
-// **A record no cut handed off is one of two things, told apart by the owner's liveness**
-// (joshuafolkken/kit#2336). A *live* owner is a session spending the budget — the ordinary in-flight
-// state, and there is nothing to do but wait. A *dead* owner is the defect this branch exists for: a
-// session that claimed the record and then exited without cutting or ending — a woken session that
-// crashed during boot, reported its state and stopped, or was ended by a stray notification — leaves
-// the record `carried`, owned by a gone process, with no hand-off. Before this the supervisor answered
-// `wait` to both and so waited on the dead one until the 8-hour bound, stopping the whole run in
-// silence. Now a dead owner is recovered through the same grace/retry machinery a hand-off uses, so a
-// crash between the claim and the next cut re-wakes rather than stranding the invocation.
-//
-// **`is_owner_live` is `!== false`, so "cannot tell" counts as living** (`run-carry.ts` →
-// `is_owner_live`): a liveness read that cannot prove death keeps the safe answer, `wait`, and never
-// double-wakes a session that is merely unreadable.
+// A live owner is a session at work; a dead one crashed between its claim and the next cut, and is
+// recovered through the hand-off's grace/retry path. "Cannot tell" counts as living.
 function decide_not_handed_off(input: WakeDecisionInput): WakeDecision {
 	if (input.is_owner_live) return WAIT_DECISION
 
 	return decide_launch(input)
 }
 
-// The whole policy, in three lines. Nothing else in this module decides whether to wake.
 function decide(input: WakeDecisionInput): WakeDecision {
 	if (input.read.kind !== 'carried') return { kind: 'stop', reason: STOP_REASONS[input.read.kind] }
 	if (input.read.carry.is_handed_off !== true) return decide_not_handed_off(input)
@@ -276,24 +147,17 @@ function decide(input: WakeDecisionInput): WakeDecision {
 	return decide_launch(input)
 }
 
-// Keyed on the repository's common git directory, exactly as the carry record is — one supervisor per
-// invocation, and every lane of that repository keys alike. `run_carry.repository_directory` is what
-// resolves it, so the two records can never key differently.
+// Keyed on the common git directory exactly as the carry record is, so every lane keys alike.
 function wake_path(git_directory: string): string {
 	return stamp_file.stamp_path(WAKE_PREFIX, git_directory)
 }
 
-// Keyed on the same directory as the two records, so a person handed one path can find the others.
 function wake_log_path(git_directory: string): string {
 	return stamp_file.stamp_path(WAKE_LOG_PREFIX, git_directory, WAKE_LOG_SUFFIX)
 }
 
 function parse_wake(raw: string): RunWake | undefined {
-	try {
-		return run_wake_schema.parse(JSON.parse(raw))
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw, run_wake_schema)
 }
 
 function read_wake(target: string): RunWake | undefined {
@@ -320,23 +184,13 @@ function fresh_wake(invocation: string, now: Date, profile?: AgentProfile): RunW
 	}
 }
 
-// **`!== false`, so "cannot tell" counts as running.** The two errors are not symmetric: a live
-// supervisor read as dead means two supervisors waking two sessions into one budget, while a dead one
-// read as live costs a refused `--start` the person can retry after `--stop`. This takes the second.
+// "Cannot tell" counts as running: a refused `--start` is cheaper than two supervisors on one budget.
 function is_supervisor_live(wake: RunWake): boolean {
 	return process_identity.is_same_process(wake.pid, wake.process_start) !== false
 }
 
-// A restarted supervisor inherits the whole wake state rather than starting it over. `woke` is
-// published against the carry record's `cuts` as an invariant, so a `--stop` / `--start` cycle mid-run
-// that reset it would make `--list` under-report and the published check read as a defect that never
-// happened. **`woke_at` and `attempts` come with it, and dropping them is not cosmetic**: a restart
-// inside the grace window would otherwise see no wake mark, launch a second session for the *same*
-// cut, count it as another cut served, and leave two sessions racing for one record. The invocation
-// has to match — a different one is a different run, and its state is not this one's.
-// **`woke_pid` comes across too.** Without it, a restart inside the grace window that then spends its
-// retries reports "the last one was none" in the warning — the one fact the warning exists to hand the
-// person, dropped exactly where it is needed.
+// A restart of the same invocation inherits the whole wake state, or it would re-wake a cut inside
+// its grace window and under-report `woke` against `cuts`.
 function carried_state(existing: RunWake | undefined, invocation: string): Partial<RunWake> {
 	if (existing?.invocation !== invocation) return { woke: NO_WAKES }
 
@@ -345,11 +199,7 @@ function carried_state(existing: RunWake | undefined, invocation: string): Parti
 		woke_at: existing.woke_at,
 		attempts: existing.attempts,
 		woke_pid: existing.woke_pid,
-		// **`spawned` carries across too, or a restart mid-run would lose the ids of every session it
-		// already started** (joshuafolkken/kit#2407) — and `josh time --run`, reading the record after
-		// the restart, would under-count the whiffs and read the loss as a saving.
 		spawned: existing.spawned,
-		// And `idle_since`, or a restart would slide the idle ceiling by the time already spent idle.
 		idle_since: existing.idle_since,
 		...(existing.profile && { profile: existing.profile }),
 	}
@@ -359,9 +209,7 @@ function is_held_by_live_supervisor(existing: RunWake | undefined): boolean {
 	return existing !== undefined && is_supervisor_live(existing)
 }
 
-// The second attempt, reached only because something was already at the target: the dead-marker sweep
-// `unit-worker-share.ts` does for the unit-suite share, and then one more exclusive create. The record
-// is re-read first, because between the two creates it may have become a live supervisor's.
+// Sweep a dead marker and create once more, re-reading first in case a live supervisor took it.
 function reclaim(target: string, wake: RunWake): RunWake | undefined {
 	if (is_held_by_live_supervisor(read_wake(target))) return undefined
 
@@ -370,15 +218,8 @@ function reclaim(target: string, wake: RunWake): RunWake | undefined {
 	return stamp_file.create_stamp(target, wake) ? wake : undefined
 }
 
-// `create_stamp` rather than `write_stamp`: two `--start`s racing must not both come away believing
-// they own the record.
-//
-// **The create is attempted before anything is removed, and that ordering is the exclusion.** Sweeping
-// first — which this did, unconditionally — gives the exclusive create nothing to exclude: two claims
-// that both read an empty target would each delete what the other had just created, and both would
-// then succeed, leaving two supervisors waking two sessions into one carry budget. Attempted first, the
-// create is what decides between them, and the sweep runs only where it found something already there
-// — including a stamp that could not be parsed at all, which is why the sweep is not simply dropped.
+// The exclusive create runs before any sweep — that ordering is what stops two racing `--start`s
+// from both owning the record.
 function claim(
 	target: string,
 	invocation: string,
@@ -394,13 +235,7 @@ function claim(
 	return stamp_file.create_stamp(target, wake) ? wake : reclaim(target, wake)
 }
 
-// A launch marks the attempt and nothing else. `woke` is left alone here because a process that has
-// started has not yet done the thing `woke` counts — `count_claim` is where that is decided.
-//
-// **The forced session id is recorded here, at the launch, because that is where it is known**
-// (joshuafolkken/kit#2407). It is appended rather than replaced: a run spawns one session per cut plus
-// one per retry, and `josh time --run` needs every id to tell a session it started from an unrelated
-// one that merely moved while it was alive.
+// A launch marks the attempt and appends its session id; `woke` waits for `count_claim`.
 function count_wake(wake: RunWake, now: Date, pid: number, session_id: string): RunWake {
 	const attempts = (wake.attempts ?? NO_WAKES) + ONE_WAKE
 	const spawned = [...(wake.spawned ?? []), session_id]
@@ -416,24 +251,13 @@ function count_wake(wake: RunWake, now: Date, pid: number, session_id: string): 
 	}
 }
 
-// Starts the idle stretch a deferred launch is bounded by (joshuafolkken/kit#2417). Marked once:
-// rewritten each pass, the ceiling would slide and never be reached.
+// Marked once: rewritten each pass, the ceiling would slide and never be reached.
 function mark_idle(wake: RunWake, now: Date): RunWake {
 	return wake.idle_since === undefined ? { ...wake, idle_since: now.toISOString() } : wake
 }
 
-// **The one pass that observes a claim, and therefore the one place `woke` may grow**
-// (joshuafolkken/kit#1746). The supervisor reaches it when the carry record stops reading as handed
-// off, which `run-carry.ts` → `adopt_carry` does only from the session that took the record over — so
-// the count is of records actually claimed rather than of processes started.
-//
-// **The mark is what says a wake was outstanding.** Without it this same state is an ordinary live
-// session working through its budget, which no supervisor woke and which must not be counted; with
-// it, the wake that was pending has just been answered.
-//
-// `undefined` rather than a deleted key, because `JSON.stringify` drops it on the way to disk and the
-// reader treats absent and undefined alike — the same round-trip `run-carry.ts` documents for its own
-// optional fields.
+// The one place `woke` grows: the record was claimed while a wake mark was outstanding. Without the
+// mark this is an ordinary live session, which no supervisor woke.
 function count_claim(wake: RunWake): RunWake {
 	const woke = wake.woke_at === undefined ? wake.woke : wake.woke + ONE_WAKE
 
@@ -446,59 +270,23 @@ function count_claim(wake: RunWake): RunWake {
 	}
 }
 
-// **Whether the record at the target is this process's own** (joshuafolkken/kit#1727). Everything
-// below that decides a write or a removal asks this rather than asking whether a record is there.
-//
-// **Existence was standing in for ownership, and the two come apart exactly when it matters.** A
-// `--stop` that removes the record but does not reach the process — `EPERM`, or a liveness read that
-// calls a running process dead — followed by a person's `--start` leaves the old loop awake beside a
-// new supervisor's record. Asked only whether *a* record is there, the old loop writes its own pid
-// and counters into the new one, and two supervisors then wake two sessions into one carry budget:
-// the state `claim`'s exclusive create exists to prevent, reached after the create rather than
-// through it. Asked whether the record is *its own*, it finds it is not and does nothing.
-//
-// **The precedent is `run-carry.ts` alone**, whose `is_owned_by` compares a record's `owner_pid` and
-// `owner_start` against the owner the caller declares, and whose `is_foreign_live_owner` is that
-// comparison deciding what a caller may touch. `run-hold.ts` is **not** a precedent and reading it as
-// one is the mistake this note exists to prevent: it records a pid for the person reading the stop
-// message and explicitly never reads it back (`run-hold.ts` → `describe_holder`), which is the
-// distinction `RunWake.pid` above already draws.
-//
-// The one difference from `run-carry.ts` is who the owner is. There the owner is declared from
-// outside, because the process spending the budget is not the one writing the record; here the writer
-// *is* the owner, so the declaration is `process_identity.own_fields()` and the comparison is against
-// this process.
+// Ownership, not existence, decides every write and removal: after a `--stop` that missed the process
+// and a fresh `--start`, the old loop must not write into the new supervisor's record. The writer is
+// the owner here, unlike `run-carry.ts` where the owner is declared from outside.
 function is_own_wake(wake: RunWake): boolean {
 	return process_identity.is_own_process(wake.pid, wake.process_start)
 }
 
-// The record only where it is this process's own. It is what the loop reads at the top of each pass,
-// so a supervisor whose record has been taken over ends **before** it decides anything — refusing the
-// write-back alone would still have spawned a session for a run somebody else is already watching.
+// Read at the top of each pass, so a superseded supervisor ends before it spawns anything.
 function read_own_wake(target: string): RunWake | undefined {
 	const wake = read_wake(target)
 
 	return wake !== undefined && is_own_wake(wake) ? wake : undefined
 }
 
-// **Removes only this process's own record.** `--stop` and the dead-marker sweep in `reclaim` keep
-// using `remove_wake`, and that is deliberate: a person stopping the supervisor is removing someone
-// else's record on purpose, and a sweep is removing a record whose writer is gone. What must not
-// happen is the loop's own tidy-up taking a live successor's record with it, which leaves the run
-// unwatched with nothing anywhere saying so.
-//
-// **Read-then-remove, so a take-over landing between the two still costs the successor its record.**
-// The same residual window `update_wake` has, and closing it needs an exclusive operation the stamp
-// layer does not offer. What this removes is the case that was certain — the loop ending after a
-// take-over it had already noticed — rather than the one that needs the hand-over to land inside two
-// statements.
-//
-// **Three answers rather than a boolean, because the caller has to tell two of them apart.** An
-// ordinary `--stop` and a take-over both leave this process with nothing to remove, and only the
-// second is worth saying anything about — a `false` covering both put the caller in the position of
-// re-deriving which one it was from a second read, which is a branch that can be written the wrong
-// way round and would then announce a supersession on every ordinary stop. Answered here, the
-// distinction is decided once, in the place that already holds the record.
+// The loop's tidy-up removes only its own record (`--stop` and `reclaim` use `remove_wake` on purpose).
+// Three answers, so the caller announces a supersession without re-reading. Read-then-remove leaves a
+// residual window the stamp layer cannot close.
 function tidy_own_wake(target: string): WakeTidyResult {
 	const wake = read_wake(target)
 
@@ -510,18 +298,8 @@ function tidy_own_wake(target: string): WakeTidyResult {
 	return 'removed'
 }
 
-// **Writes only where the record is still there *and* is this process's own.** `--stop` removes it,
-// and the loop's pass is not instantaneous — it spawns a process — so an unconditional write-back can
-// recreate a record a person has just deleted, leaving a supervisor that outlives its own stop; the
-// presence check narrows that window rather than closing it outright, and what closes it is that the
-// next pass reads the record again. The ownership check is the second half: a foreign record is
-// never written back, however long the pass took.
-//
-// **That is a claim about the write and about nothing else.** A take-over landing mid-pass is still
-// narrowed rather than closed — the pass spawns a process, so a session can go out for a cut the
-// successor is also serving, and only the write-back that follows it is refused. What closes the
-// window at the top of a pass is `read_own_wake`, and what closes it inside one is nothing here:
-// this is a refusal to make the damage permanent, not a lock.
+// Writes only where the record is still there and this process's own, so a pass never recreates a
+// record `--stop` deleted or overwrites a successor's. A refusal to make damage permanent, not a lock.
 function update_wake(target: string, wake: RunWake): boolean {
 	if (read_own_wake(target) === undefined) return false
 

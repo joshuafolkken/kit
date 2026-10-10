@@ -6,20 +6,17 @@ import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { shell_segments } from './shell-segments'
 
-// The trigger and the decision behind the `early-heartbeat` row of `delivered-rules.ts`
-// (joshuafolkken/kit#1570).
+// The trigger and the decision behind the `early-heartbeat` row of `delivered-rules.ts`.
 //
-// **The promise was kept and the interval was not.** `josh run:progress --mark` was called at every
-// real report exactly as `backlogrun.md` requires, and reports still arrived 3–5 minutes apart on a
-// 15-minute setting. The clock was never the problem: the parent armed a wait timer of its own on the
-// turn a timer fired **and** on the turn a delegated child's completion woke it, so two timers ran at
-// once and each produced a report the other knew nothing about. Nothing read the marked clock before
-// writing — `run:progress` refuses its own early lines, and there was no such refusal in front of the
-// parent's own prose.
+// **A second wait timer breaks the interval.** A parent that arms a wait timer of its own on the turn
+// a timer fires **and** on the turn a delegated child's completion wakes it runs two timers at once,
+// each producing a report the other knows nothing about — reports arrive minutes apart whatever the
+// setting. `run:progress` refuses its own early lines, but nothing refuses an early report written in
+// the parent's own prose.
 //
 // **So the refusal is put in front of the arm, not in front of the report.** A report is written in
 // prose and no hook can see it coming; the `Bash` call that sleeps is a call, and a call can be
-// refused — the same reading joshuafolkken/kit#1556 took for a verification behind a pipe.
+// refused — the same reading `piped-verification.ts` takes for a verification behind a pipe.
 //
 // **An explicit ask is not a heartbeat, and it is exempt by construction rather than by exception.**
 // What is refused here is arming a *timer*; a person asking "how is it going" arrives as a turn with
@@ -145,7 +142,7 @@ function landing_ms(command: string, now_ms: number, last_report_ms: number): nu
  *
  * **No progress record means no clock, and no clock means no rule.** An ordinary conversational
  * session never starts the watcher and never marks, so it reads `undefined` here and nothing is
- * refused — the scope joshuafolkken/kit#1570 set out of bounds, held by the absence of a record rather
+ * refused — out of the rule's scope, held by the absence of a record rather
  * than by a second judgement about what kind of session this is.
  *
  * **A live timer is counted from the record this function writes, never from the processes on the
@@ -181,8 +178,8 @@ function decide(call: GuardedCall, run: GuardRun, can_record: boolean): boolean 
 }
 
 // The instruction in the shape a refusal can carry: what the call is about to do, what already does it
-// properly, and the one command an explicit ask is answered with. The measurement is named because it
-// is the half that makes the rule believable — the promise was kept and the interval was not.
+// properly, and the one command an explicit ask is answered with. The observed failure is named
+// because it is what makes the rule believable.
 const EARLY_HEARTBEAT_REASON =
 	'⛔ early heartbeat: this call arms a wait timer of its own, and the progress clock is not yours ' +
 	'to keep. `pnpm josh run:progress --wait` keeps it for you ' +
@@ -194,8 +191,8 @@ const EARLY_HEARTBEAT_REASON =
 	'(joshuafolkken/kit#1570): a new one was armed on the turn a timer fired and again on the turn a ' +
 	"child's completion woke the run, and `--mark` recorded each report without anything refusing the " +
 	'early ones. **An explicit ask is not a heartbeat**: if the person asked for progress now, run ' +
-	'`pnpm josh run:progress --once`, which prints the five labelled lines whatever the clock says. ' +
-	'If you are ' +
+	'`pnpm josh run:progress --once`, which prints the five labelled lines whatever the clock says — ' +
+	'under `backlogrun`, `pnpm josh run:board --chat` instead. If you are ' +
 	'waiting on something rather than on a clock, wait on the thing itself — `pnpm josh followup` ' +
 	'waits for CI. The procedure is `.claude/skills/workflow-commands/backlogrun.md` → "Progress while ' +
 	'the run is quiet". **This rule fires on every early arm, not once per run**, so reissuing the ' +
@@ -205,8 +202,7 @@ const EARLY_HEARTBEAT_REASON =
 // the interval out, and `--once` answers an explicit ask. `--mark` is neither: it records a report
 // that has already gone out rather than waiting for the next one, and crediting it would score every
 // run that reported at all as having kept a rule about waiting.
-// The canonical name; both spellings match, because the alias is expanded where the command is read
-// (joshuafolkken/kit#1789).
+// The canonical name; both spellings match, because the alias is expanded where the command is read.
 const PROGRESS_NAMES: ReadonlySet<string> = new Set(['run:progress'])
 const WATCH_FLAG = /(?:^|\s)--(?:wait|once)(?=\s|$)/u
 
@@ -222,8 +218,8 @@ function is_progress_watch(command: string): boolean {
 	)
 }
 
-// **The occasion this rule governs: waiting for the run's next progress report**, in either spelling
-// (joshuafolkken/kit#1643). The trigger fires only on the hand-armed timer, so a run that always let
+// **The occasion this rule governs: waiting for the run's next progress report**, in either spelling.
+// The trigger fires only on the hand-armed timer, so a run that always let
 // the watcher wait would never appear in the reading at all.
 function waits_for_progress(command: string): boolean {
 	return is_wait_timer(command) || is_progress_watch(command)

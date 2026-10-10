@@ -12,6 +12,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EpicSnapshot } from './epic-fetch'
 import type { EpicChild } from './epic-graph'
+import { epic_label_age } from './epic-label-age'
 import { epic_next } from './epic-next'
 import type { EpicView } from './epic-next-views'
 import { epic_view_fixture } from './epic-view-fixture'
@@ -115,6 +116,7 @@ function listing(numbers: ReadonlyArray<number>): string {
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	vi.spyOn(epic_label_age, 'read_ages').mockResolvedValue(new Map())
 	stdout_lines.length = 0
 	stderr_lines.length = 0
 })

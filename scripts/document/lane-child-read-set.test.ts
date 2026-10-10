@@ -10,15 +10,17 @@ import { lane_child_read_set } from './lane-child-read-set'
 // `fullrun` that also read what the child reaches beyond it (joshuafolkken/kit#3172): `pre-gate-cut.md`
 // left `fullrun`'s path for the child's alone, and `fullrun` stopped being charged for the whole of
 // `backlogrun-progress.md`, so the old 35KB margin over a bare `fullrun` measured that over-count, not
-// the trim. 18KB is what the trim itself saves: the SKILL.md sections, `latest-gate.md`, the two
+// the trim. 17KB is what the trim itself saves: the SKILL.md sections, `latest-gate.md`, the two
 // decision documents and `progress-watcher.md`. Lowered from 22KB in joshuafolkken/kit#3174, which cut
 // the SKILL.md sections the child skipped out of the document for every entry: the saving moved from
 // the trim into the shared read, so the child reads less in absolute terms while the margin narrows.
+// Lowered from 18KB in joshuafolkken/kit#3566, which moved history out of `latest-gate.md` and
+// `progress-watcher.md`: the documents the child skips got smaller, so skipping them saves less.
 
 const ROOT = process.cwd()
 const FULLRUN = 'fullrun'
 const BYTES_PER_KB = 1024
-const REQUIRED_SAVING_BYTES = 18 * BYTES_PER_KB
+const REQUIRED_SAVING_BYTES = 17 * BYTES_PER_KB
 const MAX_INITIAL_TOKENS = 24_000
 // Raised from 30k when joshuafolkken/kit#2119 added two delivered-rule rows (the scout and the
 // per-run filing cap) to `rule-delivery.md`, which the child reads whole. Raised again to 40k in
@@ -28,7 +30,9 @@ const MAX_INITIAL_TOKENS = 24_000
 // when `backlogrun-steps.md` left the child's point-of-use set: the child never opened the scheduler's
 // step list, so its ~16k tokens were an over-count the total no longer carries. The #2021 acceptance
 // criterion the trim exists for is the 35KB saving vs `fullrun`, which is pinned above and only widens.
-const MAX_TOTAL_TOKENS = 22_000
+// Lowered to 14k in joshuafolkken/kit#3399 when `rule-delivery.md`'s rule table moved behind
+// `pnpm josh rule:list`: the child no longer reads the table whole, and the total measured 13.6k.
+const MAX_TOTAL_TOKENS = 14_000
 const NOTHING = 0
 
 function total_read_bytes(report: ReturnType<typeof entry_read_set.costed>): number {
@@ -86,7 +90,7 @@ describe('lane_child_read_set.costed — the SKILL.md section trim', () => {
 })
 
 describe('lane_child_read_set.costed — the whole reduction', () => {
-	it('reads at least 18KB less than a fullrun that also read what the child reaches', () => {
+	it('reads at least 17KB less than a fullrun that also read what the child reaches', () => {
 		const child = lane_child_read_set.costed(ROOT)
 		const reached = child.point_of_use
 			.filter((one) => lane_child_read_set.REACHED_POINT_OF_USE.has(one.file))
@@ -107,7 +111,7 @@ describe('lane_child_read_set.costed — the whole reduction', () => {
 		expect(lane_child_read_set.costed(ROOT).scoped.tokens).toBeLessThanOrEqual(MAX_INITIAL_TOKENS)
 	})
 
-	it('keeps the total read at or below 22k tokens', () => {
+	it('keeps the total read at or below 14k tokens', () => {
 		const tokens = total_read_tokens(lane_child_read_set.costed(ROOT))
 
 		expect(tokens).toBeLessThanOrEqual(MAX_TOTAL_TOKENS)

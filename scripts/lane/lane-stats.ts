@@ -1,6 +1,8 @@
+import { machine_capacity } from '#scripts/gate/machine-capacity'
 import type { GateEntry, LedgerEntry, LoadEntry } from './lane-ledger'
+import { lane_sampler } from './lane-sampler'
 
-// The lane-limit measurement's one table row (joshuafolkken/kit#3355): the ledger entries of one period
+// The lane-limit measurement's one table row: the ledger entries of one period
 // reduced to throughput, gate duration and machine load, in the column order
 // `docs/maintainers/lane-limit-measurement.md` documents, so the row pastes into #3347's table as is.
 //
@@ -15,6 +17,9 @@ import type { GateEntry, LedgerEntry, LoadEntry } from './lane-ledger'
 //
 // **The means take working samples only** for the same reason: the sampler runs through the nights,
 // and their idle samples would read four busy lanes as about one. Peaks and minima take every sample.
+//
+// **Swap is a rate, not a level.** A sample carries `machine_capacity`'s counter — every page swapped
+// since boot — so the swap columns are what was swapped between consecutive samples, per hour.
 
 const MS_PER_MINUTE = 60_000
 const MS_PER_HOUR = 3_600_000
@@ -23,6 +28,8 @@ const ACTIVE_GAP_MS = MS_PER_HOUR
 const MS_PER_DAY = 86_400_000
 const MB_PER_GB = 1024
 const HALF = 2
+// Half the sampler's interval: two samples closer than this are not one interval apart.
+const MIN_RATE_GAP_MS = lane_sampler.SAMPLE_INTERVAL_MS / HALF
 const DECIMALS = 1
 const MISSING = '—'
 const CELL_SEPARATOR = ' | '
@@ -37,8 +44,8 @@ const COLUMNS = [
 	'gate max (min)',
 	'load peak',
 	'load mean',
-	'swap peak (GB)',
-	'swap mean (GB)',
+	'swapped peak (GB/h)',
+	'swapped mean (GB/h)',
 	'free memory min (GB)',
 	'free memory mean (GB)',
 	'load samples',
@@ -107,6 +114,22 @@ function is_working(sample: LoadEntry): sample is WorkingEntry {
 	return (sample.lanes ?? 0) > 0
 }
 
+interface SamplePair {
+	sample: LoadEntry
+	next: LoadEntry
+}
+
+// Each sample beside the one that followed it, in time order.
+function sample_pairs(samples: ReadonlyArray<LoadEntry>): Array<SamplePair> {
+	const sorted = samples.toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at))
+
+	return sorted.slice(1).map((next, index) => ({ sample: sorted[index] ?? next, next }))
+}
+
+function elapsed_ms({ sample, next }: SamplePair): number {
+	return Date.parse(next.at) - Date.parse(sample.at)
+}
+
 function sum_hours(gaps: ReadonlyArray<number>): number | undefined {
 	const active = gaps.filter((gap) => gap <= ACTIVE_GAP_MS).reduce((sum, gap) => sum + gap, 0)
 
@@ -117,7 +140,7 @@ function sum_hours(gaps: ReadonlyArray<number>): number | undefined {
 // and gates) no longer than `ACTIVE_GAP_MS`.
 function gap_hours(entries: ReadonlyArray<LedgerEntry>): number | undefined {
 	const instants = entries
-		.filter((entry) => !is_load(entry))
+		.filter((entry) => entry.kind === 'merge' || is_gate(entry))
 		.map((entry) => Date.parse(entry.at))
 		.toSorted((left, right) => left - right)
 
@@ -129,14 +152,25 @@ function gap_hours(entries: ReadonlyArray<LedgerEntry>): number | undefined {
 // The time from each working sample to the next sample. The cap still applies, so a sampler stopped
 // mid-run does not count its silence as work.
 function sampled_hours(samples: ReadonlyArray<LoadEntry>): number | undefined {
-	const sorted = samples.toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at))
-	const gaps = sorted
-		.slice(1)
-		.map((next, index) => ({ sample: sorted[index] ?? next, next }))
+	const gaps = sample_pairs(samples)
 		.filter(({ sample }) => is_working(sample))
-		.map(({ sample, next }) => Date.parse(next.at) - Date.parse(sample.at))
+		.map((pair) => elapsed_ms(pair))
 
 	return sum_hours(gaps)
+}
+
+// The GB swapped per hour from one sample to the next. `swapped_mb` is a counter, so only a difference
+// says anything; a gap past `ACTIVE_GAP_MS` is a stopped sampler, whose silence is no rate. A gap under
+// `MIN_RATE_GAP_MS` is no rate either: a drive restarted seconds after its last sample, or a second
+// sampler beside it, would stretch a few seconds' burst to an hour and own the peak.
+function swap_rate(pair: SamplePair): number | undefined {
+	const swapped = machine_capacity.swapped_between(pair.sample.swapped_mb, pair.next.swapped_mb)
+	const elapsed = elapsed_ms(pair)
+	const is_one_interval = elapsed >= MIN_RATE_GAP_MS && elapsed <= ACTIVE_GAP_MS
+
+	if (swapped === undefined || !is_one_interval) return undefined
+
+	return swapped / MB_PER_GB / (elapsed / MS_PER_HOUR)
 }
 
 // The hours work was under way; `undefined` when nothing leaves any active time.
@@ -172,18 +206,26 @@ function gate_cells(entries: ReadonlyArray<LedgerEntry>): Array<string> {
 	return [cell(median(minutes)), cell(peak(minutes))]
 }
 
+function swap_cells(samples: ReadonlyArray<LoadEntry>): Array<string> {
+	const pairs = sample_pairs(samples)
+	const rates = pairs.map((pair) => swap_rate(pair)).filter(is_number)
+	const working_rates = pairs
+		.filter(({ sample }) => is_working(sample))
+		.map((pair) => swap_rate(pair))
+		.filter(is_number)
+
+	return [cell(peak(rates)), cell(mean(working_rates))]
+}
+
 function load_cells(samples: ReadonlyArray<LoadEntry>): Array<string> {
 	const working = samples.filter(is_working)
-	const swap = samples.map((sample) => sample.swap_mb).filter(is_number)
-	const working_swap = working.map((sample) => sample.swap_mb).filter(is_number)
-	const free = samples.map((sample) => sample.free_mb)
-	const working_free = working.map((sample) => sample.free_mb)
+	const free = samples.map((sample) => sample.available_mb).filter(is_number)
+	const working_free = working.map((sample) => sample.available_mb).filter(is_number)
 
 	return [
 		cell(peak(samples.map((sample) => sample.load))),
 		cell(mean(working.map((sample) => sample.load))),
-		cell(gigabytes(peak(swap))),
-		cell(gigabytes(mean(working_swap))),
+		...swap_cells(samples),
 		cell(gigabytes(lowest(free))),
 		cell(gigabytes(mean(working_free))),
 		String(samples.length),
@@ -215,8 +257,11 @@ const lane_stats = {
 	COLUMNS,
 	MISSING,
 	header,
+	in_window,
 	median,
+	peak,
 	row,
+	to_row,
 	window_of,
 }
 

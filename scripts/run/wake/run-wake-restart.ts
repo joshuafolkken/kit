@@ -1,10 +1,9 @@
 import { run_wake_loop, type LoopStop } from './run-wake-loop'
 
-// **A supervisor that fails while the run is still resumable restarts itself** (joshuafolkken/kit#3332).
-// A `backlog:drive` that exited on a transient `main:sync` failure ended the supervisor as `failed`,
-// and the run then sat for forty minutes with a valid carry record, waiting for one `run:wake --start`
-// that only a person was left to type — joshuafolkken/kit#3297's "resume it yourself" rule binds an AI
-// session, and once the supervisor is gone there is none to read it.
+// **A supervisor that fails while the run is still resumable restarts itself.** Otherwise a
+// `backlog:drive` that exited on a transient failure would leave a valid carry record waiting for a
+// `run:wake --start` that only a person is left to type — once the supervisor is gone, no AI session
+// remains to resume it.
 //
 // **Bounded, and only the bound reaches a person.** A failure that is not transient fails again on
 // every pass, so the restarts stop at `RESTART_LIMIT` and the last failure is handed back for the

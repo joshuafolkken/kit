@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { rule_value_cache, type CachePorts } from './rule-value-cache'
 
 const NOW_MS = Date.parse('2026-10-02T06:00:00.000Z')
-const READING = 'wip-cap  reached 3  100% unaided  refused 0'
+const READING = 'issue-comments  reached 3  100% unaided  refused 0'
 const MS_PER_SECOND = 1000
 
 const context = { cwd: '', stderr: new Array<string>() }

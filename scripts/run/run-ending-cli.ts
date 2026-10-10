@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 import {
@@ -8,10 +9,9 @@ import {
 	type EndingDecision,
 	type EndingRequest,
 } from './run-ending'
-import { run_issue_number } from './run-issue-number'
 
 // `josh run:ending <N> --output <path> [--repo <owner/repo>]` — one verdict about how the dispatched
-// lane child running `<N>` ended (joshuafolkken/kit#2139).
+// lane child running `<N>` ended.
 //
 // The stdout/stderr split is the contract `run:liveness` and `run:hold` keep: exactly one verdict
 // token on stdout on every path, the reason and the basis on stderr. `unreadable` exits non-zero,
@@ -59,7 +59,7 @@ interface ParsedArguments {
 function is_valid(parsed: ParsedArguments): boolean {
 	return (
 		parsed.positionals.length === 1 &&
-		run_issue_number.ISSUE_NUMBER_PATTERN.test(parsed.positionals[0] ?? '') &&
+		issue_number_shape.ISSUE_NUMBER_PATTERN.test(parsed.positionals[0] ?? '') &&
 		parsed.values.output !== undefined
 	)
 }

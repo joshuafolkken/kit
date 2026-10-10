@@ -6,10 +6,9 @@ import { defect_rate_cli } from './defect-rate-cli'
 const REPO = 'owner/repo'
 const NOW_MS = Date.parse('2026-09-23T14:00:00Z')
 const DEFECT_BODY = '- 種別: 不具合'
-const BEHAVIOR_BODY = '- 種別: 振る舞い変更'
 const INTERRUPT_LABELS = [{ name: 'route:interrupt' }]
 const DEFECT_ITEM = { body: DEFECT_BODY, labels: [] }
-const BEHAVIOR_ITEM = { body: BEHAVIOR_BODY, labels: [] }
+const ENHANCEMENT_ITEM = { body: '', labels: [{ name: 'enhancement' }] }
 const LOWER_BOUNDS = 'lower bounds'
 const TWO_SEARCHES = 2
 const THREE_PAGES_TOTAL = 201
@@ -107,7 +106,7 @@ describe('defect_rate_cli.search_path', () => {
 describe('defect_rate_cli.run', () => {
 	it('prints the rate from both searches over the requested window', async () => {
 		const filed = page([DEFECT_ITEM, { labels: INTERRUPT_LABELS }])
-		const api = stub_search(filed, page([BEHAVIOR_ITEM, BEHAVIOR_ITEM]))
+		const api = stub_search(filed, page([ENHANCEMENT_ITEM, ENHANCEMENT_ITEM]))
 		const output = capture()
 
 		expect(await defect_rate_cli.run(['--days', '7'], NOW_MS)).toBe(0)
@@ -141,7 +140,7 @@ describe('defect_rate_cli.run — the search pages', () => {
 			page([DEFECT_ITEM]),
 			page([{ labels: INTERRUPT_LABELS }]),
 		]
-		const api = stub_search(filed, page([BEHAVIOR_ITEM, BEHAVIOR_ITEM, BEHAVIOR_ITEM]))
+		const api = stub_search(filed, page([ENHANCEMENT_ITEM, ENHANCEMENT_ITEM, ENHANCEMENT_ITEM]))
 		const output = capture()
 
 		expect(await defect_rate_cli.run(['--days', '7'], NOW_MS)).toBe(0)
@@ -151,7 +150,7 @@ describe('defect_rate_cli.run — the search pages', () => {
 
 	it('reads no page past the search ceiling and warns that the window is capped', async () => {
 		const filed = Array.from({ length: CEILING_PAGES }, () => page([DEFECT_ITEM], OVER_CEILING))
-		const api = stub_search(filed, page([BEHAVIOR_ITEM]))
+		const api = stub_search(filed, page([ENHANCEMENT_ITEM]))
 		const output = capture()
 
 		expect(await defect_rate_cli.run([], NOW_MS)).toBe(0)
@@ -162,7 +161,7 @@ describe('defect_rate_cli.run — the search pages', () => {
 	it('fails rather than measuring part of a search when a later page cannot be read', async () => {
 		stub_search(
 			[page([DEFECT_ITEM], THREE_PAGES_TOTAL), page([DEFECT_ITEM])],
-			page([BEHAVIOR_ITEM]),
+			page([ENHANCEMENT_ITEM]),
 		)
 		vi.spyOn(console, 'error').mockImplementation(() => undefined)
 

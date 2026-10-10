@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import type { DependencyLink } from './epic-parse'
 
 // How an issue and a dependency between two of them are written down.
@@ -5,7 +6,7 @@ import type { DependencyLink } from './epic-parse'
 // Both spellings had accumulated a copy per module — the body generator, the graph, the chain model
 // and the insertion planner each rendered `#N` and `#B -> #M` themselves. They are one-liners, which
 // is exactly why the copies spread; and a link rendered one way in a message and another way as a
-// dedup key is a difference nothing would report (joshuafolkken/kit#890).
+// dedup key is a difference nothing would report.
 
 const DEPENDENCY_ARROW = ' -> '
 // How a list of references is written out. One definition rather than a `join` per caller: the
@@ -14,7 +15,7 @@ const DEPENDENCY_ARROW = ' -> '
 const REFERENCE_SEPARATOR = ', '
 
 function to_issue_reference(issue_number: number): string {
-	return `#${String(issue_number)}`
+	return issue_cite.plain(issue_number)
 }
 
 function format_dependency_link(link: DependencyLink): string {
@@ -27,7 +28,7 @@ function join_references(references: ReadonlyArray<string>): string {
 
 // A list of links, in the same form a single one takes. One definition rather than a `map().join()`
 // per caller: the insertion planner and the relation reporter now print the same list side by side,
-// and two spellings of it would read as two different things (joshuafolkken/kit#1080).
+// and two spellings of it would read as two different things.
 function format_dependency_links(links: ReadonlyArray<DependencyLink>): string {
 	return join_references(links.map((link) => format_dependency_link(link)))
 }
@@ -37,7 +38,7 @@ function format_issue_references(issue_numbers: ReadonlyArray<number>): string {
 }
 
 // The `blocked-by` relations a positioned `--add` dropped, named the same way wherever they are
-// reported — on stdout and inside the `--decision-file` record (joshuafolkken/kit#1711). One string
+// reported — on stdout and inside the `--decision-file` record. One string
 // rather than two, because the two are read side by side: a reader comparing the console against the
 // record must not have to decide whether two spellings mean the same thing.
 //

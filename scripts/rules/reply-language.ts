@@ -1,4 +1,4 @@
-// Whether a reply is written in the session language (joshuafolkken/kit#2470). The session-language
+// Whether a reply is written in the session language. The session-language
 // line reaches a turn only through `UserPromptSubmit`, so a turn opened by a background completion or a
 // Stop hook refusal answered in whatever language it was just shown, and kept answering in it.
 //

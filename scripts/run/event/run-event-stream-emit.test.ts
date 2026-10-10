@@ -113,6 +113,53 @@ describe('run_event_stream_emit.emit_once — one marker per episode', () => {
 	})
 })
 
+// joshuafolkken/kit#3430: the idle window is re-derived on every watching poll, and only a window that
+// moved is written — however many other events landed in between.
+const { IDLE } = run_event_stream.EVENT_KIND
+const IDLE_TEXT = 'idle since 2026-01-01T00:00:00.000Z until 2026-01-01T00:30:00.000Z (idle)'
+const MOVED_TEXT = 'idle since 2026-01-01T00:10:00.000Z until 2026-01-01T00:40:00.000Z (idle)'
+
+describe('run_event_stream_emit.emit_changed — one line per value', () => {
+	it('skips a repeat of the newest value even after other events', async () => {
+		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
+
+		expect(await run_event_stream_emit.emit_changed(IDLE, IDLE_TEXT)).toBe(true)
+		await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.MERGE, '#7 merged')
+
+		expect(await run_event_stream_emit.emit_changed(IDLE, IDLE_TEXT)).toBe(false)
+		expect(await events_of_kind(IDLE)).toHaveLength(1)
+	})
+
+	it('appends a value that moved', async () => {
+		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
+
+		await run_event_stream_emit.emit_changed(IDLE, IDLE_TEXT)
+		await run_event_stream_emit.emit_changed(IDLE, MOVED_TEXT)
+
+		expect(await events_of_kind(IDLE)).toHaveLength(2)
+	})
+
+	it('swallows a failed resolve', async () => {
+		git_directories_mock.mockRejectedValue(new Error(GIT_GONE))
+
+		expect(await run_event_stream_emit.emit_changed(IDLE, IDLE_TEXT)).toBe(false)
+	})
+
+	// The idle window, a filing and a note land after the drain marker, and the watching loop must not
+	// read any of them as a new episode — or `run:step` would fire the retrospective again.
+	it('leaves the drain marker the newest position past an idle window, a filing and a note', async () => {
+		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
+
+		await run_event_stream_emit.emit_once(DRAIN, DRAIN_TEXT)
+		await run_event_stream_emit.emit_changed(IDLE, IDLE_TEXT)
+		await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.FILED, '#3438 Count the seats')
+		await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.NOTE, '#3415 gate slowed')
+
+		expect(await run_event_stream_emit.emit_once(DRAIN, DRAIN_TEXT)).toBe(false)
+		expect(await drain_events()).toHaveLength(1)
+	})
+})
+
 // joshuafolkken/kit#2464: the stall marker's episode ends at a dispatch, not at whatever event a parallel
 // lane appends next — the newest-event dedup re-sent the stall notification on every such interleave.
 const { STALL, CHILD_LAUNCH, MERGE, HEARTBEAT } = run_event_stream.EVENT_KIND
@@ -205,5 +252,55 @@ describe('run_event_stream_emit.current_events — the invocation now running', 
 		)
 
 		expect(await run_event_stream_emit.current_events()).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#3536: a writer asking whether its marker is there keeps the whole stream unscoped.
+describe('run_event_stream_emit.invocation_or_all_events', () => {
+	it('keeps the whole stream when no carry record scopes it', async () => {
+		const repository = fresh_repository()
+
+		git_directories_mock.mockResolvedValue([WORKTREE, repository])
+		run_event_stream.append(run_event_stream.target_of(repository), MERGE, '#6 merged', EARLIER_ISO)
+
+		const events = await run_event_stream_emit.invocation_or_all_events()
+
+		expect(events.map((event) => event.text)).toStrictEqual(['#6 merged'])
+	})
+
+	it('drops a previous invocation under a carry scope', async () => {
+		const repository = fresh_repository()
+		const carry = run_carry.carry_path(repository)
+
+		git_directories_mock.mockResolvedValue([WORKTREE, repository])
+		run_event_stream.append(run_event_stream.target_of(repository), MERGE, '#6 merged', EARLIER_ISO)
+		run_carry.begin_carry(carry, 'backlogrun')
+		await run_event_stream_emit.emit(MERGE, '#7 merged')
+
+		const events = await run_event_stream_emit.invocation_or_all_events()
+
+		rmSync(carry, { force: true })
+		expect(events.map((event) => event.text)).toStrictEqual(['#7 merged'])
+	})
+})
+
+// joshuafolkken/kit#3423: the fold reads a finder's filings across invocations, carry record or none.
+describe('run_event_stream_emit.all_events — the whole stream', () => {
+	it('reads every invocation’s events through all_events, with no carry record', async () => {
+		const repository = fresh_repository()
+
+		git_directories_mock.mockResolvedValue([WORKTREE, repository])
+		run_event_stream.append(run_event_stream.target_of(repository), MERGE, '#6 merged', EARLIER_ISO)
+		await run_event_stream_emit.emit(MERGE, '#7 merged')
+
+		const events = await run_event_stream_emit.all_events()
+
+		expect(events.map((event) => event.text)).toStrictEqual(['#6 merged', '#7 merged'])
+	})
+
+	it('reads no events through all_events when the target will not resolve', async () => {
+		git_directories_mock.mockRejectedValue(new Error(GIT_GONE))
+
+		expect(await run_event_stream_emit.all_events()).toStrictEqual([])
 	})
 })

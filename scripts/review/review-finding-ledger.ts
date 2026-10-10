@@ -1,5 +1,7 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
+
 // The review-finding line's grammar, its category vocabulary and the aggregation over it — the single
-// place all three are defined (joshuafolkken/kit#2325). A `/code-review` round's findings evaporated
+// place all three are defined. A `/code-review` round's findings evaporated
 // the moment they were fixed, so no one could say which category recurred. They now land in the same
 // append-only ledger the observation lines use (`.josh/observations/`), under a distinct `- rf:`
 // prefix so `observation-ledger-line.ts`'s `- k:` grammar never treats them as its own — one ledger,
@@ -60,7 +62,7 @@ function is_valid_file(file: string): boolean {
 }
 
 function issue_field(issue: number): string {
-	return `#${String(issue)}`
+	return issue_cite.plain(issue)
 }
 
 function line_of(fields: ReadonlyArray<string>): string {
@@ -132,7 +134,7 @@ function zero_round_count(content: string): number {
 
 // The issue a finding line is keyed to — its fifth field, the `#<N>` token — or `undefined` for a
 // non-finding or malformed line. The record check reads this to ask whether a given issue's round was
-// recorded at all (joshuafolkken/kit#2343).
+// recorded at all.
 function issue_of(line: string): string | undefined {
 	const fields = line.trimStart().slice(FINDING_PREFIX.length).split(FIELD_SEPARATOR)
 
@@ -142,7 +144,7 @@ function issue_of(line: string): string | undefined {
 // **A `none` zero-round line counts as recorded, exactly like a real finding line does.** The gate
 // asks whether the round was recorded, not whether it found anything — reading the issue field, which
 // a zero-finding line carries too, is what keeps a clean round's single line from reading as "nobody
-// recorded this" (joshuafolkken/kit#2343).
+// recorded this".
 function has_issue_record(content: string, issue: number): boolean {
 	const target = issue_field(issue)
 
@@ -158,6 +160,7 @@ const review_finding_ledger = {
 	is_finding_line,
 	is_severity,
 	is_valid_file,
+	SEVERITIES,
 	zero_round_count,
 	zero_round_line,
 }

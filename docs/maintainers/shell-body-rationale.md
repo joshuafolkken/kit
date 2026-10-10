@@ -18,6 +18,15 @@ the first line of the Telegram notice (joshuafolkken/kit#1182, a child of joshua
 
 ## Why `!` is not a trigger
 
+Measured in this repository's execution environment (non-interactive zsh), inside double quotes:
+
+| Character       | Fires?                                             |
+| --------------- | -------------------------------------------------- |
+| `` ` ``         | **Yes** (command substitution)                     |
+| `$`             | **Yes** (variable expansion)                       |
+| `!`             | No (history expansion is off when non-interactive) |
+| `\$` / `` \` `` | No (the preceding backslash makes it literal)      |
+
 A comment on joshuafolkken/kit#1198 said `!` fires too, but **it does not fire in this environment** (measured in
 non-interactive zsh). It is not a trigger either — bodies containing "!" are everyday, and a hook
 that refused on them would be exactly
@@ -52,6 +61,16 @@ what the shell does to that value — is in `scripts/rules/shell-body-trigger.ts
 Some spellings are invisible to the trigger, so the resident line in `CLAUDE.md` stays. Delivery
 reaches Claude Code alone (Codex / Gemini / Cursor run no hooks), and the rule must not shrink to the
 spellings the pattern knows.
+
+### What the trigger cannot see
+
+- **A path that posts over REST from inside node** (`pnpm josh propagate` and the like) never appears in
+  a shell string
+- **`gh api --input <file>`** keeps the body in a file, so it is safe to begin with
+- **`-b` (the GitHub CLI's short `--body`) is not covered** — the same spelling is a branch name in
+  `git checkout -b`, and refusing there would fire on the wrong turn
+- **`-f title="…"`** is not covered: a title is a short phrase normalized to English, and no workflow
+  puts a backtick in one
 
 ## Why the trigger reads the body, not the flag
 

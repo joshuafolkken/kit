@@ -2,12 +2,13 @@ import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
 import type { AgentProfile } from '#scripts/agent/agent-role-profile'
+import { session_cite } from '#scripts/issue/session-cite'
 import { run_liveness } from '#scripts/run/run-liveness'
 import { lane_environment } from './lane-environment'
 import { lane_registry, type LaneInfo } from './lane-registry'
 
 // Where the delegated unit running a lane's child writes, recorded in the lane and read back from
-// anywhere (joshuafolkken/kit#1713).
+// anywhere.
 //
 // **This is the one fact about an in-flight lane that only the dispatching session held.** The
 // harness names a unit's output file after that session's own id and the unit's, and neither is
@@ -106,10 +107,10 @@ function describe_refusal(refusal: Refusal, issue: string): string {
 	}
 
 	if (refusal.kind === 'unreadable') {
-		return `The lane for #${issue} has a ${ENV_FILE_NAME} that cannot be read at ${refusal.lane.directory}. Fix it and run this again — writing a new one would drop the lane's port seat with it.`
+		return `The lane for ${session_cite.issue(issue)} has a ${ENV_FILE_NAME} that cannot be read at ${refusal.lane.directory}. Fix it and run this again — writing a new one would drop the lane's port seat with it.`
 	}
 
-	return `No lane is open for #${issue}. Run \`pnpm josh lane:list\` to see what is open.`
+	return `No lane is open for ${session_cite.issue(issue)}. Run \`pnpm josh lane:list\` to see what is open.`
 }
 
 const lane_output = {

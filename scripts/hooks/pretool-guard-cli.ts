@@ -2,10 +2,10 @@
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { hook_decision } from '#scripts/josh/hook-decision'
-import { pretool_guard, pretool_outcome_async } from './pretool-guard'
+import { pretool_guard } from './pretool-guard'
 
-// The `PreToolUse` hook's entry, kept apart from the composition in `pretool-guard.ts`
-// (joshuafolkken/kit#2922). The hook bundles are built with `splitting: true`, which moves a module
+// The `PreToolUse` hook's entry, kept apart from the composition in `pretool-guard.ts`.
+// The hook bundles are built with `splitting: true`, which moves a module
 // imported by two entries into a shared chunk — and `codex-hook-adapter.ts` imports `pretool-guard.ts`.
 // Its self-invoke went into that chunk, whose `import.meta.url` never equals the launched
 // `dist/hooks/pretool-guard.js`, so the bundled hook ran no guard at all and every refusal failed open.
@@ -16,6 +16,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 		const raw_payload = await text(process.stdin)
 
 		hook_decision.load_environment_file()
-		pretool_guard.emit(raw_payload, await pretool_outcome_async(raw_payload))
+		await pretool_guard.respond(raw_payload)
 	}
 }

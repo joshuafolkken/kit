@@ -6,8 +6,7 @@ import { time_followup_stage } from './time-followup-stage'
 import { time_instant } from './time-instant'
 import { time_reported_failure } from './time-reported-failure'
 
-// One line of a session transcript, read into the shape the span walk works on
-// (joshuafolkken/kit#1406).
+// One line of a session transcript, read into the shape the span walk works on.
 //
 // It moved out of `time-spans.ts` when that file passed its length limit — the seam that file is
 // already cut along elsewhere (`time-shell.ts`, `time-single-check.ts`), where the *reading* of a
@@ -27,22 +26,22 @@ const BLOCK_SCHEMA = z.object({
 
 	tool_use_id: z.string().nullish(),
 	input: z.unknown().nullish(),
-	// Whether the harness wrote this result back as a failure (joshuafolkken/kit#1309). Present on a
+	// Whether the harness wrote this result back as a failure. Present on a
 	// `tool_result` block and on nothing else, and absent even there for the tools that never report
 	// one — which is why it is read as three answers rather than as a boolean with a default.
 	is_error: z.boolean().nullish(),
-	// What the call printed. Read only to recover the outcome a pipeline threw away
-	// (joshuafolkken/kit#1361): it is kept as flattened text rather than as blocks, because that is
+	// What the call printed. Read only to recover the outcome a pipeline threw away:
+	// it is kept as flattened text rather than as blocks, because that is
 	// the whole of what `time-reported-failure.ts` asks of it.
 	content: z.unknown().nullish(),
 })
 
 const CONTENT_SCHEMA = z.union([z.string(), z.array(BLOCK_SCHEMA)])
 // `id` is the assistant *message* the line belongs to, and Claude Code writes one line per content
-// block — a turn that thought and then issued two calls is three lines carrying one id
-// (joshuafolkken/kit#1329). Anything asking "how many calls did that turn make" therefore has to
-// group by this field; counting one line's blocks answers one, whatever the turn actually did. Since
-// joshuafolkken/kit#1406 the same field is what says how many *turns* a run had.
+// block — a turn that thought and then issued two calls is three lines carrying one id.
+// Anything asking "how many calls did that turn make" therefore has to
+// group by this field; counting one line's blocks answers one, whatever the turn actually did. The
+// same field is what says how many *turns* a run had.
 const MESSAGE_SCHEMA = z.object({ id: z.string().nullish(), content: CONTENT_SCHEMA.nullish() })
 
 const LINE_SCHEMA = z.object({
@@ -50,10 +49,10 @@ const LINE_SCHEMA = z.object({
 	timestamp: z.string().nullish(),
 	// The branch the line was written on, which is where the issue number lives — `josh git` names a
 	// branch `<N>-<slug>`. Read here rather than re-parsed by a second reader so `josh time --issue`
-	// and `josh cost --issue` answer from the same field (joshuafolkken/kit#1268).
+	// and `josh cost --issue` answer from the same field.
 	gitBranch: z.string().nullish(),
-	// The two fields outside `message` that the harness writes an end-of-task notice on
-	// (joshuafolkken/kit#1696). **Both are read as `unknown` rather than as strings**: a schema
+	// The two fields outside `message` that the harness writes an end-of-task notice on.
+	// **Both are read as `unknown` rather than as strings**: a schema
 	// insisting on a string here would reject every line whose `content` is a list of blocks — which is
 	// most of them — and a rejected line is dropped from the timeline entirely, so the shares would stop
 	// reconstructing the elapsed time. The shape is checked at the read below instead.
@@ -63,17 +62,14 @@ const LINE_SCHEMA = z.object({
 })
 
 const UNKNOWN_BRANCH = ''
-// The field an attachment line carries the notice in. Named rather than written as a literal for the
-// reason `time-background.ts`'s `BASH_ID_KEY` is: `dot-notation` rewrote `record['prompt']` into
-// `record.prompt`, which a value read as an index-signature record does not have — until
-// joshuafolkken/kit#1783 switched that fix off. The name is kept for its own sake.
+// The field an attachment line carries the notice in, named rather than written as a literal.
 const PROMPT_KEY = 'prompt'
 const NO_MESSAGE_ID = ''
-// How much of an errored body is kept (joshuafolkken/kit#1642). A refusal's body *is* the reason the
+// How much of an errored body is kept. A refusal's body *is* the reason the
 // harness wrote back, from its first character, so an opening this long identifies the speaker
 // without retaining the output of every failed command a session ran.
 const ERROR_TEXT_LIMIT = 256
-// The icon every guard refusal opens with (joshuafolkken/kit#1913). It is not `status_icons.FAIL_ICON`
+// The icon every guard refusal opens with. It is not `status_icons.FAIL_ICON`
 // — that one (`✗`) marks a josh check's failing item, which `has_failure_line` scans for; this one
 // marks a PreToolUse hook's *deny* reason, which is a different body carried in a different result. No
 // shared constant exists because each guard writes the literal in its own reason, so the one place a
@@ -81,8 +77,11 @@ const ERROR_TEXT_LIMIT = 256
 const REFUSAL_MARKER = '⛔'
 // The label the harness puts in front of a PreToolUse hook's deny reason, naming the hook and the tool.
 const HOOK_ERROR_LABEL = /^PreToolUse:\S+ hook error: /u
+// The label the harness puts in front of a Stop hook's block reason when it sends the turn back.
+// The reason follows on the next line, opening with the same `⛔` a deny does.
+const STOP_FEEDBACK_LABEL = /^Stop hook feedback:\s*/u
 // A line that is one bare verdict token — `cut`, `busy`, `not-a-lane` — the single word a josh verdict
-// command prints on standard output (joshuafolkken/kit#3223). How many are kept bounds the field the
+// command prints on standard output. How many are kept bounds the field the
 // way `ERROR_TEXT_LIMIT` bounds `error_text`.
 const TOKEN_LINE = /^[a-z][a-z-]*$/u
 const TOKEN_LINE_LIMIT = 8
@@ -97,40 +96,40 @@ interface Block {
 	// `false`: one is a tool that reports no outcome, the other a call that succeeded.
 	is_error: boolean | undefined
 	// Whether the body carried a line opening with josh's failure icon — the one bit of it anything
-	// reads (joshuafolkken/kit#1361). The text itself is deliberately not kept: a field holding it
+	// reads. The text itself is deliberately not kept: a field holding it
 	// would retain every byte the session's tools printed for the length of the parse.
 	has_failure_line: boolean
-	// The stage rows a `pnpm josh followup` call printed into its own output
-	// (joshuafolkken/kit#1445). Read here for the same reason the bit above is, and it obeys the same
+	// The stage rows a `pnpm josh followup` call printed into its own output.
+	// Read here for the same reason the bit above is, and it obeys the same
 	// prohibition: what is kept is the ten-odd parsed laps, never the body they were read from. Empty
 	// for every other tool result, which is nearly all of them.
 	followup_stages: ReadonlyArray<FollowupStage>
 	// The opening of the body of a result the harness wrote back as a failure, and `''` for every
-	// other block (joshuafolkken/kit#1642). It obeys the same prohibition as the two fields above —
+	// other block. It obeys the same prohibition as the two fields above —
 	// what is kept is a bounded opening, never the whole body — and it exists so a reader asking
 	// which refusal a line carried can be answered from the parsed block rather than by matching
 	// `"is_error":true` against the raw line, a test one whitespace in the serializer defeats and
 	// which cannot tell one errored block from another on the same line.
 	error_text: string
 	// Which guard refused this call, read off the opening of an errored result and `''` for every other
-	// block (joshuafolkken/kit#1913). It obeys the same prohibition as `error_text` — what is kept is a
+	// block. It obeys the same prohibition as `error_text` — what is kept is a
 	// short label, never the body — and it exists so the per-guard refusal breakdown can be answered from
 	// the parsed block rather than by re-scanning the body downstream. `''` where the result was not a
 	// `⛔` refusal, so a reader tells "no guard spoke" from "this guard spoke" without a second parse.
 	refusal_guard: string
-	// The bare-token lines of a result that did not fail, and `[]` for every other block
-	// (joshuafolkken/kit#3223). It obeys the same prohibition as `error_text` — what is kept is a few
+	// The bare-token lines of a result that did not fail, and `[]` for every other block.
+	// It obeys the same prohibition as `error_text` — what is kept is a few
 	// single words, never the body — and it exists so the verdict a josh command answered with
 	// (`run:cut`'s `cut`) is read from the parsed block rather than by searching the raw line.
 	token_lines: ReadonlyArray<string>
 	// The id the harness assigned to a command it took into the background, and `''` for every other
-	// block (joshuafolkken/kit#1662). It is the fourth field read off the body under the same
+	// block. It is the fourth field read off the body under the same
 	// prohibition as the three above — what is kept is the id, never the text it was read from — and
 	// it is what pairs a launch with the call that later reads its output, so the minutes the command
 	// actually ran can be placed on the timeline instead of only the seconds its launch call took.
 	background_id: string
 	// The id of a subagent this block launched into the background, and `''` for every other block
-	// (joshuafolkken/kit#2774) — apart from `background_id` so the timeline windows stay commands only.
+	// — apart from `background_id` so the timeline windows stay commands only.
 	agent_id: string
 }
 
@@ -139,7 +138,7 @@ interface TranscriptLine {
 	timestamp_ms: number
 	branch: string
 	// The background run this line is the harness's end-of-task notice for, and `''` for every other
-	// line (joshuafolkken/kit#1696). It is read here rather than downstream for the reason every
+	// line. It is read here rather than downstream for the reason every
 	// derived field above is: the notice is the line's whole content, which a span does not keep, and
 	// it is the only thing in a transcript that says a command had *finished* rather than merely been
 	// looked at.
@@ -149,6 +148,9 @@ interface TranscriptLine {
 	// every line lacking an id would otherwise fall into one bucket spanning the whole file.
 	message_id: string
 	blocks: Array<Block>
+	// The guard whose Stop-hook block sent this turn back, or `''` for every other line
+	// — read the way `Block.refusal_guard` is, off the reason's opening.
+	stop_guard: string
 }
 
 // The four string fields, defaulted together and apart from the two that are not strings. Split out
@@ -165,15 +167,15 @@ function block_names(
 	}
 }
 
-// **A refusal is identified by what its body opens with, never by what it carries inside**
-// (joshuafolkken/kit#1913). The hook denies a call on behalf of the one guard whose trigger fired and
+// **A refusal is identified by what its body opens with, never by what it carries inside**.
+// The hook denies a call on behalf of the one guard whose trigger fired and
 // writes that guard's reason back as the whole result, so the speaker is the token after the `⛔` and
 // before the first `:` — `⛔ pre-gate cut: …` is `pre-gate cut`. A reason with no colon (a headline
 // like `⛔ scoped checks not green on this tree`) is taken whole. Reading the opening rather than
 // searching the body is what stops a result that merely quoted a reason being read as a refusal.
 //
 // **The harness writes the reason behind its own label** — `PreToolUse:Edit hook error: ⛔ …` — so that
-// label is stripped before the opening is read (joshuafolkken/kit#3223). Without it no live refusal
+// label is stripped before the opening is read. Without it no live refusal
 // carried a guard: the fixtures wrote the bare `⛔` body and passed while every recorded one read `''`.
 function guard_from_refusal(text: string): string {
 	const trimmed = text.trimStart().replace(HOOK_ERROR_LABEL, '')
@@ -183,6 +185,16 @@ function guard_from_refusal(text: string): string {
 	const colon = headline.indexOf(':')
 
 	return (colon === -1 ? headline : headline.slice(0, colon)).trim()
+}
+
+// **Only the harness's own feedback line counts.** It writes a Stop block back as a user turn whose
+// whole body is `Stop hook feedback:` and the reason, so a prompt that merely quotes one never opens
+// with the label and reads `''`.
+function stop_guard_of(data: z.infer<typeof LINE_SCHEMA>): string {
+	const content = data.message?.content
+	if (typeof content !== 'string' || !STOP_FEEDBACK_LABEL.test(content)) return ''
+
+	return guard_from_refusal(content.replace(STOP_FEEDBACK_LABEL, ''))
 }
 
 function token_lines_of(text: string): Array<string> {
@@ -196,7 +208,7 @@ function token_lines_of(text: string): Array<string> {
 // **The body is flattened once and both readers are handed the text.** `result_text` is what turns a
 // content field that may be a string or a list of blocks into one string, and it is idempotent on a
 // string — so passing its own output back to `has_failure_line` reads exactly as passing the raw
-// field did, at one flattening instead of two (joshuafolkken/kit#1445).
+// field did, at one flattening instead of two.
 function to_block(raw: z.infer<typeof BLOCK_SCHEMA>): Block {
 	const text = time_reported_failure.result_text(raw.content)
 	const is_error = raw.is_error ?? undefined
@@ -235,7 +247,7 @@ function message_fields(
 }
 
 // **One notice reaches the transcript on any of three line kinds, and which of them a session holds
-// varies** (joshuafolkken/kit#1696). The harness writes it on a `queue-operation` line when the notice
+// varies**. The harness writes it on a `queue-operation` line when the notice
 // is generated, on an `attachment` line when it is delivered, and on a `user` line where it enters the
 // conversation — and a run measured against one carrier alone came back unmeasured whenever the
 // session happened to hold a different one. All three are read, and `time_background.finished_at`
@@ -260,6 +272,7 @@ function to_line(data: z.infer<typeof LINE_SCHEMA>): TranscriptLine | undefined 
 		timestamp_ms,
 		branch: data.gitBranch ?? UNKNOWN_BRANCH,
 		finished_background: time_background.finished_id(notice_text(data)),
+		stop_guard: stop_guard_of(data),
 		...message_fields(data.message),
 	}
 }
@@ -270,12 +283,18 @@ function parse_line(line: string): TranscriptLine | undefined {
 	return parsed.success ? to_line(parsed.data) : undefined
 }
 
+// A whole transcript's text read as its parsed lines, the unparseable ones dropped.
+function parse_text(text: string): Array<TranscriptLine> {
+	return text.split('\n').flatMap((line) => parse_line(line) ?? [])
+}
+
 const time_transcript_line = {
 	ERROR_TEXT_LIMIT,
 	NO_MESSAGE_ID,
 	TOKEN_LINE_LIMIT,
 	guard_from_refusal,
 	parse_line,
+	parse_text,
 }
 
 export type { Block, TranscriptLine }

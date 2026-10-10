@@ -28,12 +28,11 @@ function read_extends_entries(content: string): ReadonlyArray<string> {
 
 // Ensure kit's tsconfig base preset is in `extends` — UNLESS an `@joshuafolkken/*` tsconfig preset
 // (kit's own base, or an app-kit / game-kit framework preset that already embeds kit base) is
-// present. Adding kit's base alongside such a preset is a redundant second extend. See
-// joshuafolkken/kit#660. The legacy `.jsonc` preset extension is migrated first: the presence check
-// below matches it too, so without the rewrite a consumer stuck on the old path would be reported
-// "already present" and never repaired. `base_directory` is the project root the `extends` paths
-// resolve against, which the migration needs to confirm the renamed preset is installed. See
-// joshuafolkken/kit#681.
+// present. Adding kit's base alongside such a preset is a redundant second extend. The legacy
+// `.jsonc` preset extension is migrated first: the presence check below matches it too, so without
+// the rewrite a consumer stuck on the old path would be reported "already present" and never
+// repaired. `base_directory` is the project root the `extends` paths resolve against, which the
+// migration needs to confirm the renamed preset is installed.
 function merge_tsconfig_extends(content: string, entry: string, base_directory: string): string {
 	const migrated = tsconfig_preset_migration.migrate_preset_paths(content, base_directory)
 	if (kit_base_preset.is_tsconfig_base_present(read_extends_entries(migrated))) return migrated
@@ -68,7 +67,7 @@ const COMPILER_OPTIONS_FIELD = 'compilerOptions'
 
 // Prune the redundant options one at a time, in place. Setting `compilerOptions` to the kept subset
 // would be one edit instead of several, but it replaces the whole block and takes any comment the
-// consumer wrote inside it along with the options being dropped (joshuafolkken/kit#798). Each
+// consumer wrote inside it along with the options being dropped. Each
 // removal re-reads the document, so the shifting offsets take care of themselves.
 function drop_redundant_options(content: string, redundant: ReadonlyArray<string>): string {
 	let current = content
@@ -146,7 +145,6 @@ function missing_entries<T>(
 // `import` and tsconfig `extends` lists. Arrays and scalars stay untouched: combining a list such as
 // `eslint.validate` would be a guess about intent, and overwriting it would drop the consumer's own
 // entries. Without this, one customized key froze out every later kit addition inside it, silently.
-// See joshuafolkken/kit#691.
 function merge_owned_entries(current: unknown, update: unknown): unknown {
 	const current_object = json_object_schema.safeParse(current)
 	const update_object = json_object_schema.safeParse(update)
@@ -218,7 +216,7 @@ function merge_package_scripts(content: string, scripts: Record<string, string>)
 }
 
 // Replace only a safe-chain `preinstall` an earlier kit wrote, for a consumer that never re-runs
-// `josh init`; every other key and script is kept (joshuafolkken/kit#3269).
+// `josh init`; every other key and script is kept.
 function upgrade_safe_chain_preinstall(content: string): string {
 	const parsed = parse_jsonc(content)
 	const raw = parsed['scripts']

@@ -2,7 +2,7 @@
 //
 // Issue-number citations and the "why / measured / rejected" prose around them are what swell the
 // documents an agent reads at run time; a reduction epic cuts them only for the next PRs to add them
-// back, because nothing held the reduced count (joshuafolkken/kit#3185). This list is that hold:
+// back, because nothing held the reduced count. This list is that hold:
 // `issue-citation-budget.test.ts` fails `pnpm josh gate` when an agent-read document cites more issue
 // numbers than its entry records, and when it cites fewer — a reduction must lower its entry in the
 // same PR, so the ceiling follows the count down and never sits loose above it. A document absent from
@@ -17,44 +17,11 @@ interface CitationBudget {
 	citations: number
 }
 
-// An issue number as a document cites it — `#3185` or `joshuafolkken/kit#3185`. Three digits or more,
+// An issue number as a document cites it — `#1234` or `joshuafolkken/kit#1234`. Three digits or more,
 // so a placeholder (`#N`, `#<N>`) and a list ordinal are not counted.
 const CITATION_PATTERN = /#\d{3,}\b/gu
 
 const ISSUE_CITATION_BUDGET: ReadonlyArray<CitationBudget> = [
-	{ path: '.claude/skills/epic-commands/epic-bundle.md', citations: 8 },
-	{ path: '.claude/skills/epic-commands/execution-waves.md', citations: 7 },
-	{ path: '.claude/skills/epic-commands/SKILL.md', citations: 22 },
-	{ path: '.claude/skills/verify-ui/SKILL.md', citations: 1 },
-	{ path: '.claude/skills/workflow-commands/background-commands.md', citations: 2 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-child.md', citations: 1 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-lanes.md', citations: 3 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-park.md', citations: 2 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-progress.md', citations: 18 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-recovery.md', citations: 1 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-steps.md', citations: 13 },
-	{ path: '.claude/skills/workflow-commands/backlogrun.md', citations: 6 },
-	{ path: '.claude/skills/workflow-commands/chain-rule.md', citations: 20 },
-	{ path: '.claude/skills/workflow-commands/entry-sequence.md', citations: 2 },
-	{ path: '.claude/skills/workflow-commands/followup.md', citations: 10 },
-	{ path: '.claude/skills/workflow-commands/fullrun-steps.md', citations: 9 },
-	{ path: '.claude/skills/workflow-commands/fullrun.md', citations: 6 },
-	{ path: '.claude/skills/workflow-commands/halfrun.md', citations: 4 },
-	{ path: '.claude/skills/workflow-commands/into-target.md', citations: 8 },
-	{ path: '.claude/skills/workflow-commands/issue-comments.md', citations: 1 },
-	{ path: '.claude/skills/workflow-commands/kickoff.md', citations: 1 },
-	{ path: '.claude/skills/workflow-commands/latest-gate.md', citations: 2 },
-	{ path: '.claude/skills/workflow-commands/needs-human-review.md', citations: 1 },
-	{ path: '.claude/skills/workflow-commands/observation-filing.md', citations: 13 },
-	{ path: '.claude/skills/workflow-commands/observation-ledger.md', citations: 11 },
-	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', citations: 9 },
-	{ path: '.claude/skills/workflow-commands/prerequisite.md', citations: 1 },
-	{ path: '.claude/skills/workflow-commands/progress-watcher.md', citations: 5 },
-	{ path: '.claude/skills/workflow-commands/prrun.md', citations: 1 },
-	{ path: '.claude/skills/workflow-commands/retrospective.md', citations: 3 },
-	{ path: '.claude/skills/workflow-commands/SKILL.md', citations: 2 },
-	{ path: '.claude/skills/workflow-commands/target-repository.md', citations: 8 },
-	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', citations: 4 },
 	{ path: 'docs/josh-commands-backlog.md', citations: 13 },
 	{ path: 'docs/josh-commands-run.md', citations: 4 },
 	{ path: 'docs/josh-commands.md', citations: 2 },
@@ -67,17 +34,17 @@ const ISSUE_CITATION_BUDGET: ReadonlyArray<CitationBudget> = [
 	{ path: 'prompts/collaboration-workflow/overview.md', citations: 1 },
 	{ path: 'prompts/collaboration-workflow/plan-comment.md', citations: 3 },
 	{ path: 'prompts/collaboration-workflow/principles.md', citations: 1 },
-	{ path: 'prompts/collaboration-workflow/report-format.md', citations: 8 },
+	{ path: 'prompts/collaboration-workflow/report-format.md', citations: 7 },
 	{ path: 'prompts/collaboration-workflow/residency.md', citations: 3 },
-	{ path: 'prompts/collaboration-workflow/rule-delivery.md', citations: 23 },
+	{ path: 'prompts/collaboration-workflow/rule-delivery.md', citations: 5 },
 	{ path: 'prompts/collaboration-workflow/shell-body.md', citations: 2 },
-	{ path: 'prompts/collaboration-workflow/turn-batching.md', citations: 6 },
+	{ path: 'prompts/collaboration-workflow/turn-batching.md', citations: 4 },
 	{ path: 'prompts/collaboration-workflow/upstream-interrupt.md', citations: 1 },
 	{ path: 'prompts/collaboration-workflow/wip-cap.md', citations: 2 },
 	{ path: 'prompts/refactoring.md', citations: 1 },
 	{ path: 'prompts/review-rubric.md', citations: 1 },
 	{ path: 'prompts/sonar-hotspot-handling.md', citations: 2 },
-	{ path: 'prompts/testing-guide.md', citations: 6 },
+	{ path: 'prompts/testing-guide.md', citations: 3 },
 ]
 
 const BUDGET_FILE = 'scripts/document/issue-citation-budget.ts'

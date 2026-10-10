@@ -3,6 +3,7 @@ import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { json_value } from '#scripts/lib/json-value'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { z } from 'zod'
 import { build_envelope, compose_context, format_edited_payload } from './format-edited-file'
@@ -36,13 +37,7 @@ const patch_input_schema = z.object({ command: z.string().min(1) })
 type PayloadFormatter = (raw_payload: string, project_root: string) => Promise<string | undefined>
 
 function parse_payload(raw_payload: string): z.infer<typeof codex_payload_schema> | undefined {
-	try {
-		const parsed = codex_payload_schema.safeParse(JSON.parse(raw_payload))
-
-		return parsed.success ? parsed.data : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw_payload, codex_payload_schema)
 }
 
 function paths_matching(command: string, pattern: RegExp): Array<string> {
@@ -96,8 +91,8 @@ function pretool_outcome(raw_payload: string): GuardOutcome {
 }
 
 // The formatters apply what eslint could fix silently and return what it could not; each patched
-// file's unfixed block is joined so the whole patch's lint problems reach the model on one edit
-// (joshuafolkken/kit#2275). `undefined` when every file was clean, so the ordinary patch adds nothing.
+// file's unfixed block is joined so the whole patch's lint problems reach the model on one edit.
+// `undefined` when every file was clean, so the ordinary patch adds nothing.
 async function format_posttool_payloads(
 	raw_payload: string,
 	project_root: string,
@@ -123,9 +118,19 @@ async function write_posttool_context(raw_payload: string): Promise<void> {
 	if (context !== undefined) process.stdout.write(`${build_envelope(context)}\n`)
 }
 
+// The environment file is loaded before the verdict, as `write_outcome` does, so the lane-child marker
+// the phase mark reads is in place; the mark follows the written envelope.
+async function write_pretool_outcome(raw_payload: string): Promise<void> {
+	hook_decision.load_environment_file()
+	const outcome = pretool_outcome(raw_payload)
+
+	hook_decision.emit_outcome(outcome)
+	await pretool_guard.mark_phase(outcome)
+}
+
 async function run(raw_payload: string, mode: string): Promise<void> {
 	if (mode === PRETOOL_MODE) {
-		hook_decision.write_outcome(raw_payload, pretool_outcome)
+		await write_pretool_outcome(raw_payload)
 
 		return
 	}
@@ -149,6 +154,7 @@ const codex_hook_adapter = {
 	posttool_payloads,
 	pretool_outcome,
 	pretool_payload,
+	write_pretool_outcome,
 }
 
 export { codex_hook_adapter }

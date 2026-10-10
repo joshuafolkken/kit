@@ -1,12 +1,10 @@
 # The working-tree hold — one run per tree
 
-**This file is the single source, so the entry read carries the trigger and the pointer, not the
-procedure** (joshuafolkken/kit#2189). `SKILL.md` → §2's table keeps the trigger, and
-`entry-sequence.md` routes here for the definition. It is read at its point of use — the moment
-a run is about to claim or release the tree.
+**The single source of the hold**, read at its point of use — the moment a run is about to claim or
+release the tree. History: `docs/maintainers/working-tree-hold-rationale.md` → "Where each rule came from".
 
 **Ask `pnpm josh run:hold` before anything else, and obey what it answers.** It is the first call of
-`fullrun` and `halfrun` alike — before the title is normalized, before `git switch main`, and **before
+`fullrun` and `halfrun` alike — before the title is normalized, before `pnpm josh ms`, and **before
 a `new` entry files its Issue**, because a run stopped after the filing has already left behind the
 artifact it should not have created.
 
@@ -24,15 +22,12 @@ pnpm josh run:release --force # a record left behind by a run that has ended
   **File nothing, create no branch, edit nothing.**
 - **`unknown` — nothing was established. Stop the same way.** It is not "the tree is free".
 
-**The unit is the working tree, and `epic-busy.ts` is not reused for it.** That read answers about a
-*repository* and implements `backlogrun`'s one-child-per-repository rule; what these entry points contend
-for is one branch, one index and one uncommitted diff, and a linked work tree has its own three.
-**`backlogrun`'s own guard is unchanged** — the two layers guard different resources.
+**The unit is the working tree** — one branch, one index and one uncommitted diff, and a linked work
+tree has its own three. **`backlogrun`'s per-repository guard (`epic-busy.ts`) is a separate layer and is
+unchanged.**
 
-**`kickoff` does not claim it, and that is an exemption rather than an omission.** `kickoff` touches
-none of branch, index or uncommitted diff: it reads the Issue, normalizes the title, posts the plan,
-notifies and stops, every one of those against GitHub. It is a fact about the command rather than a
-judgement made at the entry, and it changes nothing for `fullrun` or `halfrun`.
+**`kickoff` does not claim it** — it touches GitHub, never the branch, index or diff. Rationale for both:
+`docs/maintainers/working-tree-hold-rationale.md` → "Why the unit is the working tree".
 
 **Claim it in the checkout the run will edit.** The record is keyed to the work tree the command runs
 in, so a cross-repository `fullrun owner/repo#N` resolves that repository's checkout from `pnpm josh
@@ -70,14 +65,13 @@ the procedure.
 
 ## The halfrun resume
 
-**`fullrun #<N>` or `prrun #<N>` after a `halfrun` stop resumes it instead of claiming**
-(joshuafolkken/kit#2796, #3042). The
+**`fullrun #<N>` or `prrun #<N>` after a `halfrun` stop resumes it instead of claiming.** The
 stop is **recorded, never inferred**: the `halfrun` ends with `pnpm josh run:hold <N> --halfrun-stop`,
 which marks its own record (re-keying a `halfrun new`'s unnumbered one to the filed issue) — a
 `halfrun` still implementing or a `backlogrun` child leaves the same hold over the same dirty tree, and
 must not be adopted. On a marked hold for `#<N>` over a dirty tree, `run:entry` asks the session budget
 (`over` stops as usual), adopts the hold with the `fullrun` mark and prints `entry #<N> — resume:
-halfrun`. **Skip the title, the plan, the split assessment, `git switch main && git pull`,
+halfrun`. **Skip the title, the plan, the split assessment, `pnpm josh ms`,
 `latest:scope` and the implementation**: the diff in the tree is what the person verified. Re-read the
 issue (`pnpm josh issue:read <N>`), then run the gate **in full** from the refactor (`chain-rule.md` →
 "Run the review-to-merge chain") — a fix made during the manual check has had no gate — and ship as
@@ -85,7 +79,7 @@ any `fullrun` does.
 
 ## The prrun resume
 
-**`fullrun #<N>` after a `prrun` stop resumes it the same way** (joshuafolkken/kit#3023). The `prrun`
+**`fullrun #<N>` after a `prrun` stop resumes it the same way.** The `prrun`
 ends with `pnpm josh run:hold <N> --prrun-stop`, which writes the commit its pull request is on into its
 own record; only a record carrying that commit is adopted. `run:entry` asks the session budget, adopts
 the hold with the `fullrun` mark and prints one of three tokens — read, never inferred:

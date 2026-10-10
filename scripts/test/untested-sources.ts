@@ -1,7 +1,7 @@
 import { readdirSync } from 'node:fs'
 import path from 'node:path'
 
-// The sources under `scripts/` with no test named after them, frozen (joshuafolkken/kit#3253).
+// The sources under `scripts/` with no test named after them, frozen.
 //
 // **Coverage was neither measured nor enforced, so nothing stopped a source landing with no test.**
 // This is the regression stop the Issue allowed in place of a coverage threshold: a source whose stem
@@ -74,7 +74,6 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/git/git-fixture-workspace.ts',
 	'scripts/git/git-ls-remote.ts',
 	'scripts/git/git-pre-push-hook.ts',
-	'scripts/git/git-ssh-keepalive.ts',
 	'scripts/git/stash/stash-pop-args.ts',
 	'scripts/hooks/format-edited-cli.ts',
 	'scripts/hooks/pretool-guard-cli.ts',
@@ -124,8 +123,6 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/rules/rule-guard.ts',
 	'scripts/rules/tail-commands.ts',
 	'scripts/rules/test-declared-commit.ts',
-	'scripts/rules/wip-cap.ts',
-	'scripts/run/run-issue-number.ts',
 	'scripts/run/run-stranded-cli.ts',
 	'scripts/run/run-watcher-guard-cli.ts',
 	'scripts/self-sync-guard/index.ts',

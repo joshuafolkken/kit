@@ -1,21 +1,20 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 import { epic_parse } from './epic-parse'
 
-// joshuafolkken/kit#1113: a second look at the relations, taken only where the first one is about to
-// become a verdict.
+// A second look at the relations, taken only where the first one is about to become a verdict.
 //
 // `read_blocked_by` answers from the issue's own `issue_dependencies_summary` when that summary says
 // zero, which is what keeps a pass over the whole backlog to one request per issue that declares a
-// blocker (joshuafolkken/kit#1024). The summary is GitHub's count, and it can disagree with the
-// listing it counts: measured on joshuafolkken/kit#1111, whose summary read `total_blocked_by: 0`
-// while `dependencies/blocked_by` returned `#1106`, and where re-POSTing that relation was refused
-// with `Target issue has already been taken` — so the relation was real and only the counter was
-// wrong. `epic:next` read the epic as self-contradictory, printed `declared but not recorded:
-// #1106 -> #1111`, and exited 1. An unattended run stops there, on a graph with nothing to fix.
+// blocker. The summary is GitHub's count, and it can disagree with the listing it counts: a summary
+// can read `total_blocked_by: 0` while `dependencies/blocked_by` returns a blocker whose re-POST is
+// refused with `Target issue has already been taken` — the relation is real and only the counter is
+// wrong. Trusting that counter, `epic:next` reads the epic as self-contradictory, prints `declared
+// but not recorded`, and exits 1. An unattended run stops there, on a graph with nothing to fix.
 //
 // It corrects nothing else. A relation that is genuinely absent still comes back absent, and the
-// mismatch is still reported — the point is that the report is now about the relations rather than
+// mismatch is still reported — the point is that the report is about the relations rather than
 // about a counter.
 
 // A body may legitimately be ahead of its relations — an epic written before `josh` recorded them,
@@ -37,7 +36,7 @@ type BlockersReader = (child: EpicChild) => Promise<Array<IssueReference>>
 // Restricted to `declared_repo` because a declared link is written as a bare number, which names an
 // issue in the epic's own repository — `epic_graph` matches those by number alone. An epic tracking
 // both `#40` and `owner/other#40` would otherwise have the second child re-read on the first one's
-// account, and its relations replaced with a different issue's (joshuafolkken/kit#1014).
+// account, and its relations replaced with a different issue's.
 function suspect_children(
 	children: ReadonlyArray<EpicChild>,
 	body: string | undefined,
@@ -61,7 +60,7 @@ async function reread_child(child: EpicChild, read_blockers: BlockersReader): Pr
 		const reason = error_text.message_of(error)
 
 		console.warn(
-			`⚠ could not re-read the blockers of #${String(child.number)}: ${reason}\n` +
+			`⚠ could not re-read the blockers of ${session_cite.issue(child.number, undefined, child.repo)}: ${reason}\n` +
 				'  a mismatch reported below may be this read failing rather than a missing relation',
 		)
 

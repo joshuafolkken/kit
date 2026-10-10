@@ -1,6 +1,6 @@
 ## 本文をシェルの二重引用符に載せない（joshuafolkken/kit#1198）
 
-`CLAUDE.md` →「Never put a body in shell double quotes」の単一ソース。隣にある「Never carry a file's new text inside a shell command」（[`file-edits.md`](./file-edits.md)）と対になる規則である。**あちらは「ファイルの中身をシェルに載せるな」、こちらは「本文をシェルに載せるな」** であり、禁じている理由が違う — あちらはコストの二重払い、こちらは**テキストが実行されること**である。
+「本文をシェルの二重引用符に載せない」規則の単一ソース（`CLAUDE.md` からは [`rule-delivery.md`](./rule-delivery.md) →「配送されている規則」を経て届く）。「ファイル本文をシェルに載せない」（[`file-edits.md`](./file-edits.md)）と対になる規則である。**あちらは「ファイルの中身をシェルに載せるな」、こちらは「本文をシェルに載せるな」** であり、禁じている理由が違う — あちらはコストの二重払い、こちらは**テキストが実行されること**である。
 
 ### 何が起きるのか
 
@@ -15,18 +15,7 @@ zsh は `pnpm josh ms` を実行し、その標準出力を本文に埋め込む
 - **通知経路**: 置換結果が本文に混ざる。壊れ方が静かで、`followup` は正常終了する
 - **`gh` 経路**: 置換された結果が捨てられるのではなく、**コマンドとして実行される**
 
-### 実測 — 発火するのは `` ` `` と `$` であって `!` ではない
-
-本リポジトリの実行環境（非対話 zsh）で確かめた結果は次のとおりである。
-
-| 文字            | 二重引用符の中で                                     |
-| --------------- | ---------------------------------------------------- |
-| `` ` ``         | **発火する**（コマンド置換）                         |
-| `$`             | **発火する**（変数展開）                             |
-| `!`             | 発火しない（履歴展開は非対話では無効）               |
-| `\$` / `` \` `` | 発火しない（直前のバックスラッシュがリテラル化する） |
-
-`!` は引き金に入れていない。理由は `docs/maintainers/shell-body-rationale.md` → "Why `!` is not a trigger"。
+**発火するのは `` ` `` と `$` であって `!` ではない**（実測表は `docs/maintainers/shell-body-rationale.md` → "Why `!` is not a trigger"）。
 
 ### 安全な書き方
 
@@ -58,13 +47,4 @@ pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file <path>
 
 ### 引き金つき配送
 
-`pnpm josh rule:guard` が、二重引用符の本文値にバッククォートか `$` が実際に含まれる `Bash` 呼び出しを拒否して本文を突きつける。拒否されたら本文をファイルに移して出し直す。配線は `docs/maintainers/shell-body-rationale.md` → "Why it is a triggered delivery"、引き金の設計は `docs/maintainers/shell-body-rationale.md` → "Why the trigger reads the body, not the flag"、固定しているテストは `docs/maintainers/shell-body-rationale.md` → "Marker tests"にある。
-
-### 引き金が見えないもの
-
-- **node の中から REST で投稿する経路**（`pnpm josh propagate` など）はシェル文字列に現れない
-- **`gh api --input <file>`** は本文がファイルにあるため、そもそも安全である
-- **`-b`（GitHub CLI の `--body` の短縮形）は覆っていない** — 同じ綴りが `git checkout -b` のブランチ名でもあり、そこで拒否するのは誤ったターンでの発火になる
-- **`-f title="…"`** は覆っていない。タイトルは英語へ正規化された短い語であり、バッククォートを含む運用がない
-
-引き金が見えない綴りでも規則は同じく拘束する。フックが走らないエージェントも同じである。
+`pnpm josh rule:guard` が、二重引用符の本文値にバッククォートか `$` が実際に含まれる `Bash` 呼び出しを拒否して本文を突きつける。拒否されたら本文をファイルに移して出し直す。**引き金が見えない綴り（`-b`・`-f title=` など）でも、フックが走らないエージェントでも規則は同じく拘束する。** 配線と見えない綴りの一覧は `docs/maintainers/shell-body-rationale.md` → "Why it is a triggered delivery"、引き金の設計は `docs/maintainers/shell-body-rationale.md` → "Why the trigger reads the body, not the flag"、固定しているテストは `docs/maintainers/shell-body-rationale.md` → "Marker tests"。

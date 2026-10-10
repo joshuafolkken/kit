@@ -10,10 +10,9 @@ import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { investigation_reads } from './investigation-reads'
 
 // Refuse the second whole-file `Read` of a path whose content has not changed since the run last read
-// it (joshuafolkken/kit#2298). Measured across the latest five lanes, a run re-read the same unchanged
-// path 8.0 times on average — `#2282` read `pre-gate-cut.md` three times — and each round trip pays
+// it. Left alone, a run re-reads the same unchanged path again and again, and each round trip pays
 // ~17 seconds to return text the run already holds. The remedy is the one `investigation-guard.ts`
-// already proved: intervene in the `PreToolUse` decision rather than describe the rule in prose.
+// applies: intervene in the `PreToolUse` decision rather than describe the rule in prose.
 //
 // **It is unchanged content that is caught, never a repeat read.** The transcript says *when* the run
 // last read the path; the filesystem says *whether* it has changed since. A file whose `mtime` is
@@ -24,12 +23,12 @@ import { investigation_reads } from './investigation-reads'
 //
 // **How it speaks is decided by the one-place lane enumeration, exactly as the batching guard's is.**
 // On the interactive main line a refusal is guidance, so the guard `refuse`s; in a dispatched lane
-// child a denial ends the headless turn with nothing committed (joshuafolkken/kit#2138), and the
-// duplicates the Issue measured are in those very children — so there it is a `notice`, nudging the run
+// child a denial ends the headless turn with nothing committed, and the
+// duplicates mostly occur in those very children — so there it is a `notice`, nudging the run
 // without killing it. `lane-guard-policy.ts` is the single source of both modes.
 //
 // **The escape hatch is on by default**, for `investigation-guard.ts`'s reason: a distributed guard
-// nobody enables leaves the Issue where it started. The variable buys a way to switch it off without
+// nobody enables leaves the problem where it started. The variable buys a way to switch it off without
 // editing the settings file — debugging the guard, or a session whose re-reads really are all needed.
 const SWITCH_ENV_KEY = 'JOSH_DUPLICATE_READ_GUARD'
 const LANE_GUARD_ID = 'duplicate-read'
@@ -45,12 +44,12 @@ const GLOB_CHARACTERS = /[*?]/u
 const REASON = `⛔ duplicate read: this file was already read in this session and has not changed since (its mtime predates that read), so reading it again returns nothing new. Scroll up to the earlier result instead of re-reading it. A read with a new offset/limit, or of a file that has since changed, is allowed; set \`JOSH_DUPLICATE_READ_GUARD=off\` to disable this guard.`
 
 // The same guidance carried without a `permissionDecision`, for a dispatched lane child where a denial
-// would end the turn (joshuafolkken/kit#2138). It nudges rather than blocks, so the run survives.
+// would end the turn. It nudges rather than blocks, so the run survives.
 const NOTICE = `⚠ duplicate read: this file was already read in this session and has not changed since, so re-reading it returns nothing new — scroll up to the earlier result instead of re-reading it. Set \`JOSH_DUPLICATE_READ_GUARD=off\` to silence this.`
 
 // **A paginated read is a read of a different region, not a repeat.** A run that read lines 1–100 and
 // now wants 101–200 needs the second call, so a read carrying an `offset` or a `limit` is never the
-// whole-file re-read this guard is about — the count the Issue measured is whole-file reads.
+// whole-file re-read this guard is about.
 function is_paginated(input: Record<string, unknown>): boolean {
 	return input['offset'] !== undefined || input['limit'] !== undefined
 }
@@ -163,7 +162,7 @@ function is_redundant_reread(tail: string, call: GuardedCall, fired_at_ms: numbe
 }
 
 // **How this guard behaves for the session in hand, from the one-place enumeration** — `refuse` on the
-// main line, `notice` in a dispatched lane child (joshuafolkken/kit#2298). The enumeration reads the
+// main line, `notice` in a dispatched lane child. The enumeration reads the
 // dispatch mark against this checkout's own issue only for a mode it would change, so a person working
 // in a lane sees the guard refuse exactly as the main line does.
 function duplicate_mode(): LaneGuardMode {
@@ -178,7 +177,7 @@ function is_candidate(call: GuardedCall): boolean {
 
 // A refusable call is refused only where the mode is `refuse`. A lane child is `notice`, so it reaches
 // here and is withheld the refusal — the notice branch carries the guidance instead, because a refusal
-// ends a headless child's turn (joshuafolkken/kit#2138).
+// ends a headless child's turn.
 function should_block_here(tail: string, call: GuardedCall, refused_at_ms: number): boolean {
 	if (duplicate_mode() !== 'refuse') return false
 

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { report_format_reference } from '#scripts/report/report-format-reference'
+import { describe, expect, it, vi } from 'vitest'
 import { test_declared } from './test-declared'
 
 // joshuafolkken/kit#2118: the command prints one word to stdout and the reason to stderr, so the
@@ -96,6 +97,48 @@ describe('test_declared match mode', () => {
 				status: 'test-not-created',
 			}),
 		).toBe(`test-not-created: Unit — ${RUNTIME_FILE}`)
+	})
+})
+
+// joshuafolkken/kit#3422: `path-missing` said the path was not in the change set but not what it
+// probably meant or where the line's shape is written, so the summary was rewritten by guesswork.
+describe('test_declared.format_match — path-missing hints', () => {
+	const MISSING = { declared_type: 'Unit', path: 'foo.ts', status: 'path-missing' } as const
+	const SHAPE = report_format_reference.pointer(report_format_reference.SUMMARY_RULES_HEADING)
+
+	it('names the changed paths with the same file name and the shape of the line', () => {
+		const printed = test_declared.format_match(MISSING, [RUNTIME_FILE, UNIT_TEST_FILE])
+
+		expect(printed).toBe(
+			[
+				'path-missing: Unit — foo.ts',
+				`  changed with the same file name: ${RUNTIME_FILE}`,
+				`  the declaration line's shape: ${SHAPE}`,
+			].join('\n'),
+		)
+	})
+
+	it('omits the candidate line when no changed path shares the file name', () => {
+		const printed = test_declared.format_match(MISSING, [UNIT_TEST_FILE])
+
+		expect(printed).not.toContain('changed with the same file name')
+		expect(printed).toContain(SHAPE)
+	})
+
+	it('adds no hint to a status other than path-missing', () => {
+		const printed = test_declared.format_match({ ...MISSING, status: 'match' }, [RUNTIME_FILE])
+
+		expect(printed).toBe('match: Unit — foo.ts')
+	})
+
+	it('hands the change set to the hint when run over a summary', () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		test_declared.run_match('Extract — Test: Unit — foo.ts — verifies it', [RUNTIME_FILE])
+		const printed = write.mock.calls.map(([chunk]) => String(chunk)).join('')
+
+		write.mockRestore()
+		expect(printed).toContain(`  changed with the same file name: ${RUNTIME_FILE}`)
 	})
 })
 

@@ -6,6 +6,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "a": "audit",
     "ad": "adopt",
     "bh": "behavior",
+    "blr": "backlogrun",
     "bp": "bump",
     "by": "bytes",
     "c": "check",
@@ -19,6 +20,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "i": "init",
     "l": "lint",
     "lc": "latest:corepack",
+    "lli": "lane:limit",
     "ln": "lines",
     "lr": "lint:related",
     "lsm": "lane:sample",
@@ -26,6 +28,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "lu": "latest:update",
     "mm": "main:merge",
     "ms": "main:sync",
+    "mt": "metrics",
     "ov": "overrides",
     "pf": "profile",
     "pg": "propagate",
@@ -127,6 +130,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "network",
+      ],
+    ],
+    "backlogrun": [
+      "[#<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex]",
+      "developer",
+      [
+        "files",
+        "network",
+        "processes",
       ],
     ],
     "batch:guard": [
@@ -413,7 +425,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "issue:file": [
-      "<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]",
+      "<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--requested] [--release]",
       "automation",
       [
         "network",
@@ -498,6 +510,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "files",
         "git",
         "processes",
+      ],
+    ],
+    "lane:limit": [
+      "[<limit>] [--reset]",
+      "developer",
+      [
+        "files",
       ],
     ],
     "lane:list": [
@@ -629,11 +648,25 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "files",
       ],
     ],
+    "metrics": [
+      "[--no-startup | --totals-only | --accept --reason "<why>"]",
+      "developer",
+      [
+        "files",
+      ],
+    ],
     "notify": [
-      "--task-type <type> --body <text>",
+      "[--task-type <type>] [--body <text> | --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>]",
       "automation",
       [
         "notifications",
+      ],
+    ],
+    "observation:record": [
+      "<key> <depth> <where> <what> [--checkout <path>]",
+      "automation",
+      [
+        "files",
       ],
     ],
     "observations:flush": [
@@ -774,7 +807,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "release": [
-      "[version]",
+      "[--dry-run]",
       "maintainer",
       [
         "git",
@@ -847,10 +880,11 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "review:record": [
-      "--issue <N> [<category>:<severity>:<file> ...] | --check --issue <N>",
+      "--issue <N> [--comment] [<category>:<severity>:<file> ...] | --check --issue <N>",
       "automation",
       [
         "files",
+        "network",
       ],
     ],
     "review:round2": [
@@ -861,6 +895,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "rule:guard": [
+      "",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "rule:list": [
       "",
       "automation",
       [
@@ -878,6 +919,22 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "[--apply]",
       "maintainer",
       [
+        "network",
+      ],
+    ],
+    "run:add": [
+      "<issue...> [--no-priority]",
+      "automation",
+      [
+        "network",
+        "files",
+      ],
+    ],
+    "run:board": [
+      "[--once | --chat | --every <minutes>]",
+      "automation",
+      [
+        "files",
         "network",
       ],
     ],

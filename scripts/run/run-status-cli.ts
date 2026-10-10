@@ -1,12 +1,14 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
+import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { run_status, type StatusParts } from './run-status'
 
-// `josh run:status <N>` — one call for the read-only status a run glances at (joshuafolkken/kit#2165):
+// `josh run:status <N>` — one call for the read-only status a run glances at:
 // the issue's state and labels (`issue:state`), the session's hand-off verdict (`cost --cut`), and the
 // invocation's carry counters (`run:carry`). Each is reused rather than reproduced, and the two async
 // reads run concurrently, so three round trips become one.
@@ -19,7 +21,6 @@ import { run_status, type StatusParts } from './run-status'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = 'Usage: josh run:status <issue-number> [--repo <owner/repo>]'
 const CARRY_NONE_NOTE = 'no run recorded here'
 const CARRY_UNREADABLE_NOTE = '(run record not bundled: unreadable)'
@@ -48,7 +49,7 @@ function valid_issue(positionals: ReadonlyArray<string>): string | undefined {
 
 	if (first === undefined || rest.length > 0) return undefined
 
-	return ISSUE_NUMBER_PATTERN.test(first) ? first : undefined
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(first) ? first : undefined
 }
 
 function parse(argv: ReadonlyArray<string>): StatusRequest | undefined {
@@ -88,7 +89,7 @@ async function gather(request: StatusRequest): Promise<StatusReads> {
 // One note for a read that produced nothing, naming which of the two it was — the same distinction
 // `issue:state` keeps, so a bundled failure still tells a retry from an answer.
 function failure_note(issue_number: string, kind: string): string {
-	return `(issue #${issue_number} not bundled: ${kind})`
+	return `(issue ${session_cite.issue(issue_number)} not bundled: ${kind})`
 }
 
 function carry_summary(carry: CarryRead): string {
@@ -145,8 +146,9 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	}
 
 	const reads = await gather(request)
+	const report = run_status.format_report(to_parts(request.issue_number, reads))
 
-	console.info(run_status.format_report(to_parts(request.issue_number, reads)))
+	console.info(session_cite.text(report))
 
 	return exit_code(reads)
 }

@@ -6,8 +6,8 @@ import { PLATFORM_TEMP_ROOT } from './platform-temporary'
 
 // A small record one josh command writes and another reads, kept per checkout in the temp directory.
 //
-// Extracted from `scripts/eval/eval-stamp.ts` when `josh latest:scope` needed the same handoff
-// (joshuafolkken/kit#1215). The mechanics below are not boilerplate — the symlink defense on the
+// Extracted from `scripts/eval/eval-stamp.ts` when `josh latest:scope` needed the same handoff.
+// The mechanics below are not boilerplate — the symlink defense on the
 // write, the ownership check on the read, and the deterministic per-checkout path are each load
 // bearing — so a second copy of them is the clone `CLAUDE.md` prohibits. What differs between the
 // two records is their *payload* and the question asked of it, and that is all either module keeps.
@@ -42,7 +42,7 @@ function digest(content: Buffer | string): string {
 // without this two accounts would name one file — and the second one's unlink of a file the first owns
 // fails on the sticky directory, ending its command. Folding the account in keeps accidental
 // collisions apart; a hostile local account can still pre-create a predictable name, which fails the
-// write rather than redirecting it (joshuafolkken/kit#1909). Windows has no `getuid` and keeps the
+// write rather than redirecting it. Windows has no `getuid` and keeps the
 // per-user `os.tmpdir()`, so it contributes an empty account.
 function account_key(): string {
 	return String(process.getuid?.() ?? '')
@@ -56,17 +56,17 @@ function account_key(): string {
 // `TMPDIR`.** A record this module keeps is read by a *different* process than wrote it — the second
 // half of a handoff — and `os.tmpdir()` honors each process's own `TMPDIR`, so a session a
 // `run:wake` or a `lane:dispatch` launched resolves a different directory than its launcher and the
-// handoff is lost (joshuafolkken/kit#1909). The keyed digest below already keeps one checkout apart
+// handoff is lost. The keyed digest below already keeps one checkout apart
 // from another; the root is what has to stop moving per process, which `platform-temporary.ts` pins.
 //
 // **`root` is what the record is keyed to, and the right answer differs per caller.** `PACKAGE_DIR`
 // is the default because `josh eval` measures the kit package's own files. A record about the
 // *project* must key on `PROJECT_ROOT` instead: a globally installed `josh` has one `PACKAGE_DIR`
 // for every project on the machine, so keying on it would let a run in one project answer for
-// another (joshuafolkken/kit#1215).
+// another.
 //
 // **`suffix` is what the file is, not decoration.** Every record here was JSON until `josh gate`
-// needed to keep another tool's output verbatim (joshuafolkken/kit#1227), and a log named `.json`
+// needed to keep another tool's output verbatim, and a log named `.json`
 // tells every reader — a person, an editor, a `less` — that it is something it is not.
 function stamp_path(
 	prefix: string,
@@ -95,17 +95,46 @@ function write_stamp(target: string, payload: unknown): string {
 	return write_exclusively(target, JSON.stringify(payload))
 }
 
+// The read side of the write's problem. A record is trusted to say something is still current, so a
+// planted one suppresses the work the check exists to force. `lstatSync` reports the link rather than
+// what it points at, and it throws where the path is simply absent — both of which are "no record".
+// `getuid` is missing on Windows, where a shared temp directory is not the same hazard; the check
+// reduces to "is it a regular file" there.
+function is_own_regular_file(source: string): boolean {
+	const stats = lstatSync(source)
+
+	if (!stats.isFile()) return false
+
+	const uid = process.getuid?.()
+
+	return uid === undefined || stats.uid === uid
+}
+
+// A regular file at `target` that another account owns. An absent path or a symlink is not one: the
+// replace below swaps either out without following it.
+function is_foreign_file(target: string): boolean {
+	try {
+		return lstatSync(target).isFile() && !is_own_regular_file(target)
+	} catch {
+		return false
+	}
+}
+
 // Mutable coordination state cannot disappear between an unlink and its replacement: a reader that
 // mistakes that gap for "no child" can start the same generation twice. The temporary file lives
 // beside the target, uses the same exclusive/symlink-safe create, and rename publishes it atomically.
-function replace_stamp(target: string, payload: unknown): string {
+// `rename` replaces the path itself rather than following a symlink planted there, so the write still
+// never lands somewhere else; a regular file another account owns is refused before it is replaced,
+// the same answer the unlink gives on a sticky temp directory.
+function replace_text_stamp(target: string, text: string): string {
+	if (is_foreign_file(target)) {
+		throw new Error(`refusing to replace another account's file: ${target}`)
+	}
+
 	const temporary = `${target}.${String(process.pid)}.${randomUUID()}`
 
 	try {
-		writeFileSync(temporary, JSON.stringify(payload), {
-			flag: STAMP_CREATE_FLAG,
-			mode: STAMP_FILE_MODE,
-		})
+		writeFileSync(temporary, text, { flag: STAMP_CREATE_FLAG, mode: STAMP_FILE_MODE })
 		renameSync(temporary, target)
 
 		return target
@@ -114,8 +143,12 @@ function replace_stamp(target: string, payload: unknown): string {
 	}
 }
 
+function replace_stamp(target: string, payload: unknown): string {
+	return replace_text_stamp(target, JSON.stringify(payload))
+}
+
 // The same write for a payload that is already text. `josh gate`'s log is another tool's output read
-// by a person or by an agent's `tail` (joshuafolkken/kit#1227), and JSON-encoding it would put `\n`
+// by a person or by an agent's `tail`, and JSON-encoding it would put `\n`
 // escapes between the reader and the thing they came to read. **It shares the body above rather than
 // repeating it**: the unlink-then-create-exclusively pair is the symlink defense, and a second copy
 // of it is the clone `CLAUDE.md` prohibits.
@@ -124,7 +157,7 @@ function write_text_stamp(target: string, text: string): string {
 }
 
 // `write_stamp` for a record whose *absence* is what the caller checked, and which two processes may
-// therefore try to create at once (joshuafolkken/kit#1091). It does **not** unlink first, so `wx` is
+// therefore try to create at once. It does **not** unlink first, so `wx` is
 // doing the job it exists for: the second writer loses and is told so, rather than both being told
 // they won. `false` is that loss and never an error, because "someone else got here first" is an
 // answer; anything else still throws, since a record that could not be written for another reason
@@ -145,26 +178,11 @@ function create_stamp(target: string, payload: unknown): boolean {
 }
 
 // The counterpart to `write_stamp`, for a record that means something only while it exists — the
-// in-flight gate marker `josh gate` clears when its checks finish (joshuafolkken/kit#1242). `force`
+// in-flight gate marker `josh gate` clears when its checks finish. `force`
 // makes an absent path a success, because "there is no record" is the state the caller wanted; and
 // `rmSync` removes a symlink rather than following it, the same reason the write unlinks first.
 function remove_stamp(target: string): void {
 	rmSync(target, { force: true })
-}
-
-// The read side of the write's problem. A record is trusted to say something is still current, so a
-// planted one suppresses the work the check exists to force. `lstatSync` reports the link rather than
-// what it points at, and it throws where the path is simply absent — both of which are "no record".
-// `getuid` is missing on Windows, where a shared temp directory is not the same hazard; the check
-// reduces to "is it a regular file" there.
-function is_own_regular_file(source: string): boolean {
-	const stats = lstatSync(source)
-
-	if (!stats.isFile()) return false
-
-	const uid = process.getuid?.()
-
-	return uid === undefined || stats.uid === uid
 }
 
 // `undefined` rather than a throw or an empty string: "there is no record" and "the record says
@@ -185,6 +203,7 @@ const stamp_file = {
 	is_own_regular_file,
 	read_stamp_text,
 	replace_stamp,
+	replace_text_stamp,
 	remove_stamp,
 	stamp_path,
 	write_stamp,

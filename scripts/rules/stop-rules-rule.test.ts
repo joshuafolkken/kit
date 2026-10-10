@@ -1,12 +1,14 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { rule_list } from './rule-list'
 import { stop_rules } from './stop-rules'
 
 // The three stop-time rules are delivered on the Stop hook, and — like every delivered rule — their
 // procedure lives in a single source the delivered text points at, not restated in the reason
-// (joshuafolkken/kit#2121). This pins that rule-delivery.md carries the three rows and that each
-// reason names its own single source, so a session the hook never reaches still has the rule.
+// (joshuafolkken/kit#2121). This pins that `pnpm josh rule:list` (joshuafolkken/kit#3399) carries the
+// rows and that each reason names its own single source, so a session the hook never reaches still
+// has the rule.
 const RULE_DELIVERY_PATH = fileURLToPath(
 	new URL('../../prompts/collaboration-workflow/rule-delivery.md', import.meta.url),
 )
@@ -24,12 +26,12 @@ describe('rule-delivery.md — the Stop hook is a second entry on the one founda
 	})
 
 	it('lists a row for each of the four stop-time rules', () => {
-		const text = rule_delivery_text()
+		const text = rule_list.render()
 
-		expect(text).toContain('停止時の通知')
-		expect(text).toContain('hold の解放')
-		expect(text).toContain('Issue 引用')
-		expect(text).toContain('起票の申し出')
+		expect(text).toContain('Stop notification')
+		expect(text).toContain('Hold release')
+		expect(text).toContain('Issue citation')
+		expect(text).toContain('Offer to file')
 	})
 })
 
@@ -47,6 +49,10 @@ describe('stop_rules — each delivered text names its single source', () => {
 		expect(stop_rules.FILING_OFFER_REASON).toContain('`observation-filing.md`')
 		expect(stop_rules.FILING_OFFER_REASON).toContain('observation-filing.md')
 		expect(stop_rules.FILING_OFFER_REASON).toContain('pnpm josh issue:file')
+	})
+
+	it('the filing offer reason says it binds an unattended run', () => {
+		expect(stop_rules.FILING_OFFER_REASON).toContain('this run is unattended')
 	})
 
 	it('the issue citation reason points at issue-citation.md', () => {

@@ -1,5 +1,5 @@
 import { epic_child_schema, type EpicChildData } from '#scripts/git/git-schemas'
-import { parse_json_object_safe } from '#scripts/git/parse-json-array'
+import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 import { gh_failure } from './git-gh-failure'
@@ -41,7 +41,7 @@ const BLOCKERS = rest_blockers()
 // Through the schema the epic readers use, so the assertion is typed and the mapped JSON is proven
 // to parse under the shape written for `gh` (joshuafolkken/kit#1024).
 function parse_child(json: string | undefined): EpicChildData | undefined {
-	return json === undefined ? undefined : parse_json_object_safe(json, epic_child_schema)
+	return json === undefined ? undefined : parse_json_object_or_undefined(json, epic_child_schema)
 }
 
 // `gh api` is asked for the issue and, only when `blockedBy` was requested, for its dependencies.

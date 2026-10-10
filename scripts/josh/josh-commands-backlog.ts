@@ -1,12 +1,24 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
 // The `backlog:*` command registry, split out of `josh-commands-ai.ts` so that file stays under its
-// 300-code-line limit, exactly as `LANE_COMMANDS` and `SPLIT_COMMANDS` were for the same reason
-// (joshuafolkken/kit#2162, joshuafolkken/kit#2218). It is spread into `AI_COMMANDS` so the commands
+// 300-code-line limit, exactly as `LANE_COMMANDS` and `SPLIT_COMMANDS` were for the same reason.
+// It is spread into `AI_COMMANDS` so the commands
 // stay grouped with the other AI tools under the 'AI tools' category.
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
+	// Started from a terminal: the `backlogrun` keyword's launcher, and the board.
+	backlogrun: {
+		script: 'scripts/backlog/backlogrun-cli.ts',
+		description:
+			'Start a backlogrun in the background and show its board; with one already running, only show the board',
+		category: 'AI tools',
+		reference: [
+			'[#<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex]',
+			'developer',
+			['files', 'network', 'processes'],
+		],
+	},
 	'backlog:next': {
 		script: 'scripts/backlog/backlog-next.ts',
 		description:
@@ -41,7 +53,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'backlog:stalled': {
 		script: 'scripts/backlog/backlog-stalled-cli.ts',
-		// A stall sends one Telegram warning (joshuafolkken/kit#3357). The `Stop` hook calls the detector
+		// A stall sends one Telegram warning. The `Stop` hook calls the detector
 		// directly, so this flag costs only the manual command its in-process dispatch.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:

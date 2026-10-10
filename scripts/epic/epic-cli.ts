@@ -1,6 +1,8 @@
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { session_cite } from '#scripts/issue/session-cite'
 import { cli_body } from '#scripts/josh/cli-body'
 import type { InsertKind, InsertPosition } from './epic-chains'
-import { epic_cli_argv, ISSUE_NUMBER_PATTERN, type EpicArgv, type FormFlags } from './epic-cli-argv'
+import { epic_cli_argv, type EpicArgv, type FormFlags } from './epic-cli-argv'
 import { epic_cli_remove } from './epic-cli-remove'
 import { epic_parse, type ExternalChild } from './epic-parse'
 
@@ -12,20 +14,20 @@ const RATIONALE_FLAG = '--rationale-file'
 const ORIGIN_FLAG = '--origin'
 const PROMOTE_FLAG = '--promote'
 const ADD_FLAG = '--add'
-// `--reconcile <E>`: bring the epic's declaration and its recorded relations back into agreement
-// (joshuafolkken/kit#2235). It takes no value flags — the epic number is the whole subject.
+// `--reconcile <E>`: bring the epic's declaration and its recorded relations back into agreement.
+// It takes no value flags — the epic number is the whole subject.
 const RECONCILE_FLAG = '--reconcile'
 const BEFORE_FLAG = '--before'
 const AFTER_FLAG = '--after'
 // The same two places with the declaration withheld: move the task-list row and write neither the
-// dependency declaration nor the `blocked-by` relation (joshuafolkken/kit#1738). They exist because
+// dependency declaration nor the `blocked-by` relation. They exist because
 // `epic:next` offers children in task-list order, so "no dependency, but run this one first" had no
 // spelling at all — only a false dependency, or a row nobody would reach.
 const ORDER_BEFORE_FLAG = '--order-before'
 const ORDER_AFTER_FLAG = '--order-after'
 // The decision record for an insertion, read the same way `--rationale-file` is read for a creation:
 // from a file, or from stdin as `-`. The text is a judgement, so the caller writes it; what the command
-// contributes is placing it in the epic's `## Decisions` and on each child (joshuafolkken/kit#1350).
+// contributes is placing it in the epic's `## Decisions` and on each child.
 const DECISION_FLAG = '--decision-file'
 // Which flags each form knows, and which of them consume the argument after them — per form, for the
 // reason `epic-cli-argv.ts` gives.
@@ -53,7 +55,7 @@ interface CreateArguments {
 }
 
 // `--promote <N> <N1> <N2> …`: the issue to promote, then its children. No title — the issue already
-// has one, and the discussion in it is usually the split rationale (joshuafolkken/kit#865).
+// has one, and the discussion in it is usually the split rationale.
 interface PromoteArguments {
 	epic_number: number
 	children: Array<number>
@@ -66,7 +68,7 @@ interface PromoteArguments {
 // `--ordered` would ask GitHub to make an issue block itself.
 function to_child_numbers(raw_children: ReadonlyArray<string>): Array<number> {
 	const numbers = raw_children
-		.filter((raw) => ISSUE_NUMBER_PATTERN.test(raw))
+		.filter((raw) => issue_number_shape.is_issue_number(raw))
 		.map(Number)
 		.filter((value) => Number.isSafeInteger(value))
 
@@ -120,7 +122,10 @@ interface ReconcileArguments {
 // and no position — the repair reads what the epic already records rather than being told an order.
 function parse_reconcile_arguments(argv: ReadonlyArray<string>): ReconcileArguments | undefined {
 	const [raw_epic] = positionals_of(argv, RECONCILE_FORM)
-	if (raw_epic === undefined || !ISSUE_NUMBER_PATTERN.test(raw_epic)) return undefined
+
+	if (raw_epic === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(raw_epic)) {
+		return undefined
+	}
 
 	return { epic_number: Number(raw_epic) }
 }
@@ -130,7 +135,11 @@ function parse_reconcile_arguments(argv: ReadonlyArray<string>): ReconcileArgume
 // have it block itself under `--ordered`.
 function to_promote_arguments(parsed: EpicArgv): PromoteArguments | undefined {
 	const [raw_epic, ...raw_children] = parsed.positionals
-	if (raw_epic === undefined || !ISSUE_NUMBER_PATTERN.test(raw_epic)) return undefined
+
+	if (raw_epic === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(raw_epic)) {
+		return undefined
+	}
+
 	const epic_number = Number(raw_epic)
 	const children = to_child_numbers(raw_children).filter((child) => child !== epic_number)
 	if (children.length === 0) return undefined
@@ -146,13 +155,13 @@ function parse_promote_arguments(argv: ReadonlyArray<string>): PromoteArguments 
 
 // `--add <E> <N...> [--before <M> | --after <M> | --order-before <M> | --order-after <M>]`: the epic
 // to insert into, then the children. The epic comes first for the same reason it does under
-// `--promote`, so the children stay a bare list of numbers (joshuafolkken/kit#890).
+// `--promote`, so the children stay a bare list of numbers.
 interface AddArguments {
 	epic_number: number
 	children: Array<number>
 	position?: InsertPosition | undefined
 	// `--order-before` / `--order-after` rather than `--before` / `--after`: the row moves and nothing
-	// else is written (joshuafolkken/kit#1738).
+	// else is written.
 	is_order_only?: boolean | undefined
 	decision_path?: string | undefined
 }
@@ -165,7 +174,7 @@ function is_addition(argv: ReadonlyArray<string>): boolean {
 // The outcome of reading a positioning flag: the position, nothing, or a refusal. One shape for all
 // three so the caller branches on a field rather than on a value's type. `is_order_only` rides on the
 // same value because one flag decides both halves — where the row goes, and whether a dependency is
-// written behind it (joshuafolkken/kit#1738).
+// written behind it.
 interface PositionOutcome {
 	position?: InsertPosition
 	is_order_only?: boolean
@@ -176,7 +185,7 @@ const NO_POSITION: PositionOutcome = { is_refused: false }
 const REFUSED_POSITION: PositionOutcome = { is_refused: true }
 
 // The four positioning flags as one table: the place each one names, and whether a dependency is
-// written behind the row it moves. **One table rather than two branches** (joshuafolkken/kit#1738) —
+// written behind the row it moves. **One table rather than two branches** —
 // `--order-before` asks the same placement question `--before` does, so a second parsing path could
 // come to disagree with this one about what a repeated flag or a non-numeric target means.
 interface PositionFlag {
@@ -224,7 +233,7 @@ function parse_position(parsed: EpicArgv): PositionOutcome {
 	const has_flag = count_position_flags(parsed) > 0
 	const target = read_position_target(parsed)
 	if (target === undefined) return has_flag ? REFUSED_POSITION : NO_POSITION
-	if (!ISSUE_NUMBER_PATTERN.test(target.raw)) return REFUSED_POSITION
+	if (!issue_number_shape.ISSUE_NUMBER_PATTERN.test(target.raw)) return REFUSED_POSITION
 
 	return {
 		position: { kind: target.kind, target: Number(target.raw) },
@@ -245,7 +254,11 @@ function read_add_subject(
 	parsed: EpicArgv,
 ): { epic_number: number; children: Array<number> } | undefined {
 	const [raw_epic, ...raw_children] = parsed.positionals
-	if (raw_epic === undefined || !ISSUE_NUMBER_PATTERN.test(raw_epic)) return undefined
+
+	if (raw_epic === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(raw_epic)) {
+		return undefined
+	}
+
 	const epic_number = Number(raw_epic)
 	const children = to_child_numbers(raw_children).filter((child) => child !== epic_number)
 
@@ -267,7 +280,7 @@ function to_add_arguments(parsed: EpicArgv): AddArguments | undefined {
 }
 
 // An unknown flag is refused by the strict read: a mistyped positioning flag would otherwise leave its
-// value positional, so it becomes a child and the edit lands somewhere else (joshuafolkken/kit#890).
+// value positional, so it becomes a child and the edit lands somewhere else.
 function parse_add_arguments(argv: ReadonlyArray<string>): AddArguments | undefined {
 	const parsed = is_decision_path_unusable(argv) ? undefined : read_form(argv, ADD_FORM)
 
@@ -277,7 +290,7 @@ function parse_add_arguments(argv: ReadonlyArray<string>): AddArguments | undefi
 // The one refusal `--add` has to explain rather than merely report. `into owner/repo#N` is a legal
 // thing for a person to type, and this command cannot serve it: it reads and edits issues in the
 // repository it is run from. Falling through to the usage line would read as "that form does not
-// exist" when what it means is "run it in the other checkout" (joshuafolkken/kit#985).
+// exist" when what it means is "run it in the other checkout".
 interface CrossRepoAddTarget {
 	epic: ExternalChild
 	local: AddArguments
@@ -307,7 +320,7 @@ function find_cross_repo_add_target(argv: ReadonlyArray<string>): CrossRepoAddTa
 function format_add_arguments(local: AddArguments): string {
 	const { position } = local
 	// The order-only prefix rides along, since it is what decides whether the other checkout writes a
-	// dependency — a suggestion that dropped it would be a different instruction (joshuafolkken/kit#1738).
+	// dependency — a suggestion that dropped it would be a different instruction.
 	const prefix = local.is_order_only === true ? '--order-' : '--'
 	const suffix =
 		position === undefined ? '' : ` ${prefix}${position.kind} ${String(position.target)}`
@@ -315,7 +328,7 @@ function format_add_arguments(local: AddArguments): string {
 	return `${[local.epic_number, ...local.children].map(String).join(' ')}${suffix}`
 }
 
-// **`--decision-file` is named rather than relayed** (joshuafolkken/kit#1350). The suggestion is a
+// **`--decision-file` is named rather than relayed**. The suggestion is a
 // command to run in a *different* checkout, and the path was resolved against this one: a relative path
 // does not exist there, `-` cannot be re-read from a consumed stdin, and an unquoted path with a space
 // would break the line the person copies. So the flag is asked for again instead of pasted in wrong.
@@ -329,8 +342,8 @@ function format_decision_note(local: AddArguments): Array<string> {
 
 // A fully-qualified reference to *this* repository is the same instruction spelled longer, not a
 // cross-repository one — and `into owner/repo#N` is exactly how the suffix is documented, so a run
-// inside that repository would otherwise be refused and told to go to the checkout it is already in
-// (joshuafolkken/kit#985). An unreadable current repository resolves to a refusal rather than to a
+// inside that repository would otherwise be refused and told to go to the checkout it is already in.
+// An unreadable current repository resolves to a refusal rather than to a
 // write: refusing costs one command, and guessing wrong writes into the wrong epic.
 function resolve_local_add(
 	found: CrossRepoAddTarget,
@@ -342,7 +355,7 @@ function resolve_local_add(
 // What to type instead. `josh doctor` prints the checkout for each repository, which is the part a
 // run cannot guess.
 function format_cross_repo_refusal(found: CrossRepoAddTarget): string {
-	const reference = `${found.epic.repo}#${String(found.epic.number)}`
+	const reference = session_cite.issue(found.epic.number, undefined, found.epic.repo)
 
 	return [
 		`✖ ${reference} is an epic in another repository; this command reads and writes issues in the repository it runs from.`,
@@ -353,14 +366,14 @@ function format_cross_repo_refusal(found: CrossRepoAddTarget): string {
 
 function parse_check_argument(argv: ReadonlyArray<string>): number | undefined {
 	const [raw] = positionals_of(argv, CHECK_FORM)
-	if (raw === undefined || !ISSUE_NUMBER_PATTERN.test(raw)) return undefined
+	if (raw === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(raw)) return undefined
 
 	return Number(raw)
 }
 
 // `-` reads stdin, matching `gh issue create --body-file -`. The reader is `cli_body`'s, shared with
 // `josh notify --body-file` and `josh followup --notify-message-file` rather than copied per entry
-// point (joshuafolkken/kit#1198), so the stdin form cannot come to mean one thing here and something
+// point, so the stdin form cannot come to mean one thing here and something
 // else there.
 const { read_file_or_stdin } = cli_body
 
@@ -371,8 +384,7 @@ function read_rationale(rationale_path: string | undefined): string {
 }
 
 // `undefined` rather than `''` for an omitted path: an insertion that records no decision is the
-// ordinary case, and an empty string is a record that says nothing — which `epic --add` refuses
-// (joshuafolkken/kit#1350).
+// ordinary case, and an empty string is a record that says nothing — which `epic --add` refuses.
 function read_decision(decision_path: string | undefined): string | undefined {
 	return decision_path === undefined ? undefined : read_file_or_stdin(decision_path)
 }

@@ -24,32 +24,27 @@
   / `failure` ❌ / `kickoff_retry` 🔄 / `confirmation` ⏸️). `--repo-name` and `--issue-title` are
   auto-fetched from `gh` when not supplied. The Issue URL must be included.
 
-**`kickoff` does not claim the working-tree hold, and does not release one.** What that guard protects
-is one branch, one index and one uncommitted diff; this command reads the Issue, normalizes the title,
-posts the plan, notifies and stops — every one of those against GitHub, none against the tree. So a
-`fullrun` running in this checkout never stops a `kickoff`, and a `kickoff` never touches the record
-that run is holding. It claims nothing, so it must not release anything either. `working-tree-hold.md` is the
-single source.
+**`kickoff` does not claim the working-tree hold, and does not release one** — it touches GitHub, never
+the tree. `working-tree-hold.md` is the single source.
 
 **The target repository is named in front of the Issue reference** — `kickoff kit#new`,
-`kickoff joshuafolkken/kit#412`. The definition is `target-repository.md`, whose body is `target-repository.md`. `kickoff` is the entry that needs
+`kickoff joshuafolkken/kit#<N>`. The definition is `target-repository.md`. `kickoff` is the entry that needs
 no checkout: name the target repository in the path of every `gh api` call — reads included — and never
 clone. The one exception is the split path's epic, since `pnpm josh epic` writes only the repository it
 runs in — and the promote arm has no remote fallback at all, so it stops when that repository is not
 checked out here. A target whose owner is not this session's is third-party: Tier C, so it stops rather
 than filing.
 
-**Read `split-assessment.md` → "The question" first.** It is the split decision every entry point
-applies, including this one — `kickoff #N` assesses scope exactly as `kickoff new` does. Its default is
-not to split: separability and a scope that clearly exceeds what one verification gate can confirm in
-one pass (the size guide is stated there) have to hold **together**.
-The rest of `split-assessment.md` — what each entry does with the answer — is read on demand when a
-split is found.
+**Read `split-assessment.md` → "The question" first** — `kickoff #N` assesses scope exactly as
+`kickoff new` does. Its default is not to split: separability and a scope that clearly exceeds what one
+verification gate can confirm in one pass have to hold **together**. The rest of `split-assessment.md`
+is read on demand when a split is found.
 
 - `kickoff new` or `kickoff new "<title>"`: No Issue exists yet. Steps: (0) **Scope assessment** per
   `split-assessment.md`. If multiple → the **multi-issue split path**; if single → the **single-issue
   path**. **Single-issue path**: (1) Derive an English title from the conversation, or use the provided
-  title. (2) Create Issue: `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>` (body
+  title. (2) Create Issue: `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>
+  --requested` plus the labels the words typed after `new` name ("Words typed after `new`", below) (body
   per `prompts/collaboration-workflow/issue-template.md`) — its duplicate scan runs first, and a
   candidate that covers the same work stops the run rather than filing a second Issue (`SKILL.md` →
   `issue-scout.md`). Capture `<N>`. (3)
@@ -57,7 +52,7 @@ split is found.
   Telegram notification. (5) **Stop** — do not implement. **Multi-issue split path**: (1) For each
   independent deliverable, derive a focused English title and create a separate Issue with the
   `route:split` label (its duplicate scan is read per `issue-scout.md`): `pnpm josh issue:file
-  "<sub-title>" --body-file <body-file> --depth <n> --route split`. Capture each Issue number. **When the split is filed into a repository other than
+  "<sub-title>" --body-file <body-file> --depth <n> --route split --requested` plus the labels the words typed after `new` name. Capture each Issue number. **When the split is filed into a repository other than
   the one this session is running in**, every child body gets the `## Origin` backlink described in the
   cross-package rule the AI documents keep resident, the epic body carries the same link as prose or a
   plain bullet (never as a checkbox row, which would disable its auto-close), and the originating Issue
@@ -77,7 +72,7 @@ split is found.
   write `None — the children are independent; any execution order works.` under `Dependencies`. **The
   epic itself is never implemented** — a `backlogrun` takes a named epic and runs its *children*. `pnpm josh
   followup` closes it automatically once every child is closed. **Only when the execution order
-  matters**, record it natively: `pnpm josh epic --ordered` treats the argument order as the dependency
+  matters** — the criterion is `execution-waves.md` → "When a wave may be declared" — record it natively: `pnpm josh epic --ordered` treats the argument order as the dependency
   order; on the manual fallback path, after the child Issues exist, `gh api
   repos/{owner}/{repo}/issues/<N2>/dependencies/blocked_by -F issue_id="$(gh api
   repos/{owner}/{repo}/issues/<N1> --jq .id)"` for each dependent pair (the endpoint takes the blocker's
@@ -87,3 +82,18 @@ split is found.
 
 `pnpm josh issue:file` lints the body and applies the classification labels it declares, following `prompts/collaboration-workflow/issue-template.md` for classification (`docs/josh-commands-backlog.md` → `josh issue:file`).
 An Issue a consumer can use only once it is published is filed with `--release` (`kickoff new`), or linked with `pnpm josh issue:release <N>` (`kickoff #N`) — either makes it a blocker of the repository's `release` Issue, which never gets `auto-ok` on its own.
+
+## Words typed after `new`
+
+**An Issue a person asked for is filed with `--requested`** — every `new` entry (each child of its
+multi-issue split included), and a request in conversation. A live carry record or an `auto-ok` branch Issue then does not opt it in, so no lane takes
+it before the person picks the run; `auto-ok` comes only from the words below (`issue-auto-ok.ts`). A
+filing the run decides on its own — observation, retrospective, a split the run finds itself, routed — never declares it.
+
+**Words after `new`** (`kickoff new auto ok high`) are read like `into <target>`, never inferred. Each
+adds its labels to the `--requested` filing; a word not in the table is asked about:
+
+| Typed     | Added to `pnpm josh issue:file`    |
+| --------- | ---------------------------------- |
+| `auto ok` | `--label auto-ok --label run:lane` |
+| `high`    | `--label priority:high`            |

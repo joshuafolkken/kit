@@ -1,7 +1,7 @@
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 
-// Whether an issue was closed by a merge, read from its REST timeline (joshuafolkken/kit#2701). The
+// Whether an issue was closed by a merge, read from its REST timeline. The
 // issue's own `state_reason` cannot tell: a pull request's `closes #N` and a person's "Close as
 // completed" both answer `completed`. What only a merge leaves is a merged pull request referencing
 // the issue, so the answer is the conjunction — closed now, as completed, and referenced by a merged
@@ -55,7 +55,9 @@ function is_merged_close(rows: ReadonlyArray<TimelineRow>): boolean {
 	return rows.some((row) => row.event === MERGED_REFERENCE)
 }
 
-async function read_merged(issue: string): Promise<boolean> {
+// `undefined` when the timeline could not be read, so a caller that keeps the answer can tell "not
+// merged" from "ask again".
+async function read_merge_state(issue: string): Promise<boolean | undefined> {
 	try {
 		const raw = await git_gh_exec.exec_gh_api({
 			path: `${git_gh_api_path.issue_api_path(issue)}/timeline?per_page=100`,
@@ -65,11 +67,15 @@ async function read_merged(issue: string): Promise<boolean> {
 
 		return is_merged_close(parse_rows(raw))
 	} catch {
-		return false
+		return undefined
 	}
 }
 
-const issue_merged = { is_merged_close, parse_rows, read_merged }
+async function read_merged(issue: string): Promise<boolean> {
+	return (await read_merge_state(issue)) ?? false
+}
+
+const issue_merged = { is_merged_close, parse_rows, read_merge_state, read_merged }
 
 export type { TimelineRow }
 export { issue_merged }

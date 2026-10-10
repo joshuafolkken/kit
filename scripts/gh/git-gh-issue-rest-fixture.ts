@@ -1,8 +1,7 @@
 // One issue as `repos/{owner}/{repo}/issues/{N}` answers it. Both the mapping tests
 // (`git-gh-issue-rest.test.ts`) and the read tests (`git-gh-issue-read.test.ts`) start from exactly
 // this response — one exercises the translation, the other the requests around it — so the builder
-// lives here rather than being written out twice, which is the clone `CLAUDE.md` prohibits
-// (joshuafolkken/kit#1024).
+// lives here rather than being written out twice, which is the clone `CLAUDE.md` prohibits.
 
 // The two REST paths the tests around this fixture build on. `gh api` expands the placeholders from
 // the current repository, so they stay literal — and they live here, beside the response bodies,
@@ -38,7 +37,7 @@ function rest_issue(overrides: Record<string, unknown> = {}): string {
 
 // One page of `repos/{owner}/{repo}/issues`, whose elements are the same objects the single-issue
 // endpoint answers with — so the listing tests build their pages from the one response body above
-// rather than writing a second one (joshuafolkken/kit#1025).
+// rather than writing a second one.
 function rest_issue_page(rows: ReadonlyArray<Record<string, unknown>>): string {
 	return `[${rows.map((row) => rest_issue(row)).join(',')}]`
 }
@@ -58,8 +57,8 @@ const PULL_HTML_URL = pull_html_url(ISSUE_NUMBER)
 // readily as for an issue.
 //
 // `html_url` is the pull-request spelling because `/pull/` is what a pull request is *recognized* by
-// once it has been read — `epic_issue.is_pull_request` looks for that segment
-// (joshuafolkken/kit#947). Built from `number` rather than fixed, so a page of several pull requests
+// once it has been read — `epic_issue.is_pull_request` looks for that segment.
+// Built from `number` rather than fixed, so a page of several pull requests
 // does not have every row claiming to be the same one.
 function rest_pull_request(
 	number: number,

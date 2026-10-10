@@ -3,34 +3,32 @@ import { COMMAND_PHASES, type PhaseName } from './time-phase-names'
 import { time_shell } from './time-shell'
 import type { Span } from './time-spans'
 
-// Where a backgrounded command's runtime sits on the timeline (joshuafolkken/kit#1662).
+// Where a backgrounded command's runtime sits on the timeline.
 //
 // **A span is the gap between two consecutive events, named by the later one** — `time-spans.ts`'s
 // partition — so a command issued with `run_in_background` closes its span at the *launch's* own
 // tool result, two or three seconds later. Everything the command then spends running is a
 // different span, labelled by whatever call came next, and the join that reads its output minutes
 // afterwards is a bare `tail` / `cat` with no `josh_command` at all. So `gate` and `pr` counted the
-// launch call and nothing else: run #1597's `gate` read 4.4 s beside a last-8 median of 32.4 s,
+// launch call and nothing else: one run's `gate` read 4.4 s beside a last-8 median of 32.4 s,
 // which is a foreground reading and a launch reading averaged together.
 //
 // **The transcript does record enough to place it, in three halves that have to be read at once.**
 // The launch's result body says `Command running in background with ID: <id>`; the call that later
 // reads the output names `…/tasks/<id>.output` in its command string, or carries the shell id in a
 // field; and the task-notification line the harness writes when the command ends names the same id in
-// `<task-id>` (joshuafolkken/kit#1696). None survives on its own: a span keeps no input and no body,
+// `<task-id>`. None survives on its own: a span keeps no input and no body,
 // so all three are read at parse time and carried as fields, the same rule `marker`, `check_key` and
 // `writes` already follow.
 //
-// **The third is what tells a join from a progress poll.** Until joshuafolkken/kit#1696 the window
-// closed at the first call that read the output at all, which was right while the only way to read one
-// was to `tail` it after the fact — and wrong the moment joshuafolkken/kit#1662 made a `BashOutput`
-// join detectable, because `BashOutput` is the tool a run *polls* with. A poll thirty seconds into an
-// eight-minute gate then closed the window and, worse, marked it measured.
+// **The third is what tells a join from a progress poll.** Closing the window at the first call that
+// read the output at all would be wrong, because `BashOutput` is the tool a run *polls* with: a poll
+// thirty seconds into an eight-minute gate would close the window and, worse, mark it measured.
 //
 // **What is positioned is `own_duration_ms`, never `duration_ms`.** The four category shares
 // reconstruct the elapsed time exactly, and that invariant is what makes two runs comparable — so
 // the launch span keeps its share of the wall clock and gains the *length* of the command it
-// started, which is precisely the distinction joshuafolkken/kit#1591 added the second field for.
+// started, which is precisely the distinction the second field exists for.
 //
 // **The phase is what makes the minutes readable, and it is the existing precedence rather than a
 // new one.** `time-phases.ts` already lets a command's own phase win over whichever window a span
@@ -38,8 +36,7 @@ import type { Span } from './time-spans'
 // *inside* a backgrounded command's window and carrying no phase of its own is the same case one
 // step further: it is time the run spent with that command outstanding. A span that does carry one —
 // the review's `Skill` call above all — keeps it, so a run that genuinely overlapped its gate reports
-// a small `gate` and a run that joined immediately reports the whole wait, which is the reading
-// joshuafolkken/kit#1608 could not build while the span was the launch call.
+// a small `gate` and a run that joined immediately reports the whole wait.
 
 const NO_BACKGROUND = ''
 // No notice said this command had finished, which is a different fact from finishing at instant zero:
@@ -49,15 +46,15 @@ const NO_FINISH = 0
 
 // The launch's own result body, which is the only place the harness writes the id it assigns. Read
 // as a derived fact and the body discarded, exactly as `has_failure_line` and `followup_stages` are.
-// **A foreground call that outran its timeout is a launch too** (joshuafolkken/kit#3304): the harness
+// **A foreground call that outran its timeout is a launch too**: the harness
 // moves it to the background and says so as `moved to the background (ID: <id>)`. Missing that spelling
 // let the #3273 lane child end its turn on a running task the stop hook never saw.
 const LAUNCH_PATTERN =
 	/(?:running in background with ID:|moved to the background \(ID:)\s*([\w-]+)/iu
 // A backgrounded subagent's launch result, which names its id on an `agentId:` line of its own.
 const AGENT_LAUNCH_PATTERN = /^Async agent launched[\s\S]*?\bagentId:\s*([\w-]+)/u
-// The notice the harness writes when a task it took into the background ends
-// (joshuafolkken/kit#1696). It is anchored at the start because the whole content of that line *is*
+// The notice the harness writes when a task it took into the background ends.
+// It is anchored at the start because the whole content of that line *is*
 // the notice — a body merely quoting one is text, the same hazard `read_id` unquotes for — and it
 // keys on `<task-id>`, which the harness fills with the very id the launch's own body announced, so
 // the pairing needs no second key and no lookup through the call id.
@@ -102,7 +99,7 @@ function launch_id(text: string): string {
 	return LAUNCH_PATTERN.exec(text)?.[1] ?? NO_BACKGROUND
 }
 
-// The id of a subagent the harness took into the background (joshuafolkken/kit#2774). Its end is the
+// The id of a subagent the harness took into the background. Its end is the
 // same `<task-id>` notice a command's is, so `finished_id` pairs it unchanged. It is kept apart from
 // `launch_id` on purpose: a subagent is not a command, and folding it in would open a timeline window
 // that re-stamps the spans a backgrounded gate running beside the review is owed.
@@ -162,7 +159,7 @@ function started_ms(span: Span): number {
 }
 
 // The first call that read this launch's output **after the harness said the command had finished**,
-// or nothing (joshuafolkken/kit#1696).
+// or nothing.
 //
 // **The first of those, not the last**: a run reads one output file several times — the sample this
 // was written from read it four times, a `tail` then three `grep`s — and every reading after the
@@ -170,11 +167,10 @@ function started_ms(span: Span): number {
 // window to the last reading was weighed and refused for exactly that: it would charge the command
 // with every `grep` a run made of a result it already held.
 //
-// **And not merely the first reading of any kind**, which is what this was until joshuafolkken/kit#1696.
-// `BashOutput` is the tool a run polls progress with, so once joshuafolkken/kit#1662 made that spelling
-// detectable a poll thirty seconds in closed the window on a gate that ran eight minutes — and closed
-// it *confidently*, because `is_read` then said the runtime had been measured and no
-// `background runtime not measured` note was emitted.
+// **And not merely the first reading of any kind.** `BashOutput` is the tool a run polls progress
+// with, so a poll thirty seconds in would close the window on a gate that ran eight minutes — and
+// close it *confidently*, because `is_read` would then say the runtime had been measured and no
+// `background runtime not measured` note would be emitted.
 //
 // **A launch no notice named is unread**, rather than falling back to the first reading. The
 // direction of the error is the one this module already takes for a join written inside quotes: a

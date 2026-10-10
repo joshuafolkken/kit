@@ -1,8 +1,9 @@
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { eval_report, type MergeVerdict } from './eval-report'
 
-// How many runs in a row have ended without measuring anything (joshuafolkken/kit#1197).
+// How many runs in a row have ended without measuring anything.
 //
 // A single non-measurement is reported and correctly does not block — but nothing was watching the
 // *sequence*, so a suite that measured nothing three runs running printed three lines that each read
@@ -18,7 +19,7 @@ import { eval_report, type MergeVerdict } from './eval-report'
 // **Keyed on `PACKAGE_DIR`, the same root `eval-stamp.ts` uses, and for the same reason**: the suite
 // measures the kit package's own documents, so the run of verdicts is about that package rather than
 // about whichever project invoked it. Under a global install one `PACKAGE_DIR` serves every project
-// on the machine (joshuafolkken/kit#1215), and that is the wanted behavior here — the scenarios and
+// on the machine, and that is the wanted behavior here — the scenarios and
 // the connection they need are shared, so a run that held in one project really did measure the
 // documents the next one would have measured.
 
@@ -41,11 +42,7 @@ function streak_path(): string {
 // A record that cannot be read is no record. The count is an aid to noticing rather than a gate, so
 // every failure here reads as "start again from one" instead of ending the run that just measured.
 function parse_streak(text: string): Streak | undefined {
-	try {
-		return STREAK_SCHEMA.parse(JSON.parse(text))
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(text, STREAK_SCHEMA)
 }
 
 function read_streak(source: string = streak_path()): Streak | undefined {

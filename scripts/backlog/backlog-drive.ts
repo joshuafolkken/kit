@@ -1,10 +1,10 @@
 // The body of `josh backlog:drive`: the backlogrun parent's mechanical transitions, run as one resident
-// wait instead of a model turn per event (joshuafolkken/kit#2499).
+// wait instead of a model turn per event.
 //
-// **What it replaces is the parent's turn between two commands.** Measured after #2492 the parent still
-// spent about half of its backlogrun requests on nothing but glue: a child's process ends, the model
-// wakes, runs `run:merge`, reads a number, runs `lane:launch`, restarts `lane:await`, ends its turn — or,
-// headless, polls in the foreground because its turn cannot end. Every one of those steps is a command
+// **What it replaces is the parent's turn between two commands.** Without it the parent spends about
+// half of its backlogrun requests on nothing but glue: a child's process ends, the model wakes, runs
+// `run:merge`, reads a number, runs `lane:launch`, restarts `lane:await`, ends its turn — or, headless,
+// polls in the foreground because its turn cannot end. Every one of those steps is a command
 // whose answer is already a token, so the loop here only reads tokens and never decides what one means.
 //
 // **It decides nothing another command answers.** Collecting a child is `run:merge`'s, choosing the next
@@ -16,25 +16,40 @@
 // **Everything it touches is a port**, the pattern `run-wake-loop.ts` set, so the sequencing is pinned
 // without a process, a network or a clock.
 
+import { issue_cite } from '#scripts/issue/issue-cite'
 import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
+import { run_merge_token, type MergeToken } from '#scripts/run/merge/run-merge-token'
 
+const { MERGE_TOKEN } = run_merge_token
 const RUN_VERDICT = 'run'
 const STOP_VERDICT = 'stop'
-// The `run:merge` tokens that end the loop at once: a hand-off, a person's stop, the environment down,
-// a foreign owner, an unreadable state. `resumed` is not among them — the same lane is awaited again.
-const IMMEDIATE_TOKENS: ReadonlySet<string> = new Set([
-	'over',
-	'human-review',
-	'environment',
-	'busy',
-	'retry',
-])
-// Every token `run:merge` prints first even on a non-zero exit. `stop` — a parked backlog or the failure
-// guard — is the offer's `stop` reached through a merge: the child is collected, nothing more starts,
-// and the children still in flight are collected before the loop ends (joshuafolkken/kit#2881).
-const HANDOFF_TOKENS: ReadonlySet<string> = new Set([...IMMEDIATE_TOKENS, STOP_VERDICT])
-const RESUMED_TOKEN = 'resumed'
+// How the loop reads each `run:merge` token — keyed by the producer's own type, so a token added there
+// is a type error here until it is classified. `hand-back` ends the loop at once: a hand-off, a person's
+// stop, the environment down, a foreign owner, an unreadable state. `stop` — a parked backlog or the
+// failure guard — is the offer's `stop` reached through a merge: the child is collected, nothing more
+// starts, and the children still in flight are collected before the loop ends. `await` is a cut resumed
+// in place: the same lane is awaited again.
+type TokenHandling = 'hand-back' | 'stop' | 'await'
+const TOKEN_HANDLING: Readonly<Record<MergeToken, TokenHandling>> = {
+	[MERGE_TOKEN.OVER]: 'hand-back',
+	[MERGE_TOKEN.HUMAN_REVIEW]: 'hand-back',
+	[MERGE_TOKEN.ENVIRONMENT]: 'hand-back',
+	[MERGE_TOKEN.BUSY]: 'hand-back',
+	[MERGE_TOKEN.RETRY]: 'hand-back',
+	[MERGE_TOKEN.STOP]: 'stop',
+	[MERGE_TOKEN.RESUMED]: 'await',
+}
+
+function tokens_handled(...handlings: ReadonlyArray<TokenHandling>): ReadonlySet<string> {
+	const entries = Object.entries(TOKEN_HANDLING)
+
+	return new Set(entries.filter(([, handling]) => handlings.includes(handling)).map(([key]) => key))
+}
+
+const IMMEDIATE_TOKENS = tokens_handled('hand-back')
+// Every token `run:merge` prints first even on a non-zero exit.
+const HANDOFF_TOKENS = tokens_handled('hand-back', 'stop')
 const MERGED_OUTCOME = 'merged'
 const WATCH_VERDICT = 'watch'
 // The verdicts the loop acts on without the parent. Any other is handed back as it was printed.
@@ -56,7 +71,7 @@ interface OfferRead {
 	answer?: string | undefined
 	reason?: string | undefined
 	// Whether a drain here owes the retrospective: the opt-in switch is on and it has not run yet. Absent
-	// reads as not owed, so a drain with the switch off keeps the idle watch (joshuafolkken/kit#2750).
+	// reads as not owed, so a drain with the switch off keeps the idle watch.
 	is_retrospective_owed?: boolean
 	is_finish?: boolean | undefined
 }
@@ -65,8 +80,7 @@ interface DriveState {
 	// The children this run has in flight — seeded from the open lanes, so a restarted loop resumes them.
 	in_flight: Array<string>
 	// Every child merged, fed back to `backlog:offer` because GitHub closes a merged issue late. A parked
-	// child is left out: its labels classify it, so one a person released is offered again
-	// (joshuafolkken/kit#3041).
+	// child is left out: its labels classify it, so one a person released is offered again.
 	exclude: Array<string>
 	// When the run last did something, handed to `backlog:budget` as `--active`.
 	active: string
@@ -160,7 +174,7 @@ function merge_stopped(issue: string, state: DriveState): DriveState {
 	return {
 		...state,
 		is_stopping: true,
-		stop_reason: `run:merge #${issue} answered stop`,
+		stop_reason: `run:merge ${issue_cite.plain(issue)} answered stop`,
 		stopped_by: issue,
 	}
 }
@@ -181,7 +195,7 @@ function collected_state(
 	active: string,
 ): DriveState {
 	const in_flight =
-		collected.token === RESUMED_TOKEN
+		collected.token === MERGE_TOKEN.RESUMED
 			? state.in_flight
 			: state.in_flight.filter((item) => item !== issue)
 	const exclude = excluded(issue, collected.outcome, state)
@@ -200,7 +214,7 @@ async function collect(issue: string, state: DriveState, ports: DrivePorts): Pro
 
 	const next = collected_state(issue, collected, state, ports.now().toISOString())
 
-	return { kind: 'continue', state: token === STOP_VERDICT ? merge_stopped(issue, next) : next }
+	return { kind: 'continue', state: token === MERGE_TOKEN.STOP ? merge_stopped(issue, next) : next }
 }
 
 async function collect_finished(state: DriveState, ports: DrivePorts): Promise<PassResult> {
@@ -219,7 +233,7 @@ async function collect_finished(state: DriveState, ports: DrivePorts): Promise<P
 	return { kind: 'continue', state: current }
 }
 
-// A `lane:open` refused with every lane taken is a wait, not a judgement (joshuafolkken/kit#3027): the
+// A `lane:open` refused with every lane taken is a wait, not a judgement: the
 // next offer after a lane frees retries it. A step failing after the lane opened is always handed back —
 // that lane holds the last seat itself, so the free count would read the failure as a full pool.
 async function refused(
@@ -234,12 +248,12 @@ async function refused(
 	return ended('launch', state, undefined, issue)
 }
 
-// **No more launches than free lanes** (joshuafolkken/kit#3027). `backlog:offer` lists every ready issue
+// **No more launches than free lanes**. `backlog:offer` lists every ready issue
 // without reading the lanes, so launching all of them overran `JOSH_LANE_LIMIT` until `lane:open` ran
 // out of seats. The free count is read once, before the first launch, because every launch here opens
 // a lane the count would otherwise have to be told about.
 //
-// **Only a launch is activity** (joshuafolkken/kit#3027): a pass that started nothing — every lane taken
+// **Only a launch is activity**: a pass that started nothing — every lane taken
 // — keeps `active` where it was, or the once-a-minute offer would restart the idle budget for good.
 function launched(state: DriveState, in_flight: Array<string>, ports: DrivePorts): DriveState {
 	if (in_flight.length === state.in_flight.length) return { ...state, in_flight }
@@ -410,6 +424,7 @@ async function run_loop(
 
 const backlog_drive = {
 	HANDOFF_TOKENS,
+	TOKEN_HANDLING,
 	initial_state,
 	merge_stopped,
 	run_loop,

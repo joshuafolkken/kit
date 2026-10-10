@@ -8,7 +8,7 @@ import { document_section } from './document-section'
 // glossary), so the two can never disagree on what "resolves" means.
 //
 // **What resolves is what `pnpm josh doc:section` resolves — the same function, not a copy of its
-// rule** (joshuafolkken/kit#3248). This fixture once kept its own anchor set, which accepted bold
+// rule**. This fixture once kept its own anchor set, which accepted bold
 // labels the command could not find, so a green suite promised sections the command then refused.
 
 // A few references cite the reference form itself rather than a real anchor — the doc-section
@@ -56,6 +56,28 @@ function broken_section_references(text: string): Array<string> {
 		.map((reference) => `${reference.file} → "${reference.heading}"`)
 }
 
-const section_reference_resolution = { broken_section_references, exists }
+// A reference that names no file — `"Heading" above` or a bare `→ "Heading"` — has only the
+// document it sits in to resolve against.
+function broken_in_document(text: string, headings: ReadonlyArray<string>): Array<string> {
+	return headings
+		.filter((heading) => !EXAMPLE_HEADINGS.has(heading))
+		.filter((heading) => document_section.section(text, heading) === undefined)
+		.map((heading) => `"${heading}"`)
+}
+
+function broken_adjacent_references(text: string): Array<string> {
+	return broken_in_document(text, document_scan.adjacent_references(text))
+}
+
+function broken_bare_arrow_references(text: string): Array<string> {
+	return broken_in_document(text, document_scan.bare_arrow_references(text))
+}
+
+const section_reference_resolution = {
+	broken_adjacent_references,
+	broken_bare_arrow_references,
+	broken_section_references,
+	exists,
+}
 
 export { section_reference_resolution }

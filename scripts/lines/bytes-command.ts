@@ -9,7 +9,7 @@ import { resident_budget } from '#scripts/document/resident-budget'
 // The package root, resolved from this file rather than the caller's working directory.
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url))
 
-// `josh bytes` — the byte counterpart of `josh lines` (joshuafolkken/kit#2176). A mandated
+// `josh bytes` — the byte counterpart of `josh lines`. A mandated
 // documentation update that grows an agent-read document past its byte ceiling is invisible until
 // `pnpm josh gate` reports it 80–90 seconds in, and the raise that follows is rework. This answers
 // the same question before that: how many bytes each budgeted document already has, its ceiling, and
@@ -81,8 +81,7 @@ function remaining_phrase(remaining: number): string {
 }
 
 // The resident document is held by a fixed limit rather than a block ratchet, and loosening it is
-// Tier C, so its row names the headroom or the overage but never a value to raise it to
-// (joshuafolkken/kit#3171).
+// Tier C, so its row names the headroom or the overage but never a value to raise it to.
 function resident_row(status: DocumentStatus): string {
 	const counts = `${status.current.toString()}/${status.recorded.toString()} bytes`
 
@@ -147,7 +146,7 @@ function entry_status_of(entry: string, recorded: number): EntryStatus {
 
 // The primary budget, one row per entry: the total each workflow entry reads against its recorded
 // ceiling and the headroom left — printed on every scan, so the main budget is no longer a number the
-// gate reveals only when it fails (joshuafolkken/kit#2271).
+// gate reveals only when it fails.
 function entry_row(status: EntryStatus): string {
 	const counts = `${status.current.toString()}/${status.recorded.toString()} bytes`
 

@@ -34,7 +34,17 @@ node -v
 pnpm -v
 ```
 
-If pnpm is older than that or differs from the project's pin, install the current standalone pnpm release using the [official installer](https://pnpm.io/installation/), then check `pnpm -v` again. A Corepack-managed pnpm cannot run `pnpm self-update`; switch to the standalone installation before updating the project pin.
+If pnpm is older than 12, install the current standalone pnpm release using the [official installer](https://pnpm.io/installation/), then check `pnpm -v` again. A Corepack-managed pnpm cannot run `pnpm self-update`; switch to the standalone installation before updating the project pin.
+
+If pnpm only differs from the project's pin, you do not need to install that version. A project with `devEngines.packageManager.onFail: "download"` — what `josh init` writes — makes pnpm fetch and run the pinned version by itself. A project that still has `"error"` refuses to run instead; `josh sync` moves it to `"download"` ([sync.md](./sync.md#what-does-not-get-synced)), which fixes it for CI and every machine at once.
+
+For a project you cannot change, pnpm's own `pmOnFail` setting does the same on your machine. It overrides `onFail` in **every** project there, including a `"warn"` or `"ignore"` set on purpose ([pnpm `pmOnFail`](https://pnpm.io/settings/cli#pmonfail)). Set it in pnpm's global `config.yaml` — `~/Library/Preferences/pnpm/config.yaml` on macOS, `~/.config/pnpm/config.yaml` on Linux (`$XDG_CONFIG_HOME/pnpm/config.yaml` when that is set), `~\AppData\Local\pnpm\config\config.yaml` on Windows — changing an existing `pmOnFail` line rather than adding a second one:
+
+```yaml
+pmOnFail: download
+```
+
+Edit the file directly: pnpm 12 refuses `pnpm config set --global pmOnFail download` with `ERR_PNPM_CONFIG_SET_UNSUPPORTED_YAML_CONFIG_KEY`, although it reads the key from that file. `pnpm config get pmOnFail` prints `download` once the line is in place.
 
 ## `josh sync` reports config drift
 

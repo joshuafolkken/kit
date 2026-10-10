@@ -19,6 +19,8 @@ const LOAD_MEAN = 'load mean'
 const EFFECTIVE_LANES = 'effective lanes'
 const FREE_MIN = 'free memory min (GB)'
 const FREE_MEAN = 'free memory mean (GB)'
+const SWAPPED_PEAK = 'swapped peak (GB/h)'
+const SWAPPED_MEAN = 'swapped mean (GB/h)'
 
 function hours_before_now(hours: number): string {
 	return new Date(NOW - hours * MS_PER_MINUTE * 60).toISOString()
@@ -51,11 +53,13 @@ const GATES: ReadonlyArray<LedgerEntry> = GATE_MINUTES.map((minutes) => ({
 }))
 
 const LOADS: ReadonlyArray<LedgerEntry> = [
-	{ kind: 'load', at: hours_before_now(1), load: 4, free_mb: 2048, swap_mb: 1024, lanes: 2 },
-	{ kind: 'load', at: hours_before_now(1), load: 8, free_mb: 1024, lanes: 4 },
+	{ kind: 'load', at: hours_before_now(1), load: 4, available_mb: 2048, lanes: 2 },
+	{ kind: 'load', at: hours_before_now(1), load: 8, available_mb: 1024, lanes: 4 },
 ]
 
 const HALF_HOUR = 0.5
+// Seven seconds, in hours: a drive handed back and restarted.
+const SECONDS_APART_HOURS = 7 / 3600
 
 // Load samples every half hour from `from` hours before now down to `to`, all with `lanes` working.
 function samples_between(from: number, to: number, lanes: number): Array<LedgerEntry> {
@@ -65,7 +69,7 @@ function samples_between(from: number, to: number, lanes: number): Array<LedgerE
 		kind: 'load',
 		at: hours_before_now(from - index * HALF_HOUR),
 		load: 1,
-		free_mb: 1024,
+		available_mb: 1024,
 		lanes,
 	}))
 }
@@ -90,6 +94,19 @@ describe('lane_stats.row active hours', () => {
 		const working = samples_between(3, 0, 1)
 
 		expect(cell_of([...merges, ...idle, ...working], PER_HOUR)).toBe('0.7')
+	})
+})
+
+// joshuafolkken/kit#3643: the stage and dispatch entries are not the work entries the fallback
+// measures gaps between, so recording them leaves a period's rate where it was.
+describe('lane_stats.row beside the stage entries', () => {
+	it('keeps the rate unchanged by stage and dispatch entries', () => {
+		const added: ReadonlyArray<LedgerEntry> = [
+			{ kind: 'dispatch', at: hours_before_now(3), issue: MERGE_ISSUE },
+			{ kind: 'stage', at: hours_before_now(3), stage: 'review', elapsed_ms: MS_PER_MINUTE },
+		]
+
+		expect(cell_of([...added, ...MERGES], PER_HOUR)).toBe('1.5')
 	})
 })
 
@@ -118,11 +135,10 @@ describe('lane_stats.row', () => {
 		expect(cell_of(GATES, 'gate max (min)')).toBe('9.0')
 	})
 
-	it('reduces load samples to load, swap, free memory and lane figures', () => {
+	it('reduces load samples to load, free memory and lane figures', () => {
 		expect(cell_of(LOADS, EFFECTIVE_LANES)).toBe('3.0')
 		expect(cell_of(LOADS, LOAD_PEAK)).toBe('8.0')
 		expect(cell_of(LOADS, LOAD_MEAN)).toBe('6.0')
-		expect(cell_of(LOADS, 'swap peak (GB)')).toBe('1.0')
 		expect(cell_of(LOADS, FREE_MIN)).toBe('1.0')
 		expect(cell_of(LOADS, FREE_MEAN)).toBe('1.5')
 		expect(cell_of(LOADS, LOAD_SAMPLES)).toBe('2')
@@ -141,7 +157,7 @@ describe('lane_stats.row working samples', () => {
 			kind: 'load',
 			at: hours_before_now(1),
 			load: 9,
-			free_mb: 512,
+			available_mb: 512,
 			lanes: 0,
 		}
 		const entries = [...LOADS, idle]
@@ -152,6 +168,41 @@ describe('lane_stats.row working samples', () => {
 		expect(cell_of(entries, LOAD_PEAK)).toBe('9.0')
 		expect(cell_of(entries, FREE_MIN)).toBe('0.5')
 		expect(cell_of(entries, LOAD_SAMPLES)).toBe('3')
+	})
+})
+
+// A load sample `hours` before now that had swapped `swapped_mb` since boot.
+function swapped(hours: number, swapped_mb: number | undefined, lanes: number): LedgerEntry {
+	return { kind: 'load', at: hours_before_now(hours), load: 1, swapped_mb, lanes }
+}
+
+// joshuafolkken/kit#3593: a sample carries the swap counter, so the columns are its rate between samples.
+describe('lane_stats.row swap rate', () => {
+	it('reads the swap columns from the counter gained between consecutive samples', () => {
+		const entries = [swapped(2, 1024, 1), swapped(1.5, 2048, 0), swapped(1, 6144, 1)]
+
+		expect(cell_of(entries, SWAPPED_PEAK)).toBe('8.0')
+		expect(cell_of(entries, SWAPPED_MEAN)).toBe('2.0')
+	})
+
+	it('reads a counter that went back as nothing swapped', () => {
+		expect(cell_of([swapped(2, 2048, 1), swapped(1.5, 0, 1)], SWAPPED_PEAK)).toBe('0.0')
+	})
+
+	// joshuafolkken/kit#3643: a drive samples as it starts, so a restart leaves two samples seconds apart.
+	it('reads no rate from two samples closer than half the sampling interval', () => {
+		const restarted = [swapped(2, 1024, 1), swapped(2 - SECONDS_APART_HOURS, 2048, 1)]
+
+		expect(cell_of(restarted, SWAPPED_PEAK)).toBe(lane_stats.MISSING)
+	})
+
+	it('prints the missing mark where the counter was unread or the sampler was stopped', () => {
+		const unread = [swapped(2, undefined, 1), swapped(1.5, 1024, 1)]
+		const stopped = [swapped(4, 1024, 1), swapped(1, 2048, 1)]
+
+		expect(cell_of(unread, SWAPPED_PEAK)).toBe(lane_stats.MISSING)
+		expect(cell_of(stopped, SWAPPED_PEAK)).toBe(lane_stats.MISSING)
+		expect(cell_of(LOADS, SWAPPED_MEAN)).toBe(lane_stats.MISSING)
 	})
 })
 

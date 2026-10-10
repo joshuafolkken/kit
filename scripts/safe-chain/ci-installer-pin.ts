@@ -5,9 +5,9 @@ import { execaSync } from 'execa'
 
 // Where the workflows that install safe-chain on the runner live. Each carries the release and the
 // installer's SHA-256 as workflow-level env, so one pin per file moves every "Setup safe-chain" step
-// at once (joshuafolkken/kit#2711, joshuafolkken/kit#2765). The directories are scanned rather than
+// at once. The directories are scanned rather than
 // a file list kept, so a workflow another package distributes — app-kit's `dast.yml` and `load.yml`
-// — moves with the rest (joshuafolkken/kit#2830); a file without the pin is never a target.
+// — moves with the rest; a file without the pin is never a target.
 const WORKFLOW_DIRECTORIES = ['.github/workflows', 'templates/workflows']
 const WORKFLOW_FILE_RE = /\.ya?ml$/u
 // `[ \t]` rather than `\s`: under the `m` flag `\s*` would run across line ends and swallow the
@@ -27,7 +27,7 @@ function installer_url(version: string): string {
 }
 
 // The local composite actions follow the workflows: kit's own pin lives in
-// `.github/actions/setup-pnpm`, which every kit workflow installs through (joshuafolkken/kit#2982).
+// `.github/actions/setup-pnpm`, which every kit workflow installs through.
 function list_workflows(): Array<string> {
 	const workflows = WORKFLOW_DIRECTORIES.filter((directory) => existsSync(directory)).flatMap(
 		(directory) =>

@@ -119,3 +119,12 @@ defined answer for "no path was given".
 **Why a run that merges needs no teardown.** The issue leaves the `in-progress` listing at the merge, so
 whatever is waiting prints nothing and `--hours` ends it. A stop keeps that label, which is why a stop
 has to end the reporting itself.
+
+## Where each rule came from
+
+- The watcher as one point-of-use document binding every implementing run — joshuafolkken/kit#3172.
+- `--wait` reporting by itself and exiting only on an arrival, a removed life record or `--hours` —
+  joshuafolkken/kit#3102.
+- `pnpm josh run:watcher:guard` detecting a missed restart — joshuafolkken/kit#2113, wired into
+  `pretool-guard` by joshuafolkken/kit#2353.
+- A stop as the only interrupt — joshuafolkken/kit#2136.

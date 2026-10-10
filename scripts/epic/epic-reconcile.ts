@@ -1,4 +1,5 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { session_cite } from '#scripts/issue/session-cite'
 import { epic_add_body } from './epic-add-body'
 import { epic_chains } from './epic-chains'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
@@ -8,8 +9,7 @@ import { format_dependency_links } from './epic-reference'
 import { epic_relations } from './epic-relations'
 
 // `josh epic --reconcile <E>` — bring an epic's `## Dependencies` declaration and its native
-// `blocked-by` relations back into agreement, without a hand edit and without recording a decision
-// (joshuafolkken/kit#2235).
+// `blocked-by` relations back into agreement, without a hand edit and without recording a decision.
 //
 // `--add` and `--remove` refuse the moment the two disagree, and `backlog:next` reports the graph
 // unusable, so the only exit was to edit the epic body by hand — the very edit those commands exist
@@ -36,7 +36,7 @@ interface ReconcilePlanInput {
 	body: string | undefined
 	// The epic's children with their native relations, exactly as `epic_read` reads them.
 	recorded: ReadonlyArray<EpicChild>
-	// The epic's own repository — what a declared bare number names (joshuafolkken/kit#1126).
+	// The epic's own repository — what a declared bare number names.
 	repo: string
 }
 
@@ -60,7 +60,7 @@ function to_chain(link: DependencyLink): Array<number> {
 }
 
 // A blocker of `blocked`, keyed to the epic's own repository so a declared bare number names the
-// right issue (joshuafolkken/kit#1126).
+// right issue.
 function to_blocker(link: DependencyLink, repo: string): IssueReference {
 	return { repo, number: link.blocker }
 }
@@ -161,7 +161,7 @@ function build_reconcile_plan(input: ReconcilePlanInput): ReconcilePlan {
 // refused the mismatched epic agree on its order.
 function report_agreement(epic_number: number): void {
 	console.info(
-		`${RECONCILED} #${String(epic_number)} — epic:audit and backlog:next now agree on this epic's order.`,
+		`${RECONCILED} ${session_cite.issue(epic_number)} — epic:audit and backlog:next now agree on this epic's order.`,
 	)
 }
 
@@ -169,7 +169,9 @@ function report_declared(epic_number: number, declare: ReadonlyArray<DependencyL
 	if (declare.length === 0) return
 
 	console.info(
-		`📋 Declared ${format_dependency_links(declare)} in epic #${String(epic_number)} to match the recorded relations.`,
+		session_cite.text(
+			`📋 Declared ${format_dependency_links(declare)} in epic ${session_cite.issue(epic_number)} to match the recorded relations.`,
+		),
 	)
 }
 

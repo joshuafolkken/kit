@@ -44,7 +44,7 @@ function parse_task_type(raw: string | undefined): TelegramTaskType {
 
 // A flag counts as given only when it carries text, so `--issue-title ''` is not an answer. The
 // callers that *skip* a lookup because the flag already answered it read the same predicate, or the
-// two could disagree about an empty string and leave the field blank (joshuafolkken/kit#903).
+// two could disagree about an empty string and leave the field blank.
 // It is `cli_body`'s predicate rather than a second copy: the body flags are resolved there, and two
 // definitions of "given" would let `--body ''` count on one side and not the other.
 const has_flag_value = cli_body.has_value
@@ -56,8 +56,8 @@ function coalesce(primary: string | undefined, fallback: string | undefined): st
 }
 
 // `--body-file` is the form to reach for whenever the body carries a backtick or a `$`: inside shell
-// double quotes those are evaluated before this process starts, and the text runs
-// (joshuafolkken/kit#1198). The resolution itself is `cli_body`'s, shared with `josh followup`.
+// double quotes those are evaluated before this process starts, and the text runs.
+// The resolution itself is `cli_body`'s, shared with `josh followup`.
 function normalize_body(values: CliValues): string | undefined {
 	return cli_body.resolve({
 		inline: values.body,

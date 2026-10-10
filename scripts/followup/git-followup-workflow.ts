@@ -2,6 +2,7 @@
 import { parseArgs } from 'node:util'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_error } from '#scripts/git/git-error'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_body } from '#scripts/josh/cli-body'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { git_notify, type GitNotifyConfig } from '#scripts/notify/git-notify'
@@ -41,7 +42,7 @@ interface CliArguments {
 // The text is a constant rather than an inline literal: it is one option per supported flag, so it
 // grows with the command and would otherwise push `display_help` past the function line limit every
 // time a flag is added — a limit that exists to catch functions doing several things, which this one
-// never was (joshuafolkken/kit#1578).
+// never was.
 const HELP_TEXT = `
 🚦 PR Followup Workflow
 
@@ -99,8 +100,8 @@ async function resolve_branch_name(raw_branch: string | undefined): Promise<stri
 // The message is resolved here rather than inside `git_notify`, so the file form reaches the config
 // as text and the config keeps one `message` field. `--notify-message-file` exists because the inline
 // form is a double-quoted shell argument: a backtick or a `$` in the body is evaluated before this
-// process starts, and joshuafolkken/kit#1198 recorded both halves of that — a Telegram body that
-// silently lost a word, and a comment body whose text ran as git commands.
+// process starts — a Telegram body can silently lose a word, and a comment body's text can run as
+// git commands.
 function build_notify_config(values: CliArguments['values']): GitNotifyConfig | undefined {
 	return git_notify.build_notify_config({
 		raw_target: values['notify-target'] ?? 'issue',
@@ -118,13 +119,13 @@ function is_merge_resolved(values: CliArguments['values']): boolean {
 	return values['no-merge'] !== true
 }
 
-// joshuafolkken/kit#1522: `/code-review` is forked by the harness and inherits the *session's*
-// working directory, so a run implementing in a lane can be reviewed against a different tree
-// entirely — one holding the previous child's already-merged code. That review finds nothing wrong
-// and says so, and the run reads the silence as a clean round. **This is the seam where that stops
-// being free**: a merge is refused unless the review attested the checkout it was briefed on.
+// `/code-review` is forked by the harness and inherits the *session's* working directory, so a run
+// implementing in a lane can be reviewed against a different tree entirely — one holding the
+// previous child's already-merged code. That review finds nothing wrong and says so, and the run
+// would read the silence as a clean round. **This is the seam where that is caught**: a merge is
+// refused unless the review attested the checkout it was briefed on.
 //
-// **Absence is a refusal, not a pass.** The defect produced *no* signal, so a check that only
+// **Absence is a refusal, not a pass.** The defect produces *no* signal, so a check that only
 // compared two present records would answer `ok` in exactly the state it exists to catch.
 //
 // **Scoped to a checkout that actually briefed a review.** `review_attest.check` answers
@@ -141,10 +142,8 @@ function is_merge_permitted(status: string): boolean {
 	return status === 'ok' || status === 'not-required'
 }
 
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
-
 function is_valid_issue(issue_number: string | undefined): boolean {
-	return issue_number !== undefined && ISSUE_NUMBER_PATTERN.test(issue_number)
+	return issue_number !== undefined && issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue_number)
 }
 
 async function assert_review_attested(should_merge: boolean): Promise<void> {
@@ -157,13 +156,12 @@ async function assert_review_attested(should_merge: boolean): Promise<void> {
 	throw new Error(review_attest.refusal_message(verdict))
 }
 
-// joshuafolkken/kit#2343: recording a review round was prose, and prose failed — eleven merges after
-// the instruction landed, `review:record` had never run once, so the recurrence ledger stayed blind.
-// **This is the seam where that stops being a request and becomes a gate**: a merge is refused unless
-// the round left a `- rf:` line for its issue, a zero-finding `none` line included.
+// Recording a review round as a prose request leaves the recurrence ledger blind whenever it is
+// skipped. **This is the seam where it is a gate instead**: a merge is refused unless the round left
+// a `- rf:` line for its issue, a zero-finding `none` line included.
 //
 // **Absence is a refusal, `missing` exactly as `assert_review_attested`'s is** — the defect this
-// exists for produced *no* line, so silence must not read as success. A checkout that keeps no ledger
+// exists for produces *no* line, so silence must not read as success. A checkout that keeps no ledger
 // answers `not-required` and merges as before, and a run whose issue the followup cannot identify has
 // no key to check, so it carries on rather than blocking on missing information.
 async function assert_review_recorded(
@@ -180,7 +178,7 @@ async function assert_review_recorded(
 	throw new Error(review_record.refusal_message(issue))
 }
 
-// joshuafolkken/kit#2446: a runtime change merges only with its acceptance criteria run for real and
+// A runtime change merges only with its acceptance criteria run for real and
 // recorded in the pull request body — `live_evidence` carries the why. `exempt` (no runtime path
 // changed) merges as before, and a `--no-merge` run has not reached the gate at all.
 async function assert_live_evidence(should_merge: boolean, branch_name: string): Promise<void> {
@@ -205,8 +203,8 @@ async function assert_merge_gates(
 }
 
 // After the gates, before the CI wait: a line appended since the run's commit rides the pull request
-// itself, so it merges with it — a lane's included (joshuafolkken/kit#2919). **A pull request that has
-// already merged skips both** (joshuafolkken/kit#3023): the gates guard a merge this run no longer
+// itself, so it merges with it — a lane's included. **A pull request that has
+// already merged skips both**: the gates guard a merge this run no longer
 // makes, and a ledger commit would land on a branch that has already gone in.
 async function prepare_merge(
 	plan: MergePlan,
@@ -235,7 +233,7 @@ async function main(): Promise<void> {
 
 	await prepare_merge(plan, issue_number, branch_name)
 	// **The number the run reports on is the one it used**, which is the number the pull request
-	// closes where the invocation named none (joshuafolkken/kit#1539). Recovered inside `run`, so the
+	// closes where the invocation named none. Recovered inside `run`, so the
 	// tail records a run the command line could not identify rather than silently skipping it.
 	const used_issue_number = await git_pr_followup.run({
 		branch_name,

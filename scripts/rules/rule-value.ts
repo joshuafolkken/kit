@@ -4,13 +4,13 @@ import {
 	type TranscriptLine,
 } from '#scripts/time-runtime/time-transcript-line'
 import { delivered_rules, type MeasuredRule } from './delivered-rules'
+import { hook_context_line } from './hook-context-line'
 
-// What a rule is worth on the channel that carries it when its delivery has not fired
-// (joshuafolkken/kit#1525).
+// What a rule is worth on the channel that carries it when its delivery has not fired.
 //
 // **It exists because the eviction order was decided by protection rather than by value.**
 // `prompts/collaboration-workflow/residency.md` records that when a rule is trimmed to keep a
-// byte count, the sentence that goes is the one no marker pinned (joshuafolkken/kit#951) — so the
+// byte count, the sentence that goes is the one no marker pinned — so the
 // least-defended text leaves, never the least-useful. Nothing in the repository could tell the two
 // apart: `scripts/josh/hook-decision.ts` keeps a once-per-run stamp that answers "has this fired
 // yet", never "how often", and no other counter exists.
@@ -42,7 +42,7 @@ const PERCENT = 100
 // `scripts/time/time-batch-guard.ts` — so a session that
 // merely opened that file carries the text too — and did so in a result whose `is_error` is false.
 //
-// **That fact is read off the parsed block, never off the raw line** (joshuafolkken/kit#1642). The
+// **That fact is read off the parsed block, never off the raw line**. The
 // test it replaced was `line.includes('"is_error":true')`, which is two mistakes at once: it is
 // whitespace- and key-order-sensitive, so a serializer emitting `"is_error": true` would take every
 // rule's `refused` column to zero — indistinguishable from a hook that never fired — and it is
@@ -56,8 +56,7 @@ interface RuleReading {
 	// for a rule whose trigger is a neutral act** — filing an Issue, reading one — which a run keeping
 	// the rule still performs. Where the trigger is the violation itself, a run that kept the rule
 	// never trips it, so the row declares `reaches` and a run counts once it has reached *either* —
-	// the union, which equals `reaches` for every row whose trigger it covers
-	// (joshuafolkken/kit#1643).
+	// the union, which equals `reaches` for every row whose trigger it covers.
 	sessions: number
 	// Of those, the runs that kept the rule unaided — before the trigger fired, or without it firing
 	// at all, which is the ordinary case for a row that declares `reaches`. The compliance the carried
@@ -65,6 +64,9 @@ interface RuleReading {
 	unaided_kept: number
 	// Of those, the runs in which a refusal was actually delivered.
 	refusals: number
+	// Of those, the runs in which the hook rewrote the call instead of refusing it
+	//  — a delivery that cost no round trip.
+	rewrites: number
 	// Whether the rule declares what keeping it looks like. False makes `unaided_kept` meaningless.
 	is_measurable: boolean
 }
@@ -75,7 +77,7 @@ interface IssuedCall {
 }
 
 // **What a predicate is asked against beside the call: the turn it went out in, and the run it belongs
-// to** (joshuafolkken/kit#1867). The two travel as one parameter because every observer below takes
+// to**. The two travel as one parameter because every observer below takes
 // both, and passing them separately would put each one over the four-parameter limit. `run` is every
 // call the run issued, in timeline order, so a predicate reading it sees the whole run whatever point
 // of it the walk has reached — which is right for `reaches`, a question about *whether* the situation
@@ -96,12 +98,19 @@ interface RuleState {
 	is_reached: boolean
 	is_triggered: boolean
 	is_refused: boolean
+	is_rewritten: boolean
 }
 
 function blank_states(): Map<string, RuleState> {
 	const entries = delivered_rules.MEASURED_RULES.map((rule): [string, RuleState] => [
 		rule.id,
-		{ is_kept: false, is_reached: false, is_triggered: false, is_refused: false },
+		{
+			is_kept: false,
+			is_reached: false,
+			is_triggered: false,
+			is_refused: false,
+			is_rewritten: false,
+		},
 	])
 
 	return new Map(entries)
@@ -110,7 +119,7 @@ function blank_states(): Map<string, RuleState> {
 // **Keeping only counts before the trigger.** After the refusal the run complies because it was made
 // to, which is the delivery's contribution and not the carried text's.
 //
-// **A row may declare no call-shaped trigger at all** (joshuafolkken/kit#1792). The batching guard
+// **A row may declare no call-shaped trigger at all**. The batching guard
 // decides on the turns *behind* a call, so no predicate given one call could say whether it was
 // about to be refused; what the transcript records instead is the refusal, and `observe_error` below
 // is what closes the window for such a row.
@@ -148,13 +157,14 @@ function observe_call(
 	observe_before_trigger(rule, state, call, context)
 }
 
-// One transcript line, parsed once, as the two things a reading is taken from: the calls it issued
-// and the bodies of the results the harness wrote back as failures.
+// One transcript line, parsed once, as the things a reading is taken from: the calls it issued, the
+// bodies of the results the harness wrote back as failures, and the context a hook attached.
 interface DatedLine {
 	at_ms: number
 	message_id: string
 	calls: Array<IssuedCall>
 	errors: Array<string>
+	contexts: Array<string>
 }
 
 function calls_of(parsed: TranscriptLine): Array<IssuedCall> {
@@ -182,10 +192,11 @@ function dated_line(line: string): DatedLine | undefined {
 		message_id: parsed.message_id,
 		calls: calls_of(parsed),
 		errors: errors_of(parsed),
+		contexts: hook_context_line.hook_contexts_of(line),
 	}
 }
 
-// **A turn is a message id, not a line** (joshuafolkken/kit#1792). Claude Code writes one line per
+// **A turn is a message id, not a line**. Claude Code writes one line per
 // content block and repeats the message id on each, so a turn that thought and then issued two calls
 // is three lines carrying one id — the same reading `time-round-trips.ts` takes, for the same reason.
 // Read per line, a batched turn is indistinguishable from two turns of one call, which is the whole
@@ -206,7 +217,7 @@ function turn_key(entry: DatedLine, index: number): string {
 	return entry.message_id
 }
 
-// **The turn a call belongs to, gathered by id but never moved** (joshuafolkken/kit#1804). A folded
+// **The turn a call belongs to, gathered by id but never moved**. A folded
 // turn used to be *placed* where it opened, which both grouped a message's calls and reordered them:
 // a background unit's call landing between two blocks of a parent message was read after the whole
 // parent turn instead of at its own instant. This gathers each message's calls without touching the
@@ -232,15 +243,18 @@ function turns_by_key(entries: ReadonlyArray<DatedLine>): Map<string, Array<Issu
 // result, which is why the speaker is identified by what the body *opens* with rather than by what
 // it carries somewhere inside.
 //
-// **That is what stops a dump of the enumeration being read as a refusal by every rule at once**
-// (joshuafolkken/kit#1642). One `cat scripts/rules/delivered-rules.ts && false` writes a single
+// **That is what stops a dump of the enumeration being read as a refusal by every rule at once**.
+// One `cat scripts/rules/delivered-rules.ts && false` writes a single
 // errored result carrying all six reasons verbatim, and a containment test credited a refusal to
 // each of them; the file opens with its imports, so under this test nothing claims it. Position is
 // what separates the two, so no count of how many signatures appear is needed — and a body naming
 // several can no longer be attributed to any of them.
 function refused_id(text: string): string | undefined {
+	const body = text.trimStart()
 	const found = delivered_rules.MEASURED_RULES.find((rule) =>
-		text.trimStart().startsWith(rule.reason.slice(0, REASON_SIGNATURE_LENGTH)),
+		[rule.reason, ...(rule.former_reasons ?? [])].some((reason) =>
+			body.startsWith(reason.slice(0, REASON_SIGNATURE_LENGTH)),
+		),
 	)
 
 	return found?.id
@@ -253,10 +267,33 @@ function observe_error(states: Map<string, RuleState>, text: string): void {
 	if (state === undefined) return
 
 	state.is_refused = true
-	// **A delivered refusal is the trigger, whatever a predicate said** (joshuafolkken/kit#1792). The
+	// **A delivered refusal is the trigger, whatever a predicate said**. The
 	// hook refuses only where the rule bound, so the window in which compliance is the carried text's
 	// closes here — for the six rows this is already true by the time the result comes back, and for
 	// a row declaring no call-shaped trigger it is the only thing that can close it.
+	state.is_triggered = true
+}
+
+// **A rewrite is a delivery too, read off the note the hook attached**. The
+// call is recorded as typed and nothing errors, so the note is the one trace — matched at its opening,
+// exactly as a refusal's reason is.
+function rewritten_id(text: string): string | undefined {
+	const found = delivered_rules.MEASURED_RULES.find((rule) => {
+		const note = rule.rewrite_note
+
+		return note !== undefined && text.trimStart().startsWith(note.slice(0, REASON_SIGNATURE_LENGTH))
+	})
+
+	return found?.id
+}
+
+function observe_rewrite(states: Map<string, RuleState>, text: string): void {
+	const id = rewritten_id(text)
+	const state = id === undefined ? undefined : states.get(id)
+
+	if (state === undefined) return
+
+	state.is_rewritten = true
 	state.is_triggered = true
 }
 
@@ -268,8 +305,7 @@ function observe_for_rule(
 ): void {
 	// This line's own calls, read in order; `context.turn` is every call the message issued, so a
 	// call's siblings are the rest of the turn it went out in even where the transcript split them
-	// across lines. The two coincide except when a message spans several lines
-	// (joshuafolkken/kit#1804).
+	// across lines. The two coincide except when a message spans several lines.
 	for (const call of calls) observe_call(rule, state, call, context)
 }
 
@@ -293,6 +329,7 @@ function observe_line(
 	observe_calls(states, entry.calls, context)
 
 	for (const text of entry.errors) observe_error(states, text)
+	for (const text of entry.contexts) observe_rewrite(states, text)
 }
 
 // **One timeline, ordered by timestamp — not the files read back to back.** "Kept before the
@@ -315,9 +352,9 @@ function timeline_of(texts: ReadonlyArray<string>): Array<DatedLine> {
 
 // Every text belonging to one run — the session transcript and the transcripts of the units it
 // delegated — read as one timeline. The lines are walked in timestamp order; `turns_by_key` supplies
-// each call the rest of its message as context, so grouping no longer reorders the reading
-// (joshuafolkken/kit#1804), and the run's own calls ride beside it for the one predicate that has to
-// ask about the run rather than the turn (joshuafolkken/kit#1867).
+// each call the rest of its message as context, so grouping no longer reorders the reading,
+// and the run's own calls ride beside it for the one predicate that has to
+// ask about the run rather than the turn.
 function read_run(texts: ReadonlyArray<string>): Map<string, RuleState> {
 	const states = blank_states()
 	const entries = timeline_of(texts)
@@ -337,6 +374,7 @@ function credit(reading: RuleReading, state: RuleState): void {
 	reading.sessions += 1
 	reading.unaided_kept += state.is_kept ? 1 : 0
 	reading.refusals += state.is_refused ? 1 : 0
+	reading.rewrites += state.is_rewritten ? 1 : 0
 }
 
 function reading_to_credit(
@@ -363,6 +401,7 @@ function blank_readings(): Map<string, RuleReading> {
 			sessions: 0,
 			unaided_kept: 0,
 			refusals: 0,
+			rewrites: 0,
 			is_measurable: rule.keeps !== undefined,
 		},
 	])

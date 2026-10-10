@@ -4,18 +4,17 @@ import { run_headless } from './run-headless'
 
 // A watcher that stopped while children are still in-flight leaves the run's event stream without a
 // heartbeat and the parent without the wake an arrival would deliver. This guard detects that state so
-// a hook can refuse the calls that follow a missed restart (joshuafolkken/kit#2113).
+// a hook can refuse the calls that follow a missed restart.
 //
 // **Staleness threshold is `TICK_MULTIPLIER` watcher ticks.** The watcher pings its life record on
 // every tick (every 30 s), so a gap wider than three ticks means the process has almost certainly
 // stopped: it exited on an arrival, its bound expired, or the session was cut without a restart. A
-// report is no longer one of those (joshuafolkken/kit#3102) — `--wait` streams its reports and keeps
-// running — so a restart is owed only after an exit the parent was woken for. Three gives one missed
-// tick of slack before the guard fires.
+// report is not one of those — `--wait` streams its reports and keeps running — so a restart is owed
+// only after an exit the parent was woken for. Three gives one missed tick of slack before the guard
+// fires.
 //
-// **It watches no relay** (joshuafolkken/kit#2492). A session following the run's event stream after a
-// cut used to be held to it here; that relay re-read the session's whole history per event, so the
-// stream is now watched from a pane of its own (`run:event --watch`) and no session owes it.
+// **It watches no relay.** A relay would re-read the session's whole history per event, so the stream
+// is watched from a pane of its own (`run:board`) and no session owes it.
 
 const WATCHER_TICK_MS = 30_000
 const TICK_MULTIPLIER = 3
@@ -34,11 +33,11 @@ type GuardResult = { kind: 'ok' } | { kind: 'stale'; note: string }
 
 const OK_RESULT: GuardResult = { kind: 'ok' }
 
-// **Only the run that opened the lanes owes them a watcher** (joshuafolkken/kit#2965). The lane listing
-// is machine-wide, so a session with no run of its own — an investigation, a `fullrun` beside a batch —
-// used to be refused for another run's lanes. The session that drives the live `backlogrun` carry
-// record is the one that dispatched them; every other session passes. A session `run:wake` woke owes
-// none either (joshuafolkken/kit#3245): the supervisor's driver watches the lanes, and the woken session
+// **Only the run that opened the lanes owes them a watcher**. The lane listing is
+// machine-wide, so without this a session with no run of its own — an investigation, a `fullrun`
+// beside a batch — would be refused for another run's lanes. The session that drives the live
+// `backlogrun` carry record is the one that dispatched them; every other session passes. A session
+// `run:wake` woke owes none either: the supervisor's driver watches the lanes, and the woken session
 // only acts on the branch it was handed and cuts.
 async function owes_watcher(): Promise<boolean> {
 	if (run_headless.is_headless() || !(await run_headless.is_backlog_parent())) return false

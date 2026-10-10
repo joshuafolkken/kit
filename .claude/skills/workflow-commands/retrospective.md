@@ -1,21 +1,19 @@
 # The end-of-run retrospective
 
 **This is the retrospective's procedure, and it is read when `run:step` prints the retrospective step —
-not at the entry** (joshuafolkken/kit#2328). `SKILL.md` → §2's table keeps the rule itself: run what `run:step` prints once,
+not at the entry.** `SKILL.md` → §2's table keeps the rule itself: run what `run:step` prints once,
 file the improvements worth carrying into the next run, stack the rest, and mark the step done.
-Everything that decides *how* — what the four sections mean, how the top two are chosen rather than
-rationed, the exclusions, and the `auto-ok` default that lets the next run pick them up — is here,
-because none of it binds until a run has actually drained its backlog. A run that never empties its pool
-never reads it; the one that does reads it in full, in the same turn, before it files.
+Everything that decides *how* — what the four sections mean, how the top two are chosen, the
+exclusions, and the `auto-ok` default — is here. Read it in full, in the same turn, before filing.
 
 **When it fires is not this file's, and not a judgement.** The run driver prints the step the moment the
 backlog drains — `backlog:offer` marks that drain on the event stream and `run:step` fires the
 retrospective at it, *before* the idle watch, so the improvement issues it files are what the watch then
-picks up (joshuafolkken/kit#2335); a run that stops without draining — the failure guard, `--idle 0` —
-still prints it at the stop position. Either way the rule that decides *when* a run acts lives in
-`run:step`'s state transitions rather than in prose here, which is `CLAUDE.md`'s run-driver rule. This
-file is reached only once the step is already owed. It is kit-only — `run:step` prints the step only in
-the kit repository — so a consumer run never reaches this procedure.
+picks up; a run that stops without draining — the failure guard, `--idle 0` — still prints it at the
+stop position. It is kit-only — `run:step` prints the step only in the kit repository.
+
+Rationale: `docs/maintainers/retrospective-rationale.md` → "Why the retrospective is read at its step";
+provenance: `docs/maintainers/retrospective-rationale.md` → "Where each rule came from".
 
 ## The digest is read, not skimmed
 
@@ -45,13 +43,10 @@ improves, and a `depth:2` finding names which decision it turns on (`observation
 test"). An improvement that cannot pass the test is not filed; it is not a shortfall of the two-item
 count, it simply is not yet a finding.
 
-**Order what passes by effect, and file the top two.** This is a selection, not a ration
-(`observation-filing.md` → "This is not the count cap"): nothing that passed the test is lost, because
-**the third onward is stacked in the observation ledger**, on the same append path
-`pnpm josh observations:flush` already drains. So "two" is the amount one turn hands the next run, not a
-ceiling on what may be recorded. **File nothing when nothing passes** — a run whose measurements show no
-improvement worth carrying files zero Issues, and that is what makes the "file → drain → file again"
-loop converge.
+**Order what passes by effect, and file the top two.** **The third onward is stacked in the observation
+ledger**, on the same append path `pnpm josh observations:flush` already drains. **File nothing when
+nothing passes** — a run whose measurements show no improvement worth carrying files zero Issues.
+`docs/maintainers/retrospective-rationale.md` → "Why the top two are a selection, not a ration".
 
 **Exclude what is already filed or already done, through the existing scout** (`issue-scout.md`). File
 each with `pnpm josh issue:file`, which runs the scout before creating anything: an **open** candidate
@@ -73,7 +68,7 @@ retrospective run on the carry record, so `run:step` prints `stop` from then on 
 second time. The mark rides the record across a session cut and is removed with the record at
 `pnpm josh run:carry --end`, so one invocation runs the retrospective exactly once whether or not it was
 cut. **`--summary` is required** — the same close writes it as one `retrospective` event on the event
-stream (joshuafolkken/kit#2342), so a zero-filing retrospective differs from one that never ran; name
+stream, so a zero-filing retrospective differs from one that never ran; name
 the issues filed (or that none were) and the candidates dropped with why.
 
 **A dispatched lane child never reaches any of this** — the batch runs the retrospective at its own end,

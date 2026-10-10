@@ -16,7 +16,7 @@ These commands replace the corresponding `package.json` scripts; consumer projec
 
 ### `josh gate`
 
-Run the completion gate's checks — lint, type check, spell check, [behavior](#josh-behavior), [unused namespace members](#josh-exportsunused) and unit tests — **concurrently**, running all to completion and reporting every failure in one pass.
+Run the completion gate's checks — lint, type check, spell check, [behavior](#josh-behavior), [unused namespace members](#josh-exportsunused), the [metrics ratchet](#josh-metrics) (kit only) and unit tests — **concurrently**, running all to completion and reporting every failure in one pass.
 
 ```bash
 pnpm josh gate
@@ -25,7 +25,7 @@ pnpm josh gate --force     # re-run even on a tree already recorded green
 pnpm josh gate --no-unit   # the static checks only (CI only)
 ```
 
-- Static checks: `pnpm josh lint`, `pnpm josh cspell:dot`, `pnpm josh behavior`, `pnpm josh exports:unused`; the unit leg is `pnpm josh test:unit`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
+- Static checks: `pnpm josh lint`, `pnpm josh cspell:dot`, `pnpm josh behavior`, `pnpm josh exports:unused`, `pnpm josh metrics` (in kit only); the unit leg is `pnpm josh test:unit`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
 - A tree recorded green is reused unless `--force` or the changed-file map moved.
 - **Refuses to start when the scoped pair has not been green on this tree.** A unit-included local gate reads the same record `josh review:brief` does and refuses — naming `pnpm josh lint:related && pnpm josh test:related` — so the first gate is the only gate. It never fires for `--no-unit` (CI has no scoped check in front of it) or `--force`, and `JOSH_SCOPED_GREEN=0` turns it off.
 - **On failure, a line per failed check with the command to re-run is printed at the tail**, just above the verdict, so a `tail` of the output keeps every failure and its next action rather than one at a time.
@@ -86,6 +86,20 @@ entry fullrun  227672/229376 bytes · 1704 left
 - The scan closes with one row per workflow entry — the **primary** budget (`entry-read-budget.ts`), the total each entry reads against its ceiling — so the main budget is no longer a number the gate reveals only when it fails. The per-document rows above them are the fallback budget, covering the documents no entry reads.
 - Path is repository-root-relative (a leading `./` is stripped); a path with no budget entry reads `not counted`.
 - The recorded ceiling is block-quantized — the next 4 KB multiple at or above the document's size (`document-byte-budget.ts`), so a document growing within its block needs no ceiling edit and parallel command-adding lanes stop conflicting on this record. An over-budget row names the value to record: the next block multiple, not the raw current size. Never fails — the ceiling is the gate's and `josh lint:related`'s to enforce; a non-zero exit means the argument list was unusable.
+
+### `josh metrics`
+
+Print the repository-wide quality totals no per-function or per-file limit sees — code lines, comment lines and the comment ratio for the non-test files under `scripts/`, the lines of the rule documents (`CLAUDE.md` and `prompts/**/*.md`), the number of `*:guard` commands, and the AI cost in bytes (resident, on demand) — and hold them to the same totals measured on the merge-base.
+
+```bash
+pnpm josh metrics                             # print the totals and check them against the merge-base's
+pnpm josh metrics --accept --reason "<why>"   # record this branch's growth and why
+```
+
+- **A ratchet, and a step of [`josh gate`](#josh-gate).** Exit `1` when the code lines, the comment ratio, the rule lines, the guards or either AI cost grew past the merge-base's, naming each with both values. A total that shrank needs no record: once merged it is what the next branch is measured from. The only way up is `--accept --reason "<why>"`, which writes the growth, the reason and the date to `.josh/metrics-accepted/<issue>.json` — one file per issue, so parallel branches never conflict on it. `JOSH_METRICS_BASE=<commit>` names the commit to measure from where no merge-base can be asked for (CI) — `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' totals".
+- **kit only**: it counts kit's own rule documents and guards, so a consumer's gate leaves the step out.
+- Code lines are lint's own `max-lines` count (one lower than `josh lines` on a `#!` file); a comment line is any other non-blank line.
+- **Durations** fail past +10% of this machine's baseline; a gate times no startup — `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' durations".
 
 ### `josh format`
 
@@ -171,7 +185,7 @@ pnpm josh test:declared --help    # print usage, including the --match stdin for
 
 An unknown flag is refused with the usage rather than ignored, the same convention `josh time` follows.
 
-`--match` checks each `Test: <type> — <path>` declaration on stdin against the change set, printing `match` / `type-mismatch` / `path-missing` / `test-not-created` per line and exiting non-zero on any mismatch.
+`--match` checks each `Test: <type> — <path>` declaration on stdin against the change set, printing `match` / `type-mismatch` / `path-missing` / `test-not-created` per line and exiting non-zero on any mismatch. A path wrapped in a code span, as the template writes it, is read as the path inside it. A `path-missing` line is followed by the changed paths with the same file name, when there are any, and the `report-format.md` section that defines the declaration line's shape.
 
 ### `josh test:red`
 
@@ -533,7 +547,7 @@ pnpm josh latest:update     # update dependencies only
 
 #### `josh latest:corepack`
 
-Updates pnpm and pins `packageManager` to the newest release on the project's **current major** (from `packageManager`, or from `devEngines.packageManager.version` when that is the only pin). The command name is retained for compatibility. With an existing `packageManager` pin, it obtains the release integrity value, runs `pnpm self-update`, then restores the integrity suffix and aligns `devEngines.packageManager.version` byte-for-byte with `packageManager`. Without that pin, it adds a verified pin and checks that the selected pnpm version starts. A registry answer that is not newer than the pin, or no release on the major aged past the quarantine window yet, is a skip and exits `0`. Any failure — a registry that does not answer, no integrity value, `pnpm self-update` exiting non-zero, an unexpected pin after it, or a selected version that cannot start — restores `package.json`, prints the cause and exits `1`. When pnpm runs through the Corepack shim, which pnpm 11 and later refuse to self-update under (`ERR_PNPM_CANT_SELF_UPDATE_IN_COREPACK`), the message also names the remedy: `corepack disable pnpm` and a standalone pnpm. Either way, existing `devEngines` drift is still aligned to `packageManager`.
+Updates pnpm and pins `packageManager` to the newest release on the project's **current major** (from `packageManager`, or from `devEngines.packageManager.version` when that is the only pin). The command name is retained for compatibility. With an existing `packageManager` pin, it obtains the release integrity value, runs `pnpm self-update`, then restores the integrity suffix and aligns `devEngines.packageManager.version` byte-for-byte with `packageManager`. Without that pin, it adds a verified pin and checks that the selected pnpm version starts. A registry answer that is not newer than the pin, or no release on the major aged past the quarantine window yet, is a skip and exits `0`. Any failure — a registry that does not answer, no integrity value, `pnpm self-update` exiting non-zero, an unexpected pin after it, or a selected version that cannot start — restores `package.json`, prints the cause and exits `1`. When pnpm runs through the Corepack shim, which pnpm 11 and later refuse to self-update under (`ERR_PNPM_CANT_SELF_UPDATE_IN_COREPACK`), the message also names the remedy: `corepack disable pnpm`, a standalone pnpm, and `josh sync` so `devEngines.packageManager.onFail` is `"download"` — the standalone pnpm then fetches the pinned version rather than refusing to run. Either way, existing `devEngines` drift is still aligned to `packageManager`.
 
 #### `josh latest:update`
 
@@ -543,9 +557,43 @@ Runs `pnpm update --latest`, skipping **held-back** and **overridden** packages 
 
 Helpers for AI-assisted development workflows.
 
+### `josh backlogrun`
+
+Start a `backlogrun` from the terminal and watch it on [`josh run:board`](./josh-commands-run.md#josh-runboard). The agent runs in the background in the main checkout, its output going to a log file, and the board takes over the terminal at once.
+
+```bash
+pnpm josh backlogrun                    # start in Claude, then show the board
+pnpm josh backlogrun 3437 --only        # the arguments go to backlogrun as typed
+pnpm josh backlogrun --agent codex      # start in Codex
+```
+
+- The arguments are the `backlogrun` keyword's own: named Issues, `--only`, `--max <n>`, `--idle <minutes>`. A bare number in the named list is read as `#<n>`, since an unquoted `#` starts a shell comment.
+- `--agent claude|codex` picks the agent; the default is `claude`. The start command is built by `scripts/agent/agent-argv.ts`, the same builder that starts lane children, and the choice is handed to the run as `JOSH_AGENT_PROVIDER`.
+- A run already going in this repository is never joined by a second one: nothing is started, the board is shown, and each named Issue is printed as a `run:add` line to add it by hand.
+- Closing the board (Ctrl+C) closes only the board; the run goes on, and the board's last line says so. When the run stops for a person, the board prints the `claude --resume <session-id>` that reopens it.
+
+**Output / exit codes:** prints one line naming the started pid, session and log path, then the board's exit code. Bad arguments print the usage and exit 1; an agent that cannot start (a missing or outdated CLI) exits 1 without a board.
+
+### `josh lane:limit`
+
+Change a running `backlogrun`'s lane limit without stopping it. The run keeps the environment it started with, so `JOSH_LANE_LIMIT` cannot change under it; this writes an override onto the run's record, which every lane-limit read takes over the environment.
+
+```bash
+pnpm josh lane:limit 8        # raise or lower the live run's limit to 8
+pnpm josh lane:limit          # print the limit, the lanes in use and the free lanes
+pnpm josh lane:limit --reset  # clear the override; JOSH_LANE_LIMIT applies again
+```
+
+- The next lane allocation uses the new limit. Raising it writes a `lane-limit` event, and the parent's `run:progress --wait` watcher wakes the parent within a minute to fill the freed lanes.
+- Lowering it stops no running child: a lane that finishes is simply not refilled.
+- A limit above the nine port seats is shown and counted at the seats, as `JOSH_LANE_LIMIT` already is. A value that is not a positive integer is refused by the same rule.
+- The override lives and ends with the run (`run:carry --end` removes it). With no run in progress, the command refuses and points at `JOSH_LANE_LIMIT`.
+
+**Output / exit codes:** prints `lane limit <n> (<source>) · in use <n> · free <n>` and exits 0. Bad arguments, an invalid limit or no run in progress exit 1.
+
 ### `josh rule:value`
 
-Print each delivered rule's **unaided compliance** — how far the carried text alone kept the rule in the window before its trigger fired (`scripts/rules/rule-value.ts`). One row per rule: the runs that reached the situation it governs, the rate kept before the trigger (or `unmeasured` where the rule declares no `keeps` predicate, `unreached` where no run reached it), and the refusals the hook actually delivered.
+Print each delivered rule's **unaided compliance** — how far the carried text alone kept the rule in the window before its trigger fired (`scripts/rules/rule-value.ts`). One row per rule: the runs that reached the situation it governs, the rate kept before the trigger (or `unmeasured` where the rule declares no `keeps` predicate, `unreached` where no run reached it), and the refusals the hook actually delivered — followed by `rewritten N` on a rule whose hook rewrote the call instead of refusing it.
 
 ```bash
 pnpm josh rule:value

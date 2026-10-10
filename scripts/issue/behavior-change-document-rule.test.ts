@@ -1,16 +1,16 @@
 import { read_repo_file } from '#scripts/document/ai-document-fixture'
 import { firing_point } from '#scripts/rules/firing-point'
+import { rule_list } from '#scripts/rules/rule-list'
 import { describe, expect, it } from 'vitest'
 import { behavior_change_lint } from './behavior-change-lint'
 
 // joshuafolkken/kit#2212: the behavior-change declaration, the two required headings and the set of
 // hook-deliverable firing points are the documents' single source, and the code carries constants that
 // must not drift from them. Three things can rot independently: the template can drop a heading or the
-// declaration line, and rule-delivery.md can drop a tool the firing-point check still counts as
+// declaration line, and the rule list can drop a tool the firing-point check still counts as
 // deliverable.
 
 const ISSUE_TEMPLATE = 'prompts/collaboration-workflow/issue-template.md'
-const RULE_DELIVERY = 'prompts/collaboration-workflow/rule-delivery.md'
 
 describe('issue-template.md carries the behavior-change declaration and headings', () => {
 	it('names the declaration line the target check reads', () => {
@@ -30,9 +30,10 @@ describe('issue-template.md carries the behavior-change declaration and headings
 	})
 })
 
-describe('rule-delivery.md carries every hook-deliverable firing point', () => {
+// joshuafolkken/kit#3399: the list is rendered from the guard rows by `pnpm josh rule:list`.
+describe('pnpm josh rule:list carries every hook-deliverable firing point', () => {
 	it('names each deliverable tool the firing-point check accepts', () => {
-		const delivery = read_repo_file(RULE_DELIVERY)
+		const delivery = rule_list.render()
 
 		for (const tool of firing_point.HOOK_DELIVERABLE_TOOLS) {
 			expect(delivery).toContain(tool)

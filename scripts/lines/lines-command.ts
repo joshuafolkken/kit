@@ -5,7 +5,7 @@ import { git_command } from '#scripts/git/git-command'
 import { line_budget, type FileBudget, type LineBudget } from './line-budget'
 import { line_targets } from './line-targets'
 
-// `josh lines` — the ask-before-writing half of joshuafolkken/kit#1425. `pnpm josh lint` reports the
+// `josh lines` — ask before writing. `pnpm josh lint` reports the
 // file line limit only once it has been broken, and by then the writing is finished and the splitting
 // that follows is rework. This answers the same question before the first edit: how many code lines
 // each target file already has, and how many are left.
@@ -33,7 +33,7 @@ const NONE_NEAR = 'no files near the limit'
 // at all. It deliberately does not name eslint, because the last of those is not eslint's doing.
 const NOT_A_FILE = 'not counted: not a regular file'
 const NOT_COUNTED = 'not counted: no line count for this path'
-// The third reason, and the one that replaced a wrong number (joshuafolkken/kit#1454). This project's
+// The third reason, and the one that replaced a wrong number. This project's
 // eslint enforces no `max-lines` here, so there is nothing to report a budget against — and the
 // alternative to saying so is quoting kit's limit for someone else's project, which is the defect. It
 // names no cause because there are several: the rule is turned off for this path, no configuration
@@ -63,7 +63,7 @@ function row(relative_path: string, entry: FileBudget): string {
 // The threshold is printed with the rows rather than left implicit: a reader who sees "near the limit"
 // on one file and nothing on the next needs the boundary to know which side a third one is on.
 //
-// **It is read off the budgets rather than from a limit of this command's own** (joshuafolkken/kit#1454).
+// **It is read off the budgets rather than from a limit of this command's own**.
 // Each file's limit is whatever that project's eslint enforces for it, so there is a line count to
 // print here only where every counted file agrees on one; where they do not — or where none was
 // resolved — the boundary is stated as the share it has always been, and each row carries its own

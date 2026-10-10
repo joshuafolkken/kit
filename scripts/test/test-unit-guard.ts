@@ -16,7 +16,7 @@ const UNIT_GLOB = '**/*.{test,spec}.{ts,js}'
 const NODE_MODULES = 'node_modules'
 
 // **A unit check that executed nothing may report success only where the project has no unit suite
-// at all** (joshuafolkken/kit#1224). The two halves of "nothing ran" are not the same state:
+// at all**. The two halves of "nothing ran" are not the same state:
 //
 // - **`vitest` absent is the young project.** `josh init` installs no vitest and writes no
 //   `test:unit` script, so a freshly-bootstrapped project always lands here — which is the case the
@@ -26,11 +26,10 @@ const NODE_MODULES = 'node_modules'
 //   project may carry vitest as an unused dependency without declaring a unit suite; zero files
 //   there are reported as skipped, never as a test pass.
 //
-// Rejected: leaving both halves green — joshuafolkken/kit#1216's `--verbose` makes the zero count
-// *readable* in the CI log, but nobody reads a green log and the merge gate reads only pass/fail;
-// and putting the failing half behind an opt-in such as `JOSH_REQUIRE_UNIT_TESTS`, which is off in
-// exactly the projects that need it. The full decision, including why the absent-vitest half is
-// deliberately left asymmetric, is on joshuafolkken/kit#1224.
+// Rejected: leaving both halves green — `--verbose` makes the zero count *readable* in the CI log,
+// but nobody reads a green log and the merge gate reads only pass/fail; and putting the failing half
+// behind an opt-in such as `JOSH_REQUIRE_UNIT_TESTS`, which is off in exactly the projects that need
+// it.
 //
 // **`scripts/test/test-e2e-guard.ts` deliberately keeps both skips, and that divergence is not an
 // oversight.** The argument above rests on the package's presence being a declaration, and
@@ -43,9 +42,8 @@ const FAIL_ACTION = 'fail-no-tests'
 type GuardAction = 'run' | typeof SKIP_ACTION | typeof SKIP_NO_TESTS_ACTION | typeof FAIL_ACTION
 
 // The word the gate looks for to know a passing step did not actually run. Exported and reused on
-// both sides rather than matched by eye: joshuafolkken/kit#967 stopped printing a passing check's
-// body, and without this a gate that skipped the whole unit suite printed the same five lines as one
-// that ran it.
+// both sides rather than matched by eye: the gate does not print a passing check's body, so without
+// this a gate that skipped the whole unit suite would print the same lines as one that ran it.
 const SKIP_REASON = 'vitest is not installed'
 const SKIP_NO_TESTS_REASON = 'no unit test files were found in this basic project'
 const FAIL_REASON =
@@ -80,7 +78,7 @@ function has_unit_tests(project_directory: string): boolean {
 }
 
 // The guard's decision for one project, asked here once so the run, the scoped record and the gate's
-// precondition can never disagree about whether this project's vitest runs (joshuafolkken/kit#3136).
+// precondition can never disagree about whether this project's vitest runs.
 function guard_action(project_directory: string): GuardAction {
 	return resolve_guard_action(
 		is_vitest_installed(project_directory),
@@ -112,12 +110,11 @@ function isolated_unit_environment(
 
 // The whole vitest invocation after the binary, not just the flags: `josh test:related` runs
 // `vitest related <files> --run` where this command runs `vitest run`, and the two must not grow
-// two copies of the guard, the spawn or the skip notice around that one difference
-// (joshuafolkken/kit#1257).
+// two copies of the guard, the spawn or the skip notice around that one difference.
 // **The share is read from inside the marker, not before it.** This is the one funnel every
 // josh-driven vitest goes through — `test:unit`, `test:related` and the pre-push hook alike — so it is
-// where a run both learns how many others are in flight and announces itself to them
-// (joshuafolkken/kit#1515). The pre-push hook is the reason it is here rather than only in the gate:
+// where a run both learns how many others are in flight and announces itself to them.
+// The pre-push hook is the reason it is here rather than only in the gate:
 // it passed no cap at all, so vitest opened one worker per core in every lane at once.
 //
 // Reading the share first and claiming afterwards leaves a window in which two hooks firing together
@@ -147,7 +144,7 @@ const UNIT_COMMAND_LABEL = 'test:unit'
 
 // The two non-running outcomes report through different streams and different exit codes, because
 // they mean different things: one says the project has no unit suite yet, the other says it has one
-// that could not be found (joshuafolkken/kit#1224). Only the first keeps `SKIP_MARKER`, so the
+// that could not be found. Only the first keeps `SKIP_MARKER`, so the
 // gate's "passed without running" handling still means exactly what it did.
 function report_no_run(action: Exclude<GuardAction, 'run'>, command_label: string): number {
 	if (action === FAIL_ACTION) {
@@ -165,8 +162,7 @@ function report_no_run(action: Exclude<GuardAction, 'run'>, command_label: strin
 
 // `announcement` is printed only on the branch that actually spawns vitest. A caller that wrote it
 // itself would claim a run before this guard had decided there would be one — the same "a passing
-// step did not actually run" ambiguity `SKIP_MARKER` exists for, reintroduced one layer up
-// (joshuafolkken/kit#1257).
+// step did not actually run" ambiguity `SKIP_MARKER` exists for, reintroduced one layer up.
 async function run_guarded_vitest(
 	project_directory: string,
 	vitest_arguments: ReadonlyArray<string>,

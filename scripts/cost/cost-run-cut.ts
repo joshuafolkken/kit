@@ -4,7 +4,7 @@ import { run_cut_report } from '#scripts/run/cut/run-cut-report'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { time_transcript_line, type Block } from '#scripts/time-runtime/time-transcript-line'
 
-// Whether a lane session was ended by the implementation-phase cut (joshuafolkken/kit#3223).
+// Whether a lane session was ended by the implementation-phase cut.
 //
 // **No record of the cut outlives the resume.** `run:cut` keeps its record as a stamp the resumed
 // process spends, and the `resume-impl` verdict is printed, never stored — so the one durable trace is
@@ -19,7 +19,7 @@ import { time_transcript_line, type Block } from '#scripts/time-runtime/time-tra
 const { CUT_VERDICT } = run_cut_report
 
 function blocks_of(text: string): Array<Block> {
-	return text.split('\n').flatMap((line) => time_transcript_line.parse_line(line)?.blocks ?? [])
+	return time_transcript_line.parse_text(text).flatMap((line) => line.blocks)
 }
 
 function is_impl_cut_call(block: Block): boolean {

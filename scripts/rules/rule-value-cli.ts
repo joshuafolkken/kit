@@ -5,8 +5,8 @@ import { delivered_rules } from './delivered-rules'
 import { rule_value, type RuleReading } from './rule-value'
 import { rule_value_cache } from './rule-value-cache'
 
-// `josh rule:value` — what each delivered rule earns on the channel that carries it, one row per rule
-// (joshuafolkken/kit#2271). `rule_value.measure` was public but had no caller outside its own test, so
+// `josh rule:value` — what each delivered rule earns on the channel that carries it, one row per rule.
+// `rule_value.measure` was public but had no caller outside its own test, so
 // a rule that never fired stayed invisible until a person thought to measure it. This is that caller:
 // it groups every transcript by the run it belongs to — a lane's transcript counted with the parent
 // that dispatched it — measures them, and prints the reading.
@@ -86,8 +86,10 @@ function row(reading: RuleReading): string {
 	const id = reading.id.padEnd(ID_WIDTH)
 	const reached = `reached ${reading.sessions.toString()}`
 	const refused = `refused ${reading.refusals.toString()}`
+	// Only where a rewrite happened, so the rows of rules that can only refuse keep their shape.
+	const rewritten = reading.rewrites > 0 ? [`rewritten ${reading.rewrites.toString()}`] : []
 
-	return [id, reached, rate_text(reading), refused].join(COLUMN_GAP)
+	return [id, reached, rate_text(reading), refused, ...rewritten].join(COLUMN_GAP)
 }
 
 // The reading as text, or `NO_TARGETS` when nothing measurable was found — never an empty output that
@@ -102,7 +104,7 @@ function render(runs: ReadonlyArray<ReadonlyArray<string>>): string {
 }
 
 // `--refresh` is the detached measurement the `backlogrun` loop head starts: the reading goes to the
-// cache `backlog:offer` prints from, never to stdout (`rule-value-cache.ts`, joshuafolkken/kit#2881).
+// cache `backlog:offer` prints from, never to stdout (`rule-value-cache.ts`).
 function run_rule_value(argv: ReadonlyArray<string> = [], cwd: string = process.cwd()): number {
 	const reading = render(gather_runs(cwd))
 

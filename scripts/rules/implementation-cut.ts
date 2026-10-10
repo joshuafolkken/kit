@@ -1,3 +1,4 @@
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_format } from '#scripts/cost-runtime/cost-format'
@@ -12,23 +13,16 @@ import { bash_triggers } from './bash-triggers'
 import { implementation_cut_verdict } from './implementation-cut-verdict'
 import { shell_segments } from './shell-segments'
 
-// The implementation-phase cut, delivered at the call it binds on (joshuafolkken/kit#2310).
+// The implementation-phase cut, delivered at the call it binds on.
 //
-// **The mechanism was there and the verdict was taken at the wrong time.** joshuafolkken/kit#1933
-// built the second cut boundary — a lane child ends its process *during* implementation once its
-// recent-context cost crosses the shared threshold, and a fresh one resumes back into implementation —
-// and left the child to run `pnpm josh cost --cut` at each working-tree boundary itself. It never did.
-// The five lanes joshuafolkken/kit#2310 measured (#2304 #2294 #2297 #2296 #2298) each read the verdict
-// exactly once, at session entry where the context has not yet grown — so the check answered `under`
-// by construction and the cut fired 0 times while 33.9% of their requests ran past 200,000 tokens.
-//
-// **This is the same lesson pre-gate-cut.ts records, one boundary earlier.** joshuafolkken/kit#1864
-// measured the pre-gate cut taken 0 times while it was carried as prose, and a `PreToolUse` refusal is
-// what took it. joshuafolkken/kit#1933 had reasoned the implementation cut *could not* be a guard,
-// because the per-request cost was read asynchronously; but `cost_cli.session_verdict` is synchronous
-// and is the very verdict `pnpm josh cost --cut` prints, so the guard reads it directly rather than
-// approximating it — the same statistic and the same threshold, never the second measurement #1933
-// forbids.
+// **The verdict is read at the working-tree boundary, not at the entry.** A lane child ends its
+// process *during* implementation once its recent-context cost crosses the shared threshold, and a
+// fresh one resumes back into implementation. Read only at session entry, where the context has not
+// yet grown, the verdict answers `under` by construction; so the guard reads it at each edit, the
+// same way `pre-gate-cut.ts` binds the boundary one step later. `cost_cli.session_verdict` is
+// synchronous and is the very verdict `pnpm josh cost --cut` prints, so the guard reads it directly
+// rather than approximating it — the same statistic and the same threshold, never a second
+// measurement.
 
 // The two edit tools the `PreToolUse` matcher routes here, and the working-tree boundary the cut is
 // taken at. A `PreToolUse` refusal fires *before* the edit lands, so the tree is at the consistent
@@ -59,12 +53,12 @@ function takes_the_impl_cut(command: string): boolean {
 // What the trigger has to know about the world, passed in so the decision is testable without a lane on
 // disk, a cut record, or a session transcript. `verdict` is the synchronous `pnpm josh cost --cut`
 // reading — the same per-request billed-input statistic against the same threshold — so the guard
-// prices its cut on exactly what the parent hand-off does (joshuafolkken/kit#1933).
+// prices its cut on exactly what the parent hand-off does.
 interface LaneCostState {
 	directory: string
 	source: MarkerSource
 	carried: (now?: Date) => RunCut | undefined
-	// The issue whose run hold stands over this checkout (joshuafolkken/kit#2760) — how a `fullrun`
+	// The issue whose run hold stands over this checkout — how a `fullrun`
 	// held outside a lane is told apart from a person's tree.
 	held_issue: () => string | undefined
 	verdict: () => CostVerdict
@@ -76,7 +70,7 @@ function current_state(): LaneCostState {
 		source: process.env,
 		carried: run_cut.carried_cut_sync,
 		held_issue: run_cut.held_issue_sync,
-		// **Read through the short reuse window** (joshuafolkken/kit#2385). The row now fires per
+		// **Read through the short reuse window**. The row now fires per
 		// threshold crossing rather than once per run, so this predicate is a candidate on every edit;
 		// the window collapses one turn's burst of edits to a single whole-transcript price.
 		verdict: (): CostVerdict =>
@@ -85,7 +79,7 @@ function current_state(): LaneCostState {
 }
 
 // A dispatched lane child's issue for this checkout. The dispatch mark is what tells a child apart from
-// a person (joshuafolkken/kit#1904), read from the environment against this lane's own issue so a
+// a person, read from the environment against this lane's own issue so a
 // leaked mark for another issue reads as a person.
 function lane_child_issue(state: LaneCostState): string | undefined {
 	if (!lane_child_marker.is_child_of(state.directory, state.source)) return undefined
@@ -101,15 +95,25 @@ function held_run_issue(state: LaneCostState): string | undefined {
 	return state.held_issue()
 }
 
+// **A ship reviewer is not the run, though it carries its mark and its hold**
+// (joshuafolkken/kit#3623). The supervisor launches it in the implementing child's own checkout and
+// waits on it, so a cut would end the one session whose findings file the supervisor reads and relaunch
+// a second child beside the supervisor's repair. `agent_session_role` is what tells the two apart.
+function implementing_run_issue(state: LaneCostState): string | undefined {
+	if (agent_session_role.is_reviewer(state.source)) return undefined
+
+	return lane_child_issue(state) ?? held_run_issue(state)
+}
+
 // The run this checkout's edits belong to, with no cut already carried — a dispatched lane child, or
-// **a `fullrun` held in its own checkout** (joshuafolkken/kit#2760): the cut was lane-only, so a run a
+// **a `fullrun` held in its own checkout**: the cut was lane-only, so a run a
 // person started grew without a bound mid-implementation. The run hold naming an issue is what marks
 // such a run, and a person's tree holds nothing, so it still sees no refusal. **The carried-cut half
 // keeps the guard silent between a cut and its resume**, exactly as `pre-gate-cut.ts`'s does: a record
 // naming this issue means a cut is already in flight, and `begin_cut`'s exclusive create would refuse
 // a second one anyway.
 function uncut_run_issue(state: LaneCostState): string | undefined {
-	const issue = lane_child_issue(state) ?? held_run_issue(state)
+	const issue = implementing_run_issue(state)
 
 	if (issue === undefined) return undefined
 
@@ -133,7 +137,7 @@ function warrants_the_cut(state: LaneCostState): boolean {
 // a dispatched child makes in an uncut lane — where crossing the threshold is exactly the event this
 // guard exists to catch.
 //
-// **The unmeasurable direction matches the pre-gate cut** (joshuafolkken/kit#2385). A session that
+// **The unmeasurable direction matches the pre-gate cut**. A session that
 // cannot be priced reads as warranting the cut, the same safety-net direction `pre-gate-cut.ts`'s
 // `warrants_the_cut` takes (`verdict !== UNDER_VERDICT`): the two rules read one statistic against one
 // threshold, so they must not disagree about whether an unmeasurable session is due a cut.
@@ -146,10 +150,9 @@ function is_over_threshold_edit(
 	return warrants_the_cut(state)
 }
 
-// **The threshold in the refusal text is assembled from the constant, never spelled** (joshuafolkken/kit#2385).
-// joshuafolkken/kit#2374 lowered the shared threshold and the literal `200,000` stayed behind in this
-// text, telling agents the wrong number; building it from `CONTEXT_CUT_THRESHOLD` is what keeps the two
-// from ever drifting again. `cost_format.format_tokens` renders it the way every cost report does.
+// **The threshold in the refusal text is assembled from the constant, never spelled**.
+// A spelled literal is left behind when the shared threshold moves, telling agents the wrong number;
+// building it from `CONTEXT_CUT_THRESHOLD` keeps the two from drifting. `cost_format.format_tokens` renders it the way every cost report does.
 const THRESHOLD_TEXT = `${cost_format.format_tokens(CONTEXT_CUT_THRESHOLD)}-token`
 
 // The instruction in the shape a refusal can carry: what the cut is for, what each verdict means, and
@@ -161,7 +164,7 @@ const IMPLEMENTATION_CUT_REASON =
 	'this issue (joshuafolkken/kit#2760), and its recent-context ' +
 	`cost has crossed the shared ${THRESHOLD_TEXT} threshold mid-implementation, so the thinking accumulated ` +
 	'so far is now re-read on every later request. Take the cut before this edit. ' +
-	'First write a handoff file with the Write tool — the user’s instruction verbatim, what you have ' +
+	`First write a handoff file at \`${run_cut_handoff.HANDOFF_PATH}\` (ignored, so it is never committed) with the Write tool — the user’s instruction verbatim, what you have ` +
 	'completed, what remains, and what you deliberately did not touch, as ' +
 	`${run_cut_handoff.HANDOFF_FORMAT} (Markdown is refused) — and pass it as \`--handoff <path>\`, ` +
 	'so the fresh process resumes on the original instruction rather than the working tree alone ' +
@@ -183,7 +186,7 @@ const IMPLEMENTATION_CUT_REASON =
 	'answered — an edit reissued right after this refusal passes, so `busy` / `failed` cannot wedge the ' +
 	'run edit after edit; this fires again on the next threshold crossing rather than once per run.'
 
-// **A refusal younger than this window is this edit's own refusal being answered** (joshuafolkken/kit#2385).
+// **A refusal younger than this window is this edit's own refusal being answered**.
 // A `decide` row that refused every over-threshold edit would wedge a run whose cut came back `busy` /
 // `failed` / `unready` — the very cases once-per-run relied on the reissue passing through. So an edit
 // reissued inside this window passes: it is longer than a refusal-then-reissue round trip, so the
@@ -194,7 +197,7 @@ function is_reissued_refusal(now_ms: number, delivered_at_ms: number): boolean {
 	return now_ms - delivered_at_ms < REISSUE_WINDOW_MS
 }
 
-// **Fires on every threshold crossing rather than once per run** (joshuafolkken/kit#2385). Once per run
+// **Fires on every threshold crossing rather than once per run**. Once per run
 // silenced the row for the rest of a process the moment its first refusal landed — and a `busy` /
 // `failed` / `unready` verdict, or an edit reissued unchanged, left the context to grow unwatched to
 // 282,747 tokens with the cut never taken. `decide` re-asks on every over-threshold edit; the reissue
@@ -210,8 +213,8 @@ function decide(
 	return !is_reissued_refusal(run.now_ms, delivered_at_ms)
 }
 
-// The row itself, so `delivered-rules.ts` spreads one entry. `decide` fires it per threshold crossing
-// (joshuafolkken/kit#2385); `keeps` is the implementation cut command, read from a `Bash` call the same
+// The row itself, so `delivered-rules.ts` spreads one entry. `decide` fires it per threshold crossing;
+// `keeps` is the implementation cut command, read from a `Bash` call the same
 // way `pre-gate-cut`'s is.
 const ROW = {
 	id: 'implementation-cut',

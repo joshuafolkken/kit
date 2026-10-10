@@ -10,7 +10,7 @@ pnpm --version   # 12 or later
 gh --version     # any version — only for the GitHub Issue workflow
 ```
 
-This guide was verified with pnpm 12.6.0; older pnpm releases may lack the commands and options kit uses. If every command you need prints a version that meets the requirement, keep what you have. kit never installs or replaces a machine-wide Node.js, pnpm or gh. If `pnpm` is older than 12, update it yourself with `pnpm self-update`; if `node` is older, install a newer release with the same route you used before, or with `pnpm runtime set node 22 -g` from step 2.
+This guide was verified with pnpm 12.6.0; older pnpm releases may lack the commands and options kit uses. If every command you need prints a version that meets the requirement, keep what you have. kit never installs or replaces a machine-wide Node.js, pnpm or gh. If `pnpm` is older than 12, update it yourself with `pnpm self-update`; if `node` is older, install a newer release with the same route you used before, or with `pnpm runtime set node 22 -g` from step 2. A project that pins a pnpm other than yours does not need that version installed — if its commands refuse to run, [Troubleshooting → Wrong Node or pnpm version](../troubleshooting.md#wrong-node-or-pnpm-version) shows how to let pnpm fetch the pinned version.
 
 ## 2. Install pnpm and Node.js
 

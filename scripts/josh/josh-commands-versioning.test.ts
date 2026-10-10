@@ -59,4 +59,13 @@ describe('VERSIONING_COMMANDS release', () => {
 		expect(cmd.shell).toBeUndefined()
 		expect(cmd.category).toBe('Versioning')
 	})
+
+	// The command refuses any argument but `--dry-run` (joshuafolkken/kit#3384), so the catalog must
+	// not advertise a positional it would reject.
+	it('advertises only the arguments the command accepts', () => {
+		const cmd = VERSIONING_COMMANDS['release']
+		if (!cmd) throw new Error(RELEASE_NOT_DEFINED)
+
+		expect(cmd.reference[0]).toBe('[--dry-run]')
+	})
 })

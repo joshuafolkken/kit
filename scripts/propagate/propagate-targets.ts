@@ -1,11 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { RepoMap } from '#scripts/discovery/repo-map-logic'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
 // Deciding which repositories a published release should be carried into.
 //
-// The candidate set is joshuafolkken/kit#869's discovery map, so the owner restriction is inherited
+// The candidate set is the repository discovery map, so the owner restriction is inherited
 // rather than restated: propagation writes — `josh vu`, `josh sync`, a commit, a pull request — and
 // a write aimed at somebody else's repository is worse than a read aimed at one. Nothing here
 // re-implements discovery.
@@ -13,16 +14,15 @@ import { z } from 'zod'
 // Which candidates are targets is read from the candidate itself: a repository is downstream when
 // its manifest declares a dependency on this package. That is a fact about the checkout in front of
 // us rather than a roster, so a new consumer needs no edit here — and it covers a consumer that is
-// not a published package at all, which a list of downstream package names cannot
-// (joshuafolkken/kit#863).
+// not a published package at all, which a list of downstream package names cannot.
 
 const MANIFEST_NAME = 'package.json'
 const NODE_MODULES = 'node_modules'
 
 // Why a candidate is not going to be processed, or that it is. `not_selected` is the one state set
-// after classification: a candidate `--target` left out (joshuafolkken/kit#2755). `carried_above` is
+// after classification: a candidate `--target` left out. `carried_above` is
 // the other: a consumer that installs a toolkit above the supplier, which that toolkit's own
-// propagation delivers instead (joshuafolkken/kit#2879).
+// propagation delivers instead.
 type TargetState =
 	| 'ready'
 	| 'up_to_date'
@@ -68,11 +68,7 @@ function read_manifest(repository_path: string): Manifest | undefined {
 	if (!existsSync(manifest_path)) return undefined
 
 	try {
-		const parsed: unknown = JSON.parse(readFileSync(manifest_path, 'utf8'))
-
-		const result = manifest_schema.safeParse(parsed)
-
-		return result.success ? result.data : undefined
+		return json_value.parse_with(readFileSync(manifest_path, 'utf8'), manifest_schema)
 	} catch {
 		return undefined
 	}

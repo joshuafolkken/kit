@@ -21,6 +21,7 @@ const BASE: StopContext = {
 	handed_off: false,
 	session_lang: 'en',
 	headless_agent: false,
+	backlog_parent: false,
 }
 
 function context(overrides: Partial<StopContext>): StopContext {

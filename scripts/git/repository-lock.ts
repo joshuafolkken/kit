@@ -8,13 +8,16 @@ import { json_value } from '#scripts/lib/json-value'
 import { git_common_directory } from './git-common-directory'
 
 // One holder at a time per repository, for work that every work tree of that repository shares
-// (joshuafolkken/kit#2701 for the stash sweep, joshuafolkken/kit#2736 for `git worktree add`). The
+// (the stash sweep, `git worktree add`). The
 // record is keyed on the git common directory, so every work tree of one repository contends for one
 // record per lock name, and it lives in the platform temp root beside the other stamps rather than
 // inside `.git`. Each caller names its own lock with a prefix, so two unrelated kinds of work never
 // wait on each other.
 
 const POLL_INTERVAL_MS = 200
+// The synchronous wait is for locks held for milliseconds, so it polls far more often.
+const SYNC_POLL_INTERVAL_MS = 10
+const SLEEP_CELL = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT))
 
 type IsGone = (owner: ProcessOwner) => boolean
 
@@ -117,6 +120,23 @@ async function acquire(target: string, max_wait_ms: number): Promise<boolean> {
 	return true
 }
 
+// A blocking wait for a caller that cannot await. `Atomics.wait` parks the thread without spinning, so
+// a writer queued behind another costs no CPU while it waits.
+function sleep_sync(ms: number): void {
+	Atomics.wait(SLEEP_CELL, 0, 0, ms)
+}
+
+function acquire_sync(target: string, max_wait_ms: number): boolean {
+	const deadline = Date.now() + max_wait_ms
+
+	while (!claim(target)) {
+		if (Date.now() >= deadline) return false
+		sleep_sync(SYNC_POLL_INTERVAL_MS)
+	}
+
+	return true
+}
+
 // Runs `work` holding the lock at `target` and answers its result, or `undefined` without running it
 // when another holder kept the lock for the whole wait.
 async function with_lock<T>(
@@ -133,6 +153,18 @@ async function with_lock<T>(
 	}
 }
 
-const repository_lock = { clear_stale, lock_path, with_lock }
+// `with_lock` for synchronous work — a read-modify-write that holds the lock for milliseconds, whose
+// callers are synchronous all the way up.
+function with_lock_sync<T>(work: () => T, target: string, max_wait_ms: number): T | undefined {
+	if (!acquire_sync(target, max_wait_ms)) return undefined
+
+	try {
+		return work()
+	} finally {
+		release(target)
+	}
+}
+
+const repository_lock = { clear_stale, lock_path, with_lock, with_lock_sync }
 
 export { repository_lock }

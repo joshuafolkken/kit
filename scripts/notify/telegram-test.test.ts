@@ -1,4 +1,5 @@
 import { parseArgs } from 'node:util'
+import { session_cite } from '#scripts/issue/session-cite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const repo_get_name_with_owner_mock = vi.hoisted(() => vi.fn())
@@ -39,6 +40,7 @@ const OTHER_REPO_PULL_URL = 'https://github.com/joshuafolkken/joshuafolkken-com/
 const KIT_ISSUE_URL = 'https://github.com/joshuafolkken/kit/issues/903'
 const NON_GITHUB_URL = 'https://example.com/x'
 const WORKING_DIRECTORY_REPO = 'my-repo'
+const SCRIPT_NAME = 'telegram-test.ts'
 
 const { telegram_test } = await import('./telegram-test')
 
@@ -79,7 +81,7 @@ describe('telegram_test.run_cli — a dash-led free-text value', () => {
 	const original_argv = process.argv
 
 	beforeEach(() => {
-		process.argv = ['node', 'telegram-test.ts', '--body', '- item', '--issue-title', '-t', '--json']
+		process.argv = ['node', SCRIPT_NAME, '--body', '- item', '--issue-title', '-t', '--json']
 	})
 
 	afterEach(() => {
@@ -95,6 +97,37 @@ describe('telegram_test.run_cli — a dash-led free-text value', () => {
 		expect(vi.mocked(parseArgs)).toHaveBeenLastCalledWith(
 			expect.objectContaining({ args: ['--body=- item', '--issue-title=-t', '--json'] }),
 		)
+	})
+})
+
+// joshuafolkken/kit#3592: the flags were read by a bare `parseArgs`, so an unknown one threw
+// `ERR_PARSE_ARGS_UNKNOWN_OPTION` rather than being refused. The real parser reads this one line, so
+// the refusal is the parser's own answer and not the mock's.
+describe('telegram_test.run_cli — an unknown flag', () => {
+	const original_argv = process.argv
+
+	beforeEach(async () => {
+		const actual = await vi.importActual<{ parseArgs: typeof parseArgs }>('node:util')
+
+		vi.mocked(parseArgs).mockImplementationOnce(actual.parseArgs)
+		process.argv = ['node', SCRIPT_NAME, '--task-type', 'confirmation', '--bogus']
+	})
+
+	afterEach(() => {
+		process.argv = original_argv
+		process.exitCode = undefined
+	})
+
+	it('prints the usage, exits 1 and sends nothing', async () => {
+		const error_spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		await telegram_test.run_cli()
+
+		expect(error_spy).toHaveBeenCalledWith(expect.stringContaining('Usage: josh notify'))
+		expect(process.exitCode).toBe(1)
+		expect(telegram_send_mock).not.toHaveBeenCalled()
+		expect(error_handle_mock).not.toHaveBeenCalled()
+		error_spy.mockRestore()
 	})
 })
 
@@ -148,7 +181,9 @@ describe('telegram_test.fetch_issue_title', () => {
 
 		expect(result).toBeUndefined()
 		expect(warn_spy).toHaveBeenCalledWith(
-			expect.stringContaining(`${OTHER_REPO_NAME_WITH_OWNER}#${OTHER_REPO_ISSUE_NUMBER}`),
+			expect.stringContaining(
+				session_cite.issue(OTHER_REPO_ISSUE_NUMBER, undefined, OTHER_REPO_NAME_WITH_OWNER),
+			),
 		)
 		warn_spy.mockRestore()
 	})

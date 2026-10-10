@@ -1,23 +1,24 @@
 import { file_reader } from '#scripts/lib/read-file'
 
-// The rewrite half of the edit hook (joshuafolkken/kit#2314). The format hook runs prettier and
+// The rewrite half of the edit hook. The format hook runs prettier and
 // `eslint --fix` in place after every edit, so a file the model just wrote can be rewritten out from
 // under the image the model holds — and the next `Edit` against that stale image misses, then pays for
-// a full re-read that rides every later request. joshuafolkken/kit#2275 built the `additionalContext`
-// path this rides and joshuafolkken/kit#2296 put cspell on it; this returns the fact that the file
+// a full re-read that rides every later request. Riding the same `additionalContext` path as the lint
+// and cspell halves, this returns the fact that the file
 // changed and the region that changed, so the model reissues against current text without re-reading
 // the whole file. Nothing is added when formatting left the file untouched.
 
-// additionalContext rides back on the edit, so the changed region is cut to this bound rather than
-// let a large reformat balloon the run's context — the notice is a cheaper hint than the full re-read
-// it replaces, and stays cheaper only while it is bounded.
-const MAX_REWRITE_CHARS = 1200
-const REWRITE_TRUNCATION_NOTICE = '\n…(rewrite preview truncated)'
+// additionalContext rides back on the edit, so the whole notice is cut to this bound rather than let
+// a large reformat balloon the run's context — the notice is a cheaper hint than the full re-read it
+// replaces, and stays cheaper only while it is bounded. The line range leads, so a cut preview still
+// says where to re-read.
+const MAX_REWRITE_CHARS = 600
+const REWRITE_TRUNCATION_NOTICE = '\n…(truncated)'
 // The header names what the block is, since additionalContext arrives with no framing of its own, and
 // says the one thing the model has to act on: its copy is stale, so re-read before the next edit.
 const REWRITE_HEADER =
-	'The format hook rewrote this file after your edit, so your in-memory copy is now stale — re-read it before the next Edit or the match will miss.'
-const REWRITE_RANGE_PREFIX = 'Changed around lines '
+	'The format hook rewrote this file, so your copy is stale; re-read these lines before the next Edit.'
+const REWRITE_RANGE_PREFIX = 'Lines '
 const LINE_SEPARATOR = '\n'
 const FIRST_LINE = 1
 
@@ -64,21 +65,22 @@ function changed_range(before: string, after: string): ChangedRange {
 	}
 }
 
-function cap_body(body: string): string {
-	if (body.length <= MAX_REWRITE_CHARS) return body
+// `budget` is what the header and the range left of the bound; the marker is paid out of it.
+function cap_body(body: string, budget: number): string {
+	if (body.length <= budget) return body
 
-	return `${body.slice(0, MAX_REWRITE_CHARS)}${REWRITE_TRUNCATION_NOTICE}`
+	return `${body.slice(0, Math.max(0, budget - REWRITE_TRUNCATION_NOTICE.length))}${REWRITE_TRUNCATION_NOTICE}`
 }
 
-// The block the model reads: the header, the line range, then the region's new text cut to the bound.
-// `undefined` when formatting changed nothing, so the ordinary edit adds nothing to additionalContext.
+// The block the model reads: the header, the line range, then the region's new text — the whole cut
+// to the bound. `undefined` when formatting changed nothing, so the ordinary edit adds nothing.
 function build(before: string, after: string): string | undefined {
 	if (before === after) return undefined
 
 	const range = changed_range(before, after)
-	const location = `${REWRITE_RANGE_PREFIX}${String(range.start_line)}-${String(range.end_line)}:`
+	const head = `${REWRITE_HEADER}\n${REWRITE_RANGE_PREFIX}${String(range.start_line)}-${String(range.end_line)}:\n`
 
-	return `${REWRITE_HEADER}\n${location}\n${cap_body(range.body)}`
+	return `${head}${cap_body(range.body, MAX_REWRITE_CHARS - head.length)}`
 }
 
 // The file content around a format run, read for the before/after comparison. A path the hook was

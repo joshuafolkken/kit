@@ -1,3 +1,4 @@
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
@@ -7,31 +8,22 @@ import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { bash_triggers } from './bash-triggers'
 import { shell_segments } from './shell-segments'
 
-// The pre-gate cut, delivered at the call it binds on (joshuafolkken/kit#1864).
+// The pre-gate cut, delivered at the call it binds on.
 //
-// **The mechanism was there and nothing called it.** joshuafolkken/kit#1839 built the cut and
-// joshuafolkken/kit#1850 measured the result: across six lane children — #1853, #1849, #1855, #1854,
-// #1856 and #1847 — the cut was taken **0 times**. Four of the six issued the *entry* check
-// `pnpm josh run:cut --resume <N>` and were answered `fresh`; not one issued `pnpm josh run:cut <N>`,
-// the call that actually cuts. The procedure was read three to five times per run and remained one
-// step of prose in the middle of it, so joshuafolkken/kit#1839's fourth acceptance condition — the
-// drop in context per request — could not be judged at all.
-//
-// **This is the third time prose lost to a refusal.** joshuafolkken/kit#1344 measured three
-// consecutive runs in which resident text about batching moved the number not at all, and
-// joshuafolkken/kit#1460 measured the same for the investigation threshold; in both, a `PreToolUse`
-// refusal was what finally moved it. A step a run is free to skip is a step that gets skipped under
-// time pressure, and `run:hold` — the one boundary step that never gets missed — is the one that
-// refuses.
+// **A refusal, not prose.** A lane child issues the *entry* check `pnpm josh run:cut --resume <N>`
+// and goes on to the gate; carried as a step of prose, `pnpm josh run:cut <N>` — the call that
+// actually cuts — is the step that gets skipped. A step a run is free to skip is a step that gets
+// skipped under time pressure, and `run:hold` — the one boundary step that never gets missed — is
+// the one that refuses.
 
 const GATE_COMMANDS: ReadonlySet<string> = new Set(['gate'])
 const CUT_COMMANDS: ReadonlySet<string> = new Set(['run:cut'])
 // The three spellings that ask about a cut rather than take one: the fresh process's entry check, the
-// teardown, and the record read. **Excluding them is the whole point** — four of the six measured
-// children issued `--resume` and went straight on to the gate, so a predicate that counted any
-// `run:cut` would have been silent on exactly the runs this rule exists for.
+// teardown, and the record read. **Excluding them is the whole point** — a child that issued
+// `--resume` and went straight on to the gate is the run this rule exists for, so a predicate that
+// counted any `run:cut` would be silent on exactly those runs.
 const CUT_MODE_FLAG = /(?:^|\s)--(?:resume|end|json)(?:[=\s]|$)/u
-// **The one entry call the resumed half never makes** (joshuafolkken/kit#1867).
+// **The one entry call the resumed half never makes**.
 // `.claude/skills/workflow-commands/pre-gate-cut.md` sends a `fresh` verdict on to "claim the hold,
 // ask the session boundary, read the issue, implement", and tells a `resume` verdict to "skip the
 // title, the plan, the fresh hold claim and the implementation". So the hold claim is what a run made
@@ -75,7 +67,7 @@ function claims_the_hold(command: string): boolean {
 	return invokes_josh(command, HOLD_COMMANDS, HOLD_MODE_FLAG)
 }
 
-// **One half of the occasion, never the whole of it** (joshuafolkken/kit#1867). Taken alone this
+// **One half of the occasion, never the whole of it**. Taken alone this
 // predicate enrols both processes of one obedient lane child: the cut relaunches a second session
 // which issues this same entry check byte for byte and can never take a cut of its own, so the row
 // read at half its true rate. `delivered-rules.ts` pairs it with `claims_the_hold`, which only the
@@ -87,7 +79,7 @@ function claims_the_hold(command: string): boolean {
 // read from the working directory and appears nowhere in a transcript, so it cannot be the
 // denominator — and taking the gate as the occasion instead would enrol every ordinary non-lane run,
 // where the rule can never be kept, and `pnpm josh rule:value` would read the row low by
-// construction. joshuafolkken/kit#1643 names exactly that failure.
+// construction.
 function asks_about_the_cut(command: string): boolean {
 	return invokes_josh(command, CUT_COMMANDS)
 }
@@ -95,12 +87,15 @@ function asks_about_the_cut(command: string): boolean {
 // What the trigger has to know about the world, passed in so the decision itself is testable without
 // a lane on disk and without a git call. `marked_issue` is the dispatch mark read from the
 // environment — the fact that makes the human-or-child question mechanical rather than the model's to
-// judge (joshuafolkken/kit#1904).
+// judge.
 interface LaneCutState {
 	directory: string
 	carried: (now?: Date) => RunCut | undefined
 	marked_issue: string | undefined
-	// **The context verdict, read lazily** (joshuafolkken/kit#2312). It is a thunk, like
+	// Whether this session is a ship reviewer, which carries the implementing child's mark without
+	// being the run the cut is for (joshuafolkken/kit#3623).
+	is_reviewer: boolean
+	// **The context verdict, read lazily**. It is a thunk, like
 	// `carried`, so `current_state` builds the object without pricing a session — the read happens only
 	// after the command and lane checks pass, off the handful of calls that actually run a lane's gate.
 	context_verdict: () => CostVerdict
@@ -111,6 +106,7 @@ function current_state(): LaneCutState {
 		directory: process.cwd(),
 		carried: run_cut.carried_cut_sync,
 		marked_issue: lane_child_marker.marked_issue(),
+		is_reviewer: agent_session_role.is_reviewer(),
 		context_verdict: cost_cli.session_verdict,
 	}
 }
@@ -119,27 +115,35 @@ function current_state(): LaneCutState {
 // A person working in the lane carries no mark, so the rule stays silent for them — the
 // human-or-child call is read from the environment, never left to the model. A mark that leaked in
 // from the parent session names some other issue, so requiring it to equal this lane's issue reads
-// that leak as a person too (joshuafolkken/kit#1904).
+// that leak as a person too.
 //
 // **The resumed process must also stay silent, and the cut record is what says so.** After a cut,
 // `adopt_cut` leaves the record in place with `is_handed_off: false`, so a carried record naming this
 // issue means the process asking is the one the cut already produced. Without this half the rule
 // would fire on the fresh process too — refusing a gate call on a run that had kept the rule
 // perfectly, which `prompts/collaboration-workflow/rule-delivery.md` calls worse than no hook at all.
+//
+// **A ship reviewer's inherited mark is not a dispatch**. The supervisor that launched it is waiting on
+// its findings, so there is no fresh process a cut could hand the gate to; `implementation-cut.ts`
+// stands down for the same session on the same fact.
+function dispatched_issue(state: LaneCutState): string | undefined {
+	return state.is_reviewer ? undefined : state.marked_issue
+}
+
 function uncut_lane_issue(state: LaneCutState): string | undefined {
 	const issue = lane_paths.lane_issue_of(state.directory)
 
 	if (issue === undefined) return undefined
 
-	if (state.marked_issue !== issue) return undefined
+	if (dispatched_issue(state) !== issue) return undefined
 
 	return state.carried()?.issue === issue ? undefined : issue
 }
 
-// **The cut is taken only when the current context is worth its resume** (joshuafolkken/kit#2312).
+// **The cut is taken only when the current context is worth its resume**.
 // Below the shared `CONTEXT_CUT_THRESHOLD` a short lane has no accumulation a cut would drop, so the
 // gate runs uncut rather than paying for a relaunch; an unmeasurable session keeps the old
-// unconditional cut as the safety net joshuafolkken/kit#1933 relies on. The verdict is
+// unconditional cut as the safety net. The verdict is
 // `cost_cli.session_verdict`'s, the same statistic and threshold `run:cut` and the implementation-phase
 // cut read, so the guard and the command can never disagree about whether a cut was due.
 function warrants_the_cut(verdict: CostVerdict): boolean {
@@ -176,12 +180,11 @@ const PRE_GATE_CUT_REASON =
 	'`.claude/skills/workflow-commands/pre-gate-cut.md`. Reissue the gate once the cut has answered — ' +
 	'this fires once per run, so it cannot repeat on the call in hand.'
 
-// **The pre-gate cut is two acts, one call apart** (joshuafolkken/kit#2034), so its `rule:value`
+// **The pre-gate cut is two acts, one call apart**, so its `rule:value`
 // denominator is only the runs that reached the boundary: a run that issues the cut's entry check and,
 // somewhere in the same run, claimed the working-tree hold — the near half of the boundary a fresh
 // process never makes. Read only by the offline measurement, never the live delivery path. Moved here
-// from `delivered-rules.ts` so the pre-gate row lives with its rule, as `implementation-cut.ts`'s does
-// (joshuafolkken/kit#2346).
+// from `delivered-rules.ts` so the pre-gate row lives with its rule, as `implementation-cut.ts`'s does.
 function reaches_the_pre_gate_boundary(
 	call: GuardedCall,
 	_turn: ReadonlyArray<GuardedCall>,

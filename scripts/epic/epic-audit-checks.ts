@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import {
 	epic_audit_logic,
 	type AuditFinding,
@@ -8,19 +9,18 @@ import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 import { epic_nested } from './epic-nested'
 
 // The five cross-child checks. Each takes the children and returns findings — four of them reading
-// the bodies, and the fifth (joshuafolkken/kit#1476) reading a child's labels instead.
+// the bodies, and the fifth reading a child's labels instead.
 //
 // Warnings and errors are kept apart deliberately. An error is a contradiction that will stall the
 // implementation whatever anyone decides — an acceptance criterion that needs something built later.
 // A warning is a thing a reader has to look at: a child mentioning another child may be a real
 // missing dependency or a perfectly good design note about what comes next, and the machine cannot
 // tell. Making that an error would make legitimate notes unwritable, so the machine's job is to
-// stop the omission going unnoticed, not to decide (joshuafolkken/kit#870).
+// stop the omission going unnoticed, not to decide.
 //
 // Every reference these checks read carries the repository it lives in, and every match is on
 // repository and number both. A number alone names a different issue in every repository, so a
-// cross-repository child citing `#40` was checked against *this* repository's issue 40
-// (joshuafolkken/kit#1014).
+// cross-repository child citing `#40` would be checked against *this* repository's issue 40.
 
 const IMPLICIT_DEPENDENCY = 'implicit dependency'
 const ORDER_CONTRADICTION = 'order contradiction'
@@ -61,14 +61,9 @@ function find_sibling(
 
 // Whether anything orders these two, in either direction.
 //
-// A pair in two different repositories used to be treated as ordered, unconditionally. That was not a
-// statement about the pair but about what could be recorded: `blocked_by` was read as bare numbers,
-// so a cross-repository order could not be written onto the graph at all, and reporting one as a
-// contradiction would have failed the audit with no edit to either issue that could ever clear it.
-// joshuafolkken/kit#1126 made such an order recordable and readable, so the premise stopped holding
-// and joshuafolkken/kit#1128 removed the exemption: every pair is asked the same question now, and
-// `depends_on` walks a cross-repository chain by identity exactly as it walks a local one. What keeps
-// that from failing epics written before the capability existed is the finding's *level* rather than
+// Every pair is asked the same question, a cross-repository pair included: `depends_on` walks a
+// cross-repository chain by identity exactly as it walks a local one. What keeps that from failing
+// epics written before a cross-repository order was recordable is the finding's *level* rather than
 // a blind spot — see `order_level`.
 function is_ordered(
 	index: ReadonlyMap<string, EpicChild>,
@@ -131,9 +126,8 @@ function reported_pairs(
 // Check 1 — a child talks about another child, and neither declares a dependency on the other.
 //
 // A declared dependency in *either* direction is enough: `#864 depends on #863` makes `#863`'s note
-// about `#864` an ordinary forward reference. What this catches is the shape found in
-// joshuafolkken/kit#858 — two children each citing the other's deliverable, with `blocked_by` empty
-// on both and the epic declaring them independent.
+// about `#864` an ordinary forward reference. What this catches is two children each citing the
+// other's deliverable, with `blocked_by` empty on both and the epic declaring them independent.
 function find_implicit_dependencies(
 	children: ReadonlyArray<AuditChild>,
 	current_repo: string,
@@ -157,28 +151,24 @@ function find_implicit_dependencies(
 
 // Check 2 — a child's acceptance criteria name another child, with no dependency in either
 // direction. The criteria are where a child states what it must deliver, so a name there with
-// nothing ordering the two is the contradiction found by hand in joshuafolkken/kit#858: the criteria
-// required deliverables of children the graph let it run before.
+// nothing ordering the two is a contradiction: the criteria require deliverables of children the
+// graph lets it run before.
 //
 // A declared dependency the *other* way is suppressed, and that suppression is what keeps the check
 // honest. `#860`'s criteria say `#864` will extend a hook it provides, and `#864` is declared to
-// depend on `#860` — a forward reference, and satisfiable exactly as written. Verified against the
-// real epic: without this, four of the run's five errors were forward references of that shape.
+// depend on `#860` — a forward reference, and satisfiable exactly as written.
 //
 // The level depends on whether the pair can still run out of order. What makes an undeclared order a
 // contradiction is that the criteria's child *can run first*, and **either end closing is enough to
 // make that sentence false**: a closed naming child has already run, and a closed named child has
 // already delivered what the criteria ask for, so nothing is left to run before it. An epic that ever
 // forgot to declare an order would otherwise fail its audit forever — which stops every future
-// `epicrun` on it at the first step, for something that can no longer stall anything. Confirmed on the
-// real epic: `epic:next` handed back a runnable child while the audit was red.
+// `epicrun` on it at the first step, for something that can no longer stall anything.
 //
-// **The condition used to be both ends closed**, and that was stricter than the sentence it encodes
-// (joshuafolkken/kit#1597). It bit on the ordinary way an epic's children cite each other — a closed
-// child's criteria naming an open sibling **as evidence** — and there is no way out of it once the
-// naming child has closed: the alternatives are editing a closed body to remove the numbers or
-// declaring an order nobody decided, and both destroy the record. joshuafolkken/kit#1262 sat red on
-// exactly that shape while nothing in it could run out of order.
+// **One closed end is enough, not both.** Requiring both would bite on the ordinary way an epic's
+// children cite each other — a closed child's criteria naming an open sibling **as evidence** — and
+// there is no way out of it once the naming child has closed: the alternatives are editing a closed
+// body to remove the numbers or declaring an order nobody decided, and both destroy the record.
 //
 // **Demoted rather than dropped**, and the choice is not cosmetic. Dropping the finding does not
 // shorten the report: the acceptance criteria are part of the body, so the same pair falls straight
@@ -232,16 +222,16 @@ function order_message(
 // **Either child closed**: the pair can no longer run out of order, so the finding cannot describe
 // anything that will happen.
 //
-// **A pair in two repositories** (joshuafolkken/kit#1128): that order only became recordable with
-// joshuafolkken/kit#1126, so an error would fail the audit `epicrun` runs before its first child and
-// stop every epic written before it — joshuafolkken/kit#1010 is what that looks like.
+// **A pair in two repositories**: epics written before a cross-repository order was recordable
+// carry such pairs, so an error would fail the audit `epicrun` runs before its first child and stop
+// every one of them.
 //
 // **Be clear about what the warning does and does not buy.** It does *not* make the run safe: the
 // finding fires precisely when nothing orders the pair, so there is no relation for `epic:next` to
-// read and the child is offered as runnable — it can start before the work it cites. What changed is
-// that this was previously *silent*, and is now said out loud. Making it safe means stopping, and
-// stopping is what the recorded decision declined for epics that predate the capability. Clearing one
-// means recording the relation; `josh epic --add` cannot write it yet (joshuafolkken/kit#1138), so
+// read and the child is offered as runnable — it can start before the work it cites. It makes the gap
+// said out loud rather than silent. Making it safe means stopping, and stopping is what the recorded
+// decision declined for epics that predate the capability. Clearing one
+// means recording the relation; `josh epic --add` cannot write it yet, so
 // until then it is the `dependencies/blocked_by` endpoint by hand.
 function order_level(child: AuditChild, other: AuditChild, is_settled: boolean): FindingLevel {
 	if (is_settled) return 'warning'
@@ -349,11 +339,11 @@ function find_orphans(
 		.map((issue_number) => ({
 			level: 'warning' as const,
 			check: ORPHAN_CHILD,
-			message: `#${String(issue_number)} names this epic as its parent but is not in its task list.`,
+			message: `${issue_cite.plain(issue_number)} names this epic as its parent but is not in its task list.`,
 		}))
 }
 
-// Check 5 — a task-list row pointing at another epic (joshuafolkken/kit#1476). What the question is,
+// Check 5 — a task-list row pointing at another epic. What the question is,
 // and what it deliberately is not, is `epic-nested.ts`; this half is what the audit does with the
 // answer.
 //
@@ -392,7 +382,7 @@ function find_nested_epics(
 
 // Check 6 — the epic itself is closed while children it tracks are still open. Unlike the five
 // checks above, this one reads the *root's* state against its children rather than the children
-// against each other (joshuafolkken/kit#2337).
+// against each other.
 //
 // **An error, not a warning.** A closed epic never surfaces its children in the backlog — the epic
 // opt-in only fires while the epic is open — so an open child of a closed epic is stranded: it is

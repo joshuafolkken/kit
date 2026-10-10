@@ -1,15 +1,14 @@
 import { git_gh_helpers } from '#scripts/gh/git-gh-helpers'
 
-// joshuafolkken/kit#1539: everything a run does after its merge is cleanup, and a merge cannot be
-// taken back. Those steps used to be plain sequential statements, so whichever of them threw first
-// discarded every one after it — and the working-tree hold release is the last of them. Three runs
-// (joshuafolkken/kit#1197, #1537, #1319) ended that way: merged, the issue closed, and the hold left
-// behind for the next run to trip over.
+// Everything a run does after its merge is cleanup, and a merge cannot be taken back. As plain
+// sequential statements, whichever step threw first would discard every one after it — and the
+// working-tree hold release is the last of them, so the hold would be left behind for the next run
+// to trip over.
 //
 // **A step is run on its own, and its failure never reaches the next one.** The whole point is that
 // the steps are independent: the completion comment has nothing to do with the hold release, and
-// letting one decide the other is wrong whatever made it fail — this Issue's own defect, a Telegram
-// rate limit, or a Bad Gateway from GitHub.
+// letting one decide the other is wrong whatever made it fail — a Telegram rate limit, or a Bad
+// Gateway from GitHub.
 //
 // **Reported, never swallowed.** A cleanup that failed invisibly is a run that lies about what it
 // did, so the failure is printed where the run is being watched, with the command that finishes the

@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { run_stranded } from './run-stranded'
 import { run_stranded_detect } from './run-stranded-detect'
 
-// `josh run:stranded` — read the three facts once and print the verdict (joshuafolkken/kit#2375). This
+// `josh run:stranded` — read the three facts once and print the verdict. This
 // is the manual and testable face of the detector `stop-guard.ts` runs on every stop; both call the one
 // `detect_and_report`, so the command and the hook can never drift.
 //

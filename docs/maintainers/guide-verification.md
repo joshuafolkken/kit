@@ -18,6 +18,28 @@ repository, which exercised Pattern A's step 3: the gate went green and the pull
 | Pattern B (`auto-ok` + `backlogrun`) in a fresh practice repository           | Not verified end to end                                  |
 | Linux and Windows                                                             | Not verified end to end                                  |
 
+### Without GitHub
+
+The section [Without GitHub: one change, checked locally](../tutorial.md#without-github-one-change-checked-locally)
+([#3630](https://github.com/joshuafolkken/kit/issues/3630)) was checked by running `josh init` in a
+directory with no Git repository, then giving the step 2 prompt to a headless agent:
+
+```bash
+pnpm --allow-build=esbuild dlx @joshuafolkken/kit init
+claude -p 'Change the page title to "Hello", then tell me what you checked.' --allowedTools "Read,Edit,Write,Glob,Grep,Bash"
+```
+
+A project with only `index.html` gets the `basic` profile; the `full` project also held
+`src/main.ts`, one vitest test, and `typescript` and `vitest` as development dependencies.
+
+| Environment                                                               | Status                                                                                                                                                                                          |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| macOS (Darwin 25.6.0), pnpm 12.10.1, kit 1.1240.0, Claude Code, `basic`   | Step 3 verified — the agent read `index.html`, changed it, ran Prettier, read the title back in a browser and reported                                                                          |
+| Same, `full`                                                              | Step 3 verified — the agent added a unit test, ran `pnpm josh gate` and reported each check; it did not name the tests before editing                                                           |
+| Same, `full`, step 4 (`pnpm josh gate`), kit 1.1240.0                     | Failed at lint — ESLint stopped on the `.gitignore` a project without Git does not have; fixed by [#3653](https://github.com/joshuafolkken/kit/issues/3653)                                     |
+| Same, `full`, step 4, kit linked from the #3653 checkout, no `.gitignore` | Verified — lint reads the project's code and passes, as do check, behavior, exports and the unit tests; cspell flagged only the local `link:` path the linked install wrote into `package.json` |
+| Linux and Windows                                                         | Not verified end to end                                                                                                                                                                         |
+
 ## The basic profile setup
 
 [setup/basic.md](../setup/basic.md). The guide is checked by running

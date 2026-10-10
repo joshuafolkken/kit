@@ -1,7 +1,8 @@
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { git_spawn } from '#scripts/git/git-spawn'
 
-// The no-argument half of joshuafolkken/kit#1809. `josh lines <path>` answers for a file someone
+// The no-argument half of `josh lines`. `josh lines <path>` answers for a file someone
 // already named; a file near the limit that nobody has named yet is invisible until the gate reports
 // it. This enumerates the repository's own lint-target files so the no-argument scan can report every
 // one of them near the limit at once, before the first edit rather than after it.
@@ -51,13 +52,16 @@ function split_names(output: string): ReadonlyArray<string> {
 
 // The names resolve against the repository `root`, never the process cwd: `--full-name` prints them
 // relative to the root wherever the command runs, so resolving against cwd would double the prefix
-// and drop every file when the command is invoked from a subdirectory.
+// and drop every file when the command is invoked from a subdirectory. `--cached` still lists a file
+// deleted from the working tree but not yet staged, so a path no longer on disk is dropped — every
+// consumer reads or lints the file, and a deletion in flight would otherwise fail them.
 async function lint_target_files(root: string): Promise<ReadonlyArray<string>> {
 	const output = await git_spawn.read([...LS_FILES_FLAGS, WHOLE_TREE_PATHSPEC])
 
 	return split_names(output)
 		.filter((name) => is_lint_target(name))
 		.map((name) => path.resolve(root, name))
+		.filter((file_path) => existsSync(file_path))
 }
 
 const line_targets = {

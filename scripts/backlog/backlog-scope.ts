@@ -1,29 +1,28 @@
 import type { EpicNextResult } from '#scripts/epic/epic-report'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { AUTO_OK_LABEL, EPIC_LABEL, has_any_label } from '#scripts/issue/issue-labels'
+import { session_cite } from '#scripts/issue/session-cite'
 
-// Which open issues the backlog will not run, and why (joshuafolkken/kit#1652).
+// Which open issues the backlog will not run, and why.
 //
 // **The set is a subtraction, never a second membership rule.** Everything open that the pool did not
 // classify is out of scope, so this cannot drift from what `backlog:next` offers the way a
 // re-implemented "is it opted in" test would. What is decided per row is only the sentence saying
 // why, and each of those is read off a label rather than judged.
 //
-// It exists because the exclusion used to be silent: an issue without `auto-ok`, or a child of an
-// epic whose root lacks it, never enters the pool at all, so a person watching a `backlogrun` could
-// not tell "not opted in" from "the backlog has not reached it yet".
+// It exists because an issue without `auto-ok` never enters the pool at all, so without this a person
+// watching a `backlogrun` could not tell "not opted in" from "the backlog has not reached it yet".
 //
-// A child of an epic whose root lacks `auto-ok` is no longer one of those — since
-// joshuafolkken/kit#1668 its own label carries it into the standalone half, so it is offered rather
-// than explained. What is still explained here is the child of an epic that **is** opted in and that
-// the epic did not place, and telling that apart from a row past the listing cap is the whole of
-// `opted_in_reason` below.
+// A child of an epic whose root lacks `auto-ok` is not one of those — its own label carries it into
+// the standalone half, so it is offered rather than explained. What is explained here is the child of
+// an epic that **is** opted in and that the epic did not place, and telling that apart from a row past
+// the listing cap is the whole of `opted_in_reason` below.
 
 const EPIC_LABELS: ReadonlySet<string> = new Set([EPIC_LABEL])
 const AUTO_OK_LABELS: ReadonlySet<string> = new Set([AUTO_OK_LABEL])
 
 const NO_OPT_IN_REASON = 'not opted in — no `auto-ok` label'
-// Since joshuafolkken/kit#1668 this no longer speaks for the children: an epic that did not opt in
+// This does not speak for the children: an epic that did not opt in
 // offers none of them, but each child carrying `auto-ok` of its own is offered by the standalone
 // half. Saying "its children are not offered" here would contradict the plan's own ready section.
 const EPIC_NOT_OPTED_IN_REASON =
@@ -31,13 +30,13 @@ const EPIC_NOT_OPTED_IN_REASON =
 const EPIC_ROOT_REASON = 'epic root — a container, so its children are planned instead of it'
 const OPTED_IN_UNPLACED_REASON = 'opted in, but past the listing cap this ask could read'
 
-// The cap is what the row above says, and it used to be said of every opted-in row the plan could
-// not place — including the ones the cap had nothing to do with (joshuafolkken/kit#1668). An issue an
+// The cap is what the row above says, and it is not said of every opted-in row the plan could not
+// place — only of the ones the cap has to do with. An issue an
 // opted-in epic tracks is offered through that epic and not standalone, so when the epic did not
 // place it either, the epic is the fact worth naming and the cap is a misreport a reader acts on:
 // "past the cap" reads as "the next ask will offer it", and the next ask never does.
 function epic_tracked_reason(epic: number): string {
-	return `tracked by epic #${String(epic)}, which offers it instead of the standalone half`
+	return `tracked by epic ${session_cite.issue(epic)}, which offers it instead of the standalone half`
 }
 
 // `--exclude` drops an issue from every bucket, so an excluded one lands here. Named for what it is,
@@ -55,8 +54,8 @@ interface ScopeContext {
 	repo: string
 	exclude: ReadonlyArray<number>
 	// Which **opted-in** epic is withholding which issue — `epic_index.withheld_children`'s own answer,
-	// the one the pool decided membership from, so the sentence and the decision cannot disagree
-	// (joshuafolkken/kit#1668). A row in here is one an epic is genuinely offering instead.
+	// the one the pool decided membership from, so the sentence and the decision cannot disagree.
+	// A row in here is one an epic is genuinely offering instead.
 	tracked: ReadonlyMap<number, number>
 }
 

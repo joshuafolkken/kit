@@ -1,4 +1,5 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { session_cite } from '#scripts/issue/session-cite'
 import { epic_decision } from './epic-decision'
 import { epic_read } from './epic-read'
 import { format_dependency_links } from './epic-reference'
@@ -6,13 +7,12 @@ import { epic_relations } from './epic-relations'
 import { epic_remove_plan, type RemovePlan } from './epic-remove-plan'
 
 // `josh epic --remove <E> <M> <N> [<N2> ...] [--decision-file <path|->]` — delete a declared order
-// from the epic's body and from the native `blocked-by` relations in one input
-// (joshuafolkken/kit#1712).
+// from the epic's body and from the native `blocked-by` relations in one input.
 //
 // It is `--add`'s missing counterpart. `--add` exists because writing the declaration and the
 // relations separately is what leaves them disagreeing; deleting them separately leaves them
-// disagreeing in exactly the same way, and there was no command for it at all — so the only route
-// was the hand edit `CLAUDE.md` forbids, twenty-nine times over on epic joshuafolkken/kit#1262.
+// disagreeing in exactly the same way, and without a command for it the only route is the hand edit
+// `CLAUDE.md` forbids.
 
 const FAILURE_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
@@ -54,7 +54,9 @@ async function write_plan(
 ): Promise<void> {
 	await git_gh_command.issue_edit_body(String(epic_number), plan.body)
 	console.info(
-		`📋 Removed ${format_dependency_links(plan.links)} from epic #${String(epic_number)}.`,
+		session_cite.text(
+			`📋 Removed ${format_dependency_links(plan.links)} from epic ${session_cite.issue(epic_number)}.`,
+		),
 	)
 	report_relations(plan, await epic_relations.apply_relations(plan.removed, 'drop'))
 

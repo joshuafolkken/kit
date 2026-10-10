@@ -1,6 +1,6 @@
 # 独立した呼び出しは同じターンに載せる（joshuafolkken/kit#1304）
 
-`CLAUDE.md` →「Put every call that does not depend on another's result in the same turn」の正典。**常駐側にはトリガと判断基準の 1 行だけが残り、規則本文は `pnpm josh batch:guard` が効く瞬間に配送する**（joshuafolkken/kit#1524、`rule-delivery.md`、`docs/maintainers/turn-batching-rationale.md` → "Why it left residency (joshuafolkken/kit#1524)"）。実測・却下した機構案・経緯は `docs/maintainers/turn-batching-rationale.md` にある。
+「独立した呼び出しは同じターンに載せる」規則の正典。**常駐側には [`rule-delivery.md`](./rule-delivery.md) →「配送されている規則」への導線だけが残り、規則本文は `pnpm josh batch:guard` が効く瞬間に配送する**（joshuafolkken/kit#1524、`docs/maintainers/turn-batching-rationale.md` → "Why it left residency (joshuafolkken/kit#1524)"）。実測・却下した機構案・経緯は `docs/maintainers/turn-batching-rationale.md` にある。
 
 ## 何を求めているか
 
@@ -23,24 +23,15 @@
 
 ## ガードが見えないところ — ここでは自分で規則を当てる
 
-ガードは閉じた履歴（結果が返ったターンの並び）から判定し、共有ターゲットを持つ呼び出しは依存とみなして止めない。機構は `docs/josh-commands-automation.md` →「`josh batch:guard`」、却下した案は `docs/maintainers/turn-batching-rationale.md` → "Rejected mechanisms"、範囲が広がった経緯は `docs/maintainers/turn-batching-rationale.md` → "How the guard's scope grew"。
-
-- **いま中断しているターンの中身は見えない。** 同じターンの編集の先頭だけが拒否されることがあるが、壊れるのではなく失敗する — 再発行は本文に一致するか、一致せず報告される
-- **ファイル全体を書き出す `Write` は拒否しない**（再発行が兄弟の編集を上書きしうるため）
-- **`pnpm josh …` は読み取り専用の allow-list（`READ_JOSH_SUBCOMMANDS`）だけが bundleable** — 書き込む・送信するサブコマンドと、連鎖した行（`&&` / `|` / `>`）は通常判定に落ちる
-- **ツールを呼ばないターンと、ガードが `off` のレーン子** — 下の計測と合成コマンドが受け持つ
+中断中のターン・`Write`・書き込む `josh` サブコマンドや連鎖した行・ツールを呼ばないターン・ガードが `off` のレーン子は、ガードが止めない。止められなくても規則は同じく拘束する。一覧と機構は `docs/maintainers/turn-batching-rationale.md` → "Where the guard cannot see"、却下した案は `docs/maintainers/turn-batching-rationale.md` → "Rejected mechanisms"、範囲が広がった経緯は `docs/maintainers/turn-batching-rationale.md` → "How the guard's scope grew"。
 
 ## 事後の計測 — 実行タイミングレポートの `Round trips:`
 
-強制の代わりに、結果が毎回の計測に出る。**round trip は 1 ターンがまとめて出した呼び出しのかたまり 1 つ**で、しきい値 1.50 呼び出し/往復を下回ると 1 行の指摘が出る。`tool-less turns` はツールを 1 つも呼ばなかったターン数で、`batch:guard` が拒否できない発話だけのターンは自分で減らす。実装は `scripts/time-runtime/time-round-trips.ts`、詳細は `docs/josh-commands.md` の `time` の項、読み方と実測は `docs/maintainers/turn-batching-rationale.md` → "Reading the round-trip measurement"。
+**round trip は 1 ターンがまとめて出した呼び出しのかたまり 1 つ**で、しきい値 1.50 呼び出し/往復を下回ると 1 行の指摘が出る。`tool-less turns`（発話だけのターン）は自分で減らす。実装は `scripts/time-runtime/time-round-trips.ts`、読み方と実測は `docs/maintainers/turn-batching-rationale.md` → "Reading the round-trip measurement"。
 
 ## 実装中の独立編集に効く合成コマンド（joshuafolkken/kit#2202）
 
-レーン子ではガードが `off` なので、`Read` → `Edit` の交互の並びは誰にも止められない。**Step 0 が対象ファイルを列挙した時点で、`pnpm josh read:files <path> …` で読み取りを 1 回に畳み、続く別ファイルへの編集を 1 ターンに載せる**（`report-format.md` が導く）。書き込みは `pnpm josh edit:files` で畳む（joshuafolkken/kit#2366） — プランを 1 呼び出しで適用し、`old` が 1 箇所に一致しなければ拒否する。形式は `docs/josh-commands-run.md` →「`josh read:files`」と「`josh edit:files`」、経緯は `docs/maintainers/turn-batching-rationale.md` → "The composite commands"。
-
-## ガード発火時にも合成コマンドを手渡す（joshuafolkken/kit#2311）
-
-単発の読み取り（2 件以上）の連続でガードが発火すると、通知はそれを畳む `pnpm josh read:files` を貼り付け可能な形で渡す。単発 `Edit` の連続では、それらのファイルにわたる `pnpm josh edit:files` を添える（プラン本体はモデルが書く）。渡されたら、その 1 呼び出しで出し直す。
+**Step 0 が対象ファイルを列挙した時点で、`pnpm josh read:files <path> …` で読み取りを 1 回に畳み、続く独立した編集は `pnpm josh edit:files` の 1 呼び出しで送る**（`report-format.md` が導く。`old` が 1 箇所に一致しなければ拒否される）。ガードが発火して `read:files` / `edit:files` を手渡したら、その 1 呼び出しで出し直す。形式は `docs/josh-commands-run.md` →「`josh read:files`」と「`josh edit:files`」、経緯は `docs/maintainers/turn-batching-rationale.md` → "The composite commands"。
 
 ## マーカーテスト
 

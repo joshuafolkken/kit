@@ -6,15 +6,15 @@ import { oracle_firing, type FiringPoint } from './oracle-firing'
 import { shell_segments } from './shell-segments'
 import { tail_commands } from './tail-commands'
 
-// The one generic rule that turns a declared firing point into a delivered guard (joshuafolkken/kit#2324).
+// The one generic rule that turns a declared firing point into a delivered guard.
 // `oracle-firing.ts` records, per oracle, the action that must consult it first; this generates a
 // `DeliveredRule` for each such oracle — refused when the run performs the governed action without
 // having run the oracle's command earlier, stood down once it has.
 //
 // **It is `issue-scout`'s shape, generalized.** Each generated row refuses until its
-// `already_satisfied` stand-down reads the command off the tail — refuse the governed call, hand back the command,
-// stand down once that command is on the tail. What `issue-scout` and `issue-fold` hand-wrote per
-// oracle, this reads from the registry: the refusal is assembled from the oracle's decision, command,
+// `already_satisfied` stand-down reads the command off the tail — refuse the governed call, hand back
+// the command, stand down once that command is on the tail. What `issue-scout` hand-wrote per oracle,
+// this reads from the registry: the refusal is assembled from the oracle's decision, command,
 // answer vocabulary and single source, so no oracle carries a hand-written refusal of its own. **No new
 // delivery path** — the rows join `DELIVERED_RULES` and fire through the same `create_transcript_guard`
 // shell every other row uses.
@@ -71,7 +71,7 @@ function row_for(oracle: Oracle, firing_point: FiringPoint): DeliveredRule {
 
 // One row per oracle that declared a firing point, in registry order. Spread into `DELIVERED_RULES`
 // after the filing rows, so a firing point that overlaps a filing (`issue:lint`) delivers on the
-// reissue rather than ahead of `wip-cap` / `issue-scout`.
+// reissue rather than ahead of `filing-cap`.
 const ROWS: ReadonlyArray<DeliveredRule> = oracle_firing
 	.firing_oracles()
 	.map(({ oracle, firing_point }) => row_for(oracle, firing_point))

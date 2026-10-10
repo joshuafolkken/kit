@@ -1,6 +1,7 @@
 import { existsSync, globSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
+import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import { project_profile } from '#scripts/init/project-profile'
 import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { json_value } from '#scripts/lib/json-value'
@@ -49,6 +50,12 @@ function project_root(directory: string): string {
 			existsSync(path.join(candidate, PACKAGE_JSON)),
 		) ?? directory
 	)
+}
+
+// The kit repository itself rather than a consumer of it — the gate's and the detached ship's one
+// answer to whether kit-only checks run.
+function is_kit_repository(directory: string): boolean {
+	return !doctor_consumer.is_kit_consumer(project_root(directory))
 }
 
 function is_ignored(entry: string): boolean {
@@ -106,7 +113,7 @@ function is_declared(directory: string, package_name: string): boolean {
 }
 
 // A tool the manifest lists but `node_modules` lacks is a project that has not run `pnpm install`
-// yet — typically right after `josh init` added it (joshuafolkken/kit#2709). Skipping it would pass a
+// yet — typically right after `josh init` added it. Skipping it would pass a
 // check the configuration asks for without running it, so only an undeclared tool is skipped; a
 // declared one is run and fails until it is installed.
 function missing_tool_reason(
@@ -124,7 +131,7 @@ function skip_notice(check: string, reason: string): string {
 }
 
 // Shared by `josh check` and the gate's type-check step, so neither reaches `tsc` on a basic
-// project that has nothing to type-check (joshuafolkken/kit#2709).
+// project that has nothing to type-check.
 function type_check_skip_reason(directory: string): string | undefined {
 	if (!is_basic(directory)) return undefined
 	if (!has_files(directory, TYPE_FILES)) return 'no TypeScript files were found'
@@ -135,7 +142,7 @@ function type_check_skip_reason(directory: string): string | undefined {
 
 // Shared by `josh lint`, `josh lint:related` and `josh format`, so a basic project without Web
 // files — a Python or Rust project, which `josh init` gives no Prettier — is skipped for the same
-// reason by all three (joshuafolkken/kit#2606, joshuafolkken/kit#2709).
+// reason by all three.
 function prettier_skip_reason(directory: string): string | undefined {
 	if (!is_basic(directory)) return undefined
 	if (!has_files(directory, WEB_FILES)) return 'no HTML, CSS or JavaScript files were found'
@@ -144,7 +151,7 @@ function prettier_skip_reason(directory: string): string | undefined {
 }
 
 // Shared by `josh lint`, `josh lint:related` and `josh format`, so a basic project without ESLint
-// is skipped for the same reason by all three (joshuafolkken/kit#2693, joshuafolkken/kit#2709).
+// is skipped for the same reason by all three.
 function eslint_skip_reason(directory: string): string | undefined {
 	if (!is_basic(directory)) return undefined
 	if (!has_files(directory, SCRIPT_FILES)) return 'no JavaScript or TypeScript files were found'
@@ -163,6 +170,7 @@ const project_checks = {
 	has_config,
 	has_files,
 	is_basic,
+	is_kit_repository,
 	prettier_skip_reason,
 	project_root,
 	skip_notice,

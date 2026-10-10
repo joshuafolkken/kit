@@ -29,9 +29,10 @@ whether *several findings from one session* are one Issue — and reads the **sa
 same conjunction**: separability, and whether the whole clearly exceeds one gate.
 `pnpm josh issue:fold "<title>" …` answers `fold` / `separate` / `no-fold-needed`; its size half is
 `pnpm josh split:assess`, called not recomputed, and `separate` needs both halves exactly as `split`
-does. **There is no second criterion.** `observation-filing.md`'s observation, the review round cap's branch 2 and `prerequisite.md`'s
-prerequisite each route a second filing through it, delivered by `pnpm josh rule:guard` at the run's
-second `pnpm josh issue:file` call, never the first.
+does. A diff with no non-test file, or none readable, answers `undetermined`: the size is then the
+whole request's estimate above. **There is no second criterion.** `observation-filing.md`'s observation, the review round cap's branch 2 and `prerequisite.md`'s
+prerequisite each route a second filing through it — `pnpm josh issue:file` asks it itself at the
+run's second filing, never the first, and holds only a `fold`.
 
 ## Diff size is not a reason to split, and that is measured
 
@@ -76,7 +77,8 @@ moment that child merges and closes.
 
 **Each split child is filed with the `route:split` label** —
 `pnpm josh issue:file "<sub-title>" --body-file <body-file> --depth <n> --route split` — so the
-backlog's composition stays countable by filing route rather than by grepping issue bodies.
+backlog's composition stays countable by filing route rather than by grepping issue bodies. A split of
+a person's `kickoff new` also takes `--requested` (`kickoff.md` → "Words typed after `new`").
 
 ## Promote, or create a new epic
 

@@ -88,7 +88,7 @@ Refuse a file read once the run has read the threshold's worth of un-edited file
 
 - On the `Bash` side only read-only lines are refused (`bat`, `cat`, `head`, `less`, `more`, `nl`, `sed`, `tail`); a delegation clears the pending set.
 - **Search turns are counted as well** (`fd`, `find`, `grep`, `rg`): the third search turn since the last delegation or successful write is refused, parallel searches in one turn counting once. Every read-only search counts, the run's own instructions included — a search's named files cannot show a bare directory beside them, so no search can be proven to touch the instructions alone.
-- The refusal points at the `investigator` agent (`.claude/agents/investigator.md`, shipped through the plugin as `kit:investigator`): no `model` key, so it inherits the parent's, with `effort: low` and read-only tools. Excludes the run's own instructions (`CLAUDE.md`, `prompts/`, `.claude/skills/`) and harness session files.
+- The refusal points at the `investigator` agent (`.claude/agents/investigator.md`, shipped through the plugin as `kit:investigator`): `model: sonnet`, with `effort: low` and read-only tools. Excludes the run's own instructions (`CLAUDE.md`, `prompts/`, `.claude/skills/`) and harness session files.
 - **A notice, not a refusal, in a dispatched lane child** (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn, so the guard delivers the same guidance as a non-blocking notice — the read proceeds with the guidance attached, and the notice **names the concrete unedited files** the run read. Why: `docs/maintainers/josh-commands-automation-rationale.md` → "The investigation guard is a notice in a lane child". Decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts`.
 - Set `JOSH_INVESTIGATION_GUARD` to `off` / `0` / `false` / `no` to disable.
 
@@ -120,7 +120,6 @@ Deliver a rule at the tool call that binds it, instead of carrying it resident i
 **The rules it delivers today:**
 
 - **Direct filing** — trigger is a hand-built filing (`gh issue create`, or a `title`-bearing POST to a path ending `/issues`); refused on every occurrence and pointed at [`josh issue:file`](josh-commands-backlog.md#josh-issuefile), which runs every filing step itself.
-- **Backlog WIP cap** — trigger is a `Bash` call that files an Issue (`pnpm josh issue:file`).
 - **Issue comments** — trigger reads an Issue body without them (`gh issue view <N>`, or a `GET` ending `…/issues/<N>`); hands over `gh issue view <N> --comments`.
 - **Piped verification** — trigger is a josh check (`gate`, `check`, `lint*`, `cspell*`, `test*`, `eval`, `overrides`, `ranges`) standing anywhere but the last pipeline segment.
 - **Early heartbeat** — trigger is a `Bash` call whose whole purpose is to wait; `pnpm josh run:progress --once` / `--wait` are exempt.
@@ -128,7 +127,11 @@ Deliver a rule at the tool call that binds it, instead of carrying it resident i
 - **The implementation-phase cut row**: the trigger is an `Edit` / `Write` from a **lane** working tree that has not yet taken its cut, once the recent-context verdict (`pnpm josh cost --cut`'s, unmeasurable read `!== UNDER` on the safety-net side) is over the shared threshold, handing over `pnpm josh run:cut --impl <N> --handoff <path>`. Unlike the pre-gate row it **fires on every threshold crossing**: once per run left a `busy` / `failed` verdict to grow the context unwatched, so it carries `decide` and lets an edit reissued right after a refusal through. The verdict read is reused over a few-second per-checkout window. `.claude/skills/workflow-commands/pre-gate-cut.md` is the single source.
 - **Bare `pnpm josh git`** — trigger is a `pnpm josh git` with no `-y` / `--yes`; it prompts to confirm the staging, cancels with no TTY, and the run reissues with `-y` after throwing the time away. Hands over `pnpm josh git -y "<title> #<N>"`. Disjoint from the run-tail push row by the flag — that one requires `-y`, this refuses its absence — and it fires on every occurrence.
 
-Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. Some rows deliver once per run; some — force push / branch delete, direct filing, the bare-`git` and run-tail push rows, and the implementation-phase cut — fire on every occurrence; and a row that asks for an earlier command (`issue:fold`, the Issue comments, `pkg:scout`, the rule-body placement questions) refuses every call until that command is on the transcript.
+Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. Some rows deliver once per run; some — force push / branch delete, direct filing, the bare-`git` and run-tail push rows, and the implementation-phase cut — fire on every occurrence; and a row that asks for an earlier command (the Issue comments, `pkg:scout`, the rule-body placement questions) refuses every call until that command is on the transcript.
+
+### `josh rule:list`
+
+Print the trigger-delivered rules `rule-delivery.md` points at: one item per guard row of `scripts/rules/delivered-rules.ts`, then the `Stop` hook's rows — single source, hook, trigger, silence. The prose comes from `scripts/rules/rule-registry.ts`, joined by `id`; a row with no entry prints as missing and fails `rule-list.test.ts`. A hookless agent reads it as its checklist.
 
 ### `josh pretool:guard`
 
@@ -142,19 +145,20 @@ The Codex counterpart of `pretool:guard` and `format:edited`: `pretool` or `post
 
 ### `josh stop:guard`
 
-The `Stop` hook: one process delivering the four stop-time rules — stop-notification, hold-release, filing-offer and issue-citation all **block** the stop, since `{"decision":"block"}` is a `Stop` hook's one channel to the model. A reply whose prose offers to file an Issue ("起票してよければ", "Shall I file …") on a turn whose transcript tail holds no filing that a guard let through is sent back to file it with `pnpm josh issue:file`, because a first-party filing is Tier A (`observation-filing.md`); it stays silent when the reply names a third-party `owner/repo` or the session owner cannot be read, since a Tier C filing is never prompted. A bare `#N` in the reply's prose is fed back so the model reissues the reply with a number-link; the detection skips a `#N` inside a fenced code block, inline code, a quote line, or right after `PR` / `pull request`. Built on `hook-decision.ts`, `lane-park.ts`, `filing-cap.ts`, `repo-party.ts` and `run:hold`; fails open, and `stop_hook_active` breaks a block loop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
+The `Stop` hook: one process delivering the four stop-time rules — stop-notification, hold-release, filing-offer and issue-citation all **block** the stop, since `{"decision":"block"}` is a `Stop` hook's one channel to the model. In an unattended run (a headless session kit launched, a lane child, or the `backlogrun` parent), a reply whose prose offers to file an Issue ("起票してよければ", "Shall I file …") on a turn whose transcript tail holds no filing that a guard let through is sent back to file it with `pnpm josh issue:file`, because a first-party filing is Tier A (`observation-filing.md`); it stays silent when the reply names a third-party `owner/repo` or the session owner cannot be read, since a Tier C filing is never prompted, and in an interactive session, where asking before filing is correct. A bare `#N` in the reply's prose is fed back so the model reissues the reply with a number-link; the detection skips a `#N` inside a fenced code block, inline code, a quote line, or right after `PR` / `pull request`. Built on `hook-decision.ts`, `lane-park.ts`, `filing-cap.ts`, `repo-party.ts` and `run:hold`; fails open, and `stop_hook_active` breaks a block loop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
 
 `backlogrun`'s ordinary parent loop and the fetch of the next issue are handled by the supervisor process, so `stop:guard` does not count fetching the next issue toward a block. When a named epic is handed to a headless session for a decision, the lane-child wait protection still applies. Stall and leftover detection runs at the `Stop` event.
 
 ### `josh session:lang`
 
-Print the language this session writes in, resolved from `JOSH_SESSION_LANG`. Wired to `UserPromptSubmit` so the value is injected every turn.
+Print the language this session writes in, resolved from `JOSH_SESSION_LANG`. Wired to `UserPromptSubmit`; the `ja` default prints nothing.
 
 ```json
 { "type": "command", "command": "pnpm josh session:lang", "timeout": 10 }
 ```
 
 - Read via `process.loadEnvFile` (environment wins). Unset / empty / no-`.env` resolve to `ja`; `JOSH_SESSION_LANG=en` opts into English.
+- While a `backlogrun` is live in the repository, it also prints one line telling the session to answer a progress question with `pnpm josh run:board --chat`, so a session that is not driving the run gets the rule too. No run, no line.
 
 ### `josh e2e:retry-check`
 
@@ -332,6 +336,10 @@ pnpm josh measure:rerun 2212
 
 Related: [`josh observations:flush`](#josh-observationsflush), [`josh issue:lint`](josh-commands-backlog.md#josh-issuelint).
 
+### `josh observation:record`
+
+Count a `- k:<key>` sighting across `.josh/observations/`, append it, and print `file` (the second sighting — file it) or `ledger`; earlier sightings go to stderr. A malformed or `k:example` line is refused with exit 1. `--checkout <path>` uses another repository's ledger. The rule: `.claude/skills/workflow-commands/observation-ledger.md`.
+
 ### `josh review:record`
 
 Record a `/code-review` round's findings so they survive the run. It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the issue's own file of the observation ledger (`.josh/observations/<N>.md`, in the work tree the command runs in — a lane's inside a lane) — the same append-only ledger the observation lines use, under a distinct `- rf:` prefix so the `- k:` grammar never treats a finding as its own. It is the one write path for findings.
@@ -339,10 +347,11 @@ Record a `/code-review` round's findings so they survive the run. It appends one
 ```bash
 pnpm josh review:record --issue 2325 bug-risks:medium:src/foo.ts:42 tests:low:a.test.ts
 pnpm josh review:record --issue 2325          # a zero-finding round — records one `none` line
+pnpm josh review:record --issue 2325 --comment  # a round that passed after the PR opened — an Issue comment, no append
 pnpm josh review:record --check --issue 2325  # the merge gate: was it recorded?
 ```
 
-**Behavior:** each positional is `<category>:<severity>:<file>`, split on its first two colons so a `:line` citation stays in the file field. The category must be one of the nine review-rubric categories and the severity one of `high` / `medium` / `low`, or the call is refused. A call with no findings writes a single `- rf:none | none | - | <date> | #<issue>` line, so a round that found nothing is recorded rather than mistaken for a round nobody reviewed. Both the append and `--check` use the primary checkout's ledger, even when run in a lane — a lane's own copy never reaches the default branch. `pnpm josh observations:flush` commits the appended lines like any other ledger change.
+**Behavior:** each positional is `<category>:<severity>:<file>`, split on its first two colons so a `:line` citation stays in the file field. The category must be one of the nine review-rubric categories and the severity one of `high` / `medium` / `low`, or the call is refused with the usage and the accepted categories and severities, listed from the ledger's own constants. A call with no findings writes a single `- rf:none | none | - | <date> | #<issue>` line, so a round that found nothing is recorded rather than mistaken for a round nobody reviewed. `--comment` posts the same lines as a comment on the issue and appends nothing — for a round that passed after the pull request opened, where a line in the tree would be pushed onto it and restart its CI. Both the append and `--check` use the primary checkout's ledger, even when run in a lane — a lane's own copy never reaches the default branch. `pnpm josh observations:flush` commits the appended lines like any other ledger change.
 
 **`--check --issue <N>` is the merge gate** [`josh followup`](#josh-followup) runs: a `- rf:` line for the issue is `ok`, its absence is `missing`, no ledger `not-required`.
 
@@ -387,6 +396,7 @@ pnpm josh release --dry-run   # count and report, write nothing
 **Options:**
 
 - `--dry-run` — count and report only; writes nothing, fetches nothing, and creates no work tree.
+- `--help` / `-h` — print the usage line and exit 0 without fetching or releasing. Any other argument is refused with the usage line and a non-zero exit, before anything is fetched.
 - `JOSH_RELEASE_TAG_TIMEOUT_SECONDS` (env) — tag-watch budget, default 30 minutes.
 - `JOSH_RELEASE_NPM_TIMEOUT_SECONDS` (env) — npm-publish watch budget, default 30 minutes.
 - `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS` (env) — GitHub Release watch budget, default 30 minutes.
@@ -417,6 +427,8 @@ Create the GitHub Release for a tag `josh release` cut, with notes generated fro
 ```bash
 GH_TOKEN=… RELEASE_TAG=v1.2.0 GITHUB_REPOSITORY=owner/repo pnpm josh release:github
 ```
+
+It takes no arguments: `--help` / `-h` prints the usage line and exits 0 without reading the environment or releasing, and any other argument is refused with the usage line and a non-zero exit, before anything is released.
 
 | Environment             | Meaning                                                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------------------------------- |

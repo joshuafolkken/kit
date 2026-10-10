@@ -1,4 +1,5 @@
 import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { session_cite } from '#scripts/issue/session-cite'
 import { describe, expect, it, vi, type Mock } from 'vitest'
 import { epic_candidate_confirm, type ConfirmContext } from './epic-candidate-confirm'
 import { epic_classify } from './epic-classify'
@@ -252,7 +253,9 @@ describe('epic_candidate_confirm.answer_for_repo — a read that failed', () => 
 		const answer = await epic_candidate_confirm.answer_for_repo(children, state)
 
 		expect(answer.children).toEqual([])
-		expect(warn.mock.calls[0]?.[0]).toContain('could not confirm the blockers of #1')
+		expect(warn.mock.calls[0]?.[0]).toContain(
+			`could not confirm the blockers of ${session_cite.issue(1, undefined, REPO)}`,
+		)
 		warn.mockRestore()
 	})
 })

@@ -1,15 +1,16 @@
 import { git_command } from '#scripts/git/git-command'
+import { json_value } from '#scripts/lib/json-value'
 import { package_with_version_schema } from '#scripts/lib/schemas'
 import { version_targets } from '#scripts/version/version-targets'
 import { release_plan, type ReleasePlan, type VersionedCommit } from './release-plan'
 
 // Reading main's history for the two numbers a release is made of: where the version last changed,
-// and how many merges have landed since (joshuafolkken/kit#1169).
+// and how many merges have landed since.
 
 const { PACKAGE_JSON } = version_targets
 
 // How far back the search for "the commit that last changed the version" goes, counted in commits
-// that touched `package.json`. Once children stop bumping (joshuafolkken/kit#1486) that file still
+// that touched `package.json`. Once children stop bumping that file still
 // changes for every dependency update, so the base can sit several entries down — but a repository
 // that has taken thirty `package.json` commits without a single release has a different problem, and
 // guessing past that point would be worse than saying so.
@@ -18,8 +19,7 @@ const BASE_SEARCH_LIMIT = 30
 // **Which ref the history is read from.** `josh release` runs on a pulled default branch, so `HEAD`
 // is main there and the default is right. A caller on a feature branch names the ref it means —
 // `origin/main` — because `--first-parent` from a branch tip walks that branch rather than main, and
-// the count would silently omit every merge main took after the branch was cut
-// (joshuafolkken/kit#1486).
+// the count would silently omit every merge main took after the branch was cut.
 const DEFAULT_TIP = 'HEAD'
 
 // The reads this module makes, named so a test can answer them without a git repository. Production
@@ -42,11 +42,7 @@ const git_reader: HistoryReader = {
 function parse_version(content: string | undefined): string | undefined {
 	if (content === undefined) return undefined
 
-	try {
-		return package_with_version_schema.parse(JSON.parse(content)).version
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(content, package_with_version_schema)?.version
 }
 
 async function read_version_at(
@@ -90,7 +86,7 @@ async function read_base(
 
 // The version `package.json` carries at a git revision. `josh release` reads it from
 // `origin/<default>` rather than from the checkout's own `package.json`, so the number it raises is
-// main's latest even when the run happens in a work tree cut for the release (joshuafolkken/kit#2411).
+// main's latest even when the run happens in a work tree cut for the release.
 async function read_current_version(
 	tip: string = DEFAULT_TIP,
 	reader: HistoryReader = git_reader,

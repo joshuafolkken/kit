@@ -134,4 +134,21 @@ describe('issue_cite_cli.run — the failures', () => {
 		expect(code).toBe(FAILURE)
 		expect(reported()).toContain(issue_cite_cli.USAGE)
 	})
+
+	// joshuafolkken/kit#3592: the flags were read by a bare `parseArgs`, so an unknown one threw
+	// `ERR_PARSE_ARGS_UNKNOWN_OPTION` out of `run` instead of being refused.
+	it('refuses an unknown flag with usage and reads nothing', async () => {
+		const code = await issue_cite_cli.run([ISSUE_A, '--bogus'])
+
+		expect(code).toBe(FAILURE)
+		expect(reported()).toContain(issue_cite_cli.USAGE)
+		expect(classified_mock).not.toHaveBeenCalled()
+	})
+
+	it('refuses a --repo given no value with usage', async () => {
+		const code = await issue_cite_cli.run([ISSUE_A, '--repo'])
+
+		expect(code).toBe(FAILURE)
+		expect(reported()).toContain(issue_cite_cli.USAGE)
+	})
 })

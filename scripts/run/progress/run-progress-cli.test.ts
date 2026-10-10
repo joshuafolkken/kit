@@ -381,4 +381,9 @@ describe('the watch loop — josh followup ends it at the merge', () => {
 
 		expect(output.warned).toEqual([run_progress_cli.WAIT_EXPIRED_NOTICE])
 	})
+
+	// joshuafolkken/kit#3438: the pane a person watches the stream in is the board, not the event watch.
+	it('names the board pane as where the reports are read', () => {
+		expect(run_progress_cli.WAIT_EXPIRED_NOTICE).toContain('`pnpm josh run:board` pane')
+	})
 })

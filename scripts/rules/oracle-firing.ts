@@ -1,7 +1,7 @@
 import { decision_oracle } from './decision-oracle'
 import { shell_segments } from './shell-segments'
 
-// The firing-point declaration every decision oracle owes (joshuafolkken/kit#2324). An oracle records a
+// The firing-point declaration every decision oracle owes. An oracle records a
 // *decision*, but nothing on the oracle entry says which action must consult it first — so the 32
 // oracles have a command each and a firing point almost never. This module is the missing half: for
 // every oracle name, either the governed action (a `FiringPoint`, matched as a Bash command) or the
@@ -32,8 +32,8 @@ function is_package_add(command: string): boolean {
 }
 
 // The firing point wired — the oracle whose governed call can be named without guessing: the package
-// add. The Issue filing's `issue:lint` point left with joshuafolkken/kit#2808, when `josh issue:file`
-// began running the lint itself. The rest declare why none can be named, so the unenforced oracles are
+// add. The Issue filing needs no `issue:lint` point, because `josh issue:file` runs the lint itself.
+// The rest declare why none can be named, so the unenforced oracles are
 // visible rather than silently missing.
 const FIRING: ReadonlyMap<string, FiringPoint> = new Map([
 	[
@@ -49,7 +49,7 @@ const FIRING: ReadonlyMap<string, FiringPoint> = new Map([
 // oracles already gated or sequenced elsewhere. `PHASE` — the governed act is a run phase, not one
 // shell call. `READ` — it answers a status question and governs no action of its own. `SELF` — the
 // command is itself the act, with nothing earlier to gate. A guard for any of these would fire on the
-// wrong turn or double-gate a call another rule already claims; `release:scope` (joshuafolkken/kit#2334)
+// wrong turn or double-gate a call another rule already claims; `release:scope`
 // is the one that *trails* rather than gates — it reads state that only exists after the merge.
 const PHASE =
 	'the act it governs is a phase of a run, not a single shell call a trigger can anchor on'
@@ -60,7 +60,7 @@ const LATEST_SCOPE_REASON =
 	'the run it governs (`pnpm josh latest`) is already gated at its point of use by the latest-gate; ' +
 	'a firing here would double-gate it'
 // `josh issue:file` runs the scout, the lint and `epic:bundle` itself, and a filing made any other way
-// is refused by the `direct-filing` row (joshuafolkken/kit#2808) — so none of the three has a call left
+// is refused by the `direct-filing` row — so none of the three has a call left
 // to gate before.
 const FILING_STEP_REASON =
 	'`pnpm josh issue:file` runs it as one of its filing steps, and a direct filing is refused by the ' +
@@ -83,10 +83,7 @@ const NOT_NAMED: ReadonlyMap<string, string> = new Map([
 	['epic:bundle', FILING_STEP_REASON],
 	['issue:scout', FILING_STEP_REASON],
 	['issue:lint', FILING_STEP_REASON],
-	[
-		'issue:fold',
-		'the second filing it governs is already gated by the `issue-fold` delivered rule',
-	],
+	['issue:fold', '`issue:file` asks the fold question itself on the second filing it governs'],
 	['cases', READ],
 	['issue:state', READ],
 	['run:cut:resume', SELF],

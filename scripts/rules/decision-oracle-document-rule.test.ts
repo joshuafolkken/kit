@@ -1,6 +1,7 @@
 import { read_repo_file } from '#scripts/document/ai-document-fixture'
 import { decision_oracle } from '#scripts/rules/decision-oracle'
 import { describe, expect, it } from 'vitest'
+import { rule_list } from './rule-list'
 
 // joshuafolkken/kit#2117: question 0 of the rule-placement criterion lives in residency.md as the
 // single source, and both CLAUDE.md and SKILL.md §3 carry a pointer rather than repeating it.
@@ -11,6 +12,7 @@ import { describe, expect, it } from 'vitest'
 const RESIDENCY = 'prompts/collaboration-workflow/residency.md'
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const CLAUDE = 'CLAUDE.md'
+const RULE_DELIVERY = 'prompts/collaboration-workflow/rule-delivery.md'
 
 // The unique marker for question 0 in residency.md. The phrase appears only in the question 0
 // criterion — the previous criterion used a "question 1 / question 2" numbering.
@@ -34,9 +36,12 @@ describe('residency.md carries question 0 as the single source', () => {
 
 // joshuafolkken/kit#3256 moved question 0 out of residency: it matters only on the turn a rule is
 // placed, where the rule-prose hook delivers it. CLAUDE.md keeps the pointer to the criterion.
-describe('CLAUDE.md points at the residency criterion', () => {
-	it('names residency.md, which carries oracle:list', () => {
-		expect(read_repo_file(CLAUDE)).toContain(RESIDENCY)
+// joshuafolkken/kit#3395: CLAUDE.md routes to the delivery enumeration, which lists residency.md.
+describe('CLAUDE.md reaches the residency criterion through the delivery enumeration', () => {
+	it('names rule-delivery.md, which lists residency.md', () => {
+		expect(read_repo_file(CLAUDE)).toContain(RULE_DELIVERY)
+		expect(read_repo_file(RULE_DELIVERY)).toContain('pnpm josh rule:list')
+		expect(rule_list.render()).toContain('`residency.md`')
 	})
 })
 

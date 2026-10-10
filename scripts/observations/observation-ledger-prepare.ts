@@ -1,12 +1,12 @@
 import { observation_ledger_home } from './observation-ledger-home'
 import { observation_ledger_line, type BrokenLine } from './observation-ledger-line'
 
-// **What has to hold before a ledger line is committed, asked by every path that commits one**
-// (joshuafolkken/kit#2763): `pnpm josh observations:flush`, the run's own commit in
+// **What has to hold before a ledger line is committed, asked by every path that commits one**:
+// `pnpm josh observations:flush`, the run's own commit in
 // `scripts/git/git-staging.ts` and `pnpm josh followup`'s pre-merge ledger commit. Lines still on an
-// old path are moved first (joshuafolkken/kit#2724, joshuafolkken/kit#2919), so the commit carries the
+// old path are moved first, so the commit carries the
 // move and the lines together, and every entry line is then parsed against the grammar
-// (joshuafolkken/kit#2123) — each caller decides what a broken line costs it.
+// — each caller decides what a broken line costs it.
 //
 // **A ledger that is not there has no line to break** — the change a status saw is then its deletion,
 // and a commit carries that like any other change to it.

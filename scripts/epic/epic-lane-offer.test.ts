@@ -16,6 +16,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ConfirmContext } from './epic-candidate-confirm'
 import { epic_classify } from './epic-classify'
 import type { EpicChild, IssueReference } from './epic-graph'
+import { epic_label_age } from './epic-label-age'
 import { epic_lane_offer, type LaneRequest, type RepoPool } from './epic-lane-offer'
 
 // joshuafolkken/kit#1491: how many children a repository has room to start. The occupancy is counted
@@ -76,6 +77,7 @@ beforeEach(() => {
 	vi.clearAllMocks()
 	// Every holder these cases list is running; a stale one is `epic-solo-stale.test.ts`'s case.
 	vi.spyOn(lane_await, 'is_process_running_default').mockReturnValue(true)
+	vi.spyOn(epic_label_age, 'read_ages').mockResolvedValue(new Map())
 })
 
 describe('epic_lane_offer.offer_for_repo — how many children fit', () => {
@@ -144,6 +146,44 @@ describe('epic_lane_offer.offer_for_repo — a repository with no free lane', ()
 		const offer = await epic_lane_offer.offer_for_repo([pool([child(FIRST)])], request(ONE_LANE))
 
 		expect(offer.children).toEqual([])
+	})
+})
+
+// joshuafolkken/kit#3400: the stale-label rule is applied by age, so the age is printed beside the
+// holder it belongs to rather than left to a hand-written timeline query.
+describe('epic_lane_offer.offer_for_repo — the label age of each holder', () => {
+	it('prints each holder with the age of its label', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome(holders([HOLDER])))
+		vi.mocked(epic_label_age.read_ages).mockResolvedValueOnce(
+			new Map([[HOLDER, 'in-progress for 95 min — stale']]),
+		)
+
+		const offer = await epic_lane_offer.offer_for_repo([pool([child(FIRST)])], request(ONE_LANE))
+
+		expect(offer.notice).toContain(`#${String(HOLDER)}`)
+		expect(offer.notice).toContain('(in-progress for 95 min — stale)')
+		expect(epic_label_age.read_ages).toHaveBeenCalledWith([HOLDER], REPO, expect.any(Date))
+	})
+
+	it('prints the age beside a holder when a lane is still free', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome(holders([HOLDER])))
+		vi.mocked(epic_label_age.read_ages).mockResolvedValueOnce(
+			new Map([[HOLDER, 'in-progress for 12 min']]),
+		)
+
+		const offer = await epic_lane_offer.offer_for_repo([pool([child(FIRST)])], request(TWO_LANES))
+
+		expect(numbers_of(offer.children)).toEqual([FIRST])
+		expect(offer.notice).toContain(`#${String(HOLDER)}`)
+		expect(offer.notice).toContain('(in-progress for 12 min)')
+	})
+
+	it('reads no label age when nothing holds a lane', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
+
+		await epic_lane_offer.offer_for_repo([pool([child(FIRST)])], request(ONE_LANE))
+
+		expect(epic_label_age.read_ages).not.toHaveBeenCalled()
 	})
 })
 

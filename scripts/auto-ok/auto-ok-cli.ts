@@ -10,9 +10,9 @@ import { cutoff_cause, cutoff_of, type ScanCutoff } from '#scripts/git/listing-c
 import { read_json_listing } from '#scripts/git/parse-json-array'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
 import { AUTO_OK_LABEL } from '#scripts/issue/issue-labels'
+import { session_cite } from '#scripts/issue/session-cite'
 
-// `josh auto-ok:next` — which issue outside the epic an unattended run picks up next
-// (joshuafolkken/kit#906).
+// `josh auto-ok:next` — which issue outside the epic an unattended run picks up next.
 //
 // A command rather than a documented `gh` invocation, for the reason the label constant exists: the
 // name `auto-ok` is single-sourced in `scripts/issue/issue-labels.ts`, and a procedure that told an
@@ -33,29 +33,23 @@ const USAGE = `Usage: josh auto-ok:next [${EXCLUDE_FLAG} <issue-number>[,<issue-
 const NONE_TOKEN = 'none'
 // Wide enough that the cap is never what decides the order. The listing is newest first because
 // `git-gh-issue-list.ts` spells `sort=created&direction=desc` into every request rather than leaning
-// on REST's default (joshuafolkken/kit#1025), so a truncated listing drops the *oldest* opted-in
+// on REST's default, so a truncated listing drops the *oldest* opted-in
 // issues — which is reported rather than silently ranked.
 const LISTING_LIMIT = 200
 
 // Two different gaps, told apart because they send a person to two different places. A listing that
 // never arrived is an access or connectivity problem; a listing that arrived in a shape the schema
 // rejects is the rows' fields having changed under the REST mapping in `git-gh-issue-rest.ts`, where
-// `gh auth status` is green and checking it wastes the one hint the message had to give
-// (joshuafolkken/kit#996).
-//
-// The second message named `gh --version` until joshuafolkken/kit#1069. The listing has been REST
-// since joshuafolkken/kit#1025 and `git-gh-issue-list.ts` builds the JSON this parser reads, so the
-// CLI's version cannot be what changed the row shape — the same misdirection the message below
-// already refuses to repeat for the blocker relations, left standing one constant above it.
+// `gh auth status` is green and checking it wastes the one hint the message had to give. Neither
+// names `gh --version`: the listing is REST and `git-gh-issue-list.ts` builds the JSON this parser
+// reads, so the CLI's version cannot be what changed the row shape.
 const UNREADABLE_MESSAGE = `Could not read the \`${AUTO_OK_LABEL}\` listing. That is not "nothing is opted in" — check \`gh auth status\` and ask again.`
 const UNEXPECTED_SHAPE_MESSAGE = `Read the \`${AUTO_OK_LABEL}\` listing but could not parse it. That is not "nothing is opted in" — the rows came back in a shape this command does not recognize, so check the fields it asks for and the REST field mapping in \`scripts/gh/git-gh-issue-rest.ts\` rather than your authentication.`
 // The blocker relations failing takes the whole listing with them, and `issue_list` swallows
 // the error — so the read looks exactly like an access failure and sends the reader to
-// `gh auth status`, which is green. That is the misdirection joshuafolkken/kit#996 added the message
-// above to remove, walked straight back in by the field the same change started asking for
-// (joshuafolkken/kit#1005).
+// `gh auth status`, which is green — the misdirection the message above exists to remove.
 //
-// The listing is REST now, so the cause is no longer `gh`'s version: the relations come from each
+// The cause is not `gh`'s version either: the relations come from each
 // issue's own `dependencies/blocked_by` endpoint, and it is those requests — not the CLI — that the
 // probe has just shown to be the difference. Naming `gh --version` here would send a reader on a
 // current `gh` to the one place the answer is not.
@@ -63,12 +57,12 @@ const UNEXPECTED_SHAPE_MESSAGE = `Read the \`${AUTO_OK_LABEL}\` listing but coul
 // It names both causes rather than asserting one. The probe separates "the relations" from "the
 // listing", and it cannot separate a host that does not serve dependencies from a rate limit reached
 // by the one-request-per-blocked-issue pass — so claiming the first would be the same misdirection
-// in a new place (joshuafolkken/kit#1025).
+// in a new place.
 const BLOCKERS_UNREADABLE_MESSAGE = `Could not read the \`${AUTO_OK_LABEL}\` listing, though the same listing reads once the blocker relations are dropped from it — so it is reading the relations that failed, not your authentication. That is one \`dependencies/blocked_by\` request per opted-in issue declaring a blocker: either this GitHub host does not serve issue dependencies, or those requests are being rate limited. Ask again, and check the host if it persists.`
 // Said once the answer is known, so it never claims there is an answer below when there is not.
 // Either cutoff only ever drops the *oldest* opted-in issues, the listing being newest first, so the
 // consequence is one sentence — but the two cite different numbers and a reader who wants the
-// listing widened reaches for a different knob for each (joshuafolkken/kit#1067).
+// listing widened reaches for a different knob for each.
 const TRUNCATED_BY_LIMIT = `hit the ${String(LISTING_LIMIT)}-issue cap`
 const TRUNCATED_WITH_ANSWER =
 	'; the answer below is opted in, but it may not be the highest-priority one.'
@@ -81,8 +75,8 @@ function truncated_cause(cutoff: ScanCutoff): string | undefined {
 
 const NONE_OPTED_IN_MESSAGE = `No open issue carries \`${AUTO_OK_LABEL}\`.`
 // The epic listing failing is not "no epic tracks anything". Read that way, every child of every
-// epic reads as a standalone candidate and the pickup hands one back out of its epic's order — the
-// single failure joshuafolkken/kit#1633 is about, arriving with exit 0 and nothing said.
+// epic reads as a standalone candidate and the pickup hands one back out of its epic's order,
+// arriving with exit 0 and nothing said.
 const EPICS_UNREADABLE_MESSAGE = `Could not read the epic listing, so which issues an epic already tracks is unknown. That is not "no epic tracks anything" — an opted-in child would be handed back outside its epic's order, so no answer is given. Check \`gh auth status\` and ask again.`
 const CLOSED_STATE = 'CLOSED'
 const NO_CUTOFF: ScanCutoff = 'none'
@@ -91,12 +85,12 @@ const NO_CUTOFF: ScanCutoff = 'none'
 // effect asynchronously, so for a few seconds after a merge the issue is still listed as open —
 // which is why `prioritize` takes this number at all, and why a pickup loop that never passes it
 // leaves an already-merged issue to be excluded only by the `in-progress` label it happens to still
-// carry (joshuafolkken/kit#906).
+// carry.
 interface NextOptions {
 	// Every number the caller asked to skip. A pickup loop passes the ones it has already run this
 	// session, not just the last: `closes #N` can fail to fire — a reference dropped from a PR body —
 	// and the `in-progress` label the procedure itself calls an unreliable guard is then the only
-	// thing standing between the loop and running an issue twice (joshuafolkken/kit#996).
+	// thing standing between the loop and running an issue twice.
 	exclude?: ReadonlyArray<number>
 	usage?: string
 }
@@ -134,7 +128,7 @@ function parse_pair(argv: ReadonlyArray<string>, index: number): ReadonlyArray<n
 // argument.
 //
 // `usage` is a parameter so a second command with the same `--exclude` grammar reuses this rather
-// than copying the loop — `josh backlog:next` does (joshuafolkken/kit#1630). Only the line printed on
+// than copying the loop — `josh backlog:next` does. Only the line printed on
 // a bad argument differs between them, and a caller that passes nothing gets this command's own.
 function parse_options(argv: ReadonlyArray<string>, usage: string = USAGE): NextOptions {
 	const exclude: Array<number> = []
@@ -150,23 +144,22 @@ function parse_options(argv: ReadonlyArray<string>, usage: string = USAGE): Next
 
 // Every open issue carrying the label, or which of two gaps stopped the read. Neither gap is an
 // empty listing: reading a failed read as "none" ends the run reporting a confident absence built on
-// a response nobody parsed (joshuafolkken/kit#950). They stay apart from each other because the zod
+// a response nobody parsed. They stay apart from each other because the zod
 // rejection `parse_json_array_or_undefined` deliberately rethrows means the listing's *fields*
-// changed, not that the caller's authentication lapsed (joshuafolkken/kit#996).
+// changed, not that the caller's authentication lapsed.
 type OptedInRead =
 	| { kind: 'read'; issues: Array<OpenIssueData>; cutoff: ScanCutoff }
 	| { kind: 'unreadable' }
 	| { kind: 'unexpected_shape' }
 	| { kind: 'blockers_unreadable' }
 
-// The two gaps `read_json_listing` names, carried through unchanged. Since joshuafolkken/kit#1025
-// `raw` is the JSON `git-gh-issue-list.ts` assembles from the REST rows rather than a CLI's stdout,
+// The two gaps `read_json_listing` names, carried through unchanged. `raw` is the JSON `git-gh-issue-list.ts` assembles from the REST rows rather than a CLI's stdout,
 // so a transport failure — a rate limit, a dropped connection — never reaches this parser at all:
 // `issue_list` catches it into `json === undefined` and `classify_failed_read` decides what it
 // was. What does reach here is the rethrown zod rejection, meaning the listing arrived and its
 // *fields* were not what was asked for. `unreadable` is passed on rather than folded away because
-// reading a gap as an empty listing is the confident absence kit#950 exists to prevent, and this is
-// not the place to make that assumption.
+// reading a gap as an empty listing is a confident absence built on a response nobody parsed, and
+// this is not the place to make that assumption.
 function parse_listing(raw: string, is_capped: boolean): OptedInRead {
 	const read = read_json_listing(raw, open_issue_schema)
 	if (read.kind !== 'read') return { kind: read.kind }
@@ -180,8 +173,7 @@ function parse_listing(raw: string, is_capped: boolean): OptedInRead {
 
 // Whether the *identical* listing reads once `blockedBy` is dropped from it. Named for what it
 // answers rather than for what it implies, because the two are opposite: a `true` here means the
-// field was the problem, and an earlier spelling returned the failure instead — correct only because
-// its one call site inverted it back (joshuafolkken/kit#1005).
+// field was the problem.
 //
 // **Only the field list changes.** Varying the limit as well would let a rate limit or a timeout that
 // a smaller request happens to survive read as the blocker relations failing, on a host that serves
@@ -200,8 +192,7 @@ async function reads_without_blocked_by(): Promise<boolean> {
 // success of that form is not enough on its own: a network blip or a passing rate limit on the first
 // read clears by the time the probe runs, and the run would then send someone whose host serves
 // dependencies perfectly well to look at it. `issue_list` swallows the underlying error, so
-// repeating the original read is what separates a transient failure from a standing one
-// (joshuafolkken/kit#1005).
+// repeating the original read is what separates a transient failure from a standing one.
 async function classify_failed_read(): Promise<OptedInRead> {
 	if (!(await reads_without_blocked_by())) return { kind: 'unreadable' }
 
@@ -226,14 +217,12 @@ async function fetch_opted_in(): Promise<OptedInRead> {
 // relation `epic:next` builds its graph from, and each blocker's state comes back alongside its
 // number, so no blocker needs a read of its own.
 //
-// The relations are not in the listing response at all since joshuafolkken/kit#1025 — REST serves
-// them from each issue's own dependencies endpoint — so this pickup pays one extra request per row
+// The relations are not in the listing response at all — REST serves them from each issue's own dependencies endpoint — so this pickup pays one extra request per row
 // whose own dependency summary does not report exactly zero blockers, and nothing for the rest.
 //
 // An unattended run must not start an issue whose prerequisite is still open: `auto-ok` is applied
-// by a person to an issue they judged needs no decision, which says nothing about ordering, and the
-// pickup previously consulted only the `epic` / `in-progress` / `needs-decision` labels
-// (joshuafolkken/kit#996). A blocker with no state reads as standing — the safe direction, since the
+// by a person to an issue they judged needs no decision, which says nothing about ordering.
+// A blocker with no state reads as standing — the safe direction, since the
 // cost is deferring an issue rather than implementing one out of order.
 // `nodes` is a page — fifty under GraphQL, one hundred under REST. When `totalCount` says there are
 // more, the ones outside the page are unknown, and unknown reads as standing — the same direction
@@ -248,7 +237,7 @@ function is_page_complete(blocked_by: OpenIssueData['blockedBy']): boolean {
 
 // `epic_issue.normalize_state` rather than a second spelling of it: the epic commands already read
 // GitHub's state casing through one function, and "is this blocker closed" is the question it
-// answers (joshuafolkken/kit#862). A blocker reported without a state reads as standing.
+// answers. A blocker reported without a state reads as standing.
 function is_closed(blocker: { state?: string | undefined }): boolean {
 	return epic_issue.normalize_state(blocker.state ?? '') === CLOSED_STATE
 }
@@ -261,21 +250,20 @@ function is_unblocked(issue: OpenIssueData): boolean {
 
 // Which issues an epic already tracks, or that the epic listing could not be read.
 //
-// **The question is membership, not a label** (joshuafolkken/kit#1633). An epic's child carries none
+// **The question is membership, not a label**. An epic's child carries none
 // of `epic` / `in-progress` / `needs-decision`, so the label comparison inside `prioritize` never
-// saw one — and `auto-ok` on a child put that child in the standalone candidate set, where the
+// sees one — and `auto-ok` on a child would put that child in the standalone candidate set, where the
 // epic's `blockedBy` ordering is never consulted. The epics themselves are still found by the `epic`
 // label, exactly as `epic:bundle` finds them, so this does not survive an epic that never received
-// it — what it removes is the *child's* labels deciding, which is the half that was failing.
+// it — what it removes is the *child's* labels deciding.
 //
-// **The whole index is carried rather than its key set** (joshuafolkken/kit#1668). Which epic tracks
+// **The whole index is carried rather than its key set**. Which epic tracks
 // a child decides both whether the standalone half withholds it — `epic_index.withheld_children` —
-// and, when it is withheld, the number `backlog:plan` names as the reason. Flattening to a `Set`
-// here threw that number away, so the plan reported a listing cap it had never reached.
+// and, when it is withheld, the number `backlog:plan` names as the reason.
 //
-// **And every tracking epic, not one winner** (joshuafolkken/kit#1694). Two epics can name the same
+// **And every tracking epic, not one winner**. Two epics can name the same
 // child, and a map of one epic per child keeps whichever came last — so an opted-in epic that came
-// earlier vanished, and the child was offered standalone *and* through that epic.
+// earlier would vanish, and the child be offered standalone *and* through that epic.
 type TrackingRead =
 	| { kind: 'read'; index: ReadonlyMap<number, ReadonlyArray<number>>; cutoff: ScanCutoff }
 	| { kind: 'epics_unreadable' }
@@ -313,8 +301,7 @@ async function fetch_tracking(count: number): Promise<TrackingRead> {
 // The pickup *order* is `git_next_issues.order` itself, not a copy of it: the ranking `prioritize`
 // shows, with the `epic` / `in-progress` / `needs-decision` exclusions, before its display cap.
 //
-// The two are no longer the same *set*, and deliberately so: since joshuafolkken/kit#996 the pickup
-// also drops a candidate whose prerequisite is still open, while `🗒 Next issues` shows every open
+// The two are not the same *set*, and deliberately so: the pickup also drops a candidate whose prerequisite is still open, while `🗒 Next issues` shows every open
 // issue and leaves the judgement to the person reading it. So the display can name an issue this
 // command refuses — a person can see a blocked issue is next and decide to start it anyway, and an
 // unattended run must not.
@@ -326,20 +313,19 @@ async function fetch_tracking(count: number): Promise<TrackingRead> {
 // `prioritize`'s capped one, which would answer `none` whenever its first rows happen to be blocked
 // while a runnable issue sits below them. They are applied **after** the ranking, not before it: the
 // dependents key counts the issues waiting on a row, and a waiting issue is by definition blocked —
-// filtered first, every row would count zero and the key would never decide anything
-// (joshuafolkken/kit#2928).
+// filtered first, every row would count zero and the key would never decide anything.
 //
 // The `🗒 Next issues` display is deliberately *not* filtered this way; `git-next-issues.ts` records
 // why, and the short version is that a person can see a blocked issue and choose to start it anyway
-// while an unattended run cannot (joshuafolkken/kit#1005).
+// while an unattended run cannot.
 //
 // A child of an epic that is itself opted in is dropped here for the same reason and by the same
 // rule: that epic's declared order sequences its children, and it is going to offer them, so a
-// standalone offer would skip the order and hand the same issue over twice (joshuafolkken/kit#1633).
-// **A child of an epic that is *not* opted in is no longer dropped** — no path would ever offer it,
-// which made a person's `auto-ok` on the child silently inert, and the order it does have is carried
-// by the native `blockedBy` relations `is_unblocked` already refuses to run past
-// (joshuafolkken/kit#1668). `tracked` is the narrowed set `epic_index.withheld_children` builds, not
+// standalone offer would skip the order and hand the same issue over twice.
+// **A child of an epic that is *not* opted in is kept** — no path would otherwise offer it, which
+// would make a person's `auto-ok` on the child silently inert, and the order it does have is carried
+// by the native `blockedBy` relations `is_unblocked` already refuses to run past.
+// `tracked` is the narrowed set `epic_index.withheld_children` builds, not
 // every tracked child; this function only applies it.
 function is_runnable(
 	issue: OpenIssueData,
@@ -370,7 +356,7 @@ function none_reason(count: number): string {
 
 // Said only when the cap actually bit, and worded from the answer rather than before it: the one run
 // where truncation matters is the one where everything listed was excluded, and announcing "the
-// answer below is opted in" there contradicted the `none` that followed (joshuafolkken/kit#996).
+// answer below is opted in" there contradicted the `none` that followed.
 function truncation_note(cutoff: ScanCutoff, has_answer: boolean): string | undefined {
 	const cause = truncated_cause(cutoff)
 	if (cause === undefined) return undefined
@@ -414,14 +400,14 @@ function report(context: PickupContext): number {
 		return SUCCESS_EXIT_CODE
 	}
 
-	console.error(`#${String(next.number)} ${next.title}`)
+	console.error(session_cite.issue(next.number, next.title))
 	console.info(String(next.number))
 
 	return SUCCESS_EXIT_CODE
 }
 
 // The second listing runs only once the first one has an answer to filter, and its failure is
-// reported rather than folded into "no epic tracks anything" (joshuafolkken/kit#1633).
+// reported rather than folded into "no epic tracks anything".
 async function answer(
 	read: { issues: Array<OpenIssueData>; cutoff: ScanCutoff },
 	exclude?: ReadonlyArray<number>,
@@ -444,7 +430,7 @@ async function answer(
 }
 
 // The gap that stopped the read decides the message, so a changed field list does not send anyone to
-// `gh auth status` (joshuafolkken/kit#996).
+// `gh auth status`.
 const READ_FAILURE_MESSAGES = {
 	unreadable: UNREADABLE_MESSAGE,
 	unexpected_shape: UNEXPECTED_SHAPE_MESSAGE,
@@ -474,7 +460,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 // `process.exitCode` rather than `process.exit()`: the answer is written with `console.info`, and on
 // macOS a write to a pipe is asynchronous — `process.exit()` can tear the process down before it has
 // drained, and this command's whole contract is `answer=$(pnpm josh auto-ok:next)`. The same shape
-// is already in `scripts/cost-runtime/cost-cli.ts`, which met the truncation first (joshuafolkken/kit#996).
+// is already in `scripts/cost-runtime/cost-cli.ts`, which met the truncation first.
 async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }

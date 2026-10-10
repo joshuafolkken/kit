@@ -3,6 +3,8 @@ import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
 import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
+import { hook_context_line } from './hook-context-line'
+import { piped_verification } from './piped-verification'
 import { rule_value, type RuleReading } from './rule-value'
 import { rule_value_fixture } from './rule-value-fixture'
 
@@ -11,15 +13,15 @@ const { TIMESTAMP, assistant_line, call_line, reading_for, result_line, session,
 	rule_value_fixture
 const NEXT_TIMESTAMP = '2026-09-09T00:00:01.000Z'
 const LATER_TIMESTAMP = '2026-09-09T00:00:02.000Z'
-const FILED_TIMESTAMP = '2026-09-09T00:00:09.000Z'
-const WIP_CAP = 'wip-cap'
+const TRIGGER_TIMESTAMP = '2026-09-09T00:00:09.000Z'
+// The worked example of a row with a neutral trigger and a recorded compliance call: the body read
+// reaches it, the comments read in front of it keeps it.
 const ISSUE_COMMENTS = 'issue-comments'
 // The filing cap declares no `keeps` — staying under a cap is not a call — so it reads unmeasured
 // (joshuafolkken/kit#2119).
 const FILING_CAP_ID = 'filing-cap'
 
 const FILING = 'pnpm josh issue:file "x" --body-file b.md --depth 1'
-const COUNT = 'gh api repos/o/r/issues?state=open --jq length'
 const BODY_READ = 'gh api repos/o/r/issues/12'
 const COMMENTS_READ = 'gh api repos/o/r/issues/12/comments'
 
@@ -64,37 +66,37 @@ function turn_lines(commands: ReadonlyArray<string>): string {
 
 describe('rule_value.measure — what the carried text earns unaided', () => {
 	it('counts only sessions whose trigger was actually reached', () => {
-		expect(reading_for(WIP_CAP, [[session('ls')], [session(FILING)]]).sessions).toBe(1)
+		expect(reading_for(ISSUE_COMMENTS, [[session('ls')], [session(BODY_READ)]]).sessions).toBe(1)
 	})
 
 	it('reads a run and its delegated units as one timeline, never as separate runs', () => {
-		// The parent counted, the unit it delegated filed. Scored per file this is two runs, one of
+		// The parent read the comments, the unit it delegated read the body. Scored per file this is two runs, one of
 		// them "trigger reached, not kept"; scored per run it is one run that kept the rule.
-		const reading = reading_for(WIP_CAP, [[session(COUNT), session(FILING)]])
+		const reading = reading_for(ISSUE_COMMENTS, [[session(COMMENTS_READ), session(BODY_READ)]])
 
 		expect(reading.sessions).toBe(1)
 		expect(reading.unaided_kept).toBe(1)
 	})
 
 	it('orders a run by timestamp, not by the order its transcripts were handed in', () => {
-		// `list_sessions` returns newest first, so the parent that filed can arrive ahead of the unit
-		// that counted. Read back to back that scores "trigger reached, not kept"; read as one
-		// timeline it is a run that kept the rule.
-		const filed = call_line(FILING, FILED_TIMESTAMP)
-		const counted = call_line(COUNT, NEXT_TIMESTAMP)
-		const reading = reading_for(WIP_CAP, [[filed, counted]])
+		// `list_sessions` returns newest first, so the parent that read the body can arrive ahead of the
+		// unit that read the comments. Read back to back that scores "trigger reached, not kept"; read
+		// as one timeline it is a run that kept the rule.
+		const body_read = call_line(BODY_READ, TRIGGER_TIMESTAMP)
+		const comments_read = call_line(COMMENTS_READ, NEXT_TIMESTAMP)
+		const reading = reading_for(ISSUE_COMMENTS, [[body_read, comments_read]])
 
 		expect(reading.unaided_kept).toBe(1)
 	})
 
 	it('credits keeping the rule when it happened before the trigger fired', () => {
-		expect(reading_for(WIP_CAP, [[session(COUNT, FILING)]]).unaided_kept).toBe(1)
+		expect(reading_for(ISSUE_COMMENTS, [[session(COMMENTS_READ, BODY_READ)]]).unaided_kept).toBe(1)
 	})
 
 	it('does not credit compliance that came after the trigger', () => {
-		// The refusal is what produced the count here, so it is the delivery's contribution and not
+		// The refusal is what produced the comments read here, so it is the delivery's contribution and not
 		// the carried text's — the distinction the whole measurement rests on.
-		const reading = reading_for(WIP_CAP, [[session(FILING, COUNT)]])
+		const reading = reading_for(ISSUE_COMMENTS, [[session(BODY_READ, COMMENTS_READ)]])
 
 		expect(reading.sessions).toBe(1)
 		expect(reading.unaided_kept).toBe(0)
@@ -105,9 +107,10 @@ describe('rule_value.measure — what the carried text earns unaided', () => {
 // is a neutral act** (joshuafolkken/kit#1643).
 describe('rule_value.measure — the situation a rule governs', () => {
 	it('leaves the denominator at the trigger for a rule that declares no reached-situation test', () => {
-		// wip-cap's trigger is the filing, which a run keeping the rule makes too — so a run that
-		// counted and never filed never reached the rule at all and must stay out of the denominator.
-		expect(reading_for(WIP_CAP, [[session(COUNT)]]).sessions).toBe(0)
+		// issue-comments' trigger is the body read, which a run keeping the rule makes too — so a run
+		// that read the comments and never the body never reached the rule at all and must stay out of
+		// the denominator.
+		expect(reading_for(ISSUE_COMMENTS, [[session(COMMENTS_READ)]]).sessions).toBe(0)
 	})
 
 	it('counts a run that reached the situation compliantly, though its trigger never fired', () => {
@@ -120,27 +123,25 @@ describe('rule_value.measure — the situation a rule governs', () => {
 	})
 })
 
-describe('rule_value.measure — the comments rule', () => {
-	it('scores the comments rule from a comments read that preceded the body read', () => {
-		const kept = reading_for(ISSUE_COMMENTS, [[session(COMMENTS_READ, BODY_READ)]])
-		const missed = reading_for(ISSUE_COMMENTS, [[session(BODY_READ)]])
-
-		expect(kept.unaided_kept).toBe(1)
-		expect(missed.unaided_kept).toBe(0)
-	})
-})
-
 describe('rule_value.measure — refusals and unmeasurable rules', () => {
 	it('counts a delivered refusal from the reason the hook wrote back', () => {
-		const text = `${session(FILING)}\n${result_line(delivered_rules.WIP_CAP_REASON)}`
+		const text = `${session(BODY_READ)}\n${result_line(delivered_rules.ISSUE_COMMENTS_REASON)}`
 
-		expect(reading_for(WIP_CAP, [[text]]).refusals).toBe(1)
+		expect(reading_for(ISSUE_COMMENTS, [[text]]).refusals).toBe(1)
+	})
+
+	it('still counts a refusal delivered before the reason was reworded', () => {
+		const former =
+			"⛔ an Issue's comments are part of the Issue: read them before implementing, not only the body."
+		const text = `${session(BODY_READ)}\n${result_line(former)}`
+
+		expect(reading_for(ISSUE_COMMENTS, [[text]]).refusals).toBe(1)
 	})
 
 	it("does not read another rule's refusal as this one's", () => {
-		const text = `${session(FILING)}\n${result_line(delivered_rules.SHELL_BODY_REASON)}`
+		const text = `${session(BODY_READ)}\n${result_line(delivered_rules.SHELL_BODY_REASON)}`
 
-		expect(reading_for(WIP_CAP, [[text]]).refusals).toBe(0)
+		expect(reading_for(ISSUE_COMMENTS, [[text]]).refusals).toBe(0)
 	})
 
 	it('does not read a session that merely opened the source file as a refusal', () => {
@@ -153,19 +154,46 @@ describe('rule_value.measure — refusals and unmeasurable rules', () => {
 			timestamp: TIMESTAMP,
 			message: {
 				content: [
-					{ type: 'tool_result', content: delivered_rules.WIP_CAP_REASON, is_error: false },
+					{ type: 'tool_result', content: delivered_rules.ISSUE_COMMENTS_REASON, is_error: false },
 				],
 			},
 		})
 
-		expect(reading_for(WIP_CAP, [[`${session(FILING)}\n${read_result}`]]).refusals).toBe(0)
+		expect(reading_for(ISSUE_COMMENTS, [[`${session(BODY_READ)}\n${read_result}`]]).refusals).toBe(
+			0,
+		)
 	})
 
 	it('never reports more refusals than runs that reached the trigger', () => {
-		const text = `${session('ls')}\n${result_line(delivered_rules.WIP_CAP_REASON)}`
-		const reading = reading_for(WIP_CAP, [[text]])
+		const text = `${session('ls')}\n${result_line(delivered_rules.ISSUE_COMMENTS_REASON)}`
+		const reading = reading_for(ISSUE_COMMENTS, [[text]])
 
 		expect(reading.refusals).toBeLessThanOrEqual(reading.sessions)
+	})
+})
+
+// joshuafolkken/kit#3570: a rewritten call leaves only the note the hook attached.
+const PIPED_VERIFICATION = 'piped-verification'
+
+function context_line(content: string): string {
+	const attachment = { type: hook_context_line.HOOK_CONTEXT_TYPE, content: [content] }
+
+	return JSON.stringify({ type: 'attachment', timestamp: TIMESTAMP, attachment })
+}
+
+describe('rule_value.measure — a rewrite is a delivery', () => {
+	it('counts the rewrite note as a rewrite, not a refusal', () => {
+		const text = `${session('ls')}\n${context_line(piped_verification.PIPEFAIL_NOTE)}`
+		const reading = reading_for(PIPED_VERIFICATION, [[text]])
+
+		expect(reading.rewrites).toBe(1)
+		expect(reading.refusals).toBe(0)
+	})
+
+	it("does not read another hook's context as a rewrite", () => {
+		const text = `${session('ls')}\n${context_line(delivered_rules.SHELL_BODY_REASON)}`
+
+		expect(reading_for(PIPED_VERIFICATION, [[text]]).rewrites).toBe(0)
 	})
 })
 
@@ -174,9 +202,9 @@ describe('rule_value.measure — a refusal is read from the block, not from the 
 		// The test this replaced matched `"is_error":true` against the raw line, so one whitespace in
 		// the serializer would take every rule's `refused` column to zero — indistinguishable from a
 		// hook that never fired (joshuafolkken/kit#1642).
-		const spaced = `{"type":"user","timestamp":"${TIMESTAMP}","message":{"content":[{"type":"tool_result","content":${JSON.stringify(delivered_rules.WIP_CAP_REASON)},"is_error": true}]}}`
+		const spaced = `{"type":"user","timestamp":"${TIMESTAMP}","message":{"content":[{"type":"tool_result","content":${JSON.stringify(delivered_rules.ISSUE_COMMENTS_REASON)},"is_error": true}]}}`
 
-		expect(reading_for(WIP_CAP, [[`${session(FILING)}\n${spaced}`]]).refusals).toBe(1)
+		expect(reading_for(ISSUE_COMMENTS, [[`${session(BODY_READ)}\n${spaced}`]]).refusals).toBe(1)
 	})
 
 	it('does not lend an errored block its successful neighbor on the same line', () => {
@@ -188,12 +216,12 @@ describe('rule_value.measure — a refusal is read from the block, not from the 
 			message: {
 				content: [
 					{ type: 'tool_result', content: 'unrelated failure', is_error: true },
-					{ type: 'tool_result', content: delivered_rules.WIP_CAP_REASON, is_error: false },
+					{ type: 'tool_result', content: delivered_rules.ISSUE_COMMENTS_REASON, is_error: false },
 				],
 			},
 		})
 
-		expect(reading_for(WIP_CAP, [[`${session(FILING)}\n${mixed}`]]).refusals).toBe(0)
+		expect(reading_for(ISSUE_COMMENTS, [[`${session(BODY_READ)}\n${mixed}`]]).refusals).toBe(0)
 	})
 
 	it('does not read one errored dump of the enumeration as a refusal by every rule', () => {
@@ -251,6 +279,7 @@ describe('rule_value.measure — rules nothing can score', () => {
 			sessions: 3,
 			unaided_kept: 0,
 			refusals: 0,
+			rewrites: 0,
 			is_measurable: false,
 		}
 
@@ -290,15 +319,15 @@ describe('rule_value.measure — rules nothing can score', () => {
 
 describe('rule_value.measure — the rates it reports', () => {
 	it('gives no rate for a rule no session reached', () => {
-		const reading = reading_for(WIP_CAP, [[session('ls')]])
+		const reading = reading_for(ISSUE_COMMENTS, [[session('ls')]])
 
 		expect(rule_value.unaided_rate(reading)).toBeUndefined()
 	})
 
 	it('reports the unaided rate as a percentage of the sessions that reached the trigger', () => {
-		const runs = [[session(COUNT, FILING)], [session(FILING)], [session(FILING)]]
+		const runs = [[session(COMMENTS_READ, BODY_READ)], [session(BODY_READ)], [session(BODY_READ)]]
 
-		expect(rule_value.unaided_rate(reading_for(WIP_CAP, runs))).toBe(33)
+		expect(rule_value.unaided_rate(reading_for(ISSUE_COMMENTS, runs))).toBe(33)
 	})
 
 	it('survives a line that is not JSON', () => {
@@ -402,13 +431,9 @@ describe('rule_value.measure — what counts as one turn', () => {
 const PARENT_MESSAGE_ID = 'msg_parent'
 
 // The parent message's opening block: a thought, no call, carrying the id at t0 so the turn opens
-// before the unit's call at t2 and closes with the filing at t9.
+// before the unit's call at t2 and closes with the body read at t9.
 function thought_line(timestamp: string = TIMESTAMP): string {
-	return assistant_line(
-		[{ type: 'text', text: 'planning the filing' }],
-		timestamp,
-		PARENT_MESSAGE_ID,
-	)
+	return assistant_line([{ type: 'text', text: 'planning the read' }], timestamp, PARENT_MESSAGE_ID)
 }
 
 function parent_call_line(command: string, timestamp: string): string {
@@ -417,12 +442,13 @@ function parent_call_line(command: string, timestamp: string): string {
 
 describe('rule_value.measure — a folded turn is not reordered around a unit call', () => {
 	it('reads a unit call that landed between two blocks of a parent message in timeline order', () => {
-		// The parent opens with a thought at t0 and files (its trigger) at t9; a delegated unit counts
-		// open Issues (keeps) at t2, between them. Placing the folded parent turn at t0 absorbs the t9
-		// filing, so the trigger is read before the t2 count and the run is scored "reached, not kept".
-		const parent = `${thought_line()}\n${parent_call_line(FILING, FILED_TIMESTAMP)}`
-		const unit = call_line(COUNT, LATER_TIMESTAMP)
-		const reading = reading_for(WIP_CAP, [[parent, unit]])
+		// The parent opens with a thought at t0 and reads the body (its trigger) at t9; a delegated unit
+		// reads the comments (keeps) at t2, between them. Placing the folded parent turn at t0 absorbs
+		// the t9 body read, so the trigger is read before the t2 comments read and the run is scored
+		// "reached, not kept".
+		const parent = `${thought_line()}\n${parent_call_line(BODY_READ, TRIGGER_TIMESTAMP)}`
+		const unit = call_line(COMMENTS_READ, LATER_TIMESTAMP)
+		const reading = reading_for(ISSUE_COMMENTS, [[parent, unit]])
 
 		expect(reading.unaided_kept).toBe(1)
 	})

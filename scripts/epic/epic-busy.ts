@@ -7,21 +7,19 @@ import {
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
 } from '#scripts/issue/issue-labels'
+import { session_cite } from '#scripts/issue/session-cite'
 
 // How much of a repository's parallelism is already spoken for — asked of the *repository*, never of
-// the epic (joshuafolkken/kit#925), and counted rather than treated as a yes/no since
-// joshuafolkken/kit#1491.
+// the epic, and counted rather than treated as a yes/no.
 //
 // `epic-classify.ts` sorts only the children the epic tracks, so an `in-progress` issue belonging to
 // a *different* epic is invisible to it: start two `epicrun`s and both answer "nothing of mine is in
 // progress". This read is what closes that gap, and it is deliberately outside the classification —
 // the question is not about the graph.
 //
-// **What an `in-progress` issue holds is one lane, not the repository.** Until joshuafolkken/kit#1490
-// the contended resource really was one working tree, one `main` and one `pnpm-lock.yaml`, so one
-// holder excluded everything. A lane is its own checkout with its own branch and its own ports, so
-// the question stopped being "is anything running" and became "how many are running" — and the
-// answer is a count the caller compares against `lane_capacity`'s limit.
+// **What an `in-progress` issue holds is one lane, not the repository.** A lane is its own checkout
+// with its own branch and its own ports, so the question is not "is anything running" but "how many
+// are running" — and the answer is a count the caller compares against `lane_capacity`'s limit.
 //
 // **The count is read from GitHub, never kept in the session.** Two `epicrun`s counting to six in
 // their own memory give twelve lanes; the label on an open issue is the one record both of them
@@ -37,14 +35,14 @@ const LISTING_LIMIT = 100
 // `issue-labels.ts` records: GitHub keeps the spelling a label was created with.
 //
 // `already-done` joins `needs-decision` here for the same reason it joins it in
-// `epic_classify.local_category` (joshuafolkken/kit#1679): the run that applied it committed
+// `epic_classify.local_category`: the run that applied it committed
 // nothing, so the checkout it ran in is clean and there is no uncommitted work for the next child to
 // start on top of. That is exactly what separates both from `needs-human-review`, which is
 // deliberately not parked because its work is still sitting in the tree.
 const PARKED_LABELS: ReadonlySet<string> = new Set([NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL])
 
-// What one repository answered. `unreadable` is kept apart from `idle` for the reason
-// joshuafolkken/kit#950 records: reading a failed read as an empty listing is a confident absence
+// What one repository answered. `unreadable` is kept apart from `idle` because reading a failed
+// read as an empty listing is a confident absence
 // built on a response nobody parsed — and here that absence *starts* work, which is the one
 // direction a guard must never fail in.
 //
@@ -55,12 +53,14 @@ const PARKED_LABELS: ReadonlySet<string> = new Set([NEEDS_DECISION_LABEL, ALREAD
 // children are read first, and one that could not be read is already an anomaly that exits 1. What
 // is left at this line is transient, and `wait` self-heals where an exit needs a person.
 //
-// **`truncated` is kept apart from `idle` for the same reason, one step further in**
-// (joshuafolkken/kit#1067). Since the page ceiling applies to every listing, a listing can now come
+// **`truncated` is kept apart from `idle` for the same reason, one step further in**.
+// Since the page ceiling applies to every listing, a listing can now come
 // back well-formed, short, and missing the very issue that holds this repository — and "no holder in
 // the rows I was given" is not "no holder". It is grouped with `unreadable` rather than with `idle`
 // because what it authorizes is identical: nothing. It gets its own kind only so the message names
 // the real cause — `unreadable_message` sends a reader to `gh auth status`, which is green here.
+const NO_AGES: ReadonlyMap<number, string> = new Map()
+
 type BusyRead =
 	| { kind: 'idle' }
 	| { kind: 'busy'; issues: ReadonlyArray<OpenIssueData> }
@@ -69,9 +69,25 @@ type BusyRead =
 
 // Named so the reader can go and look at them: the stale-label rule is what keeps an abandoned
 // `in-progress` from holding a repository forever, and it cannot be applied to an issue nobody was
-// told about.
-function format_holders(issues: ReadonlyArray<OpenIssueData>): string {
-	return issues.map((issue) => `#${String(issue.number)} ${issue.title}`).join(', ')
+// told about. Each holder's label age is printed beside it when the caller read one,
+// since the age is what that rule is applied against.
+function format_holder(
+	issue: OpenIssueData,
+	repo: string,
+	ages: ReadonlyMap<number, string>,
+): string {
+	const cite = session_cite.issue(issue.number, issue.title, repo)
+	const age = ages.get(issue.number)
+
+	return age === undefined ? cite : `${cite} (${age})`
+}
+
+function format_holders(
+	issues: ReadonlyArray<OpenIssueData>,
+	repo: string,
+	ages: ReadonlyMap<number, string>,
+): string {
+	return issues.map((issue) => format_holder(issue, repo, ages)).join(', ')
 }
 
 // How many lanes this read shows occupied. Every kind but `busy` is zero, and the two that could not
@@ -87,8 +103,9 @@ function occupancy_message(
 	issues: ReadonlyArray<OpenIssueData>,
 	repo: string,
 	limit: number,
+	ages: ReadonlyMap<number, string> = NO_AGES,
 ): string {
-	return `${String(issues.length)} of ${String(limit)} lanes in use in ${repo}: ${format_holders(issues)}.`
+	return `${String(issues.length)} of ${String(limit)} lanes in use in ${repo}: ${format_holders(issues, repo, ages)}.`
 }
 
 // The occupancy said once, with the consequence appended — rather than a second sentence that
@@ -97,15 +114,16 @@ function lanes_full_message(
 	issues: ReadonlyArray<OpenIssueData>,
 	repo: string,
 	limit: number,
+	ages: ReadonlyMap<number, string> = NO_AGES,
 ): string {
-	return `${occupancy_message(issues, repo, limit)} No lane is free, so nothing is offered here. A lane is released when its child merges or is parked; if a label is stale, remove it and ask again, and \`JOSH_LANE_LIMIT\` is what raises the ceiling.`
+	return `${occupancy_message(issues, repo, limit, ages)} No lane is free, so nothing is offered here. A lane is released when its child merges or is parked; if a label is stale, remove it and ask again, and \`JOSH_LANE_LIMIT\` is what raises the ceiling.`
 }
 
 function unreadable_message(repo: string): string {
 	return `Could not read the \`${IN_PROGRESS_LABEL}\` listing for ${repo}. That is not "nothing is running" — check \`gh auth status\` and ask again.`
 }
 
-// Said in the `⚠ … cap` shape joshuafolkken/kit#1033 settled on, because it is the same kind of
+// Said in the shared `⚠ … cap` shape, because it is the same kind of
 // statement: the read happened and covered less than the whole listing. What it means here is
 // stronger than elsewhere, so the message says the consequence out loud rather than leaving a reader
 // to infer it from a warning marker.
@@ -129,8 +147,13 @@ const BUSY_REASONS: Readonly<
 	truncated: truncated_message,
 }
 
-function busy_reason(read: BusyRead, repo: string, limit: number): string {
-	if (read.kind === 'busy') return lanes_full_message(read.issues, repo, limit)
+function busy_reason(
+	read: BusyRead,
+	repo: string,
+	limit: number,
+	ages: ReadonlyMap<number, string> = NO_AGES,
+): string {
+	if (read.kind === 'busy') return lanes_full_message(read.issues, repo, limit, ages)
 	if (read.kind === 'idle') return ''
 
 	return BUSY_REASONS[read.kind](repo)
@@ -141,7 +164,7 @@ function busy_reason(read: BusyRead, repo: string, limit: number): string {
 // `in-progress` and so calls a parked child `human` rather than `time`. Two readings of one issue
 // have to agree, and without this they do not — nothing removes `in-progress` when a child is
 // parked, so `park and continue` would spend a lane on the very child it just set aside, and with
-// one lane the run would poll instead of continuing (joshuafolkken/kit#925). A child stopped by
+// one lane the run would poll instead of continuing. A child stopped by
 // `needs-human-review` is deliberately not parked and goes on holding its lane: its uncommitted work
 // is still sitting in that checkout.
 function is_parked(issue: OpenIssueData): boolean {

@@ -1,9 +1,9 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
 // The run-lifecycle registry (`run:hold` through `run:step`), split out of `josh-commands-ai.ts` so
-// that file stays under its 300-code-line limit, as `BACKLOG_COMMANDS` and `LANE_COMMANDS` were
-// (joshuafolkken/kit#2992). It is spread into `AI_COMMANDS` at the place the entries used to sit, so
-// the generated catalog keeps their order.
+// that file stays under its 300-code-line limit, as `BACKLOG_COMMANDS` and `LANE_COMMANDS` are. It
+// is spread into `AI_COMMANDS` at the place the entries belong, so the generated catalog keeps their
+// order.
 
 // One script answers both `run:hold` and `run:release`; the flag below is what tells them apart.
 const RUN_HOLD_SCRIPT = 'scripts/run/hold/run-hold-cli.ts'
@@ -32,11 +32,17 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 	'run:carry': {
 		script: 'scripts/run/carry/run-carry-cli.ts',
 		// `--stopped` sends the stop confirmation, so the Telegram credentials come from `.env` as for
-		// `run:wake` below (joshuafolkken/kit#3357).
+		// `run:wake` below.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description: 'Carry one invocation’s budget across its own session cuts',
 		category: 'AI tools',
 		reference: ['<operation> [arguments...]', 'automation', ['files']],
+	},
+	'run:add': {
+		script: 'scripts/run/add/run-add-cli.ts',
+		description: 'Add issues to a live backlogrun, ahead of the queue unless --no-priority',
+		category: 'AI tools',
+		reference: ['<issue...> [--no-priority]', 'automation', ['network', 'files']],
 	},
 	'run:wake': {
 		script: 'scripts/run/wake/run-wake-cli.ts',
@@ -76,18 +82,26 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 			['files'],
 		],
 	},
+	'run:board': {
+		script: 'scripts/run/board/run-board-cli.ts',
+		// `--every` pushes its frame as a Telegram, so the credentials come from `.env` as for `run:carry`.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description: 'Draw a live board of the running backlogrun, redrawn every second',
+		category: 'AI tools',
+		reference: ['[--once | --chat | --every <minutes>]', 'automation', ['files', 'network']],
+	},
 	'run:prep': {
 		script: 'scripts/run/run-prep-cli.ts',
 		description: 'Bundle a run’s pre-edit reads: body, comments, state, dependency scope',
 		category: 'AI tools',
 		reference: ['<issue>', 'automation', ['network']],
 	},
-	// The entry sequence a lane opened on, folded into one call (joshuafolkken/kit#2372): claim the tree,
+	// The entry sequence a lane opened on, folded into one call: claim the tree,
 	// read the budget, gather the issue reads and decide the pre-implementation step. `run:hold`,
 	// `cost --cut`, `run:prep` and `run:step` were four round trips re-billing a lane's full context each.
 	'run:entry': {
 		script: 'scripts/run/entry/run-entry-cli.ts',
-		// A `busy` hold or an `over` budget sends the stop confirmation (joshuafolkken/kit#3357).
+		// A `busy` hold or an `over` budget sends the stop confirmation.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
 			'Open a run in one call: claim the tree, read the budget, bundle the reads, decide the pre-implementation step',

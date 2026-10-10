@@ -3,21 +3,18 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { z } from 'zod'
 
-// joshuafolkken/kit#1454: `pnpm josh lines` asked the project's own eslint how many code lines a file
-// has, and then explained that answer against **kit's** `max-lines` entry. In kit the two are the same
-// object, so nothing showed; in a consumer whose `eslint.config.js` overrides the rule after
-// `create_base_config`, the report and the gate described different limits — and the report was the one
-// that was wrong, while `line-budget.ts` opens by declaring that agreeing with the gate is the whole of
-// its purpose.
+// Resolves the `max-lines` entry the project's own eslint applies, so `pnpm josh lines` explains its
+// count against the limit the gate enforces — in a consumer whose `eslint.config.js` overrides the
+// rule after `create_base_config`, kit's own entry would describe a different limit.
 //
-// **The limit is therefore asked of the configuration the gate actually applies, per file.** A flat
+// **The limit is asked of the configuration the gate actually applies, per file.** A flat
 // config block can key an override on a `files` pattern, so "the project's limit" is not one number: a
 // consumer that raises `max-lines` for generated code and leaves it alone elsewhere enforces two, and a
 // report that picked either would be wrong about the other set.
 //
 // **The counting options travel with it, and that is not a widening of the subject.** `skipBlankLines`
 // and `skipComments` decide what a code line *is*, and taking them from kit while taking the count from
-// the consumer's eslint is the same defect wearing a different number. Both now come from the same
+// the consumer's eslint would mismatch the two the same way. Both come from the same
 // resolved entry, so there is one source rather than two that can disagree.
 //
 // **This is the resolution `eslint --print-config` performs, not a second linter.** `line-budget.ts`
@@ -43,7 +40,11 @@ interface ConfigResolver {
 	calculateConfigForFile: (file_path: string) => Promise<unknown>
 }
 
-type ResolverConstructor = new (options: { cwd: string }) => ConfigResolver
+// eslint's own camelCase name for the option, kept apart from the object that spells it.
+const CONFIG_FILE_OPTION = 'overrideConfigFile'
+
+type ResolverOptions = { cwd: string } & Partial<Record<typeof CONFIG_FILE_OPTION, string>>
+type ResolverConstructor = new (options: ResolverOptions) => ConfigResolver
 
 // The module is imported from a path computed at runtime, so its shape is checked rather than assumed:
 // a build that no longer exports `ESLint` must answer "no limit" instead of throwing past the caller.
@@ -100,13 +101,19 @@ function options_in(config: unknown): LineRuleOptions | undefined {
 // the consumer's own eslint. Every failure — no eslint there, a build without the export, a config that
 // throws while loading — is the same answer, and it is "no limit" rather than kit's number: falling
 // back to kit's is precisely the defect this file exists to remove, and it would be silent.
-async function resolver_for(project_root: string): Promise<ConfigResolver | undefined> {
+async function resolver_for(
+	project_root: string,
+	config_file: string | undefined,
+): Promise<ConfigResolver | undefined> {
 	try {
 		const require_from = createRequire(path.join(project_root, PACKAGE_JSON))
 		const loaded: unknown = await import(pathToFileURL(require_from.resolve(ESLINT_MODULE)).href)
 		const eslint_module = module_schema.parse(loaded)
 
-		return new eslint_module.ESLint({ cwd: project_root })
+		return new eslint_module.ESLint({
+			cwd: project_root,
+			...(config_file !== undefined && { [CONFIG_FILE_OPTION]: config_file }),
+		})
 	} catch {
 		return undefined
 	}
@@ -128,12 +135,18 @@ async function entry_for(
 // One resolver for the whole call: the configuration is loaded and cached once, and every path after
 // the first is a lookup rather than a load. That is what makes a per-file limit affordable at all.
 // Keyed by the absolute path, so the caller's spelling of a path does not have to match.
+//
+// `config_file` names the configuration to ask instead of the one `project_root` holds, with
+// `project_root` still the directory its `files` patterns are matched from — what `josh metrics` needs
+// to hold another commit's tree to this checkout's limits (`metrics-code-lines.ts`).
 async function options_for(
 	file_paths: ReadonlyArray<string>,
 	project_root: string,
+	config_file?: string,
 ): Promise<ReadonlyMap<string, LineRuleOptions>> {
 	const found = new Map<string, LineRuleOptions>()
-	const resolver = file_paths.length === 0 ? undefined : await resolver_for(project_root)
+	const resolver =
+		file_paths.length === 0 ? undefined : await resolver_for(project_root, config_file)
 
 	if (resolver === undefined) return found
 

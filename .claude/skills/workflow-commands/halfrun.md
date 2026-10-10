@@ -6,9 +6,9 @@ When this run files a new Issue, file it with `pnpm josh issue:file`, which lint
 implements the change and runs the full verification gate, then **stops before commit** — nothing is
 committed, pushed, or opened as a PR — so a person verifies the working tree by hand. Use it when a change needs human eyes before shipping.
 
-**This file is the manifest** (joshuafolkken/kit#2189). The entry sequence and the stop branches are
-`entry-sequence.md`, shared with `fullrun` and `prrun` (joshuafolkken/kit#3174); this file names only
-what is `halfrun`'s own.
+**This file is the manifest.** The entry sequence and the stop branches are `entry-sequence.md`,
+shared with `fullrun` and `prrun`; this file names only what is `halfrun`'s own. History:
+`docs/maintainers/halfrun-rationale.md` → "Where each rule came from".
 
 ## The difference — the entry
 
@@ -20,7 +20,7 @@ what is `halfrun`'s own.
 ## The step list
 
 `halfrun #<N>`: read Issue #N and its comments → **normalize the title** (same as
-`fullrun`) → post the agreed plan only if the body is blank → `git switch main && git pull`, then `pnpm
+`fullrun`) → post the agreed plan only if the body is blank → `pnpm josh ms`, then `pnpm
 josh latest:scope` and update dependencies only on `required` (`latest-gate.md`; the
 `dependency-update` skill) → implement → run the **full verification gate** (refactor →
 start `pnpm josh gate` beside a subagent `/code-review` with the brief `pnpm josh review:brief` prints,
@@ -30,7 +30,7 @@ skip is the answer where the project has no suite) → **mark the stop: `pnpm jo
 --halfrun-stop`** (the record `fullrun #<N>` adopts; `new` passes the filed number) → send a
 `confirmation` Telegram with the resume commands in the body → **stop**. Plan comments are in the session language. The `confirmation` Telegram
 body MUST include the exact resume commands — **the `Next:` line first**, since that is how a verified
-`halfrun` ships (joshuafolkken/kit#2796): its `run:entry` adopts this stop's marked hold and resumes at
+`halfrun` ships: its `run:entry` adopts this stop's marked hold and resumes at
 the gate. The direct commands follow for shipping without an agent:
 `pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'halfrun ready for manual
 verification\nNext: prrun #<N> | fullrun #<N>\nWithout an agent: pnpm josh git -y "<title> #<N>" && pnpm josh
@@ -42,11 +42,12 @@ back with fixes, treat each as a new round: implement, re-run `pnpm josh gate`, 
 
 `halfrun new` or `halfrun new "<title>"`: `kickoff new` + `halfrun #<N>` (no Issue exists yet). Steps
 mirror `fullrun new` (1)–(8): derive an English title (or use the provided one) → create the Issue
-(`pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>`, body per
+(`pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --requested`, with the labels
+`kickoff.md` → "Words typed after `new`" maps, body per
 `prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `issue-scout.md`) → add `in-progress` (as `fullrun new` (3)) → post the agreed plan → stash
 any pre-existing changes with `git stash push -m "halfrun new: pre-existing changes" -- ':!.josh/observations'`
-(the pathspec keeps the observation ledger in the tree for this run's commit; joshuafolkken/kit#2919), popped by
+(the pathspec keeps the observation ledger in the tree for this run's commit), popped by
 message with `pnpm josh stash:pop "halfrun new: pre-existing changes"`, never a positional `git stash pop` →
-`git switch main && git pull` → `pnpm josh latest:scope` → implement → run the gate (as above, `pnpm
+`pnpm josh ms` → `pnpm josh latest:scope` → implement → run the gate (as above, `pnpm
 josh test:e2e` run by **you**) → `pnpm josh run:hold <N> --halfrun-stop` → send the `confirmation`
 Telegram and **stop**.

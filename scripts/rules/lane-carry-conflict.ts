@@ -1,9 +1,10 @@
+import { platform_temporary } from '#scripts/josh/platform-temporary'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { bash_triggers } from './bash-triggers'
 import { shell_segments } from './shell-segments'
 
 // A dispatched lane child is stopped from running its parent's budget commands, and told the live
-// carry record is its parent's rather than a competing run (joshuafolkken/kit#2267).
+// carry record is its parent's rather than a competing run.
 //
 // **A child read its own parent as a competitor and refused to implement.** On 2026-09-21, inside
 // `backlogrun #2252`, a lane launched for #2258 stopped before touching a line: the child ran
@@ -32,13 +33,46 @@ import { shell_segments } from './shell-segments'
 // canonical form only — `shell_segments.is_josh_command` canonicalizes an alias before the match.
 const RUN_BUDGET_COMMANDS: ReadonlySet<string> = new Set(['run:merge', 'run:carry'])
 
+// **A `run:carry` call prefixed with a non-empty `JOSH_TEMP_ROOT` cannot reach the parent's record**,
+// because every record it keeps is a `stamp_path` under that root. It is how
+// live evidence of it is taken, so it is let through rather than refused — refusing it is what sent a
+// child round the guard to the bare CLI, which then ended its parent's record. `run:merge` stays
+// refused under any root: besides its record it syncs main, closes lanes and writes to GitHub, none of
+// which a redirected root moves. Only a leading
+// assignment counts: an `export` in an earlier segment is not read, and is refused as before. A bare
+// variable is refused too: shell state does not survive between tool calls, so `$EV` set in an
+// earlier call expands to nothing here, and an empty root is the live run's default one.
+//
+// One leading assignment, its value read as the shell reads it: a run of quoted strings, `$(…)`
+// substitutions (one nested level) and plain characters, so a space inside a quote or a substitution
+// does not end it. Cut at the first space, `JOSH_TEMP_ROOT=$(mktemp -d -t ev) pnpm josh run:merge`
+// left `ev) pnpm …` behind, whose head the command reader rejects, and slipped the refusal.
+const LEADING_ASSIGNMENT = String.raw`[A-Za-z_]\w*=(?:"[^"]*"|'[^']*'|\$\((?:[^()]|\([^()]*\))*\)|[^\s"'])*\s+`
+
+const REDIRECTED_PREFIX = new RegExp(
+	String.raw`^(?:${LEADING_ASSIGNMENT})*${platform_temporary.TEMP_ROOT_KEY}=(?!""|''|\s|$|"?\$\{?[A-Za-z_])`,
+	'u',
+)
+
+// The budget commands with an effect outside the temp root, so a redirected root does not isolate them.
+const SHARED_STATE_COMMANDS: ReadonlySet<string> = new Set(['run:merge'])
+
+// The leading assignments, stripped before the command is read. The shared command reader unwraps
+// `$(…)` into the command position — the subshell is the real work in a cost row — so without this
+// `JOSH_TEMP_ROOT="$(mktemp -d)" pnpm josh run:merge` read as `mktemp` and slipped the refusal.
+const LEADING_ASSIGNMENTS = new RegExp(`^(?:${LEADING_ASSIGNMENT})*`, 'u')
+
+function is_budget_segment(segment: string): boolean {
+	const commands = REDIRECTED_PREFIX.test(segment) ? SHARED_STATE_COMMANDS : RUN_BUDGET_COMMANDS
+
+	return shell_segments.is_josh_command(segment.replace(LEADING_ASSIGNMENTS, ''), commands)
+}
+
 // A segment that invokes one of the parent's budget commands. Segment-wise and alias-expanded for the
 // reason every command predicate in this directory is: one shell line carries several commands, and a
 // name quoted inside a body is not the command being invoked.
 function invokes_budget_command(command: string): boolean {
-	return shell_segments
-		.segments_of(command)
-		.some((segment) => shell_segments.is_josh_command(segment, RUN_BUDGET_COMMANDS))
+	return shell_segments.segments_of(command).some((segment) => is_budget_segment(segment))
 }
 
 // **The command test comes first and the world is consulted second**, so the `is_child_of` read — the
@@ -71,7 +105,9 @@ const LANE_CARRY_CONFLICT_REASON =
 	'dispatched child cannot ask, and there is nothing to decide. Continue implementing this Issue; the ' +
 	'parent owns the budget and counts the outcome at the return. The procedure is ' +
 	'`.claude/skills/workflow-commands/pre-gate-cut.md` and `backlogrun-progress.md` → "The hand-off". ' +
-	'This rule fires on every occurrence, not once per run.'
+	'Live evidence of `run:carry` is taken with a fresh `JOSH_TEMP_ROOT` prefixed to the call, which this ' +
+	'rule lets through (joshuafolkken/kit#3458); `run:merge` is refused under any root, because it also ' +
+	'syncs main, closes lanes and writes to GitHub. This rule fires on every occurrence, not once per run.'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. `is_trigger` reads the input through
 // `on_bash_command` — the `Bash` tool-name gate every command row shares — and `decide` returns true

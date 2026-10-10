@@ -7,41 +7,41 @@ const ENHANCEMENT_LABEL = 'enhancement'
 const BREAKING_CHANGE_LABEL = 'breaking-change'
 const IN_PROGRESS_LABEL = 'in-progress'
 // Applied by `kickoff` once its plan is on the issue, so the next command's `run:entry` reads the issue
-// as planned and starts at the implementation rather than planning again (joshuafolkken/kit#3042).
+// as planned and starts at the implementation rather than planning again.
 // Namespaced like `run:solo`: a bare `planned` is a common roadmap label a person may already apply,
 // and reading one as kickoff's mark would skip the planning that never happened.
 const PLANNED_LABEL = 'run:planned'
 // Parks a child that cannot advance without a person deciding something. `epic:next` is what reads
 // it: a parked child is why a run reports "nothing left that time will fix" rather than waiting
-// forever (joshuafolkken/kit#860).
+// forever.
 const NEEDS_DECISION_LABEL = 'needs-decision'
-// Marks an issue whose defect reaches the verification path, so it runs with nothing beside it
-// (joshuafolkken/kit#2776). A run applies it from the verification-path enumeration in `backlogrun-lanes.md`;
+// Marks an issue whose defect reaches the verification path, so it runs with nothing beside it.
+// A run applies it from the verification-path enumeration in `backlogrun-lanes.md`;
 // `backlog:next` enforces it (`backlog-solo.ts`), so the rule no longer rests on a judgement at
 // dispatch time.
 const RUN_SOLO_LABEL = 'run:solo'
-// The other half of the same judgement: an issue a run read and found safe to run beside others
-// (joshuafolkken/kit#2779). Without it an issue lacking `run:solo` could mean "judged parallel" or
+// The other half of the same judgement: an issue a run read and found safe to run beside others.
+// Without it an issue lacking `run:solo` could mean "judged parallel" or
 // "never judged", and `backlog:next` withholds the second (`epic-triage.ts`).
 const RUN_LANE_LABEL = 'run:lane'
-// Puts an issue at the head of the backlog's ranking (joshuafolkken/kit#2928). A person or a run may
+// Puts an issue at the head of the backlog's ranking. A person or a run may
 // apply it — a run only where it can cite a deadline or a stated urgency, or a policy a person wrote
 // (`backlogrun-steps.md`) — and **only a person removes it**: a run that could clear it could undo
 // the person's ordering. Read by `issue-rank.ts`, the one place the ranking keys are decided.
 const PRIORITY_HIGH_LABEL = 'priority:high'
-// Opts one issue outside any epic into unattended execution (joshuafolkken/kit#906). **Only a
+// Opts one issue outside any epic into unattended execution. **Only a
 // person applies it.** `epicrun #<E>` approves the merges inside `#<E>`; this label is the only way
 // a person extends that approval past the epic's edge, so a label an AI could apply to itself would
 // let an unattended run widen its own authorization — which is not a guard at all.
 const AUTO_OK_LABEL = 'auto-ok'
 // Degrades one issue's run to a `halfrun`-shaped stop: it is implemented and taken through the
-// verification gate, and then nothing is committed, pushed, opened as a pull request or merged
-// (joshuafolkken/kit#1125). **Only a person applies it** — a mark a run could clear for itself is not
+// verification gate, and then nothing is committed, pushed, opened as a pull request or merged.
+// **Only a person applies it** — a mark a run could clear for itself is not
 // a mark.
 //
 // It is the opposite of `auto-ok` in what it does: one widens unattended execution past an epic's
 // edge, the other withholds the last step of it. Unlike `auto-ok`, which `issue:file` applies by
-// default to work found by opted-in work (joshuafolkken/kit#3213), no run ever applies it. `auto-ok`
+// default to work found by opted-in work, no run ever applies it. `auto-ok`
 // answers "may this run at all", this one answers "may its result ship without a person looking".
 //
 // **Not `needs-decision`, and the difference is what the two sets below encode.** A parked issue is
@@ -51,10 +51,9 @@ const AUTO_OK_LABEL = 'auto-ok'
 // checkout and must go on holding the repository. Read as parked in either place, the next child
 // would start on top of that work.
 const NEEDS_HUMAN_REVIEW_LABEL = 'needs-human-review'
-// Marks an issue whose work a run verified is **already merged** (joshuafolkken/kit#1679). Closing
-// an Issue is Tier C, so a run that reaches that conclusion may not act on it — and before this
-// label there was no exit that was not Tier C: `fullrun #1656` verified the work was already in
-// `main` from joshuafolkken/kit#1623 and closed the Issue itself.
+// Marks an issue whose work a run verified is **already merged**. Closing
+// an Issue is Tier C, so a run that reaches that conclusion may not act on it — this label is its
+// exit that is not Tier C.
 //
 // **It is not `needs-decision`, and the difference is the whole reason it exists.** A parked issue
 // waits for an answer nobody has given; this one has its answer already — the work is done, and all
@@ -65,7 +64,7 @@ const NEEDS_HUMAN_REVIEW_LABEL = 'needs-human-review'
 // takes it off, because taking it off asserts the work is *not* done, which is the same claim in
 // reverse and is no more a run's to make.
 const ALREADY_DONE_LABEL = 'already-done'
-// Marks the Issue that tracks a repository's next release (joshuafolkken/kit#3360). An Issue whose
+// Marks the Issue that tracks a repository's next release. An Issue whose
 // change reaches a consumer only once published is linked to it as a `blocked_by` blocker
 // (`josh issue:release`), so "merged but not yet released" is visible in the backlog. A run applies
 // it; **`auto-ok` never rides on it** — `issue-auto-ok.ts` refuses the default for it on every path,
@@ -90,20 +89,19 @@ const NOT_DIRECTLY_RUNNABLE_LABELS: ReadonlySet<string> = new Set([
 	ALREADY_DONE_LABEL,
 ])
 
-// joshuafolkken/kit#1083: filing-route labels, applied at filing time so the backlog's composition —
-// a review-cap carry-forward vs a split child vs a Tier A in-implementation filing — is countable
-// with `gh api "repos/{owner}/{repo}/issues?labels=<route>"` instead of grepping issue bodies by
-// hand, which is how the 2026-08-30 breakdown was produced and why it did not reproduce. Purely
+// Filing-route labels, applied at filing time so the backlog's composition — a review-cap
+// carry-forward vs a split child vs a Tier A in-implementation filing — is countable with
+// `gh api "repos/{owner}/{repo}/issues?labels=<route>"` instead of grepping issue bodies by hand,
+// which does not reproduce. Purely
 // informational: unlike the three above, a route label says nothing about whether an issue may run,
 // so none of them joins NOT_DIRECTLY_RUNNABLE_LABELS. The names are duplicated as literals in the
 // filing procedures (prose cannot import this module); `scripts/rules/filing-route-label.test.ts` keys the
 // docs to these constants so a filing command that drops the label fails rather than drifting.
 //
-// joshuafolkken/kit#1518 added a fourth: an interrupt is a defect found in *this* repository that
-// does not block the run that found it, and which the WIP cap would otherwise push into the
-// discretionary exit — the route joshuafolkken/kit#1517 took, surviving only as a comment on another
-// issue. It is not `route:tier-a`: that one is a filing the run is blocked by (an upstream defect or
-// a prerequisite), and reading the two as one is what lost #1517.
+// `route:interrupt` is a defect found in *this* repository that does not block the run that found
+// it, and which the WIP cap would otherwise push into the discretionary exit, surviving only as a
+// comment on another issue. It is not `route:tier-a`: that one is a filing the run is blocked by (an
+// upstream defect or a prerequisite), and reading the two as one loses the interrupt.
 const INTERRUPT_ROUTE_LABEL = 'route:interrupt'
 const REVIEW_CAP_ROUTE_LABEL = 'route:review-cap'
 const SPLIT_ROUTE_LABEL = 'route:split'
@@ -145,7 +143,7 @@ const FILING_ROUTE_LABELS: ReadonlyArray<{
 	},
 ]
 
-// joshuafolkken/kit#1729: the depth of an issue's subject, recorded as a label at filing time.
+// The depth of an issue's subject, recorded as a label at filing time.
 //
 // **The definition is not here.** `.claude/skills/workflow-commands/observation-filing.md` → "The depth test",
 // is the single source: depth 0 is what a consumer of this package touches, depth 1 the run
@@ -154,10 +152,9 @@ const FILING_ROUTE_LABELS: ReadonlyArray<{
 // would be the clone `CLAUDE.md` prohibits, and the descriptions below therefore name the section
 // rather than paraphrase it.
 //
-// **Why a label at all.** joshuafolkken/kit#1698 set a measurable target — the share of open issues
-// at depth 0 — and left nothing that records a depth, so the share could only be obtained by reading
-// every open issue's body by hand. Two hand counts a day apart disagreed on the denominator and were
-// therefore not comparable, which is the failure a recorded label removes.
+// **Why a label at all.** The share of open issues at depth 0 is a measured target, and without a
+// recorded depth it could only be obtained by reading every open issue's body by hand — hand counts
+// disagree on the denominator and are not comparable, which is the failure a recorded label removes.
 //
 // **The depth is read off the subject, so a run applies it.** Unlike `auto-ok` and
 // `needs-human-review` this is not a person's judgement about authorization; it is the same reading
@@ -169,8 +166,7 @@ const DEPTH_2_LABEL = 'depth:2'
 
 // Ordered shallowest first, which is what makes `depth_label_of` deterministic: an issue carrying
 // more than one depth label counts as the **lowest** depth present, the one closest to the consumer.
-// Without a fixed tie-break the same listing measured twice could answer differently, which is the
-// whole defect joshuafolkken/kit#1729 was filed for.
+// Without a fixed tie-break the same listing measured twice could answer differently.
 const DEPTH_LABEL_ORDER: ReadonlyArray<string> = [DEPTH_0_LABEL, DEPTH_1_LABEL, DEPTH_2_LABEL]
 
 // The metadata `gh api ... labels` needs, in the shape `FILING_ROUTE_LABELS` above uses and for the
@@ -179,7 +175,7 @@ const DEPTH_LABEL_ORDER: ReadonlyArray<string> = [DEPTH_0_LABEL, DEPTH_1_LABEL, 
 // Green, amber and pale blue, so the consumer-facing depth is the one that stands out in a listing.
 //
 // **`josh issue:file` provisions them** through `repository_labels.ensure_labels` before its create
-// call (joshuafolkken/kit#3176), so no document carries a creation command to keep in step.
+// call, so no document carries a creation command to keep in step.
 const DEPTH_LABELS: ReadonlyArray<{
 	name: string
 	color: string
@@ -209,7 +205,7 @@ interface LabelDefinition {
 }
 
 // What `josh start` provisions on a new repository so the first `kickoff` finds every label a run
-// applies with its intended color (joshuafolkken/kit#2197). The `epic` and `in-progress` metadata is
+// applies with its intended color. The `epic` and `in-progress` metadata is
 // the one the workflow documents create them with; the labels only a person applies are left out.
 const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 	{
@@ -243,8 +239,8 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 	...DEPTH_LABELS,
 ]
 
-// The pull request release classifications `pr-classification.yml` requires exactly one of
-// (joshuafolkken/kit#2797). The check is distributed by `josh sync`, so the labels it asks for are
+// The pull request release classifications `pr-classification.yml` requires exactly one of.
+// The check is distributed by `josh sync`, so the labels it asks for are
 // provisioned from this same list — a repository that never had them would otherwise fail the check
 // on every pull request that is not an `enhancement`.
 const BUGFIX_LABEL = 'bugfix'
@@ -300,7 +296,7 @@ function has_any_label(
 // A membership test answers whether the label is there; a *removal* has to name it, and
 // `DELETE …/issues/<N>/labels/<name>` names it in the path. Lowercasing the wanted name and sending
 // that would be a second comparison — GitHub's, on a spelling we did not read — so the removal reads
-// the stored one and sends it back (joshuafolkken/kit#1794).
+// the stored one and sends it back.
 function label_name_of(labels: ReadonlyArray<string>, wanted: string): string | undefined {
 	const target = wanted.toLowerCase()
 
@@ -329,7 +325,7 @@ function depth_label_of(labels: ReadonlyArray<LabelReference> | undefined): stri
 }
 
 // Every workflow label this package manages. The label-reference scan
-// (`scripts/document/label-reference.test.ts`, joshuafolkken/kit#1923) reads this to check that no
+// (`scripts/document/label-reference.test.ts`) reads this to check that no
 // document operates on a label name that does not exist here — a stale or mistyped `labels[]=…`
 // otherwise fails silently at run time. One source, so a label added above joins the scan without a
 // second edit.

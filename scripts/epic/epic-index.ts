@@ -6,9 +6,9 @@ import { EPIC_LABEL, has_any_label } from '#scripts/issue/issue-labels'
 import { z } from 'zod'
 import { epic_parse } from './epic-parse'
 
-// Which epic tracks which issue — the one answer, in one place (joshuafolkken/kit#1633).
+// Which epic tracks which issue — the one answer, in one place.
 //
-// `epic:bundle` has asked it since joshuafolkken/kit#873, to keep an issue an epic already tracks
+// `epic:bundle` asks it to keep an issue an epic already tracks
 // from being recommended a second one. The `auto-ok` pickup needs the same answer for the opposite
 // reason: an issue tracked by an epic that will offer it must run through that epic's order and
 // never be picked up standalone. Two callers, one question, so the read and the index live here
@@ -27,7 +27,7 @@ interface FetchedEpics {
 }
 
 // Which epics track each issue, from the epics' own task lists. **A child can be named by more than
-// one** (joshuafolkken/kit#1694): a task list expresses at most one epic per row, and nothing stops
+// one**: a task list expresses at most one epic per row, and nothing stops
 // two epics writing the same row — `epic_lane_offer.dedupe_pools` has handled exactly that collision
 // on the `epic:next` side since it was written. So the tracking is recorded whole here, and each
 // caller collapses it for its own question rather than losing the other epics at build time.
@@ -104,8 +104,8 @@ function child_epics_of(
 }
 
 // Every epic an `auto-ok` root opts in — the root itself and, transitively, every nested epic reached
-// through its task list and theirs in turn (joshuafolkken/kit#2244). A person puts `auto-ok` on a root
-// to approve everything under it, and the direct-children-only reading (joshuafolkken/kit#1668) stopped
+// through its task list and theirs in turn. A person puts `auto-ok` on a root
+// to approve everything under it, and the direct-children-only reading stopped
 // one level short: a grandchild fell out as "not opted in", though the same reasoning that admits the
 // child admits it. So the root's approval is read down the whole subtree rather than one level of it.
 //
@@ -132,32 +132,30 @@ function reachable_epic_numbers(
 }
 
 // **Which wins when an epic's declared order and a child's own `auto-ok` disagree — the single
-// source** (joshuafolkken/kit#1668, narrowing joshuafolkken/kit#1633).
+// source**.
 //
 // The epic wins wherever the epic is actually going to offer the child, and only there. So the
 // standalone half withholds a tracked child when the epic tracking it carries `auto-ok`: that epic's
 // `blocked-by` graph sequences its children, and offering the child standalone as well would both
 // skip that order and hand the same issue over twice.
 //
-// It withholds nothing when the tracking epic is **not** opted in. joshuafolkken/kit#1633 dropped
-// that child too, on the ground that the standalone path read none of the ordering graph — which has
-// since stopped being true: `auto_ok_cli.is_runnable` refuses a candidate whose `blockedBy` is still
-// open, and `josh epic --ordered` records an epic's declared order as exactly those native
-// relations. So the order survives the standalone route, while the old rule left a person's `auto-ok`
-// on the child silently inert — no path offered it at all, because the epic side never reads an epic
-// that did not opt in.
+// It withholds nothing when the tracking epic is **not** opted in. The standalone route keeps the
+// order: `auto_ok_cli.is_runnable` refuses a candidate whose `blockedBy` is still open, and
+// `josh epic --ordered` records an epic's declared order as exactly those native relations. Withholding
+// that child too would leave a person's `auto-ok` on it silently inert — no path would offer it at
+// all, because the epic side never reads an epic that did not opt in.
 // **It answers with the epic, not merely with membership**, because the withholding and the sentence
 // `backlog:plan` prints about it have to come from one answer. Handing the scope layer the whole
-// index instead let it name an epic that was not withholding anything — the same misreport, moved.
+// index instead would let it name an epic that was not withholding anything.
 //
-// **Any one opted-in epic withholds the child** (joshuafolkken/kit#1694). It reads the whole tracking
+// **Any one opted-in epic withholds the child**. It reads the whole tracking
 // rather than one collapsed winner because the two are not the same answer when two epics name the
 // same child: collapsed, an opted-in epic that merely came earlier in the listing is gone, the child
 // reads as tracked by nobody who would offer it, and the standalone half hands it over while the
 // opted-in epic hands it over too. The epic named as the reason is the first opted-in one in listing
 // order — any of them is withholding it, and picking by position keeps the sentence deterministic.
 //
-// **The opted-in set is the transitive closure, not one level of it** (joshuafolkken/kit#2244). A
+// **The opted-in set is the transitive closure, not one level of it**. A
 // child of a nested epic is withheld from the standalone half exactly when that nested epic is one the
 // backlog is going to offer — which, since the closure reaches it, it now is. Withholding only the
 // direct roots' children here would leave a nested epic's child offered both through the epic and

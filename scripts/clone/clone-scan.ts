@@ -9,7 +9,7 @@ import {
 } from './clone-aggregate'
 import { clone_fingerprint } from './clone-fingerprint'
 
-// Walking the source trees and reporting the clones (joshuafolkken/kit#2217).
+// Walking the source trees and reporting the clones.
 //
 // The current repository is always scanned; every first-party sibling `repo_discovery` finds —
 // including the ones `JOSH_REPO_PATHS` adds — is scanned too, so a copy that crossed a package

@@ -6,16 +6,16 @@ import { run_review, type GateState, type ReviewTiming } from './run-review'
 import { run_review_steps } from './run-review-steps'
 
 // `josh run:review` — one call that leaves `josh gate` running in the background and prints the whole
-// `/code-review` brief, so a lane child launches the two together and they overlap
-// (joshuafolkken/kit#2179). It composes `josh gate` and `josh review:brief` and changes neither: the
-// gate is the same command spawned detached, and the brief is `review:brief` run unchanged, so the
-// nonce/checkout contract `review:attest --check` enforces is minted exactly as before.
+// `/code-review` brief, so a lane child launches the two together and they overlap.
+// It composes `josh gate` and `josh review:brief` and changes neither: the gate is the same command
+// spawned detached, and the brief is `review:brief` run unchanged, so the nonce/checkout contract
+// `review:attest --check` enforces is minted exactly as a standalone brief mints it.
 //
 // **The default mode opens the pair; `--join` closes it.** The child runs the default, reads the brief
 // off stdout, launches the review subagent, and — once it returns — runs `--join`, which waits for the
 // gate to finish, records the overlap, and exits non-zero if the gate came back red. That exit code is
-// what makes "a red gate is not adopted over" a mechanical guarantee rather than an ordering the child
-// used to get for free (`run-review.ts` → `adopt_verdict`).
+// what makes "a red gate is not adopted over" a mechanical guarantee rather than an ordering
+// (`run-review.ts` → `adopt_verdict`).
 
 const ARGV_OFFSET = 2
 const JOIN_FLAG = '--join'

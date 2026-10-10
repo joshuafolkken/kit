@@ -1,4 +1,9 @@
+import { spawnSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { process_identity } from './process-identity'
 import { process_identity_fixture } from './process-identity-fixture'
@@ -22,6 +27,30 @@ const {
 	has_start_probe,
 	sandbox_probes,
 } = process_identity_fixture
+
+const SOCKET_SCHEME = 'socket:'
+const UNUSED_TARGET = 'unused.sock'
+// A child its timeout or a signal killed reports no exit status.
+const KILLED_STATUS = undefined
+// The probe's exit when its own one-second socket timeout fires.
+const SOCKET_TIMEOUT_STATUS = 1
+// A listener SIGKILLed while bound, which leaves its socket file behind with nobody accepting on it.
+const KILLED_LISTENER_SOURCE =
+	"require('node:net').createServer().listen(process.argv[1],()=>process.kill(process.pid,'SIGKILL'))"
+
+function missing_socket(): string {
+	return path.join(tmpdir(), `${randomUUID()}.sock`)
+}
+
+function in_scratch_directory(work: (directory: string) => void): void {
+	const directory = mkdtempSync(path.join(tmpdir(), 'process-identity-test-'))
+
+	try {
+		work(directory)
+	} finally {
+		rmSync(directory, { force: true, recursive: true })
+	}
+}
 
 function fail_binding(): never {
 	throw new Error('bind denied')
@@ -112,6 +141,59 @@ describe('process_identity — sandbox generation beacons', () => {
 		expect(process_identity.open_beacon(() => createServer())).toBeUndefined()
 		expect(process_identity.open_beacon(fail_binding)).toBeUndefined()
 	})
+})
+
+// joshuafolkken/kit#3503: a beacon probe that a loaded machine timed out was read as a dead holder,
+// so a waiter cleared a live holder's lock and two writers lost an event between them.
+describe('process_identity.is_live_beacon — an unanswered probe is unknown, not gone', () => {
+	it('answers undefined for a probe killed by its timeout or a signal', () => {
+		expect(process_identity.is_live_beacon(UNUSED_TARGET, () => KILLED_STATUS)).toBeUndefined()
+	})
+
+	it('answers undefined for a probe whose own socket timed out', () => {
+		expect(
+			process_identity.is_live_beacon(UNUSED_TARGET, () => SOCKET_TIMEOUT_STATUS),
+		).toBeUndefined()
+	})
+
+	it.skipIf(process.platform === 'win32')('answers true for a listening beacon', () => {
+		const token = process_identity.open_beacon() ?? ''
+
+		try {
+			expect(process_identity.is_live_beacon(token.slice(SOCKET_SCHEME.length))).toBe(true)
+		} finally {
+			process_identity.close_beacon(token)
+		}
+	})
+
+	it.skipIf(process.platform === 'win32')('answers false for a socket that is not there', () => {
+		expect(process_identity.is_live_beacon(missing_socket())).toBe(false)
+	})
+})
+
+describe('process_identity.is_live_beacon — which connection errors prove the listener gone', () => {
+	it.skipIf(process.platform === 'win32')('answers false for a socket nobody listens on', () => {
+		in_scratch_directory((directory) => {
+			const target = path.join(directory, 'stale.sock')
+
+			spawnSync(process.execPath, ['-e', KILLED_LISTENER_SOURCE, target])
+
+			expect(process_identity.is_live_beacon(target)).toBe(false)
+		})
+	})
+
+	it.skipIf(process.platform === 'win32')(
+		'answers undefined for any other connection error',
+		() => {
+			in_scratch_directory((directory) => {
+				const file = path.join(directory, 'not-a-directory')
+
+				writeFileSync(file, '')
+
+				expect(process_identity.is_live_beacon(path.join(file, UNUSED_TARGET))).toBeUndefined()
+			})
+		},
+	)
 })
 
 // joshuafolkken/kit#1727: liveness and ownership are different questions, and a record's writer

@@ -49,6 +49,12 @@ was delivered.
 - **The switch**: `JOSH_RULE_GUARD` for the rule guard — on by default, off with `off` / `0` /
   `false` / `no`. The batching and investigation guards each have their own.
 
+**A delivery may be a rewrite rather than a refusal** (joshuafolkken/kit#3570) — only where the rule's
+outcome can be produced mechanically, as the piped-verification row's `set -o pipefail;` prefix is
+(`output-bounds-rationale.md`). The call is recorded as typed and nothing errors, so the note the hook
+attaches (a row's `rewrite_note`) is the one trace; `scripts/rules/hook-context-line.ts` reads it and
+`pnpm josh rule:value` counts it as `rewritten`, a delivery that cost no round trip.
+
 **The rule guard's enumeration holds only rules whose moment is a shell call** (the later `Edit` /
 `Write` and `AskUserQuestion` rows aside). Claude Code refuses one call of a turn and runs the rest,
 so a refused `Edit` leaves the state where only its siblings were applied (joshuafolkken/kit#1390).
@@ -122,9 +128,9 @@ the one resident line stays.
 
 ### Posting a comment is not a trigger
 
-The WIP cap's trigger looks only at **creating** an Issue. `…/issues/<N>/comments` is a comment, not a
-filing — comments outnumber filings by an order of magnitude, and a hook that refused there would be
-exactly "a hook that fires on the wrong turn". `scripts/rules/delivered-rules.test.ts` pins that
+The filing rows' triggers look only at **creating** an Issue. `…/issues/<N>/comments` is a comment,
+not a filing — comments outnumber filings by an order of magnitude, and a hook that refused there would
+be exactly "a hook that fires on the wrong turn". `scripts/rules/delivered-rules.test.ts` pins that
 boundary from both sides.
 
 ### Reading Issue comments — put them in front of the run, do not ask it to read them
@@ -194,7 +200,7 @@ a timer that never ran as alive.
 **A row with `already_satisfied` (is the prerequisite action at the transcript tail?) is outside
 once-per-run** (joshuafolkken/kit#2807). Kept once-per-run, a run that skipped the prerequisite would pass on its reissue, and
 the run that skimmed the procedure would be the one that walked past the guard. The rows are
-`issue-fold`, `issue-comments`, `rule-body` and `oracle-consulted:*`. A run that complies is never
+`issue-comments`, `rule-body` and `oracle-consulted:*`. A run that complies is never
 stuck — once the prerequisite is done, the stand-down answers first and lets it through. There is no
 record to use up either, so it does not yield to `batch:guard` (yielding would let a reissue inside
 the 10-second window through without the prerequisite).
@@ -203,7 +209,6 @@ the 10-second window through without the prerequisite).
 pass is explained in a code comment. The current ones:
 
 - The transcript itself cannot be read (`hook-decision.ts`)
-- A first filing, with nothing to fold into (`issue-fold-rule.ts`)
 - No progress record (`early-heartbeat.ts`)
 - A failed git read treated as no change (the `test-declared` row in `delivered-rules.ts`)
 
@@ -238,8 +243,8 @@ test file pins:
 - `scripts/claude/claude-settings-hooks.test.ts` — `rule:guard` is wired under `PreToolUse` naming
   `Bash` alone, declares a timeout and points at a josh subcommand that exists
 - `scripts/backlog/backlog-manufacturing-rule.test.ts` — the WIP cap exists in `wip-cap.md` as its
-  single source, and the message carries the count, the refusal, the two exemptions and the three
-  conditions that decide an exemption
+  single source, and the hold `issue:file` prints carries the refusal, the two exemptions and the
+  three conditions that decide an exemption (no longer a delivered row since joshuafolkken/kit#3423)
 - `scripts/rules/turn-batching-rule.test.ts` — the batching message carries the criterion, and points
   at `turn-batching.md` in this directory rather than at `CLAUDE.md`
 - `scripts/document/document-markers.test.ts` — the early-progress-report procedure exists as its
@@ -316,10 +321,10 @@ test file pins:
   and that the single source is `residency.md`
 - `scripts/rules/stop-rules-rule.test.ts` — pins the single sources of the four stop rules (the stop
   notification in `CLAUDE.md`, `working-tree-hold.md`, `observation-filing.md`, `issue-citation.md`)
-  and their entry in `rule-delivery.md`'s enumeration. `scripts/rules/stop-rules.test.ts`,
+  and their entry in `pnpm josh rule:list`. `scripts/rules/stop-rules.test.ts`,
   `scripts/rules/filing-offer.test.ts` and `scripts/rules/issue-citation.test.ts` pin firing and
   silence (hold × no notice blocks; clean × hold blocks; dirty or notified is silent;
-  `stop_hook_active` is silent; an offer to file × nothing filed blocks, while filed, a third-party
+  `stop_hook_active` is silent; an unattended offer to file × nothing filed blocks, while an interactive session, filed, a third-party
   repository or an unknown owner is silent; a bare `#N` blocks, while one in link form, a code fence,
   inline code, a quoted line or a PR reference is silent), and
   `scripts/claude/claude-settings-hooks.test.ts` pins the `Stop` hook's wiring

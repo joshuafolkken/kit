@@ -29,6 +29,9 @@ const FIXTURE_ROOT = path.join(
 	`.josh-lines-fixture-${String(process.pid)}`,
 )
 const NO_ESLINT_PREFIX = 'josh-lines-no-eslint-'
+const CONFIG_NAME = 'eslint.config.js'
+// A project root that holds no configuration of its own, beside the fixture and for the same reasons.
+const OTHER_ROOT_PREFIX = '.josh-lines-other-root-'
 
 // Spawning eslint against a cold configuration is seconds, not milliseconds.
 const PROBE_TIMEOUT_MS = 120_000
@@ -67,7 +70,7 @@ function fixture(name: string): string {
 
 beforeAll(() => {
 	mkdirSync(FIXTURE_ROOT, { recursive: true })
-	writeFileSync(fixture('eslint.config.js'), config_source(), 'utf8')
+	writeFileSync(fixture(CONFIG_NAME), config_source(), 'utf8')
 
 	for (const name of [SKIPPED, RAW, UNLIMITED, INTEGER]) {
 		writeFileSync(fixture(name), SOURCE, 'utf8')
@@ -135,6 +138,22 @@ describe('effective_limit.options_for — the consumer’s own eslint answers', 
 
 		expect(options.size).toBe(0)
 	})
+
+	// joshuafolkken/kit#3644: `josh metrics` holds another commit's tree to this checkout's limits.
+	it(
+		'asks the named configuration instead of the one the project root holds',
+		async () => {
+			const root = mkdtempSync(path.join(REPO_ROOT, 'node_modules', OTHER_ROOT_PREFIX))
+			const file = path.join(root, SKIPPED)
+			const config_file = fixture(CONFIG_NAME)
+			const options = await effective_limit.options_for([file], root, config_file)
+
+			rmSync(root, { recursive: true, force: true })
+
+			expect(options.get(file)?.max).toBe(CONSUMER_LIMIT)
+		},
+		PROBE_TIMEOUT_MS,
+	)
 
 	it('spawns nothing and loads nothing when asked about no paths', async () => {
 		const options = await effective_limit.options_for([], FIXTURE_ROOT)

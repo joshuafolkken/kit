@@ -1,30 +1,30 @@
 import { git_gh_pr_read } from '#scripts/gh/git-gh-pr-read'
 import { git_command } from '#scripts/git/git-command'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { session_cite } from '#scripts/issue/session-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { json_value } from '#scripts/lib/json-value'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { z } from 'zod'
-import { run_issue_number } from './run-issue-number'
 
 // The preflight check — what an interrupted run left in this working tree, and what the rule says to
-// do about it before the next child starts (joshuafolkken/kit#926). It once had its own
-// `josh run:preflight` CLI; joshuafolkken/kit#1965 folded the check into `run:hold`, which now runs it
-// before it claims the tree, so this module is the shared logic behind that claim and behind
-// `run:progress`, and no longer a command of its own.
+// do about it before the next child starts. `run:hold` runs it before it claims the tree, so this
+// module is the shared logic behind that claim and behind `run:progress`, not a command of its own.
 //
-// joshuafolkken/kit#1091 gave a run a way to say "this tree is mine". This is the sibling question,
-// and it is about the run that never said anything again: an unattended run ends abnormally — a
-// crash, a Ctrl-C, a laptop asleep, an expired token — and leaves its feature branch, its open pull
-// request and its uncommitted changes behind. Every child of an `epicrun` starts with
-// `git switch main && git pull`, which refuses over a dirty tree, and an agent may not reach for
-// `git stash` on its own judgement, so the batch could not recover without a person.
+// It is about the run that never said anything again: an unattended run ends abnormally — a crash, a
+// Ctrl-C, a laptop asleep, an expired token — and leaves its feature branch, its open pull request and
+// its uncommitted changes behind. The next child's checkout refuses over a dirty tree, and an agent
+// may not reach for `git stash` on its own judgement, so without this check the batch cannot
+// recover unattended.
 //
 // **The rule answers, so the run does not judge.** "There is a branch already, I will carry on from
 // it" and "there is a branch already, I had better stop" are both defensible in the moment, which is
 // exactly why the choice is not left to the moment — the same reason `josh delegate` and
 // `josh review:level` refuse to leave their answers to an agent.
 //
-// **The check is re-askable, which the claim it now gates deliberately is not.** A claim asked twice
-// answers `busy`, because the second ask is a second run. This check reads state and writes nothing,
+// **The check is re-askable, and so is the claim it now gates — but only by the same run.** A claim
+// asked again for the issue the record names answers `hold`; for any other
+// issue it answers `busy`, because that ask is a second run. This check reads state and writes nothing,
 // so the reclaim recovery ends by asking `run:hold` again on the tree it just cleaned.
 
 const CLEAN_VERDICT = 'clean'
@@ -88,8 +88,8 @@ const STASH_LABEL_PREFIX = 'run:hold reclaimed before #'
 // The issue number reaches the advice inside a double-quoted shell command a caller is told to paste,
 // so the shape it may take is pinned beside the interpolation rather than only in the CLI that
 // happens to be today's single caller. `run:liveness` interpolates it the same way, so the pattern
-// and the refusal live in one module both read (joshuafolkken/kit#1485).
-const { require_issue_number } = run_issue_number
+// and the refusal live in one module both read.
+const { require_issue_number } = issue_number_shape
 const UNREADABLE_PR_MESSAGE = 'The pull request could not be read for branch '
 
 function needs_reclaim(tree: TreeState): boolean {
@@ -156,7 +156,7 @@ function to_reason(verdict: PreflightVerdict, tree: TreeState, child: ChildState
 }
 
 // **`-u` is not optional.** What an interrupted run leaves almost always includes a new `*.test.ts`,
-// which is untracked, and a stash without it leaves exactly those files for the `git switch` that
+// which is untracked, and a stash without it leaves exactly those files for the checkout that
 // follows to refuse over. **And the stash is recorded rather than popped**, which is what sets this
 // stash apart from every other sanctioned one: the work belongs to a run that is gone, so the Issue
 // comment is the only thing that can ever bring it back.
@@ -169,14 +169,14 @@ function reclaim_steps(tree: TreeState, issue: string): Array<string> {
 
 	return [
 		`git stash push -u -m "${STASH_LABEL_PREFIX}${issue}"`,
-		`Record the stash on #${issue} — the comment is what gets it popped; nothing pops it for you.`,
+		`Record the stash on ${session_cite.issue(issue)} — the comment is what gets it popped; nothing pops it for you.`,
 	]
 }
 
 function reclaim_advice(tree: TreeState, issue: string): string {
 	return [
 		...reclaim_steps(tree, issue),
-		`git switch ${tree.default_branch} && git pull`,
+		'pnpm josh ms',
 		'Then ask this command again: it is re-askable, and the clean tree gets its own answer.',
 	].join('\n')
 }
@@ -202,11 +202,7 @@ function decide(tree: TreeState, child: ChildState, issue: string): PreflightDec
 }
 
 function read_pr_field(raw: string): string | undefined {
-	try {
-		return pr_info_schema.parse(JSON.parse(raw)).state
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw, pr_info_schema)?.state
 }
 
 function to_pr_state(raw: string): PrState {
@@ -227,11 +223,11 @@ async function read_tree_state(): Promise<TreeState> {
 
 // **An unreadable `gh` is not an absent pull request.** `pr_view` folds both into `''` and cannot tell
 // them apart, so the existence question is asked through `pr_exists`, which throws on a lookup it
-// could not complete (joshuafolkken/kit#1048). That throw reaches the CLI as `unknown`; without it a
+// could not complete. That throw reaches the CLI as `unknown`; without it a
 // rate-limited or logged-out `gh` turns a **merged** pull request into `resume`, and the run commits
 // on top of work somebody already landed — the exact hazard `park` exists for.
-// **The second half of the same guard.** `pr_view` throws on a read it could not complete
-// (joshuafolkken/kit#3263), but the two are separate round trips, so a lookup that answers empty
+// **The second half of the same guard.** `pr_view` throws on a read it could not complete,
+// but the two are separate round trips, so a lookup that answers empty
 // between them would still put a **merged** pull request back through `NO_PR` and out as `resume`.
 // An empty answer for a branch `pr_exists` has just confirmed is therefore a failed read by
 // construction, and it throws rather than answering.
@@ -335,9 +331,9 @@ interface CandidateContext {
 }
 
 // **A branch with no pull request, no commit beyond the default branch and no uncommitted change in
-// its lane holds no work** (joshuafolkken/kit#2855). A lane that ended before implementing — an
-// operational issue with no code change — leaves exactly that behind, and reading its mere existence
-// as a partial implementation sent the next `fullrun #N` to `resume` over nothing. A branch with a
+// its lane holds no work**. A lane that ended before implementing — an operational issue with no code
+// change — leaves exactly that behind, and reading its mere existence as a partial implementation
+// would send the next `fullrun #N` to `resume` over nothing. A branch with a
 // pull request is never counted: whatever its commits, the pull request is the state the verdict is
 // decided on.
 async function read_candidate(

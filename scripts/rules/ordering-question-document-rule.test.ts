@@ -1,6 +1,7 @@
 import { read_repo_file } from '#scripts/document/ai-document-fixture'
 import { run_step } from '#scripts/run/run-step'
 import { describe, expect, it } from 'vitest'
+import { rule_list } from './rule-list'
 
 // joshuafolkken/kit#2251: the ordering question of the rule-placement criterion lives in residency.md
 // as the single source, applied right after question 0. A rule that decides *when or in what order* to
@@ -12,6 +13,7 @@ import { describe, expect, it } from 'vitest'
 const RESIDENCY = 'prompts/collaboration-workflow/residency.md'
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const CLAUDE = 'CLAUDE.md'
+const RULE_DELIVERY = 'prompts/collaboration-workflow/rule-delivery.md'
 const FULLRUN = '.claude/skills/workflow-commands/fullrun.md'
 const BACKLOGRUN = '.claude/skills/workflow-commands/backlogrun.md'
 
@@ -35,9 +37,13 @@ describe('residency.md carries the ordering question as the single source', () =
 	})
 })
 
-describe('CLAUDE.md carries the ordering-question pointer', () => {
-	it('names run:step so agents know where an ordering rule goes', () => {
-		expect(read_repo_file(CLAUDE)).toContain(DRIVER_COMMAND)
+// joshuafolkken/kit#3395: CLAUDE.md routes to the delivery enumeration, whose rule-prose entry names
+// the ordering question and residency.md, which names run:step (asserted above).
+describe('CLAUDE.md reaches the ordering question through the delivery enumeration', () => {
+	it('names rule-delivery.md, which lists the ordering question', () => {
+		expect(read_repo_file(CLAUDE)).toContain(RULE_DELIVERY)
+		expect(read_repo_file(RULE_DELIVERY)).toContain('pnpm josh rule:list')
+		expect(rule_list.render()).toContain(ORDERING_EN_MARKER)
 	})
 })
 

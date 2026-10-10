@@ -1,9 +1,19 @@
 import { parseArgs, type ParseArgsConfig, type ParseArgsOptionsConfig } from 'node:util'
 
 // Argument reading for the commands under `scripts/`.
-//
+
+const HELP_FLAGS: ReadonlySet<string> = new Set(['--help', '-h'])
+
+// The usage line `refuse_unknown_flags` ends with, for a command that prints it on its own help
+// request (`josh release --help`).
+function usage_line(known_flags: ReadonlyArray<string>, command: string): string {
+	if (known_flags.length === 0) return `Usage: josh ${command}`
+
+	return `Usage: josh ${command} [${known_flags.join('] [')}]`
+}
+
 // Reject anything not on the list rather than ignoring it: a misspelled `--dryrun` that fell through
-// would run the real write path. `josh propagate` and `josh adopt` both write into working trees, so
+// would run the real write path. `josh propagate`, `josh adopt` and `josh release` all write, so
 // the refusal is single-sourced here rather than described once per command (`CLAUDE.md` → "No
 // clones").
 function refuse_unknown_flags(
@@ -13,15 +23,36 @@ function refuse_unknown_flags(
 ): string | undefined {
 	const unknown = argv.filter((argument) => !known_flags.includes(argument))
 	if (unknown.length === 0) return undefined
-	const usage = `Usage: josh ${command} [${known_flags.join('] [')}]`
 
-	return `Unknown argument(s): ${unknown.join(' ')}\n${usage}`
+	return `Unknown argument(s): ${unknown.join(' ')}\n${usage_line(known_flags, command)}`
+}
+
+// The argument gate of a command that publishes (`josh release`, `josh release:github`): a help
+// request prints the usage and exits 0, an unknown argument is refused with exit 1, both before any side effect. `undefined` means the
+// arguments are all known and the command may run.
+function answer_help_or_unknown(
+	argv: ReadonlyArray<string>,
+	known_flags: ReadonlyArray<string>,
+	command: string,
+): number | undefined {
+	if (argv.some((argument) => HELP_FLAGS.has(argument))) {
+		console.info(usage_line(known_flags, command))
+
+		return 0
+	}
+
+	const refusal = refuse_unknown_flags(argv, known_flags, command)
+	if (refusal === undefined) return undefined
+
+	console.error(refusal)
+
+	return 1
 }
 
 // `parseArgs`, answering `undefined` where it would throw — an unknown flag, a missing option value,
 // or a positional the config does not allow. Each caller turns that into its usage line and a failure
 // exit rather than a stack trace, on commands whose output a workflow reads; eleven of them had begun
-// to carry a copy of the same try/catch each (joshuafolkken/kit#2902), and this is the one copy.
+// to carry a copy of the same try/catch each, and this is the one copy.
 function parse_or_undefined<T extends ParseArgsConfig>(
 	config: T,
 ): ReturnType<typeof parseArgs<T>> | undefined {
@@ -34,7 +65,7 @@ function parse_or_undefined<T extends ParseArgsConfig>(
 
 // The two shapes every command reads `argv` in: flags alone, or flags beside positionals. Both are
 // strict, so an unknown flag is `undefined` rather than a silently ignored typo; the commands had each
-// carried a one-line wrapper spelling these out (joshuafolkken/kit#3072).
+// carried a one-line wrapper spelling these out.
 type FlagsOnly<T extends ParseArgsOptionsConfig> = ReturnType<
 	typeof parseArgs<{ args: Array<string>; options: T }>
 >
@@ -123,7 +154,9 @@ function attach_values(
 
 const cli_flags = {
 	attach_values,
+	usage_line,
 	refuse_unknown_flags,
+	answer_help_or_unknown,
 	parse_or_undefined,
 	values_of,
 	arguments_of,

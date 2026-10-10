@@ -1,12 +1,11 @@
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_step, type StepInput } from './run-step'
 
-// The golden-transcript input for the run driver (joshuafolkken/kit#2250). #2248 lifted the run's step
-// sequence out of prose and into `run-step.ts`'s `next_action`; once the steps are code, the steps can
-// be pinned. This drives that pure function across the representative scenarios and renders one line per
-// turn, so `run-transcript-fixture.test.ts` can hold the whole sequence byte-for-byte against a
-// checked-in golden — a regression in the steps shows as a diff rather than passing a prose slice that
-// silently degraded to an empty string.
+// The golden-transcript input for the run driver. The run's step sequence is code in `run-step.ts`'s
+// `next_action`, so the steps can be pinned. This drives that pure function across the representative
+// scenarios and renders one line per turn, so `run-transcript-fixture.test.ts` can hold the whole
+// sequence byte-for-byte against a checked-in golden — a regression in the steps shows as a diff
+// rather than passing a prose slice that silently degraded to an empty string.
 //
 // **Nothing here reads GitHub, the clock, a process or the filesystem.** The driver is a pure function
 // of three mechanical facts, so the same fixture always renders the same transcript — the property the
@@ -27,13 +26,14 @@ const DEFAULTS: StepInput = {
 	is_retrospective_done: false,
 	is_lane_child: false,
 	is_consumer: false,
-	// The switch defaults off in production (joshuafolkken/kit#2370); the transcript sets it on so the
+	// The switch defaults off in production; the transcript sets it on so the
 	// golden keeps exercising the retrospective positions it documents. The off path is unit-tested.
 	is_retrospective_enabled: true,
 	has_changes: false,
 	has_completion_callback: true,
 	is_at_cut_cap: false,
 	is_handed_off: false,
+	is_merge_owed: false,
 }
 
 // One turn of a run: `label` names the position the run has reached in words, and `at` is the change
@@ -56,7 +56,7 @@ const PLANNED: Frame = { label: 'planned', at: { last_event: KIND.PLAN } }
 
 // The scenarios the acceptance criteria name — a child completing, a park, a cut and its resume, lanes
 // full, the consecutive-failure stop, and the drain that fires the retrospective before the idle watch
-// (joshuafolkken/kit#2335) — followed by the terminal answers the driver reads before position matters.
+// — followed by the terminal answers the driver reads before position matters.
 const SCENARIOS: ReadonlyArray<Scenario> = [
 	{
 		name: 'child-completion',

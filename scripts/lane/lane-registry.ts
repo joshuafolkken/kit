@@ -5,11 +5,12 @@ import type { AgentProfile } from '#scripts/agent/agent-role-profile'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { git_command } from '#scripts/git/git-command'
 import { git_worktree } from '#scripts/git/git-worktree'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { file_reader } from '#scripts/lib/read-file'
 import { lane_environment } from './lane-environment'
 import { lane_paths } from './lane-paths'
 
-// The open lanes, read from git and from each lane's own `.env` (joshuafolkken/kit#1490).
+// The open lanes, read from git and from each lane's own `.env`.
 //
 // **There is no ledger file, and that is the design rather than an omission.** A lane's seat has to
 // live in its `.env` anyway — that file is what `josh port` and `playwright.config.ts` read inside
@@ -25,11 +26,11 @@ interface LaneInfo {
 	directory: string
 	// The lane's seat (`JOSH_LANE_SEAT`, 1..9), and the dev/preview ports it resolves to through
 	// `ports/index.js` — all `undefined` when the lane's `.env` cannot be read. The seat is what a new
-	// lane's allocation has to avoid; the ports are what the report shows (joshuafolkken/kit#1494).
+	// lane's allocation has to avoid; the ports are what the report shows.
 	seat: number | undefined
 	development_port: number | undefined
 	preview_port: number | undefined
-	// Where the delegated unit running this lane's child writes (joshuafolkken/kit#1713), or
+	// Where the delegated unit running this lane's child writes, or
 	// `undefined` where the lane records none. It is the one thing about a lane that a session which
 	// did not open it cannot derive: the harness names a unit's file after the dispatching session
 	// and the unit's own id, neither of which is written anywhere else on disk. Recorded here, a
@@ -43,10 +44,6 @@ interface LaneInfo {
 const WORKTREE_PREFIX = 'worktree '
 const BRANCH_PREFIX = 'branch refs/heads/'
 const BLOCK_SEPARATOR = '\n\n'
-// The same shape `lane:open` accepts. Nothing reserves the `-lane` suffix, so a hand-made
-// `spike-lane` branch with a work tree would otherwise be read as a lane — and `lane:close --all`
-// would delete its directory and its branch on an issue number that never existed.
-const ISSUE_PATTERN = /^[1-9]\d*$/u
 
 function line_value(lines: ReadonlyArray<string>, prefix: string): string | undefined {
 	return lines.find((line) => line.startsWith(prefix))?.slice(prefix.length)
@@ -101,7 +98,7 @@ function held_seat(content: string | undefined): SeatPorts {
 /**
  * The lane's own `.env`, or `undefined` when it cannot be read.
  *
- * One read serves both the seat and the recorded output path (joshuafolkken/kit#1713). Reading the
+ * One read serves both the seat and the recorded output path. Reading the
  * file twice would let the two disagree about whether it could be read at all, and `unreadable` is
  * a state the report shows rather than a state anything falls back from.
  */
@@ -112,12 +109,16 @@ function read_environment(directory: string): string | undefined {
 // A lane is identified by its branch rather than by where it sits, so nothing here compares two
 // spellings of one path — git prints the resolved one, and a lane root reached through a symlink
 // would otherwise read as no lane at all.
+//
+// The issue is the same shape `lane:open` accepts. Nothing reserves the `-lane` suffix, so a hand-made
+// `spike-lane` branch with a work tree would otherwise be read as a lane — and `lane:close --all`
+// would delete its directory and its branch on an issue number that never existed.
 function branch_issue(branch: string | undefined): string | undefined {
 	if (!branch?.endsWith(lane_paths.LANE_BRANCH_SUFFIX)) return undefined
 
 	const issue = branch.slice(0, -lane_paths.LANE_BRANCH_SUFFIX.length)
 
-	return ISSUE_PATTERN.test(issue) ? issue : undefined
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue) ? issue : undefined
 }
 
 // **Stranded means the work tree is gone from disk, and nothing else.** git also marks a
@@ -154,8 +155,8 @@ function build_lane(
 	}
 }
 
-// **A lane is its branch *and* its place, and the place is what makes the identification safe**
-// (joshuafolkken/kit#1497). The branch alone is not a namespace anyone stays out of: `pnpm josh git`
+// **A lane is its branch *and* its place, and the place is what makes the identification safe**.
+// The branch alone is not a namespace anyone stays out of: `pnpm josh git`
 // builds an issue branch as `<N>-<slug of the title>`, so an issue titled "Lane" produces `<N>-lane`
 // — byte for byte the name `lane_paths.lane_branch` builds. Read as a lane, that work tree is
 // whichever checkout the person was working in, and `lane:close --all` would delete it, because
@@ -194,11 +195,11 @@ async function worktree_blocks(): Promise<Array<string>> {
 /**
  * The main work tree's root, whichever work tree this was run in.
  *
- * **Every lane path is derived from here, and `git rev-parse --show-toplevel` is not it**
- * (joshuafolkken/kit#1497). That answers the *current* work tree, which inside a lane is the lane
+ * **Every lane path is derived from here, and `git rev-parse --show-toplevel` is not it**.
+ * That answers the *current* work tree, which inside a lane is the lane
  * itself — so `lane:list` run there would look for lanes under `<lane>/.<lane>-lanes` and report that
  * none are open while six are running. The step from the current work tree to the main one is exactly
- * what `repo_discovery.main_worktree` resolves from the filesystem (joshuafolkken/kit#2233), so this
+ * what `repo_discovery.main_worktree` resolves from the filesystem, so this
  * is a thin async layer over it: `repository_root()` names the current work tree, and the shared
  * resolver walks its `.git`/`commondir` up to the main checkout. Keeping that walk in one place lets
  * the synchronous discovery callers — which cannot await this — share the same answer. For an ordinary
@@ -252,7 +253,7 @@ function find_lane(lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | un
 /**
  * The open lane for one issue, read from the listing every other lane reading goes through.
  *
- * **The listing and the find are one call because every caller needs both** (joshuafolkken/kit#1749).
+ * **The listing and the find are one call because every caller needs both**.
  * Each one that wrote the pair itself is a place the listing could be read differently — from a cache,
  * from a stale array — and the whole point of reading it live is that the answer is the same in every
  * session, including one that never opened the lane.

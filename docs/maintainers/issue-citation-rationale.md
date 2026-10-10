@@ -20,6 +20,21 @@ would fix half the complaint.
 The correct form needs a round trip to fetch each title, which is why mentions fell back to a bare
 `#N`. `pnpm josh issue:cite` makes the cheap path and the correct path the same command.
 
+## Why josh prints the citation form itself
+
+A run copies josh's own output — a warning, a progress line, a refusal — into its reply verbatim, so a
+bare `#N` printed by josh became a bare `#N` the Stop hook sent back (joshuafolkken/kit#3424). An Issue
+number therefore reaches a string only through `issue_cite`: `session_cite.issue` links it for what a
+session reads, using a title only when the caller already holds one and the repository from the work
+tree's `origin` rather than a `gh` call, and `issue_cite.plain` keeps `#N` for what GitHub renders or a
+program parses. A line built from `plain` by a helper that also feeds GitHub or a parser is linked
+where it is printed, through `session_cite.text`. `scripts/issue/session-cite-scan.test.ts` refuses a
+bare `#${…}` assembled anywhere else and counts every `plain` call against the reason its text is not
+printed to the session as it is, so a new one fails until it is linked or justified.
+
+Not every line josh prints is linked: a commit message, a PR body, a run event line or a Telegram body
+keeps the plain `#N` its reader needs. A session copying one of those into a reply still cites it.
+
 ## Why the trigger is resident in CLAUDE.md
 
 The rule fires the moment session output is about to name an Issue number, which happens on turns where

@@ -1,12 +1,11 @@
 import { run_ship_stage, type Stage } from './run-ship-stage'
 import type { ShipArguments } from './run-ship-steps'
 
-// The command a relaunched lane child runs once it has fixed what stopped its detached ship
-// (joshuafolkken/kit#2964). The ship-stop prompt used to say only "hand the region back per
-// chain-rule.md", so every relaunched session searched that document and re-derived the next command
-// — 179 reads of it in one run. The stopped stage decides the command mechanically, so it is decided
-// here, once, and the prompt carries it. `chain-rule.md` step 0 stays the single source of the
-// procedure; `ship-stop-prompt-document-rule.test.ts` holds every command below to it.
+// The command a relaunched lane child runs once it has fixed what stopped its detached ship.
+// The stopped stage decides the command mechanically, so it is decided here, once, and the prompt
+// carries it rather than each relaunched session re-deriving it. `chain-rule.md` step 0 stays the
+// single source of the procedure; `ship-stop-prompt-document-rule.test.ts` holds every command below
+// to it.
 //
 // The fix is left uncommitted on purpose: a dirty tree reads as not committed
 // (`run-ship-probe.ts`), so a re-detached ship runs the gate and the commit again on the fixed tree
@@ -42,7 +41,7 @@ interface ShipResume {
 	title: string
 	flags: ReadonlyArray<string>
 	is_review: boolean
-	// The paths a merge of the default branch left unmerged (joshuafolkken/kit#3221).
+	// The paths a merge of the default branch left unmerged.
 	conflicts?: ReadonlyArray<string>
 }
 
@@ -99,7 +98,7 @@ const AFTER_FIX: Record<Stage, (resume: ShipResume) => string> = {
 	[STAGE.REPORT]: detach_again,
 }
 
-// A conflict names its paths (joshuafolkken/kit#3221), so the resumed session resolves them without
+// A conflict names its paths, so the resumed session resolves them without
 // reading the report or asking git which files are unmerged.
 function conflict_step(conflicts: ReadonlyArray<string>): string {
 	return `Resolve the conflict with origin/main in ${conflicts.join(', ')} (the merge is left in progress: remove the conflict markers in those files), then`

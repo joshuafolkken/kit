@@ -12,7 +12,7 @@ import { detached_launch, type LaunchArgv, type LaunchResult } from '#scripts/ru
 import { run_review, type GateState, type ReviewTiming, type TimingStart } from './run-review'
 
 // The side effects `josh run:review` performs, kept out of `run-review.ts` the way `run-merge-steps.ts`
-// is kept out of `run-merge.ts` (joshuafolkken/kit#2179). Three of them: launch the gate detached so
+// is kept out of `run-merge.ts`. Three of them: launch the gate detached so
 // one command leaves it running in the background, read back the state the join waits on from the
 // stamps a real `josh gate` writes, and keep the four timestamps the overlap is measured from.
 
@@ -65,10 +65,10 @@ function launch_gate(root: string = PROJECT_ROOT): LaunchResult {
 // in-flight marker reads. `reusable_green_gate` is the gate's own reuse test rather than a second copy
 // of it, so the join calls a gate green on exactly the trees the gate would skip.
 //
-// **The marker is read before the green record, never after** (joshuafolkken/kit#2434). The gate writes
-// its green record and only then clears the marker, so a marker read as gone means any green record is
-// already on disk for the read that follows. Read the other way round, a gate that recorded green and
-// cleared its marker between the two reads was seen as neither — and the join answered RED.
+// **The marker is read before the green record, never after**. The gate writes its green record
+// and only then clears the marker, so a marker read as gone means any green record is already on disk
+// for the read that follows. Read the other way round, a gate that recorded green and cleared its
+// marker between the two reads would be seen as neither — and the join would answer RED.
 async function read_gate_state(): Promise<GateState> {
 	const is_running = file_map_stamp.is_writer_running(review_stamps.in_flight_stamp.read())
 	const tree = await gate_tree.read_gate_tree()
@@ -78,7 +78,7 @@ async function read_gate_state(): Promise<GateState> {
 }
 
 // The brief has to report the gate as in-flight, or it says `Not verified` and sends the review agent
-// to re-run the suite the gate is already running (joshuafolkken/kit#1242). The detached gate writes
+// to re-run the suite the gate is already running. The detached gate writes
 // that marker itself, but its cold start can outrun the brief — so the composite writes the marker up
 // front, for the tree it is about to review. The gate overwrites it with its own identity the moment it
 // starts and clears it when it finishes, so this only closes the window between launch and that write;

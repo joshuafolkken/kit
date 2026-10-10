@@ -1,3 +1,4 @@
+import { report_format_reference } from '#scripts/report/report-format-reference'
 import { describe, expect, it, vi } from 'vitest'
 import { live_evidence } from './live-evidence'
 
@@ -91,5 +92,15 @@ describe('live_evidence.check', () => {
 describe('live_evidence.refusal_message', () => {
 	it('names the section the body is missing', () => {
 		expect(live_evidence.refusal_message()).toContain(live_evidence.EVIDENCE_HEADING)
+	})
+
+	// joshuafolkken/kit#3422: the refusal names the section's shape and the document that defines it.
+	it('names the format and the document section it is written in', () => {
+		const message = live_evidence.refusal_message()
+
+		expect(message).toContain(live_evidence.EVIDENCE_FORMAT)
+		expect(message).toContain(
+			report_format_reference.pointer(report_format_reference.COMPLETION_REPORT_HEADING),
+		)
 	})
 })

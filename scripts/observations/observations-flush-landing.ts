@@ -1,12 +1,13 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { OpenPull } from '#scripts/gh/git-gh-pr-auto-merge'
 import { git_pr_checks } from '#scripts/gh/git-pr-checks'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { error_text } from '#scripts/lib/error-message'
 
-// **A flush pull request lands whether or not the flush that opened it is still alive**
-// (joshuafolkken/kit#2497). The merge used to happen only inside the flush's own wait, so a session
-// cut or a killed process left a green pull request open with nobody to merge it — and once a later
-// flush appended to the same ledger tail, it conflicted and could not land at all. Auto-merge moves
+// **A flush pull request lands whether or not the flush that opened it is still alive**.
+// A merge only inside the flush's own wait would let a session cut or a killed process leave a green
+// pull request open with nobody to merge it — and once a later flush appended to the same ledger
+// tail, it would conflict and could not land at all. Auto-merge moves
 // the merge to GitHub, and the wait that remains is only for fast-forwarding the local default
 // branch.
 
@@ -18,7 +19,7 @@ const MERGE_FAILED_REASON =
 	'a required check failed or the branch conflicts, so auto-merge will not land the pull request'
 
 // **Best-effort, and the answer says which wait to use.** GraphQL — the only way to enable auto-merge
-// — can be refused in a cloud session (joshuafolkken/kit#1022), and that loses the safety net rather
+// — can be refused in a cloud session, and that loses the safety net rather
 // than the flush: the in-process wait-and-merge still runs, exactly as before auto-merge existed.
 async function request_auto_merge(branch_name: string): Promise<boolean> {
 	try {
@@ -49,7 +50,7 @@ async function wait_for_landing(branch_name: string, is_auto_merge: boolean): Pr
 }
 
 function describe_pull(pull: OpenPull): string {
-	return `#${String(pull.number)} (\`${pull.head_ref}\`)`
+	return `${issue_cite.plain(pull.number)} (\`${pull.head_ref}\`)`
 }
 
 // **Landing means GitHub will merge it with nobody watching**: auto-merge is on and the merge gate has

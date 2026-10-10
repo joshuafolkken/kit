@@ -1,18 +1,19 @@
 import { randomUUID } from 'node:crypto'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { issue_cite } from '#scripts/issue/issue-cite'
+import { session_cite } from '#scripts/issue/session-cite'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { z } from 'zod'
 
-// `josh ship --detach` — hand the post-implementation region to a supervisor that outlives the agent
-// (joshuafolkken/kit#2428). A lane child used to take the pre-gate cut and relaunch a fresh agent session
-// to drive the gate, the review and the merge; that session re-read the issue to run fixed procedure,
-// and the wake role it billed was 59.8% of a run's wall time. This starts `josh ship` itself as a
-// detached process instead, so the agent ends at the hand-off and nothing but the mechanical region runs.
+// `josh ship --detach` — hand the post-implementation region to a supervisor that outlives the agent.
+// This starts `josh ship` itself as a detached process, so the agent ends at the hand-off and nothing
+// but the mechanical region runs.
 //
 // **The supervisor's command line ends with the `"<title> #<N>"` title**, which is what the parent's
 // liveness pattern (`lane-child-invocation.ts`) anchors on — so a lane whose agent has ended is still
@@ -24,7 +25,7 @@ import { z } from 'zod'
 // while that process is alive is refused `busy`: two supervisors would race each other's commit and
 // merge, which the resume record (`run-ship-stage.ts`) orders but cannot serialize.
 //
-// **The supervisor names itself once it starts** (joshuafolkken/kit#2642). The launcher reads the child's
+// **The supervisor names itself once it starts**. The launcher reads the child's
 // start time from outside, which a sandbox that refuses `ps` cannot answer; a pid with no start time
 // would then be believed for as long as any process holds that number. The supervisor therefore claims
 // the record with its own identity — whose socket beacon answers where `ps` cannot — and a record still
@@ -114,11 +115,8 @@ function result_path(repository: string, number: string): string {
 function read_record(repository: string, number: string): ShipRecord | undefined {
 	try {
 		const raw = stamp_file.read_stamp_text(result_path(repository, number))
-		if (raw === undefined) return undefined
-		const value: unknown = JSON.parse(raw)
-		const parsed = ship_record_schema.safeParse(value)
 
-		return parsed.success ? parsed.data : undefined
+		return raw === undefined ? undefined : json_value.parse_with(raw, ship_record_schema)
 	} catch {
 		return undefined
 	}
@@ -291,7 +289,7 @@ function launch(request: DetachRequest): DetachResult {
 			cwd: request.cwd,
 			log_path: log,
 			// The provider travels as a mark because the launch strips the session keys that name it, and
-			// `ship --review` resolves its reviewer from it (joshuafolkken/kit#2456).
+			// `ship --review` resolves its reviewer from it.
 			env: supervisor_environment(launch_id),
 		},
 		(note) => {
@@ -299,6 +297,7 @@ function launch(request: DetachRequest): DetachResult {
 		},
 	)
 
+	agent_role_profile.warn_of_default()
 	if (result.kind === 'failed') return failed_launch(request, result.note)
 
 	record_launch(request, result.pid, launch_id)
@@ -311,7 +310,10 @@ function launch(request: DetachRequest): DetachResult {
 
 async function detach(request: DetachRequest): Promise<DetachResult> {
 	if (read_result(request.repository, request.number)?.result === 'running') {
-		return { verdict: BUSY, note: `a ship supervisor for #${request.number} is already running` }
+		return {
+			verdict: BUSY,
+			note: `a ship supervisor for ${session_cite.issue(request.number)} is already running`,
+		}
 	}
 
 	const result = launch(request)
@@ -319,7 +321,7 @@ async function detach(request: DetachRequest): Promise<DetachResult> {
 	if (result.verdict === LAUNCHED) {
 		await run_event_stream_emit.emit(
 			run_event_stream.EVENT_KIND.SHIP_LAUNCH,
-			`#${request.number} ship supervisor launched`,
+			`${issue_cite.plain(request.number)} ship supervisor launched`,
 		)
 	}
 

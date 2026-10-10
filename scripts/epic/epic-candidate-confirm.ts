@@ -1,20 +1,19 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
 import { epic_classify, type ResolveDependency } from './epic-classify'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 import type { BlockersReader } from './epic-relation-recheck'
 import { epic_report, type EpicVerdict } from './epic-report'
 
-// joshuafolkken/kit#1121: the other direction of joshuafolkken/kit#1113's defect, checked where it
-// would otherwise start work.
+// A stale dependency counter, checked where it would otherwise start work.
 //
 // `read_blocked_by` answers from the issue's own `issue_dependencies_summary` when that summary says
-// zero, so a child whose counter is stale is read as `blocked_by: []`. joshuafolkken/kit#1113
+// zero, so a child whose counter is stale is read as `blocked_by: []`. `epic-relation-recheck.ts`
 // re-reads such a child only when the epic body *declared* the missing link, which is the direction
 // that makes `epic:next` exit 1 on a graph with nothing to fix. A relation recorded but never
 // declared leaves no trace in the body, so nothing marks the child as a suspect — and there the
 // mistake runs the other way: the child is classified runnable and handed to an unattended run,
-// which then implements a deliverable before the thing it needs. That is exactly the ordering
-// joshuafolkken/kit#1005 exists to preserve.
+// which then implements a deliverable before the thing it needs.
 //
 // So the summary is not trusted for the one child that is about to be offered. The candidate's
 // relations are read from the listing, and a listing that disagrees replaces that child's
@@ -29,14 +28,14 @@ interface ConfirmContext {
 	resolve: ResolveDependency
 	read_blockers: BlockersReader
 	// The issues this invocation may run, so a re-classified candidate weighs an outside blocker exactly
-	// as `decide` did (joshuafolkken/kit#1943). Absent, the classifier's own default applies.
+	// as `decide` did. Absent, the classifier's own default applies.
 	running?: ReadonlySet<string> | undefined
 }
 
 // The answer for one repository: the children to offer, or the verdict that stands in its place when
 // every candidate was withheld.
 //
-// A list rather than one child since joshuafolkken/kit#1491: a repository runs as many children at
+// A list rather than one child: a repository runs as many children at
 // once as it has free lanes, and how many that is comes from the caller as `wanted`. The type says
 // nothing about lanes or epics — it is a list and a verdict, so the same walk serves one lane, six,
 // or a caller that has not been written yet.
@@ -123,7 +122,7 @@ async function read_or_withhold(
 		const reason = error_text.message_of(error)
 
 		console.warn(
-			`⚠ could not confirm the blockers of #${String(candidate.number)}: ${reason}\n` +
+			`⚠ could not confirm the blockers of ${session_cite.issue(candidate.number, undefined, candidate.repo)}: ${reason}\n` +
 				'  it is withheld rather than offered; asking again is what resolves this',
 		)
 
@@ -137,17 +136,17 @@ function warn_withheld(candidate: EpicChild, listed: ReadonlyArray<IssueReferenc
 	const named = listed.map((blocker) => epic_graph.key_of(blocker)).join(', ')
 
 	console.warn(
-		`⚠ #${String(candidate.number)} is withheld: its relations listing names ${named}, ` +
+		`⚠ ${session_cite.issue(candidate.number, undefined, candidate.repo)} is withheld: its relations listing names ${named}, ` +
 			'which the dependency summary it was classified from did not count',
 	)
 }
 
 // Relations the listing recovered that this epic does not track as a child.
 //
-// `classify_children` weighs such a blocker since joshuafolkken/kit#1943, so a candidate that is still
+// `classify_children` weighs such a blocker, so a candidate that is still
 // offered here has only outside blockers the classifier found finished. The relation is still named,
 // because the run has just paid a request to learn it exists and the graph holds nothing to order it
-// against (joshuafolkken/kit#1121).
+// against.
 function untracked_blockers(
 	listed: ReadonlyArray<IssueReference>,
 	children: ReadonlyArray<EpicChild>,
@@ -161,7 +160,7 @@ function warn_untracked(candidate: EpicChild, untracked: ReadonlyArray<IssueRefe
 	const named = untracked.map((blocker) => epic_graph.key_of(blocker)).join(', ')
 
 	console.warn(
-		`⚠ #${String(candidate.number)} is offered although its relations listing names ${named}: ` +
+		`⚠ ${session_cite.issue(candidate.number, undefined, candidate.repo)} is offered although its relations listing names ${named}: ` +
 			'this epic does not track those, and every one of them is already finished',
 	)
 }
@@ -207,14 +206,13 @@ async function confirm_one(
 
 // The bundle walked from its head until `wanted` candidates have confirmed, or the bundle runs out.
 //
-// Walking on rather than making the whole repository wait is the recorded decision on
-// joshuafolkken/kit#1108: a healthy sibling should not be held for one child whose counter is stale,
+// Walking on rather than making the whole repository wait is deliberate: a healthy sibling should not be held for one child whose counter is stale,
 // and nobody repairs that counter — so the next poll would put the same child at the head and answer
 // the same way, and the wait would never clear. The worst case is one request per candidate, and it
 // happens only when every candidate is withheld, where the epic is broken and stopping is right.
 //
-// **It stops the moment the caller's appetite is met**, so asking for one child costs exactly what
-// it cost before joshuafolkken/kit#1491: the walk ends at the first confirmation.
+// **It stops the moment the caller's appetite is met**, so asking for one child costs one walk to
+// the first confirmation.
 //
 // Recursive rather than a loop with two exits, because the corrected graph has to be threaded from
 // one candidate to the next: a second candidate is classified against what the first read
@@ -254,8 +252,7 @@ function withheld_verdict(
 // The answer for one repository. An empty bundle costs no request and re-derives the verdict the
 // caller already had, so the path a repository with nothing to offer takes is unchanged.
 //
-// `wanted` defaults to one lane, so a caller written before joshuafolkken/kit#1491 asks for exactly
-// what it used to get.
+// `wanted` defaults to one lane.
 async function answer_for_repo(
 	candidates: ReadonlyArray<EpicChild>,
 	context: ConfirmContext,

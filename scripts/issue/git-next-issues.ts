@@ -3,14 +3,15 @@ import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { parse_json_array_safe } from '#scripts/git/parse-json-array'
 import { has_any_label, NOT_DIRECTLY_RUNNABLE_LABELS } from './issue-labels'
 import { issue_rank, type DependencyRow } from './issue-rank'
+import { session_cite } from './session-cite'
 
-// The next-issues display printed when a workflow completes (#821): up to five open issues in
+// The next-issues display printed when a workflow completes: up to five open issues in
 // priority order, so the user picks the next run from the completion output instead of opening the
 // issue list. Priority is recency — a newer issue usually encodes the most current understanding
 // of the backlog — with the label-based exclusions below, under the ranking keys `issue-rank.ts`
-// defines (joshuafolkken/kit#2928).
+// defines.
 //
-// `prioritize` is also the order `epicrun` picks up `auto-ok` issues in (joshuafolkken/kit#906).
+// `prioritize` is also the order `epicrun` picks up `auto-ok` issues in.
 // The two ask one question — which open issue outside an epic is run next — so they share one
 // answer; a second ordering would have the run start something other than what this display, shown
 // at the end of every workflow, has just told the person is next.
@@ -19,7 +20,7 @@ const DISPLAY_LIMIT = 5
 const HEADER = '🗒 Next issues (newest first):'
 
 // Surfacing an `epic`, an `in-progress` or a `needs-decision` issue as "next" would suggest a run
-// the workflow rules forbid, duplicate, or cannot finish (joshuafolkken/kit#861). The set itself is
+// the workflow rules forbid, duplicate, or cannot finish. The set itself is
 // shared with the `auto-ok` pickup, which asks the same question of the same listing shape.
 function has_excluded_label(issue: OpenIssueData): boolean {
 	return has_any_label(issue.labels, NOT_DIRECTLY_RUNNABLE_LABELS)
@@ -51,7 +52,7 @@ function dependency_row(issue: OpenIssueData): DependencyRow {
 }
 
 // Every candidate in rank order, uncapped. `backlog:next` takes this rather than `prioritize`, so the
-// `run:solo` gate sees the whole ranking before anything is cut (joshuafolkken/kit#2928).
+// `run:solo` gate sees the whole ranking before anything is cut.
 function order(
 	issues: ReadonlyArray<OpenIssueData>,
 	completed_issue_number?: number,
@@ -69,7 +70,7 @@ function order(
 
 // **This display deliberately does not drop a blocked issue, and the `auto-ok` pickup deliberately
 // does.** They share this ordering and differ on the set, which reads as an inconsistency and is not
-// one (joshuafolkken/kit#1005).
+// one.
 //
 // The display is read by a person, who can see that an issue is blocked, judge that the blocker is
 // nearly done or does not really block it, and start anyway. The pickup feeds an unattended run,
@@ -87,7 +88,7 @@ function prioritize(
 function format_lines(issues: ReadonlyArray<OpenIssueData>): Array<string> {
 	if (issues.length === 0) return []
 	const rows = issues.map(
-		(issue, index) => `  ${String(index + 1)}. #${String(issue.number)} ${issue.title}`,
+		(issue, index) => `  ${String(index + 1)}. ${session_cite.issue(issue.number, issue.title)}`,
 	)
 
 	return [HEADER, ...rows]
@@ -99,7 +100,7 @@ function format_lines(issues: ReadonlyArray<OpenIssueData>): Array<string> {
 // failed over a purely informational display.
 async function fetch_next_issue_lines(completed_issue_number?: number): Promise<Array<string>> {
 	try {
-		// **`is_capped` is deliberately not read here** (joshuafolkken/kit#1067). The paging is
+		// **`is_capped` is deliberately not read here**. The paging is
 		// newest-first and this display keeps only the five newest of the twenty it asks for, so a
 		// listing the page ceiling cut short is a *prefix* of the one it would otherwise have got — the
 		// same five rows, in the same order. There is nothing the truncation hides that this display

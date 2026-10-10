@@ -1,7 +1,7 @@
 import { issue_rank } from '#scripts/issue/issue-rank'
 import { epic_graph, type EpicChild } from './epic-graph'
 
-// `issue-rank.ts`'s keys over graph children (joshuafolkken/kit#2928), for both offer paths that hand
+// `issue-rank.ts`'s keys over graph children, for both offer paths that hand
 // out children: `backlog:next` (`backlog-rank.ts`) and a named epic's `epic:next --lanes`
 // (`epic-lane-offer.ts`). One ranking, so the two cannot disagree about which child goes first.
 

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_cut, type RunCut } from './run-cut'
+import { run_cut_handoff } from './run-cut-handoff'
 import { run_cut_report } from './run-cut-report'
 
 const RECORD: RunCut = {
@@ -154,7 +155,9 @@ describe('run_cut_report.report_bad_handoff', () => {
 			expect(run_cut_report.report_bad_handoff(note)).toBe(FAILURE_EXIT_CODE)
 			expect_verdict(run_cut_report.BAD_HANDOFF_VERDICT)
 			expect(error_spy.mock.calls).toStrictEqual([
-				[`${note}. Nothing was cut; write the handoff file and reissue.`],
+				[
+					`${note}. Nothing was cut; write the handoff file at ${run_cut_handoff.HANDOFF_PATH} and reissue.`,
+				],
 			])
 		},
 	)

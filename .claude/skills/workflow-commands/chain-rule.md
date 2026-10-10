@@ -2,22 +2,21 @@
 
 ## Run the review-to-merge chain
 
-This is the execution contract for `fullrun` and `backlogrun`; the record below is reference only.
+This is the execution contract for `fullrun` and `backlogrun`, and for `prrun` up to the pull request: a `prrun` never issues `pnpm josh ship` or a merging `pnpm josh followup` — it opens the pull request with `pnpm josh git -y` and ends by `prrun.md` → "The difference — the end of the run". The record below is reference only.
 Review results and successful pushes are never turn boundaries.
 
-0. **A lane child** (#2428): `pnpm josh main:merge`, the scoped pair, `pnpm josh ship --detach --review
+0. **A lane child**: `pnpm josh main:merge`, the scoped pair, `pnpm josh ship --detach --review
    "<title> #<N>"` (`--cite <N>`), then **end the turn** on `launched`/`busy`. A stop relaunches a child
-   whose prompt names `pnpm josh ship --log <N>` and (Anthropic lane, #2964) the re-detach to run after
+   whose prompt names `pnpm josh ship --log <N>` and (Anthropic lane) the re-detach to run after
    the fix — `pnpm josh ship --detach`, `--review` only if the stopped ship carried it and stopped before
    round 2, which is final (`scripts/run/ship/run-ship-next.ts`); the supervisor skips a recorded round 1.
    `failed` → step 1. A backgrounded `ship` issued alone is moved to the foreground by the hook
-   rather than refused (#3154).
+   rather than refused.
 1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before the scoped pair and
-   the gate** — the pre-gate cut (a no-op outside a lane, joshuafolkken/kit#2177). Then run the final scoped lint/test pair and `pnpm josh run:review`: it starts
-   `pnpm josh gate` in the background and prints the `/code-review` brief in one call, so the two overlap
-   rather than the review waiting on the gate (joshuafolkken/kit#2179). Launch the `/code-review`
-   subagent as the `general-purpose` agent type with that brief (every tool, so `--fix` applies; a
-   guessed type name fails, joshuafolkken/kit#2297).
+   the gate** — the pre-gate cut (a no-op outside a lane). Then run the final scoped lint/test pair and
+   `pnpm josh run:review`: it starts `pnpm josh gate` in the background and prints the `/code-review`
+   brief in one call, so the two overlap. Launch the `/code-review` subagent as the `general-purpose`
+   agent type with that brief (every tool, so `--fix` applies; never a guessed type name).
    Never load the review skill in the main line.
 2. Once the review returns, run `pnpm josh run:review --join` to join and read the gate before
    committing; it exits non-zero on a red gate. Fix any red check, then rerun the affected scoped check
@@ -34,14 +33,15 @@ Review results and successful pushes are never turn boundaries.
      of remaining non-High findings; a confirmed High blocks and receives a `confirmation` Telegram.
    Any round-1 fix runs its affected scoped check and the gate before `git -y`.
    Once a round's verdict is attested, record its findings with `pnpm josh review:record --issue <N>
-   [<category>:<severity>:<file> ...]` — a clean round records one zero-finding line.
+   [<category>:<severity>:<file> ...]` — a clean round records one zero-finding line. **A round 2 that
+   passes takes `--comment`** (`observation-ledger.md` → "The commit path").
    **`pnpm josh followup` refuses the merge until the round is recorded**
-   (`pnpm josh review:record --check --issue <N>`, joshuafolkken/kit#2343).
+   (`pnpm josh review:record --check --issue <N>`).
 5. **The clean path ships in one call** — with no second round due, background
-   `pnpm josh ship "<title> #<N>" --body-file <evidence.md>`: PR preflight (#2946) → gate → `git -y` →
-   `followup` → `run:tail`, stopping at the first failure (#2398). `--review` runs both rounds (#2489). **Else a due round 2
-   does not fit `ship`**: the PR opens between the rounds — background `pnpm josh git -y "<title> #<N>"`, round 2 beside CI, then
-   `pnpm josh followup`.
+   `pnpm josh ship "<title> #<N>" --body-file <evidence.md>`: PR preflight → gate → `git -y` →
+   `followup` → `run:tail`, stopping at the first failure. `--review` runs both rounds. **Else a due
+   round 2 does not fit `ship`**: the PR opens between the rounds — background
+   `pnpm josh git -y "<title> #<N>"`, round 2 beside CI, then `pnpm josh followup`.
 
 A lane child may end once, at step 0 or the pre-gate cut (`pre-gate-cut.md`); never at the push. The chain otherwise stops only when the PR is merged, the completion Telegram was sent, and
 `pnpm josh ms` returned to the default branch, or when user judgment is required by an unverifiable
@@ -51,51 +51,47 @@ Recommendations are informational; severity decides. A CodeRabbit rate-limit war
 
 ## Orchestration facts single-sourced here
 
-These are the gate → review → PR → merge facts other documents cite. This file is their single source
-(joshuafolkken/kit#1927 moved them out of `prompts/review.md`, which now carries only the review
-_policy_ — level, round cap, disposition — and `prompts/review-rubric.md` the rubric). Each is stated
-once here; the measurements that motivated each one live in the linked Issues.
+These are the gate → review → PR → merge facts other documents cite; this file is their single source
+(`prompts/review.md` carries the review _policy_, `prompts/review-rubric.md` the rubric). Where each
+rule came from and why it holds: `docs/maintainers/chain-rule-rationale.md` → "Where each rule came
+from", `docs/maintainers/chain-rule-rationale.md` → "Why the orchestration facts hold".
 
 - **The gate runs beside this review, not in front of it** — `pnpm josh gate` is started when the review
-  starts and joined before the commit; the two read the same tree and neither writes to it, so running
-  them serially is pure waiting. A red gate is fixed and re-run whatever the review concluded, and there
-  is no path to a commit on a gate nobody read (joshuafolkken/kit#1242).
+  starts and joined before the commit. A red gate is fixed and re-run whatever the review concluded, and
+  there is no path to a commit on a gate nobody read.
 - **origin/main is merged in before the gate** — `pnpm josh main:merge` merges `origin/<default>` into
-  the branch before the gate and the review start, so the gate verifies the tree that will actually
-  merge rather than one that never existed (joshuafolkken/kit#1837). It is the last edit, so the scoped
-  pair and the gate run once over it. A conflict here fires `backlogrun-recovery.md` → "Conflicts are not predicted"
-  early. **This is the one place a conflicted merge's procedure is written** (joshuafolkken/kit#2445):
+  the branch before the gate and the review start. It is the last edit, so the scoped pair and the gate
+  run once over it. A conflict here fires `backlogrun-recovery.md` → "Conflicts are not predicted"
+  early. **This is the one place a conflicted merge's procedure is written**:
   `main:merge` refuses before merging when uncommitted changes touch a path the default branch also
   changed, or when the index still holds unresolved or staged paths — commit the work first with
-  `pnpm josh git -y`, then rerun it, and **never stash around the merge** (a stash reapplied over it
-  leaves `UU` in the index). A merge that stops on a conflict is finished the same way: remove the
-  markers, then `pnpm josh git -y` stages the resolution and records the merge commit. That commit is
-  the sanctioned flow, so it is **Tier A** — a lane child never stops to ask a person for `git add`, and
-  the `Stop` hook sends back a reply that does.
+  `pnpm josh git -y`, then rerun it, and **never stash around the merge**. A merge that stops on a
+  conflict is finished the same way: remove the markers, then `pnpm josh git -y` stages the resolution
+  and records the merge commit. That commit is the sanctioned flow, so it is **Tier A** — a lane child
+  never stops to ask a person for `git add`, and the `Stop` hook sends back a reply that does.
 - **A single check answers once per tree** — while implementing, re-run a single check by name
   (`pnpm josh lint:related`, `pnpm josh cspell:dot`, `pnpm josh test:related`, or the project's type
   check) after every edit; a repeat of the same command with the same arguments over a tree nothing has
-  touched since buys only a copy of the answer already in hand (joshuafolkken/kit#1383).
+  touched since buys only a copy of the answer already in hand. In kit a detached `pnpm josh ship` also
+  checks the metrics totals before the hand-off, so the implementing session accepts a grown total with
+  its reason, as the ship's output names.
 - **The pull request opens between the rounds, so CI runs beside round 2** — `pnpm josh git -y` sits
   between the two review rounds. Round 1 runs on the uncommitted tree and its High/Medium findings are
   fixed before anything is committed; the verification pass over those fixes then runs against the open
-  pull request, beside the CI the commit started (joshuafolkken/kit#1261).
+  pull request, beside the CI the commit started.
 - **The round-2 fix commit is pushed before its gate** — a fix the second round makes in place is
   pushed (`pnpm josh git -y` again, a follow-up commit) before its `pnpm josh gate`, so the gate runs
-  inside the CI wait and is joined before `pnpm josh followup` rather than in front of it
-  (joshuafolkken/kit#1326). The commit and pre-push hooks and CI's `Checks` job mean pushing first is
-  not pushing unverified code.
+  inside the CI wait and is joined before `pnpm josh followup` rather than in front of it.
 - **A clean second round issues the merge in the same turn** — the turn that reads a clean second round
   issues `pnpm josh followup`, after any branch-2 filing and `pnpm josh epic:bundle` and never in a turn
   of its own. Clean has two halves: no confirmed High is standing, and nothing was routed to branch 1 of
-  the disposition (joshuafolkken/kit#1333).
+  the disposition.
 - **The review runs in a subagent, never a main-line skill load** — `/code-review` is spawned through
-  the `Agent` tool in its own context, as the agent type step 1 names; a mid-run `Skill` load rewrites
-  the whole cached prompt prefix, which is what makes it expensive (joshuafolkken/kit#1855).
+  the `Agent` tool in its own context, as the agent type step 1 names.
 - **The brief names the checkout, and a review that read another one is refused** — `pnpm josh
   review:brief` prints the checkout root, branch and HEAD and a nonce; the review runs `pnpm josh
   review:attest <nonce>` from the tree it read, and `pnpm josh review:attest --check` must answer `ok`
-  before the run or `pnpm josh followup` acts on the verdict, or it is discarded (joshuafolkken/kit#1522).
+  before the run or `pnpm josh followup` acts on the verdict, or it is discarded.
 
 This file is the single source of the gate → review → PR → merge chain rule; other documents reference
 it rather than restating it. `prompts/collaboration-workflow/plan-comment.md` keeps Step 3.

@@ -4,6 +4,7 @@ import path from 'node:path'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { afterAll, describe, expect, it, vi } from 'vitest'
+import { review_finding_ledger } from './review-finding-ledger'
 import { review_record_cli } from './review-record-cli'
 
 vi.mock('#scripts/observations/observation-ledger-home', async (original) => {
@@ -11,6 +12,12 @@ vi.mock('#scripts/observations/observation-ledger-home', async (original) => {
 
 	return { observation_ledger_home: { ...actual.observation_ledger_home, ledger_root: vi.fn() } }
 })
+
+const issue_comment_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/gh/git-gh-issue-write', () => ({
+	git_gh_issue_write: { issue_comment: issue_comment_mock },
+}))
 
 const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-'))
 const NOW = new Date('2026-09-22T00:00:00Z')
@@ -110,6 +117,43 @@ describe('review_record_cli.run', () => {
 	})
 })
 
+// joshuafolkken/kit#3422: a refused spec printed only the usage line, so the reader grepped for the
+// category and severity vocabulary. The refusal now names it, built from the ledger's constants.
+async function refusal_of(argv: ReadonlyArray<string>): Promise<string> {
+	const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+	await review_record_cli.run(argv, NOW, root_of('refused'))
+	const printed = error.mock.calls.flat().join('\n')
+
+	error.mockRestore()
+
+	return printed
+}
+
+describe('review_record_cli.run — a refused spec names the accepted values', () => {
+	it.each(review_finding_ledger.CATEGORIES)('names the category %s', async (category) => {
+		expect(await refusal_of(['--issue', '3422', 'bug:low:package.json'])).toContain(category)
+	})
+
+	it.each(review_finding_ledger.SEVERITIES)('names the severity %s', async (severity) => {
+		expect(await refusal_of(['--issue', '3422', 'bug-risks:minor:a.ts'])).toContain(severity)
+	})
+
+	it('names the accepted values on an unknown flag too', async () => {
+		expect(await refusal_of(['--bogus'])).toBe(review_record_cli.usage_text())
+	})
+
+	it('builds the accepted-values line from the list it is given', () => {
+		expect(review_record_cli.accepted_values('<x>', ['one', 'two'])).toBe('  <x>: one | two')
+	})
+
+	it('keeps the --check usage short', async () => {
+		const printed = await refusal_of(['--check'])
+
+		expect(printed).not.toContain(review_finding_ledger.CATEGORIES[0])
+	})
+})
+
 // joshuafolkken/kit#2919 regression: two lanes recording at once wrote one file's tail, so their pull
 // requests conflicted on the ledger. Each issue now writes its own file, and the two never meet.
 describe('review_record_cli.run — two parallel lanes', () => {
@@ -163,6 +207,39 @@ describe('review_record_cli.run --check', () => {
 				async () => await review_record_cli.run(['--check', '--issue', '9999'], NOW, root),
 			),
 		).toBe(1)
+	})
+})
+
+// joshuafolkken/kit#3645: a round recorded after the pull request opened goes to the issue, so the
+// tree holds no pending ledger append for `pnpm josh followup` to push onto the open pull request.
+describe('review_record_cli.run --comment', () => {
+	const ZERO_LINE = '- rf:none | none | - | 2026-09-22 | #3645'
+
+	it('posts the lines as an issue comment and appends nothing', async () => {
+		const root = root_of('comment')
+
+		issue_comment_mock.mockReset().mockResolvedValue('https://example.test/comment\n')
+		const argv = ['--issue', '3645', '--comment', 'tests:low:b.ts']
+		const code = await quietly(async () => await review_record_cli.run(argv, NOW, root))
+
+		expect(code).toBe(0)
+		expect(issue_comment_mock).toHaveBeenCalledWith(
+			'3645',
+			review_record_cli.comment_body(['- rf:tests | low | b.ts | 2026-09-22 | #3645']),
+		)
+		expect(existsSync(issue_file(root, 3645))).toBe(false)
+	})
+
+	it('keeps the ledger grammar readable inside the comment', () => {
+		expect(review_record_cli.comment_body([ZERO_LINE]).split('\n')).toContain(ZERO_LINE)
+	})
+
+	it('exits 1 when the comment could not be posted, the round being recorded nowhere', async () => {
+		issue_comment_mock.mockReset().mockRejectedValue(new Error('gh refused'))
+		const argv = ['--issue', '3645', '--comment']
+		const code = await quietly(async () => await review_record_cli.run(argv, NOW, root_of('lost')))
+
+		expect(code).toBe(1)
 	})
 })
 

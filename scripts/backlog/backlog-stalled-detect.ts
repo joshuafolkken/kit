@@ -4,7 +4,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { backlog_ready, type ReadyPorts } from './backlog-ready'
 import { backlog_stalled, type StallReading, type StallVerdict } from './backlog-stalled'
 
-// The I/O half of the stall detector (joshuafolkken/kit#2359): it gathers the three counts the pure
+// The I/O half of the stall detector: it gathers the three counts the pure
 // judge in `backlog-stalled.ts` weighs, then — on a stall — leaves the marker and sends the one
 // notification. `stop-guard.ts` wires it into the Stop hook, so it runs at each loop boundary; the CLI
 // exposes the same call for a person to run by hand.
@@ -37,8 +37,8 @@ interface DetectPorts {
 }
 
 // The free-lane and runnable-issue reads are `backlog-ready.ts`'s — the watcher's ready line reads the
-// same two, so they live once there (joshuafolkken/kit#2452) — and a caller that reads them again after
-// this check hands its own ports in, so the two share one reading (joshuafolkken/kit#2472).
+// same two, so they live once there — and a caller that reads them again after
+// this check hands its own ports in, so the two share one reading.
 function ready_count_of(ready: ReadyPorts): () => Promise<number> {
 	return async function (): Promise<number> {
 		const issues = await ready.ready_issues()
@@ -48,7 +48,7 @@ function ready_count_of(ready: ReadyPorts): () => Promise<number> {
 }
 
 // One stall per episode, and the episode ends at a dispatch rather than at whatever event lands next
-// (joshuafolkken/kit#2464) — every parallel lane appends to this stream, so a newest-event dedup re-fired.
+// — every parallel lane appends to this stream, so a newest-event dedup re-fired.
 async function real_emit_stall(text: string): Promise<boolean> {
 	const { STALL, CHILD_LAUNCH } = run_event_stream.EVENT_KIND
 

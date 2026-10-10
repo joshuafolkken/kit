@@ -2,6 +2,7 @@ import { listing_of, listing_outcome } from '#scripts/gh/git-gh-issue-list-fixtu
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { describe, expect, it, vi } from 'vitest'
 import { git_next_issues } from './git-next-issues'
+import { session_cite } from './session-cite'
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_list_recent: vi.fn() },
@@ -125,8 +126,8 @@ describe('git_next_issues.format_lines', () => {
 
 		expect(git_next_issues.format_lines(issues)).toEqual([
 			HEADER,
-			'  1. #9 Issue 9',
-			'  2. #7 Issue 7',
+			`  1. ${session_cite.issue(9, 'Issue 9')}`,
+			`  2. ${session_cite.issue(7, 'Issue 7')}`,
 		])
 	})
 
@@ -144,8 +145,8 @@ describe('git_next_issues.fetch_next_issue_lines', () => {
 
 		expect(await git_next_issues.fetch_next_issue_lines()).toEqual([
 			HEADER,
-			'  1. #2 Issue 2',
-			'  2. #1 Issue 1',
+			`  1. ${session_cite.issue(2, 'Issue 2')}`,
+			`  2. ${session_cite.issue(1, 'Issue 1')}`,
 		])
 	})
 

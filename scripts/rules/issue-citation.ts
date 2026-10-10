@@ -1,6 +1,6 @@
-// The bare-`#N` predicate behind the `issue-citation` row of the stop guard (joshuafolkken/kit#2121),
+// The bare-`#N` predicate behind the `issue-citation` row of the stop guard,
 // and the printing-side formatter that keeps a bare `#N` out of session-facing output in the first
-// place (joshuafolkken/kit#2329).
+// place.
 //
 // **Session-facing output cites an Issue as a number-link, never a bare `#N`.** `CLAUDE.md` and
 // `prompts/collaboration-workflow/issue-citation.md` require `[#<N>](https://github.com/<owner>/<repo>/issues/<N>) — <short summary>`
@@ -8,13 +8,13 @@
 // it is. The stop guard reads `last_assistant_message` — the turn's session-facing text — and this
 // predicate answers whether a bare number slipped into it.
 //
-// **It blocks the stop, so a false positive costs a wasted turn** (joshuafolkken/kit#2247). The nudge
+// **It blocks the stop, so a false positive costs a wasted turn**. The nudge
 // now reaches the model rather than the person, so the detection is tightened to what is genuinely a
 // bare citation: a `#N` inside a fenced code block, inside an inline-code span, on a quote line, or
 // right after `PR` / `pull request` is not a citation slip and is skipped. The scan is line-based so
 // each exclusion is decided from the one line the mention sits on.
 //
-// **`linkify` runs that same scan the other way** (joshuafolkken/kit#2329): a command whose stdout a
+// **`linkify` runs that same scan the other way**: a command whose stdout a
 // run copies into its reply passes the text through it, and every bare `#N` the predicate would flag
 // is rewritten to `[#N](url)` — which the predicate then reads as linked, so the material that fed the
 // duplicate reply is fixed where it is printed rather than scolded after it reaches the screen. The
@@ -40,7 +40,7 @@ const OWNER_REPO = /^[^\s/#]+\/[^\s/#]+$/u
 const MARKDOWN_LINK = /\[[^[\]]*\]\([^()]*\)/gu
 // What continues a `#N` into something longer, read off the two characters after its last digit: a
 // word character (a hex color, `#1e90ff`) or a hyphen and a letter (a heading anchor, `#12-setup`) —
-// never an Issue number (joshuafolkken/kit#2995). A hyphen before a digit or `#` is a range
+// never an Issue number. A hyphen before a digit or `#` is a range
 // (`#12-#15`, `#3-5`), whose first number is still a citation.
 const NUMBER_CONTINUATION = /^(?:\w|-[a-z])/iu
 // The width of the window `NUMBER_CONTINUATION` reads: a hyphen and the letter after it.
@@ -178,7 +178,7 @@ function lines_outside_fences(message: string): ReadonlyArray<string> {
 }
 
 // The run's own prose: the lines outside every fenced-code block and off every quote line. Shared with
-// the filing-offer row of the stop guard (joshuafolkken/kit#2422), which asks the same "is this the
+// the filing-offer row of the stop guard, which asks the same "is this the
 // run speaking, not an example or a quote" question of the same reply.
 function prose_lines(message: string): ReadonlyArray<string> {
 	return lines_outside_fences(message).filter((line) => !QUOTE_LINE.test(line))
@@ -208,7 +208,7 @@ function prompt_references(prompt: string): ReadonlySet<string> {
 	return found
 }
 
-// **A number the person's prompt already carried is quoted, not cited** (joshuafolkken/kit#2819). A
+// **A number the person's prompt already carried is quoted, not cited**. A
 // pasted log from another repository holds its own `#1`…`#7`; `issue:cite` would link them to this
 // repository's unrelated Issues, so following the refusal would make the reply wrong. Only the exact
 // reference the prompt wrote is exempt, so a bare `#N` the run brought in itself is still refused.

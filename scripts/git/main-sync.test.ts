@@ -12,13 +12,19 @@ vi.mock('./git-command', () => ({
 		get_default_branch: vi.fn(),
 		git_directories: vi.fn(),
 		pull_fast_forward: vi.fn(),
+		repository_root: vi.fn(),
 	},
 }))
 
 vi.mock('./gone-branch', () => ({ gone_branch: { prune: vi.fn() } }))
 
+vi.mock('./lockfile-sync', () => ({
+	lockfile_sync: { reinstall_if_stale: vi.fn() },
+}))
+
 const { git_command } = await import('./git-command')
 const { gone_branch } = await import('./gone-branch')
+const { lockfile_sync } = await import('./lockfile-sync')
 const { main_sync } = await import('./main-sync')
 
 const MAIN_GIT_DIRECTORY = '/repo/.git'
@@ -36,9 +42,20 @@ const pull = vi.mocked(git_command.pull_fast_forward)
 const fast_forward = vi.mocked(git_command.fast_forward_local)
 const current_branch = vi.mocked(git_command.branch)
 const prune = vi.mocked(gone_branch.prune)
+const reinstall = vi.mocked(lockfile_sync.reinstall_if_stale)
+
+const REPOSITORY_ROOT = '/repo'
+const INSTALL_OUTPUT = 'ERR_PNPM_OUTDATED_LOCKFILE'
 
 function in_main_work_tree(): void {
 	git_directories.mockResolvedValue([MAIN_GIT_DIRECTORY, MAIN_GIT_DIRECTORY])
+}
+
+// What follows the pull — nothing to prune and an unchanged lock — so a test changes only its own step.
+function with_a_quiet_tail(): void {
+	prune.mockResolvedValue({ deleted: [], failed: [] })
+	vi.mocked(git_command.repository_root).mockResolvedValue(REPOSITORY_ROOT)
+	reinstall.mockResolvedValue({ is_installed: true, output: '' })
 }
 
 function in_a_lane(): void {
@@ -54,8 +71,37 @@ beforeEach(() => {
 	current_branch.mockResolvedValue(FEATURE_BRANCH)
 	fast_forward.mockResolvedValue('')
 	pull.mockResolvedValue()
-	prune.mockResolvedValue({ deleted: [], failed: [] })
+	with_a_quiet_tail()
 	in_main_work_tree()
+})
+
+// joshuafolkken/kit#3463: a pull that added a dependency left `node_modules` behind the lock, and every
+// `josh` typed in the primary checkout failed to load it. When the install runs is pinned in
+// `lockfile-sync.test.ts`; this pins that the sync asks for it in the repository root after the pull.
+describe('reinstalling when the pull changed the lock', () => {
+	it('asks for the reinstall in the repository root once the pull has run', async () => {
+		await main_sync.run(NO_ARGUMENTS)
+
+		expect(reinstall).toHaveBeenCalledWith(REPOSITORY_ROOT)
+		expect(pull.mock.invocationCallOrder[0]).toBeLessThan(
+			reinstall.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	it('exits non-zero and shows the install output when the install fails', async () => {
+		reinstall.mockResolvedValue({ is_installed: false, output: INSTALL_OUTPUT })
+
+		expect(await main_sync.run(NO_ARGUMENTS)).toBe(FAILURE_EXIT_CODE)
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining(INSTALL_OUTPUT))
+	})
+
+	it('reinstalls nothing inside a lane', async () => {
+		in_a_lane()
+
+		await main_sync.run(NO_ARGUMENTS)
+
+		expect(reinstall).not.toHaveBeenCalled()
+	})
 })
 
 // joshuafolkken/kit#2504: which branches go is pinned in `gone-branch.test.ts`; this pins that the

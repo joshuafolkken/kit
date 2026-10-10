@@ -9,7 +9,7 @@ import type { ShipResume } from './run-ship-next'
 import { run_ship_stage, type Stage } from './run-ship-stage'
 import { run_ship_stop_text } from './run-ship-stop-text'
 
-// How a detached `josh ship` supervisor hands a stopped stage back (joshuafolkken/kit#2428). The agent
+// How a detached `josh ship` supervisor hands a stopped stage back. The agent
 // ended when it handed the region over, so a red gate, a High/Medium review, a failed push or red CI has
 // nobody to read it — this is what gives it one, in two halves:
 //

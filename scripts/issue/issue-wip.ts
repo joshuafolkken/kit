@@ -1,11 +1,11 @@
-import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { INTERRUPT_ROUTE_LABEL, SPLIT_ROUTE_LABEL, TIER_A_ROUTE_LABEL } from './issue-labels'
 
-// The WIP cap at the call that files (joshuafolkken/kit#3181). The count used to be a hand-run
-// `gh api … | wc -l` the agent compared with the cap itself; `josh issue:file` now reads it and asks
-// the exemption question before anything is sent, the same hold `--distinct` places on a duplicate.
+// The WIP cap at the call that files. `josh issue:file` reads the count and asks the exemption
+// question before anything is sent, the same hold `--distinct` places on a duplicate.
 // What stays judgement — whether a filing is exempt — is declared by the route or by `--over-cap`.
 
+// `WIP_CAP` is the number's single source; `wip-cap.md` states it once and a test pins the two equal.
+const WIP_CAP = 30
 const WITHIN = 'within'
 const EXEMPT = 'exempt'
 const HELD = 'held' as const
@@ -43,13 +43,13 @@ function is_exempt(filing: WipFiling): boolean {
 
 // The cap is "more than `WIP_CAP` open", so exactly the cap is still within it.
 function verdict_of(count: number, filing: WipFiling): WipVerdict {
-	if (count <= delivered_rules.WIP_CAP) return WITHIN
+	if (count <= WIP_CAP) return WITHIN
 
 	return is_exempt(filing) ? EXEMPT : HELD
 }
 
 function count_line(count: number, repo: string, verdict: WipVerdict): string {
-	return `wip: ${String(count)} open in ${repo} · cap ${String(delivered_rules.WIP_CAP)} · ${verdict}`
+	return `wip: ${String(count)} open in ${repo} · cap ${String(WIP_CAP)} · ${verdict}`
 }
 
 // The listing's JSON is an array of rows; anything else is unreadable rather than zero, because zero
@@ -64,7 +64,7 @@ function count_of(json: string): number | undefined {
 	}
 }
 
-const issue_wip = { HELD, HELD_MESSAGE, UNREAD_MESSAGE, verdict_of, count_line, count_of }
+const issue_wip = { WIP_CAP, HELD, HELD_MESSAGE, UNREAD_MESSAGE, verdict_of, count_line, count_of }
 
 export type { WipVerdict }
 export { issue_wip }

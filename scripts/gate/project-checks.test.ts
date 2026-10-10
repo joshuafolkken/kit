@@ -159,6 +159,29 @@ describe('project_checks eslint readiness', () => {
 	})
 })
 
+// joshuafolkken/kit#3568: the one answer the gate and the detached ship share.
+describe('project_checks.is_kit_repository', () => {
+	it('answers true for the kit package itself', () => {
+		const root = fixture()
+
+		writeFileSync(path.join(root, PACKAGE_JSON), '{"name":"@joshuafolkken/kit"}')
+		mkdirSync(path.join(root, 'src'))
+
+		expect(project_checks.is_kit_repository(path.join(root, 'src'))).toBe(true)
+	})
+
+	it('answers false for a consumer that depends on kit', () => {
+		const root = fixture()
+
+		writeFileSync(
+			path.join(root, PACKAGE_JSON),
+			'{"name":"app","devDependencies":{"@joshuafolkken/kit":"1.0.0"}}',
+		)
+
+		expect(project_checks.is_kit_repository(root)).toBe(false)
+	})
+})
+
 describe('project_checks optional configuration', () => {
 	it('finds later ESLint and cspell configuration from a subdirectory', () => {
 		const root = fixture()

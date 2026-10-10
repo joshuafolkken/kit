@@ -3,11 +3,12 @@ import { linkSync, statSync, unlinkSync } from 'node:fs'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_owner_schema } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { openai_lane_supervisor_decision } from './openai-lane-supervisor-decision'
 
 // The supervisor's owner and state stamps — who holds a lane, and which child it last launched —
-// split out of `openai-lane-supervisor.ts` when it reached its line limit (joshuafolkken/kit#3264).
+// split out of `openai-lane-supervisor.ts` when it reached its line limit.
 // `openai_lane_supervisor` re-exports each public one under the name it always had, so the move
 // changed no call site and no suite that spies on `openai_lane_supervisor`.
 
@@ -41,14 +42,7 @@ function state_path(lane_directory: string): string {
 }
 
 function parsed_stamp<T>(target: string, schema: z.ZodType<T>): T | undefined {
-	try {
-		const value: unknown = JSON.parse(stamp_file.read_stamp_text(target) ?? '')
-		const parsed = schema.safeParse(value)
-
-		return parsed.success ? parsed.data : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(stamp_file.read_stamp_text(target) ?? '', schema)
 }
 
 function read(lane_directory: string): SupervisorOwner | undefined {

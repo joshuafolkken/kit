@@ -1,8 +1,9 @@
 import { epic_triage } from '#scripts/epic/epic-triage'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 
-// When ready backlog work sits undispatched while lanes are free, nobody notices until a person asks
-// (joshuafolkken/kit#2359). This is the mechanical judge of that state: three facts read, never
+// When ready backlog work sits undispatched while lanes are free, nobody notices until a person asks.
+// This is the mechanical judge of that state: three facts read, never
 // weighed — is there runnable work, is there a free lane, and has nothing been dispatched for a while.
 // The verdict is a report, not a stop: a false positive costs one notification, never a halted run.
 //
@@ -86,8 +87,6 @@ function describe(reading: StallReading): string {
 	return `${String(reading.ready_count)} ready, ${String(reading.free_lanes)} free lane(s), ${String(minutes)}m since the last dispatch`
 }
 
-const NUMERIC_TOKEN = /^\d+$/u
-
 // The runnable issue numbers `backlog:next` printed: one token per line, a bare number per runnable
 // issue and a verdict word (`wait`, `stop`, …) when there is none — so the numeric lines are the ready
 // issues.
@@ -95,14 +94,14 @@ function ready_tokens(out: string): ReadonlyArray<string> {
 	return out
 		.split('\n')
 		.map((token) => token.trim())
-		.filter((token) => NUMERIC_TOKEN.test(token))
+		.filter((token) => issue_number_shape.is_issue_number(token))
 }
 
 function count_ready_tokens(out: string): number {
 	return ready_tokens(out).length
 }
 
-// Whether `backlog:next` answered `triage` (joshuafolkken/kit#2779): no number is runnable, yet a session
+// Whether `backlog:next` answered `triage`: no number is runnable, yet a session
 // has work — judging the untriaged issues — so a reader of the numeric lines alone would take it for an
 // empty pool.
 function needs_triage(out: string): boolean {

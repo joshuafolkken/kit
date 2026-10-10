@@ -1,5 +1,5 @@
 // Phrases retracted from the distributed documents, kept so a clone or a reverted decision cannot
-// creep back unnoticed (joshuafolkken/kit#1923). This is the small negative table that replaced the
+// creep back unnoticed. This is the small negative table that replaced the
 // ~140 scattered `not.toContain` assertions the per-rule marker suites carried: each phrase is
 // checked absent from the whole document corpus at once by `document-markers.test.ts`.
 //
@@ -27,6 +27,7 @@ const RETIRED_PHRASES: ReadonlyArray<string> = [
 	'2 件以上に分割したら常に epic を作る。件数の閾値も、実行順序の有無による分岐も無い',
 	'3-6 line work summary',
 	'3–6 line work summary',
+	"A child appends only to its own issue's file",
 	'Artifact languages are unaffected',
 	'Ask the user to run `pnpm josh test` and share the output',
 	'CI only runs the suite it can find, so specs stay under',
@@ -72,6 +73,7 @@ const RETIRED_PHRASES: ReadonlyArray<string> = [
 	'is a separate deliverable',
 	"it asks only after a child that ran in the parent's own context",
 	'its own `pnpm josh gate` join',
+	'jgame',
 	'join it, and `pnpm josh git -y`; on `skip`',
 	'kit exports that rule for consumers and does not apply it to itself',
 	'operating-rules.md` → "Auto-merge',

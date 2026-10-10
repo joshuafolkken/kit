@@ -2,6 +2,7 @@
 
 1. 提案を人間が判断する
 2. 採用した計画を Issue に記録する（Issue body が空の場合は計画をファイルに書き、`gh api -X PATCH repos/{owner}/{repo}/issues/<N> --field body=@<path>` で body に書き込む — 本文はパスで渡し、シェルの二重引用符には載せない（`shell-body.md`）。body が既にある場合は `pnpm josh issue:comment <N> --body-file <path>` でコメント追加する）
+   - **計画が stash の復元を含むとき（会話で先に作った実装を stash でランへ渡す場合を含む）、復元手順には `pnpm josh stash:pop "<メッセージ>"` だけを書く。** `git stash apply` / `git stash pop` と「drop しない」という条件は書かない — 単一ソースは `operating-rules.md` → "no-self-staging"
 3. Telegram で計画開始を通知する:
 
    ```bash
@@ -20,7 +21,7 @@
    ```
 5. メインブランチへ切り替えて最新を取得する:
    ```bash
-   git switch main && git pull
+   pnpm josh ms
    ```
 6. 依存関係の更新はコマンドに問う — `pnpm josh latest:scope` が `required` と答えたときだけ `pnpm josh latest` を実行し、`dependency-update` スキルに従う（単一ソースは `.claude/skills/workflow-commands/latest-gate.md`）。脆弱性への override は `pnpm-workspace.yaml` の `overrides` に書く（pnpm 11/12 は `package.json` の `pnpm.overrides` を無視する）。
    ステップ 4 で stash した場合は、ここでメッセージ指定で復元する（stash は全 work tree が共有するため、位置指定や引数なしの `git stash pop` は使わない — joshuafolkken/kit#2050）:

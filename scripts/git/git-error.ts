@@ -37,7 +37,7 @@ function display_error_details(cause: unknown): void {
 const FAILURE_EXIT_CODE = 1
 const OPERATION_CANCELLED_MESSAGE = '💡 Operation cancelled.'
 
-// **A library refuses by throwing; only the CLI entry decides the exit code** (joshuafolkken/kit#2985).
+// **A library refuses by throwing; only the CLI entry decides the exit code**.
 // `process.exit()` from an imported module skips every `finally` above it (a lock release included)
 // and truncates a piped stdout, so these modules throw a typed error instead, and `handle` — the catch
 // at each entry — renders it and sets `process.exitCode`.

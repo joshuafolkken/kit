@@ -5,11 +5,9 @@ import { epic_sections, type BodyLines, type SectionRange } from './epic-section
 // Placing a decision record inside an epic body's `## Decisions` section.
 //
 // `epic-commands` requires an auto-decision to be written in **both** the epic's `## Decisions` and a
-// comment on each child it applies to, and until now no command wrote the epic half — so a run had to
-// read the body, edit it and `PATCH` it back by hand, which is the one operation `CLAUDE.md` forbids.
-// Measured on runs #1333 and #1349, that repair-shaped detour is where the post-merge bookkeeping
-// spends its round trips, and the two most recent filings skipped the epic half entirely rather than
-// pay for it (joshuafolkken/kit#1350).
+// comment on each child it applies to. Without a command for the epic half, a run would have to read
+// the body, edit it and `PATCH` it back by hand, which is the one operation `CLAUDE.md` forbids — or
+// skip the epic half entirely.
 //
 // So the record rides on the body edit `--add` already makes: no extra round trip, and the half that
 // was being dropped is written by the command instead of by hand.
@@ -27,7 +25,7 @@ const EMPTY_RECORD =
 
 // **The offending line is named, never quoted.** The record is a file the caller handed over, and
 // echoing a line of it into stderr puts arbitrary file content in the console — the leak SonarCloud's
-// `tssecurity:S8689` reports for exactly this path on joshuafolkken/kit#1350. A line number is as
+// `tssecurity:S8689` reports for exactly this path. A line number is as
 // actionable, since the author has the file open, and it carries nothing out of it.
 function to_declaration_error(line_number: number): string {
 	return `Line ${String(line_number)} of the decision record is nothing but a dependency chain, which \`epic:next\` would read as part of the epic's dependency order; wrap it in backticks, fence it, or reword it.`
@@ -35,8 +33,7 @@ function to_declaration_error(line_number: number): string {
 
 // Whether the record can be written at all. The declaration check is the load-bearing one: a bare
 // `#A -> #B` line anywhere in the body is parsed as a declaration, so a record quoting an order as a
-// standalone line would silently add a dependency nobody declared — the failure mode
-// joshuafolkken/kit#1253 documents, arriving by a second route.
+// standalone line would silently add a dependency nobody declared.
 //
 // **It is judged exactly the way the merged body will be judged**: the predicate is the parser's own,
 // and the lines are read through the same fence mask, so a record whose chain sits inside a fenced
@@ -91,16 +88,15 @@ function append_decision(body: string, record: string): string {
 }
 
 // The record as it will actually be written, with the relations this insertion replaced appended to
-// it (joshuafolkken/kit#1711).
+// it.
 //
-// **A positioned `--add` discards the `blocked-by` relation the child already had, and until now the
-// record said nothing about it.** On joshuafolkken/kit#1703 that overwrote a decision whose reasoning
-// was written down, twice in four minutes, leaving the body's declaration, the native relations and
-// the recorded decision disagreeing with one another. The record is the artifact read months later, so
-// it is where what was replaced has to survive — the console line scrolls away.
+// **A positioned `--add` discards the `blocked-by` relation the child already had, so the record says
+// so.** Unsaid, it can overwrite a decision whose reasoning was written down, leaving the body's
+// declaration, the native relations and the recorded decision disagreeing with one another. The
+// record is the artifact read months later, so it is where what was replaced has to survive — the
+// console line scrolls away.
 //
-// **The policy is to report, not to refuse.** Re-pointing a position is what joshuafolkken/kit#1701
-// deliberately added, so refusing an invocation that carries no `--decision-file` would close a
+// **The policy is to report, not to refuse.** Re-pointing a position is deliberate, so refusing an invocation that carries no `--decision-file` would close a
 // working route to force a record; naming what was dropped costs the caller nothing and loses nothing.
 //
 // `undefined` stays `undefined`: an insertion that records no decision gains none here, and an
@@ -128,7 +124,7 @@ function format_decision_report(input: { total: number; failures: number }): str
 
 // The heading a creation writes its reasoning under. Beside a pattern exactly as `DECISIONS_HEADING`
 // is, and tied to `epic_body`'s own literal by a test that reads a body the builder produced
-// rather than by a string comparison (joshuafolkken/kit#1712).
+// rather than by a string comparison.
 const RATIONALE_HEADING_PATTERN = /^#{1,6}[ \t]+Split rationale\b/u
 
 function read_section(body: string, heading: RegExp): string {
@@ -145,7 +141,7 @@ function read_section(body: string, heading: RegExp): string {
 // Both, not just the first. `josh epic … --ordered` declares a whole chain and records its reasoning
 // under `## Split rationale`, writing no `## Decisions` at all — so a reader that looked only at
 // `## Decisions` would report every correctly-documented ordered epic as unjustified the moment it
-// was created (joshuafolkken/kit#1712). It is this module's because the heading patterns are: a
+// was created. It is this module's because the heading patterns are: a
 // second reader with its own copies is one that comes to disagree with the writers about where a
 // record goes.
 function read_recorded_reasons(body: string | undefined): string {

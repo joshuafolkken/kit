@@ -1,13 +1,14 @@
 ---
 name: workflow-commands
-description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun`, `prrun` and `backlogrun` — planning, implementation, the verification gate, unattended epic and backlog execution, the `/code-review` → `followup` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
+description: Procedures for `kickoff`, `fullrun`, `halfrun`, `prrun` and `backlogrun`. Read it the moment one is typed (with or without `#N` / `new`), before any command, and when asked what one does or a run must be resumed or repaired.
 ---
 
 # Issue-driven workflow commands
 
 `kickoff`, `fullrun`, `halfrun`, `prrun` and `backlogrun` are the shorthand commands this
 package's collaboration workflow is built on. **This file is their manifest — triggers and pointers,
-never a procedure** (joshuafolkken/kit#3174): each rule is stated once, in the file its row names.
+never a procedure**: each rule is stated once, in the file its row names. History:
+`docs/maintainers/workflow-commands-rationale.md` → "Where each rule came from".
 
 ## 0. The rule that fires before any of them — explicit invocation
 
@@ -48,13 +49,13 @@ Each is fetched at its named scope, in the same turn, by the named command that 
 | ----------------------- | ------------------------------------------------------------------------------ |
 | `latest-gate.md`        | `pnpm josh latest:scope` answers `required` — before `josh latest` runs         |
 | `followup.md` → "Run `pnpm josh followup`" | Before issuing `pnpm josh followup`, in that same turn |
-| `chain-rule.md` → "Run the review-to-merge chain" | Before the first `pnpm josh gate` launch (`fullrun` / `backlogrun`) — the gate starts overlapped with the review, so the section is read before the gate |
-| `background-commands.md` → "Background the gate and push" | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `backlogrun`) |
+| `chain-rule.md` → "Run the review-to-merge chain" | Before the first `pnpm josh gate` launch (`fullrun` / `prrun` / `backlogrun`) — the gate overlaps the review, so the section is read before it |
+| `background-commands.md` → "Background the gate and push" | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `prrun` / `backlogrun`) |
 
 A `skip` answer from `latest:scope` reads nothing. **A lane child that parks reads
 `backlogrun-park.md` → "park and continue" at that point of use**, and **every implementing run reads
 `progress-watcher.md` → "Progress while the run is quiet"** before starting `pnpm josh run:progress
---wait` once its hold is claimed (joshuafolkken/kit#3172).
+--wait` once its hold is claimed.
 
 ### A section reference is read as a section
 
@@ -65,8 +66,7 @@ pnpm josh doc:section <file.md> "<heading>"   # the section, verbatim
 pnpm josh read:set [<keyword>]                # what an entry reads, and what it costs
 ```
 
-A heading that does not resolve is refused, with the file's own headings listed. The set is derived
-from the table above and the documents themselves, never transcribed.
+A heading that does not resolve is refused, with the file's own headings listed.
 
 ## 2. What every one of them shares
 
@@ -91,11 +91,11 @@ from — read at that trigger, never restated here.
 | Implementation is done | Refactor → `pnpm josh main:merge` → `pnpm josh gate` beside a subagent `/code-review`, joined before the commit → round cap → PR → merge | `chain-rule.md` → "Run the review-to-merge chain" |
 | A review has run | Its verdict counts only once `pnpm josh review:attest --check` answers `ok`; `missing` / `mismatch` are refusals `pnpm josh followup` blocks the merge on | `chain-rule.md` → "The brief names the checkout, and a review that read another one is refused" |
 | A command can take minutes | Issue it in the background; the turn never ends at the push (`pnpm josh followup` stays foreground) | `background-commands.md` → "Background the gate and push" |
-| E2E gate | The CI E2E job where the command ends in a PR (`fullrun` / `backlogrun`, enforced by `pnpm josh followup`); you run `pnpm josh test:e2e` yourself where it does not (`halfrun`) | `prompts/testing-guide.md` → "Closing the E2E gate without a human run" |
+| E2E gate | The CI E2E job where the command ends in a PR (`fullrun` / `prrun` / `backlogrun`, enforced by `pnpm josh followup`); you run `pnpm josh test:e2e` yourself where it does not (`halfrun`) | `prompts/testing-guide.md` → "Closing the E2E gate without a human run" |
 | Filing any new Issue | `pnpm josh issue:file` — it runs the `issue:scout` scan first; read its duplicate and epic answers | `issue-scout.md` |
 | Another Issue here must land first | A prerequisite is a dependency, not a park — file it, stash, record the dependency; `fullrun` / `halfrun` stop, `backlogrun` continues | `prerequisite.md` |
-| Something worth filing, none of the three | File it without asking (Tier A, first-party) and carry on; a delegated child returns it to the parent instead | `observation-filing.md` |
-| A defect in kit's own verification turns up | It runs alone when all three conditions hold; a batch resumes once it merges | `backlogrun-lanes.md` → "Lanes — running more than one child at a time" |
+| Something worth filing, none of the three | Unattended: file it (Tier A, first-party); else ask; a delegated child returns it to the parent instead | `observation-filing.md` |
+| A defect in kit's own verification turns up | It runs alone when all three conditions hold; a batch resumes once it merges | `backlogrun-lanes.md` → "A solo run" |
 | Under `backlogrun`, a stop that would end a batch, or a named non-epic item | Park one child and continue; run a named non-epic item as a `fullrun` | `backlogrun-park.md` → "park and continue"; `backlogrun-child.md` → "When `#N` is not an epic" |
 | `backlogrun`'s authorization | The whole `auto-ok` opted-in pool as well as its named items; `pnpm josh backlog:next` offers them | `backlogrun.md` |
 | `run:step` prints the retrospective step (a run drained its backlog and stopped, not a lane child) | Run what it prints once, file 0–2 improvements, then `pnpm josh run:carry --retrospective` | `retrospective.md` |

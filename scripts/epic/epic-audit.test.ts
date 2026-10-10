@@ -55,6 +55,27 @@ describe('epic_audit_logic.parse_references', () => {
 
 		expect(epic_audit_logic.parse_references(text, REPO)).toEqual([863, 864])
 	})
+
+	// A number in pasted command output is not the author naming that issue (joshuafolkken/kit#3425).
+	it('ignores a number inside a backtick fence', () => {
+		const text = '## 再現\n\n```\n#3347 lane open\n```\n'
+
+		expect(epic_audit_logic.parse_references(text, REPO)).toEqual([])
+	})
+
+	it('ignores a number inside a tilde fence', () => {
+		expect(epic_audit_logic.parse_references('~~~\nsee #3347\n~~~', REPO)).toEqual([])
+	})
+
+	it('ignores a number on a quote line', () => {
+		expect(epic_audit_logic.parse_references('> blocked on #3347', REPO)).toEqual([])
+	})
+
+	it('still reads a number named in the prose beside a fence', () => {
+		const text = 'follows #3412\n\n```\n#3347\n```\n\nafter the fence, #3413'
+
+		expect(epic_audit_logic.parse_references(text, REPO)).toEqual([3412, 3413])
+	})
 })
 
 describe('epic_audit_logic.acceptance_section', () => {

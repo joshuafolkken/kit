@@ -8,11 +8,12 @@ import { rule_value_cache } from './rule-value-cache'
 import { rule_value_cli } from './rule-value-cli'
 import { rule_value_fixture } from './rule-value-fixture'
 
-// A filing reaches the WIP-cap trigger; the count in front of it is what keeping the rule looks like,
-// so this run reaches and keeps it. The filing cap declares no `keeps`, so it reads unmeasured.
-const COUNT = 'gh api repos/o/r/issues?state=open --jq length'
+// A body read reaches the issue-comments trigger; the comments read in front of it is what keeping
+// the rule looks like, so this run reaches and keeps it. The filing reaches the filing cap, which
+// declares no `keeps`, so it reads unmeasured.
+const COMMENTS_READ = 'gh api repos/o/r/issues/12/comments'
+const BODY_READ = 'gh api repos/o/r/issues/12'
 const FILING = 'pnpm josh issue:file "x" --body-file b.md --depth 1'
-const WIP_CAP = 'wip-cap'
 const FILING_CAP = 'filing-cap'
 const ISSUE_COMMENTS = 'issue-comments'
 const TEMPORARY_PREFIX = 'rule-value-cli-'
@@ -32,17 +33,19 @@ describe('rule_value_cli.render — one row per rule, or the no-targets answer',
 	})
 
 	it('prints exactly one line per measured rule', () => {
-		const lines = rule_value_cli.render([[rule_value_fixture.session(COUNT, FILING)]]).split('\n')
+		const lines = rule_value_cli
+			.render([[rule_value_fixture.session(COMMENTS_READ, BODY_READ, FILING)]])
+			.split('\n')
 
 		expect(lines).toHaveLength(delivered_rules.MEASURED_RULES.length)
 	})
 })
 
 describe('rule_value_cli.row — the three readings a row can carry', () => {
-	const kept = [[rule_value_fixture.session(COUNT, FILING)]]
+	const kept = [[rule_value_fixture.session(COMMENTS_READ, BODY_READ, FILING)]]
 
 	it('renders a reached, measurable rule as a percentage kept unaided', () => {
-		const reading = rule_value_fixture.reading_for(WIP_CAP, kept)
+		const reading = rule_value_fixture.reading_for(ISSUE_COMMENTS, kept)
 
 		expect(rule_value_cli.row(reading)).toContain('% unaided')
 	})

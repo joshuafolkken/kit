@@ -1,10 +1,10 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { github_issue_url, type IssueUrlTarget } from '#scripts/gh/github-issue-url'
 import { git_error } from '#scripts/git/git-error'
+import { session_cite } from '#scripts/issue/session-cite'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { telegram_notify } from './telegram-notify'
@@ -12,36 +12,44 @@ import { telegram_test_logic, type CliValues, type ResolvedContext } from './tel
 
 const REPO_NAME_SEPARATOR = '/'
 const ARGV_OFFSET = 2
+const FAILURE_EXIT_CODE = 1
+const USAGE =
+	'Usage: josh notify [--task-type <type>] [--body <text> | --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>]'
 
 // The free-text values a caller writes, often opening with a Markdown `-` bullet.
 const FREE_TEXT_FLAGS = ['--body', '--issue-title']
 
-function parse_cli_arguments(): CliValues {
-	const { values } = parseArgs({
-		args: [...cli_flags.attach_values(process.argv.slice(ARGV_OFFSET), FREE_TEXT_FLAGS)],
-		options: {
-			'task-type': { type: 'string' },
-			'repo-name': { type: 'string' },
-			'issue-title': { type: 'string' },
-			body: { type: 'string' },
-			'body-file': { type: 'string' },
-			'issue-url': { type: 'string' },
-			'pr-url': { type: 'string' },
-		},
-	})
+const OPTIONS = {
+	'task-type': { type: 'string' },
+	'repo-name': { type: 'string' },
+	'issue-title': { type: 'string' },
+	body: { type: 'string' },
+	'body-file': { type: 'string' },
+	'issue-url': { type: 'string' },
+	'pr-url': { type: 'string' },
+} as const
 
-	return values
+// `undefined` for a line nobody can read — an unknown flag, or a flag given no value.
+function parse_cli_arguments(): CliValues | undefined {
+	return cli_flags.values_of(
+		cli_flags.attach_values(process.argv.slice(ARGV_OFFSET), FREE_TEXT_FLAGS),
+		OPTIONS,
+	)
+}
+
+// A refused line sends nothing: the notification a misspelled flag would have produced is not the one
+// the caller wrote, and the non-zero exit is what tells a workflow it never went out.
+function refuse_usage(): void {
+	console.error(USAGE)
+	process.exitCode = FAILURE_EXIT_CODE
 }
 
 // The repository this notification is about, for the Telegram header.
 //
-// joshuafolkken/kit#1063: this used to spawn `gh repo view --json nameWithOwner` through a
-// promisified `execFile`, which is why joshuafolkken/kit#1022's survey never counted it — the
-// callee was not `execa` and the file was not `scripts/`. `gh repo view` goes through GraphQL and
-// is answered 403 in a cloud session, so the header simply lost its repository name there.
-//
-// The same fact is already read over REST by `git_gh_repo`, whose failure contract is the
-// `undefined` this caller was already handling, so it is read from there rather than from a second
+// Not `gh repo view`: it goes through GraphQL and is answered 403 in a cloud session, which would
+// lose the header's repository name there. The same fact is already read over REST by
+// `git_gh_repo`, whose failure contract is the `undefined` this caller handles, so it is read from
+// there rather than from a second
 // spawn (`CLAUDE.md` → "No clones").
 async function fetch_repo_name(): Promise<string | undefined> {
 	const name_with_owner = await git_gh_repo.repo_get_name_with_owner()
@@ -53,8 +61,7 @@ async function fetch_repo_name(): Promise<string | undefined> {
 
 // The title is read from the repository the URL names, through the same reader every other
 // cross-repository read goes through. Read unqualified, `gh` would answer with the issue of that
-// number in the working directory's repository — a different issue with a different title
-// (joshuafolkken/kit#903).
+// number in the working directory's repository — a different issue with a different title.
 //
 // A repository the token cannot read answers the same `undefined` as an issue that does not exist,
 // and the notification would then go out with no title line at all. Say so, so the gap is visible
@@ -65,7 +72,9 @@ async function fetch_issue_title(target: IssueUrlTarget | undefined): Promise<st
 	const title = await git_gh_issue_read.issue_get_title(target.issue_number, target.name_with_owner)
 
 	if (title === undefined) {
-		console.warn(`⚠️  Could not read ${target.name_with_owner}#${target.issue_number}.`)
+		console.warn(
+			`⚠️  Could not read ${session_cite.issue(target.issue_number, undefined, target.name_with_owner)}.`,
+		)
 	}
 
 	return title
@@ -90,9 +99,8 @@ async function resolve_issue_title(
 //
 // `--issue-url` outranks `--pr-url` because it identifies the issue the title is read from as well
 // as the repository. A pull URL answers the repository half only, which is why it is read for
-// `repo_name` and not passed to `resolve_issue_title` — a completion notification carrying only a
-// PR link used to go out under the working directory's repository while its link pointed elsewhere
-// (joshuafolkken/kit#994).
+// `repo_name` and not passed to `resolve_issue_title` — otherwise a completion notification carrying
+// only a PR link goes out under the working directory's repository while its link points elsewhere.
 async function resolve_context(values: CliValues): Promise<ResolvedContext> {
 	const target = github_issue_url.parse(values['issue-url'])
 	const pull_target = github_issue_url.parse_pull(values['pr-url'])
@@ -105,13 +113,20 @@ async function resolve_context(values: CliValues): Promise<ResolvedContext> {
 async function main(): Promise<void> {
 	josh_environment_file.load_environment_file()
 	const values = parse_cli_arguments()
+
+	if (values === undefined) {
+		refuse_usage()
+
+		return
+	}
+
 	const context = await resolve_context(values)
 	const input = telegram_test_logic.build_input({ values, context })
 
 	await telegram_notify.send(input)
 }
 
-// **A notification nobody received must not read as success** (joshuafolkken/kit#1564). This command
+// **A notification nobody received must not read as success**. This command
 // *is* the notification, so a failed send is its result and the exit code has to say so — the state
 // that Issue measured was three lost messages, each printing a warning and exiting 0.
 //

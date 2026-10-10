@@ -18,7 +18,8 @@ const COMMAND_DOC = 'docs/josh-commands-backlog.md'
 // command and caps the rounds at two, while the inert enumeration, the "never by judgement" phrasing
 // and "documentation is not inert" moved to `prompts/review.md` and `docs/josh-commands-backlog.md`, which
 // still carry and pin them. So the detailed set is asserted at those two, not resident.
-const INERT_DOCUMENTS: ReadonlyArray<string> = [REVIEW_PROMPT, COMMAND_DOC]
+// joshuafolkken/kit#3401 moved the derivation off the read path into the review history.
+const INERT_DOCUMENTS: ReadonlyArray<string> = [REVIEW_HISTORY, COMMAND_DOC]
 
 // Every file that tells a run which level to review at. The first version of this suite read only
 // `CLAUDE.md` and `prompts/review.md`, so the rule could be — and was — documented in two places

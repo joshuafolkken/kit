@@ -2,11 +2,26 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The signal a pipe reader that exits early sends a writer, exit 141 under `pipefail` (#3570).
+  - SIGPIPE
+  # `lsof -F`'s field line naming a working directory, which the run:board usage reader parses (#3489).
+  - fcwd
+  # The macOS `libproc` call and mach clock the run:board usage reader reaches through `node:ffi` (#3529).
+  - libproc
+  - rusage
+  - timebase
+  - numer
   # The macOS `sysctl` memory-pressure key the core budget reads available memory from (#3371).
   - memorystatus
   - purgeable
   # The macOS `sysctl` key the lane-limit measurement reads swap from (#3355).
   - swapusage
+  # The swap counters `run:board`'s machine line reads: macOS `sysctl` and Linux `/proc/vmstat` (#3450).
+  - swapins
+  - swapouts
+  - pswpin
+  - pswpout
+  - getconf
   # A run trying kit's distribution on a throwaway project of its own (#3142).
   - dogfood
   # The workflow command that stops at a green, mergeable pull request (#3023).

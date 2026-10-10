@@ -1,61 +1,27 @@
 # コーディング指針 — lint では表せない書き方
 
-命名・関数の構文・エクスポート・ファイル名・品質上限・型安全・早期 return・マジックナンバーといった機械的な規約の単一ソースは `CLAUDE.md` → "Critical Conventions (non-standard — always apply)" である。その大半は ESLint が強制する（クラスのプロパティ・メソッドの `snake_case` など `CLAUDE.md` に書いていない細目は `eslint/rules/naming-convention.js` が持つ）。ただし **`function` 構文（アロー関数を使わない）と早期 return の 1 行形式は lint が検査しない**ので、書き手とレビューが確かめる。このファイルは本文を写さず、lint では表せない書き方の指針だけを持つ。
+命名・エクスポート・ファイル名・内容の規約の単一ソースは下記「Conventions」、関数の構文・品質上限・型安全・早期 return・マジックナンバーの単一ソースは `CLAUDE.md` → "Critical Conventions (non-standard — always apply)" である。その大半は ESLint が強制する（クラスのプロパティ・メソッドの `snake_case` などここに書いていない細目は `eslint/rules/naming-convention.js` が持つ）。ただし **`function` 構文（アロー関数を使わない）と早期 return の 1 行形式は lint が検査しない**ので、書き手とレビューが確かめる。このファイルは本文を写さず、lint では表せない書き方の指針だけを持つ。
 
 lint・型検査の実行手順は `CLAUDE.md` → "Code Change Rules" の検証ゲート（`pnpm josh gate`、実装中は `pnpm josh lint:related` / `pnpm josh test:related`）が単一ソースである。
 
+## Conventions
+
+`CLAUDE.md` から移した、lint が強制する規約の単一ソース。
+
+- **Naming**: `snake_case` variables / functions / params · `PascalCase` types / classes / interfaces / enums · `UPPER_CASE` enum members · booleans prefixed `is_` / `has_` / `should_` / `can_` / `will_` / `did_` · constants `UPPER_CASE` or `snake_case`
+- **Functions & exports**: multiple functions → a namespace object `export { my_module }` (constants exempt) · no `export default`
+- **Files**: Svelte `PascalCase.svelte(.ts)` · TypeScript `kebab-case.ts` · tests `*.test.ts` / `*.svelte.test.ts`, colocated, never `*.spec.ts` (`prompts/testing-guide.md`) · in `scripts/`, no `../` imports — use `#scripts/*`
+- **Content rules**: user-visible strings use i18n message keys in every locale · comments / test titles English only (`eslint/rules/` may explain rationale in Japanese) · no duplication; `/* @refactor-ignore */` at file top excludes a file from refactoring
+
 ## 📝 基本方針
 
-### コードの書き方
+一般的な書き方の助言（シンプルさ・命名・過度な抽象化の回避など）は繰り返さない。lint が強制せず、一般論でもない指針だけを置く。
 
-- **シンプルで読みやすく**: 複雑な実装よりも、シンプルで理解しやすいコードを優先する
-- **現在の要件に集中**: 予定のない未来の拡張性を考慮せず、現在必要な機能のみを実装する
-- **適切な分割**: 同一ファイルに無理に実装を詰め込まず、適宜別ファイルにロジックを分割する
-- **意図が不明瞭な処理は関数に抽出**: 条件式がわかりにくい、意図がわかりにくい処理は、たとえ1行でも抽出を行い、関数名等で理解できるようにする
-- **既存のコード体系に寄り添う**: 現在のコード体系に可能な限り寄り添ったうえで、更に良いコードがかけるのであれば目指すこと
-
-### コメントとドキュメント
-
-- **コメントは必要最小限に**: コードで表現できることはコメントにしない。コード自体が説明になるように書く
-- **なぜ書いたかを説明**: 何をしているかではなく、なぜその実装にしたかを説明する場合のみコメントを書く
-- **複雑なロジックのみ**: 複雑な処理や意図が伝わりにくい部分のみにコメントを追加
-- **コメントは英語で記載**: コメントは英語で記載する
-
-### 抽象化と設計
-
-- **過度な抽象化を避ける**: 現在の要件で必要な抽象化のみを行う。将来の拡張性を考慮した抽象化は不要
-- **パターンの強制は避ける**: デザインパターンやアーキテクチャパターンを無理に適用しない
-- **コードの重複は撲滅**: コードクローン（重複）は完全に撲滅する。重複が見つかった場合は関数やモジュールに抽出して共通化する
-- **仕組みを足す前に原因を問う**: これは**書かれたコードの可読性**の規則。仕組み（フック・ガード・ルール）を足すか・どこへ置くかという**設計時の判断**は `prompts/collaboration-workflow/principles.md` → "elegant-design" の担当なので、本文を写さずそちらを参照する
-
-### エラーハンドリング
-
-- **シンプルなエラーハンドリング**: 複雑なエラーハンドリングロジックは避け、必要最小限の処理のみを行う
-- **エラーメッセージは明確に**: エラーメッセージは原因が分かるように、簡潔に記述する
-
-### 命名の考え方
-
-- **意図が明確に伝わる命名**: 変数名や関数名から、何をしているかが分かるように命名する
-- **略語は避ける**: 一般的でない略語は使わず、明確な単語を使用する
-- **長すぎる名前も避ける**: 必要以上に長い名前は避け、適切な長さで意図を表現する
-
-### 条件式と定数
-
-- **条件式が複雑な場合は関数に抽出**: 条件式の意図が不明瞭な場合は、関数に抽出して関数名で意図を明確にする
-
-  ```typescript
-  // ❌ 意図が不明瞭
-  if (user.age >= 18 && user.country === 'JP' && user.verified === true) { ... }
-
-  // ✅ 関数に抽出して意図を明確化
-  if (is_eligible_for_service(user)) { ... }
-
-  function is_eligible_for_service(user: User): boolean {
-    return user.age >= 18 && user.country === 'JP' && user.verified === true
-  }
-  ```
-
+- **意図が不明瞭な処理は関数に抽出する**: 条件式や処理の意図がわかりにくければ、たとえ 1 行でも抽出し、関数名で意図を表す（`if (is_eligible_for_service(user))`）
+- **コメントは「なぜ」だけ、経緯は書かない**: 残すのは一行の理由（そのルールの意図）だけ。「以前は…」という経緯、Issue 番号への参照、計測値は git 履歴と Issue が保持している
 - **文字列も定数化する**: 数値リテラルの抽出は lint が強制するが、繰り返し使用する文字列や識別子も定数化し、意味の分かる名前を付ける
+- **既存のコード体系に寄り添う**: そのうえで、より良く書けるなら目指す
+- **仕組みを足す前に原因を問う**: 設計時の判断は `prompts/collaboration-workflow/principles.md` → "elegant-design" の担当。コメントの英語限定と重複の撲滅は上の「Conventions」と `principles.md` → "no-clones" が単一ソースである
 
 ## 📁 新規作成時の手順
 
@@ -76,7 +42,7 @@ find src -name "*.ts" -o -name "*.svelte" | grep -i [関連キーワード]
 
 ### 3. 名前空間オブジェクトの名付け方
 
-複数の関数を名前空間オブジェクトにまとめてエクスポートする規則そのものは `CLAUDE.md` → "Functions & exports" にある（定数は個別エクスポートでよい）。ここでは名付け方だけを述べる。
+複数の関数を名前空間オブジェクトにまとめてエクスポートする規則そのものは上記「Conventions」にある（定数は個別エクスポートでよい）。ここでは名付け方だけを述べる。
 
 - ファイル名と名前空間名で意図を明確にする（例: `git-command.ts` → `git_command`）
 - メソッド名は短く、名前空間で補完する（例: `exec_git_branch()` → `git_command.branch()`）

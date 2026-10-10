@@ -9,6 +9,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { rule_body_guard } from './rule-body-guard'
 import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
+import { rule_list } from './rule-list'
 
 // joshuafolkken/kit#2272: the residency questions have to be delivered at the edit that writes a rule
 // into prose, and only there. This suite pins both halves — the append fires, and the three edits that
@@ -259,8 +260,8 @@ describe('RULE_BODY_REASON — what the refusal states', () => {
 	})
 })
 
-describe(`${RULE_DELIVERY} — the enumeration names this rule`, () => {
-	const content = read_repo_file(RULE_DELIVERY)
+describe(`pnpm josh rule:list — the enumeration names this rule`, () => {
+	const content = rule_list.render()
 
 	it.each([EDIT, ORACLE_LIST])('states %j', (marker) => {
 		expect(content).toContain(marker)

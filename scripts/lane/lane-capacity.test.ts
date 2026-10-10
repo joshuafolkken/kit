@@ -7,6 +7,7 @@ import { lane_capacity } from './lane-capacity'
 const { LANE_LIMIT_KEY } = lane_capacity
 const DEFAULT_LIMIT = 6
 const CONFIGURED_LIMIT = 3
+const OVERRIDE_LIMIT = 8
 const NO_LANES = 0
 const OCCUPIED_LANES = 2
 const REMAINING_LANES = DEFAULT_LIMIT - OCCUPIED_LANES
@@ -17,29 +18,52 @@ function environment(value: string | undefined): Record<string, string | undefin
 	return { [LANE_LIMIT_KEY]: value }
 }
 
+async function no_override(): Promise<number | undefined> {
+	return undefined
+}
+
+async function override(): Promise<number | undefined> {
+	return OVERRIDE_LIMIT
+}
+
+async function limit_of(value: string | undefined): ReturnType<typeof lane_capacity.lane_limit> {
+	return await lane_capacity.lane_limit(environment(value), no_override)
+}
+
 describe('lane_capacity.lane_limit', () => {
 	// The documented default. Asserted against a literal rather than against the constant it reads,
 	// so a change to the number is a change to this test — which is what "documented" means here.
-	it('is six when the variable is unset', () => {
-		expect(lane_capacity.lane_limit(environment(undefined))).toEqual({
-			kind: 'limit',
-			limit: DEFAULT_LIMIT,
-		})
+	it('is six when the variable is unset', async () => {
+		await expect(limit_of(undefined)).resolves.toEqual({ kind: 'limit', limit: DEFAULT_LIMIT })
 	})
 
 	// Blank is the shape an `.env.example` key ships in, so it is unset rather than invalid — the
 	// reading `lane_paths.lane_root` already applies to `JOSH_LANE_ROOT`.
-	it('is six when the variable is blank', () => {
-		expect(lane_capacity.lane_limit(environment('  '))).toEqual({
-			kind: 'limit',
-			limit: DEFAULT_LIMIT,
-		})
+	it('is six when the variable is blank', async () => {
+		await expect(limit_of('  ')).resolves.toEqual({ kind: 'limit', limit: DEFAULT_LIMIT })
 	})
 
-	it('takes the configured number', () => {
-		const configured = environment(String(CONFIGURED_LIMIT))
+	it('takes the configured number', async () => {
+		await expect(limit_of(String(CONFIGURED_LIMIT))).resolves.toEqual({
+			kind: 'limit',
+			limit: CONFIGURED_LIMIT,
+		})
+	})
+})
 
-		expect(lane_capacity.lane_limit(configured)).toEqual({ kind: 'limit', limit: CONFIGURED_LIMIT })
+// joshuafolkken/kit#3434: a running parent keeps the environment it started with, so the live run's
+// `lane:limit` override is the only way its limit moves.
+describe('lane_capacity.lane_limit — a live run override', () => {
+	it('takes the override over the configured number', async () => {
+		const choice = await lane_capacity.lane_limit(environment(String(CONFIGURED_LIMIT)), override)
+
+		expect(choice).toEqual({ kind: 'limit', limit: OVERRIDE_LIMIT })
+	})
+
+	it('takes the override over a variable that is not a limit', async () => {
+		const choice = await lane_capacity.lane_limit(environment('six'), override)
+
+		expect(choice).toEqual({ kind: 'limit', limit: OVERRIDE_LIMIT })
 	})
 })
 
@@ -47,23 +71,41 @@ describe('lane_capacity.lane_limit', () => {
 // holds to: a typo that quietly becomes the default is a limit nobody chose, and the setting exists
 // precisely so the number is the one a person chose.
 describe('lane_capacity.lane_limit — a value that is not a limit', () => {
-	it('refuses a value that is not a number', () => {
-		expect(lane_capacity.lane_limit(environment('six')).kind).toBe('problem')
+	it('refuses a value that is not a number', async () => {
+		await expect(limit_of('six')).resolves.toMatchObject({ kind: 'problem' })
 	})
 
-	it('refuses zero, which would offer nothing forever', () => {
-		expect(lane_capacity.lane_limit(environment('0')).kind).toBe('problem')
+	it('refuses zero, which would offer nothing forever', async () => {
+		await expect(limit_of('0')).resolves.toMatchObject({ kind: 'problem' })
 	})
 
-	it('refuses a negative number', () => {
-		expect(lane_capacity.lane_limit(environment('-2')).kind).toBe('problem')
+	it('refuses a negative number', async () => {
+		await expect(limit_of('-2')).resolves.toMatchObject({ kind: 'problem' })
 	})
 
-	it('names the variable and the value in the problem', () => {
-		const choice = lane_capacity.lane_limit(environment('six'))
+	it('names the variable and the value in the problem', async () => {
+		const choice = await limit_of('six')
 
 		expect(choice.kind === 'problem' && choice.problem).toContain(LANE_LIMIT_KEY)
 		expect(choice.kind === 'problem' && choice.problem).toContain('six')
+	})
+})
+
+describe('lane_capacity.read_limit', () => {
+	it('names the given name in the problem', () => {
+		const choice = lane_capacity.read_limit('0', '<limit>')
+
+		expect(choice.kind === 'problem' && choice.problem).toContain('<limit>')
+	})
+})
+
+describe('lane_capacity.seated_limit', () => {
+	it('keeps a limit within the seats', () => {
+		expect(lane_capacity.seated_limit(OVERRIDE_LIMIT)).toBe(OVERRIDE_LIMIT)
+	})
+
+	it('caps a limit above the seats at the seats', () => {
+		expect(lane_capacity.seated_limit(LIMIT_ABOVE_SEATS)).toBe(LANE_SEATS)
 	})
 })
 

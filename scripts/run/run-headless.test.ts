@@ -14,6 +14,7 @@ vi.mock('#scripts/run/carry/run-carry', () => ({
 		repository_directory: vi.fn(),
 		carry_path: vi.fn(() => '/carry.json'),
 		read_carry: vi.fn(),
+		is_at_cut_cap: vi.fn(() => true),
 	},
 }))
 
@@ -66,6 +67,19 @@ describe('run_headless.environment', () => {
 	it('marks the launched session headless', () => {
 		expect(run_headless.is_headless(run_headless.environment())).toBe(true)
 		expect(run_headless.is_headless(ATTACHED)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#3454: a headless judgment session's `--cut` is the hand-back to the driver, so a
+// record at the cap must not refuse it while the headless stop rule demands it.
+describe('run_headless.is_cut_capped', () => {
+	it('never caps the hand-back of a headless parent at the cut cap', () => {
+		expect(run_headless.is_cut_capped(carry(), HEADLESS)).toBe(false)
+	})
+
+	it('caps an attached session and a lane child that inherited the mark', () => {
+		expect(run_headless.is_cut_capped(carry(), ATTACHED)).toBe(true)
+		expect(run_headless.is_cut_capped(carry(), HEADLESS_CHILD)).toBe(true)
 	})
 })
 

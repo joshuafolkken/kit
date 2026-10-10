@@ -10,7 +10,16 @@ import { section_reference_resolution } from './section-reference-fixture'
 // counts as an anchor is `section-reference-fixture.ts`'s, shared with the workflow glossary.
 
 const DOCUMENTS = all_documents()
-const { broken_section_references, exists } = section_reference_resolution
+const {
+	broken_adjacent_references,
+	broken_bare_arrow_references,
+	broken_section_references,
+	exists,
+} = section_reference_resolution
+
+// A bare `→ "Heading"` is a same-document reference only in the skills; the prompts write one as
+// shorthand that continues the file the sentence named before it, so it is scanned here alone.
+const SKILL_DOCUMENTS = DOCUMENTS.filter((path) => path.startsWith('.claude/skills/'))
 
 // A relative link is resolved against the containing file's directory only, because that is how
 // GitHub renders it — a repository-root fallback would pass a link that breaks on the page
@@ -68,6 +77,30 @@ describe('every cross-document reference resolves', () => {
 		expect(broken_links('CLAUDE.md', 'see [x](does-not-exist.md)')).toStrictEqual([
 			'does-not-exist.md',
 		])
+	})
+})
+
+describe('every reference that names no file resolves in its own document', () => {
+	const missing = '"No Such Heading Here"'
+
+	it.each(DOCUMENTS)('%s — "Heading" above / below resolves', (path) => {
+		expect(broken_adjacent_references(read_document(path))).toStrictEqual([])
+	})
+
+	it.each(SKILL_DOCUMENTS)('%s — a bare → "Heading" resolves', (path) => {
+		expect(broken_bare_arrow_references(read_document(path))).toStrictEqual([])
+	})
+
+	it('flags an above / below reference to a heading the document lacks', () => {
+		const text = `## Present\n\nSee "Present" above and\n${missing} below.`
+
+		expect(broken_adjacent_references(text)).toStrictEqual([missing])
+	})
+
+	it('flags a bare arrow to a missing heading and leaves a filed one to the section scan', () => {
+		const text = `## Present\n\n→ "Present", → ${missing} and \`CLAUDE.md\` → "Other"`
+
+		expect(broken_bare_arrow_references(text)).toStrictEqual([missing])
 	})
 })
 

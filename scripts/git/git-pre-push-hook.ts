@@ -1,9 +1,10 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { git_spawn } from './git-spawn'
 
-// The pre-push hook, run ahead of the push instead of inside it (joshuafolkken/kit#3300).
+// The pre-push hook, run ahead of the push instead of inside it.
 //
 // **The push budget is a transfer budget, and a hook is not a transfer.** `PUSH_TIMEOUT_MS` was read
 // off what moving objects costs here, but `git push` runs the pre-push hook first and the budget
@@ -13,9 +14,10 @@ import { git_spawn } from './git-spawn'
 // either: lefthook and vitest outlived it, and the retry started a second suite in the same work tree,
 // where each `test-state-guard` read the other's temporary files as a mutation and both failed.
 //
-// So the hook runs here, once, with no budget, and `git_command.push` spawns the bounded transfer that
-// follows with `--no-verify`. The retry then repeats the transfer alone, and a hook that is still
-// running cannot exist for it to overlap.
+// So the hook runs here, once, on a suite's budget rather than a transfer's, and `git_command.push`
+// spawns the bounded transfer that follows with `--no-verify`. The retry then repeats the transfer
+// alone, and a hook that is still running cannot exist for it to overlap: a hook cut at
+// `SUITE_TIMEOUT_MS` fails the push instead of reaching the transfer.
 //
 // **What git hands the hook is reproduced rather than dropped.** `git hook run` executes whatever
 // hook is configured — lefthook's or anyone's — and the arguments and stdin are git's pre-push
@@ -108,12 +110,11 @@ async function run_with_stdin(stdin_line: string): Promise<boolean> {
 		if (!(await can_run_hooks(stdin_path))) return false
 		const url = await git_spawn.read(['remote', 'get-url', REMOTE])
 
-		await git_spawn.with_output('hook', [
-			...to_hook_run_arguments(stdin_path, HOOK_NAME),
-			'--',
-			REMOTE,
-			url,
-		])
+		await git_spawn.with_output(
+			'hook',
+			[...to_hook_run_arguments(stdin_path, HOOK_NAME), '--', REMOTE, url],
+			{ timeout_ms: SUITE_TIMEOUT_MS },
+		)
 
 		return true
 	} finally {

@@ -1,12 +1,13 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_any_label, IN_PROGRESS_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { lane_await } from '#scripts/lane/lane-await'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import type { BusyRead } from './epic-busy'
 
-// A `run:solo` holder nothing is running for (joshuafolkken/kit#3017).
+// A `run:solo` holder nothing is running for.
 //
 // A running `run:solo` issue lets nothing new start (`epic-solo.ts`), and "running" is read off the
 // `in-progress` label alone. A label nothing removed — a child that parked itself, then had its
@@ -77,7 +78,7 @@ async function find_stale(
 }
 
 function stale_message(stale: ReadonlyArray<OpenIssueData>, repo: string): string {
-	const named = stale.map((issue) => `#${String(issue.number)}`).join(', ')
+	const named = stale.map((issue) => issue_cite.plain(issue.number)).join(', ')
 
 	return issue_citation.linkify(
 		`${named} carries \`${RUN_SOLO_LABEL}\` and \`${IN_PROGRESS_LABEL}\`, but no process of it is running in ${repo} — the \`${IN_PROGRESS_LABEL}\` label is stale, so it does not hold the backlog. Remove the label once you have confirmed nothing is running it.`,

@@ -10,7 +10,7 @@ const MAX_VALUE_LENGTH = 4096
 const ROLE_SCHEMA = z.enum(['scheduler', 'worker', 'reviewer'])
 const PROVIDER_SCHEMA = z.enum(['anthropic', 'openai'])
 const EFFORT_SCHEMA = z.enum(['low', 'medium', 'high', 'xhigh', 'max'])
-// The run phases effort may vary by (joshuafolkken/kit#2382). They are the cut boundaries a lane child
+// The run phases effort may vary by. They are the cut boundaries a lane child
 // resumes across — `run-cut.ts` imports these names for its own cut record, so the phase a run passes
 // and the phase this table is keyed on cannot drift. A phase-less call resolves the role default, which
 // is what keeps every existing caller unchanged.
@@ -31,7 +31,7 @@ type AgentEnvironment = Readonly<Record<string, string | undefined>>
 type ProfileResult = { kind: 'profile'; profile: AgentProfile } | { kind: 'rejected'; note: string }
 type Rejected = Extract<ProfileResult, { kind: 'rejected' }>
 type EffortResult = Rejected | { kind: 'effort'; effort: AgentEffort }
-type ProviderResult = Rejected | { kind: 'provider'; provider: AgentProvider }
+type ProviderResult = Rejected | { kind: 'provider'; provider: AgentProvider; is_default?: true }
 
 const SCHEDULER: AgentRole = 'scheduler'
 const WORKER: AgentRole = 'worker'
@@ -40,7 +40,7 @@ const IMPLEMENTATION_PHASE: AgentPhase = 'implementation'
 const PRE_GATE_PHASE: AgentPhase = 'pre-gate'
 const ANTHROPIC_PROVIDER: AgentProvider = 'anthropic'
 const OPENAI_PROVIDER: AgentProvider = 'openai'
-// **Pinned model ids, never a floating alias** (joshuafolkken/kit#2415). An alias such as `opus` moves
+// **Pinned model ids, never a floating alias**. An alias such as `opus` moves
 // whenever the CLI moves it, so a run log could not say which model produced it and a model migration
 // could not be measured apart from everything else. A new lane records the id it resolved; a lane
 // created before a migration keeps the model it recorded (`with_phase_effort` leaves it untouched).
@@ -72,7 +72,7 @@ const OPENAI_PROFILES: Readonly<Record<AgentRole, AgentProfile>> = {
 
 const PROVIDER_PROFILES = { anthropic: DEFAULT_PROFILES, openai: OPENAI_PROFILES }
 
-// **Effort as a function of the run phase, not the role alone** (joshuafolkken/kit#2382). For the first
+// **Effort as a function of the run phase, not the role alone**. For the first
 // merge only the mechanical ship/bookkeeping region is lowered: the pre-gate resume drives the gate,
 // commit, PR and merge, applying fixes the gate has already named — work delegation.md calls the opposite
 // of judgement. The design-judgment implementation phases keep the role default, as does any role/phase
@@ -162,24 +162,32 @@ function has_session(environment: AgentEnvironment, keys: ReadonlyArray<string>)
 	return keys.some((key) => trimmed(environment[key]) !== undefined)
 }
 
-function session_rejection(is_conflicting: boolean): Rejected {
-	const note = is_conflicting
-		? 'both Codex and Claude Code sessions were detected'
-		: 'no Codex or Claude Code session was detected'
-
-	return { kind: 'rejected', note }
+const CONFLICTING_SESSIONS: Rejected = {
+	kind: 'rejected',
+	note: 'both Codex and Claude Code sessions were detected',
 }
 
-// The provider a detached launcher hands a process that is not itself an agent session
-// (joshuafolkken/kit#2456). `detached_launch` strips the parent-session keys — the very keys the
+// The provider a detached launcher hands a process that is not itself an agent session.
+// `detached_launch` strips the parent-session keys — the very keys the
 // detection below reads — so a `josh ship --detach --review` supervisor could never resolve its reviewer.
 // **It is a fallback, read only when no session is detected**: the mark is inherited by everything the
 // supervisor starts, and a real session's own keys must keep deciding for that session.
 const HANDED_PROVIDER_KEY = 'JOSH_AGENT_PROVIDER'
 
+// **Nothing named a provider, so Claude Code is the default** — a person typing `josh lane:launch` in a
+// plain terminal has no session and no mark. Only silence defaults: two detected sessions and a mark
+// naming no allowed provider still refuse. `is_default` lets a launch say so, and lets `josh cost` keep
+// reading "no session of its own" rather than pricing another session's transcript.
+const DEFAULT_PROVIDER: ProviderResult = {
+	kind: 'provider',
+	provider: ANTHROPIC_PROVIDER,
+	is_default: true,
+}
+const DEFAULT_NOTICE = ` No agent session or ${HANDED_PROVIDER_KEY} was found, so the provider defaulted to ${ANTHROPIC_PROVIDER} (Claude Code).`
+
 function handed_provider(environment: AgentEnvironment): ProviderResult {
 	const value = trimmed(environment[HANDED_PROVIDER_KEY])
-	if (value === undefined) return session_rejection(false)
+	if (value === undefined) return DEFAULT_PROVIDER
 	const parsed = PROVIDER_SCHEMA.safeParse(value)
 
 	return parsed.success
@@ -192,7 +200,7 @@ function detected_provider(environment: AgentEnvironment): ProviderResult | unde
 	const has_codex = has_session(environment, [CODEX_SESSION_KEY])
 	const has_claude = has_session(environment, agent_session_environment.PARENT_SESSION_KEYS)
 
-	if (has_codex === has_claude) return has_codex ? session_rejection(true) : undefined
+	if (has_codex === has_claude) return has_codex ? CONFLICTING_SESSIONS : undefined
 
 	return { kind: 'provider', provider: has_codex ? OPENAI_PROVIDER : ANTHROPIC_PROVIDER }
 }
@@ -201,18 +209,34 @@ function resolve_provider(environment: AgentEnvironment = process.env): Provider
 	return detected_provider(environment) ?? handed_provider(environment)
 }
 
-// Whether this session is woken when a background command it started completes
-// (joshuafolkken/kit#2653). Claude Code re-invokes the session at the completion; a Codex session is not
+// The sentence a launch appends when it ran on the default, so falling back is never silent; empty when
+// a session or a mark decided.
+function default_notice(environment: AgentEnvironment = process.env): string {
+	const selected = resolve_provider(environment)
+
+	return selected.kind === 'provider' && selected.is_default === true ? DEFAULT_NOTICE : ''
+}
+
+// The same sentence on stderr, for a launcher whose own line is a verdict or a brief another process
+// reads: `run:wake --start`, `review:brief` and `ship --detach` default exactly as a dispatch does.
+function warn_of_default(environment: AgentEnvironment = process.env): void {
+	const notice = default_notice(environment).trim()
+
+	if (notice !== '') console.error(notice)
+}
+
+// Whether this session is woken when a background command it started completes.
+// Claude Code re-invokes the session at the completion; a Codex session is not
 // re-invoked, so a parent there can only wait by polling, each poll a model call over its whole context.
-// Only a resolved Codex session answers no — an unresolved one keeps the behavior it had before.
+// Only a resolved Codex session answers no — a defaulted or conflicting one keeps the callback.
 function has_completion_callback(environment: AgentEnvironment = process.env): boolean {
 	const selected = resolve_provider(environment)
 
 	return selected.kind !== 'provider' || selected.provider !== OPENAI_PROVIDER
 }
 
-// The mark a detached launch sets on its child: the provider this session resolved, or nothing when it
-// resolved none — the child then fails the same way this session would have.
+// The mark a detached launch sets on its child: the provider this session resolved, the default
+// included, or nothing when it was refused — the child then fails the same way this session would have.
 function handoff_environment(
 	environment: AgentEnvironment = process.env,
 ): Readonly<Record<string, string>> {
@@ -230,7 +254,7 @@ function validate(profile: AgentProfile, model_key: string): ProfileResult {
 }
 
 // The effort a phase resolves to before any env override: the phase's own value where the table names
-// one, otherwise the fallback (joshuafolkken/kit#2382). A phase-less or unrecognized call returns the
+// one, otherwise the fallback. A phase-less or unrecognized call returns the
 // fallback unchanged, which is what keeps every existing caller reading the current default.
 function phase_effort(
 	role: AgentRole,
@@ -244,7 +268,7 @@ function phase_effort(
 }
 
 // The effort a stored profile takes in a phase: an env override wins, then the phase value, then the
-// profile's own effort (joshuafolkken/kit#2382). A cut relaunch that keeps a lane's stored model resolves
+// profile's own effort. A cut relaunch that keeps a lane's stored model resolves
 // the effort through this so a person's `JOSH_WORKER_EFFORT` is never overwritten by the phase value.
 function overridden_effort(
 	profile: AgentProfile,
@@ -257,7 +281,7 @@ function overridden_effort(
 }
 
 // A stored profile with its effort resolved for the phase the run is entering, its model and provider
-// left as they were (joshuafolkken/kit#2382).
+// left as they were.
 function with_phase_effort(
 	profile: AgentProfile,
 	phase: string,
@@ -301,6 +325,7 @@ function parse(value: unknown): AgentProfile | undefined {
 }
 
 const agent_role_profile = {
+	CODEX_SESSION_KEY,
 	DEFAULT_PROFILES,
 	HANDED_PROVIDER_KEY,
 	IMPLEMENTATION_PHASE,
@@ -311,6 +336,7 @@ const agent_role_profile = {
 	REVIEWER,
 	SCHEDULER,
 	WORKER,
+	default_notice,
 	describe,
 	handoff_environment,
 	has_completion_callback,
@@ -318,6 +344,7 @@ const agent_role_profile = {
 	parse,
 	resolve,
 	resolve_provider,
+	warn_of_default,
 	with_phase_effort,
 }
 

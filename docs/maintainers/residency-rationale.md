@@ -12,7 +12,7 @@ cut `residency.md` down to its four questions and moved the rest here: the argum
 line, the trigger-and-pointer shape and the retirement route, the resident-rule list, the pointer
 citation convention, and the budget and its raise conditions.
 
-## Why a delivered rule keeps one resident line
+## Why a delivered rule leaves no resident line
 
 **Question 1 comes first because the means of delivery grew.** The list used to be decided by
 question 2 alone, which was the right criterion while residency was the only way to deliver a rule.
@@ -22,15 +22,15 @@ once fired**. A delivered rule is cheaper than resident prose (no other turn pay
 refusal cannot be skimmed past. Moving is not deleting** — the rule body does not vanish, it moves to
 a stronger channel.
 
-**The resident side keeps one line — the trigger and the criterion — because a delivery channel reaches
-one harness.** A hook reaches Claude Code only. `CLAUDE.md` is written without assuming a particular
-agent (`AGENTS.md` / `GEMINI.md` / `.cursorrules` all point to it), and a Codex, Gemini CLI or Cursor
-session runs none of the hooks in `.claude/settings.json`; neither does a Claude Code session with the
-stop switch set. **Remove the line entirely and in those sessions the rule exists nowhere.** So what
-leaves residency on a move is the **rule body**, not the line: measurements, rejected mechanisms and
-procedure move to the delivery side and the topic file, and one line stays. **What is gained is the
-body, not the line.** A rule may leave residency completely only when the agent that obeys it can be
-said to always be this harness.
+**A delivery channel reaches one harness, so the rules still need a route on every other one.** A hook
+reaches Claude Code only. `CLAUDE.md` is written without assuming a particular agent (`AGENTS.md` /
+`GEMINI.md` / `.cursorrules` all point to it), and a Codex, Gemini CLI or Cursor session runs none of
+the hooks in `.claude/settings.json`; neither does a Claude Code session with the stop switch set.
+Until joshuafolkken/kit#3395 each delivered rule kept its own resident trigger line for those sessions.
+**Now `CLAUDE.md` keeps one route line to the enumeration in `rule-delivery.md`, and a session that runs
+no hook applies that enumeration as a self-check list**
+(`principles.md` → "Claude Code 以外のエージェントでの読み替え"). The rule still exists in those sessions — it is reached through one shared line
+instead of one line per rule, so no delivered rule leaves a trigger line resident.
 
 ## Trigger and pointer, and the narrow retirement route
 
@@ -93,18 +93,22 @@ never checked against the criterion.
 **Drawing the line by counting skills is wrong** — `verify-ui` is pointed to from three documents as
 well, and one entry below points to `prompts/review.md`, which is not a skill at all.
 
-**A resident rule outside that scope is correctly absent from this list.** Naming conventions, the
-quality limits, the Code Change Rules and Package-First have nowhere to move to, so the question "must
+**A resident rule outside that scope is correctly absent from this list.** The quality limits, the
+Code Change Rules and Package-First have nowhere to move to (the naming conventions did: lint enforces
+them, and their text is `prompts/coding-standards.md` → "Conventions" — joshuafolkken/kit#3395), so the question "must
 it bind on a turn with no skill loaded" does not arise for them. **Absence from the list is not an
 omission** (joshuafolkken/kit#955).
 
 Every rule in scope that stays resident is below, and a marker test asserts each one is still in
 `CLAUDE.md` (most in `scripts/claude/workflow-skills.test.ts`; **the UI verification gate in
-`scripts/claude/verify-ui-skill.test.ts`**; the follow-up filing and the file-edit prohibition in
+`scripts/claude/verify-ui-skill.test.ts`**; the follow-up filing in
 `scripts/document/document-markers.test.ts`). **A rule moved to triggered delivery is pinned by firing,
-not by residency** — turn batching by `scripts/rules/turn-batching-rule.test.ts`, the WIP cap by
-`scripts/backlog/backlog-manufacturing-rule.test.ts`, the mechanism itself by
-`scripts/rules/delivered-rules.test.ts` — and only the one trigger line is asserted resident.
+not by residency** — turn batching by `scripts/rules/turn-batching-rule.test.ts`, the mechanism itself by
+`scripts/rules/delivered-rules.test.ts`. The WIP cap left delivery: `pnpm josh issue:file` holds it
+itself, and `scripts/backlog/backlog-manufacturing-rule.test.ts` pins that no resident copy returns
+(joshuafolkken/kit#3423). **No trigger line stays resident**: `CLAUDE.md` keeps one route
+to the enumeration, which a session that runs no hook applies as a self-check list (`principles.md` →
+"Claude Code 以外のエージェントでの読み替え", joshuafolkken/kit#3079, #3395).
 
 - **Explicit invocation required** ("take no action you were not told to") — it decides whether a
   workflow may start at all, so it must bind the moment the user types the keyword, before any skill
@@ -114,7 +118,8 @@ not by residency** — turn batching by `scripts/rules/turn-batching-rule.test.t
   ever typed.
 - **`overrides` protection** and **`devEngines` protection** — a dependency-update command can run on any
   turn, including one that never loads the `dependency-update` skill, and by the time the skill is read
-  the pins are already rewritten.
+  the pins are already rewritten. Both are one Tier C entry in "Decision autonomy", beside the trigger
+  that loads the skill (joshuafolkken/kit#3395).
 - **The UI verification gate** — a change that reaches the screen is not done until the rendered result
   has been looked at; the capture procedure is in `verify-ui`. The gate binds at the moment a UI change
   is reported done, often on a turn with no keyword typed and no skill loaded.
@@ -122,23 +127,15 @@ not by residency** — turn batching by `scripts/rules/turn-batching-rule.test.t
   `epic:bundle`. The pre-commit self-review runs outside workflows too, so an Issue it files would be
   orphaned the same way. The full procedure is `prompts/review.md` → "Review round cap"
   (joshuafolkken/kit#946).
-- **The three `josh epic:*` rules that bind outside the commands** — clearing `needs-decision` by
-  recording a decision, fixing what `epic:audit` finds as Tier A, and referencing an epic in another
-  repository as `owner/repo#N`. Each binds on a turn running no `epic:*` command (right after filing an
-  Issue, the moment a decision is written). The commands' own procedure is in
-  `.claude/skills/epic-commands/`.
-- **Never carry a file's new text inside a command** — file edits happen on any turn and **no skill loads
-  right before an edit**, so on the on-demand side the rule would never fire, which behaves exactly
-  like deleting it. The table is `prompts/collaboration-workflow/file-edits.md`, the measurements and
-  rationale `docs/maintainers/file-edits-rationale.md`; only the instruction and its criterion ("does
-  it carry the whole body", not the tool name) stay resident (joshuafolkken/kit#1150). **Widening an
-  `Edit` to the whole file is part of the same rule** — rewriting a whole file for a few-line finding
-  pays the same cost with a different tool; residency carries only that one clause, and the three
-  conditions under which a whole file may be written sit at the same pointer (joshuafolkken/kit#1260).
+
+**Moved off residency by joshuafolkken/kit#3395.** The three `josh epic:*` rules that bind outside the
+commands (clearing `needs-decision`, fixing what `epic:audit` finds as Tier A, `owner/repo#N` for an
+epic in another repository) are in `.claude/skills/epic-commands/`, whose resident trigger names the
+moment a filed issue is placed and the moment a decision is recorded on a `needs-decision` child. The file-edit prohibition joined the delivered rules below.
 
 **Rules that answered "yes" to question 1 and moved to triggered delivery** (joshuafolkken/kit#1524).
 None of their bodies is gone; the hook presents them the moment the rule applies. Listed are only the
-rows that left one resident line or needed a reason for that call, not every delivered rule. **The
+rows that needed a reason for that call, not every delivered rule. **The
 single source of the enumeration, and of what a turn on which the trigger does not fire means, is
 `prompts/collaboration-workflow/rule-delivery.md`; no count is copied here** — a number kept in two
 places always drifts (joshuafolkken/kit#1525).
@@ -149,12 +146,13 @@ places always drifts (joshuafolkken/kit#1525).
   condition never to weaken a gate are in `prompts/collaboration-workflow/turn-batching.md` and
   `docs/maintainers/turn-batching-rationale.md`; `scripts/rules/turn-batching-rule.test.ts` pins it
   (joshuafolkken/kit#1304, #1390, #1524; `Edit` joined in #1762, `Read` in #1798).
-- **The backlog WIP cap** — the trigger is `pnpm josh rule:guard` (a `Bash` that creates an Issue). The
-  delivered text carries how to count, the decision not to file, the two exemptions and **the three
-  interrupt tests** as they are; dropping the three would put "is it serious" back into judgement, so
-  they were not cut from the delivered text either (joshuafolkken/kit#1518). Posting a comment is not
+- **The backlog WIP cap** — delivered by `pnpm josh rule:guard` from joshuafolkken/kit#1524 until
+  joshuafolkken/kit#3423, which retired the row: `pnpm josh issue:file` counts the cap and holds the
+  filing itself, so the pre-refusal was a pure round trip. Its hold message still carries how to count,
+  the decision not to file, the two exemptions and **the three interrupt tests**; dropping the three
+  would put "is it serious" back into judgement (joshuafolkken/kit#1518). Posting a comment is not
   filing and is out of scope. The procedure and the conditions for moving the numbers are in
-  `prompts/collaboration-workflow/wip-cap.md` (joshuafolkken/kit#1469, #1524).
+  `prompts/collaboration-workflow/wip-cap.md` (joshuafolkken/kit#1469).
 - **Reading Issue comments** — the trigger is `pnpm josh rule:guard` (a `Bash` that reads only an Issue
   body). The refusal hands over the re-read with comments and how to treat a comment that contradicts
   the body. It refuses every time until the precondition is met, so it refuses even on a turn where
@@ -163,10 +161,13 @@ places always drifts (joshuafolkken/kit#1525).
 - **Never put a body in shell double quotes** — the trigger is `pnpm josh rule:guard` (a `Bash` whose body
   value contains a backtick or `$`). **The trigger reads the body, not the flag** — every worked example
   passes a harmless placeholder, so keying on the flag would refuse turns already keeping the rule.
-  **One resident line remains because this is not the "may be deleted" side** — delivery reaches
-  Claude Code alone, and the spellings the regex knows (`-f body=` / `--body` / `--notify-message`) must
-  not become the rule's whole scope. Measurements, safe spellings and the trigger's blind spots are in
-  `prompts/collaboration-workflow/shell-body.md` (joshuafolkken/kit#1198).
+  Measurements, safe spellings and the trigger's blind spots — the spellings the regex does not know
+  included — are in `prompts/collaboration-workflow/shell-body.md` (joshuafolkken/kit#1198).
+- **Never carry a file's new text inside a command** — the trigger is `pnpm josh rule:guard` (a `Bash`
+  that carries a file body). The criterion is "does it carry the whole body", not the tool name, and
+  **widening an `Edit` to the whole file is part of the same rule** (joshuafolkken/kit#1150, #1260).
+  The table is `prompts/collaboration-workflow/file-edits.md`, the measurements
+  `docs/maintainers/file-edits-rationale.md`.
 
 Examples that answer "no" and keep their body on the skill side:
 

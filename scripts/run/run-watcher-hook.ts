@@ -1,14 +1,14 @@
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { json_value } from '#scripts/lib/json-value'
 import { run_progress_read } from '#scripts/run/progress/run-progress-read'
 import { z } from 'zod'
 import { run_watcher_guard } from './run-watcher-guard'
 
 // The `PreToolUse` adapter that turns `run_watcher_guard`'s verdict into a deny reason, so the guard
-// the CLI already carries is finally *called* on every tool call rather than left to prose asking the
-// run to call it (joshuafolkken/kit#2353). It is composed into `pretool-guard.ts` — the one PreToolUse
-// hook, kept one by joshuafolkken/kit#1930 — rather than added as a second `.claude/settings.json`
-// entry, so the consolidation invariant holds; the detection itself is unchanged.
+// the CLI already carries is *called* on every tool call rather than left to prose asking the run to
+// call it. It is composed into `pretool-guard.ts` — the one PreToolUse hook — rather than added as a
+// second `.claude/settings.json` entry, so the consolidation invariant holds.
 //
 // **It fires once per run, for the same reason every guard here stamps.** A stale watcher would other-
 // wise refuse *every* tool call, including the `pnpm josh run:progress --wait` that fixes it — a wedge.
@@ -24,13 +24,7 @@ const STAMP_PREFIX = 'josh-watcher-guard-'
 const payload_schema = z.object({ transcript_path: z.string().min(1) })
 
 function transcript_of(raw_payload: string): string | undefined {
-	try {
-		const parsed = payload_schema.safeParse(JSON.parse(raw_payload))
-
-		return parsed.success ? parsed.data.transcript_path : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw_payload, payload_schema)?.transcript_path
 }
 
 // The once-per-run arm: refuse only when nothing has been recorded yet, and record before returning so
@@ -56,7 +50,7 @@ function is_active(): boolean {
 
 // The guard's note when the watcher is stale and this call is the once-per-run one that refuses, or
 // `undefined` when the watcher is fresh (or the refusal was already spent this run). No session is asked
-// to relay the run's stream any more — the watch pane does (joshuafolkken/kit#2492).
+// to relay the run's stream — the watch pane does.
 async function stale_reason(transcript: string, now_ms: number): Promise<string | undefined> {
 	const result = await run_watcher_guard.check(await run_progress_read.live_target())
 

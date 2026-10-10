@@ -1,5 +1,6 @@
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_merge_token } from './run-merge-token'
 
 // joshuafolkken/kit#2024: the composite `run:merge` command, exercised end to end with the side-effect
 // steps and the GitHub read mocked. The four branches the acceptance criteria name are each asserted —
@@ -46,12 +47,13 @@ vi.mock('./run-merge-steps', () => ({
 		has_resumable_cut: has_resumable_cut_mock,
 		is_over_budget: is_over_budget_mock,
 		refused_carry: refused_carry_mock,
-		remove_in_progress: vi.fn(),
 		resume_cut: resume_cut_mock,
 	},
 }))
+vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: vi.fn() } }))
 
 const { run_merge_cli } = await import('./run-merge-cli')
+const { MERGE_TOKEN } = run_merge_token
 
 const CHILD = '2024'
 const REPO = 'joshuafolkken/kit'
@@ -67,6 +69,8 @@ const IN_PROGRESS = 'in-progress'
 const EPIC = 'epic'
 const NEEDS_DECISION = 'needs-decision'
 const NEEDS_HUMAN_REVIEW = 'needs-human-review'
+const NOT_REFUSED = { is_refused: false, blockers: [] }
+const PARKED_FAILURE = { carry: { failures: BELOW_GUARD }, is_parked: true, ...NOT_REFUSED }
 
 function state_read(
 	state: string,
@@ -112,7 +116,7 @@ describe('run_merge_cli.run — a merged child', () => {
 		is_over_budget_mock.mockResolvedValue(true)
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
-		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.OVER_TOKEN)
+		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.OVER)
 	})
 })
 
@@ -158,11 +162,7 @@ describe('run_merge_cli.run — a split child', () => {
 describe('run_merge_cli.run — a failed child', () => {
 	it('parks a failed or budget-exhausted worker once without retrying it', async () => {
 		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
-		do_failed_mock.mockResolvedValue({
-			carry: { failures: BELOW_GUARD },
-			is_parked: true,
-			is_refused: false,
-		})
+		do_failed_mock.mockResolvedValue(PARKED_FAILURE)
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
 		expect(do_failed_mock).toHaveBeenCalledOnce()
@@ -177,17 +177,17 @@ describe('run_merge_cli.run — a failed child', () => {
 			carry: { failures: AT_GUARD },
 			is_parked: true,
 			is_refused: false,
+			blockers: [],
 		})
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
-		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.STOP_TOKEN)
+		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.STOP)
 		expect(ask_next_mock).not.toHaveBeenCalled()
 	})
 })
 
 // joshuafolkken/kit#2484: a child that ended its session with a cut its successor never adopted is
 // resumed in its own lane — not parked and not counted — while a child that simply stopped is parked.
-const PARKED_FAILURE = { carry: { failures: BELOW_GUARD }, is_parked: true, is_refused: false }
 const OUTPUT_ARGS = [...EPIC_ARGS, '--output', 'child.jsonl']
 
 describe('run_merge_cli.run — a child that ended on a cut', () => {
@@ -203,7 +203,7 @@ describe('run_merge_cli.run — a child that ended on a cut', () => {
 		expect(resume_cut_mock).toHaveBeenCalledWith(CHILD)
 		expect(do_failed_mock).not.toHaveBeenCalled()
 		expect(ask_next_mock).not.toHaveBeenCalled()
-		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.RESUMED_TOKEN)
+		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.RESUMED)
 		expect(emit_mock).toHaveBeenCalledWith('child-launch', `#${CHILD} resumed from its cut`)
 	})
 
@@ -213,7 +213,7 @@ describe('run_merge_cli.run — a child that ended on a cut', () => {
 
 		expect(await run_merge_cli.run(OUTPUT_ARGS)).toBe(SUCCESS)
 		expect(do_outage_mock).not.toHaveBeenCalled()
-		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.RESUMED_TOKEN)
+		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.RESUMED)
 	})
 
 	it('parks the child as before when its successor could not be relaunched', async () => {
@@ -255,7 +255,7 @@ describe('run_merge_cli.run — an API-outage child', () => {
 		do_outage_mock.mockResolvedValue({ carry: { outages: AT_GUARD }, is_refused: false })
 
 		expect(await run_merge_cli.run(OUTPUT_ARGS)).toBe(SUCCESS)
-		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.ENVIRONMENT_TOKEN)
+		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.ENVIRONMENT)
 		expect(ask_next_mock).not.toHaveBeenCalled()
 	})
 
@@ -263,7 +263,7 @@ describe('run_merge_cli.run — an API-outage child', () => {
 		do_outage_mock.mockResolvedValue({ carry: { outages: 0, owner_pid: 99_999 }, is_refused: true })
 
 		expect(await run_merge_cli.run(OUTPUT_ARGS)).toBe(FAILURE)
-		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.BUSY_TOKEN)
+		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.BUSY)
 	})
 })
 
@@ -273,11 +273,7 @@ describe('run_merge_cli.run — the outage split is off without --output', () =>
 	it('classifies an OPEN unparked child as failed when no output was passed', async () => {
 		is_outage_mock.mockReturnValue(true)
 		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
-		do_failed_mock.mockResolvedValue({
-			carry: { failures: BELOW_GUARD },
-			is_parked: true,
-			is_refused: false,
-		})
+		do_failed_mock.mockResolvedValue(PARKED_FAILURE)
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
 		expect(do_failed_mock).toHaveBeenCalledOnce()
@@ -291,7 +287,7 @@ describe('run_merge_cli.run — a carry ownership refusal', () => {
 		do_merged_mock.mockResolvedValue({ failures: 0, owner_pid: 99_999 })
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
-		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.BUSY_TOKEN)
+		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.BUSY)
 		expect(ask_next_mock).not.toHaveBeenCalled()
 	})
 
@@ -301,10 +297,11 @@ describe('run_merge_cli.run — a carry ownership refusal', () => {
 			carry: { failures: BELOW_GUARD },
 			is_parked: false,
 			is_refused: true,
+			blockers: [],
 		})
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
-		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.BUSY_TOKEN)
+		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.BUSY)
 		expect(ask_next_mock).not.toHaveBeenCalled()
 	})
 })
@@ -319,7 +316,7 @@ describe('run_merge_cli.run — a cut fallback from a session that does not own 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
 		expect(resume_cut_mock).not.toHaveBeenCalled()
 		expect(do_failed_mock).not.toHaveBeenCalled()
-		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.BUSY_TOKEN)
+		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.BUSY)
 	})
 })
 
@@ -330,10 +327,11 @@ describe('run_merge_cli.run — a stop and a refusal', () => {
 			carry: { failures: BELOW_GUARD },
 			is_parked: false,
 			is_refused: false,
+			blockers: [],
 		})
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
-		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.STOP_TOKEN)
+		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.STOP)
 		expect(ask_next_mock).not.toHaveBeenCalled()
 	})
 
@@ -341,7 +339,7 @@ describe('run_merge_cli.run — a stop and a refusal', () => {
 		read_issue_mock.mockResolvedValue({ kind: 'unreadable' })
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
-		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.RETRY_TOKEN)
+		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.RETRY)
 	})
 
 	it('uses the shared threshold without a numeric argument', () => {
@@ -365,7 +363,7 @@ describe('run_merge_cli.run — human review', () => {
 			read_issue_mock.mockResolvedValue(state_read(OPEN, labels, true))
 
 			expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
-			expect(info_mock).toHaveBeenCalledWith(run_merge_cli.HUMAN_REVIEW_TOKEN)
+			expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.HUMAN_REVIEW)
 			expect(ask_next_mock).not.toHaveBeenCalled()
 		},
 	)

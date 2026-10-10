@@ -15,9 +15,9 @@ import type { EpicChild } from './epic-graph'
 // too early. Merging kit's issue does not publish kit — the merge, the auto-tag and the publish run
 // one after another — so a consumer child told it may start at that moment either fails to install
 // the version it needs or, worse, installs the previous one and implements against it. That failure
-// shows up as "it breaks sometimes", which is the hardest kind to diagnose (joshuafolkken/kit#864).
+// shows up as "it breaks sometimes", which is the hardest kind to diagnose.
 //
-// The publish check itself is joshuafolkken/kit#863's, imported rather than restated: two
+// The publish check itself is imported rather than restated: two
 // implementations of "has this version appeared" would drift, and the looser one would decide.
 
 // The package a repository distributes, by convention: the npm scope is the GitHub owner and the
@@ -78,7 +78,7 @@ const NOT_FOUND_STATUS = 404
 
 // What the blocker repository's default branch says about what it ships.
 //
-// **`absent` is not `unreadable`, and joshuafolkken/kit#1129 is the difference.** A repository with no
+// **`absent` is not `unreadable`.** A repository with no
 // manifest, or one whose manifest says `private`, publishes nothing — so a closed blocker there has
 // no release anyone could wait for, and waiting means waiting until the run's own eight-hour timeout
 // with nothing an operator can edit to clear it. A read that merely failed says none of that.
@@ -89,7 +89,7 @@ const NOT_FOUND_STATUS = 404
 // registry 404 would start a consumer child before its blocker's release existed. The manifest is a
 // fact about the repository we already have access to, and `private: true` is a positive statement
 // rather than an inference from an absence.
-// **`private` alone does not settle it** (joshuafolkken/kit#1134). A workspace root is private by
+// **`private` alone does not settle it**. A workspace root is private by
 // convention while the packages under it publish, so reading one as "ships nothing" would resolve a
 // dependency before its blocker's release existed — the direction this module may not fail in.
 // `is_workspace` is what keeps that case waiting.
@@ -103,7 +103,7 @@ type ManifestAnswer =
 // Read from GitHub rather than from a local checkout: a consumer's state is a GitHub fact, and the
 // wait must work before anyone has cloned the repository.
 //
-// **It moves when `josh release` runs, not when a child merges** (joshuafolkken/kit#1486). A child's
+// **It moves when `josh release` runs, not when a child merges**. A child's
 // pull request carries no version change at all, so the number here right after one merges is still
 // the previous release. The target of a wait is therefore the version that follows the release the
 // change lands in, never the one the merge itself leaves behind.
@@ -122,10 +122,9 @@ type WorkspaceCheck = 'workspace' | 'single' | 'unreadable'
 // Whether `pnpm-workspace.yaml` actually declares members.
 //
 // **The file's existence proves nothing.** `josh sync` distributes it to every consumer regardless of
-// layout — it carries `allowBuilds`, `overrides` and the like — so probing for its presence read every
-// private first-party repository as a workspace and restored joshuafolkken/kit#1129's eight-hour wait
-// for all of them. Measured: 20 of 20 private first-party checkouts have the file and none declares
-// `packages:` (joshuafolkken/kit#1134). What makes a repository a workspace is a non-empty `packages`
+// layout — it carries `allowBuilds`, `overrides` and the like — so probing for its presence would read
+// every private first-party repository as a workspace and wait the eight-hour timeout on each. What
+// makes a repository a workspace is a non-empty `packages`
 // key, so that is what is read.
 function declares_packages(yaml: string): boolean {
 	try {
@@ -225,7 +224,7 @@ function to_manifest(repo: string, stdout: string): ManifestAnswer {
 //
 // The probe is `exec_gh_api_status_sync`, the synchronous twin of `exec_gh_api_status`: every caller
 // down to `resolve_cross_repo` is synchronous, and turning the classifier, the resolver and
-// `epic_classify` async for one probe would cost more than the twin (joshuafolkken/kit#2901). A 404
+// `epic_classify` async for one probe would cost more than the twin. A 404
 // here is trustworthy in a way a registry 404 is not: the repository's issues are already being read,
 // so access is established and what is missing is the file.
 function classify_manifest_failure(repo: string): ManifestAnswer {
@@ -245,8 +244,8 @@ function fetch_manifest(repo: string): ManifestAnswer {
 }
 
 // Read once per pass, for the reason `published_cache` holds the other half: every edge to one
-// repository asks the same question, and joshuafolkken/kit#1121 made a pass run once per withheld
-// candidate rather than once — so an uncached read is a blocking `gh` call multiplied by both.
+// repository asks the same question, and a pass runs once per withheld candidate rather than
+// once — so an uncached read is a blocking `gh` call multiplied by both.
 function read_manifest(repo: string): ManifestAnswer {
 	const cached = version_cache.get(repo)
 	if (cached !== undefined) return cached
@@ -267,7 +266,7 @@ function read_default_branch_version(repo: string): string | undefined {
 // Whether the repository ships no package at all: no manifest on its default branch, or one that
 // declares itself private. Either way there is no release for a dependency to wait on.
 //
-// **A workspace root is excluded, and the exclusion is deliberately coarse** (joshuafolkken/kit#1134).
+// **A workspace root is excluded, and the exclusion is deliberately coarse**.
 // Such a root is private by convention while its packages publish, so reading one as shipping nothing
 // would start a dependent before its blocker's release existed. What is asked is only whether the
 // repository *is* a workspace — the members are not enumerated and nothing looks for which of them
@@ -284,11 +283,10 @@ function publishes_nothing(repo: string): boolean {
 // A version that could not be read leaves the dependency waiting rather than resolved: not knowing
 // what to wait for is not the same as having nothing to wait for.
 //
-// **"Ships nothing" is asked first, and it is a different question** (joshuafolkken/kit#1129, the
-// state joshuafolkken/kit#1126 made reachable). Waiting is right only where something could still
-// arrive; a closed blocker in a repository that publishes no package has no release for
-// `is_published` to ever find, so it waited until the run's own eight-hour timeout with nothing an
-// operator could edit to clear it. It is answered from that repository's own manifest and never from
+// **"Ships nothing" is asked first, and it is a different question.** Waiting is right only where
+// something could still arrive; a closed blocker in a repository that publishes no package has no
+// release for `is_published` to ever find, so it would wait until the run's own eight-hour timeout
+// with nothing an operator could edit to clear it. It is answered from that repository's own manifest and never from
 // the registry, for the reason `ManifestAnswer` records: a registry 404 also means "this token may
 // not see it", and resolving on one would start a consumer child before its blocker's release
 // existed.
@@ -323,9 +321,8 @@ function owner_of(repo: string): string {
 	return repo.split('/', 1)[0] ?? ''
 }
 
-// Whether a repository may be depended on at all. Inherited from joshuafolkken/kit#869's
-// restriction rather than restated: a child in a repository this owner does not own is not something
-// to wait for, dispatch to, or write into — nor, since joshuafolkken/kit#1014, an issue reference to
+// Whether a repository may be depended on at all: a child in a repository this owner does not own is
+// not something to wait for, dispatch to, or write into — nor an issue reference to
 // resolve: a body that mentions a third party's issue must not send this command to their tracker.
 function is_same_owner_repo(repo: string, current_owner: string): boolean {
 	const identity = repo_origin.parse_origin_url(`https://${repo_origin.GITHUB_HOST}/${repo}`)

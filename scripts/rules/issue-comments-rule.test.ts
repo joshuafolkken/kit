@@ -1,6 +1,8 @@
 import { read_unwrapped } from '#scripts/document/ai-document-fixture'
+import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
+import { rule_list } from './rule-list'
 
 // joshuafolkken/kit#1319: **the place a run is told to write was the place it was never told to
 // read.** This repository records a Tier A decision, a dropped review finding, a split agreement and
@@ -21,7 +23,7 @@ const WORKFLOW_SKILL = '.claude/skills/workflow-commands/SKILL.md'
 // joshuafolkken/kit#3174: the entry sequence `fullrun` and `halfrun` share lives in one file.
 const ENTRY_SEQUENCE_SKILL = '.claude/skills/workflow-commands/entry-sequence.md'
 const KICKOFF_SKILL = '.claude/skills/workflow-commands/kickoff.md'
-const DELIVERY_TOPIC = 'prompts/collaboration-workflow/rule-delivery.md'
+const ISSUE_ROUTE = '…/issues/<N>'
 const GUARD_DOC = 'docs/josh-commands-automation.md'
 
 const ENTRY_POINTS = [ENTRY_SEQUENCE_SKILL, KICKOFF_SKILL]
@@ -73,7 +75,22 @@ describe('the delivered row that makes the step hard to walk past', () => {
 	})
 
 	// The hook reaches Claude Code alone, so the documents have to describe a rule that outlives it.
-	it.each([DELIVERY_TOPIC, GUARD_DOC])('%s documents the trigger', (document) => {
-		expect(read_unwrapped(document)).toContain('…/issues/<N>')
+	it('docs/josh-commands-automation.md documents the trigger', () => {
+		expect(read_unwrapped(GUARD_DOC)).toContain(ISSUE_ROUTE)
+	})
+
+	it('pnpm josh rule:list documents the trigger', () => {
+		expect(rule_list.render()).toContain(ISSUE_ROUTE)
+	})
+
+	// joshuafolkken/kit#3570: the refusal leads with the call that fixes it, the reason after, and the
+	// label before the call keeps the guard attributed as itself rather than as `pnpm josh issue`.
+	it('opens with the reissue command on its first line', () => {
+		const [first_line] = delivered_rules.ISSUE_COMMENTS_REASON.split('\n', 1)
+
+		expect(first_line).toBe('⛔ issue comments: pnpm josh issue:read <N>')
+		expect(time_transcript_line.guard_from_refusal(delivered_rules.ISSUE_COMMENTS_REASON)).toBe(
+			'issue comments',
+		)
 	})
 })

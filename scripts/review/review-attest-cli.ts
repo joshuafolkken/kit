@@ -3,8 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { review_attest, type AttestVerdict } from './review-attest'
 import { review_checkout } from './review-checkout'
 
-// `josh review:attest` — the two halves of the checkout contract `josh review:brief` opens
-// (joshuafolkken/kit#1522).
+// `josh review:attest` — the two halves of the checkout contract `josh review:brief` opens.
 //
 // **`josh review:attest <nonce>` is run by the review**, from the checkout it actually read. It
 // compares that checkout against the one the brief described and exits non-zero when they differ, so

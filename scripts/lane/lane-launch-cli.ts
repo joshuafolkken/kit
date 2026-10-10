@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_vacant } from '#scripts/lane/lane-vacant'
@@ -8,7 +9,7 @@ import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 
 // `josh lane:launch <issue> [--stash <message>]` — one composite command for a `backlogrun` lane-start
-// event (joshuafolkken/kit#2162). Opening one lane was four to six turns of the parent: `lane:open`,
+// event. Opening one lane was four to six turns of the parent: `lane:open`,
 // then — only the first lane, and only when `josh latest` had stashed — `stash:pop` and a re-install,
 // then `lane:dispatch`. This collapses them into one call that returns the child's pid, or a refusal,
 // the same shape `lane:dispatch` alone has.
@@ -24,7 +25,6 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const should_forward_stderr = true
 const PNPM = 'pnpm'
-const ISSUE_PATTERN = /^[1-9]\d*$/u
 
 const USAGE = 'Usage: josh lane:launch <issue-number> [--stash <message>]'
 
@@ -44,7 +44,13 @@ function read_context(argv: ReadonlyArray<string>): LaunchContext | undefined {
 
 	const [issue, ...rest] = parsed.positionals
 
-	if (issue === undefined || rest.length > 0 || !ISSUE_PATTERN.test(issue)) return undefined
+	if (
+		issue === undefined ||
+		rest.length > 0 ||
+		!issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue)
+	) {
+		return undefined
+	}
 
 	return { issue, stash: parsed.values.stash }
 }
@@ -82,8 +88,7 @@ async function prepare(stash: string | undefined, directory: string): Promise<bo
 }
 
 // Where the chain ended. `unopened` is a `lane:open` refusal — no lane was taken; `failed` is a step
-// after it, which leaves the opened lane holding a seat, so a caller cannot read the two alike
-// (joshuafolkken/kit#3027).
+// after it, which leaves the opened lane holding a seat, so a caller cannot read the two alike.
 type LaunchOutcome = { kind: 'launched'; pid: string } | { kind: 'unopened' } | { kind: 'failed' }
 
 const UNOPENED: LaunchOutcome = { kind: 'unopened' }
@@ -95,7 +100,7 @@ async function close_if_vacant(lane: LaneInfo | undefined): Promise<void> {
 	await josh_command.josh_run(['lane:close', lane.issue], should_forward_stderr)
 }
 
-// **A lane a park kept open is resumed, not reopened** (joshuafolkken/kit#3228). A child parked before
+// **A lane a park kept open is resumed, not reopened**. A child parked before
 // its commit leaves its uncommitted work in its lane, and `lane:open` refuses that lane as
 // `already-open` — so the released child is dispatched into the kept tree instead. **Only a lane a
 // child was already dispatched into counts as kept**: `lane:dispatch` records the child's output in the
@@ -103,7 +108,7 @@ async function close_if_vacant(lane: LaneInfo | undefined): Promise<void> {
 // `lane:open` and its refusal. So does a stranded lane, whose `.env` is gone with its tree.
 //
 // **A lane no child was dispatched into and that holds nothing is closed and opened afresh**
-// (joshuafolkken/kit#3289) — a run cut between the open and the dispatch leaves one. It is reopened
+// — a run cut between the open and the dispatch leaves one. It is reopened
 // rather than reused because nothing recorded whether its install finished. A lane with work or a live
 // process in it still meets `lane:open`'s refusal.
 async function lane_directory(issue: string): Promise<string | undefined> {
@@ -119,7 +124,7 @@ async function lane_directory(issue: string): Promise<string | undefined> {
 }
 
 // The launch chain in-process. The CLI prints the pid; `backlog:drive` launches through this same
-// chain (joshuafolkken/kit#2508).
+// chain.
 async function launch_lane(context: LaunchContext): Promise<LaunchOutcome> {
 	const directory = await lane_directory(context.issue)
 

@@ -259,7 +259,7 @@ kit **ships it as a package.**
 
 Add it as a devDependency and initialize, and the rules, the verification scripts and the deny rules for dangerous operations all reach that project. The procedure skills arrive as a Claude Code plugin, with nothing to install. Update kit and the sync command brings the project along. **The same keyword works the same way in every project.** (Everything above reaches a `full`-profile project; a `basic` project gets only short rules and minimal formatting and Git settings.)
 
-For scale: there are 155 `josh` commands, and **107 of them are meant to be run by the agent, not by a person.** That is what it means to be built with the agent as the primary user, rather than having AI support bolted on later.
+For scale: there are 162 `josh` commands, and **111 of them are meant to be run by the agent, not by a person.** That is what it means to be built with the agent as the primary user, rather than having AI support bolted on later.
 
 ## What to know up front
 

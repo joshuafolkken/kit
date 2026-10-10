@@ -23,11 +23,15 @@ interface ReadyPorts {
 	ready_issues: () => Promise<ReadonlyArray<string>>
 }
 
-async function free_under(limit: number): Promise<number> {
+// The lanes in use: the open worktrees an interruption has not stranded. `josh lane:limit` prints it.
+async function live_lane_count(): Promise<number> {
 	const lanes = await lane_registry.list_lanes()
-	const live = lanes.filter((lane) => !lane.is_stranded).length
 
-	return lane_capacity.free_lanes(limit, live)
+	return lanes.filter((lane) => !lane.is_stranded).length
+}
+
+async function free_under(limit: number): Promise<number> {
+	return lane_capacity.free_lanes(limit, await live_lane_count())
 }
 
 // Free lanes right now: the limit less the live lanes. An unreadable limit reads as no free lane — the
@@ -40,25 +44,25 @@ async function free_under(limit: number): Promise<number> {
 // (`backlog:next`) is gated behind a free lane, so a network read here would defeat that design. The
 // two can diverge, but only toward over-counting live lanes → fewer free lanes, the safe direction.
 async function free_lane_count(): Promise<number> {
-	const limit = lane_capacity.lane_limit()
+	const limit = await lane_capacity.lane_limit()
 
 	if (limit.kind !== 'limit') return NO_FREE
 
 	return await free_under(limit.limit)
 }
 
-// **The drive's count throws on an unreadable limit** (joshuafolkken/kit#3027). The drive launches no
+// **The drive's count throws on an unreadable limit**. The drive launches no
 // more than this count, so the safe-direction zero above would leave it launching nothing and reporting
 // nothing for good; a bad setting is the hard error `lane_capacity` says it is, ending the drive loudly.
 async function drive_free_lane_count(): Promise<number> {
-	const limit = lane_capacity.lane_limit()
+	const limit = await lane_capacity.lane_limit()
 
 	if (limit.kind !== 'limit') throw new Error(limit.problem)
 
 	return await free_under(limit.limit)
 }
 
-// **A `--only` run has no pool to drain** (joshuafolkken/kit#2472). `backlog:next` lists the opted-in
+// **A `--only` run has no pool to drain**. `backlog:next` lists the opted-in
 // pool, and a `--only` run's work is its named list — issues and epics that run in order through their
 // own step, never through the pick-up ask — so a ready pool issue is neither a stall nor an ask it owes.
 // Without a `--only` record the pool is the run's, whole.
@@ -67,7 +71,7 @@ function drains_pool(carry: RunCarry | undefined): boolean {
 }
 
 // The `backlog:next` read, or `undefined` for a `--only` run, which answers none before paying for the
-// network read. A bounded read (joshuafolkken/kit#2503) keeps stderr piped: the arrival probe reads once
+// network read. A bounded read keeps stderr piped: the arrival probe reads once
 // a minute, and a forwarded refusal would fill the watcher's output.
 async function read_backlog_next(timeout_ms?: number): Promise<JoshResult | undefined> {
 	if (!drains_pool(await run_headless.current_carry())) return undefined
@@ -95,7 +99,7 @@ async function read_ready(ports: ReadyPorts = DEFAULT_PORTS): Promise<ReadyReadi
 }
 
 // `undefined` unless there is both runnable work and a lane for it — the only state worth a line. Each
-// issue is a number-link against `slug` (joshuafolkken/kit#3099): the parent copies this line into its
+// issue is a number-link against `slug`: the parent copies this line into its
 // report, so a bare `#N` here is the citation the Stop guard sends back.
 function ready_line(reading: ReadyReading, slug: string | undefined): string | undefined {
 	if (reading.issues.length === NONE || reading.free_lanes <= NO_FREE) return undefined
@@ -141,7 +145,7 @@ async function print_ready_line(
 
 // The line `epic --add` prints once a child entered an epic while a `backlogrun` parent drives this
 // checkout: a filing made mid-run joins the pool the moment it is placed, so the parent asks now rather
-// than on the next wake (joshuafolkken/kit#2452). The recommendation commands (`issue:scout`,
+// than on the next wake. The recommendation commands (`issue:scout`,
 // `epic:bundle`) carry none — before the insertion the child is in no pool the ask could find.
 const OFFER_HINT =
 	'↻ backlogrun parent: a child just entered an epic — run `pnpm josh backlog:offer` next, so a ' +
@@ -163,6 +167,7 @@ const backlog_ready = {
 	read_backlog_next,
 	print_offer_hint,
 	free_lane_count,
+	live_lane_count,
 	drive_free_lane_count,
 	drains_pool,
 	print_ready_line,

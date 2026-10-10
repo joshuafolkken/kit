@@ -1,17 +1,13 @@
-import {
-	read_unwrapped,
-	RULE_DELIVERY_RATIONALE,
-	WORKFLOW_PROMPT_DIRECTORY,
-} from '#scripts/document/ai-document-fixture'
+import { read_unwrapped, RULE_DELIVERY_RATIONALE } from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
+import { rule_list } from './rule-list'
 
 // joshuafolkken/kit#2034: a dispatched lane child that stopped for a decision left no question on the
 // Issue — twice in one run. What this suite pins is the correction: the rule is delivered at the stop
 // notify it binds on, its procedure stays in one place, and the enumeration a reader reaches for names
 // the trigger.
 const TOPIC_FILE = '.claude/skills/workflow-commands/pre-gate-cut.md'
-const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
 const FIRING_SUITE = 'scripts/rules/lane-park.test.ts'
 const GUARD_COMMAND = 'pnpm josh rule:guard'
 const STOP_NOTIFY = 'pnpm josh notify --task-type confirmation'
@@ -40,15 +36,12 @@ describe('the delivered text — what the refusal states', () => {
 	})
 })
 
-describe(`${TOPIC_FILE} — the single source for the rule and the measurement behind it`, () => {
+describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 	const content = read_unwrapped(TOPIC_FILE)
 
 	it.each([
 		'## A lane child records its park before it stops',
-		'(joshuafolkken/kit#2034)',
-		// The two runs the enforcement rests on.
-		'#2012',
-		'#2011',
+		'`pnpm josh run:liveness` reads it `settled`',
 		STOP_NOTIFY,
 	])('states %j', (marker) => {
 		expect(content).toContain(marker)
@@ -66,8 +59,8 @@ describe(`${TOPIC_FILE} — the single source for the rule and the measurement b
 	})
 })
 
-describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, () => {
-	const content = read_unwrapped(DELIVERY)
+describe(`pnpm josh rule:list — the enumeration names this rule and its silent turn`, () => {
+	const content = rule_list.render()
 
 	it.each([TOPIC_FILE, GUARD_COMMAND])('states %j', (marker) => {
 		expect(content).toContain(marker)
@@ -80,6 +73,6 @@ describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, 
 	// Every row of the table has a non-firing state that means the rule is kept, or the trigger has not
 	// been identified. This one's is a checkout that is not a lane child, or a call that is not a stop.
 	it('says what a turn with no trigger means', () => {
-		expect(content).toContain('レーンの子でない')
+		expect(content).toContain('not a lane child')
 	})
 })

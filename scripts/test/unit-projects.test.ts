@@ -1,4 +1,5 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { describe, expect, it } from 'vitest'
@@ -8,6 +9,7 @@ import { VITEST_INCLUDE_GLOBS } from './vitest-include-globs'
 
 const {
 	ISOLATED_PROJECT,
+	MACHINE_GUARD,
 	MAIN_EXCLUDE,
 	PURE_PROJECT,
 	STATE_GUARD,
@@ -91,6 +93,18 @@ describe('each project carries the per-run environment and timeout', () => {
 		expect(env[run_ship_detach.SUPERVISED_KEY]).toBe('')
 		expect(env[agent_role_profile.HANDED_PROVIDER_KEY]).toBe('')
 	})
+
+	// joshuafolkken/kit#3419: a supervisor outliving its session would otherwise record a gone owner on
+	// every fixture's hold, which then reads back as stale.
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the agent session pid for %s', (name) => {
+		expect(project(name).env[agent_session_environment.AGENT_PID_KEY]).toBe('')
+	})
+
+	// joshuafolkken/kit#3623: a ship reviewer running the suite would otherwise carry its role into every
+	// cut-guard delivery fixture, which then stands down where the refusal is expected.
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the agent session role for %s', (name) => {
+		expect(project(name).env[agent_session_role.KEY]).toBe('')
+	})
 })
 
 // The state guard belongs to the pure project alone: isolate:false is the only run a leaked branch or
@@ -108,9 +122,10 @@ describe('the state guard is scoped to the pure project', () => {
 
 // joshuafolkken/kit#2296: the stdout guard must run inside every worker of both projects, so a
 // fixture's direct stream write never leaks into `pnpm josh test:unit`'s output. joshuafolkken/kit#2494
-// puts the Telegram guard beside it, since it wraps each worker's own `fetch`.
+// puts the Telegram guard beside it, since it wraps each worker's own `fetch`, and joshuafolkken/kit#3415
+// the machine guard, since it replaces each worker's own machine reading.
 describe('the per-worker guards run on both projects', () => {
-	it.each([PURE_PROJECT, ISOLATED_PROJECT])('sets up both guards on %s', (name) => {
-		expect(project(name).setupFiles).toEqual([...STDOUT_GUARD, ...TELEGRAM_GUARD])
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('sets up every worker guard on %s', (name) => {
+		expect(project(name).setupFiles).toEqual([...STDOUT_GUARD, ...TELEGRAM_GUARD, ...MACHINE_GUARD])
 	})
 })

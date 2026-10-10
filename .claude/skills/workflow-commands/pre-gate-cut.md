@@ -106,8 +106,8 @@ pnpm josh run:cut --resume <N>
   for the plan and the recorded decisions, then go straight to `pnpm josh gate`.
 - `resume-impl` (0) — like `resume`, but the cut was taken **during** implementation. Skip the title, the plan, the fresh hold claim and the split assessment,
   re-read the plan, then **continue implementation** — do **not** go straight to the gate.
-- `handed-off` (0) — a successor has already adopted this cut, `is_handed_off` is spent
-  (joshuafolkken/kit#1935). This process was woken **after** its own cut. **End the turn quietly and do
+- `handed-off` (0) — a successor has already adopted this cut, `is_handed_off` is spent.
+  This process was woken **after** its own cut. **End the turn quietly and do
   nothing**: a benign stop, no Telegram owed.
 - `stale` (1) — the record does not match the tree (wrong branch, a clean tree, an expired record, or
   an unknown hand-off state). **A resume failure**: send a `confirmation` Telegram and stop; never gate
@@ -145,7 +145,7 @@ decisions are read back from the issue. Rationale:
 - **The cut is exclusive** — `run:cut` writes the record with an exclusive create, so a second cut on
   the same tree is refused `busy`.
 - **The resume is unique.** Taking the hand-off over spends it — a second `run:cut --resume` reads a
-  spent record and is answered `handed-off` (joshuafolkken/kit#1935), and the take-over is itself an
+  spent record and is answered `handed-off`, and the take-over is itself an
   exclusive create, so two resumes racing cannot both win. One lane crosses the pre-gate boundary
   exactly once.
 
@@ -176,7 +176,7 @@ not once per run**; **An edit reissued right after a refusal passes**; **An unme
 warrants the cut**; **It is silent between a cut and its resume**. Rationale:
 `docs/maintainers/pre-gate-cut-rationale.md` → "Why the rules are guards, not prose";
 `scripts/rules/implementation-cut.ts` implements it. A child that ended without cutting is detected
-after the fact by `pnpm josh run:ending <N> --output <path>` (joshuafolkken/kit#2139).
+after the fact by `pnpm josh run:ending <N> --output <path>`.
 
 ## The threshold
 
@@ -191,8 +191,7 @@ the push is never a turn boundary (`chain-rule.md`).
 
 **The trigger**: a dispatched lane child about to stop for a decision (a Tier B toss-up, a Tier C
 action, an upstream defect) parks its own Issue first — `backlogrun-park.md` → "park and
-continue" — so the parent's `pnpm josh run:liveness` reads it `settled` (joshuafolkken/kit#2034),
-after #2012 and #2011. A `needs-human-review` or `already-done` stop already carries its label.
+continue" — so the parent's `pnpm josh run:liveness` reads it `settled`. A `needs-human-review` or `already-done` stop already carries its label.
 `pnpm josh rule:guard` refuses `pnpm josh notify --task-type confirmation` from a marked child until
 then — **It fires once per run.**, and a person's own `fullrun` is never refused
 (`scripts/rules/lane-park.ts`).
@@ -205,9 +204,10 @@ the child promoted this run, on every occurrence (`scripts/rules/lane-split-park
 ### The interactive ask is refused one call earlier
 
 **The trigger**: a headless session ends the turn on an interactive ask, so the notify guard never
-fires (#2178). `pnpm josh rule:guard` therefore refuses `AskUserQuestion` for a marked lane child on
-every occurrence — park the question instead (joshuafolkken/kit#2201), completing
-joshuafolkken/kit#2034. A child that slips past is recovered by `pnpm josh run:ending`, which lifts
+fires. `pnpm josh rule:guard` therefore refuses `AskUserQuestion` for a marked lane child on
+every occurrence — park the question instead.
+A child that slips past is recovered by `pnpm josh run:ending`, which lifts
 the refused ask into the park basis; `scripts/rules/lane-interactive-ask.ts` and the shared
 `scripts/agent/interactive-ask.ts` implement it.
 
+Provenance of each rule: `docs/maintainers/pre-gate-cut-rationale.md` → "Where each rule came from".

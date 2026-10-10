@@ -29,7 +29,7 @@ pnpm josh run:tidy
 
 - **Lanes:** closes a lane whose issue was closed by a merge, whose work tree has no uncommitted change, whose branch has no commit that no remote reaches, and that no live run holds — then releases its run record.
 - **Stashes:** drops an entry when every issue its message names (`#N`, a leading `N: `, or an `On N-lane:` branch) was closed by a merge. An entry that touches the observation ledger has its ledger lines appended first to the running work tree's own ledger file, less those any file of `.josh/observations/` already holds.
-- **Left alone:** an issue closed as not planned or without a merged pull request, an open issue, a stash naming no issue, a lane with changes or unpushed commits.
+- **Left alone:** an issue closed as not planned or without a merged pull request, an open issue, a stash naming no issue, a lane with changes or unpushed commits, and a lane the running `backlogrun` launched and has not settled — its `run:merge` (or `run:carry --end`) records that merge.
 
 "Closed by a merge" is read from the issue's REST timeline: its latest closed/reopened event is `closed` as completed (not `not_planned` or `duplicate`) and a merged pull request cross-references it.
 
@@ -55,8 +55,26 @@ pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind pa
 - `--retrospective` marks the end-of-run retrospective run, once per invocation, and requires `--summary <text>` — the same close writes that result as one `retrospective` event on the run's event stream (best-effort), so a run that filed zero improvements reads apart from one whose retrospective never ran. Either flag without the other is refused.
 - `--stopped <reason>` rides on `--end`: the run ended by _stopping_ rather than finishing, so one ⏸️ confirmation is pushed with the reason as the record is cleared, reaching the person after a cut a headless parent's report would not. A bare `--end` (a clean finish) stays silent, and because `--end` removes the record a second `--end --stopped` never sends twice. Named without `--end` it is ignored.
 - `--end` over a live record flushes pending ledger lines once; a failed flush goes to stderr and the record is still cleared.
+- `--end` over a live record first collects each lane the run launched and never settled whose issue merged — closed by a merged pull request, or left open behind one — exactly as `run:merge` would: the merge is counted, put on the event stream and in the ledger, and the lane closed. A lane a detached `josh ship` still supervises, or one that did not merge, is left; a failed collection goes to stderr and the record is still cleared.
+- `--end` keeps the run it removes as the last ended run — its invocation, start and end, one record overwritten by the next `--end` — so `run:board` can still draw a finished run.
 
 **Output / exit codes:** stdout is one token (`--json` prints the record on one line). `began`, `resumed`, `carried`, `counted`, `ended`, `expired` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown`, `over` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
+
+### `josh run:add`
+
+Add issues to the `backlogrun` running in this repository without stopping it. A running child is never interrupted: an added issue takes the next lane that frees.
+
+```bash
+pnpm josh run:add 101 102                 # ahead of the rest of the queue (`#N` works too)
+pnpm josh run:add 101 --no-priority       # at the end of the queue
+```
+
+- A child filed into an epic the run names needs no `run:add`: `backlog:drive` reads that epic's current children on every pass.
+- Each issue gets `auto-ok` and `run:lane`, plus `priority:high` unless `--no-priority`. A `backlogrun #N --only` run also gets the issue written to its carry record, so its named list includes it; the recorded invocation is never rewritten.
+- A closed issue, one that could not be read, or one a label would not apply to is refused; the others are still added. An issue with open blockers is added and reported as waiting on them.
+- Each added issue is written to the run's event stream as an `add` event, which wakes a `run:progress --wait` so the run offers the issue the next free lane.
+
+**Output / exit codes:** one line per issue — `queued #N · next free lane`, `queued #N · end of the queue`, `queued #N · waiting: blocked by #M`, or `refused #N · <reason>`. Exits 0 when every issue was added, 1 when any was refused or no `backlogrun` is running here (nothing is added then), 2 on a malformed argument.
 
 ### `josh run:wake`
 
@@ -100,10 +118,12 @@ Codex sessions use OpenAI; Claude Code sessions use Anthropic.
 | OpenAI    | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `high`     |
 
 Role overrides resolve before launch; model overrides apply only to Claude Code, effort overrides to
-either provider, and legacy `JOSH_LANE_*` values to the worker only. Invalid configuration, a missing
-or conflicting session marker, or a missing, outdated or unauthenticated CLI refuses without fallback,
-promotion or worker retry. `run:wake --list`, `lane:list`, the review brief and each launch log expose
-the resolved provider, role, model and effort; the worker's launch is "`josh lane:dispatch`".
+either provider, and legacy `JOSH_LANE_*` values to the worker only. With no session marker and no
+`JOSH_AGENT_PROVIDER` the provider defaults to Anthropic (Claude Code), which is what lets a person
+launch from a plain terminal. Invalid configuration, conflicting session markers, or a missing,
+outdated or unauthenticated CLI refuses without fallback, promotion or worker retry.
+`run:wake --list`, `lane:list`, the review brief and each launch log expose the resolved provider,
+role, model and effort; the worker's launch is "`josh lane:dispatch`".
 
 **Output / exit codes:** stdout is one token; stderr explains. `started`, `running`, `supervising`, `stale`, `stopped`, `ended`, `expired`, `unreadable` exit 0; `none` exits 0 for `--list` / `--stop` and 1 for `--start`; `failed`, `unknown` exit 1. `expired`, `unreadable`, and `failed` each warn.
 
@@ -117,7 +137,7 @@ and a fresh `fullrun #<N>` resumes it; every other cut outside a lane answers `n
 
 ```bash
 pnpm josh run:cut 1839                          # take the cut and hand it to a fresh process
-pnpm josh run:cut --impl 1839 --handoff h.json  # cut mid-implementation, carrying the instruction
+pnpm josh run:cut --impl 1839 --handoff .claude/tmp/handoff-1839.json  # cut mid-implementation, carrying the instruction
 pnpm josh run:cut --resume 1839                 # a fresh process's entry check
 pnpm josh run:cut --end                         # clear the record
 ```
@@ -139,14 +159,14 @@ The relaunched child is started at the **effort of the phase it resumes into**: 
 Say whether the delegated unit running a child is still working, or stopped without reporting. Two traces decide it: whether the transcript grew, and whether a child process is alive.
 
 ```bash
-pnpm josh run:liveness 1169 --output <path> --process none
-pnpm josh run:liveness 1169 --output <path> --process alive --window 45 --gap 2 --repo joshuafolkken/app-kit
+pnpm josh run:liveness 1169 --output <path>
+pnpm josh run:liveness 1169 --output <path> --window 45 --gap 2 --repo joshuafolkken/app-kit
 ```
 
 **Options:**
 
 - `--output <path>` — absolute, under the home or temp directory; a symlink is followed and size compared as well as mtime.
-- `--process alive | none` — the result of the caller's own `pgrep -laf` against the child's checkout.
+- `--process alive | none` — overrides the process trace, which the command otherwise reads itself: the child's own command line (`fullrun #<N>`) or its detached ship supervisor.
 - `--window <min>` — silent window the file must be frozen for (default 30); `--gap <sec>` — spacing between samples (default 5); `--repo <owner/name>`.
 
 **Output / exit codes:** stdout is one token; stderr explains. `alive`, `stopped`, `settled` exit 0; `undetermined` exits 1. Growth in the transcript answers `alive` on its own. Two `undetermined` answers in a row is a check fault; the caller stops polling rather than escalating to `stopped`.
@@ -344,7 +364,7 @@ pnpm josh run:report   # print the report; the same text josh notify sends
 Appends to, or reads back, the run's append-only ordered event stream. Keyed to the run's identity — the common git directory `run:carry` uses — so parent and every
 lane child append to one stream that survives a session cut; `--from` reads everything after a position,
 `--last` the newest event alone, `--follow` one bounded read that waits, and
-`--watch` the ambient pane.
+`--watch` every event in order, for debugging — the ambient pane is `run:board`, which `.vscode/tasks.json` opens on folder open.
 
 ```bash
 pnpm josh run:event --append <kind> <text>   # append one event; prints its position
@@ -361,7 +381,10 @@ and after a cut, the stream the run's, the position the caller's.
 `--watch` loops that pass, printing `HH:MM · <label> · <text>` in the session language.
 
 `<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `outage`, `cut`,
-`resume`, `stop`, `pr-opened`, `review-round`); a kind outside it is refused. `run:merge` appends `merge`, `park`
+`resume`, `stop`, `pr-opened`, `review-round`, `idle`, `filed`, `note`, `lane-phase`); a kind outside it is refused.
+`lane-phase` is a lane child's first implementation edit, written by the PreToolUse hook.
+`idle` is the idle watch's window, `filed` an Issue `issue:file` created, and `note` a one-line
+observation below the filing bar (`run:board` shows all three). `run:merge` appends `merge`, `park`
 and `outage`; other steps call `--append`. The stream is bounded, so an unattended run cannot grow it
 without limit.
 
@@ -384,6 +407,27 @@ pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 - `--hours <n>` — how long the watcher lives (default 8 with `--wait`, 1 otherwise); `--repo <owner/name>` scopes the read.
 
 **Output / exit codes:** stdout carries only the five labelled progress lines; notices go to stderr. `--once` with no run recorded prints nothing and exits 0; an unreadable listing exits 1. It sends no Telegram; `JOSH_PROGRESS=0` reports nothing (`--mark` still records).
+
+### `josh run:board`
+
+A full-screen board of the running `backlogrun`, redrawn every second for a person to keep open beside the run. `.vscode/tasks.json`, distributed by `josh sync`, opens it in a pane of its own when the workspace opens.
+
+```bash
+pnpm josh run:board          # redraw until interrupted
+pnpm josh run:board --once   # one frame, then exit
+pnpm josh run:board --chat   # one frame for a chat, recorded as a progress report
+pnpm josh run:board --every 5   # the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends
+```
+
+`--chat` answers a `backlogrun` progress question: the frame `--once` draws, with only `🧠` on the machine line and no escapes; it records the report as `run:progress --mark` does.
+
+`--every <minutes>` answers a request for periodic progress off-screen, with no model in between: started in the background, it sends the `--chat` frame as a `📊 Progress` Telegram at once and every `<minutes>` after, sends the ended run's frame once after `run:carry --end` and exits; with no run here it sends nothing and exits. It runs only when a person asks for it — the `run:progress` heartbeat still sends no Telegram — and `JOSH_PROGRESS=0` sends nothing. A failed send is reported on stderr and the next interval sends again.
+
+The header is two lines of symbols: the run's state (`▶` running, `⏸` idle, `✋` waiting on a person, `■` ended), a progress bar with arrivals as `(+N)` and per-state counts, `💓` age of the newest event (yellow after 15 silent minutes, red after 30), `⚠` only when a plan read failed; then `⏱` elapsed, `⌛` time left to the cut-off and the machine's gauges (`⚡` CPU, `🧠` memory, `💾` swap rate). While the run waits on an empty backlog it adds when the wait ends and why. Below: touched children — each with its elapsed `MM:SS` and a track of every phase it has passed (`investigate` → `plan` → `implement` → `review` → `gate` → `commit` → `followup`, read from the `child-launch`, `plan`, `lane-phase` and `ship-stage` events), a settled child's ending on its state icon — the `backlog:plan --waves` order under `── 1 ──` rules (epic children as a tree under the epic's title, other blockers as `🔗`), `needs-decision` and unreached children, and the newest filings, parks and notes. A dim legend at the foot names the symbols.
+
+On a terminal it draws on the alternate screen, as `top` and `less` do, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and the cursor that were there before. `--once`, or a stdout that is not a terminal (a pipe or a redirect), writes one frame with no screen control and exits — no color either when it is not a terminal.
+
+**Output / exit codes:** the stream and lanes re-read at most every five seconds; the plan from GitHub at most every two minutes, keeping the previous one on a failed read. A touched child the open listing no longer holds is read from GitHub once — its title, when it closed and whether a merged pull request closed it — and drawn `✅` (merged) or `🏁` with its time; until that read answers it is drawn `🏁` with no time. After `run:carry --end` the board keeps the ended run — `■`, its duration as `⏱` and when it ended in the header, no `⌛`, only that run's events — until the next run begins. An ended run asks GitHub about its unread closed children once after it ended, then reads nothing until the next run. No run here, running or ended, prints `no run` and reads no plan. Exits 0; an unknown argument, or an `--every` that is not a positive number of minutes, exits 1; Ctrl+C exits 130 and SIGTERM 143.
 
 ### `josh run:watcher:guard`
 
@@ -465,9 +509,13 @@ put. The printed PID is the supervisor's.
 - `JOSH_{SCHEDULER,WORKER,REVIEWER}_MODEL` — Claude Code role overrides; Anthropic defaults are respectively `claude-opus-5-5`, `claude-opus-5-5`, and `claude-opus-5-5`. Codex keeps its provider-specific model.
 - `JOSH_{SCHEDULER,WORKER,REVIEWER}_EFFORT` — role effort overrides for either provider; defaults are `medium`, `medium`, and `high`.
 
-Blank means unset. The inherited agent session identifier selects the provider; a missing or
-conflicting identifier refuses launch. Invalid model/effort or unavailable selected CLI/auth
-refuses launch. There is no provider fallback, promotion, or worker retry. OpenAI
+Blank means unset. The inherited agent session identifier selects the provider, then
+`JOSH_AGENT_PROVIDER`; with neither — a plain terminal — the provider defaults to Anthropic (Claude
+Code) and the launch says so — on the dispatch line, and on stderr for `run:wake --start`,
+`review:brief` and `ship --detach`. Conflicting identifiers (both a Codex and a Claude Code session)
+and a `JOSH_AGENT_PROVIDER` naming no allowed provider refuse launch, as does an invalid model/effort
+or an unavailable selected CLI/auth. A selected provider is never swapped for the other, and there is
+no promotion or worker retry. OpenAI
 defaults to `gpt-6.1-sol` with scheduler/worker/reviewer efforts `medium`/`medium`/`high`; the worker
 drops to `low` only in the pre-gate phase, on either provider.
 
@@ -512,7 +560,7 @@ The child's pid is the one thing on stdout; a refusal is an empty capture beside
 
 #### `josh lane:sample` / `josh lane:stats`
 
-Measure a lane limit: `lane:sample [--every <seconds>]` records the machine load to a per-repository ledger that merges and gates also write to; `lane:stats --period <days> [--limit <n>]` prints a period as one table row. Procedure and columns: [lane-limit-measurement.md](./maintainers/lane-limit-measurement.md).
+Measure a lane limit: a per-repository ledger holds merges, gates, each lane's dispatch and ship stages, and the machine load `backlog:drive` samples while it runs (`lane:sample [--every <seconds>]` takes a reading outside a run); `lane:stats --period <days> [--limit <n>]` prints a period as one table row, and under it the median and maximum of each stage of a lane. Procedure and columns: [lane-limit-measurement.md](./maintainers/lane-limit-measurement.md).
 
 ## Session and documents
 
@@ -634,7 +682,7 @@ pnpm josh edit:files - <<'EDITS'   # plan from stdin, then EDITS
 
 - **Each edit is content-addressed**: its `old` text must match exactly once — zero matches is `no match`, more than one is `ambiguous (N)` — so a false fold surfaces rather than corrupts, the same guarantee the `Edit` tool gives. A file is written **only when every one of its edits applied**, so a partial plan leaves the file untouched.
 - **`dependent`**: an earlier edit touched this one's text; file untouched.
-- **The batching guard hands it out.** On a run of single-call `Edit` turns the notice names the edits and offers `pnpm josh edit:files` over their files (`turn-batching.md` → "ガード発火時にも合成コマンドを手渡す"), the write-side of the read fold.
+- **The batching guard hands it out.** On a run of single-call `Edit` turns the notice names the edits and offers `pnpm josh edit:files` over their files (`turn-batching.md` → "実装中の独立編集に効く合成コマンド"), the write-side of the read fold.
 
 **Output / exit codes:** one line per edit (`applied` / `no match` / `ambiguous (N)` / `dependent` / `missing`); any non-`applied` edit, an unreadable plan, or a plan with no blocks exits non-zero.
 

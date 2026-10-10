@@ -1,29 +1,29 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_tail, type TailSection } from './run-tail'
 
-// `josh run:tail [<N> ...]` — one call for the fixed post-merge sequence a run closes on
-// (joshuafolkken/kit#2372). The loop used to spend a round trip on `observations:flush`, one on
-// `issue:cite` and one on `release:scope`, re-billing a lane's full context each time; this runs the
-// three internally and prints one composite report, the same way `backlog:offer` chains its two calls
-// and `run:prep` bundles three reads. Each step's stderr is forwarded, so the reader still sees every
-// explanation the three would have printed on their own.
+// `josh run:tail [<N> ...]` — one call for the fixed post-merge sequence a run closes on.
+// It runs `observations:flush`, `issue:cite` and `release:scope` internally, so no round trip per step
+// re-bills a lane's full context, and prints one composite report, the same way
+// `backlog:offer` chains its two calls and `run:prep` bundles three reads. Each
+// step's stderr is forwarded, so the reader still sees every explanation the three would have
+// printed on their own.
 //
 // The issue numbers are the completion's citations — the closed issue and any follow-ups filed this run
 // — and go to `issue:cite`; the other two take none. A `run:tail` with no numbers still closes the run,
 // because `issue:cite` with no target exits zero.
 //
-// **A dispatched lane child skips the ledger step** (joshuafolkken/kit#2492). A flush opens a
+// **A dispatched lane child skips the ledger step**. A flush opens a
 // ledger-only pull request and waits out its whole CI before it merges — minutes per issue, spent on a
 // file only the retrospective and the measurements read — and a lane has nothing for it: its lines
-// merged with its own pull request (joshuafolkken/kit#2919). A single run outside a lane keeps the
+// merged with its own pull request. A single run outside a lane keeps the
 // step for a line written on the default branch outside any issue's run.
 
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = 'Usage: josh run:tail [<issue-number> ...]'
 const should_forward_stderr = true
 
@@ -33,14 +33,13 @@ interface Step {
 }
 
 // The steps in the order a run closes on: the checkout returns to the default branch, any ledger line
-// the run's own commit did not carry (joshuafolkken/kit#2763) is committed so the recurrence count is on
+// the run's own commit did not carry is committed so the recurrence count is on
 // main — on most runs the flush answers `clean` — the citations are read for the completion report, and
 // the release scope is decided last.
 //
-// **The return comes first because the flush refuses anywhere else** (joshuafolkken/kit#2979). A run
-// closes right after its merge, still on the feature branch it shipped from, and `josh ship` reaches
-// this report with nothing in between — so the flush stopped a merged run as failed. `main:sync` is the
-// step a person used to type after the fact; it fast-forwards the local default branch before the
+// **The return comes first because the flush refuses anywhere else**. A run closes right
+// after its merge, still on the feature branch it shipped from, and `josh ship` reaches this report
+// with nothing in between. `main:sync` fast-forwards the local default branch before the
 // checkout, so a ledger line appended after the merge is carried along rather than refused.
 const LEDGER_STEPS: ReadonlyArray<Step> = [
 	{ header: run_tail.SYNC_HEADER, argv: () => ['main:sync'] },
@@ -58,7 +57,7 @@ function steps_for(is_lane_child: boolean): ReadonlyArray<Step> {
 // Numbers only — a target `issue:cite` reads as an issue, so a stray flag is refused rather than
 // forwarded to the wrong step.
 function parse_issues(argv: ReadonlyArray<string>): ReadonlyArray<string> | undefined {
-	if (argv.every((token) => ISSUE_NUMBER_PATTERN.test(token))) return argv
+	if (argv.every((token) => issue_number_shape.is_issue_number(token))) return argv
 
 	return undefined
 }
@@ -74,7 +73,7 @@ async function run_step(step: Step, issues: ReadonlyArray<string>): Promise<Tail
 }
 
 // Run the steps in order, not concurrently: the ledger commit must land on main before the release scope
-// reads main's pending count, and the order is what a lane spent three turns on.
+// reads main's pending count.
 async function close_run(issues: ReadonlyArray<string>): Promise<ReadonlyArray<TailSection>> {
 	const sections: Array<TailSection> = []
 

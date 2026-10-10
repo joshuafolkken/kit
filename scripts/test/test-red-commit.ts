@@ -1,8 +1,9 @@
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
+import { session_cite } from '#scripts/issue/session-cite'
 import { test_red, type RedRun } from './test-red'
 import { test_red_logic } from './test-red-logic'
 
-// The commit-stage half of joshuafolkken/kit#2448: `josh git -y` on an Issue that declares itself a
+// The commit-stage half of `josh test:red`: `josh git -y` on an Issue that declares itself a
 // bug fix (`test_red_logic.BUG_DECLARATION_LINE`) refuses a commit whose tests are all green on the
 // pre-fix tree.
 //
@@ -22,7 +23,7 @@ const DEFAULT_PORTS: RedCommitPorts = {
 
 function reason_for(issue_number: string, files: ReadonlyArray<string>): string {
 	return (
-		`⛔ test:red — #${issue_number} declares \`${test_red_logic.BUG_DECLARATION_LINE}\`, but every ` +
+		`⛔ test:red — ${session_cite.issue(issue_number)} declares \`${test_red_logic.BUG_DECLARATION_LINE}\`, but every ` +
 		'changed test passes on the pre-fix tree (the merge-base), so none of them reproduces the ' +
 		`reported symptom:\n  ${files.join('\n  ')}\n` +
 		'Write a regression test at the grain the user saw the symptom (the whole output, not a ' +

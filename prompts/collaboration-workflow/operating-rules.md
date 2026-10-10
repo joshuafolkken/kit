@@ -15,13 +15,7 @@
 
 ### ほかの単一ソースにある規則
 
-このファイルにかつて書き直されていた規則は、次の単一ソースにある。ここには繰り返さない。単一ソース化の経緯は `docs/maintainers/operating-rules-rationale.md` → "Rules that moved to their single source" にある。
-
-- **auto-merge と `completion` 通知** — `.claude/skills/workflow-commands/followup.md` → "`auto-merge` — Default `fullrun` behavior" と `.claude/skills/workflow-commands/followup.md` → "Completion notifications: always via `pnpm josh followup`"
-- **明示的な起動が必須** — `CLAUDE.md` → "Explicit invocation required (MANDATORY)"（常駐）と `.claude/skills/workflow-commands/SKILL.md` → "0. The rule that fires before any of them — explicit invocation"（スキル側の単一ソース）
-- **確認待ちで停止するときの Telegram 通知** — `CLAUDE.md` → "Mid-workflow stop notification (`confirmation`)"
-- **作業ツリーは 1 本のランが保持する（`josh run:hold`）** — `.claude/skills/workflow-commands/working-tree-hold.md` → "The working-tree hold — one run per tree"
-- **overrides の保護** — `.claude/skills/dependency-update/SKILL.md` → "1. Effective overrides live in the workspace — inspect both files"
+auto-merge と `completion` 通知・明示的な起動・`confirmation` 通知・作業ツリーの保持・overrides の保護は、それぞれの単一ソースにあり、ここには繰り返さない。移動先の一覧は `docs/maintainers/operating-rules-rationale.md` → "Rules that moved to their single source"。
 
 ### 指示されていない行動は取らない
 
@@ -57,6 +51,11 @@
 
   **4 番目だけが復元を伴わない。1〜3 はいずれも直後に `pnpm josh stash:pop "<メッセージ>"` で復元することが手順に含まれている**（stash はリポジトリ単位の 1 本のスタックを全 work tree が共有するため、位置指定や引数なしの `git stash pop` は別のレーンが最後に積んだ stash を取り込む — メッセージで対象を特定する。joshuafolkken/kit#2050）。 回収するのは異常終了したランの置き土産であって、いま実行中のランの作業ではないから、pop して戻す先がない。**代わりに stash を子の Issue にコメントで記録する** — 前提 Issue で中断するときの stash（`prerequisite.md`）と同じく、**その記録だけが後で pop させられる唯一の手がかり**であり、記録し忘れた stash は誰にも拾われない。これら以外の場面で退避したくなったときは、実行せずに先に確認する
 
+- **会話で作った実装をランへ渡す「引き渡し用の stash」も `pnpm josh stash:pop "<メッセージ>"` で復元する。当てたあと stash は消える**（経緯は `docs/maintainers/operating-rules-rationale.md` → "Why a handed-over stash is popped"）
+  - **計画には復元手順としてこの 1 行だけを書く。** `git stash apply` / `git stash pop` も「drop しない」という条件も書かない
+  - **計画がガードの拒否する復元形を指していたら、実行側は `stash:pop` に読み替えて続行し、Issue コメントに残す（Tier A）。** `needs-decision` では止まらない
+  - **stash を残すのは持ち主の判断だけである。** 持ち主が計画に理由を書き、ランはそこで止まって確認する
+
 - **staging・index の書き換え・`git commit` の直接実行は deny されており、deny には「そのターンでユーザーが明示指示した」という例外がない。** だから上記ケース 1 は AI 側では実行できず、ユーザー自身の端末で実行してもらう。ユーザーが明示的にコミットを指示した場合も、承認済みのコミットは `pnpm josh git` を通す（理由は `docs/maintainers/operating-rules-rationale.md` → "Why the index is the user's"）
 - index を守る deny と `pnpm josh rule:guard`（`worktree-mutation`・`index-mutation`・`destructive-command`・`protected-file` 行）も事故防止の実装である — 上記「指示されていない行動は取らない」→「deny と配送ガードは実装であって規則ではない」
 
@@ -69,5 +68,5 @@
 - **自己修正**は設計判断ではなく後始末である — 自分が公開した成果物の事実誤り（誤った帰属を含む）の訂正と、同じセッションで自分が特定した自分の作業の抜けの穴埋め（例: 欠けていると自分で指摘した相互リンクの追加）。どちらも可逆で、望ましい結果が 1 つしかなく、問題を迂回せず既に行った作業を修復するだけなので、回避策のリスクはない
 - **「相談と実行を区別する」との境界**: ここでの Tier A は **すでに承認され実行された作業を完了・修復する**ことに限られる。目標の表明（「〜したい」）や進め方への問い（「どうすべき？」）に対して勝手に動いてよい、という意味ではない（→ `principles.md` → "consult-vs-execute"）
 - **Tier C との境界**: 自分のコメントの訂正は Tier A。マージ・ブランチ削除・force push・スコープ外の変更は、**その問題を招いたのが自分自身であっても** Tier C のまま。確認を外しても監査証跡は外さない
-- **major のバージョン bump は Tier C**: `pnpm josh bump major` は自分の判断で実行せず、提案もしない。破壊的な変更に見えても既定は minor / patch で、major はユーザーがそのターンで明示したときだけ（0.x の major は 1.0.0 になり、戻せない公開を伴う）
+- **major のバージョン bump は Tier C**: `pnpm josh bump major` は自分の判断で実行せず、提案もしない。破壊的な変更に見えても既定は minor / patch で、major はユーザーがそのターンで明示したときだけ（0.x の major は 1.0.0 になり、戻せない公開を伴う）。`josh bump` が版を変えたら、変わった挙動の `docs/` をコミット前に更新する
 - **自動判断の記録の書き方**: Issue 駆動ワークフロー内では `pnpm josh issue:comment <N> --body-file <path>` で、採用案・不採用の代替案・なぜ採用案が明確に優位かを記載する

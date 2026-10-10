@@ -1,14 +1,14 @@
+import { lane_limit_override } from './lane-limit-override'
 import type { LaneEnvironment } from './lane-paths'
 import { lane_seed_policy } from './lane-seed'
 
-// How many lanes one repository may run at once, and how many of them are free
-// (joshuafolkken/kit#1491).
+// How many lanes one repository may run at once, and how many of them are free.
 //
 // **Nothing here knows what a lane holds.** The limit is a number, the occupancy is a number, and
 // the answer is a number — so the same pool serves an epic's children, several epics' children at
 // once, or anything else a scheduler decides to put in a lane. Threading an epic through this module
-// is what would have to be undone the first time two epics run together, and the whole reason
-// joshuafolkken/kit#1491 built the scheduler epic-free from the start.
+// is what would have to be undone the first time two epics run together, which is why the scheduler
+// is epic-free.
 //
 // **It is a ceiling, not a prediction.** Six lanes does not say six children will run at once; it
 // says a seventh will not start. What actually runs is bounded by what is runnable, by the port
@@ -33,40 +33,55 @@ type LimitChoice = { kind: 'limit'; limit: number } | { kind: 'problem'; problem
 //
 // Blank is unset, not invalid: an `.env` line left as `JOSH_LANE_LIMIT=` is a variable nobody
 // configured, exactly as `lane_paths.lane_root` reads a blank root.
-function read_limit(raw: string | undefined): LimitChoice {
+//
+// `name` is what the problem names: `josh lane:limit` reads its argument by the same rule.
+function read_limit(raw: string | undefined, name: string): LimitChoice {
 	const trimmed = raw?.trim() ?? ''
 
 	if (trimmed === '') return { kind: 'limit', limit: DEFAULT_LANE_LIMIT }
 
 	if (!POSITIVE_INTEGER.test(trimmed)) {
-		return {
-			kind: 'problem',
-			problem: `${LANE_LIMIT_KEY} must be a positive integer, not "${trimmed}"`,
-		}
+		return { kind: 'problem', problem: `${name} must be a positive integer, not "${trimmed}"` }
 	}
 
 	return { kind: 'limit', limit: Number(trimmed) }
 }
 
-function lane_limit(environment: LaneEnvironment = process.env): LimitChoice {
-	return read_limit(environment[LANE_LIMIT_KEY])
+// **A live run's `lane:limit` override outranks the environment**: a running
+// parent keeps the environment it started with, so the override is the only way its limit moves. This
+// stays the one place the limit is read; the override reader is injected so a test reads none.
+async function lane_limit(
+	environment: LaneEnvironment = process.env,
+	read_override: () => Promise<number | undefined> = lane_limit_override.read_override,
+): Promise<LimitChoice> {
+	const override = await read_override()
+
+	if (override !== undefined) return { kind: 'limit', limit: override }
+
+	return read_limit(environment[LANE_LIMIT_KEY], LANE_LIMIT_KEY)
+}
+
+// **A limit above the seat count is capped at the seats**. `lane:open` refuses
+// a tenth lane however high the limit is set, so a limit past the seats offers launches bound to be
+// refused.
+function seated_limit(limit: number): number {
+	return Math.min(limit, lane_seed_policy.LAST_LANE_SEAT)
 }
 
 // Never negative: a repository holding more `in-progress` issues than the limit allows — the limit
 // was lowered, or a stale label outlived its run — has no free lane, and a negative count read as
 // "how many to offer" would be a slice nobody meant.
-//
-// **A limit above the seat count is capped at the seats** (joshuafolkken/kit#3027). `lane:open` refuses
-// a tenth lane however high `JOSH_LANE_LIMIT` is set, so counting free lanes past the seats offers a
-// launch that is bound to be refused.
 function free_lanes(limit: number, occupied: number): number {
-	return Math.max(NO_LANES, Math.min(limit, lane_seed_policy.LAST_LANE_SEAT) - occupied)
+	return Math.max(NO_LANES, seated_limit(limit) - occupied)
 }
 
 const lane_capacity = {
 	LANE_LIMIT_KEY,
-	lane_limit,
 	free_lanes,
+	lane_limit,
+	read_limit,
+	seated_limit,
 }
 
+export type { LimitChoice }
 export { lane_capacity }

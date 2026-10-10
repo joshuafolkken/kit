@@ -1,12 +1,12 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { issue_read, type IssueComment, type IssueFields } from './issue-read'
 import { issue_report_failures, type ReadFailureKind } from './issue-report-failures'
 
-// `josh issue:read <N> [<N> ...]` — the body *and* the comments of every issue named, in one call
-// (joshuafolkken/kit#1715).
+// `josh issue:read <N> [<N> ...]` — the body *and* the comments of every issue named, in one call.
 //
 // It replaces the two `gh api` reads `.claude/skills/workflow-commands/issue-comments.md` tells an agent
 // to type per issue. Measured over four recorded `backlogrun` parents, `issue bookkeeping` was the
@@ -28,7 +28,6 @@ import { issue_report_failures, type ReadFailureKind } from './issue-report-fail
 
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = 'Usage: josh issue:read <issue-number> [<issue-number> ...]'
 const BLOCK_SEPARATOR = '\n\n---\n\n'
 // The same bound `issue:state` puts on its batch read, for the same reason: every read is a `gh`
@@ -45,7 +44,7 @@ interface IssueContent {
 type NumberResult = { kind: 'issue'; content: IssueContent } | { kind: ReadFailureKind }
 
 // The formatted block for one issue, or the failure kind — what `run:prep` bundles beside the state
-// and the dependency-update scope (joshuafolkken/kit#1978). It reuses this file's read and the shared
+// and the dependency-update scope. It reuses this file's read and the shared
 // `format_issue` rather than reproducing either, so the two `gh` reads and the block shape stay
 // single-sourced here.
 type BlockRead = { kind: 'ok'; block: string } | { kind: ReadFailureKind }
@@ -59,7 +58,7 @@ interface IssueReport {
 // Dropping it answers fewer numbers than were asked for and still exits zero — and nothing in the
 // output then says a number went unanswered. `#1262` copied out of a table is exactly that token.
 function parse_numbers(argv: ReadonlyArray<string>): ReadonlyArray<string> | undefined {
-	const numbers = argv.filter((argument) => ISSUE_NUMBER_PATTERN.test(argument))
+	const numbers = argv.filter((argument) => issue_number_shape.is_issue_number(argument))
 
 	if (numbers.length === 0 || numbers.length !== argv.length) return undefined
 

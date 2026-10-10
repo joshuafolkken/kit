@@ -3,12 +3,12 @@
 ## Background the gate and push
 
 - **The clean path folds the region into one backgrounded `pnpm josh ship`** (preflight → gate → `git -y` →
-  foreground `followup` → `run:tail`; joshuafolkken/kit#2398). The calls below serve a due second round.
+  foreground `followup` → `run:tail`). The calls below serve a due second round.
 - Background `pnpm josh gate` beside the review; join it before commit.
 - Issue `pnpm josh git -y` in the background; its completion resumes the run, so the turn never ends
   at the push.
 - Keep `pnpm josh followup` in the foreground — nearly every following step reads its result.
-- **Record before the CI wait ends, never after the merge** (joshuafolkken/kit#2763): the commit
+- **Record before the CI wait ends, never after the merge**: the commit
   carries the observation ledger lines recorded so far, and while CI runs the run makes the records
   that need no CI result — observation Issues, the completion report draft.
 - Overlap only tree-readers, and compose merge-independent tail data before `followup` (the table
@@ -17,6 +17,7 @@
 - A lane child's hand-off or pre-gate cut is the sole turn boundary before the push (`chain-rule.md`).
 
 Use harness detachment so completion returns to the run. Foreground timeouts stay within the cap.
+Where each rule came from: `docs/maintainers/background-commands-rationale.md` → "Where each rule came from".
 
 ## How the wait ends — the task's exit, never a regex over its output
 
@@ -82,8 +83,7 @@ the cut" is its single source.
 
 **A headless lane child (`claude -p`) is where "a background command re-invokes the run" does not
 hold: its background Bash tasks are killed when its turn ends.** It hands the gate-to-merge region to
-a foreground `pnpm josh ship --detach` instead (`chain-rule.md` step 0) — its preflight runs before the
-supervisor exists, so a backgrounded `ship` dies with the turn; `pnpm josh rule:guard` refuses a
+a foreground `pnpm josh ship --detach` instead (`chain-rule.md` step 0); `pnpm josh rule:guard` refuses a
 backgrounded `josh gate` / `git` / `followup` / `ship` there, and the `Stop` hook sends a child with a
 task still running back to wait.
 

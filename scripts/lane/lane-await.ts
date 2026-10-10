@@ -1,15 +1,21 @@
 import { spawnSync } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
-import { run_liveness } from '#scripts/run/run-liveness'
+import {
+	PROCESS_ALIVE,
+	PROCESS_NONE,
+	PROCESS_UNKNOWN,
+	run_liveness,
+	type ProcessTrace,
+} from '#scripts/run/run-liveness'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_handoff } from './lane-handoff'
 
 // Detached lane children are not harness-tracked processes, so their completion fires no
 // re-invocation event in the parent's session. Without a blocking wait the parent notices only
-// on the next heartbeat interval -- up to 15 minutes after the fact in the measured case
-// (joshuafolkken/kit#2113).
+// on the next heartbeat interval -- up to 15 minutes after the fact.
 //
 // **The re-confirm delay is the one value the caller must not be left to choose.** A process that
 // disappears briefly and reappears (the pre-gate boundary cut, where one process exits and a
@@ -22,12 +28,12 @@ const RECONFIRM_MS = 15_000
 const DEFAULT_POLL_MS = 5000
 const NEVER_APPEARED_TIMEOUT_MS = 600_000
 const MS_PER_SECOND = 1000
-const ISSUE_PATTERN = /^[1-9]\d*$/u
 const PROCESS_FOUND = 0
+const PROCESS_NOT_FOUND = 1
 
 // `is_settled` is read once, when the wait starts: a child that ended between two `lane:await` calls
 // never appears in the second one, and only its settled issue tells it apart from one not yet
-// launched (joshuafolkken/kit#3133).
+// launched.
 interface AwaitState {
 	appeared: boolean
 	disappeared_at: number | undefined
@@ -52,6 +58,8 @@ interface AwaitOptions {
 	poll_ms?: number
 	reconfirm_ms?: number
 	never_appeared_timeout_ms?: number
+	now?: () => number
+	sleep?: (ms: number) => Promise<void>
 }
 
 interface CheckConfig {
@@ -63,18 +71,28 @@ interface CheckConfig {
 interface RunConfig extends CheckConfig {
 	is_settled: (issue: string) => Promise<boolean>
 	poll_ms: number
+	now: () => number
+	sleep: (ms: number) => Promise<void>
 }
 
-function is_process_running_default(issue: string): boolean {
+// Three answers, not two: only pgrep's own "no match" exit is `none`. A pgrep that failed or hit its
+// timeout never looked, and `run:liveness` answers `undetermined` for it rather than booking a live
+// child as stopped.
+function process_trace_default(issue: string): ProcessTrace {
 	const pattern = lane_child_invocation.process_pattern(issue)
 	const result = spawnSync('pgrep', ['-f', pattern], {
 		encoding: 'utf8',
 		timeout: PROBE_TIMEOUT_MS,
 	})
 
-	if (result.status === PROCESS_FOUND) return true
+	if (result.status === PROCESS_FOUND) return PROCESS_ALIVE
+	if (lane_handoff.is_ship_running(issue, process.cwd())) return PROCESS_ALIVE
 
-	return lane_handoff.is_ship_running(issue, process.cwd())
+	return result.status === PROCESS_NOT_FOUND ? PROCESS_NONE : PROCESS_UNKNOWN
+}
+
+function is_process_running_default(issue: string): boolean {
+	return process_trace_default(issue) === PROCESS_ALIVE
 }
 
 // The same positive evidence `run:liveness` answers `settled` on: the issue closed, or it was parked.
@@ -101,7 +119,10 @@ function is_valid(raw: RawAwaitArguments): boolean {
 	const { owner } = raw.values
 	const numbers = owner === undefined ? raw.positionals : [...raw.positionals, owner]
 
-	return raw.positionals.length > 0 && numbers.every((value) => ISSUE_PATTERN.test(value))
+	return (
+		raw.positionals.length > 0 &&
+		numbers.every((value) => issue_number_shape.is_issue_number(value))
+	)
 }
 
 // The issues to wait on and the waiting session's pid, or `undefined` for anything else.
@@ -142,6 +163,8 @@ function resolve_options(options: AwaitOptions): RunConfig {
 	return {
 		is_running: options.is_running ?? is_process_running_default,
 		is_settled: options.is_settled ?? is_settled_default,
+		now: options.now ?? Date.now,
+		sleep: options.sleep ?? sleep,
 		...resolve_timing(options),
 	}
 }
@@ -225,12 +248,12 @@ async function wait_for_any(
 	const states = await make_states(issues, config.is_settled)
 
 	for (;;) {
-		const completed = check_any(states, Date.now(), config)
+		const completed = check_any(states, config.now(), config)
 
 		if (completed !== undefined) return completed
 
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await sleep(config.poll_ms)
+		await config.sleep(config.poll_ms)
 	}
 }
 
@@ -240,6 +263,7 @@ const lane_await = {
 	check_issue,
 	is_process_running_default,
 	parse_arguments,
+	process_trace_default,
 	wait_for_any,
 }
 

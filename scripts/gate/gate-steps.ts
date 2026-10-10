@@ -13,6 +13,10 @@ function unit_worker_args(check: GateCheck, plan: GatePlan): ReadonlyArray<strin
 	return [`${UNIT_WORKER_FLAG}=${String(plan.unit_worker_cap)}`]
 }
 
+function check_args(check: GateCheck, plan: GatePlan): ReadonlyArray<string> {
+	return [...(check.args ?? []), ...unit_worker_args(check, plan)]
+}
+
 // Resolve the type checker per project and run every static check from its package root.
 async function build_gate_step(
 	check: GateCheck,
@@ -26,7 +30,7 @@ async function build_gate_step(
 	if (check.label !== TYPE_CHECK_LABEL) {
 		return {
 			label: check.label,
-			command_args: [JOSH, check.target, ...unit_worker_args(check, plan)],
+			command_args: [JOSH, check.target, ...check_args(check, plan)],
 			cwd,
 		}
 	}

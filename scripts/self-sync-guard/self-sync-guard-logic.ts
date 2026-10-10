@@ -6,8 +6,8 @@ import path from 'node:path'
 // truth is overwritten by the derived template, and the copy transforms fire against a project
 // where they are wrong (a `prompts/…` reference rewritten to `node_modules/@joshuafolkken/kit/…`
 // resolves nowhere, a workflow written from `templates/` loses the pins `.github/workflows` owns).
-// joshuafolkken/game-kit#447 is the incident; joshuafolkken/kit#868 reproduced the same damage in
-// kit — 14 files, including CLAUDE.md, tsconfig.json and both mapped workflows.
+// In kit the same damage reaches 14 files, including CLAUDE.md, tsconfig.json and both mapped
+// workflows.
 //
 // The check lives here rather than in each package's sync so the three distributors share one
 // implementation: a second copy would drift, and a distributor that spelled the signal differently

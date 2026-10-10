@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os'
 // "the temp directory"**: it honors `TMPDIR`, which on macOS names a per-user `/var/folders/…/T`, so
 // two processes with different `TMPDIR` values resolve two different places. A record one josh
 // command writes for another to read then lands where the reader never looks — the transcript a
-// harness wrote under `/tmp` that `os.tmpdir()` could not name (joshuafolkken/kit#1501), and the run
-// record a `backlogrun` handed off that the `run:wake`-launched session began again from nothing
-// (joshuafolkken/kit#1909). A cross-process handoff has to key on a root neither end's own `TMPDIR`
+// harness wrote under `/tmp` that `os.tmpdir()` could not name, and the run
+// record a `backlogrun` handed off that the `run:wake`-launched session began again from nothing.
+// A cross-process handoff has to key on a root neither end's own `TMPDIR`
 // can move, and that is what this pins.
 //
 // **It is decided by platform rather than written as a bare `/tmp`, because a POSIX literal is not
@@ -42,12 +42,14 @@ function resolve_temporary_root(
 	return can_write(POSIX_TEMP_ROOT) ? POSIX_TEMP_ROOT : tmpdir()
 }
 
-// **An explicit root wins, and the unit suite is who sets one** (joshuafolkken/kit#2494). Every
+// **An explicit root wins, and the unit suite is who sets one**. Every
 // record keyed here is shared by the whole host, so a unit test that drove a writer for real wrote
 // into the live run's records — progress lines for issues the run never touched, relayed to the
 // session watching it. The network guard's `arm` points this at a directory of its own before any
 // worker forks, so every process of one test run shares a root no real run reads, and `disarm`
-// removes it with the rest of the guard.
+// removes it with the rest of the guard. Live evidence of `run:carry` sets it for the same
+// reason: the run's state records are keyed here too, and evidence taken against the default root
+// once ended the record of the run that was actually going.
 const TEMP_ROOT_KEY = 'JOSH_TEMP_ROOT'
 
 function temporary_root(override: string | undefined, platform: string): string {

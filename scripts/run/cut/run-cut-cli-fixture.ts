@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_argv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { git_command } from '#scripts/git/git-command'
 import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
@@ -12,9 +13,9 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterAll, beforeEach, vi } from 'vitest'
 import { run_cut } from './run-cut'
 
-// What the `josh run:cut` CLI suites share (joshuafolkken/kit#2484): the scratch repository, the spied git
-// and lane reads, and the per-test reset — split out so the setup-boundary suite runs on the same harness
-// as the main suite rather than on a second copy of it.
+// What the `josh run:cut` CLI suites share: the scratch repository, the spied git and lane reads, and
+// the per-test reset — so the setup-boundary suite runs on the same harness as the main suite rather
+// than on a second copy of it.
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'run-cut-cli-test-'))
 const REPOSITORY = path.join(scratch, 'repository.git')
@@ -26,8 +27,7 @@ const DEFAULT_BRANCH = 'main'
 const LANE_DIRECTORY = '/lanes/1839'
 const DERIVED_LOG = path.join(scratch, 'lane-1839.log')
 const LAUNCHED_PID = 4242
-// The context verdicts as `CostVerdict` values (joshuafolkken/kit#2312). The exported
-// tokens widen to `string` through their namespace objects, so a typed literal is what the spied
+// The context verdicts as `CostVerdict` values. The exported tokens widen to `string` through their namespace objects, so a typed literal is what the spied
 // `session_verdict` return accepts.
 const CONTEXT_OVER: CostVerdict = 'over'
 const CONTEXT_UNDER: CostVerdict = 'under'
@@ -56,10 +56,12 @@ const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
 const log_path = vi.spyOn(lane_dispatch_log, 'default_log_path')
 const launch = vi.spyOn(detached_launch, 'launch')
 
-// joshuafolkken/kit#2312: the pre-gate cut is conditional on the current context, so the suite
-// pins the verdict rather than reading the live session. `over` is the beforeEach default so the cases
-// that predate the condition still cut exactly as they did.
+// The pre-gate cut is conditional on the current context, so the suite pins the verdict rather than
+// reading the live session. `over` is the beforeEach default, so a case cuts unless it says otherwise.
 const session_verdict = vi.spyOn(cost_cli, 'session_verdict')
+// Pinned rather than read from the environment: a suite run by a ship reviewer carries that role, and
+// would take no cut at all. A case that is the reviewer says so once, for its own call.
+const is_reviewer = vi.spyOn(agent_session_role, 'is_reviewer').mockReturnValue(false)
 // The stream append a cut makes is spied so the suite writes no event to the real repository; what it
 // pins is that the append is made, and with the cut kind, so `run:step` advances past the boundary.
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
@@ -69,8 +71,8 @@ function verdict(): string {
 	return String(info.mock.calls.at(-1)?.[0])
 }
 
-// **The relaunch starts the child at the effort of the phase it resumes into** (joshuafolkken/kit#2382),
-// so the expected profile is resolved for that phase — the default pre-gate cut lowers the worker to the
+// **The relaunch starts the child at the effort of the phase it resumes into**, so
+// the expected profile is resolved for that phase — the default pre-gate cut lowers the worker to the
 // ship/bookkeeping effort, which is the branch every relaunch case here takes.
 function worker_argv(invocation: string): Extract<AgentArgvResult, { kind: 'argv' }> {
 	const phase = run_cut.PRE_GATE_PHASE
@@ -80,11 +82,10 @@ function worker_argv(invocation: string): Extract<AgentArgvResult, { kind: 'argv
 	return built
 }
 
-// The instruction a resume into implementation requires (joshuafolkken/kit#2354); carried on every
-// declared cut here, harmless where a pre-gate cut resumes into the gate and does not read it.
+// The instruction a resume into implementation requires; carried on every declared cut here, harmless
+// where a pre-gate cut resumes into the gate and does not read it.
 const HANDOFF = { instruction: 'go', completed: [], remaining: [], untouched: [] }
-// The same instruction as a `--handoff` file, which an implementation cut is refused without
-// (joshuafolkken/kit#2484).
+// The same instruction as a `--handoff` file, which an implementation cut is refused without.
 const HANDOFF_PATH = path.join(scratch, 'handoff.json')
 const WITH_HANDOFF = ['--handoff', HANDOFF_PATH]
 
@@ -135,6 +136,7 @@ const run_cut_cli_fixture = {
 	lane,
 	state,
 	find_open_lane,
+	is_reviewer,
 	launch,
 	session_verdict,
 	emit,

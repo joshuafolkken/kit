@@ -84,22 +84,24 @@ pnpm josh issue:file "<title>" --body-file body.md --depth 1 --distinct 2801,279
 - `--distinct <N,…>` — duplicate candidates you read and judged distinct.
 - `--over-cap` — the run is blocked by this filing; the cap lets it through.
 - `--no-auto-ok` — needs a person's judgement (Tier B / C); no `auto-ok`.
-- `--release` — a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 9).
+- `--requested` — a person asked for this filing (a `new` entry, or a request in conversation). The carry record and the branch's issue are not read, so `auto-ok` comes only from `--label auto-ok`.
+- `--release` — a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).
 
 **Steps (run in this order):**
 
 1. Refuse when the target is third-party (Tier C).
 2. Check the body against the same criteria as [`josh issue:lint`](#josh-issuelint). Refuse on any problem.
 3. For another repository, confirm `## Origin` names the originating issue (`owner/repo#N` or a URL). Refuse when it does not.
-4. Print the `auto-ok` decision (applied in a `backlogrun` or when the branch's issue has it). When the labels carry `auto-ok` but neither `run:lane` nor `run:solo`, refuse: an untriaged opted-in issue stops `backlog:next` from offering anything. Pass `--label run:lane`, or `--label run:solo` for a defect in kit's own verification (`backlogrun-lanes.md`), or `--no-auto-ok`.
-5. Count the target's open issues and print `wip: <count> open in <owner/repo> · cap <cap> · <verdict>`: `within` up to the cap; past it `exempt` (route `interrupt` / `split` / `tier-a`, or `--over-cap`), else `held`, which asks the exemption question and refuses; an unreadable count warns.
-6. Run the same duplicate search as [`josh issue:scout`](#josh-issuescout) and print its report. While there are candidates, file nothing until every one is named in `--distinct`. A duplicate is not filed; it is folded into the existing issue by `issue-fold-existing.md`. A filing to another repository points `GH_REPO` at the target, so the duplicate search and the epic decision run there.
-7. Create any missing workflow label (depth / route) with its color and description — the same set as [`josh sync`](josh-commands.md#josh-sync). A label that cannot be created is printed with a warning, and the filing goes on.
-8. File with all labels in one request; print the URL.
-9. With `--release`, link the filed issue to the target's release issue, as [`josh issue:release`](#josh-issuerelease) does. A link that does not complete prints `⚠` with that command to re-run, prefixed with `GH_REPO=<target>` so a `--repo` filing is linked in the target rather than the current repository.
-10. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run. The issue already exists, so the exit code stays 0.
+4. Print the `auto-ok` decision (applied in a `backlogrun` or when the branch's issue has it, unless `--no-auto-ok`, `--requested` or a `release` label withholds it). When the labels carry `auto-ok` but neither `run:lane` nor `run:solo`, refuse: an untriaged opted-in issue stops `backlog:next` from offering anything. Pass `--label run:lane`, or `--label run:solo` for a defect in kit's own verification (`backlogrun-lanes.md`), or `--no-auto-ok`.
+5. Unless the filing is a split child (`--route split` — the split assessment already decided it is separate), when the same finder already filed an issue into the same repository that is still open (a `filed` event not named in `--distinct`, by the same finder — the lane child, else the issue the branch names, read across every invocation on the stream; with no finder, a `filed` event with none in the current invocation), ask the [`josh issue:fold`](#josh-issuefold) question and print `fold: <reason> · filed earlier by this finder: <refs>`. Only `fold` refuses, naming the earlier issue to add the finding to and the `--distinct <N>` that declares it a separate deliverable; `undetermined` (no diff that measures the size) files. A first filing asks nothing.
+6. Count the target's open issues and print `wip: <count> open in <owner/repo> · cap <cap> · <verdict>`: `within` up to the cap; past it `exempt` (route `interrupt` / `split` / `tier-a`, or `--over-cap`), else `held`, which asks the exemption question and refuses; an unreadable count warns.
+7. Run the same duplicate search as [`josh issue:scout`](#josh-issuescout) and print its report. While there are candidates, file nothing until every one is named in `--distinct`. A duplicate is not filed; it is folded into the existing issue by `issue-fold-existing.md`. A filing to another repository points `GH_REPO` at the target, so the duplicate search and the epic decision run there.
+8. Create any missing workflow label (depth / route) with its color and description — the same set as [`josh sync`](josh-commands.md#josh-sync). A label that cannot be created is printed with a warning, and the filing goes on.
+9. File with all labels in one request; print the URL.
+10. With `--release`, link the filed issue to the target's release issue, as [`josh issue:release`](#josh-issuerelease) does. A link that does not complete prints `⚠` with that command to re-run, prefixed with `GH_REPO=<target>` so a `--repo` filing is linked in the target rather than the current repository.
+11. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run. The issue already exists, so the exit code stays 0.
 
-A refusal in steps 1–6 files nothing and exits 1. The per-run filing cap (`filing-cap`) and the `issue:fold` required before a second filing (`issue-fold`) apply to calls of this command. A refused call is not counted.
+A refusal in steps 1–7 files nothing and exits 1. The per-run filing cap (`filing-cap`) applies to calls of this command; a refused call is not counted. The WIP cap and the fold question are this command's own steps, so no delivered rule refuses the call ahead of them.
 
 ### `josh issue:fold-existing`
 
@@ -116,7 +118,7 @@ The JSON carries `content` (`duplicate` / `compatible` / `separate` / `unknown`)
 Before a run files a **second** finding in one session, answer whether the findings fold into one issue or stay separate — the filing-time counterpart to the split assessment, reading its same two questions (separability, and whether the whole clearly exceeds one verification gate).
 
 ```bash
-pnpm josh issue:fold "First finding" "Second finding"                 # fold | separate | no-fold-needed
+pnpm josh issue:fold "First finding" "Second finding"                 # fold | separate | no-fold-needed | undetermined
 pnpm josh issue:fold "a" "b" --not-separable                          # the pair is really one deliverable → fold
 pnpm josh issue:fold "a" "b" --json                                   # the verdict and reason, machine-readable
 ```
@@ -126,7 +128,7 @@ pnpm josh issue:fold "a" "b" --json                                   # the verd
 - `--not-separable` — declare the judgement half: the findings are one deliverable, so they fold whatever their size.
 - `--json` — print the verdict and reason as JSON.
 
-The size half is [`josh split:assess`](#josh-splitassess)'s own verdict, called not recomputed — the counting and the guide are single-sourced there. `separate` needs both halves (separable **and** over the size guide); every other case folds, and a lone candidate answers `no-fold-needed` without measuring. **An unreadable diff measures as under the guide, so an unanswerable size folds** rather than tipping to `separate`. `pnpm josh rule:guard` delivers the fold gate at a run's second `gh api … issues` call, never the first.
+The size half is [`josh split:assess`](#josh-splitassess)'s own verdict, called not recomputed — the counting and the guide are single-sourced there. `separate` needs both halves (separable **and** over the size guide); every other measured case folds, and a lone candidate answers `no-fold-needed` without measuring. **A diff that cannot be read, or that has no non-test file, answers `undetermined`**: an empty diff is the state of a run that has not yet written its findings, and reading it as under the guide would fold every one of them. The size is then the whole request's estimate (`split-assessment.md` → "The question"). [`josh issue:file`](#josh-issuefile) asks this question itself on a run's second filing (its step 5), so a filing needs no separate call.
 
 ### `josh issue:cite`
 
@@ -196,7 +198,7 @@ pnpm josh defect:rate --days 30
 
 - `--days <n>` — the window in whole days (default 14, at most 3650). Anything else prints the usage and exits 1.
 
-**Behavior:** the numerator is issues filed in the window with `- 種別: 不具合` or `route:interrupt`; the denominator is completed issues with `- 種別: 振る舞い変更`. Filing lint now requires an explicit bug decision; older undeclared defects count only through `route:interrupt`. With no completed behavior change, prints `n/a`. The search API returns at most 1000 results; beyond that the counts are lower bounds. An unreadable search exits 1. `backlog:next` uses this rate to prioritize defects.
+**Behavior:** the numerator is issues filed in the window labelled `bug`, `bugfix` or `route:interrupt`, or declaring `- 種別: 不具合`; the denominator is issues closed as completed in the window labelled `enhancement`. The labels read older issues, whose bodies rarely declared a kind, by the same standard as newer ones. With no completed enhancement, prints `n/a`. The search API returns at most 1000 results; beyond that the counts are lower bounds. An unreadable search exits 1. `backlog:next` uses this rate to prioritize defects.
 
 ### `josh issue:backlinks`
 
@@ -216,7 +218,7 @@ Check a two-layer work summary (`CLAUDE.md` Step 0, single-sourced in `prompts/c
 pnpm josh report:lint < summary.md
 ```
 
-Prints `ok` (exit 0), or the violations one per line (exit 1). The judgement half — whether the overview names a concrete subject — is left to the writer, because a machine cannot answer it.
+Prints `ok` (exit 0), or the violations one per line followed by one line naming the template's section in `report-format.md` (exit 1). The judgement half — whether the overview names a concrete subject — is left to the writer, because a machine cannot answer it.
 
 ### `josh stash:pop`
 
@@ -310,6 +312,8 @@ pnpm josh epic:next 858 --repo joshuafolkken/kit --lanes   # one child per free 
 - `--repo <owner/repo>` — answer for one repository; stdout carries one token (an issue number, or `wait`/`stop`/`complete`), everything else on stderr.
 - `--lanes` — print one issue number per free lane (requires `--repo`); `JOSH_LANE_LIMIT` sets the ceiling, default 6. Prints `triage` instead while any candidate carries neither `run:solo` nor `run:lane` (the triage gate in [`josh backlog:next`](#josh-backlognext)).
 
+With `--repo`, the occupancy line names each `in-progress` holder with its label age read from the issue timeline — `in-progress for <n> min`, marked `stale` past 90 minutes or when the label predates the timeline, `label age unread` when the timeline could not be read.
+
 Several leading epic arguments merge into one candidate pool per repository. A cross-repository dependency resolves only when the blocker is closed **and** its declared version has published. `run`/`wait`/`stop`/`complete` exit `0`; an unusable graph (cycle, or body/relations disagreement) exits `1`.
 
 ### `josh epic:bundle`
@@ -393,7 +397,7 @@ stdout is one token per line (all exit 0 unless noted): `<number>…` (each an i
 
 **Triage gate**: a candidate is triaged when it carries `run:solo` (runs alone) or `run:lane` (may run beside others), matched case-insensitively. When any candidate of this repository carries neither, the command prints `triage` and no numbers — an untriaged issue may be one that must run alone, so none of the others may start either — and names the untriaged issues on stderr. `backlog:offer` maps it to the budget answer `untriaged`, `backlog:budget` answers `triage`, and `backlog:drive` hands it back to the parent. The gate runs before the `run:solo` gate below. `epic:next --lanes` applies it to a named epic's lanes too.
 
-**Defect priority**: on a `run` answer the command measures `defect:rate` over its default 14 days. While the rate is strictly above the baseline (0.42, `BASELINE_RATE` in `scripts/issue/defect-rate.ts`), the runnable numbers are re-ordered — defects (`- 種別: 不具合` or `route:interrupt`) first, new mechanisms (`- 種別: 振る舞い変更` without either) last, everything else in between — each kind keeping the graph's order. At or below the baseline, or when the rate cannot be read (noted on stderr), the order is unchanged. Only the order within the runnable set changes, so no dependency is crossed.
+**Defect priority**: on a `run` answer the command measures `defect:rate` over its default 14 days. While the rate is strictly above the baseline (0.73, `BASELINE_RATE` in `scripts/issue/defect-rate.ts`), the runnable numbers are re-ordered — defects (counted as `defect:rate`'s numerator counts them) first, new mechanisms (`- 種別: 振る舞い変更` without either) last, everything else in between — each kind keeping the graph's order. At or below the baseline, or when the rate cannot be read (noted on stderr), the order is unchanged. Only the order within the runnable set changes, so no dependency is crossed.
 
 **Ranking**: after the defect priority, this repository's runnable numbers are sorted by three keys, the earlier order breaking ties — `priority:high` first, then a verification-path defect (`bug` with `run:solo`, or `route:interrupt`), then the number of open backlog issues blocked by it. The `run:solo` gate below sees the whole ranking; only then are the standalone (non-epic) numbers cut to five, and a number past the cut is listed as waiting.
 

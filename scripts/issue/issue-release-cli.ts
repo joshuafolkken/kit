@@ -5,14 +5,16 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list, MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { RELEASE_LABEL } from './issue-labels'
 import { issue_release } from './issue-release'
+import { session_cite } from './session-cite'
 
 // `josh issue:release <N>` — link Issue `<N>` to its repository's release Issue as a `blocked_by`
-// blocker, filing the release Issue when none is open (joshuafolkken/kit#3360). `josh issue:file
+// blocker, filing the release Issue when none is open. `josh issue:file
 // --release` calls the same `link` once its Issue exists, so a new and an existing Issue are linked
 // by one body of code.
 //
@@ -22,7 +24,6 @@ import { issue_release } from './issue-release'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = 'Usage: josh issue:release <issue-number>'
 const NONE = 'none'
 const UNKNOWN_REPO_MESSAGE =
@@ -90,10 +91,17 @@ async function release_of(target: string): Promise<ReleaseIssue | undefined> {
 	return filed === undefined ? undefined : { issue_number: filed, is_filed: true }
 }
 
-function linked_line(release: ReleaseIssue, issue_number: number): string {
+function linked_line(release: ReleaseIssue, issue_number: number, target: string): string {
 	const how = release.is_filed ? 'filed' : 'open'
+	const release_cite = session_cite.issue(release.issue_number, undefined, target)
 
-	return `release: #${String(release.issue_number)} (${how}) is blocked by #${String(issue_number)}`
+	return `release: ${release_cite} (${how}) is blocked by ${session_cite.issue(issue_number, undefined, target)}`
+}
+
+function unlinked_line(issue_number: number, blocked: string, target: string): string {
+	const blocker = session_cite.issue(issue_number, undefined, target)
+
+	return `✖ ${blocker} could not be recorded as a blocker of ${session_cite.issue(blocked, undefined, target)}`
 }
 
 // Whether Issue `issue_number` of `target` now blocks the release Issue. Every outcome is printed.
@@ -104,8 +112,8 @@ async function link(issue_number: number, target: string): Promise<boolean> {
 	const blocked = String(release.issue_number)
 	const is_linked = await git_gh_issue_write.issue_add_blocked_by(blocked, String(issue_number))
 
-	if (is_linked) console.info(linked_line(release, issue_number))
-	else console.error(`✖ #${String(issue_number)} could not be recorded as a blocker of #${blocked}`)
+	if (is_linked) console.info(linked_line(release, issue_number, target))
+	else console.error(unlinked_line(issue_number, blocked, target))
 
 	return is_linked
 }
@@ -120,7 +128,9 @@ function issue_number_of(argv: ReadonlyArray<string>): number | undefined {
 	const [issue_number, ...rest] = positionals_of(argv)
 	const is_single = rest.length === 0 && issue_number !== undefined
 
-	return is_single && ISSUE_NUMBER_PATTERN.test(issue_number) ? Number(issue_number) : undefined
+	return is_single && issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue_number)
+		? Number(issue_number)
+		: undefined
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

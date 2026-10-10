@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { git_command } from '#scripts/git/git-command'
+import { issue_cite } from '#scripts/issue/issue-cite'
 
 interface CheckResult {
 	success: boolean
@@ -25,10 +26,10 @@ function is_inside(directory: string, resolved_path: string): boolean {
 	return relative !== '' && !relative.startsWith(PARENT_SEGMENT) && !path.isAbsolute(relative)
 }
 
-// joshuafolkken/kit#1106: the guard used to be a prefix test — the path had to *start* with `.git/`,
-// which is only the shape the main work tree produces. A linked work tree gets an absolute
-// `<repo>/.git/worktrees/<name>/COMMIT_EDITMSG`, which shares no prefix with it, so the guard threw
-// before the real check ran and no commit inside a work tree could succeed.
+// A prefix test — the path has to *start* with `.git/` — fits only the shape the main work tree
+// produces. A linked work tree gets an absolute `<repo>/.git/worktrees/<name>/COMMIT_EDITMSG`, which
+// shares no prefix with it, so such a guard would throw before the real check ran and no commit inside
+// a work tree could succeed.
 //
 // The directories are asked of git rather than assumed to be named `.git`, because the name is not a
 // property of a repository: a bare repository's git directory is the repository, and
@@ -50,7 +51,7 @@ function is_safe_commit_message_path(
 // Where git would have written the message, for a run that was passed no path. The work tree's own
 // git directory rather than a literal `.git/`: in a linked work tree that name is a *file*, so the
 // relative spelling this used to hardcode ends the run at ENOTDIR — the same defect as the guard's,
-// on the branch the guard does not reach (joshuafolkken/kit#1106).
+// on the branch the guard does not reach.
 function default_commit_message_path(git_directories: ReadonlyArray<string>): string {
 	return path.join(git_directories[0] ?? FALLBACK_GIT_DIRECTORY, COMMIT_MESSAGE_FILE_NAME)
 }
@@ -85,11 +86,13 @@ function extract_issue_number(branch_name: string): string | undefined {
 }
 
 function create_error_message(issue_number: string, branch: string, message: string): string {
+	const reference = issue_cite.plain(issue_number)
+
 	return (
-		`🚫 Error: Commit message must include #${issue_number}\n` +
+		`🚫 Error: Commit message must include ${reference}\n` +
 		`   Current branch: ${branch}\n` +
 		`   Commit message: ${message}\n` +
-		`   Please include #${issue_number} in your commit message\n`
+		`   Please include ${reference} in your commit message\n`
 	)
 }
 
@@ -106,7 +109,7 @@ async function check_commit_message(): Promise<CheckResult> {
 
 	const commit_message = await get_commit_message()
 
-	if (!commit_message.includes(`#${issue_number}`)) {
+	if (!commit_message.includes(issue_cite.plain(issue_number))) {
 		return {
 			success: false,
 			message: create_error_message(issue_number, current_branch, commit_message),
@@ -115,7 +118,7 @@ async function check_commit_message(): Promise<CheckResult> {
 
 	return {
 		success: true,
-		message: `✅ Commit message check passed: Found #${issue_number}`,
+		message: `✅ Commit message check passed: Found ${issue_cite.plain(issue_number)}`,
 	}
 }
 

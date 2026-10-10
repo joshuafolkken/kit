@@ -24,8 +24,8 @@ function handle_unknown(cmd: string): never {
 	process.exit(1)
 }
 
-// `process.exit` truncates a piped stdout at its buffer size, and since joshuafolkken/kit#1342 the
-// output at risk is the script's own — `scripts/gate/verification-gate.ts` writes its per-check blocks
+// `process.exit` truncates a piped stdout at its buffer size, and the output at risk is the script's
+// own — `scripts/gate/verification-gate.ts` writes its per-check blocks
 // and its failure summary through this process, and sets `process.exitCode` rather than exiting for
 // exactly that reason. Recording the code and letting node exit when the loop drains keeps every
 // byte, and it leaves the last word with a script that finishes work after module evaluation
@@ -36,7 +36,7 @@ function record_exit_code(exit_code: number): void {
 }
 
 // `run_command` answers with a number for a shell command and a promise for a script it runs in
-// this same process (joshuafolkken/kit#1342); `await` covers both, and the argv slice is taken
+// this same process; `await` covers both, and the argv slice is taken
 // before it because the in-process branch replaces `process.argv` with the script's own.
 async function main(): Promise<void> {
 	const cmd = process.argv[ARGV_OFFSET]

@@ -1,5 +1,5 @@
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
-import { AI_DOCS, ENV_EXAMPLE, read_repo_file } from '#scripts/document/ai-document-fixture'
+import { ENV_EXAMPLE, read_repo_file } from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#869: the repository map decides which local checkout other commands write to,
@@ -25,7 +25,11 @@ const JOSH_COMMANDS_DOC = 'docs/josh-commands.md'
 // joshuafolkken/kit#1924 slimmed the Environment Variables table to prose, so the resident mention is
 // now the variable name in the `.env` sentence rather than a table row — the rule still names it, and
 // the owner-restriction body stays at the command reference below.
-const AI_DOC_MARKERS: ReadonlyArray<string> = ['`JOSH_REPO_PATHS`']
+//
+// joshuafolkken/kit#3395 took that sentence out of `CLAUDE.md`: the variable is read only when a
+// project is configured, so it is documented in the environment-variable reference alone.
+const ENV_DOC = 'docs/environment-variables.md'
+const ENV_DOC_MARKERS: ReadonlyArray<string> = ['`JOSH_REPO_PATHS`']
 
 const COMMAND_DOC_MARKERS: ReadonlyArray<string> = [
 	'#### The discovered repository map',
@@ -36,10 +40,10 @@ const COMMAND_DOC_MARKERS: ReadonlyArray<string> = [
 ]
 
 describe('repository map documentation', () => {
-	it.each(AI_DOCS)('documents the override variable in %s', (document_name) => {
-		const content = read_repo_file(document_name)
+	it('documents the override variable in the environment-variable reference', () => {
+		const content = read_repo_file(ENV_DOC)
 
-		for (const marker of AI_DOC_MARKERS) expect(content).toContain(marker)
+		for (const marker of ENV_DOC_MARKERS) expect(content).toContain(marker)
 	})
 
 	it('offers the variable in the env sample a new project copies', () => {

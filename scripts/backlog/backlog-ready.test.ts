@@ -1,4 +1,5 @@
 import { josh_command } from '#scripts/josh/josh-run'
+import { lane_limit_override } from '#scripts/lane/lane-limit-override'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_headless } from '#scripts/run/run-headless'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -74,6 +75,8 @@ describe('backlog_ready.read_ready', () => {
 // joshuafolkken/kit#3027: a zero here would leave the drive launching nothing and reporting nothing.
 describe('backlog_ready.drive_free_lane_count', () => {
 	it('throws on an unreadable lane limit instead of reading it as no free lane', async () => {
+		// A live run's `lane:limit` override outranks the variable, so the test reads none.
+		vi.spyOn(lane_limit_override, 'read_override').mockResolvedValue(undefined)
 		vi.stubEnv('JOSH_LANE_LIMIT', 'abc')
 
 		await expect(backlog_ready.drive_free_lane_count()).rejects.toThrow('JOSH_LANE_LIMIT')

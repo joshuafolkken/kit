@@ -1,5 +1,5 @@
 // The mark every agent session kit launches itself carries — a lane child, a ship reviewer, a woken
-// `run:wake` session (joshuafolkken/kit#3245).
+// `run:wake` session.
 //
 // **Those sessions run under `claude -p`, and nobody reads their replies.** Their output goes to a
 // stream-json log, and the only reader of the final text is the exit record's failure reason. So the

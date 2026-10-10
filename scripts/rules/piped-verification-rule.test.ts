@@ -8,6 +8,7 @@ import {
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { piped_verification } from './piped-verification'
+import { rule_list } from './rule-list'
 
 // joshuafolkken/kit#1556: a pipeline exits with its last command's status, so `pnpm josh gate | tail`
 // answered success on a gate that had printed `✗ verification gate failed`. The failure was real, and
@@ -22,7 +23,6 @@ import { piped_verification } from './piped-verification'
 // boundary holds: a read-only listing must never be caught by it.
 const TOPIC_FILE = 'output-bounds.md'
 const CANONICAL = `${WORKFLOW_PROMPT_DIRECTORY}/${TOPIC_FILE}`
-const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
 const RATIONALE = 'docs/maintainers/output-bounds-rationale.md'
 const SUITE_PATH = 'scripts/rules/piped-verification-rule.test.ts'
 // Named once: the enumeration, the topic file and this suite have to agree on the command, and a
@@ -113,8 +113,8 @@ describe.each(AI_DOCS)('%s — leaves the reasoning at the pointer', (document_p
 	})
 })
 
-describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, () => {
-	const content = read_unwrapped(DELIVERY)
+describe(`pnpm josh rule:list — the enumeration names this rule and its silent turn`, () => {
+	const content = rule_list.render()
 
 	it.each([TOPIC_FILE, GUARD_COMMAND])('states %j', (marker) => {
 		expect(content).toContain(marker)
@@ -127,7 +127,7 @@ describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, 
 	// Every row of that table has to have a non-firing state that means the rule is being kept, or the
 	// trigger has not been identified. This one's is that no verification status is being discarded.
 	it('says what a turn with no trigger means', () => {
-		expect(content).toContain('検証の終了コードが握りつぶされていない')
+		expect(content).toContain('the exit code reaches the caller')
 	})
 
 	// **The trigger set drifts out of the table the moment a command joins it**, and the reader who

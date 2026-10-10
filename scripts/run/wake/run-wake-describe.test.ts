@@ -40,6 +40,8 @@ const CARRY = {
 const EVENT = { pos: 7, at: '2026-10-03T01:00:00.000Z', kind: 'merged', text: '#1 merged' }
 const REPO = 'owner/repo'
 const LINE_COUNT_WITHOUT_OPTIONALS = 7
+const WATCH_LINE =
+	'watch: `pnpm josh run:board` in a pane of its own (recover with `tail -F /stub/events.jsonl`)'
 
 const live_spy = vi.spyOn(run_wake, 'is_supervisor_live')
 const carry_spy = vi.spyOn(run_carry, 'read_carry')
@@ -69,7 +71,7 @@ describe('run_wake_describe.describe_wake — the always-present lines', () => {
 			'supervisor: process 4242 (running), watching since 2026-10-03T00:00:00.000Z',
 			WOKE_LINE,
 			'output: /stub/wake.log',
-			'watch: `pnpm josh run:event --watch 0` in a pane of its own (recover with `tail -F /stub/events.jsonl`)',
+			WATCH_LINE,
 			'stop it with `pnpm josh run:wake --stop`',
 		])
 	})
@@ -128,12 +130,12 @@ describe('run_wake_describe.describe_wake — the optional lines', () => {
 		expect(agent_spy).toHaveBeenCalledWith(CONTEXT.log_target)
 	})
 
-	it('relays the newest event and watches on from its position', () => {
+	it('relays the newest event and names the board pane to watch on in', () => {
 		event_spy.mockReturnValue(EVENT)
 
 		expect(lines().slice(5, 7)).toStrictEqual([
 			`progress: ${run_event_stream.format_event(EVENT)}`,
-			'watch: `pnpm josh run:event --watch 7` in a pane of its own (recover with `tail -F /stub/events.jsonl`)',
+			WATCH_LINE,
 		])
 		expect(event_spy).toHaveBeenCalledWith(CONTEXT.event_target)
 	})

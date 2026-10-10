@@ -95,48 +95,6 @@ describe('the precedence between them is fixed', () => {
 	})
 })
 
-describe('the advice names what the rule requires', () => {
-	it('stashes with -u and records the stash instead of popping it', () => {
-		const { advice } = run_preflight.decide({ ...CLEAN_TREE, is_dirty: true }, NO_WORK, ISSUE)
-
-		expect(advice).toContain(`git stash push -u -m "${run_preflight.STASH_LABEL_PREFIX}${ISSUE}"`)
-		expect(advice).toContain(`Record the stash on #${ISSUE}`)
-		expect(advice).not.toContain('git stash pop')
-	})
-
-	// A clean checkout parked on a feature branch also answers `reclaim`, and telling the caller to
-	// record a stash `git stash push` never created posts an Issue comment naming nothing.
-	it('prescribes no stash over a clean tree that is merely on the wrong branch', () => {
-		const tree: TreeState = { branch: '926-x', default_branch: 'main', is_dirty: false }
-		const { advice } = run_preflight.decide(tree, NO_WORK, ISSUE)
-
-		expect(advice).not.toContain('git stash')
-		expect(advice).not.toContain('Record the stash')
-		expect(advice).toContain('git switch main && git pull')
-	})
-
-	it('switches to the branch git reported, not to a hard-coded main', () => {
-		const tree: TreeState = { branch: 'work', default_branch: 'trunk', is_dirty: false }
-
-		expect(run_preflight.decide(tree, NO_WORK, ISSUE).advice).toContain(
-			'git switch trunk && git pull',
-		)
-	})
-
-	it('requires the whole verification gate when a branch is reused', () => {
-		expect(run_preflight.decide(CLEAN_TREE, child('open', '926-x'), ISSUE).advice).toBe(
-			run_preflight.RESUME_ADVICE,
-		)
-		expect(run_preflight.RESUME_ADVICE).toContain('from the start')
-	})
-
-	it('names what was found in the reason', () => {
-		expect(run_preflight.decide(CLEAN_TREE, child('open', '926-x'), ISSUE).reason).toContain(
-			'926-x',
-		)
-	})
-})
-
 const BRANCH = '926-reclaim-a-tree'
 const OPEN_PR_JSON = '{"state":"OPEN"}'
 const MERGED_PR_JSON = '{"state":"MERGED"}'

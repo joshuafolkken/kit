@@ -1,7 +1,7 @@
 import type { CommandEntry } from './josh-command-types'
 
 // The issue-reading and issue-citation commands, split out of `josh-commands-ai.ts` when the mandated
-// `issue:cite` section pushed that file past its 300-line ceiling (joshuafolkken/kit#2220) — the same
+// `issue:cite` section pushed that file past its 300-line ceiling — the same
 // group-per-file shape `LANE_COMMANDS` and `SPLIT_COMMANDS` already take. `COMMAND_MAP` spreads this
 // in, so nothing downstream sees where an entry lives.
 
@@ -33,8 +33,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'defect:rate': {
 		script: 'scripts/issue/defect-rate-cli.ts',
-		description:
-			'Print the defect rate of merged work: defects filed per behavior change completed',
+		description: 'Print the defect rate of merged work: defects filed per enhancement completed',
 		category: 'AI tools',
 		reference: ['[--days <n>]', 'automation', ['network']],
 	},
@@ -66,10 +65,10 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 	'issue:file': {
 		script: 'scripts/issue/issue-file-cli.ts',
 		description:
-			'File an Issue with every filing step: lint, Origin, WIP cap, duplicate scout, labels, then epic:bundle',
+			'File an Issue with every filing step: lint, Origin, fold, WIP cap, duplicate scout, labels, then epic:bundle',
 		category: 'AI tools',
 		reference: [
-			'<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]',
+			'<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--requested] [--release]',
 			'automation',
 			['network'],
 		],

@@ -79,7 +79,7 @@ function search_path(query: string, page: number = FIRST_PAGE): string {
 
 // How many pages the search holds, read off the first page's own count. Bounded by the API's
 // ceiling, past which GitHub serves no page at all — so this asks for exactly the pages `gh api
-// --paginate` used to walk to.
+// --paginate` would walk to.
 function page_count(first: SearchPage): number {
 	return Math.ceil(Math.min(first.total_count, SEARCH_RESULT_CEILING) / Number(PER_PAGE))
 }
@@ -87,13 +87,12 @@ function page_count(first: SearchPage): number {
 async function read_page(query: string, page: number): Promise<SearchPage | undefined> {
 	const raw = await git_gh_exec.exec_gh_api({ path: search_path(query, page) })
 
-	return parse_json.parse_json_object_safe(raw, search_page_schema)
+	return parse_json.parse_json_object_or_undefined(raw, search_page_schema)
 }
 
-// Every page of one search. joshuafolkken/kit#3103: `--paginate` follows each page's `next` link, so
-// a two-week window of ~5 pages cost ~1.5 s a page, one after another, on every `backlog:plan`. The
-// first page names the total, so the rest are fetched together; any page that does not read fails
-// the whole search, as a failed `--paginate` did.
+// Every page of one search. Not `gh api --paginate`: it follows each page's `next` link one page
+// after another, at about 1.5 s a page, on every `backlog:plan`. The first page names the total, so
+// the rest are fetched together; any page that does not read fails the whole search.
 async function read_pages(query: string): Promise<ReadonlyArray<SearchPage> | undefined> {
 	const first = await read_page(query, FIRST_PAGE)
 
@@ -138,7 +137,7 @@ async function search(query: string): Promise<SearchResult | undefined> {
 }
 
 // The rate over a window, or `undefined` when either search could not be read. `backlog:next` asks
-// this same measurement (joshuafolkken/kit#2455), so the two cannot disagree about the rate.
+// this same measurement, so the two cannot disagree about the rate.
 async function measure_window(
 	repo: string,
 	days: number,

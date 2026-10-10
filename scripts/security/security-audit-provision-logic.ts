@@ -6,7 +6,7 @@ import { security_audit_logic } from './security-audit-logic'
 //
 // v2.6.0 is the floor because every earlier build parses only a fraction of pnpm-lock.yaml — the
 // 2.5.1 and 2.3.5 scanners both read 19 of 584 packages and reported the tree clean while four High
-// advisories sat in it (joshuafolkken/kit#2200). A scanner below the floor is a false negative, so
+// advisories sat in it. A scanner below the floor is a false negative, so
 // the provisioned version and the floor move together.
 const SCANNER_VERSION = '2.6.0'
 const MINIMUM_SCANNER_VERSION = SCANNER_VERSION

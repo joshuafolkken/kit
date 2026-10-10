@@ -2,9 +2,9 @@
 
 **単一ソースはこのファイルである。**
 
-**この規則は常駐していない — 引き金つき配送に移った**（joshuafolkken/kit#1524）。`pnpm josh rule:guard` が Issue を作成する `Bash` 呼び出し（`pnpm josh issue:file`。`gh issue create` や `…/issues` への `title` 付き POST による直接起票は `direct-filing` が毎回拒否する）を拒否し、そこで数え方・拒否・2 つの免除・免除を決める 3 条件を突きつける。起票が無いターンでは何も起きず、それは上限に触れる行為が無いということである。配送は**ラン 1 回につき 1 度**なので、数えたうえで同じ呼び出しをもう一度出せばよい。機構と列挙表は `rule-delivery.md`、配送文の実体は `scripts/rules/wip-cap.ts` の `WIP_CAP_REASON` にある（固定するテストは `docs/maintainers/wip-cap-rationale.md` → "Tests that pin the wording"）。
+**この規則は常駐しておらず、配送もされない — 起票するコマンドそのものが守らせる**（joshuafolkken/kit#1524 で常駐を外し、その後 `rule:guard` の配送行も外した）。`pnpm josh issue:file` が起票の前に件数を数え、上限を超えて免除が無ければ何も送らずに保留し、そこで拒否・2 つの免除・免除を決める 3 条件を印字する（`gh issue create` や `…/issues` への `title` 付き POST による直接起票は `direct-filing` が毎回拒否するので、起票は必ずこのコマンドを通る）。事前の拒否と出し直しの往復は無い。保留文の実体は `scripts/issue/issue-wip.ts` の `HELD_MESSAGE` にある（固定するテストは `docs/maintainers/wip-cap-rationale.md` → "Tests that pin the wording"）。
 
-背景・測定・経緯は保守者向けの `docs/maintainers/wip-cap-rationale.md` にあり、ラン中に読む必要はない。
+背景・測定・経緯は保守者向けの文書にあり（上限が要る理由は `docs/maintainers/wip-cap-rationale.md` → "Why a cap is needed — the measurement"）、ラン中に読む必要はない。
 
 ## 規則
 
@@ -12,15 +12,9 @@
 
 **件数は `pnpm josh issue:file` が起票の前に数える**（joshuafolkken/kit#3181）。手で数えることも、見積もりや記憶で済ませることもない。数え方・印字・保留の詳細は `docs/josh-commands-backlog.md` → "`josh issue:file`" にある。
 
-- **上限は 30。** これを超える 1 件を作る前に 1 件閉じる。エージェントが読む文書（`CLAUDE.md`・`prompts/`・配布 skill）がこの数字を書くのはこの行だけで、一次情報は `scripts/rules/wip-cap.ts` の `WIP_CAP` である（一致はテストが固定する）。
+- **上限は 30。** これを超える 1 件を作る前に 1 件閉じる。エージェントが読む文書（`CLAUDE.md`・`prompts/`・配布 skill）がこの数字を書くのはこの行だけで、一次情報は `scripts/issue/issue-wip.ts` の `WIP_CAP` である（一致はテストが固定する）。
 - コマンドは起票先（`--repo` を付ければそのリポジトリ）のオープン Issue を epic も含めて数え、`wip:` 行に件数・上限・判定を印字する。上限を超えて免除が宣言されていなければ**何も送らずに保留し、免除の問いを印字する**。
 - **免除を宣言するのはこのファイルの判断である** — `--route interrupt`（下の 3 条件）、`--route split` / `--route tier-a`（実行が詰まる起票）はルートそのものが宣言になる。ルートの無い実行が詰まる起票（利用者が `new` と打った入口など）は `--over-cap` を付けて出し直す。裁量起票（`--route review-cap` を含む）に `--over-cap` を付けてはならない。
-
-## なぜ上限が要るのか
-
-測定は `docs/maintainers/wip-cap-rationale.md` → "Why a cap is needed — the measurement"。
-
-**上限は、増加を見えるようにするための強制装置である。** 数を減らすこと自体が目的ではない。上限を超えた状態で起票しようとしたときに「本当にこれは 1 件増やす価値があるか」を必ず 1 回考えさせる、そこだけが役割である。
 
 ## 超過時の手順
 
@@ -46,7 +40,7 @@
 
 ### 割り込み起票 — 上限が効かない側（3 条件で機械的に決める）
 
-**重大な欠陥の発見は、それが現在のランを止めていなくても捨ててはならない。** 上限の目的は増加を見えるようにすることであって、**発見を捨てることではない**（上の「なぜ上限が要るのか」）。由来は `docs/maintainers/wip-cap-rationale.md` → "Where the interrupt category comes from"。
+**重大な欠陥の発見は、それが現在のランを止めていなくても捨ててはならない。** 上限の目的は増加を見えるようにすることであって、**発見を捨てることではない**（`docs/maintainers/wip-cap-rationale.md` → "Why a cap is needed — the measurement"）。由来は `docs/maintainers/wip-cap-rationale.md` → "Where the interrupt category comes from"。
 
 **別パッケージ起因の割り込みとは別の区分である。** あちらは上流リポジトリへ起票して停止する手順（`upstream-interrupt.md`、`route:tier-a`）で、実行が詰まる側に属する。ここで言う割り込みは、**このリポジトリの欠陥で、発見したランをブロックしていないもの**を指す。
 
@@ -76,4 +70,4 @@
 
 **起票と、実行されるようにするところまでが 1 つのまとまりである。** epic の下にある割り込みを起票だけして追加しなければ、`epic:next` はそれを候補にすら出さない — Issue は残るが実行されないという、コメントに埋もれるのと大差ない状態になる。**epic の外にある割り込みでは、まとまりの後半は 4 の報告そのもの**であり、打つべきコマンドを利用者に渡すまでが 1 回の行為である。上の「ひとまとまりで判定する」がここにも効く。
 
-**割り込みをバッチの中で単独で走らせるか、並列のレーンで走らせるか**は `.claude/skills/workflow-commands/backlogrun-lanes.md` → "Lanes — running more than one child at a time" が単一ソースである（理由は `docs/maintainers/wip-cap-rationale.md` → "Why a solo run"）。上限の数字の変え方は `docs/maintainers/wip-cap-rationale.md` → "Changing the cap itself"、上限が分割判定・レビュー上限と一緒に動く理由は `docs/maintainers/wip-cap-rationale.md` → "The three move together"と `docs/maintainers/wip-cap-rationale.md` → "Why the three landed in one commit"にある。
+**割り込みをバッチの中で単独で走らせるか、並列のレーンで走らせるか**は `.claude/skills/workflow-commands/backlogrun-lanes.md` → "A solo run" が単一ソースである（理由は `docs/maintainers/wip-cap-rationale.md` → "Why a solo run"）。上限の数字の変え方は `docs/maintainers/wip-cap-rationale.md` → "Changing the cap itself"、上限が分割判定・レビュー上限と一緒に動く理由は `docs/maintainers/wip-cap-rationale.md` → "The three move together"と `docs/maintainers/wip-cap-rationale.md` → "Why the three landed in one commit"にある。

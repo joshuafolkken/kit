@@ -1,7 +1,6 @@
 import type { IssueListOutcome } from './git-gh-issue-list'
 
-// A listing as the six wrappers in `git-gh-issue.ts` answer it, for the suites that mock one of them
-// (joshuafolkken/kit#1067).
+// A listing as the six wrappers in `git-gh-issue.ts` answer it, for the suites that mock one of them.
 //
 // Every caller receives `{ json, is_capped }` now, so a suite resolving a bare JSON string would be
 // pinning a shape no caller ever sees. Built here rather than spelled out in each file: six suites

@@ -1,5 +1,6 @@
 import { git_spawn } from '#scripts/git/git-spawn'
 import { git_stash } from '#scripts/git/stash/git-stash'
+import { session_cite } from '#scripts/issue/session-cite'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { run_hold } from '#scripts/run/hold/run-hold'
@@ -64,10 +65,20 @@ describe('run_tidy_lanes.tidy_lanes', () => {
 	it('closes the merged lane, releases its run record, and leaves the open one alone', async () => {
 		const outcomes = await run_tidy_lanes.tidy_lanes(is_merged)
 
-		expect(outcomes).toStrictEqual([{ target: 'lane #2583', verdict: { kind: 'clean' } }])
+		expect(outcomes).toStrictEqual([
+			{ target: `lane ${session_cite.issue(2583)}`, verdict: { kind: 'clean' } },
+		])
 		expect(lane_close.close_lane).toHaveBeenCalledExactlyOnceWith(MERGED_ISSUE)
 		expect(run_hold.hold_path).toHaveBeenCalledWith(GIT_DIRECTORY)
 		expect(run_hold.release_hold).toHaveBeenCalledWith(HOLD_PATH)
+	})
+
+	// joshuafolkken/kit#3451: closed here, an in-flight lane left the run with no `merge` event.
+	it('leaves a merged lane the running backlogrun still has in flight to its run:merge', async () => {
+		const outcomes = await run_tidy_lanes.tidy_lanes(is_merged, new Set([MERGED_ISSUE]))
+
+		expect(outcomes).toStrictEqual([])
+		expect(lane_close.close_lane).not.toHaveBeenCalled()
 	})
 
 	it('keeps a merged lane with uncommitted changes', async () => {

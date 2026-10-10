@@ -1,10 +1,7 @@
-import {
-	read_unwrapped,
-	RULE_DELIVERY_RATIONALE,
-	WORKFLOW_PROMPT_DIRECTORY,
-} from '#scripts/document/ai-document-fixture'
+import { read_unwrapped, RULE_DELIVERY_RATIONALE } from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
+import { rule_list } from './rule-list'
 
 // joshuafolkken/kit#1864: the pre-gate cut existed, was documented, was read three to five times per
 // run — and was taken **0 times in 6 lane children**. What this suite pins is the correction: that the
@@ -15,7 +12,6 @@ import { delivered_rules } from './delivered-rules'
 // precaution, and a precaution is the first thing dropped when the enumeration is next trimmed.
 const TOPIC_FILE = '.claude/skills/workflow-commands/pre-gate-cut.md'
 const RATIONALE_FILE = 'docs/maintainers/pre-gate-cut-rationale.md'
-const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
 const COMMANDS_DOCUMENT = 'docs/josh-commands-automation.md'
 const FIRING_SUITE = 'scripts/rules/pre-gate-cut.test.ts'
 // Named once: the enumeration, the topic file and the command reference have to agree on both
@@ -104,8 +100,8 @@ describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 	})
 })
 
-describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, () => {
-	const content = read_unwrapped(DELIVERY)
+describe(`pnpm josh rule:list — the enumeration names this rule and its silent turn`, () => {
+	const content = rule_list.render()
 
 	it.each([TOPIC_FILE, GUARD_COMMAND])('states %j', (marker) => {
 		expect(content).toContain(marker)
@@ -119,9 +115,7 @@ describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, 
 	// trigger has not been identified. This one's is a checkout that is not a lane, or a cut already
 	// taken.
 	it('says what a turn with no trigger means', () => {
-		expect(content).toContain(
-			'レーン以外の checkout に居る、目印が無い（レーン内の人）、または既に cut 済み',
-		)
+		expect(content).toContain('outside a lane, no marker (a person in the lane), or already cut')
 	})
 })
 

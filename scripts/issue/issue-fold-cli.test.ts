@@ -23,6 +23,9 @@ const OVERSIZE_DIFF = Array.from(
 	(_row, index) => `300\t300\tsrc/f${String(index)}.ts`,
 ).join('\n')
 
+// A measured diff well under the guide.
+const SMALL_DIFF = '3\t1\tsrc/one.ts'
+
 // Two candidate titles — the smallest input the fold question is asked of.
 const TITLES = ['a', 'b']
 const NOT_SEPARABLE = '--not-separable'
@@ -57,18 +60,11 @@ describe('issue:fold — the size half is single-sourced from split:assess', () 
 	})
 
 	it('folds two findings when the size is under the guide', async () => {
-		diff_main_numstat.mockResolvedValue('3\t1\tsrc/one.ts')
+		diff_main_numstat.mockResolvedValue(SMALL_DIFF)
 
 		expect(await issue_fold_cli.run(TITLES)).toBe(0)
 		expect(output()).toContain(issue_fold.FOLD)
 		expect(output()).not.toContain(issue_fold.SEPARATE)
-	})
-
-	it('folds rather than separates when the diff cannot be read', async () => {
-		diff_main_numstat.mockRejectedValue(new Error('no base'))
-
-		expect(await issue_fold_cli.run(TITLES)).toBe(0)
-		expect(output()).toContain(issue_fold.FOLD)
 	})
 
 	it('answers no-fold-needed for a single candidate without measuring', async () => {
@@ -86,9 +82,47 @@ describe('issue:fold — the size half is single-sourced from split:assess', () 
 	})
 })
 
-describe('size_verdict defaults to single on an unreadable diff', () => {
-	it('returns single when the git read throws', async () => {
+// joshuafolkken/kit#3423: neither an unreadable diff nor one with no changed non-test file is evidence
+// of the findings' size, so neither folds.
+describe('issue:fold — undetermined where the diff measures nothing', () => {
+	it('answers undetermined rather than separate when the diff cannot be read', async () => {
+		diff_main_numstat.mockRejectedValue(new Error('no base'))
+
+		expect(await issue_fold_cli.run(TITLES)).toBe(0)
+		expect(output()).toContain(issue_fold.UNDETERMINED)
+		expect(output()).not.toContain(issue_fold.SEPARATE)
+	})
+
+	it('answers undetermined rather than fold when the diff is empty', async () => {
+		diff_main_numstat.mockResolvedValue('')
+
+		expect(await issue_fold_cli.run(TITLES)).toBe(0)
+		expect(output()).toContain(issue_fold.UNDETERMINED)
+	})
+
+	it('answers undetermined when only test files changed', async () => {
+		diff_main_numstat.mockResolvedValue('30\t2\tsrc/one.test.ts')
+
+		expect(await issue_fold_cli.run(TITLES)).toBe(0)
+		expect(output()).toContain(issue_fold.UNDETERMINED)
+	})
+})
+
+describe('size_verdict — no size where the diff measures nothing', () => {
+	it('returns undefined when the git read throws', async () => {
 		diff_main_numstat.mockRejectedValue(new Error('not a checkout'))
+
+		expect(await issue_fold_cli.size_verdict()).toBeUndefined()
+	})
+
+	it('returns undefined for an empty diff', async () => {
+		diff_main_numstat.mockResolvedValue('')
+
+		expect(await issue_fold_cli.size_verdict()).toBeUndefined()
+	})
+
+	it('returns single for a measured diff under the guide', async () => {
+		diff_main_numstat.mockResolvedValue(SMALL_DIFF)
 
 		expect(await issue_fold_cli.size_verdict()).toBe(split_assess.SINGLE_VERDICT)
 	})

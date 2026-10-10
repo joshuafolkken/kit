@@ -1,11 +1,11 @@
 ---
 name: dependency-update
-description: The verification procedure that runs after `pnpm update`, `josh latest`, `pnpm josh overrides` or any other dependency-update command — how to confirm the `overrides` entries in both `pnpm-workspace.yaml` and `package.json` survived, and which single `devEngines` change is the expected one rather than a violation. Read it before reporting that a dependency update left the pins intact, and whenever a bump has to be resolved forward or pinned back.
+description: Checks after `pnpm update`, `josh latest`, `pnpm josh overrides` or any dependency update — the `overrides` survived, the one expected `devEngines` change. Read it before reporting the pins intact or pinning a bump back.
 ---
 
 # After a dependency-update command
 
-`CLAUDE.md` keeps the two prohibitions resident — never touch `overrides`
+`CLAUDE.md` → "Decision autonomy" keeps both prohibitions resident as Tier C — never touch `overrides`
 in either file, never touch `devEngines`, without explicit user approval. This skill is the other
 half: what you actually run to find out whether a command already touched them, and how to read the
 one change that is expected. It applies after `pnpm update`, `josh latest`, `pnpm josh overrides`,
@@ -65,7 +65,9 @@ intent.
 **Restore + ask only** when `devEngines` changed in some OTHER way: its version no longer matches
 `packageManager` (a dropped, stale, or truncated integrity suffix counts as a mismatch), its
 structure changed (`name` / `onFail` / fields added or removed), or it was touched by something other
-than `josh latest`.
+than `josh latest`. The one structural change that is expected is `josh sync` moving
+`devEngines.packageManager.onFail` from `"error"` to `"download"` — a user-approved migration that
+leaves `name` and `version` untouched; keep it.
 
 ## 4. When the bump breaks something — fix forward
 

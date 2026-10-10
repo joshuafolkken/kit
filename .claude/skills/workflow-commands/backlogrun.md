@@ -1,11 +1,9 @@
 # `backlogrun` — the manifest (named issues, epics and the opted-in backlog)
 
-**This file is the manifest, not the procedure** (joshuafolkken/kit#2190). It carries the ordered flow
-as terse triggers and pointers; the fine print of each step is read on demand from
-`backlogrun-steps.md`, its reference-only companion. `backlogrun-steps.md` is **not an entry read** —
-it is classified point-of-use in `entry-read-set.ts`, exactly as the four `backlogrun-*.md` phase
-documents are, so a `backlogrun` entry carries this manifest and nothing else up front
-(joshuafolkken/kit#2010, joshuafolkken/kit#2190).
+**This file is the manifest, not the procedure**: the ordered flow as terse triggers, and the route
+table naming the one section each moment reads. Rationale and provenance:
+`docs/maintainers/backlogrun-rationale.md` → "Why the loop's position is computed";
+`docs/maintainers/backlogrun-rationale.md` → "Where each rule came from".
 
 **`backlogrun` names either nothing, or the issues and epics to run first.** With no argument it runs
 whatever `pnpm josh backlog:next` offers — the whole opted-in backlog, every issue carrying `auto-ok`
@@ -15,12 +13,9 @@ that same backlog. **`--only` stops it after the named list**, draining nothing.
 
 **The loop's current position is computed, not carried in the conversation.** `pnpm josh run:step <N>`
 reads where the run is from the event stream, the carry record and the issue state, and prints the next
-single action — a runnable command, or the one point a person has to judge — so a session cut, a
-compaction or a fresh resume reaches the same next step from the same three inputs
-(joshuafolkken/kit#2248).
+single action — a runnable command, or the one point a person has to judge.
 
-**A named item may be a single issue or an epic** (joshuafolkken/kit#1985, folding in the old
-`epicrun` keyword). A single-issue item is one `fullrun`; **a named epic runs its children in
+**A named item may be a single issue or an epic.** A single-issue item is one `fullrun`; **a named epic runs its children in
 dependency order across the free lanes, and the run does not advance to the next named item until
 every one of that epic's children has been processed — merged or parked.** `backlogrun #E --only`
 therefore runs exactly one epic's children and stops.
@@ -33,56 +28,50 @@ is still that one invocation (`backlogrun-steps.md` → "The session cut is insi
 
 ## The manifest — the ordered flow
 
-Each step is a terse trigger and a pointer; the procedure is read on demand from the section named.
-
 1. **Claim nothing at the entry — this parent orchestrates and never implements.** The working-tree
    hold, the split assessment and `fullrun.md` are read by a dispatched child inside its own delegated
-   `fullrun` unit (`backlogrun-child.md`), never at the parent's entry.
+   `fullrun` unit, never at the parent's entry.
 2. **Begin the carry record before the plan** — `pnpm josh run:carry --begin "<invocation>" --owner
-   "$PPID"` and `pnpm josh run:wake --start`, in the same turn as the first `git switch main && git
-   pull`. The answer table (`began` / `resumed` / `busy` / `standing` / `mismatch` / `expired` /
-   `unreadable` / `unknown`) and the counting/hand-off/resume mechanism are
-   `backlogrun-steps.md` → "The session cut is inside the invocation".
-3. **What this invocation approves** — `backlogrun-steps.md` → "What one invocation approves": the
-   opted-in pool, a run's own filings once bundled, and the brake (`--max`, ten filings, the WIP cap)
-   that bounds the amount. `auto-ok` reaches a run's own filings only through `issue:file`'s default.
+   "$PPID"` and `pnpm josh run:wake --start`, in the same turn as the first `pnpm josh ms`.
+3. **What this invocation approves** — the opted-in pool, a run's own filings once bundled, and the
+   brake that bounds the amount; the route table's row points at the single source of the `auto-ok` default.
 4. **Report the plan before the first child** — `pnpm josh backlog:plan`, then resolve every
-   `needs-decision` issue decidable from its body in one pass. In the same pass, record `blocked-by`
-   between issues that must land in order, and apply `run:solo` where all three of the
-   `backlogrun-lanes.md` → "Lanes — running more than one child at a time" conditions hold, `run:lane` elsewhere. `backlogrun-steps.md` → "The plan,
-   before the first child starts" and its "Resolve what the plan can resolve, before starting".
-5. **Named issues run first, in order** — `backlogrun-steps.md` → "Named issues run first, in order":
-   the supervisor's driver dispatches each as a delegated `fullrun`, one at a time, then drains the
-   pool; `--only` stops after the list.
-6. **The loop belongs to the supervisor** — `run:wake` runs `backlog:drive`; the driver uses
-   `pnpm josh backlog:offer` as its loop head and returns a branch to an AI session only when it needs
-   judgment. `backlogrun-steps.md` → "The loop"
-   fixes what a handed-back branch asks, "The two budgets" the `run` / `watch` / `stop` verdict, "The cost
-   check is not asked during a watch", and "Where the run stops" every termination.
-7. **What runs once per session, not once per issue** — `backlogrun-steps.md` → "What runs once per
-   session, not once per issue": the per-repository preflight, `josh latest` on `required`, the
-   progress watcher, the carry/wake pair, and the release ask.
-8. **End the record when the run ends** — the driver's finish path runs `run:report` before
-   `run:carry --end` (or `--end --stopped "<reason>"`). The supervisor then observes that the record
-   ended and exits; a judgment branch hands its reason and resume flags to the AI session.
-   `backlogrun-steps.md` → "End the record when the run ends" is the single source.
+   `needs-decision` issue decidable from its body in one pass, recording `blocked-by`, `run:solo` and
+   `run:lane` in the same pass.
+5. **Named issues run first, in order** — each as a delegated `fullrun`, one at a time, then the pool;
+   `--only` stops after the list.
+6. **The loop belongs to the supervisor** — `run:wake` runs `backlog:drive`, which returns a branch to
+   an AI session only when it needs judgment.
+7. **End the record when the run ends** — `run:report`, then `run:carry --end` (or `--end --stopped
+   "<reason>"`) and `run:wake --stop`.
 
-## Running a child — read the phase document at its point of use
+## The route table
 
-Everything about *running one child* — of a named epic or of the opted-in pool — lives in four phase
-documents, split out so the entry read carries only what binds before the first child
-(joshuafolkken/kit#2010). **None of the four is an entry read.** Each is read in full, in the turn the
-named step reaches it, exactly as `backlogrun-steps.md` and the shared gate documents
-(`chain-rule.md` / `latest-gate.md` / `followup.md` / `background-commands.md`) are
-(`SKILL.md` → §1, "Four documents are read at the point of use"):
+**Read one section, at the moment its row names, with `pnpm josh doc:section <file> "<heading>"`** —
+never a whole document (`SKILL.md` → "A section reference is read as a section"):
 
-| Read | In full, before | What it carries |
-| --- | --- | --- |
-| `backlogrun-child.md` | dispatching the first child (`pnpm josh delegate epic-child`, `pnpm josh lane:dispatch`) | the shared per-child `fullrun`, a bare non-epic `#N`, the delegated unit and its summary bound, liveness recovery, and the once-per-session setup (audit, `josh latest`, preflight) |
-| `backlogrun-lanes.md` | opening the first lane (`pnpm josh lane:open`) | the per-repository lane ceiling and the lane lifecycle, and how a merge conflict is resolved |
-| `progress-watcher.md` | starting the progress watcher (`pnpm josh run:progress --wait`) | the heartbeat, shared with every implementing run |
-| `backlogrun-progress.md` | dispatching the first child and the hand-off check at a merge (`pnpm josh cost --cut`) | the hand-off and the cut/resume, waiting without waiting forever, and the end-of-run summary and propagate |
-| `backlogrun-park.md` | a child cannot finish | park-and-continue, the `needs-human-review` stop, a stale `in-progress`, a prerequisite discovered mid-run, and a mid-run split |
+| The moment | Read |
+| --- | --- |
+| The entry: the carry record and its answers | `backlogrun-steps.md` → "The session cut is inside the invocation" |
+| What the invocation may merge, and the `auto-ok` default | `backlogrun-steps.md` → "What one invocation approves" |
+| Before the first child: the plan and the decision pass | `backlogrun-steps.md` → "The plan, before the first child starts" |
+| The driver hands a branch back | `backlogrun-steps.md` → "The loop" |
+| Once per session | `backlogrun-steps.md` → "What runs once per session, not once per issue" |
+| `josh latest:scope` answers `required` | `latest-gate.md` (whole) |
+| Starting the progress watcher | `progress-watcher.md` → "Progress while the run is quiet" |
+| The run ends | `backlogrun-steps.md` → "End the record when the run ends" |
+| Labelling an issue `run:solo` | `backlogrun-lanes.md` → "A solo run" |
+| Before the first lane opens | `backlogrun-lanes.md` → "Once per repository, before the first lane opens" |
+| Opening a lane by hand | `backlogrun-lanes.md` → "Opening one lane and dispatching its child" |
+| The first child is in hand | `backlogrun-child.md` → "`josh latest` runs once per session, not once per child" |
+| Dispatching a child | `backlogrun-child.md` → "Each child runs in a delegated unit" |
+| An `epic #N` hand-back, a `merge` branch, or a `run:merge` token | `backlogrun-progress.md` → "Running a named epic's children" |
+| A merge answered `over` | `backlogrun-progress.md` → "The hand-off" |
+| A resumed session | `backlogrun-progress.md` → "Resuming after a cut" |
+| The run's last merge | `backlogrun-progress.md` → "Who sends the summary, and who propagates" |
+| `josh release:scope`, after the last merge | `followup.md` → "When `pnpm josh release` runs" |
+| A unit went silent | `backlogrun-recovery.md` → "A delegated unit that stopped without reporting" |
+| A child cannot finish | `backlogrun-park.md` → "park and continue" |
 
 ## Guards
 
@@ -97,7 +86,7 @@ A failure that is not consecutive parks its child and the run continues.
 ## This file is the single source of the `backlogrun` procedure
 
 `CLAUDE.md` carries the keyword's row in the shorthand table and the explicit-invocation rule;
-`SKILL.md` → §1 routes here. This manifest names which children there are and in what order; the
-procedure for each step is `backlogrun-steps.md`, and *running one child* is the four phase documents
-above. Where any of them could disagree, the rule is that this manifest and `backlogrun-steps.md` add
-nothing to a child's procedure — they only say which children there are.
+`SKILL.md` → §1 routes here. This manifest names which children there are and in what order; each
+step's procedure is the section its route-table row names. Where any of them could disagree, the rule
+is that this manifest and `backlogrun-steps.md` add nothing to a child's procedure — they only say
+which children there are.

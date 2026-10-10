@@ -131,6 +131,14 @@ describe('latest_corepack.fail_self_update', () => {
 		expect(printed_errors()).toContain('corepack disable pnpm')
 	})
 
+	it('tells the Corepack user how a standalone pnpm of another version keeps working', () => {
+		latest_corepack.fail_self_update(FAILURE, { COREPACK_ROOT: '/corepack' })
+
+		expect(printed_errors()).toContain(
+			'run josh sync so a devEngines.packageManager.onFail of "error" becomes "download"',
+		)
+	})
+
 	it('reports only the exit status outside Corepack', () => {
 		expect(latest_corepack.fail_self_update(FAILURE, {})).toBe(FAILURE)
 		expect(printed_errors()).not.toContain(COREPACK_CODE)

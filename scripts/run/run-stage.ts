@@ -1,4 +1,6 @@
-// joshuafolkken/kit#3042: the workflow commands form a ladder — `kickoff` → `halfrun` → `prrun` →
+import { issue_cite } from '#scripts/issue/issue-cite'
+
+// The workflow commands form a ladder — `kickoff` → `halfrun` → `prrun` →
 // `fullrun` — and **the command typed decides only how far a run goes; where it starts is read off the
 // issue**. A run that finds work already done resumes after it rather than redoing it, and a command
 // whose stopping point the issue has already reached reports that and stops.
@@ -19,7 +21,7 @@ const COMMANDS = [KICKOFF, HALFRUN, PRRUN, FULLRUN] as const
 
 type StageCommand = (typeof COMMANDS)[number]
 
-// What `run:entry` serves when no command is named — the one it served alone before the ladder existed.
+// What `run:entry` serves when no command is named.
 const DEFAULT_COMMAND: StageCommand = FULLRUN
 
 const FRESH = 'fresh'
@@ -105,7 +107,7 @@ function next_commands(command: StageCommand): ReadonlyArray<StageCommand> {
 
 // The `Next:` line a stop's Telegram and report carry, e.g. `Next: prrun #<N> | fullrun #<N>`.
 function next_line(command: StageCommand, issue: string): string {
-	const commands = next_commands(command).map((next) => `${next} #${issue}`)
+	const commands = next_commands(command).map((next) => `${next} ${issue_cite.plain(issue)}`)
 
 	return `${NEXT_PREFIX}${commands.join(NEXT_SEPARATOR)}`
 }
@@ -113,7 +115,7 @@ function next_line(command: StageCommand, issue: string): string {
 function format_decision(issue: string, decision: StageDecision): string {
 	const fields = [`at: ${decision.state}`, `to: ${decision.command}`, `start: ${decision.start}`]
 
-	return `stage #${issue} — ${fields.join(' · ')}`
+	return `stage ${issue_cite.plain(issue)} — ${fields.join(' · ')}`
 }
 
 function cell(state: StageState, command: StageCommand): string {

@@ -15,14 +15,14 @@ import { epic_sections, type BodyLines, type SectionRange } from './epic-section
 // declaration `epic:next` parses, and the native `blocked-by` relations — and editing the body by
 // hand is what leaves them disagreeing, which stops an unattended run outright. So the rewritten
 // body is parsed back before it is returned, and a round trip that does not reproduce the intended
-// links is reported instead of written (joshuafolkken/kit#890).
+// links is reported instead of written.
 
 interface RewriteInput {
 	body: string
 	// The children being placed, in the order the caller named them: the additions and the children
 	// the epic already tracks, together in one list. **A position places both kinds the same way** —
 	// the task-list row and the declaration are one statement, so an addition whose row was appended
-	// while the chain named a position left the two disagreeing (joshuafolkken/kit#1704). Which of
+	// while the chain named a position left the two disagreeing. Which of
 	// them already has a row is read off the body rather than passed in, since the two are placed
 	// identically and only the removal of an existing row differs.
 	placed: ReadonlyArray<number>
@@ -33,11 +33,10 @@ interface RewriteInput {
 	// The decision record to append to the epic's `## Decisions` section, or `undefined` for an
 	// insertion that records none. It is folded in **before** the declaration work below, so the stray
 	// declaration and round-trip guards see the record too: a record carrying a bare `#A -> #B` line
-	// would otherwise be written and then read back by `epic:next` as part of the order
-	// (joshuafolkken/kit#1350).
+	// would otherwise be written and then read back by `epic:next` as part of the order.
 	decision?: string | undefined
 	// Whether an empty `chains_after` means "write that there is no order" rather than "leave the
-	// declaration alone" (joshuafolkken/kit#1712).
+	// declaration alone".
 	//
 	// The two callers mean opposite things by it. An insertion given no position computes no chains
 	// because none were ever declared, so the body is left exactly as it stood. A removal that took out
@@ -92,13 +91,12 @@ function is_placed_row(line: string, placed: ReadonlySet<number>): boolean {
 }
 
 // The rows of the placed children, put beside the row the position names. **The list order is part
-// of what a position declares**: `epic:next` presents an epic's children in task-list order
-// (joshuafolkken/kit#1583), so rewriting only the declaration would leave the two disagreeing
-// (joshuafolkken/kit#1701).
+// of what a position declares**: `epic:next` presents an epic's children in task-list order,
+// so rewriting only the declaration would leave the two disagreeing.
 //
 // **Both kinds of placement go through here.** A child the epic already tracks has its row lifted
 // out first; an addition has none to lift, so the same insertion serves both and they land in the
-// order the caller named rather than in the order they were classified (joshuafolkken/kit#1704).
+// order the caller named rather than in the order they were classified.
 //
 // The target's row is located after the removal rather than before it, so the index needs no
 // adjusting for the rows that came out above it. Both lookups go through `find_indices`, which skips
@@ -119,8 +117,7 @@ function insert_task_rows(
 }
 
 // The task list with the placed children in it: at the position where one was named, appended where
-// none was. An insertion that named no position appends, which is every insertion made before
-// joshuafolkken/kit#1701 and every unordered one since.
+// none was. An insertion that named no position appends.
 function to_placed_lines(input: RewriteInput): Array<string> {
 	const lines = to_body_lines(input.body)
 	const { position } = input
@@ -174,8 +171,8 @@ function replace_declaration(
 
 // The declaration a line names, **re-rendered from the issue numbers it parsed to rather than echoed
 // back**. The message has to name what it found, or the answer "move this line" is unactionable — and
-// the body it comes from is not this process's: it is fetched from GitHub, and since
-// joshuafolkken/kit#1350 it also carries a record file the caller supplied. Echoing a line of either
+// the body it comes from is not this process's: it is fetched from GitHub, and it also carries a
+// record file the caller supplied. Echoing a line of either
 // into stderr puts content this code never read in the console, which is what SonarCloud's
 // `tssecurity:S8689` reports for this path. Rendering from the parsed numbers keeps the useful half —
 // the chain, exactly as the parser read it — while what reaches the console is built from integers.
@@ -207,7 +204,7 @@ type BodyOutcome = { body: string } | { error: string }
 // The task rows and the decision record, in that order. **The record goes in before the declaration
 // work**: it is the one part of the new body that a caller wrote by hand, so the stray-declaration and
 // round-trip guards below have to see it — a record appended afterwards would be written unchecked and
-// read back by `epic:next` as part of the order (joshuafolkken/kit#1350).
+// read back by `epic:next` as part of the order.
 function to_written_lines(input: RewriteInput): Array<string> {
 	const with_rows = to_placed_lines(input)
 	const { decision } = input
@@ -230,7 +227,7 @@ function is_declaration_unchanged(
 
 // The declaration work, once the task rows and any record are in.
 //
-// **An unchanged declaration is left as text rather than re-rendered** (joshuafolkken/kit#1253). The
+// **An unchanged declaration is left as text rather than re-rendered**. The
 // rewrite moves every chain line to the first one's index, so re-rendering a declaration nothing
 // changed detaches the rationale lines a chain is documented by and files them under whichever chain
 // ends up above them — a rewrite of somebody else's prose in exchange for a body that would have been
@@ -260,7 +257,7 @@ function to_declared_body(
 // The declaration to write. An empty computed order means "nothing was ever declared" to an
 // insertion and "the last link was just deleted" to a removal, and only the second has anything to
 // say — the unordered sentence, since an emptied section carries no machine-readable declaration at
-// all (joshuafolkken/kit#1712).
+// all.
 function to_rendered_declaration(input: RewriteInput): Array<string> {
 	const rendered = epic_chains.render_chains(input.chains_after)
 	if (rendered.length > 0) return rendered
@@ -312,11 +309,11 @@ function to_placement_start(position: InsertPosition, target: number, count: num
 // Whether the rewritten task list puts the placed rows where the position asked. The link round trip
 // above says nothing about it — a body whose rows never moved declares exactly the same order and
 // passes every other check here, while `epic:next` goes on presenting the order it was told to
-// replace (joshuafolkken/kit#1701).
+// replace.
 //
 // **It covers an addition's row as well as a moved one**, since a position now places both: the row
 // an addition gains is the half of the statement the declaration cannot verify for itself, and it
-// was the half left unchecked (joshuafolkken/kit#1704).
+// was the half left unchecked.
 function has_intended_rows(body: string, input: RewriteInput): boolean {
 	const { position, placed } = input
 	if (position === undefined || placed.length === 0) return true

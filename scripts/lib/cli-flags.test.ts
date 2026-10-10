@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cli_flags } from './cli-flags'
 
 const OPTIONS = { json: { type: 'boolean' }, repo: { type: 'string' } } as const
@@ -8,6 +8,11 @@ const REPO = 'owner/name'
 const UNKNOWN_FLAG = 'an unknown flag'
 const MISSING_VALUE = 'a string option with no value'
 const UNDEFINED_ON = 'answers undefined on %s'
+const ALL_KNOWN = 'answers undefined when every argument is known'
+
+afterEach(() => {
+	vi.restoreAllMocks()
+})
 
 describe('cli_flags.parse_or_undefined', () => {
 	it('answers what parseArgs answers on a well-formed invocation', () => {
@@ -78,7 +83,7 @@ describe('cli_flags.string_of', () => {
 })
 
 describe('cli_flags.refuse_unknown_flags', () => {
-	it('answers undefined when every argument is known', () => {
+	it(ALL_KNOWN, () => {
 		expect(cli_flags.refuse_unknown_flags(['--dry-run'], ['--dry-run'], 'adopt')).toBeUndefined()
 	})
 
@@ -86,6 +91,42 @@ describe('cli_flags.refuse_unknown_flags', () => {
 		expect(cli_flags.refuse_unknown_flags(['--dryrun'], ['--dry-run'], 'adopt')).toBe(
 			'Unknown argument(s): --dryrun\nUsage: josh adopt [--dry-run]',
 		)
+	})
+})
+
+describe('cli_flags.usage_line', () => {
+	it('lists every known flag after the command', () => {
+		expect(cli_flags.usage_line(['--dry-run', '--force'], 'adopt')).toBe(
+			'Usage: josh adopt [--dry-run] [--force]',
+		)
+	})
+
+	it('shows the bare command when it takes no flags', () => {
+		expect(cli_flags.usage_line([], 'release:github')).toBe('Usage: josh release:github')
+	})
+})
+
+describe('cli_flags.answer_help_or_unknown', () => {
+	it.each(['--help', '-h'])('prints the usage and answers 0 on %s', (flag) => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		expect(cli_flags.answer_help_or_unknown([flag], ['--dry-run'], 'release')).toBe(0)
+		expect(info).toHaveBeenCalledWith('Usage: josh release [--dry-run]')
+	})
+
+	it('refuses an unknown argument with 1', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(cli_flags.answer_help_or_unknown(['--dryrun'], ['--dry-run'], 'release')).toBe(1)
+		expect(error).toHaveBeenCalledWith(
+			'Unknown argument(s): --dryrun\nUsage: josh release [--dry-run]',
+		)
+	})
+
+	it(ALL_KNOWN, () => {
+		expect(
+			cli_flags.answer_help_or_unknown(['--dry-run'], ['--dry-run'], 'release'),
+		).toBeUndefined()
 	})
 })
 

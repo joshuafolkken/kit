@@ -1,10 +1,14 @@
+import { report_format_reference } from './report-format-reference'
+
 // The mechanical half of the two-layer work summary (`CLAUDE.md` Step 0, single-sourced in
 // `prompts/collaboration-workflow/report-format.md`) is a fixed shape, yet only an advisory echo in
 // the `UserPromptSubmit` hook ever mentions it and nothing reads the summary an agent actually
 // wrote. This checks the half a machine can: the labels are present, the overview lines stay inside
 // their length, nothing wraps the summary in a code fence, and no file path or CLI flag leaks into
 // the overview. The judgement half — whether the subject is concrete — is deliberately left out,
-// because a machine cannot answer it (joshuafolkken/kit#2123).
+// because a machine cannot answer it.
+
+const TEMPLATE_HEADING = report_format_reference.SUMMARY_TEMPLATE_HEADING
 
 // The session-facing labels are Japanese because that is the form the summary is written in
 // (`JOSH_SESSION_LANG` defaults to `ja`); `report-format.md`'s template is the single source and the
@@ -33,7 +37,7 @@ const CLI_FLAG_PATTERN = /(?:^|\s)--[a-z]/u
 const BOLD_MARKER = '**'
 const LEADING_LABEL_PUNCTUATION = /^[\s:：]+/u
 
-// The case-based test declaration (joshuafolkken/kit#2246): the changes section carries a first tier
+// The case-based test declaration: the changes section carries a first tier
 // of fixed-vocabulary cases — each non-applicable one crossed out with a reason — and a second tier
 // of at-least-three "if it breaks" conditions. This checks the mechanical half: the two tier markers
 // are present, an N/A cross-out carries a reason, and the second tier holds enough conditions (or the
@@ -235,8 +239,18 @@ function lint_report(summary: string): ReadonlyArray<string> {
 	]
 }
 
+// The violations followed by one line naming where the summary's shape is written
+// — the violations say what is wrong, the pointer where the right shape is.
+// A clean summary stays empty, so `ok` is still the only output of a pass.
+function with_reference(violations: ReadonlyArray<string>): ReadonlyArray<string> {
+	if (violations.length === 0) return violations
+
+	return [...violations, `→ the template: ${report_format_reference.pointer(TEMPLATE_HEADING)}`]
+}
+
 const report_lint = {
 	lint_report,
+	with_reference,
 	REQUIRED_LABELS,
 	MAX_OVERVIEW_CHARS,
 	CASE_LABEL,

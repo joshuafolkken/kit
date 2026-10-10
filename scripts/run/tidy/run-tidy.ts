@@ -1,7 +1,8 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { observation_ledger_line } from '#scripts/observations/observation-ledger-line'
 
-// The decisions behind `josh run:tidy` (joshuafolkken/kit#2701), kept apart from the git and GitHub
-// reads so each can be pinned without either. A run start sweeps what merged work left behind — the
+// The decisions behind `josh run:tidy`, kept apart from the git and GitHub reads so each
+// can be pinned without either. A run start sweeps what merged work left behind — the
 // lanes holding a seat after their branch merged, and the stashes of issues that are all merged — and
 // every rule here is written so that doubt keeps the thing: a lane with any uncommitted change or any
 // commit no remote has, and a stash naming any issue that is not merged or naming none at all, stay.
@@ -52,7 +53,7 @@ function lane_verdict(facts: LaneFacts): Verdict | undefined {
 }
 
 function unmerged_reason(unmerged: ReadonlyArray<string>): string {
-	const named = unmerged.map((issue) => `#${issue}`).join(', ')
+	const named = unmerged.map((issue) => session_cite.issue(issue)).join(', ')
 
 	return `${named} not merged`
 }

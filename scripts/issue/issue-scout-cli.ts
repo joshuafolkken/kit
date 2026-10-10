@@ -15,13 +15,14 @@ import {
 	type ScoutIssue,
 } from './issue-scout'
 import { issue_scout_closed, type ClosedScan } from './issue-scout-closed'
+import { session_cite } from './session-cite'
 
 const { CLOSED_CEILING_LINE, CLOSED_UNREADABLE_LINE, read_recently_closed, warn_about_closed } =
 	issue_scout_closed
 
 // `josh issue:scout "<title>" [--body "<summary>"]` — before an issue is filed, answer the two
 // questions every `new` entry point asks first: has this already been filed, and which epic does it
-// belong to (joshuafolkken/kit#1252).
+// belong to.
 //
 // Both were assembled by hand every time, differently every time: a measured `fullrun new` spent
 // 7 minutes 32 seconds — 22% of the run — listing epics, reading their children and searching for
@@ -104,13 +105,13 @@ function draft_of(args: ScoutArguments, repo: string): BacklogIssue {
 // below decides from prose references, and a title-only draft has none to give it.
 function format_duplicate(candidate: DuplicateCandidate): string {
 	const score = candidate.is_referenced === true ? 'ref' : candidate.score.toFixed(SCORE_DIGITS)
-	const epic = candidate.epic === undefined ? '' : ` (epic #${String(candidate.epic)})`
+	const epic = candidate.epic === undefined ? '' : ` (epic ${session_cite.issue(candidate.epic)})`
 	// The reader does two different things with the two states, so the row has to say which it is: an
 	// open candidate means somebody is already tracking this, a closed one means it may already be
 	// done — and the second is the exit `issue-comments.md` names, not a second filing.
 	const closed = candidate.is_closed === true ? ' (closed)' : ''
 
-	return `  #${String(candidate.number)}  ${score}  ${candidate.title}${closed}${epic}`
+	return `  ${session_cite.issue(candidate.number)}  ${score}  ${candidate.title}${closed}${epic}`
 }
 
 // Weak matches are not padding for an empty answer: a list nobody trusts is read once and skipped
@@ -147,7 +148,7 @@ const NO_EPIC_LINE = 'Epic: none — file it standalone; nothing open shares a r
 function format_epic(decision: BundleDecision): Array<string> {
 	const lines = [`Epic: ${epic_bundle_cli.ACTION_LINES[decision.action] ?? ''}`]
 
-	if (decision.epic !== undefined) lines.push(`  Target epic: #${String(decision.epic)}`)
+	if (decision.epic !== undefined) lines.push(`  Target epic: ${session_cite.issue(decision.epic)}`)
 
 	if (decision.candidates.length > 0) {
 		lines.push(`  Related: ${epic_bundle_cli.format_numbers(decision.candidates)}`)
@@ -168,9 +169,9 @@ const NO_REFERENCE_LINE =
 	'Epic: not asked — no issue number in the summary. Pass --body "…#<N>…", or take the epic printed beside a duplicate above.'
 
 // Every placing verdict above asserts that no epic already tracks the draft's relatives, and a cut
-// epic listing cannot support that: `epic:bundle` withholds them for it (joshuafolkken/kit#1697),
+// epic listing cannot support that: `epic:bundle` withholds them for it,
 // while this command drew the same lines out of `ACTION_LINES` and never passed through the gate that
-// does (joshuafolkken/kit#1703). The verdict is `epic:bundle`'s own, reused rather than restated, with
+// does. The verdict is `epic:bundle`'s own, reused rather than restated, with
 // only the `Epic:` label the rest of this report is read by put in front of it.
 function format_unconfirmed_epic(decision: BundleDecision): string {
 	const related = epic_bundle_cli.format_numbers(decision.candidates)
@@ -245,7 +246,7 @@ function format_epic_answer(
 // The closed rows reach the duplicate half only. `decide_bundle` places a draft among issues that
 // are still being worked on, and a closed one can neither gain a sibling nor be recommended as an
 // epic — so widening the placement pool with them would answer a different question from the one it
-// was asked (joshuafolkken/kit#1679).
+// was asked.
 function duplicates_of(
 	draft: BacklogIssue,
 	issues: ReadonlyArray<BacklogIssue>,
@@ -292,8 +293,7 @@ function qualify_duplicate_report(report_text: string, is_incomplete: boolean): 
 }
 
 // The report a run copies into its reply, with every `#N` in the `Related:` / `Target epic:` /
-// duplicate listings linkified so the references it carries are clickable rather than bare
-// (joshuafolkken/kit#2329).
+// duplicate listings linkified so the references it carries are clickable rather than bare.
 function linkified_report(
 	draft: BacklogIssue,
 	widened: Widened,
@@ -315,7 +315,7 @@ function linkified_report(
 }
 
 // The scan's answer in both shapes it is read in: the report a person reads, and the candidate numbers
-// `issue:file` holds a filing to (joshuafolkken/kit#2808).
+// `issue:file` holds a filing to.
 interface ScoutOutcome {
 	report: string
 	candidates: ReadonlyArray<number>
@@ -335,7 +335,7 @@ async function scout(args: ScoutArguments, repo: string): Promise<ScoutOutcome |
 
 	const draft = draft_of(args, repo)
 	// A reference the open listing cannot show — the parent that merged minutes ago — is read directly,
-	// the same widening `epic:bundle` does and for the same reason (joshuafolkken/kit#947). The closed
+	// the same widening `epic:bundle` does and for the same reason. The closed
 	// listing needs nothing from it, so the two requests go out together.
 	const [widened, closed] = await Promise.all([
 		epic_bundle_cli.widen_with_referenced(draft, backlog),

@@ -16,8 +16,7 @@ const AUTO_MERGE_WORKFLOW_PATH = '.github/workflows/dependabot-auto-merge.yml'
 // The command that needs the repository's "Allow auto-merge" setting, and the only thing in the
 // workflow that does. Matching it rather than the filename is what keeps the report tied to the
 // prerequisite: a file of that name which never calls `--auto` creates no prerequisite, and a
-// consumer's own auto-merge workflow which does creates the same one kit's does
-// (joshuafolkken/kit#834).
+// consumer's own auto-merge workflow which does creates the same one kit's does.
 const AUTO_MERGE_COMMAND = 'gh pr merge --auto'
 const YAML_COMMENT_PREFIX = '#'
 
@@ -45,7 +44,7 @@ function resolve_pnpm_global_josh(): string | undefined {
 
 // Whether the working directory is provably *outside* a git work tree. Purely local — no network,
 // and it does not depend on `gh` being installed or authenticated, which is what makes it usable to
-// decide whether a repository-scoped check applies at all (joshuafolkken/kit#805).
+// decide whether a repository-scoped check applies at all.
 //
 // An empty root from a successful run is not an answer, so it is undetermined rather than inside.
 function classify_top_level(top_level: string): GitTopLevel {
@@ -67,8 +66,8 @@ function classify_git_failure(exit_code: number | undefined, stderr: string): Gi
 // directory instead would skip the check in every subdirectory of a consumer repository.
 //
 // `outside` and `undetermined` are kept apart deliberately: only proof of absence may skip the
-// caller's check, because reporting an unknown as a clean result is the false all-clear
-// joshuafolkken/kit#805 exists to remove. See the two classifiers above for what proves what.
+// caller's check, because reporting an unknown as a clean result is a false all-clear. See the two
+// classifiers above for what proves what.
 function resolve_git_top_level(): GitTopLevel {
 	// The C locale `toplevel` asks under is what keeps the stderr match below from failing on a
 	// translated message and bringing the spurious warning back.
@@ -162,7 +161,7 @@ function has_marked_project_file(
 }
 
 // Whether the project has received kit's `.github/dependabot.yml`. The npm entry's
-// `open-pull-requests-limit: 0` is what creates the prerequisite (joshuafolkken/kit#803), so that is
+// `open-pull-requests-limit: 0` is what creates the prerequisite, so that is
 // what is matched.
 function has_distributed_dependabot_config(start: string, boundary?: string): boolean {
 	return has_marked_project_file(start, DEPENDABOT_CONFIG_PATH, boundary, (content) =>
@@ -181,7 +180,7 @@ function is_auto_merge_command_line(line: string): boolean {
 }
 
 // Whether the project runs a Dependabot auto-merge workflow. `gh pr merge --auto` is what needs the
-// repository's "Allow auto-merge" setting, so that is what is matched (joshuafolkken/kit#834).
+// repository's "Allow auto-merge" setting, so that is what is matched.
 function has_auto_merge_workflow(start: string, boundary?: string): boolean {
 	return has_marked_project_file(start, AUTO_MERGE_WORKFLOW_PATH, boundary, (content) =>
 		content.split('\n').some((line) => is_auto_merge_command_line(line)),

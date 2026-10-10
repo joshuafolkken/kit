@@ -210,6 +210,7 @@ describe('propagate_steps.STEP_COMMANDS', () => {
 			'cspell:dot',
 			'behavior',
 			'exports:unused',
+			'metrics',
 			'test:unit',
 		])
 	})

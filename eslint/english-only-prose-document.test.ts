@@ -1,4 +1,4 @@
-import { CANONICAL_DOC, read_repo_file } from '#scripts/document/ai-document-fixture'
+import { read_repo_file } from '#scripts/document/ai-document-fixture'
 import { Linter } from 'eslint'
 import { describe, expect, it } from 'vitest'
 import { english_only_prose_plugin } from './rules/english-only-prose.js'
@@ -10,7 +10,9 @@ import { english_only_prose_plugin } from './rules/english-only-prose.js'
 // half fails here rather than passing silently.
 
 const RULE_ID = 'kit/english-only-prose'
-const CONTENT_RULE_MARKER = 'Comments / test titles'
+// The content rule's single source is the coding standards' Conventions list, not CLAUDE.md (#3395).
+const CONVENTIONS_DOC = 'prompts/coding-standards.md'
+const CONTENT_RULE_MARKER = 'comments / test titles'
 const ENGLISH_ONLY_MARKER = 'English only'
 const EXCEPTION_PATH = 'eslint/rules/'
 const ECMA_VERSION = 2024
@@ -23,7 +25,7 @@ const DISABLED_LINE = `'${RULE_ID}': 'off'`
 const OFF_FOR_ESLINT_RULES = /['"]eslint\/rules\/\*\*['"][\S\s]*?'off'/u
 
 function content_rule_line(): string {
-	const line = read_repo_file(CANONICAL_DOC)
+	const line = read_repo_file(CONVENTIONS_DOC)
 		.split('\n')
 		.find((candidate) => candidate.includes(CONTENT_RULE_MARKER))
 
@@ -40,7 +42,7 @@ function count(source: string): number {
 	return messages.filter((message) => message.ruleId === RULE_ID).length
 }
 
-describe('CLAUDE.md states the English-only content rule', () => {
+describe('the coding standards state the English-only content rule', () => {
 	const line = content_rule_line()
 
 	it('has the content-rule line', () => {

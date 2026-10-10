@@ -11,12 +11,12 @@ import { init_logic_workspace } from './init-logic-workspace'
 import { init_logic_yaml_merge } from './init-logic-yaml-merge'
 
 const DEV_ENGINES_VALUE = {
-	packageManager: { name: 'pnpm', version: '>=12.1.0', onFail: 'error' },
+	packageManager: { name: 'pnpm', version: '>=12.1.0', onFail: 'download' },
 }
 
 // The settings lines earlier kit releases wrote into a project `.npmrc`. pnpm 12 reads only registry
 // and auth settings from `.npmrc`, so all four are inert there: the age window and engine check now
-// live in `pnpm-workspace.yaml`, and `confirmModulesPurge` no longer exists (joshuafolkken/kit#3267).
+// live in `pnpm-workspace.yaml`, and `confirmModulesPurge` no longer exists.
 const LEGACY_NPMRC_LINES: ReadonlySet<string> = new Set([
 	'engine-strict=true',
 	'minimum-release-age=1440',
@@ -43,7 +43,7 @@ const LEGACY_POSTINSTALL_KEY = 'postinstall'
 // both, so an install that left **zero** hooks in place still exited 0 and said nothing. The way it
 // happens in practice is `core.hooksPath` — lefthook refuses to install while any custom hooks path is
 // set — and the developer then commits and pushes for weeks with no pre-commit or pre-push check
-// running at all, believing they are (joshuafolkken/kit#1503).
+// running at all, believing they are.
 //
 // **The `|| true` stays**: a consumer's `pnpm install` must not die over a developer-only hook, which
 // is what it was added for. What changes is that the failure is named on standard error. The warning
@@ -72,7 +72,7 @@ const PREPARE_CMD = `(${GUARDED_LEFTHOOK_CMD} || true) && (${GUARDED_FIX_GH_PACK
 
 // CLAUDE.md is deliberately absent: it is no longer byte-copied. A consumer's CLAUDE.md is a single
 // @import of kit's published, path-transformed rules (ensure_claude_md_import), so a package update
-// alone keeps it current (joshuafolkken/kit#1878). AGENTS.md / GEMINI.md / .cursorrules stay copies
+// alone keeps it current. AGENTS.md / GEMINI.md / .cursorrules stay copies
 // here — they are for other tools that do not read CLAUDE.md's import.
 const AI_COPY_FILES: ReadonlyArray<string> = [
 	'AGENTS.md',
@@ -92,11 +92,10 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'.github/workflows/sonar-qube.yml',
 	'.github/workflows/pr-classification.yml',
 	// Called by `ci.yml` and `pr-classification.yml` as `uses: ./.github/actions/setup-pnpm`; without
-	// it the consumer's jobs cannot resolve the action and their checks fail (joshuafolkken/kit#3013,
-	// joshuafolkken/kit#3095).
+	// it the consumer's jobs cannot resolve the action and their checks fail.
 	'.github/actions/setup-pnpm/action.yml',
 	// The one place the workflows' Node.js version is written, called by every distributed workflow
-	// that sets Node.js up (joshuafolkken/kit#3084).
+	// that sets Node.js up.
 	'.github/actions/setup-node/action.yml',
 	'.github/pull_request_template.md',
 	'.github/release.yml',
@@ -119,19 +118,18 @@ const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
 	{ src: 'templates/workflows/ci.yml', dest: '.github/workflows/ci.yml' },
 	// The counterpart to the distributed `.github/dependabot.yml`: without it a consumer receives
 	// the machinery that opens Dependabot pull requests and none of the machinery that closes them,
-	// so every github-actions bump sits green and unmerged (joshuafolkken/kit#834).
+	// so every github-actions bump sits green and unmerged.
 	{
 		src: 'templates/workflows/dependabot-auto-merge.yml',
 		dest: '.github/workflows/dependabot-auto-merge.yml',
 	},
 	// A template rather than a copy of kit's own file: kit releases from its publish.yml, so the file
-	// must not run in kit as well (joshuafolkken/kit#3007).
+	// must not run in kit as well.
 	{ src: 'templates/workflows/github-release.yml', dest: '.github/workflows/github-release.yml' },
 ]
 
-// Empty since joshuafolkken/kit#1879: the five skill directories kit used to copy whole
-// (`workflow-commands`, `epic-commands`, `dependency-update`, `verify-ui`, `diag`) now ship as the
-// `kit` Claude Code plugin and load from the package, so nothing is copied into a consumer's tree.
+// Empty: kit's skill directories ship as the `kit` Claude Code plugin and load from the package, so
+// nothing is copied into a consumer's tree.
 // The copy-and-transform machinery (directory-copy-guard.ts → transform_copied_tree) is kept intact
 // for any future distributed directory; the migration that removes a consumer's stale skill copies
 // lives in `scripts/sync/skill-migration.ts`.
@@ -143,7 +141,7 @@ const LEFTHOOK_EXTENDS = 'node_modules/@joshuafolkken/kit/lefthook/vanilla.yml'
 // `extends` entry that does not already end in it, then hard-throws when the resulting path is
 // missing — so a `.jsonc` preset resolves to `*.jsonc.json` and takes down the whole E2E suite
 // before a single test runs. A tsconfig is parsed as JSONC regardless of extension, so comments in
-// the preset still work. See joshuafolkken/kit#681.
+// the preset still work.
 const TSCONFIG_EXTENDS = './node_modules/@joshuafolkken/kit/tsconfig/base.json'
 
 // Preset file basename within the package's tsconfig/ directory, used to read the base
@@ -159,7 +157,7 @@ const TSCONFIG_EXCLUDE_FIELD = 'exclude'
 // config for. The two directories must stay disjoint (Playwright refuses an html output folder nested
 // in the tests output folder, and vice versa), so both are excluded rather than consolidated. These
 // belong in the CONSUMER file: a consumer `exclude` overrides the extended preset's instead of merging
-// with it, so shipping them only in a preset would have no effect. See joshuafolkken/kit#712.
+// with it, so shipping them only in a preset would have no effect.
 const TSCONFIG_GENERATED_OUTPUT_EXCLUDE: ReadonlyArray<string> = [
 	'node_modules',
 	'build',
@@ -186,10 +184,10 @@ const TSCONFIG_GENERATED_OUTPUT_EXCLUDE: ReadonlyArray<string> = [
 // `node_modules` above already covers it.
 //
 // Limit: these are the DEFAULT paths. A project that moves the worker with `kit.files.serviceWorker`
-// in `svelte.config.js` gets globs that match nothing, and its real exclusion is still replaced — the
-// #796 failure, unfixed for that shape. Covering it means reading `svelte.config.js`, which is the
-// same project detection kit does not have; such a project should add its own path to `exclude`
-// (the merge appends, so a hand-added entry survives). See joshuafolkken/kit#796.
+// in `svelte.config.js` gets globs that match nothing, and its real exclusion is still replaced.
+// Covering it means reading `svelte.config.js`, which is the same project detection kit does not
+// have; such a project should add its own path to `exclude` (the merge appends, so a hand-added entry
+// survives).
 const TSCONFIG_SVELTEKIT_EXCLUDE: ReadonlyArray<string> = [
 	'src/service-worker.js',
 	'src/service-worker/**/*.js',
@@ -226,7 +224,7 @@ const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 // they fit within printWidth, one element per line once they do not — so the file kit writes is
 // `prettier --check`-clean in the consumer whatever the entry count happens to be (#660).
 // TypeScript 6 defaults `types` to `[]`, so a full project sees no `process` global — not even in the
-// generated `playwright.config.ts` — until the Node types are named (joshuafolkken/kit#2710).
+// generated `playwright.config.ts` — until the Node types are named.
 function generate_tsconfig(): string {
 	return json_format.format_json({
 		extends: TSCONFIG_EXTENDS,
@@ -378,9 +376,8 @@ function get_suggested_scripts_for_content(content: string): Record<string, stri
 
 // **The upgrade path for projects `josh init` has already run in.** Their `prepare` carries the
 // fix-gh-packages marker, and that marker is exactly what makes both merges here return early — so
-// the population joshuafolkken/kit#1503 is actually about, the consumers already installing with zero
-// hooks and no warning, would never receive the fix however often they re-ran `josh init`; only new
-// projects would. This rewrites the lefthook clause kit itself wrote and nothing else, because the
+// the consumers already installing with zero hooks and no warning would never receive the fix
+// however often they re-ran `josh init`; only new projects would. This rewrites the lefthook clause kit itself wrote and nothing else, because the
 // rest of that script is the consumer's. It is idempotent by construction: the new clause does not
 // contain the old one as a substring, since `{ ` sits between them.
 function upgrade_prepare_lefthook_warning(content: string): string {

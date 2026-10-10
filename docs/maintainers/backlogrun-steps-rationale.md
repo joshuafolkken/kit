@@ -159,3 +159,16 @@ its cost is bounded before it starts (`--idle N` is at most `N / 5` asks). When 
 something up the run has work again, and the check is asked at that child's merge in the ordinary way.
 Taking every cut at a merge is also what lets a resumed session state its own `--active`: a woken
 session picks the run up seconds after the merge the cut was taken at.
+
+## Where each rule came from
+
+The procedure states these rules without their issue numbers; the provenance is kept here.
+
+- The two repairs that would bound the authorization the other way (dropping a run's own filings,
+  requiring a person's `auto-ok` on a child) are prohibited, and the brake bounds it instead —
+  joshuafolkken/kit#1675
+- Named issues run first, in the order typed, one at a time — joshuafolkken/kit#1984
+- `run:carry` answering `over` ends the conversation and the invocation is retyped in a fresh
+  session — joshuafolkken/kit#2760
+- The decision pass orders and isolates with `blocked-by`, `run:solo` and `run:lane` —
+  joshuafolkken/kit#2776

@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { describe, expect, it } from 'vitest'
 import { run_tidy, type LaneFacts } from './run-tidy'
 
@@ -45,7 +46,7 @@ describe('run_tidy.stash_verdict', () => {
 
 	it('keeps an entry naming an issue that is not merged, and says which', () => {
 		expect(run_tidy.stash_verdict({ subject: '', issues: ['2583', '2701'] }, merged)).toStrictEqual(
-			run_tidy.keep('#2701 not merged'),
+			run_tidy.keep(`${session_cite.issue(2701)} not merged`),
 		)
 	})
 

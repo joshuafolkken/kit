@@ -1,23 +1,23 @@
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import type { BacklogAnswer } from './backlog-budget'
 import { backlog_next } from './backlog-next'
 
-// The mechanical half of `josh backlog:offer` (joshuafolkken/kit#2162): turn what `backlog:next`
+// The mechanical half of `josh backlog:offer`: turn what `backlog:next`
 // answered — its stdout tokens and its exit code — into the one word `backlog:budget` is then asked
 // with, plus the issue numbers to start and the consecutive-retry count carried to the next ask.
 //
 // **The mapping is `docs/josh-commands-backlog.md` → "`josh backlog:offer`", held here so it cannot
 // drift.** It fixes which `backlog:next` answer becomes which `backlog:budget` word, and it carries two
-// context branches an agent once applied by hand every iteration: `wait` is `blocked` while this run
-// has children in flight and `exhausted` when it has none, and `retry` is `blocked` until the third
-// consecutive one, which is `unreadable`. Both are decided from a count here rather than from a
-// judgement (joshuafolkken/kit#3175 dropped the prose copy from `backlogrun-steps.md`).
+// context branches an agent would otherwise apply by hand every iteration: `wait` is `blocked` while
+// this run has children in flight and `exhausted` when it has none, and `retry` is `blocked` until the
+// third consecutive one, which is `unreadable`. Both are decided from a count here rather than from a
+// judgement.
 
 // Three consecutive `retry` answers end the run: below that a transport hiccup is re-asked, at it the
 // outage is not a hiccup. "`josh backlog:offer`" is the single source of the count.
 const RETRY_LIMIT = 3
 const FAILURE_EXIT_CODE = 1
 const NO_RETRIES = 0
-const NUMBER_PATTERN = /^[1-9]\d*$/u
 
 const TOKENS = backlog_next.VERDICT_TOKENS
 
@@ -70,7 +70,7 @@ function from_verdict(token: string, running: number, retries: number): OfferAns
 }
 
 function is_numbers(tokens: ReadonlyArray<string>): boolean {
-	return tokens.length > 0 && tokens.every((token) => NUMBER_PATTERN.test(token))
+	return tokens.length > 0 && tokens.every((token) => issue_number_shape.is_issue_number(token))
 }
 
 // **Read the exit code before the tokens.** Exit 1 is "the listing could not be read", which is never

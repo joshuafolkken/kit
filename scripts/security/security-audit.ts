@@ -29,7 +29,7 @@ function scanner_version(binary_or_path: string): string | undefined {
 
 // Whether the binary at this name or path parses the whole lockfile, i.e. is at or above the pinned
 // floor. A version that cannot be read is not the floor met — an unspawnable or version-less binary
-// is treated as below it, never as a pass (joshuafolkken/kit#2200).
+// is treated as below it, never as a pass.
 function meets_floor(binary_or_path: string): boolean {
 	const version = scanner_version(binary_or_path)
 
@@ -68,9 +68,9 @@ function managed_scanner(project_root: string, platform: string): string | undef
 }
 
 // PATH first, but only when its scanner meets the floor: an older PATH build reads a fraction of the
-// lockfile and calls it clean (joshuafolkken/kit#2200), so a provisioned v2.6.0 is preferred over it
-// rather than the other way round (the preference of joshuafolkken/kit#1563 held only while every
-// build read the whole file). A below-floor PATH binary is the last resort, returned flagged so the
+// lockfile and calls it clean, so a provisioned v2.6.0 is preferred over it
+// rather than the other way round (preferring PATH outright holds only while every
+// build reads the whole file). A below-floor PATH binary is the last resort, returned flagged so the
 // audit can warn that its clean result proves nothing. `undefined` means no scanner at all.
 function resolve_scanner(project_root: string, platform: string): ScannerChoice | undefined {
 	const { BINARY_NAME } = security_audit_logic
@@ -92,7 +92,7 @@ function resolve_scanner(project_root: string, platform: string): ScannerChoice 
 // next shell prompt as `11;rgb:0101/0404/0909;1R` after a push ran this audit from the pre-push hook.
 // A pipe means the scanner sees no terminal and asks nothing; the `inherit` half still prints its report.
 // The fix belongs here, at the one command that asks, rather than on `git push`: piping the push would
-// make its timeout wait on any process a hook left running (joshuafolkken/kit#2801).
+// make its timeout wait on any process a hook left running.
 const FORWARDED_OUTPUT = ['inherit', 'pipe'] as const
 
 function run_scanner(scanner_path: string): number {

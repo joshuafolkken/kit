@@ -16,8 +16,8 @@ import { resolve_local_bin } from '#scripts/build/local-bin'
 import { git_fixture_workspace } from '#scripts/git/git-fixture-workspace'
 import { josh_cli_fixture, type JoshLauncher } from '#scripts/josh/josh-cli-fixture'
 
-// Most defects reach a run at an environment boundary rather than inside a function
-// (joshuafolkken/kit#2447): a consumer without `docs/` (#2402), a lane worktree whose ledger lives in
+// Most defects reach a run at an environment boundary rather than inside a function:
+// a consumer without `docs/` (#2402), a lane worktree whose ledger lives in
 // the primary checkout (#2419), two processes racing on one marker (#2434). Unit tests call functions
 // inside this checkout, so none of those boundaries exists for them. Each environment here is a real
 // directory in the system temp dir, assembled the way a run meets it, and josh is spawned into it as a
@@ -108,11 +108,18 @@ const TOOLCHAIN_FILES: ReadonlyArray<FixtureFile> = [
 
 // The kit's own shape: its package name, so josh treats the directory as the kit rather than a
 // consumer, and the `docs/` and `prompts/` directories only the kit carries.
+const KIT_RULES: ReadonlyArray<FixtureFile> = [
+	['CLAUDE.md', '# Claude Code Instructions\n'],
+	['prompts/README.md', '# Prompts\n'],
+]
+
+// The kit's gate runs `josh metrics` (#3408), which holds the totals to the merge-base's: the fixture
+// is one commit on the default branch, so it is measured against itself and the gate stays green.
 const KIT_FILES: ReadonlyArray<FixtureFile> = [
 	...TOOLCHAIN_FILES,
 	[PACKAGE_JSON, json_file({ name: PACKAGE_NAME, version: '0.0.0', ...PROJECT_FIELDS })],
 	['docs/README.md', '# Docs\n'],
-	['prompts/README.md', '# Prompts\n'],
+	...KIT_RULES,
 ]
 
 // The least a consumer is: a project that depends on the kit and carries neither `docs/` nor

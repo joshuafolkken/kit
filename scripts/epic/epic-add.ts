@@ -1,5 +1,6 @@
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { session_cite } from '#scripts/issue/session-cite'
 import { epic_add_plan, type AddPlan } from './epic-add-plan'
 import type { InsertPosition } from './epic-chains'
 import { epic_decision } from './epic-decision'
@@ -15,7 +16,7 @@ import { epic_relations } from './epic-relations'
 // `josh epic --add <E> <N...> [--before <M> | --after <M> | --order-before <M> | --order-after <M>]
 // [--decision-file <path|->]` — insert children into an existing epic.
 //
-// **`--order-*` moves the row and writes nothing else** (joshuafolkken/kit#1738). `epic:next` offers
+// **`--order-*` moves the row and writes nothing else**. `epic:next` offers
 // children in task-list order, so putting one first meant `--before`, which records a `blocked-by`:
 // "no dependency, but run this one first" had no spelling, and an order written that way stops every
 // child behind the one that stalls.
@@ -23,10 +24,9 @@ import { epic_relations } from './epic-relations'
 // Adding a child by editing the body is what the procedure told an agent to do, and it is what stops
 // an unattended run: the body then declares an order the native `blocked-by` relations do not record,
 // `epic:next` reports `declaration_mismatch`, and the verdict is `error`. This command writes the
-// task-list row, the declaration and the relations from one input, so the three cannot disagree
-// (joshuafolkken/kit#890).
+// task-list row, the declaration and the relations from one input, so the three cannot disagree.
 //
-// **`--decision-file` folds the fourth and fifth writes in** (joshuafolkken/kit#1350). An auto-decided
+// **`--decision-file` folds the fourth and fifth writes in**. An auto-decided
 // placement has to be recorded in the epic's `## Decisions` and on each child, and no command wrote the
 // epic half — so a run read the body, edited it and `PATCH`ed it back, which is the hand edit
 // `CLAUDE.md` forbids. The epic half now rides on the body edit this command already makes, so it costs
@@ -37,7 +37,7 @@ const SUCCESS_EXIT_CODE = 0
 
 // A completed epic takes no new children: adding one silently produces a closed epic with unfinished
 // children, whose backlog opt-in no longer fires, so the child never surfaces and the addition is
-// lost (joshuafolkken/kit#2337). The refusal is only fired on a *confirmed* closed state — an
+// lost. The refusal is only fired on a *confirmed* closed state — an
 // unreadable state field leaves the addition to proceed, since blocking on a lookup that never
 // answered would be the worse failure.
 function is_closed_epic(state: string | undefined): boolean {
@@ -45,7 +45,7 @@ function is_closed_epic(state: string | undefined): boolean {
 }
 
 function closed_epic_error(epic_number: number): string {
-	return `Epic #${String(epic_number)} is closed — a completed epic takes no new children. Reopen it if it is not actually done, or run \`pnpm josh epic:bundle <child>\` to place the child in an open epic instead.`
+	return `Epic ${session_cite.issue(epic_number)} is closed — a completed epic takes no new children. Reopen it if it is not actually done, or run \`pnpm josh epic:bundle <child>\` to place the child in an open epic instead.`
 }
 
 interface AddChildrenInput {
@@ -53,12 +53,11 @@ interface AddChildrenInput {
 	children: ReadonlyArray<number>
 	position?: InsertPosition | undefined
 	// `--order-before` / `--order-after`: place the row at `position` and write nothing else — no
-	// declaration, no `blocked-by` (joshuafolkken/kit#1738).
+	// declaration, no `blocked-by`.
 	is_order_only?: boolean | undefined
-	// The decision record to write, from `--decision-file`. It goes to two places, and both used to be
-	// separate calls a run made afterwards: the epic's `## Decisions` section — folded into the body
-	// edit below, so it costs no round trip — and a comment on each child added
-	// (joshuafolkken/kit#1350).
+	// The decision record to write, from `--decision-file`. It goes to two places, neither of them a
+	// separate call a run makes afterwards: the epic's `## Decisions` section — folded into the body
+	// edit below, so it costs no round trip — and a comment on each child added.
 	decision?: string | undefined
 }
 
@@ -96,20 +95,22 @@ async function apply_plan(plan: AddPlan): Promise<void> {
 // The two things one insertion can do, reported separately because they are different edits: an
 // addition gains a task-list row, a relocation moves the row it already had. Either list can be empty
 // — `--before` / `--after` on children the epic already tracks adds nothing at all
-// (joshuafolkken/kit#1701) — so neither line is printed unconditionally.
+// — so neither line is printed unconditionally.
 // A row moved onto the wrong side of an order the declaration already states. `epic:next` filters by
 // `blocked_by` before it applies task-list order, so the move cannot change when that child is offered
 // until the declaration itself changes — and the placement line above, read alone, says the opposite.
-// It is a warning rather than a refusal for the reason `contradicted` gives (joshuafolkken/kit#1738).
+// It is a warning rather than a refusal for the reason `contradicted` gives.
 function report_contradiction(plan: AddPlan): void {
 	if (plan.contradicted.length === 0) return
 
 	console.info(
-		`⚠️ ${format_issue_references(plan.contradicted)} is still held by a declared order, so \`epic:next\` will not offer it any earlier until that order is changed — \`--remove\` deletes one.`,
+		session_cite.text(
+			`⚠️ ${format_issue_references(plan.contradicted)} is still held by a declared order, so \`epic:next\` will not offer it any earlier until that order is changed — \`--remove\` deletes one.`,
+		),
 	)
 }
 
-// **An order-only move reports the place, because nothing else will** (joshuafolkken/kit#1738). An
+// **An order-only move reports the place, because nothing else will**. An
 // ordinary insertion is followed by the replaced-relation line and the relation report, which between
 // them say where the child landed; `--order-*` writes neither, so without this line the console says a
 // row moved and never says where to. The position is read from the input rather than the plan: the
@@ -122,7 +123,9 @@ function report_order(input: AddChildrenInput, plan: AddPlan): void {
 	const target = to_issue_reference(position.target)
 
 	console.info(
-		`📋 Placed ${placed} ${position.kind} ${target} in epic #${String(input.epic_number)} — order only, no dependency written.`,
+		session_cite.text(
+			`📋 Placed ${placed} ${position.kind} ${target} in epic ${session_cite.issue(input.epic_number)} — order only, no dependency written.`,
+		),
 	)
 	report_contradiction(plan)
 }
@@ -134,19 +137,23 @@ function report_placements(input: AddChildrenInput, plan: AddPlan): void {
 		return
 	}
 
-	const epic = `epic #${String(input.epic_number)}`
+	const epic = `epic ${session_cite.issue(input.epic_number)}`
 
 	if (plan.additions.length > 0) {
-		console.info(`📋 Added ${format_issue_references(plan.additions)} to ${epic}.`)
+		console.info(
+			session_cite.text(`📋 Added ${format_issue_references(plan.additions)} to ${epic}.`),
+		)
 	}
 
 	if (plan.relocations.length > 0) {
-		console.info(`📋 Moved ${format_issue_references(plan.relocations)} within ${epic}.`)
+		console.info(
+			session_cite.text(`📋 Moved ${format_issue_references(plan.relocations)} within ${epic}.`),
+		)
 	}
 }
 
-// **What the insertion discarded, printed from `plan.replaced` rather than `plan.removed`**
-// (joshuafolkken/kit#1711). The two differ by the filter `removed` carries for `gh`'s sake: a link the
+// **What the insertion discarded, printed from `plan.replaced` rather than `plan.removed`**.
+// The two differ by the filter `removed` carries for `gh`'s sake: a link the
 // body declared but nobody ever recorded natively is dropped from the declaration all the same, and
 // reporting from the work list let exactly those go by without a word. A positioned `--add` is the
 // only invocation that can replace anything, so an addition that re-points nothing prints nothing.
@@ -176,7 +183,7 @@ async function comment_decision(children: ReadonlyArray<number>, decision: strin
 
 // The record posted to the children is `plan.decision`, not the caller's file: the plan is what folded
 // the replaced relations into it, and reading the raw input here would leave the epic's `## Decisions`
-// carrying a line the child comments do not (joshuafolkken/kit#1711).
+// carrying a line the child comments do not.
 // A child new to the epic, not a reordering — the only insertion that can put runnable work in the pool.
 function has_new_child(input: AddChildrenInput, plan: AddPlan): boolean {
 	return input.is_order_only !== true && plan.additions.length > 0
@@ -188,7 +195,7 @@ async function write_plan(input: AddChildrenInput, plan: AddPlan): Promise<void>
 	await apply_plan(plan)
 
 	// A relocation is a placement decision as much as an addition is, so the record reaches the child
-	// that was moved too (joshuafolkken/kit#1701).
+	// that was moved too.
 	if (plan.decision !== undefined) {
 		await comment_decision([...plan.additions, ...plan.relocations], plan.decision)
 	}
@@ -196,8 +203,8 @@ async function write_plan(input: AddChildrenInput, plan: AddPlan): Promise<void>
 	if (has_new_child(input, plan)) await backlog_ready.print_offer_hint()
 }
 
-// The epic ready to receive children, or the reason it cannot be added to: unreadable, or closed
-// (joshuafolkken/kit#2337). Both reasons come back as a bare string the one caller prefixes `✖` onto,
+// The epic ready to receive children, or the reason it cannot be added to: unreadable, or closed.
+// Both reasons come back as a bare string the one caller prefixes `✖` onto,
 // so the two refusals read identically on stderr.
 async function read_open_epic(epic_number: number): Promise<EpicReading | { error: string }> {
 	const epic = await epic_read.read_epic(epic_number)

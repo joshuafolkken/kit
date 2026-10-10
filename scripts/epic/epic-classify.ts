@@ -19,14 +19,13 @@ import {
 // difference is not academic: the moment kit's child closes and app-kit's child is waiting for the
 // release to publish, there is no runnable child, nothing carries `in-progress` (kit's child is
 // closed) and nothing carries `needs-decision` (nothing was parked). A label-based reading sees
-// "nothing running, nothing parked" and stops — in the one situation where it should wait
-// (joshuafolkken/kit#860).
+// "nothing running, nothing parked" and stops — in the one situation where it should wait.
 
 // What a caller does with a child: run it, wait for it, or stop and report it.
 type ChildCategory = 'runnable' | 'time' | 'human' | 'done'
 
 // `DependencyVerdict` and `ResolveDependency` live in `epic-outside-blocker.ts`, which weighs a
-// blocker no graph tracks with the same resolver (joshuafolkken/kit#1943), and are re-exported below.
+// blocker no graph tracks with the same resolver, and are re-exported below.
 
 interface Classification {
 	runnable: ReadonlyArray<EpicChild>
@@ -51,7 +50,7 @@ function has_label(child: EpicChild, label: string): boolean {
 
 // The labels that put a child in `human` on their own. `needs-decision` waits for an answer nobody
 // has given; `already-done` has its answer — the work is merged, and the close that is left is Tier C
-// and so a person's (joshuafolkken/kit#1679). Neither is resolved by waiting, which is what separates
+// and so a person's. Neither is resolved by waiting, which is what separates
 // them from `in-progress` below.
 const HUMAN_LABELS: ReadonlyArray<string> = [NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL]
 
@@ -62,12 +61,12 @@ function has_human_label(child: EpicChild): boolean {
 // What a child is before its dependencies are considered. A parked child is `human` whatever blocks
 // it, and a child already being worked on is `time` — someone else's session will finish it.
 //
-// **A child that is itself an epic is `human`** (joshuafolkken/kit#1476). An epic is not a unit of
+// **A child that is itself an epic is `human`**. An epic is not a unit of
 // work, so a run handed one has nothing to implement; before this the row fell straight through to
 // `from_blockers`, which mints `runnable` for anything unblocked, and `epicrun` passed the epic to
 // `fullrun` as an ordinary issue. `human` rather than `time` because no amount of waiting turns an
 // epic into work: a person has to flatten the row or restructure the epics, and meta-epic support is
-// frozen (joshuafolkken/kit#894). What the question is — and, just as importantly, what it is not —
+// frozen. What the question is — and, just as importantly, what it is not —
 // is `epic-nested.ts`, which the audit asks the same way.
 function local_category(child: EpicChild): ChildCategory | undefined {
 	if (child.state === CLOSED) return 'done'
@@ -99,9 +98,9 @@ interface ClassifyContext {
 	index: ReadonlyMap<string, EpicChild>
 	resolve: ResolveDependency
 	// Keyed by identity — repository plus number — because two children of one epic can share a
-	// number across repositories (joshuafolkken/kit#864).
+	// number across repositories.
 	memo: Map<string, ChildCategory>
-	// Every issue this invocation may run, keyed like `index` (joshuafolkken/kit#1943). A blocker
+	// Every issue this invocation may run, keyed like `index`. A blocker
 	// outside `index` waits when it is in here and goes to a person when it is not.
 	running: ReadonlySet<string>
 }
@@ -125,9 +124,9 @@ function report_notice(notice: OutsideNotice): void {
 	console.warn(notice.message)
 }
 
-// A blocker no graph in this invocation tracks. It used to be announced and dropped, which offered a
-// child waiting on another epic's open issue as runnable; it is weighed now, and what could not be
-// decided is still said out loud (joshuafolkken/kit#1126, joshuafolkken/kit#1943).
+// A blocker no graph in this invocation tracks. It is weighed rather than announced and dropped, which
+// would offer a child waiting on another epic's open issue as runnable; what could not be decided is
+// still said out loud.
 function outside_category(
 	child: EpicChild,
 	reference: IssueReference,
@@ -147,7 +146,7 @@ function outside_category(
 
 // Said out loud because the report cannot say it: a withheld epic prints as a bare `#N` under
 // "Waiting on a person", which is true of a parked issue and of an epic alike, and the two need
-// entirely different things done to them (joshuafolkken/kit#1476).
+// entirely different things done to them.
 function report_nested_epic(child: EpicChild): void {
 	const line = `epic:${epic_graph.key_of(child)}`
 	if (reported.has(line)) return

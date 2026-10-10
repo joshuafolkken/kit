@@ -1,4 +1,5 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { session_cite } from '#scripts/issue/session-cite'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { epic_add } from './epic-add'
 import { epic_add_fixture, EPIC_FIXTURE_REPO } from './epic-add-fixture'
@@ -204,7 +205,9 @@ describe('epic_add.add_children — a child the epic already tracks', () => {
 		const lines = info.mock.calls.map((call) => String(call[0]))
 
 		info.mockRestore()
-		expect(lines).toContain(`📋 Moved #891 within epic #${String(EPIC_NUMBER)}.`)
+		expect(lines).toContain(
+			`📋 Moved ${session_cite.issue(891)} within epic ${session_cite.issue(EPIC_NUMBER)}.`,
+		)
 		expect(lines.some((line) => line.startsWith('📋 Added'))).toBe(false)
 	})
 

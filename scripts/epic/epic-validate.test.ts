@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { describe, expect, it } from 'vitest'
 import { epic_body } from './epic-body'
 import { UNORDERED_DEPENDENCIES } from './epic-parse'
@@ -183,7 +184,7 @@ describe('epic_validate.format_check_report', () => {
 		const results = epic_validate.validate_epic(to_subject({}))
 
 		expect(epic_validate.format_check_report(EPIC_NUMBER, results)).toContain(
-			'✅ Epic #700 satisfies every requirement.',
+			`✅ Epic ${session_cite.issue(EPIC_NUMBER)} satisfies every requirement.`,
 		)
 	})
 
@@ -191,7 +192,9 @@ describe('epic_validate.format_check_report', () => {
 		const results = epic_validate.validate_epic(to_subject({ labels: [] }))
 		const report = epic_validate.format_check_report(EPIC_NUMBER, results)
 
-		expect(report).toContain('❌ Epic #700 does not satisfy every requirement.')
+		expect(report).toContain(
+			`❌ Epic ${session_cite.issue(EPIC_NUMBER)} does not satisfy every requirement.`,
+		)
 		expect(report).toContain(`✖ ${LABEL_CHECK}`)
 		expect(report).toContain('the auto-close only looks at labelled issues')
 	})
@@ -199,6 +202,8 @@ describe('epic_validate.format_check_report', () => {
 	it('lists the tracked children when the task list is readable', () => {
 		const results = epic_validate.validate_epic(to_subject({}))
 
-		expect(epic_validate.format_check_report(EPIC_NUMBER, results)).toContain('#101, #102')
+		expect(epic_validate.format_check_report(EPIC_NUMBER, results)).toContain(
+			`${session_cite.issue(101)}, ${session_cite.issue(102)}`,
+		)
 	})
 })

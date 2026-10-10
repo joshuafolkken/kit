@@ -1,11 +1,12 @@
+import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 
-// The scoped pair `josh ship` meets itself rather than stops on (joshuafolkken/kit#2500), shared by
-// every stage that needs a green record for this tree (joshuafolkken/kit#2946): the preflight stage at
-// the start, the review rounds, and the gate stage — a reviewer may have edited the tree after round
-// 1's pair ran, and `josh gate` refuses a tree with no green record.
+// The scoped pair `josh ship` meets itself rather than stops on, shared by every stage that needs a
+// green record for this tree: the preflight stage at the start, the review rounds, and the gate
+// stage — a reviewer may have edited the tree after round 1's pair ran, and `josh gate` refuses a
+// tree with no green record.
 
 const SUCCESS_EXIT_CODE = 0
 const should_forward_stderr = true
@@ -40,7 +41,7 @@ async function scoped_pair(): Promise<JoshResult> {
 }
 
 // The scoped pair and then `josh gate` — the gate stage, and the followup's gate over a merged tree
-// before its push (joshuafolkken/kit#3307), so both leave the record the pre-push hook reuses.
+// before its push, so both leave the record the pre-push hook reuses.
 async function scoped_gate(): Promise<JoshResult> {
 	return await run_phases([
 		scoped_pair,
@@ -48,7 +49,15 @@ async function scoped_gate(): Promise<JoshResult> {
 	])
 }
 
-const run_ship_scoped = { run_phases, scoped_gate, scoped_pair }
+// Whether `josh gate` would only reuse this tree's green record: the gate's own reuse test rather than
+// a second copy of it, so the ship calls a gate stage a reuse on exactly the trees the gate skips.
+async function is_gate_green(): Promise<boolean> {
+	const tree = await gate_tree.read_gate_tree()
+
+	return gate_skip.reusable_green_gate(tree.files, tree.base) !== undefined
+}
+
+const run_ship_scoped = { is_gate_green, run_phases, scoped_gate, scoped_pair }
 
 export type { Phase }
 export { run_ship_scoped }

@@ -28,7 +28,8 @@ is the way it is, and the issues it came from, live in the matching `*-rationale
 - [eval.md](./eval.md) — `josh eval`, measuring whether a document change changed what an agent does
 - [eval-rationale.md](./eval-rationale.md) — why the suite is built the way it is
 - [guide-verification.md](./guide-verification.md) — how the step-by-step user guides were verified
-- [lane-limit-measurement.md](./lane-limit-measurement.md) — `josh lane:sample` / `lane:stats`, measuring a `JOSH_LANE_LIMIT`
+- [lane-limit-measurement.md](./lane-limit-measurement.md) — `josh lane:sample` / `lane:stats`, measuring a `JOSH_LANE_LIMIT` and where a lane's time goes
+- [backlogrun-driver.md](./backlogrun-driver.md) — what the `backlogrun` driver commands do on their own, kept off the parent's read path
 
 ## Why the rules and commands are the way they are
 
@@ -53,8 +54,29 @@ from the page it explains.
 - [observation-ledger-rationale.md](./observation-ledger-rationale.md) — the observation ledger
 - [runtime-bundling.md](./runtime-bundling.md) — running josh commands without tsx
 - [epic-commands-rationale.md](./epic-commands-rationale.md) — the `josh epic:*` commands
-- [backlogrun-steps-rationale.md](./backlogrun-steps-rationale.md),
+- [workflow-commands-rationale.md](./workflow-commands-rationale.md) — the workflow-commands skill
+  manifest
+- [entry-sequence-rationale.md](./entry-sequence-rationale.md),
+  [fullrun-rationale.md](./fullrun-rationale.md),
+  [fullrun-steps-rationale.md](./fullrun-steps-rationale.md),
+  [halfrun-rationale.md](./halfrun-rationale.md) — the `fullrun`, `halfrun` and `prrun` entries
+- [chain-rule-rationale.md](./chain-rule-rationale.md),
+  [followup-rationale.md](./followup-rationale.md) — the review-to-merge chain and
+  `pnpm josh followup`
+- [working-tree-hold-rationale.md](./working-tree-hold-rationale.md) — the working-tree hold
+- [issue-comments-rationale.md](./issue-comments-rationale.md) — reading an Issue's comments
+- [needs-human-review-rationale.md](./needs-human-review-rationale.md) — the `needs-human-review`
+  stop
+- [prerequisite-rationale.md](./prerequisite-rationale.md) — a prerequisite Issue
+- [target-repository-rationale.md](./target-repository-rationale.md),
+  [into-target-rationale.md](./into-target-rationale.md) — the target repository and the `into`
+  suffix
+- [retrospective-rationale.md](./retrospective-rationale.md) — the run retrospective
+- [verify-ui-rationale.md](./verify-ui-rationale.md) — the `verify-ui` skill
+- [backlogrun-rationale.md](./backlogrun-rationale.md),
+  [backlogrun-steps-rationale.md](./backlogrun-steps-rationale.md),
   [backlogrun-child-rationale.md](./backlogrun-child-rationale.md),
+  [backlogrun-park-rationale.md](./backlogrun-park-rationale.md),
   [backlogrun-lanes-rationale.md](./backlogrun-lanes-rationale.md),
   [backlogrun-progress-rationale.md](./backlogrun-progress-rationale.md),
   [backlogrun-recovery-rationale.md](./backlogrun-recovery-rationale.md) — `backlogrun`

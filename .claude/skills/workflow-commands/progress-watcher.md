@@ -2,7 +2,7 @@
 
 **Read this file in full when the run's hold is claimed, before the watcher starts.** It is a
 point-of-use document, never an entry read, and the single source of the heartbeat for `fullrun`,
-`halfrun`, `prrun` and the `backlogrun` parent alike (joshuafolkken/kit#3172). `kickoff` starts none.
+`halfrun`, `prrun` and the `backlogrun` parent alike. `kickoff` starts none.
 
 ## Progress while the run is quiet
 
@@ -13,7 +13,7 @@ point-of-use document, never an entry read, and the single source of the heartbe
 pnpm josh run:progress --wait --output <the transcript path of each delegated unit>   # in the background
 ```
 
-**Start it once; it reports by itself** (joshuafolkken/kit#3102). Each silence interval appends the
+**Start it once; it reports by itself.** Each silence interval appends the
 five labelled lines to the run's event stream as a heartbeat and to the ambient log, prints nothing to
 standard output and keeps running — so a scheduled report never wakes the session, and the session
 relays none. **It exits only on one of three, and the command computes which:**
@@ -27,8 +27,8 @@ relays none. **It exits only on one of three, and the command computes which:**
 **A report is not an exit, and neither is a decline** — with no run recorded it keeps waiting, and the
 `--hours` exit says so on standard error.
 
-**`pnpm josh run:watcher:guard` detects a missed restart** (joshuafolkken/kit#2113): wired into
-`pretool-guard` (joshuafolkken/kit#2353), it refuses the next tool call while lane children are in
+**`pnpm josh run:watcher:guard` detects a missed restart**: wired into
+`pretool-guard`, it refuses the next tool call while lane children are in
 flight and the watcher's life record has gone stale — once per run, so the restart is not blocked.
 
 **`--mark` at every real report.** Whenever the run reports something of its own, run
@@ -47,18 +47,22 @@ Rationale: `docs/maintainers/progress-watcher-rationale.md` → "Why the heartbe
 
 ### What a report says
 
-**Every unscheduled progress statement is answered by `pnpm josh run:progress --once`** — the reply to
-an explicit ask and the note just after a run starts alike; it is exempt from the interval and records
-the report itself, so no `--mark` beside it. **Relay its five field lines verbatim** — round, rephrase
+**Every unscheduled progress statement is answered by `pnpm josh run:progress --once`** — under
+`backlogrun`, `pnpm josh run:board --chat` in one code block — the reply to an explicit ask and
+the note just after a run starts alike; each is exempt from the interval and records the report
+itself, so no `--mark` beside it. **Relay its lines verbatim** — round, rephrase
 or re-label nothing, and **never write a clock time the command did not print**; where a field is
 missing, say so. **A field's empty value is an observation, never a state** (`record unread` is not
 *not stalled*), and **nothing in the lines is a verification result** — no gate, CI or check rollup.
 
-**The heartbeat is ambient, never a Telegram.** `pnpm josh run:event --watch` is its reader, in a pane
-of the person's own; **no session relays the stream** — name the watch command once, at the first cut
-or when asked. `pnpm josh run:wake --list` is the one-line read for a person who types for it.
+**The heartbeat is ambient, never a Telegram.** `pnpm josh run:board` is its reader, in a pane of the
+person's own; **no session relays the stream** — name the board command once, at the first cut or when
+asked; `.vscode/tasks.json` starts it on folder open once VSCode's automatic-task prompt is allowed.
+`pnpm josh run:event --watch` stays for following the raw events one by one. `pnpm josh run:wake --list` is the one-line read for a person who types for it.
+**A request for periodic progress is never a CronCreate job** — on screen, name `pnpm josh run:board`;
+off-screen, start `pnpm josh run:board --every <minutes>` in the background (`docs/josh-commands-run.md`).
 
-**A stop is the only interrupt** (joshuafolkken/kit#2136): a `backlogrun` that has stopped ends with
+**A stop is the only interrupt**: a `backlogrun` that has stopped ends with
 `pnpm josh run:carry --end --stopped "<reason>"`, which sends one ⏸️ confirmation; a parked child sends
 its own (`backlogrun-park.md`). Rationale: `docs/maintainers/progress-watcher-rationale.md` → "Why the
 signal tiers are split this way".
@@ -88,3 +92,5 @@ notification, and the running `--wait` is stopped in the same turn, since no rep
 covers `halfrun`'s stop before commit, a `needs-human-review` stop, a split or prerequisite stop, and a
 `backlogrun` named issue's failure stop. Rationale: `docs/maintainers/progress-watcher-rationale.md` →
 "Why the watcher runs where it does".
+
+Provenance of each rule: `docs/maintainers/progress-watcher-rationale.md` → "Where each rule came from".

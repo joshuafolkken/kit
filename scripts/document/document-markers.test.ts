@@ -35,17 +35,11 @@ const RESIDENT_ANCHORS: ReadonlyArray<Anchor> = [
 	{ file: CLAUDE_MD, heading: 'Communication' },
 	{ file: CLAUDE_MD, heading: 'Decision autonomy' },
 	{ file: CLAUDE_MD, heading: 'Critical Conventions' },
-	{ file: CLAUDE_MD, heading: 'Naming' },
-	{ file: CLAUDE_MD, heading: 'Functions & exports' },
-	{ file: CLAUDE_MD, heading: 'Files' },
 	{ file: CLAUDE_MD, heading: 'Quality limits' },
-	{ file: CLAUDE_MD, heading: 'Content rules' },
-	{ file: CLAUDE_MD, heading: 'Dependency overrides' },
 	{ file: CLAUDE_MD, heading: 'Package-First Development' },
 	{ file: CLAUDE_MD, heading: 'Code Change Rules' },
 	{ file: CLAUDE_MD, heading: 'Completion gate' },
 	{ file: CLAUDE_MD, heading: 'Pre-commit Self-Review' },
-	{ file: CLAUDE_MD, heading: 'Doc Sync Rules' },
 	{ file: CLAUDE_MD, heading: 'Git Rules' },
 	{ file: CLAUDE_MD, heading: 'Collaboration Workflow' },
 	{ file: CLAUDE_MD, heading: 'Shorthand Commands' },
@@ -65,6 +59,12 @@ const RESIDENT_ANCHORS: ReadonlyArray<Anchor> = [
 	{ file: SPLIT_MD, heading: 'The question' },
 	{ file: SPLIT_MD, heading: 'Two or more always means an epic' },
 	{ file: 'prompts/review.md', heading: 'Review round cap' },
+	// joshuafolkken/kit#3395 moved the lint-enforced conventions and the Step 0 detail out of `CLAUDE.md`.
+	{ file: 'prompts/coding-standards.md', heading: 'Conventions' },
+	{
+		file: 'prompts/collaboration-workflow/report-format.md',
+		heading: '作業前サマリはいつ・どう出すか',
+	},
 	{ file: 'prompts/testing-guide.md', heading: '6. Closing the E2E gate without a human run' },
 ]
 
