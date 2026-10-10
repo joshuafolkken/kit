@@ -2,6 +2,7 @@ import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { git_command } from '#scripts/git/git-command'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { stamp_record, type StampRecordSpec } from '#scripts/josh/stamp-record'
 import { json_value } from '#scripts/lib/json-value'
 import { run_invocation } from '#scripts/run/run-invocation'
 import { z } from 'zod'
@@ -190,8 +191,6 @@ type CarryRead =
 	| { kind: 'expired'; carry: RunCarry }
 	| { kind: 'unreadable' }
 
-const NONE_READ: CarryRead = { kind: 'none' }
-const UNREADABLE_READ: CarryRead = { kind: 'unreadable' }
 const NO_OWNER: CarryOwner = {}
 
 const carry_addition_schema = z.object({ issue: z.number(), is_priority: z.boolean() })
@@ -235,25 +234,28 @@ function parse_carry(raw: string): RunCarry | undefined {
 	return json_value.parse_with(raw, run_carry_schema)
 }
 
-// A `started_at` that is not a date is read as expired rather than as current, for the reason
-// `run-hold.ts` reads an unparsable `taken_at` that way: a record nothing can ever expire is the one
-// state the bound exists to make impossible.
+function started_at_of(carry: RunCarry): string {
+	return carry.started_at
+}
+
+// The expiry and the classification are `stamp-record.ts`'s, shared with `run-cut.ts` and
+// `run-hold.ts`; what a `started_at` that is not a date means is decided there.
+const CARRY_SPEC: StampRecordSpec<RunCarry> = {
+	parse: parse_carry,
+	timestamp_of: started_at_of,
+	max_age_ms: CARRY_MAX_AGE_MS,
+}
+
 function is_expired(carry: RunCarry, now: Date): boolean {
-	const started = Date.parse(carry.started_at)
-
-	if (Number.isNaN(started)) return true
-
-	return now.getTime() - started > CARRY_MAX_AGE_MS
+	return stamp_record.is_older_than(started_at_of(carry), CARRY_MAX_AGE_MS, now)
 }
 
 function classify(raw: string | undefined, now: Date): CarryRead {
-	if (raw === undefined) return NONE_READ
+	const read = stamp_record.classify(raw, CARRY_SPEC, now)
 
-	const carry = parse_carry(raw)
+	if (!('record' in read)) return read
 
-	if (carry === undefined) return UNREADABLE_READ
-
-	return { kind: is_expired(carry, now) ? 'expired' : 'carried', carry }
+	return { kind: read.kind, carry: read.record }
 }
 
 function read_carry(target: string, now: Date = new Date()): CarryRead {

@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1048,
-		"code_lines": 87231,
-		"comment_lines": 33516,
+		"files": 1049,
+		"code_lines": 87269,
+		"comment_lines": 33523,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 459560
 	},
 	"accepted": {
-		"reason": "#3598 adds the exhaustive run:merge token coverage test its acceptance criteria require, plus the shared token module and typed verdicts",
+		"reason": "#3595: the stamp-record expiry and classification moved into one shared module (scripts/josh/stamp-record.ts); its generic spec and read types cost more lines than the three inline copies saved",
 		"date": "2026-10-10"
 	}
 }
