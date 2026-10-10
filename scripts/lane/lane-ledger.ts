@@ -41,14 +41,17 @@ const gate_schema = z.object({
 	// whichever was higher. Absent when the machine could not be read.
 	external_cores: z.number().optional(),
 })
-// `swap_mb` and `lanes` are optional because either read can fail on its own — a platform with no
-// swap reading, a `git worktree` call that did not answer — and a sample is still worth its load.
+// `available_mb`, `swapped_mb` and `lanes` are optional because each read can fail on its own — a
+// platform with no memory reading, a `git worktree` call that did not answer — and a sample is still
+// worth its load. `swapped_mb` is `machine_capacity`'s counter, every page swapped since boot.
+// Both memory fields were renamed with their meaning (joshuafolkken/kit#3593): an older row's
+// `free_mb` / `swap_mb` are stripped on read, so the two measurements never share a column.
 const load_schema = z.object({
 	kind: z.literal(KIND.LOAD),
 	at: z.string(),
 	load: z.number(),
-	free_mb: z.number(),
-	swap_mb: z.number().optional(),
+	available_mb: z.number().optional(),
+	swapped_mb: z.number().optional(),
 	lanes: z.number().optional(),
 })
 const entry_schema = z.discriminatedUnion('kind', [merge_schema, gate_schema, load_schema])

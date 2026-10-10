@@ -123,20 +123,13 @@ function memory_percent(sample: MachineSample): number | undefined {
 		: PERCENT - (available_mb / sample.total_mb) * PERCENT
 }
 
-// A counter that went back — a reboot between samples — is read as nothing swapped.
-function swapped_between(before: MachineMark, after: MachineMark): number | undefined {
-	const from = before.sample.memory.swapped_mb
-	const to = after.sample.memory.swapped_mb
-
-	if (from === undefined || to === undefined) return undefined
-
-	return Math.max(0, to - from)
-}
-
 function swap_rate(before: MachineMark | undefined, after: MachineMark): number | undefined {
 	if (before === undefined) return undefined
 
-	const swapped = swapped_between(before, after)
+	const swapped = machine_capacity.swapped_between(
+		before.sample.memory.swapped_mb,
+		after.sample.memory.swapped_mb,
+	)
 	const seconds = (after.at_ms - before.at_ms) / MS_PER_SECOND
 
 	return swapped === undefined || seconds <= 0 ? undefined : swapped / seconds

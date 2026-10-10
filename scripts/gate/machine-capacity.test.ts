@@ -127,3 +127,19 @@ describe('machine_capacity memory readers', () => {
 		expect(machine_capacity.parse_linux_available('MemTotal: 1 kB\n')).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#3593: `run:board` and `lane:stats` read the swap counter's difference from one place.
+describe('machine_capacity.swapped_between', () => {
+	it('answers what the counter gained between two readings', () => {
+		expect(machine_capacity.swapped_between(AVAILABLE_MB, AVAILABLE_MB + 1)).toBe(1)
+	})
+
+	it('reads a counter that went back as nothing swapped', () => {
+		expect(machine_capacity.swapped_between(AVAILABLE_MB, 0)).toBe(0)
+	})
+
+	it('answers undefined when either reading is unread', () => {
+		expect(machine_capacity.swapped_between(undefined, 1)).toBeUndefined()
+		expect(machine_capacity.swapped_between(1, undefined)).toBeUndefined()
+	})
+})
