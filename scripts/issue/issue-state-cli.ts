@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { issue_report_failures, type ReadFailureKind } from './issue-report-failures'
@@ -28,7 +29,6 @@ import { issue_state, type IssueState } from './issue-state'
 
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = 'Usage: josh issue:state <issue-number> [<issue-number> ...] [--repo <owner/repo>]'
 // A blank line between the blocks of a multi-number report, so a person sees where one issue ends
 // while a reader matching `issue: ` still finds each block by its first line.
@@ -79,7 +79,8 @@ function read_repo(given: ReadonlyArray<string> | undefined): { repo?: string } 
 // unanswered. `#1262` copied out of a `diag` table is exactly that token.
 function is_issue_numbers(positionals: ReadonlyArray<string>): boolean {
 	return (
-		positionals.length > 0 && positionals.every((argument) => ISSUE_NUMBER_PATTERN.test(argument))
+		positionals.length > 0 &&
+		positionals.every((argument) => issue_number_shape.is_issue_number(argument))
 	)
 }
 

@@ -4,6 +4,7 @@ import { epic_busy } from '#scripts/epic/epic-busy'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { issue_cite, type IssueCiter } from '#scripts/issue/issue-cite'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -33,7 +34,6 @@ const SINGLE_ARGUMENT = 1
 const ISSUE_AND_PATH_ARGUMENTS = 2
 const ALL_FLAG = '--all'
 const NONE_TOKEN = 'none'
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 
 const USAGE = [
 	'Usage: josh lane:open <issue-number>',
@@ -72,7 +72,7 @@ async function guard_cut_session(): Promise<string | undefined> {
 function parse_lane_issue(value: string | undefined): string | undefined {
 	if (value === undefined) return undefined
 
-	return ISSUE_NUMBER_PATTERN.test(value) ? value : undefined
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(value) ? value : undefined
 }
 
 function parse_issue(rest: ReadonlyArray<string>): string | undefined {

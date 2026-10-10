@@ -1,6 +1,6 @@
 import { backlog_budget_cli } from '#scripts/backlog/backlog-budget-cli'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
-import { run_issue_number } from './run-issue-number'
 
 // The grammar of an invocation that can be carried across a session cut, and the only place it is
 // written down. Two readers need the same answer — the supervisor, to rebuild the text it wakes with,
@@ -66,7 +66,7 @@ interface Invocation {
 // A space is the only separator that can survive `detached-launch.ts`'s `is_safe_value`, which has
 // already refused every control character — so the split needs no pattern, and this file is left with
 // no regular expression of its own for a backtracking analysis to find. The one pattern it does use
-// is `run-issue-number.ts`'s, which is anchored and has no alternation.
+// is `issue-number-shape.ts`'s, which is anchored and has no alternation.
 function tokens_of(invocation: string): ReadonlyArray<string> {
 	return invocation.split(TOKEN_SEPARATOR).filter((token) => token.length > EMPTY_LENGTH)
 }
@@ -105,7 +105,7 @@ function rendered_options(tokens: ReadonlyArray<ArgumentToken>): ReadonlyArray<s
 	return rendered
 }
 
-// **The issue-number shape is `run-issue-number.ts`'s, for the reason the flag value's is
+// **The issue-number shape is `issue-number-shape.ts`'s, for the reason the flag value's is
 // `backlog:budget`'s.** It already refuses `0` and a leading zero, which is what keeps `#05` from
 // rebuilding as `#5` and being refused downstream as a rewritten record.
 // **The magnitude bound is here and not in the pattern**, which is anchored on digits and says nothing
@@ -117,7 +117,7 @@ function issue_of(token: string): number | undefined {
 
 	const digits = token.slice(ISSUE_PREFIX.length)
 
-	if (!run_issue_number.ISSUE_NUMBER_PATTERN.test(digits)) return undefined
+	if (!issue_number_shape.ISSUE_NUMBER_PATTERN.test(digits)) return undefined
 
 	const issue = Number(digits)
 

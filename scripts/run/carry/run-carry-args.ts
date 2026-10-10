@@ -1,6 +1,6 @@
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_invocation } from '#scripts/run/run-invocation'
-import { run_issue_number } from '#scripts/run/run-issue-number'
 import { run_carry, type CarryChange, type CarryClaimRequest, type CarryOwner } from './run-carry'
 
 // The argument half of `josh run:carry`: everything here turns `argv` into one `Request` and reads no
@@ -90,7 +90,7 @@ function to_count(value: OptionValue): number | undefined {
 }
 
 // **`--done` and `--merged` name an issue, so each is checked as one and not as a count.** The shape
-// is `run-issue-number.ts`'s, which already refuses `0` and a leading zero — the same rule the `run:*`
+// is `issue-number-shape.ts`'s, which already refuses `0` and a leading zero — the same rule the `run:*`
 // commands interpolate a number under, imported rather than restated. Absent is an empty object rather
 // than a zero: there is no issue to record, which is a different fact from recording issue zero. A
 // present-but-malformed value is `undefined`, which invalidates the whole invocation.
@@ -99,7 +99,7 @@ function to_issue(value: OptionValue): { issue?: number } | undefined {
 
 	if (text === undefined) return {}
 
-	if (!run_issue_number.ISSUE_NUMBER_PATTERN.test(text)) return undefined
+	if (!issue_number_shape.ISSUE_NUMBER_PATTERN.test(text)) return undefined
 
 	const issue = Number(text)
 

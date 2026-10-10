@@ -2,12 +2,12 @@
 import { fileURLToPath } from 'node:url'
 import { epic_issue } from '#scripts/epic/epic-issue'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_added, type CarryAddition } from '#scripts/run/carry/run-carry-added'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_invocation } from '#scripts/run/run-invocation'
-import { run_issue_number } from '#scripts/run/run-issue-number'
 import { run_add, type AddOutcome, type AddPorts, type IssueView } from './run-add'
 
 // `josh run:add <issue...> [--no-priority]` — the wiring around `run-add.ts`.
@@ -40,7 +40,7 @@ interface LiveRun {
 function parse_issue(token: string): number | undefined {
 	const digits = token.startsWith(ISSUE_PREFIX) ? token.slice(ISSUE_PREFIX.length) : token
 
-	return run_issue_number.ISSUE_NUMBER_PATTERN.test(digits) ? Number(digits) : undefined
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(digits) ? Number(digits) : undefined
 }
 
 // Every token but the flag must be an issue number: a typo is refused whole rather than adding the

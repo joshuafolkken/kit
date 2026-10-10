@@ -1,9 +1,9 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_await } from '#scripts/lane/lane-await'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
-import { run_issue_number } from './run-issue-number'
 import {
 	MS_PER_MINUTE,
 	MS_PER_SECOND,
@@ -93,7 +93,7 @@ interface ParsedArguments {
 function is_valid_target(parsed: ParsedArguments): boolean {
 	return (
 		parsed.positionals.length === 1 &&
-		run_issue_number.ISSUE_NUMBER_PATTERN.test(parsed.positionals[0] ?? '')
+		issue_number_shape.ISSUE_NUMBER_PATTERN.test(parsed.positionals[0] ?? '')
 	)
 }
 

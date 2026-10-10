@@ -3,10 +3,10 @@ import { agent_exit_record } from '#scripts/agent/agent-exit-record'
 import { api_outage } from '#scripts/agent/api-outage'
 import type { ClaudeResultEvent } from '#scripts/agent/claude-result-event'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state } from '#scripts/issue/issue-state'
 import { run_cut } from '#scripts/run/cut/run-cut'
 import { run_hold } from '#scripts/run/hold/run-hold'
-import { run_issue_number } from './run-issue-number'
 import { run_liveness } from './run-liveness'
 
 // `josh run:ending <N>` — how a dispatched lane child *ended*, not whether it is still moving.
@@ -210,7 +210,7 @@ async function read_traces(request: EndingRequest): Promise<EndingTraces> {
 }
 
 async function check(request: EndingRequest): Promise<EndingDecision> {
-	run_issue_number.require_issue_number(request.issue)
+	issue_number_shape.require_issue_number(request.issue)
 
 	return decide(await read_traces(request))
 }

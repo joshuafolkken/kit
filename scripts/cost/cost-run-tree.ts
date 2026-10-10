@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { cost_run_cut } from './cost-run-cut'
 import { cost_run_nodes, type NodeContext, type RunNode } from './cost-run-nodes'
@@ -183,8 +184,6 @@ function build_tree(
 	return to_tree(files, chosen, context, clusters.length)
 }
 
-const LANE_ISSUE = /^\d+$/u
-
 function lane_prefix(cwd: string): string {
 	return `${cost_transcript.project_slug(lane_paths.lane_root(cwd))}-`
 }
@@ -207,7 +206,7 @@ function lane_issue_of(
 
 	const rest = slug.slice(prefix.length)
 
-	return LANE_ISSUE.test(rest) ? Number(rest) : undefined
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(rest) ? Number(rest) : undefined
 }
 
 function to_context(

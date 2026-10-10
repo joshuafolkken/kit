@@ -1,5 +1,5 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { run_issue_number } from '#scripts/run/run-issue-number'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { run_ship_next, type ShipResume } from '#scripts/run/ship/run-ship-next'
 import type { Stage } from '#scripts/run/ship/run-ship-stage'
 
@@ -17,7 +17,7 @@ const RESUME_GUIDE = '.claude/skills/workflow-commands/pre-gate-cut.md'
 const SHIP_PROCESS = String.raw`(josh(\.[jt]s)? ship|run-ship-cli\.ts)`
 
 function child_invocation(issue: string): string {
-	run_issue_number.require_issue_number(issue)
+	issue_number_shape.require_issue_number(issue)
 
 	return `${CHILD_INVOCATION} ${issue_cite.plain(issue)}`
 }
@@ -32,7 +32,7 @@ function child_invocation(issue: string): string {
 // command line ends with its `#<N>` title, so the one extended pattern covers both, and the wait, the
 // liveness read and the reaper keep searching with a single pattern.
 function process_pattern(issue: string): string {
-	run_issue_number.require_issue_number(issue)
+	issue_number_shape.require_issue_number(issue)
 
 	return `(${CHILD_INVOCATION}|${SHIP_PROCESS} .*) ${issue_cite.plain(issue)}$`
 }

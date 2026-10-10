@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { git_stash } from '#scripts/git/stash/git-stash'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_read_cli, type BlockRead } from '#scripts/issue/issue-read-cli'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { session_cite } from '#scripts/issue/session-cite'
@@ -26,7 +27,6 @@ import { run_prep_locate } from './run-prep-locate'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = 'Usage: josh run:prep <issue-number>'
 const LANE_SKIP_SCOPE = 'not asked'
 const LANE_SKIP_REASON =
@@ -51,7 +51,11 @@ interface PrepReads {
 function parse_number(argv: ReadonlyArray<string>): string | undefined {
 	const [first] = argv
 
-	if (first === undefined || argv.length !== 1 || !ISSUE_NUMBER_PATTERN.test(first)) {
+	if (
+		first === undefined ||
+		argv.length !== 1 ||
+		!issue_number_shape.ISSUE_NUMBER_PATTERN.test(first)
+	) {
 		return undefined
 	}
 

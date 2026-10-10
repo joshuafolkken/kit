@@ -66,6 +66,13 @@ test('waits rather than launching a child already in flight', async () => {
 	expect(await verdict_of([CHILD])).toBe('wait')
 })
 
+// joshuafolkken/kit#3597: `0` and a leading zero are not issue numbers, so neither is launched as a child.
+test.each(['0\n', '05\n'])('refuses to offer %j as a child of the epic', async (out) => {
+	answer(out)
+
+	expect(await offer_of()).toMatchObject({ verdict: 'wait', issues: [] })
+})
+
 test('waits while every open child is behind an open dependency', async () => {
 	answer('wait\n')
 

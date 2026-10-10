@@ -1,3 +1,4 @@
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import type { DriveState } from './backlog-drive'
 
@@ -9,7 +10,6 @@ import type { DriveState } from './backlog-drive'
 const MS_PER_MINUTE = 60_000
 const LIST_SEPARATOR = ','
 const COUNT_PATTERN = /^\d+$/u
-const ISSUE_PATTERN = /^[1-9]\d*$/u
 const USAGE =
 	'Usage: josh backlog:drive --owner <pid> [--active <ISO-8601>] [--max <n>] [--idle <minutes>] [--only] [--exclude <n>[,<n>...]] [--await <n>[,<n>...]] [--window <minutes>] [--stopped <n>]'
 
@@ -51,7 +51,7 @@ function to_issues(raw: string | undefined): ReadonlyArray<string> | undefined {
 
 	const issues = raw.split(LIST_SEPARATOR)
 
-	return issues.some((issue) => !ISSUE_PATTERN.test(issue)) ? undefined : issues
+	return issues.some((issue) => !issue_number_shape.is_issue_number(issue)) ? undefined : issues
 }
 
 function forwarded_of(values: Values): ReadonlyArray<string> | undefined {
@@ -72,7 +72,8 @@ function is_valid_window(raw: string | undefined): boolean {
 }
 
 function is_valid_single(values: Values): boolean {
-	const is_valid_stopped = values.stopped === undefined || ISSUE_PATTERN.test(values.stopped)
+	const is_valid_stopped =
+		values.stopped === undefined || issue_number_shape.ISSUE_NUMBER_PATTERN.test(values.stopped)
 
 	return is_valid_stopped && is_valid_window(values.window)
 }

@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
@@ -20,7 +21,6 @@ import { run_status, type StatusParts } from './run-status'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = 'Usage: josh run:status <issue-number> [--repo <owner/repo>]'
 const CARRY_NONE_NOTE = 'no run recorded here'
 const CARRY_UNREADABLE_NOTE = '(run record not bundled: unreadable)'
@@ -49,7 +49,7 @@ function valid_issue(positionals: ReadonlyArray<string>): string | undefined {
 
 	if (first === undefined || rest.length > 0) return undefined
 
-	return ISSUE_NUMBER_PATTERN.test(first) ? first : undefined
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(first) ? first : undefined
 }
 
 function parse(argv: ReadonlyArray<string>): StatusRequest | undefined {

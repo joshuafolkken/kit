@@ -1,4 +1,5 @@
 import type { AgentProvider } from '#scripts/agent/agent-role-profile'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { run_invocation } from '#scripts/run/run-invocation'
 
 // `josh backlogrun`'s arguments. `--agent claude|codex` picks the agent the run
@@ -13,7 +14,6 @@ const AGENT_FLAG = '--agent'
 const BACKLOG_COMMAND = 'backlogrun'
 const ISSUE_PREFIX = '#'
 const FLAG_PREFIX = '-'
-const BARE_ISSUE = /^\d+$/u
 const NOT_FOUND = -1
 const FLAG_AND_VALUE = 2
 const AGENTS: Readonly<Record<string, AgentProvider>> = { claude: 'anthropic', codex: 'openai' }
@@ -45,7 +45,7 @@ function split_agent(argv: ReadonlyArray<string>): AgentSplit {
 }
 
 function issue_token(token: string): string {
-	return BARE_ISSUE.test(token) ? `${ISSUE_PREFIX}${token}` : token
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(token) ? `${ISSUE_PREFIX}${token}` : token
 }
 
 // The named list is the leading block before the first flag, as the grammar reads it.

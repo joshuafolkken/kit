@@ -51,6 +51,11 @@ describe('backlogrun_args.parse flags', () => {
 		{ argv: ['--agent'] },
 		{ argv: ['--bogus'] },
 		{ argv: ['--agent', 'claude', '--agent', 'codex'] },
+		// joshuafolkken/kit#3597: issue `0` and a leading zero are not issue numbers, bare or prefixed.
+		{ argv: ['0'] },
+		{ argv: ['#0'] },
+		{ argv: ['05'] },
+		{ argv: ['3437', '0'] },
 	])('refuses $argv with the usage', ({ argv }) => {
 		expect(parse(argv)).toStrictEqual({ kind: 'refused' })
 	})
