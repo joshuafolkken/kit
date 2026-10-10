@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_body } from '#scripts/josh/cli-body'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
@@ -21,7 +22,6 @@ const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const BODY_FLAG = '--body'
 const BODY_FILE_FLAG = '--body-file'
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = `Usage: josh issue:comment <issue-number> ${BODY_FLAG} <text> | ${BODY_FILE_FLAG} <path>`
 
 interface CommentRequest {
@@ -39,7 +39,9 @@ function single_issue_number(positionals: ReadonlyArray<string>): string | undef
 	const [issue_number, ...rest] = positionals
 	const is_single = rest.length === 0 && issue_number !== undefined
 
-	return is_single && ISSUE_NUMBER_PATTERN.test(issue_number) ? issue_number : undefined
+	return is_single && issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue_number)
+		? issue_number
+		: undefined
 }
 
 // `resolve` may throw when both body flags are given, which `run` reports — the message names the two

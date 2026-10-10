@@ -5,6 +5,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list, MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 import { repository_labels } from '#scripts/repo/repository-labels'
@@ -23,7 +24,6 @@ import { session_cite } from './session-cite'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = 'Usage: josh issue:release <issue-number>'
 const NONE = 'none'
 const UNKNOWN_REPO_MESSAGE =
@@ -128,7 +128,9 @@ function issue_number_of(argv: ReadonlyArray<string>): number | undefined {
 	const [issue_number, ...rest] = positionals_of(argv)
 	const is_single = rest.length === 0 && issue_number !== undefined
 
-	return is_single && ISSUE_NUMBER_PATTERN.test(issue_number) ? Number(issue_number) : undefined
+	return is_single && issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue_number)
+		? Number(issue_number)
+		: undefined
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

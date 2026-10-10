@@ -5,6 +5,7 @@ import type { AgentProfile } from '#scripts/agent/agent-role-profile'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { git_command } from '#scripts/git/git-command'
 import { git_worktree } from '#scripts/git/git-worktree'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { file_reader } from '#scripts/lib/read-file'
 import { lane_environment } from './lane-environment'
 import { lane_paths } from './lane-paths'
@@ -43,10 +44,6 @@ interface LaneInfo {
 const WORKTREE_PREFIX = 'worktree '
 const BRANCH_PREFIX = 'branch refs/heads/'
 const BLOCK_SEPARATOR = '\n\n'
-// The same shape `lane:open` accepts. Nothing reserves the `-lane` suffix, so a hand-made
-// `spike-lane` branch with a work tree would otherwise be read as a lane — and `lane:close --all`
-// would delete its directory and its branch on an issue number that never existed.
-const ISSUE_PATTERN = /^[1-9]\d*$/u
 
 function line_value(lines: ReadonlyArray<string>, prefix: string): string | undefined {
 	return lines.find((line) => line.startsWith(prefix))?.slice(prefix.length)
@@ -112,12 +109,16 @@ function read_environment(directory: string): string | undefined {
 // A lane is identified by its branch rather than by where it sits, so nothing here compares two
 // spellings of one path — git prints the resolved one, and a lane root reached through a symlink
 // would otherwise read as no lane at all.
+//
+// The issue is the same shape `lane:open` accepts. Nothing reserves the `-lane` suffix, so a hand-made
+// `spike-lane` branch with a work tree would otherwise be read as a lane — and `lane:close --all`
+// would delete its directory and its branch on an issue number that never existed.
 function branch_issue(branch: string | undefined): string | undefined {
 	if (!branch?.endsWith(lane_paths.LANE_BRANCH_SUFFIX)) return undefined
 
 	const issue = branch.slice(0, -lane_paths.LANE_BRANCH_SUFFIX.length)
 
-	return ISSUE_PATTERN.test(issue) ? issue : undefined
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue) ? issue : undefined
 }
 
 // **Stranded means the work tree is gone from disk, and nothing else.** git also marks a

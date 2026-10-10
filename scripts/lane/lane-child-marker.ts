@@ -1,4 +1,4 @@
-import { run_issue_number } from '#scripts/run/run-issue-number'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_paths } from './lane-paths'
 
 // The mark a dispatched lane child carries, so the pre-gate cut and a resume are decided from the
@@ -34,7 +34,7 @@ type MarkerSource = Readonly<Record<string, string | undefined>>
 // issue number rather than from text read anywhere — the same discipline `lane-dispatch.ts` applies to
 // the invocation it builds — so a malformed number fails here rather than reaching a child.
 function environment_for(issue: string): Record<string, string> {
-	run_issue_number.require_issue_number(issue)
+	issue_number_shape.require_issue_number(issue)
 
 	return { [KEY]: issue, [CACHE_TTL_KEY]: CACHE_TTL }
 }
@@ -47,7 +47,7 @@ function marked_issue(source: MarkerSource = process.env): string | undefined {
 
 	if (value === undefined) return undefined
 
-	return run_issue_number.ISSUE_NUMBER_PATTERN.test(value) ? value : undefined
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(value) ? value : undefined
 }
 
 // True when this session is a dispatched lane child for the checkout it is running in: the mark is

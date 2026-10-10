@@ -14,7 +14,6 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 // not know refuses the invocation — a mistyped flag would otherwise leave its value positional, so it
 // becomes an issue number and the edit silently lands somewhere else.
 
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 // Every value flag is read as a list so a repeat is visible rather than resolved to one of the two:
 // two `--decision-file` paths name two records, and two `--before` targets name two places.
 const VALUE_OPTION = { type: 'string', multiple: true } as const
@@ -104,5 +103,5 @@ const epic_cli_argv = {
 	is_value_unusable,
 }
 
-export { epic_cli_argv, ISSUE_NUMBER_PATTERN }
+export { epic_cli_argv }
 export type { EpicArgv, FormFlags }

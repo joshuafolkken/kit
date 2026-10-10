@@ -99,7 +99,7 @@ describe('a backlogrun invocation with a named issue list', () => {
 		expect(run_invocation.rebuild('backlogrun --max 5 #1749')).toBeUndefined()
 	})
 
-	// `run-issue-number.ts` refuses `0` and a leading zero outright, so — unlike a flag value — a
+	// `issue-number-shape.ts` refuses `0` and a leading zero outright, so — unlike a flag value — a
 	// malformed issue reference never reaches the normalization above and is refused here.
 	it.each(['backlogrun #0', 'backlogrun #05', 'backlogrun #17a9', 'backlogrun #'])(
 		REFUSES,

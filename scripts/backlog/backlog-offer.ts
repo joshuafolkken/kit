@@ -1,3 +1,4 @@
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import type { BacklogAnswer } from './backlog-budget'
 import { backlog_next } from './backlog-next'
 
@@ -17,7 +18,6 @@ import { backlog_next } from './backlog-next'
 const RETRY_LIMIT = 3
 const FAILURE_EXIT_CODE = 1
 const NO_RETRIES = 0
-const NUMBER_PATTERN = /^[1-9]\d*$/u
 
 const TOKENS = backlog_next.VERDICT_TOKENS
 
@@ -70,7 +70,7 @@ function from_verdict(token: string, running: number, retries: number): OfferAns
 }
 
 function is_numbers(tokens: ReadonlyArray<string>): boolean {
-	return tokens.length > 0 && tokens.every((token) => NUMBER_PATTERN.test(token))
+	return tokens.length > 0 && tokens.every((token) => issue_number_shape.is_issue_number(token))
 }
 
 // **Read the exit code before the tokens.** Exit 1 is "the listing could not be read", which is never

@@ -4,13 +4,13 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { LabelWrite } from '#scripts/gh/git-gh-issue-write'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ending } from '#scripts/run/run-ending'
-import { run_issue_number } from '#scripts/run/run-issue-number'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch_log } from './lane-dispatch-log'
@@ -348,7 +348,7 @@ async function finish_dispatch(issue: string, request: StartRequest): Promise<Di
 
 /** Start `fullrun #<N>` detached in the lane for `#<N>`, recording where it writes as it does so. */
 async function dispatch_child(issue: string): Promise<DispatchOutcome> {
-	run_issue_number.require_issue_number(issue)
+	issue_number_shape.require_issue_number(issue)
 
 	const lane = await lane_registry.find_open_lane(issue)
 

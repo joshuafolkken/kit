@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
 import { run_label } from '#scripts/run/run-label'
 import { run_preflight, type PreflightDecision } from '#scripts/run/run-preflight'
@@ -49,7 +50,6 @@ const HALFRUN_STOP_FLAG = '--halfrun-stop'
 const PRRUN_STOP_FLAG = '--prrun-stop'
 // The most a claim reads: the issue number and the one flag after it.
 const MAX_CLAIM_ARGUMENTS = 2
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE =
 	'Usage: josh run:hold [<issue-number> [--fullrun | --halfrun-stop | --prrun-stop]] | josh run:release [<issue-number> | --force]'
 
@@ -116,7 +116,9 @@ function parse_claim(argv: ReadonlyArray<string>): HoldRequest | undefined {
 
 	if (first === undefined) return { kind: 'claim', issue: run_hold.UNNUMBERED_ISSUE }
 
-	if (argv.length > MAX_CLAIM_ARGUMENTS || !ISSUE_NUMBER_PATTERN.test(first)) return undefined
+	if (argv.length > MAX_CLAIM_ARGUMENTS || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(first)) {
+		return undefined
+	}
 
 	return numbered_claim(first, flag)
 }
@@ -124,7 +126,7 @@ function parse_claim(argv: ReadonlyArray<string>): HoldRequest | undefined {
 function parse_release_argument(first: string): HoldRequest | undefined {
 	if (first === FORCE_FLAG) return FORCE_RELEASE_REQUEST
 
-	return ISSUE_NUMBER_PATTERN.test(first) ? release_request(first) : undefined
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(first) ? release_request(first) : undefined
 }
 
 // **A bare `run:release` is the unnumbered run's release, not a release of whatever is there.** It

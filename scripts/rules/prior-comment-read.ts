@@ -1,4 +1,5 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { tail_commands } from './tail-commands'
@@ -22,7 +23,6 @@ const ISSUE_PATH_NUMBER = /issues\/(\d+)/gu
 const ISSUE_VIEW_NUMBER = /\bissue\s+view\s+(?:-{1,2}\S+\s+)*(\d+)/u
 // The run of numbers `pnpm josh issue:read` takes as its positional arguments.
 const ISSUE_READ_ARGUMENTS = /\bissue:read\b([\s\d]*)/u
-const A_NUMBER = /^\d+$/u
 
 // A command that prints an Issue's comments: the comments endpoint, `gh issue view … --comments`, or
 // the josh command that reads body and comments together.
@@ -38,7 +38,7 @@ function add_issue_read_numbers(command: string, numbers: Set<number>): void {
 	const tokens = (match[1] ?? '').split(/\s+/u)
 
 	for (const token of tokens) {
-		if (A_NUMBER.test(token)) numbers.add(Number(token))
+		if (issue_number_shape.ISSUE_NUMBER_PATTERN.test(token)) numbers.add(Number(token))
 	}
 }
 

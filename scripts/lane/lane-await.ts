@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import {
 	PROCESS_ALIVE,
@@ -27,7 +28,6 @@ const RECONFIRM_MS = 15_000
 const DEFAULT_POLL_MS = 5000
 const NEVER_APPEARED_TIMEOUT_MS = 600_000
 const MS_PER_SECOND = 1000
-const ISSUE_PATTERN = /^[1-9]\d*$/u
 const PROCESS_FOUND = 0
 const PROCESS_NOT_FOUND = 1
 
@@ -119,7 +119,10 @@ function is_valid(raw: RawAwaitArguments): boolean {
 	const { owner } = raw.values
 	const numbers = owner === undefined ? raw.positionals : [...raw.positionals, owner]
 
-	return raw.positionals.length > 0 && numbers.every((value) => ISSUE_PATTERN.test(value))
+	return (
+		raw.positionals.length > 0 &&
+		numbers.every((value) => issue_number_shape.is_issue_number(value))
+	)
 }
 
 // The issues to wait on and the waiting session's pid, or `undefined` for anything else.

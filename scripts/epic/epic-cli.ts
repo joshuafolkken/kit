@@ -1,7 +1,8 @@
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_body } from '#scripts/josh/cli-body'
 import type { InsertKind, InsertPosition } from './epic-chains'
-import { epic_cli_argv, ISSUE_NUMBER_PATTERN, type EpicArgv, type FormFlags } from './epic-cli-argv'
+import { epic_cli_argv, type EpicArgv, type FormFlags } from './epic-cli-argv'
 import { epic_cli_remove } from './epic-cli-remove'
 import { epic_parse, type ExternalChild } from './epic-parse'
 
@@ -67,7 +68,7 @@ interface PromoteArguments {
 // `--ordered` would ask GitHub to make an issue block itself.
 function to_child_numbers(raw_children: ReadonlyArray<string>): Array<number> {
 	const numbers = raw_children
-		.filter((raw) => ISSUE_NUMBER_PATTERN.test(raw))
+		.filter((raw) => issue_number_shape.is_issue_number(raw))
 		.map(Number)
 		.filter((value) => Number.isSafeInteger(value))
 
@@ -121,7 +122,10 @@ interface ReconcileArguments {
 // and no position — the repair reads what the epic already records rather than being told an order.
 function parse_reconcile_arguments(argv: ReadonlyArray<string>): ReconcileArguments | undefined {
 	const [raw_epic] = positionals_of(argv, RECONCILE_FORM)
-	if (raw_epic === undefined || !ISSUE_NUMBER_PATTERN.test(raw_epic)) return undefined
+
+	if (raw_epic === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(raw_epic)) {
+		return undefined
+	}
 
 	return { epic_number: Number(raw_epic) }
 }
@@ -131,7 +135,11 @@ function parse_reconcile_arguments(argv: ReadonlyArray<string>): ReconcileArgume
 // have it block itself under `--ordered`.
 function to_promote_arguments(parsed: EpicArgv): PromoteArguments | undefined {
 	const [raw_epic, ...raw_children] = parsed.positionals
-	if (raw_epic === undefined || !ISSUE_NUMBER_PATTERN.test(raw_epic)) return undefined
+
+	if (raw_epic === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(raw_epic)) {
+		return undefined
+	}
+
 	const epic_number = Number(raw_epic)
 	const children = to_child_numbers(raw_children).filter((child) => child !== epic_number)
 	if (children.length === 0) return undefined
@@ -225,7 +233,7 @@ function parse_position(parsed: EpicArgv): PositionOutcome {
 	const has_flag = count_position_flags(parsed) > 0
 	const target = read_position_target(parsed)
 	if (target === undefined) return has_flag ? REFUSED_POSITION : NO_POSITION
-	if (!ISSUE_NUMBER_PATTERN.test(target.raw)) return REFUSED_POSITION
+	if (!issue_number_shape.ISSUE_NUMBER_PATTERN.test(target.raw)) return REFUSED_POSITION
 
 	return {
 		position: { kind: target.kind, target: Number(target.raw) },
@@ -246,7 +254,11 @@ function read_add_subject(
 	parsed: EpicArgv,
 ): { epic_number: number; children: Array<number> } | undefined {
 	const [raw_epic, ...raw_children] = parsed.positionals
-	if (raw_epic === undefined || !ISSUE_NUMBER_PATTERN.test(raw_epic)) return undefined
+
+	if (raw_epic === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(raw_epic)) {
+		return undefined
+	}
+
 	const epic_number = Number(raw_epic)
 	const children = to_child_numbers(raw_children).filter((child) => child !== epic_number)
 
@@ -354,7 +366,7 @@ function format_cross_repo_refusal(found: CrossRepoAddTarget): string {
 
 function parse_check_argument(argv: ReadonlyArray<string>): number | undefined {
 	const [raw] = positionals_of(argv, CHECK_FORM)
-	if (raw === undefined || !ISSUE_NUMBER_PATTERN.test(raw)) return undefined
+	if (raw === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(raw)) return undefined
 
 	return Number(raw)
 }
