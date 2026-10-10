@@ -74,7 +74,6 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/git/git-fixture-workspace.ts',
 	'scripts/git/git-ls-remote.ts',
 	'scripts/git/git-pre-push-hook.ts',
-	'scripts/git/git-ssh-keepalive.ts',
 	'scripts/git/stash/stash-pop-args.ts',
 	'scripts/hooks/format-edited-cli.ts',
 	'scripts/hooks/pretool-guard-cli.ts',

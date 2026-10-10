@@ -10,9 +10,9 @@
 // slash.
 //
 // **It is the arguments that are shared, not the spawn.** `git_worktree.ls_remote_branch` runs this
-// asynchronously against the process's own cwd with no timeout, while
-// `propagate_git.has_remote_branch` runs it synchronously against a consumer's path under a remote
-// budget — three differences that belong to those callers. What is shared is the knowledge above:
+// asynchronously against the process's own cwd, while `propagate_git.has_remote_branch` runs it
+// synchronously against a consumer's path — both under a remote budget, and two differences that
+// belong to those callers. What is shared is the knowledge above:
 // kept in one module, a fix to it reaches both.
 const LS_REMOTE_COMMAND = 'ls-remote'
 const HEADS_FLAG = '--heads'

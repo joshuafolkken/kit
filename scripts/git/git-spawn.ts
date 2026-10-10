@@ -1,3 +1,4 @@
+import { GIT_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import { git_utilities } from './constants'
 import {
@@ -24,21 +25,27 @@ import { git_ssh_keepalive } from './git-ssh-keepalive'
 // `scripts/git/git-fixture-workspace.ts`), and an audit of how the git binary is resolved has to read
 // those too.
 
-async function read(arguments_: Array<string>): Promise<string> {
+// Bounded by `GIT_TIMEOUT_MS` unless the caller says otherwise, as the synchronous `git_spawn_sync.run`
+// is: a local git that never answers ends the call instead of holding an unattended run open.
+async function read(
+	arguments_: Array<string>,
+	timeout_ms: number = GIT_TIMEOUT_MS,
+): Promise<string> {
 	const git_cmd = git_utilities.get_git_command_for_spawn()
 	// execa runs the binary directly with an argument array and no `shell` option, so CLI
 	// args cannot break out of a shell sandbox; the git command and args are internally
 	// controlled, never untrusted input. tssecurity:S8705 is a false positive here.
-	const { stdout } = await execa(git_cmd, arguments_) // NOSONAR
+	const { stdout } = await execa(git_cmd, arguments_, { timeout: timeout_ms }) // NOSONAR
 
 	return stdout.trimEnd()
 }
 
 // The budget for a git call that talks to the remote — `fetch` and `pull`.
-// `read` and `with_output` wait without end, and a `git fetch --prune` under `josh main:sync` sat on
-// a dead ssh connection for 37 minutes, stalling the unattended backlog driver whose merge step runs
-// it. The push's budget is reused rather than a second number chosen: both transfer objects over the
-// same transport, and that one is already read off what a healthy transfer costs here.
+// `read` and `with_output` once waited without end, and a `git fetch --prune` under `josh main:sync`
+// sat on a dead ssh connection for 37 minutes, stalling the unattended backlog driver whose merge step
+// runs it. Their default now is a local command's, far too short for a transfer, so a remote call
+// still takes this one. The push's budget is reused rather than a second number chosen: both transfer
+// objects over the same transport, and that one is already read off what a healthy transfer costs here.
 const REMOTE_TIMEOUT_MS = PUSH_TIMEOUT_MS
 const MS_PER_SECOND = 1000
 
@@ -46,7 +53,7 @@ const MS_PER_SECOND = 1000
 // `cause` carries the same `TIMEOUT_EXIT_CODE` a timed-out push does. Unlike the push it is not
 // retried here: what the issue needed is that the wait ends, and a failure then surfaces to the
 // caller — `run:merge` raises a failed `main:sync` — instead of a second budget doubling the wait.
-function to_remote_error(command: string, error: unknown, timeout_ms: number): Error {
+function to_budget_error(command: string, error: unknown, timeout_ms: number): Error {
 	if (!has_timed_out(error)) return create_spawn_error(command, get_exit_code(error))
 
 	const seconds = String(Math.round(timeout_ms / MS_PER_SECOND))
@@ -75,7 +82,7 @@ async function spawn_remote(arguments_: Array<string>, options: RemoteOptions): 
 
 		return typeof stdout === 'string' ? stdout.trimEnd() : ''
 	} catch (error) {
-		throw to_remote_error(arguments_[0] ?? '', error, options.timeout)
+		throw to_budget_error(arguments_[0] ?? '', error, options.timeout)
 	}
 }
 
@@ -103,11 +110,20 @@ async function with_output_remote(command: string, arguments_list: Array<string>
 
 // `config_options` are `-c <key>=<value>` pairs, which git reads only ahead of the command name and
 // which last for this one call — nothing is written into anyone's git configuration.
+//
+// `timeout_ms` defaults to a local command's budget. A command that runs hooks — a commit, a merge,
+// `git hook run` — is not one, and names the longer budget itself.
+interface OutputOptions {
+	config_options?: ReadonlyArray<string>
+	timeout_ms?: number
+}
+
 async function with_output(
 	command: string,
 	arguments_list: Array<string>,
-	config_options: ReadonlyArray<string> = [],
+	options: OutputOptions = {},
 ): Promise<void> {
+	const { config_options = [], timeout_ms = GIT_TIMEOUT_MS } = options
 	const git_command_bin = git_utilities.get_git_command_for_spawn()
 	const spawn_arguments = [...config_options, command, ...arguments_list]
 
@@ -115,9 +131,9 @@ async function with_output(
 		// execa runs the binary directly with an argument array and no `shell` option, so CLI
 		// args cannot break out of a shell sandbox; the git command and args are internally
 		// controlled, never untrusted input. tssecurity:S8705 is a false positive here.
-		await execa(git_command_bin, spawn_arguments, { stdio: 'inherit' }) // NOSONAR
+		await execa(git_command_bin, spawn_arguments, { stdio: 'inherit', timeout: timeout_ms }) // NOSONAR
 	} catch (error) {
-		throw create_spawn_error(command, get_exit_code(error))
+		throw to_budget_error(command, error, timeout_ms)
 	}
 }
 

@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { INSTALL_TIMEOUT_MS, SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_common_directory } from './git-common-directory'
 import { git_worktree } from './git-worktree'
@@ -13,10 +14,24 @@ import { git_worktree } from './git-worktree'
 // milliseconds so two calls left to run side by side would overlap there (joshuafolkken/kit#2736).
 const spawn_mock = vi.hoisted(() => {
 	const HOLD_MS = 20
-	const state = { last_arguments: [] as Array<string>, active: 0, peak: 0 }
+	const state = {
+		last_arguments: [] as Array<string>,
+		last_timeout_ms: undefined as number | undefined,
+		// What the remote spawn was handed, kept apart so a call routed through `read` leaves it empty.
+		remote_arguments: [] as Array<string>,
+		active: 0,
+		peak: 0,
+	}
 
-	async function read(arguments_: Array<string>): Promise<string> {
+	async function read_remote(arguments_: Array<string>): Promise<string> {
+		state.remote_arguments = [...arguments_]
+
+		return ''
+	}
+
+	async function read(arguments_: Array<string>, timeout_ms?: number): Promise<string> {
 		state.last_arguments = [...arguments_]
+		state.last_timeout_ms = timeout_ms
 		state.active += 1
 		state.peak = Math.max(state.peak, state.active)
 		await new Promise<void>((resolve) => {
@@ -27,11 +42,11 @@ const spawn_mock = vi.hoisted(() => {
 		return ''
 	}
 
-	return { state, read }
+	return { state, read, read_remote }
 })
 
 vi.mock('./git-spawn', () => ({
-	git_spawn: { read: spawn_mock.read },
+	git_spawn: { read: spawn_mock.read, read_remote: spawn_mock.read_remote },
 }))
 
 // joshuafolkken/kit#1490: a lane's whole lifecycle is these four calls, and each one's flags are the
@@ -54,6 +69,8 @@ const scratch = mkdtempSync(path.join(tmpdir(), 'git-worktree-test-'))
 
 beforeEach(() => {
 	spawn_mock.state.last_arguments = []
+	spawn_mock.state.last_timeout_ms = undefined
+	spawn_mock.state.remote_arguments = []
 	spawn_mock.state.peak = 0
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(scratch)
 })
@@ -100,6 +117,34 @@ describe('git_worktree worktree calls', () => {
 	})
 })
 
+// joshuafolkken/kit#3590: an add checks a tree out, so a consumer's `post-checkout` hook runs inside
+// it and a local git command's budget would end the add mid-hook.
+describe('git_worktree budgets', () => {
+	it('gives both adds the budget of a suite', async () => {
+		await git_worktree.worktree_add(LANE_DIRECTORY, LANE_BRANCH, ORIGIN_MAIN_REF)
+		const add_timeout_ms = spawn_mock.state.last_timeout_ms
+
+		await git_worktree.worktree_add_detached(LANE_DIRECTORY, 'abc1234')
+
+		expect(add_timeout_ms).toBe(SUITE_TIMEOUT_MS)
+		expect(spawn_mock.state.last_timeout_ms).toBe(SUITE_TIMEOUT_MS)
+	})
+
+	// It runs no hook, but it deletes the `node_modules` an install wrote: cut at a local command's
+	// budget it leaves a half-deleted tree, and `release_worktree.remove` raises instead of going on.
+	it('gives a removal the budget of an install', async () => {
+		await git_worktree.worktree_remove(LANE_DIRECTORY)
+
+		expect(spawn_mock.state.last_timeout_ms).toBe(INSTALL_TIMEOUT_MS)
+	})
+
+	it('leaves a prune on the local budget', async () => {
+		await git_worktree.worktree_prune()
+
+		expect(spawn_mock.state.last_timeout_ms).toBeUndefined()
+	})
+})
+
 describe('git_worktree lane reads', () => {
 	it('asks for the machine-readable listing rather than the displayed one', async () => {
 		await git_worktree.worktree_list()
@@ -110,11 +155,13 @@ describe('git_worktree lane reads', () => {
 	// Asked of the remote rather than of a remote-tracking ref, because nothing prunes those and a
 	// stale one cannot say "gone" (joshuafolkken/kit#1627). The pattern is the full ref path, so that
 	// a branch pushed under a prefix — `refs/heads/wip/1490-lane` is the shape that bit — can no
-	// longer answer for this one on a ref-tail match (joshuafolkken/kit#1709).
+	// longer answer for this one on a ref-tail match (joshuafolkken/kit#1709). It goes through the
+	// remote spawn: `read` is bounded as a local command, too short for a slow connection
+	// (joshuafolkken/kit#3590).
 	it('asks the remote for the full ref path of the lane branch, not the bare name', async () => {
 		await git_worktree.ls_remote_branch(LANE_BRANCH)
 
-		expect(spawn_mock.state.last_arguments).toStrictEqual([
+		expect(spawn_mock.state.remote_arguments).toStrictEqual([
 			'ls-remote',
 			'--heads',
 			'origin',
@@ -128,7 +175,7 @@ describe('git_worktree lane reads', () => {
 	it('prefixes a slash-bearing release branch name exactly once', async () => {
 		await git_worktree.ls_remote_branch(RELEASE_BRANCH)
 
-		expect(spawn_mock.state.last_arguments).toStrictEqual([
+		expect(spawn_mock.state.remote_arguments).toStrictEqual([
 			'ls-remote',
 			'--heads',
 			'origin',
