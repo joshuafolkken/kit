@@ -417,7 +417,7 @@ pnpm josh run:board --chat   # one frame for a chat, recorded as a progress repo
 pnpm josh run:board --every 5   # the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends
 ```
 
-`--chat` answers a `backlogrun` progress question: titles whole, no legend, only `🧠`, no escapes; it records the report as `run:progress --mark` does.
+`--chat` answers a `backlogrun` progress question: the frame `--once` draws, with only `🧠` on the machine line and no escapes; it records the report as `run:progress --mark` does.
 
 `--every <minutes>` answers a request for periodic progress off-screen, with no model in between: started in the background, it sends the `--chat` frame as a `📊 Progress` Telegram at once and every `<minutes>` after, sends the ended run's frame once after `run:carry --end` and exits; with no run here it sends nothing and exits. It runs only when a person asks for it — the `run:progress` heartbeat still sends no Telegram — and `JOSH_PROGRESS=0` sends nothing. A failed send is reported on stderr and the next interval sends again.
 
