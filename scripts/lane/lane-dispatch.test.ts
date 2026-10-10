@@ -9,6 +9,7 @@ import { agent_session_environment } from '#scripts/josh/agent-session-environme
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_label } from '#scripts/run/run-label'
 import { run_liveness } from '#scripts/run/run-liveness'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_child_marker } from './lane-child-marker'
@@ -40,7 +41,8 @@ const launch = vi.spyOn(detached_launch, 'launch')
 const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
 const record_output = vi.spyOn(lane_output, 'record_output')
 const apply_label = vi.spyOn(git_gh_command, 'issue_apply_label')
-const remove_label = vi.spyOn(git_gh_command, 'issue_remove_label')
+// The removal itself — read first, stored casing, warned failure — is `lane-dispatch-unmark.test.ts`'s.
+const unmark = vi.spyOn(run_label, 'unmark')
 const check_diagnostics = vi.spyOn(agent_diagnostics, 'check')
 const active_supervisor = vi.spyOn(openai_lane_supervisor, 'active')
 const wait_for_supervisor = vi.spyOn(openai_lane_supervisor, 'wait_for_active')
@@ -92,7 +94,7 @@ beforeEach(() => {
 		output: DERIVED_LOG,
 	})
 	apply_label.mockResolvedValue({ is_applied: true })
-	remove_label.mockResolvedValue(undefined)
+	unmark.mockResolvedValue(true)
 	mock_supervisor()
 })
 
@@ -194,7 +196,7 @@ describe('lane_dispatch.dispatch_child — provider selection', () => {
 
 		expect(launch).toHaveBeenCalledOnce()
 		expect(outcome.kind).toBe('failed')
-		expect(remove_label).toHaveBeenCalledWith(ISSUE, IN_PROGRESS_LABEL)
+		expect(unmark).toHaveBeenCalledWith(ISSUE)
 	})
 
 	it('reports failure when the spawned OpenAI supervisor never claims the lane', async () => {
@@ -207,7 +209,7 @@ describe('lane_dispatch.dispatch_child — provider selection', () => {
 		expect(outcome.kind).toBe('failed')
 		expect(outcome.kind === 'failed' && outcome.note).toContain('did not claim')
 		expect(cancel_supervisor).toHaveBeenCalledOnce()
-		expect(remove_label).toHaveBeenCalledWith(ISSUE, IN_PROGRESS_LABEL)
+		expect(unmark).toHaveBeenCalledWith(ISSUE)
 	})
 })
 
@@ -364,13 +366,13 @@ describe('lane_dispatch.dispatch_child — the in-progress marker the parent cla
 
 		await lane_dispatch.dispatch_child(ISSUE)
 
-		expect(remove_label).toHaveBeenCalledWith(ISSUE, IN_PROGRESS_LABEL)
+		expect(unmark).toHaveBeenCalledWith(ISSUE)
 	})
 
 	it('leaves the marker in place on a dispatch that started the child', async () => {
 		await lane_dispatch.dispatch_child(ISSUE)
 
-		expect(remove_label).not.toHaveBeenCalled()
+		expect(unmark).not.toHaveBeenCalled()
 	})
 })
 

@@ -6,6 +6,7 @@ import { agent_session_environment } from '#scripts/josh/agent-session-environme
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_label } from '#scripts/run/run-label'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_dispatch } from './lane-dispatch'
 import { lane_output } from './lane-output'
@@ -47,7 +48,7 @@ beforeEach(() => {
 		output: LOG_PATH,
 	})
 	vi.spyOn(git_gh_command, 'issue_apply_label').mockResolvedValue({ is_applied: true })
-	vi.spyOn(git_gh_command, 'issue_remove_label').mockResolvedValue(undefined)
+	vi.spyOn(run_label, 'unmark').mockResolvedValue(true)
 	emit.mockResolvedValue(undefined)
 })
 
