@@ -2,6 +2,7 @@
 
 1. 提案を人間が判断する
 2. 採用した計画を Issue に記録する（Issue body が空の場合は計画をファイルに書き、`gh api -X PATCH repos/{owner}/{repo}/issues/<N> --field body=@<path>` で body に書き込む — 本文はパスで渡し、シェルの二重引用符には載せない（`shell-body.md`）。body が既にある場合は `pnpm josh issue:comment <N> --body-file <path>` でコメント追加する）
+   - **計画が stash の復元を含むとき（会話で先に作った実装を stash でランへ渡す場合を含む）、復元手順には `pnpm josh stash:pop "<メッセージ>"` だけを書く。** `git stash apply` / `git stash pop` と「drop しない」という条件は書かない — 単一ソースは `operating-rules.md` → "no-self-staging"
 3. Telegram で計画開始を通知する:
 
    ```bash
