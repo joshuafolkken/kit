@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_local_bin, resolve_package_bin } from '#scripts/build/local-bin'
 import { ESLINT_EDIT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
+import { json_value } from '#scripts/lib/json-value'
 import { HOOK_PROCESS_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { execa } from 'execa'
@@ -137,13 +138,7 @@ interface CommandOutcome {
 type CommandRunner = (command: FormatCommand, project_root: string) => Promise<CommandOutcome>
 
 function parse_edited_path(raw_payload: string): string | undefined {
-	try {
-		const result = hook_payload_schema.safeParse(JSON.parse(raw_payload))
-
-		return result.success ? result.data.tool_input?.file_path : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw_payload, hook_payload_schema)?.tool_input?.file_path
 }
 
 // Read against the path relative to the project root, never the absolute one: a checkout that lives

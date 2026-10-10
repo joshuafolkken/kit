@@ -4,6 +4,7 @@ import { agent_session_environment } from '#scripts/josh/agent-session-environme
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
 // One run at a time per working tree. The entry points a person types — `fullrun`, `halfrun`,
@@ -110,13 +111,7 @@ const run_hold_schema = z.object({
 // `undefined` for anything that is not a well-formed record, so the caller decides what a broken one
 // means. It means blocked, not free — see `classify`.
 function parse_hold(raw: string): RunHold | undefined {
-	try {
-		const parsed = run_hold_schema.safeParse(JSON.parse(raw))
-
-		return parsed.success ? parsed.data : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw, run_hold_schema)
 }
 
 // **A `taken_at` that is not a date is stale, not current.** It passes the schema — it is a string —

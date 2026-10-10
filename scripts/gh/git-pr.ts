@@ -4,6 +4,7 @@ import { pr_info_schema } from '#scripts/git/git-schemas'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { session_cite } from '#scripts/issue/session-cite'
 import { animation_helpers, type AnimationOptions } from '#scripts/lib/animation-helpers'
+import { json_value } from '#scripts/lib/json-value'
 import { git_gh_command } from './git-gh-command'
 import { git_pr_error } from './git-pr-error'
 import { git_pr_messages } from './git-pr-messages'
@@ -91,13 +92,7 @@ async function create_and_report(
 }
 
 function parse_pr_state(pr_info_json: string): string | undefined {
-	try {
-		const result = pr_info_schema.safeParse(JSON.parse(pr_info_json))
-
-		return result.success ? result.data.state : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(pr_info_json, pr_info_schema)?.state
 }
 
 // A read that failed throws rather than answering `undefined`: "no state" is read as "not merged",

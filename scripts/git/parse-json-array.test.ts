@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { parse_json_array_or_undefined, parse_json_array_safe } from './parse-json-array'
+import {
+	parse_json_array_or_undefined,
+	parse_json_array_safe,
+	parse_json_object_or_undefined,
+} from './parse-json-array'
 
 const element_schema = z.object({ id: z.number(), name: z.string() })
 // Valid JSON, but not a listing — what `gh` prints when it answers an error instead of results.
@@ -84,5 +88,23 @@ describe('parse_json_array_or_undefined', () => {
 	it('differs from the safe variant on a JSON value that is not an array', () => {
 		expect(() => parse_json_array_safe(NOT_AN_ARRAY, element_schema)).toThrow()
 		expect(parse_json_array_or_undefined(NOT_AN_ARRAY, element_schema)).toBeUndefined()
+	})
+})
+
+describe('parse_json_object_or_undefined', () => {
+	it('parses a JSON object the schema accepts', () => {
+		expect(parse_json_object_or_undefined('{"id":3,"name":"c"}', element_schema)).toEqual({
+			id: 3,
+			name: 'c',
+		})
+	})
+
+	it('reads text that is not JSON as undefined', () => {
+		expect(parse_json_object_or_undefined('{"id":3,', element_schema)).toBeUndefined()
+	})
+
+	// The half of the contract the old `_safe` name hid: a shape change stays visible to the caller.
+	it('throws on an object the schema rejects', () => {
+		expect(() => parse_json_object_or_undefined(NOT_AN_ARRAY, element_schema)).toThrow(z.ZodError)
 	})
 })

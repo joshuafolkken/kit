@@ -1,7 +1,7 @@
 import { rest_comment_schema } from '#scripts/git/git-schemas'
 import {
 	parse_json_array_or_undefined,
-	parse_json_object_safe,
+	parse_json_object_or_undefined,
 } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 import { MERGED_STATE, to_gh_state } from './git-gh-rest-state'
@@ -63,7 +63,7 @@ const OPEN_STATE = 'open'
 const EMPTY_BODY = ''
 
 function parse_rest_pull(rest_json: string): RestPull {
-	const parsed = parse_json_object_safe(rest_json, rest_pull_schema)
+	const parsed = parse_json_object_or_undefined(rest_json, rest_pull_schema)
 	if (parsed === undefined) throw new Error(NOT_A_PULL_MESSAGE)
 
 	return parsed

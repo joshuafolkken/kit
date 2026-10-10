@@ -2,6 +2,7 @@ import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { git_command } from '#scripts/git/git-command'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { run_invocation } from '#scripts/run/run-invocation'
 import { z } from 'zod'
 import { run_carry_added, type CarryAddition } from './run-carry-added'
@@ -231,13 +232,7 @@ async function repository_directory(): Promise<string | undefined> {
 }
 
 function parse_carry(raw: string): RunCarry | undefined {
-	try {
-		const parsed = run_carry_schema.safeParse(JSON.parse(raw))
-
-		return parsed.success ? parsed.data : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw, run_carry_schema)
 }
 
 // A `started_at` that is not a date is read as expired rather than as current, for the reason

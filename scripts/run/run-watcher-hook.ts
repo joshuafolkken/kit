@@ -1,5 +1,6 @@
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { json_value } from '#scripts/lib/json-value'
 import { run_progress_read } from '#scripts/run/progress/run-progress-read'
 import { z } from 'zod'
 import { run_watcher_guard } from './run-watcher-guard'
@@ -23,13 +24,7 @@ const STAMP_PREFIX = 'josh-watcher-guard-'
 const payload_schema = z.object({ transcript_path: z.string().min(1) })
 
 function transcript_of(raw_payload: string): string | undefined {
-	try {
-		const parsed = payload_schema.safeParse(JSON.parse(raw_payload))
-
-		return parsed.success ? parsed.data.transcript_path : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw_payload, payload_schema)?.transcript_path
 }
 
 // The once-per-run arm: refuse only when nothing has been recorded yet, and record before returning so
