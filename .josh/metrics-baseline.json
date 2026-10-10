@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1043,
-		"code_lines": 87117,
-		"comment_lines": 33369,
+		"files": 1044,
+		"code_lines": 87138,
+		"comment_lines": 33381,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 459560
 	},
 	"accepted": {
-		"reason": "protected-file guard now matches the .env.* variants and .dev.vars with the two tracked exceptions (#3602)",
+		"reason": "#3589: run:cut / run:carry / run:hold report the real failure — a shared run-cli-fault module separates the unresolved git directory from any other exception",
 		"date": "2026-10-10"
 	}
 }
