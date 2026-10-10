@@ -4,6 +4,8 @@ For anyone who has installed kit and wants to see the Issue-driven loop once, en
 
 `kickoff`, `halfrun`, `prrun`, `fullrun` and `backlogrun` are keywords you type to the agent, not `josh` commands; the agent drives `josh` and `gh` for you. [Run Issues with the workflow keywords](./how-to/run-issues.md) explains each one.
 
+Not using GitHub? Both patterns need it — go to [Without GitHub: one change, checked locally](#without-github-one-change-checked-locally).
+
 ## Before you start
 
 - kit is set up with `josh start`, and its setup is on `main` — merge the setup pull request it opened, if it opened one ([init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start)). The profile guides walk through it: [Set up the basic profile](./setup/basic.md) for `basic`, [Set up the full profile](./setup/full.md) for `full`.
@@ -70,6 +72,34 @@ The agent runs every opted-in Issue in dependency order, each one from implement
 ## Separately: pull in kit's updates with `josh sync`
 
 Not part of the loop above. After upgrading `@joshuafolkken/kit`, run `pnpm josh sync` to refresh the rules and files kit manages; it writes only the file set of the project's profile. [Update kit](./how-to/update-kit.md) has the steps, and [sync.md](./sync.md) lists what it overwrites.
+
+## Without GitHub: one change, checked locally
+
+For a project set up with `josh init` and no GitHub. The workflow keywords above need GitHub, so do not type them — ask in plain words. What `josh init` set up: [TypeScript projects](./setup/full.md#2-install-and-initialize-with-josh-init) · [other projects](./setup/basic.md).
+
+1. Open an agent that reads the project's `CLAUDE.md`, such as Claude Code, in the project directory.
+2. Ask for one small change:
+
+   ```text
+   Change the page title to "Hello", then tell me what you checked.
+   ```
+
+3. The agent reads the file before changing it, makes the change, checks it and reports what it saw. In a `full` profile project it also adds a test where one fits, runs `pnpm josh gate`, and reports which checks passed and which did not.
+4. Check it yourself: run `pnpm josh gate` ([what it checks and skips](./setup/basic.md#3-verify)), and open the page in a browser when the change is visible.
+
+   In a `full` profile project with no Git repository, lint stops on a missing `.gitignore` before it reads your code. Create an empty one first, then run the gate again:
+
+   ```bash
+   touch .gitignore
+   ```
+
+   In PowerShell on Windows, where `touch` does not exist:
+
+   ```powershell
+   New-Item .gitignore -ItemType File
+   ```
+
+Want Issues, pull requests and merges handled too? Run `pnpm exec josh start` ([init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start)), then follow Pattern A.
 
 ## Where next
 

@@ -101,12 +101,20 @@ could not.
 - **A line that breaks the grammar is not carried.** The staging step parses
   every file of the ledger first — after moving lines still on an old single-file path — and on a broken line leaves the ledger out of the
   commit and says so; the commit itself goes ahead.
-- **`pnpm josh followup` commits a line appended after the run's commit onto the pull request, before
-  the merge** — a second review round's record is the usual case. After the
-  merge gates and before the CI wait, `followup` reads the tree and, **only when the ledger holds a
-  pending append**, stages the ledger paths alone, commits them and pushes the branch; the CI wait
-  that follows covers the pushed commit. A broken line refuses the merge, because the line would
-  otherwise be lost with the branch. A run whose lines rode its commit pays nothing.
+- **A review round that passes after the pull request opened is recorded on the Issue, not in the
+  ledger** — `pnpm josh review:record --issue <N> --comment` posts the same `- rf:` lines as a comment
+  and appends nothing. That round reads only, so no commit of the run's follows it; a line in the tree
+  would be pushed onto the open pull request and its CI would start over. `pnpm josh ship --review`
+  does this for a passing round 2. **A round 2 that blocks records in the tree as before** — the fix it
+  stops for is pushed anyway and carries the lines. The comment's lines are outside the count
+  `pnpm josh review:findings` and the retrospective read.
+- **`pnpm josh followup` commits any other line appended after the run's commit onto the pull request,
+  before the merge** — the residual path, for an observation recorded between the commit and the
+  merge. After the merge gates and before the CI wait, `followup` reads the tree and, **only when the
+  ledger holds a pending append**, stages the ledger paths alone, commits them and pushes the branch;
+  that push restarts the pull request's CI, and the wait that follows covers it. A broken line refuses
+  the merge, because the line would otherwise be lost with the branch. A run whose lines rode its
+  commit pays nothing.
 - **A lane carries its own lines, in its own pull request.** Its writers
   append to its own tree's `<N>.md`, so the two steps above take them to the default branch exactly as
   they do for a run in the primary checkout. **Nothing is held in the primary checkout for later.**

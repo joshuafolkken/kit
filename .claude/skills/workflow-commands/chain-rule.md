@@ -33,7 +33,8 @@ Review results and successful pushes are never turn boundaries.
      of remaining non-High findings; a confirmed High blocks and receives a `confirmation` Telegram.
    Any round-1 fix runs its affected scoped check and the gate before `git -y`.
    Once a round's verdict is attested, record its findings with `pnpm josh review:record --issue <N>
-   [<category>:<severity>:<file> ...]` — a clean round records one zero-finding line.
+   [<category>:<severity>:<file> ...]` — a clean round records one zero-finding line. **A round 2 that
+   passes takes `--comment`** (`observation-ledger.md` → "The commit path").
    **`pnpm josh followup` refuses the merge until the round is recorded**
    (`pnpm josh review:record --check --issue <N>`).
 5. **The clean path ships in one call** — with no second round due, background

@@ -347,10 +347,11 @@ Record a `/code-review` round's findings so they survive the run. It appends one
 ```bash
 pnpm josh review:record --issue 2325 bug-risks:medium:src/foo.ts:42 tests:low:a.test.ts
 pnpm josh review:record --issue 2325          # a zero-finding round — records one `none` line
+pnpm josh review:record --issue 2325 --comment  # a round that passed after the PR opened — an Issue comment, no append
 pnpm josh review:record --check --issue 2325  # the merge gate: was it recorded?
 ```
 
-**Behavior:** each positional is `<category>:<severity>:<file>`, split on its first two colons so a `:line` citation stays in the file field. The category must be one of the nine review-rubric categories and the severity one of `high` / `medium` / `low`, or the call is refused with the usage and the accepted categories and severities, listed from the ledger's own constants. A call with no findings writes a single `- rf:none | none | - | <date> | #<issue>` line, so a round that found nothing is recorded rather than mistaken for a round nobody reviewed. Both the append and `--check` use the primary checkout's ledger, even when run in a lane — a lane's own copy never reaches the default branch. `pnpm josh observations:flush` commits the appended lines like any other ledger change.
+**Behavior:** each positional is `<category>:<severity>:<file>`, split on its first two colons so a `:line` citation stays in the file field. The category must be one of the nine review-rubric categories and the severity one of `high` / `medium` / `low`, or the call is refused with the usage and the accepted categories and severities, listed from the ledger's own constants. A call with no findings writes a single `- rf:none | none | - | <date> | #<issue>` line, so a round that found nothing is recorded rather than mistaken for a round nobody reviewed. `--comment` posts the same lines as a comment on the issue and appends nothing — for a round that passed after the pull request opened, where a line in the tree would be pushed onto it and restart its CI. Both the append and `--check` use the primary checkout's ledger, even when run in a lane — a lane's own copy never reaches the default branch. `pnpm josh observations:flush` commits the appended lines like any other ledger change.
 
 **`--check --issue <N>` is the merge gate** [`josh followup`](#josh-followup) runs: a `- rf:` line for the issue is `ok`, its absence is `missing`, no ledger `not-required`.
 

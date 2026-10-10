@@ -41,6 +41,12 @@ after its own — 144 ledger-only pull requests in one month.
 (joshuafolkken/kit#2492); another run's stash of that checkout took the lines before the flush saw
 them, so neither route remains.
 
+**Why a passing second review round is recorded on the Issue.** That round runs after the commit,
+beside CI, and reads only, so its line had no commit left to ride: `pnpm josh followup` pushed it onto
+the open pull request and the CI started over — six of the fourteen lanes merged on 2026-10-10. Having
+the parent collect such lines in the primary checkout was the other candidate, and it needs both
+routes the paragraph above removed, so the record leaves the tree instead (joshuafolkken/kit#3645).
+
 **Why an empty flush exits 0.** Most cycles append nothing, and a command that errored there would be
 one nobody runs.
 

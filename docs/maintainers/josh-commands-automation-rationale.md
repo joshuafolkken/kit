@@ -45,6 +45,6 @@ the behavior.
 | `josh followup`             | #2446, #2770, #3023                                              |
 | `josh observations:flush`   | #2763, #2919                                                     |
 | `josh measure:rerun`        | #2178, #3064                                                     |
-| `josh review:record`        | #2325, #2343, #2419, #2919                                       |
+| `josh review:record`        | #2325, #2343, #2419, #2919, #3645                                |
 | `josh reserved-run`         | #2351                                                            |
 | `josh repo:party`           | #2122                                                            |

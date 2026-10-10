@@ -1,18 +1,18 @@
 {
 	"scripts": {
 		"files": 1050,
-		"code_lines": 87381,
-		"comment_lines": 33566,
+		"code_lines": 87425,
+		"comment_lines": 33584,
 		"comment_ratio": 0.38
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2099
+		"lines": 2105
 	},
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 459819
+		"on_demand_bytes": 461817
 	},
 	"accepted": {
 		"reason": "The cycle recheck now also covers lint:related and loads eslint lazily (#3641 review fixes)",
