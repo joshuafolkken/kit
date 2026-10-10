@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1046,
-		"code_lines": 87209,
-		"comment_lines": 33496,
+		"files": 1047,
+		"code_lines": 87232,
+		"comment_lines": 33511,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 459560
 	},
 	"accepted": {
-		"reason": "#3597 adds the issue-number-shape suite and the issue-0 regression cases; the 31 local pattern declarations it removes are fewer lines than the tests that pin the single declaration",
+		"reason": "#3598 adds the exhaustive run:merge token coverage test its acceptance criteria require, plus the shared token module and typed verdicts",
 		"date": "2026-10-10"
 	}
 }
