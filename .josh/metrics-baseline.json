@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1044,
-		"code_lines": 87163,
-		"comment_lines": 33390,
+		"files": 1045,
+		"code_lines": 87206,
+		"comment_lines": 33430,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 459560
 	},
 	"accepted": {
-		"reason": "Four commands gain an unknown-flag refusal branch (usage + exit 1) in place of a bare parseArgs throw, and the notify synopsis lists every flag its usage line names #3592",
+		"reason": "#3623 adds the agent session role mark and the reviewer exemption to both cut guards and run:cut, and blanks the role in the unit-suite env (43 code lines)",
 		"date": "2026-10-10"
 	}
 }

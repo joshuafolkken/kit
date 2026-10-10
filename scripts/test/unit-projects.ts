@@ -41,6 +41,11 @@ const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test
 // hold's owner, and the supervisor inherits it from a session that has usually ended by the time the
 // gate runs, so every hold a fixture writes would read back as `stale` there and nowhere else. A suite
 // about the owner stubs the pid it is testing.
+//
+// **The agent session role is blanked for the lane mark's reason**: a ship reviewer runs the related
+// tests after a fix it applies, and its `JOSH_AGENT_ROLE` would make both cut guards stand down on a
+// delivery fixture that sets the lane mark and expects the refusal. A suite about the reviewer passes
+// the role itself.
 const PROXY_ENV: Record<string, string> = Object.fromEntries(
 	[...agent_session_environment.PROXY_KEYS, agent_session_environment.PROXY_CERTIFICATE_KEY].map(
 		(key) => [key, ''],
@@ -53,6 +58,7 @@ const ENV: Record<string, string> = {
 	CLAUDE_CODE_SESSION_ID: 'vitest-session',
 	CODEX_THREAD_ID: '',
 	JOSH_AGENT_PROVIDER: '',
+	JOSH_AGENT_ROLE: '',
 	JOSH_LANE_CHILD: '',
 	JOSH_SHIP_SUPERVISED: '',
 }

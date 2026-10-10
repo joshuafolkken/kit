@@ -12,6 +12,7 @@ const {
 	emit,
 	existing_cut,
 	find_open_lane,
+	is_reviewer,
 	launch,
 	session_verdict,
 	state,
@@ -116,6 +117,42 @@ describe('a cut outside a lane that is not taken', () => {
 
 		expect(verdict()).toBe(run_cut_cli.NOT_A_LANE_VERDICT)
 		expect(run_cut.read_cut(target()).kind).toBe('none')
+	})
+})
+
+// joshuafolkken/kit#3623: the ship reviewer runs in the implementing child's lane, so `--impl` cut it
+// and relaunched a second child beside the one the supervisor repairs with.
+describe('a cut asked for by a ship reviewer', () => {
+	it.each([
+		['the implementation cut in a lane', ['--impl', ISSUE, ...WITH_HANDOFF]],
+		['the pre-gate cut in a lane', [ISSUE]],
+	])('takes no cut and relaunches nothing for %s', async (_name, argv) => {
+		is_reviewer.mockReturnValueOnce(true)
+
+		const code = await run_cut_cli.run(argv)
+
+		expect([code, verdict()]).toStrictEqual([0, run_cut_cli.NOT_A_LANE_VERDICT])
+		expect(run_cut.read_cut(target()).kind).toBe('none')
+		expect([launch, emit, find_open_lane].map((spy) => spy.mock.calls.length)).toStrictEqual([
+			0, 0, 0,
+		])
+	})
+
+	it('takes no cut under a hold outside a lane either', async () => {
+		held_by(ISSUE)
+		is_reviewer.mockReturnValueOnce(true)
+
+		await run_cut_cli.run(['--impl', ISSUE, ...WITH_HANDOFF])
+
+		expect(verdict()).toBe(run_cut_cli.NOT_A_LANE_VERDICT)
+		expect(run_cut.read_cut(target()).kind).toBe('none')
+	})
+
+	it('still cuts and relaunches for the implementing child in the same lane', async () => {
+		const code = await run_cut_cli.run(['--impl', ISSUE, ...WITH_HANDOFF])
+
+		expect([code, verdict()]).toStrictEqual([0, run_cut_cli.CUT_VERDICT])
+		expect(launch).toHaveBeenCalledOnce()
 	})
 })
 

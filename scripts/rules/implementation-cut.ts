@@ -1,3 +1,4 @@
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_format } from '#scripts/cost-runtime/cost-format'
@@ -94,6 +95,16 @@ function held_run_issue(state: LaneCostState): string | undefined {
 	return state.held_issue()
 }
 
+// **A ship reviewer is not the run, though it carries its mark and its hold**
+// (joshuafolkken/kit#3623). The supervisor launches it in the implementing child's own checkout and
+// waits on it, so a cut would end the one session whose findings file the supervisor reads and relaunch
+// a second child beside the supervisor's repair. `agent_session_role` is what tells the two apart.
+function implementing_run_issue(state: LaneCostState): string | undefined {
+	if (agent_session_role.is_reviewer(state.source)) return undefined
+
+	return lane_child_issue(state) ?? held_run_issue(state)
+}
+
 // The run this checkout's edits belong to, with no cut already carried — a dispatched lane child, or
 // **a `fullrun` held in its own checkout**: the cut was lane-only, so a run a
 // person started grew without a bound mid-implementation. The run hold naming an issue is what marks
@@ -102,7 +113,7 @@ function held_run_issue(state: LaneCostState): string | undefined {
 // naming this issue means a cut is already in flight, and `begin_cut`'s exclusive create would refuse
 // a second one anyway.
 function uncut_run_issue(state: LaneCostState): string | undefined {
-	const issue = lane_child_issue(state) ?? held_run_issue(state)
+	const issue = implementing_run_issue(state)
 
 	if (issue === undefined) return undefined
 

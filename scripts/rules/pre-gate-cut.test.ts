@@ -76,7 +76,12 @@ function state_of(
 		return verdict
 	}
 
-	return { directory, carried, marked_issue: ISSUE, context_verdict }
+	return { directory, carried, marked_issue: ISSUE, is_reviewer: false, context_verdict }
+}
+
+// The ship reviewer the supervisor launched in this lane: the implementing child's mark, inherited.
+function reviewer_state(): LaneCutState {
+	return { ...state_of(LANE_DIRECTORY), is_reviewer: true }
 }
 
 // A lane checkout whose mark is absent (a person working there) or names another issue (a leak from
@@ -288,6 +293,13 @@ describe('is_uncut_gate', () => {
 		const state = state_marked(LANE_DIRECTORY, undefined)
 
 		expect(pre_gate_cut.is_uncut_gate(GATE, state)).toBe(false)
+	})
+
+	// joshuafolkken/kit#3623: the reviewer's supervisor is waiting on it, so no fresh process could
+	// take the gate over — its inherited mark is not a dispatch.
+	it('says nothing about a gate run by a ship reviewer in a marked lane', () => {
+		expect(pre_gate_cut.uncut_lane_issue(reviewer_state())).toBeUndefined()
+		expect(pre_gate_cut.is_uncut_gate(GATE, reviewer_state())).toBe(false)
 	})
 
 	it('says nothing about the cut itself, issued in the same lane', () => {

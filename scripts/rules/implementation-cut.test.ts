@@ -1,6 +1,8 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
 import type { RunCut } from '#scripts/run/cut/run-cut'
@@ -47,7 +49,12 @@ interface StateOptions {
 	cut?: RunCut | undefined
 	held?: string | undefined
 	verdict?: () => CostVerdict
+	// The role fragment the launch wrote, absent for a session kit did not launch.
+	role?: MarkerSource
 }
+
+const REVIEWER = agent_session_role.env_for(agent_role_profile.REVIEWER)
+const WORKER = agent_session_role.env_for(agent_role_profile.WORKER)
 
 // `'mark' in options` rather than a destructuring default, so an explicit `{ mark: undefined }` — a
 // person's lane with no dispatch mark — is honored instead of falling back to ISSUE.
@@ -67,7 +74,7 @@ function state_of(options: StateOptions = {}): LaneCostState {
 
 	return {
 		directory,
-		source: source_of(mark_of(options)),
+		source: { ...source_of(mark_of(options)), ...options.role },
 		carried: () => cut,
 		held_issue: () => held,
 		verdict,
@@ -244,6 +251,41 @@ describe('is_over_threshold_edit — a run held outside a lane', () => {
 		const state = held_run({ held: undefined, verdict: unread_verdict })
 
 		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#3623: the ship supervisor launches its reviewer in the implementing child's own
+// checkout, so the reviewer carries that child's mark and hold. Refusing its findings `Write` sent it
+// to `run:cut --impl`, which relaunched a second child beside the supervisor's own repair.
+function never_priced(): CostVerdict {
+	throw new Error('a reviewer session was priced')
+}
+
+describe('is_over_threshold_edit — a ship reviewer session', () => {
+	it.each([[EDIT], ['Write']])('says nothing about a reviewer %j in a marked lane', (name) => {
+		const state = state_of({ role: REVIEWER, verdict: never_priced })
+
+		expect(implementation_cut.uncut_run_issue(state)).toBeUndefined()
+		expect(implementation_cut.is_over_threshold_edit(edit_call(name), state)).toBe(false)
+	})
+
+	it('says nothing about a reviewer edit in a run held outside a lane', () => {
+		const state = held_run({ role: REVIEWER, verdict: never_priced })
+
+		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
+	})
+
+	it('still fires on the implementing child the reviewer shares the lane with', () => {
+		const state = state_of({ role: WORKER })
+
+		expect(implementation_cut.uncut_run_issue(state)).toBe(ISSUE)
+		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(true)
+	})
+
+	it('still fires on a held run launched as a worker', () => {
+		expect(implementation_cut.is_over_threshold_edit(edit_call(), held_run({ role: WORKER }))).toBe(
+			true,
+		)
 	})
 })
 
