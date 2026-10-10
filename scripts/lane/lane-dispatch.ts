@@ -407,10 +407,10 @@ function describe(outcome: DispatchOutcome, issue: string): string {
 	}
 
 	if (outcome.kind === 'failed') {
-		return `The child for ${session_cite.issue(issue)} did not start: ${outcome.note}. Its log is at ${outcome.log_path}.`
+		return `The child for ${session_cite.issue(issue)} did not start: ${outcome.note}.${agent_role_profile.default_notice()} Its log is at ${outcome.log_path}.`
 	}
 
-	return `Dispatched \`${outcome.invocation}\` as process ${String(outcome.pid)} in ${outcome.lane.directory} with ${agent_role_profile.describe(outcome.profile)}.${resume_sentence(outcome)}${log_sentence(outcome, issue)}`
+	return `Dispatched \`${outcome.invocation}\` as process ${String(outcome.pid)} in ${outcome.lane.directory} with ${agent_role_profile.describe(outcome.profile)}.${agent_role_profile.default_notice()}${resume_sentence(outcome)}${log_sentence(outcome, issue)}`
 }
 
 /**

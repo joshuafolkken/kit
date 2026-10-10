@@ -1,5 +1,5 @@
+import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { includeIgnoreFile } from '@eslint/compat'
 import js from '@eslint/js'
 import stylistic from '@stylistic/eslint-plugin'
 import prettier from 'eslint-config-prettier'
@@ -8,7 +8,7 @@ import importPlugin, { createNodeResolver } from 'eslint-plugin-import-x'
 import promise from 'eslint-plugin-promise'
 import sonarjs from 'eslint-plugin-sonarjs'
 import unicorn from 'eslint-plugin-unicorn'
-import { defineConfig } from 'eslint/config'
+import { defineConfig, includeIgnoreFile } from 'eslint/config'
 import globals from 'globals'
 import ts from 'typescript-eslint'
 import { checkout_rooted_parser } from './checkout-rooted-parser.js'
@@ -85,9 +85,20 @@ function create_test_filename_ban_block(files, ban_entry) {
 	}
 }
 
+// joshuafolkken/kit#3653: a project `josh init` set up without Git has no `.gitignore` — init
+// leaves the Git files out there — while the generated `eslint.config.js` still names one.
+// `includeIgnoreFile` reads the file eagerly and throws ENOENT, so lint failed before it read a
+// line of the project's code. A missing file carries no patterns, which is what it means here.
+function create_gitignore_blocks(gitignore_path) {
+	const file_path = fileURLToPath(gitignore_path)
+	if (!existsSync(file_path)) return []
+
+	return [includeIgnoreFile(file_path)]
+}
+
 export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 	return defineConfig(
-		includeIgnoreFile(fileURLToPath(gitignore_path)),
+		create_gitignore_blocks(gitignore_path),
 		{
 			// joshuafolkken/kit#1112: `.claude/worktrees/` is where Claude Code puts its bridge work
 			// trees — a full checkout of the project, carrying its own repository root. Linted, every

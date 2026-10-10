@@ -254,7 +254,7 @@ describe('installation guidance', () => {
 			'pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit',
 		)
 		expect(content).not.toContain('gh auth login --scopes read:packages')
-		expect(content).toContain('the gh CLI — [how to install them](./docs/setup/prerequisites.md)')
+		expect(content).toContain('[Node.js, pnpm and the gh CLI](./docs/setup/prerequisites.md)')
 	})
 
 	it.each([CLI_GUIDE, PACKAGE_GUIDE])(

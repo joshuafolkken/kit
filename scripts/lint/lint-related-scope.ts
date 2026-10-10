@@ -5,7 +5,11 @@ import {
 	type ScopeInputs,
 	type ScopeVocabulary,
 } from '#scripts/git/changed-file-scope'
-import { ESLINT_RELATED_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
+import {
+	ESLINT_RELATED_CACHE_FILE,
+	ESLINT_RELATED_CACHE_FLAGS,
+} from '#scripts/josh/josh-command-types'
+import type { CycleRecheckOptions } from './cycle-recheck'
 
 // `josh lint` reads the whole repository on every call, and an implementation loop calls it after
 // every few edits — re-reading files the change never touched.
@@ -109,8 +113,19 @@ function eslint_arguments(files: ReadonlyArray<string>): ReadonlyArray<string> {
 	return [...ESLINT_ARGS, ...files, ...ESLINT_RELATED_CACHE_FLAGS, ...ESLINT_SCOPED_FLAGS]
 }
 
+// What re-reading a cached cycle report (`cycle-recheck.ts`) needs to ask the narrowed run's question
+// again: the same targets, the same cache file, and the Node API's spelling of `--no-warn-ignored`.
+function cycle_recheck_options(files: ReadonlyArray<string>): CycleRecheckOptions {
+	return {
+		cache_file: ESLINT_RELATED_CACHE_FILE,
+		patterns: files,
+		eslint_options: { warnIgnored: false },
+	}
+}
+
 const lint_related_scope = {
 	COMMAND_LABEL,
+	cycle_recheck_options,
 	NOTHING_LINTABLE_REASON,
 	describe_scope,
 	eslint_arguments,

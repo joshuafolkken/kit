@@ -121,10 +121,13 @@ function report_empty(cwd: string, session_id: string | undefined): number {
 	return FAILURE_EXIT_CODE
 }
 
+// The provider of this process's own session. A defaulted provider is no session at all: a launch may
+// default to Claude Code, but pricing here would measure the newest transcript of some other session.
 function provider_of(environment: Environment): AgentProvider | undefined {
 	const resolved = agent_role_profile.resolve_provider(environment)
+	if (resolved.kind !== 'provider' || resolved.is_default === true) return undefined
 
-	return resolved.kind === 'provider' ? resolved.provider : undefined
+	return resolved.provider
 }
 
 // The own-session measurement, and — when there is none — which of the two "nothing to measure"

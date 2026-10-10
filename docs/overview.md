@@ -29,7 +29,7 @@ In a `basic` project, `josh gate`, `josh lint` and the other checks skip each to
 3. **Sync** — run `josh sync` after upgrading the package to pull in updated AI files, workflow templates, and other managed files. It follows the recorded profile, so a `basic` project gets only its own file set.
 4. **josh CLI** — a single `josh` binary (available as `pnpm josh` after init) gives you git workflow helpers, version management, security auditing, and more.
 
-To walk the Issue-driven loop once — file an Issue, have an agent plan and implement it, verify, merge — follow [tutorial.md](./tutorial.md). To find the steps for a task — updating kit or dependencies, running Issues — start at [how-to.md](./how-to.md). The full list of guides is below.
+To walk the Issue-driven loop once — file an Issue, have an agent plan and implement it, verify, merge — follow [tutorial.md](./tutorial.md); without GitHub, its [one change, checked locally](./tutorial.md#without-github-one-change-checked-locally) is the first step. To find the steps for a task — updating kit or dependencies, running Issues — start at [how-to.md](./how-to.md). The full list of guides is below.
 
 ## Documentation
 
@@ -44,7 +44,7 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 **Use**
 
 - [why.md](./why.md) — why kit exists: the pains it solves
-- [tutorial.md](./tutorial.md) — your first change with an agent, from Issue to merge
+- [tutorial.md](./tutorial.md) — your first change with an agent, from Issue to merge, or checked locally without GitHub
 - [how-to.md](./how-to.md) — guides by task
 - [glossary.md](./glossary.md) — the workflow's words: gate, lane, epic, profile, `auto-ok`
 - [labels-and-run-states.md](./labels-and-run-states.md) — the Issue labels and the run states the workflow reads

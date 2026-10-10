@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url'
 import { document_byte_check } from '#scripts/document/document-byte-check'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
-import { ESLINT_RELATED_CACHE_FILE } from '#scripts/josh/josh-command-types'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { lint_parallel } from './lint-parallel'
 import { lint_related_scope } from './lint-related-scope'
@@ -37,7 +36,7 @@ async function lint_exit_code(scope: ChangedFileScope): Promise<number> {
 	return await lint_parallel.run_lint_checks(
 		lint_related_scope.prettier_arguments(scope.files),
 		lint_related_scope.eslint_arguments(scope.files),
-		ESLINT_RELATED_CACHE_FILE,
+		lint_related_scope.cycle_recheck_options(scope.files),
 	)
 }
 

@@ -297,6 +297,7 @@ function launch(request: DetachRequest): DetachResult {
 		},
 	)
 
+	agent_role_profile.warn_of_default()
 	if (result.kind === 'failed') return failed_launch(request, result.note)
 
 	record_launch(request, result.pid, launch_id)

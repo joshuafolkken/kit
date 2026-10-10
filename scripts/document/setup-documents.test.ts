@@ -5,20 +5,18 @@ import { all_documents, linked_paths, read_document, read_unwrapped } from './ai
 import { document_scan } from './document-scan'
 
 // The setup guides (joshuafolkken/kit#2826): one page per profile under `docs/setup/`, each the
-// detailed version of the README Quick start. They only stay reachable while the Quick start links
-// to them as its details and the overview routes readers to them. Their link on to the tutorial is
-// pinned by the tutorial's own suite.
+// detailed version of the README Quick start. They only stay reachable while the overview routes
+// readers to them and the Quick start does too: to the prerequisites directly, and to each profile
+// guide through the tutorial it names as the one next step. Their link on to the tutorial is pinned
+// by the tutorial's own suite.
 const PREREQUISITES = 'docs/setup/prerequisites.md'
-const SETUP_PAGES: ReadonlyArray<string> = [
-	'docs/setup/basic.md',
-	'docs/setup/full.md',
-	PREREQUISITES,
-]
+const PROFILE_GUIDES: ReadonlyArray<string> = ['docs/setup/basic.md', 'docs/setup/full.md']
+const SETUP_PAGES: ReadonlyArray<string> = [...PROFILE_GUIDES, PREREQUISITES]
+const TUTORIAL = 'docs/tutorial.md'
 const README = 'README.md'
 const QUICK_START_HEADING = '## Quick start'
-const NEXT_README_HEADING = '## Docs'
+const NEXT_README_HEADING = '## The workflow'
 const OVERVIEW = 'docs/overview.md'
-const ENTRY_DOCUMENTS: ReadonlyArray<string> = [README, OVERVIEW]
 const AUTHENTICATION = 'docs/authentication.md'
 const INIT_GUIDE = 'docs/init.md'
 const COMMAND_CATALOG = 'docs/josh-command-catalog.md'
@@ -56,12 +54,16 @@ describe('the setup guides', () => {
 		expect(SETUP_PAGES.filter((path) => !scanned.has(path))).toStrictEqual([])
 	})
 
-	it.each(SETUP_PAGES)('the README Quick start links to %s as its details', (path) => {
+	it.each([PREREQUISITES, TUTORIAL])('the README Quick start links to %s', (path) => {
 		expect(quick_start_links()).toContain(path)
 	})
 
-	it.each(ENTRY_DOCUMENTS)('%s links to every setup page', (from) => {
-		const linked = new Set(linked_paths(from))
+	it.each(PROFILE_GUIDES)('the tutorial the Quick start names links to %s', (path) => {
+		expect(linked_paths(TUTORIAL)).toContain(path)
+	})
+
+	it('the overview links to every setup page', () => {
+		const linked = new Set(linked_paths(OVERVIEW))
 
 		expect(SETUP_PAGES.filter((path) => !linked.has(path))).toStrictEqual([])
 	})
