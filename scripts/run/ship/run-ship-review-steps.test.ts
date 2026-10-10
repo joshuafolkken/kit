@@ -135,10 +135,11 @@ describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
 // joshuafolkken/kit#2964: a ship relaunched with `--review` after a round-1 stop leaves the fix delta
 // to round 2 rather than reviewing the whole change again as round 1.
 describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
+	// joshuafolkken/kit#3643: a round that ran no review says so, so the ship does not time it as one.
 	it('skips the review when the issue already has a recorded round', async () => {
 		record_check_mock.mockResolvedValueOnce({ status: 'ok' })
 
-		expect(await stage_code()).toBe(OK)
+		expect(await run_ship_review_steps.review_stage(ISSUE)).toHaveProperty('is_skipped', true)
 		expect(record_check_mock).toHaveBeenCalledWith(Number(ISSUE))
 		expect(commands()).toStrictEqual([])
 		expect(launch).not.toHaveBeenCalled()
@@ -349,7 +350,7 @@ describe('run_ship_review_steps.round_two_stage — due or not', () => {
 	it('skips when round 1 left no fix delta, launching no reviewer', async () => {
 		answer_round_two('skip')
 
-		expect(await round_two_code()).toBe(OK)
+		expect(await run_ship_review_steps.round_two_stage(ISSUE)).toHaveProperty('is_skipped', true)
 		expect(commands()).toStrictEqual([DECIDE])
 		expect(launch).not.toHaveBeenCalled()
 	})

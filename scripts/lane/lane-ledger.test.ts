@@ -2,7 +2,7 @@ import { appendFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { run_carry } from '#scripts/run/carry/run-carry'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_ledger } from './lane-ledger'
 
 // joshuafolkken/kit#3355: the lane-limit measurement ledger is append-only JSONL that survives a
@@ -108,17 +108,66 @@ describe('lane_ledger.record', () => {
 	})
 })
 
-describe('lane_ledger.target', () => {
-	it('answers no ledger outside a repository instead of rejecting', async () => {
-		const outside = vi
-			.spyOn(run_carry, 'repository_directory')
-			.mockRejectedValue(new Error('fatal: not a git repository'))
+// joshuafolkken/kit#3643: a lane's dispatch and each finished stage are entries of their own, so
+// `lane:stats` can say where a lane's time went.
+describe('lane_ledger — the stage and dispatch entries', () => {
+	it('records a finished stage with its issue and its duration', async () => {
+		const target = ledger('stage')
 
-		try {
-			await expect(lane_ledger.target()).resolves.toBeUndefined()
-		} finally {
-			outside.mockRestore()
-		}
+		await lane_ledger.record_stage({ stage: 'review', elapsed_ms: GATE_MS, issue: 7 }, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([
+			{ kind: 'stage', stage: 'review', elapsed_ms: GATE_MS, issue: 7 },
+		])
+	})
+
+	it('records a stage whose writer holds no issue', async () => {
+		const target = ledger('stage-no-issue')
+		const stage = lane_ledger.CI_WAIT_STAGE
+
+		await lane_ledger.record_stage({ stage, elapsed_ms: GATE_MS }, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'stage', stage }])
+	})
+
+	it('records a dispatch naming the issue', async () => {
+		const target = ledger('dispatch')
+
+		await lane_ledger.record_dispatch(7, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'dispatch', issue: 7 }])
+	})
+})
+
+describe('lane_ledger.target', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+		vi.restoreAllMocks()
+	})
+
+	it('answers no ledger outside a repository instead of rejecting', async () => {
+		vi.stubEnv('VITEST', undefined)
+		vi.spyOn(run_carry, 'repository_directory').mockRejectedValue(
+			new Error('fatal: not a git repository'),
+		)
+
+		await expect(lane_ledger.target()).resolves.toBeUndefined()
+	})
+
+	it('names the repository ledger on a real command path', async () => {
+		vi.stubEnv('VITEST', undefined)
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue('/repo/a')
+
+		await expect(lane_ledger.target()).resolves.toBe(lane_ledger.target_of('/repo/a'))
+	})
+
+	// joshuafolkken/kit#3643: the stage and dispatch writers sit on paths many suites run, and one that
+	// forgot to mock this module would append fixture durations to the real measurement.
+	it('answers no ledger inside a test run, so a suite never writes the real one', async () => {
+		const repository = vi.spyOn(run_carry, 'repository_directory').mockResolvedValue('/repo/a')
+
+		await expect(lane_ledger.target()).resolves.toBeUndefined()
+		expect(repository).not.toHaveBeenCalled()
 	})
 })
 

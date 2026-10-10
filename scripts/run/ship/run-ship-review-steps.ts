@@ -9,6 +9,7 @@ import { review_record } from '#scripts/review/review-record'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
 import { run_ship_scoped, type Phase } from './run-ship-scoped'
+import type { StepResult } from './run-ship-sync'
 
 // The side effects of `josh ship --review`: the round-1 review — open, launch, join, attest and
 // record — run by the supervisor beside the gate rather than across agent turns. Each step is the
@@ -209,6 +210,11 @@ async function round_one_record(issue: string): Promise<JoshResult> {
 	)
 }
 
+// A round that had nothing to review: it passes, and the ship does not time it as a review that ran.
+function skipped(out: string): StepResult {
+	return { code: SUCCESS_EXIT_CODE, out, is_skipped: true }
+}
+
 // The round-1 review, beside the gate: scoped pair → open → review → join → attest → record, stopping
 // at the first that did not pass.
 //
@@ -216,10 +222,10 @@ async function round_one_record(issue: string): Promise<JoshResult> {
 // after a round-1 stop would otherwise review the whole change a second time as round 1 — a new Medium
 // there stops it again, and round 2 after the commit makes a third. The fix delta is round 2's to
 // verify, and `round_two_stage` asks whether it is due after the commit.
-async function review_stage(issue: string): Promise<JoshResult> {
+async function review_stage(issue: string): Promise<StepResult> {
 	const recorded = await review_record.check(Number(issue))
 
-	if (recorded.status === 'ok') return { code: SUCCESS_EXIT_CODE, out: ROUND_ONE_RECORDED_NOTE }
+	if (recorded.status === 'ok') return skipped(ROUND_ONE_RECORDED_NOTE)
 
 	return await run_phases([
 		scoped_pair,
@@ -232,15 +238,13 @@ async function review_stage(issue: string): Promise<JoshResult> {
 
 // The round-2 verification pass, after the commit so it runs beside CI: due only when the round-1 fix
 // delta says so, then scoped pair → brief → fresh reviewer → attest → record.
-async function round_two_stage(issue: string): Promise<JoshResult> {
+async function round_two_stage(issue: string): Promise<StepResult> {
 	const decision = await josh(ROUND_TWO_DECISION)
 	const answer = decision.out.trim()
 
 	if (decision.code !== SUCCESS_EXIT_CODE) return decision
 
-	if (answer !== ROUND_TWO_REQUIRED) {
-		return { code: SUCCESS_EXIT_CODE, out: `${answer}\n${ROUND_TWO_SKIPPED_NOTE}` }
-	}
+	if (answer !== ROUND_TWO_REQUIRED) return skipped(`${answer}\n${ROUND_TWO_SKIPPED_NOTE}`)
 
 	return await run_phases([
 		scoped_pair,

@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -176,8 +177,21 @@ function parse(argv: ReadonlyArray<string>): ShipCommand | undefined {
 	return parsed === undefined ? undefined : command_of(parsed.values, parsed.positionals)
 }
 
+// Every stage that ran is timed into the lane ledger, failed ones included — a stage that stopped the
+// ship cost the lane its time as well. The append is local and best-effort, so it adds no wait.
+//
+// **A stage that found nothing to do is not timed**: a round 2 that was not due, or a round 1 already
+// recorded, would otherwise read as a review that took a second and pull the stage's median to zero.
+async function record_timed(step: Step, issue: string, elapsed_ms: number): Promise<void> {
+	await lane_ledger.record_stage({ stage: step.stage, elapsed_ms, issue: Number(issue) })
+}
+
 async function run_step(step: Step, args: ShipArguments, state: ShipState): Promise<ShipSection> {
+	const started_ms = performance.now()
 	const result = await step.run(args, state)
+	const elapsed_ms = performance.now() - started_ms
+
+	if (result.is_skipped !== true) await record_timed(step, args.number, elapsed_ms)
 	const section = { header: step.header, body: result.out, code: result.code }
 
 	return result.conflicts === undefined ? section : { ...section, conflicts: result.conflicts }

@@ -5,7 +5,8 @@ import { run_carry } from '#scripts/run/carry/run-carry'
 import { z } from 'zod'
 
 // The measurement ledger the lane limit is tuned against: one JSON line per
-// lane merge, per finished `josh gate`, and per machine-load sample, read back by `josh lane:stats`.
+// lane merge, per finished `josh gate`, per machine-load sample, per lane dispatch and per finished
+// `josh ship` stage, read back by `josh lane:stats`.
 //
 // **Its own file rather than the run's event stream.** The stream is capped at 500 events and is
 // rewritten whole on every append, which is right for "where is the run" and wrong for a measurement
@@ -20,13 +21,21 @@ import { z } from 'zod'
 const LEDGER_PREFIX = 'josh-lane-ledger-'
 const LEDGER_SUFFIX = '.jsonl'
 const LINE_SEPARATOR = '\n'
+// `followup`'s wait for CI — a stage of a lane's run that no `josh ship` stage is the whole of.
+const CI_WAIT_STAGE = 'ci-wait'
 const LEDGER_FILE_MODE = 0o600
 // The flags `detached-launch.ts` appends its log with, for the same deterministic shared-temp path.
 const { O_APPEND, O_CREAT, O_NOFOLLOW, O_WRONLY } = constants
 // eslint-disable-next-line no-bitwise -- POSIX open flags are a bit field; `||` here would be a bug
 const APPEND_FLAGS = O_WRONLY | O_APPEND | O_CREAT | O_NOFOLLOW
 
-const KIND = { MERGE: 'merge', GATE: 'gate', LOAD: 'load' } as const
+const KIND = {
+	MERGE: 'merge',
+	GATE: 'gate',
+	LOAD: 'load',
+	DISPATCH: 'dispatch',
+	STAGE: 'stage',
+} as const
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
 const gate_schema = z.object({
@@ -54,14 +63,39 @@ const load_schema = z.object({
 	swapped_mb: z.number().optional(),
 	lanes: z.number().optional(),
 })
-const entry_schema = z.discriminatedUnion('kind', [merge_schema, gate_schema, load_schema])
+// A lane child started on `issue` — the instant its implementation is timed from.
+const dispatch_schema = z.object({
+	kind: z.literal(KIND.DISPATCH),
+	at: z.string(),
+	issue: z.number(),
+})
+// One finished stage of a lane's run, passed or failed: `at` is its end and `elapsed_ms` its length, so
+// its start is read from the two. `issue` is absent where the writer does not hold one — `followup`'s
+// CI wait, which is timed on a path that fails before the issue is known.
+const stage_schema = z.object({
+	kind: z.literal(KIND.STAGE),
+	at: z.string(),
+	stage: z.string(),
+	elapsed_ms: z.number(),
+	issue: z.number().optional(),
+})
+const entry_schema = z.discriminatedUnion('kind', [
+	merge_schema,
+	gate_schema,
+	load_schema,
+	dispatch_schema,
+	stage_schema,
+])
 
 type LedgerEntry = z.infer<typeof entry_schema>
 type MergeEntry = z.infer<typeof merge_schema>
 type GateEntry = z.infer<typeof gate_schema>
 type LoadEntry = z.infer<typeof load_schema>
+type DispatchEntry = z.infer<typeof dispatch_schema>
+type StageEntry = z.infer<typeof stage_schema>
 // What a finished gate reports; the ledger stamps the kind and the time.
 type GateRecord = Omit<GateEntry, 'kind' | 'at'>
+type StageRecord = Omit<StageEntry, 'kind' | 'at'>
 
 function target_of(repository: string): string {
 	return stamp_file.stamp_path(LEDGER_PREFIX, repository, LEDGER_SUFFIX)
@@ -70,7 +104,13 @@ function target_of(repository: string): string {
 // The ledger of the repository this checkout belongs to, or `undefined` outside one. `git rev-parse`
 // rejects outside a repository, and `josh gate` resolves this before it runs a check, so the rejection
 // is read as "no ledger" rather than allowed to fail the gate it would only have measured.
+//
+// **A test run has no ledger either.** The writers sit on paths dozens of suites exercise — a ship
+// stage, a dispatch, a `followup` — and one suite that forgot to mock this module would append its
+// fixture durations to the real measurement; a test that writes passes its own path instead.
 async function target(): Promise<string | undefined> {
+	if (process.env['VITEST'] !== undefined) return undefined
+
 	try {
 		const repository = await run_carry.repository_directory()
 
@@ -120,6 +160,14 @@ async function record_merge(issue: number): Promise<void> {
 	await record({ kind: KIND.MERGE, at: now_iso(), issue })
 }
 
+async function record_dispatch(issue: number, path?: string): Promise<void> {
+	await record({ kind: KIND.DISPATCH, at: now_iso(), issue }, path)
+}
+
+async function record_stage(stage: StageRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.STAGE, at: now_iso(), ...stage }, path)
+}
+
 function parse_line(line: string): LedgerEntry | undefined {
 	return entry_schema.safeParse(json_value.parse_or_undefined(line)).data
 }
@@ -142,15 +190,18 @@ function read_entries(path: string): ReadonlyArray<LedgerEntry> {
 }
 
 const lane_ledger = {
+	CI_WAIT_STAGE,
 	KIND,
 	append,
 	read_entries,
 	record,
+	record_dispatch,
 	record_gate,
 	record_merge,
+	record_stage,
 	target,
 	target_of,
 }
 
-export type { GateEntry, LedgerEntry, LoadEntry, MergeEntry }
+export type { DispatchEntry, GateEntry, LedgerEntry, LoadEntry, MergeEntry, StageEntry }
 export { lane_ledger }

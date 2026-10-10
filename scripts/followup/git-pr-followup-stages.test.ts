@@ -85,6 +85,7 @@ vi.mock('./git-followup-pending', () => ({
 	},
 }))
 
+const { lane_ledger } = await import('#scripts/lane/lane-ledger')
 const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const { git_pr_checks } = await import('#scripts/gh/git-pr-checks')
 const { git_pr_ai_review } = await import('#scripts/gh/git-pr-ai-review')
@@ -174,6 +175,29 @@ describe('git_pr_followup.run — the stage block on a run that finished', () =>
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: false })
 
 		expect(printed_stages()).not.toContain(STAGE.merge)
+	})
+})
+
+// joshuafolkken/kit#3643: the wait for CI is the one lap `lane:stats` reads beside the round-one
+// review, so it goes to the lane ledger as well as to the console.
+describe('git_pr_followup.run — the CI wait in the lane ledger', () => {
+	it('records the wait as its own stage', async () => {
+		const record = vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		expect(record.mock.calls.map(([stage]) => stage.stage)).toStrictEqual([
+			lane_ledger.CI_WAIT_STAGE,
+		])
+	})
+
+	it('records nothing for a run that failed before its wait finished', async () => {
+		const record = vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
+
+		vi.mocked(git_pr_checks.wait_for_pr_success).mockRejectedValue(new Error('checks failed'))
+
+		await expect(git_pr_followup.run({ ...BASE_INPUT, should_merge: true })).rejects.toThrow()
+		expect(record).not.toHaveBeenCalled()
 	})
 })
 

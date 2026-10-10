@@ -1201,7 +1201,7 @@ Close every lane an interruption left without its work tree, then sweep unregist
 
 `[--every <seconds>]`
 
-Record the machine load (load average, swap, free memory, working lanes) to the lane ledger
+Record the machine load (load average, swap, free memory, working lanes) to the lane ledger — a backlogrun samples itself, this is for a reading outside one
 
 ---
 
@@ -1211,7 +1211,7 @@ Record the machine load (load average, swap, free memory, working lanes) to the 
 
 `--period <days> [--limit <lane-limit>]`
 
-Print one table row of lane throughput, gate duration and machine load over a period
+Print one table row of lane throughput, gate duration and machine load over a period, and the per-stage durations of a lane under it
 
 ---
 

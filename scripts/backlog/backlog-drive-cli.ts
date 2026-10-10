@@ -6,6 +6,7 @@ import { hook_decision } from '#scripts/josh/hook-decision'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
 import { lane_registry } from '#scripts/lane/lane-registry'
+import { lane_sampler } from '#scripts/lane/lane-sampler'
 import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
@@ -220,13 +221,19 @@ async function drive(context: DriveContext): Promise<number> {
 	return SUCCESS_EXIT_CODE
 }
 
+// The machine load is sampled for exactly as long as the drive runs, so a `backlogrun` leaves its own
+// load in the lane ledger without a sampler anyone has to start or stop (`lane-sampler.ts`).
 async function run_safe(context: DriveContext): Promise<number> {
+	const stop_sampling = lane_sampler.start()
+
 	try {
 		return await drive(context)
 	} catch (error) {
 		console.info(`error ${error_text.message_of(error)}`)
 
 		return FAILURE_EXIT_CODE
+	} finally {
+		stop_sampling()
 	}
 }
 
@@ -256,6 +263,7 @@ const backlog_drive_cli = {
 	offer_argv: backlog_drive_offer_argv.offer_argv,
 	parse: backlog_drive_args.parse,
 	resume_line: backlog_drive_args.resume_line,
+	run,
 	to_offer,
 }
 
