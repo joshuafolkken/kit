@@ -158,6 +158,7 @@ Print the language this session writes in, resolved from `JOSH_SESSION_LANG`. Wi
 ```
 
 - Read via `process.loadEnvFile` (environment wins). Unset / empty / no-`.env` resolve to `ja`; `JOSH_SESSION_LANG=en` opts into English.
+- While a `backlogrun` is live in the repository, it also prints one line telling the session to answer a progress question with `pnpm josh run:board --chat`, so a session that is not driving the run gets the rule too. No run, no line.
 
 ### `josh e2e:retry-check`
 
