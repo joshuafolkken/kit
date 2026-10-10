@@ -20,16 +20,14 @@ engineStrict: true
 trustLockfile: true
 
 # Security fixes often require same-day vite releases; minimumReleaseAge would block them.
-# `@types/node` and `tsx` are also excluded so routine Dependabot-style bumps are not
-# delayed by the minimumReleaseAge window.
+# Nothing else is excluded: `tsx` runs every `josh` command, so it waits out the window like any
+# other dependency (kit #3602).
 #
 # `josh init` / `josh sync` mirror this list to Safe Chain's .aikido project config (kit #2618).
 # Older Safe Chain shims ignore .aikido and can still hide an excluded release. `josh ranges`
 # checks published dependency ranges through that filtered view before a release (kit #742).
 minimumReleaseAgeExclude:
   - vite
-  - '@types/node'
-  - tsx
 
 overrides:
   svelte: ^5.55.7

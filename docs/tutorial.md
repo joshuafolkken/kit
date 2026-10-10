@@ -45,7 +45,7 @@ The agent writes the plan on the Issue if it has none (the one `kickoff new` fil
 
 To merge the pull request by hand instead, type `prrun #N`: it goes as far as a green, mergeable pull request and stops there ([Run Issues with the workflow keywords](./how-to/run-issues.md)).
 
-If you ran `halfrun` in step 2, its changes are still uncommitted in the working tree, and `fullrun` will not start on a tree with uncommitted changes. Finish that run with the commit command its stop notification gives instead — it opens the pull request and merges it the same way ([Recover a stopped run](./how-to/recover-a-run.md)).
+If you ran `halfrun` in step 2, its changes are still uncommitted in the working tree. Type `fullrun #N` all the same: it picks the stopped `halfrun` up from the gate, skipping the plan and the implementation, and ships the change you checked. Without an agent, the commit command in the stop notification finishes that run instead of `fullrun #N` or `prrun #N` ([Recover a stopped run](./how-to/recover-a-run.md)).
 
 ## Pattern B: many Issues at once
 

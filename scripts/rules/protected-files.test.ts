@@ -28,13 +28,18 @@ function settings_path_in(manifest: string | undefined): string {
 }
 
 describe('protected_files.is_protected_file_call — .env', () => {
-	it('refuses a Read of .env', () => {
-		const call = { name: 'Read', input: { file_path: '/work/app/.env' } }
+	it.each([
+		'/work/app/.env',
+		'/work/app/.env.local',
+		'/work/app/apps/web/.env.production',
+		'/work/app/.dev.vars',
+	])('refuses a Read of %j', (file) => {
+		const call = { name: 'Read', input: { file_path: file } }
 
 		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(true)
 	})
 
-	it.each(['/work/app/.env.example', '/work/app/src/env.ts'])(
+	it.each(['/work/app/.env.example', '/work/app/.env.test', '/work/app/src/env.ts'])(
 		'is silent on a Read of %j',
 		(file) => {
 			const call = { name: 'Read', input: { file_path: file } }
@@ -53,6 +58,9 @@ describe('protected_files.is_protected_file_call — .env through Bash', () => {
 		'. ./.env',
 		'git status; sed -n 1p .env',
 		'wc -l < .env',
+		'grep KEY .env.local',
+		'source .env.production && pnpm dev',
+		'cat .dev.vars',
 	])('refuses %j', (command) => {
 		const call = { name: 'Bash', input: { command } }
 
@@ -61,7 +69,7 @@ describe('protected_files.is_protected_file_call — .env through Bash', () => {
 
 	it.each([
 		'cat .env.example',
-		'grep KEY .env.local',
+		'source .env.test',
 		'git add .env.example',
 		'git commit -m "Ignore .env"',
 		'ls -a',
