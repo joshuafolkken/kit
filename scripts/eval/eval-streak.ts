@@ -1,4 +1,5 @@
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { eval_report, type MergeVerdict } from './eval-report'
 
@@ -41,11 +42,7 @@ function streak_path(): string {
 // A record that cannot be read is no record. The count is an aid to noticing rather than a gate, so
 // every failure here reads as "start again from one" instead of ending the run that just measured.
 function parse_streak(text: string): Streak | undefined {
-	try {
-		return STREAK_SCHEMA.parse(JSON.parse(text))
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(text, STREAK_SCHEMA)
 }
 
 function read_streak(source: string = streak_path()): Streak | undefined {

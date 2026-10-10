@@ -1,6 +1,7 @@
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
 // The report clock `josh run:progress` keeps, in the one form both of its readers can use.
@@ -84,11 +85,7 @@ function read_last_line(target: string): string | undefined {
 
 	if (raw === undefined) return undefined
 
-	try {
-		return report_stamp_schema.safeParse(JSON.parse(raw)).data?.line
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw, report_stamp_schema)?.line
 }
 
 /**

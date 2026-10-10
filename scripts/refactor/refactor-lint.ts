@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
+import { json_value } from '#scripts/lib/json-value'
 import { LINT_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import { z } from 'zod'
@@ -188,13 +189,7 @@ function eslint_command(root: string, files: ReadonlyArray<string>): ReadonlyArr
 // `undefined` means the run did not produce parseable eslint JSON — a failure, kept distinct from a
 // valid empty array (a clean scope), so a scan that could not run is never reported as `clear`.
 function parse_results(raw: string | undefined = 'null'): Array<LintResult> | undefined {
-	try {
-		const parsed = results_schema.safeParse(JSON.parse(raw))
-
-		return parsed.success ? parsed.data : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw, results_schema)
 }
 
 // The project's own eslint over the scope, in JSON. `reject: false` because eslint exits non-zero when

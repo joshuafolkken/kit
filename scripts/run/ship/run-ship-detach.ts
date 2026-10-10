@@ -5,6 +5,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { session_cite } from '#scripts/issue/session-cite'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -114,11 +115,8 @@ function result_path(repository: string, number: string): string {
 function read_record(repository: string, number: string): ShipRecord | undefined {
 	try {
 		const raw = stamp_file.read_stamp_text(result_path(repository, number))
-		if (raw === undefined) return undefined
-		const value: unknown = JSON.parse(raw)
-		const parsed = ship_record_schema.safeParse(value)
 
-		return parsed.success ? parsed.data : undefined
+		return raw === undefined ? undefined : json_value.parse_with(raw, ship_record_schema)
 	} catch {
 		return undefined
 	}

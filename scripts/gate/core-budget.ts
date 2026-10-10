@@ -6,6 +6,7 @@ import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_owner_schema } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { z } from 'zod'
 import { core_admission, type Admission, type LedgerEntry, type Overflow } from './core-admission'
@@ -129,13 +130,7 @@ function read_reservation(source: string): Reservation | undefined {
 
 	if (raw === undefined) return undefined
 
-	try {
-		const parsed = reservation_schema.safeParse(JSON.parse(raw))
-
-		return parsed.success ? parsed.data : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw, reservation_schema)
 }
 
 // **A dead marker is removed, not merely skipped** — otherwise a reissued pid turns a leaked place into

@@ -1,6 +1,6 @@
 import { git_gh_issue_rest } from '#scripts/gh/git-gh-issue-rest'
 import { blocked_by_schema } from '#scripts/git/git-schemas'
-import { parse_json_object_safe } from '#scripts/git/parse-json-array'
+import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 import type { IssueReference } from './epic-reference'
 
@@ -45,7 +45,7 @@ function parse_epic_issue(raw: string | undefined): EpicIssue | undefined {
 	if (raw === undefined) return undefined
 
 	try {
-		return parse_json_object_safe(raw, epic_issue_schema)
+		return parse_json_object_or_undefined(raw, epic_issue_schema)
 	} catch {
 		return undefined
 	}

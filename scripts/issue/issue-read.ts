@@ -1,4 +1,4 @@
-import { parse_json_object_safe, read_json_listing } from '#scripts/git/parse-json-array'
+import { parse_json_object_or_undefined, read_json_listing } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 
 // The block `josh issue:read` prints for one issue, kept apart from the reading and the printing so
@@ -64,7 +64,7 @@ const UNKNOWN_TIME = '(undated)'
 // parse.
 function parse_issue_fields(json: string): IssueFields | undefined {
 	try {
-		const parsed = parse_json_object_safe(json, issue_fields_schema)
+		const parsed = parse_json_object_or_undefined(json, issue_fields_schema)
 
 		if (parsed === undefined) return undefined
 

@@ -5,6 +5,7 @@ import { git_command } from '#scripts/git/git-command'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
+import { json_value } from '#scripts/lib/json-value'
 import { run_hold, type RunHold } from '#scripts/run/hold/run-hold'
 import { z } from 'zod'
 import { run_cut_handoff, type Handoff } from './run-cut-handoff'
@@ -172,13 +173,7 @@ function invocation_for(issue: string): string {
 }
 
 function parse_cut(raw: string): RunCut | undefined {
-	try {
-		const parsed = run_cut_schema.safeParse(JSON.parse(raw))
-
-		return parsed.success ? parsed.data : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw, run_cut_schema)
 }
 
 // A `cut_at` that is not a date is read as expired, for the reason `run-carry.ts` reads an unparsable

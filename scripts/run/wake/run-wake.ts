@@ -3,6 +3,7 @@ import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_owner_schema } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
 import { z } from 'zod'
 
@@ -156,11 +157,7 @@ function wake_log_path(git_directory: string): string {
 }
 
 function parse_wake(raw: string): RunWake | undefined {
-	try {
-		return run_wake_schema.parse(JSON.parse(raw))
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw, run_wake_schema)
 }
 
 function read_wake(target: string): RunWake | undefined {

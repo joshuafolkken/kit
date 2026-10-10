@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import type { CarryRead } from './run-carry'
 
@@ -68,13 +69,7 @@ function record_ended(
 }
 
 function parse_ended(raw: string): EndedRun | undefined {
-	try {
-		const parsed = ended_run_schema.safeParse(JSON.parse(raw))
-
-		return parsed.success ? parsed.data : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw, ended_run_schema)
 }
 
 // `undefined` when no run has ended here, or the record does not read.

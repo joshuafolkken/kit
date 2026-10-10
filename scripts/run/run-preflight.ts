@@ -3,6 +3,7 @@ import { git_command } from '#scripts/git/git-command'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { json_value } from '#scripts/lib/json-value'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { z } from 'zod'
 
@@ -201,11 +202,7 @@ function decide(tree: TreeState, child: ChildState, issue: string): PreflightDec
 }
 
 function read_pr_field(raw: string): string | undefined {
-	try {
-		return pr_info_schema.parse(JSON.parse(raw)).state
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw, pr_info_schema)?.state
 }
 
 function to_pr_state(raw: string): PrState {

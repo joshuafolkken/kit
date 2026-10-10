@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { RepoMap } from '#scripts/discovery/repo-map-logic'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
 // Deciding which repositories a published release should be carried into.
@@ -67,11 +68,7 @@ function read_manifest(repository_path: string): Manifest | undefined {
 	if (!existsSync(manifest_path)) return undefined
 
 	try {
-		const parsed: unknown = JSON.parse(readFileSync(manifest_path, 'utf8'))
-
-		const result = manifest_schema.safeParse(parsed)
-
-		return result.success ? result.data : undefined
+		return json_value.parse_with(readFileSync(manifest_path, 'utf8'), manifest_schema)
 	} catch {
 		return undefined
 	}

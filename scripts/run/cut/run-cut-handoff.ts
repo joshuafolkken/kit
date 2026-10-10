@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
 // The session state a cut carries across the process boundary. `RunCut`'s six
@@ -58,13 +59,7 @@ const HANDOFF_FORMAT = `a JSON object {${handoff_schema
 	.join(', ')}}`
 
 function parse_handoff(raw: string): Handoff | undefined {
-	try {
-		const parsed = handoff_schema.safeParse(JSON.parse(raw))
-
-		return parsed.success ? parsed.data : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw, handoff_schema)
 }
 
 // A path given but unreadable, or holding text that is not a well-formed handoff, is `undefined` — the

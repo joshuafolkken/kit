@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { ancestor_directories } from '#scripts/lib/ancestor-directories'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { run_progress } from './run-progress'
 
@@ -36,9 +37,8 @@ const package_schema = z.object({
 function read_declared_minutes(directory: string): number | undefined {
 	try {
 		const raw = readFileSync(path.join(directory, PACKAGE_FILE), 'utf8')
-		const parsed = package_schema.safeParse(JSON.parse(raw))
 
-		return parsed.success ? parsed.data.josh?.progress_interval_minutes : undefined
+		return json_value.parse_with(raw, package_schema)?.josh?.progress_interval_minutes
 	} catch {
 		return undefined
 	}

@@ -59,7 +59,7 @@ function has_gh_failure(error: unknown): error is Error & { gh_failure: GhFailur
 // nothing in it says what the status was, and guessing one would be the inference this module
 // exists to remove.
 function parse_response_status(stdout: string): number | undefined {
-	const document = parse_json.parse_json_object_safe(stdout, error_document_schema)
+	const document = parse_json.parse_json_object_or_undefined(stdout, error_document_schema)
 	if (document?.status === undefined) return undefined
 	const status = Number(document.status)
 
