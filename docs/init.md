@@ -128,6 +128,17 @@ The following table describes the `full` profile. The profile table above lists 
 
 > Kit-only `.vscode/settings.json` keys (currently `sonarlint.connectedMode.project`, which points at the kit's own SonarQube project) are stripped from the template before distribution, so they are never written into consumer projects.
 
+### Claude Code permission mode
+
+The template's `.vscode/settings.json` sets `claudeCode.initialPermissionMode` to `bypassPermissions` and `claudeCode.allowDangerouslySkipPermissions` to `true`, and the distributed `.claude/settings.json` sets `permissions.defaultMode` to `bypassPermissions` with `Bash(*)` allowed. The issue-driven commands (`fullrun`, `backlogrun`, …) run unattended and stall on a permission prompt, so this is the default kit ships: where the mode applies, Claude Code runs tools without asking, and the `permissions.deny` list plus the `pretool-guard` hook are what stand between a session and a destructive command or a secret file. Both refuse a read of `.env`, `.env.*` and `.dev.vars` — the deny list for the Read tool and the shell readers Claude Code recognizes, the hook for the rest (`source .env.local`) — and both leave the tracked `.env.example` and `.env.test` readable. A script or subprocess that opens the file itself is outside both.
+
+**Where the mode applies depends on the Claude Code version.** Since Claude Code v2.1.257 a `permissions.defaultMode` of `bypassPermissions` is ignored in project and local settings (`.claude/settings.json`, `.claude/settings.local.json`), so on a current CLI the distributed value does nothing and a session still prompts: for an unattended run, set it in your user settings (`~/.claude/settings.json`) or pass `--permission-mode bypassPermissions`. Before v2.1.257 the distributed value takes effect as written.
+
+**This is opt-out, not opt-in — decide before the first session.** Both `.vscode/settings.json` keys are scalars, so the merge never touches a value the project already owns:
+
+- To keep the prompts in the VS Code extension, set `"claudeCode.initialPermissionMode": "default"` and `"claudeCode.allowDangerouslySkipPermissions": false` in your `.vscode/settings.json`. Set the values rather than deleting the keys — `josh sync` adds a missing key back.
+- `josh sync` overwrites `.claude/settings.json`, so on a Claude Code older than v2.1.257 override `permissions.defaultMode` in `.claude/settings.local.json` instead of editing the distributed file; user settings rank below the project file and do not override it. To rule the mode out on any version, set `"permissions": { "disableBypassPermissionsMode": "disable" }` there.
+
 ### tsconfig merge strategy
 
 The preset is **prepended** to the `extends` array so it does not override project-specific entries:
