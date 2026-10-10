@@ -1,38 +1,82 @@
-import { describe, expect, it } from 'vitest'
+import type { machine_capacity } from '#scripts/gate/machine-capacity'
+import { hanging_execa } from '#scripts/test/hanging-execa'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_load } from './lane-load'
-import type { LaneInfo } from './lane-registry'
+import { lane_registry, type LaneInfo } from './lane-registry'
 
-// joshuafolkken/kit#3355: swap is read per platform, and an output nobody recognizes leaves the
-// sample without swap rather than recording a zero nobody measured.
+// joshuafolkken/kit#3355: a load sample sets the machine's load beside the lanes with a child working.
+// joshuafolkken/kit#3593: its memory is the reading the gate admits against — `os.freemem()` read near
+// zero on macOS, and a second swap parser measured a different figure for the same machine.
 
-const MEMORY_LINE = 'MemTotal: 16000000 kB'
-const LINUX_MEMINFO = [MEMORY_LINE, 'SwapTotal: 4194304 kB', 'SwapFree: 3145728 kB'].join('\n')
+vi.mock('execa', async () => {
+	const { hanging_execa: stand_in } = await import('#scripts/test/hanging-execa')
 
-describe('lane_load.parse_darwin_swap', () => {
-	it('reads a used figure given in megabytes', () => {
-		const output = 'total = 5120.00M  used = 3993.25M  free = 1126.75M  (encrypted)'
-
-		expect(lane_load.parse_darwin_swap(output)).toBe(3993.25)
-	})
-
-	it('scales a used figure given in gigabytes', () => {
-		const output = 'total = 8.00G  used = 2.50G  free = 5.50G  (encrypted)'
-
-		expect(lane_load.parse_darwin_swap(output)).toBe(2560)
-	})
-
-	it('answers undefined for an unrecognized output', () => {
-		expect(lane_load.parse_darwin_swap('no swap here')).toBeUndefined()
-	})
+	return { execa: stand_in.spawn }
 })
 
-describe('lane_load.parse_linux_swap', () => {
-	it('derives the swap in use from the total and the free swap', () => {
-		expect(lane_load.parse_linux_swap(LINUX_MEMINFO)).toBe(1024)
+const AT = '2026-10-10T00:00:00.000Z'
+// Half the memory available, and 256 + 512 pages of 4 KB: 3 MB swapped since boot.
+const SYSCTL_OUTPUT = [
+	'kern.memorystatus_level: 50',
+	'vm.compressor.swapper.swapins_total: 256',
+	'vm.compressor.swapper.swapouts_total: 512',
+	'hw.pagesize: 4096',
+].join('\n')
+const SWAPPED_MB = 3
+
+function stub_platform(platform: NodeJS.Platform): void {
+	vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
+}
+
+// The reading the gate's admission takes — the real `read_machine`, which the machine guard replaces in
+// every worker — with its sampling window skipped.
+async function read_admission(): Promise<number | undefined> {
+	const actual = await vi.importActual<{ machine_capacity: typeof machine_capacity }>(
+		'#scripts/gate/machine-capacity',
+	)
+	const reading = await actual.machine_capacity.read_machine(async () => {
+		await Promise.resolve()
 	})
 
-	it('answers undefined when a swap line is missing', () => {
-		expect(lane_load.parse_linux_swap(MEMORY_LINE)).toBeUndefined()
+	return reading.available_mb
+}
+
+beforeEach(() => {
+	hanging_execa.reset()
+	vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue([])
+})
+
+afterEach(() => {
+	vi.restoreAllMocks()
+})
+
+describe('lane_load.sample', () => {
+	it('shares the memory reading the gate admits against', async () => {
+		stub_platform('darwin')
+		hanging_execa.answer_with('sysctl', SYSCTL_OUTPUT)
+
+		const sample = await lane_load.sample(AT)
+		const available_mb = await read_admission()
+		const [sampled, admitted] = hanging_execa.calls()
+
+		expect(available_mb).toBeGreaterThan(0)
+		expect(sample.available_mb).toBe(Math.round(available_mb ?? 0))
+		expect(sample.swapped_mb).toBe(SWAPPED_MB)
+		expect(hanging_execa.calls()).toHaveLength(2)
+		expect(sampled).toStrictEqual(admitted)
+	})
+
+	it('records the sample without memory on a platform the reading does not cover', async () => {
+		stub_platform('win32')
+
+		await expect(lane_load.sample(AT)).resolves.toMatchObject({
+			kind: 'load',
+			at: AT,
+			available_mb: undefined,
+			swapped_mb: undefined,
+			lanes: 0,
+		})
+		expect(hanging_execa.calls()).toHaveLength(0)
 	})
 })
 
@@ -59,11 +103,5 @@ describe('lane_load.count_working', () => {
 
 	it('counts no lane when only a parked lane is open', () => {
 		expect(lane_load.count_working([lane('4', false)], () => false)).toBe(0)
-	})
-})
-
-describe('lane_load.read_swap_mb', () => {
-	it('answers undefined on a platform with no swap reading', async () => {
-		await expect(lane_load.read_swap_mb('win32')).resolves.toBeUndefined()
 	})
 })

@@ -25,11 +25,11 @@ describe('lane_ledger.read_entries', () => {
 		const target = ledger('round-trip')
 
 		lane_ledger.append(target, { kind: 'merge', at: AT, issue: 1 })
-		lane_ledger.append(target, { kind: 'load', at: AT, load: 2.5, free_mb: 512 })
+		lane_ledger.append(target, { kind: 'load', at: AT, load: 2.5, available_mb: 512 })
 
 		expect(lane_ledger.read_entries(target)).toStrictEqual([
 			{ kind: 'merge', at: AT, issue: 1 },
-			{ kind: 'load', at: AT, load: 2.5, free_mb: 512 },
+			{ kind: 'load', at: AT, load: 2.5, available_mb: 512 },
 		])
 	})
 
@@ -45,6 +45,33 @@ describe('lane_ledger.read_entries', () => {
 
 	it('reads an absent file as an empty ledger', () => {
 		expect(lane_ledger.read_entries(ledger('absent'))).toStrictEqual([])
+	})
+})
+
+describe('lane_ledger.read_entries on a load sample memory', () => {
+	// joshuafolkken/kit#3593: the memory is `machine_capacity`'s reading, which can go unread.
+	it('keeps a load sample whose memory could not be read', () => {
+		const target = ledger('unread-memory')
+
+		lane_ledger.append(target, { kind: 'load', at: AT, load: 2.5, lanes: 1 })
+		lane_ledger.append(target, { kind: 'load', at: AT, load: 1, available_mb: 512, swapped_mb: 3 })
+
+		expect(lane_ledger.read_entries(target)).toStrictEqual([
+			{ kind: 'load', at: AT, load: 2.5, lanes: 1 },
+			{ kind: 'load', at: AT, load: 1, available_mb: 512, swapped_mb: 3 },
+		])
+	})
+
+	// joshuafolkken/kit#3593: a row measured before the rename keeps its load and loses its memory.
+	it('reads a pre-rename load sample without its memory fields', () => {
+		const target = ledger('pre-rename')
+		const old_row = { kind: 'load', at: AT, load: 2.5, free_mb: 40, swap_mb: 900, lanes: 1 }
+
+		appendFileSync(target, `${JSON.stringify(old_row)}\n`)
+
+		expect(lane_ledger.read_entries(target)).toStrictEqual([
+			{ kind: 'load', at: AT, load: 2.5, lanes: 1 },
+		])
 	})
 })
 
