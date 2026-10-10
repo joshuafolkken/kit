@@ -87,18 +87,6 @@ For a project set up with `josh init` and no GitHub. The workflow keywords above
 3. The agent reads the file before changing it, makes the change, checks it and reports what it saw. In a `full` profile project it also adds a test where one fits, runs `pnpm josh gate`, and reports which checks passed and which did not.
 4. Check it yourself: run `pnpm josh gate` ([what it checks and skips](./setup/basic.md#3-verify)), and open the page in a browser when the change is visible.
 
-   In a `full` profile project with no Git repository, lint stops on a missing `.gitignore` before it reads your code. Create an empty one first, then run the gate again:
-
-   ```bash
-   touch .gitignore
-   ```
-
-   In PowerShell on Windows, where `touch` does not exist:
-
-   ```powershell
-   New-Item .gitignore -ItemType File
-   ```
-
 Want Issues, pull requests and merges handled too? Run `pnpm exec josh start` ([init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start)), then follow Pattern A.
 
 ## Where next
