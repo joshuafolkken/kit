@@ -1,4 +1,5 @@
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
 const DECISION_PREFIX = 'josh-openai-lane-supervisor-decision-'
@@ -16,14 +17,9 @@ function target(lane_directory: string, nonce: string): string {
 }
 
 function read(lane_directory: string, nonce: string): Decision | undefined {
-	try {
-		const raw = stamp_file.read_stamp_text(target(lane_directory, nonce)) ?? ''
-		const value: unknown = JSON.parse(raw)
+	const raw = stamp_file.read_stamp_text(target(lane_directory, nonce)) ?? ''
 
-		return schema.parse(value)
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw, schema)
 }
 
 function decide(lane_directory: string, nonce: string, decision: Decision['decision']): boolean {

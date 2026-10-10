@@ -7,6 +7,7 @@ import { josh_command } from '#scripts/josh/josh-run'
 import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { error_text } from '#scripts/lib/error-message'
+import { json_value } from '#scripts/lib/json-value'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_merge_cli, type MergeResult } from '#scripts/run/merge/run-merge-cli'
@@ -59,13 +60,7 @@ const offer_read_schema = z.object({
 const offer_schema = z.object({ [backlog_offer_cli.JSON_KEY]: offer_read_schema })
 
 function to_offer(out: string): OfferRead | undefined {
-	try {
-		const parsed = offer_schema.safeParse(JSON.parse(out))
-
-		return parsed.success ? parsed.data[backlog_offer_cli.JSON_KEY] : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(out, offer_schema)?.[backlog_offer_cli.JSON_KEY]
 }
 
 async function read_record(): Promise<RunCarry | undefined> {

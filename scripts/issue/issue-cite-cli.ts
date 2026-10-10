@@ -4,6 +4,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { IssueRead } from '#scripts/gh/git-gh-issue-read'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { issue_cite, type CiteTarget } from './issue-cite'
 
@@ -39,13 +40,9 @@ type LineResult = { kind: 'ok'; line: string } | { kind: 'fail'; line: string }
 // The title out of the one-field read, or `undefined` for an empty or unparseable one — an empty title
 // is not a summary, so it is reported as a read that produced nothing rather than cited as a blank.
 function parse_title(json: string): string | undefined {
-	try {
-		const title = title_schema.parse(JSON.parse(json)).title.trim()
+	const title = json_value.parse_with(json, title_schema)?.title.trim()
 
-		return title === '' ? undefined : title
-	} catch {
-		return undefined
-	}
+	return title === '' ? undefined : title
 }
 
 // A read's outcome as one line: the citation on success, the matching failure line otherwise. The

@@ -1,3 +1,4 @@
+import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
@@ -168,11 +169,7 @@ function last_refusal_ms(target: string): number {
 
 	if (raw === undefined) return NEVER_MS
 
-	try {
-		return refusal_schema.parse(JSON.parse(raw)).refused_at_ms
-	} catch {
-		return NEVER_MS
-	}
+	return json_value.parse_with(raw, refusal_schema)?.refused_at_ms ?? NEVER_MS
 }
 
 function record_refusal(target: string, now_ms: number): boolean {

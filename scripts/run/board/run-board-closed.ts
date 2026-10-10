@@ -1,6 +1,6 @@
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { issue_label_schema } from '#scripts/git/git-schemas'
-import { parse_json_object_safe } from '#scripts/git/parse-json-array'
+import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_merged } from '#scripts/issue/issue-merged'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { z } from 'zod'
@@ -58,7 +58,7 @@ function closed_ms_of(view: ClosedView): number | undefined {
 // failure is never kept as closed-not-merged.
 async function read_closed(issue: number): Promise<ClosedRead> {
 	const json = await git_gh_issue_read.issue_view_json(String(issue), CLOSED_FIELDS)
-	const view = json === undefined ? undefined : parse_json_object_safe(json, closed_schema)
+	const view = json === undefined ? undefined : parse_json_object_or_undefined(json, closed_schema)
 
 	if (view === undefined) return undefined
 	if (view.state !== CLOSED_STATE) return STILL_OPEN

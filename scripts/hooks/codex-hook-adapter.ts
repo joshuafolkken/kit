@@ -3,6 +3,7 @@ import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { json_value } from '#scripts/lib/json-value'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { z } from 'zod'
 import { build_envelope, compose_context, format_edited_payload } from './format-edited-file'
@@ -36,13 +37,7 @@ const patch_input_schema = z.object({ command: z.string().min(1) })
 type PayloadFormatter = (raw_payload: string, project_root: string) => Promise<string | undefined>
 
 function parse_payload(raw_payload: string): z.infer<typeof codex_payload_schema> | undefined {
-	try {
-		const parsed = codex_payload_schema.safeParse(JSON.parse(raw_payload))
-
-		return parsed.success ? parsed.data : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw_payload, codex_payload_schema)
 }
 
 function paths_matching(command: string, pattern: RegExp): Array<string> {

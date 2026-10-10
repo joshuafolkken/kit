@@ -1,7 +1,7 @@
 import { blocking_issue_schema } from '#scripts/git/git-schemas'
 import {
 	parse_json_array_or_undefined,
-	parse_json_object_safe,
+	parse_json_object_or_undefined,
 } from '#scripts/git/parse-json-array'
 import type { IssueReference } from '#scripts/issue/issue-reference'
 import { z } from 'zod'
@@ -123,7 +123,7 @@ function to_gh_field_value(field: string, rest: RestIssue): unknown {
 // catch it into `undefined`, which is the same "the read failed" every other failure produces, while
 // a partial object would be reported as an issue whose fields are all missing.
 function parse_rest_issue(rest_json: string): RestIssue {
-	const parsed = parse_json_object_safe(rest_json, rest_issue_schema)
+	const parsed = parse_json_object_or_undefined(rest_json, rest_issue_schema)
 	if (parsed === undefined) throw new Error(NOT_AN_ISSUE_MESSAGE)
 
 	return parsed

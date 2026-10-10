@@ -1,5 +1,6 @@
 import { closeSync, fstatSync, openSync, readSync } from 'node:fs'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { time_batch_guard, type GuardedCall } from './time-batch-guard'
 import { time_density } from './time-density'
@@ -116,11 +117,7 @@ function last_notice_ms(source: string): number {
 
 	if (raw === undefined) return NEVER_MS
 
-	try {
-		return notice_schema.parse(JSON.parse(raw)).notified_at_ms
-	} catch {
-		return NEVER_MS
-	}
+	return json_value.parse_with(raw, notice_schema)?.notified_at_ms ?? NEVER_MS
 }
 
 // **Arming the throttle is best-effort, and never costs the line.** The caller prints and exits, so

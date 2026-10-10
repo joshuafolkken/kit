@@ -2,7 +2,7 @@ import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
-import { parse_json_object_safe } from '#scripts/git/parse-json-array'
+import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 
 // **The merged pull request that closes an issue GitHub left open**. A
@@ -48,7 +48,7 @@ function is_reference(row: TimelineRow): row is MergedReference {
 function parse_references(raw: string): Array<MergedReference> {
 	const rows = raw
 		.split(LINE_SEPARATOR)
-		.map((line) => parse_json_object_safe(line, row_schema))
+		.map((line) => parse_json_object_or_undefined(line, row_schema))
 		.filter((row) => row !== undefined)
 	const last_reopen = rows.findLastIndex((row) => !is_reference(row))
 

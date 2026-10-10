@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { josh_command } from '#scripts/josh/josh-run'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { json_value } from '#scripts/lib/json-value'
 import { rule_value_cache } from '#scripts/rules/rule-value-cache'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -136,19 +137,14 @@ interface BudgetRead {
 }
 
 function budget_of(out: string): BudgetRead | undefined {
-	try {
-		const parsed = budget_read_schema.safeParse(JSON.parse(out))
+	const read = json_value.parse_with(out, budget_read_schema)
+	if (read === undefined) return undefined
 
-		return parsed.success
-			? {
-					verdict: parsed.data[BUDGET_JSON_KEY],
-					reason: parsed.data.reason,
-					is_finish: parsed.data.is_finish,
-					idle: parsed.data.idle,
-				}
-			: undefined
-	} catch {
-		return undefined
+	return {
+		verdict: read[BUDGET_JSON_KEY],
+		reason: read.reason,
+		is_finish: read.is_finish,
+		idle: read.idle,
 	}
 }
 

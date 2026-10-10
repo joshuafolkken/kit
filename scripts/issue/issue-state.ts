@@ -1,4 +1,4 @@
-import { parse_json_object_safe } from '#scripts/git/parse-json-array'
+import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 import { has_any_label, NEEDS_HUMAN_REVIEW_LABEL } from './issue-labels'
 
@@ -57,7 +57,7 @@ interface IssueState {
 // the same answer, because printing either as a state is what this command exists to prevent.
 function parse_issue_state(json: string): IssueState | undefined {
 	try {
-		const parsed = parse_json_object_safe(json, issue_state_schema)
+		const parsed = parse_json_object_or_undefined(json, issue_state_schema)
 
 		if (parsed === undefined) return undefined
 

@@ -7,6 +7,7 @@ import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
+import { json_value } from '#scripts/lib/json-value'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { z } from 'zod'
@@ -60,10 +61,7 @@ function response_path(directory: string, issue: string): string | undefined {
 
 function read_record<T>(target: string, schema: z.ZodType<T>): T | undefined {
 	try {
-		const content: unknown = JSON.parse(readFileSync(target, 'utf8'))
-		const parsed = schema.safeParse(content)
-
-		return parsed.success ? parsed.data : undefined
+		return json_value.parse_with(readFileSync(target, 'utf8'), schema)
 	} catch {
 		return undefined
 	}

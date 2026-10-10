@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { parse_json_object_safe } from '#scripts/git/parse-json-array'
+import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { z } from 'zod'
 import { issue_backlinks, type UpstreamEntry } from './issue-backlinks'
@@ -21,7 +21,7 @@ const body_schema = z.object({ body: z.string().nullish() })
 
 function parse_body(raw_json: string | undefined): string | undefined {
 	if (raw_json === undefined) return undefined
-	const parsed = parse_json_object_safe(raw_json, body_schema)
+	const parsed = parse_json_object_or_undefined(raw_json, body_schema)
 
 	return parsed === undefined ? undefined : (parsed.body ?? '')
 }

@@ -8,6 +8,7 @@ import {
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { detached_launch, type LaunchResult } from '#scripts/run/detached-launch'
 import { run_headless } from '#scripts/run/run-headless'
@@ -60,13 +61,7 @@ function log_path(git_directory: string): string {
 }
 
 function read_launch(target: string): LaunchRecord | undefined {
-	try {
-		const parsed = launch_schema.safeParse(JSON.parse(stamp_file.read_stamp_text(target) ?? ''))
-
-		return parsed.success ? parsed.data : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(stamp_file.read_stamp_text(target) ?? '', launch_schema)
 }
 
 // The launched parent is still the process it was: a pid reused by another process is not a run.
