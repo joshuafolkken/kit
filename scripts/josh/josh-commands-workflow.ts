@@ -79,9 +79,9 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Record a review round’s findings, or check a round was recorded',
 		category: 'Workflow',
 		reference: [
-			'--issue <N> [<category>:<severity>:<file> ...] | --check --issue <N>',
+			'--issue <N> [--comment] [<category>:<severity>:<file> ...] | --check --issue <N>',
 			'automation',
-			['files'],
+			['files', 'network'],
 		],
 	},
 	// The reader over what `review:record` wrote: each recurring category’s
