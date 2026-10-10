@@ -9,7 +9,7 @@ These three commands are what turn an epic from a list of issue numbers into som
 execute unattended. **This skill is their single source**; where each rule came from is
 `docs/maintainers/epic-commands-rationale.md` → "Where each rule came from".
 
-The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `backlogrun` — live in the
+The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `prrun`, `backlogrun` — live in the
 `workflow-commands` skill.
 
 ## The order they run in

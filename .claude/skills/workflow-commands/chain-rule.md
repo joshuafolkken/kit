@@ -2,7 +2,7 @@
 
 ## Run the review-to-merge chain
 
-This is the execution contract for `fullrun` and `backlogrun`; the record below is reference only.
+This is the execution contract for `fullrun` and `backlogrun`, and for `prrun` up to the pull request: a `prrun` never issues `pnpm josh ship` or a merging `pnpm josh followup` — it opens the pull request with `pnpm josh git -y` and ends by `prrun.md` → "The difference — the end of the run". The record below is reference only.
 Review results and successful pushes are never turn boundaries.
 
 0. **A lane child**: `pnpm josh main:merge`, the scoped pair, `pnpm josh ship --detach --review

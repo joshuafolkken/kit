@@ -1,6 +1,6 @@
 # Install the global `josh` CLI
 
-For anyone who wants `josh` on their PATH, for both project profiles. Install `@joshuafolkken/kit` globally to run `josh` from any directory, independent of any project's `node_modules` — the same model as `@joshuafolkken/game-kit`'s `jgame`.
+For anyone who wants `josh` on their PATH, for both project profiles. Install `@joshuafolkken/kit` globally to run `josh` from any directory, independent of any project's `node_modules` — the same model as `@joshuafolkken/game-kit`'s `josh-game`.
 
 ## 1. Install globally
 

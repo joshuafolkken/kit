@@ -73,6 +73,7 @@ const RETIRED_PHRASES: ReadonlyArray<string> = [
 	'is a separate deliverable',
 	"it asks only after a child that ran in the parent's own context",
 	'its own `pnpm josh gate` join',
+	'jgame',
 	'join it, and `pnpm josh git -y`; on `skip`',
 	'kit exports that rule for consumers and does not apply it to itself',
 	'operating-rules.md` → "Auto-merge',
