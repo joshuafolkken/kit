@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1049,
-		"code_lines": 87348,
-		"comment_lines": 33557,
+		"files": 1050,
+		"code_lines": 87442,
+		"comment_lines": 33594,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 461817
 	},
 	"accepted": {
-		"reason": "#3651: the provider default (DEFAULT_PROVIDER, default_notice, warn_of_default at run:wake --start, review:brief and ship --detach) and the cost guard that keeps a defaulted provider unmeasurable add 18 code lines",
+		"reason": "The cycle recheck now also covers lint:related and loads eslint lazily (#3641 review fixes)",
 		"date": "2026-10-10"
 	}
 }
