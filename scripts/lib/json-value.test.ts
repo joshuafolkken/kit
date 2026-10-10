@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import { json_value } from './json-value'
+
+const record_schema = z.object({ issue: z.number(), note: z.string().optional() })
 
 describe('json_value.parse_or_undefined — one JSON Lines line', () => {
 	it('reads a well-formed line as its value', () => {
@@ -28,6 +31,38 @@ describe('json_value.parse_or_undefined — one JSON Lines line', () => {
 			.map((line) => json_value.parse_or_undefined(line))
 
 		expect(values).toEqual([{ a: 1 }, { b: 2 }, undefined])
+	})
+})
+
+describe('json_value.parse_with — JSON read against a schema', () => {
+	it('reads text the schema accepts as the parsed value', () => {
+		expect(json_value.parse_with('{"issue":7,"note":"a"}', record_schema)).toEqual({
+			issue: 7,
+			note: 'a',
+		})
+	})
+
+	it.each([
+		['empty text', ''],
+		['an object cut short', '{"issue":'],
+		['prose', 'no braces here'],
+	])('reads %s as undefined without throwing', (_label, text) => {
+		expect(json_value.parse_with(text, record_schema)).toBeUndefined()
+	})
+
+	it.each([
+		['a field of the wrong type', '{"issue":"7"}'],
+		['a missing required field', '{"note":"a"}'],
+		['an array', '[1]'],
+		['JSON null', 'null'],
+	])('reads %s as undefined when the schema rejects it', (_label, text) => {
+		expect(json_value.parse_with(text, record_schema)).toBeUndefined()
+	})
+
+	it('never lets a defaulting schema stand in for text that is not JSON', () => {
+		const defaulting = z.object({ issue: z.number() }).default({ issue: 0 })
+
+		expect(json_value.parse_with('not json', defaulting)).toBeUndefined()
 	})
 })
 

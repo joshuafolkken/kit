@@ -1,3 +1,4 @@
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_format } from '#scripts/cost-runtime/cost-format'
@@ -94,6 +95,16 @@ function held_run_issue(state: LaneCostState): string | undefined {
 	return state.held_issue()
 }
 
+// **A ship reviewer is not the run, though it carries its mark and its hold**
+// (joshuafolkken/kit#3623). The supervisor launches it in the implementing child's own checkout and
+// waits on it, so a cut would end the one session whose findings file the supervisor reads and relaunch
+// a second child beside the supervisor's repair. `agent_session_role` is what tells the two apart.
+function implementing_run_issue(state: LaneCostState): string | undefined {
+	if (agent_session_role.is_reviewer(state.source)) return undefined
+
+	return lane_child_issue(state) ?? held_run_issue(state)
+}
+
 // The run this checkout's edits belong to, with no cut already carried — a dispatched lane child, or
 // **a `fullrun` held in its own checkout**: the cut was lane-only, so a run a
 // person started grew without a bound mid-implementation. The run hold naming an issue is what marks
@@ -102,7 +113,7 @@ function held_run_issue(state: LaneCostState): string | undefined {
 // naming this issue means a cut is already in flight, and `begin_cut`'s exclusive create would refuse
 // a second one anyway.
 function uncut_run_issue(state: LaneCostState): string | undefined {
-	const issue = lane_child_issue(state) ?? held_run_issue(state)
+	const issue = implementing_run_issue(state)
 
 	if (issue === undefined) return undefined
 
@@ -153,7 +164,7 @@ const IMPLEMENTATION_CUT_REASON =
 	'this issue (joshuafolkken/kit#2760), and its recent-context ' +
 	`cost has crossed the shared ${THRESHOLD_TEXT} threshold mid-implementation, so the thinking accumulated ` +
 	'so far is now re-read on every later request. Take the cut before this edit. ' +
-	'First write a handoff file with the Write tool — the user’s instruction verbatim, what you have ' +
+	`First write a handoff file at \`${run_cut_handoff.HANDOFF_PATH}\` (ignored, so it is never committed) with the Write tool — the user’s instruction verbatim, what you have ` +
 	'completed, what remains, and what you deliberately did not touch, as ' +
 	`${run_cut_handoff.HANDOFF_FORMAT} (Markdown is refused) — and pass it as \`--handoff <path>\`, ` +
 	'so the fresh process resumes on the original instruction rather than the working tree alone ' +

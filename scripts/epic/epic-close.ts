@@ -3,7 +3,7 @@ import { epic_child_schema, epic_issue_schema, type EpicChildData } from '#scrip
 import { cutoff_cause, cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import {
 	parse_json_array_or_undefined,
-	parse_json_object_safe,
+	parse_json_object_or_undefined,
 } from '#scripts/git/parse-json-array'
 import { EPIC_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
@@ -80,7 +80,7 @@ async function fetch_open_epics(): Promise<Array<EpicIssue> | undefined> {
 function parse_child(raw_json: string | undefined): EpicChildData | undefined {
 	if (raw_json === undefined) return undefined
 
-	return parse_json_object_safe(raw_json, epic_child_schema)
+	return parse_json_object_or_undefined(raw_json, epic_child_schema)
 }
 
 function has_blocked_by(child: EpicChildData | undefined): boolean {

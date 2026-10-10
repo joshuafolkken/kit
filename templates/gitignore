@@ -74,4 +74,10 @@ e2e/.auth/chrome-profile/
 .claude/scheduled_tasks.lock
 .claude/tmp/
 
+# Run handoff notes (written for josh run:cut --handoff); they belong in .claude/tmp/, and the
+# names below are the ones that were once written beside the code and committed with it
+/.git-handoff-*.json
+/.josh-handoff-*.json
+.josh/handoff-*.json
+
 .pnpm-store

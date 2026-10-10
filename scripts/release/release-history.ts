@@ -1,4 +1,5 @@
 import { git_command } from '#scripts/git/git-command'
+import { json_value } from '#scripts/lib/json-value'
 import { package_with_version_schema } from '#scripts/lib/schemas'
 import { version_targets } from '#scripts/version/version-targets'
 import { release_plan, type ReleasePlan, type VersionedCommit } from './release-plan'
@@ -41,11 +42,7 @@ const git_reader: HistoryReader = {
 function parse_version(content: string | undefined): string | undefined {
 	if (content === undefined) return undefined
 
-	try {
-		return package_with_version_schema.parse(JSON.parse(content)).version
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(content, package_with_version_schema)?.version
 }
 
 async function read_version_at(

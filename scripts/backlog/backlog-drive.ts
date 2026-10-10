@@ -19,23 +19,37 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
+import { run_merge_token, type MergeToken } from '#scripts/run/merge/run-merge-token'
 
+const { MERGE_TOKEN } = run_merge_token
 const RUN_VERDICT = 'run'
 const STOP_VERDICT = 'stop'
-// The `run:merge` tokens that end the loop at once: a hand-off, a person's stop, the environment down,
-// a foreign owner, an unreadable state. `resumed` is not among them — the same lane is awaited again.
-const IMMEDIATE_TOKENS: ReadonlySet<string> = new Set([
-	'over',
-	'human-review',
-	'environment',
-	'busy',
-	'retry',
-])
-// Every token `run:merge` prints first even on a non-zero exit. `stop` — a parked backlog or the failure
-// guard — is the offer's `stop` reached through a merge: the child is collected, nothing more starts,
-// and the children still in flight are collected before the loop ends.
-const HANDOFF_TOKENS: ReadonlySet<string> = new Set([...IMMEDIATE_TOKENS, STOP_VERDICT])
-const RESUMED_TOKEN = 'resumed'
+// How the loop reads each `run:merge` token — keyed by the producer's own type, so a token added there
+// is a type error here until it is classified. `hand-back` ends the loop at once: a hand-off, a person's
+// stop, the environment down, a foreign owner, an unreadable state. `stop` — a parked backlog or the
+// failure guard — is the offer's `stop` reached through a merge: the child is collected, nothing more
+// starts, and the children still in flight are collected before the loop ends. `await` is a cut resumed
+// in place: the same lane is awaited again.
+type TokenHandling = 'hand-back' | 'stop' | 'await'
+const TOKEN_HANDLING: Readonly<Record<MergeToken, TokenHandling>> = {
+	[MERGE_TOKEN.OVER]: 'hand-back',
+	[MERGE_TOKEN.HUMAN_REVIEW]: 'hand-back',
+	[MERGE_TOKEN.ENVIRONMENT]: 'hand-back',
+	[MERGE_TOKEN.BUSY]: 'hand-back',
+	[MERGE_TOKEN.RETRY]: 'hand-back',
+	[MERGE_TOKEN.STOP]: 'stop',
+	[MERGE_TOKEN.RESUMED]: 'await',
+}
+
+function tokens_handled(...handlings: ReadonlyArray<TokenHandling>): ReadonlySet<string> {
+	const entries = Object.entries(TOKEN_HANDLING)
+
+	return new Set(entries.filter(([, handling]) => handlings.includes(handling)).map(([key]) => key))
+}
+
+const IMMEDIATE_TOKENS = tokens_handled('hand-back')
+// Every token `run:merge` prints first even on a non-zero exit.
+const HANDOFF_TOKENS = tokens_handled('hand-back', 'stop')
 const MERGED_OUTCOME = 'merged'
 const WATCH_VERDICT = 'watch'
 // The verdicts the loop acts on without the parent. Any other is handed back as it was printed.
@@ -181,7 +195,7 @@ function collected_state(
 	active: string,
 ): DriveState {
 	const in_flight =
-		collected.token === RESUMED_TOKEN
+		collected.token === MERGE_TOKEN.RESUMED
 			? state.in_flight
 			: state.in_flight.filter((item) => item !== issue)
 	const exclude = excluded(issue, collected.outcome, state)
@@ -200,7 +214,7 @@ async function collect(issue: string, state: DriveState, ports: DrivePorts): Pro
 
 	const next = collected_state(issue, collected, state, ports.now().toISOString())
 
-	return { kind: 'continue', state: token === STOP_VERDICT ? merge_stopped(issue, next) : next }
+	return { kind: 'continue', state: token === MERGE_TOKEN.STOP ? merge_stopped(issue, next) : next }
 }
 
 async function collect_finished(state: DriveState, ports: DrivePorts): Promise<PassResult> {
@@ -410,6 +424,7 @@ async function run_loop(
 
 const backlog_drive = {
 	HANDOFF_TOKENS,
+	TOKEN_HANDLING,
 	initial_state,
 	merge_stopped,
 	run_loop,

@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1043,
-		"code_lines": 87111,
-		"comment_lines": 33365,
+		"files": 1049,
+		"code_lines": 87287,
+		"comment_lines": 33529,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 459560
+		"on_demand_bytes": 459819
 	},
 	"accepted": {
-		"reason": "#3617 round-2 fix: root-level files are claimed only by a known extension so dotted code identifiers no longer serialize lanes",
-		"date": "2026-10-09"
+		"reason": "Review fix #3601: chain-rule.md states that prrun leaves the chain at the pull request (no ship, no merging followup), and jgame joins RETIRED_PHRASES",
+		"date": "2026-10-10"
 	}
 }

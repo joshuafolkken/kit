@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_finding_ledger, type Finding } from './review-finding-ledger'
@@ -24,7 +25,6 @@ const CHECK_USAGE = 'Usage: josh review:record --check --issue <N>'
 const RECORDED_LINE = 'Recorded: the review round for this issue is in the ledger.'
 const NOT_REQUIRED_LINE =
 	'No review-finding ledger is kept in this checkout, so there is nothing to check.'
-const ISSUE_PATTERN = /^[1-9]\d*$/u
 const OPTIONS = { issue: { type: 'string' }, check: { type: 'boolean' } } as const
 
 interface Request {
@@ -85,7 +85,7 @@ function parse_argv(argv: ReadonlyArray<string>): Parsed | undefined {
 function to_request(parsed: Parsed): Request | undefined {
 	const { issue } = parsed
 
-	if (issue === undefined || !ISSUE_PATTERN.test(issue)) return undefined
+	if (issue === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue)) return undefined
 
 	const findings = parse_findings(parsed.positionals)
 
@@ -126,7 +126,7 @@ function check_line(verdict: RecordVerdict): string {
 }
 
 async function run_check(issue: string | undefined, root: string): Promise<number> {
-	if (issue === undefined || !ISSUE_PATTERN.test(issue)) {
+	if (issue === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue)) {
 		console.error(CHECK_USAGE)
 
 		return FAILURE_EXIT_CODE

@@ -201,7 +201,7 @@ List refactoring candidates in the changed scope by category and answer clear/ca
 
 _No arguments._
 
-Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context (the ja default prints nothing)
+Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, and the run:board reply rule while a backlogrun is live (otherwise nothing)
 
 ---
 
@@ -449,7 +449,7 @@ Re-run a merged issue’s baseline command and print the before/after pair
 
 > **Audience:** automation · **Side effects:** notifications
 
-`--task-type <type> --body <text>`
+`[--task-type <type>] [--body <text> | --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>]`
 
 Send Telegram notification
 

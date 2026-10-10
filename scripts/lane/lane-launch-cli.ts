@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_vacant } from '#scripts/lane/lane-vacant'
@@ -24,7 +25,6 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const should_forward_stderr = true
 const PNPM = 'pnpm'
-const ISSUE_PATTERN = /^[1-9]\d*$/u
 
 const USAGE = 'Usage: josh lane:launch <issue-number> [--stash <message>]'
 
@@ -44,7 +44,13 @@ function read_context(argv: ReadonlyArray<string>): LaunchContext | undefined {
 
 	const [issue, ...rest] = parsed.positionals
 
-	if (issue === undefined || rest.length > 0 || !ISSUE_PATTERN.test(issue)) return undefined
+	if (
+		issue === undefined ||
+		rest.length > 0 ||
+		!issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue)
+	) {
+		return undefined
+	}
 
 	return { issue, stash: parsed.values.stash }
 }

@@ -1,5 +1,6 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
 // `josh ship`'s durable stage record, and the decision of which stage a resumed ship may pass over,
@@ -72,11 +73,7 @@ function record_path(repository: string, issue: string): string {
 }
 
 function parse_record(raw: string): ShipRecord {
-	try {
-		return record_schema.parse(JSON.parse(raw))
-	} catch {
-		return EMPTY_RECORD
-	}
+	return json_value.parse_with(raw, record_schema) ?? EMPTY_RECORD
 }
 
 // An absent, planted or malformed record reads as empty — the state decides from there, so "no

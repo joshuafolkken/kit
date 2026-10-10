@@ -1,7 +1,8 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { parse_json_object_safe } from '#scripts/git/parse-json-array'
+import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { z } from 'zod'
 import { issue_backlinks, type UpstreamEntry } from './issue-backlinks'
 
@@ -12,7 +13,6 @@ import { issue_backlinks, type UpstreamEntry } from './issue-backlinks'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const REF_PATTERN = /^([\w.-]+\/[\w.-]+)#(\d+)$/u
 const BODY_FIELD = 'body'
 const USAGE = 'Usage: josh issue:backlinks <issue-number>'
@@ -21,7 +21,7 @@ const body_schema = z.object({ body: z.string().nullish() })
 
 function parse_body(raw_json: string | undefined): string | undefined {
 	if (raw_json === undefined) return undefined
-	const parsed = parse_json_object_safe(raw_json, body_schema)
+	const parsed = parse_json_object_or_undefined(raw_json, body_schema)
 
 	return parsed === undefined ? undefined : (parsed.body ?? '')
 }
@@ -67,7 +67,7 @@ async function classify(issue_number: string): Promise<string | undefined> {
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const [issue_number] = argv
 
-	if (issue_number === undefined || !ISSUE_NUMBER_PATTERN.test(issue_number)) {
+	if (issue_number === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue_number)) {
 		console.error(USAGE)
 
 		return FAILURE_EXIT_CODE

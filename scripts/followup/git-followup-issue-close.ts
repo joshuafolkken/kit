@@ -1,6 +1,6 @@
 import { epic_parse } from '#scripts/epic/epic-parse'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { parse_json_object_safe } from '#scripts/git/parse-json-array'
+import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { session_cite } from '#scripts/issue/session-cite'
 import { poll, type PollOptions } from '#scripts/lib/poll'
 import { z } from 'zod'
@@ -26,7 +26,8 @@ const state_read_schema = z.object({ state: z.string().optional() })
 
 async function is_issue_closed(issue_number: string): Promise<boolean> {
 	const raw = await git_gh_command.issue_get_state_and_relations(issue_number)
-	const parsed = raw === undefined ? undefined : parse_json_object_safe(raw, state_read_schema)
+	const parsed =
+		raw === undefined ? undefined : parse_json_object_or_undefined(raw, state_read_schema)
 
 	return epic_parse.is_state_closed(parsed?.state)
 }

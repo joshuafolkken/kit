@@ -1,5 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { run_cli_fault } from '#scripts/run/run-cli-fault'
 import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
 import { run_label } from '#scripts/run/run-label'
 import { run_preflight, type PreflightDecision } from '#scripts/run/run-preflight'
@@ -49,9 +51,10 @@ const HALFRUN_STOP_FLAG = '--halfrun-stop'
 const PRRUN_STOP_FLAG = '--prrun-stop'
 // The most a claim reads: the issue number and the one flag after it.
 const MAX_CLAIM_ARGUMENTS = 2
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE =
 	'Usage: josh run:hold [<issue-number> [--fullrun | --halfrun-stop | --prrun-stop]] | josh run:release [<issue-number> | --force]'
+
+const COMMAND = 'run:hold'
 
 const HOLD_VERDICT = 'hold'
 const BUSY_VERDICT = 'busy'
@@ -116,7 +119,9 @@ function parse_claim(argv: ReadonlyArray<string>): HoldRequest | undefined {
 
 	if (first === undefined) return { kind: 'claim', issue: run_hold.UNNUMBERED_ISSUE }
 
-	if (argv.length > MAX_CLAIM_ARGUMENTS || !ISSUE_NUMBER_PATTERN.test(first)) return undefined
+	if (argv.length > MAX_CLAIM_ARGUMENTS || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(first)) {
+		return undefined
+	}
 
 	return numbered_claim(first, flag)
 }
@@ -124,7 +129,7 @@ function parse_claim(argv: ReadonlyArray<string>): HoldRequest | undefined {
 function parse_release_argument(first: string): HoldRequest | undefined {
 	if (first === FORCE_FLAG) return FORCE_RELEASE_REQUEST
 
-	return ISSUE_NUMBER_PATTERN.test(first) ? release_request(first) : undefined
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(first) ? release_request(first) : undefined
 }
 
 // **A bare `run:release` is the unnumbered run's release, not a release of whatever is there.** It
@@ -214,7 +219,7 @@ function take_tree(target: string, request: ClaimRequest, read: HoldRead): numbe
 
 // A non-clean preflight verdict is not an error: it is an answer a loop branches on, exactly as
 // `busy` is, so it prints the reason and advice the check composed and exits zero. Only an unreadable
-// tree is `unknown`, and that reaches `report_unknown` through `run`'s catch.
+// tree is `unknown`, and that reaches `report_unknown` through `answer`'s directory read.
 function report_preflight(decision: PreflightDecision): number {
 	console.error(`${decision.reason}\n${decision.advice}`)
 	console.info(decision.verdict)
@@ -264,10 +269,10 @@ function report_held(hold: RunHold): number {
 	return report(run_hold.foreign_release_message(hold), HELD_VERDICT, FAILURE_EXIT_CODE)
 }
 
-// A record nothing can parse names no run, so no claimant can match it — and removing it anyway is
-// the one thing this path exists to refuse. It answers `unknown` for the reason every other
+// A record nothing can parse names no run, so no claimant can match it — and removing it, or marking
+// a stop on it, is what these paths refuse. It answers `unknown` for the reason every other
 // unreadable state here does: nothing was established, so nothing may be concluded.
-function report_unreadable_release(): number {
+function report_unreadable_record(): number {
 	return report(run_hold.unreadable_message(), UNKNOWN_VERDICT, FAILURE_EXIT_CODE)
 }
 
@@ -278,7 +283,7 @@ function release_record(target: string, claimant: string): number {
 
 	if (read.kind === 'free') return remove_record(target, false)
 
-	if (read.kind === 'unreadable') return report_unreadable_release()
+	if (read.kind === 'unreadable') return report_unreadable_record()
 
 	if (!run_hold.is_own_hold(read.hold, claimant)) return report_held(read.hold)
 
@@ -323,14 +328,6 @@ function report_usage(): number {
 	return FAILURE_EXIT_CODE
 }
 
-async function read_worktree(): Promise<string | undefined> {
-	try {
-		return await run_hold.worktree_directory()
-	} catch {
-		return undefined
-	}
-}
-
 // **A `halfrun` stop marks its own record** — the positive "this run has ended over its verified diff"
 // that `run:entry` adopts on `fullrun #N`. Another run's record is left alone. A `prrun` stop marks
 // its record the same way, with the commit it stopped on.
@@ -342,7 +339,7 @@ async function mark_stop(target: string, request: StopRequest): Promise<number> 
 
 	if (mark === run_halfrun_resume.MARKED) return report_hold()
 
-	if (mark === run_halfrun_resume.UNREADABLE) return report_unknown()
+	if (mark === run_halfrun_resume.UNREADABLE) return report_unreadable_record()
 
 	return report_busy(run_hold.race_message(run_hold.read_hold(target), target))
 }
@@ -358,7 +355,7 @@ async function dispatch(request: HoldRequest, target: string, is_linked: boolean
 }
 
 async function answer(request: HoldRequest): Promise<number> {
-	const directory = await read_worktree()
+	const directory = await run_cli_fault.directory_of(COMMAND, run_hold.worktree_directory)
 
 	if (directory === undefined) return report_unknown()
 
@@ -370,6 +367,8 @@ async function answer(request: HoldRequest): Promise<number> {
 // **Every path out of here prints exactly one token**, including the ones nobody planned — a
 // permission error on the record, or a git binary that is not there: an empty `$answer` matches none
 // of the three tokens, which an entry point would read as "not busy" and walk straight past the guard.
+// The token stays `unknown`, and the failure says what it was rather than borrowing the
+// unreadable-git-directory message.
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const request = parse_request(argv)
 
@@ -377,8 +376,8 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	try {
 		return await answer(request)
-	} catch {
-		return report_unknown()
+	} catch (error) {
+		return report(run_cli_fault.message(COMMAND, error), UNKNOWN_VERDICT, FAILURE_EXIT_CODE)
 	}
 }
 

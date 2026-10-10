@@ -1,10 +1,11 @@
 import { git_gh_pr_read } from '#scripts/gh/git-gh-pr-read'
 import { git_command } from '#scripts/git/git-command'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { json_value } from '#scripts/lib/json-value'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { z } from 'zod'
-import { run_issue_number } from './run-issue-number'
 
 // The preflight check — what an interrupted run left in this working tree, and what the rule says to
 // do about it before the next child starts. `run:hold` runs it before it claims the tree, so this
@@ -88,7 +89,7 @@ const STASH_LABEL_PREFIX = 'run:hold reclaimed before #'
 // so the shape it may take is pinned beside the interpolation rather than only in the CLI that
 // happens to be today's single caller. `run:liveness` interpolates it the same way, so the pattern
 // and the refusal live in one module both read.
-const { require_issue_number } = run_issue_number
+const { require_issue_number } = issue_number_shape
 const UNREADABLE_PR_MESSAGE = 'The pull request could not be read for branch '
 
 function needs_reclaim(tree: TreeState): boolean {
@@ -201,11 +202,7 @@ function decide(tree: TreeState, child: ChildState, issue: string): PreflightDec
 }
 
 function read_pr_field(raw: string): string | undefined {
-	try {
-		return pr_info_schema.parse(JSON.parse(raw)).state
-	} catch {
-		return undefined
-	}
+	return json_value.parse_with(raw, pr_info_schema)?.state
 }
 
 function to_pr_state(raw: string): PrState {

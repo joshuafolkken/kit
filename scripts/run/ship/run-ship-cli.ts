@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
@@ -53,9 +54,6 @@ const EXTRA_CITE_START = 1
 // The issue reference at the tail of the title — `git -y` and `followup` read the whole string, and
 // `run:tail` needs the number alone.
 const TRAILING_ISSUE_PATTERN = /#([1-9]\d*)\s*$/u
-// A follow-up citation passed as a trailing positional — a bare issue number, so a stray flag is
-// refused rather than forwarded to the wrong step.
-const CITE_PATTERN = /^[1-9]\d*$/u
 // Both body forms `followup` documents, forwarded verbatim: the inline `--notify-message` and the
 // shell-body-safe `--notify-message-file` a body naming a command or path must use (`followup.md`).
 const NOTIFY_OPTIONS = ['notify-message', 'notify-message-file'] as const
@@ -124,6 +122,8 @@ interface ParsedValues extends NotifyValues {
 	cite?: Array<string>
 }
 
+// A follow-up citation passed as a trailing positional is a bare issue number, so a stray flag is
+// refused rather than forwarded to the wrong step.
 function ship_args(
 	title: string,
 	rest: ReadonlyArray<string>,
@@ -132,7 +132,9 @@ function ship_args(
 	const number = issue_number(title)
 	const cites = [...rest, ...(values.cite ?? [])]
 
-	if (number === undefined || cites.some((token) => !CITE_PATTERN.test(token))) return undefined
+	if (number === undefined || cites.some((token) => !issue_number_shape.is_issue_number(token))) {
+		return undefined
+	}
 
 	return {
 		title,
@@ -148,7 +150,9 @@ function ship_args(
 
 // `--log <N>` stands alone: a bare issue number and nothing to ship.
 function log_command(number: string, positionals: ReadonlyArray<string>): ShipCommand | undefined {
-	return CITE_PATTERN.test(number) && positionals.length === 0 ? { kind: 'log', number } : undefined
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(number) && positionals.length === 0
+		? { kind: 'log', number }
+		: undefined
 }
 
 function command_of(

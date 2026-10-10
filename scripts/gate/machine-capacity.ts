@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { availableParallelism, cpus, totalmem } from 'node:os'
+import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 
 // What the machine has free right now, read for the core budget's admission.
@@ -24,7 +25,8 @@ import { execa } from 'execa'
 //
 // **`run:board` draws its machine gauges from the same reading**, so what the
 // board shows a person is what the gate admits against. The board takes a sample with no window and
-// draws the difference from its previous one.
+// draws the difference from its previous one. `lane:sample` records the memory half of it, so the
+// lane-limit measurement sets the same figures beside the lane count.
 
 // The window the busy cores are measured over: long enough that one scheduler tick does not dominate it,
 // short enough that a solo admission is not visibly delayed.
@@ -145,6 +147,14 @@ function swapped_mb(pages: number | undefined, page_bytes: number | undefined): 
 	return (pages * page_bytes) / BYTES_PER_MB
 }
 
+// What was swapped between two readings of the counter. A counter that went back — a reboot between
+// them — is read as nothing swapped.
+function swapped_between(from: number | undefined, to: number | undefined): number | undefined {
+	if (from === undefined || to === undefined) return undefined
+
+	return Math.max(0, to - from)
+}
+
 // `kern.memorystatus_level: 58` → 58% of physical memory still available, beside the swapped pages.
 function parse_darwin_memory(output: string, total_bytes: number): MemoryReading {
 	const values = sysctl_values(output)
@@ -190,13 +200,16 @@ async function settled<T>(read: () => Promise<T>): Promise<T | undefined> {
 
 // A name `sysctl` does not know fails the command but still prints the others, so the exit is not read.
 async function read_darwin_memory(): Promise<MemoryReading> {
-	const { stdout } = await execa('sysctl', SYSCTL_ARGUMENTS, { reject: false })
+	const { stdout } = await execa('sysctl', SYSCTL_ARGUMENTS, {
+		reject: false,
+		timeout: PROBE_TIMEOUT_MS,
+	})
 
 	return parse_darwin_memory(stdout, totalmem())
 }
 
 async function read_page_size(): Promise<string> {
-	const { stdout } = await execa('getconf', PAGE_SIZE_ARGUMENTS)
+	const { stdout } = await execa('getconf', PAGE_SIZE_ARGUMENTS, { timeout: PROBE_TIMEOUT_MS })
 
 	return stdout
 }
@@ -291,7 +304,9 @@ const machine_capacity = {
 	parse_linux_available,
 	parse_linux_swapped,
 	read_machine,
+	read_memory,
 	read_sample,
+	swapped_between,
 }
 
 export type { CpuTimes, LedgerLoad, MachineBudget, MachineReading, MachineSample, MemoryReading }

@@ -4,6 +4,7 @@
 // undetected. This classifies an origin issue's filed backlinks into one of four fixed words.
 // The headings are the single source's, pinned by the document test.
 
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { markdown_section } from './markdown-section'
 
 const ORIGIN_HEADING = '## Origin'
@@ -12,7 +13,6 @@ const UPSTREAM_CANDIDATE_HEADING = '## Upstream candidate'
 const CHECKBOX_PATTERN = /^\s*-\s*\[[ xX]\]/u
 const WRONG_UPSTREAM_HEADING_PATTERN = /^##\s+Upstream\b/iu
 const BARE_REFERENCE_PATTERN = /^#\d+$/u
-const DIGITS_PATTERN = /^\d+$/u
 const REFERENCE_MARK = '#'
 const PATH_SEPARATOR = '/'
 const PATH_SEGMENT_COUNT = 2
@@ -71,7 +71,7 @@ function is_qualified_reference(token: string): boolean {
 	const [path, number, ...rest] = token.split(REFERENCE_MARK)
 	if (number === undefined || rest.length > 0) return false
 
-	return DIGITS_PATTERN.test(number) && has_two_segments(path)
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(number) && has_two_segments(path)
 }
 
 function has_bare_reference(section: ReadonlyArray<string>): boolean {

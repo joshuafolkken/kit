@@ -1,5 +1,5 @@
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
-import { run_issue_number } from '#scripts/run/run-issue-number'
 
 // `josh run:cut` turns its `argv` into one of four requests. The contract mirrors `run-carry-args.ts`:
 // parsing lives here, acting on the record lives in `run-cut-cli.ts`, and a malformed command line is
@@ -58,7 +58,7 @@ function issue_of(positionals: ReadonlyArray<string>): string | undefined {
 	if (issue === undefined) return undefined
 
 	try {
-		run_issue_number.require_issue_number(issue)
+		issue_number_shape.require_issue_number(issue)
 	} catch {
 		return undefined
 	}

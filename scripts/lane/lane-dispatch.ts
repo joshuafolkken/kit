@@ -4,13 +4,14 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { LabelWrite } from '#scripts/gh/git-gh-issue-write'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ending } from '#scripts/run/run-ending'
-import { run_issue_number } from '#scripts/run/run-issue-number'
+import { run_label } from '#scripts/run/run-label'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch_log } from './lane-dispatch-log'
@@ -312,22 +313,14 @@ async function mark_in_progress(issue: string): Promise<LabelWrite> {
 	return await git_gh_command.issue_apply_label(issue, IN_PROGRESS_LABEL)
 }
 
-// The dispatch owns both halves of the marker: it applied it, so a launch that never started takes it
-// back off, leaving no `in-progress` on an issue nothing is running. A removal that itself fails is
-// swallowed — the failed launch is already warned about, and `lane:list` / `run:progress` surface a
-// stuck marker — so this never turns a launch failure into a thrown error.
-async function unmark_in_progress(issue: string): Promise<void> {
-	try {
-		await git_gh_command.issue_remove_label(issue, IN_PROGRESS_LABEL)
-	} catch {
-		/* the launch already failed and is warned about; a stuck marker is reported by lane:list */
-	}
-}
-
 // A started child is recorded on the run's stream, which is where the stall detector ages the last
 // dispatch from — unrecorded, every stall read "hours since the last dispatch"
 // minutes after a launch. A failed start records nothing: no child is running. The marker is claimed
 // first, so a refused one starts nothing.
+//
+// The dispatch owns both halves of the marker: it applied it, so a launch that never started takes it
+// back off through `run_label.unmark`, leaving no `in-progress` on an issue nothing is running. That
+// removal warns and never throws, so it cannot turn a launch failure into a thrown error.
 async function finish_dispatch(issue: string, request: StartRequest): Promise<DispatchOutcome> {
 	const mark = await mark_in_progress(issue)
 
@@ -337,7 +330,7 @@ async function finish_dispatch(issue: string, request: StartRequest): Promise<Di
 	const is_failed = outcome.kind === 'failed'
 
 	await (is_failed
-		? unmark_in_progress(issue)
+		? run_label.unmark(issue)
 		: run_event_stream_emit.emit(
 				run_event_stream.EVENT_KIND.CHILD_LAUNCH,
 				`${issue_cite.plain(issue)} dispatched`,
@@ -348,7 +341,7 @@ async function finish_dispatch(issue: string, request: StartRequest): Promise<Di
 
 /** Start `fullrun #<N>` detached in the lane for `#<N>`, recording where it writes as it does so. */
 async function dispatch_child(issue: string): Promise<DispatchOutcome> {
-	run_issue_number.require_issue_number(issue)
+	issue_number_shape.require_issue_number(issue)
 
 	const lane = await lane_registry.find_open_lane(issue)
 

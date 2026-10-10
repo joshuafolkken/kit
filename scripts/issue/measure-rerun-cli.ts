@@ -2,7 +2,8 @@
 import { execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
-import { parse_json_object_safe } from '#scripts/git/parse-json-array'
+import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { error_text } from '#scripts/lib/error-message'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { z } from 'zod'
@@ -22,7 +23,6 @@ import { session_cite } from './session-cite'
 
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const ISSUE_FIELDS = 'body,author_association'
 const TRUSTED_ASSOCIATIONS: ReadonlySet<string> = new Set(['OWNER', 'MEMBER', 'COLLABORATOR'])
 const TRUSTED_LIST = [...TRUSTED_ASSOCIATIONS].join(' / ')
@@ -86,7 +86,7 @@ function today(now: Date): string {
 async function read_issue(issue_number: string): Promise<IssueFields | undefined> {
 	const json = await git_gh_issue_read.issue_view_json(issue_number, ISSUE_FIELDS)
 
-	return json === undefined ? undefined : parse_json_object_safe(json, issue_schema)
+	return json === undefined ? undefined : parse_json_object_or_undefined(json, issue_schema)
 }
 
 // The body, only when its author can write to the repository. A read that fails is refused as well:
@@ -131,7 +131,7 @@ async function rerun(body: string, now: Date): Promise<number> {
 }
 
 async function run(issue_number: string | undefined, now: Date): Promise<number> {
-	if (issue_number === undefined || !ISSUE_NUMBER_PATTERN.test(issue_number)) {
+	if (issue_number === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue_number)) {
 		console.error(USAGE)
 
 		return FAILURE_EXIT_CODE

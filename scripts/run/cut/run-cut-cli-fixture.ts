@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_argv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { git_command } from '#scripts/git/git-command'
 import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
@@ -58,6 +59,9 @@ const launch = vi.spyOn(detached_launch, 'launch')
 // The pre-gate cut is conditional on the current context, so the suite pins the verdict rather than
 // reading the live session. `over` is the beforeEach default, so a case cuts unless it says otherwise.
 const session_verdict = vi.spyOn(cost_cli, 'session_verdict')
+// Pinned rather than read from the environment: a suite run by a ship reviewer carries that role, and
+// would take no cut at all. A case that is the reviewer says so once, for its own call.
+const is_reviewer = vi.spyOn(agent_session_role, 'is_reviewer').mockReturnValue(false)
 // The stream append a cut makes is spied so the suite writes no event to the real repository; what it
 // pins is that the append is made, and with the cut kind, so `run:step` advances past the boundary.
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
@@ -132,6 +136,7 @@ const run_cut_cli_fixture = {
 	lane,
 	state,
 	find_open_lane,
+	is_reviewer,
 	launch,
 	session_verdict,
 	emit,

@@ -1,6 +1,6 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_label_schema } from '#scripts/git/git-schemas'
-import { parse_json_object_safe } from '#scripts/git/parse-json-array'
+import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { IN_PROGRESS_LABEL, label_name_of } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
 import { z } from 'zod'
@@ -40,7 +40,7 @@ async function read_label_names(issue_number: string): Promise<ReadonlyArray<str
 	const raw = await git_gh_command.issue_get_labels_and_body(issue_number)
 	if (raw === undefined) throw unreadable_error(issue_number)
 
-	const parsed = parse_json_object_safe(raw, labels_read_schema)
+	const parsed = parse_json_object_or_undefined(raw, labels_read_schema)
 	if (parsed === undefined) throw unreadable_error(issue_number)
 
 	return (parsed.labels ?? []).map((label) => label.name)

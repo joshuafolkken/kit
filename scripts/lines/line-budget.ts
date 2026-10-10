@@ -3,6 +3,7 @@ import { statSync } from 'node:fs'
 import path from 'node:path'
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { json_value } from '#scripts/lib/json-value'
 import { LINT_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import { z } from 'zod'
@@ -243,20 +244,11 @@ function counts_from(results: ReadonlyArray<LintResult>): ReadonlyMap<string, nu
 	return counts
 }
 
-function counts_in(raw_output: string | undefined = 'null'): ReadonlyMap<string, number> {
-	const parsed = results_schema.safeParse(JSON.parse(raw_output))
+// eslint's output can be empty or truncated, and neither is JSON — both read as no counts at all.
+function parse_counts(raw_output: string | undefined = 'null'): ReadonlyMap<string, number> {
+	const results = json_value.parse_with(raw_output, results_schema)
 
-	return parsed.success ? counts_from(parsed.data) : new Map<string, number>()
-}
-
-// The safe entry point, and the only one exported: eslint's output can be empty or truncated, and
-// `JSON.parse` throws on both.
-function parse_counts(raw_output: string | undefined): ReadonlyMap<string, number> {
-	try {
-		return counts_in(raw_output)
-	} catch {
-		return new Map<string, number>()
-	}
+	return results === undefined ? new Map<string, number>() : counts_from(results)
 }
 
 // **Only regular files are passed to eslint, and this is not tidiness.** One argument eslint cannot

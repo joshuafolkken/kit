@@ -1,4 +1,5 @@
 import { issue_bug_label } from '#scripts/issue/issue-bug-label'
+import { json_value } from '#scripts/lib/json-value'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { z } from 'zod'
 import { test_declared_logic } from './test-declared-logic'
@@ -51,13 +52,7 @@ function is_test_only(paths: ReadonlyArray<string>): boolean {
 const REPORT_SCHEMA = z.object({ testResults: z.array(z.unknown()) })
 
 function ran_file_count(report: string): number {
-	try {
-		const parsed = REPORT_SCHEMA.safeParse(JSON.parse(report))
-
-		return parsed.success ? parsed.data.testResults.length : 0
-	} catch {
-		return 0
-	}
+	return json_value.parse_with(report, REPORT_SCHEMA)?.testResults.length ?? 0
 }
 
 // `no-test` when nothing ran; otherwise a failing run is `red` — the test caught the pre-fix tree — and

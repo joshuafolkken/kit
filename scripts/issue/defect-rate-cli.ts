@@ -87,7 +87,7 @@ function page_count(first: SearchPage): number {
 async function read_page(query: string, page: number): Promise<SearchPage | undefined> {
 	const raw = await git_gh_exec.exec_gh_api({ path: search_path(query, page) })
 
-	return parse_json.parse_json_object_safe(raw, search_page_schema)
+	return parse_json.parse_json_object_or_undefined(raw, search_page_schema)
 }
 
 // Every page of one search. Not `gh api --paginate`: it follows each page's `next` link one page

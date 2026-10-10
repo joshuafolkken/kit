@@ -33,7 +33,7 @@ beforeEach(() => {
 		kind: 'load',
 		at,
 		load: 3,
-		free_mb: 1024,
+		available_mb: 1024,
 	}))
 	vi.spyOn(console, 'error').mockReturnValue(undefined)
 	vi.spyOn(console, 'info').mockReturnValue(undefined)
@@ -62,7 +62,7 @@ describe('lane_measure_cli.run — sample', () => {
 
 		expect(sample_mock).toHaveBeenCalledWith(AT)
 		expect(lane_ledger.read_entries(context.ledger_path)).toStrictEqual([
-			{ kind: 'load', at: AT, load: 3, free_mb: 1024 },
+			{ kind: 'load', at: AT, load: 3, available_mb: 1024 },
 		])
 	})
 })

@@ -1,5 +1,5 @@
 import { epic_subject_schema } from '#scripts/git/git-schemas'
-import { parse_json_object_safe } from '#scripts/git/parse-json-array'
+import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { EPIC_LABEL, has_label_name } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
 import { epic_parse, type DeclarationState } from './epic-parse'
@@ -34,7 +34,7 @@ interface CheckResult {
 function parse_epic_subject(raw_json: string | undefined): EpicSubject | undefined {
 	if (raw_json === undefined) return undefined
 
-	const parsed = parse_json_object_safe(raw_json, epic_subject_schema)
+	const parsed = parse_json_object_or_undefined(raw_json, epic_subject_schema)
 	if (parsed === undefined) return undefined
 
 	return {
