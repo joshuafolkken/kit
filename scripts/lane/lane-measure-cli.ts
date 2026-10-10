@@ -4,16 +4,18 @@ import { fileURLToPath } from 'node:url'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { lane_capacity } from './lane-capacity'
 import { lane_ledger } from './lane-ledger'
-import { lane_load } from './lane-load'
+import { lane_sampler, type MeasureContext } from './lane-sampler'
+import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats } from './lane-stats'
 
 // `josh lane:sample` / `josh lane:stats` — the lane-limit measurement.
 //
 // `lane:sample` appends one machine-load sample to the ledger, or one every `--every <seconds>` until it
 // is stopped; `lane:stats` reduces a period of the ledger to the one table row #3347 records per lane
-// limit. The merges and the gates write themselves (`run:merge`, `josh gate`), so a person runs only
-// the sampler beside a `backlogrun` and closes the period with `lane:stats`. The procedure is
-// `docs/maintainers/lane-limit-measurement.md`.
+// limit, and under it the per-stage durations of the period's lanes. Every entry writes itself during
+// a `backlogrun` — the merges, the gates, the stages, and the load `backlog:drive` samples while it
+// runs — so a person only closes the period with `lane:stats`; `lane:sample` is for a load reading
+// outside one. The procedure is `docs/maintainers/lane-limit-measurement.md`.
 
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
@@ -28,12 +30,6 @@ const USAGE = [
 const SAMPLE_OPTIONS = { every: { type: 'string' } } as const
 const STATS_OPTIONS = { period: { type: 'string' }, limit: { type: 'string' } } as const
 
-// Where the ledger is and what "now" is, overridable so a test reads a fixed ledger at a fixed instant.
-interface MeasureContext {
-	ledger_path?: string
-	now_ms?: number
-}
-
 function refuse(): number {
 	console.error(USAGE)
 
@@ -45,12 +41,6 @@ function positive(text: string | undefined): number | undefined {
 	const value = Number(text)
 
 	return text !== undefined && Number.isFinite(value) && value > 0 ? value : undefined
-}
-
-async function take_sample(context: MeasureContext): Promise<void> {
-	const at = new Date(context.now_ms ?? Date.now()).toISOString()
-
-	await lane_ledger.record(await lane_load.sample(at), context.ledger_path)
 }
 
 // The `--every` interval: `{ seconds: undefined }` for a single sample, `undefined` for a refusal.
@@ -71,7 +61,7 @@ function sample_interval(rest: ReadonlyArray<string>): { seconds: number | undef
 async function keep_sampling(context: MeasureContext, seconds: number): Promise<void> {
 	const ticks = every(seconds * MS_PER_SECOND, context)
 
-	for await (const tick_context of ticks) await take_sample(tick_context)
+	for await (const tick_context of ticks) await lane_sampler.take(tick_context)
 }
 
 // One sample now, then — with `--every` — one per interval.
@@ -83,7 +73,7 @@ async function sample_command(
 
 	if (interval === undefined) return refuse()
 
-	await take_sample(context)
+	await lane_sampler.take(context)
 
 	if (interval.seconds !== undefined) await keep_sampling(context, interval.seconds)
 
@@ -119,9 +109,10 @@ async function stats_command(
 
 	const window = lane_stats.window_of(period_days, context.now_ms ?? Date.now())
 	const label = { limit: await limit_label(values.limit), period_days }
-	const row = lane_stats.row(await read_ledger(context), window, label)
+	const entries = await read_ledger(context)
+	const row = lane_stats.row(entries, window, label)
 
-	console.info(`${lane_stats.header()}\n${row}`)
+	console.info(`${lane_stats.header()}\n${row}\n\n${lane_stage_stats.table(entries, window)}`)
 
 	return 0
 }
@@ -145,5 +136,4 @@ const lane_measure_cli = {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
-export type { MeasureContext }
 export { lane_measure_cli }

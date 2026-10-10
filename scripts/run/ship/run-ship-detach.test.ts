@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -347,6 +348,19 @@ describe('run_ship_detach.detach provider hand-off', () => {
 
 		expect(launched.env[agent_role_profile.HANDED_PROVIDER_KEY]).toBe('anthropic')
 		expect(launched.env).not.toHaveProperty('CLAUDE_CODE_SESSION_ID')
+	})
+
+	// joshuafolkken/kit#3651: a plain terminal's ship reviews on the default, and stderr says so.
+	it('says the provider was defaulted when nothing named one', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		vi.stubEnv('CODEX_THREAD_ID', '')
+		for (const key of agent_session_environment.PARENT_SESSION_KEYS) vi.stubEnv(key, '')
+		vi.stubEnv(agent_role_profile.HANDED_PROVIDER_KEY, '')
+		await run_ship_detach.detach(request())
+
+		expect(error).toHaveBeenCalledWith(expect.stringContaining('defaulted to anthropic'))
+		error.mockRestore()
 	})
 })
 

@@ -89,7 +89,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 	'lane:sample': {
 		...MEASURE_ARGUMENTS,
 		description:
-			'Record the machine load (load average, swap, free memory, working lanes) to the lane ledger',
+			'Record the machine load (load average, swap, free memory, working lanes) to the lane ledger — a backlogrun samples itself, this is for a reading outside one',
 		category: 'AI tools',
 		reference: ['[--every <seconds>]', 'maintainer', ['files']],
 		default_script_arguments: ['sample'],
@@ -97,7 +97,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 	'lane:stats': {
 		...MEASURE_ARGUMENTS,
 		description:
-			'Print one table row of lane throughput, gate duration and machine load over a period',
+			'Print one table row of lane throughput, gate duration and machine load over a period, and the per-stage durations of a lane under it',
 		category: 'AI tools',
 		reference: ['--period <days> [--limit <lane-limit>]', 'maintainer', ['none']],
 		default_script_arguments: ['stats'],

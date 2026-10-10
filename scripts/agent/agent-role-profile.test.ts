@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { agent_role_profile, type AgentProfile } from './agent-role-profile'
 
 const { REVIEWER, SCHEDULER, WORKER } = agent_role_profile
@@ -58,8 +58,39 @@ describe('the role policy defaults', () => {
 })
 
 describe('invoking session detection', () => {
-	it('rejects an environment with no invoking agent session', () => {
-		expect(agent_role_profile.resolve(WORKER, {})).toMatchObject({ kind: 'rejected' })
+	// joshuafolkken/kit#3651: a plain terminal names no provider, so the launch defaults to Claude Code.
+	it('defaults to Anthropic when no session and no mark names a provider', () => {
+		expect(agent_role_profile.resolve_provider({})).toStrictEqual({
+			kind: 'provider',
+			provider: 'anthropic',
+			is_default: true,
+		})
+		expect(profile(WORKER, {})).toStrictEqual(agent_role_profile.DEFAULT_PROFILES.worker)
+	})
+
+	it('marks only the defaulted provider as a default', () => {
+		const handed = { [agent_role_profile.HANDED_PROVIDER_KEY]: 'anthropic' }
+
+		expect(agent_role_profile.resolve_provider(ANTHROPIC_ENV)).not.toHaveProperty('is_default')
+		expect(agent_role_profile.resolve_provider(handed)).not.toHaveProperty('is_default')
+	})
+
+	it('says so when the provider was defaulted, and nothing when it was named', () => {
+		expect(agent_role_profile.default_notice({})).toContain('defaulted to anthropic')
+		expect(agent_role_profile.default_notice(ANTHROPIC_ENV)).toBe('')
+		expect(agent_role_profile.default_notice({ ...ANTHROPIC_ENV, ...OPENAI_ENV })).toBe('')
+	})
+
+	it('writes the default notice to stderr only when the provider was defaulted', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		agent_role_profile.warn_of_default(ANTHROPIC_ENV)
+		expect(error).not.toHaveBeenCalled()
+		agent_role_profile.warn_of_default({})
+		expect(error).toHaveBeenCalledWith(
+			expect.stringMatching(/^No agent session.*defaulted to anthropic/u),
+		)
+		error.mockRestore()
 	})
 
 	it('rejects conflicting invoking agent sessions instead of choosing a fallback', () => {
@@ -83,7 +114,7 @@ describe('completion callback detection', () => {
 		expect(agent_role_profile.has_completion_callback(environment)).toBe(false)
 	})
 
-	it('keeps the callback for a session it cannot resolve', () => {
+	it('keeps the callback for a defaulted provider and for a session it cannot resolve', () => {
 		expect(agent_role_profile.has_completion_callback({})).toBe(true)
 		expect(agent_role_profile.has_completion_callback({ ...ANTHROPIC_ENV, ...OPENAI_ENV })).toBe(
 			true,
@@ -119,11 +150,19 @@ describe('the handed provider mark', () => {
 		expect(JSON.stringify(result)).toContain(HANDED_PROVIDER_KEY)
 	})
 
-	it('builds the mark from the session it resolves, and nothing without one', () => {
+	it('builds the mark from the provider it resolves, the default included', () => {
 		expect(agent_role_profile.handoff_environment(ANTHROPIC_ENV)).toStrictEqual({
 			[HANDED_PROVIDER_KEY]: 'anthropic',
 		})
-		expect(agent_role_profile.handoff_environment({})).toStrictEqual({})
+		expect(agent_role_profile.handoff_environment({})).toStrictEqual({
+			[HANDED_PROVIDER_KEY]: 'anthropic',
+		})
+	})
+
+	it('builds no mark when the provider is refused', () => {
+		const conflicting = { ...ANTHROPIC_ENV, ...OPENAI_ENV }
+
+		expect(agent_role_profile.handoff_environment(conflicting)).toStrictEqual({})
 	})
 })
 

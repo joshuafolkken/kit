@@ -316,6 +316,7 @@ async function run_review(round: number, reading: ChangeReading): Promise<number
 	const resolved = agent_role_profile.resolve(agent_role_profile.REVIEWER)
 
 	if (resolved.kind === 'rejected') return report_error(resolved.note)
+	agent_role_profile.warn_of_default()
 	console.info(await compose_brief({ round, paths, tree, base, profile: resolved.profile }))
 	record_round_one(round, tree, commit)
 	record_briefed(round, tree, commit)

@@ -316,6 +316,7 @@ async function run(input: FollowupInput): Promise<string | undefined> {
 		throw error
 	} finally {
 		git_followup_stages.print_stages(log)
+		await git_followup_stages.record_ci_wait(log)
 	}
 }
 

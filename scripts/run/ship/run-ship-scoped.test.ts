@@ -2,12 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const missing_mock = vi.hoisted(() => vi.fn<() => Array<string>>())
+const reusable_mock = vi.hoisted(() => vi.fn<() => object | undefined>())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/gate/gate-tree', () => ({
 	gate_tree: { read_gate_tree: vi.fn(async () => ({ files: {}, base: 'base' })) },
 }))
 vi.mock('#scripts/gate/scoped-green', () => ({ scoped_green: { missing_scripts: missing_mock } }))
+vi.mock('#scripts/gate/gate-skip', () => ({ gate_skip: { reusable_green_gate: reusable_mock } }))
 
 const { run_ship_scoped } = await import('./run-ship-scoped')
 
@@ -65,5 +67,21 @@ describe('run_ship_scoped.scoped_gate', () => {
 
 		expect(await run_ship_scoped.scoped_gate()).toStrictEqual({ code: FAILED, out: 'lint red' })
 		expect(commands()).toStrictEqual([LINT])
+	})
+})
+
+// joshuafolkken/kit#3643: the gate's own reuse test decides whether a gate stage only reused a record.
+describe('run_ship_scoped.is_gate_green', () => {
+	it('is green when the gate holds a reusable record for this tree', async () => {
+		reusable_mock.mockReturnValue({})
+
+		expect(await run_ship_scoped.is_gate_green()).toBe(true)
+		expect(reusable_mock).toHaveBeenCalledWith({}, 'base')
+	})
+
+	it('is not green when no record matches the tree', async () => {
+		reusable_mock.mockReturnValue(undefined)
+
+		expect(await run_ship_scoped.is_gate_green()).toBe(false)
 	})
 })

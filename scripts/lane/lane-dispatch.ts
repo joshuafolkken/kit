@@ -15,6 +15,7 @@ import { run_label } from '#scripts/run/run-label'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch_log } from './lane-dispatch-log'
+import { lane_ledger } from './lane-ledger'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_resume, type ResumePlan } from './lane-resume'
@@ -321,6 +322,17 @@ async function mark_in_progress(issue: string): Promise<LabelWrite> {
 // The dispatch owns both halves of the marker: it applied it, so a launch that never started takes it
 // back off through `run_label.unmark`, leaving no `in-progress` on an issue nothing is running. That
 // removal warns and never throws, so it cannot turn a launch failure into a thrown error.
+//
+// The lane ledger takes the same instant: `lane:stats` times a lane's implementation from it, and the
+// stream is capped, so a period's earlier dispatches would be gone from there.
+async function record_started(issue: string): Promise<void> {
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.CHILD_LAUNCH,
+		`${issue_cite.plain(issue)} dispatched`,
+	)
+	await lane_ledger.record_dispatch(Number(issue))
+}
+
 async function finish_dispatch(issue: string, request: StartRequest): Promise<DispatchOutcome> {
 	const mark = await mark_in_progress(issue)
 
@@ -329,12 +341,7 @@ async function finish_dispatch(issue: string, request: StartRequest): Promise<Di
 
 	const is_failed = outcome.kind === 'failed'
 
-	await (is_failed
-		? run_label.unmark(issue)
-		: run_event_stream_emit.emit(
-				run_event_stream.EVENT_KIND.CHILD_LAUNCH,
-				`${issue_cite.plain(issue)} dispatched`,
-			))
+	await (is_failed ? run_label.unmark(issue) : record_started(issue))
 
 	return outcome
 }
@@ -400,10 +407,10 @@ function describe(outcome: DispatchOutcome, issue: string): string {
 	}
 
 	if (outcome.kind === 'failed') {
-		return `The child for ${session_cite.issue(issue)} did not start: ${outcome.note}. Its log is at ${outcome.log_path}.`
+		return `The child for ${session_cite.issue(issue)} did not start: ${outcome.note}.${agent_role_profile.default_notice()} Its log is at ${outcome.log_path}.`
 	}
 
-	return `Dispatched \`${outcome.invocation}\` as process ${String(outcome.pid)} in ${outcome.lane.directory} with ${agent_role_profile.describe(outcome.profile)}.${resume_sentence(outcome)}${log_sentence(outcome, issue)}`
+	return `Dispatched \`${outcome.invocation}\` as process ${String(outcome.pid)} in ${outcome.lane.directory} with ${agent_role_profile.describe(outcome.profile)}.${agent_role_profile.default_notice()}${resume_sentence(outcome)}${log_sentence(outcome, issue)}`
 }
 
 /**

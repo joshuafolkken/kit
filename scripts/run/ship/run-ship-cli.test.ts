@@ -41,7 +41,11 @@ vi.mock('./run-ship-scoped', async (import_original) => {
 		])
 	}
 
-	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_gate, scoped_pair: scoped_mock } }
+	// No green record: the gate stage runs its checks, so no test reads this checkout's own record.
+	const gate_green = vi.fn<typeof real_scoped.is_gate_green>().mockResolvedValue(false)
+	const mocked = { scoped_gate, scoped_pair: scoped_mock, is_gate_green: gate_green }
+
+	return { run_ship_scoped: { ...actual.run_ship_scoped, ...mocked } }
 })
 // The sync stage's merge of the default branch is pinned in `run-ship-sync.test.ts`; here it is
 // current, so no test ever merges into the checkout it runs in.
@@ -56,6 +60,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: vi.fn().mockReturnValue(false) },
 }))
 
+const { lane_ledger } = await import('#scripts/lane/lane-ledger')
 const { run_ship_cli } = await import('./run-ship-cli')
 const { run_ship_detach } = await import('./run-ship-detach')
 
@@ -361,4 +366,18 @@ describe('run_ship_cli.run — --review carries round 2 between the commit and t
 		expect(argv_calls()).toStrictEqual([GATE, COMMIT])
 		expect(info_lines[0]).toContain('stopped at: === round-2 review ===')
 	})
+})
+
+// joshuafolkken/kit#3643: every stage that ran leaves its duration in the lane ledger, so
+// `lane:stats` can say where a lane's time went — the stage that stopped the ship included.
+it('records each stage a ship ran, never a skipped one, up to the one that failed', async () => {
+	const record = vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
+
+	review_mock.mockResolvedValue({ code: OK, out: 'round 1 already recorded', is_skipped: true })
+	josh_run_mock.mockResolvedValueOnce({ code: FAILED, out: 'gate red' })
+	await run_ship_cli.run([TITLE, '--review'])
+
+	expect(
+		record.mock.calls.map(([stage]) => `${stage.stage} #${String(stage.issue)}`),
+	).toStrictEqual(['preflight', 'sync', 'gate'].map((stage) => `${stage} #${NUMBER}`))
 })

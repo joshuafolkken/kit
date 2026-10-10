@@ -58,6 +58,8 @@ const LOADS: ReadonlyArray<LedgerEntry> = [
 ]
 
 const HALF_HOUR = 0.5
+// Seven seconds, in hours: a drive handed back and restarted.
+const SECONDS_APART_HOURS = 7 / 3600
 
 // Load samples every half hour from `from` hours before now down to `to`, all with `lanes` working.
 function samples_between(from: number, to: number, lanes: number): Array<LedgerEntry> {
@@ -92,6 +94,19 @@ describe('lane_stats.row active hours', () => {
 		const working = samples_between(3, 0, 1)
 
 		expect(cell_of([...merges, ...idle, ...working], PER_HOUR)).toBe('0.7')
+	})
+})
+
+// joshuafolkken/kit#3643: the stage and dispatch entries are not the work entries the fallback
+// measures gaps between, so recording them leaves a period's rate where it was.
+describe('lane_stats.row beside the stage entries', () => {
+	it('keeps the rate unchanged by stage and dispatch entries', () => {
+		const added: ReadonlyArray<LedgerEntry> = [
+			{ kind: 'dispatch', at: hours_before_now(3), issue: MERGE_ISSUE },
+			{ kind: 'stage', at: hours_before_now(3), stage: 'review', elapsed_ms: MS_PER_MINUTE },
+		]
+
+		expect(cell_of([...added, ...MERGES], PER_HOUR)).toBe('1.5')
 	})
 })
 
@@ -172,6 +187,13 @@ describe('lane_stats.row swap rate', () => {
 
 	it('reads a counter that went back as nothing swapped', () => {
 		expect(cell_of([swapped(2, 2048, 1), swapped(1.5, 0, 1)], SWAPPED_PEAK)).toBe('0.0')
+	})
+
+	// joshuafolkken/kit#3643: a drive samples as it starts, so a restart leaves two samples seconds apart.
+	it('reads no rate from two samples closer than half the sampling interval', () => {
+		const restarted = [swapped(2, 1024, 1), swapped(2 - SECONDS_APART_HOURS, 2048, 1)]
+
+		expect(cell_of(restarted, SWAPPED_PEAK)).toBe(lane_stats.MISSING)
 	})
 
 	it('prints the missing mark where the counter was unread or the sampler was stopped', () => {

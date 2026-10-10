@@ -82,4 +82,24 @@ describe('lane_measure_cli.run — stats', () => {
 		expect(printed.startsWith(lane_stats.header())).toBe(true)
 		expect(printed).toContain('| 6 | 2 | 1 |')
 	})
+
+	// joshuafolkken/kit#3643: the same command prints where the period's lanes spent their time.
+	it('prints the per-stage table under the row, unmeasured stages named as such', async () => {
+		const context = fresh_context()
+		const minute = 60_000
+
+		lane_ledger.append(context.ledger_path, {
+			kind: 'stage',
+			at: AT,
+			stage: 'review',
+			elapsed_ms: minute,
+		})
+
+		await lane_measure_cli.run(['stats', '--period', '2'], context)
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| review | 1.0 | 1.0 | 1 |')
+		expect(printed).toContain('| ci-wait | not measured | not measured | 0 |')
+	})
 })

@@ -11,7 +11,9 @@ import type { Metrics } from './metrics-logic'
 
 vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
 vi.mock('#scripts/git/git-command', () => ({ git_command: { status: vi.fn() } }))
-vi.mock('#scripts/git/change-base', () => ({ change_base: { resolved: vi.fn() } }))
+vi.mock('#scripts/git/change-base', () => ({
+	change_base: { resolved_through_merge: vi.fn() },
+}))
 
 const { git_spawn } = await import('#scripts/git/git-spawn')
 const { git_command } = await import('#scripts/git/git-command')
@@ -55,14 +57,14 @@ afterAll(() => {
 
 describe('metrics_base.resolve_commit', () => {
 	it('asks git for the merge-base where no commit is named', async () => {
-		vi.mocked(change_base.resolved).mockResolvedValue(MERGE_BASE)
+		vi.mocked(change_base.resolved_through_merge).mockResolvedValue(MERGE_BASE)
 
 		await expect(metrics_base.resolve_commit()).resolves.toBe(MERGE_BASE)
 		expect(git_spawn.read).not.toHaveBeenCalled()
 	})
 
 	it('has no commit where none is named and git has no merge-base', async () => {
-		vi.mocked(change_base.resolved).mockResolvedValue(undefined)
+		vi.mocked(change_base.resolved_through_merge).mockResolvedValue(undefined)
 
 		await expect(metrics_base.resolve_commit()).resolves.toBeUndefined()
 	})
@@ -73,7 +75,7 @@ describe('metrics_base.resolve_commit', () => {
 
 		await expect(metrics_base.resolve_commit()).resolves.toBe(NAMED_COMMIT)
 		expect(git_spawn.read).toHaveBeenCalledWith(['rev-parse', '--verify', `${NAMED}${COMMIT_PEEL}`])
-		expect(change_base.resolved).not.toHaveBeenCalled()
+		expect(change_base.resolved_through_merge).not.toHaveBeenCalled()
 	})
 
 	it('fails on a name that resolves to no commit', async () => {

@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import semver from 'semver'
 import { describe, expect, it } from 'vitest'
 import { create_base_config } from './base.js'
 
@@ -18,6 +20,29 @@ function build_config(): Array<ConfigBlock> {
 		gitignore_path: GITIGNORE_PATH,
 		tsconfig_root_dir: TSCONFIG_ROOT_DIR,
 	})
+}
+
+// The name `includeIgnoreFile` gives the block it builds from a `.gitignore`.
+const GITIGNORE_BLOCK_NAME = 'Imported .gitignore patterns'
+const MISSING_GITIGNORE_PATH = new URL('no-such-directory/.gitignore', import.meta.url)
+
+function has_gitignore_block(gitignore_path: URL): boolean {
+	const config = create_base_config({ gitignore_path, tsconfig_root_dir: TSCONFIG_ROOT_DIR })
+
+	return config.some((block) => block.name === GITIGNORE_BLOCK_NAME)
+}
+
+// `eslint/config` exports `includeIgnoreFile` from ESLint 10.4.0 on; an older eslint inside the
+// peer range would fail the import in `base.js` before any config is built.
+const INCLUDE_IGNORE_FILE_SINCE = '10.4.0'
+const MANIFEST_PATH = new URL('../package.json', import.meta.url)
+
+function eslint_peer_floor(): string {
+	const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as {
+		peerDependencies: Record<string, string>
+	}
+
+	return semver.minVersion(manifest.peerDependencies['eslint'] ?? '')?.version ?? ''
 }
 
 function rules_of(block: ConfigBlock | undefined): RuleMap {
@@ -54,6 +79,22 @@ function find_global_block(config: Array<ConfigBlock>): ConfigBlock | undefined 
 			Boolean((block.plugins as Record<string, unknown> | undefined)?.['@stylistic']),
 	)
 }
+
+// joshuafolkken/kit#3653: `josh init` without Git writes no `.gitignore`, and the config it generates
+// still names one — a missing file has to read as no patterns rather than stop lint with ENOENT.
+describe('create_base_config — gitignore block (issue #3653)', () => {
+	it('imports the patterns of a .gitignore that exists', () => {
+		expect(has_gitignore_block(GITIGNORE_PATH)).toBe(true)
+	})
+
+	it('builds a config with no imported patterns when the .gitignore is missing', () => {
+		expect(has_gitignore_block(MISSING_GITIGNORE_PATH)).toBe(false)
+	})
+
+	it('asks for an eslint whose eslint/config exports includeIgnoreFile', () => {
+		expect(semver.gte(eslint_peer_floor(), INCLUDE_IGNORE_FILE_SINCE)).toBe(true)
+	})
+})
 
 // joshuafolkken/kit#2903 moved the `scripts-ai/` entry points under `scripts/`, so they follow the
 // `scripts/` import rules and no block relaxes them any more.

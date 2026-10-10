@@ -1,6 +1,7 @@
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_registry } from '#scripts/lane/lane-registry'
-import type { RunCarry } from '#scripts/run/carry/run-carry'
+import { lane_sampler } from '#scripts/lane/lane-sampler'
+import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_merge_cli } from '#scripts/run/merge/run-merge-cli'
 import { describe, expect, it, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
@@ -183,6 +184,44 @@ describe('backlog_drive_cli.merge_token', () => {
 
 it('accepts only mode without entering the backlog loop', () => {
 	expect(backlog_drive_cli.parse(['--owner', '4242', '--only'])?.is_only).toBe(true)
+})
+
+// joshuafolkken/kit#3643: a `backlogrun` samples its own machine load for exactly as long as the drive
+// runs — nobody starts a sampler beside it, and none is left running after it.
+describe('backlog_drive_cli.run — the load sampler', () => {
+	it('starts the sampler with the drive and stops it when the drive ends', async () => {
+		const stop = vi.fn()
+		const start = vi.spyOn(lane_sampler, 'start').mockReturnValue(stop)
+
+		// No carry record: the drive ends at once, which is an end like any other.
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
+
+		await backlog_drive_cli.run(['--owner', '4242'])
+
+		expect(start).toHaveBeenCalledOnce()
+		expect(stop).toHaveBeenCalledOnce()
+	})
+
+	it('stops the sampler when the drive throws', async () => {
+		const stop = vi.fn()
+
+		vi.spyOn(lane_sampler, 'start').mockReturnValue(stop)
+		vi.spyOn(run_carry, 'repository_directory').mockRejectedValue(new Error('git died'))
+		vi.spyOn(console, 'info').mockImplementation(vi.fn())
+
+		await backlog_drive_cli.run(['--owner', '4242'])
+
+		expect(stop).toHaveBeenCalledOnce()
+	})
+
+	it('starts no sampler for arguments it refuses', async () => {
+		const start = vi.spyOn(lane_sampler, 'start')
+
+		vi.spyOn(console, 'error').mockImplementation(vi.fn())
+		await backlog_drive_cli.run(['--owner'])
+
+		expect(start).not.toHaveBeenCalled()
+	})
 })
 
 it('reports before ending the carry record', async () => {

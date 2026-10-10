@@ -28,7 +28,7 @@ is the way it is, and the issues it came from, live in the matching `*-rationale
 - [eval.md](./eval.md) — `josh eval`, measuring whether a document change changed what an agent does
 - [eval-rationale.md](./eval-rationale.md) — why the suite is built the way it is
 - [guide-verification.md](./guide-verification.md) — how the step-by-step user guides were verified
-- [lane-limit-measurement.md](./lane-limit-measurement.md) — `josh lane:sample` / `lane:stats`, measuring a `JOSH_LANE_LIMIT`
+- [lane-limit-measurement.md](./lane-limit-measurement.md) — `josh lane:sample` / `lane:stats`, measuring a `JOSH_LANE_LIMIT` and where a lane's time goes
 - [backlogrun-driver.md](./backlogrun-driver.md) — what the `backlogrun` driver commands do on their own, kept off the parent's read path
 
 ## Why the rules and commands are the way they are

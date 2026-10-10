@@ -37,6 +37,8 @@ const CONTROL_CHARACTERS = /[\u{0}-\u{1F}\u{7F}]/gu
 
 function scheduler_profile(): AgentProfile | undefined {
 	const resolved = agent_role_profile.resolve(agent_role_profile.SCHEDULER)
+
+	agent_role_profile.warn_of_default()
 	if (resolved.kind === 'profile') return resolved.profile
 
 	console.error(resolved.note)

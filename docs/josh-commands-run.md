@@ -118,10 +118,12 @@ Codex sessions use OpenAI; Claude Code sessions use Anthropic.
 | OpenAI    | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `high`     |
 
 Role overrides resolve before launch; model overrides apply only to Claude Code, effort overrides to
-either provider, and legacy `JOSH_LANE_*` values to the worker only. Invalid configuration, a missing
-or conflicting session marker, or a missing, outdated or unauthenticated CLI refuses without fallback,
-promotion or worker retry. `run:wake --list`, `lane:list`, the review brief and each launch log expose
-the resolved provider, role, model and effort; the worker's launch is "`josh lane:dispatch`".
+either provider, and legacy `JOSH_LANE_*` values to the worker only. With no session marker and no
+`JOSH_AGENT_PROVIDER` the provider defaults to Anthropic (Claude Code), which is what lets a person
+launch from a plain terminal. Invalid configuration, conflicting session markers, or a missing,
+outdated or unauthenticated CLI refuses without fallback, promotion or worker retry.
+`run:wake --list`, `lane:list`, the review brief and each launch log expose the resolved provider,
+role, model and effort; the worker's launch is "`josh lane:dispatch`".
 
 **Output / exit codes:** stdout is one token; stderr explains. `started`, `running`, `supervising`, `stale`, `stopped`, `ended`, `expired`, `unreadable` exit 0; `none` exits 0 for `--list` / `--stop` and 1 for `--start`; `failed`, `unknown` exit 1. `expired`, `unreadable`, and `failed` each warn.
 
@@ -507,9 +509,13 @@ put. The printed PID is the supervisor's.
 - `JOSH_{SCHEDULER,WORKER,REVIEWER}_MODEL` — Claude Code role overrides; Anthropic defaults are respectively `claude-opus-5-5`, `claude-opus-5-5`, and `claude-opus-5-5`. Codex keeps its provider-specific model.
 - `JOSH_{SCHEDULER,WORKER,REVIEWER}_EFFORT` — role effort overrides for either provider; defaults are `medium`, `medium`, and `high`.
 
-Blank means unset. The inherited agent session identifier selects the provider; a missing or
-conflicting identifier refuses launch. Invalid model/effort or unavailable selected CLI/auth
-refuses launch. There is no provider fallback, promotion, or worker retry. OpenAI
+Blank means unset. The inherited agent session identifier selects the provider, then
+`JOSH_AGENT_PROVIDER`; with neither — a plain terminal — the provider defaults to Anthropic (Claude
+Code) and the launch says so — on the dispatch line, and on stderr for `run:wake --start`,
+`review:brief` and `ship --detach`. Conflicting identifiers (both a Codex and a Claude Code session)
+and a `JOSH_AGENT_PROVIDER` naming no allowed provider refuse launch, as does an invalid model/effort
+or an unavailable selected CLI/auth. A selected provider is never swapped for the other, and there is
+no promotion or worker retry. OpenAI
 defaults to `gpt-6.1-sol` with scheduler/worker/reviewer efforts `medium`/`medium`/`high`; the worker
 drops to `low` only in the pre-gate phase, on either provider.
 
@@ -554,7 +560,7 @@ The child's pid is the one thing on stdout; a refusal is an empty capture beside
 
 #### `josh lane:sample` / `josh lane:stats`
 
-Measure a lane limit: `lane:sample [--every <seconds>]` records the machine load to a per-repository ledger that merges and gates also write to; `lane:stats --period <days> [--limit <n>]` prints a period as one table row. Procedure and columns: [lane-limit-measurement.md](./maintainers/lane-limit-measurement.md).
+Measure a lane limit: a per-repository ledger holds merges, gates, each lane's dispatch and ship stages, and the machine load `backlog:drive` samples while it runs (`lane:sample [--every <seconds>]` takes a reading outside a run); `lane:stats --period <days> [--limit <n>]` prints a period as one table row, and under it the median and maximum of each stage of a lane. Procedure and columns: [lane-limit-measurement.md](./maintainers/lane-limit-measurement.md).
 
 ## Session and documents
 

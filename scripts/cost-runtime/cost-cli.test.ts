@@ -230,7 +230,13 @@ describe('cost_cli.session_verdict', () => {
 		expect(cost_cli.session_verdict(CWD, OPENAI_ENV)).toBe(cost_cli.UNMEASURABLE_VERDICT)
 	})
 
-	it('answers unmeasurable when no provider is resolved', () => {
+	// joshuafolkken/kit#3651: a launch defaults to Claude Code outside a session, but there is still no
+	// session of its own to price — the newest transcript on disk belongs to someone else.
+	it('answers unmeasurable outside a session, even beside a priced transcript', () => {
+		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
+
 		expect(cost_cli.session_verdict(CWD, {})).toBe(cost_cli.UNMEASURABLE_VERDICT)
+		expect(cost_cli.run(['--over', '0'], CWD, {})).toBe(FAILURE_EXIT_CODE)
+		expect(output()).toContain(cost_cli.USAGE)
 	})
 })

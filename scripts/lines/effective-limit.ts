@@ -40,7 +40,11 @@ interface ConfigResolver {
 	calculateConfigForFile: (file_path: string) => Promise<unknown>
 }
 
-type ResolverConstructor = new (options: { cwd: string }) => ConfigResolver
+// eslint's own camelCase name for the option, kept apart from the object that spells it.
+const CONFIG_FILE_OPTION = 'overrideConfigFile'
+
+type ResolverOptions = { cwd: string } & Partial<Record<typeof CONFIG_FILE_OPTION, string>>
+type ResolverConstructor = new (options: ResolverOptions) => ConfigResolver
 
 // The module is imported from a path computed at runtime, so its shape is checked rather than assumed:
 // a build that no longer exports `ESLint` must answer "no limit" instead of throwing past the caller.
@@ -97,13 +101,19 @@ function options_in(config: unknown): LineRuleOptions | undefined {
 // the consumer's own eslint. Every failure — no eslint there, a build without the export, a config that
 // throws while loading — is the same answer, and it is "no limit" rather than kit's number: falling
 // back to kit's is precisely the defect this file exists to remove, and it would be silent.
-async function resolver_for(project_root: string): Promise<ConfigResolver | undefined> {
+async function resolver_for(
+	project_root: string,
+	config_file: string | undefined,
+): Promise<ConfigResolver | undefined> {
 	try {
 		const require_from = createRequire(path.join(project_root, PACKAGE_JSON))
 		const loaded: unknown = await import(pathToFileURL(require_from.resolve(ESLINT_MODULE)).href)
 		const eslint_module = module_schema.parse(loaded)
 
-		return new eslint_module.ESLint({ cwd: project_root })
+		return new eslint_module.ESLint({
+			cwd: project_root,
+			...(config_file !== undefined && { [CONFIG_FILE_OPTION]: config_file }),
+		})
 	} catch {
 		return undefined
 	}
@@ -125,12 +135,18 @@ async function entry_for(
 // One resolver for the whole call: the configuration is loaded and cached once, and every path after
 // the first is a lookup rather than a load. That is what makes a per-file limit affordable at all.
 // Keyed by the absolute path, so the caller's spelling of a path does not have to match.
+//
+// `config_file` names the configuration to ask instead of the one `project_root` holds, with
+// `project_root` still the directory its `files` patterns are matched from — what `josh metrics` needs
+// to hold another commit's tree to this checkout's limits (`metrics-code-lines.ts`).
 async function options_for(
 	file_paths: ReadonlyArray<string>,
 	project_root: string,
+	config_file?: string,
 ): Promise<ReadonlyMap<string, LineRuleOptions>> {
 	const found = new Map<string, LineRuleOptions>()
-	const resolver = file_paths.length === 0 ? undefined : await resolver_for(project_root)
+	const resolver =
+		file_paths.length === 0 ? undefined : await resolver_for(project_root, config_file)
 
 	if (resolver === undefined) return found
 

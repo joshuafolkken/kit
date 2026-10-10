@@ -19,6 +19,10 @@ import { metrics_ratchet, type Approval } from './metrics-ratchet'
 // (`base-tree.ts`). The same ruler on both trees is what makes the difference this branch's growth: a
 // change to how a total is counted moves both sides, so it never reads as growth of its own.
 //
+// **A merge in progress is measured against the base its commit will have**
+// (`change_base.resolved_through_merge`): the tree already holds what the default branch brought in,
+// so the merge-base of `HEAD` alone would count all of it as this branch's growth.
+//
 // **`JOSH_METRICS_BASE` names the commit where the merge-base cannot be asked for.** CI checks a pull
 // request out as a shallow merge commit with no default-branch ref beside it; its first parent is the
 // default branch's tip, and the workflow names it. A name that does not resolve is an error rather
@@ -47,7 +51,7 @@ interface Reading {
 async function resolve_commit(): Promise<string | undefined> {
 	const named = process.env[BASE_VARIABLE] ?? ''
 
-	if (named.length === 0) return await change_base.resolved()
+	if (named.length === 0) return await change_base.resolved_through_merge()
 
 	try {
 		return await git_spawn.read(['rev-parse', '--verify', `${named}${COMMIT_PEEL}`])

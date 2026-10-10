@@ -87,6 +87,18 @@ describe('lint_related_scope.eslint_arguments', () => {
 	})
 })
 
+// joshuafolkken/kit#3641: the re-reading of a cached cycle report asks the narrowed run's own
+// question again — its files, its cache file, and no warning for a named file eslint ignores.
+describe('lint_related_scope.cycle_recheck_options', () => {
+	it('re-reads the given files against the narrowed cache, silent about ignored ones', () => {
+		expect(lint_related_scope.cycle_recheck_options(FILES)).toEqual({
+			cache_file: ESLINT_RELATED_CACHE_FLAGS.at(-1),
+			patterns: FILES,
+			eslint_options: { warnIgnored: false },
+		})
+	})
+})
+
 describe('lint_related_scope.describe_scope', () => {
 	it('says it narrowed, and to what', () => {
 		const description = lint_related_scope.describe_scope(

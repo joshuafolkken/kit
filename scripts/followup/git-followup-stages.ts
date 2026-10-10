@@ -1,4 +1,5 @@
 import { PrConflictError } from '#scripts/gh/git-pr-checks-eval'
+import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { time_format } from '#scripts/time-runtime/time-format'
 
 // Where `pnpm josh followup` spends its own wall clock.
@@ -137,6 +138,20 @@ function print_stages(log: StageLog): void {
 	for (const line of format_stages(log)) console.info(line)
 }
 
+// The wait for CI goes to the lane ledger as well, where `josh lane:stats` reads it beside the review
+// round it would overlap: the printed block reaches only this run's reader. A wait that threw is the
+// `interrupted` lap and records nothing here.
+async function record_ci_wait(log: StageLog): Promise<void> {
+	const wait = log.stages.find((stage) => stage.name === STAGE.checks_wait)
+
+	if (wait === undefined) return
+
+	await lane_ledger.record_stage({
+		stage: lane_ledger.CI_WAIT_STAGE,
+		elapsed_ms: wait.duration_ms,
+	})
+}
+
 const git_followup_stages = {
 	STAGE,
 	STAGE_LINE_PREFIX,
@@ -146,6 +161,7 @@ const git_followup_stages = {
 	total_ms,
 	format_stages,
 	print_stages,
+	record_ci_wait,
 	stopped_lap,
 }
 

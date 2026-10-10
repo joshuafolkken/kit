@@ -1,7 +1,7 @@
 {
-	"reason": "#3644: the merge-base comparison (base-tree.ts, metrics-base.ts) replaces the tracked baseline, its merge driver and the gate's own-write exemption, and refuses a tree whose eslint configuration did not load instead of totalling it as zero",
+	"reason": "#3644: the merge-base comparison (base-tree.ts, metrics-base.ts) replaces the tracked baseline, its merge driver and the gate's own-write exemption, counts every tree under this checkout's eslint configuration so a merge-base whose own configuration cannot load is still measured, and holds a merge in progress to the base its commit will have so the default branch's incoming lines are not read as this branch's growth",
 	"date": "2026-10-10",
 	"growth": {
-		"scripts.code_lines": 39
+		"scripts.code_lines": 73
 	}
 }
