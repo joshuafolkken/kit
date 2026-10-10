@@ -19,6 +19,10 @@ import { shell_segments } from './shell-segments'
 // (with or without `-u`) and the read-only `git stash list` / `show` pass, and everything else — bare
 // `git stash`, a message-less push, `pop` / `apply` / `drop` / `save` / `clear` — is refused.
 //
+// **The refusal names the way on for a handed-over stash.** joshuafolkken/kit#3630's plan restored a
+// stash with `git stash apply`, and the lane parked on how to apply it instead of popping by message;
+// the reason now says the substitution is the run's own to make (joshuafolkken/kit#3648).
+//
 // **It fires on every occurrence**, for the reason `git-force.ts` does: discarding the working tree is
 // destructive each time it is issued.
 
@@ -127,8 +131,11 @@ const WORKTREE_MUTATION_REASON =
 	'josh stash:pop "<message>"`, never a positional `git stash pop` a shared stack lets another lane ' +
 	'divert. A stash push is authorized only inside a documented flow and only with a findable message ' +
 	'— `git stash push -u -m "<message>"` — which this row allows; a bare `git stash`, a message-less ' +
-	'push, or `pop` / `apply` / `drop` is refused. **This rule fires on every occurrence, not once per ' +
-	'run.**'
+	'push, or `pop` / `apply` / `drop` is refused. A plan that restores a handed-over stash with `git ' +
+	'stash apply` / `git stash pop` is read as `pnpm josh stash:pop "<message>"`: apply it that way, ' +
+	'continue, and record the substitution on the Issue — Tier A, never a `needs-decision` park ' +
+	'unless the plan says why the owner keeps the stash: then stop and confirm (`operating-rules.md` ' +
+	'→ "no-self-staging"). **This rule fires on every occurrence, not once per run.**'
 
 const ROW = {
 	id: 'worktree-mutation',
