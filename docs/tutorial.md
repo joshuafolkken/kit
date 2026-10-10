@@ -93,6 +93,12 @@ For a project set up with `josh init` and no GitHub. The workflow keywords above
    touch .gitignore
    ```
 
+   In PowerShell on Windows, where `touch` does not exist:
+
+   ```powershell
+   New-Item .gitignore -ItemType File
+   ```
+
 Want Issues, pull requests and merges handled too? Run `pnpm exec josh start` ([init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start)), then follow Pattern A.
 
 ## Where next

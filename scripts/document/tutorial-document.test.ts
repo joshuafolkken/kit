@@ -45,6 +45,12 @@ const LOCAL_ENTRY_DOCUMENTS: ReadonlyArray<string> = ['README.md', BASIC_GUIDE, 
 // set up itself — the same two links under "Before you start" sit on the path that needs GitHub.
 const LOCAL_NEXT_HEADING = '## Where next'
 const LOCAL_GUIDE_LINKS: ReadonlyArray<string> = ['](./setup/basic.md', '](./setup/full.md']
+// A `full` project with no Git repository has to create `.gitignore` by hand before the gate runs, and
+// the prerequisites put Windows readers in PowerShell, where `touch` does not exist — one command each.
+const LOCAL_GITIGNORE_COMMANDS: ReadonlyArray<string> = [
+	'touch .gitignore',
+	'New-Item .gitignore -ItemType File',
+]
 
 function section(text: string, heading: string, next_heading: string): string {
 	const start = text.indexOf(heading)
@@ -88,5 +94,9 @@ describe('the first-change tutorial', () => {
 
 	it.each(LOCAL_GUIDE_LINKS)('the section that needs no GitHub links to %s', (link) => {
 		expect(section(read_document(TUTORIAL), LOCAL_HEADING, LOCAL_NEXT_HEADING)).toContain(link)
+	})
+
+	it.each(LOCAL_GITIGNORE_COMMANDS)('the section that needs no GitHub names `%s`', (command) => {
+		expect(section(read_document(TUTORIAL), LOCAL_HEADING, LOCAL_NEXT_HEADING)).toContain(command)
 	})
 })
