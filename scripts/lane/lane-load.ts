@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { freemem, loadavg } from 'node:os'
+import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import { lane_await } from './lane-await'
 import type { LoadEntry } from './lane-ledger'
@@ -55,7 +56,7 @@ async function read_swap_mb(
 ): Promise<number | undefined> {
 	try {
 		if (platform === 'darwin') {
-			const { stdout } = await execa('sysctl', SYSCTL_ARGUMENTS)
+			const { stdout } = await execa('sysctl', SYSCTL_ARGUMENTS, { timeout: PROBE_TIMEOUT_MS })
 
 			return parse_darwin_swap(stdout)
 		}

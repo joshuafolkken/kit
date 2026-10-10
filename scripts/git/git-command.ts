@@ -1,3 +1,4 @@
+import { SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { PORCELAIN_FLAG, UNTRACKED_FILES_FLAG } from './constants'
 import { git_diff_reads } from './git-diff-reads'
 import { create_spawn_error } from './git-execa-error'
@@ -88,7 +89,7 @@ async function diff_cached(file_path: string): Promise<string> {
 async function fetch_branch(branch_name: string): Promise<string> {
 	const refspec = `+refs/heads/${branch_name}:refs/remotes/origin/${branch_name}`
 
-	return await git_spawn.read(['fetch', 'origin', refspec])
+	return await git_spawn.read_remote(['fetch', 'origin', refspec])
 }
 
 // The fast-forward `gh pr checkout` ran after its fetch, for the case the branch is already local.
@@ -98,15 +99,17 @@ async function fetch_branch(branch_name: string): Promise<string> {
 //
 // `--ff-only` is the whole point — a branch that has diverged fails loudly rather than growing a
 // merge commit nobody asked for, which is the behavior the CLI had.
+//
+// It moves the working tree, so it runs the `post-merge` hook and takes a suite's budget for it.
 async function merge_fast_forward(branch_name: string): Promise<string> {
-	return await git_spawn.read(['merge', '--ff-only', `origin/${branch_name}`])
+	return await git_spawn.read(['merge', '--ff-only', `origin/${branch_name}`], SUITE_TIMEOUT_MS)
 }
 
 // The same fast-forward for a branch that is *not* checked out, so no file in the working tree moves.
 // A plain refspec refuses a non-fast-forward update, and git refuses it
 // outright for a branch checked out in any work tree — both are failures, never a rewrite.
 async function fast_forward_local(branch_name: string): Promise<string> {
-	return await git_spawn.read(['fetch', 'origin', `${branch_name}:${branch_name}`])
+	return await git_spawn.read_remote(['fetch', 'origin', `${branch_name}:${branch_name}`])
 }
 
 // The merge `josh main:merge` runs, and the deliberate opposite of the one above: **no `--ff-only`**,
@@ -121,6 +124,9 @@ async function fast_forward_local(branch_name: string): Promise<string> {
 // by the `commit-msg` hook on an issue branch.
 //
 // `config_options` carry the merge drivers `.gitattributes` names, for this merge only.
+//
+// The budget is a suite's, not a local git command's: the merge commit runs the `commit-msg` hook and
+// those drivers, neither of which is git's own work.
 async function merge_branch(
 	branch_name: string,
 	message?: string,
@@ -128,23 +134,27 @@ async function merge_branch(
 ): Promise<void> {
 	const message_arguments = message === undefined ? [] : ['-m', message]
 
-	await git_spawn.with_output(
-		'merge',
-		[...message_arguments, `origin/${branch_name}`],
+	await git_spawn.with_output('merge', [...message_arguments, `origin/${branch_name}`], {
 		config_options,
-	)
+		timeout_ms: SUITE_TIMEOUT_MS,
+	})
 }
 
+// Both checkouts run the `post-checkout` hook — a `pnpm install` in some consumers — so they take the
+// budget of a suite rather than a local git command's, which would end them inside that hook with the
+// branch already created.
 async function checkout_b(branch_name: string): Promise<string> {
-	return await git_spawn.read(['checkout', '-b', branch_name])
+	return await git_spawn.read(['checkout', '-b', branch_name], SUITE_TIMEOUT_MS)
 }
 
 async function checkout(branch_name: string): Promise<string> {
-	return await git_spawn.read(['checkout', branch_name])
+	return await git_spawn.read(['checkout', branch_name], SUITE_TIMEOUT_MS)
 }
 
+// A commit runs the `pre-commit` and `commit-msg` hooks — a type check among them — so it takes the
+// budget of the suite those hooks may run rather than a local git command's.
 async function commit(message: string): Promise<void> {
-	await git_spawn.with_output('commit', ['-m', message])
+	await git_spawn.with_output('commit', ['-m', message], { timeout_ms: SUITE_TIMEOUT_MS })
 }
 
 // **`-d` rather than `-D`, and that is the safety rather than a preference**.
@@ -189,7 +199,8 @@ function is_upstream_not_set_error(error: unknown): boolean {
 const NO_VERIFY_FLAG = '--no-verify'
 
 // Both pushes go through `git_push_transport` rather than `git_spawn.with_output`, which is
-// what gives them a timeout and an SSH keepalive the local git commands beside them do not need.
+// what gives them a transfer's timeout and an SSH keepalive the local git commands beside them do not
+// need.
 // The thrown error keeps the same `cause.exit_code` shape, so the 128
 // fallback below reads it exactly as it did.
 async function push_with_upstream(
@@ -200,7 +211,7 @@ async function push_with_upstream(
 }
 
 // **The push budget bounds the transfer alone**. The pre-push hook runs once,
-// unbounded, before either push and outside the `try`; both transfers then skip it with `--no-verify`,
+// on a suite's budget of its own, before either push and outside the `try`; both transfers then skip it with `--no-verify`,
 // so neither the timeout retry nor the `--set-upstream` fallback repeats it, and a failed hook is not
 // mistaken for a missing upstream. A git too old to run the hook ahead leaves it to the push, as before.
 async function push(): Promise<void> {

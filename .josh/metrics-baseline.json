@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1043,
-		"code_lines": 87111,
-		"comment_lines": 33365,
+		"files": 1044,
+		"code_lines": 87189,
+		"comment_lines": 33402,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 459560
 	},
 	"accepted": {
-		"reason": "#3617 round-2 fix: root-level files are claimed only by a known extension so dotted code identifiers no longer serialize lanes",
-		"date": "2026-10-09"
+		"reason": "#3590: timeouts on six probe spawns and the async git reads, plus the shared hanging-execa stand-in their tests run against (a test helper counted as a script)",
+		"date": "2026-10-10"
 	}
 }

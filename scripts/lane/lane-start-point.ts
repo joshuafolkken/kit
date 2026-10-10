@@ -19,9 +19,9 @@ const REFS_REMOTES_ORIGIN_PREFIX = 'refs/remotes/origin/'
 
 // A fetch *failure* is reported and stepped over rather than raised. `lane:open` has to keep working
 // with no network at all — offline, and on a clone with no `origin` — and what it degrades to is
-// whatever `origin/<default>` already holds, which is still never *behind* the local branch. Note
-// what this does not cover: `fetch_branch` runs through `git_spawn.read`, which sets no
-// timeout, so a connection that hangs rather than failing blocks here instead of degrading.
+// whatever `origin/<default>` already holds, which is still never *behind* the local branch. A
+// connection that hangs rather than failing degrades the same way: `fetch_branch` runs through
+// `git_spawn.read_remote`, whose budget ends the wait as a failure.
 async function refresh_default_branch(default_branch: string): Promise<void> {
 	try {
 		await git_command.fetch_branch(default_branch)

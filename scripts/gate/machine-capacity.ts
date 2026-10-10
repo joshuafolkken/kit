@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { availableParallelism, cpus, totalmem } from 'node:os'
+import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 
 // What the machine has free right now, read for the core budget's admission.
@@ -190,13 +191,16 @@ async function settled<T>(read: () => Promise<T>): Promise<T | undefined> {
 
 // A name `sysctl` does not know fails the command but still prints the others, so the exit is not read.
 async function read_darwin_memory(): Promise<MemoryReading> {
-	const { stdout } = await execa('sysctl', SYSCTL_ARGUMENTS, { reject: false })
+	const { stdout } = await execa('sysctl', SYSCTL_ARGUMENTS, {
+		reject: false,
+		timeout: PROBE_TIMEOUT_MS,
+	})
 
 	return parse_darwin_memory(stdout, totalmem())
 }
 
 async function read_page_size(): Promise<string> {
-	const { stdout } = await execa('getconf', PAGE_SIZE_ARGUMENTS)
+	const { stdout } = await execa('getconf', PAGE_SIZE_ARGUMENTS, { timeout: PROBE_TIMEOUT_MS })
 
 	return stdout
 }

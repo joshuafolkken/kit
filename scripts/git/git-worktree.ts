@@ -1,3 +1,4 @@
+import { INSTALL_TIMEOUT_MS, SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { PORCELAIN_FLAG } from './constants'
 import { ls_remote_branch_arguments } from './git-ls-remote'
 import { git_spawn } from './git-spawn'
@@ -32,10 +33,13 @@ const WORKTREE_LOCK_PREFIX = 'josh-worktree-lock-'
 // because a large repository's checkout is itself several seconds, and several lanes queue behind it.
 const WORKTREE_LOCK_MAX_WAIT_MS = 120_000
 
-async function locked(arguments_: Array<string>): Promise<string> {
+// `timeout_ms` is left out by every call that only edits git's own records. An add checks a tree out
+// and so runs the `post-checkout` hook — a `pnpm install` in some consumers — on a suite's budget
+// instead of a local git command's, and a removal names the budget of what it deletes.
+async function locked(arguments_: Array<string>, timeout_ms?: number): Promise<string> {
 	const target = repository_lock.lock_path(WORKTREE_LOCK_PREFIX)
 	const output = await repository_lock.with_lock(
-		async () => await git_spawn.read(arguments_),
+		async () => await git_spawn.read(arguments_, timeout_ms),
 		target,
 		WORKTREE_LOCK_MAX_WAIT_MS,
 	)
@@ -80,21 +84,25 @@ async function worktree_add(
 ): Promise<string> {
 	const flags = start_point === undefined ? ['add'] : ['add', '--no-track', '-b', branch_name]
 
-	return await locked([WORKTREE, ...flags, directory, start_point ?? branch_name])
+	return await locked([WORKTREE, ...flags, directory, start_point ?? branch_name], SUITE_TIMEOUT_MS)
 }
 
 // A throwaway tree at one commit, on no branch — `josh test:red` checks the merge-base out here, so
 // the pre-fix tree is built without creating a branch or touching the caller's tree and index.
 async function worktree_add_detached(directory: string, commit: string): Promise<string> {
-	return await locked([WORKTREE, 'add', '--detach', directory, commit])
+	return await locked([WORKTREE, 'add', '--detach', directory, commit], SUITE_TIMEOUT_MS)
 }
 
 // **`--force` is the point, not a convenience.** A lane is closed after a park, a failure or an
 // interruption as readily as after a success, and in each of those the tree still holds uncommitted
 // or untracked work. Refusing to remove it there would leave exactly the debris the close exists to
 // prevent.
+//
+// **It takes an install's budget, not a local git command's.** The tree it deletes holds the
+// `node_modules` an install wrote, and a removal cut partway leaves a half-deleted tree git still
+// registers — which `release_worktree.remove` does not step over, so the release branch stays too.
 async function worktree_remove(directory: string): Promise<string> {
-	return await locked([WORKTREE, 'remove', '--force', directory])
+	return await locked([WORKTREE, 'remove', '--force', directory], INSTALL_TIMEOUT_MS)
 }
 
 // Drops the registrations whose directories are already gone — what makes a lane whose directory was
@@ -115,8 +123,11 @@ async function worktree_prune(): Promise<string> {
 // An unanchored ref would make the message untruthful rather than the answer unsafe: `lane:open`
 // would be told origin has the lane branch and then stop naming a branch nobody could find there,
 // and the release guard would refuse a name that was free.
+//
+// **It takes the remote budget, not `read`'s**: that default is a local command's, and an ssh that
+// is slow to connect or waiting at a passphrase prompt would be cut there and read as `unreachable`.
 async function ls_remote_branch(branch_name: string): Promise<string> {
-	return await git_spawn.read(ls_remote_branch_arguments(branch_name))
+	return await git_spawn.read_remote(ls_remote_branch_arguments(branch_name))
 }
 
 // `-D` rather than `-d`: a lane branch is deleted whatever state its work reached, and `-d` refuses
