@@ -1,4 +1,5 @@
 import { run_cut, type CutState, type RunCut } from './run-cut'
+import { run_cut_handoff } from './run-cut-handoff'
 
 // The verdict tokens `josh run:cut` answers with and the reports that print them, kept apart from
 // `run-cut-cli.ts` so the CLI keeps to acting on the record. **Standard output carries exactly one
@@ -71,7 +72,9 @@ const HANDOFF_OVERFLOW_NOTE = '--handoff <path> would grow the cut record past i
 const HANDOFF_MISSING_NOTE = 'this cut resumes into implementation and needs --handoff <path>'
 
 function report_bad_handoff(note: string): number {
-	console.error(`${note}. Nothing was cut; write the handoff file and reissue.`)
+	console.error(
+		`${note}. Nothing was cut; write the handoff file at ${run_cut_handoff.HANDOFF_PATH} and reissue.`,
+	)
 
 	return report(BAD_HANDOFF_VERDICT, FAILURE_EXIT_CODE)
 }

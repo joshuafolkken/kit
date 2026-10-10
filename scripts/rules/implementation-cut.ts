@@ -164,7 +164,7 @@ const IMPLEMENTATION_CUT_REASON =
 	'this issue (joshuafolkken/kit#2760), and its recent-context ' +
 	`cost has crossed the shared ${THRESHOLD_TEXT} threshold mid-implementation, so the thinking accumulated ` +
 	'so far is now re-read on every later request. Take the cut before this edit. ' +
-	'First write a handoff file with the Write tool — the user’s instruction verbatim, what you have ' +
+	`First write a handoff file at \`${run_cut_handoff.HANDOFF_PATH}\` (ignored, so it is never committed) with the Write tool — the user’s instruction verbatim, what you have ` +
 	'completed, what remains, and what you deliberately did not touch, as ' +
 	`${run_cut_handoff.HANDOFF_FORMAT} (Markdown is refused) — and pass it as \`--handoff <path>\`, ` +
 	'so the fresh process resumes on the original instruction rather than the working tree alone ' +

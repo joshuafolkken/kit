@@ -135,7 +135,7 @@ and a fresh `fullrun #<N>` resumes it; every other cut outside a lane answers `n
 
 ```bash
 pnpm josh run:cut 1839                          # take the cut and hand it to a fresh process
-pnpm josh run:cut --impl 1839 --handoff h.json  # cut mid-implementation, carrying the instruction
+pnpm josh run:cut --impl 1839 --handoff .claude/tmp/handoff-1839.json  # cut mid-implementation, carrying the instruction
 pnpm josh run:cut --resume 1839                 # a fresh process's entry check
 pnpm josh run:cut --end                         # clear the record
 ```
